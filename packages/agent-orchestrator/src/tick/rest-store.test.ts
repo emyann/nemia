@@ -51,7 +51,8 @@ const { feedFile } = await import('../feed/feed.store.ts');
 const { runWith: runEngine, EngineService } = await import('../runtime-client.ts');
 const { PlaceService } = await import('../place/place.store.ts');
 const { meteredPlace } = await import('../place/builtin.store.ts');
-const { RUNS_FINISHED, RUNS_OPEN } = await import('../command/pages.verb.ts');
+const { runList } = await import('../run-list/run-list.verb.ts');
+const { verifiesRest } = await import('../config/config.store.ts');
 const { metered } = await import('../meter/tally.store.ts');
 const { informerMemo, informerRead } = await import('../rest/informer.verb.ts');
 const { NOTHING_READ, standingReader } = await import('../standing/standing.verb.ts');
@@ -258,16 +259,31 @@ const reads = (c: PassCost) => ({
 });
 /** The names of `spans`, sorted: what a pass traced, whatever order its fibers ended in. */
 const namesOf = (spans: readonly Tracer.NativeSpan[]): string[] => spans.map((s) => s.name).sort();
-/** The board's light list of the open runs, as the api answers it, read cold. */
-const open = (e: Parameters<typeof runWith>[0]) => runWith(e, RUNS_OPEN.handler({}, process.env));
+/** What a RunList keeps between requests: the informer and the feed's filing times. */
+type Kept = { runs: import('../rest/informer.verb.ts').InformerMemo; filings: { filed: Map<string, string>; cursor: number } };
+/** A fresh memo, as a cold read has it. */
+const cold = (): Kept => ({ runs: informerMemo(), filings: { filed: new Map(), cursor: 0 } });
+/** The RunList asked by `fieldSelector`, read through `kept`, verified as `env` says. */
+const byState = (e: Parameters<typeof runWith>[0], fieldSelector: string, kept = cold(), env = process.env, more = {}) =>
+  runWith(
+    e,
+    runList(
+      e,
+      { home: ROOT, memo: kept.runs, filings: kept.filings, verify: verifiesRest(env) },
+      { memo: { filings: kept.filings, said: new Map() } },
+      { fieldSelector, ...more },
+    ),
+  );
+/** The board's frame of the runs not finished, as the api answers it, read cold. */
+const open = (e: Parameters<typeof runWith>[0]) => byState(e, 'status.state!=finished');
 /**
- * An answer of the light list without its clocks, which the wall clock moves between two reads, nor the note of how many words a run in
- * flight was said, which the story says to them between the two.
+ * An answer of the frame's list without its clocks, which the wall clock moves between two reads, nor the note of how many words a run in
+ * flight was said, nor those words (`said`), which the story says to them between the two, nor the `resourceVersion` digested from them.
  */
 const unclocked = (answer: object) =>
   JSON.parse(
     JSON.stringify(answer, (key, value) =>
-      ['asOf', 'clock', 'wallMs', 'waitingSince', 'startedAt', 'note'].includes(key) ? undefined : value,
+      ['asOf', 'clock', 'wallMs', 'waitingSince', 'startedAt', 'note', 'said', 'resourceVersion'].includes(key) ? undefined : value,
     ),
   );
 
@@ -299,10 +315,10 @@ test('a big quiet store: two hundred finished runs beside three in flight cost a
     return traced(false);
   };
   const unverified = { ...process.env, WF_VERIFY_REST: '0' };
-  const kept = { runs: informerMemo(), filings: { filed: new Map(), cursor: 0 } };
+  const kept = cold();
   const warm = async (): Promise<number | undefined> => {
-    await runWith(h.e, RUNS_OPEN.handler({}, unverified, ROOT, kept));
-    return (await metered(() => runWith(h.e, RUNS_OPEN.handler({}, unverified, ROOT, kept)))).tallies?.records;
+    await byState(h.e, 'status.state!=finished', kept, unverified);
+    return (await metered(() => byState(h.e, 'status.state!=finished', kept, unverified))).tallies?.records;
   };
   const ISOLATED_REPOS = [aRepo(), aRepo()];
   type Quiet = Awaited<ReturnType<typeof quiet>>;
@@ -384,15 +400,25 @@ test('a big quiet store: two hundred finished runs beside three in flight cost a
   await st.test(
     "the board's light list answers the same with none finished and two hundred, and a warm read of it reads no more",
     async () => {
-      const after = (await open(h.e)) as { counts: { finished: number } };
-      assert.equal(after.counts.finished, 200);
-      assert.deepEqual(unclocked({ ...after, counts: { ...after.counts, finished: 0 } }), unclocked(lightBefore));
-      const last = await runWith(h.e, RUNS_FINISHED.handler({ page: '23' }, process.env));
-      assert.equal(last.runs.length, 2, 'two hundred finished runs, nine a page: two on the last');
+      const after = await open(h.e);
+      assert.equal(after.metadata.counts?.finished, 200);
+      const { metadata: _a, ...items } = after;
+      const { metadata: _b, ...itemsBefore } = lightBefore as typeof after;
+      assert.deepEqual(unclocked(items), unclocked(itemsBefore), 'the runs not finished answered the same');
+      let token: string | undefined;
+      let pages = 0;
+      let last = after;
+      do {
+        last = await byState(h.e, 'status.state=finished', kept, unverified, { limit: 9, continue: token });
+        token = last.metadata.continue;
+        pages++;
+      } while (token !== undefined && pages < 30);
+      assert.equal(pages, 23, 'two hundred finished runs, nine a page: twenty-three pages');
+      assert.equal(last.items.length, 2, 'two on the last');
       const many = await warm();
-      assert.equal(warmBefore, 2 * inFlight.length, 'the records of the runs in flight alone, at rest in no memo, read for their clocks');
+      assert.equal(warmBefore, inFlight.length, 'the records of the runs in flight alone, at rest in no memo');
       assert.equal(many, warmBefore, "a warm read reads no finished run's record, however many there are");
-      const warmed = await runWith(h.e, RUNS_OPEN.handler({}, unverified, ROOT, kept));
+      const warmed = await byState(h.e, 'status.state!=finished', kept, unverified);
       assert.deepEqual(unclocked(warmed), unclocked(await open(h.e)), "the warm answer is a cold read's own");
     },
   );

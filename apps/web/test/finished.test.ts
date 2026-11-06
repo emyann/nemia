@@ -1,134 +1,117 @@
 /**
- * The finished runs a page at a time (src/lib/finished.ts, `finishedRunsQuery` in src/lib/api/runs.ts): the answer decoded as the api
- * gives it, the page kept in the address beside the factory, what Newer and Older lead to, and a page past the last said.
+ * The finished runs a page at a time (src/lib/finished.ts, `finishedRunsQuery` in src/lib/api/runs.ts): the RunList asked by state read
+ * as a page, the trail of tokens kept in the address beside the factory, what Newer and Older lead to, and a token past the last said.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { QueryClient } from '@tanstack/react-query';
 import { FINISHED_SIZE, finishedRunsQuery, type FinishedPage } from '../src/lib/api/runs.ts';
-import { finishedSearch, newerOf, olderOf, pageAt, pageSaid, pageSearch, pastLast, rowsSaid } from '../src/lib/finished.ts';
-import { summary } from './run-fixtures.ts';
+import { finishedSearch, newerOf, olderTrailOf, pageSaid, pastLast, rowsSaid, trailOf, trailSearch } from '../src/lib/finished.ts';
+import { detail, runList, runObject } from './run-fixtures.ts';
 
-/** Where a finished row's wall time went, as the api answers it: five parts that add up to its `wallMs`. */
+/** Where a finished run's wall time went, as the api answers it: five parts that add up to its `wallMs`. */
 const CLOCK = { wallMs: 1_660_000, sessionsMs: 1_200_000, checksMs: 300_000, personMs: 100_000, slotMs: 60_000, restMs: 0 };
 
-/** A finished row as the api answers it: the list's own row with its three facts and its clock. */
-const row = (id: string, extra: Record<string, unknown> = {}) => ({
-  ...summary([['plan', 'verified ✓']], { id, status: 'succeeded', moving: false }),
-  wallMs: 1_660_000,
-  finishedAt: '2026-09-13T00:27:40.000Z',
-  outcome: 'succeeded',
-  clock: CLOCK,
-  ...extra,
-});
+/** A finished run as the list asked `status.state=finished` carries it: its object, with its finish, its outcome and its clock. */
+const finishedRun = (id: string, outcome: 'succeeded' | 'undecided' = 'succeeded') =>
+  runObject(detail({ id, status: 'succeeded', moving: false }), {
+    state: 'finished',
+    wallMs: 1_660_000,
+    clock: CLOCK,
+    stepCosts: null,
+    waitingSince: null,
+    finishedAt: '2026-09-13T00:27:40.000Z',
+    outcome,
+  });
 
-/** One page as `GET /api/runs-finished` answers it, when it was read (`asOf`) included. */
-const answer = (extra: Record<string, unknown> = {}) => ({
-  asOf: '2026-09-13T01:00:00.000Z',
-  total: 634,
-  page: 3,
-  size: 9,
-  pages: 71,
-  runs: [row('r-2', { outcome: 'undecided', somethingNew: 1 }), row('r-1')],
-  ...extra,
-});
+/** One page as `GET /api/runs?fieldSelector=status.state=finished&limit=9` answers it: its counts, `asOf` and the next token. */
+const answer = (next: string | null = 'f.next') =>
+  runList([finishedRun('r-2', 'undecided'), finishedRun('r-1')], {
+    asOf: '2026-09-13T01:00:00.000Z',
+    counts: { waiting: 1, inFlight: 2, finished: 634 },
+    ...(next === null ? {} : { continue: next }),
+  });
 
-/** The board's read of a page of the finished runs, the api answering `value`: the page decoded, or rejected with why it is not read. */
-async function read(value: unknown): Promise<FinishedPage> {
+/** The board's read of a page of the finished runs from the token `from`, the api answering `value`. */
+async function read(value: unknown, older: string[] = []): Promise<FinishedPage> {
   const before = globalThis.fetch;
   globalThis.fetch = async () => new Response(JSON.stringify(value), { status: 200, headers: { 'content-type': 'application/json' } });
   const client = new QueryClient();
   try {
-    return await client.fetchQuery(finishedRunsQuery(undefined, 3));
+    return await client.fetchQuery(finishedRunsQuery(undefined, older));
   } finally {
     client.clear();
     globalThis.fetch = before;
   }
 }
 
-/** Why `value` is not read as a page, or that it is. */
-const refusal = (value: unknown): Promise<string> =>
-  read(value).then(
-    () => 'decoded',
-    (err: Error) => err.message,
-  );
-
-test('finishedSearch, newerOf, olderOf, pageSaid and rowsSaid: the finished pager', async (t) => {
-  await t.test('the address round-trips: a page and a factory in, the same out, and the first page is the bare address', () => {
-    const at = { factory: 'nemia', page: 3 };
+test('finishedSearch, trailOf, newerOf, olderTrailOf, pageSaid and rowsSaid: the finished pager by its trail', async (t) => {
+  await t.test('the address round-trips: a trail and a factory in, the same out, and the first page is the bare address', () => {
+    assert.equal(finishedSearch({ older: 'bogus' }).older, undefined, 'a trail that is no token reads as the first page');
+    assert.equal(finishedSearch({ older: 'f.a~bogus' }).older, undefined, 'and so does one a piece of which is none');
+    const at = { factory: 'nemia', older: 'f.a~f.b' };
     assert.deepEqual(finishedSearch(at), at);
-    assert.deepEqual(finishedSearch(pageSearch(at, 3)), at);
-    assert.deepEqual(finishedSearch({ factory: 'nemia', page: '3' }), at, 'a page read off the address as digits');
-    assert.deepEqual(pageSearch(at, 1), { factory: 'nemia' });
-    assert.deepEqual(pageSearch({}, 1), {}, 'REFUSED: the first page never spells ?page=1');
-    assert.deepEqual(finishedSearch(pageSearch({}, 1)), {});
-    assert.deepEqual(pageSearch({ factory: 'nemia', tab: 'x' }, 4), { factory: 'nemia', tab: 'x', page: 4 }, 'every other key is kept');
-    assert.equal(pageAt(finishedSearch({})), 1);
-    assert.equal(pageAt(finishedSearch(at)), 3);
+    assert.deepEqual(trailOf(finishedSearch(at)), ['f.a', 'f.b']);
+    assert.deepEqual(finishedSearch(trailSearch(at, ['f.a', 'f.b'])), at);
+    assert.deepEqual(trailSearch(at, []), { factory: 'nemia' });
+    assert.deepEqual(trailSearch({}, []), {}, 'REFUSED: the first page never spells an empty trail');
+    assert.deepEqual(trailSearch({ factory: 'nemia', tab: 'x' }, ['f.a']), { factory: 'nemia', tab: 'x', older: 'f.a' }, 'every key kept');
+    assert.deepEqual(trailOf(finishedSearch({})), []);
   });
-  await t.test('REFUSED: a page that is no whole number past the first is no page', () => {
-    for (const page of [1, 0, -2, 2.5, 'abc', '', '1', '2.5', '-3', null, undefined, [3], Number.NaN]) {
-      assert.deepEqual(finishedSearch({ factory: 'nemia', page }), { factory: 'nemia' }, JSON.stringify(page));
+  await t.test('REFUSED: a trail that is no string of tokens, or holds an empty one, is no trail', () => {
+    for (const older of ['', '~', 'f.a~', '~f.a', 'f.a~~f.b', 3, null, undefined, ['f.a']]) {
+      assert.deepEqual(finishedSearch({ factory: 'nemia', older }), { factory: 'nemia' }, JSON.stringify(older));
     }
   });
-  await t.test('what Newer and Older lead to: none at each end, and from a page past the last, Newer is the last', () => {
-    assert.deepEqual([newerOf(1, 3), olderOf(1, 3)], [null, 2]);
-    assert.deepEqual([newerOf(2, 3), olderOf(2, 3)], [1, 3]);
-    assert.deepEqual([newerOf(3, 3), olderOf(3, 3)], [2, null]);
-    assert.deepEqual([newerOf(1, 1), olderOf(1, 1)], [null, null]);
-    assert.deepEqual([newerOf(80, 71), olderOf(80, 71)], [71, null]);
+  await t.test("Older puts the page's continue on the trail, Newer takes the last off: none at each end", () => {
+    const first = { trail: [], next: 'f.a', count: 9 };
+    assert.deepEqual([newerOf(first), olderTrailOf(first)], [null, ['f.a']]);
+    const second = { trail: ['f.a'], next: 'f.b', count: 9 };
+    assert.deepEqual([newerOf(second), olderTrailOf(second)], [[], ['f.a', 'f.b']]);
+    const last = { trail: ['f.a', 'f.b'], next: null, count: 7 };
+    assert.deepEqual([newerOf(last), olderTrailOf(last)], [['f.a'], null]);
+    const only = { trail: [], next: null, count: 3 };
+    assert.deepEqual([newerOf(only), olderTrailOf(only)], [null, null]);
   });
-  await t.test('REFUSED: a page past the last is said, not drawn empty', () => {
-    const past = { total: 634, page: 80, size: 9, pages: 71 };
+  await t.test('a token past the last gives a page of no row: said so, Newer pops it, and Older leads nowhere', () => {
+    const past = { trail: ['f.a', 'f.gone'], next: null, count: 0, total: 25, size: 9 };
     assert.equal(pastLast(past), true);
-    assert.equal(pageSaid(past), 'Page 80 is past the last, 71.');
-    assert.equal(rowsSaid(past), 'No run on this page, of 634');
-    assert.equal(pastLast({ page: 71, pages: 71 }), false);
-    assert.equal(pastLast({ page: 1, pages: 1 }), false, 'an empty store has one page, and the first is not past it');
+    assert.equal(pageSaid(past), 'Page 3 is past the last, 3.');
+    assert.equal(rowsSaid(past), 'No run on this page, of 25');
+    assert.deepEqual([newerOf(past), olderTrailOf({ ...past, next: 'f.x' })], [['f.a'], null]);
+    assert.equal(pastLast({ trail: [], count: 0 }), false, 'an empty store has one page, and the first is not past it');
   });
-  await t.test('the pager says the rows a page shows and where it stands', () => {
-    assert.equal(rowsSaid({ total: 634, page: 3, size: 9, pages: 71 }), 'Runs 19–27 of 634');
-    assert.equal(rowsSaid({ total: 634, page: 71, size: 9, pages: 71 }), 'Runs 631–634 of 634');
-    assert.equal(rowsSaid({ total: 0, page: 1, size: 9, pages: 1 }), 'No finished runs');
-    assert.equal(pageSaid({ page: 3, pages: 71 }), 'Page 3 / 71');
+  await t.test('the rows of a page and where it stands, from the total, the trail and its count', () => {
+    assert.equal(rowsSaid({ trail: ['f.a'], next: 'f.b', count: 9, total: 30, size: 9 }), 'Runs 10–18 of 30');
+    assert.equal(rowsSaid({ trail: ['f.a', 'f.b', 'f.c'], next: null, count: 3, total: 30, size: 9 }), 'Runs 28–30 of 30');
+    assert.equal(rowsSaid({ trail: [], next: null, count: 0, total: 0, size: 9 }), 'No finished runs');
+    assert.equal(pageSaid({ trail: ['f.a'], next: 'f.b', count: 9, total: 30, size: 9 }), 'Page 2 / 4');
+    assert.equal(pageSaid({ trail: [], next: null, count: 0, total: 0, size: 9 }), 'Page 1 / 1');
   });
 });
 
-test('finishedRunsQuery: the finished read decoded, refused, and asked by page and factory', async (t) => {
-  await t.test(
-    "the finished read decodes the api's answer, when it was read included, and drops a key the board does not know",
-    async () => {
-      const page = await read(answer());
-      assert.deepEqual([page.total, page.page, page.size, page.pages], [634, 3, 9, 71]);
-      assert.deepEqual(
-        page.runs.map((run) => [run.id, run.outcome, run.wallMs, run.finishedAt]),
-        [
-          ['r-2', 'undecided', 1_660_000, '2026-09-13T00:27:40.000Z'],
-          ['r-1', 'succeeded', 1_660_000, '2026-09-13T00:27:40.000Z'],
-        ],
-      );
-      assert.equal(page.asOf, '2026-09-13T01:00:00.000Z', 'the instant every time on the page is said against');
-      assert.equal('somethingNew' in page.runs[0], false);
-      assert.equal(page.runs[0].steps[0].name, 'plan', "a row keeps the list's own keys");
-      assert.deepEqual(page.runs[0].clock, CLOCK, 'a row carries the clock its cell breaks down');
-      assert.equal(page.runs[0].clock?.wallMs, page.runs[0].wallMs, "the clock's wall time is the row's own");
-    },
-  );
-  await t.test(
-    'REFUSED: an outcome the board has no word for, a row that does not say when it finished, and pages that are no number',
-    async () => {
-      assert.match(await refusal(answer({ runs: [row('r-1', { outcome: 'shelved' })] })), /outcome/);
-      const { finishedAt: _dropped, ...unfinished } = row('r-1');
-      assert.match(await refusal(answer({ runs: [unfinished] })), /finishedAt/);
-      const { clock: _unbroken, ...noClock } = row('r-1');
-      assert.match(await refusal(answer({ runs: [noClock] })), /clock/);
-      assert.equal(await refusal(answer({ runs: [row('r-1', { clock: null })] })), 'decoded', 'a clock the api could not read is none');
-      assert.match(await refusal(answer({ pages: '71' })), /pages/);
-      assert.match(await refusal(answer({ asOf: undefined })), /asOf/);
-      assert.equal(await refusal(answer()), 'decoded');
-    },
-  );
-  await t.test('the query asks for nine a page, by page and by factory, under a key of its factory and page', async (t) => {
+test('finishedRunsQuery: the RunList asked by state read as a page, nine at a time, from the last token of the trail', async (t) => {
+  await t.test("each row the run's with its finish, outcome and clock; the total the list's count, and its next token", async () => {
+    const page = await read(answer());
+    assert.equal(page.total, 634);
+    assert.equal(page.continue, 'f.next');
+    assert.deepEqual(
+      page.runs.map((run) => [run.id, run.outcome, run.wallMs, run.finishedAt]),
+      [
+        ['r-2', 'undecided', 1_660_000, '2026-09-13T00:27:40.000Z'],
+        ['r-1', 'succeeded', 1_660_000, '2026-09-13T00:27:40.000Z'],
+      ],
+    );
+    assert.equal(page.asOf, '2026-09-13T01:00:00.000Z', 'the instant every time on the page is said against');
+    assert.deepEqual(page.runs[0].clock, CLOCK, 'a row carries the clock its cell breaks down');
+    assert.equal((await read(answer(null))).continue, null, 'the last page has no next');
+  });
+  await t.test('REFUSED: an outcome the board has no word for', async () => {
+    const shelved = answer();
+    (shelved.items[0].status as { outcome: string }).outcome = 'shelved';
+    await assert.rejects(read(shelved), /outcome/);
+  });
+  await t.test('the query asks the finished state nine a page, by factory and token, under a key of its factory and token', async (t) => {
     const asked: string[] = [];
     const before = globalThis.fetch;
     globalThis.fetch = async (input) => {
@@ -141,11 +124,17 @@ test('finishedRunsQuery: the finished read decoded, refused, and asked by page a
       globalThis.fetch = before;
     });
     assert.equal(FINISHED_SIZE, 9);
-    const one = await client.fetchQuery(finishedRunsQuery('harbour', 2));
-    await client.fetchQuery(finishedRunsQuery(undefined, 1));
-    assert.deepEqual(asked, ['/api/runs-finished?page=2&size=9&ofFactory=harbour', '/api/runs-finished?page=1&size=9']);
-    assert.equal(one.runs.length, 2);
-    assert.deepEqual(finishedRunsQuery('harbour', 2).queryKey, ['runs-finished', 'harbour', 2]);
-    assert.deepEqual(finishedRunsQuery(undefined, 1).queryKey, ['runs-finished', null, 1]);
+    await client.fetchQuery(finishedRunsQuery('harbour', ['f.a', 'f.b']));
+    await client.fetchQuery(finishedRunsQuery(undefined, []));
+    const urls = asked.map((at) => new URL(at, 'http://board'));
+    assert.deepEqual(
+      urls.map((url) => [url.pathname, Object.fromEntries(url.searchParams)]),
+      [
+        ['/api/namespaces/harbour/runs', { fieldSelector: 'status.state=finished', limit: '9', continue: 'f.b' }],
+        ['/api/runs', { fieldSelector: 'status.state=finished', limit: '9' }],
+      ],
+    );
+    assert.deepEqual(finishedRunsQuery('harbour', ['f.a', 'f.b']).queryKey, ['runs-finished', 'harbour', 'f.b']);
+    assert.deepEqual(finishedRunsQuery(undefined, []).queryKey, ['runs-finished', null, null]);
   });
 });

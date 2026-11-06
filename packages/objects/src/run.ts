@@ -10,6 +10,7 @@
  */
 import { Schema } from 'effect';
 import { API_VERSION, listOf } from './meta.ts';
+import { RunClock, RunListMeta } from './run-frame.ts';
 import { ObjectGraph } from './graph.ts';
 import {
   ANSWER_VIA,
@@ -18,15 +19,16 @@ import {
   CHECK_RESULTS,
   ENGINE_OUTCOMES,
   GATE_BUDGETS_FROM,
-  HANDED_HOW,
   OUTCOMES,
   PEAK_MARKS,
   PLACE_KINDS,
   RAISE_BY,
   RETRY_MODES,
   REVISION_KINDS,
+  RUN_OUTCOMES,
   RUN_PHASES,
   RUN_REASONS,
+  RUN_STATES,
   RUN_STATUSES,
   RUNS_IN_BY,
   SAID_AFTER,
@@ -34,7 +36,6 @@ import {
   STEP_PHASES,
   STEP_REASONS,
   STEP_STATUSES,
-  TOLD_VIA,
   TRY_CAUSES,
   WAIT_ON,
 } from './words.ts';
@@ -51,15 +52,17 @@ const StepPhase = Schema.Literals(STEP_PHASES);
 const StepReason = Schema.Literals(STEP_REASONS);
 
 /**
- * The run's name, the namespace it is in (its factory, `default` for one that names none; absent on an object served before the run had
- * one), when it was made, and the labels it is found by, one map (`metadataLabels`): its `workflow`, the `factory` it was started in
- * (`default` for the default one, as the feed says it), and a person's labels on it (`nemia label run`), as `-l` selects them.
+ * The run's name, its namespace (its factory, `default` for none), when it was made, and the labels it is found by, one map
+ * (`metadataLabels`): its `workflow`, the `factory` it was started in (`default` for the default one, as the feed says it), and a
+ * person's labels on it (`nemia label run`), as `-l` selects them; its `resourceVersion`, opaque, moved by every change of what is served
+ * of it. `namespace` and `resourceVersion` are absent on an object served before the Run had them.
  */
 export const RunMetadata = Schema.Struct({
   name: Schema.String,
   namespace: Schema.optionalKey(Schema.String),
   creationTimestamp: Schema.String,
   labels: Schema.Record(Schema.String, Schema.String),
+  resourceVersion: Schema.optionalKey(Schema.String),
 }).annotate({ identifier: 'RunMetadata' });
 export type RunMetadata = typeof RunMetadata.Type;
 
@@ -409,6 +412,10 @@ export const RunDrift = Schema.Struct({
   step: Schema.optionalKey(Schema.String),
 });
 
+/** What one step of a run has cost, every try's session together; `cost` null until one was measured. */
+export const StepCost = Schema.Struct({ step: Schema.String, cost: Schema.NullOr(Spent) }).annotate({ identifier: 'StepCost' });
+export type StepCost = typeof StepCost.Type;
+
 /**
  * The run now: the runs list's judged fields (`judgedFields`) — its word and codes, whether it moves, its cost, time at work and tokens,
  * what it waits on, its hold and what a person has to decide — then its graph, where its time went as a whole (`Timeline`'s rounds, run
@@ -482,6 +489,21 @@ export const RunStatus = Schema.Struct({
   gates: Strings,
   warning: NullString,
   kinds: List(RunDrift),
+  /**
+   * The parts of the board's frame, present on a list asked by state (`?fieldSelector=status.state…`) alone and measured to its
+   * `metadata.asOf`: a plain list, a run read alone and their watches never carry them. Its state in the list (`RUN_STATES`); its
+   * wall time in ms, from its creation until its work stopped or until `asOf`; where that time went (`clock`, frozen at its finish
+   * for a finished run, null where a task of it does not read); each step's cost and when its present wait on a person began
+   * (`stepCosts`, `waitingSince`, for a waiting run, null otherwise or where it is not dated); when its work stopped and how it
+   * ended (`finishedAt`, `outcome`, for a finished run, null otherwise).
+   */
+  state: Schema.optionalKey(Schema.Literals(RUN_STATES)),
+  wallMs: Schema.optionalKey(Schema.Finite),
+  clock: Schema.optionalKey(Schema.NullOr(RunClock)),
+  stepCosts: Schema.optionalKey(Schema.NullOr(List(StepCost))),
+  waitingSince: Schema.optionalKey(NullString),
+  finishedAt: Schema.optionalKey(NullString),
+  outcome: Schema.optionalKey(Schema.NullOr(Schema.Literals(RUN_OUTCOMES))),
 }).annotate({ identifier: 'RunStatus' });
 export type RunStatus = typeof RunStatus.Type;
 
@@ -503,6 +525,8 @@ export const RunUnjudged = Schema.Struct({
   name: Schema.String,
   namespace: Schema.optionalKey(Schema.String),
   error: Schema.String,
+  /** Its state in the list (`RUN_STATES`), on a list asked by state alone: what its summary says, which reads without its tasks. */
+  state: Schema.optionalKey(Schema.Literals(RUN_STATES)),
 }).annotate({ identifier: 'RunUnjudged' });
 export type RunUnjudged = typeof RunUnjudged.Type;
 
@@ -511,10 +535,12 @@ export type RunUnjudged = typeof RunUnjudged.Type;
  * out of `items` since it cannot be judged into a `Run`. A departure from Kubernetes, whose list holds objects alone: a run dropped with
  * no word would read as gone, and a page refused for one journal would blank every other run of it. A run of a list is judged without
  * the reads a poll should not pay for: no harness is asked for a blocked session's last line and no drift is read, so each step's
- * `lastLine` is null and `kinds` empty there; the run read alone (`GET …/runs/<name>`) says them.
+ * `lastLine` is null and `kinds` empty there; the run read alone (`GET …/runs/<name>`) says them. Its metadata is `RunListMeta`, and a
+ * list asked by state (`?fieldSelector=status.state…`) still judges its whole namespace to count it, whatever its `limit`.
  */
 export const RunList = Schema.Struct({
   ...listOf('Run', Run).fields,
+  metadata: RunListMeta,
   unjudged: Schema.optionalKey(Schema.Array(RunUnjudged)),
 }).annotate({ identifier: 'RunList' });
 export type RunList = typeof RunList.Type;
@@ -598,64 +624,3 @@ export const TryCloseout = Schema.Struct({
   unreadable: Schema.NullOr(StepUnreadable),
 }).annotate({ identifier: 'TryCloseout' });
 export type TryCloseout = typeof TryCloseout.Type;
-
-/** What a step was told by layer (`ToldLayers`, brief.ts). */
-const ToldLayers = Schema.Struct({
-  agent: NullString,
-  instructions: NullString,
-  custom: NullString,
-  factory: NullString,
-  agentSkills: Strings,
-  policy: Schema.String,
-  addedSkills: Strings,
-  fence: List(Schema.Struct({ key: Schema.String, value: Schema.String })),
-  folderFiles: Schema.Boolean,
-  task: NullString,
-  via: Schema.Literals(TOLD_VIA),
-});
-
-/** A part of a step's task (`TaskPart`, told.verb.ts): its own text, or a run's section, with how the run was handed. */
-const TaskPart = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal('text'), text: Schema.String }),
-  Schema.Struct({
-    kind: Schema.Literal('from'),
-    run: Schema.String,
-    asked: Schema.String,
-    body: Schema.String,
-    how: Schema.optionalKey(Schema.Literals(HANDED_HOW)),
-  }),
-]);
-
-/**
- * What a step was told (`toldOf`, told.verb.ts): its own body in the workflow (null where none shows it), its brief, by layer, and its
- * task by part: `GET /api/runs/:runId/steps/:step/told`.
- */
-export const StepTold = Schema.Struct({
-  body: NullString,
-  told: NullString,
-  layers: Schema.NullOr(ToldLayers),
-  taskParts: Schema.NullOr(List(TaskPart)),
-}).annotate({ identifier: 'StepTold' });
-export type StepTold = typeof StepTold.Type;
-
-/** A person's labels: a key to its value, Kubernetes' `map[string]string`. */
-export const Labels = Schema.Record(Schema.String, Schema.String).annotate({ identifier: 'Labels' });
-
-/**
- * An edit of a run's or a card's labels: kubectl's words, `key=value` to set and `key-` to remove, and whether a set may change a
- * value.
- */
-export const LabelEdit = Schema.Struct({
-  labels: Schema.Array(Schema.String),
-  overwrite: Schema.optionalKey(Schema.Boolean),
-}).annotate({ identifier: 'LabelEdit' });
-export type LabelEdit = typeof LabelEdit.Type;
-
-/** What an edit did: the run or the card, by its name, its person labels after (`labels`) and before (`was`). */
-export const Labelled = Schema.Struct({
-  kind: Schema.Literals(['Run', 'Card']),
-  name: Schema.String,
-  labels: Labels,
-  was: Labels,
-}).annotate({ identifier: 'Labelled' });
-export type Labelled = typeof Labelled.Type;

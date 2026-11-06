@@ -72,9 +72,10 @@ export function supportOf(item: PickerFactory, open: OpenRuns | undefined): stri
 
 /**
  * The top bar's factory switcher, the kit's `Select` labelled Factory, of the page at `path` with `search`: `picked`, the address's
- * (`pickedOf`), else All factories, then each factory with its runs in flight (`GET /api/runs-open`) under its name. Its title holds the
- * factory's repositories whole and why its file does not read. It reads the factories, and whether the default factory holds a run;
- * nothing but All factories is offered while an answer it needs is missing. A pick goes where `pickTo` says, or nowhere.
+ * (`pickedOf`), else All factories, then each factory with its runs in flight (`GET /api/runs?fieldSelector=status.state!=finished`)
+ * under its name. Its title holds the factory's repositories whole and why its file does not read. It reads the factories, and whether
+ * the default factory holds a run; nothing but All factories is offered while an answer it needs is missing. A pick goes where `pickTo`
+ * says, or nowhere.
  */
 export function FactoryPicker({ path, search, picked }: { path: string; search: Record<string, unknown>; picked: string | undefined }) {
   const navigate = useNavigate();

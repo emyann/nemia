@@ -291,8 +291,9 @@ test('RunSteps, Pager and TextLink: the rail of a run, and the ways off a page',
       assert.match(html, /aria-label="design done, implement verified, review to come"/, 'read aloud, a check is told from a word');
     },
   );
-  await t.test('the pager: Newer and Older keep the address and change its page alone, and say the rows and where it stands', async () => {
-    const html = await drawn(createElement(Pager, { page: 2, pages: 3, total: 25, size: 9 }), '/?factory=nemia&page=2');
+  await t.test('the pager: Newer and Older keep the address and change its trail alone, and say the rows and where it stands', async () => {
+    const at = { trail: ['f.a'], next: 'f.b', count: 9, total: 25, size: 9 };
+    const html = await drawn(createElement(Pager, at), '/?factory=nemia&older=f.a');
     assert.match(html, /role="group" aria-label="Pages of finished runs"/);
     assert.match(tagWith(html, 'data-pager-rows'), /data-pager-rows/);
     assert.match(html, />Runs 10–18 of 25</);
@@ -300,26 +301,27 @@ test('RunSteps, Pager and TextLink: the rail of a run, and the ways off a page',
     assert.match(
       tagWith(html, 'data-pager-newer'),
       /href="\/\?factory=nemia"/,
-      'Newer drops the page for the first, and keeps the factory',
+      'Newer takes the last token off, the first page holding none, and keeps the factory',
     );
-    assert.match(tagWith(html, 'data-pager-older'), /href="\/\?factory=nemia&amp;page=3"/);
+    assert.match(tagWith(html, 'data-pager-older'), /href="\/\?factory=nemia&amp;older=f.a%7Ef.b"/, "Older puts the page's continue on");
   });
-  await t.test('REFUSED: the pager at an end offers no link there, and from a page past the last Newer leads to the last', async () => {
-    const first = await drawn(createElement(Pager, { page: 1, pages: 3, total: 25, size: 9 }));
+  await t.test('REFUSED: the pager at an end offers no link there, and from a page past the last Newer leads back', async () => {
+    const first = await drawn(createElement(Pager, { trail: [], next: 'f.a', count: 9, total: 25, size: 9 }));
     const newer = tagWith(first, 'data-pager-newer');
     assert.match(newer, /aria-disabled="true"/);
     assert.doesNotMatch(newer, /href=/);
-    assert.match(tagWith(first, 'data-pager-older'), /href="\/\?page=2"/);
-    const last = await drawn(createElement(Pager, { page: 3, pages: 3, total: 25, size: 9 }), '/?page=3');
+    assert.match(tagWith(first, 'data-pager-older'), /href="\/\?older=f.a"/);
+    const last = await drawn(createElement(Pager, { trail: ['f.a', 'f.b'], next: null, count: 7, total: 25, size: 9 }), '/?older=f.a~f.b');
     assert.match(tagWith(last, 'data-pager-older'), /aria-disabled="true"/);
-    assert.match(tagWith(last, 'data-pager-newer'), /href="\/\?page=2"/);
-    const past = await drawn(createElement(Pager, { page: 80, pages: 3, total: 25, size: 9 }), '/?page=80');
-    assert.match(past, />Page 80 is past the last, 3\.</);
-    assert.match(tagWith(past, 'data-pager-newer'), /href="\/\?page=3"/);
+    assert.match(tagWith(last, 'data-pager-newer'), /href="\/\?older=f.a"/);
+    const trail = ['f.a', 'f.b', 'f.gone'];
+    const past = await drawn(createElement(Pager, { trail, next: null, count: 0, total: 25, size: 9 }), '/?older=f.a~f.b~f.gone');
+    assert.match(past, />Page 4 is past the last, 3\.</);
+    assert.match(tagWith(past, 'data-pager-newer'), /href="\/\?older=f.a%7Ef.b"/);
     assert.match(tagWith(past, 'data-pager-older'), /aria-disabled="true"/);
   });
   await t.test('the pager writes its buttons in the label face, never the mono of its counts, and rings them as the kit does', async () => {
-    const html = await drawn(createElement(Pager, { page: 2, pages: 3, total: 25, size: 9 }));
+    const html = await drawn(createElement(Pager, { trail: ['f.a'], next: 'f.b', count: 9, total: 25, size: 9 }));
     for (const mark of ['data-pager-newer', 'data-pager-older']) {
       const button = tagWith(html, mark);
       assert.match(button, /\bfont-plain\b/, `${mark} is in the label face`);

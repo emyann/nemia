@@ -55,7 +55,6 @@ const RUN: WaitingRun = {
   work: null,
   brief: 'A title that runs over the copy control of its card',
   workflowDir: '/code/app/workflows/dev',
-  workflowPage: null,
   try: null,
   createdAt: '2026-10-12T15:02:00.000Z',
   startedAt: '2026-10-12T15:02:00.000Z',

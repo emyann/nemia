@@ -1,6 +1,7 @@
 /**
- * A journal that does not read is a check's, or an earlier try's, and not the step's own session's: the list marks the step whose check or
- * try it is `unreadable`, not the word its session's view would give; and the decision `nemia decide` shows (`GET
+ * A journal that does not read is a check's, or an earlier try's, and not the step's own session's: the RunList leaves its run unjudged,
+ * naming that task, and `nemia ls` (`GET /api/listing/:runId`) marks the step whose check or try it is `unreadable`, not the word its
+ * session's view would give; and the decision `nemia decide` shows (`GET
  * /api/runs/:runId/decision`) is refused as the run's object is, a 502 in the list's words — for a run waiting on such a run too — while a
  * run whose tasks read is answered. A pass has read where the runs' branches stand (`passStanding`), which the list reads off
  * `standing.json`.
@@ -15,9 +16,9 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from '../app.ts';
-import { engine, passStanding, runStore, type RunSummary } from 'agent-orchestrator';
+import { engine, passStanding, runStore } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
-import { summariesOf } from '../../test/run-reads.ts';
+import { lsOf, runListOf } from '../../test/run-reads.ts';
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(
@@ -119,8 +120,13 @@ writeRun('r-try', {
 writeRun('r-child', {}, { after: ['r-check'] });
 await runWith(engine(), passStanding(runStore.runs.list()));
 
-const listed = async (): Promise<Map<string, RunSummary>> => {
-  return new Map((await summariesOf(app)).map((run) => [run.id, run]));
+/** Why the RunList leaves each run unjudged (its `unjudged` entry's `error`), by name, and the names of the runs it judges. */
+const listed = async () => {
+  const list = await runListOf(app);
+  return {
+    unreadable: new Map((list.unjudged ?? []).map((entry) => [entry.name, entry.error])),
+    judged: list.items.map((run) => run.metadata.name),
+  };
 };
 
 test("a check's or an earlier try's journal that does not read marks its step unreadable on the list, and refuses the run's decision as its page", async (t) => {
@@ -129,23 +135,26 @@ test("a check's or an earlier try's journal that does not read marks its step un
     "the list marks unreadable the step whose check's journal, or an earlier try's, does not read, and names that task",
     async () => {
       const runs = await listed();
-      assert.equal(runs.get('r-good')!.unreadable, null);
-      assert.notEqual(runs.get('r-good')!.steps[0].message, 'unreadable');
+      assert.ok(runs.judged.includes('r-good') && !runs.unreadable.has('r-good'), 'a run whose tasks read is judged');
+      assert.notDeepEqual(
+        (await lsOf(app, 'r-good')).listed.steps.map((s) => s.message),
+        ['unreadable'],
+      );
       for (const [id, task] of [
         ['r-check', 'r-check-implement-check'],
         ['r-try', 'r-try-implement'],
       ]) {
-        const run = runs.get(id)!;
         assert.deepEqual(
-          run.steps.map((s) => [s.name, s.message]),
+          (await lsOf(app, id)).listed.steps.map((s) => [s.name, s.message]),
           [['implement', 'unreadable']],
           id,
         );
+        const unreadable = runs.unreadable.get(id);
         assert.ok(
-          run.unreadable?.startsWith(`${id}'s record reads, but the journal of its task ${task} does not: ${task}'s journal (`),
-          run.unreadable ?? 'null',
+          unreadable?.startsWith(`${id}'s record reads, but the journal of its task ${task} does not: ${task}'s journal (`),
+          unreadable ?? 'null',
         );
-        assert.ok(run.unreadable?.includes('So the board does not judge the run'), run.unreadable ?? 'null');
+        assert.ok(unreadable?.includes('So the board does not judge the run'), unreadable ?? 'null');
       }
     },
   );
@@ -153,7 +162,7 @@ test("a check's or an earlier try's journal that does not read marks its step un
     "the decision `nemia decide` shows is refused as the run's object is, in the list's words, and answered for a run whose tasks read",
     async () => {
       const runs = await listed();
-      const child = runs.get('r-child')!.unreadable;
+      const child = runs.unreadable.get('r-child');
       assert.ok(
         child?.startsWith(
           `r-child's record reads, but the journal of a task of a run it waits on does not: r-check-implement-check's journal (`,
@@ -164,8 +173,8 @@ test("a check's or an earlier try's journal that does not read marks its step un
         const res = await app.request(`/api/runs/${id}/decision`);
         const body = (await res.json()) as { error?: string };
         assert.equal(res.status, 502, JSON.stringify(body));
-        assert.ok(runs.get(id)!.unreadable, `${id} is unreadable on the list`);
-        assert.equal(body.error, runs.get(id)!.unreadable, `${id}'s decision and the list say one thing`);
+        assert.ok(runs.unreadable.get(id), `${id} is unjudged on the list`);
+        assert.equal(body.error, runs.unreadable.get(id), `${id}'s decision and the list say one thing`);
         const page = await app.request(`/api/runs/${id}`);
         assert.equal(page.status, 502);
         assert.equal(((await page.json()) as { error?: string }).error, body.error, `${id}'s decision and its page say one thing`);

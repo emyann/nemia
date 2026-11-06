@@ -39,11 +39,15 @@ import type * as yours from '../../api/src/workflows/yours.ts';
 
 /** A step of a run's object, as the api answers it (`GET /api/runs/:id`): its status, as the package judges it. */
 type Step = runs.RunAnswer['status']['steps'][number];
+type Judged = runs.RunAnswer['status'];
 /**
- * A run's row as the runs-open view answers it, but the three keys that view adds: the summary the board's run row (`RunSummary`) is
- * held to, now that the array of rows has gone and the board reads every run off the open and finished views.
+ * A run as its object answers it (`RunAnswer`), which the board's row of a run (`runRowOf`) is made of: its status, its place off its
+ * spec, and its graph without what a step is handed, which the board draws no edge of.
  */
-type RunRow = Omit<runs.OpenListing['inFlight'][number], 'wallMs' | 'finishedAt' | 'clock'>;
+type RunRow = Omit<Judged, 'graph'> &
+  Pick<runs.RunAnswer['spec'], 'place'> & {
+    graph: Omit<Judged['graph'], 'edges'> & { edges: Array<Exclude<Judged['graph']['edges'][number], { kind: 'input' }>> };
+  };
 type SaidHeld = Omit<Step['said'][number], 'after'> & { after: NonNullable<Step['said'][number]['after']> | null };
 type RadiusOf = Extract<decision.Touched['radius'], { changes: unknown }>;
 type ChatEventOf = chat.ChatHistoryAnswer['events'][number];
@@ -213,15 +217,6 @@ export type Interrupt = Holds<Same<Board.Interrupt, pause.PauseNowRead['interrup
 
 export type QuotaWindow = Holds<Same<Board.QuotaWindow, quota.QuotaWindow>>;
 export type Quota = Holds<Same<Board.Quota, quota.Quota>>;
-
-export type RunSummary = Holds<Same<Board.RunSummary, RunRow>>;
-export type OpenRuns = Holds<Same<Board.OpenRuns, runs.OpenListing>>;
-export type FinishedPage = Holds<Same<Board.FinishedPage, runs.FinishedListing>>;
-export type ListedRun = Holds<Same<Board.ListedRun, runs.OpenListing['inFlight'][number]>>;
-export type WaitingRun = Holds<Same<Board.WaitingRun, runs.OpenListing['waiting'][number]>>;
-export type RunClock = Holds<Same<Board.RunClock, NonNullable<runs.OpenListing['inFlight'][number]['clock']>>>;
-export type StepCost = Holds<Same<Board.StepCost, NonNullable<runs.OpenListing['waiting'][number]['stepCosts']>[number]>>;
-export type FinishedRun = Holds<Same<Board.FinishedRun, runs.FinishedListing['runs'][number]>>;
 
 export type TranscriptEvent = Holds<Same<Board.TranscriptEvent, steps.TranscriptEvent>>;
 export type StepTranscript = Holds<Same<Board.StepTranscript, steps.StepTranscript>>;

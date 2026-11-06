@@ -1,60 +1,29 @@
 /**
- * Every run, as the Factory, the strips and the pickers list them (`GET /api/runs-summaries`); the rows of the runs-open and
- * runs-finished views; and a run's named actions, each in the run's namespace.
+ * Every run, as the Factory, the strips and the pickers list them, and the frame's and the Runs page's views of them, each read off the
+ * RunList (`runs.listAll`, `runs.list`) and made the board's row of a run (`runRowOf`); and a run's named actions, each in the run's
+ * namespace.
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
+import { DEFAULT_NAMESPACE, type Run, type RunHeld, type RunList, type RunRemoved, type RunUnjudged } from 'objects';
+import type { RunClock, RunOutcome, StepCost } from 'objects';
 import { decodes } from './decodes.ts';
 import { pace } from '../feed.ts';
-import { selectorKey, withSelector } from './selector.ts';
+import { selectorKey } from './selector.ts';
 import { get } from './read.ts';
-import { runs } from './objects.ts';
-import type { RunHeld, RunRemoved } from 'objects';
-import { RunGraphSchema, type RunGraph } from './graph.ts';
-import { WorkflowPageAddressSchema, type WorkflowPageAddress } from './address.ts';
-import {
-  CheckVerdictSchema,
-  RunPhaseSchema,
-  RunReasonSchema,
-  StepCodesFields,
-  type CheckVerdict,
-  type RunPhase,
-  type RunReason,
-  type StepPhase,
-  type StepReason,
-  type AnswerVia,
-  type WaitOn,
-  AnswerViaSchema,
-  WaitOnSchema,
-} from './reasons.ts';
-import {
-  AtWorkSchema,
-  PlaceKindSchema,
-  RunHoldingSchema,
-  RunStatusSchema,
-  RunToDecideSchema,
-  RunTokensSchema,
-  RunWaitingSchema,
-  SpentSchema,
-  StepNeedsFields,
-  StringsSchema,
-  type AtWork,
-  type PlaceKind,
-  type RunHolding,
-  type RunStatus,
-  type RunToDecide,
-  type RunTokens,
-  type RunWaiting,
-  type Spent,
-  type StepNeeds,
-} from './judged.ts';
+import { runs, type RunListQuery } from './objects.ts';
+import type { RunGraph } from './graph.ts';
+import type { AnswerVia, CheckVerdict, RunPhase, RunReason, StepPhase, StepReason, WaitOn } from './reasons.ts';
+import type { AtWork, PlaceKind, RunHolding, RunStatus, RunToDecide, RunTokens, RunWaiting, Spent, StepNeeds } from './judged.ts';
 
-/** Mirrors `RunListing` in apps/api/src/runs/runs.ts: a run's summary, the whole list's row and the base of each row of its two views. */
+export type { RunClock, RunOutcome, StepCost } from 'objects';
+
+/** The board's row of a run, made of a `Run` (`runRowOf`), or of a run the list could not judge (`unjudgedRowOf`). */
 export type RunSummary = {
   id: string;
   /** The repository a repository run is about; null for a folder run (`place`), which has none. */
   repo: string | null;
-  /** The factory the run was started in, as its record names it; null for a run of the default factory, whose record names none. */
+  /** The factory the run was started in, its namespace; null for a run of the default factory (`default`). */
   factory: string | null;
   place: PlaceKind;
   /** Where a folder run's work is: the directory its steps' folders are made under. Null on a repository run. */
@@ -62,8 +31,6 @@ export type RunSummary = {
   brief: string;
   /** The workflow folder the run was started from: its last segment names the workflow (`workflowNameOf`). */
   workflowDir: string;
-  /** The address of its workflow's page, and each step's under it: null where the board pages none, as for a folder given by path. */
-  workflowPage: WorkflowPageAddress | null;
   /** The agent it tried, for a try started from an agent's page; null for every other run. */
   try: { agent: string } | null;
   createdAt: string;
@@ -158,79 +125,150 @@ export type RunSummary = {
   /** What a person has to decide about the run's result (`RunToDecide`); null while there is nothing — which is every run still going. */
   toDecide: RunToDecide | null;
   /**
-   * Why the run is not judged, when a task it reads has a journal that does not read, in the runtime's words; null for every run whose
-   * tasks read. Such a run is answered off its record alone: `running`, moving, the unreadable step's status `unreadable`.
+   * Why the run is not judged, when a task it reads has a journal that does not read, in the list's words (`RunUnjudged.error`); null
+   * for every run judged. Such a run is a bare row (`unjudgedRowOf`): its name, its factory, `running` and moving, and no step.
    */
   unreadable: string | null;
   /** The run's whole label map: its own labels, `workflow`, and `factory` when it names one. */
   labels: Record<string, string>;
 };
 
-/** Decodes a `RunSummary`: each key the board reads, of its type and words; a key it does not know is dropped. */
-const RunSummarySchema = decodes<RunSummary>()(
-  Schema.Struct({
-    id: Schema.String,
-    repo: Schema.NullOr(Schema.String),
-    factory: Schema.NullOr(Schema.String),
-    place: PlaceKindSchema,
-    work: Schema.NullOr(Schema.String),
-    brief: Schema.String,
-    workflowDir: Schema.String,
-    workflowPage: Schema.NullOr(WorkflowPageAddressSchema),
-    try: Schema.NullOr(Schema.Struct({ agent: Schema.String })),
-    createdAt: Schema.String,
-    startedAt: Schema.NullOr(Schema.String),
-    cancelledAt: Schema.NullOr(Schema.String),
-    pruned: Schema.NullOr(Schema.Struct({ said: Schema.String })),
-    after: StringsSchema,
-    context: StringsSchema,
-    waiting: Schema.NullOr(RunWaitingSchema),
-    holdUntil: StringsSchema,
-    holding: Schema.NullOr(RunHoldingSchema),
-    status: RunStatusSchema,
-    phase: RunPhaseSchema,
-    reason: RunReasonSchema,
-    on: Schema.NullOr(WaitOnSchema),
-    via: Schema.NullOr(AnswerViaSchema),
-    moving: Schema.Boolean,
-    cost: Schema.NullOr(SpentSchema),
-    atWork: Schema.NullOr(AtWorkSchema),
-    tokens: Schema.NullOr(RunTokensSchema),
-    steps: Schema.mutable(
-      Schema.Array(
-        Schema.Struct({
-          name: Schema.String,
-          taskId: Schema.NullOr(Schema.String),
-          branch: Schema.NullOr(Schema.String),
-          ...StepCodesFields,
-          verdict: Schema.NullOr(CheckVerdictSchema),
-          note: Schema.NullOr(Schema.String),
-          roundDue: Schema.Boolean,
-          agent: Schema.NullOr(Schema.String),
-          since: Schema.NullOr(Schema.String),
-          ...StepNeedsFields,
-        }),
-      ),
-    ),
-    graph: RunGraphSchema,
-    waitingOnYou: StringsSchema,
-    waitingOnYouWords: StringsSchema,
-    toDecide: Schema.NullOr(RunToDecideSchema),
-    unreadable: Schema.NullOr(Schema.String),
-    labels: Schema.Record(Schema.String, Schema.String),
-  }),
-);
+/** A step of a run as its row has it. */
+type RowStep = RunSummary['steps'][number];
 
 /**
- * Every run's summary (`GET /api/runs-summaries`), `selector` taking them by their labels where it says one: one read, off the informer's
- * summaries, never the RunList, whose objects cost a judgement of each run on every poll.
+ * When the step's task still at work started: the earliest `spawnedAt` of a session or check of its tries that has not ended, as the
+ * orchestrator's `atWork` of the step alone says it; null while none runs.
  */
-const everyRun = (selector = ''): Promise<RunSummary[]> =>
-  get(withSelector('/api/runs-summaries', selector), Schema.mutable(Schema.Array(RunSummarySchema)));
+export function sinceOf(step: Pick<Run['status']['steps'][number], 'timeline'>): string | null {
+  const open = step.timeline
+    .flatMap((t) => [t.session, t.check])
+    .flatMap((span) => (span && span.spawnedAt !== null && span.endedAt === null ? [span.spawnedAt] : []));
+  return open.length === 0 ? null : open.reduce((a, b) => (Date.parse(b) < Date.parse(a) ? b : a));
+}
+
+/** The factory of a run in `namespace`: null for the default factory's, which names none. */
+const factoryOf = (namespace: string | undefined): string | null =>
+  namespace === undefined || namespace === DEFAULT_NAMESPACE ? null : namespace;
 
 /**
- * Every run. Read again on each event of the workflow feed (`useFeed`), and every 5 s while the feed is not followed — every minute while
- * it is.
+ * The board's row of a run (`RunSummary`), off its object: its name and factory (its namespace, `default` for none), what it froze, what
+ * is judged of it, and each step with the agent it froze (`spec.steps`) and when its task at work started (`sinceOf`); its graph without
+ * what a step is handed, which the board draws no edge of.
+ */
+export function runRowOf(run: Run): RunSummary {
+  const { metadata, spec, status } = run;
+  const agents = new Map(spec.steps.map((s) => [s.name, s.agent ?? null]));
+  return {
+    id: metadata.name,
+    repo: spec.repo,
+    factory: factoryOf(metadata.namespace),
+    place: spec.place,
+    work: spec.work,
+    brief: spec.brief,
+    workflowDir: spec.workflowDir,
+    try: spec.try,
+    createdAt: metadata.creationTimestamp,
+    startedAt: status.startedAt,
+    cancelledAt: status.cancelledAt,
+    pruned: status.pruned ? { said: status.pruned.said ?? '' } : null,
+    after: spec.after,
+    context: spec.context,
+    waiting: status.waiting,
+    holdUntil: status.holdUntil,
+    holding: status.holding,
+    status: status.status,
+    phase: status.phase,
+    reason: status.reason,
+    on: status.on,
+    via: status.via,
+    moving: status.moving,
+    cost: status.cost,
+    atWork: status.atWork,
+    tokens: status.tokens,
+    steps: status.steps.map((s): RowStep => ({
+      name: s.name,
+      taskId: s.taskId,
+      branch: s.branch,
+      phase: s.phase,
+      reason: s.reason,
+      on: s.on,
+      via: s.via,
+      message: s.message,
+      verdict: s.verdict,
+      note: s.note,
+      roundDue: s.roundDue,
+      agent: agents.get(s.name) ?? null,
+      since: sinceOf(s),
+      needs: s.needs,
+      waitingFor: s.waitingFor,
+      approve: s.approve,
+      denied: s.denied,
+      sessionUnread: s.sessionUnread,
+    })),
+    graph: {
+      roots: status.graph.roots,
+      edges: status.graph.edges.flatMap((e) => (e.kind === 'input' ? [] : [e])),
+      ...(status.graph.nodes ? { nodes: status.graph.nodes } : {}),
+    },
+    waitingOnYou: status.waitingOnYou,
+    waitingOnYouWords: status.waitingOnYouWords,
+    toDecide: status.toDecide,
+    unreadable: null,
+    labels: metadata.labels,
+  };
+}
+
+/**
+ * The row of a run the list could not judge (`RunUnjudged`): its name, its factory and why (`unreadable`), and nothing judged — `running`
+ * and moving, as the tick counts it in flight, with no step, so its card is bare.
+ */
+export const unjudgedRowOf = (run: RunUnjudged): RunSummary => ({
+  id: run.name,
+  repo: null,
+  factory: factoryOf(run.namespace),
+  place: 'git',
+  work: null,
+  brief: '',
+  workflowDir: '',
+  try: null,
+  createdAt: '',
+  startedAt: null,
+  cancelledAt: null,
+  pruned: null,
+  after: [],
+  context: [],
+  waiting: null,
+  holdUntil: [],
+  holding: null,
+  status: 'running',
+  phase: 'running',
+  reason: 'Running',
+  on: null,
+  via: null,
+  moving: true,
+  cost: null,
+  atWork: null,
+  tokens: null,
+  steps: [],
+  graph: { roots: [], edges: [] },
+  waitingOnYou: [],
+  waitingOnYouWords: [],
+  toDecide: null,
+  unreadable: run.error,
+  labels: {},
+});
+
+/** Every row of a list: each run judged, then each it could not judge, in name order as the list's. */
+export const rowsOf = (list: RunList): RunSummary[] =>
+  [...list.items.map(runRowOf), ...(list.unjudged ?? []).map(unjudgedRowOf)].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+
+/** Every run of `query`, the RunList whole: a plain list, no page and no state, so no run's frame is measured. */
+const everyRun = (query: RunListQuery = {}): Promise<RunSummary[]> => runs.listAll(query).then(rowsOf);
+
+/**
+ * Every run (`GET /api/runs`). Read again on each event of the workflow feed (`useFeed`), and every 5 s while the feed is not followed —
+ * every minute while it is.
  */
 export const runsQuery = queryOptions({
   queryKey: ['runs'],
@@ -238,41 +276,31 @@ export const runsQuery = queryOptions({
   refetchInterval: () => pace(5_000),
 });
 
-/** The runs `selector` takes by their labels (`GET /api/runs-summaries?selector=`), under `['runs']`, read again as it is. */
+/** The runs `selector` takes by their labels (`GET /api/runs?labelSelector=`), under `['runs']`, read again as it is. */
 export const runsSelectedQuery = (selector: string) =>
   queryOptions({
     queryKey: ['runs', ...selectorKey(selector)],
-    queryFn: () => everyRun(selector),
+    queryFn: () => everyRun(selector.trim() === '' ? {} : { labelSelector: selector.trim() }),
     refetchInterval: () => pace(5_000),
   });
 
 /**
- * Mirrors `ListedRun` in agent-orchestrator: the list's own row, its wall time (`wallMs`), when its work stopped, null while it has
- * not, and where that wall time went (`clock`), null where the api could not read it. Every row of both tables carries the clock, which
- * is what its Clock cell breaks down.
+ * A run's row in the frame, as a list asked by state carries it: its wall time to the list's `asOf` (`wallMs`), when its work stopped,
+ * null while it has not, and where that wall time went (`clock`), null where the api could not read it — what its Clock cell breaks down.
  */
 export type ListedRun = RunSummary & { wallMs: number; finishedAt: string | null; clock: RunClock | null };
 
 /**
- * Mirrors `RunClock` in agent-orchestrator: where a run's wall time went, in five parts that add up to `wallMs`: sessions at work,
- * checks running, a wait on a person, a wait for a slot, and the rest.
- */
-export type RunClock = { wallMs: number; sessionsMs: number; checksMs: number; personMs: number; slotMs: number; restMs: number };
-
-/** Mirrors `StepCost` of the light answer: what a step's tries cost; null for a step no cost was measured of. */
-export type StepCost = { step: string; cost: Spent | null };
-
-/**
- * Mirrors `WaitingRun` in agent-orchestrator: a run that waits on a person, with, beyond every row's `clock`, the cost of each of its
- * steps (`stepCosts`) and the instant its present wait on a person began (`waitingSince`), each null where the api could not read it,
- * the last also where the api dates no such wait.
+ * A run that waits on a person, as the frame lists it: beyond every row's `clock`, the cost of each of its steps (`stepCosts`) and the
+ * instant its present wait on a person began (`waitingSince`), each null where the api could not read it, the last also where the api
+ * dates no such wait.
  */
 export type WaitingRun = ListedRun & { stepCosts: StepCost[] | null; waitingSince: string | null };
 
 /**
- * Mirrors `OpenListing` in apps/api/src/runs/runs.ts: the instant it was read at (`asOf`), the runs that wait on a person (`waiting`)
- * and the runs in flight (`inFlight`), each run in one of the two, a run that moves and also waits among the waiting; and `counts` of
- * each and of the finished runs, which the answer lists none of.
+ * The frame, off the list of the runs not finished: the instant it is measured to (`asOf`), the runs that wait on a person (`waiting`)
+ * and the runs in flight (`inFlight`), each in one by its `status.state`, and `counts` of each and of the finished runs, which it lists
+ * none of.
  */
 export type OpenRuns = {
   asOf: string;
@@ -281,123 +309,120 @@ export type OpenRuns = {
   inFlight: ListedRun[];
 };
 
-/** Decodes a `RunClock`. */
-const RunClockSchema = decodes<RunClock>()(
-  Schema.Struct({
-    wallMs: Schema.Number,
-    sessionsMs: Schema.Number,
-    checksMs: Schema.Number,
-    personMs: Schema.Number,
-    slotMs: Schema.Number,
-    restMs: Schema.Number,
-  }),
-);
+/** A run's row with the frame's parts its by-state list carries, each none where a plain list answered. */
+const listedOf = (row: RunSummary, status: Partial<Run['status']>): ListedRun => ({
+  ...row,
+  wallMs: status.wallMs ?? 0,
+  finishedAt: status.finishedAt ?? null,
+  clock: status.clock ?? null,
+});
 
-/** The keys a listed row adds to the whole list's (`ListedRun`). */
-const ListedFields = {
-  ...RunSummarySchema.fields,
-  wallMs: Schema.Number,
-  finishedAt: Schema.NullOr(Schema.String),
-  clock: Schema.NullOr(RunClockSchema),
-};
+/** A waiting run's row, with its steps' costs and the start of its wait. */
+const waitingOf = (row: RunSummary, status: Partial<Run['status']>): WaitingRun => ({
+  ...listedOf(row, status),
+  stepCosts: status.stepCosts ?? null,
+  waitingSince: status.waitingSince ?? null,
+});
 
-/** Decodes a `ListedRun`. */
-const ListedRunSchema = decodes<ListedRun>()(Schema.Struct(ListedFields));
+/** The counts a by-state list carries, none where a list carries none. */
+const NO_COUNTS = { waiting: 0, inFlight: 0, finished: 0 };
 
-/** Decodes a `WaitingRun`: the listed row with its clock, its steps' costs and when its present wait began. */
-const WaitingRunSchema = decodes<WaitingRun>()(
-  Schema.Struct({
-    ...ListedFields,
-    stepCosts: Schema.NullOr(Schema.mutable(Schema.Array(Schema.Struct({ step: Schema.String, cost: Schema.NullOr(SpentSchema) })))),
-    waitingSince: Schema.NullOr(Schema.String),
-  }),
-);
+/** Each run of a by-state list with its state and its frame's parts, judged or not, in name order. */
+const statedOf = (list: RunList): Array<{ row: RunSummary; state: Run['status']['state']; status: Partial<Run['status']> }> =>
+  [
+    ...list.items.map((run) => ({ row: runRowOf(run), state: run.status.state, status: run.status })),
+    ...(list.unjudged ?? []).map((u) => ({ row: unjudgedRowOf(u), state: u.state ?? ('inFlight' as const), status: {} })),
+  ].sort((a, b) => (a.row.id < b.row.id ? -1 : a.row.id > b.row.id ? 1 : 0));
 
-/** Decodes an `OpenRuns`: a waiting row with its costs and its wait besides, each row with its wall time and its clock. */
-const OpenRunsSchema = decodes<OpenRuns>()(
-  Schema.Struct({
-    asOf: Schema.String,
-    counts: Schema.Struct({ waiting: Schema.Number, inFlight: Schema.Number, finished: Schema.Number }),
-    waiting: Schema.mutable(Schema.Array(WaitingRunSchema)),
-    inFlight: Schema.mutable(Schema.Array(ListedRunSchema)),
-  }),
-);
+/** The frame (`OpenRuns`) off the list of the runs not finished: each run in its state's part, the counts and `asOf` the list's. */
+export function openOf(list: RunList): OpenRuns {
+  const stated = statedOf(list);
+  return {
+    asOf: list.metadata.asOf ?? new Date().toISOString(),
+    counts: list.metadata.counts ?? NO_COUNTS,
+    waiting: stated.flatMap((s) => (s.state === 'waiting' ? [waitingOf(s.row, s.status)] : [])),
+    inFlight: stated.flatMap((s) => (s.state === 'waiting' || s.state === 'finished' ? [] : [listedOf(s.row, s.status)])),
+  };
+}
+
+/** The field selector of the frame: every run not finished. */
+export const OPEN_SELECTOR = 'status.state!=finished';
+
+/** The field selector of the finished runs, newest finished first. */
+export const FINISHED_SELECTOR = 'status.state=finished';
+
+/** A list of runs, of every factory or of `factory` alone (its namespace, `default` the runs of none). */
+const listOf = (factory: string | undefined, query: RunListQuery): Promise<RunList> =>
+  factory === undefined ? runs.listAll(query) : runs.list(factory, query);
+
+/** `query` with the label selector `selector` says, none for none. */
+const labelled = (query: RunListQuery, selector: string | undefined): RunListQuery =>
+  selector === undefined || selector.trim() === '' ? query : { ...query, labelSelector: selector.trim() };
 
 /**
- * The light answer (`GET /api/runs-open`): the runs that wait and move with the counts, of every factory, or of `factory` alone
- * (`?ofFactory=`), `default` naming the runs of none. What the board's frame reads on every page. Keyed `['runs-open']`, and
+ * The frame (`GET /api/runs?fieldSelector=status.state!=finished`, or `/api/namespaces/<factory>/runs` for one factory, `default` naming
+ * the runs of none): the runs that wait and move with the counts, what the board's frame reads on every page. Keyed `['runs-open']`, and
  * `['runs-open', factory]` for one factory; read again on each event of the workflow feed (`useFeed`), and paced as `runsQuery` is.
  */
 export const openRunsQuery = (factory?: string, selector?: string) =>
   queryOptions({
     queryKey: [...(factory === undefined ? ['runs-open'] : ['runs-open', factory]), ...selectorKey(selector)],
-    queryFn: () =>
-      get(
-        withSelector(`/api/runs-open${factory === undefined ? '' : `?ofFactory=${encodeURIComponent(factory)}`}`, selector),
-        OpenRunsSchema,
-      ),
+    queryFn: () => listOf(factory, labelled({ fieldSelector: OPEN_SELECTOR }, selector)).then(openOf),
     refetchInterval: () => pace(5_000),
   });
 
-/** How a finished run ended, in the api's words: `undecided` for one whose result nobody has decided. */
-export type RunOutcome = 'succeeded' | 'failed' | 'cancelled' | 'undecided';
-
 /**
- * Mirrors a row of `FinishedListing` in apps/api/src/runs/runs.ts: the list's own row, when its work stopped (`finishedAt`), its wall
- * time from its creation until then (`wallMs`), how it ended (`outcome`), and where that wall time went (`clock`), read where its work
- * stopped and so standing still.
+ * A finished run's row: when its work stopped (`finishedAt`), its wall time from its creation until then (`wallMs`), how it ended
+ * (`outcome`), and where that wall time went (`clock`), read where its work stopped and so standing still.
  */
 export type FinishedRun = RunSummary & { wallMs: number; finishedAt: string; outcome: RunOutcome; clock: RunClock | null };
 
 /**
- * Mirrors `FinishedListing`: one page of the finished runs, newest finished first, read at `asOf`. `total` rows in all, `page` from 1
- * of `pages`, at least one, of `size` rows each. A page past the last is answered with no row, and says the `pages` there are.
+ * One page of the finished runs, newest finished first, measured to `asOf`: `total` finished in all (the list's count), the rows of this
+ * page, and the token of the next, older page (`continue`), null on the last. A token past the last is answered with no row.
  */
-export type FinishedPage = { asOf: string; total: number; page: number; size: number; pages: number; runs: FinishedRun[] };
+export type FinishedPage = { asOf: string; total: number; runs: FinishedRun[]; continue: string | null };
 
-/** Decodes a `FinishedPage`: each row the list's (`RunSummarySchema`) with its three facts and its clock. */
-const FinishedPageSchema = decodes<FinishedPage>()(
-  Schema.Struct({
-    asOf: Schema.String,
-    total: Schema.Number,
-    page: Schema.Number,
-    size: Schema.Number,
-    pages: Schema.Number,
-    runs: Schema.mutable(
-      Schema.Array(
-        Schema.Struct({
-          ...RunSummarySchema.fields,
-          wallMs: Schema.Number,
-          finishedAt: Schema.String,
-          outcome: Schema.Literals(['succeeded', 'failed', 'cancelled', 'undecided']),
-          clock: Schema.NullOr(RunClockSchema),
-        }),
-      ),
-    ),
-  }),
-);
+/**
+ * A page of the finished runs off the list asked `status.state=finished`: each run judged with its finish, in the list's order. A run the
+ * list could not judge has no finish to say and is no row of it; the count holds it.
+ */
+export function finishedOf(list: RunList): FinishedPage {
+  return {
+    asOf: list.metadata.asOf ?? new Date().toISOString(),
+    total: list.metadata.counts?.finished ?? list.items.length,
+    runs: list.items.map((run) => ({
+      ...runRowOf(run),
+      wallMs: run.status.wallMs ?? 0,
+      finishedAt: run.status.finishedAt ?? run.metadata.creationTimestamp,
+      outcome: run.status.outcome ?? 'undecided',
+      clock: run.status.clock ?? null,
+    })),
+    continue: list.metadata.continue || null,
+  };
+}
 
 /** How many finished runs a page of the board holds. */
 export const FINISHED_SIZE = 9;
 
 /**
- * One page of the finished runs (`GET /api/runs-finished`), `FINISHED_SIZE` rows, of every factory, or of `factory` alone
- * (`?ofFactory=`). Keyed `['runs-finished', factory, page]`, the factory null for every factory's; read again on each event of the
- * workflow feed (`useFeed`), and paced as `runsQuery` is.
+ * One page of the finished runs (`GET /api/runs?fieldSelector=status.state=finished&limit=9`), of every factory or of `factory` alone, from
+ * the token the page before it answered, the last of `older` (`continue`), the first page for none. Keyed `['runs-finished', factory,
+ * token]`, the factory and the token null for every factory's and the first page; read again on each event of the workflow feed
+ * (`useFeed`), and paced as `runsQuery` is.
  */
-export const finishedRunsQuery = (factory: string | undefined, page: number, selector?: string) =>
-  queryOptions({
-    queryKey: ['runs-finished', factory ?? null, page, ...selectorKey(selector)],
+export const finishedRunsQuery = (factory: string | undefined, older: readonly string[], selector?: string) => {
+  const from = older.at(-1);
+  return queryOptions({
+    queryKey: ['runs-finished', factory ?? null, from ?? null, ...selectorKey(selector)],
     queryFn: () =>
-      get(
-        withSelector(
-          `/api/runs-finished?page=${page}&size=${FINISHED_SIZE}${factory === undefined ? '' : `&ofFactory=${encodeURIComponent(factory)}`}`,
-          selector,
-        ),
-        FinishedPageSchema,
-      ),
+      listOf(
+        factory,
+        labelled({ fieldSelector: FINISHED_SELECTOR, limit: FINISHED_SIZE, ...(from === undefined ? {} : { continue: from }) }, selector),
+      ).then(finishedOf),
     refetchInterval: () => pace(5_000),
   });
+};
 
 /**
  * What a run started now with this one as context would be handed of it, as the CLI's `concluded` prints it: the run, whether it has

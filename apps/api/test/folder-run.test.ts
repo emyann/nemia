@@ -22,7 +22,7 @@ import type { Card } from 'objects';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor } from './placed.ts';
-import { linesOf, objectOf, specOf, stepOf, summariesOf } from './run-reads.ts';
+import { linesOf, listedOf, listedRuns, objectOf, specOf, stepOf } from './run-reads.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -104,10 +104,9 @@ const GIT_WORD = /\b(branch|base|merge|merged|diff|commit|worktree|repository|re
 test("a folder run read on the board: listed by its kind and place, its page with no repository and its step's folder, its decision with nothing about git, its files served by name", async (t) => {
   const s = story(t);
   await s.test('the runs list shows a folder run with no repository, and says its kind', async () => {
-    const run = (await summariesOf(app())).find((r) => r.id === 'f-notes');
-    assert.ok(run, 'the folder run is listed');
-    assert.equal(run.repo, null);
-    assert.equal(run.place, 'folder');
+    const run = await listedOf(app(), 'f-notes');
+    assert.equal(run.spec.repo, null);
+    assert.equal(run.spec.place, 'folder');
   });
   await s.test(
     "the runs list says each run's place in the store's words: a folder run's, and a repository's for a record with no place",
@@ -130,9 +129,9 @@ test("a folder run read on the board: listed by its kind and place, its page wit
         }),
       );
       try {
-        const listed = await summariesOf(app());
+        const listed = await listedRuns(app());
         assert.deepEqual(
-          listed.map((r) => [r.id, r.place]).sort(([a], [b]) => String(a).localeCompare(String(b))),
+          listed.map((r) => [r.metadata.name, r.spec.place]).sort(([a], [b]) => String(a).localeCompare(String(b))),
           [
             ['f-notes', 'folder'],
             ['r-repo', 'git'],

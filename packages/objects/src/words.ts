@@ -23,6 +23,25 @@ export const RUN_PHASES = [...STEP_PHASES, 'cancelled'] as const;
 export type RunPhase = (typeof RUN_PHASES)[number];
 
 /**
+ * A run's state in the list, each run in exactly one: `waiting`, it waits on a person, though something of it may still move;
+ * `inFlight`, something of it moves, or it is running and waits on nobody; `finished`, every other run. What a RunList's
+ * `?fieldSelector=status.state…` selects by.
+ */
+export const RUN_STATES = ['waiting', 'inFlight', 'finished'] as const;
+
+/** One of `RUN_STATES`. */
+export type RunState = (typeof RUN_STATES)[number];
+
+/**
+ * How a finished run ended: `cancelled`, a person called it off; `undecided`, its work is done and nobody has decided its result;
+ * `succeeded`; or `failed`, every other end.
+ */
+export const RUN_OUTCOMES = ['succeeded', 'failed', 'cancelled', 'undecided'] as const;
+
+/** One of `RUN_OUTCOMES`. */
+export type RunOutcome = (typeof RUN_OUTCOMES)[number];
+
+/**
  * What a step or a run waits on when the wait is a thing's, not a person's (reason `Waiting`): other runs (`run`), the limit on runs in
  * flight (`limit`), the base branch the run lands on, while another run lands there (`base`), the store's pause (`pause`), or a person's
  * hold that names no run, which a person alone lifts (`hold`).

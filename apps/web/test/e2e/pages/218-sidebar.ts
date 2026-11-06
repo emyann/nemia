@@ -3,8 +3,7 @@ import type { Locator, Page } from 'playwright';
 import { notStarted } from '../../../src/lib/inbox.ts';
 import type { CardList } from 'objects';
 import { entriesOf } from '../../../src/lib/api/inbox.ts';
-import type { OpenRuns } from '../../../src/lib/api/runs.ts';
-import { pick, photograph, railPlace, sectionsOf, sidebar, startOf, themeOf } from '../board.ts';
+import { openAnswered, pick, photograph, railPlace, sectionsOf, sidebar, startOf, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FACTORIES, FOLDER } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -43,7 +42,7 @@ async function answer<T>(page: Page, pathname: string): Promise<T> {
  * started; none drawn for none.
  */
 async function countsAre(page: Page, picked: string | undefined, where: string): Promise<void> {
-  const open = await answer<OpenRuns>(page, `/api/runs-open${picked ? `?ofFactory=${picked}` : ''}`);
+  const open = await openAnswered(page, picked || undefined);
   const cards = notStarted(entriesOf(await answer<CardList>(page, '/api/cards')), picked).length;
   await expectTexts(
     badgeOf(page, 'Runs'),

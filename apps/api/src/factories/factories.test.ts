@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { story } from '../../test/checkpoints.ts';
-import { linesOf, summariesOf } from '../../test/run-reads.ts';
+import { linesOf, listedOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
 import { workflowsListed } from '../../test/definitions.ts';
 import {
@@ -284,19 +284,14 @@ test('a person works in a factory with hires: the listing names what is unfilled
       const run = runStore.runs.read(id);
       assert.deepEqual([run.factory, run.repo, run.workflowDir], ['hired', repoR, path.join(repoR, 'workflows', 'alpha')]);
 
-      const listed = { body: await summariesOf(app) };
-      assert.equal(listed.body.find((r) => r.id === id)?.factory, 'hired', 'the list names the factory the run is in');
+      const listed = await listedOf(app, id);
+      assert.equal(listed.metadata.namespace, 'hired', 'the RunList names the factory the run is in');
 
       const address = { from: 'repo', workflow: 'alpha', factory: 'hired', repo: repoR };
       assert.deepEqual(
-        listed.body.find((r) => r.id === id)?.workflowPage,
-        address,
-        "the list gives the address of the run's workflow page, in its factory",
-      );
-      assert.deepEqual(
         (await linesOf(app, id)).workflowPage,
         address,
-        "and so does the lines read beside its object (`…/lines`), which keeps the board's address the run object leaves out",
+        "the lines read beside its object (`…/lines`) give the address of the run's workflow page, in its factory, which the run object and the RunList leave out",
       );
 
       const page = await get<WorkflowStepPage>('/api/workflows/repo/alpha/implement?factory=hired');

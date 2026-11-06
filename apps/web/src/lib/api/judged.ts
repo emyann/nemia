@@ -1,9 +1,9 @@
 /**
- * What a run established, as agent-orchestrator judges it and the api answers it on a run's summary (`GET /api/runs`) and its object's
- * status (`GET /api/runs/:id`): where it stands, who it waits on, what it cost, what to decide. Each type has its schema beside it, which
- * `get` decodes the api's answer with.
+ * What a run established, as agent-orchestrator judges it and the api answers it on a run's object (`GET /api/runs`, `GET
+ * /api/runs/:id`): where it stands, who it waits on, what it cost, what to decide — the words the board's row of a run holds
+ * (`runRowOf`). A type a read of the board's own decodes has its schema beside it, which `get` decodes the api's answer with.
  */
-import { Schema, SchemaTransformation } from 'effect';
+import { Schema } from 'effect';
 import { decodes } from './decodes.ts';
 
 /** A list of strings, as a decoded answer holds it: mutable, as the plain types say. */
@@ -14,16 +14,6 @@ export const StringsSchema = Schema.mutable(Schema.Array(Schema.String));
  * repository, or `folder`, folders the run makes — as a step's `place:` says it.
  */
 export type PlaceKind = 'git' | 'folder';
-
-/** Decodes a `PlaceKind`, and `repository`, its former spelling an api not yet restarted still answers, as `git`. */
-export const PlaceKindSchema = decodes<PlaceKind>()(
-  Schema.Literals(['git', 'folder', 'repository']).pipe(
-    Schema.decodeTo(
-      Schema.Literals(['git', 'folder']),
-      SchemaTransformation.transform({ decode: (kind) => (kind === 'repository' ? 'git' : kind), encode: (kind) => kind }),
-    ),
-  ),
-);
 
 /**
  * Mirrors `RunStatus` in agent-orchestrator: where `assess` puts the run. `failed` is a run in which a step broke; one a person alone
@@ -62,23 +52,6 @@ export type RunToDecide =
     }
   | { kind: 'result'; branches: string[]; said: string; command: string };
 
-/** Decodes a `RunToDecide`, either kind. */
-export const RunToDecideSchema = decodes<RunToDecide>()(
-  Schema.Union([
-    Schema.Struct({
-      kind: Schema.Literal('approve'),
-      step: Schema.String,
-      says: Schema.NullOr(Schema.String),
-      filed: Schema.Boolean,
-      back: StringsSchema,
-      onto: Schema.NullOr(Schema.String),
-      said: Schema.String,
-      command: Schema.String,
-    }),
-    Schema.Struct({ kind: Schema.Literal('result'), branches: StringsSchema, said: Schema.String, command: Schema.String }),
-  ]),
-);
-
 /**
  * Mirrors `Spent` in agent-orchestrator: what sessions cost, as the package adds it up — the dollars of the attempts that ended
  * with a cost on them, how many did and how many ended with none — and `said`, its word for it: `$4.20`, or `≥$4.20` where an ended attempt
@@ -86,31 +59,12 @@ export const RunToDecideSchema = decodes<RunToDecide>()(
  */
 export type Spent = { usd: number; measured: number; unmeasured: number; said: string };
 
-/** Decodes a `Spent`. */
-export const SpentSchema = decodes<Spent>()(
-  Schema.Struct({
-    usd: Schema.Number,
-    measured: Schema.Number,
-    unmeasured: Schema.Number,
-    said: Schema.String,
-  }),
-);
-
 /**
  * Mirrors `AtWork` in agent-orchestrator's timeline/took.ts: a run's time at work, two tasks at once counted once and a wait counted for
  * nothing. `ms` is what ran and ended, `since` the earliest start of what still runs (null when nothing does), `endedAt` the last end once
  * nothing runs.
  */
 export type AtWork = { ms: number; since: string | null; endedAt: string | null };
-
-/** Decodes an `AtWork`. */
-export const AtWorkSchema = decodes<AtWork>()(
-  Schema.Struct({
-    ms: Schema.Number,
-    since: Schema.NullOr(Schema.String),
-    endedAt: Schema.NullOr(Schema.String),
-  }),
-);
 
 /**
  * Mirrors `RunTokens` in agent-orchestrator's timeline/took.ts: the tokens a run's sessions used — `total`, the `input` and its parts
@@ -129,22 +83,6 @@ export type RunTokens = {
   said: string;
   split: string;
 };
-
-/** Decodes a `RunTokens`. */
-export const RunTokensSchema = decodes<RunTokens>()(
-  Schema.Struct({
-    total: Schema.Number,
-    input: Schema.Number,
-    output: Schema.Number,
-    cacheRead: Schema.NullOr(Schema.Number),
-    cacheWrite: Schema.NullOr(Schema.Number),
-    uncached: Schema.NullOr(Schema.Number),
-    measured: Schema.Number,
-    unmeasured: Schema.Number,
-    said: Schema.String,
-    split: Schema.String,
-  }),
-);
 
 /**
  * Mirrors `RunWaiting` in agent-orchestrator: what a run started `--after` still waits on, in the package's words. `runs` are each
@@ -227,13 +165,4 @@ export type StepNeeds = {
   approve: string | null;
   denied: { words: string; calls: string[] } | null;
   sessionUnread: string | null;
-};
-
-/** The fields of a `StepNeeds`, for the schema of a step that carries them to take in with its own (`RunSummarySchema` in runs.ts). */
-export const StepNeedsFields = {
-  needs: Schema.NullOr(Schema.String),
-  waitingFor: Schema.NullOr(Schema.Struct({ words: Schema.String, advice: Schema.String })),
-  approve: Schema.NullOr(Schema.String),
-  denied: Schema.NullOr(Schema.Struct({ words: Schema.String, calls: StringsSchema })),
-  sessionUnread: Schema.NullOr(Schema.String),
 };

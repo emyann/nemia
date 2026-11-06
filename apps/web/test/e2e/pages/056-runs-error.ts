@@ -20,8 +20,9 @@ export default {
     const other = await page.context().newPage();
     try {
       const { problems } = watch(other);
-      await other.route(/\/api\/runs-finished\b/, (route) =>
-        route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: WHY }) }),
+      await other.route(
+        (url) => url.pathname === '/api/runs' && url.searchParams.get('fieldSelector') === 'status.state=finished',
+        (route) => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: WHY }) }),
       );
       await other.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
       await idle(other);
@@ -42,7 +43,7 @@ export default {
       await photographBothWidths(other, OUT, 'runs-error', 'error');
       await contrastHolds(other, ['[role="alert"] p:first-child', '[data-error-reason]']);
       const seen = problems();
-      const refused = /^request answered 500: GET .*\/api\/runs-finished\?/;
+      const refused = /^request answered 500: GET .*\/api\/runs\?.*fieldSelector=status\.state(%3D|=)finished/;
       const said = new RegExp(`^console error: \\w+: ${WHY}\\b`);
       const others = seen.filter(
         (p) =>

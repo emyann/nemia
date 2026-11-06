@@ -1,9 +1,8 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import type { OpenRuns } from '../../../src/lib/api/runs.ts';
 import { bellHash, bellRows, type BellRow } from '../../../src/lib/bell.ts';
 import { waitsOnYou } from '../../../src/lib/factory.ts';
-import { photograph, themeOf, rowsAnswered } from '../board.ts';
+import { openAnswered, photograph, themeOf, rowsAnswered } from '../board.ts';
 import { expectCount, expectOnScreen, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FACTORIES } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -14,11 +13,6 @@ const openerOf = (page: Page): Locator => page.locator('[data-section="waiting"]
 
 /** The floating bar of the runs waiting on you. */
 const waitingBar = (page: Page): Locator => page.getByRole('complementary', { name: 'Waiting on you' });
-
-/** What the api answers at `pathname`, read as the board reads it. */
-async function answer<T>(page: Page, pathname: string): Promise<T> {
-  return (await (await page.request.get(new URL(pathname, page.url()).href)).json()) as T;
-}
 
 /** Goes to `to` in this tab and waits for its reads. */
 async function visit(page: Page, to: string): Promise<void> {
@@ -92,7 +86,7 @@ export default {
   route: '/runs',
   expect: async (page) => {
     try {
-      const rows = bellRows((await answer<OpenRuns>(page, '/api/runs-open')).waiting);
+      const rows = bellRows((await openAnswered(page)).waiting);
       await agrees(page, rows);
       await opens(page, '/runs', rows);
       await opens(page, `/runs?factory=${FACTORIES.others[0]}`, rows);

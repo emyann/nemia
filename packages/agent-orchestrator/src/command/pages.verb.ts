@@ -1,10 +1,9 @@
 /**
- * The board's reads of its runs, each an entry of the command table served on the api alone: every run's summary for its list (`RUNS`),
- * the runs that wait or move with the counts (`RUNS_OPEN`), a page of the finished runs (`RUNS_FINISHED`), and of one of a run's steps a
- * file of its files directory (`STEP_ARTIFACT`) or of its own folder (`STEP_FILE`), the path of one of its tasks through the runtime's
- * lifecycle (`STEP_PATH`), and a read of that task's conversation (`STEP_TRANSCRIPT`). A run is found among those the store lists, never
- * by a path made of its id, and a file by its name, never by a path. The api resolves the task a request names, words the answer for what
- * is not there, and judges what it is handed.
+ * The board's reads of a run's steps, each an entry of the command table served on the api alone: of one of a run's steps a file of its
+ * files directory (`STEP_ARTIFACT`) or of its own folder (`STEP_FILE`), the path of one of its tasks through the runtime's lifecycle
+ * (`STEP_PATH`), and a read of that task's conversation (`STEP_TRANSCRIPT`). A run is found among those the store lists, never by a path
+ * made of its id, and a file by its name, never by a path. The api resolves the task a request names, words the answer for what is not
+ * there, and judges what it is handed.
  */
 import { Effect } from 'effect';
 import { EngineService, asked, tried, type Engine } from '../runtime-client.ts';
@@ -16,8 +15,7 @@ import { isRepositoryRun, type Run } from '../record/record.ts';
 import { verifiesRest } from '../config/config.store.ts';
 import { informerMemo } from '../rest/informer.verb.ts';
 import { HOME } from '../record/record.store.ts';
-import { type FinishedPage, type OpenRuns, runsFinished, runsOpen } from '../runlist/runlist.verb.ts';
-import { type RunSummary, runsSummarized, type SummaryHow } from '../summary/summary.verb.ts';
+import type { SummaryHow } from '../summary/summary.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import type { Labels } from '../labels/labels.ts';
 import { labelSegments, runLabelMap } from '../runlist/runlist.ts';
@@ -104,32 +102,7 @@ const NAME: readonly Positional[] = [{ key: 'name', takes: 'required', kind: 'na
 const runOf = (args: Args): Run | undefined => runStore.runs.find(textOf(args, 'runId') ?? '');
 
 /**
- * Every run's summary, in the store's order (`runsSummarized`): read off the informer and the feed's filing times the caller
- * keeps (`kept.runs`, `kept.filings`), verified as its environment says (`verifiesRest`); a caller that keeps neither judges every run.
- * Of the runs a `selector` takes, where one is given (`selectorsIn`), selected before any is judged.
- */
-export const RUNS: Command<RunSummary[]> = {
-  name: 'runs',
-  usage: '',
-  help: ["every run's summary, for the board's list"],
-  spec: { positionals: [], flags: [selectorFlag('the list of runs')], unknown: (arg) => `the board's list of runs takes no ${arg}.` },
-  check: selectorCheck,
-  writes: false,
-  class: 'read',
-  route: { method: 'GET', path: '/api/runs-summaries', status: 200 },
-  only: {
-    side: 'api',
-    why: "every run judged into a summary, kept between polls while the run rests, which the board's floor, strips and pickers poll: `GET /api/runs` is the RunList, which judges each run it lists; the command line prints each run's lines",
-  },
-  handler: Effect.fnUntraced(function* (args: Args, env?: NodeJS.ProcessEnv, home?: string, kept?: Kept) {
-    const selectors = yield* selectorsIn(args);
-    return yield* runsSummarized(yield* EngineService, { ...howOf(env, home, kept), selectors });
-  }),
-  print: () => [],
-};
-
-/**
- * How a read of the list reads, as `RUNS` does: the informer and the feed's filing times its caller keeps, verified as its
+ * How a read of the list reads, as the inbox's do: the informer and the feed's filing times its caller keeps, verified as its
  * environment says; a caller that keeps neither judges every run.
  */
 export const howOf = (env?: NodeJS.ProcessEnv, home?: string, kept?: Kept): SummaryHow => ({
@@ -138,78 +111,6 @@ export const howOf = (env?: NodeJS.ProcessEnv, home?: string, kept?: Kept): Summ
   filings: kept?.filings ?? { filed: new Map(), cursor: 0 },
   verify: env ? verifiesRest(env) : false,
 });
-
-/**
- * The runs that wait on a person and the runs in flight, with the counts of each and of the finished runs (`runsOpen`), read now: of
- * the factory `factory`, or of every factory where none is given, and of the runs a `selector` takes, selected before they are counted.
- * The waiting runs carry the cost of each step, their clock's parts and
- * when their present wait began.
- */
-export const RUNS_OPEN: Command<OpenRuns> = {
-  name: 'runs open',
-  usage: '',
-  help: ['the runs that wait on a person and the runs in flight, with the counts of each and of the finished'],
-  spec: {
-    positionals: [],
-    flags: [keyed('factory'), selectorFlag('the read of the open runs')],
-    unknown: (arg) => `the board's read of the open runs takes no ${arg}.`,
-  },
-  check: selectorCheck,
-  writes: false,
-  class: 'read',
-  route: { method: 'GET', path: '/api/runs-open', status: 200 },
-  only: {
-    side: 'api',
-    why: "the board's bell and its runs page poll what waits and what moves, apart from the finished runs; the command line lists every run",
-  },
-  handler: Effect.fnUntraced(function* (args: Args, env?: NodeJS.ProcessEnv, home?: string, kept?: Kept) {
-    const selectors = yield* selectorsIn(args);
-    return yield* runsOpen(
-      yield* EngineService,
-      { ...howOf(env, home, kept), selectors },
-      { factory: textOf(args, 'factory'), now: Date.now() },
-    );
-  }),
-  print: () => [],
-};
-
-/**
- * One page of the finished runs, newest first by when their work stopped (`runsFinished`), read now: of the factory `factory`, or of
- * every factory, and of the runs a `selector` takes, selected before the page is cut; page `page`, from 1, of `size` rows, 9 where none
- * is said. Refused (`Invalid`): a page, a size or a selector asked wrongly.
- */
-export const RUNS_FINISHED: Command<FinishedPage> = {
-  name: 'runs finished',
-  usage: '',
-  help: ['one page of the finished runs, newest first by when their work stopped'],
-  spec: {
-    positionals: [],
-    flags: [...['factory', 'page', 'size'].map(keyed), selectorFlag('the read of the finished runs')],
-    unknown: (arg) => `the board's read of the finished runs takes no ${arg}.`,
-  },
-  check: selectorCheck,
-  writes: false,
-  class: 'read',
-  route: { method: 'GET', path: '/api/runs-finished', status: 200 },
-  only: {
-    side: 'api',
-    why: "the board's runs page reads the finished runs a page at a time; the command line lists every run",
-  },
-  handler: Effect.fnUntraced(function* (args: Args, env?: NodeJS.ProcessEnv, home?: string, kept?: Kept) {
-    const selectors = yield* selectorsIn(args);
-    return yield* runsFinished(
-      yield* EngineService,
-      { ...howOf(env, home, kept), selectors },
-      {
-        factory: textOf(args, 'factory'),
-        page: textOf(args, 'page'),
-        size: textOf(args, 'size'),
-        now: Date.now(),
-      },
-    );
-  }),
-  print: () => [],
-};
 
 /** The file `name` of the files directory of the step `step` of the run `id` (`artifactFile`), or null where there is none. */
 export const STEP_ARTIFACT: Command<{ file: Buffer | null }> = {
@@ -299,12 +200,4 @@ export const STEP_TRANSCRIPT: Command<{ events: ConversationEvent[]; cursor: str
 };
 
 /** The board's reads of one run and its steps, in the order the table lists them. */
-export const PAGES: readonly Command[] = [
-  RUNS,
-  RUNS_OPEN,
-  RUNS_FINISHED,
-  STEP_ARTIFACT,
-  STEP_FILE,
-  STEP_PATH,
-  STEP_TRANSCRIPT,
-] as readonly Command[];
+export const PAGES: readonly Command[] = [STEP_ARTIFACT, STEP_FILE, STEP_PATH, STEP_TRANSCRIPT] as readonly Command[];

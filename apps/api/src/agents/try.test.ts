@@ -29,7 +29,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import { story } from '../../test/checkpoints.ts';
-import { objectOf, summariesOf } from '../../test/run-reads.ts';
+import { listedRuns, objectOf } from '../../test/run-reads.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -98,7 +98,6 @@ fs.writeFileSync(
   '---\nworkspace: folder\npermissionMode: dontAsk\nallowedTools: Edit(**)\n---\nWrite the note.\n',
 );
 
-type RunSummary = import('agent-orchestrator').RunSummary;
 type AgentListing = import('./agents.ts').AgentListing;
 
 const json = { 'content-type': 'application/json' };
@@ -141,7 +140,8 @@ function signedOff(taskId: string, cwd: string): void {
   });
 }
 
-const listed = async (): Promise<RunSummary[]> => await summariesOf(app());
+/** Each run of the RunList (`GET /api/runs`): its name (`id`), what it tried (`spec.try`) and whether it moves (`status.moving`). */
+const listed = async () => (await listedRuns(app())).map((r) => ({ id: r.metadata.name, try: r.spec.try, moving: r.status.moving }));
 
 let first = '';
 

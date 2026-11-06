@@ -4,6 +4,7 @@
  * (`judgedFields`), so the object and the list say a run alike. The board reads the object, and a step's tries and told layers at their
  * sub-resources, each its own read.
  */
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
@@ -44,7 +45,7 @@ import { folderFiles, workFolderOf } from '../resource/files.store.ts';
 import { type LastSaid, lastLineOf } from '../resource/checks.verb.ts';
 import { readOf, totalOf, usedOf } from '../resource/usage.ts';
 import type { Run as RunObject, RunSpec, RunStatus, RunStepStatus, StepTold, TryCloseout, TryShort } from './run.model.ts';
-import { runNamespace } from '../run-list/run-list.ts';
+import { runNamespace } from '../run-list/index.ts';
 import { prunedWords } from '../record/record.ts';
 import { prunedKept } from '../prune/prune.ts';
 import { currentOf, raiseReads, runReading, type RunReading, stepsReading, triesIn } from './read.verb.ts';
@@ -311,10 +312,29 @@ export const runObject = Effect.fn('runObject')(function* (run: Run, { memo, inR
 });
 
 /**
- * The run's object (`runObject`) built off its reading in hand (`RunReading`), its parts no stamp watches read now (`diskPartsOf`): what
- * the RunList builds a run of its page with, having judged and read the page in one batch.
+ * The run's object (`runObject`) built off its reading in hand (`RunReading`), its parts no stamp watches read now (`diskPartsOf`): the
+ * object before them (`runObjectCore`) with them laid over (`withDiskParts`).
  */
 export const runObjectOf = Effect.fnUntraced(function* (
+  run: Run,
+  at: RunReading,
+  reads: { readonly said: LastSaid } & Pick<RunReads, 'inRequest' | 'listed'>,
+) {
+  return withDiskParts(yield* runObjectCore(run, at, reads), diskPartsOf(run, at.home, at.folder));
+});
+
+/**
+ * A digest of `value`, its JSON's sha256 cut to 16 hex characters, as every other kind's `resourceVersion` is taken: the same value, the
+ * same word, across a restart too.
+ */
+const runVersion = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 16);
+
+/**
+ * The run's object before its disk parts (`withDiskParts`), built off its reading in hand (`RunReading`): what the RunList builds a run of
+ * its page with, having judged and read the page in one batch, and keeps beside its judgement. Its `resourceVersion` is the digest of
+ * what it holds (`runVersion`), which `withDiskParts` digests again with the parts it lays.
+ */
+export const runObjectCore = Effect.fnUntraced(function* (
   run: Run,
   at: RunReading,
   { said, inRequest, listed = false }: { readonly said: LastSaid } & Pick<RunReads, 'inRequest' | 'listed'>,
@@ -323,25 +343,28 @@ export const runObjectOf = Effect.fnUntraced(function* (
   const stepAt: StepAt = { ...at, used: consumption(at.views, run), said, listed };
   const steps = yield* Effect.forEach(at.names, (name) => stepStatusOf(name, stepAt), { concurrency: 'unbounded' });
   const { factory, workflow } = runLabels(run);
+  const metadata = {
+    name: run.id,
+    namespace: runNamespace(run.factory),
+    creationTimestamp: run.createdAt,
+    labels: metadataLabels({ workflow, factory, ...(run.labels !== undefined ? { labels: run.labels } : {}) }),
+  };
+  const spec = specOf(run, at);
+  const status: RunStatus = {
+    ...judgedFields(run, at.judged, at.views),
+    graph: runInputGraph(at.steps, at.names),
+    timeline: runTimeline(at),
+    steps,
+    ...restOf(run, at, kinds),
+  };
   const object: RunObject = {
     apiVersion: 'nemia/v1',
     kind: 'Run',
-    metadata: {
-      name: run.id,
-      namespace: runNamespace(run.factory),
-      creationTimestamp: run.createdAt,
-      labels: metadataLabels({ workflow, factory, ...(run.labels !== undefined ? { labels: run.labels } : {}) }),
-    },
-    spec: specOf(run, at),
-    status: {
-      ...judgedFields(run, at.judged, at.views),
-      graph: runInputGraph(at.steps, at.names),
-      timeline: runTimeline(at),
-      steps,
-      ...restOf(run, at, kinds),
-    },
+    metadata: { ...metadata, resourceVersion: runVersion({ metadata, spec, status }) },
+    spec,
+    status,
   };
-  return withDiskParts(object, diskPartsOf(run, at.home, at.folder));
+  return object;
 });
 
 /**
@@ -362,16 +385,30 @@ export const diskPartsOf = (run: Run, home: string, folder: RunReading['folder']
   files: (step) => filesOf(run, step),
 });
 
-/** `object` with its disk parts laid over (`RunDiskParts`): a new object, the one handed in left as it was, since a kept one is shared. */
-export const withDiskParts = (object: RunObject, parts: RunDiskParts): RunObject => ({
-  ...object,
-  status: {
-    ...object.status,
+/**
+ * The object before its disk parts (`runObjectCore`) with them laid over (`RunDiskParts`): a new object, the one handed in left as it
+ * was, since a kept one is shared. Its `resourceVersion` is the core's digested with the parts laid (`runVersion`), so it moves when
+ * either does; laid twice, the version is digested twice, so it is laid on the core alone.
+ */
+export const withDiskParts = (object: RunObject, parts: RunDiskParts): RunObject => {
+  const laid = object.status.steps.map((step) => ({ step, files: parts.files(step.name) }));
+  const resourceVersion = runVersion({
+    core: object.metadata.resourceVersion,
     onDisk: parts.onDisk,
     warning: parts.warning,
-    steps: object.status.steps.map((step) => ({ ...step, ...parts.files(step.name) })),
-  },
-});
+    files: laid.map(({ files }) => files),
+  });
+  return {
+    ...object,
+    metadata: { ...object.metadata, resourceVersion },
+    status: {
+      ...object.status,
+      onDisk: parts.onDisk,
+      warning: parts.warning,
+      steps: laid.map(({ step, files }) => ({ ...step, ...files })),
+    },
+  };
+};
 
 /** The run `runId`'s record and its one read, its step `step` named: refused where the run is not judged, or has no such step. */
 const stepRead = Effect.fnUntraced(function* (runId: string, step: string) {

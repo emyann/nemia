@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
-import { objectOf, summariesOf, triesOf } from './run-reads.ts';
+import { listedOf, objectOf, triesOf } from './run-reads.ts';
 import { app } from '../src/app.ts';
 import { approveRun, engine, list, runStore } from 'agent-orchestrator';
 import { runWith } from './builtin-place.ts';
@@ -91,11 +91,8 @@ fs.appendFileSync(
 
 /** What the run object of `id` says of it and its steps (`GET /api/runs/:id`, `status`). */
 const detail = async (id: string) => (await objectOf(app, id)).status;
-const summary = async (id: string) => {
-  const run = (await summariesOf(app)).find((r) => r.id === id);
-  assert.ok(run, `${id} is on the list`);
-  return run;
-};
+/** What the RunList (`GET /api/runs`) says of `id` and its steps (`status`). */
+const summary = async (id: string) => (await listedOf(app, id)).status;
 
 test("a held step closed and not yet settled reads as it signed, never the engine's `between-attempts` for a session still going — as `nemia ls` says", async () => {
   assert.equal(

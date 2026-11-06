@@ -72,10 +72,16 @@ export function keysOf(event: FeedEvent, run?: string): QueryKey[] {
 /** The third word of every key of a step's sub-resources (`stepTriesQuery`, `stepToldQuery`): it stands for each step's, at each stamp. */
 const STEPS = 'steps';
 
-/** The key of the light answer for every factory (`openRunsQuery`), which stands for the one of each factory, keyed under it. */
+/**
+ * The key of the frame's RunList of the runs not finished for every factory (`openRunsQuery`), which stands for the one of each factory,
+ * keyed under it.
+ */
 const OPEN = 'runs-open';
 
-/** The first word of every key of a page of the finished runs (`finishedRunsQuery`): it stands for each factory's every page. */
+/**
+ * The first word of every key of a page of the finished runs' RunList (`finishedRunsQuery`): it stands for each factory's every page, from
+ * whichever token.
+ */
 const FINISHED = 'runs-finished';
 
 /** The first word of every read of the inbox (`inboxQuery`, `inboxAllQuery`, a selector's, a card's page): it stands for each of them. */

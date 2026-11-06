@@ -52,7 +52,8 @@ async function lastRowsClose(page: Page): Promise<void> {
 async function noRowsNoLine(page: Page): Promise<void> {
   const other = await page.context().newPage();
   try {
-    await other.goto(new URL('/runs?page=99', page.url()).href, { waitUntil: 'load' });
+    const past = `f.${Buffer.from(JSON.stringify(['1970-01-01T00:00:00.000Z', ''])).toString('base64url')}`;
+    await other.goto(new URL(`/runs?older=${past}`, page.url()).href, { waitUntil: 'load' });
     await idle(other);
     await expectCount(other.locator('section[data-section="finished"] [data-pager-box]'), 1, 'past the last page, the pager is drawn');
     await expectCount(other.locator('section[data-section="finished"] table'), 0, 'and no table, for no row');

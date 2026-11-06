@@ -1,7 +1,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
-import { FINISHED_SIZE, type FinishedPage, type ListedRun, type OpenRuns, type WaitingRun } from '../../../src/lib/api/runs.ts';
+import type { RunList } from 'objects';
+import {
+  FINISHED_SELECTOR,
+  FINISHED_SIZE,
+  finishedOf,
+  OPEN_SELECTOR,
+  openOf,
+  type FinishedPage,
+  type ListedRun,
+  type OpenRuns,
+  type WaitingRun,
+} from '../../../src/lib/api/runs.ts';
+import type { WorkflowPageAddress } from '../../../src/lib/api/address.ts';
 import { rowsSaid } from '../../../src/lib/finished.ts';
 import { workflowNameOf } from '../../../src/lib/api/workflows.ts';
 import { runClock, titleOf } from '../../../src/lib/factory.ts';
@@ -19,6 +31,9 @@ import {
   themeOf,
   railPlace,
   litOf,
+  finishedAnswered,
+  openAnswered,
+  runListPath,
 } from '../board.ts';
 import { expectBeneath, expectCount, expectNone, expectTexts, expectVisible, idle, literal, Refused, WAIT_MS } from '../checks.ts';
 import { agosRefused } from '../runs-times.ts';
@@ -54,7 +69,7 @@ async function asksOf(page: Page): Promise<string[]> {
   const asked: string[] = [];
   again.on('request', (request) => {
     const url = new URL(request.url());
-    if (request.method() === 'GET' && url.pathname.startsWith('/api/')) asked.push(url.pathname);
+    if (request.method() === 'GET' && url.pathname.startsWith('/api/')) asked.push(decodeURIComponent(`${url.pathname}${url.search}`));
   });
   try {
     await again.goto(page.url(), { waitUntil: 'load' });
@@ -66,10 +81,13 @@ async function asksOf(page: Page): Promise<string[]> {
   return asked;
 }
 
-/** The page asks its two reads, and never the whole list. */
+/** The two reads of the page: the RunList of the runs not finished, and the first page of the finished, nine of them. */
+const TWO_READS = [`/api/runs?fieldSelector=${OPEN_SELECTOR}`, `/api/runs?limit=${FINISHED_SIZE}&fieldSelector=${FINISHED_SELECTOR}`];
+
+/** The page asks its two reads of the RunList by state, and never the whole list. */
 async function twoReads(page: Page): Promise<void> {
   const asked = await asksOf(page);
-  for (const read of ['/api/runs-open', '/api/runs-finished'])
+  for (const read of TWO_READS)
     if (!asked.includes(read)) throw new Refused(`the Runs page asks GET ${read} — it asked ${[...new Set(asked)].join(', ')}`);
   if (asked.includes('/api/runs')) throw new Refused('the Runs page never asks GET /api/runs, the whole list — it did');
 }
@@ -603,32 +621,33 @@ const PRICED = {
   },
 };
 
-/** The rows of each table an answer at `url` carries, if it is one of the two the runs page reads. */
-const rowsAt = (url: URL, body: unknown): Array<[keyof typeof PRICED, ListedRun[]]> =>
-  url.pathname === '/api/runs-open'
-    ? [['in-flight', (body as OpenRuns).inFlight]]
-    : url.pathname === '/api/runs-finished'
-      ? [['finished', (body as FinishedPage).runs]]
-      : [];
+/** The runs of each table an answer at `url` carries, if it is one of the two RunLists by state the runs page reads. */
+const rowsAt = (url: URL, body: unknown): Array<[keyof typeof PRICED, RunList['items']]> => {
+  const field = url.pathname === '/api/runs' ? url.searchParams.get('fieldSelector') : null;
+  const items = (body as Partial<RunList>).items ?? [];
+  if (field === OPEN_SELECTOR) return [['in-flight', items.filter((run) => run.status.state === 'inFlight')]];
+  return field === FINISHED_SELECTOR ? [['finished', items]] : [];
+};
 
-/** An answer of the runs page with each table's first row priced (`PRICED`). */
+/** An answer of the runs page with each table's first run priced (`PRICED`), in its status. */
 const pricedIn = <T>(url: URL, body: T): T => {
-  for (const [table, rows] of rowsAt(url, body)) if (rows[0]) Object.assign(rows[0], PRICED[table]);
+  for (const [table, rows] of rowsAt(url, body)) if (rows[0]) Object.assign(rows[0].status, PRICED[table]);
   return body;
 };
 
 /** The runs page's two answers with each table's first row priced, routed in the page and let go by `back`. */
 async function pricedRows(page: Page): Promise<{ open: OpenRuns; finished: FinishedPage; back: () => Promise<void> }> {
-  const isRuns = (url: URL) => rowsAt(url, { inFlight: [], runs: [] }).length > 0;
+  const isRuns = (url: URL) => rowsAt(url, { items: [] }).length > 0;
   await page.route(isRuns, async (route) => {
     const response = await route.fetch();
     await route.fulfill({ response, json: pricedIn(new URL(route.request().url()), await response.json()) });
   });
   await page.reload({ waitUntil: 'load' });
   await idle(page);
-  const read = async <T>(pathname: string): Promise<T> => pricedIn(new URL(pathname, page.url()), await answered<T>(page, pathname));
-  const open = await read<OpenRuns>('/api/runs-open');
-  const finished = await read<FinishedPage>(`/api/runs-finished?page=1&size=${FINISHED_SIZE}`);
+  const read = async (pathname: string): Promise<RunList> =>
+    pricedIn(new URL(pathname, page.url()), await answered<RunList>(page, pathname));
+  const open = openOf(await read(runListPath(undefined, { fieldSelector: OPEN_SELECTOR })));
+  const finished = finishedOf(await read(runListPath(undefined, { fieldSelector: FINISHED_SELECTOR, limit: String(FINISHED_SIZE) })));
   const back = async () => {
     await page.unroute(isRuns);
     await page.reload({ waitUntil: 'load' });
@@ -709,10 +728,11 @@ function finishedDrawn(page: Page): { last: () => FinishedPage | undefined; stop
   let last: FinishedPage | undefined;
   const seen = (response: Response) => {
     const url = new URL(response.url());
-    if (url.pathname !== '/api/runs-finished' || url.searchParams.get('page') !== '1' || url.searchParams.has('ofFactory')) return;
+    if (url.pathname !== '/api/runs' || url.searchParams.get('fieldSelector') !== FINISHED_SELECTOR || url.searchParams.has('continue'))
+      return;
     if (response.ok())
       response.json().then(
-        (body: FinishedPage) => void (last = body),
+        (body: RunList) => void (last = finishedOf(body)),
         () => undefined,
       );
   };
@@ -761,7 +781,7 @@ async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage, given
   );
   await expectNone(async () => {
     const last = given();
-    if (!last) return 'the page was given no answer of /api/runs-finished?page=1 to draw its rows against';
+    if (!last) return 'the page was given no first page of the finished RunList to draw its rows against';
     const asOf = new Date(last.asOf);
     const whens = finished.runs.map((run) => [run.createdAt, run.finishedAt].map((at) => agoWords(new Date(at), asOf)).join('|'));
     const said = await section(page, 'finished')
@@ -790,17 +810,21 @@ async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage, given
     );
   const refused = agosRefused(drawn);
   if (refused !== null) throw new Refused(refused);
-  await expectTexts(page.locator('[data-pager-rows]'), [rowsSaid(finished)], 'the pager says the rows of the first page');
+  const at = { trail: [], next: finished.continue, count: finished.runs.length, total: finished.total, size: FINISHED_SIZE };
+  await expectTexts(page.locator('[data-pager-rows]'), [rowsSaid(at)], 'the pager says the rows of the first page');
 }
 
-/** Where a finished run's workflow link leads: its workflow's page in the run's place where the api pages one, else the Workflows page. */
-const workflowAddress = (run: FinishedPage['runs'][number]): { path: string; search: Record<string, string> } =>
-  run.workflowPage
+/**
+ * Where a finished run's workflow link leads: its workflow's page in the run's place where its lines page one (`workflowPage`), else the
+ * Workflows page.
+ */
+const workflowAddress = (workflowPage: WorkflowPageAddress | null): { path: string; search: Record<string, string> } =>
+  workflowPage
     ? {
-        path: `/workflows/${encodeURIComponent(run.workflowPage.from)}/${encodeURIComponent(run.workflowPage.workflow)}`,
+        path: `/workflows/${encodeURIComponent(workflowPage.from)}/${encodeURIComponent(workflowPage.workflow)}`,
         search: {
-          ...(run.workflowPage.factory ? { factory: run.workflowPage.factory } : {}),
-          ...(run.workflowPage.repo ? { repo: run.workflowPage.repo } : {}),
+          ...(workflowPage.factory ? { factory: workflowPage.factory } : {}),
+          ...(workflowPage.repo ? { repo: workflowPage.repo } : {}),
         },
       }
     : { path: '/workflows', search: {} };
@@ -827,8 +851,13 @@ async function workflowsSay(page: Page, finished: FinishedPage): Promise<void> {
   const said = await links.evaluateAll((all) =>
     all.map((link) => ({ title: link.getAttribute('title') ?? '', href: link.getAttribute('href') ?? '' })),
   );
+  const pages = await Promise.all(
+    finished.runs.map(
+      async (run) => (await answered<{ workflowPage: WorkflowPageAddress | null }>(page, `/api/runs/${run.id}/lines`)).workflowPage,
+    ),
+  );
   const wrong = finished.runs.flatMap((run, i) => {
-    const want = workflowAddress(run);
+    const want = workflowAddress(pages[i] ?? null);
     const got = addressParts(said[i]?.href ?? '');
     return said[i]?.title === run.workflowDir && JSON.stringify(got) === JSON.stringify(want)
       ? []
@@ -842,7 +871,7 @@ async function workflowsSay(page: Page, finished: FinishedPage): Promise<void> {
     throw new Refused(`and each run's title, a link cut to its room, is whole on hover — ${titled.join(', ')}`);
   const [first] = finished.runs;
   if (!first) throw new Refused('the seed holds a finished run, to press its workflow');
-  const want = workflowAddress(first);
+  const want = workflowAddress(pages[0] ?? null);
   await links.first().click();
   await page.waitForURL((url) => url.pathname === want.path, { timeout: WAIT_MS });
   const at = addressParts(page.url());
@@ -1093,8 +1122,8 @@ function regatedBack(): void {
 /** What the page asserts while REGATED is in the store, from its two reads to the menu's places and back. */
 async function withRegated(page: Page, drawn: () => FinishedPage | undefined): Promise<void> {
   await regated(page);
-  const open = await answered<OpenRuns>(page, '/api/runs-open');
-  const finished = await answered<FinishedPage>(page, `/api/runs-finished?page=1&size=${FINISHED_SIZE}`);
+  const open = await openAnswered(page);
+  const finished = await finishedAnswered(page);
   await twoReads(page);
   await threeParts(page, open, finished);
   for (const run of open.waiting) {

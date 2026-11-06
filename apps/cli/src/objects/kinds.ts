@@ -28,7 +28,7 @@ import {
 } from 'objects';
 import type { ObjectsClient } from '../objects.ts';
 
-/** What every kind's metadata carries: the Run's has no `resourceVersion`. */
+/** What every kind's metadata carries: a Run served before it had one carries no `resourceVersion`. */
 export type ServedMeta = Pick<ObjectMeta, 'name' | 'namespace' | 'labels' | 'creationTimestamp'> & {
   readonly resourceVersion?: string;
 };

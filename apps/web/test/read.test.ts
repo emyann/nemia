@@ -11,7 +11,17 @@ import path from 'node:path';
 import ts from 'typescript';
 import * as api from '../src/lib/api.ts';
 import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
-import { openRunsQuery, runsQuery, runsSelectedQuery, type OpenRuns, type RunSummary } from '../src/lib/api/runs.ts';
+import {
+  openRunsQuery,
+  runRowOf,
+  runsQuery,
+  runsSelectedQuery,
+  unjudgedRowOf,
+  type OpenRuns,
+  type RunSummary,
+} from '../src/lib/api/runs.ts';
+import type { StepView } from '../src/lib/runView.ts';
+import { detail, runList, runObject, step } from './run-fixtures.ts';
 
 const DIR = path.resolve(import.meta.dirname, '../src/lib/api');
 
@@ -24,118 +34,120 @@ function answering(t: { after: (fn: () => void) => void }, body: unknown, status
   });
 }
 
-/** A row of `GET /api/runs` as the api answers it: every key the board reads, each shape the unions have. */
-const row = (extra: object = {}): RunSummary => ({
-  labels: {},
-  id: 'r-1',
-  repo: '/work/repo',
-  factory: 'nemia',
-  place: 'git',
-  work: null,
-  brief: 'Decode the reads',
-  workflowDir: '/work/workflows/build',
-  workflowPage: null,
-  try: null,
-  createdAt: '2026-09-30T05:00:00.000Z',
-  startedAt: null,
-  cancelledAt: null,
-  pruned: { said: 'removed 2 worktrees' },
-  after: ['r-0'],
-  waiting: {
-    runs: [{ run: 'r-0', missing: false, cancelledAt: null, gone: [] }],
-    word: 'waiting on r-0',
-    advice: 'wait',
-    waitingOnYou: false,
-  },
-  context: [],
-  holdUntil: [],
-  holding: {
-    at: '2026-09-30T05:00:00.000Z',
-    runs: [{ run: 'r-0', missing: false, cancelledAt: null, gone: [], landed: false }],
-    word: 'held until r-0 lands',
-    advice: 'wf hold r-1 --off',
-    waitingOnYou: true,
-  },
-  status: 'running',
-  phase: 'pending',
-  reason: 'Waiting',
-  on: 'run',
-  via: null,
-  moving: true,
-  cost: { usd: 4.2, measured: 1, unmeasured: 0, said: '$4.20' },
-  atWork: { ms: 1_920_000, since: null, endedAt: '2026-09-30T05:40:00.000Z' },
-  tokens: {
-    total: 3_040_000,
-    input: 3_000_000,
-    output: 40_000,
-    cacheRead: 2_700_000,
-    cacheWrite: 230_000,
-    uncached: 70_000,
-    measured: 2,
-    unmeasured: 0,
-    said: '3.04M tokens',
-    split: '2.7M read from the cache · 230k written to it · 70k uncached · 40k out',
-  },
-  steps: [
-    {
-      name: 'implement',
-      taskId: 't-1',
-      branch: 'wf/r-1/implement',
-      phase: 'waiting',
-      reason: 'AwaitingAnswer',
-      on: null,
-      via: 'closeout',
-      message: 'succeeded · BLOCKED',
-      verdict: null,
-      note: 'try 1',
-      roundDue: false,
-      agent: null,
-      since: null,
-      needs: 'a decision',
-      waitingFor: { words: 'a permission', advice: 'answer it' },
-      approve: null,
-      denied: { words: 'denied: Skill(look)', calls: ['Skill(look)'] },
-      sessionUnread: "`ae/t-1/1`'s output cannot be read",
-    },
-  ],
-  graph: {
-    roots: ['implement'],
+type TimelineTry = StepView['timeline'][number];
+
+/** A try of a step whose session started at `spawnedAt` and ended at `endedAt`, null while it runs; a check where `check` gives one. */
+const tried = (n: number, spawnedAt: string, endedAt: string | null, check?: [string, string | null]): TimelineTry => {
+  const span = (from: string, to: string | null) => ({
+    taskId: `t-${n}`,
+    at: to === null ? ('running' as const) : ('ended' as const),
+    filedAt: from,
+    spawnedAt: from,
+    endedAt: to,
+    attempts: 1,
+    queuedMs: 0,
+    ranMs: null,
+    queued: '0s',
+    ran: '',
+  });
+  return { try: n, round: 1, session: span(spawnedAt, endedAt), sessionOf: null, check: check ? span(...check) : null, used: null };
+};
+
+/** The run `runRowOf` is shown: two steps, the first given an agent, its tries `timeline`, in `namespace`. */
+const object = (timeline: TimelineTry[], namespace?: string) => {
+  const view = detail({ id: 'r-1', steps: [step({ name: 'plan', timeline }), step({ name: 'land', timeline: [] })] });
+  const graph = {
+    roots: ['plan'],
     edges: [
-      { from: 'implement', to: 'review', kind: 'after' },
-      { from: 'review', to: 'implement', kind: 'loop', rounds: 3 },
+      { from: 'plan', to: 'land', kind: 'after' as const },
+      { from: 'plan', to: 'land', kind: 'input' as const },
     ],
-  },
-  waitingOnYou: ['implement'],
-  waitingOnYouWords: ['implement'],
-  toDecide: {
-    kind: 'approve',
-    step: 'ship',
-    says: null,
-    filed: false,
-    back: ['implement'],
-    onto: 'main',
-    said: 'approve ship',
-    command: 'wf approve r-1 ship',
-  },
-  unreadable: null,
-  ...extra,
-});
+  };
+  const run = runObject(view, { graph }, namespace);
+  const [plan, land] = run.spec.steps;
+  return {
+    ...run,
+    spec: {
+      ...run.spec,
+      steps: [
+        { ...plan, name: 'plan', agent: 'planner' },
+        { ...land, name: 'land' },
+      ],
+    },
+  };
+};
 
 const readRuns = runsQuery.queryFn as unknown as () => Promise<RunSummary[]>;
 
-/** Whether `err` is an `UnreadAnswer` of the runs' summaries whose message names `at` and what was found there. */
-const unread = (at: string, found: string) => (err: unknown) => {
-  assert.ok(err instanceof UnreadAnswer, String(err));
-  assert.ok(err.message.includes(`at ${at}, `), err.message);
-  assert.ok(err.message.includes(found), err.message);
-  assert.equal(err.route, 'GET /api/runs-summaries');
-  return true;
-};
-
-/** The light answer read for `factory`, or for every factory, with no context of a query's. */
+/** The frame read for `factory`, or for every factory, with no context of a query's. */
 const readOpen = (factory?: string) => (openRunsQuery(factory).queryFn as unknown as () => Promise<OpenRuns>)();
 
-test("the light answer decodes what the api gives, a waiting run with its clock and its steps' costs, asks for one factory by its name encoded, and keeps no key it does not read", async (t) => {
+test("runRowOf: a run's row off its object — its factory from its namespace, each step's agent from its spec, and since", async (t) => {
+  await t.test("a step's since is the earliest spawnedAt of a session or check of it that has not ended", () => {
+    const run = object([
+      tried(1, '2026-10-12T10:00:00.000Z', '2026-10-12T10:05:00.000Z'),
+      tried(2, '2026-10-12T10:20:00.000Z', null, ['2026-10-12T10:10:00.000Z', null]),
+      tried(3, '2026-10-12T10:15:00.000Z', null),
+    ]);
+    const row = runRowOf(run);
+    assert.equal(row.steps[0].since, '2026-10-12T10:10:00.000Z');
+    assert.equal(row.steps[1].since, null, 'a step never tried has none');
+  });
+  await t.test('REFUSED: a step all of whose spans have ended has no since', () => {
+    const run = object([
+      tried(1, '2026-10-12T10:00:00.000Z', '2026-10-12T10:05:00.000Z', ['2026-10-12T10:06:00.000Z', '2026-10-12T10:07:00.000Z']),
+    ]);
+    assert.equal(runRowOf(run).steps[0].since, null);
+  });
+  await t.test("the factory is the run's namespace, none for the default factory's", () => {
+    assert.equal(runRowOf(object([], 'harbour')).factory, 'harbour');
+    assert.equal(runRowOf(object([], 'default')).factory, null);
+    assert.equal(runRowOf(object([])).factory, null);
+  });
+  await t.test("each step's agent is the one its spec froze, none for a step given none; the graph keeps no input edge", () => {
+    const row = runRowOf(object([]));
+    assert.deepEqual(
+      row.steps.map((s) => [s.name, s.agent]),
+      [
+        ['plan', 'planner'],
+        ['land', null],
+      ],
+    );
+    assert.deepEqual(row.graph.edges, [{ from: 'plan', to: 'land', kind: 'after' }]);
+    assert.deepEqual([row.id, row.createdAt, row.unreadable], ['r-1', object([]).metadata.creationTimestamp, null]);
+  });
+  await t.test('a run the list could not judge is an unreadable row: its name, its factory and why, bare', () => {
+    const row = unjudgedRowOf({ name: 'r-9', namespace: 'harbour', error: 'journal t-9 does not read', state: 'inFlight' });
+    assert.deepEqual([row.id, row.factory, row.unreadable, row.steps.length], ['r-9', 'harbour', 'journal t-9 does not read', 0]);
+    assert.deepEqual([row.status, row.moving], ['running', true]);
+    assert.equal(unjudgedRowOf({ name: 'r-9', namespace: 'default', error: 'x' }).factory, null);
+  });
+});
+
+test('every run is the plain RunList whole, a label selector going with it, each run it could not judge a row in name order', async (t) => {
+  const asked: string[] = [];
+  const before = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    asked.push(String(input));
+    const list = runList([runObject(detail({ id: 'r-2' }))], {}, [{ name: 'r-1', namespace: 'default', error: 'unread' }]);
+    return new Response(JSON.stringify(list), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  t.after(() => {
+    globalThis.fetch = before;
+  });
+  const rows = await readRuns();
+  assert.deepEqual(
+    rows.map((row) => [row.id, row.unreadable]),
+    [
+      ['r-1', 'unread'],
+      ['r-2', null],
+    ],
+  );
+  await (runsSelectedQuery('team=blue').queryFn as unknown as () => Promise<RunSummary[]>)();
+  assert.deepEqual(asked.map(decodeURIComponent), ['/api/runs', '/api/runs?labelSelector=team=blue'], 'no state, no page: the list whole');
+});
+
+test("the frame is the RunList of the runs not finished, split by each run's state, with the list's counts and asOf", async (t) => {
   const asked: string[] = [];
   const before = globalThis.fetch;
   const clock = { wallMs: 5, sessionsMs: 1, checksMs: 1, personMs: 1, slotMs: 1, restMs: 1 };
@@ -143,110 +155,55 @@ test("the light answer decodes what the api gives, a waiting run with its clock 
     { step: 'plan', cost: { usd: 1.5, measured: 1, unmeasured: 0, said: '$1.50' } },
     { step: 'land', cost: null },
   ];
-  const listed = { wallMs: 5, finishedAt: null, clock };
-  const answer = {
-    asOf: '2026-10-12T12:00:00.000Z',
-    counts: { waiting: 1, inFlight: 1, finished: 7 },
-    waiting: [{ ...row(), ...listed, clock, stepCosts, waitingSince: '2026-10-12T11:57:00.000Z' }],
-    inFlight: [{ ...row({ id: 'r-2' }), ...listed }],
-  };
+  const parts = { wallMs: 5, clock, finishedAt: null, outcome: null };
+  const list = runList(
+    [
+      runObject(detail({ id: 'r-1' }), { ...parts, state: 'waiting', stepCosts, waitingSince: '2026-10-12T11:57:00.000Z' }),
+      runObject(detail({ id: 'r-3' }), { ...parts, state: 'inFlight', stepCosts: null, waitingSince: null }),
+    ],
+    { asOf: '2026-10-12T12:00:00.000Z', counts: { waiting: 1, inFlight: 2, finished: 7 } },
+    [{ name: 'r-2', error: 'unread', state: 'inFlight' }],
+  );
   globalThis.fetch = async (input) => {
     asked.push(String(input));
-    return new Response(
-      JSON.stringify({
-        ...answer,
-        unknown: 1,
-        waiting: answer.waiting.map((run) => ({ ...run, page: 1 })),
-        inFlight: answer.inFlight.map((run) => ({ ...run, stepCosts, page: 1 })),
-      }),
-      { status: 200, headers: { 'content-type': 'application/json' } },
-    );
+    return new Response(JSON.stringify(list), { status: 200, headers: { 'content-type': 'application/json' } });
   };
   t.after(() => {
     globalThis.fetch = before;
   });
-  assert.deepEqual(await readOpen(), answer);
-  assert.deepEqual(await readOpen('a b'), answer);
-  assert.deepEqual(asked, ['/api/runs-open', '/api/runs-open?ofFactory=a%20b']);
+  const open = await readOpen();
+  assert.equal(open.asOf, '2026-10-12T12:00:00.000Z');
+  assert.deepEqual(open.counts, { waiting: 1, inFlight: 2, finished: 7 });
+  assert.deepEqual(
+    open.waiting.map((run) => [run.id, run.wallMs, run.clock, run.stepCosts, run.waitingSince]),
+    [['r-1', 5, clock, stepCosts, '2026-10-12T11:57:00.000Z']],
+  );
+  assert.deepEqual(
+    open.inFlight.map((run) => [run.id, run.unreadable, run.wallMs]),
+    [
+      ['r-2', 'unread', 0],
+      ['r-3', null, 5],
+    ],
+  );
+  await readOpen('a b');
+  assert.deepEqual(asked.map(decodeURIComponent), [
+    '/api/runs?fieldSelector=status.state!=finished',
+    '/api/namespaces/a b/runs?fieldSelector=status.state!=finished',
+  ]);
   assert.deepEqual(openRunsQuery().queryKey, ['runs-open']);
   assert.deepEqual(openRunsQuery('a b').queryKey, ['runs-open', 'a b']);
 });
 
-test('the Runs list decodes an answer the api gives, each union in its every shape', async (t) => {
-  const result = row({ toDecide: { kind: 'result', branches: ['wf/r-1/implement'], said: 'merge', command: 'git merge' } });
-  answering(t, [row(), result, row({ place: 'folder', waiting: null, holding: null, cost: null, toDecide: null, pruned: null })]);
-  const runs = await readRuns();
-  assert.equal(runs.length, 3);
-  assert.deepEqual(runs[0], row());
-  assert.deepEqual(runs[1], result);
-});
-
-test('REFUSED: a row whose status is no word the board knows', async (t) => {
-  answering(t, [row(), row({ status: 'nonsense' })]);
-  await assert.rejects(
-    readRuns(),
-    unread('[1].status', '"nonsense", where the board reads "running" | "succeeded" | "failed" | "cancelled"'),
+test('REFUSED: a run whose status is no word the board knows is an answer unread, of the list', async (t) => {
+  const run = runObject();
+  (run.status as { status: string }).status = 'nonsense';
+  answering(t, runList([run]));
+  const err: unknown = await readRuns().then(
+    () => assert.fail('a status of no word was read'),
+    (e: unknown) => e,
   );
-});
-
-test('REFUSED: a row whose steps are not an array', async (t) => {
-  answering(t, [row({ steps: { implement: 'blocked' } })]);
-  await assert.rejects(readRuns(), unread('[0].steps', '{"implement":"blocked"}, where the board reads array'));
-});
-
-test('REFUSED: a step without a key the board reads, and a value quoted to 60 characters', async (t) => {
-  const [step] = row().steps;
-  const { waitingFor: _, ...without } = step;
-  answering(t, [row({ steps: [without] })]);
-  await assert.rejects(readRuns(), unread('[0].steps[0].waitingFor', 'is missing'));
-
-  const { via: __, ...unqualified } = step;
-  answering(t, [row({ steps: [unqualified] })]);
-  await assert.rejects(readRuns(), unread('[0].steps[0].via', 'is missing'));
-  const { on: ___, ...runUnqualified } = row();
-  answering(t, [runUnqualified]);
-  await assert.rejects(readRuns(), unread('[0].on', 'is missing'));
-  answering(t, [row({ on: 'slot' })]);
-  await assert.rejects(readRuns(), unread('[0].on', '"slot", where'));
-
-  answering(t, [row({ brief: 7 })]);
-  await assert.rejects(readRuns(), unread('[0].brief', '7, where'));
-  answering(t, [row({ graph: 'x'.repeat(100) })]);
-  await assert.rejects(readRuns(), unread('[0].graph', `"${'x'.repeat(58)}…, where`));
-});
-
-test('REFUSED: an answer that is no list at all is refused at the answer itself', async (t) => {
-  answering(t, { runs: [] });
-  await assert.rejects(readRuns(), unread('the answer', '{"runs":[]}, where the board reads array'));
-});
-
-test('a key the board does not know is dropped, not refused', async (t) => {
-  answering(t, [row({ colour: 'blue', steps: [{ ...row().steps[0], mood: 'calm' }] })]);
-  const [run] = await readRuns();
-  assert.equal(Object.hasOwn(run, 'colour'), false);
-  assert.equal(Object.hasOwn(run.steps[0], 'mood'), false);
-  assert.deepEqual(run, row());
-});
-
-test('every run is one read of the summaries, a selector going with it, and never the RunList', async (t) => {
-  const asked: string[] = [];
-  const before = globalThis.fetch;
-  globalThis.fetch = async (input) => {
-    asked.push(String(input));
-    return new Response(JSON.stringify([row()]), { status: 200, headers: { 'content-type': 'application/json' } });
-  };
-  t.after(() => {
-    globalThis.fetch = before;
-  });
-  await readRuns();
-  await (runsSelectedQuery('team=blue').queryFn as unknown as () => Promise<RunSummary[]>)();
-  const paths = asked.map((at) => new URL(at, 'http://board'));
-  assert.deepEqual(
-    paths.map((at) => at.pathname),
-    ['/api/runs-summaries', '/api/runs-summaries'],
-    'the RunList judges every run it lists: a poll reads the summaries',
-  );
-  assert.equal(paths[1]?.searchParams.get('selector'), 'team=blue');
+  assert.ok(err instanceof UnreadAnswer, String(err));
+  assert.equal(err.route, 'GET /api/runs');
 });
 
 test("a read the api refused still rejects in the api's words and status, not as an answer unread", async (t) => {

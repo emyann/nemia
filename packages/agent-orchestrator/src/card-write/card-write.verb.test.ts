@@ -16,7 +16,7 @@ const { RunDoor } = await import('../runs/runs.store.ts');
 const { runDoorMemory } = await import('../runs/memory.store.ts');
 const { CardDoor } = await import('../cards/cards.store.ts');
 const { cardDoorMemory } = await import('../cards/memory.store.ts');
-const { CardName } = await import('./inbox.model.ts');
+const { CardName } = await import('../inbox/inbox.model.ts');
 const { aRun } = await import('../../test/run-walks.ts');
 
 const QUEUED = '2026-11-01T10:00:00.000Z';

@@ -1,6 +1,6 @@
 /**
  * Whether a card may be written whole through the Card's update (`PUT /api/namespaces/<factory>/cards/<name>`, `nemia apply`), and why
- * not (agent-orchestrator, src/inbox/card-write.ts, `cardWriteRefusal`), before anything is written: a card a run's record says was
+ * not (agent-orchestrator, src/card-write/card-write.ts, `cardWriteRefusal`), before anything is written: a card a run's record says was
  * started keeps its file as its run read it (`started`, a Conflict, as `nemia inbox from` refuses one); a write that hands back the
  * `resourceVersion` it read, where the card now has another, is stale (`stale`, a Conflict); `queued` is a person's intent said by the
  * card's actions (`nemia inbox queue`, the Card's `queue` and `unqueue`), so a write that changes it is refused (`queued`, an Invalid
@@ -61,5 +61,5 @@ const cardWriteRefusalSpec = spec<(ask: CardWriteAsk) => CardWriteRefusal | null
   },
 });
 
-/** `cardWriteRefusal`'s type, which src/inbox/card-write.ts takes. */
+/** `cardWriteRefusal`'s type, which src/card-write/card-write.ts takes. */
 export type CardWriteRefusalOf = Implementation<typeof cardWriteRefusalSpec>;

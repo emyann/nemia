@@ -14,11 +14,11 @@ import { CardDoor } from '../cards/cards.store.ts';
 import { CardName } from '../inbox/inbox.model.ts';
 import { CARD_IN_PLAY, cardLabels, type InboxListing, parseInboxCard } from '../inbox/index.ts';
 import { inboxJudged } from '../inbox/inbox.verb.ts';
-import { cardVersion } from '../inbox/card-write.verb.ts';
+import { cardVersion } from '../card-write/card-write.verb.ts';
 
 /** The Card's whole write, served beside its reads (`update`): the api reads it off the package's entry with them. */
-export { cardWriteRefusal } from '../inbox/card-write.ts';
-export { replaceCard, type CardReplaced } from '../inbox/card-write.verb.ts';
+export { cardWriteRefusal } from '../card-write/index.ts';
+export { replaceCard, type CardReplaced } from '../card-write/card-write.verb.ts';
 import type { SummaryHow } from '../summary/summary.verb.ts';
 import type { Engine } from '../runtime-client.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';

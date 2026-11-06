@@ -117,13 +117,14 @@ function writable<S>(
 }
 
 /**
- * A card's spec with its `queued` as the api serves it: the queue is `nemia inbox queue`'s and the tick's, so a write sends back the time
- * it read, and a file that leaves it out, or says another, changes nothing of it.
+ * A card's spec with its `queued` as the file says it, or, where the file leaves the key out, as the api serves it: the queue is `nemia
+ * inbox queue`'s and the tick's, so a file that says another time is sent as it is and refused by the api, naming that command, and a
+ * file written by hand with no `queued` keeps the card's.
  */
 const queuedAsServed = (spec: CardSpec, served: Served | null): CardSpec => {
-  const { queued: _filed, ...rest } = spec;
+  if (spec.queued !== undefined) return spec;
   const was = typeof served?.spec === 'object' && served.spec !== null && 'queued' in served.spec ? served.spec.queued : undefined;
-  return typeof was === 'string' ? { ...rest, queued: was } : rest;
+  return typeof was === 'string' ? { ...spec, queued: was } : spec;
 };
 
 /** A namespace's object by its name, and the list of a namespace's. */

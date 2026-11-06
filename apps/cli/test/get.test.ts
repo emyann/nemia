@@ -11,6 +11,7 @@ import { servedStore, write } from './served.ts';
 const store = await servedStore('nemia-cli-get-', (root) => {
   write(path.join(root, 'inbox', 'cache-the-views.md'), '---\nworkflow: dev\nlabels:\n  team: core\n---\nCache the views.\n');
   write(path.join(root, 'inbox', 'tidy-the-docs.md'), '---\nlabels:\n  team: docs\n---\nTidy the docs.\n');
+  write(path.join(root, 'inbox', 'paint-the-harbour.md'), '---\nfactory: harbour\n---\nPaint the harbour.\n');
 });
 test.after(() => store.stop());
 
@@ -46,14 +47,16 @@ test('`nemia get card <name> -n default -o yaml` is read back by `nemia apply -f
 });
 
 test('`nemia get card <name>` with no -n finds the card in its factory, by its store-wide name (`GET /api/cards/:name`)', async () => {
-  const read = await store.nemia(['get', 'card', 'cache-the-views', '-o', 'json']);
+  const read = await store.nemia(['get', 'card', 'paint-the-harbour', '-o', 'json']);
   assert.equal(read.code, 0, read.err);
   const card: unknown = JSON.parse(read.out);
   assert.ok(typeof card === 'object' && card !== null && 'metadata' in card);
   assert.deepEqual(
     card.metadata && typeof card.metadata === 'object' && 'namespace' in card.metadata ? card.metadata.namespace : null,
-    'default',
+    'harbour',
   );
+  const inDefault = await store.nemia(['get', 'card', 'paint-the-harbour', '-n', 'default', '-o', 'json']);
+  assert.notEqual(inDefault.code, 0, 'the card is in harbour, not default: only the store-wide read finds it');
 });
 
 test('REFUSED: `nemia get nope` exits 2 naming `nemia explain` and the resources there are', async () => {

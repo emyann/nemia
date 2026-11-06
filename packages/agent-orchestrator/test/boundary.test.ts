@@ -223,6 +223,8 @@ const STORE_SHARED: Record<string, readonly string[]> = {
     'src/skills/read.store.ts',
   ],
   'src/script/script.store.ts': [],
+  'src/proposal/proposal.store.ts': ['src/door/door.store.ts', 'src/record/record.store.ts'],
+  'src/delegation/delegation.store.ts': ['src/door/door.store.ts', 'src/record/record.store.ts'],
 };
 
 /**
@@ -240,6 +242,8 @@ const STAND_INS: readonly string[] = [
   'src/feed/memory.store.ts',
   'src/skills/skill-memory.store.ts',
   'src/agents/agent-memory.store.ts',
+  'src/proposal/memory.store.ts',
+  'src/delegation/memory.store.ts',
 ];
 
 /** The package's files the CLI may import, beside the files of its own folder. */

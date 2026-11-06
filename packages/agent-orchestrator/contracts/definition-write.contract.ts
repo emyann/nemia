@@ -3,8 +3,8 @@
  * `definitionWriteRefusal`): the namespace it is sent to, what it does, and the origin of the definition it addresses there (`none` where
  * nothing is at the name). The api writes your library alone, never a checkout nor what Nemia builds in. Every definition of yours is
  * served in `default`, and a write there is a write of every namespace that resolves it, so a write of yours is taken in `default` alone.
- * A factory's own definitions — its tree, origin `factory` — change the factory's way, never through this path: today `nemia workflows
- * write factory`, and a proposal the person approves once the factory's definitions are objects of their own. So a refusal says which way
+ * A factory's own definitions — its tree, origin `factory` — change the factory's way, never through this path: a proposal, `nemia
+ * propose -f <file> -n <factory>`, which the person approves, or an agent within its delegation at auto. So a refusal says which way
  * the definition changes (`way`): through `default`, or the factory's. Its kind is the api's answer (`REFUSAL_STATUS`); its words are
  * nobody's law. A version's judgement stays `definitionVersionRefusal`'s and `workflowVersionRefusal`'s, after this one lets a write
  * through.

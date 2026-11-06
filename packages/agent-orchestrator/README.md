@@ -3377,6 +3377,45 @@ The api serves both (`GET`, `PUT` and `DELETE` on `/api/factories/<name>/instruc
 shows it on the factory's settings page, linked from its floor: the words of a store's instruction edited there, a folder's file shown as
 it reads.
 
+### Proposals: a factory's definitions changed by one action, `nemia propose`
+
+A factory's definitions and wiring — its tree's Workflows, Agents and Skills, its Hires and McpServers, and the Factory's attached
+workflows, rules and instruction — change through a Proposal (`src/proposal/`): the very objects apply takes, each at the
+`resourceVersion` it was read at, never the person's settings. Any agent of a factory proposes in its own (`mayPropose`); the person
+approves, or, at `auto` alone, an agent within the Delegation the person wrote it (`src/delegation/`, none by default) and under a rule
+for auto the person confirmed (`approve-proposal`, `nemia policy confirm`, refused where it reaches past the delegation:
+`proposalRuleReach`), never its own agent's proposal (`proposalApproval`). An approved proposal applies at approval, or at its run's
+successful end (`applyAt: run-end`), checked again as it applies (`proposalApply`): an object moved makes it stale, a lapsed approval sends
+it back to the person, a run called off drops it, and a failed run, which can be retried, leaves it approved. The tick's proposals pass
+acts on each approved proposal every pass (`pass.verb.ts`). Undo is proposing the objects as they stood before (`status.before`).
+
+<!-- diagram:proposal:begin — generated, from the repository's root: node -e "import('./packages/agent-orchestrator/src/proposal/machine.ts').then((m) => console.log(m.proposalDiagram()))" -->
+```mermaid
+stateDiagram-v2
+  [*] --> waiting: proposed
+  state "waiting" as waiting
+  state "approved" as approved
+  state "applied" as applied
+  state "declined" as declined
+  state "stale" as stale
+  state "dropped" as dropped
+  state "failed" as failed
+  waiting --> approved: approved, by the person or under a rule within a delegation
+  waiting --> declined: declined by the person
+  approved --> declined: declined by the person
+  approved --> applied: applied, every object written
+  approved --> failed: a write refused midway
+  approved --> stale: an object moved since it was read
+  approved --> waiting: an agent's approval lapsed
+  approved --> dropped: its run called off
+  applied --> [*]
+  declined --> [*]
+  stale --> [*]
+  dropped --> [*]
+  failed --> [*]
+```
+<!-- diagram:proposal:end -->
+
 ### Schedules: `nemia factory schedule` and `nemia factory unschedule`
 
 A factory can start a workflow it has attached on its own, at each fire of a cron. The schedule sits on the attachment, in the factory's

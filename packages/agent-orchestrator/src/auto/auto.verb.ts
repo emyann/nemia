@@ -13,8 +13,10 @@ import { AgentName } from '../agents/agents.model.ts';
 import { HOME } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { rooted } from '../wiring/wire.verb.ts';
-import { DEFAULT_POLICY, listInForce, ruleRefusal, ruleWords, type PolicyRule } from './auto.ts';
+import { DEFAULT_POLICY, isProposalRule, listInForce, ruleRefusal, ruleWords, type PolicyRule } from './auto.ts';
 import { confirmedFile, confirmRule, digestOf, dropRule, proposedFile, readConfirmed, readProposed, writeProposed } from './auto.store.ts';
+import { DelegationDoor } from '../delegation/delegation.store.ts';
+import { proposalRuleReach } from '../proposal/rule.ts';
 
 /** A rule with its words, as the person reads it. */
 export type WordedRule = PolicyRule & { words: string };
@@ -168,13 +170,25 @@ export function proposalOf(words: string): { rules: PolicyRule[]; guidance: stri
   if (new Set(ids).size !== ids.length) throw proposalRefusal('the proposal names a rule id twice');
   if (!Array.isArray(guidance) || guidance.some((g) => typeof g !== 'string' || !g.trim()))
     throw proposalRefusal('its guidance is a list of words the machinery cannot hold');
-  const kept = (rule: PolicyRule): PolicyRule => ({
-    id: rule.id,
-    answer: rule.answer,
-    ...(rule.steps === undefined ? {} : { steps: rule.steps }),
-    when: rule.when,
-    ...(rule.under === undefined ? {} : { under: rule.under }),
-  });
+  const kept = (rule: PolicyRule): PolicyRule =>
+    isProposalRule(rule)
+      ? {
+          id: rule.id,
+          answer: rule.answer,
+          factory: rule.factory,
+          resources: rule.resources,
+          resourceNames: rule.resourceNames,
+          verbs: rule.verbs,
+          widens: rule.widens,
+          proposedBy: rule.proposedBy,
+        }
+      : {
+          id: rule.id,
+          answer: rule.answer,
+          ...(rule.steps === undefined ? {} : { steps: rule.steps }),
+          when: rule.when,
+          ...(rule.under === undefined ? {} : { under: rule.under }),
+        };
   return { rules: rules.map(kept), guidance };
 }
 
@@ -226,6 +240,24 @@ export const POLICY_PROPOSE: Command<PolicyList> = {
 };
 
 /**
+ * A proposal rule `agent` proposed under `id` refused (`Invalid`) where it reaches past the agent's delegation in its factory
+ * (`proposalRuleReach`), naming each pair of resource and verb and the delegation to write; any other rule, and one within it, goes on.
+ */
+const withinDelegation = Effect.fnUntraced(function* (home: string, agent: string, id: string) {
+  const rule = (yield* tried(() => readProposed(home, agent)))?.rules.find((r) => r.id === id);
+  if (rule === undefined || !isProposalRule(rule)) return;
+  const delegation = yield* (yield* DelegationDoor).delegations.read(rule.factory, agent);
+  const past = proposalRuleReach(rule, delegation?.spec.rules ?? []);
+  if (past.length === 0) return;
+  const pairs = past.map((p) => `${p.verb} ${p.resource}`).join(', ');
+  return yield* Effect.fail(
+    new Invalid({
+      message: `${agent}'s rule ${id} reaches past what its delegation in ${rule.factory} grants (${pairs}), and is not confirmed: write the delegation first, a PUT of /api/namespaces/${rule.factory}/delegations/${agent} granting them, or ask ${agent} to propose a narrower rule.`,
+    }),
+  );
+});
+
+/**
  * `nemia policy confirm <agent> <id> --words <words>`: a rule the agent proposed put in force as the person read it, the person's; asked of
  * them every time an agent calls it. Refused: a confirm with no words.
  */
@@ -265,10 +297,11 @@ export const POLICY_CONFIRM: Command<PolicyList> = {
     rooted(
       home,
       'policy confirm',
-      Effect.andThen(
-        tried(() => confirmRule(home, agentIn(args), idIn(args), wordsIn(args), new Date())),
-        listed(home, agentIn(args)),
-      ),
+      Effect.gen(function* () {
+        yield* withinDelegation(home, agentIn(args), idIn(args));
+        yield* tried(() => confirmRule(home, agentIn(args), idIn(args), wordsIn(args), new Date()));
+        return yield* listed(home, agentIn(args));
+      }),
     ),
   print: (list, args) => [`${list.agent}: the rule ${idIn(args)} is in force at auto.`, ...listLines(list)],
 };

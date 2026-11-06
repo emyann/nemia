@@ -3,7 +3,7 @@
  * out of her reach (`nemiaFence`), and the prompts the person widened (`widened`). Pure: her task is filed with it (`nemiaSpec`), beside
  * the store's denies and her admission.
  */
-import type { CommandClass } from './class.ts';
+import { agentClassOf, CLIENT_CLASSES, type CommandClass } from './class.ts';
 
 /** An entry of the table as her fence reads it: its name and its class. */
 type Entry = { readonly name: string; readonly class: CommandClass };
@@ -23,7 +23,9 @@ const any = (name: string): string => `Bash(nemia ${name}:*)`;
  *   person where it answers what waits (`admissionOf`): a rule cannot read the run's state;
  * - a write classed `ask` asks, whatever follows;
  * - a command that reads bare runs unasked, and asks with each word or flag that sets: a word right after its name, a flag anywhere;
- * - a command out of her reach is denied.
+ * - a command out of her reach is denied, a factory's definition written by hand among them (`agentClassOf`), which she proposes;
+ * - the client's own verbs (`CLIENT_CLASSES`), `nemia propose` and `nemia proposals approve|decline`, run unasked;
+ * - and any assignment before `nemia` is denied (`ASSIGNED`).
  *
  * An allow on a name covers the commands that extend it (`agents`, `agents write`), and their ask or deny stands over it: a harness asks
  * before it allows, and refuses before it asks.
@@ -31,17 +33,27 @@ const any = (name: string): string => `Bash(nemia ${name}:*)`;
 export function nemiaFence(table: readonly Entry[]): Fence {
   const unasked = (name: string) => [bare(name), any(name)];
   const fence: Fence = { allow: [], ask: [], deny: [] };
-  for (const c of table) {
-    const name = c.name;
-    if (c.class === 'none') fence.deny.push(any(name));
-    else if (c.class === 'ask') fence.ask.push(any(name));
-    else if (typeof c.class === 'object') {
+  for (const entry of [...table, ...CLIENT_CLASSES]) {
+    const name = entry.name;
+    const c = agentClassOf(entry);
+    if (c === 'none') fence.deny.push(any(name));
+    else if (c === 'ask') fence.ask.push(any(name));
+    else if (typeof c === 'object') {
       fence.allow.push(...unasked(name));
-      fence.ask.push(...c.class.setsBy.map((s) => (s.startsWith('-') ? `Bash(nemia ${name} *${s}*)` : `Bash(nemia ${name} ${s}:*)`)));
+      const setting = c.setsBy.map((s) => (s.startsWith('-') ? `Bash(nemia ${name} *${s}*)` : `Bash(nemia ${name} ${s}:*)`));
+      (c.sets === 'none' ? fence.deny : fence.ask).push(...setting);
     } else fence.allow.push(...unasked(name));
   }
+  fence.deny.push(ASSIGNED);
   return fence;
 }
+
+/**
+ * Any assignment before `nemia` on a line, an `=` anywhere before ` nemia`: an allow is matched with a leading assignment stripped, so
+ * `WF_SESSION_TOKEN= nemia proposals approve <p>` would pass the allow of `nemia proposals approve` as the person, its token dropped.
+ * The leading `*` reaches an assignment after another, or after a `nohup` or a `timeout`, as git's and gh's are denied on the agents.
+ */
+export const ASSIGNED = 'Bash(*=* nemia *)';
 
 /**
  * `fence` with each prompt the person allowed by its own rule (`allows`, her folder's local settings) asked no more: an ask outranks an

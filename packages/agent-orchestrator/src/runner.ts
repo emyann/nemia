@@ -558,3 +558,30 @@ import * as RunObject from './object/run.model.ts';
  * (`RunObject`, object/run.model.ts). One namespace each, imported and exported by name.
  */
 export { RunModel, RunObject };
+
+/**
+ * Proposals and delegations (`src/proposal/`, `src/delegation/`): the programs the api serves, each taking its caller explicitly
+ * (`ProposalCaller`, the person or an agent's session, which the api obtains from the session's token) and the store's place; the doors
+ * and their files layers; the refusal by who calls (`Forbidden`, with its reason, the api's 403); the pure deciders and the pass.
+ */
+export { Forbidden } from './proposal/forbidden.ts';
+export { PERSON, proposerOf, type Caller, type ProposalCaller } from './proposal/caller.ts';
+export { proposeProgram, undoProgram, objectRefusal, verbOf } from './proposal/propose.verb.ts';
+export { approveProgram, declineProgram, proposalGet, proposalsList, recordedRunState } from './proposal/approve.verb.ts';
+export { applyProgram, type RunStateOf } from './proposal/apply.verb.ts';
+export { proposalsPass, runStatesOf } from './proposal/pass.verb.ts';
+export { currentOf, type Current, type ProposalNeeds, type ProposalPlace } from './proposal/current.verb.ts';
+export { ProposalDoor, proposalDoorFiles, proposalFiles, type ProposalDoorShape } from './proposal/proposal.store.ts';
+export { proposalApproval, mayPropose } from './proposal/approval.ts';
+export { proposalApply, proposingRunOf, type RunState } from './proposal/apply.ts';
+export { accessChange, accessOf } from './proposal/access.ts';
+export { proposalRuleReach } from './proposal/rule.ts';
+export { proposalDiagram, PROPOSAL_EDGES } from './proposal/machine.ts';
+export { delegationGet, delegationObject, delegationPut, delegationRemove, delegationsList } from './delegation/delegation.verb.ts';
+export {
+  DelegationDoor,
+  delegationDoorFiles,
+  delegationFiles,
+  type DelegationDoorShape,
+  type DelegationRecord,
+} from './delegation/delegation.store.ts';

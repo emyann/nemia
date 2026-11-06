@@ -1,12 +1,13 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 import { FinishedTable } from '../components/FinishedTable';
 import { FlightTable } from '../components/FlightTable';
 import { WaitingCard } from '../components/WaitingCard';
 import { SelectorField } from '../components/SelectorField';
 import { finishedRunsQuery, labelSearch, openRunsQuery, runLinesQuery } from '../lib/api';
-import { finishedSearch, trailOf } from '../lib/finished';
+import { ReadRefusal } from '../lib/api/read';
+import { finishedSearch, trailOf, trailSearch } from '../lib/finished';
 import { ink } from '../lib/meaning';
 import { Plate, ScanLines } from '../components/look';
 import { Button } from '../components/ui/ds';
@@ -14,13 +15,20 @@ import { useBar } from '../lib/useBar';
 
 export const Route = createFileRoute('/runs/')({
   validateSearch: (search: Record<string, unknown>) => ({ ...finishedSearch(search), ...labelSearch(search) }),
-  loaderDeps: ({ search }) => ({ factory: search.factory, older: search.older, l: search.l }),
+  loaderDeps: ({ search }) => ({ factory: search.factory, older: finishedSearch(search).older, l: search.l }),
   loader: ({ context, deps }) =>
     Promise.all([
       context.queryClient.ensureQueryData(openRunsQuery(deps.factory, deps.l)),
       context.queryClient
         .ensureQueryData(finishedRunsQuery(deps.factory, trailOf(deps), deps.l))
-        .then((page) => Promise.all(page.runs.map((run) => context.queryClient.prefetchQuery(runLinesQuery(run.id))))),
+        .then((page) => Promise.all(page.runs.map((run) => context.queryClient.prefetchQuery(runLinesQuery(run.id)))))
+        .catch((error: unknown) => {
+          // A trail the api refuses (a 422: `?older=` that is no token of the finished runs) reads as the first page, as a `?page=`
+          // that was no number did: the address drops it, and the waiting and in-flight sections are drawn as ever.
+          if (deps.older !== undefined && error instanceof ReadRefusal && error.status === 422)
+            throw redirect({ to: '/runs', search: (prev) => trailSearch(prev, []), replace: true });
+          throw error;
+        }),
     ]),
   component: Runs,
   staticData: { fullBleed: true },
@@ -109,7 +117,7 @@ function Nothing({ children }: { children: string }) {
 function Runs() {
   const search = Route.useSearch();
   const { data: open } = useSuspenseQuery(openRunsQuery(search.factory, search.l));
-  const trail = trailOf(search);
+  const trail = trailOf(finishedSearch(search));
   const { data: finished } = useSuspenseQuery(finishedRunsQuery(search.factory, trail, search.l));
   const navigate = useNavigate({ from: '/runs/' });
   const asOf = new Date(open.asOf);

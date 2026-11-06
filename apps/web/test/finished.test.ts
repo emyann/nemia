@@ -47,6 +47,8 @@ async function read(value: unknown, older: string[] = []): Promise<FinishedPage>
 
 test('finishedSearch, trailOf, newerOf, olderTrailOf, pageSaid and rowsSaid: the finished pager by its trail', async (t) => {
   await t.test('the address round-trips: a trail and a factory in, the same out, and the first page is the bare address', () => {
+    assert.equal(finishedSearch({ older: 'bogus' }).older, undefined, 'a trail that is no token reads as the first page');
+    assert.equal(finishedSearch({ older: 'f.a~bogus' }).older, undefined, 'and so does one a piece of which is none');
     const at = { factory: 'nemia', older: 'f.a~f.b' };
     assert.deepEqual(finishedSearch(at), at);
     assert.deepEqual(trailOf(finishedSearch(at)), ['f.a', 'f.b']);

@@ -14,10 +14,16 @@ const JOIN = '~';
  */
 export type PageAt = { trail: readonly string[]; next: string | null; count: number; total: number; size: number };
 
-/** `value` as a trail held in the address: tokens joined by `~`, none of them empty; none for anything else. */
+/** A token of the finished runs' list as the api writes one: `f.`, then base64url. Any other text is no place in that list. */
+const TOKEN = /^f\.[A-Za-z0-9_-]+$/;
+
+/**
+ * `value` as a trail held in the address: tokens joined by `~`, each shaped as the finished list writes one (`TOKEN`); none for anything
+ * else, so a trail that is no token reads as the first page, as a `?page=` that was no number did, and is never sent to be refused.
+ */
 function olderOf(value: unknown): string | undefined {
   if (typeof value !== 'string' || value === '') return undefined;
-  return value.split(JOIN).every((token) => token !== '') ? value : undefined;
+  return value.split(JOIN).every((token) => TOKEN.test(token)) ? value : undefined;
 }
 
 /**

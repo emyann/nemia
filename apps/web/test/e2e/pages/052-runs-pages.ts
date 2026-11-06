@@ -109,6 +109,17 @@ async function pastTheLast(page: Page, trail: string[]): Promise<void> {
   await expectCount(rowsOf(page), 1, 'Newer leads back to the last page');
 }
 
+/**
+ * A trail that holds no token of the finished runs (`?older=bogus`) reads as the first page, as a `?page=` that was no number did: the
+ * trail is never sent, and the waiting and in-flight sections are drawn as ever, never the page's failure.
+ */
+async function noToken(page: Page): Promise<void> {
+  await visit(page, `/runs?factory=${FACTORY}&older=bogus`);
+  await expectVisible(page.locator('section[data-section="waiting"]'), 'a trail that is no token still draws the waiting runs');
+  await expectVisible(page.locator('section[data-section="in-flight"]'), 'and the runs in flight');
+  await expectVisible(rowsOf(page).locator(`[data-run-id][title="${FOLDER.id}"]`), 'and the first page of the finished');
+}
+
 /** A run that finished more than a year back, whenever the e2e runs: four hundred days ago. */
 const LONG_AGO = { id: 'finished-another-year-e2py', title: 'Finished another year', factory: FACTORY, finishedAgo: 400 * 24 * 60 };
 
@@ -236,6 +247,7 @@ export default {
       await thirdPage(page, trail);
       await newerAndOlder(page, trail);
       await pastTheLast(page, trail);
+      await noToken(page);
     } finally {
       for (const back of takeBack.reverse()) back();
     }

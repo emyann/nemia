@@ -4,6 +4,7 @@
  * `status.ts` reads a step's codes into its state, `runWords.ts` and `stepCard.ts` compose; each reads its words from here. No word here is
  * the runtime's: a person hovering over a chip reads what the state means to them, never how it is kept.
  */
+import type { ProposalPhase } from 'objects';
 import type { CardState } from './api/inbox.ts';
 import type { RunOutcome } from './api/runs.ts';
 import type { CheckVerdict, WaitOn } from './api/reasons.ts';
@@ -240,6 +241,24 @@ export const CARD_WORDS: Record<CardState, { word: string; title: string; hue: H
   failed: { word: ENDED.failed.word, title: `Its run failed. ${ENDED.failed.title}`, hue: 'failure' },
   stopped: { word: 'stopped', title: 'Its run was stopped before it ended.', hue: 'grey' },
   cancelled: { word: ENDED.cancelled.word, title: `Its run was called off. ${ENDED.cancelled.title}`, hue: 'grey' },
+};
+
+/**
+ * A person's word for each phase of a factory's proposal (`ProposalPhase`), its whole sentence on hover, and the hue its tag is drawn in:
+ * `yours` while it waits on them, `failure` where it failed to apply, sage once applied, grey for the rest.
+ */
+export const PROPOSAL_WORDS: Record<ProposalPhase, { word: string; title: string; hue: Hue }> = {
+  waiting: { word: 'waits on you', title: 'It waits on your approval: Approve it, or Decline it.', hue: 'yours' },
+  approved: {
+    word: 'approved',
+    title: 'Approved, and applied when the run that proposed it ends well: Decline it before then to take it back.',
+    hue: 'grey',
+  },
+  applied: { word: 'applied', title: 'Approved and applied: the factory reads it as written.', hue: 'sage' },
+  declined: { word: 'declined', title: 'Declined: nothing of it was written.', hue: 'grey' },
+  stale: { word: 'stale', title: 'An object it changes moved since it was proposed: nothing was written; propose it again.', hue: 'grey' },
+  dropped: { word: 'dropped', title: 'The run that proposed it ended without succeeding: nothing was written.', hue: 'grey' },
+  failed: { word: 'failed', title: 'Approved, and it failed to apply: its message says why.', hue: 'failure' },
 };
 
 /** A sentence a try is given in its box, the same for each case that asks for one: something to tell it, if anything. */

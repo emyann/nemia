@@ -1,10 +1,12 @@
 /**
  * An agent's rules for Auto (`GET /api/policy/:name`, and `PUT` and `DELETE /api/policy/:name/rules/:id`, the routes the package's command
  * table generates): the rules in force, what the agent proposed from the custom instruction, the words it keeps as guidance, and the
- * custom instruction itself; a proposed rule confirmed, and a rule in force dropped, each the person's.
+ * custom instruction itself; a proposed rule confirmed, and a rule in force dropped, each the person's. Her rules for approving a
+ * factory's proposals (`approve-proposal`) are said apart, in `proposalRules` beside each `rules`.
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
+import { CHANGE_VERBS, type ChangeVerb } from 'objects';
 import { decodes } from './decodes.ts';
 import { pace } from '../feed.ts';
 import { get, send } from './read.ts';
@@ -29,6 +31,24 @@ export type PolicyRule = {
 };
 
 /**
+ * Mirrors the package's worded `ProposalPolicyRule`: a rule that approves, at Auto, the proposals of one factory (`factory`) that change
+ * the resources `resources` (by their plural), named `resourceNames` (any where none), by the verbs `verbs`; made by the agents
+ * `proposedBy` (any agent or the person where none); widening access too where `widens`; and its words.
+ */
+export type ProposalRule = {
+  id: string;
+  answer: 'approve-proposal';
+  factory: string;
+  resources: string[];
+  resourceNames: string[];
+  verbs: ChangeVerb[];
+  widens: boolean;
+  proposedBy: string[];
+  from?: 'proposed';
+  words: string;
+};
+
+/**
  * Mirrors the package's `PolicyList`: the agent, the file of the person's list, whether the builtin rule is in force for want of one
  * they confirmed (`isDefault`), the rules in force, the builtin rule in its words (`builtin`), what the agent proposed (each rule saying
  * whether it is in force, the words kept as guidance, and whether the custom instruction changed since, `stale`) or null, and the custom
@@ -39,11 +59,13 @@ export type PolicyList = {
   file: string;
   isDefault: boolean;
   rules: readonly PolicyRule[];
+  proposalRules: readonly ProposalRule[];
   builtin: PolicyRule;
   proposed: {
     file: string;
     at: string;
     rules: readonly (PolicyRule & { confirmed: boolean })[];
+    proposalRules: readonly (ProposalRule & { confirmed: boolean })[];
     guidance: readonly string[];
     stale: boolean;
   } | null;
@@ -61,6 +83,20 @@ const RULE_FIELDS = {
   words: Schema.String,
 };
 
+/** The fields of a proposal rule, decoded. */
+const PROPOSAL_RULE_FIELDS = {
+  id: Schema.String,
+  answer: Schema.Literal('approve-proposal'),
+  factory: Schema.String,
+  resources: Schema.mutable(Schema.Array(Schema.String)),
+  resourceNames: Schema.mutable(Schema.Array(Schema.String)),
+  verbs: Schema.mutable(Schema.Array(Schema.Literals(CHANGE_VERBS))),
+  widens: Schema.Boolean,
+  proposedBy: Schema.mutable(Schema.Array(Schema.String)),
+  from: Schema.optionalKey(Schema.Literal('proposed')),
+  words: Schema.String,
+};
+
 /** Decodes an `PolicyList`. */
 const PolicyListSchema = decodes<PolicyList>()(
   Schema.Struct({
@@ -68,12 +104,14 @@ const PolicyListSchema = decodes<PolicyList>()(
     file: Schema.String,
     isDefault: Schema.Boolean,
     rules: Schema.Array(Schema.Struct(RULE_FIELDS)),
+    proposalRules: Schema.Array(Schema.Struct(PROPOSAL_RULE_FIELDS)),
     builtin: Schema.Struct(RULE_FIELDS),
     proposed: Schema.NullOr(
       Schema.Struct({
         file: Schema.String,
         at: Schema.String,
         rules: Schema.Array(Schema.Struct({ ...RULE_FIELDS, confirmed: Schema.Boolean })),
+        proposalRules: Schema.Array(Schema.Struct({ ...PROPOSAL_RULE_FIELDS, confirmed: Schema.Boolean })),
         guidance: Schema.Array(Schema.String),
         stale: Schema.Boolean,
       }),

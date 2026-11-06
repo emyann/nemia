@@ -29,7 +29,6 @@ import {
   capabilities,
   cardList,
   cardObject,
-  cardPage,
   ceilings,
   factoryCommands,
   factoryList,
@@ -58,10 +57,6 @@ const readCard = cardQuery('x').queryFn as unknown as () => Promise<InboxCardPag
 const readCapabilities = capabilitiesQuery.queryFn as unknown as () => Promise<Capabilities>;
 const readCeilings = ceilingsQuery.queryFn as unknown as () => Promise<Ceilings>;
 
-/** `value` without `keys`, as an api that does not send them answers. */
-const without = <T extends object>(value: T, ...keys: string[]): T =>
-  Object.fromEntries(Object.entries(value).filter(([k]) => !keys.includes(k))) as T;
-
 /** A factory's rules as the api answers them: kept in its file, with words. */
 const rules: FactoryRules = {
   name: 'mill',
@@ -79,10 +74,12 @@ test("get, the Factory's and the inbox's reads: each decodes what the api gives,
     assert.equal(Object.hasOwn(entry, 'queued'), false);
     assert.equal(Object.hasOwn(entry, 'tried'), false);
 
-    answering(t, without(cardPage(), 'queued'));
+    answering(t, { ...cardObject({ status: { source: '---\nworkflow: build\n---\nDecode the reads\n' } }), spec: unqueued });
     const page = await readCard();
     assert.equal(Object.hasOwn(page, 'queued'), false);
     assert.equal(Object.hasOwn(page, 'tried'), true);
+    assert.equal(page.source, '---\nworkflow: build\n---\nDecode the reads\n', 'its file as written, off status.source');
+    assert.equal(page.keys?.find((row) => row.key === 'queued')?.value, null, 'its keys made of the Card');
   });
   await t.test(
     'a key the board does not read is dropped, not refused: on a card, on a harness of the last pass, on a step it offers',

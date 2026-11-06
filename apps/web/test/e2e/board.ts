@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from './checks.ts';
-import type { FactoryCommands, FactoryList, ScheduleList } from 'objects';
+import { type Card, CARD_KEY_MEANINGS, CARD_KEYS, type FactoryCommands, type FactoryList, type ScheduleList } from 'objects';
 import type { RunSummary } from '../../src/lib/api/runs.ts';
 import { factoryViewOf, type Factory } from '../../src/lib/api/factories.ts';
 import { instantWhole, instantWords } from '../../src/lib/instant.ts';
@@ -361,6 +361,9 @@ export async function expectRendered(
     );
 }
 
+/** A key's row as a page's key table draws it: the key, its value or none, and what it means. */
+type KeyRow = { key: string; value: string | null; meaning: string };
+
 /**
  * A page's key table: a row per key the api answers, in its order, each with its value — or `not set` — and what it means, as the api says
  * it. `set` is what the file sets, by key, as the seed wrote it: every other key reads `not set`.
@@ -368,15 +371,42 @@ export async function expectRendered(
 export async function expectKeys(page: Page, file: Locator, api: string, set: Readonly<Record<string, string>>): Promise<void> {
   const answered = await page.request.get(new URL(api, page.url()).href);
   if (!answered.ok()) throw new Refused(`GET ${api} answers the page's keys — it answered ${answered.status()}`);
-  const { keys } = (await answered.json()) as { keys: Array<{ key: string; value: string | null; meaning: string }> };
+  const { keys } = (await answered.json()) as { keys: KeyRow[] };
+  for (const { key, value } of keys)
+    if (value !== (set[key] ?? null))
+      throw new Refused(`GET ${api} reads ${key} as the file sets it (${set[key] ?? 'not set'}) — it answered ${JSON.stringify(value)}`);
+  await expectKeyRows(page, file, keys);
+}
+
+/**
+ * A card's key table: the Card read by its name (`GET /api/cards/<name>`) as the file sets it, and a row per key a card may set, in
+ * `CARD_KEYS`' order, each with its value — or `not set` — and what it means (`CARD_KEY_MEANINGS`). `set` is what the card's file sets, by
+ * key, as the seed wrote it, of a card in the default factory: every other key reads `not set`.
+ */
+export async function expectCardKeys(page: Page, file: Locator, name: string, set: Readonly<Record<string, string>>): Promise<void> {
+  const api = `/api/cards/${name}`;
+  const answered = await page.request.get(new URL(api, page.url()).href);
+  if (!answered.ok()) throw new Refused(`GET ${api} answers the card — it answered ${answered.status()}`);
+  const card = (await answered.json()) as Card;
+  if (card.metadata.name !== name || (card.spec.workflow ?? null) !== (set.workflow ?? null))
+    throw new Refused(
+      `GET ${api} reads the card as its file sets it (workflow ${set.workflow ?? 'not set'}) — it answered ${JSON.stringify(card)}`,
+    );
+  await expectKeyRows(
+    page,
+    file,
+    CARD_KEYS.map((key) => ({ key, value: set[key] ?? null, meaning: CARD_KEY_MEANINGS[key] })),
+  );
+}
+
+/** The key table's rows: one per row of `keys`, in its order, each with its value — or `not set` — and what it means. */
+async function expectKeyRows(page: Page, file: Locator, keys: readonly KeyRow[]): Promise<void> {
   const rows = file.locator('section[aria-label="Keys"] tr[data-key]');
   await expectCount(rows, keys.length, `a row per key (${keys.map((k) => k.key).join(', ')})`);
   const order = await rows.evaluateAll((trs) => trs.map((tr) => tr.getAttribute('data-key')));
   if (JSON.stringify(order) !== JSON.stringify(keys.map((k) => k.key)))
     throw new Refused(`the rows are in the package's order — ${order.join(', ')}`);
   for (const { key, value, meaning } of keys) {
-    if (value !== (set[key] ?? null))
-      throw new Refused(`GET ${api} reads ${key} as the file sets it (${set[key] ?? 'not set'}) — it answered ${JSON.stringify(value)}`);
     const row = rows.filter({ has: page.locator(`th[scope="row"]`, { hasText: new RegExp(`^${key}$`) }) });
     await expectTexts(row.locator('[data-value]'), [value ?? 'not set'], `${key}'s value reads ${value ?? 'not set'}`);
     await expectTexts(

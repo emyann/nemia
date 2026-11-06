@@ -7,7 +7,8 @@ import type { Refusal } from './fence.ts';
 /**
  * The six reads, the run's object counted twice, the old list of summaries beside the RunList (its yardstick), the list, an open run
  * and the inbox read again after a pass, and her chat's three (its history, the old beat's whole re-projection and the fold of one
- * moment of her session): `measures`' keys.
+ * moment of her session), and the factory's reads the board polls (the list, one factory, its commands, its schedules, hires, volumes
+ * and MCP servers) and the ceilings: `measures`' keys.
  */
 export const MEASURES = [
   'tickPass',
@@ -25,6 +26,14 @@ export const MEASURES = [
   'chatHistory',
   'chatBeatBefore',
   'chatFoldStep',
+  'factoryList',
+  'factoryGet',
+  'factoryCommands',
+  'scheduleList',
+  'hireList',
+  'volumeList',
+  'mcpServerList',
+  'ceilings',
 ] as const;
 
 /** A read the report measures. */
@@ -33,8 +42,8 @@ export type MeasureKey = (typeof MEASURES)[number];
 /** One read's cost: the median of its calls in milliseconds, and the median heap it left held after a collection, in megabytes. */
 export type Timed = { ms: number; heapMb: number };
 
-/** A read cold and warm. */
-export type Measured = { cold: Timed; warm: Timed };
+/** A read cold and warm, and the median count of run records (`runs/<id>.json`) one call read, where it was counted. */
+export type Measured = { cold: Timed; warm: Timed; records?: { cold: number; warm: number } };
 /** What the report says, as `--json` writes it and `--compare` reads it. */
 export type StoreMeasure = {
   /** `load` is the machine's five-minute load average as the measure ends: numbers taken under another's load are not a baseline. */
@@ -60,6 +69,8 @@ export type StoreMeasure = {
     invariantRefusals: number;
   };
   asked: {
+    /** The factory the factory's reads were asked of: the copy's first but the default, null where it has none. */
+    factory?: string | null;
     finishedRun: string | null;
     openRun: string | null;
     feedCursor: number;
@@ -84,8 +95,8 @@ export function rendered(report: StoreMeasure): string {
   const row = (key: MeasureKey) => {
     const m = report.measures[key];
     return m === null
-      ? `| ${key} | — | — | — | — |`
-      : `| ${key} | ${ms(m.cold.ms)} | ${m.cold.heapMb.toFixed(1)} | ${ms(m.warm.ms)} | ${m.warm.heapMb.toFixed(1)} |`;
+      ? `| ${key} | — | — | — | — | — |`
+      : `| ${key} | ${ms(m.cold.ms)} | ${m.cold.heapMb.toFixed(1)} | ${ms(m.warm.ms)} | ${m.warm.heapMb.toFixed(1)} | ${m.records ? `${m.records.cold} / ${m.records.warm}` : '—'} |`;
   };
   return [
     `store measure of ${report.from} (${report.engine}), copied: ${report.copy.files} files, ${mb(report.copy.bytes)} MB in ${(report.copy.ms / 1000).toFixed(0)} s, without ${report.copy.leftOut.join(', ') || 'nothing'}`,
@@ -93,8 +104,8 @@ export function rendered(report: StoreMeasure): string {
     `${report.machine.cpu}, ${report.machine.cores} cores, ${mb(report.machine.memoryBytes)} MB, node ${report.machine.node}, load ${report.machine.load}; commit ${report.commit.slice(0, 12)}; ${report.date}; median of ${report.repeat}`,
     `runs read: finished ${report.asked.finishedRun ?? '—'}, open ${report.asked.openRun ?? '—'}; feed from byte ${report.asked.feedCursor}, ${report.asked.feedLinesRead} lines; her chat: task ${report.asked.chat?.task ?? '—'}, ${report.asked.chat?.events ?? 0} events listed, cursor ${report.asked.chat?.cursor ?? '—'}`,
     '',
-    '| read | cold ms | cold heap MB | warm ms | warm heap MB |',
-    '| --- | ---: | ---: | ---: | ---: |',
+    '| read | cold ms | cold heap MB | warm ms | warm heap MB | run records read, cold / warm |',
+    '| --- | ---: | ---: | ---: | ---: | ---: |',
     ...MEASURES.map(row),
     '',
     `spawned: ${
@@ -111,17 +122,18 @@ export function rendered(report: StoreMeasure): string {
 
 /** Each number of `now` beside `baseline`'s, and their ratio, as markdown: `—` for a read or a count the baseline lacks. */
 export function comparedWith(now: StoreMeasure, baseline: StoreMeasure): string {
+  const records = (m: Measured | null | undefined) => (m?.records ? `${m.records.cold} / ${m.records.warm}` : '—');
   const ratio = (a: number, b: number | undefined) => (b !== undefined && b > 0 ? `×${(a / b).toFixed(2)}` : '—');
   const cell = (n: Measured | null, b: Measured | null | undefined, side: 'cold' | 'warm') =>
     n === null ? '— | — | —' : `${ms(n[side].ms)} | ${b ? ms(b[side].ms) : '—'} | ${ratio(n[side].ms, b?.[side].ms)}`;
   return [
     `against ${baseline.commit.slice(0, 12)} of ${baseline.date}: ${now.counts.runs} runs now, ${baseline.counts.runs} then; ${now.counts.tasks} tasks now, ${baseline.counts.tasks} then; ${now.counts.cards.listed} cards now, ${baseline.counts.cards?.listed ?? '—'} then`,
     '',
-    '| read | cold ms | baseline | ratio | warm ms | baseline | ratio |',
-    '| --- | ---: | ---: | ---: | ---: | ---: | ---: |',
+    '| read | cold ms | baseline | ratio | warm ms | baseline | ratio | records read now | baseline |',
+    '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
     ...MEASURES.map(
       (key) =>
-        `| ${key} | ${cell(now.measures[key], baseline.measures?.[key], 'cold')} | ${cell(now.measures[key], baseline.measures?.[key], 'warm')} |`,
+        `| ${key} | ${cell(now.measures[key], baseline.measures?.[key], 'cold')} | ${cell(now.measures[key], baseline.measures?.[key], 'warm')} | ${records(now.measures[key])} | ${records(baseline.measures?.[key])} |`,
     ),
   ].join('\n');
 }

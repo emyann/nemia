@@ -45,6 +45,13 @@
  *   first thing it sends, its follow handing one `events` moment of one new event; null where no session of hers is filed. Its time holds
  *   the rest's start too (the follow of the feed, the look at the files), so it bounds the fold from above.
  *
+ * - `factoryList`, `factoryGet`, `factoryCommands`, `scheduleList`, `hireList`, `volumeList`, `mcpServerList`: `GET /api/factories`,
+ *   and of the copy's first factory but the default by name, `GET /api/factories/:name`, `…/commands` and
+ *   `GET /api/namespaces/:name/schedules`, `hires`, `volumes` and `mcp-servers`, over apps as `runList` is; null where the copy has no
+ *   factory of its own. `ceilings`: `GET /api/ceilings`, the same way.
+ *
+ * Each read over apps carries the run records (`runs/<id>.json`) one call read, cold and warm (`records`), counted on a call of its own.
+ *
  * Beside the numbers: the runs, finished and open, the inbox's cards and those a run was started from, the runtime's tasks and their
  * journals' bytes, the runs whose tasks did not read and the pass's unreadable lines, and `invariantRefusals`, the records the Run model
  * refuses. A markdown table on stdout; with `--json`, the report as JSON with the machine, the commit and the date; with `--compare`,
@@ -59,6 +66,7 @@ import path from 'node:path';
 import { Duration, Effect, Layer, Logger, Option, Stream } from 'effect';
 import type { ChatFollow, ChatFollowed, ChatReads, Pass } from 'agent-orchestrator';
 import { AE_LEFT_OUT, copyStore, destinationRefusal, installFence, placeRefused, readOnlyPlace, type Fence } from './fence.ts';
+import { passEngine, recordsReadBy } from './reads.ts';
 import { comparedWith, MEASURES, rendered, type MeasureKey, type Measured, type StoreMeasure, type Timed } from './render.ts';
 
 export { comparedWith, MEASURES, rendered, type MeasureKey, type Measured, type StoreMeasure, type Timed };
@@ -206,7 +214,10 @@ async function getJson(app: App, url: string): Promise<unknown> {
   return JSON.parse(body) as unknown;
 }
 
-/** `read` over a fresh app for each of `repeat` cold calls, then over one app kept, after a first call that is not counted. */
+/**
+ * `read` over a fresh app for each of `repeat` cold calls, then over one app kept, after a first call that is not counted; with the run
+ * records each call read (`recordsReadBy`), counted on a call apart from the timed ones so the count costs the time nothing.
+ */
 async function overApps(fresh: () => Promise<Built>, read: (app: App) => Promise<unknown>, repeat: number): Promise<Measured> {
   const cold: Timed[] = [];
   for (let i = 0; i < repeat; i++) {
@@ -214,12 +225,16 @@ async function overApps(fresh: () => Promise<Built>, read: (app: App) => Promise
     cold.push(await timed(() => read(app)));
     await runtime.dispose();
   }
+  const counted = await fresh();
+  const coldRecords = (await recordsReadBy(() => read(counted.app))).records;
+  await counted.runtime.dispose();
   const { app, runtime } = await fresh();
   await read(app);
   const warm: Timed[] = [];
   for (let i = 0; i < repeat; i++) warm.push(await timed(() => read(app)));
+  const warmRecords = (await recordsReadBy(() => read(app))).records;
   await runtime.dispose();
-  return { cold: medianOf(cold), warm: medianOf(warm) };
+  return { cold: medianOf(cold), warm: medianOf(warm), records: { cold: coldRecords, warm: warmRecords } };
 }
 
 /** Where the feed's read starts and ends, and how many lines the last read of it took. */
@@ -457,7 +472,12 @@ async function measure(asked: Asked, root: string, fence: Fence) {
   const finishedRun = newestOf(listing, true);
   const openRun = newestOf(listing, false);
   const cards = ((await getJson(first.app, INBOX_URL)) as { items: { status: { runs: readonly string[] } }[] }).items;
+  const factory = ((await getJson(first.app, '/api/factories')) as { items: { metadata: { name: string } }[] }).items
+    .map((f) => f.metadata.name)
+    .find((name) => name !== 'default');
   await first.runtime.dispose();
+  const ofFactory = (url: (name: string) => string) =>
+    factory === undefined ? null : overApps(fresh, (app) => getJson(app, url(encodeURIComponent(factory))), repeat);
   const feed = feedOf(wf);
   const passed = passedOver(orch, place, fence, wf, fresh);
   const objectOf = (id: string | null, over = fresh) =>
@@ -478,6 +498,14 @@ async function measure(asked: Asked, root: string, fence: Fence) {
     chatHistory: null,
     chatBeatBefore: null,
     chatFoldStep: null,
+    factoryList: await overApps(fresh, (app) => getJson(app, '/api/factories'), repeat),
+    factoryGet: await ofFactory((f) => `/api/factories/${f}`),
+    factoryCommands: await ofFactory((f) => `/api/factories/${f}/commands`),
+    scheduleList: await ofFactory((f) => `/api/namespaces/${f}/schedules`),
+    hireList: await ofFactory((f) => `/api/namespaces/${f}/hires`),
+    volumeList: await ofFactory((f) => `/api/namespaces/${f}/volumes`),
+    mcpServerList: await ofFactory((f) => `/api/namespaces/${f}/mcp-servers`),
+    ceilings: await overApps(fresh, (app) => getJson(app, '/api/ceilings'), repeat),
   };
   const chat = await chatMeasured(orch, place, fence, repeat);
   Object.assign(measures, chat.measures);
@@ -498,45 +526,9 @@ async function measure(asked: Asked, root: string, fence: Fence) {
       unreadable: { runs: unjudged, passLines: pass?.unreadable?.length ?? 0 },
       invariantRefusals: await invariantRefusals(wf),
     },
-    asked: { finishedRun, openRun, feedCursor: feed.cursor, feedLinesRead: feed.read, chat: chat.asked },
+    asked: { factory: factory ?? null, finishedRun, openRun, feedCursor: feed.cursor, feedLinesRead: feed.read, chat: chat.asked },
     measures,
   };
-}
-
-/**
- * The engine's verbs a pass on the copy may call: its reads, the three writes that only append to the copy's journals, and the sessions'
- * drain, which each pass sets from the pause and which writes or removes the copy's own drain file alone.
- */
-const PASS_VERBS = new Set([
-  'view',
-  'list',
-  'path',
-  'logs',
-  'output',
-  'transcript',
-  'feed',
-  'kept',
-  'io',
-  'tallied',
-  'file',
-  'admit',
-  'stop',
-  'drainSessions',
-]);
-
-/**
- * `e` for a pass on the copy: its `tick`, the runtime's own pass, answers a report that saw nothing, so nothing is admitted, started,
- * observed or stopped by it; and every verb but `PASS_VERBS` is refused, kept among the fence's refusals, since one may reach a live
- * session (`answer`, `say`, `close`) or run the runtime (`up`).
- */
-function passEngine<E extends Record<string, unknown>>(e: E, fence: Fence): E {
-  const wrapped: Record<string, unknown> = { ...e };
-  for (const [verb, value] of Object.entries(e)) {
-    if (typeof value !== 'function' || PASS_VERBS.has(verb)) continue;
-    wrapped[verb] = () => Effect.die(fence.refuse('engine', verb));
-  }
-  wrapped.tick = () => Effect.succeed({ views: [], refused: [], unreadable: [], unobserved: [], running: {}, ms: 0, observed: {} });
-  return wrapped as E;
 }
 
 /** The commit the checkout of this file is at, or `unknown`. */

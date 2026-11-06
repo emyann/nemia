@@ -24,3 +24,14 @@ test('`nameOf`: the first word, and `inbox <word>` a command of its own', () => 
     assert.equal(routeOf({ name: nameOf(argv), local: false, help: false }), 'process', `${argv.join(' ')} is a write, in process`);
   assert.equal(routeOf({ name: nameOf(['ls', '-l', 'team=core']), local: false, help: false }), 'api', 'ls -l is the moved read');
 });
+
+test("the client's own verbs (`get`, `apply`, `explain`) go to the client with --help and --local too: no process has them", () => {
+  for (const argv of [
+    ['get', 'cards'],
+    ['apply', '-f', 'x.yaml'],
+    ['explain', 'card.spec.from'],
+  ])
+    for (const local of [false, true])
+      for (const help of [false, true])
+        assert.equal(routeOf({ name: nameOf(argv), local, help }), 'api', `${argv.join(' ')} local=${local} help=${help}`);
+});

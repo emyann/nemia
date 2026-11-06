@@ -13,7 +13,7 @@ import { Missing, type Invalid } from '../refusal/refusal.ts';
 import { BUILTIN_SERVERS, builtinServers } from '../servers/servers.store.ts';
 import { maskedHeaders, type FactoryServer } from '../servers/index.ts';
 import { FACTORY_SERVERS, type ServerListed, type ServersListing } from '../servers/servers.verb.ts';
-import { bornAt, factoryObject, objectsListed, versionOf, type ObjectQuery } from './factory.verb.ts';
+import { bornAt, factoryFiled, objectsListed, versionOf, type ObjectQuery } from './factory.verb.ts';
 
 /** A server's spec, as its record holds it, each header masked where `masked`. */
 const specOf = (server: FactoryServer, masked = true): McpServer['spec'] => ({
@@ -43,7 +43,7 @@ export const mcpServerOf = (s: ServerListed, namespace: string, filedAt: string,
 
 /** The servers of the factory `namespace`, read now at `home`; none for the default factory; `Missing` where no factory has the name. */
 const serversOf = Effect.fn('serversOf')(function* (home: string, repo: string, namespace: string) {
-  const factory = yield* factoryObject(home, repo, namespace);
+  const { factory } = yield* factoryFiled(home, repo, namespace);
   if (namespace === DEFAULT_FACTORY) return [];
   const listing: ServersListing = yield* FACTORY_SERVERS.handler({ factory: namespace }, undefined, home);
   return listing.servers.map((s) => mcpServerOf(s, namespace, factory.metadata.creationTimestamp, listing.unread));

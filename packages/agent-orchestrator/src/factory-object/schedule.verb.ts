@@ -2,14 +2,18 @@
  * A factory's schedules as objects (`Schedule`, `ScheduleList`, from `objects`), in the factory's namespace, each named by its workflow:
  * its spec what the factory's file holds (its cron, brief, repository and zone), its status the package's listing of it
  * (`schedulesListed`, as `nemia factory` reads it) — when it was filed (`since`), its next fire, its last scheduled run and a kept
- * refusal of its latest fire. The default factory schedules nothing.
+ * refusal of its latest fire. The default factory schedules nothing. What a schedule fired is found among every run's record, read through
+ * the memo a caller that polls hands in (`keptRuns`): a warm read reads no finished run's record, and a run started since is read.
  */
 import { Effect } from 'effect';
 import { API_VERSION, type Schedule, type ScheduleList } from 'objects';
 import type { FactoryListing } from '../factory/factory.ts';
+import { keptRuns } from '../record/files.store.ts';
 import { Missing, type Invalid } from '../refusal/refusal.ts';
+import { scheduleRun, schedulesListed, type ScheduleRuns } from '../schedule/listed.store.ts';
 import type { ScheduleListed } from '../schedule/schedule.ts';
-import { factoriesListed, factoryObject, objectsListed, versionOf, type ObjectQuery } from './factory.verb.ts';
+import { tried } from '../runtime-client.ts';
+import { factoryFiled, objectsListed, versionOf, type ObjectQuery } from './factory.verb.ts';
 
 /** The object of the schedule `s`, which the factory `listing`'s file holds. */
 export const scheduleOf = (s: ScheduleListed, listing: Exclude<FactoryListing, { error: string }>): Schedule => {
@@ -35,24 +39,38 @@ export const scheduleOf = (s: ScheduleListed, listing: Exclude<FactoryListing, {
   };
 };
 
-/** The schedules of the factory `namespace`, read now; none for the default factory; `Missing` where no factory has the name. */
-const schedulesOf = Effect.fn('schedulesOf')(function* (home: string, repo: string, namespace: string) {
-  yield* factoryObject(home, repo, namespace);
-  const listed = yield* factoriesListed(home);
-  const listing = listed.factories.find((l) => l.name === namespace);
+/**
+ * The schedules of the factory `namespace`, read now, the runs read through `memo` where one is handed; none for the default factory or a
+ * file that does not read; `Missing` where no factory has the name.
+ */
+const schedulesOf = Effect.fn('schedulesOf')(function* (home: string, repo: string, namespace: string, memo: ScheduleRuns | undefined) {
+  const { listing } = yield* factoryFiled(home, repo, namespace);
   if (listing === undefined || 'error' in listing) return [];
-  return listed.schedules.filter((s) => s.factory === namespace).map((s) => scheduleOf(s, listing));
+  const listed = yield* tried(() => schedulesListed(keptRuns(memo, scheduleRun)));
+  return listed.filter((s) => s.factory === namespace).map((s) => scheduleOf(s, listing));
 });
 
-/** A page of the schedules of the factory `namespace` (`ScheduleList`), read now at the store `home`. */
-export const scheduleList = Effect.fn('scheduleList')(function* (home: string, repo: string, namespace: string, query: ObjectQuery) {
-  const listed: ScheduleList = yield* objectsListed('Schedule', yield* schedulesOf(home, repo, namespace), query, 'schedule');
+/** A page of the schedules of the factory `namespace` (`ScheduleList`), read now at the store `home`, the runs through `memo`. */
+export const scheduleList = Effect.fn('scheduleList')(function* (
+  home: string,
+  repo: string,
+  namespace: string,
+  query: ObjectQuery,
+  memo: ScheduleRuns | undefined,
+) {
+  const listed: ScheduleList = yield* objectsListed('Schedule', yield* schedulesOf(home, repo, namespace, memo), query, 'schedule');
   return listed;
 });
 
-/** The schedule of the workflow `name` in the factory `namespace`; `Missing` where it schedules none. */
-export const scheduleObject = Effect.fn('scheduleObject')(function* (home: string, repo: string, namespace: string, name: string) {
-  const found = (yield* schedulesOf(home, repo, namespace)).find((s) => s.metadata.name === name);
+/** The schedule of the workflow `name` in the factory `namespace`, the runs read through `memo`; `Missing` where it schedules none. */
+export const scheduleObject = Effect.fn('scheduleObject')(function* (
+  home: string,
+  repo: string,
+  namespace: string,
+  name: string,
+  memo: ScheduleRuns | undefined,
+) {
+  const found = (yield* schedulesOf(home, repo, namespace, memo)).find((s) => s.metadata.name === name);
   if (found === undefined)
     return yield* Effect.fail<Missing | Invalid>(
       new Missing({

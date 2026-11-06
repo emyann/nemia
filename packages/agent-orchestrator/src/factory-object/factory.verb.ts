@@ -2,7 +2,8 @@
  * The factories as objects (`Factory`, `FactoryList`, from `objects`), cluster-scoped: the default factory first, on the repository the
  * caller names (the api's own), offering every workflow, hiring no one and keeping no file; then each factory of the store as `nemia
  * factory` lists it (`factoriesListed`), a file that does not read listed all the same, its `status.error` saying why, so it hides no
- * other. A factory's `metadata.generation` is its file's count of changes to its spec (`generationOf`); its status the controller's
+ * other. A factory's parts read it through `factoryFiled`: its spec and its listing, off one read of the store's factories, no status, and
+ * no run. A factory's `metadata.generation` is its file's count of changes to its spec (`generationOf`); its status the controller's
  * `status.json` (its conditions, each with the time it last moved, the generation that pass observed, the version applied and an upgrade
  * waiting) and its places a harness does not trust, read live; its `resourceVersion` a digest of its encoded spec and status, so a live
  * read that changes moves it with no file written. And `factoryCommands`, the lines a person types for one factory, built off the
@@ -29,11 +30,8 @@ import { COMMANDS } from '../command/commands.verb.ts';
 import { generationOf } from '../factories/generation.ts';
 import { DEFAULT_FACTORY, type FactoryListing } from '../factory/factory.ts';
 import { readFactoriesAt } from '../factory/factory.store.ts';
-import { keptRuns } from '../record/files.store.ts';
 import { tried } from '../runtime-client.ts';
-import { schedulesListed } from '../schedule/listed.store.ts';
 import { untrustedPlaces } from '../trust/trust.verb.ts';
-import type { ScheduleListed } from '../schedule/schedule.ts';
 import type { Untrusted } from '../trust/trust.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import type { Level } from '../level/level.ts';
@@ -52,6 +50,9 @@ export type ObjectQuery = {
 
 /** An object of any kind here: what a list reads of it, its name and labels. */
 type Named = { readonly metadata: { readonly name: string; readonly labels?: Readonly<Record<string, string>> } };
+
+/** Two texts in the order `<` compares them. */
+const byText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 /** Objects in the order a list answers them and a token reads them: by name, as `<` compares. */
 const byName = (a: Named, b: Named): number => (a.metadata.name < b.metadata.name ? -1 : a.metadata.name > b.metadata.name ? 1 : 0);
@@ -99,12 +100,20 @@ export const objectsListed = <const K extends string, T extends Named>(
 /** A list's metadata: how many objects are after the page, and the token of the next one. */
 type ListedMeta = { remainingItemCount: number; continue?: string };
 
-/** What a factory's object is made of beside its listing: its schedules and its places not trusted, as `nemia factory` read them. */
+/** What a factory's object is made of: the store's factories, and the places not trusted of those whose status is built. */
 export type FactoryListed = {
   readonly factories: readonly FactoryListing[];
-  readonly schedules: readonly ScheduleListed[];
   readonly untrusted: readonly Untrusted[];
 };
+
+/** A factory as its parts read it: its name and when it was filed, and its spec, with no status. */
+export type FiledFactory = {
+  readonly metadata: Omit<ObjectMeta, 'resourceVersion'>;
+  readonly spec: FactoryObject['spec'];
+};
+
+/** A factory as `factoryFiled` answers it: as its parts read it, and its listing in the store, none for the default factory. */
+export type Filed = { readonly factory: FiledFactory; readonly listing: FactoryListing | undefined };
 
 /** The places of `name` among `untrusted`, as the object says them, `never` left out where any trust can be kept. */
 const untrustedOf = (untrusted: readonly Untrusted[], name: string): FactoryStatus['untrusted'] =>
@@ -147,18 +156,30 @@ const ownLevel = (home: string, name: string): { level: Level } | { error: strin
  * file and its places not trusted among `listed`'s; one that does not read with no spec but its name's, its error saying why.
  */
 export const factoryObjectOf = (listing: FactoryListing, listed: FactoryListed, home: string): FactoryObject => {
-  const meta = { name: listing.name, creationTimestamp: bornAt(listing.file) };
-  if ('error' in listing)
-    return objectOf(
-      meta,
-      { repos: [], workflows: [], hires: {}, volumes: [] },
-      {
-        conditions: [],
-        untrusted: [],
-        error: `${listing.file} ${listing.error}`,
-      },
-    );
+  const { metadata, spec } = filedOf(listing, home);
+  if ('error' in listing) return objectOf(metadata, spec, { conditions: [], untrusted: [], error: `${listing.file} ${listing.error}` });
   const written = readStatusAt(home, listing.name);
+  const level = ownLevel(home, listing.name);
+  const status: FactoryStatus = {
+    ...(written?.observedGeneration === undefined ? {} : { observedGeneration: written.observedGeneration }),
+    conditions: (written?.conditions ?? listing.status?.conditions ?? []).map((c) => ({ ...c })),
+    ...(written?.version == null ? {} : { applied: written.version }),
+    ...(written?.upgrade === undefined
+      ? {}
+      : { upgrade: { ...written.upgrade, conflicts: written.upgrade.conflicts.map((c) => ({ ...c })) } }),
+    untrusted: untrustedOf(listed.untrusted, listing.name),
+    ...('error' in level ? { error: level.error } : {}),
+  };
+  return objectOf(metadata, spec, status);
+};
+
+/**
+ * The factory of one `listing` of the store as its parts read it, at the store `home`: a file that reads as its spec, its own level among
+ * it; one that does not with no spec but its name's. No status: neither the controller's file nor a harness's trust is read.
+ */
+export const filedOf = (listing: FactoryListing, home: string): FiledFactory => {
+  const meta = { name: listing.name, creationTimestamp: bornAt(listing.file) };
+  if ('error' in listing) return { metadata: meta, spec: { repos: [], workflows: [], hires: {}, volumes: [] } };
   const level = ownLevel(home, listing.name);
   const spec: FactoryObject['spec'] = {
     repos: [...listing.repos],
@@ -172,17 +193,7 @@ export const factoryObjectOf = (listing: FactoryListing, listed: FactoryListed, 
       : { template: { source: listing.template.source, version: listing.template.version, params: { ...listing.template.params } } }),
     ...('level' in level ? { level: level.level } : {}),
   };
-  const status: FactoryStatus = {
-    ...(written?.observedGeneration === undefined ? {} : { observedGeneration: written.observedGeneration }),
-    conditions: (written?.conditions ?? listing.status?.conditions ?? []).map((c) => ({ ...c })),
-    ...(written?.version == null ? {} : { applied: written.version }),
-    ...(written?.upgrade === undefined
-      ? {}
-      : { upgrade: { ...written.upgrade, conflicts: written.upgrade.conflicts.map((c) => ({ ...c })) } }),
-    untrusted: untrustedOf(listed.untrusted, listing.name),
-    ...('error' in level ? { error: level.error } : {}),
-  };
-  return objectOf({ ...meta, generation: generationOf(listing) }, spec, status);
+  return { metadata: { ...meta, generation: generationOf(listing) }, spec };
 };
 
 /** The default factory's object: on `repo`, offering every workflow (no `workflows`), hiring no one, keeping no file. */
@@ -206,27 +217,37 @@ export const noFactory = (name: string): Missing =>
   });
 
 /**
- * The store's factories as `nemia factory` reads them now: each factory's file at the store `home`, the schedules with the runs they
- * started, and the places a harness does not trust, read live.
+ * The store's factories, each factory's file at the store `home` read once, and the places a harness does not trust, read live of the
+ * factories `placesOf` keeps — none unless asked, since only a Factory's status says them. No run is read: what a schedule fired is the
+ * schedules' own read (`scheduleList`).
  */
-export const factoriesListed = Effect.fn('factoriesListed')(function* (home: string) {
+export const factoriesListed = Effect.fn('factoriesListed')(function* (
+  home: string,
+  placesOf: (listing: FactoryListing) => boolean = () => false,
+) {
   const factories = yield* tried(() => readFactoriesAt(home));
-  const schedules = yield* tried(() =>
-    schedulesListed(
-      keptRuns(undefined, (run) => ({
-        id: run.id,
-        createdAt: run.createdAt,
-        ...(run.scheduled === undefined ? {} : { scheduled: run.scheduled }),
-      })),
-    ),
-  );
-  const listed: FactoryListed = { factories, schedules, untrusted: yield* untrustedPlaces(factories) };
+  const listed: FactoryListed = { factories, untrusted: yield* untrustedPlaces(factories.filter(placesOf)) };
   return listed;
+});
+
+/**
+ * The factory `name` as its parts read it (`filedOf`), the default on `repo`, read now at the store `home`, with its listing (none for
+ * the default factory): `Missing` where none has the name. One read of the store's factories, and none of git or of a run.
+ */
+export const factoryFiled = Effect.fn('factoryFiled')(function* (home: string, repo: string, name: string) {
+  if (name === DEFAULT_FACTORY) {
+    const filed: Filed = { factory: defaultFactoryObject(repo, home), listing: undefined };
+    return filed;
+  }
+  const listing = (yield* factoriesListed(home)).factories.find((l) => l.name === name);
+  if (listing === undefined) return yield* Effect.fail(noFactory(name));
+  const filed: Filed = { factory: filedOf(listing, home), listing };
+  return filed;
 });
 
 /** A page of the factories (`FactoryList`), the default on `repo`, read now at the store `home`. */
 export const factoryList = Effect.fn('factoryList')(function* (home: string, repo: string, query: ObjectQuery) {
-  const objects = factoryObjectsOf(yield* factoriesListed(home), repo, home);
+  const objects = factoryObjectsOf(yield* factoriesListed(home, () => true), repo, home);
   const listed: FactoryList = yield* objectsListed('Factory', objects, query, 'factory');
   return listed;
 });
@@ -234,7 +255,7 @@ export const factoryList = Effect.fn('factoryList')(function* (home: string, rep
 /** The factory `name` as an object, the default on `repo`, read now at the store `home`; `Missing` where none has the name. */
 export const factoryObject = Effect.fn('factoryObject')(function* (home: string, repo: string, name: string) {
   if (name === DEFAULT_FACTORY) return defaultFactoryObject(repo, home);
-  const listed = yield* factoriesListed(home);
+  const listed = yield* factoriesListed(home, (l) => l.name === name);
   const listing = listed.factories.find((l) => l.name === name);
   if (listing === undefined) return yield* Effect.fail(noFactory(name));
   return factoryObjectOf(listing, listed, home);
@@ -252,7 +273,7 @@ const named = (name: string) => {
  * a workflow scheduled, its places trusted again, a volume mounted; and of the factory's own parts, each schedule taken back, by its
  * workflow, and each volume unmounted, by its name.
  */
-export const factoryCommands = (factory: Pick<FactoryObject, 'metadata' | 'spec'>, schedules: readonly string[]): FactoryCommands => {
+export const factoryCommands = (factory: FiledFactory, schedules: readonly string[]): FactoryCommands => {
   const name = factory.metadata.name;
   return {
     attach: commandLine(named('factory attach'), { factory: name }),
@@ -270,12 +291,12 @@ export const factoryCommands = (factory: Pick<FactoryObject, 'metadata' | 'spec'
   };
 };
 
-/** The lines of the factory `name` (`factoryCommands`), read now at `home`; `Missing` where no factory has the name. */
+/**
+ * The lines of the factory `name` (`factoryCommands`), read now at `home`, each schedule its file holds taken back by its workflow, by
+ * name: none for the default factory or a file that does not read. `Missing` where no factory has the name.
+ */
 export const factoryCommandsOf = Effect.fn('factoryCommandsOf')(function* (home: string, repo: string, name: string) {
-  const factory = yield* factoryObject(home, repo, name);
-  const listed = name === DEFAULT_FACTORY ? [] : (yield* factoriesListed(home)).schedules;
-  return factoryCommands(
-    factory,
-    listed.filter((s) => s.factory === name).map((s) => s.workflow),
-  );
+  const { factory, listing } = yield* factoryFiled(home, repo, name);
+  const scheduled = listing === undefined || 'error' in listing ? [] : Object.keys(listing.schedules).sort(byText);
+  return factoryCommands(factory, scheduled);
 });

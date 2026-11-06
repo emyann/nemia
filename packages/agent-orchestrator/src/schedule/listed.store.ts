@@ -12,6 +12,13 @@ import { scheduleDue, settledFire, type ScheduleListed, type ScheduleTry } from 
 /** What a schedule reads of a run: which fire of which schedule started it, and the run itself, for its last run's line. */
 export type ScheduleRun = Pick<Run, 'id' | 'createdAt' | 'scheduled'>;
 
+/** A run as a schedule's listing reads it (`ScheduleRun`): which fire of which schedule started it, and when the run was created. */
+export const scheduleRun = (run: Run): ScheduleRun => ({
+  id: run.id,
+  createdAt: run.createdAt,
+  ...(run.scheduled === undefined ? {} : { scheduled: run.scheduled }),
+});
+
 /** The memo a caller that polls the factories keeps of what their schedules read of every run. */
 export type ScheduleRuns = RecordMemo<ScheduleRun>;
 

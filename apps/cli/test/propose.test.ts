@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import path from 'node:path';
+import { ambient } from './ambient.ts';
 import { scratch } from '../../api/test/scratch.ts';
 import { sessionHeaders } from '../src/client.ts';
 import type { Said } from './served.ts';
@@ -161,8 +162,7 @@ fs.writeFileSync(path.join(root, 'daemon.json'), JSON.stringify({ url: `http://1
 
 /** `nemia argv` on the stand-in, with `token` as `WF_SESSION_TOKEN` where given, else none in its environment; `stdin` its input. */
 function nemia(argv: readonly string[], { token, stdin }: { token?: string; stdin?: string } = {}): Promise<Said> {
-  const { WF_SESSION_TOKEN: _token, OTEL_EXPORTER_OTLP_ENDPOINT: _otel, ...ambient } = process.env;
-  const env = { ...ambient, WF_ROOT: root, NEMIA_DAEMON_START: 'off', ...(token !== undefined ? { WF_SESSION_TOKEN: token } : {}) };
+  const env = { ...ambient(), WF_ROOT: root, NEMIA_DAEMON_START: 'off', ...(token !== undefined ? { WF_SESSION_TOKEN: token } : {}) };
   const run = spawn(process.execPath, [CLI, ...argv], { env, stdio: ['pipe', 'pipe', 'pipe'] });
   let out = '';
   let err = '';

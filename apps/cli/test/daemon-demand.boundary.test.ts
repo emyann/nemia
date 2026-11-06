@@ -16,6 +16,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
+import { ambient } from './ambient.ts';
 import { scratch } from '../../api/test/scratch.ts';
 
 const BIN = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
@@ -38,14 +39,7 @@ const free = (port: number): Promise<boolean> =>
 
 /** The environment of the test's `nemia`: the store and home scratch ones, the start left on, and no collector. */
 const ENV: NodeJS.ProcessEnv = (() => {
-  const {
-    NEMIA_DAEMON_START: _start,
-    OTEL_EXPORTER_OTLP_ENDPOINT: _otel,
-    AE_ROOT: _ae,
-    XDG_CONFIG_HOME: _config,
-    PORT: _port,
-    ...rest
-  } = process.env;
+  const rest = ambient('NEMIA_DAEMON_START', 'AE_ROOT', 'XDG_CONFIG_HOME', 'PORT');
   return { ...rest, WF_ROOT: ROOT, HOME, WF_VERIFY_REST: '1' };
 })();
 

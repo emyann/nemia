@@ -11,6 +11,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { ambient } from './ambient.ts';
 
 const BIN = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 const SCRATCH = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-local-'));
@@ -22,14 +23,7 @@ function aStore(name: string): { root: string; env: NodeJS.ProcessEnv } {
   const home = path.join(SCRATCH, name, 'home');
   fs.mkdirSync(root, { recursive: true });
   fs.mkdirSync(home, { recursive: true });
-  const {
-    NEMIA_DAEMON_START: _start,
-    OTEL_EXPORTER_OTLP_ENDPOINT: _otel,
-    AE_ROOT: _ae,
-    WF_ROOT: _wf,
-    XDG_CONFIG_HOME: _config,
-    ...rest
-  } = process.env;
+  const rest = ambient('NEMIA_DAEMON_START', 'AE_ROOT', 'WF_ROOT', 'XDG_CONFIG_HOME');
   return { root, env: { ...rest, WF_ROOT: root, HOME: home, NEMIA_DAEMON_START: 'off', WF_VERIFY_REST: '1' } };
 }
 

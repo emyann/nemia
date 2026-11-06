@@ -11,15 +11,16 @@ import { hasStarted } from '../wait/wait.ts';
 import type { Workflow } from '../step/step.ts';
 import { loopSpan } from '../workflow/index.ts';
 import { turnOf, turnSpanOf, type TurnSpan, type TurnTry } from './turns.ts';
+import type { AttemptEnd, EngineOutcome, SpanAt } from 'objects';
 
 /** How an attempt ended, or a task settled, as the runtime records it: its `Outcome`, written out because this file imports no runtime. */
-export type EngineOutcome = 'succeeded' | 'failed' | 'stopped';
+export type { EngineOutcome };
 
 /**
  * Why an attempt ended, as the runtime records it: its `EndReason`, written out because this file imports no runtime, and held equal to
  * it in `runtime-client.ts` (`attemptReasonHeld`).
  */
-export type AttemptReason = 'harness' | 'lost' | 'unstartable' | 'operator' | 'deadline';
+export type AttemptReason = Exclude<AttemptEnd, 'budget' | 'unsigned'>;
 
 /**
  * An attempt's clock, and what it consumed, as the engine's `Attempt` keeps them: named here because this file does not import the
@@ -94,7 +95,7 @@ export const taskUsage = (view: TaskClock | undefined): Consumed | undefined =>
  */
 export type TaskSpan = {
   taskId: string;
-  at: 'unknown' | 'queued' | 'starting' | 'running' | 'ended' | 'unspawned';
+  at: SpanAt;
   filedAt: string | null;
   spawnedAt: string | null;
   endedAt: string | null;

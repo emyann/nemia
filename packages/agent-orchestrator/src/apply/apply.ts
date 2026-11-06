@@ -3,6 +3,7 @@
  * mark it stale where its objects moved, send a lapsed agent's approval back to the person, or apply it. Pure.
  */
 import type { ProposalApply, ProposingRun } from '../../contracts/proposal-apply.contract.ts';
+import type { RunStatusWord } from 'objects';
 
 export const proposalApply: ProposalApply = (f) => {
   if (f.at === 'run-end' && f.run === 'going') return 'wait';
@@ -13,7 +14,7 @@ export const proposalApply: ProposalApply = (f) => {
 };
 
 /** A run's status, as the tick's pass judges it (`Assessment['status']`), or `gone` where the store holds the run no more. */
-export type RunState = 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'waiting' | 'gone';
+export type RunState = RunStatusWord | 'gone';
 
 /**
  * The proposing run as `proposalApply` reads it: none where the proposal names no run (the person's, Nemia's); `succeeded` once it

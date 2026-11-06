@@ -2,6 +2,7 @@
  * The numbers of the Overview's strip (`OverviewStrip`): the factories' day, what is at work against the machine's caps, the agents at
  * work and when the quota runs out. Pure: the instant, the day's start and the time zone are handed in, the browser's own on the page.
  */
+import type { RunOutcome } from 'objects';
 import type { Ceilings, Factory, QuotaWindow, RunSummary } from './api';
 import type { TokenCounts } from './breakdown.ts';
 import { keptBy } from './factories.ts';
@@ -63,9 +64,7 @@ export const finishedAtOf = (run: Pick<RunSummary, 'atWork' | 'cancelledAt' | 'c
 };
 
 /** How a finished run ended (the api's own rule): called off, its result undecided, landed, or failed. */
-export const outcomeOf = (
-  run: Pick<RunSummary, 'cancelledAt' | 'toDecide' | 'status'>,
-): 'cancelled' | 'undecided' | 'succeeded' | 'failed' => {
+export const outcomeOf = (run: Pick<RunSummary, 'cancelledAt' | 'toDecide' | 'status'>): RunOutcome => {
   if (run.cancelledAt) return 'cancelled';
   if (run.toDecide?.kind === 'result') return 'undecided';
   return run.status === 'succeeded' ? 'succeeded' : 'failed';

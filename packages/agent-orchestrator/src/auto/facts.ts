@@ -3,6 +3,7 @@
  * a fixture state, and carrying nothing between calls. The reads are `nemia admit`'s (`admit.verb.ts`).
  */
 import type { Facts } from './auto.ts';
+import type { Outcome } from 'objects';
 
 /**
  * What admission read of a run at a call, for the step it answers: the step's closeout, outcome and what it needs of the person, or
@@ -15,7 +16,7 @@ import type { Facts } from './auto.ts';
  * on the person (`othersWaiting`).
  */
 export type Seen = {
-  closeout: { outcome: 'done' | 'blocked'; needs?: string } | undefined;
+  closeout: { outcome: Outcome; needs?: string } | undefined;
   questions: readonly { recommended: string | readonly string[] | null }[];
   verdict: number | 'unfinished' | undefined;
   loops: readonly { again: boolean; personAccepted: boolean }[];

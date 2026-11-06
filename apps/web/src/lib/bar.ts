@@ -2,7 +2,7 @@
  * The frame's floating bar, as the address and this browser keep it: what it shows, read from and written to the root's search key `bar`,
  * what a press beside it does, how wide it is drawn, and what Escape does. Pure, for `useBar`, the bar (`FloatingBar`) and its node test.
  */
-import type { DefinitionOrigin } from 'objects';
+import { DEFINITION_ORIGINS, type DefinitionOrigin } from 'objects';
 import type { PagePlace } from './api/workflows.ts';
 
 /**
@@ -44,9 +44,10 @@ function stepOf(name: string): Bar | undefined {
  * (`factory`, `repo`, `yours`, `builtin`), or without a workflow or a step.
  */
 function specOf(name: string): Bar | undefined {
-  const [from, workflow] = name.split('/', 2);
-  const step = name.slice(`${from}/${workflow}/`.length);
-  if (from !== 'factory' && from !== 'repo' && from !== 'yours' && from !== 'builtin') return undefined;
+  const [word, workflow] = name.split('/', 2);
+  const step = name.slice(`${word}/${workflow}/`.length);
+  const from = DEFINITION_ORIGINS.find((origin) => origin === word);
+  if (!from) return undefined;
   return workflow && step && name.startsWith(`${from}/${workflow}/`) ? { kind: 'spec', from, workflow, step } : undefined;
 }
 

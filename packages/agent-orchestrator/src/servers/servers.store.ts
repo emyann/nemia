@@ -12,6 +12,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Result, Schema } from 'effect';
+import { MCP_TRANSPORTS } from 'objects';
 import { factoryNameRefusal } from '../factory/factory.ts';
 import { firstRefusal } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
@@ -27,7 +28,7 @@ import type { FactoryServer, FactoryServers, FactoryServersFile, BuiltinServer }
 
 const FactoryServerSchema = Schema.StructWithRest(
   Schema.Struct({
-    type: Schema.Literals(['http', 'sse']),
+    type: Schema.Literals(MCP_TRANSPORTS),
     url: Schema.String,
     headers: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
     oauth: Schema.optionalKey(Schema.Struct({ clientId: Schema.String, callbackPort: Schema.optionalKey(Schema.Number) })),

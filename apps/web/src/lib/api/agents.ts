@@ -47,7 +47,7 @@ const ROLE_KEYS: readonly AgentRoleKey[] = [
 ];
 
 /** A node that names an agent: the step of a workflow in the agent's own place. */
-export type AgentUser = { from: 'repo' | 'yours'; workflow: string; step: string };
+export type AgentUser = { from: Extract<DefinitionOrigin, 'repo' | 'yours'>; workflow: string; step: string };
 
 /**
  * An agent as the board reads it, off its Agent object: its keys as its file writes them, its instructions, the result schema its

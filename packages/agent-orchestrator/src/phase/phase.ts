@@ -16,22 +16,23 @@ import type { Reason } from '../feed/index.ts';
 import type { StepStatus } from '../record/record.ts';
 import type { ListedPhase } from '../list/list.ts';
 import type { Assessment } from '../tick/assess.ts';
+import type { AnswerVia, RunPhase, RunReason, StepPhase, StepReason, WaitOn } from 'objects';
 
 /**
  * Where a step is in its life: not yet at work (`pending`, a wait on another step, a run, a slot, the base or the pause among it), at
  * work or its check running (`running`), waiting on a person (`waiting`: a gate, a question, a budget, a refused or unsigned try), done
  * (`succeeded`), broken (`failed`), or stopped by an operator or a cancel (`stopped`).
  */
-export const STEP_PHASES = ['pending', 'running', 'waiting', 'succeeded', 'failed', 'stopped'] as const;
+export const STEP_PHASES = ['pending', 'running', 'waiting', 'succeeded', 'failed', 'stopped'] as const satisfies readonly StepPhase[];
 
 /** One of `STEP_PHASES`. */
-export type StepPhase = (typeof STEP_PHASES)[number];
+export type { StepPhase };
 
 /** Where a run is in its life: a step's phases, and `cancelled` for a run a person called off. */
-export const RUN_PHASES = [...STEP_PHASES, 'cancelled'] as const;
+export const RUN_PHASES = [...STEP_PHASES, 'cancelled'] as const satisfies readonly RunPhase[];
 
 /** One of `RUN_PHASES`. */
-export type RunPhase = (typeof RUN_PHASES)[number];
+export type { RunPhase };
 
 /**
  * What a step or a run waits on when the wait is a thing's, not a person's (reason `Waiting`, phase `pending`): other runs it is filed
@@ -39,19 +40,19 @@ export type RunPhase = (typeof RUN_PHASES)[number];
  * (`base`), the store's pause (`pause`), or a person's hold that names no run, lifted by a person alone (`hold`). A field beside the
  * reason, never part of it, so a selector names it as a key (`on=limit`).
  */
-export const WAIT_ON = ['run', 'limit', 'base', 'pause', 'hold'] as const;
+export const WAIT_ON = ['run', 'limit', 'base', 'pause', 'hold'] as const satisfies readonly WaitOn[];
 
 /** One of `WAIT_ON`. */
-export type WaitOn = (typeof WAIT_ON)[number];
+export type { WaitOn };
 
 /**
  * Where a person is asked for an answer (reason `AwaitingAnswer`, phase `waiting`): by the session itself, which stopped to ask
  * (`session`, the engine's `needs-human`), or by the closeout, which signed off blocked (`closeout`).
  */
-export const ANSWER_VIA = ['session', 'closeout'] as const;
+export const ANSWER_VIA = ['session', 'closeout'] as const satisfies readonly AnswerVia[];
 
 /** One of `ANSWER_VIA`. */
-export type AnswerVia = (typeof ANSWER_VIA)[number];
+export type { AnswerVia };
 
 /**
  * The reasons a step can stand in: the feed's codes of a step that are a word it keeps, not a one-shot (`once`) written beside it. What
@@ -80,10 +81,10 @@ export const STEP_REASONS = [
   'Skipped',
   'Sent',
   'Unknown',
-] as const satisfies readonly Reason[];
+] as const satisfies readonly (StepReason & Reason)[];
 
 /** One of `STEP_REASONS`. */
-export type StepReason = (typeof STEP_REASONS)[number];
+export type { StepReason };
 
 /**
  * The reasons a run can stand in: `assess`'s statuses, `Waiting` (on `run`) for a running run a person holds until other runs land, and
@@ -102,10 +103,10 @@ export const RUN_REASONS = [
   'BudgetExhausted',
   'Unsigned',
   'Denied',
-] as const satisfies readonly Reason[];
+] as const satisfies readonly (RunReason & Reason)[];
 
 /** One of `RUN_REASONS`. */
-export type RunReason = (typeof RUN_REASONS)[number];
+export type { RunReason };
 
 /**
  * A reason with what it is qualified by: `Waiting` always says what it waits on (`on`), `AwaitingAnswer` always where the answer is

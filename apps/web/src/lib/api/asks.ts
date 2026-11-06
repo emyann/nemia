@@ -5,6 +5,7 @@
  */
 
 import { Schema } from 'effect';
+import type { RetryMode } from 'objects';
 import { decoded } from './read.ts';
 import { runs } from './objects.ts';
 import type { TranscriptEvent } from './steps.ts';
@@ -22,8 +23,11 @@ export type Said = { at: string; attempt: number; text: string; after: { kind: T
  */
 export type QuestionAnswer = { question: string; chose: readonly string[]; own?: string };
 
-/** How the CLI's `retry` tries a step again: continue its session, a new one, or its check run again and no session. */
-export type RetryMode = 'continue' | 'fresh' | 'recheck';
+/**
+ * How the CLI's `retry` tries a step again (`objects`' `RetryMode`): continue its session, a new one, or its check run again and no
+ * session.
+ */
+export type { RetryMode } from 'objects';
 
 /** What an ask for a try answers: the try asked for, its ask file, and whether the tick stops the step's blocked session first. */
 export type AskedTry = { try: number; file: string; stopFirst: boolean };

@@ -4,13 +4,14 @@
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
+import { LEVELS, type Level } from 'objects';
 import { decodes } from './decodes.ts';
 import { pace } from '../feed.ts';
 import { BridgeSchema, type Bridge } from './bridge.ts';
 import { get, ReadRefusal, send } from './read.ts';
 
-/** Mirrors the package's `Level`: Manual, her session stopped; Semi-auto, her session kept, what waits on a person asked of them. */
-export type Level = 'manual' | 'semi-auto' | 'auto';
+/** `objects`' `Level`: Manual, her session stopped; Semi-auto, her session kept, what waits on a person asked of them. */
+export type { Level } from 'objects';
 
 /** Mirrors the package's `Spend`: what her ended sessions cost, how many were measured, and how many were not. */
 export type Spend = { usd: number; measured: number; unmeasured: number };
@@ -50,7 +51,7 @@ export type NemiaLevel = {
 export type NemiaMemory = { dir: string; facts: readonly string[]; fact: { name: string; text: string } | null };
 
 /** Decodes a `Level`. */
-const LevelSchema = Schema.Literals(['manual', 'semi-auto', 'auto']);
+const LevelSchema = Schema.Literals(LEVELS);
 
 /** Decodes a `FactoryLevel`. */
 const FactoryLevelSchema = decodes<FactoryLevel>()(

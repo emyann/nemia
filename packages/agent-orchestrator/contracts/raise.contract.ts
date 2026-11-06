@@ -5,8 +5,8 @@
  * `raise` and `nemia decide`'s raise lines both read that one verdict, so the two cannot say different things.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
+import type { RaiseBy, RetryMode } from 'objects';
 import type { StepStatus } from '../src/record/record.ts';
-import type { RetryMode } from '../src/retry/index.ts';
 
 /**
  * What a step's raise is judged from. `called`: the run was cancelled, pruned or held, where no raise is asked. `tryRaise`: the raise
@@ -25,7 +25,7 @@ export type RaiseInput = {
 };
 
 /** A raise the package takes: by a try or by a round, what the budget has to be more than, and for a try its modes and own status. */
-export type RaiseVerdict = { by: 'retry' | 'round'; above: number; modes: RetryMode[]; own: StepStatus | null };
+export type RaiseVerdict = { by: RaiseBy; above: number; modes: RetryMode[]; own: StepStatus | null };
 
 /** A try's raise is due: the try carries one, and there is a way to try it. */
 const tryDue = (i: RaiseInput): boolean => i.tryRaise !== null && i.modes.length > 0;

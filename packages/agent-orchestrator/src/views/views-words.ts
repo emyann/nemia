@@ -6,6 +6,7 @@
 import { type TaskPhase } from '../record/record.ts';
 import { signedAndHeld, type AttemptClock, type AttemptReason, type EngineOutcome, type TaskClock } from '../timeline/index.ts';
 import type { AttemptMemory, KilledAtLimit } from '../../contracts/out-of-memory.contract.ts';
+import type { AttemptEnd } from 'objects';
 
 export type { AttemptMemory, AttemptReason, EngineOutcome, KilledAtLimit };
 
@@ -14,7 +15,7 @@ export type { AttemptMemory, AttemptReason, EngineOutcome, KilledAtLimit };
  * own judging of an end the runtime only carries the fact of — `budget`, cut at the step's spend cap, and `unsigned`, ended without the
  * statement its task asked for.
  */
-export type AttemptEnd = AttemptReason | 'budget' | 'unsigned';
+export type { AttemptEnd };
 
 /**
  * The runtime's task phases, written out because a pure file imports no runtime, a type included: the closed set a task's view stands

@@ -1,38 +1,40 @@
 /**
  * Where a step or a run stands, and what a check said, as the codes the api carries beside each sentence (`phase`, `reason`, `verdict`):
- * the board's copies of agent-orchestrator's tables (`phase/phase.ts`, `check/check.ts`), which it never imports, held equal to them by
- * `test/wire.test.ts`. The board groups, colours and decides by these codes alone, and shows the sentence (`message`) as it comes. A code
- * this board does not know is refused at the decode, as an answer of an api built apart from it.
+ * each a union of `objects`, and its list kept here as a tuple, since every file of the mirror imports this one and it loads no value but
+ * effect's and `decodes` (`test/api-files.test.ts`): each schema's `decodes` holds the tuple to its union both ways. The board groups,
+ * colours and decides by these codes alone, and shows the sentence (`message`) as it comes. A code this board does not know is refused at
+ * the decode, as an answer of an api built apart from it.
  */
 import { Schema } from 'effect';
+import type { AnswerVia, CheckResult, RunPhase, RunReason, StepPhase, StepReason, WaitOn } from 'objects';
 import { decodes } from './decodes.ts';
 
 /** The phases a step stands in: to come, at work, waiting on a person, done, failed, stopped. */
-export const STEP_PHASES = ['pending', 'running', 'waiting', 'succeeded', 'failed', 'stopped'] as const;
+export const STEP_PHASES = ['pending', 'running', 'waiting', 'succeeded', 'failed', 'stopped'] as const satisfies readonly StepPhase[];
 
-/** Mirrors `StepPhase` in agent-orchestrator's phase/phase.ts: one of `STEP_PHASES`. */
-export type StepPhase = (typeof STEP_PHASES)[number];
+/** `objects`' `StepPhase`: one of `STEP_PHASES`. */
+export type { StepPhase } from 'objects';
 
 /** The phases a run stands in: a step's, and `cancelled` for a run a person called off. */
-export const RUN_PHASES = [...STEP_PHASES, 'cancelled'] as const;
+export const RUN_PHASES = [...STEP_PHASES, 'cancelled'] as const satisfies readonly RunPhase[];
 
-/** Mirrors `RunPhase` in agent-orchestrator's phase/phase.ts: one of `RUN_PHASES`. */
-export type RunPhase = (typeof RUN_PHASES)[number];
+/** `objects`' `RunPhase`: one of `RUN_PHASES`. */
+export type { RunPhase } from 'objects';
 
 /**
  * What a wait on a thing waits on (reason `Waiting`, phase `pending`): other runs (`run`), the limit on runs in flight (`limit`), the
  * base branch's checkout (`base`), the store's pause (`pause`), or a person's hold that names no run (`hold`).
  */
-export const WAIT_ON = ['run', 'limit', 'base', 'pause', 'hold'] as const;
+export const WAIT_ON = ['run', 'limit', 'base', 'pause', 'hold'] as const satisfies readonly WaitOn[];
 
-/** Mirrors `WaitOn` in agent-orchestrator's phase/phase.ts: one of `WAIT_ON`. */
-export type WaitOn = (typeof WAIT_ON)[number];
+/** `objects`' `WaitOn`: one of `WAIT_ON`. */
+export type { WaitOn } from 'objects';
 
 /** Where a person is asked for an answer (reason `AwaitingAnswer`): by the session, which stopped to ask, or by its closeout. */
-export const ANSWER_VIA = ['session', 'closeout'] as const;
+export const ANSWER_VIA = ['session', 'closeout'] as const satisfies readonly AnswerVia[];
 
-/** Mirrors `AnswerVia` in agent-orchestrator's phase/phase.ts: one of `ANSWER_VIA`. */
-export type AnswerVia = (typeof ANSWER_VIA)[number];
+/** `objects`' `AnswerVia`: one of `ANSWER_VIA`. */
+export type { AnswerVia } from 'objects';
 
 /**
  * The reasons a step stands in, the feed's codes: a wait on a person is an `Awaiting*` code or a stop beside them (phase `waiting`), a
@@ -61,10 +63,10 @@ export const STEP_REASONS = [
   'Skipped',
   'Sent',
   'Unknown',
-] as const;
+] as const satisfies readonly StepReason[];
 
-/** Mirrors `StepReason` in agent-orchestrator's phase/phase.ts: one of `STEP_REASONS`. */
-export type StepReason = (typeof STEP_REASONS)[number];
+/** `objects`' `StepReason`: one of `STEP_REASONS`. */
+export type { StepReason } from 'objects';
 
 /**
  * The reasons a run stands in: `assess`'s statuses, `Waiting` (on `run`) for a running run a person holds, and for a run a person's
@@ -83,16 +85,16 @@ export const RUN_REASONS = [
   'BudgetExhausted',
   'Unsigned',
   'Denied',
-] as const;
+] as const satisfies readonly RunReason[];
 
-/** Mirrors `RunReason` in agent-orchestrator's phase/phase.ts: one of `RUN_REASONS`. */
-export type RunReason = (typeof RUN_REASONS)[number];
+/** `objects`' `RunReason`: one of `RUN_REASONS`. */
+export type { RunReason } from 'objects';
 
 /** What a check's verdict can be: passed, failed, unfinished (no verdict on the work), running, or unknown. */
-export const CHECK_RESULTS = ['passed', 'failed', 'unfinished', 'running', 'unknown'] as const;
+export const CHECK_RESULTS = ['passed', 'failed', 'unfinished', 'running', 'unknown'] as const satisfies readonly CheckResult[];
 
-/** Mirrors `CheckResult` in agent-orchestrator's check/check.ts: one of `CHECK_RESULTS`. */
-export type CheckResult = (typeof CHECK_RESULTS)[number];
+/** `objects`' `CheckResult`: one of `CHECK_RESULTS`. */
+export type { CheckResult } from 'objects';
 
 /**
  * Mirrors `CheckVerdict` in agent-orchestrator's check/check.ts: a check's `result`, and the code it exited with — `0` once it passed,

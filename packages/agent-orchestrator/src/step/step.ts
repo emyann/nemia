@@ -7,6 +7,7 @@
  */
 import { Invalid } from '../refusal/refusal.ts';
 import type { HarnessPrompt } from '../agents/agents.ts';
+import type { PlaceKind } from 'objects';
 
 export type Workflow = {
   /** The step's name — the file's, minus `.md`. What `after` refers to. */
@@ -45,7 +46,7 @@ export type Workflow = {
    * would in its worktree; any other step gets a folder of its own, empty, and what the steps before it made reaches it as their output and
    * their files. `workspace: folder` is its former spelling (`placeSpelled`).
    */
-  place?: 'git' | 'folder';
+  place?: PlaceKind;
   /**
    * `writable: [web]`: the folders of the run's factory this step may write, each by its directory's name. A run in a factory mounts its
    * other repositories read-only for every local step; this step alone is given the ones it names writable, and one that is the run's
@@ -498,7 +499,7 @@ export const CLOSEOUT_FIELDS = ['apiVersion', 'outcome', 'summary', 'body', 'art
  * Where a step works: its `place:`, or `git` for a step frozen on a run record before the key, as every step worked then; a step file
  * without the line is refused at load (`placeRequired`). The one reader of a step's place. Pure.
  */
-export const stepPlace = (step: Pick<Workflow, 'place'>): 'git' | 'folder' => step.place ?? 'git';
+export const stepPlace = (step: Pick<Workflow, 'place'>): PlaceKind => step.place ?? 'git';
 
 /**
  * Whether a step acts on the base branch itself: it works in the repository's own checkout (`workspace: base`). Pure, and read of the

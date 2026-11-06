@@ -8,6 +8,7 @@ import type { ScriptRoute } from '../../contracts/route-answer.contract.ts';
 import type { TableRoute } from '../../contracts/route-table.contract.ts';
 import { stopsFollowers } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
+import type { NodeKind } from 'objects';
 
 export type { Fate } from '../../contracts/join.contract.ts';
 export type { ScriptAnswer, ScriptRead, ScriptVerdict } from '../../contracts/route-answer.contract.ts';
@@ -44,7 +45,7 @@ export const nodeFate: NodeFate = (when, answered, parents) => {
 };
 
 /** What kind of node a step is: a condition (`routes:`), a route to a workflow (`workflow:`), or a step. */
-export type NodeKind = 'step' | 'condition' | 'workflow';
+export type { NodeKind };
 
 export const nodeKind = (step: Pick<Workflow, 'routes' | 'workflow'>): NodeKind =>
   step.routes !== undefined ? 'condition' : step.workflow !== undefined ? 'workflow' : 'step';

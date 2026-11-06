@@ -5,6 +5,13 @@
  * A closeout with no `apiVersion` is v0, as every closeout given before v1 was: read as it is, converted on read, never rewritten.
  */
 import { CLOSEOUT_FIELDS } from '../step/step.ts';
+import type { Outcome } from 'objects';
+
+/**
+ * How a step signs off, as the envelope's `outcome` takes it: `objects`' list word for word (`packages/objects/src/words.ts`), held equal
+ * by `wordsHeld` (`object/run.model.ts`).
+ */
+export const CLOSEOUT_OUTCOMES = ['done', 'blocked'] as const satisfies readonly Outcome[];
 
 /** The version every closeout is asked for now. */
 export const CLOSEOUT_V1 = 'nemia/v1';
@@ -44,7 +51,7 @@ export const ENVELOPE_SCHEMA = {
   type: 'object',
   properties: {
     apiVersion: { type: 'string', enum: [CLOSEOUT_V1] },
-    outcome: { type: 'string', enum: ['done', 'blocked'] },
+    outcome: { type: 'string', enum: [...CLOSEOUT_OUTCOMES] },
     summary: {
       type: 'string',
       description: `One line of at most ${SUMMARY_MAX} characters; everything else goes in body. A longer one is cut, and the whole of it leads the body.`,

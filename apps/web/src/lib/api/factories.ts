@@ -17,6 +17,7 @@ import {
   type Hire,
   type McpServer,
   type McpServerWrite,
+  type McpTransport,
   type Schedule,
   type SignedOut,
   type SignInStarted,
@@ -216,7 +217,7 @@ export const fireAgent = (name: string, step: string): Promise<Hire> => hires.de
  */
 export type FactoryServer = {
   name: string;
-  type: 'http' | 'sse';
+  type: McpTransport;
   url: string;
   headers?: Readonly<Record<string, string>>;
   oauth?: { clientId: string; callbackPort?: number };

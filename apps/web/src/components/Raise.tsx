@@ -3,6 +3,7 @@
  * row's twin on the Decide section, beside a box for the amount.
  */
 import { useId, useState } from 'react';
+import type { RaiseBy } from 'objects';
 import type { Question, QuestionAnswer, RetryMode } from '../lib/api';
 import { askedSaid, raiseTo, type Answer } from '../lib/asks';
 import { cn } from '../lib/utils';
@@ -206,7 +207,7 @@ function RaiseAsked({ step, said }: { step: string; said: string }) {
 }
 
 /** What a raise's button asks for: a round, its check again, an answer, or a try. */
-const raiseWord = (by: 'retry' | 'round', rechecking: boolean, asks: boolean): string => {
+const raiseWord = (by: RaiseBy, rechecking: boolean, asks: boolean): string => {
   const { button, buttons } = OFFERS.raise;
   return by === 'round' ? buttons.round : rechecking ? buttons.recheck : asks ? buttons.answer : button;
 };

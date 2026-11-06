@@ -1,7 +1,9 @@
 /**
  * The closed words the objects carry: each list a field of an object is one of, said once here and read by the Schemas beside it
- * (`run.ts`). Plain tuples of strings, importing nothing. The orchestrator holds its own unions and its pure files' tuples equal to these
- * at compile time, both ways (`packages/agent-orchestrator/src/object/run.model.ts`): a word added on one side alone fails the typecheck.
+ * (`run.ts`). Plain tuples of strings, importing nothing, each with its union beside it. Every other layer but the runtime imports a list
+ * or its union from the `objects` entry rather than spelling it again; the one exception is a tuple in a file the orchestrator's pure
+ * entries load, which cannot load `objects` at run time: `wordsHeld` holds each such tuple equal to these at compile time, both ways
+ * (`packages/agent-orchestrator/src/object/run.model.ts`), so a word added on one side alone fails the typecheck.
  *
  * `nemia/v1` is additions only: a word is never renamed or dropped under it, and a word added is one an older reader refuses, so it is a
  * change of the version (`packages/objects/CLAUDE.md`).
@@ -131,6 +133,9 @@ export type RevisionKind = (typeof REVISION_KINDS)[number];
 /** A run's word, as `nemia ls` says it. */
 export const RUN_STATUSES = ['running', 'succeeded', 'failed', 'cancelled', 'awaiting approval', 'waiting'] as const;
 
+/** One of `RUN_STATUSES`. */
+export type RunStatusWord = (typeof RUN_STATUSES)[number];
+
 /** A step's word, as `nemia ls` says it. */
 export const STEP_STATUSES = [
   'pending',
@@ -152,41 +157,80 @@ export const STEP_STATUSES = [
   'sent',
 ] as const;
 
+/** One of `STEP_STATUSES`. */
+export type StepStatusWord = (typeof STEP_STATUSES)[number];
+
 /** How a try is taken: continuing the session, in a fresh one, or running the check again. */
 export const RETRY_MODES = ['continue', 'fresh', 'recheck'] as const;
+
+/** One of `RETRY_MODES`. */
+export type RetryMode = (typeof RETRY_MODES)[number];
 
 /** Where a task stands on the clock. */
 export const SPAN_AT = ['unknown', 'queued', 'starting', 'running', 'ended', 'unspawned'] as const;
 
+/** One of `SPAN_AT`. */
+export type SpanAt = (typeof SPAN_AT)[number];
+
 /** How a raise of a step's cap is asked for: with a try, or with a round. */
 export const RAISE_BY = ['retry', 'round'] as const;
+
+/** One of `RAISE_BY`. */
+export type RaiseBy = (typeof RAISE_BY)[number];
 
 /** How a step signed off, in its closeout. */
 export const OUTCOMES = ['done', 'blocked'] as const;
 
+/** One of `OUTCOMES`. */
+export type Outcome = (typeof OUTCOMES)[number];
+
 /** How an attempt ended. */
 export const ENGINE_OUTCOMES = ['succeeded', 'failed', 'stopped'] as const;
+
+/** One of `ENGINE_OUTCOMES`. */
+export type EngineOutcome = (typeof ENGINE_OUTCOMES)[number];
 
 /** Why an attempt ended. */
 export const ATTEMPT_ENDS = ['harness', 'lost', 'unstartable', 'operator', 'deadline', 'budget', 'unsigned'] as const;
 
+/** One of `ATTEMPT_ENDS`. */
+export type AttemptEnd = (typeof ATTEMPT_ENDS)[number];
+
 /** The last event of a session before a person's words went to it, by its kind. */
 export const SAID_AFTER = ['text', 'thinking', 'tool_use', 'tool_result', 'system'] as const;
+
+/** One of `SAID_AFTER`. */
+export type SaidAfter = (typeof SAID_AFTER)[number];
 
 /** Where a session's peak stands against its step's cap. */
 export const PEAK_MARKS = ['cap', 'large'] as const;
 
+/** One of `PEAK_MARKS`. */
+export type PeakMark = (typeof PEAK_MARKS)[number];
+
 /** Where the way a try's session runs came from: what it was filed with, the default, or its tools. */
 export const RUNS_IN_BY = ['filed', 'default', 'tools'] as const;
+
+/** One of `RUNS_IN_BY`. */
+export type RunsInBy = (typeof RUNS_IN_BY)[number];
 
 /** What the board does with a file a closeout named: shows it as an image, as text, or links it. */
 export const ARTIFACT_KINDS = ['image', 'text', 'other'] as const;
 
+/** One of `ARTIFACT_KINDS`. */
+export type ArtifactKind = (typeof ARTIFACT_KINDS)[number];
+
 /** How a step was handed a run's section of its task: waited for, or read. */
 export const HANDED_HOW = ['waited', 'read'] as const;
 
+/** One of `HANDED_HOW`. */
+export type HandedHow = (typeof HANDED_HOW)[number];
+
 /** Where a step's told layers were given: its prompt, or its brief. */
 export const TOLD_VIA = ['prompt', 'brief'] as const;
+
+/** One of `TOLD_VIA`. */
+export type ToldVia = (typeof TOLD_VIA)[number];
 
 /** The conditions the controller says of a templated factory: whether its base holds the template, and whether an upgrade waits. */
 export const FACTORY_CONDITION_TYPES = ['Applied', 'ConflictsPending'] as const;
@@ -293,6 +337,9 @@ export type WriteWay = (typeof WRITE_WAYS)[number];
 
 /** Where a gate's budgets come from: the gated step's proposal, before the approval; the approval's caps, after it. */
 export const GATE_BUDGETS_FROM = ['proposed', 'approved'] as const;
+
+/** One of `GATE_BUDGETS_FROM`. */
+export type GateBudgetsFrom = (typeof GATE_BUDGETS_FROM)[number];
 
 /**
  * The reasons an Event is served under: the feed's codes, in its table's order (`REASONS`, agent-orchestrator's `src/feed/reason.ts`),

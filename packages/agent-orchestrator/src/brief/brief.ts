@@ -34,6 +34,7 @@ import { costsSection, type WorkflowCosts } from '../costs/index.ts';
 import { sayFilled, skillSaid, type PlaceSay } from '../place/place.ts';
 import { judgeSection } from '../route/index.ts';
 import type { RetryAsk } from '../retry/index.ts';
+import type { ToldVia } from 'objects';
 
 /**
  * What a step's place gives its brief: how an ending that lands on its check stages the merge and what it denies (`words`), and the
@@ -467,7 +468,7 @@ export type ToldLayers = {
   fence: Array<{ key: string; value: string }>;
   folderFiles: boolean;
   task: string | null;
-  via: 'prompt' | 'brief';
+  via: ToldVia;
 };
 
 /**

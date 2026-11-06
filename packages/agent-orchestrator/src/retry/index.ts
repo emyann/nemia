@@ -9,6 +9,7 @@ export {
   sessionModel,
   signoffsSpent,
   spentAsks,
+  RETRY_MODES,
   TRY_CAUSES,
   FORMER_MODES,
   upgradeAsk,

@@ -13,6 +13,7 @@ import type { Pause } from '../pause/pause.ts';
 import type { Pin } from '../revisions/revisions.ts';
 import type { Labels } from '../labels/labels.ts';
 import type { HarnessSettings } from '../harness-settings/harness-settings.ts';
+import type { PlaceKind, StepStatusWord } from 'objects';
 
 /**
  * A folder a step may reach beyond its workspace, as the runtime takes it (`config.mounts`): an absolute path, and whether the step may
@@ -76,8 +77,8 @@ export type FolderRun = RunBase & {
  * file may not import (test/boundary.test.ts). `objects`' list word for word (`packages/objects/src/words.ts`), held equal by `wordsHeld`
  * (`object/run.model.ts`).
  */
-export const PLACE_KINDS = ['git', 'folder'] as const;
-export type PlaceKind = (typeof PLACE_KINDS)[number];
+export const PLACE_KINDS = ['git', 'folder'] as const satisfies readonly PlaceKind[];
+export type { PlaceKind };
 
 /** Which kind of workspace a run's steps work in. Pure. */
 export const placeOf = (run: Pick<Run, 'place'>): PlaceKind => run.place?.kind ?? 'git';
@@ -357,24 +358,7 @@ export type Acceptance = { step: string; try: number; at: string; message: strin
  * Only `verified`, `unverified` and `sent` let a follower be filed. The engine's `succeeded` means the session
  * ended, never that the work is done.
  */
-export type StepStatus =
-  | 'pending'
-  | 'running'
-  | 'blocked'
-  | 'unsigned'
-  | 'checking'
-  | 'verified'
-  | 'unverified'
-  | 'awaiting approval'
-  | 'exhausted'
-  | 'over budget'
-  | 'budget exhausted'
-  | 'denied'
-  | 'failed (check)'
-  | 'failed'
-  | 'stopped'
-  | 'skipped'
-  | 'sent';
+export type StepStatus = StepStatusWord;
 
 /** What a follower may be filed on: work a step did, or a card a workflow node filed (`sent`). `skipped` neither satisfies nor stops. */
 export const satisfiesAfter = (s: StepStatus): boolean => s === 'verified' || s === 'unverified' || s === 'sent';

@@ -7,9 +7,10 @@
  * stands, and is undone by applying an earlier revision as a new one. Pure.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
+import type { ApplyAt as ObjectsApplyAt, ApprovedBy } from 'objects';
 
 /** When an approved proposal applies: at approval, or at the proposing run's successful end. */
-export type ApplyAt = 'approval' | 'run-end';
+export type ApplyAt = ObjectsApplyAt;
 
 /**
  * The proposing run, as the pass reads it: still going (a failed run among them, since it may be tried again), ended well, ended
@@ -24,7 +25,7 @@ export type ProposingRun = 'going' | 'succeeded' | 'ended' | 'none';
 export type ApplyFacts = {
   readonly at: ApplyAt;
   readonly run: ProposingRun;
-  readonly approvedBy: 'person' | 'rule';
+  readonly approvedBy: ApprovedBy;
   readonly current: boolean;
   readonly stillApproved: boolean;
 };

@@ -23,7 +23,7 @@ export type SkillRow = {
   /** The agents of yours that give it. */
   usedBy: string[];
   /** A builtin skill's name, where an agent of yours already finds a skill of it; null elsewhere. */
-  found: 'yours' | 'repo' | null;
+  found: Extract<DefinitionOrigin, 'yours' | 'repo'> | null;
 };
 
 /** One place, in the order an agent of yours finds a name, the builtin last; its folder, null where it holds no skill to say it. */
@@ -106,7 +106,7 @@ export type SkillDraft = {
 };
 
 /** An agent that gives a skill, by its place and its name. */
-export type SkillUser = { from: 'factory' | 'yours' | 'repo'; name: string };
+export type SkillUser = { from: Extract<DefinitionOrigin, 'factory' | 'yours' | 'repo'>; name: string };
 
 /**
  * One skill on its page — its row, the version a write carries back, its draft (null where its SKILL.md does not read, `body` its

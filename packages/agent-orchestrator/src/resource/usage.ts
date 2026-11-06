@@ -1,6 +1,7 @@
 /** What sessions consumed, in `nemia decide`'s words: a step's, several steps' together, and what a run's sessions read. */
 import { type Consumed, dollars, peakMark, readWords, sumUsage, usedLines } from '../status/status.ts';
 import type { Workflow } from '../workflow.ts';
+import type { PeakMark } from 'objects';
 
 /** What a session consumed as the engine's `Usage` carries it (`consumption`): a count nobody measured is absent, never 0. */
 export type Usage = Consumed;
@@ -27,7 +28,7 @@ export type StepUsed = {
    * Where the peak stands (`peakMark`): `cap` once the session reached the step's `context:` cap — it compacted, or its peak got there —
    * `large` past 200k on a step with none; null otherwise.
    */
-  peak: 'cap' | 'large' | null;
+  peak: PeakMark | null;
   /**
    * How many resumed sessions wrote their context to the cache again instead of reading it (`rebuiltCache`); 0 where none did, or nobody
    * could tell.

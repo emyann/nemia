@@ -3,7 +3,8 @@
  * `workflows/`, and a schema's, a `.json` file directly in that folder, each refusal a sentence naming the fix (400). And what a step's
  * form is drawn from, by key: how each is set (`KeyKind`, `KINDS`) and the words a key of a fixed list may be set to (`WORDS`).
  */
-import { AGENTS_FOLDER, DENIALS, PLACES, SLOTS, WORKSPACES, type StepKey } from 'agent-orchestrator/workflow';
+import { AGENTS_FOLDER, DENIALS, SLOTS, WORKSPACES, type StepKey } from 'agent-orchestrator/workflow';
+import { PLACE_KINDS } from 'objects';
 
 /**
  * Why `name` cannot be a folder of yours (400), or undefined: a name the listing would show, one folder directly in the store's
@@ -107,7 +108,7 @@ const FLAGS: Readonly<Partial<Record<StepKey, readonly string[]>>> = { remote: E
 /** The words a key of a fixed list may be set to, the flags' among them; the harness and the agent are offered as the store has them. */
 export const WORDS: Readonly<Partial<Record<StepKey, readonly string[]>>> = {
   ...FLAGS,
-  place: PLACES,
+  place: PLACE_KINDS,
   workspace: WORKSPACES,
   slot: SLOTS,
   denials: DENIALS,

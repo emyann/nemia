@@ -8,6 +8,7 @@ import type { RetryAsk } from '../retry/index.ts';
 import { holdsTheRun } from '../phase/phase.ts';
 import { standing, type RoundAsk, type SpendOf } from '../status/status.ts';
 import { assess } from '../tick/assess.ts';
+import type { RunStatusWord } from 'objects';
 
 /**
  * What cancelling this run has to do — and, because they are the same decision, what to tell the
@@ -39,7 +40,7 @@ import { assess } from '../tick/assess.ts';
 export type CancelPlan =
   | { kind: 'cancel'; stop: InFlight[] }
   | { kind: 'already-cancelled'; at: string; stop: InFlight[] }
-  | { kind: 'finished'; status: 'succeeded' | 'failed' };
+  | { kind: 'finished'; status: Extract<RunStatusWord, 'succeeded' | 'failed'> };
 
 /**
  * What cancelling the run has to do (`CancelPlan`). Whatever is in flight is stopped whatever the rest of the run looks like: a fan-out

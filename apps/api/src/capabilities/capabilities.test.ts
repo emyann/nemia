@@ -265,7 +265,7 @@ test('a server that exits before it answers is an error with what it printed on 
 });
 
 /** A deadline for asking a server that the test can wait for; the api's own is `ASK_MS`. */
-const WAITABLE_DEADLINE_MS = 500;
+const WAITABLE_DEADLINE_MS = 200;
 
 /** The most asks the silent-server test makes, each with twice the deadline of the one before, for the server to start within it. */
 const SILENT_TRIES = 6;

@@ -525,10 +525,6 @@ const layerAboveIn = (text: string, retired: ReadonlySet<string> = RETIRED): num
 const measuredBy = (texts: ReadonlyMap<string, string>, count: (text: string) => number): Record<string, number> =>
   Object.fromEntries([...texts].map(([file, text]) => [file, count(text)]).filter(([, n]) => n !== 0));
 
-/** Each file's count of `words`, for the files that say one at least once. */
-const measured = (texts: ReadonlyMap<string, string>, words: readonly string[], plain: readonly string[] = []): Record<string, number> =>
-  measuredBy(texts, (text) => wordsIn(text, words, plain));
-
 /** What an entry fails to name: a card `CARDS` knows, else a move with where it goes. */
 function namingBreak(file: string, what: string, entry: Entry): string | undefined {
   if ('card' in entry)
@@ -568,33 +564,63 @@ function ratchetBreaks(rule: Rule, counts: Record<string, number>, baseline: Bas
 
 const onDisk = (file: string): boolean => fs.existsSync(path.join(ROOT, file));
 
+/** Each count already taken, by what it counts (`key`) and the text it read: a planted file is the one text a breach reads anew. */
+const counted = new Map<string, Map<string, number>>();
+
+/** `count`, kept for each text it is given under `key`, which names everything `count` reads beside the text. */
+const kept =
+  (key: string, count: (text: string) => number) =>
+  (text: string): number => {
+    let byText = counted.get(key);
+    if (!byText) counted.set(key, (byText = new Map()));
+    let n = byText.get(text);
+    if (n === undefined) byText.set(text, (n = count(text)));
+    return n;
+  };
+
+/** Each file's count of `words`, for the files that say one at least once, kept under its words. */
+const measured = (texts: ReadonlyMap<string, string>, words: readonly string[], plain: readonly string[] = []): Record<string, number> =>
+  measuredBy(
+    texts,
+    kept(JSON.stringify(['words', words, plain]), (text) => wordsIn(text, words, plain)),
+  );
+
+type Texts = {
+  harness: ReadonlyMap<string, string>;
+  workflow: ReadonlyMap<string, string>;
+  team: ReadonlyMap<string, string>;
+  fence: ReadonlyMap<string, string>;
+};
+
 /** Every breach of the six rules over `texts` of each, against their baselines; the layer above's words read where a workflow's are. */
-function breaches(
-  texts: { harness: Map<string, string>; workflow: Map<string, string>; team: Map<string, string>; fence: Map<string, string> },
-  team: string[],
-  folders: readonly string[] = TEAM_FOLDERS,
-) {
+function breaches(texts: Texts, team: string[], folders: readonly string[] = TEAM_FOLDERS) {
   return [
     ...ratchetBreaks(FENCE_RULE, measured(texts.fence, FENCE), FENCE_WORDS, onDisk),
     ...ratchetBreaks(HARNESS_RULE, measured(texts.harness, HARNESS), HARNESS_WORDS, onDisk),
     ...ratchetBreaks(WORKFLOW_RULE, measured(texts.workflow, WORKFLOW), WORKFLOW_WORDS, onDisk),
-    ...ratchetBreaks(LAYER_ABOVE_RULE, measuredBy(texts.workflow, layerAboveIn), LAYER_ABOVE_WORDS, onDisk),
+    ...ratchetBreaks(LAYER_ABOVE_RULE, measuredBy(texts.workflow, kept('layer above', layerAboveIn)), LAYER_ABOVE_WORDS, onDisk),
     ...ratchetBreaks(TEAM_RULE, measured(texts.team, [...team, ...FORMER_TEAM, ...FACTORY_NAMES], PLAIN_NAMES), TEAM_NAMES, onDisk),
     ...ratchetBreaks(
       TEAM_PATHS_RULE,
-      measuredBy(texts.team, (text) => teamPathsIn(text, folders)),
+      measuredBy(
+        texts.team,
+        kept(JSON.stringify(['paths', folders]), (text) => teamPathsIn(text, folders)),
+      ),
       TEAM_PATHS,
       onDisk,
     ),
   ];
 }
 
-const repository = () => ({
-  harness: textsOf(HARNESS_RULE.dirs),
-  workflow: textsOf(WORKFLOW_RULE.dirs),
-  team: textsOf(TEAM_RULE.dirs, teamSkipped, teamRead),
-  fence: new Map([...textsOf(FENCE_RULE.dirs)].filter(([file]) => !file.startsWith(OWN_FENCE))),
-});
+let repositoryRead: Readonly<Texts> | undefined;
+/** The texts each rule reads, read once for the whole file: a test plants a file into a copy of a map, never into these. */
+const repository = (): Readonly<Texts> =>
+  (repositoryRead ??= Object.freeze({
+    harness: textsOf(HARNESS_RULE.dirs),
+    workflow: textsOf(WORKFLOW_RULE.dirs),
+    team: textsOf(TEAM_RULE.dirs, teamSkipped, teamRead),
+    fence: new Map([...textsOf(FENCE_RULE.dirs)].filter(([file]) => !file.startsWith(OWN_FENCE))),
+  }));
 
 /** sdlc, the template the nemia factory runs on: its agents are the team's. */
 const SDLC = path.join(ROOT, 'packages', 'templates', 'sdlc');

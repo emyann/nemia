@@ -16,6 +16,11 @@ import { Api, type APIResource, Conflict, Invalid, Missing, Unjudged } from 'obj
 import { olderThanThis, Refused, served, unanswered } from './client.ts';
 import { daemonStarted } from './daemon.ts';
 import { resourceNamed } from './objects/resource.ts';
+import { CLIENT_VERBS } from './route.ts';
+
+/** The way to read in process, for a verb that has one: the client's own verbs have none (`noLocal`). */
+const localWay = (verb: string): string =>
+  (CLIENT_VERBS as readonly string[]).includes(verb.split(' ')[0] ?? verb) ? '' : `, or read in process: \`nemia ${verb} … --local\``;
 
 /**
  * How long a moved read waits on the api before it gives up: the whole call, from the request to the decoded answer. Thirty seconds, some
@@ -63,7 +68,7 @@ const attempt = <A, E>(base: string, call: (client: ObjectsClient) => Effect.Eff
 /** A daemon that took the read and did not answer it within `boundMs`: refused, naming its status and the read in process. */
 const notInTime = (verb: string, base: string, boundMs: number): Refused =>
   new Refused(
-    `the daemon at ${base} did not answer \`nemia ${verb}\` within ${boundMs / 1000} s. See whether it is up, \`nemia service status\`, or read in process: \`nemia ${verb} … --local\``,
+    `the daemon at ${base} did not answer \`nemia ${verb}\` within ${boundMs / 1000} s. See whether it is up, \`nemia service status\`${localWay(verb)}`,
   );
 
 /**
@@ -82,11 +87,11 @@ function answerOf<A, E>(exit: Exit.Exit<A, E>, verb: string, base: string, bound
     if (status === 404) throw olderThanThis(verb, base, pathOf(failed));
     if (reason._tag === 'TransportError') throw unanswered(verb, base, failed);
     throw new Refused(
-      `the daemon at ${base} answered ${status ?? 'nothing'} to ${pathOf(failed)}, which this nemia does not read: restart it, \`nemia service restart\`, or read in process: \`nemia ${verb} … --local\``,
+      `the daemon at ${base} answered ${status ?? 'nothing'} to ${pathOf(failed)}, which this nemia does not read: restart it, \`nemia service restart\`${localWay(verb)}`,
     );
   }
   throw new Refused(
-    `the daemon at ${base} answered in a shape this nemia does not read (${failed instanceof Error ? failed.message : String(failed)}): restart it, \`nemia service restart\`, or read in process: \`nemia ${verb} … --local\``,
+    `the daemon at ${base} answered in a shape this nemia does not read (${failed instanceof Error ? failed.message : String(failed)}): restart it, \`nemia service restart\`${localWay(verb)}`,
   );
 }
 

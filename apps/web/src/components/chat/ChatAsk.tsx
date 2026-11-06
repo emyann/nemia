@@ -8,7 +8,7 @@
  * A permission — a call of hers that would prompt — is this same form, what the SDK handed over drawn over its fieldset
  * (`PermissionFactsOf`), and `Deny` picked first where the SDK leans to no.
  *
- * Her one-question ask whose choices need no explanation is `ChatProposal` (boards 5 and 6), and several questions take
+ * Her one-question ask whose choices need no explanation is `ChatActions` (boards 5 and 6), and several questions take
  * `ChatAskMany` (board 7b); `drawnAsk` says which of the three an ask takes.
  */
 import { useState, type ReactNode } from 'react';

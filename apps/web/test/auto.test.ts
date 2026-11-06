@@ -22,11 +22,13 @@ const LIST: PolicyList = {
   file: '/store/auto/nemia.json',
   isDefault: true,
   rules: [DEFAULT],
+  proposalRules: [],
   builtin: DEFAULT,
   proposed: {
     file: '/store/auto/nemia.proposed.json',
     at: '2026-10-06T12:00:00.000Z',
     rules: [{ id: 'tries', answer: 'retry', steps: ['implement'], when: ['checked'], under: 3, words: 'Try again.', confirmed: false }],
+    proposalRules: [],
     guidance: ['answer in French'],
     stale: false,
   },

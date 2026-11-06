@@ -64,3 +64,4 @@ export * from './api/pause.ts';
 export * from './api/nemia.ts';
 export * from './api/chat.ts';
 export * from './api/policy.ts';
+export * from './api/proposals.ts';

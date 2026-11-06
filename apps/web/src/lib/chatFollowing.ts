@@ -4,8 +4,9 @@
  * (`changedChat`, `followChat`), the one translation of the api's presence into the board's (`presenceOf`), her
  * consecutive calls folded into a turn (`foldChat`) and that fold mapped onto the one shape both conversations draw (`chatItems`, her
  * adapter onto `lib/conversation.ts`, a step's session having one of its own), the links read out of her words (`linksOf`) and the
- * steps of runs they bring (`broughtOf`, `lib/stepLink.ts`), how an ask of hers is drawn (`drawnAsk`) and what is left to answer of
- * one of several questions (`askLeft`, `askAnswered`, `asksOpen`), which of them the composer's own words answer (`askInWords`,
+ * steps of runs and the proposals they bring (`broughtOf`, `lib/stepLink.ts`; `proposalLinkOf`, `lib/proposalLink.ts`), how an ask of
+ * hers is drawn (`drawnAsk`) and what is left to answer of one of several questions (`askLeft`, `askAnswered`, `asksOpen`), which of
+ * them the composer's own words answer (`askInWords`,
  * `wordsAnswer`), and which of her messages are new to the person (`newFrom`, `readableFrom`).
  *
  * Beside the effect in `lib/useNemiaChat.ts`, as `lib/following.ts` sits beside `lib/useStepTranscript.ts`. The transport under
@@ -16,6 +17,7 @@ import { chatDataOf } from './api/chat.ts';
 import type { ConversationItem, ConversationLine } from './conversation.ts';
 import { follow, type Followed, type Follower, type Frames, type StreamLike } from './follow.ts';
 import type { Presence } from './presence.ts';
+import { proposalLinkOf } from './proposalLink.ts';
 import { broughtOf } from './stepLink.ts';
 
 export { broughtOf } from './stepLink.ts';
@@ -297,19 +299,29 @@ export function linksOf(text: string): { text: string; links: ChatLink[] } {
 /** A step of a run her words link to, which her talk draws under them as the run's page's own part for it (`ChatBrought`). */
 export type ChatBrought = { kind: 'brought'; run: string; step: string };
 
-/** What her talk draws itself, through the family's one escape hatch: an ask of hers, or a step her words bring. */
-export type ChatOwn = ChatAsk | ChatBrought;
+/** A proposal her words link to, which her talk draws under them as the proposal page's own part (`ChatProposal`). */
+export type ChatBroughtProposal = { kind: 'brought-proposal'; factory: string; name: string };
 
-/** The steps the links `links` bring, each once, in the order she wrote them. */
-const broughtIn = (links: readonly ChatLink[]): ChatBrought[] => {
+/** What her talk draws itself, through the family's one escape hatch: an ask of hers, or a step or a proposal her words bring. */
+export type ChatOwn = ChatAsk | ChatBrought | ChatBroughtProposal;
+
+/** What a link of hers brings: a step of a run (`broughtOf`) or a proposal (`proposalLinkOf`), keyed for once each; none for another. */
+const bringOf = (href: string): { key: string; own: ChatBrought | ChatBroughtProposal } | undefined => {
+  const step = broughtOf(href);
+  if (step) return { key: `brought:${step.run}/${step.step}`, own: { kind: 'brought', ...step } };
+  const proposal = proposalLinkOf(href);
+  if (proposal) return { key: `brought-proposal:${proposal.factory}/${proposal.name}`, own: { kind: 'brought-proposal', ...proposal } };
+  return undefined;
+};
+
+/** The steps and proposals the links `links` bring, each once, in the order she wrote them, each with its key. */
+const broughtIn = (links: readonly ChatLink[]): { key: string; own: ChatBrought | ChatBroughtProposal }[] => {
   const seen = new Set<string>();
   return links.flatMap((link) => {
-    const named = broughtOf(link.href);
-    if (!named) return [];
-    const key = `${named.run}/${named.step}`;
-    if (seen.has(key)) return [];
-    seen.add(key);
-    return [{ kind: 'brought' as const, ...named }];
+    const named = bringOf(link.href);
+    if (!named || seen.has(named.key)) return [];
+    seen.add(named.key);
+    return [named];
   });
 };
 
@@ -351,9 +363,9 @@ function saidOf(message: ChatMessage): ConversationItem<ChatOwn> {
  * Her chat on the one shape the family draws (`lib/conversation.ts`), her adapter onto it: her consecutive calls folded into one `work`
  * item a line a call (`foldChat`), her words and the person's into `said`, the keeper's framing and the rule between two of her
  * sessions into `note`, and a question, a proposal or a permission of hers into `own`, carrying the event her talk draws itself
- * (`drawnAsk`). After her words, an `own` item for each step of a run they link to (`broughtOf`), once a step, in her order: her talk
- * draws the run's page's own part for it there. An event the board has no drawing for is left out. Pure: a node test proves the whole
- * mapping without a browser.
+ * (`drawnAsk`). After her words, an `own` item for each step of a run they link to (`broughtOf`) and each proposal (`proposalLinkOf`),
+ * once each, in her order: her talk draws the run's page's, or the proposal page's, own part for it there. An event the board has no
+ * drawing for is left out. Pure: a node test proves the whole mapping without a browser.
  */
 export function chatItems(events: readonly ChatEvent[]): ConversationItem<ChatOwn>[] {
   const out: ConversationItem<ChatOwn>[] = [];
@@ -367,7 +379,7 @@ export function chatItems(events: readonly ChatEvent[]): ConversationItem<ChatOw
       const said = saidOf(event);
       out.push(said);
       if (said.kind === 'said' && !said.yours)
-        for (const own of broughtIn(said.links)) out.push({ kind: 'own', id: `${event.id}:brought:${own.run}/${own.step}`, own });
+        for (const { key, own } of broughtIn(said.links)) out.push({ kind: 'own', id: `${event.id}:${key}`, own });
     } else if (isAsk(event)) out.push({ kind: 'own', id: event.id, own: event });
     else if (event.kind === 'session')
       out.push({ kind: 'note', id: event.id, what: 'session', words: `A session of hers began — her ${event.attempt}` });

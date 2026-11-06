@@ -1,9 +1,10 @@
 /**
- * The talk of Nemia's chat: the family's talk (`conversation/Talk`) fed her events through her own adapter (`chatItems`), under the
- * `chat` prefix every page of hers reads. What is hers and hers alone is the ask — a proposal, one question's form or the flow of
- * several, as `drawnAsk` says — and a step of a run her words link to, drawn as the run's page's own part for it (`ChatBrought`): each
- * drawn through the family's one escape hatch (`drawOwn`). And the two labels her log is read by. The line over what is new, the jump
- * pill, the read mark's sentinel and the scroll that follows her latest are the family's.
+ * The talk of Nemia's chat: the family's talk (`conversation/Talk`) fed her events through her own adapter (`chatItems`), under the `chat`
+ * prefix every page of hers reads. What is hers and hers alone is the ask — its actions, one question's form or the flow of several, as
+ * `drawnAsk` says — a step of a run her words link to, drawn as the run's page's own part for it (`ChatBrought`), and a proposal they link
+ * to, drawn as the proposal page's own part (`ChatProposal`): each drawn through the family's one escape hatch (`drawOwn`). And the two
+ * labels her log is read by. The line over what is new, the jump pill, the read mark's sentinel and the scroll that follows her latest are
+ * the family's.
  */
 import { chatItems, drawnAsk, newFrom, readableFrom, type ChatAsk as Ask, type ChatOwn } from '@/lib/chatFollowing';
 import type { AskPick, ChatEvent } from '@/lib/api';
@@ -12,6 +13,7 @@ import { ChatAsk } from './ChatAsk';
 import { ChatAskMany } from './ChatAskMany';
 import { ChatBrought } from './ChatBrought';
 import { ChatProposal } from './ChatProposal';
+import { ChatActions } from './ChatActions';
 
 /** The person's answer to an ask of hers, filed whole. */
 type Answering = (id: string, picks: readonly AskPick[]) => void;
@@ -23,7 +25,7 @@ type Answering = (id: string, picks: readonly AskPick[]) => void;
 function Asked({ ask, onAnswer }: { ask: Ask; onAnswer: Answering }) {
   const drawn = ask.kind === 'permission' ? 'form' : drawnAsk(ask.questions);
   if (drawn === 'many') return <ChatAskMany ask={ask} onAnswer={onAnswer} />;
-  if (drawn === 'actions') return <ChatProposal ask={ask} onAnswer={onAnswer} />;
+  if (drawn === 'actions') return <ChatActions ask={ask} onAnswer={onAnswer} />;
   return <ChatAsk ask={ask} onAnswer={onAnswer} />;
 }
 
@@ -50,7 +52,13 @@ export function ChatTalk({
       readable={readableFrom(events)}
       onRead={onRead}
       drawOwn={(own: ChatOwn) =>
-        own.kind === 'brought' ? <ChatBrought run={own.run} step={own.step} /> : <Asked ask={own} onAnswer={onAnswer} />
+        own.kind === 'brought' ? (
+          <ChatBrought run={own.run} step={own.step} />
+        ) : own.kind === 'brought-proposal' ? (
+          <ChatProposal factory={own.factory} name={own.name} />
+        ) : (
+          <Asked ask={own} onAnswer={onAnswer} />
+        )
       }
     />
   );

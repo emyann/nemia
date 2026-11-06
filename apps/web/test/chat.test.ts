@@ -737,6 +737,32 @@ test('broughtOf and chatItems: a step her words link to is brought, drawn under 
       );
     },
   );
+  await t.test(
+    'her message brings each proposal it links once, beside the steps, in her order; a person who writes the same brings none',
+    () => {
+      const items = chatItems([
+        message(
+          'm:2:a',
+          1,
+          'agent',
+          'I proposed [the hire](/factories/acme/proposals/nemia-ab12c) for [design of r-1](/runs/r-1?step=design); [again](/factories/acme/proposals/nemia-ab12c).',
+        ),
+        message('p:2:b', 2, 'person', 'Is [the hire](/factories/acme/proposals/nemia-ab12c) right?'),
+      ]);
+      assert.deepEqual(
+        items.map((item) => [item.kind, item.id]),
+        [
+          ['said', 'm:2:a'],
+          ['own', 'm:2:a:brought-proposal:acme/nemia-ab12c'],
+          ['own', 'm:2:a:brought:r-1/design'],
+          ['said', 'p:2:b'],
+        ],
+      );
+      const own = items[1];
+      if (own.kind !== 'own') throw new Error('a brought proposal is her own item');
+      assert.deepEqual(own.own, { kind: 'brought-proposal', factory: 'acme', name: 'nemia-ab12c' });
+    },
+  );
 });
 
 test('reading her chat: one stream opened after the first read, from its cursor, and a read made again that fails is the end', async (t) => {

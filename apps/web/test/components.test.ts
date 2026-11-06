@@ -7487,7 +7487,7 @@ test('a chat the api cannot stream and reads again on a beat is a quiet note at 
 
 const { ChatAsk } = await import('../src/components/chat/ChatAsk.tsx');
 const { ChatAskMany } = await import('../src/components/chat/ChatAskMany.tsx');
-const { ChatProposal } = await import('../src/components/chat/ChatProposal.tsx');
+const { ChatActions } = await import('../src/components/chat/ChatActions.tsx');
 type AskQuestion = import('../src/lib/api.ts').AskQuestion;
 type ChatAskEvent = Extract<ChatEvent, { kind: 'question' | 'proposal' }>;
 
@@ -7532,7 +7532,7 @@ test('her one question with its choices explained is drawn as the form: the choi
 
 test('her proposal is drawn as its actions, each choice said whole by its own button, and answered it says what was chosen', () => {
   const asks = renderToStaticMarkup(
-    createElement(ChatProposal, { ask: askEvent('proposal', [askQuestion(true)]), onAnswer: () => undefined }),
+    createElement(ChatActions, { ask: askEvent('proposal', [askQuestion(true)]), onAnswer: () => undefined }),
   );
   assert.match(asks, /data-chat-ask="actions"/);
   assert.match(asks, /data-chat-tag="proposes"/);
@@ -7540,7 +7540,7 @@ test('her proposal is drawn as its actions, each choice said whole by its own bu
   assert.match(asks, /data-chat-action="First line as it is"/);
   assert.doesNotMatch(asks, /data-chat-option=/, 'a choice with nothing to explain is a button, never a row of a form');
   const chose = renderToStaticMarkup(
-    createElement(ChatProposal, {
+    createElement(ChatActions, {
       ask: askEvent('proposal', [askQuestion(true)], { [askQuestion().question]: 'Cut it on read' }),
       onAnswer: () => undefined,
     }),
@@ -7685,4 +7685,115 @@ test('a link to a factory definition given no place is read in the factory of th
     createElement(RouterContextProvider, { router, children: createElement(AgentLink, { from: 'factory', name: 'drafter' }) }),
   );
   assert.match(html, /href="\/agents\/factory\/drafter\?factory=treed"/, "the page's factory is carried");
+});
+
+/** A proposal of `acme` named `nemia-ab12c` in `phase`, changing one hire to widen access where `widens`. */
+const proposalIn = (phase: import('objects').ProposalPhase, widens: boolean, applyAt?: 'run-end'): import('objects').Proposal => ({
+  apiVersion: 'nemia/v1',
+  kind: 'Proposal',
+  metadata: { name: 'nemia-ab12c', namespace: 'acme', resourceVersion: '3', creationTimestamp: '2026-11-06T10:00:00Z' },
+  spec: { objects: [], why: 'the planner reads more', ...(applyAt ? { applyAt } : {}) },
+  status: {
+    phase,
+    proposedBy: { agent: 'nemia' },
+    changes: [{ resource: 'hires', name: 'build.plan', verb: 'update', access: widens ? 'widens' : 'same' }],
+    widens,
+    ...(phase === 'applied' ? { approvedBy: { by: 'person' as const, at: '2026-11-06T10:05:00Z' } } : {}),
+  },
+});
+
+/** `element` rendered with the proposal `proposal` read already, as the page's loader leaves it. */
+async function withProposal(proposal: import('objects').Proposal, element: Parameters<typeof renderToStaticMarkup>[0]): Promise<string> {
+  const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
+  const client = new QueryClient();
+  client.setQueryData(['proposal', 'acme', 'nemia-ab12c'], proposal);
+  return renderToStaticMarkup(createElement(QueryClientProvider, { client }, element));
+}
+
+test('a proposal shows its phase, its widens mark, its changes and the buttons its phase takes', async () => {
+  const { ProposalCard } = await import('../src/components/ProposalCard.tsx');
+  const card = createElement(ProposalCard, { factory: 'acme', name: 'nemia-ab12c' });
+  const waiting = await withProposal(proposalIn('waiting', true), card);
+  assert.match(waiting, /data-proposal-phase="waiting"/);
+  assert.match(waiting, /data-proposal-widens/);
+  assert.match(waiting, /data-proposal-change="hires\/build.plan"/);
+  assert.match(waiting, /data-proposal-approve=/);
+  assert.match(waiting, /data-proposal-decline/);
+  const approved = await withProposal(proposalIn('approved', false, 'run-end'), card);
+  assert.doesNotMatch(approved, /data-proposal-approve=/, 'an approved proposal is approved no more');
+  assert.match(approved, /data-proposal-decline/, 'it is declined until its run ends');
+  assert.doesNotMatch(approved, /data-proposal-widens/);
+  const applied = await withProposal(proposalIn('applied', true), card);
+  assert.doesNotMatch(applied, /data-proposal-approve=|data-proposal-decline=/);
+  assert.match(applied, />applied</);
+  assert.match(applied, /data-proposal-approver/);
+  assert.match(waiting, /data-proposal-widens[^>]*ring-yours/, 'waiting, the mark says it is yours to judge');
+  assert.doesNotMatch(applied, /yours/, 'judged, nothing of it says it waits on you');
+});
+
+test("her chat draws a proposal she links as the page's own part, in her frame", async () => {
+  const { ChatProposal } = await import('../src/components/chat/ChatProposal.tsx');
+  const html = await withProposal(proposalIn('waiting', true), createElement(ChatProposal, { factory: 'acme', name: 'nemia-ab12c' }));
+  assert.match(html, /^<div data-chat-proposal="nemia-ab12c" data-factory="acme"/);
+  assert.match(html, /data-proposal="nemia-ab12c"/);
+  assert.match(html, /data-proposal-widens/);
+});
+
+test('her policy lists her rules over proposals: in force with a Drop, and proposed with a Confirm until it is in force', async () => {
+  const { PolicyRules } = await import('../src/components/PolicyRules.tsx');
+  const gate = { id: 'default', answer: 'approve' as const, when: ['recommends' as const], from: 'default' as const, words: 'Approve.' };
+  const hires = {
+    id: 'hires',
+    answer: 'approve-proposal' as const,
+    factory: 'acme',
+    resources: ['hires'],
+    resourceNames: [],
+    verbs: ['update' as const],
+    widens: false,
+    proposedBy: ['nemia'],
+    words: 'Approve proposals in acme that update hires, made by nemia, that never widen access.',
+  };
+  const list = {
+    agent: 'nemia',
+    file: '/store/auto/nemia.json',
+    isDefault: false,
+    rules: [gate],
+    proposalRules: [hires],
+    builtin: gate,
+    proposed: {
+      file: '/store/auto/nemia.proposed.json',
+      at: '2026-11-06T10:00:00.000Z',
+      rules: [],
+      proposalRules: [
+        { ...hires, from: 'proposed' as const, confirmed: true },
+        { ...hires, id: 'skills', resources: ['skills'], words: 'Approve proposals in acme that update skills.', confirmed: false },
+      ],
+      guidance: [],
+      stale: false,
+    },
+    instruction: null,
+  };
+  const html = await routedWith(createElement(PolicyRules, { agent: 'nemia' }), [[['policy', 'nemia'], list]]);
+  assert.match(html, /data-auto-proposal-rules[^]*data-auto-proposal-rule="hires"[^]*data-auto-drop/, 'in force, with a Drop');
+  assert.match(html, /data-auto-proposed[^]*data-auto-proposal-rule="hires"[^]*data-auto-confirmed/, 'proposed and in force');
+  assert.match(html, /data-auto-proposal-rule="skills"[^]*data-auto-confirm=/, 'proposed, with a Confirm');
+  assert.doesNotMatch(html, /data-auto-rule="hires"/, 'a rule over proposals is not a gate rule');
+});
+
+test("a factory's delegations list each agent's grants in words with a Remove, beside the form that writes one", async () => {
+  const { FactoryDelegations } = await import('../src/components/FactoryDelegations.tsx');
+  const delegation = {
+    apiVersion: 'nemia/v1' as const,
+    kind: 'Delegation' as const,
+    metadata: { name: 'planner', namespace: 'acme', resourceVersion: '1', creationTimestamp: '2026-11-06T10:00:00Z' },
+    spec: { rules: [{ resources: ['hires'], resourceNames: [], verbs: ['update' as const] }] },
+  };
+  const html = await routedWith(createElement(FactoryDelegations, { name: 'acme' }), [
+    [['delegations', 'acme'], [delegation]],
+    [['delegable-agents', 'acme'], ['planner']],
+  ]);
+  assert.match(html, /data-delegation="planner"[^]*data-delegation-grant[^>]*>update hires, any name<[^]*data-delegation-remove/);
+  assert.match(html, /data-delegation-form[^]*data-delegation-resource="hires"[^]*data-delegation-verb="update"/);
+  const none = await routedWith(createElement(FactoryDelegations, { name: 'acme' }), [[['delegations', 'acme'], []]]);
+  assert.match(none, /data-no-delegation/);
 });

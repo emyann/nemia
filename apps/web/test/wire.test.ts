@@ -96,15 +96,9 @@ export type AgentRoleKey = Holds<Same<Board.AgentRoleKey, keyof agents.AgentList
 export type Said = Holds<Same<Board.Said, SaidHeld>>;
 export type QuestionAnswer = Holds<Same<Board.QuestionAnswer, answers.Answer>>;
 
-/**
- * Held open: the board does not draw an agent's rules for approving proposals yet (`proposalRules`, in force and proposed); the board's
- * proposals card draws them. Its mirror leaves both keys out, and every gate rule it reads is the api's.
- */
-type PolicyHeld = Omit<nemia.PolicyAnswer, 'proposalRules' | 'proposed'> & {
-  proposed: Omit<NonNullable<nemia.PolicyAnswer['proposed']>, 'proposalRules'> | null;
-};
-export type PolicyList = Holds<Same<Board.PolicyList, PolicyHeld>>;
+export type PolicyList = Holds<Same<Board.PolicyList, nemia.PolicyAnswer>>;
 export type PolicyRule = Holds<Same<Board.PolicyRule, nemia.PolicyAnswer['rules'][number]>>;
+export type ProposalRule = Holds<Same<Board.ProposalRule, nemia.PolicyAnswer['proposalRules'][number]>>;
 export type Condition = Holds<Same<Board.Condition, nemia.PolicyAnswer['rules'][number]['when'][number]>>;
 
 export type Bridge = Holds<Same<Board.Bridge, NonNullable<runs.StepFiled['bridge']>>>;

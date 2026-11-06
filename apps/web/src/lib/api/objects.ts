@@ -3,7 +3,8 @@
  * by `HttpApiClient` from the one definition the api serves, over `FetchHttpClient` — the Run and its sub-resources (`runs`), the
  * inbox's cards (`cards`), and a factory and its parts: the Factory with its rules, instruction and command lines (`factories`), its MCP
  * servers and their sign-ins (`mcpServers`), Nemia's own servers (`builtin`), its schedules, hires and volumes; and the definitions a
- * namespace serves, its workflows, agents and skills (`workflows`, `agents`, `skills`). Each is a promise, as TanStack Query's functions
+ * namespace serves, its workflows, agents and skills (`workflows`, `agents`, `skills`); and the proposals that change them and the
+ * delegations that may approve them (`proposals`, `delegations`). Each is a promise, as TanStack Query's functions
  * take one.
  *
  * What a call rejects with is what the board's own reads and writes reject with (`read.ts`): a refusal in the api's words (its `error`)
@@ -25,6 +26,9 @@ import {
   Api,
   Card,
   DEFAULT_NAMESPACE,
+  Delegation,
+  DelegationList,
+  type DelegationWrite,
   type CardFile,
   CardList,
   type CardStart,
@@ -41,6 +45,8 @@ import {
   Labelled,
   McpServer,
   McpServerList,
+  Proposal,
+  ProposalList,
   type McpServerWrite,
   Run,
   RunApproved,
@@ -408,6 +414,38 @@ export const hires = {
   /** The agent hired into the step the hire `name` is of fired: answers the hire as it then reads. */
   delete: (namespace: string, name: string): Promise<Hire> =>
     call((c) => c.hires.delete({ params: { namespace, name } }), write(Hire, HIRE_WRITTEN)),
+};
+
+/** What an approval or a decline may have done, and what to look at before sending it again. */
+const PROPOSAL_JUDGED = 'The proposal may be judged: read it again on its page before approving or declining it again.';
+
+/** A factory's proposals, each a change to its definitions waiting on, or judged by, an approval. */
+export const proposals = {
+  list: (namespace: string): Promise<ProposalList> =>
+    call((c) => c.proposals.list({ params: { namespace }, query: {} }), read(ProposalList)),
+  get: (namespace: string, name: string): Promise<Proposal> =>
+    call((c) => c.proposals.get({ params: { namespace, name } }), read(Proposal)),
+  /** The proposal `name` approved, the person's: answers it as it then reads, applied where it applies at approval. */
+  approve: (namespace: string, name: string): Promise<Proposal> =>
+    call((c) => c.proposals.approve({ params: { namespace, name } }), write(Proposal, PROPOSAL_JUDGED)),
+  /** The proposal `name` declined, the person's: answers it as it then reads. */
+  decline: (namespace: string, name: string): Promise<Proposal> =>
+    call((c) => c.proposals.decline({ params: { namespace, name } }), write(Proposal, PROPOSAL_JUDGED)),
+};
+
+/** What a delegation's write may have done, and what to look at before sending it again. */
+const DELEGATION_WRITTEN = "The factory's delegations may be changed: read its settings again before writing one again.";
+
+/** A factory's delegations, each named after the agent it lets approve proposals within its grants; written by the person alone. */
+export const delegations = {
+  list: (namespace: string): Promise<DelegationList> =>
+    call((c) => c.delegations.list({ params: { namespace }, query: {} }), read(DelegationList)),
+  /** The delegation of the agent `name` written whole as `spec`: answers it as it then reads. */
+  put: (namespace: string, name: string, spec: DelegationWrite): Promise<Delegation> =>
+    call((c) => c.delegations.put({ params: { namespace, name }, payload: spec }), write(Delegation, DELEGATION_WRITTEN)),
+  /** The delegation of the agent `name` removed: answers it as it read. */
+  delete: (namespace: string, name: string): Promise<Delegation> =>
+    call((c) => c.delegations.delete({ params: { namespace, name } }), write(Delegation, DELEGATION_WRITTEN)),
 };
 
 /** A factory's volumes, read-only: each folder its runs reach beside its repositories. */

@@ -119,6 +119,10 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - A step her message links to (`/runs/<run>?step=<step>`, read by `broughtOf` in `lib/stepLink.ts`) is drawn under her words by
   `components/chat/ChatBrought.tsx` from the run's page's own parts, never a copy: `GateBrief`, Decide's `AnswerRow`, `Continue`,
   `AskedRow`. Which one is `broughtPart` (`lib/brought.ts`, proved by `contracts/brought.contract.ts`), off the run's page's own reads.
+- A proposal her message links to (`/factories/<factory>/proposals/<name>`, read by `proposalLinkOf` in `lib/proposalLink.ts`, held to
+  the link `nemia.md` teaches by `tools/guards/test/proposal-link.test.ts`) is drawn under her words by `components/chat/ChatProposal.tsx`
+  from the proposal page's own part, `components/ProposalCard.tsx`, never a copy; its Approve and Decline are `proposalOffers`
+  (`lib/proposals.ts`, proved by `contracts/proposal.contract.ts`). Her action ask, the chat event kind `proposal`, is `ChatActions`.
 - A person's word for a step's state has one writer, `PERSON` in `lib/words.ts`, a total `Record<StepState, PersonWords>`: its rail word
   (on the chip, the rail and the card's tag), what it means on hover, and the words of its wait for a state that waits on a person. The
   run's own waits (`RUN_WAITS`) and how a run ended (`ENDED`, `called off` for `cancelled`) sit beside it. Where the board's word differs

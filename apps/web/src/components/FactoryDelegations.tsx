@@ -101,7 +101,7 @@ function DelegationRow({ delegation, pending, onRemove }: { delegation: Delegati
   return (
     <li data-delegation={delegation.metadata.name} className="flex flex-wrap items-start justify-between gap-2 rounded-lg border px-3 py-2">
       <span className="min-w-0 flex-1 text-body-medium">
-        <span className="font-mono">{delegation.metadata.name}</span> may approve what{' '}
+        <span className="font-mono">{delegation.metadata.name}</span> may approve proposals that{' '}
         {delegation.spec.rules.map((rule, i) => (
           <span key={i} data-delegation-grant>
             {i > 0 ? '; or ' : ''}

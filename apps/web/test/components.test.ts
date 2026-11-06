@@ -7736,3 +7736,44 @@ test('her chat draws a proposal she links as the page\'s own part, in her frame'
   assert.match(html, /data-proposal="nemia-ab12c"/);
   assert.match(html, /data-proposal-widens/);
 });
+
+test('her policy lists her rules over proposals: in force with a Drop, and proposed with a Confirm until it is in force', async () => {
+  const { PolicyRules } = await import('../src/components/PolicyRules.tsx');
+  const gate = { id: 'default', answer: 'approve' as const, when: ['recommends' as const], from: 'default' as const, words: 'Approve.' };
+  const hires = {
+    id: 'hires',
+    answer: 'approve-proposal' as const,
+    factory: 'acme',
+    resources: ['hires'],
+    resourceNames: [],
+    verbs: ['update' as const],
+    widens: false,
+    proposedBy: ['nemia'],
+    words: 'Approve proposals in acme that update hires, made by nemia, that never widen access.',
+  };
+  const list = {
+    agent: 'nemia',
+    file: '/store/auto/nemia.json',
+    isDefault: false,
+    rules: [gate],
+    proposalRules: [hires],
+    builtin: gate,
+    proposed: {
+      file: '/store/auto/nemia.proposed.json',
+      at: '2026-11-06T10:00:00.000Z',
+      rules: [],
+      proposalRules: [
+        { ...hires, from: 'proposed' as const, confirmed: true },
+        { ...hires, id: 'skills', resources: ['skills'], words: 'Approve proposals in acme that update skills.', confirmed: false },
+      ],
+      guidance: [],
+      stale: false,
+    },
+    instruction: null,
+  };
+  const html = await routedWith(createElement(PolicyRules, { agent: 'nemia' }), [[['policy', 'nemia'], list]]);
+  assert.match(html, /data-auto-proposal-rules[^]*data-auto-proposal-rule="hires"[^]*data-auto-drop/, 'in force, with a Drop');
+  assert.match(html, /data-auto-proposed[^]*data-auto-proposal-rule="hires"[^]*data-auto-confirmed/, 'proposed and in force');
+  assert.match(html, /data-auto-proposal-rule="skills"[^]*data-auto-confirm=/, 'proposed, with a Confirm');
+  assert.doesNotMatch(html, /data-auto-rule="hires"/, 'a rule over proposals is not a gate rule');
+});

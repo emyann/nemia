@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { policyQuery, confirmRule, dropRule, type PolicyList, type PolicyRule } from '../lib/api';
+import { policyQuery, confirmRule, dropRule, type PolicyList } from '../lib/api';
 import { clockWord } from '../lib/quota';
 import { useNow } from '../lib/useNow';
 import { CustomInstructions, SESSION } from './CustomInstructions';
@@ -16,7 +16,8 @@ const DEFAULT_ID = 'default';
 /**
  * An agent's rules for Auto on Nemia's settings: the custom instruction they come from, written there, the rules in force with the
  * default marked and a Drop each, what the agent proposed with a Confirm each, sending the words read, and whether the instruction changed
- * since, and the words kept as guidance, which nothing enforces. A write sets what the part shows from the api's answer and reads the
+ * since, and the words kept as guidance, which nothing enforces. Her rules for approving a factory's proposals (`approve-proposal`) are
+ * listed apart in each, through the same Confirm and Drop. A write sets what the part shows from the api's answer and reads the
  * rules again; a refusal is shown in its words.
  */
 export function PolicyRules({ agent }: { agent: string }) {
@@ -64,6 +65,17 @@ function PolicyParts({ list, pending, onAsk }: { list: PolicyList; pending: bool
   return (
     <>
       <InForce list={list} pending={pending} onAsk={onAsk} />
+      {list.proposalRules.length > 0 && (
+        <Sub heading="In force over proposals" data-auto-proposal-rules>
+          <ul className="flex flex-col gap-1.5">
+            {list.proposalRules.map((rule) => (
+              <Rule key={rule.id} rule={rule}>
+                <Drop id={rule.id} pending={pending} onAsk={onAsk} />
+              </Rule>
+            ))}
+          </ul>
+        </Sub>
+      )}
       <Proposed list={list} pending={pending} onAsk={onAsk} />
     </>
   );
@@ -79,15 +91,49 @@ function Sub({ heading, children, ...data }: { heading: string; children: ReactN
   );
 }
 
-/** One rule in its words, with what is said and offered beside it. */
-function Rule({ rule, children }: { rule: PolicyRule; children?: ReactNode }) {
+/** One rule in its words, with what is said and offered beside it; a rule that approves proposals marked as one. */
+function Rule({ rule, children }: { rule: { id: string; words: string; answer: string }; children?: ReactNode }) {
   return (
-    <li data-auto-rule={rule.id} className="flex flex-wrap items-start justify-between gap-2 rounded-lg border px-3 py-2">
+    <li
+      data-auto-rule={rule.answer === 'approve-proposal' ? undefined : rule.id}
+      data-auto-proposal-rule={rule.answer === 'approve-proposal' ? rule.id : undefined}
+      className="flex flex-wrap items-start justify-between gap-2 rounded-lg border px-3 py-2"
+    >
       <span data-auto-words className="min-w-0 flex-1 text-body-medium">
         {rule.words}
       </span>
       <span className="flex items-center gap-2">{children}</span>
     </li>
+  );
+}
+
+/** A Drop for the rule `id` in force. */
+function Drop({ id, pending, onAsk }: { id: string; pending: boolean; onAsk: (rule: RuleAsk) => void }) {
+  return (
+    <Button variant="outline" size="sm" data-auto-drop isDisabled={pending} onPress={() => onAsk({ verb: 'drop', id })}>
+      Drop
+    </Button>
+  );
+}
+
+/** A Confirm for a proposed rule, or that it is in force already. */
+function Confirm({
+  rule,
+  pending,
+  onAsk,
+}: {
+  rule: { id: string; words: string; confirmed: boolean };
+  pending: boolean;
+  onAsk: (rule: RuleAsk) => void;
+}) {
+  return rule.confirmed ? (
+    <Badge variant="secondary" data-auto-confirmed>
+      In force
+    </Badge>
+  ) : (
+    <Button size="sm" data-auto-confirm isDisabled={pending} onPress={() => onAsk({ verb: 'confirm', id: rule.id, words: rule.words })}>
+      Confirm
+    </Button>
   );
 }
 
@@ -104,9 +150,7 @@ function InForce({ list, pending, onAsk }: { list: PolicyList; pending: boolean;
                   Default
                 </Badge>
               )}
-              <Button variant="outline" size="sm" data-auto-drop isDisabled={pending} onPress={() => onAsk({ verb: 'drop', id: rule.id })}>
-                Drop
-              </Button>
+              <Drop id={rule.id} pending={pending} onAsk={onAsk} />
             </Rule>
           ))}
         </ul>
@@ -153,20 +197,12 @@ function Proposed({ list, pending, onAsk }: { list: PolicyList; pending: boolean
         <ul className="flex flex-col gap-1.5">
           {proposed.rules.map((rule) => (
             <Rule key={rule.id} rule={rule}>
-              {rule.confirmed ? (
-                <Badge variant="secondary" data-auto-confirmed>
-                  In force
-                </Badge>
-              ) : (
-                <Button
-                  size="sm"
-                  data-auto-confirm
-                  isDisabled={pending}
-                  onPress={() => onAsk({ verb: 'confirm', id: rule.id, words: rule.words })}
-                >
-                  Confirm
-                </Button>
-              )}
+              <Confirm rule={rule} pending={pending} onAsk={onAsk} />
+            </Rule>
+          ))}
+          {proposed.proposalRules.map((rule) => (
+            <Rule key={rule.id} rule={rule}>
+              <Confirm rule={rule} pending={pending} onAsk={onAsk} />
             </Rule>
           ))}
         </ul>

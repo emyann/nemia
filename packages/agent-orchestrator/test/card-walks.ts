@@ -85,6 +85,17 @@ export const CARD_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       says: true,
     },
   ],
+  'cards.entryText': [
+    { name: 'an entry not there is null', walk: ({ door }) => done(door.cards.entryText({ file: 'gone-idea.md' })), says: null },
+    {
+      name: "a card's entry reads as its card's text",
+      walk: ({ door }) => {
+        filed(door, 'an-idea', aCard('Read me'));
+        return done(door.cards.entryText({ file: 'an-idea.md' }));
+      },
+      says: aCard('Read me'),
+    },
+  ],
   'cards.add': [
     { name: 'filed at its name, in the inbox', walk: ({ door }) => filed(door, 'an-idea'), says: '<root>/inbox/an-idea.md' },
     {

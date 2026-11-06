@@ -6,7 +6,7 @@
  * name, then cut into a page (`pageOf`), so `remainingItemCount` counts what the selector keeps. An entry of the inbox that is no
  * markdown file (`idea.txt`, a folder `sub/`) is no card, and is listed all the same, never hidden: under its file, which is its name,
  * its `status.error` saying why, dated by when it was last written (`entryAt`); one that does not read is listed too, its error saying
- * why. Neither is read or pressed by its name: `cardObjectOf` finds a card alone.
+ * why. Either is read by its name, for its page (`cardObjectOf`), a card first, and pressed by none.
  */
 import { Effect } from 'effect';
 import { API_VERSION, type Card, type CardList, DEFAULT_NAMESPACE } from 'objects';
@@ -98,7 +98,10 @@ const objectOf = Effect.fn('objectOf')(function* (l: InboxListing, source = fals
   const door = yield* CardDoor;
   if (!l.file.endsWith('.md')) {
     const at = yield* door.cards.entryAt(l);
-    return at === null ? null : cardOf(l, '', at);
+    if (at === null) return null;
+    const stray = cardOf(l, '', at);
+    const text = source ? yield* door.cards.entryText(l) : null;
+    return text === null ? stray : { ...stray, status: { ...stray.status, source: text } };
   }
   const name = CardName.read(l.name);
   const text = yield* door.cards.read(name);
@@ -140,12 +143,13 @@ export const cardListOf = Effect.fn('cardListOf')(function* (listing: readonly I
 
 /**
  * The card `name` of `listing` as an object, in `namespace` where one is given, its file as written in its `status.source` (a read of one
- * card): `Missing` where no card has that name, or the one that does is in another namespace.
+ * card): a card before a stray entry of the same name (`notes.md` and `notes` both list as `notes`), a stray entry, its `status.error`
+ * saying why it is no card, carrying its own file's text where it is a file. `Missing` where no entry has that name, or the one that does
+ * is in another namespace.
  */
 export const cardObjectOf = Effect.fn('cardObjectOf')(function* (listing: readonly InboxListing[], name: string, namespace?: string) {
-  const l = listing.find(
-    (entry) => entry.file.endsWith('.md') && entry.name === name && (namespace === undefined || namespaceOf(entry) === namespace),
-  );
+  const named = listing.filter((entry) => entry.name === name && (namespace === undefined || namespaceOf(entry) === namespace));
+  const l = named.find((entry) => entry.file.endsWith('.md')) ?? named[0];
   const card = l === undefined ? null : yield* objectOf(l, true);
   if (card === null)
     return yield* Effect.fail(

@@ -741,7 +741,12 @@ test("what a filing, a card's page or a drop refuses, writing nothing", async (t
         ['notes.md', 'The card called notes', '---\nworkflow: dev\n---\nThe card called notes\n', 'dev'],
         "notes.md and a stray notes both list as notes: the read is the card's",
       );
-      assert.equal((await cardPage('notes.txt')).status, 404, 'a stray file is no card, and is not read as one');
+      const stray = (await (await cardPage('notes.txt')).json()) as Card;
+      assert.deepEqual(
+        [stray.spec.body, stray.status.source, typeof stray.status.error],
+        [undefined, 'not a card\n', 'string'],
+        'a stray file with no card of its name has a page all the same: its refusal and its text',
+      );
     },
   );
 

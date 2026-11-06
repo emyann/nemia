@@ -137,7 +137,7 @@ test("a factory's own workflow, a make in a factory and yours outside default ar
   const before = fs.readFileSync(file, 'utf8');
   const own = await send('PUT', '/api/namespaces/treed/workflows/make', { metadata: { resourceVersion: 'x' }, spec: { steps: [] } });
   assert.deepEqual([own.status, own.body.way], [422, 'factory']);
-  assert.match(String(own.body.error), /nemia workflows write factory/);
+  assert.match(String(own.body.error), /nemia propose/);
   assert.equal(fs.readFileSync(file, 'utf8'), before);
   const made = await send('POST', '/api/namespaces/works/workflows', { metadata: { name: 'fresh' }, spec: { steps: [] } });
   assert.deepEqual([made.status, made.body.way], [422, 'factory']);

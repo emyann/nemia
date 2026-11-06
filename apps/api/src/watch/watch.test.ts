@@ -2,7 +2,7 @@
  * Every list watched (`?watch=true`, src/watch/watch.ts): the initial state as an ADDED per object then a BOOKMARK; a card filed,
  * relabelled, started and dropped arriving as ADDED, MODIFIED and DELETED, the DELETED carrying the last object sent; a labelSelector
  * kept on every read, a card relabelled out of it DELETED; the runs of a store holding one watched, plain and namespaced; a fieldSelector
- * of the runs' state kept on every read, a run approved out of waiting DELETED; every GET list of the `Api` watchable; the watch's query
+ * of the runs' state kept on every read, a run waiting sent no MODIFIED for its clock alone and approved out of waiting DELETED; every GET list of the `Api` watchable; the watch's query
  * refused before any stream; and the feed's reader let go when the request is aborted. The resync beat is shortened (`Beats.watch`), never
  * waited out.
  */
@@ -173,7 +173,7 @@ const doneTask = (taskId: string) => {
 };
 
 /** A run of `default` waiting at its `design` gate, its task done, its record laid by hand and taken away after `t`. */
-const gatedRun = (t: TestContext, id: string) => {
+const gatedRun = (t: TestContext, id: string, createdAt = '2026-11-05T06:00:00.000Z') => {
   t.after(() => fs.rmSync(path.join(root, 'runs', `${id}.json`), { force: true }));
   doneTask(`t-${id}`);
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
@@ -188,7 +188,7 @@ const gatedRun = (t: TestContext, id: string) => {
       isolate: true,
       brief: 'Design it.',
       workflowDir: path.join(root, 'no-such-workflow'),
-      createdAt: '2026-11-05T06:00:00.000Z',
+      createdAt,
       workflow: [
         { name: 'design', after: [], body: 'Design it.', harness: 'codex' },
         { name: 'implement', after: ['design'], body: 'Implement it.', harness: 'codex' },
@@ -216,7 +216,7 @@ test('a watch of the runs over a store holding one, plain and namespaced, sends 
   }
 });
 
-test('a watch of the runs by state keeps its fieldSelector on every read: a run approved at its gate, waiting no more, arrives as DELETED', async (t) => {
+test('a watch of the runs by state sends no MODIFIED for the clock alone: a run that waits, then is approved, arrives as ADDED, then DELETED, and nothing between', async (t) => {
   const id = 'r-watch-gated';
   gatedRun(t, id);
   const w = await watch(t, '/api/runs?watch=true&fieldSelector=status.state%3Dwaiting');
@@ -226,6 +226,16 @@ test('a watch of the runs by state keeps its fieldSelector on every read: a run 
     assert.ok(sent && sent.type === 'ADDED', 'the run at its gate is among the waiting');
     assert.equal(sent.object.kind, 'Run');
     assert.equal((sent.object.status as { state?: string }).state, 'waiting', 'with the frame its list carries');
+    const other = 'r-watch-gated-later';
+    const plantedAt = Date.now();
+    gatedRun(t, other, new Date(plantedAt).toISOString());
+    await waitFor(t, () => changes(w.events, other).includes('ADDED'), `${other} ADDED once it waits`);
+    const receivedAt = Date.now();
+    const added = w.events.find((e) => named(e) === other);
+    const status = added?.object.status as { wallMs?: number; clock?: { wallMs?: number } } | undefined;
+    const wallMs = status?.wallMs ?? -1;
+    assert.ok(wallMs >= 0 && wallMs <= receivedAt - plantedAt, `its wall time measured to the read that sent it, got ${wallMs}`);
+    assert.equal(status?.clock?.wallMs, wallMs, 'its clock measured to the same instant');
     const approved = await app.request(`/api/namespaces/default/runs/${id}/steps/design/approve`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', host: '127.0.0.1:8787' },
@@ -233,18 +243,8 @@ test('a watch of the runs by state keeps its fieldSelector on every read: a run 
     });
     assert.equal(approved.status, 202, await approved.clone().text());
     await waitFor(t, () => changes(w.events, id).includes('DELETED'), `${id} DELETED once it waits no more`);
-    const said = w.events.filter((e) => named(e) === id);
-    assert.equal(said[0]?.type, 'ADDED', 'its first event ADDED');
-    assert.equal(said.at(-1)?.type, 'DELETED', 'its last DELETED');
-    for (const e of said.slice(1, -1)) {
-      assert.equal(e.type, 'MODIFIED', 'between them only MODIFIED');
-      if (e.type === 'MODIFIED')
-        assert.equal(
-          (e.object.status as { state?: string }).state,
-          'waiting',
-          'never MODIFIED into a state the selector does not keep (a MODIFIED still waiting is its frame measured to now again)',
-        );
-    }
+    assert.deepEqual(changes(w.events, id), ['ADDED', 'DELETED'], 'its clock moving between the reads is no change of it');
+    assert.deepEqual(changes(w.events, other), ['ADDED'], 'nor of the run still waiting');
   } finally {
     await w.stop();
   }

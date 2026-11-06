@@ -125,8 +125,18 @@ const framed = (state: string, wallMs: number, more: Record<string, unknown> = {
 
 test("a watch compares a run leaving out its frame's time exactly where it is measured to the read", async (t) => {
   const rows: { name: string; a: WatchedObject; b: WatchedObject; same: boolean }[] = [
-    { name: 'two waiting runs apart only in their time', a: watched(framed('waiting', 1000)), b: watched(framed('waiting', 9000)), same: true },
-    { name: 'two runs in flight apart only in their time', a: watched(framed('inFlight', 1000)), b: watched(framed('inFlight', 9000)), same: true },
+    {
+      name: 'two waiting runs apart only in their time',
+      a: watched(framed('waiting', 1000)),
+      b: watched(framed('waiting', 9000)),
+      same: true,
+    },
+    {
+      name: 'two runs in flight apart only in their time',
+      a: watched(framed('inFlight', 1000)),
+      b: watched(framed('inFlight', 9000)),
+      same: true,
+    },
     {
       name: "two waiting runs apart in a step's status",
       a: watched(framed('waiting', 1000)),
@@ -151,7 +161,12 @@ test("a watch compares a run leaving out its frame's time exactly where it is me
       b: watched(framed('inFlight', 1000)),
       same: false,
     },
-    { name: 'two finished runs apart in their frozen time', a: watched(framed('finished', 1000)), b: watched(framed('finished', 9000)), same: false },
+    {
+      name: 'two finished runs apart in their frozen time',
+      a: watched(framed('finished', 1000)),
+      b: watched(framed('finished', 9000)),
+      same: false,
+    },
     {
       name: 'two runs with no state, of a plain list, apart in their wall time',
       a: watched({ phase: 'running', wallMs: 1000 }),
@@ -161,8 +176,7 @@ test("a watch compares a run leaving out its frame's time exactly where it is me
     { name: 'two runs whose state is no run state', a: watched(framed('later', 1000)), b: watched(framed('later', 9000)), same: false },
     { name: 'an object whose status is no object', a: watched('waiting'), b: watched('inFlight'), same: false },
   ];
-  for (const row of rows)
-    await t.test(row.name, () => assert.equal(runWatchVersion(row.a) === runWatchVersion(row.b), row.same));
+  for (const row of rows) await t.test(row.name, () => assert.equal(runWatchVersion(row.a) === runWatchVersion(row.b), row.same));
   await t.test('an object with no status, or a status that is no object, is compared as its JSON', () => {
     const bare: WatchedObject = { apiVersion: 'nemia/v1', kind: 'Run', metadata: { name: 'r-1' } };
     assert.equal(runWatchVersion(bare), JSON.stringify(bare));

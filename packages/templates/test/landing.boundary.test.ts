@@ -27,7 +27,7 @@ import path from 'node:path';
 import { loadWorkflows } from 'agent-orchestrator';
 import { LANDING_CHECK_DEADLINE_SECONDS, checkArgv } from 'agent-orchestrator/run';
 import { scratch } from './scratch.ts';
-import { renderedSdlc } from './template.ts';
+import { copyOf, rendered } from './template.ts';
 import { type Called, type Gh, type Rule, bareOrigin, ghStub, gitIn } from './origin.ts';
 
 /** The template these scripts ship in. */
@@ -49,6 +49,27 @@ function stepsOf(at: Rendered, workflow: string) {
   return loadWorkflows(path.join(at.tree, 'workflows', workflow), { home: at.store }, { factory: 'sdlc', workflow, agents });
 }
 
+/**
+ * sdlc rendered the three ways the land steps' checks are read here, applied on one scratch store and rendered by one `nemia up`
+ * (`rendered`), the first test that asks rendering them: on GitHub, on GitHub with no wait on CI, and in the checkout with a stub's name
+ * for its local check.
+ */
+let rendering: Promise<Record<'github' | 'unwaited' | 'local', Rendered>> | undefined;
+const renders = (): Promise<Record<'github' | 'unwaited' | 'local', Rendered>> =>
+  (rendering ??= (async () => {
+    const all = await rendered([
+      { name: 'github', template: copyOf(SDLC), sets: ['github=true'] },
+      { name: 'unwaited', template: copyOf(SDLC), sets: ['github=true', 'landingWaitsOnCi=false'] },
+      { name: 'local', template: copyOf(SDLC), sets: ['localCheck=local-check'] },
+    ]);
+    const treeOf = (name: 'github' | 'unwaited' | 'local'): Rendered => {
+      const at = all[name];
+      assert.ok(at?.tree, `${name} was rendered: ${JSON.stringify(at?.conditions)}`);
+      return { tree: at.tree, store: at.store };
+    };
+    return { github: treeOf('github'), unwaited: treeOf('unwaited'), local: treeOf('local') };
+  })());
+
 /** The run every fixture here lands, and the branch its result is on. */
 const RUN = 'r-1';
 const RESULT = `wf/${RUN}/run`;
@@ -63,8 +84,26 @@ type World = { repo: string; bare: string; base: string; tip: string; merged: st
  * A checkout on `main` with a commit, a result branch `wf/r-1/run` — a run's own line of work — one commit ahead, and an `origin`
  * whose `main` holds the merge commit GitHub would have made of the two — so `git merge --ff-only origin/main` is the fast-forward the
  * merge verb ends with. The checkout itself is left on the base at the commit before the merge, as the owner's is when a landing starts.
+ *
+ * Built once for each `extra` (`builtWorld`), then copied for each call, checkout and origin both, the copy's `origin` set to the
+ * copied bare repository: every test has a world of its own to change, with the same commits.
  */
 function world({ extra }: { extra?: string } = {}): World {
+  const built = builtWorlds.get(extra) ?? builtWorld(extra);
+  builtWorlds.set(extra, built);
+  const repo = scratch('wf-land-repo-');
+  const bare = scratch('wf-origin-bare-');
+  fs.cpSync(built.repo, repo, { recursive: true });
+  fs.cpSync(built.bare, bare, { recursive: true });
+  gitIn(repo, 'remote', 'set-url', 'origin', bare);
+  return { ...built, repo, bare, gh: ghStub() };
+}
+
+/** The worlds built so far, by their `extra`: never handed to a test, only copied. */
+const builtWorlds = new Map<string | undefined, Omit<World, 'gh'>>();
+
+/** The world `world` copies, built in git: `extra`, where given, a branch off the base of one commit of its own. */
+function builtWorld(extra: string | undefined): Omit<World, 'gh'> {
   const repo = scratch('wf-land-repo-');
   gitIn(repo, 'init', '-q', '-b', 'main');
   fs.writeFileSync(path.join(repo, 'a.ts'), 'export const a = 1;\n');
@@ -90,7 +129,7 @@ function world({ extra }: { extra?: string } = {}): World {
   const merged = gitIn(repo, 'rev-parse', 'HEAD').trim();
   gitIn(repo, 'push', '-q', 'origin', 'main');
   gitIn(repo, 'reset', '-q', '--hard', base);
-  return { repo, bare, base, tip, merged, gh: ghStub() };
+  return { repo, bare, base, tip, merged };
 }
 
 /**
@@ -979,7 +1018,7 @@ test("the receipt's wait fits the landing check's deadline: the start bound unde
 });
 
 test("both land steps' checks, rendered on GitHub, are the receipt alone, run from the run's frozen workflow files, and run no suite and no e2e", async () => {
-  const at = await renderedSdlc(['github=true']);
+  const at = (await renders()).github;
   for (const workflow of ['build', 'quick']) {
     const step = stepsOf(at, workflow).find((s) => s.name === 'land');
     assert.equal(typeof step?.check, 'string', `sdlc's ${workflow} has a land step with a check`);
@@ -1035,7 +1074,7 @@ test("both land steps' checks, rendered on GitHub, are the receipt alone, run fr
     assert.ok(waited(w.gh.calls(), `commits/${w.merged}`).length > 0, 'and its wait on ci at the merge commit');
   }
 
-  const unwaited = await renderedSdlc(['github=true', 'landingWaitsOnCi=false']);
+  const unwaited = (await renders()).unwaited;
   for (const workflow of ['build', 'quick']) {
     const frozen = stepsOf(unwaited, workflow).find((s) => s.name === 'land')?.check ?? '';
     assert.ok(frozen.includes('receipt --run "$WF_RUN" --check "ci" --wait-on-ci "false";'), `${workflow}: ${frozen}`);
@@ -1052,7 +1091,7 @@ function localCheckStub(bin: string, log: string, exit: number): void {
 }
 
 test("REFUSED at shipped defaults: both land steps' checks run the local check on the tree the landing staged, from no frozen file, and call no gh", async () => {
-  const at = await renderedSdlc(['localCheck=local-check']);
+  const at = (await renders()).local;
   for (const workflow of ['build', 'quick']) {
     const check = stepsOf(at, workflow).find((s) => s.name === 'land')?.check;
     assert.equal(typeof check, 'string', `sdlc's ${workflow} has a land step with a check`);

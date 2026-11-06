@@ -807,35 +807,42 @@ test('REFUSED: `nemia up` and `nemia tick` given words they do not take, each na
     });
 });
 
+/**
+ * The signals that stop `nemia up`, each with the code it exits with: one child each, one after another, each on a store of its own so
+ * that no one's daemon.json is another's.
+ */
+const STOPPING = [
+  ['SIGINT', 130],
+  ['SIGTERM', 143],
+  ['SIGHUP', 129],
+] as const;
+
 test("`nemia up` stopped by a signal lets the store go on the way out, with the signal's exit code", async (t) => {
-  for (const [signal, code] of [
-    ['SIGINT', 130],
-    ['SIGTERM', 143],
-    ['SIGHUP', 129],
-  ] as const)
+  const cli = new URL('../cli/main.ts', import.meta.url).href;
+  const fake = new URL('../../test/promised.ts', import.meta.url).href;
+  for (const [signal, code] of STOPPING)
     await t.test(`${signal}: ${code}`, async () => {
-      clear();
-      const cli = new URL('../cli/main.ts', import.meta.url).href;
-      const fake = new URL('../../test/promised.ts', import.meta.url).href;
+      const root = scratch('wf-daemon-signal-');
+      const file = path.join(root, 'daemon.json');
+      const readIt = () => JSON.parse(fs.readFileSync(file, 'utf8')) as ReturnType<typeof read>;
       const w = nodeChild(
         `const { main } = await import(${JSON.stringify(cli)}); const { promised } = await import(${JSON.stringify(fake)}); await main(['up', '20'], promised({ tick: async () => ({ tasks: 0, actions: [], running: {}, views: [] }), admit: async () => [] }));`,
-        { ...process.env, WF_ROOT: ROOT },
+        { ...process.env, WF_ROOT: root },
       );
       const { child } = w;
       try {
-        await w.until(() => fs.existsSync(FILE) && read().pid === child.pid && Boolean(read().passedAt), 'the daemon wrote a pass');
+        await w.until(() => fs.existsSync(file) && readIt().pid === child.pid && Boolean(readIt().passedAt), 'the daemon wrote a pass');
         child.kill(signal);
         assert.equal(
           (await w.closed).code,
           code,
           'a real process, since a signal stops it; its engine a fake, so no harness is asked anything',
         );
-        const file = read();
-        assert.equal(file.pid, child.pid);
-        assert.ok(file.stoppedAt, 'stoppedAt written as it stopped');
+        const held = readIt();
+        assert.equal(held.pid, child.pid);
+        assert.ok(held.stoppedAt, 'stoppedAt written as it stopped');
       } finally {
         child.kill('SIGKILL');
-        clear();
       }
     });
 });

@@ -360,8 +360,12 @@ test("REFUSED: a test file with a git call in every package, where its test scri
 
 const onDisk = (file: string): boolean => fs.existsSync(path.join(ROOT, file));
 
+let measure: ReadonlyMap<string, Reach> | undefined;
+/** What every package's tests reach, measured once for the whole file: a test plants a file into a copy, never into this. */
+const repositoryReach = (): ReadonlyMap<string, Reach> => (measure ??= measureOf(ROOT));
+
 test("every package's tests are held to the baseline: no new file, no new kind, and no entry left loose", () => {
-  const found = measureOf(ROOT);
+  const found = repositoryReach();
   assert.ok(found.size > 300, `the scan read ${found.size} files, and a misrooted scan passes for nothing`);
   for (const pkg of PACKAGES)
     for (const dir of ['test', 'src'])
@@ -381,7 +385,7 @@ test("every package's tests are held to the baseline: no new file, no new kind, 
 });
 
 test('REFUSED: a new test file that reaches the real thing, in each package, and a listed file given a new kind', () => {
-  const found = measureOf(ROOT);
+  const found = repositoryReach();
   for (const pkg of PACKAGES) {
     const file = `${pkg}/test/planted.test.ts`;
     const reach = reachOf(file, over({ [file]: FIXTURES[0].text }));
@@ -487,7 +491,7 @@ test('a boundary test of the runtime earns its name by the real engine alone, wh
   assert.deepEqual(breaksOf({ [boundary]: "import { testEngine } from '../src/testing.ts';\ntestEngine();\n" }), [
     `${boundary} is named a boundary test and reaches nothing real: drop .boundary from its name`,
   ]);
-  const found = measureOf(ROOT);
+  const found = repositoryReach();
   assert.deepEqual(found.get(`${R}/test/engine-contract.boundary.test.ts`)?.named, ['engine']);
   assert.deepEqual(found.get(`${R}/test/engine-contract.test.ts`)?.named, []);
 });

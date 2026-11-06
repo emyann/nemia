@@ -63,6 +63,27 @@ const engineOn = (s: RemoteServer, o: Partial<EngineOptions> = {}, root = scratc
   e: builtEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } }, ...o })),
 });
 
+/**
+ * How long a pass waits on a send the agent holds, at the seam (`spawnWaitMs`), in a test whose point is not the shipped
+ * `SPAWN_WAIT_MS`: each pass that spawns into a held send would wait that second out.
+ */
+const SPAWN_HELD_MS = 50;
+
+/**
+ * `engineOn`, its agent `harness` built by `remoteOps` with the spawn's wait shortened to `SPAWN_HELD_MS` at the seam, and the
+ * engine's `credentials` handed to it: for a test whose agent holds the send.
+ */
+const heldEngineOn = (s: RemoteServer, o: Partial<EngineOptions> = {}, root = scratch('ae-remote-')) => ({
+  root,
+  e: builtEngine(
+    EngineService.layer({
+      root,
+      ...o,
+      harnesses: { remote: remoteOps('remote', { url: s.url }, root, o.credentials, REQUEST_MS, { spawnWaitMs: SPAWN_HELD_MS }) },
+    }),
+  ),
+});
+
 const task = (o: Partial<TaskSpec> = {}): TaskSpec => ({
   brief: 'paint the fence',
   cwd: '/nowhere/in/particular',
@@ -986,14 +1007,14 @@ test(
     const s = await serve(t, { script: HELD });
     const root = scratch('ae-remote-');
     const card = (await (await fetch(`${s.url}/.well-known/agent-card.json`)).json()) as Record<string, unknown>;
-    const ops = remoteOps('remote', { url: s.url }, root, undefined, 300, { sendMs: 600, spawnWaitMs: 100 });
-    const given = remoteOps('remote', { card }, root, undefined, 300, { sendMs: 600, spawnWaitMs: 100 });
+    const ops = remoteOps('remote', { url: s.url }, root, undefined, 150, { sendMs: 450, spawnWaitMs: 50 });
+    const given = remoteOps('remote', { card }, root, undefined, 150, { sendMs: 450, spawnWaitMs: 50 });
     const spawnOf = (on: typeof ops, name: string) => Effect.runPromise(Effect.flip(on.spawn({ name, brief: 'b', cwd: '/w' })));
 
     s.hanging.card = true;
     const unread = await spawnOf(ops, 'ae/card/1');
     assert.equal(unread.refused, true);
-    assert.match(unread.message, /could not be read at .*agent-card\.json \(.*did not answer within 0\.3 s\): the agent is not reachable/);
+    assert.match(unread.message, /could not be read at .*agent-card\.json \(.*did not answer within 0\.15 s\): the agent is not reachable/);
     s.hanging.card = false;
 
     s.hanging.a2a = true;
@@ -1002,7 +1023,7 @@ test(
     assert.equal(
       under.sending.pid,
       process.pid,
-      'the spawn returned after its 0.1 s: a send held goes on to its own bound, `sendMs`, off the pass, in this process',
+      'the spawn returned after its 0.05 s: a send held goes on to its own bound, `sendMs`, off the pass, in this process',
     );
     assert.equal((await Effect.runPromise(given.observe)).get('ae/send/1')?.state, 'submitted', 'being sent: a Task submitted');
     await untilEvent(
@@ -1023,11 +1044,11 @@ test(
     assert.notEqual(send.refused, true, 'held, the send may have been taken: in doubt, not refused');
     assert.match(
       send.message,
-      /since the agent did not answer the send of `ae\/send\/1` within 0\.6 s: whether the agent made a Task of it is not known, and it is not sent twice/,
+      /since the agent did not answer the send of `ae\/send\/1` within 0\.45 s: whether the agent made a Task of it is not known, and it is not sent twice/,
     );
     s.hanging.a2a = false;
 
-    const seenOps = remoteOps('remote', { card }, root, undefined, 300, { spawnWaitMs: 100 });
+    const seenOps = remoteOps('remote', { card }, root, undefined, 150, { spawnWaitMs: 50 });
     await Effect.runPromise(seenOps.spawn({ name: 'ae/seen/1', brief: 'b', cwd: '/w' }));
     const taskId: string = await untilEvent(
       t,
@@ -1075,14 +1096,17 @@ test('a request the agent holds holds a pass for the request bound, and the task
   assert.equal(seen.get('ae/held/1')?.state, 'working', 'as last seen');
 });
 
-/** How long the pass waits on a send in the test below, at the seam (`spawnWaitMs`): shorter than the shipped `SPAWN_WAIT_MS`. */
-const SPAWN_HELD_MS = 50;
+/**
+ * How late the agent below replies: past the request bound by twice that bound, so a send cut at the request bound is cut well
+ * before the reply, and far past the two passes' spawn waits read before it.
+ */
+const REPLY_LATE_MS = 3 * HELD_MS;
 
 test(
   'an agent that replies later than the request bound is read submitted, then ends with its reply, sent once: the send leaves the pass',
   WAITED,
   async (t) => {
-    const s = await serve(t, { script: () => [{ reply: 'slow and sure', data: { verdict: 'fine' }, after: 1_500 }] });
+    const s = await serve(t, { script: () => [{ reply: 'slow and sure', data: { verdict: 'fine' }, after: REPLY_LATE_MS }] });
     const root = scratch('ae-remote-');
     const card = (await (await fetch(`${s.url}/.well-known/agent-card.json`)).json()) as Record<string, unknown>;
     assert.ok(SPAWN_HELD_MS < SPAWN_WAIT_MS && HELD_MS < REQUEST_MS, 'both bounds shortened at the seam, never lengthened');
@@ -1137,7 +1161,12 @@ test(
     const held = await serve(t, { script: () => [{ until: g.shut, data: { ok: 'held' }, state: 'completed' }] });
     const quick = await serve(t, { script: () => [{ data: { ok: 'quick' }, state: 'completed' }] });
     const root = scratch('ae-remote-');
-    const e = builtEngine(EngineService.layer({ root, harnesses: { held: { url: held.url }, quick: { url: quick.url } } }));
+    const at = { spawnWaitMs: SPAWN_HELD_MS };
+    const harnesses = {
+      held: remoteOps('held', { url: held.url }, root, undefined, REQUEST_MS, at),
+      quick: remoteOps('quick', { url: quick.url }, root, undefined, REQUEST_MS, at),
+    };
+    const e = builtEngine(EngineService.layer({ root, harnesses }));
     const a = await Effect.runPromise(e.file(task({ harness: 'held' })));
     const b = await Effect.runPromise(e.file(task({ harness: 'quick' })));
     await Effect.runPromise(e.tick());
@@ -1170,7 +1199,7 @@ test("a remote statement is kept when the wall clock steps back after the attemp
     await t.test(name, async (t) => {
       const g = gate();
       const s = await serve(t, { script: () => steps(g.shut) });
-      const { e } = engineOn(s);
+      const { e } = heldEngineOn(s);
       const id = await Effect.runPromise(e.file(task()));
       await running(e, id);
       stepClock(t, -60_000);
@@ -1211,7 +1240,7 @@ test(
 test('a stop while the agent holds the send cuts it: the task settles stopped, and a Task the agent then makes is cancelled', async (t) => {
   const g = gate();
   const s = await serve(t, { script: () => [{ until: g.shut, state: 'working' }] });
-  const { root, e } = engineOn(s);
+  const { root, e } = heldEngineOn(s);
   const id = await Effect.runPromise(e.file(task()));
   await Effect.runPromise(e.tick());
   assert.equal(s.counts.sendMessage, 1);
@@ -1222,15 +1251,15 @@ test('a stop while the agent holds the send cuts it: the task settles stopped, a
   const let_go = path.join(root, 'remote', 'done', `${encodeURIComponent(`ae/${id}/1`)}.json`);
   assert.ok(fs.existsSync(let_go), 'let go of');
   g.open();
-  await new Promise((r) => setTimeout(r, 200));
+  await untilEvent(t, () => s.tasks().length === 1, 'the Task the agent made once let go', { everyMs: 10 });
   await Effect.runPromise(e.tick());
   assert.equal(s.counts.sendMessage, 1, 'the agent answers a request the stop cut: nothing reads it, and nothing is sent again');
   assert.equal(fs.existsSync(entryFile(root, `ae/${id}/1`)), false, 'nothing brought back into the open registry');
 });
 
 test('a refusal that comes after the spawn returned ends the session `rejected`, in its words on `logs`, and the intent is kept', async (t) => {
-  const s = await serve(t, { security: bearer('right'), slowMs: SPAWN_WAIT_MS + 500, script: HELD });
-  const { root, e } = engineOn(s, { credentials: () => 'wrong' });
+  const s = await serve(t, { security: bearer('right'), slowMs: SPAWN_HELD_MS + 300, script: HELD });
+  const { root, e } = heldEngineOn(s, { credentials: () => 'wrong' });
   const id = await Effect.runPromise(e.file(task()));
   const v = await until(e, id, (x) => x.state.settled !== null, 'settled', 400);
   assert.equal(v.state.settled, 'failed');

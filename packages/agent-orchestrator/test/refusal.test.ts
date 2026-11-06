@@ -14,7 +14,9 @@ import { Effect } from 'effect';
 import { scratch } from './scratch.ts';
 
 process.env.WF_ROOT = scratch('wf-refusal-store-');
-const { Conflict, Invalid, Missing, isRefusal, maxRuns, unhold } = await import('../src/runner.ts');
+const { Conflict, Invalid, Missing, isRefusal } = await import('../src/refusal/refusal.ts');
+const { maxRuns } = await import('../src/config/config.store.ts');
+const { unhold } = await import('../src/wait/wait.verb.ts');
 const { WorkflowError } = await import('../src/workflow.ts');
 
 const PKG = path.join(import.meta.dirname, '..');

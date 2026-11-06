@@ -304,18 +304,27 @@ function sourcesOf(texts: Record<string, string>): Sources {
   );
 }
 
-/** Every `.ts` under `src` and `bin`, in folders too, but the tests beside the code. */
+let scanned: Sources | undefined;
+
+/**
+ * Every `.ts` under `src` and `bin`, in folders too, but the tests beside the code: read and scanned once for the whole file, and
+ * each call given its own copy, its lists too, so a test that changes one changes no other's.
+ */
 const packageSources = (): Sources =>
-  sourcesOf(
-    Object.fromEntries(
-      ['src', 'bin'].flatMap((dir) =>
-        fs
-          .readdirSync(path.join(PKG, dir), { recursive: true, encoding: 'utf8' })
-          .map((f) => `${dir}/${f.split(path.sep).join('/')}`)
-          .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
-          .map((f) => [f, fs.readFileSync(path.join(PKG, f), 'utf8')]),
-      ),
-    ),
+  Object.fromEntries(
+    Object.entries(
+      (scanned ??= sourcesOf(
+        Object.fromEntries(
+          ['src', 'bin'].flatMap((dir) =>
+            fs
+              .readdirSync(path.join(PKG, dir), { recursive: true, encoding: 'utf8' })
+              .map((f) => `${dir}/${f.split(path.sep).join('/')}`)
+              .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+              .map((f) => [f, fs.readFileSync(path.join(PKG, f), 'utf8')]),
+          ),
+        ),
+      )),
+    ).map(([file, imports]) => [file, [...imports]]),
   );
 
 /** The runtime's pure door to its vocabulary, which any file may import: by that exact name, and no subpath of it. */

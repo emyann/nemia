@@ -22,7 +22,7 @@ import path from 'node:path';
 import { loadWorkflows } from 'agent-orchestrator';
 import { CHECK_DEADLINE_SECONDS, checkArgv } from 'agent-orchestrator/run';
 import { scratch } from './scratch.ts';
-import { renderedSdlc } from './template.ts';
+import { copyOf, rendered } from './template.ts';
 import { CI_URL, GREEN, type Called, type Gh, type Rule, bareOrigin, ghStub, gitIn, listed, passing, rollup, tip } from './origin.ts';
 
 /** The template these scripts ship in. */
@@ -46,6 +46,31 @@ function stepsOf(at: Rendered, workflow: string) {
   );
   return loadWorkflows(path.join(at.tree, 'workflows', workflow), { home: at.store }, { factory: 'sdlc', workflow, agents });
 }
+
+/**
+ * sdlc rendered the three ways the implement checks and notes are read here, applied on one scratch store and rendered by one `nemia
+ * up` (`rendered`), the first test that asks rendering them: on GitHub with a round check, a CI context and label rules of its own; on
+ * GitHub with the label rules alone; and in the checkout with a stub's name for its local check.
+ */
+let rendering: Promise<Record<'round' | 'labelled' | 'local', Rendered>> | undefined;
+const renders = (): Promise<Record<'round' | 'labelled' | 'local', Rendered>> =>
+  (rendering ??= (async () => {
+    const all = await rendered([
+      {
+        name: 'round',
+        template: copyOf(SDLC),
+        sets: ['github=true', 'roundCheck=round-check --all', 'ciCheck=gate', `pullRequestLabels=${RULES}`],
+      },
+      { name: 'labelled', template: copyOf(SDLC), sets: ['github=true', `pullRequestLabels=${RULES}`] },
+      { name: 'local', template: copyOf(SDLC), sets: ['localCheck=local-check'] },
+    ]);
+    const treeOf = (name: 'round' | 'labelled' | 'local'): Rendered => {
+      const at = all[name];
+      assert.ok(at?.tree, `${name} was rendered: ${JSON.stringify(at?.conditions)}`);
+      return { tree: at.tree, store: at.store };
+    };
+    return { round: treeOf('round'), labelled: treeOf('labelled'), local: treeOf('local') };
+  })());
 
 /**
  * The retry line a refusal of the wait must print: the run the branch names, and the step `WF_STEP` says — or, with it unset, the
@@ -1066,7 +1091,7 @@ test('REFUSED with no re-run, as today, where none can be asked', () => {
 });
 
 test("build's implement check, rendered on GitHub, pushes through the script before the round check, labelling by the rules it was set, waits last on the CI context it was set, and runs no suite and no e2e itself", async () => {
-  const at = await renderedSdlc(['github=true', 'roundCheck=round-check --all', 'ciCheck=gate', `pullRequestLabels=${RULES}`]);
+  const at = (await renders()).round;
   const check = stepsOf(at, 'build').find((step) => step.name === 'implement')?.check;
   assert.equal(typeof check, 'string', "sdlc's build has an implement step with a check");
   const frozen = check as string;
@@ -1139,7 +1164,7 @@ test("build's implement check, rendered on GitHub, pushes through the script bef
 });
 
 test("build's and quick's implement notes, rendered on GitHub, open the pull request labelled by the rules the factory set", async () => {
-  const at = await renderedSdlc(['github=true', `pullRequestLabels=${RULES}`]);
+  const at = (await renders()).labelled;
   for (const workflow of ['build', 'quick']) {
     const note = fs.readFileSync(path.join(at.tree, 'workflows', workflow, 'implement.md'), 'utf8');
     const line = note.split('\n').find((text) => text.includes('pull-request.ts" open --title'));
@@ -1174,7 +1199,7 @@ test("build's and quick's implement notes, rendered on GitHub, open the pull req
 });
 
 test("REFUSED at shipped defaults, in the checkout: build's implement check runs the probes, then the local check, pushes nothing and calls no gh", async () => {
-  const at = await renderedSdlc(['localCheck=local-check']);
+  const at = (await renders()).local;
   const check = stepsOf(at, 'build').find((step) => step.name === 'implement')?.check;
   assert.equal(typeof check, 'string', "sdlc's build has an implement step with a check");
   const place = placed();

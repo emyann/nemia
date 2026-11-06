@@ -1,6 +1,6 @@
 /**
  * What the tick's memo of runs at rest saves a pass, and what takes a run out of it (`advanceResting` in tick.verb.ts). Two tests. A story
- * over one big quiet store, built once: two hundred finished runs beside three in flight, where a pass costs what is in flight — its
+ * over one big quiet store, built once: forty finished runs (`FINISHED`) beside three in flight, where a pass costs what is in flight — its
  * records, journals read on disk, observes, questions of its place and spans — and never what has finished, nor how long the runtime's
  * feed has grown; the board's light list and a warm read of it alike. And a table of every input of a run at rest (`restStamps`, the feed,
  * its result branches) and every refusal of `verifyRest`, each row on a small store of its own, made for it and emptied by the next, so no
@@ -11,7 +11,7 @@
  * hand, which takes what it is said and lets a session go. On one test place for the file; the git processes a pass's place starts are
  * counted on git in pass-processes.boundary.test.ts. A file of its own, since `tick` reads every run under `WF_ROOT`, read as the module
  * loads, so it is set before the import; no cap on runs in flight, and sessions enough that every task filed is admitted on the pass
- * after, so a store of two hundred runs is built in a few passes. Every pass that is not a measurement judges the runs the memo answered
+ * after, so a store of forty runs is built in a few passes. Every pass that is not a measurement judges the runs the memo answered
  * in full as well (`verifyRest`), and throws where the two differ.
  */
 import { test } from 'node:test';
@@ -287,7 +287,19 @@ const unclocked = (answer: object) =>
     ),
   );
 
-test('a big quiet store: two hundred finished runs beside three in flight cost a pass what the three cost', async (t) => {
+/**
+ * The finished runs of the big quiet store, compared at none, half and all of them: as small as the claim allows. What a pass costs must
+ * not grow with them, and both sizes stand above every bound a pass or a read of the list puts on runs, so neither hides a cost under one:
+ * the tick judges its runs one after another and the informer and the standing read theirs all at once, with
+ * no batch, chunk or cache bound on runs; the runtime has none either; the one page is this test's own, `PAGE`. Half holds the six runs
+ * on the two isolated repositories.
+ */
+const FINISHED = 40;
+const HALF = FINISHED / 2;
+/** The light list's page, asked of the finished runs. */
+const PAGE = 9;
+
+test('a big quiet store: forty finished runs beside three in flight cost a pass what the three cost', async (t) => {
   const s = storeOf();
   const st = story(t);
   const { h, inFlight } = s;
@@ -327,7 +339,7 @@ test('a big quiet store: two hundred finished runs beside three in flight cost a
   let warmBefore: number | undefined;
 
   await st.test(
-    'a pass costs as many journal reads, observes and questions of its place on 200 finished runs as on none: what is in flight sets it',
+    `a pass costs as many journal reads, observes and questions of its place on ${FINISHED} finished runs as on none: what is in flight sets it`,
     async () => {
       inFlight.push(...(await s.started(3)));
       sizes.push({ cost: await s.steady(), quiet: await quiet() });
@@ -335,12 +347,12 @@ test('a big quiet store: two hundred finished runs beside three in flight cost a
       warmBefore = await warm();
       await s.started(3, TWO, ISOLATED_REPOS[0], true);
       await s.started(3, TWO, ISOLATED_REPOS[1], true);
-      await s.started(94);
+      await s.started(HALF - 3 * ISOLATED_REPOS.length);
       sizes.push({ cost: await s.steady(), quiet: await quiet() });
-      await s.started(100);
+      await s.started(FINISHED - HALF);
       sizes.push({ cost: await s.steady(), quiet: await quiet() });
 
-      const [none, hundred, twoHundred] = sizes.map((z) => z.cost) as [PassCost, PassCost, PassCost];
+      const [none, half, full] = sizes.map((z) => z.cost) as [PassCost, PassCost, PassCost];
       assert.equal(none.rested, 0);
       assert.ok(
         journals(none) < 3,
@@ -348,8 +360,8 @@ test('a big quiet store: two hundred finished runs beside three in flight cost a
       );
       assert.ok(observes(none) >= 1, `and their harness observed (${observes(none)} observes)`);
       for (const [at, c] of [
-        [100, hundred],
-        [200, twoHundred],
+        [HALF, half],
+        [FINISHED, full],
       ] as const) {
         assert.equal(c.rested, at, `every finished run of ${at} answered from memory`);
         assert.equal(c.records, none.records, `${at} finished runs: no record read more than the runs in flight make`);
@@ -365,43 +377,47 @@ test('a big quiet store: two hundred finished runs beside three in flight cost a
   );
 
   await st.test(
-    'the runs in flight said a word, the pass at rest reads their journals on disk, as much over 200 finished as over none, and traces as much',
+    `the runs in flight said a word, the pass at rest reads their journals on disk, as much over ${FINISHED} finished as over none, and traces as much`,
     async () => {
-      const [none, hundred, twoHundred] = sizes.map((z) => z.quiet) as [Quiet, Quiet, Quiet];
+      const [none, half, full] = sizes.map((z) => z.quiet) as [Quiet, Quiet, Quiet];
       assert.ok(
         reads(none.cost).runtime > 0,
         `the runtime's pass reads its journals on disk, for what was said (${reads(none.cost).runtime})`,
       );
       assert.equal(none.cost.records, inFlight.length, 'the records of the runs in flight alone');
-      assert.deepEqual(reads(twoHundred.cost), reads(none.cost), 'as many journals and records read over 200 finished runs as over none');
+      assert.deepEqual(reads(full.cost), reads(none.cost), `as many journals and records read over ${FINISHED} finished runs as over none`);
       const said = ({ spans }: Quiet) => {
         const pass = spans.find((span) => span.name === 'pass');
         return [pass?.attributes.get('runs'), pass?.attributes.get('rested')];
       };
       assert.deepEqual(
-        [said(hundred), said(twoHundred)],
+        [said(half), said(full)],
         [
-          [100 + inFlight.length, 100],
-          [200 + inFlight.length, 200],
+          [HALF + inFlight.length, HALF],
+          [FINISHED + inFlight.length, FINISHED],
         ],
         'the pass says how many runs it listed and answered from memory',
       );
-      assert.deepEqual(namesOf(twoHundred.spans), namesOf(hundred.spans), 'as many spans, and the same, over 200 runs at rest as over 100');
       assert.deepEqual(
-        namesOf(twoHundred.spans).filter((name) => name === 'advanceResting' || name === 'releaseFinished'),
+        namesOf(full.spans),
+        namesOf(half.spans),
+        `as many spans, and the same, over ${FINISHED} runs at rest as over ${HALF}`,
+      );
+      assert.deepEqual(
+        namesOf(full.spans).filter((name) => name === 'advanceResting' || name === 'releaseFinished'),
         [],
         'no span for a run answered from memory, nor for a settled task with nothing to release',
       );
-      const advanced = twoHundred.spans.filter((span) => span.name === 'advancePass').map((span) => String(span.attributes.get('run')));
+      const advanced = full.spans.filter((span) => span.name === 'advancePass').map((span) => String(span.attributes.get('run')));
       assert.deepEqual(advanced.sort(), inFlight.map((r) => r.id).sort(), 'a run judged in full is a run in flight');
     },
   );
 
   await st.test(
-    "the board's light list answers the same with none finished and two hundred, and a warm read of it reads no more",
+    `the board's light list answers the same with none finished and ${FINISHED}, and a warm read of it reads no more`,
     async () => {
       const after = await open(h.e);
-      assert.equal(after.metadata.counts?.finished, 200);
+      assert.equal(after.metadata.counts?.finished, FINISHED);
       const { metadata: _a, ...items } = after;
       const { metadata: _b, ...itemsBefore } = lightBefore as typeof after;
       assert.deepEqual(unclocked(items), unclocked(itemsBefore), 'the runs not finished answered the same');
@@ -409,12 +425,12 @@ test('a big quiet store: two hundred finished runs beside three in flight cost a
       let pages = 0;
       let last = after;
       do {
-        last = await byState(h.e, 'status.state=finished', kept, unverified, { limit: 9, continue: token });
+        last = await byState(h.e, 'status.state=finished', kept, unverified, { limit: PAGE, continue: token });
         token = last.metadata.continue;
         pages++;
-      } while (token !== undefined && pages < 30);
-      assert.equal(pages, 23, 'two hundred finished runs, nine a page: twenty-three pages');
-      assert.equal(last.items.length, 2, 'two on the last');
+      } while (token !== undefined && pages <= FINISHED);
+      assert.equal(pages, Math.ceil(FINISHED / PAGE), `${FINISHED} finished runs, ${PAGE} a page`);
+      assert.equal(last.items.length, FINISHED - (pages - 1) * PAGE, 'what is left on the last');
       const many = await warm();
       assert.equal(warmBefore, inFlight.length, 'the records of the runs in flight alone, at rest in no memo');
       assert.equal(many, warmBefore, "a warm read reads no finished run's record, however many there are");
@@ -429,21 +445,24 @@ test('a big quiet store: two hundred finished runs beside three in flight cost a
       await s.measured();
       const second = await s.measured();
       const listed = listRuns().length;
-      assert.equal(second.rested, 200, 'every finished run answered from memory');
+      assert.equal(second.rested, FINISHED, 'every finished run answered from memory');
       assert.equal(second.records, listed - second.rested, `only the records of the runs in flight read (${second.records} of ${listed})`);
       const fresh = await s.measured(freshRestMemo());
       assert.ok(fresh.records >= listed, `every record read with nothing in memory (${fresh.records} of ${listed})`);
       assert.equal(fresh.rested, 0, 'nothing answered from memory');
-      const [none, , twoHundred] = sizes.map((z) => z.cost) as [PassCost, PassCost, PassCost];
-      assert.ok(journals(fresh) >= journals(none) + 200, `each of the 200 finished runs' tasks read (${journals(fresh)} reads)`);
+      const [none, , full] = sizes.map((z) => z.cost) as [PassCost, PassCost, PassCost];
+      assert.ok(
+        journals(fresh) >= journals(none) + FINISHED,
+        `each of the ${FINISHED} finished runs' tasks read (${journals(fresh)} reads)`,
+      );
       assert.equal(
         places(fresh),
-        places(twoHundred),
+        places(full),
         "the six runs whose tips are read ask no git of their own: their tips are read off the heads of the pass's one `standing` a repository",
       );
       assert.equal(
         journals(await s.measured()),
-        journals(twoHundred),
+        journals(full),
         "the pass that follows, on the engine's own memo, is as it was: an empty memo is a cost, never an answer",
       );
     },
@@ -458,7 +477,7 @@ test('a big quiet store: two hundred finished runs beside three in flight cost a
         await s.measured();
         const paused = await s.measured();
         const listed = listRuns().length;
-        assert.equal(paused.rested, 200, 'every finished run answered from memory while the pause stands');
+        assert.equal(paused.rested, FINISHED, 'every finished run answered from memory while the pause stands');
         assert.equal(
           paused.records,
           listed - paused.rested,
@@ -469,7 +488,7 @@ test('a big quiet store: two hundred finished runs beside three in flight cost a
         resumePause();
       }
       await s.measured();
-      assert.equal((await s.measured()).rested, 200, 'and once it is lifted, as before');
+      assert.equal((await s.measured()).rested, FINISHED, 'and once it is lifted, as before');
     },
   );
 
@@ -478,7 +497,7 @@ test('a big quiet store: two hundred finished runs beside three in flight cost a
     async () => {
       for (let k = 0; k < 3; k++) {
         const pass = await s.verified();
-        assert.ok(pass.cost!.rested >= 200, `pass ${k + 1}: the finished runs answered from memory (${pass.cost!.rested})`);
+        assert.ok(pass.cost!.rested >= FINISHED, `pass ${k + 1}: the finished runs answered from memory (${pass.cost!.rested})`);
         assert.equal(pass.refused, undefined, `pass ${k + 1}: no refused move`);
       }
     },
@@ -696,7 +715,7 @@ test('a big quiet store: two hundred finished runs beside three in flight cost a
       const pass = await runWith(h.e, tickRun({ repo: ROOT, memo: s.memo, verifyRest: false }));
       const cost = pass.cost!;
       const listed = listRuns().length;
-      assert.ok(cost.rested >= 200, `the finished runs answered from memory (${cost.rested})`);
+      assert.ok(cost.rested >= FINISHED, `the finished runs answered from memory (${cost.rested})`);
       assert.equal(
         cost.records,
         listed - cost.rested,

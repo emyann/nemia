@@ -140,7 +140,7 @@ test(
   async (t) => {
     const s = story(t);
     const dir = root();
-    const ok = detachedOps(sh('sleep 2; echo done > out.txt; exit 0'), dir);
+    const ok = detachedOps(sh('sleep 1; echo done > out.txt; exit 0'), dir);
     const three = detachedOps(sh('exit 3'), dir);
     const says = detachedOps(sh('echo hello-from-the-harness; exit 0'), dir);
 
@@ -153,7 +153,7 @@ test(
     });
 
     await s.test('the worker outlives the process that spawned it', async () => {
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 250));
       assert.equal(
         (await Effect.runPromise(ok.observe)).get('ae/t1/1')?.state,
         'working',
@@ -681,6 +681,12 @@ const stopped = async (t: Waiter, ops: ReturnType<typeof detachedOps>, name: str
   await settle(t, ops, name, 'canceled');
 };
 
+/**
+ * How long a test waits for the worker to have looked at the inbox: over two of the worker's `INBOX_MS` (500, a bound with no seam), so
+ * a timer that fires late still leaves one look inside the wait. Shortened only through a seam for `INBOX_MS`, never by a thinner margin.
+ */
+const INBOX_LOOKED_MS = 1_200;
+
 test('a harness that reads its stdin hears its brief, then each word said, until its closing line closes its input', WAITED, async (t) => {
   const s = story(t);
   const dir = root();
@@ -703,7 +709,7 @@ test('a harness that reads its stdin hears its brief, then each word said, until
 
   await s.test('a line half appended waits for its end, and is written on whole, once', async (sub) => {
     fs.appendFileSync(inboxOf(dir, 'ae/i1/1'), '{"said":"par');
-    await new Promise((r) => setTimeout(r, 1_200));
+    await new Promise((r) => setTimeout(r, INBOX_LOOKED_MS));
     fs.appendFileSync(inboxOf(dir, 'ae/i1/1'), 'ted"}\n');
     await listened(sub, () => heardIn(one).length === 4, 'the line once whole');
     assert.equal(heardIn(one)[3], 'parted', 'written on whole, once');
@@ -721,7 +727,7 @@ test('a harness that reads its stdin hears its brief, then each word said, until
     await sayRefused(ops, 'ae/i1/1', 'more', /^in: `ae\/i1\/1` has given its result and reads no more words/);
     const size = fs.statSync(inboxOf(dir, 'ae/i1/1')).size;
     fs.appendFileSync(inboxOf(dir, 'ae/i1/1'), '{"said":"behind its back"}\n');
-    await new Promise((r) => setTimeout(r, 1_200));
+    await new Promise((r) => setTimeout(r, INBOX_LOOKED_MS));
     assert.deepEqual(
       heardIn(one),
       ['the brief', 'first', 'second', 'parted', 'end and linger', 'EOF'],
@@ -2740,14 +2746,31 @@ test('a detached look, find and stop read the run files of the sessions they are
   });
 });
 
+/** The grace the test below gives its harness: what it waits out, once. */
+const SECOND_STOP_GRACE_MS = 1600;
+
+/**
+ * How far into the first stop's grace the second comes in the test below, on the harness's own clock: half of it, far over a tick's
+ * 0.1 s.
+ */
+const SECOND_STOP_INTO_MS = SECOND_STOP_GRACE_MS / 2;
+
+/**
+ * A shell command that prints the instant, in seconds, off `/proc/uptime`, a clock that only goes forward: the wall clock `date`
+ * reads can be stepped under a test (WSL2 steps it to the host's), and once read a harness killed 2.3 s after a second stop in a test
+ * that ran 1.8 s in all.
+ */
+const UPTIME_SH = 'cut -d" " -f1 /proc/uptime';
+
 test('a second stop while one is under way signals the harness again, and leaves the grace counted from the first', WAITED, async (t) => {
-  const grace = 3000;
+  const grace = SECOND_STOP_GRACE_MS;
+  const into = SECOND_STOP_INTO_MS;
   const dir = root();
   const cwd = scratch('ae-harness-');
   const script = [
-    "trap 'date +%s%3N >> terms' TERM",
+    `trap '${UPTIME_SH} >> terms' TERM`,
     ': > started',
-    'while :; do sleep 0.1; if [ -s terms ]; then date +%s%3N >> ticks; fi; done',
+    `while :; do sleep 0.1; if [ -s terms ]; then ${UPTIME_SH} >> ticks; fi; done`,
   ].join('; ');
   const ops = detachedOps(sh(script), dir, { stopGraceMs: grace, beatMs: 200 });
   await Effect.runPromise(ops.spawn(req('ae/g5/1', cwd)));
@@ -2755,17 +2778,28 @@ test('a second stop while one is under way signals the harness again, and leaves
   const worker = runningIn([dir]).find((p) => /\bae-worker\.ts\b/.test(p.args))!.pid;
   const lines = (name: string) => {
     const file = path.join(cwd, name);
-    return fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map(Number) : [];
+    return fs.existsSync(file)
+      ? fs
+          .readFileSync(file, 'utf8')
+          .trim()
+          .split('\n')
+          .filter(Boolean)
+          .map((l) => Math.round(Number(l) * 1000))
+      : [];
   };
   process.kill(worker, 'SIGTERM');
-  await within(t, () => lines('ticks').length >= 20, 'the harness ticks on, two seconds into the first stop’s grace');
+  await within(
+    t,
+    () => (lines('ticks').at(-1) ?? 0) - (lines('terms')[0] ?? Infinity) >= into,
+    'the harness ticks on, half its grace into the first stop’s',
+  );
   process.kill(worker, 'SIGTERM');
   await within(t, () => lines('terms').length === 2, 'the second stop reached the harness too');
   await within(t, () => !alive(worker) && runningIn([cwd]).length === 0, 'the worker and its harness ended');
   const [, second] = lines('terms');
   const last = lines('ticks').at(-1)!;
   assert.ok(
-    last - second < grace - 1000,
+    last - second < grace - into / 2,
     `the harness was killed ${last - second} ms after the second stop: the grace runs from the first, not again from the second`,
   );
 });

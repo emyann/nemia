@@ -19,7 +19,7 @@ import path from 'node:path';
 import { loadWorkflows } from 'agent-orchestrator';
 import { checkArgv } from 'agent-orchestrator/run';
 import { scratch } from './scratch.ts';
-import { copyOf, rendered, renderedSdlc } from './template.ts';
+import { copyOf, rendered } from './template.ts';
 import { type Rule, bareOrigin, ghIn, passing, rollup } from './origin.ts';
 
 /** The template these scripts ship in. */
@@ -149,34 +149,40 @@ const SCRIPTS = Object.fromEntries(
 );
 
 /**
- * sdlc rendered for a factory on GitHub, its other parameters at their defaults, and quick's folder in it: what a run freezes as
- * `WF_WORKFLOW_FILES`.
+ * The four ways the tests render sdlc, applied on one scratch store and rendered by one `nemia up` (`rendered`), each over a repository
+ * of its own: `sdlc`, on GitHub, its other parameters at their defaults; `checkout`, at its default way, in the checkout, its local check
+ * a stub's name; and `github` and `local`, the two ways again with a check of the factory's own, a stub's name handed the run's id.
  */
-const RENDERED = await renderedSdlc(['github=true']);
+const OWN_COMMAND = 'own-check "$WF_RUN"';
+const TREES = await (async () => {
+  const all = await rendered([
+    { name: 'sdlc', template: copyOf(SDLC), sets: ['github=true'] },
+    { name: 'checkout', template: copyOf(SDLC), sets: ['localCheck=local-check'] },
+    { name: 'github', template: copyOf(SDLC), sets: ['github=true', `implementCheck=${OWN_COMMAND}`] },
+    { name: 'local', template: copyOf(SDLC), sets: ['localCheck=local-check', `implementCheck=${OWN_COMMAND}`] },
+  ]);
+  const treeOf = (name: 'sdlc' | 'checkout' | 'github' | 'local'): Rendered => {
+    const at = all[name];
+    assert.ok(at?.tree, `${name} was rendered: ${JSON.stringify(at?.conditions)}`);
+    return { tree: at.tree, store: at.store };
+  };
+  return { sdlc: treeOf('sdlc'), checkout: treeOf('checkout'), github: treeOf('github'), local: treeOf('local') };
+})();
+
+/** sdlc rendered for a factory on GitHub, and quick's folder in it: what a run freezes as `WF_WORKFLOW_FILES`. */
+const RENDERED = TREES.sdlc;
 const FROZEN = path.join(RENDERED.tree, 'workflows', 'quick');
 
 /** Quick's implement check, as the rendered tree gives it to a run. */
 const CHECK = stepsOf(RENDERED, 'quick').find((step) => step.name === 'implement')?.check ?? '';
 
-/** sdlc rendered at its default way, in the checkout, its local check a stub's name, and quick's folder and implement check in it. */
-const LOCAL = await renderedSdlc(['localCheck=local-check']);
+/** sdlc rendered at its default way, in the checkout, and quick's folder and implement check in it. */
+const LOCAL = TREES.checkout;
 const LOCAL_FROZEN = path.join(LOCAL.tree, 'workflows', 'quick');
 const LOCAL_CHECK = stepsOf(LOCAL, 'quick').find((step) => step.name === 'implement')?.check ?? '';
 
-/** sdlc rendered with a check of the factory's own, a stub's name handed the run's id, on GitHub and in the checkout. */
-const OWN_COMMAND = 'own-check "$WF_RUN"';
-const OWN_RENDERED = await (async () => {
-  const both = await rendered([
-    { name: 'github', template: copyOf(SDLC), sets: ['github=true', `implementCheck=${OWN_COMMAND}`] },
-    { name: 'local', template: copyOf(SDLC), sets: ['localCheck=local-check', `implementCheck=${OWN_COMMAND}`] },
-  ]);
-  const treeOf = (name: 'github' | 'local'): { tree: string; store: string } => {
-    const at = both[name];
-    assert.ok(at?.tree, `${name} was rendered: ${JSON.stringify(at?.conditions)}`);
-    return { tree: at.tree, store: at.store };
-  };
-  return { github: treeOf('github'), local: treeOf('local') };
-})();
+/** sdlc rendered with a check of the factory's own, on GitHub and in the checkout. */
+const OWN_RENDERED = { github: TREES.github, local: TREES.local };
 
 /** Where a rendered check `check` branches on its way: what runs before, the GitHub branch, and the local one (`; else …`). */
 function waysOf(check: string): { before: string; github: string; local: string } {

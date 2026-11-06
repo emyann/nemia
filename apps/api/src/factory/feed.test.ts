@@ -466,11 +466,25 @@ test(
   },
 );
 
+/** The reader's beat the tests below give their app (`Beats.feed`): a few of them are waited for, never the package's second. */
+const BEAT_MS = 50;
+/**
+ * How long a read is kept failing in the test below before the feed is made readable again: 500 ms, ten of `BEAT_MS` and many more than
+ * the two beats the test's claim needs, so a slow machine still sees the failing read repeated.
+ */
+const FAILING_FOR_MS = 500;
+/** An app whose feed reader beats every `BEAT_MS` (`Beats.feed`), disposed after the test that built it. */
+const beatenApp = (t: { after: (fn: () => unknown) => void }) => {
+  const own = appOf(Layer.merge(liveOf(), Layer.succeed(Beats)({ ...Beats.defaultValue(), feed: `${BEAT_MS} millis` })));
+  t.after(() => own.runtime.dispose());
+  return own.app;
+};
+
 test('a feed truncated under the stream ends it: `unreadable`, not tried again, and the response closes', WAITED, async (t) => {
   const pass = emptyFeed();
   await pass({ 'r-1': planAt('running') });
   await pass({ 'r-1': planAt('succeeded') });
-  const { reader, text } = await open(`?after=${end()}`);
+  const { reader, text } = await open(`?after=${end()}`, {}, beatenApp(t));
   await pass({ 'r-1': planAt('failed') });
   await readUntil(t, reader, text, (s) => s.length >= 1);
 
@@ -495,17 +509,13 @@ test('a feed truncated under the stream ends it: `unreadable`, not tried again, 
   );
 });
 
-/** The reader's beat the test below gives its app (`Beats.feed`): a few of them are waited for, never the package's seconds. */
-const BEAT_MS = 100;
-
 test(
   'a read that fails is said once, `retrying`, and cleared by the first read that works, before the lines it found',
   WAITED,
   async (t) => {
     if (process.getuid?.() === 0) return t.skip('a mode of 200 does not keep root from reading');
     assert.ok(BEAT_MS < 1_000, "the reader's beat shorter than the package's own second (`followFeed`), never longer");
-    const own = appOf(Layer.merge(liveOf(), Layer.succeed(Beats)({ ...Beats.defaultValue(), feed: `${BEAT_MS} millis` })));
-    t.after(() => own.runtime.dispose());
+    const own = beatenApp(t);
     const pass = emptyFeed();
     const [first] = await pass({ 'r-1': planAt('running') });
     await until(
@@ -514,7 +524,7 @@ test(
       () => `${followers()} readers left behind by the tests before this one`,
       { everyMs: 20 },
     );
-    const { reader, text } = await open(`?after=${end()}`, {}, own.app);
+    const { reader, text } = await open(`?after=${end()}`, {}, own);
     try {
       await until(
         t,
@@ -543,7 +553,7 @@ test(
         const { error, retrying } = JSON.parse(failed[0].data!);
         assert.equal(retrying, true, 'a read that failed, not a feed that cannot be read from again');
         assert.match(error, /EACCES/);
-        await new Promise((r) => setTimeout(r, BEAT_MS * 5));
+        await new Promise((r) => setTimeout(r, FAILING_FOR_MS));
       } finally {
         fs.chmodSync(feedFile(), 0o644);
       }

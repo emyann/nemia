@@ -1,13 +1,15 @@
 /**
  * The rules of a run's state in the list the board reads (a RunList asked by `?fieldSelector=status.state…`): what state a listed run is
  * in — it waits on a person, it is in flight, or it is finished (`kindOf`) — when a finished run finished, a run's wall time, a finished
- * run's outcome, and the factory a read keeps.
+ * run's outcome, the factory a read keeps, which runs' frame says time measured to the read (`measuredToNow`), and the version a watch
+ * compares a run at (`runWatchVersion`).
  *
  * Pure: a run's summary in, as the whole list answers it, and a word or a time out. Each rule reads the fields it names
  * (`Listed`), so the list's own summary is handed as it is.
  */
 import path from 'node:path';
-import type { RunOutcome, RunState } from 'objects';
+import { RUN_STATES, type RunOutcome, type RunState, type WatchedObject } from 'objects';
+import type { MeasuredToNow } from '../../contracts/measured-to-now.contract.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { labelsText, metadataLabels, type Labels } from '../labels/labels.ts';
 import type { Run } from '../record/record.ts';
@@ -103,3 +105,26 @@ export const selectedRuns = <R extends Pick<Run, 'workflowDir' | 'factory' | 'la
  */
 export const labelSegments = (map: Labels, shown: { readonly all: boolean; readonly columns: readonly string[] }): string =>
   `${shown.all ? `  labels: ${labelsText(map)}` : ''}${shown.columns.map((key) => `  ${key}: ${map[key] ?? '<none>'}`).join('')}`;
+
+/**
+ * Whether the frame of a run in `state` (its status's `state`, undefined where the status carries no frame) has its `wallMs` and `clock`
+ * measured to the instant its list was read at: a run still going, as `clockUntilOf` reads it to `now`. A finished run's stand still.
+ */
+export const measuredToNow: MeasuredToNow = (state) => state === 'waiting' || state === 'inFlight';
+
+/** Whether `v` is an object of JSON, not an array. */
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** `word` as a run's state, or undefined where it is none. */
+const runStateOf = (word: unknown): RunState | undefined => RUN_STATES.find((s) => s === word);
+
+/**
+ * The version a watch compares a run at (`Versioned`): its JSON as served, its status's `wallMs` and `clock` left out where they are
+ * measured to the read (`measuredToNow`), so time passing alone is no change of the run. Any other object is its JSON as is.
+ */
+export const runWatchVersion = (object: WatchedObject): string => {
+  const status = object['status'];
+  if (!isObject(status) || !measuredToNow(runStateOf(status['state']))) return JSON.stringify(object);
+  const { wallMs: _wallMs, clock: _clock, ...still } = status;
+  return JSON.stringify({ ...object, status: still });
+};

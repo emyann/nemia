@@ -25,7 +25,7 @@ const watchChangesSpec = spec<(sent: readonly Versioned[], now: readonly Version
    * object new now is ADDED, every one sent at another version MODIFIED, every one gone DELETED — and that no object is said twice run out
    * of the solver's work through the `filter` of the result (the last on some runs and not others), and are held whole by
    * `src/list-watch/list-watch.test.ts` until tsverify card `src-a-filter-s-result-is-pro-p25m` (a filter's result proved to keep every
-   * element that passes) restores them here.
+   * element that passes) restores them here; tsverify 0.9.0 still leaves each `bounded`.
    */
   ensures: {
     addedOnlyTheNew: {

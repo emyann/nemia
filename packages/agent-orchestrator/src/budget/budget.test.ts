@@ -5,8 +5,9 @@
  * proves are its laws' (`contracts/budget.contract.ts`), not rows here, but one: the full law `aProposalStands` narrows there, that each
  * budget the step proposed and the person did not change is the cap the approval sets for its step, is held here by `approvedCaps` over
  * every proposal and every set of amounts given, until tsverify proves a loop keeps every element it passes on
- * (src-a-filter-s-result-is-pro-p25m, in the tsverify factory); so is `someCapAboveIsNamed`'s, that a cap above its step's own budget is
- * named, held here by `aboveTheWorkflow` over every set of caps against every set of ceilings. Each refusal row breaks one rule and is
+ * (src-a-filter-s-result-is-pro-p25m, in the tsverify factory). That a cap above its step's own budget is named, which the contract
+ * proves whole since tsverify 0.9.0 (`eachCapAboveItsCeiling`), is held here too by `aboveTheWorkflow` over every set of caps against
+ * every set of ceilings. Each refusal row breaks one rule and is
  * asserted by its kind and the facts it names.
  */
 import { test } from 'node:test';

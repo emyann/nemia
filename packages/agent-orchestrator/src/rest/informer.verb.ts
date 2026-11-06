@@ -43,7 +43,10 @@ type Entry<T, O = unknown> = {
   atRest: boolean;
   pass: number | undefined;
   value: T;
-  /** The run's listed object built on `value` (`keepObject`), its disk parts as they were then: served while `value` is. */
+  /**
+   * The run's listed object built on `value` (`keepObject`), before its disk parts (`runObjectCore`, its core `resourceVersion` on it),
+   * laid with them on every request (`withDiskParts`): served while `value` is.
+   */
   object?: O;
 };
 

@@ -27,6 +27,7 @@ import { Refused } from '../refused.ts';
 import { isRecord, objectsOf, type Read, readOf, servedOf, textOf } from './apply.ts';
 
 export const PROPOSE_HELP = `nemia propose -f <file|-> [-n <factory>] [--at approval|run-end] [--why <text>]
+nemia propose --objects '<json>' [-n <factory>] [--at approval|run-end] [--why <text>]
 nemia propose --undo <proposal> [-n <factory>] [--why <text>]
 
 Propose a change of a factory's definitions — workflows, agents, skills, hires, MCP servers, the factory — for the person (or an agent
@@ -38,6 +39,7 @@ named applied, and the removal of each it made. Prints the proposal's name, its 
   -n, --namespace <factory>    the factory proposed in; else the one the file names; default where neither does
       --at <when>              approval (the default): applied once approved; run-end: once the proposing run has succeeded
       --why <text>             why, in your words, shown beside the change
+      --objects '<json>'       the objects themselves, as JSON or YAML on one line, for a session that writes no file
       --undo <proposal>        propose undoing a proposal that applied
 `;
 
@@ -53,6 +55,7 @@ with nemia get proposals -n <factory>; read one with nemia get proposal <name> -
 /** What `args` ask of propose. */
 type Asked = {
   file?: string;
+  inline?: string;
   undo?: string;
   namespace?: string;
   at?: ApplyAt;
@@ -87,19 +90,20 @@ function parsed(args: readonly string[]): Asked {
     '--at': 'at',
     '--why': 'why',
     '--undo': 'undo',
+    '--objects': 'inline',
   });
   const at = said.get('at');
   if (at !== undefined && !oneOf(APPLY_AT, at))
     throw new Refused(`nemia propose: --at takes ${APPLY_AT.join(' or ')}; see \`nemia propose --help\``);
   const asked: Asked = {};
-  for (const key of ['file', 'undo', 'namespace', 'why'] as const) {
+  for (const key of ['file', 'inline', 'undo', 'namespace', 'why'] as const) {
     const value = said.get(key);
     if (value !== undefined) asked[key] = value;
   }
   if (at !== undefined) asked.at = at;
-  if ((asked.file === undefined) === (asked.undo === undefined))
+  if ([asked.file, asked.inline, asked.undo].filter((said) => said !== undefined).length !== 1)
     throw new Refused(
-      'nemia propose: name the file to propose, `nemia propose -f <file>` (`-f -` for stdin), or the proposal to undo, `nemia propose --undo <proposal>`, not both',
+      "nemia propose: name one of the file to propose, `nemia propose -f <file>` (`-f -` for stdin), the objects themselves, `nemia propose --objects '<json>'`, or the proposal to undo, `nemia propose --undo <proposal>`",
     );
   if (asked.undo !== undefined && asked.at !== undefined)
     throw new Refused('nemia propose: an undo applies once approved, and takes no --at: drop it, `nemia propose --undo <proposal>`');
@@ -163,10 +167,17 @@ function namespaceOf(objects: readonly unknown[], namespace: string | undefined)
   return [...named][0] ?? DEFAULT_NAMESPACE;
 }
 
-/** The objects of the file `file` names, as the proposal carries them, in `namespace`. */
-async function fromFile(file: string, namespace: string | undefined): Promise<{ namespace: string; objects: ProposedObject[] }> {
-  const objects = objectsOf(textOf(file, 'propose'), file, 'propose');
-  if (objects.length === 0) throw new Refused(`nemia propose: ${file} holds no object: write one, then \`nemia propose -f ${file}\``);
+/**
+ * The objects of `text`, read from the file `file` names or given on the line (`--objects`, where `file` says so), as the proposal
+ * carries them, in `namespace`.
+ */
+async function fromText(
+  text: string,
+  file: string,
+  namespace: string | undefined,
+): Promise<{ namespace: string; objects: ProposedObject[] }> {
+  const objects = objectsOf(text, file, 'propose');
+  if (objects.length === 0) throw new Refused(`nemia propose: ${file} holds no object: name one, then \`nemia propose -f <file>\``);
   const where = namespaceOf(objects, namespace);
   const resources = await discovered('propose');
   const proposed: ProposedObject[] = [];
@@ -238,7 +249,9 @@ export async function propose(args: readonly string[]): Promise<number> {
     objects = await undoOf(proposal, namespace);
     why ??= `undo ${undone}`;
   } else {
-    ({ namespace, objects } = await fromFile(said.file ?? '-', said.namespace));
+    const file = said.file ?? '--objects';
+    const text = said.inline ?? textOf(file, 'propose');
+    ({ namespace, objects } = await fromText(text, file, said.namespace));
   }
   const payload = { objects, ...(said.at !== undefined ? { applyAt: said.at } : {}), ...(why !== undefined ? { why } : {}) };
   const ns = namespace;

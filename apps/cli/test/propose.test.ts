@@ -223,6 +223,29 @@ test('propose sends every request with the session token, each object at the ver
   assert.match(said.out, /\/factories\/f1\/proposals\/grace-ab12c$/m);
 });
 
+test('propose --objects: the objects given on the line, as JSON, are proposed as a file of them would be', async () => {
+  const inline = JSON.stringify({
+    apiVersion: 'nemia/v1',
+    kind: 'Hire',
+    metadata: { name: 'tidy.fresh' },
+    spec: { workflow: 'tidy', step: 'fresh', agent: 'otto' },
+  });
+  const { said, requests } = await sent(() => nemia(['propose', '--objects', inline, '-n', 'f1', '--at', 'run-end'], { token: 'tok' }));
+  assert.equal(said.code, 0, said.err);
+  const post = requests.find((r) => r.method === 'POST' && r.path === '/api/namespaces/f1/proposals');
+  assert.deepEqual(post?.body, {
+    objects: [
+      {
+        apiVersion: 'nemia/v1',
+        kind: 'Hire',
+        metadata: { name: 'tidy.fresh', namespace: 'f1' },
+        spec: { workflow: 'tidy', step: 'fresh', agent: 'otto' },
+      },
+    ],
+    applyAt: 'run-end',
+  });
+});
+
 test('with WF_SESSION_TOKEN unset or empty, no request carries an Authorization header: the caller is the person', async () => {
   for (const token of [undefined, '']) {
     const { said, requests } = await sent(() =>

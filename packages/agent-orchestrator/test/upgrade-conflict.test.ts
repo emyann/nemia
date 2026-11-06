@@ -126,19 +126,33 @@ test('an upgrade with a conflict: previewed, filed, waited on with the status al
   });
 
   await s.test(
-    'nemia factory diff previews what merges cleanly and each conflict, with the line that resolves it, and writes nothing',
+    'nemia factory diff previews what merges cleanly and each conflict, then the upgrade to file before the line that resolves each, and writes nothing',
     async (t) => {
       const before = bytesUnder(FACTORIES);
       const printed = await printedBy(t, 'factory', 'diff', 'crew', '--to', '0.2.0');
       assert.deepEqual(bytesUnder(FACTORIES), before, 'the plan writes nothing');
       assert.equal(printed[0], 'crew: 0.1.0 → 0.2.0');
       assert.ok(printed.includes('conflicts: 2'), printed.join('\n'));
+      const upgrade = printed.findIndex((line) => line.startsWith('first, nemia factory upgrade crew --to 0.2.0 files it'));
+      assert.ok(upgrade > 0, printed.join('\n'));
+      assert.match(printed[upgrade - 1] ?? '', /^plan: sha256:[0-9a-f]{64}$/, 'the digest the upgrade is held to, where one is');
       for (const at of [LINE, ROUNDS]) {
         assert.ok(printed.includes(`  ${at}`), printed.join('\n'));
-        assert.ok(printed.includes(`    nemia factory resolve crew '${at}' --ours|--theirs|--file <path>`), printed.join('\n'));
+        const resolve = printed.indexOf(`    nemia factory resolve crew '${at}' --ours|--theirs|--file <path>`);
+        assert.ok(resolve > upgrade, `the resolve of ${at} comes after the upgrade it is taken for:\n${printed.join('\n')}`);
       }
-      assert.match(printed.at(-2) ?? '', /^plan: sha256:[0-9a-f]{64}$/, 'the digest the upgrade is held to, where one is');
-      assert.equal(printed.at(-1), 'nemia factory upgrade crew --to 0.2.0 files it; the daemon merges once each conflict is resolved.');
+    },
+  );
+
+  await s.test(
+    'a resolve typed before its upgrade is filed is refused as a Conflict whose fix is that upgrade, and writes nothing',
+    async () => {
+      const before = bytesUnder(FACTORIES);
+      await assert.rejects(
+        stage.main(['factory', 'resolve', 'crew', LINE, '--ours']),
+        refusedWith('Conflict', /nemia factory upgrade crew --to 0\.2\.0/),
+      );
+      assert.deepEqual(bytesUnder(FACTORIES), before, 'nothing is resolved');
     },
   );
 

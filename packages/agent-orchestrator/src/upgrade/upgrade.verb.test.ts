@@ -235,7 +235,7 @@ test('a switch onto a template of another name is judged by no version: neither 
         released(other, version, 5);
         const printed = await printedBy(t, 'factory', 'diff', name, '--to', version, '--template', other);
         assert.equal(printed[0], `${name}: team 0.1.0 → renamed ${version}`);
-        const line = printed.at(-1) ?? '';
+        const line = printed.find((l) => l.includes(' files it')) ?? '';
         assert.doesNotMatch(line, /--downgrade/);
         const plan = /--plan (sha256:[0-9a-f]{64})/.exec(line)?.[1];
         assert.ok(plan, line);
@@ -435,10 +435,10 @@ test('choices made for another version are not merged, and the next resolve drop
   );
 });
 
-/** The plan `nemia factory diff` printed in `printed`, and the line it prints last, which files it. */
+/** The plan `nemia factory diff` printed in `printed`, and the line that files it. */
 const planIn = (printed: string[]): { plan: string; line: string } => ({
   plan: printed.find((line) => line.startsWith('plan: '))?.slice('plan: '.length) ?? '',
-  line: printed.at(-1) ?? '',
+  line: printed.find((line) => line.includes(' files it')) ?? '',
 });
 
 test('a parameter set again at the version applied: previewed, filed with its plan, merged with no new version', async (t) => {

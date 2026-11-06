@@ -10,6 +10,7 @@ import { handedSection, type ParentCloseout } from './handed.ts';
 import { depsLines, givenPlan, workspacePlan, type Provisioned } from '../workspace/workspace.ts';
 import {
   acceptedSection,
+  answeredSection,
   approvedSection,
   fromSection,
   loopSection,
@@ -32,6 +33,7 @@ import { resultSteps, workChecks } from '../branches/index.ts';
 import { costsSection, type WorkflowCosts } from '../costs/index.ts';
 import { sayFilled, skillSaid, type PlaceSay } from '../place/place.ts';
 import { judgeSection } from '../route/index.ts';
+import type { RetryAsk } from '../retry/index.ts';
 
 /**
  * What a step's place gives its brief: how an ending that lands on its check stages the merge and what it denies (`words`), and the
@@ -75,6 +77,22 @@ const conflictLines = (merge: { readonly conflicts: readonly string[]; readonly 
 export const PRECEDENCE =
   "Of what you are told, your instructions are layer 1, the custom instructions 2, the files of the folder you work in 3, this factory's rules 4 and this step's policy 5: where two of them say different things, the higher number wins, and what is asked of you below is above them all.";
 
+/**
+ * What every brief ends on: the check the step is judged by, as a landing's or a step's (`landingContract`, `checkContract`), where its
+ * files go (`artifactsContract`), and the closeout, last (`closeoutContract`).
+ */
+const contractsOf = (
+  step: Workflow,
+  run: Run,
+  steps: readonly Workflow[],
+  at: { artifactsDir?: string; round?: RoundBriefing; words?: LandingWords; inFolder: boolean },
+): string =>
+  [
+    ...(step.check ? [landsOnCheck(step, run) ? landingContract(step.check, at.words) : checkContract(step.check)] : []),
+    ...(at.artifactsDir ? [artifactsContract(at.artifactsDir, endsOnBase(step), at.inFolder)] : []),
+    closeoutContract(step, repliesOf(step, run, steps, at.round), at.inFolder),
+  ].join('\n');
+
 /** What the brief opens with: the precedence (`PRECEDENCE`), then the layers the step is told in its brief (`briefBody`), where it has
  * any. */
 const opened = (step: Workflow): string => [PRECEDENCE, briefBody(step)].filter(Boolean).join('\n\n');
@@ -102,7 +120,8 @@ const opened = (step: Workflow): string => [PRECEDENCE, briefBody(step)].filter(
  * context (`--from`) is handed theirs the same way, after, each labelled landed or not landed, not judged — see `contextSection`.
  *
  * And a step after a gate is handed the approval that let it be filed, and the words given with it (`## Approved`): a person's decision
- * on the record, which the step after the gate and every step after that one read — see `approvedSection`.
+ * on the record, which the step after the gate and every step after that one read — see `approvedSection`. So is a step after one a
+ * person sent back with an answer (`## Answered`), which every step after the answered one reads — see `answeredSection`.
  *
  * A step after a loop a person ended as it stands is handed the same way what they said and what the loop still had open (`## Accepted`):
  * it was filed because a person decided the findings are not this run's work, and it is the only step that can tell anyone — see
@@ -153,6 +172,8 @@ const opened = (step: Workflow): string => [PRECEDENCE, briefBody(step)].filter(
  *   contract and the brief send the step to its place's skill.
  * @param merge For a step that waits on several, as its place merged them (`make`): the paths the merge left conflicted, and the place's
  *   sentence of how to see them (`say.conflicts`). Conflicts are named under what is in the workspace; none, and nothing is said of them.
+ * @param answers Every answer a person gave with `nemia retry --message` on the run, waiting or consumed (`asks.answers`): those to the
+ *   steps this one comes after are handed on under `## Answered` (`answeredSection`). Absent, and nothing is said of them.
  */
 export function composeBrief(
   step: Workflow,
@@ -170,18 +191,15 @@ export function composeBrief(
   costs?: WorkflowCosts,
   place: BriefPlace = {},
   merge?: { readonly conflicts: readonly string[]; readonly say: string },
+  answers: readonly RetryAsk[] = [],
 ): string {
   const inFolder = placeOf(run) === 'folder';
-  const contracts = [
-    ...(step.check ? [landsOnCheck(step, run) ? landingContract(step.check, place.words) : checkContract(step.check)] : []),
-    ...(artifactsDir ? [artifactsContract(artifactsDir, endsOnBase(step), inFolder)] : []),
-    closeoutContract(step, repliesOf(step, run, steps, round), inFolder),
-  ].join('\n');
+  const contracts = contractsOf(step, run, steps, { artifactsDir, round, words: place.words, inFolder });
   const again = againSection(step, run, steps, closeoutOf, inFolder, place.say, retry, round);
   if (retry?.resumed || round?.resumed) return again.slice(1) + contracts;
   const given = givenSections(step, run, steps, closeoutOf, checked, place.say) + again + judgeSection(step, steps, place.targets);
   const tree = depsLines(deps);
-  const handed = handedOf(step, run, steps, closeoutOf, parents, costs);
+  const handed = handedOf(step, run, steps, closeoutOf, parents, costs, answers);
 
   if (step.resume && !retry && !round)
     return (
@@ -303,7 +321,8 @@ function endingLook(
 
 /**
  * What a step is handed under what was asked for: what each run it waited on or was handed concluded (`parents`), then what a person
- * approved and accepted before it and what recent runs of its workflow cost (`decided`), each section left out where it says nothing.
+ * approved, answered and accepted before it and what recent runs of its workflow cost (`decided`), each section left out where it says
+ * nothing.
  */
 function handedOf(
   step: Workflow,
@@ -312,12 +331,16 @@ function handedOf(
   closeoutOf: (step: string) => Closeout | undefined,
   parents: readonly ParentCloseout[] = [],
   costs?: WorkflowCosts,
+  answers: readonly RetryAsk[] = [],
 ): { parents: string[]; decided: string[] } {
   return {
     parents: parents.map((p) => handedSection(p)),
-    decided: [approvedSection(step, run, steps), acceptedSection(step, run, steps, closeoutOf), costs ? costsSection(costs) : ''].filter(
-      Boolean,
-    ),
+    decided: [
+      approvedSection(step, run, steps),
+      answeredSection(step, run, steps, answers),
+      acceptedSection(step, run, steps, closeoutOf),
+      costs ? costsSection(costs) : '',
+    ].filter(Boolean),
   };
 }
 
@@ -362,8 +385,8 @@ function givenSections(
 
 /**
  * The brief of a step on a remote A2A agent (`harness: a2a:<name>`): its note, what was asked for, what the runs this one waited on
- * concluded, what a person approved or accepted before it, what the steps it reads declared, and, on a try, which try it is and what a
- * person said with it.
+ * concluded, what a person approved, answered or accepted before it, what the steps it reads declared, and, on a try, which try it is
+ * and what a person said with it.
  *
  * Nothing of this machine. The agent runs somewhere else, as its operator configured it, so a path under the store — an artifacts
  * directory, the run's inputs, a workspace — names nothing it can open, and none is said: files given with `nemia start --input` are named,
@@ -378,6 +401,7 @@ export function remoteBrief(
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   retry?: RetryBriefing,
   parents?: readonly ParentCloseout[],
+  answers: readonly RetryAsk[] = [],
 ): string {
   const opening = briefBody(step) ? [briefBody(step), ''] : [];
   const inputs = run.inputs?.length
@@ -389,6 +413,7 @@ export function remoteBrief(
   const handed = [
     ...(parents ?? []).map((p) => handedSection(p, true)),
     approvedSection(step, run, steps),
+    answeredSection(step, run, steps, answers),
     acceptedSection(step, run, steps, closeoutOf),
   ].filter(Boolean);
   const given = (step.input ?? []).map((from) => fromSection(from, steps, closeoutOf));

@@ -25,14 +25,13 @@ import { filedFolders, type FiledFolders } from '../filed/filed.ts';
 import { artifactFiles, filesHanded, holdsCloseout } from '../artifacts/artifacts.store.ts';
 import { lackLines } from '../artifacts/artifacts.ts';
 import type { EndingStopped, RetryBriefing } from '../brief/index.ts';
-import { budgetOf, ownStatus, type SpendOf } from '../status/status.ts';
-import type { Retry } from '../retry/index.ts';
+import { budgetOf, ownStatus, type RoundAsk, type SpendOf } from '../status/status.ts';
+import type { Retry, RetryAsk } from '../retry/index.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, saidIn, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
-import type { PassReads } from './file.verb.ts';
 import { splitFrontmatter, type Workflow } from '../step/step.ts';
 import { realRepoOf } from '../workspace/worktree.store.ts';
 import { agentFilesDir, renderedIn } from '../agents/agents.store.ts';
@@ -41,7 +40,7 @@ import { workflowDescription } from '../folder/folder.store.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
 import { SkillName } from '../agents/agents.model.ts';
 import { enabledSkillsOf, renderedFlags, rendersAgent, unrendered, type SkillAgain } from '../agents/agents.ts';
-import type { LandingWords } from '../check/check.ts';
+import type { LandingWords, Verdict } from '../check/check.ts';
 import { landingWords, placeSay } from '../place/landing.store.ts';
 import type { Place } from '../place/place.store.ts';
 import type { PlaceSay } from '../place/place.ts';
@@ -365,3 +364,24 @@ export const readPass = Effect.fnUntraced(function* (e: Engine, run: Run) {
   const reads: PassReads = { steps, views, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks, answers, home };
   return { reads, askNotes };
 });
+
+/**
+ * What a pass read of a run before it filed anything (`advanceRun`): the run's steps, the engine's views of its tasks and the readers made
+ * of them, and a person's asks. One for the pass: every phase of it reads the same.
+ */
+export type PassReads = {
+  steps: Workflow[];
+  views: Map<string, TaskView>;
+  phaseOf: (taskId: string) => TaskPhase;
+  signedOff: (step: string) => Closeout | undefined;
+  asked: (taskId: string) => CloseoutAsked;
+  verdictOf: (step: string) => Verdict | undefined;
+  sessionBlocked: (taskId: string) => boolean;
+  spendOf: SpendOf;
+  asks: RetryAsk[];
+  roundAsks: RoundAsk[];
+  /** Every answer a person gave with `nemia retry --message` on the run, waiting or consumed: what the steps after each are handed. */
+  answers: readonly RetryAsk[];
+  /** The store's root, as the pass was given it (`StoreRoot`): where a filing reads the run's factory's MCP server record. */
+  home: string;
+};

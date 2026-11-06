@@ -18,7 +18,7 @@ import { holdsOf, type ParentRun, type Wait } from '../wait/wait.ts';
 import { runLabels, stepLabels } from '../telemetry/telemetry.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { CheckoutHold, RunSlot } from '../cap/cap.ts';
-import type { PassReads } from '../tick/file.verb.ts';
+import type { PassReads } from '../tick/told.verb.ts';
 import { driftWords } from '../revisions/revisions.ts';
 import type { Behind } from '../revisions/pin.verb.ts';
 

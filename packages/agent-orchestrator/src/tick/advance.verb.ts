@@ -52,8 +52,8 @@ import { onceFacts, roundsGranted, settledOnce, timelineFacts, type StepFact } f
 import { checkoutHold, landEnding } from '../ending/ending.verb.ts';
 import { statusMemo } from '../place/landing.store.ts';
 import type { PassRead } from '../cap/cap.verb.ts';
-import { fileChecks, fileReady, fileRounds, fileTries, type Closer, type Filing, type Heads, type PassReads } from './file.verb.ts';
-import { readPass, recordNamed } from './told.verb.ts';
+import { fileChecks, fileReady, fileRounds, fileTries, type Closer, type Filing, type Heads } from './file.verb.ts';
+import { readPass, recordNamed, type PassReads } from './told.verb.ts';
 import { closeHeld, stopAsked } from './held.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 

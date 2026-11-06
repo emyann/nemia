@@ -56,7 +56,7 @@ import { readSkillRules, RULES_FILE } from '../src/skills/read.store.ts';
 import { appliesMatch, appliesOf } from '../src/skills/skills.ts';
 import { scratch } from './scratch.ts';
 import { levelFile, promptFile, readNemia, storeDenies, toldFile } from '../src/nemia/level.store.ts';
-import { admissionOf, nemiaFence, widened } from '../src/admission/index.ts';
+import { admissionOf, agentClassOf, nemiaFence, widened } from '../src/admission/index.ts';
 import { TABLE } from '../src/command/commands.verb.ts';
 import { rulesOfTry } from '../src/stats/discipline.ts';
 import { REPO, TEAM, TEAM_DEV, teamCopy } from './team.ts';
@@ -1776,14 +1776,16 @@ const editVerdictOf = (rules: Rules, file: string): Verdict =>
   rules.deny.some((rule) => editReaches(rule, file)) ? 'deny' : rules.allow.some((rule) => editReaches(rule, file)) ? 'allow' : 'unmatched';
 
 /**
- * Each call the command line serves of every command of `table`, and the verdict its class owes: a write that prompts asks, bare and with
- * an argument, one out of her reach is denied, a read, her own write and an answer run unasked by her rules alone; a command that reads
+ * Each call the command line serves of every command of `table`, and the verdict its class for an agent owes (`agentClassOf`: a
+ * factory's definition write is proposed instead, so out of her reach): a write that prompts asks, bare and with an argument, one out of
+ * her reach is denied, a read, her own write and an answer run unasked by her rules alone; a command that reads
  * bare runs unasked with an argument and with a flag it reads by, and asks with each word or flag that sets, after its argument and
  * before it.
  */
 function owedOf(table: readonly (typeof TABLE)[number][]): [string, Verdict][] {
   return table
     .filter((entry) => entry.only?.side !== 'api')
+    .map((entry) => ({ name: entry.name, class: agentClassOf(entry) }))
     .flatMap(({ name, class: c }): [string, Verdict][] => {
       const forms = [`nemia ${name}`, `nemia ${name} r-1`];
       if (c === 'none' || c === 'ask') return forms.map((form) => [form, c === 'none' ? 'deny' : 'ask']);
@@ -1792,7 +1794,7 @@ function owedOf(table: readonly (typeof TABLE)[number][]): [string, Verdict][] {
       return [
         ...forms.map((form): [string, Verdict] => [form, 'allow']),
         ...(c.readsBy ?? []).map((s): [string, Verdict] => [`nemia ${name} r-1 ${s} v`, 'allow']),
-        ...c.setsBy.flatMap(set).map((form): [string, Verdict] => [form, 'ask']),
+        ...c.setsBy.flatMap(set).map((form): [string, Verdict] => [form, c.sets === 'none' ? 'deny' : 'ask']),
       ];
     });
 }
@@ -1819,12 +1821,12 @@ test('her fence asks every write that prompts and every write form of a command 
     ['nemia level manual', 'ask'],
     ['nemia cancel r-1', 'ask'],
     ['nemia rm r-1', 'ask'],
-    ['nemia factory instruct f --text t', 'ask'],
+    ['nemia factory instruct f --text t', 'deny'],
     ['nemia factory instruction f --path NEMIA.md', 'ask'],
     ['nemia factory instruction --store f', 'ask'],
     ['nemia agents custom --clear ada', 'ask'],
     ['nemia agents custom ada --file -', 'ask'],
-    ['nemia agents write ada', 'ask'],
+    ['nemia agents write ada', 'deny'],
     ['nemia tick', 'deny'],
     ['nemia up --port 8787', 'deny'],
     ['wf approve r-1 design', 'deny'],

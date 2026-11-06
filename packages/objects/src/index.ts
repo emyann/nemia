@@ -15,7 +15,6 @@ export {
   StepCheck,
   StepCloseout,
   StepRaise,
-  StepTold,
   StepTries,
   StepTry,
   StepUnreadable,
@@ -24,6 +23,7 @@ export {
   TryShort,
   RunUnjudged,
 } from './run.ts';
+export { StepTold } from './run-told.ts';
 export { LabelEdit, Labelled, Labels } from './labels.ts';
 export { RunClock, RunListMeta } from './run-frame.ts';
 export {

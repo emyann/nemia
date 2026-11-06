@@ -7,7 +7,8 @@ import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';
 import { BadRequest, Conflict, Invalid, listQuery, Missing, Unjudged, WriteFailed } from './api-errors.ts';
 import { LabelEdit, Labelled } from './labels.ts';
-import { Run, RunList, StepTold, StepTries, StepTry, TryCloseout } from './run.ts';
+import { Run, RunList, StepTries, StepTry, TryCloseout } from './run.ts';
+import { StepTold } from './run-told.ts';
 import {
   RunApprove,
   RunApproved,

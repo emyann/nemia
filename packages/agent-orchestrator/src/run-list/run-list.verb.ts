@@ -151,8 +151,8 @@ const notJudged = (run: Pick<Run, 'id'>) => Effect.die(new Error(`Run ${run.id} 
 /**
  * How a run's listed object is answered (`listed`: no harness asked, no drift read) off its `judgement` and the feed's filing times: the
  * object kept beside that judgement (`keptObject`), before its disk parts (`runObjectCore`), with them read now and laid over
- * (`withDiskParts`), or one built and its core kept (`keepObject`) where none is and its read did not fail (`readFailed`). Under `verify`, one served from memory is built afresh too, and one that differs dies.
- * Each workflow folder is loaded once a request (`folderReader`).
+ * (`withDiskParts`), or one built and its core kept (`keepObject`) where none is and its read did not fail (`readFailed`). Under `verify`,
+ * one served from memory is built afresh too, and one that differs dies. Each workflow folder is loaded once a request (`folderReader`).
  */
 const objectsOf = (e: Engine, { home, memo }: SummaryHow, reads: RunReads, verify: boolean) => {
   const folders = folderReader(home);

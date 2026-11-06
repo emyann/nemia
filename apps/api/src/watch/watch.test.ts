@@ -1,9 +1,10 @@
 /**
  * Every list watched (`?watch=true`, src/watch/watch.ts): the initial state as an ADDED per object then a BOOKMARK; a card filed,
  * relabelled, started and dropped arriving as ADDED, MODIFIED and DELETED, the DELETED carrying the last object sent; a labelSelector
- * kept on every read, a card relabelled out of it DELETED; the runs of a store holding one watched, plain and namespaced; a fieldSelector of the runs' state kept on every read, a run approved out of
- * waiting DELETED; every GET list of the `Api` watchable; the watch's query refused before any
- * stream; and the feed's reader let go when the request is aborted. The resync beat is shortened (`Beats.watch`), never waited out.
+ * kept on every read, a card relabelled out of it DELETED; the runs of a store holding one watched, plain and namespaced; a fieldSelector
+ * of the runs' state kept on every read, a run approved out of waiting DELETED; every GET list of the `Api` watchable; the watch's query
+ * refused before any stream; and the feed's reader let go when the request is aborted. The resync beat is shortened (`Beats.watch`), never
+ * waited out.
  */
 import { root } from '../../test/harness.ts';
 import { test, type TestContext } from 'node:test';

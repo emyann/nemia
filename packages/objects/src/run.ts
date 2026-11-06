@@ -19,7 +19,6 @@ import {
   CHECK_RESULTS,
   ENGINE_OUTCOMES,
   GATE_BUDGETS_FROM,
-  HANDED_HOW,
   OUTCOMES,
   PEAK_MARKS,
   PLACE_KINDS,
@@ -37,7 +36,6 @@ import {
   STEP_PHASES,
   STEP_REASONS,
   STEP_STATUSES,
-  TOLD_VIA,
   TRY_CAUSES,
   WAIT_ON,
 } from './words.ts';
@@ -54,11 +52,10 @@ const StepPhase = Schema.Literals(STEP_PHASES);
 const StepReason = Schema.Literals(STEP_REASONS);
 
 /**
- * The run's name, the namespace it is in (its factory, `default` for one that names none; absent on an object served before the run had
- * one), when it was made, and the labels it is found by, one map (`metadataLabels`): its `workflow`, the `factory` it was started in
- * (`default` for the default one, as the feed says it), and a person's labels on it (`nemia label run`), as `-l` selects them; and its
- * `resourceVersion`, an opaque word that changes whenever what the api serves of the run changes, as every other kind's (absent on an
- * object served before the Run had one).
+ * The run's name, its namespace (its factory, `default` for none), when it was made, and the labels it is found by, one map
+ * (`metadataLabels`): its `workflow`, the `factory` it was started in (`default` for the default one, as the feed says it), and a
+ * person's labels on it (`nemia label run`), as `-l` selects them; its `resourceVersion`, opaque, moved by every change of what is served
+ * of it. `namespace` and `resourceVersion` are absent on an object served before the Run had them.
  */
 export const RunMetadata = Schema.Struct({
   name: Schema.String,
@@ -627,42 +624,3 @@ export const TryCloseout = Schema.Struct({
   unreadable: Schema.NullOr(StepUnreadable),
 }).annotate({ identifier: 'TryCloseout' });
 export type TryCloseout = typeof TryCloseout.Type;
-
-/** What a step was told by layer (`ToldLayers`, brief.ts). */
-const ToldLayers = Schema.Struct({
-  agent: NullString,
-  instructions: NullString,
-  custom: NullString,
-  factory: NullString,
-  agentSkills: Strings,
-  policy: Schema.String,
-  addedSkills: Strings,
-  fence: List(Schema.Struct({ key: Schema.String, value: Schema.String })),
-  folderFiles: Schema.Boolean,
-  task: NullString,
-  via: Schema.Literals(TOLD_VIA),
-});
-
-/** A part of a step's task (`TaskPart`, told.verb.ts): its own text, or a run's section, with how the run was handed. */
-const TaskPart = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal('text'), text: Schema.String }),
-  Schema.Struct({
-    kind: Schema.Literal('from'),
-    run: Schema.String,
-    asked: Schema.String,
-    body: Schema.String,
-    how: Schema.optionalKey(Schema.Literals(HANDED_HOW)),
-  }),
-]);
-
-/**
- * What a step was told (`toldOf`, told.verb.ts): its own body in the workflow (null where none shows it), its brief, by layer, and its
- * task by part: `GET /api/runs/:runId/steps/:step/told`.
- */
-export const StepTold = Schema.Struct({
-  body: NullString,
-  told: NullString,
-  layers: Schema.NullOr(ToldLayers),
-  taskParts: Schema.NullOr(List(TaskPart)),
-}).annotate({ identifier: 'StepTold' });
-export type StepTold = typeof StepTold.Type;

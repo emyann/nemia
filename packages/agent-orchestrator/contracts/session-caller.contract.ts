@@ -6,6 +6,7 @@
  * longer the step's live one (settled, superseded, or its run gone), read afresh on each request and remembered nowhere. Pure.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
+import type { CallerKind, TokenRefusal } from 'objects';
 
 /**
  * What the store keeps of a token it minted, found by the token's digest: the session's agent, its factory (null for a session of the
@@ -21,15 +22,15 @@ export type TokenRecord = {
 
 /** The caller a request is: the person, an agent's live session, or refused with its reason. */
 export type CallerOf =
-  | { readonly kind: 'person' }
+  | { readonly kind: Extract<CallerKind, 'person'> }
   | {
-      readonly kind: 'agent';
+      readonly kind: Extract<CallerKind, 'agent'>;
       readonly agent: string;
       readonly factory: string | null;
       readonly run: string | null;
       readonly step: string | null;
     }
-  | { readonly kind: 'refused'; readonly reason: 'unknown-token' | 'session-ended' };
+  | { readonly kind: 'refused'; readonly reason: TokenRefusal };
 
 const callerOfSpec = spec<(presented: boolean, record: TokenRecord | null, live: boolean) => CallerOf>({
   ensures: {

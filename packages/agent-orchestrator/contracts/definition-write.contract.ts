@@ -10,15 +10,16 @@
  * through.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
+import type { DefinitionOrigin, WriteWay as ObjectsWriteWay } from 'objects';
 
 /** Where the addressed definition is read from, or `none` where nothing is at its name. */
-export type WriteThere = 'factory' | 'repo' | 'yours' | 'builtin' | 'none';
+export type WriteThere = DefinitionOrigin | 'none';
 
 /** What a write does: makes a definition, replaces one, removes one, or runs one of its named actions (`try`, `copy`). */
 export type DefinitionWrite = 'create' | 'replace' | 'remove' | 'act';
 
 /** The way a refused definition changes instead: through the `default` namespace, or the factory's own way. */
-export type WriteWay = 'default' | 'factory';
+export type WriteWay = ObjectsWriteWay;
 
 /** A refusal: its kind, as the package's refusals are told apart, the way the definition changes instead, and its words. */
 export type WriteRefused = { readonly kind: 'Invalid' | 'Missing'; readonly way?: WriteWay; readonly message: string };

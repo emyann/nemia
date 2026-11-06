@@ -7,12 +7,13 @@
  * words is one dropped and one added, so a change of an allow's words reads as widening. Pure.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
+import type { AccessChange as ObjectsAccessChange } from 'objects';
 
 /** What an object lets through and refuses, as rules written, and how far its permission mode reaches. */
 export type Access = { readonly allows: readonly string[]; readonly denies: readonly string[]; readonly mode: number };
 
 /** What a change does to access: reaches further, reaches less, or leaves it as it was. */
-export type AccessChange = 'widens' | 'narrows' | 'same';
+export type AccessChange = ObjectsAccessChange;
 
 /** Whether `after` holds a rule `before` does not. */
 const gained = (before: readonly string[], after: readonly string[]): boolean => after.some((rule) => !before.includes(rule));

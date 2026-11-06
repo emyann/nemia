@@ -7,12 +7,13 @@
  * use; nothing where it does not. A list is this, name by name, in the order the names were found.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
+import type { DefinitionOrigin as ObjectsDefinitionOrigin } from 'objects';
 
 /**
  * Where a definition is read from, as `objects` names it (`DEFINITION_ORIGINS`): a factory's own tree (`factory`, the folder a factory
  * made from a template keeps in the store), the repository's checkout, your library, or what Nemia builds in.
  */
-export type DefinitionOrigin = 'factory' | 'repo' | 'yours' | 'builtin';
+export type DefinitionOrigin = ObjectsDefinitionOrigin;
 
 /** A definition served: its origin, and the origin that shadows it in the namespace, null where none does. */
 export type DefinitionServed = { readonly origin: DefinitionOrigin; readonly shadowedBy: DefinitionOrigin | null };

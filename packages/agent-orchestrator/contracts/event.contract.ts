@@ -11,9 +11,10 @@
  * `Event`'s `reason` stays one of the closed words its Schema reads (`EVENT_REASONS`) whatever a newer writer stamped.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
+import type { InvolvedKind } from 'objects';
 
-/** What a line is about, as the feed's `involved.kind` says it. Declared here until `src/event-object/event.ts` holds it. */
-export type EventInvolvedKind = 'Run' | 'Step' | 'Daemon' | 'Store';
+/** What a line is about, as the feed's `involved.kind` says it: `objects`' word. */
+export type EventInvolvedKind = InvolvedKind;
 
 /** Whether a line of this kind is a run's: the run's own, or one of its steps'. */
 const ofARun = (kind: EventInvolvedKind): boolean => kind === 'Run' || kind === 'Step';

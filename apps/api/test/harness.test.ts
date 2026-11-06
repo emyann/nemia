@@ -3,7 +3,20 @@
  * `--import` before every test file, under `test/` or beside the code in `src/`, every test file imports it first too, and the `claude` the
  * api's engine runs is the harness's.
  */
-import { askEnded, asks, away, bin, engineRoot, recorded, realHome, root, scriptUnharnessed, unharnessed, usageAnswer } from './harness.ts';
+import {
+  askEnded,
+  asks,
+  away,
+  bin,
+  DAEMON_ONLY,
+  engineRoot,
+  recorded,
+  realHome,
+  root,
+  scriptUnharnessed,
+  unharnessed,
+  usageAnswer,
+} from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
@@ -159,6 +172,33 @@ test("REFUSED under the daemon's OTEL_EXPORTER_OTLP_ENDPOINT: a test file run un
   };
   assert.deepEqual(seen(['--import', path.join(API, 'test', 'harness.ts')]), { address: null });
   assert.deepEqual(seen([]), { address: named }, 'the probe reads what it is given, so the absence above is the harness');
+});
+
+test("REFUSED under the daemon's per-session variables: a test file run under the harness sees none of them, and without it sees the daemon's", () => {
+  const dir = scratch('nemia-api-probe-');
+  const out = path.join(dir, 'probe.json');
+  const daemons = { WF_SESSION_TOKEN: 'a-token-no-test-minted', WF_MEMORY_LIMIT: '6Gi', WF_CGROUP_PARENT: 'sessions.slice' };
+  const names = Object.keys(daemons);
+  assert.deepEqual(names, [...DAEMON_ONLY]);
+  fs.writeFileSync(
+    path.join(dir, 'probe.test.mjs'),
+    [
+      "import fs from 'node:fs';",
+      "import { test } from 'node:test';",
+      `const seen = Object.fromEntries(${JSON.stringify(names)}.map((n) => [n, process.env[n] ?? null]));`,
+      "test('probe', () => fs.writeFileSync(process.env.PROBE_OUT, JSON.stringify(seen)));",
+      '',
+    ].join('\n'),
+  );
+  const env: Record<string, string | undefined> = { ...process.env, PROBE_OUT: out, ...daemons };
+  for (const key of ['NODE_TEST_CONTEXT', 'NODE_OPTIONS']) delete env[key];
+  const seen = (flags: string[]): unknown => {
+    const ran = spawnSync(process.execPath, [...flags, '--test', 'probe.test.mjs'], { cwd: dir, env, encoding: 'utf8', timeout: 60_000 });
+    assert.equal(ran.status, 0, `${ran.stdout}\n${ran.stderr}`);
+    return JSON.parse(fs.readFileSync(out, 'utf8'));
+  };
+  assert.deepEqual(seen(['--import', path.join(API, 'test', 'harness.ts')]), Object.fromEntries(names.map((n) => [n, null])));
+  assert.deepEqual(seen([]), daemons, 'the probe reads what it is given, so the absence above is the harness');
 });
 
 test("REFUSED, whatever the daemon's: a test that leaves WF_MAX_RUNS to the harness is answered 422 by GET /api/ceilings, naming the variable to set", async () => {

@@ -469,6 +469,11 @@
       "type": "StepSessionState"
     },
     {
+      "term": "Session token",
+      "meaning": "who a session is to the api: a random token the store mints for each session it files, a step's try or Nemia's, handed to it in its environment as `WF_SESSION_TOKEN` (`SESSION_TOKEN`) and kept only as the record its sha-256 digest names under the store's tokens folder (`packages/agent-orchestrator/src/token/token.store.ts`). A request presents it as `Authorization: Bearer <token>`; none is the person. Judged afresh on each request (`sessionCaller`, `packages/agent-orchestrator/src/token/caller.verb.ts`): its agent, in its factory, run and step, while its try is the step's live one (Nemia's: while her task is unsettled), else refused `session-ended`, and one the store never minted `unknown-token` (`callerOf`). A bound token, as a Kubernetes ServiceAccount's is bound to its Pod: it ends with its try, and no list of revoked ones is kept.",
+      "type": "TokenRecord"
+    },
+    {
       "term": "Show",
       "meaning": "the one spelling of a read of one thing: `nemia show` of a run, which prints the run object (`--raw` its record), the api's `skills show`.",
       "retired": [

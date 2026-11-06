@@ -8,12 +8,12 @@
   "terms": [
     {
       "term": "Route",
-      "meaning": "which way a command goes (`routeOf`, `apps/cli/src/route.ts`): `api`, for a moved read (`READ_VERBS`: `show`, `closeout`, `ls`, the inbox's read, `watch`) asked of the api over HTTP, and for the client's own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`) whatever else is typed; `process`, for every other verb, a help and a moved read typed with `--local`, run on the orchestrator's own CLI in a process of its own (`apps/cli/src/local.ts`).",
+      "meaning": "which way a command goes (`routeOf`, `apps/cli/src/route.ts`): `api`, for a moved read (`READ_VERBS`: `show`, `closeout`, `ls`, the inbox's read, `watch`) asked of the api over HTTP, and for the client's own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`, `propose`, `proposals`) whatever else is typed; `process`, for every other verb, a help and a moved read typed with `--local`, run on the orchestrator's own CLI in a process of its own (`apps/cli/src/local.ts`).",
       "type": "Route"
     },
     {
       "term": "Client verb",
-      "meaning": "a verb this client alone has, generic over every kind the api serves (`CLIENT_VERBS` in `apps/cli/contracts/route.contract.ts`: `get`, `apply`, `explain`): no process answers it, so it asks the api whatever else is typed, says its own help, and refuses `--local`, naming `nemia service status`. Each kind is called through one table, `KIND_CALLS` (`apps/cli/src/objects/kinds.ts`), and a word names a resource by discovery (`resourceNamed`, `apps/cli/src/objects/resource.ts`).",
+      "meaning": "a verb this client alone has, generic over every kind the api serves (`CLIENT_VERBS` in `apps/cli/contracts/route.contract.ts`: `get`, `apply`, `explain`, `propose`, `proposals`): no process answers it, so it asks the api whatever else is typed, says its own help, and refuses `--local`, naming `nemia service status`. Each kind is called through one table, `KIND_CALLS` (`apps/cli/src/objects/kinds.ts`), and a word names a resource by discovery (`resourceNamed`, `apps/cli/src/objects/resource.ts`).",
       "type": "ClientVerb"
     },
     {
@@ -27,6 +27,18 @@
     {
       "term": "explain",
       "meaning": "`nemia explain <resource>[.<field>]...` (`apps/cli/src/objects/explain.ts`): a resource's kind, version, scope and verbs from discovery, and its fields, each with its type and description, from the package's own OpenAPI document (`OpenApi.fromApi(Api)`), picked by `explained`."
+    },
+    {
+      "term": "propose",
+      "meaning": "`nemia propose -f <file|-> [-n <factory>] [--at approval|run-end] [--why <text>]` (`apps/cli/src/objects/propose.ts`): the objects a file holds, read as `nemia apply -f` reads them, each stamped with the `resourceVersion` served now where the file says none, sent as one `ProposalCreate` for the person, or an agent the person delegated to, to approve; `--undo <proposal>` proposes back the objects as they stood before it applied (`status.before`) and the removal of each it made. Prints `proposals/<name> <phase>`, `(widens access)` where it does, and its board page, `/factories/<factory>/proposals/<name>`."
+    },
+    {
+      "term": "proposals approve|decline",
+      "meaning": "`nemia proposals approve|decline <name> [-n <factory>]` (`apps/cli/src/objects/propose.ts`): a waiting proposal judged on its endpoint, printed as `nemia propose` prints one; a caller the api refuses (`Forbidden`, 403) or a token it does not take (`Unauthorized`, 401) exits 2 in the api's words, as every refusal."
+    },
+    {
+      "term": "Session token header",
+      "meaning": "`Authorization: Bearer <token>` on every request this client sends where `WF_SESSION_TOKEN` is set and not empty (`sessionHeaders`, `apps/cli/src/client.ts`), the token the orchestrator hands a session; none otherwise, which the api reads as the person."
     },
     {
       "term": "--local",

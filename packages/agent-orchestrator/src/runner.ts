@@ -479,8 +479,7 @@ export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction, type Factory
 export { FACTORY_RULES, factoryRules, type FactoryRules } from './rules/rules.verb.ts';
 /** A factory's own MCP servers: the entry that lists its record with each server's state, and the name rule the board shares. */
 export { FACTORY_SERVERS } from './servers/servers.verb.ts';
-export { serverNameRefusal } from './servers/index.ts';
-export type { BuiltinServer } from './servers/index.ts';
+export { serverNameRefusal, type BuiltinServer } from './servers/index.ts';
 export { BUILTIN_SERVERS, builtinServers } from './servers/servers.store.ts';
 /** A factory's server signed in to and out of from the board, through the engine; the builtin secret stays inside the package. */
 export { serverSignIn, serverSignInState, serverSignOut } from './servers/sign-in.verb.ts';
@@ -496,8 +495,7 @@ export { forgetRun, runsForgetting } from './forget/forget.verb.ts';
 export { freeingMany, judgingMany, prune, type Listed, type Turned } from './prune/prune.verb.ts';
 export { decideRun, type Answered, type Decided } from './decide/decide.verb.ts';
 export { freshStatsMemo, statsRun, type StatsMemo, type StatsOptions } from './stats/stats.verb.ts';
-export { seriesMemo } from './series/series.ts';
-export type { Health, SeriesMemo, SeriesPoint, SeriesRead } from './series/series.ts';
+export { seriesMemo, type Health, type SeriesMemo, type SeriesPoint, type SeriesRead } from './series/series.ts';
 export { BY_KEYS, statsLine, statsLines, statsQueryOf, type ByKey, type QueryKey, type Stats, type StatsQuery } from './stats/index.ts';
 export { list, pausedRead, runReading, unjudgedOf } from './list/list.verb.ts';
 export type { ReadingHow, RunReading } from './list/list.verb.ts';
@@ -559,29 +557,5 @@ import * as RunObject from './object/run.model.ts';
  */
 export { RunModel, RunObject };
 
-/**
- * Proposals and delegations (`src/proposal/`, `src/delegation/`): the programs the api serves, each taking its caller explicitly
- * (`ProposalCaller`, the person or an agent's session, which the api obtains from the session's token) and the store's place; the doors
- * and their files layers; the refusal by who calls (`Forbidden`, with its reason, the api's 403); the pure deciders and the pass.
- */
-export { Forbidden } from './proposal/forbidden.ts';
-export { PERSON, proposerOf, type Caller, type ProposalCaller } from './proposal/caller.ts';
-export { proposeProgram, undoProgram, objectRefusal, verbOf } from './proposal/propose.verb.ts';
-export { approveProgram, declineProgram, proposalGet, proposalsList, recordedRunState } from './proposal/approve.verb.ts';
-export { applyProgram, type RunStateOf } from './proposal/apply.verb.ts';
-export { proposalsPass, runStatesOf } from './proposal/pass.verb.ts';
-export { currentOf, type Current, type ProposalNeeds, type ProposalPlace } from './proposal/current.verb.ts';
-export { ProposalDoor, proposalDoorFiles, proposalFiles, type ProposalDoorShape } from './proposal/proposal.store.ts';
-export { proposalApproval, mayPropose } from './proposal/approval.ts';
-export { proposalApply, proposingRunOf, type RunState } from './proposal/apply.ts';
-export { accessChange, accessOf } from './proposal/access.ts';
-export { proposalRuleReach } from './proposal/rule.ts';
-export { proposalDiagram, PROPOSAL_EDGES } from './proposal/machine.ts';
-export { delegationGet, delegationObject, delegationPut, delegationRemove, delegationsList } from './delegation/delegation.verb.ts';
-export {
-  DelegationDoor,
-  delegationDoorFiles,
-  delegationFiles,
-  type DelegationDoorShape,
-  type DelegationRecord,
-} from './delegation/delegation.store.ts';
+export * from './token/caller.verb.ts';
+export * from './proposal/entry.ts';

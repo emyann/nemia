@@ -25,8 +25,8 @@ import { splitServers, type FactoryServer, type FactoryServers } from '../server
  * then the run's inputs folder at `t.inputs`, read-only, given only for a run given inputs, then the run's copy of its workflow folder
  * at `t.workflowFiles`, read-only (`workflowMounts`); the key left out with none, the MCP servers
  * its sessions load, its factory's record first and the checkout's `.mcp.json` for the rest (`serversOf`), the step's files directory and
- * the run's copy of its workflow folder and the run's labels in its session's environment (`stepFilesEnv`), and the
- * harness's own arguments (`own`) last, a step's settings given its factory's harness settings beneath its own (`ownWith`). The
+ * the run's copy of its workflow folder, the run's labels and the try's session token in its session's environment (`stepFilesEnv`),
+ * and the harness's own arguments (`own`) last, a step's settings given its factory's harness settings beneath its own (`ownWith`). The
  * runtime judges no budget:
  * `budgetUsd` is the harness's own cap, and whether the step went over is this package's (`ownStatus`). Pure.
  */
@@ -53,6 +53,11 @@ export const filedConfig = <Own extends object>(
      * declare. `{}` or absent: every name resolves against the checkout, as it did.
      */
     servers?: FactoryServers;
+    /**
+     * The session's token, minted for this try as it is filed (`stepToken`, token.store.ts) and handed as `SESSION_TOKEN`: absent where
+     * nothing is filed — a check of the config a try or a start would file — and the variable left out.
+     */
+    sessionToken?: string;
   },
 ) => ({
   model: t.model,
@@ -65,7 +70,7 @@ export const filedConfig = <Own extends object>(
   budgetUsd: t.budgetUsd,
   ...mountsOf([...(stepMounts(step, run.mounts) ?? []), ...volumeMounts(step, run.volumes), ...folders(filedFolders(step, steps, t))]),
   ...serversOf(step, t.servers),
-  ...stepFilesEnv(step, t.runArtifacts, t.workflowFiles, run.labels),
+  ...stepFilesEnv(step, t.runArtifacts, t.workflowFiles, run.labels, t.sessionToken),
   ...ownWith(step, run.harnessSettings, t.own),
 });
 
@@ -105,19 +110,30 @@ export const WORKFLOW_FILES = 'WF_WORKFLOW_FILES';
 export const RUN_LABELS = 'WF_LABELS';
 
 /**
+ * The variable a step's session finds its session token in: minted for its try as it is filed, kept by the store only as a digest
+ * (`token.store.ts`), and presented to the api as `Authorization: Bearer <token>`, which knows the session's agent, factory, run and step
+ * by it while the try is the step's live one (`sessionCaller`, token/caller.verb.ts), as a Kubernetes bound ServiceAccount token is
+ * mounted into its Pod.
+ */
+export const SESSION_TOKEN = 'WF_SESSION_TOKEN';
+
+/**
  * A step's session's own environment: its files directory under `runArtifacts` as `STEP_FILES`, the run's copy of its workflow folder
- * as `WORKFLOW_FILES` where the record names one (`workflowFiles`), and the run's labels as `RUN_LABELS`.
+ * as `WORKFLOW_FILES` where the record names one (`workflowFiles`), the run's labels as `RUN_LABELS`, and its session token as
+ * `SESSION_TOKEN` where one was minted (`sessionToken`).
  */
 const stepFilesEnv = (
   step: Pick<Workflow, 'name'>,
   runArtifacts: string,
   workflowFiles: string | undefined,
   labels: Run['labels'],
+  sessionToken: string | undefined,
 ): { env: Record<string, string> } => ({
   env: {
     [STEP_FILES]: stepFilesOf(step, runArtifacts),
     ...(workflowFiles === undefined ? {} : { [WORKFLOW_FILES]: workflowFiles }),
     [RUN_LABELS]: JSON.stringify(labels ?? {}),
+    ...(sessionToken === undefined ? {} : { [SESSION_TOKEN]: sessionToken }),
   },
 });
 

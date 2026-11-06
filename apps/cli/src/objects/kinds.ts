@@ -7,17 +7,21 @@
  *
  * What apply can write: a Workflow, an Agent and a Skill are made and written whole; a McpServer, a Schedule and a Hire are written by a
  * PUT that makes one where none is (`upsert`); a Card is written whole and never made here, the api naming a filed card from its idea
- * (`nemia inbox add`). The Run, the Factory, the Volume, the Template, the Subscription and the Event take no write.
+ * (`nemia inbox add`); a Delegation is written by a PUT that makes one where none is, as a McpServer; a Proposal is read here and made
+ * by `nemia propose` alone, which reads the objects as they are served and asks the api to judge them. The Run, the Factory, the Volume,
+ * the Template, the Subscription and the Event take no write.
  */
 import { Effect, Schema } from 'effect';
 import {
   AgentSpec,
   CardSpec,
+  DelegationSpec,
   HireSpec,
   type Kind,
   McpServerSpec,
   Missing,
   type ObjectMeta,
+  ProposalSpec,
   ScheduleSpec,
   SkillSpec,
   WorkflowSpec,
@@ -229,6 +233,22 @@ export const KIND_CALLS: { readonly [K in Kind]: KindCalls } = {
   Subscription: {
     list: { all: (s) => (c) => c.subscriptions.listAll({ query: query(s) }) },
     get: { all: (name) => (c) => c.subscriptions.get({ params: { name } }) },
+  },
+  Proposal: {
+    list: { in: (namespace, s) => (c) => c.proposals.list({ params: { namespace }, query: query(s) }) },
+    get: { in: (namespace, name) => (c) => c.proposals.get({ params: { namespace, name } }) },
+    writes: writable(
+      Schema.decodeUnknownSync(ProposalSpec),
+      { create: false, update: false, upsert: false, labels: false, madeBy: 'nemia propose -f <file>' },
+      () => ({}),
+    ),
+  },
+  Delegation: {
+    list: { in: (namespace, s) => (c) => c.delegations.list({ params: { namespace }, query: query(s) }) },
+    get: { in: (namespace, name) => (c) => c.delegations.get({ params: { namespace, name } }) },
+    writes: writable(Schema.decodeUnknownSync(DelegationSpec), { create: false, update: true, upsert: true, labels: false }, (spec) => ({
+      update: (a) => (c) => c.delegations.put({ ...params(a), payload: spec }),
+    })),
   },
   Event: {
     list: {

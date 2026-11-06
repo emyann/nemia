@@ -48,6 +48,8 @@ import { nemiaFence, widened } from '../admission/index.ts';
 import { TABLE } from '../command/commands.verb.ts';
 import { daemonFile, parseDaemonFile } from '../daemon/daemon.store.ts';
 import { levelsNow } from '../level/levels.verb.ts';
+import { SESSION_TOKEN } from '../filed/filed.ts';
+import { TokenDoor } from '../token/token.store.ts';
 import {
   NEMIA_DIGEST_EVERY,
   NEMIA_FLOOR,
@@ -115,9 +117,9 @@ const factoryFolders = (): Mount[] => {
  * folder (`widened`, `promptAllows`), the store's denies (`storeDenies`) and the daemon's own bin first on her path (`ownBin`) in the
  * harness's settings, and her admission (`nemia admit`, with her floor and her rules for auto) asked before each of her shell calls. A
  * prompt allowed while she runs is widened the next time she is filed. Her instruction is composed with the person's custom words for
- * her, `custom` (`herCustom`).
+ * her, `custom` (`herCustom`), and her session token, minted as she is filed (`herToken`), is in her environment as `SESSION_TOKEN`.
  */
-export function nemiaSpec(id: string, custom: string | undefined): Parameters<Engine['file']>[0] {
+export function nemiaSpec(id: string, custom: string | undefined, token: string): Parameters<Engine['file']>[0] {
   const step = readNemia();
   const prompt = composePrompt(step.body, custom);
   const memory = `Edit(/${memoryDir()}/**)`;
@@ -143,6 +145,7 @@ export function nemiaSpec(id: string, custom: string | undefined): Parameters<En
         tools: ['Bash'],
       },
       mounts: factoryFolders(),
+      env: { [SESSION_TOKEN]: token },
       ...ownOf(
         { harness: step.harness, remote: true },
         { appendSystemPromptFile: prompt, pluginDir: [SHIPPED_NEMIA], settings },
@@ -163,13 +166,20 @@ const herCustom = Effect.fnUntraced(function* () {
   return yield* (yield* AgentDoor).custom.read(NEMIA);
 });
 
+/**
+ * Her session token for her task `id`, minted through the token door at the store's root the keeper is given: in no factory, since she
+ * works in every one, and no run's; live while `id` is filed and unsettled (`liveSession`).
+ */
+const herToken = (id: string) =>
+  Effect.flatMap(TokenDoor, (door) => door.tokens.mint({ agent: 'nemia', factory: null, run: null, step: null, attempt: 1, task: id }));
+
 /** Her task `id` filed, warned of where no nemia of the daemon's is first on her path. */
 const fileHer = (e: Engine, id: string) =>
   Effect.gen(function* () {
     if (ownBin() === undefined)
       yield* Effect.logWarning(`Nemia is filed with no nemia of the daemon's first on her path: none links ${SHIPPED_NEMIA}/../bin.`);
     const custom = yield* herCustom();
-    yield* asked('file', e.file(nemiaSpec(id, custom)));
+    yield* asked('file', e.file(nemiaSpec(id, custom, yield* herToken(id))));
   });
 
 /**

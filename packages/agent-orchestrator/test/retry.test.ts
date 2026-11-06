@@ -777,6 +777,66 @@ test('a check that ended stopped spends no retry, and `nemia retry --recheck` ru
   });
 });
 
+test('a session cut off at its budget before its check ran: `nemia retry --recheck` runs the check alone, no session', async (t) => {
+  const s = story(t);
+  const b = stage.board();
+  let run: RepositoryRun;
+  const session = () => `${run.id}-implement`;
+  const check2 = () => `${run.id}-implement-try2-check`;
+  const cutOff = async (checked = true): Promise<RepositoryRun> => {
+    const started = await startedRun(implementThenReview(['harness: claude', ...(checked ? ['check: npm test'] : []), 'budget: 3']));
+    await tick(started.id);
+    ended(`${started.id}-implement`, 'failed', { exitCode: 1, reason: 'harness', limit: 'budget', usage: { costUsd: 3.02 } });
+    await tick(started.id);
+    return started;
+  };
+  await s.test('implement is budget exhausted, its check never run; `nemia decide` offers the recheck beside the raise', async () => {
+    run = await cutOff();
+    assert.deepEqual(b.filings, [session()], 'no check was filed for a session cut off');
+    const { decision: d, offers } = await stage.runWith(b.e, decideRun(run.id));
+    assert.deepEqual(d.kind === 'awaiting' && [d.budgetExhausted, d.failedCheck], [['implement'], []]);
+    names(offers.join('\n'), `nemia retry ${run.id} implement --budget <amount>`, '--recheck');
+  });
+  await s.test('`--recheck` files its check alone, on the same task, and no session', async () => {
+    await stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'recheck' }));
+    const pass = await tick(run.id);
+    assert.deepEqual([pass.tried, pass.checked, pass.filed], [['implement'], ['implement'], []]);
+    assert.deepEqual(b.filings, [session(), check2()], 'a check, and no session');
+    assert.equal(b.tasks.get(check2())!.spec.harness, 'check');
+    assert.deepEqual(filedAs(readRun(run.id).steps.implement), {
+      taskId: session(),
+      workspace: run.repo,
+      branch: run.branch,
+      check: { taskId: check2() },
+      tries: [{ taskId: session(), cause: 'recheck' }],
+    });
+  });
+  await s.test('the check exits 0: implement is verified as if its session had signed off, and review is filed', async () => {
+    ended(check2(), 'succeeded', { exitCode: 0 });
+    assert.deepEqual((await tick(run.id)).filed, ['review']);
+    assert.deepEqual((await stage.runWith(b.e, list(b.e, readRun(run.id)))).waitingOnYou, []);
+  });
+  await s.test('a recheck that refuses waits on you as a failed check does, the budget stop still said', async () => {
+    const refused = await cutOff();
+    await stage.runWith(b.e, retryRun(refused.id, 'implement', { mode: 'recheck' }));
+    await tick(refused.id);
+    ended(`${refused.id}-implement-try2-check`, 'failed', { exitCode: 1 });
+    const after = await tick(refused.id);
+    assert.deepEqual([after.tried, after.filed, after.unreachable], [[], [], ['review']]);
+    assert.deepEqual((await stage.runWith(b.e, list(b.e, readRun(refused.id)))).waitingOnYou, ['implement']);
+    const { decision: d } = await stage.runWith(b.e, decideRun(refused.id));
+    assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.failedCheck, d.budgetExhausted], ['failed', ['implement'], ['implement']]);
+  });
+  await s.test('a step with no check is refused the recheck, and told the session retry with --budget', async () => {
+    const unchecked = await cutOff(false);
+    await assert.rejects(
+      stage.runWith(b.e, retryRun(unchecked.id, 'implement', { mode: 'recheck' })),
+      refusedAs('Conflict', `nemia retry ${unchecked.id} implement --budget <amount>`),
+    );
+    assert.deepEqual(retryAsks(unchecked.id), []);
+  });
+});
+
 test("`nemia retry` writes a person's ask, and the tick honours it once, consuming it whole", async (t) => {
   const s = story(t);
   const b = stage.board();
@@ -1625,7 +1685,7 @@ test("a claude job's cap, shared by its tries and raised by a person", async (t)
     const { offers, decision: d } = await stage.runWith(b.e, decideRun(id));
     assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.budgetExhausted, d.failed], ['waiting', ['implement'], []]);
     assert.deepEqual(offers, [
-      `implement: budget exhausted, $3.02 of $3. Raise its cap above $3.02 and continue its session:  nemia retry ${id} implement --budget <amount>  (--fresh, or --model <m>, for a new session; retries: 2, 0 spent)`,
+      `implement: budget exhausted, $3.02 of $3. Raise its cap above $3.02 and continue its session:  nemia retry ${id} implement --budget <amount>  (--fresh, or --model <m>, for a new session; retries: 2, 0 spent; --recheck runs its check, never run, on the work as it stands, and needs no --budget)`,
     ]);
     await assert.rejects(
       stage.runWith(b.e, retryRun(id, 'implement', { mode: 'fresh' })),

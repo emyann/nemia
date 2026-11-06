@@ -79,7 +79,10 @@ export type Decision =
        * one (`stepStatus`).
        */
       overBudget: string[];
-      /** Steps whose harness ended their session at their `budget:`. */
+      /**
+       * Steps whose harness ended their session at their `budget:`, and those of them a recheck then failed (`budgetStopped`): the
+       * stop stays said beside the check.
+       */
       budgetExhausted: string[];
       /**
        * Steps that signed off having been denied a call, and say `denials: fail`: nothing after them is filed, and no check of them ran.
@@ -236,7 +239,7 @@ export function decision(
     .filter((s) => statusOf.get(s.name) === 'over budget')
     .map((s) => s.name)
     .sort();
-  const budgetExhausted = named('budget exhausted');
+  const budgetExhausted = [...named('budget exhausted'), ...checkFailed.filter((name) => budgetStopped(run, name, spendOf))].sort();
   const denied = named('denied');
   const outcome =
     failed.length || checkFailed.length
@@ -269,6 +272,12 @@ export function decision(
     direct,
   };
 }
+
+/** Whether the session of a step's current try was ended at its budget: its `budget exhausted`, kept by a recheck on the same task. */
+const budgetStopped = (run: Run, name: string, spendOf: SpendOf): boolean => {
+  const taskId = run.steps[name]?.taskId;
+  return Boolean(taskId && spendOf(taskId)?.budgetEnded);
+};
 
 /**
  * A step's `cost` line on `nemia decide`, under its `used`: what its current try cost (`used`, as `consumption` reads it) and what it read,

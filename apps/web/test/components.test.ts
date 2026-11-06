@@ -7729,7 +7729,7 @@ test('a proposal shows its phase, its widens mark, its changes and the buttons i
   assert.match(applied, /data-proposal-approver/);
 });
 
-test('her chat draws a proposal she links as the page\'s own part, in her frame', async () => {
+test("her chat draws a proposal she links as the page's own part, in her frame", async () => {
   const { ChatProposal } = await import('../src/components/chat/ChatProposal.tsx');
   const html = await withProposal(proposalIn('waiting', true), createElement(ChatProposal, { factory: 'acme', name: 'nemia-ab12c' }));
   assert.match(html, /^<div data-chat-proposal="nemia-ab12c" data-factory="acme"/);
@@ -7776,4 +7776,22 @@ test('her policy lists her rules over proposals: in force with a Drop, and propo
   assert.match(html, /data-auto-proposed[^]*data-auto-proposal-rule="hires"[^]*data-auto-confirmed/, 'proposed and in force');
   assert.match(html, /data-auto-proposal-rule="skills"[^]*data-auto-confirm=/, 'proposed, with a Confirm');
   assert.doesNotMatch(html, /data-auto-rule="hires"/, 'a rule over proposals is not a gate rule');
+});
+
+test("a factory's delegations list each agent's grants in words with a Remove, beside the form that writes one", async () => {
+  const { FactoryDelegations } = await import('../src/components/FactoryDelegations.tsx');
+  const delegation = {
+    apiVersion: 'nemia/v1' as const,
+    kind: 'Delegation' as const,
+    metadata: { name: 'planner', namespace: 'acme', resourceVersion: '1', creationTimestamp: '2026-11-06T10:00:00Z' },
+    spec: { rules: [{ resources: ['hires'], resourceNames: [], verbs: ['update' as const] }] },
+  };
+  const html = await routedWith(createElement(FactoryDelegations, { name: 'acme' }), [
+    [['delegations', 'acme'], [delegation]],
+    [['delegable-agents', 'acme'], ['planner']],
+  ]);
+  assert.match(html, /data-delegation="planner"[^]*data-delegation-grant[^>]*>update hires, any name<[^]*data-delegation-remove/);
+  assert.match(html, /data-delegation-form[^]*data-delegation-resource="hires"[^]*data-delegation-verb="update"/);
+  const none = await routedWith(createElement(FactoryDelegations, { name: 'acme' }), [[['delegations', 'acme'], []]]);
+  assert.match(none, /data-no-delegation/);
 });

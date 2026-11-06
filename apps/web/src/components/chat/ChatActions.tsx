@@ -1,12 +1,11 @@
 /**
  * Her action ask in the chat (the chat event kind `proposal`), the canvas's boards 5 and 6: a one-question ask whose choices carry no
- * explanation of their own, so each choice is said whole by its own button — the first filled, as her chat's own Answer is, and the rest outlined, as the canvas draws
- * them — and nothing else is asked of the person. Filled and not tonal: a tonal ground is the panel's own ground here, so the
- * choice she puts first would read as the plainest thing on the row, and the lesser choice as the button. Answered, it keeps her
- * words and her tag turns to `Proposed`, with the line that says what they chose (board 6).
+ * explanation of their own, so each choice is said whole by its own button — the first filled, as her chat's own Answer is, and the rest
+ * outlined, as the canvas draws them — and nothing else is asked of the person. Filled and not tonal: a tonal ground is the panel's own
+ * ground here, so the choice she puts first would read as the plainest thing on the row, and the lesser choice as the button. Answered, it
+ * keeps her words and her tag turns to `Proposed`, with the line that says what they chose (board 6).
  *
- * `drawnAsk` says when an ask is drawn this way; one whose choices explain themselves is `ChatAsk`, and several questions
- * `ChatAskMany`.
+ * `drawnAsk` says when an ask is drawn this way; one whose choices explain themselves is `ChatAsk`, and several questions `ChatAskMany`.
  */
 import { Button } from '@/components/ui/button';
 import type { AskPick } from '@/lib/api';

@@ -1,5 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
+import { FactoryDelegations } from '@/components/FactoryDelegations';
 import { FactoryInstruction } from '@/components/FactoryInstruction';
 import { FactoryRules } from '@/components/FactoryRules';
 import { FactoryTrust } from '@/components/FactoryTrust';
@@ -8,16 +9,16 @@ import { FactoryServers } from '@/components/FactoryServers';
 import { FactoryVolumes } from '@/components/FactoryVolumes';
 import { routeLink } from '@/components/routeLink';
 import { LinkButton } from '@/components/ui/button';
-import { factoriesQuery, factoryInstructionQuery, factoryRulesQuery, factoryServersQuery } from '@/lib/api';
+import { delegationsQuery, factoriesQuery, factoryInstructionQuery, factoryRulesQuery, factoryServersQuery } from '@/lib/api';
 
 /**
  * A factory's settings, at /factories/$factory/settings: `$factory_` draws it on its own, not inside the floor, which has no outlet for it.
- * It waits for the factories, then prefetches the rules, the instruction and the MCP servers of a factory a person made, each of which
- * says why it does not read in its own section; the default factory and a name no factory has ask for none. The servers are prefetched
- * because something that mounts beside the floor after its first render narrows a floor already fitted — and because that read spawns a
- * harness session, which the loader makes once per visit rather than on each render. The query never goes stale
- * (`factoryServersQuery`), so the loader reads it as stale on entering the page (`OPENED`) and the section's mount reads nothing again;
- * a preload, on a link's hover, reads none, since the page it would read for is not open.
+ * It waits for the factories, then prefetches the rules, the instruction, the delegations and the MCP servers of a factory a person made,
+ * each of which says why it does not read in its own section; the default factory and a name no factory has ask for none. The servers are
+ * prefetched because something that mounts beside the floor after its first render narrows a floor already fitted — and because that read
+ * spawns a harness session, which the loader makes once per visit rather than on each render. The query never goes stale
+ * (`factoryServersQuery`), so the loader reads it as stale on entering the page (`OPENED`) and the section's mount reads nothing again; a
+ * preload, on a link's hover, reads none, since the page it would read for is not open.
  */
 export const Route = createFileRoute('/factories/$factory_/settings')({
   loader: async ({ context, params, cause }) => {
@@ -26,6 +27,7 @@ export const Route = createFileRoute('/factories/$factory_/settings')({
       await Promise.all([
         context.queryClient.prefetchQuery(factoryRulesQuery(params.factory)),
         context.queryClient.prefetchQuery(factoryInstructionQuery(params.factory)),
+        context.queryClient.prefetchQuery(delegationsQuery(params.factory)),
         cause === 'preload'
           ? undefined
           : context.queryClient.prefetchQuery({ ...factoryServersQuery(params.factory), staleTime: OPENED[cause] }),
@@ -49,11 +51,11 @@ const OPENED = { enter: 0, stay: Infinity } as const;
 const RouterLinkButton = routeLink(LinkButton);
 
 /**
- * What a person sets of one factory: first, a place of it that is not trusted, with the line that trusts it (`FactoryTrust`); the
- * folders its runs reach beside its repositories, each with the line that takes it back (`FactoryVolumes`); its rules, what every agent
- * hired into it is told (`FactoryRules`); its instruction, what Nemia is to know about it (`FactoryInstruction`); then its schedules,
- * shown as the factories' read answers them (`FactorySchedules`). The default factory, and a name no factory has, have no settings to
- * keep, and say so: neither the rules nor the instruction is read for them.
+ * What a person sets of one factory: first, a place of it that is not trusted, with the line that trusts it (`FactoryTrust`); the folders
+ * its runs reach beside its repositories, each with the line that takes it back (`FactoryVolumes`); its rules, what every agent hired into
+ * it is told (`FactoryRules`); the agents it lets approve its proposals (`FactoryDelegations`); its instruction, what Nemia is to know
+ * about it (`FactoryInstruction`); then its schedules, shown as the factories' read answers them (`FactorySchedules`). The default factory,
+ * and a name no factory has, have no settings to keep, and say so: neither the rules nor the instruction is read for them.
  */
 function SettingsPage() {
   const { factory: name } = Route.useParams();
@@ -85,6 +87,7 @@ function SettingsPage() {
           <FactoryTrust factory={factory} />
           <FactoryVolumes factory={factory} />
           <FactoryRules name={name} />
+          <FactoryDelegations name={name} />
           <FactoryInstruction name={name} />
           <FactoryServers name={name} />
           <FactorySchedules factory={factory} />

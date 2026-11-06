@@ -364,8 +364,8 @@ function saidOf(message: ChatMessage): ConversationItem<ChatOwn> {
  * item a line a call (`foldChat`), her words and the person's into `said`, the keeper's framing and the rule between two of her
  * sessions into `note`, and a question, a proposal or a permission of hers into `own`, carrying the event her talk draws itself
  * (`drawnAsk`). After her words, an `own` item for each step of a run they link to (`broughtOf`) and each proposal (`proposalLinkOf`),
- * once each, in her order: her talk draws the run's page's, or the proposal page's, own part for it there. An event the board has no drawing for is left out. Pure: a node test proves the whole
- * mapping without a browser.
+ * once each, in her order: her talk draws the run's page's, or the proposal page's, own part for it there. An event the board has no
+ * drawing for is left out. Pure: a node test proves the whole mapping without a browser.
  */
 export function chatItems(events: readonly ChatEvent[]): ConversationItem<ChatOwn>[] {
   const out: ConversationItem<ChatOwn>[] = [];

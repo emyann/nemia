@@ -423,7 +423,8 @@ const PROPOSAL_JUDGED = 'The proposal may be judged: read it again on its page b
 export const proposals = {
   list: (namespace: string): Promise<ProposalList> =>
     call((c) => c.proposals.list({ params: { namespace }, query: {} }), read(ProposalList)),
-  get: (namespace: string, name: string): Promise<Proposal> => call((c) => c.proposals.get({ params: { namespace, name } }), read(Proposal)),
+  get: (namespace: string, name: string): Promise<Proposal> =>
+    call((c) => c.proposals.get({ params: { namespace, name } }), read(Proposal)),
   /** The proposal `name` approved, the person's: answers it as it then reads, applied where it applies at approval. */
   approve: (namespace: string, name: string): Promise<Proposal> =>
     call((c) => c.proposals.approve({ params: { namespace, name } }), write(Proposal, PROPOSAL_JUDGED)),

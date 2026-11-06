@@ -8,7 +8,7 @@ import { queryOptions } from '@tanstack/react-query';
 import type { Delegation, DelegationWrite, Proposal } from 'objects';
 import { pace } from '../feed.ts';
 import { ReadRefusal } from './read.ts';
-import { delegations, proposals } from './objects.ts';
+import { agents, delegations, proposals } from './objects.ts';
 
 /** The key of the factory `factory`'s proposals, which a judgement invalidates exactly. */
 export const proposalsKey = (factory: string) => ['proposals', factory] as const;
@@ -33,10 +33,10 @@ export const proposalQuery = (factory: string, name: string) =>
     retry: (count: number, error: Error) => !(error instanceof ReadRefusal && error.status === 404) && count < 3,
   });
 
-/** Approve the proposal `name` of `factory`, the person's: the proposal as it then reads. Rejects with a `WriteRefusal` in the api's words. */
+/** Approve the proposal `name` of `factory`, the person's: the proposal as it then reads. Rejects with a `WriteRefusal`. */
 export const approveProposal = (factory: string, name: string): Promise<Proposal> => proposals.approve(factory, name);
 
-/** Decline the proposal `name` of `factory`, the person's: the proposal as it then reads. Rejects with a `WriteRefusal` in the api's words. */
+/** Decline the proposal `name` of `factory`, the person's: the proposal as it then reads. Rejects with a `WriteRefusal`. */
 export const declineProposal = (factory: string, name: string): Promise<Proposal> => proposals.decline(factory, name);
 
 /** The key of the factory `factory`'s delegations, which a write invalidates. */
@@ -55,3 +55,10 @@ export const putDelegation = (factory: string, agent: string, spec: DelegationWr
 
 /** Remove the delegation of `agent` in `factory`, the person's. Rejects with a `WriteRefusal` in the api's words. */
 export const removeDelegation = (factory: string, agent: string): Promise<Delegation> => delegations.delete(factory, agent);
+
+/** The names of the agents the factory `factory` serves, which its delegations may name: read on the settings page's visit. */
+export const delegableAgentsQuery = (factory: string) =>
+  queryOptions({
+    queryKey: ['delegable-agents', factory],
+    queryFn: async (): Promise<readonly string[]> => [...new Set((await agents.list(factory)).map((a) => a.metadata.name))].sort(),
+  });

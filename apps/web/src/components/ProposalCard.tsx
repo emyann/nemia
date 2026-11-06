@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Instant } from '@/components/Instant';
 import { approveProposal, declineProposal, proposalKey, proposalQuery, proposalsKey, ReadRefusal } from '@/lib/api';
 import { filled, ringed } from '@/lib/meaning';
-import { proposalOffers } from '@/lib/proposals';
+import { proposalOffers, type ProposalOffers } from '@/lib/proposals';
 import { cn } from '@/lib/utils';
 import { PROPOSAL_WORDS } from '@/lib/words';
 
@@ -156,27 +156,46 @@ export function ProposalView({
             {message}
           </p>
         )}
-        {(offers.approve || offers.decline) && (
-          <div className="flex flex-wrap gap-2">
-            {offers.approve && (
-              <Button data-proposal-approve isDisabled={pending} onPress={() => onJudge('approve')}>
-                Approve
-              </Button>
-            )}
-            {offers.decline && (
-              <Button data-proposal-decline variant="outline" isDisabled={pending} onPress={() => onJudge('decline')}>
-                Decline
-              </Button>
-            )}
-          </div>
-        )}
-        {refused !== null && (
-          <Alert variant="destructive" data-proposal-refused>
-            <AlertTitle>Not judged</AlertTitle>
-            <AlertDescription className="break-words">{refused}</AlertDescription>
-          </Alert>
-        )}
+        <Judge offers={offers} pending={pending} refused={refused} onJudge={onJudge} />
       </CardContent>
     </Card>
+  );
+}
+
+/** Approve and Decline as `offers` says, and a refusal of the last click in the api's words. */
+function Judge({
+  offers,
+  pending,
+  refused,
+  onJudge,
+}: {
+  offers: ProposalOffers;
+  pending: boolean;
+  refused: string | null;
+  onJudge: (asked: Judgement) => void;
+}) {
+  return (
+    <>
+      {(offers.approve || offers.decline) && (
+        <div className="flex flex-wrap gap-2">
+          {offers.approve && (
+            <Button data-proposal-approve isDisabled={pending} onPress={() => onJudge('approve')}>
+              Approve
+            </Button>
+          )}
+          {offers.decline && (
+            <Button data-proposal-decline variant="outline" isDisabled={pending} onPress={() => onJudge('decline')}>
+              Decline
+            </Button>
+          )}
+        </div>
+      )}
+      {refused !== null && (
+        <Alert variant="destructive" data-proposal-refused>
+          <AlertTitle>Not judged</AlertTitle>
+          <AlertDescription className="break-words">{refused}</AlertDescription>
+        </Alert>
+      )}
+    </>
   );
 }

@@ -10,7 +10,7 @@ import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { Context, Effect, Layer } from 'effect';
-import { MCP_TRANSPORTS, transportOf, type McpTransport, type Running } from 'agent-orchestrator';
+import { MCP_TRANSPORTS as HARNESS_TRANSPORTS, transportOf, type McpTransport as HarnessTransport, type Running } from 'agent-orchestrator';
 import { WorkflowError, readFrontmatter, splitFrontmatter } from 'agent-orchestrator/workflow';
 import type { FrontmatterEntry } from 'agent-orchestrator/workflow';
 
@@ -25,10 +25,11 @@ export type McpServer = {
   name: string;
   source: string;
   /**
-   * `.mcp.json`'s `type`, as the transport a harness loads the server over (`MCP_TRANSPORTS`): `stdio` for a server with a command and
-   * none given, and `unknown` for any other word, or a url with none, the word as written quoted in `notAsked`.
+   * `.mcp.json`'s `type`, as the transport a harness loads the server over (`HARNESS_TRANSPORTS`, the harness's own, which objects'
+   * `McpTransport` of a url is not): `stdio` for a server with a command and none given, and `unknown` for any other word, or a url with
+   * none, the word as written quoted in `notAsked`.
    */
-  type: McpTransport | 'unknown';
+  type: HarnessTransport | 'unknown';
   /**
    * `command`, `args` and `url` as `.mcp.json` writes them: the api expands `${VAR}` only to start the server, so no secret reaches the
    * page.
@@ -139,7 +140,7 @@ export async function capabilitiesOf(
           ...entry,
           notAsked:
             server.type === 'unknown'
-              ? `Not a server a harness loads (${server.written === null ? 'no `type`' : `\`type: ${JSON.stringify(server.written)}\``}, at ${server.url}): give "type" one of ${MCP_TRANSPORTS.map((t) => `"${t}"`).join(', ')} in ${MCP_JSON}.`
+              ? `Not a server a harness loads (${server.written === null ? 'no `type`' : `\`type: ${JSON.stringify(server.written)}\``}, at ${server.url}): give "type" one of ${HARNESS_TRANSPORTS.map((t) => `"${t}"`).join(', ')} in ${MCP_JSON}.`
               : `Not a stdio server (${server.type}, at ${server.url}): the api asks only stdio servers for their tools.`,
         };
       if (!entry.enabled) {
@@ -427,7 +428,7 @@ function enabledBy(settings: Json | null, warnings: string[]): (name: string) =>
  */
 type Declared = {
   name: string;
-  type: McpTransport | 'unknown';
+  type: HarnessTransport | 'unknown';
   written: string | null;
   command: string | null;
   args: string[];

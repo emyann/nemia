@@ -14,7 +14,7 @@ import { Effect } from 'effect';
 import { Invalid, parseInboxCard, readFactory, inboxEntries, StoreRoot, type Factory, type InboxListing } from 'agent-orchestrator';
 import type { CardFile } from 'objects';
 import type { Refusal } from '../guard.ts';
-import { folderOf } from '../workflows/workflows.ts';
+import { folderOf, type WorkflowSource } from '../workflows/workflows.ts';
 
 /**
  * A card as the board lists it: the package's listing (`InboxListing`) — its name, first line, workflow and repo as the card writes them,
@@ -64,7 +64,7 @@ const outsideFactory = (factory: Factory, repo: string): Invalid =>
  */
 function folderAmong(
   name: string,
-  from: 'repo' | 'yours' | undefined,
+  from: WorkflowSource | undefined,
   repos: readonly string[],
   home: string,
   factory: Factory,

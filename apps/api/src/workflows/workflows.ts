@@ -56,9 +56,10 @@ import { StoreRoot, type Engine } from '../store.ts';
 import { graphOf, workflowVersion, type RunGraph } from 'agent-orchestrator';
 import { runPlaced } from '../store.ts';
 import type { PlaceService } from 'agent-orchestrator';
+import type { DefinitionOrigin, PlaceKind } from 'objects';
 
 /** Where a workflow is read from: the repository's `workflows/`, or yours, in the store. */
-export type WorkflowSource = 'repo' | 'yours';
+export type WorkflowSource = Extract<DefinitionOrigin, 'repo' | 'yours'>;
 
 /**
  * A step's frontmatter as the loader read it, before any run has frozen it: `null` where the step does not set it. The run object has
@@ -77,7 +78,7 @@ export type WorkflowStepSpec = {
    * `place: folder`: the step works in a folder the run makes, in a run with no repository; `git`: on branches of a repository. Every step
    * file says one; null only for a step frozen on a run record before the key, which worked on a repository.
    */
-  place: 'git' | 'folder' | null;
+  place: PlaceKind | null;
   /** `workspace: base`: the step runs in the repository's own checkout, on the base branch. Null for a step without the line. */
   workspace: 'base' | null;
   /** The factory's folders the step may write (`writable:`), each by its directory's name: empty where it writes none of them. */

@@ -5,11 +5,11 @@
  */
 import { Invalid as Refused, pageOf, parseSelectors, selectorsRefusal, selectsLabels, type ObjectQuery } from 'agent-orchestrator';
 import { definitionsServed, definitionWriteRefusal, type DefinitionWrite } from 'agent-orchestrator/workflow';
-import { API_VERSION, DEFINITION_ORIGINS, Invalid, Missing } from 'objects';
+import { API_VERSION, DEFINITION_ORIGINS, Invalid, Missing, type DefinitionOrigin } from 'objects';
 export { writtenAt } from '../workflows/builder.ts';
 
 /** An origin a definition is read from: the factory's tree, the repository, yours, or Nemia's builtin. */
-export type Origin = (typeof DEFINITION_ORIGINS)[number];
+export type Origin = DefinitionOrigin;
 
 /** A definition read at one origin, before it is served: its name, its origin, and what the object is made from. */
 export type Held<T> = { name: string; origin: Origin; item: T };

@@ -611,6 +611,49 @@ function boundDrift(workflow: Workflow): string[] {
   ];
 }
 
+/** Where Playwright keeps the browsers it downloads, the one path the e2e job may cache. */
+const BROWSERS = '~/.cache/ms-playwright';
+
+/** The lockfile's entry whose version names the browsers a run downloads, which the cache's key must be read off. */
+const PLAYWRIGHT_PIN = 'node_modules/playwright';
+
+/** The step of the e2e job that installs Chromium. */
+const installStep = (steps: Step[]): Step | undefined => steps.find((step) => step.run?.includes('playwright install') === true);
+
+/**
+ * An e2e job whose browsers are not restored from a cache keyed on the Playwright the lockfile pins, or that installs them on a hit.
+ * The install's `--with-deps` runs apt, which stalled shards for ten minutes on cache hits of a key the lockfile's hash made. And the
+ * cache holds the browsers alone: a build or a page's result restored from one would be a verdict nothing in the run decided.
+ */
+function browserDrift(workflow: Workflow): string[] {
+  const steps = workflow.jobs[E2E]?.steps ?? [];
+  const caches = steps.filter((step) => step.uses?.startsWith('actions/cache') === true);
+  const cache = caches[0];
+  if (caches.length !== 1 || cache === undefined || cache.with?.path !== BROWSERS)
+    return [
+      `the ${E2E} job in ${FILE} does not cache ${BROWSERS} alone: give it one actions/cache step whose path is ${BROWSERS}, so Chromium is restored rather than installed, and cache nothing else, so no verdict is read from a cache`,
+    ];
+  const sentences: string[] = [];
+  const keyed = /^\$\{\{ steps\.([\w-]+)\.outputs\.key \}\}$/.exec(String(cache.with.key ?? ''));
+  const reader = steps.findIndex((step) => keyed !== null && step.id === keyed[1]);
+  const read = steps[reader]?.run ?? '';
+  if (reader === -1 || reader > steps.indexOf(cache) || !read.includes('package-lock.json') || !read.includes(PLAYWRIGHT_PIN))
+    sentences.push(
+      `the browsers' cache of the ${E2E} job in ${FILE} is not keyed on the version of ${PLAYWRIGHT_PIN} in package-lock.json: key it on \${{ steps.<id>.outputs.key }} of a step before it that reads that version, so a lockfile change that moves no Playwright keeps the browsers`,
+    );
+  if (cache.with['restore-keys'] !== undefined)
+    sentences.push(
+      `the browsers' cache of the ${E2E} job in ${FILE} has restore-keys: take them off, since a near miss holds another Playwright's builds, which the install downloads past and the save then carries too`,
+    );
+  const install = installStep(steps);
+  const hit = `steps.${cache.id ?? '<id>'}.outputs.cache-hit != 'true'`;
+  if (install === undefined || cache.id === undefined || install.if !== hit || steps.indexOf(install) < steps.indexOf(cache))
+    sentences.push(
+      `the ${E2E} job in ${FILE} does not install Chromium on a cache miss alone: give the cache step an id and the install, after it, if: ${hit}, or every shard runs apt on a hit`,
+    );
+  return sentences;
+}
+
 /** The two commands the build job must run, and what each writes, as the sentence that refuses its absence names it. */
 const BUILT: { command: string; writes: string }[] = [
   { command: 'npm run build', writes: 'apps/web/src/routeTree.gen.ts' },
@@ -894,6 +937,7 @@ const drift = (
   ...targetDrift(text),
   ...shardDrift(workflow, pages),
   ...boundDrift(workflow),
+  ...browserDrift(workflow),
   ...buildDrift(workflow),
   ...scanDrift(workflow, config),
   ...allowDrift(config, stubs),
@@ -1407,6 +1451,38 @@ test('REFUSED: no job that sums the shards, one that does not wait for them, and
       "shards' page times are summed against PAGES_BOUND_MS, whose only writer is apps/web/test/e2e/timing.ts, so run it rather than " +
       'comparing a copy of the bound here',
   ]);
+});
+
+test("REFUSED: the e2e caching more than the browsers, keyed off the lockfile's hash, with restore-keys, and installing on a hit", () => {
+  const shipped = readWorkflow();
+  assert.deepEqual(browserDrift(shipped), [], 'the e2e restores its browsers from a cache keyed on the pinned Playwright today');
+  const cacheOf = (workflow: Workflow): Step => {
+    const step = (workflow.jobs[E2E].steps ?? []).find((each) => each.uses?.startsWith('actions/cache') === true);
+    assert.ok(step?.with !== undefined, 'the e2e job caches its browsers today');
+    return step;
+  };
+  const refused = (drift: string[], token: string, why: string): void => {
+    assert.equal(drift.length, 1, `${why}: ${drift.join(' | ')}`);
+    assert.ok(drift[0].includes(token), `${why}: the sentence names ${token}`);
+  };
+
+  const widened = structuredClone(shipped);
+  cacheOf(widened).with = { ...cacheOf(widened).with, path: `${BROWSERS}\n.e2e` };
+  refused(browserDrift(widened), 'alone', "the pages' results cached beside the browsers");
+
+  const hashed = structuredClone(shipped);
+  cacheOf(hashed).with = { ...cacheOf(hashed).with, key: "playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}" };
+  refused(browserDrift(hashed), PLAYWRIGHT_PIN, "the key the lockfile's whole hash");
+
+  const near = structuredClone(shipped);
+  cacheOf(near).with = { ...cacheOf(near).with, 'restore-keys': 'playwright-' };
+  refused(browserDrift(near), 'restore-keys', 'a near miss restored');
+
+  const always = structuredClone(shipped);
+  const install = installStep(always.jobs[E2E].steps ?? []);
+  assert.ok(install?.if !== undefined, 'the install is conditioned on a miss today');
+  delete install.if;
+  refused(browserDrift(always), 'cache miss alone', 'the install run on a hit');
 });
 
 test('REFUSED: no build job, a generator not run, a staleness step that names one generated path, and a path this repository has not', () => {

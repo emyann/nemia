@@ -48,6 +48,14 @@
       ]
     },
     {
+      "term": "Caller",
+      "meaning": "who a request is from, as the api resolves it before any router is reached (`callerGate`, `apps/api/src/caller/caller.ts`): the person where it presents no `Authorization`, an agent's session by the session token it presents as `Authorization: Bearer <token>`, asked of the orchestrator (`sessionCaller`). A token refused, or a header that is no bearer, is a 401 `Unauthorized` with its reason on any route. A handler reads it as `caller` (`Served`, `apps/api/src/layer.ts`), and a proposal's and a delegation's handlers hand it to the orchestrator's programs (`apps/api/src/proposals/`), which judge it: a refusal by who calls is a 403 `Forbidden` with its reason.",
+      "see": {
+        "label": "The api",
+        "href": "/map/#the-api"
+      }
+    },
+    {
       "term": "Command text",
       "meaning": "the `nemia …` line the api hands the board for a person to copy.",
       "retired": [

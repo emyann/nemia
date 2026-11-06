@@ -14,7 +14,8 @@
  *
  * The factories and their parts are handed on by `partsRoutes` (factory-parts/parts.ts), which says each of their writes as the guard does;
  * the Workflows, Agents and Skills by `definitionsRoutes` (definitions/routes.ts), each request placed in the factory its namespace names
- * and on the repository its `?repo=` names (`placeFor`), so `default` is the api's repository and your library.
+ * and on the repository its `?repo=` names (`placeFor`), so `default` is the api's repository and your library; a factory's Proposals and
+ * Delegations by `proposalsRoutes` (proposals/routes.ts), placed the same way, each judged by who calls (`caller`, caller/caller.ts).
  *
  * The cluster's templates and their documents, the feed's subscriptions — their `GET`s alone, subscribing and unsubscribing being
  * commands/routes.ts's — and the feed's lines as events, cluster-wide and in a namespace, are handed on as they are.
@@ -53,6 +54,7 @@ import {
   volumesHandlers,
 } from '../factory-parts/index.ts';
 import { agentsHandlers, definitionsRoutes, skillsHandlers, workflowsHandlers } from '../definitions/index.ts';
+import { delegationsHandlers, proposalsHandlers, proposalsRoutes } from '../proposals/index.ts';
 import { placeFor } from '../factories/place.ts';
 import { ServedNow } from './refused.ts';
 import { runsHandlers } from './runs.ts';
@@ -129,6 +131,8 @@ export const objectsHandler = (runtime: ApiRuntime) => {
         workflowsHandlers,
         agentsHandlers,
         skillsHandlers,
+        proposalsHandlers,
+        delegationsHandlers,
         templatesHandlers,
         subscriptionsHandlers,
         eventsHandlers,
@@ -305,11 +309,12 @@ export function objectsRoutes(runtime: ApiRuntime): Hono<ApiEnv> {
     const refused = refusedBeforeReading(guard, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
     return refused ? c.json({ error: refused.error }, refused.status) : placed(c, guard.shape);
   };
-  const definitions = definitionsRoutes(new Hono<ApiEnv>(), {
-    forward: (c) => placed(c, ONE_TAKES),
+  const placedHand = {
+    forward: (c: RequestContext<ApiEnv>) => placed(c, ONE_TAKES),
     listed: watchable((c, request) => placed(c, LIST_TAKES, request)),
     guarded: placedGuarded,
-  });
+  };
+  const definitions = proposalsRoutes(definitionsRoutes(new Hono<ApiEnv>(), placedHand), placedHand);
   const runs = runsRoutes(new Hono<ApiEnv>(), { forward, listed, guarded }).post('/api/namespaces/:namespace/runs', async (c) =>
     located(await placedGuarded((c) => startGuarded(at(c)[0]))(c)),
   );

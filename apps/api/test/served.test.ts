@@ -17,6 +17,10 @@ import { app } from '../src/app.ts';
 const DEFINITION =
   "served by the objects' handler from `objects`' Api (definitions/): a namespace's Workflows, Agents and Skills as its factory resolves them, which the table's entries they replace say `only`";
 
+/** Why a proposal's or a delegation's path is the api's own. */
+const PROPOSAL =
+  "served by the objects' handler from `objects`' Api (src/proposals/): a factory's Proposals and Delegations, each judged by who calls, which `nemia propose` and `nemia proposals` reach through the api";
+
 /** Why a template's path is the api's own. */
 const TEMPLATE =
   "served by the objects' handler from `objects`' Api (src/template-objects/templates.ts): the builtin templates and their documents as objects, which no command reads";
@@ -116,6 +120,15 @@ const OWN: Readonly<Record<string, string>> = {
     "the Factory's verbs, served by the objects' handler from `objects`' Api (src/objects/factories.ts) over the factories' entries",
   'DELETE /api/factories/:name/instruction/words':
     "the Factory's verbs, served by the objects' handler from `objects`' Api (src/objects/factories.ts) over the factories' entries",
+  'GET /api/namespaces/:namespace/proposals': PROPOSAL,
+  'GET /api/namespaces/:namespace/proposals/:name': PROPOSAL,
+  'POST /api/namespaces/:namespace/proposals': PROPOSAL,
+  'POST /api/namespaces/:namespace/proposals/:name/approve': PROPOSAL,
+  'POST /api/namespaces/:namespace/proposals/:name/decline': PROPOSAL,
+  'GET /api/namespaces/:namespace/delegations': PROPOSAL,
+  'GET /api/namespaces/:namespace/delegations/:name': PROPOSAL,
+  'PUT /api/namespaces/:namespace/delegations/:name': PROPOSAL,
+  'DELETE /api/namespaces/:namespace/delegations/:name': PROPOSAL,
   'GET /api/namespaces/:namespace/workflows': DEFINITION,
   'GET /api/namespaces/:namespace/workflows/:name': DEFINITION,
   'POST /api/namespaces/:namespace/workflows': DEFINITION,

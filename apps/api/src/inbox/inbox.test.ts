@@ -718,7 +718,8 @@ test("what a filing, a card's page or a drop refuses, writing nothing", async (t
       clear();
       const { card } = onStore(addToInbox({ text: 'Keep this one' }));
       write(path.join(inbox, 'broken.md'), '---\ncolour: red\n---\nPaint it.\n');
-      write(path.join(inbox, 'notes.txt'), 'not a card\n');
+      const strayText = 'not a card\n';
+      write(path.join(inbox, 'notes.txt'), strayText);
       fs.mkdirSync(path.join(inbox, 'sub'));
       assert.deepEqual(
         (await listed()).map((e) => e.name).sort(),
@@ -734,19 +735,18 @@ test("what a filing, a card's page or a drop refuses, writing nothing", async (t
       names(((await dropped.json()) as Refused).error, 'no-such-card', 'nemia inbox');
 
       write(path.join(inbox, 'notes'), 'a stray file\n');
-      write(path.join(inbox, 'notes.md'), '---\nworkflow: dev\n---\nThe card called notes\n');
+      const notesBody = 'The card called notes';
+      const notesText = `---\nworkflow: dev\n---\n${notesBody}\n`;
+      write(path.join(inbox, 'notes.md'), notesText);
       const notes = (await (await cardPage('notes')).json()) as Card;
       assert.deepEqual(
         [notes.status.file, notes.spec.body, notes.status.source, notes.spec.workflow],
-        ['notes.md', 'The card called notes', '---\nworkflow: dev\n---\nThe card called notes\n', 'dev'],
+        ['notes.md', notesBody, notesText, 'dev'],
         "notes.md and a stray notes both list as notes: the read is the card's",
       );
+      // A stray file with no card of its name has a page all the same: its refusal and its text.
       const stray = (await (await cardPage('notes.txt')).json()) as Card;
-      assert.deepEqual(
-        [stray.spec.body, stray.status.source, typeof stray.status.error],
-        [undefined, 'not a card\n', 'string'],
-        'a stray file with no card of its name has a page all the same: its refusal and its text',
-      );
+      assert.deepEqual([stray.spec.body, stray.status.source, typeof stray.status.error], [undefined, strayText, 'string']);
     },
   );
 

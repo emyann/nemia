@@ -23,8 +23,6 @@ export const Route = createFileRoute('/runs/')({
         .ensureQueryData(finishedRunsQuery(deps.factory, trailOf(deps), deps.l))
         .then((page) => Promise.all(page.runs.map((run) => context.queryClient.prefetchQuery(runLinesQuery(run.id)))))
         .catch((error: unknown) => {
-          // A trail the api refuses (a 422: `?older=` that is no token of the finished runs) reads as the first page, as a `?page=`
-          // that was no number did: the address drops it, and the waiting and in-flight sections are drawn as ever.
           if (deps.older !== undefined && error instanceof ReadRefusal && error.status === 422)
             throw redirect({ to: '/runs', search: (prev) => trailSearch(prev, []), replace: true });
           throw error;

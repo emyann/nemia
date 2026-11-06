@@ -12,9 +12,15 @@
 import { Cause, Duration, Effect, Exit, Option } from 'effect';
 import { FetchHttpClient, HttpClientError } from 'effect/http';
 import { HttpApiClient } from 'effect/http-api';
-import { Api, Conflict, Invalid, Missing, Unjudged } from 'objects';
+import { Api, type APIResource, Conflict, Invalid, Missing, Unjudged } from 'objects';
 import { olderThanThis, Refused, served, unanswered } from './client.ts';
 import { daemonStarted } from './daemon.ts';
+import { resourceNamed } from './objects/resource.ts';
+import { CLIENT_VERBS } from './route.ts';
+
+/** The way to read in process, for a verb that has one: the client's own verbs have none (`noLocal`). */
+const localWay = (verb: string): string =>
+  (CLIENT_VERBS as readonly string[]).includes(verb.split(' ')[0] ?? verb) ? '' : `, or read in process: \`nemia ${verb} … --local\``;
 
 /**
  * How long a moved read waits on the api before it gives up: the whole call, from the request to the decoded answer. Thirty seconds, some
@@ -62,7 +68,7 @@ const attempt = <A, E>(base: string, call: (client: ObjectsClient) => Effect.Eff
 /** A daemon that took the read and did not answer it within `boundMs`: refused, naming its status and the read in process. */
 const notInTime = (verb: string, base: string, boundMs: number): Refused =>
   new Refused(
-    `the daemon at ${base} did not answer \`nemia ${verb}\` within ${boundMs / 1000} s. See whether it is up, \`nemia service status\`, or read in process: \`nemia ${verb} … --local\``,
+    `the daemon at ${base} did not answer \`nemia ${verb}\` within ${boundMs / 1000} s. See whether it is up, \`nemia service status\`${localWay(verb)}`,
   );
 
 /**
@@ -81,11 +87,11 @@ function answerOf<A, E>(exit: Exit.Exit<A, E>, verb: string, base: string, bound
     if (status === 404) throw olderThanThis(verb, base, pathOf(failed));
     if (reason._tag === 'TransportError') throw unanswered(verb, base, failed);
     throw new Refused(
-      `the daemon at ${base} answered ${status ?? 'nothing'} to ${pathOf(failed)}, which this nemia does not read: restart it, \`nemia service restart\`, or read in process: \`nemia ${verb} … --local\``,
+      `the daemon at ${base} answered ${status ?? 'nothing'} to ${pathOf(failed)}, which this nemia does not read: restart it, \`nemia service restart\`${localWay(verb)}`,
     );
   }
   throw new Refused(
-    `the daemon at ${base} answered in a shape this nemia does not read (${failed instanceof Error ? failed.message : String(failed)}): restart it, \`nemia service restart\`, or read in process: \`nemia ${verb} … --local\``,
+    `the daemon at ${base} answered in a shape this nemia does not read (${failed instanceof Error ? failed.message : String(failed)}): restart it, \`nemia service restart\`${localWay(verb)}`,
   );
 }
 
@@ -116,3 +122,32 @@ export async function asked<A, E>(
 /** The factories the api lists (`FactoryList`, `GET /api/factories`), the default first on its own repository, for the read `verb`. */
 export const factoriesListed = (verb: string, env: NodeJS.ProcessEnv = process.env) =>
   asked(verb, (client) => client.factories.listAll({ query: {} }), env);
+
+/** Every resource the api serves (`GET /api`), for the verb `verb` names: what `get`, `apply` and `explain` resolve a word against. */
+export const discovered = async (verb: string, env: NodeJS.ProcessEnv = process.env): Promise<readonly APIResource[]> =>
+  (await asked(verb, (client) => client.discovery.resources(), env)).resources;
+
+/** The kinds' own resources of `resources`, by their plurals: what a refusal names. */
+const servedNames = (resources: readonly APIResource[]): string =>
+  resources
+    .filter((r) => !r.name.includes('/'))
+    .map((r) => r.name)
+    .join(', ');
+
+/**
+ * The resource `word` names among `resources`, in any case, for the verb `verb` names (`resourceNamed`); refused, naming the resources
+ * there are and the command that explains one, where it names none.
+ */
+export function resourceFor(verb: string, resources: readonly APIResource[], word: string): APIResource {
+  const named = resourceNamed(resources, word.toLowerCase());
+  if (!('refused' in named)) return named;
+  throw new Refused(
+    `nemia ${verb}: the api serves no resource named "${word}". It serves ${servedNames(resources)}: see one with \`nemia explain <resource>\``,
+  );
+}
+
+/** `--local` typed to a verb of the client's own, which no process answers: refused, naming how to see the daemon that serves it. */
+export const noLocal = (verb: string): Refused =>
+  new Refused(
+    `nemia ${verb} asks the api alone, and has no --local: type it again without --local, and see the daemon that serves this store with \`nemia service status\``,
+  );

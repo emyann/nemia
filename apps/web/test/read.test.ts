@@ -695,7 +695,7 @@ test("every read and write the board's source makes passes a schema", () => {
   const { faults, schemed, sent } = unschemedReads(texts);
   assert.ok(schemed >= 15, `the walk counted ${schemed} reads through get with a schema`);
   assert.deepEqual(faults, []);
-  assert.ok(sent >= 12, `the walk counted ${sent} writes through send with a schema`);
+  assert.ok(sent >= 11, `the walk counted ${sent} writes through send with a schema`);
 });
 
 test("read.ts hands out its read, its write, the decode they share with the objects' client and their three refusals, and nothing else", async () => {

@@ -19,7 +19,6 @@ import { customInstructions } from './custom/custom.ts';
 import { commands } from './commands/index.ts';
 import { capabilitiesWithSteps, McpAsker } from './capabilities/index.ts';
 import { ceilingsOf, metricsOf, passesOf, seriesOf, pauseNowOf, pauseOf, feed, QuotaAsker, readDaemon } from './factory/index.ts';
-import { inbox } from './inbox/inbox.ts';
 import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Services } from './layer.ts';
 import { nemia, nemiaChat } from './nemia/index.ts';
 import { objectsRoutes } from './objects/index.ts';
@@ -123,8 +122,9 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  * - custom/custom.ts — a person's custom instructions for an agent, by its name, read through `nemia agents custom`'s entry; written and
  *   cleared on the routes the table generates from it (commands/routes.ts).
  * - agents/skills.ts — the reads and writes of a skill the Skill object calls.
- * - inbox/inbox.ts — the inbox: its cards listed and one filed, through `nemia inbox`'s and `nemia inbox add`'s entries; one dropped and
- *   one queued on the routes the table generates (commands/routes.ts).
+ * - inbox/inbox.ts — what a card filed through the Card's verb files, and the inbox listed with each card's body. The Card's verbs —
+ *   listed, read alone with its file as written, written whole, filed, dropped, started, queued, labelled — are the objects'
+ *   (objects/cards.ts).
  * - runs/runs.ts — the runs listed, one run in full, and what `nemia decide` shows of it.
  * - stats/stats.ts — the flow numbers of every run in the store, as `nemia stats --json` prints them.
  * - `GET /api/ceilings` — the cap on runs in flight the daemon's last pass ran with, and the runs it counts and holds: what the Factory
@@ -159,7 +159,7 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  * - commands/routes.ts — the pipeline every command of the package's table is served through: the run's named actions, a try (with answers
  *   to its questions, commands/extend.ts and asks/answers.ts), a round, words for a running session, an approval and an acceptance, served
  *   in the run's namespace by the objects' handlers (objects/runs.ts); and the routes it generates: the store's pause put and lifted,
- *   `nemia pause` and `nemia resume`'s routes; an inbox card dropped, queued and taken off the queue; an agent's custom instructions
+ *   `nemia pause` and `nemia resume`'s routes; an agent's custom instructions
  *   written and cleared; and a factory's instruction put where it is kept, and written and cleared.
  * - steps/steps.ts — a step's own reads: its output, its files, and its conversation, once or followed.
  * - factory/feed.ts — the workflow feed followed, as server-sent events.
@@ -194,7 +194,6 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', yours)
     .route('/', agents)
     .route('/', customInstructions)
-    .route('/', inbox)
     .route('/', objectsRoutes(runtime))
     .route('/', runs)
     .route('/', openapi)

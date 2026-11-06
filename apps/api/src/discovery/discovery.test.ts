@@ -35,6 +35,7 @@ test('each resource says its scope and the verbs its routes serve, sub-resources
   assert.deepEqual(verbs('runs'), ['create', 'delete', 'get', 'list', 'watch']);
   assert.equal(resource(list, 'runs')?.namespaced, true);
   assert.deepEqual(verbs('runs/hold'), ['create', 'delete']);
+  assert.deepEqual(verbs('cards'), ['create', 'delete', 'get', 'list', 'update', 'watch']);
   assert.deepEqual(verbs('cards/start'), ['create']);
   assert.equal(resource(list, 'factories')?.namespaced, false);
   assert.deepEqual(verbs('templates/workflows'), ['get']);

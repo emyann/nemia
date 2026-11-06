@@ -3,10 +3,12 @@ export {
   CARD_IN_PLAY,
   CARD_STATES,
   cardInPlay,
+  cardText,
   cardState,
   INBOX_KEY_MEANINGS,
   INBOX_KEYS,
   cardLabels,
+  fromLine,
   labelledText,
   ignoredRepoLine,
   inboxLines,
@@ -16,6 +18,7 @@ export {
   parseInboxCard,
   queueLine,
   queueOrder,
+  startedRefusal,
   workflowAt,
 } from './inbox.ts';
 export type { CardListing, CardRun, CardState, InboxCard, InboxListing, LabelsShown, QueueStarted, MissedStart } from './inbox.ts';

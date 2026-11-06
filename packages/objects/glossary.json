@@ -239,6 +239,16 @@
     {
       "term": "Plural",
       "meaning": "the word a kind's paths name its collection by, `/api/<plural>` and `/api/namespaces/<namespace>/<plural>` (`RESOURCE_PLURALS`, `packages/objects/src/api.ts`)."
+    },
+    {
+      "term": "CardWrite",
+      "meaning": "a card written whole, the body of the Card's update (`PUT /api/namespaces/<factory>/cards/<name>`, what `nemia apply` sends): its spec as it is to be, its labels, and the `resourceVersion` it was read at (`CardWrite`, `packages/objects/src/card.ts`).",
+      "type": "CardWrite"
+    },
+    {
+      "term": "Card key meaning",
+      "meaning": "one line saying what a key of a card's frontmatter means, in `CARD_KEYS`' order: the description of the Card's field that holds it, which `nemia explain` and the board's card page read (`CARD_KEY_MEANINGS`, `packages/objects/src/card.ts`).",
+      "type": "CARD_KEY_MEANINGS"
     }
   ]
 }

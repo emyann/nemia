@@ -1,7 +1,8 @@
 /**
  * The cards group's handlers (`objects`' `Api`): the inbox's cards as objects, over the package's entries the inbox's routes and the card
- * start run — a page of them (`cardList`), one (`cardObject`), filed (`nemia inbox add`), dropped (`inbox rm`),
- * started (`nemia start <card>`), queued and taken off (`inbox queue`), and its labels edited (`label inbox`).
+ * start run — a page of them (`cardList`), one (`cardObject`) in its namespace or found in any (`getAll`), each with its file as
+ * written, written whole (`replaceCard`), filed (`nemia inbox add`), dropped (`inbox rm`), started (`nemia start <card>`), queued and
+ * taken off (`inbox queue`), and its labels edited (`label inbox`).
  *
  * A card's namespace is its factory, `default` for one that names none: a card read, dropped, started, queued or labelled under a
  * namespace it is not in is `Missing`, as one no card has the name of; a card filed under `default` names no factory, under another the
@@ -13,6 +14,7 @@ import {
   cardList,
   cardObject,
   INBOX_ADD,
+  replaceCard,
   inboxNameRefusal,
   informerMemo,
   Invalid as Refused,
@@ -75,8 +77,11 @@ const thrown = ({ status, error }: Refusal): never => {
   throw new Refused({ message: error });
 };
 
-/** The card `name` of `namespace`, read now, after its name is one a card can have: what every verb on one card reads first. */
-const cardIn = async (s: Served, namespace: string, name: string) => {
+/**
+ * The card `name` of `namespace` (any namespace, for none), read now with its file as written (`status.source`), after its name is one a
+ * card can have: what every verb on one card reads first.
+ */
+const cardIn = async (s: Served, namespace: string | undefined, name: string) => {
   const wrong = inboxNameRefusal(name);
   if (wrong) throw new Refused({ message: wrong });
   return runPlaced(s, s.e, cardObject(s.e, howOf(s), name, namespace));
@@ -98,6 +103,13 @@ export const cardsHandlers = HttpApiBuilder.group(Api, 'cards', (handlers) =>
     .handle('listAll', ({ query }) => page(undefined, query))
     .handle('list', ({ params: { namespace }, query }) => page(namespace, query))
     .handle('get', ({ params: { namespace, name } }) => answered((s) => cardIn(s, namespace, name)))
+    .handle('getAll', ({ params: { name } }) => answered((s) => cardIn(s, undefined, name)))
+    .handle('update', ({ params: { namespace, name }, payload }) =>
+      answered(async (s) => {
+        await runPlaced(s, s.e, replaceCard(name, namespace, payload));
+        return cardIn(s, namespace, name);
+      }),
+    )
     .handle('create', ({ params: { namespace }, payload }) =>
       answered(async (s) => {
         const factory = factoryOf(namespace);

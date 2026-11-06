@@ -200,13 +200,13 @@ async function onTheCard(page: Page, what: string): Promise<void> {
   await expectVisible(from.getByText('reads no run as context'), 'the card reads no run');
   await from.getByRole('button', { name: 'Change' }).click();
   const row = from.locator(`li[data-run="${DIAMOND.landed.id}"] label`);
-  const pathname = `/api/inbox/${name}/from`;
+  const pathname = `/api/namespaces/default/cards/${name}`;
   await Promise.all([answered(page, 'PUT', pathname), row.click()]);
   await expectVisible(from.locator(`[data-from="${DIAMOND.landed.id}"]`), `the card reads ${DIAMOND.landed.id}, as its file says`);
   await expectVisible(from.locator(`section[data-concluded="${DIAMOND.landed.id}"] [data-markdown]`), 'and what it would hand');
   await from.scrollIntoViewIfNeeded();
   await shoot(page, item, `card-${what}`);
-  await Promise.all([answered(page, 'DELETE', pathname), row.click()]);
+  await Promise.all([answered(page, 'PUT', pathname), row.click()]);
   await expectVisible(from.getByText('reads no run as context'), 'taken back off, the card reads no run again');
   await from.getByRole('button', { name: 'Done' }).click();
 }

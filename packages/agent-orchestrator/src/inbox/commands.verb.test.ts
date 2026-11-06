@@ -1,8 +1,7 @@
 /**
- * The board's card page as an entry of the table (`INBOX_CARD`), served on the api alone: a card found among the entries the inbox lists,
- * the card before a stray file of the same name, with its file as written; and a name with no card refused, naming the cards there are —
- * one table. And `nemia inbox` (`INBOX`): the cards in play by default, every card with `--all`, each started card in its run's phase.
- * `WF_ROOT` is set before the import, since the store reads it as it loads.
+ * `nemia inbox from` (`INBOX_FROM`), on the command line alone, and its print. And `nemia inbox` (`INBOX`): the cards in play
+ * by default, every card with `--all`, each started card in its run's phase. `WF_ROOT` is set before the import, since the store
+ * reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,12 +12,11 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
-import { names } from '../../test/assessed.ts';
 import { Effect } from 'effect';
 
 const ROOT = scratch('wf-inbox-card-');
 process.env.WF_ROOT = ROOT;
-const { INBOX, INBOX_CARD } = await import('./commands.verb.ts');
+const { INBOX, INBOX_FROM } = await import('./commands.verb.ts');
 const { runWith: runEngine } = await import('../runtime-client.ts');
 const stand = eachTest(testPlace);
 const runWith = runOver(runEngine, () => stand().layer);
@@ -27,31 +25,23 @@ const { engineOf } = await import('../runtime-client.ts');
 const engine = eachTest(testEngine);
 heldUnasked(engine);
 
-/** The engine of this test: the stand-in, which no command here files on, stops, says to or forgets from (`heldUnasked`). */
-const noEngine = () => engineOf(engine().layer);
-
 const CARD = '---\nworkflow: dev\n---\nCache the engine views.\n';
 fs.mkdirSync(path.join(ROOT, 'inbox'), { recursive: true });
 fs.writeFileSync(path.join(ROOT, 'inbox', 'notes'), 'a stray file, no card\n');
 fs.writeFileSync(path.join(ROOT, 'inbox', 'notes.md'), CARD);
 
-test('`INBOX_CARD`: a card read for its page by its name — REFUSED, a name with no card', async (t) => {
-  await t.test('a card is read by its name, before a stray file of the same name, with its file as written', async () => {
-    const { card, source } = await runWith(noEngine(), INBOX_CARD.handler({ name: 'notes' }, undefined, ROOT));
-    assert.equal(card.file, 'notes.md');
-    assert.equal(card.workflow, 'dev');
-    assert.equal(source, CARD);
-  });
-  await t.test('REFUSED: a name the inbox has no card of, a Missing naming the name and the cards there are', async () => {
-    await assert.rejects(
-      runWith(noEngine(), INBOX_CARD.handler({ name: 'nowhere' }, undefined, ROOT)),
-      (err: Error & { _tag?: string }) => {
-        assert.equal(err._tag, 'Missing');
-        names(err.message, 'no card nowhere', 'notes.');
-        return true;
-      },
-    );
-  });
+test("`INBOX_FROM`: the command line's alone, the api writing `from:` as the Card's update; its print unchanged", () => {
+  assert.equal(INBOX_FROM.route, undefined);
+  assert.equal(INBOX_FROM.apiKeys, undefined);
+  assert.equal(INBOX_FROM.only?.side, 'cli');
+  const card = { name: 'notes', file: 'notes.md', body: 'Cache the engine views.' };
+  assert.deepEqual(
+    INBOX_FROM.print({ card: { ...card, from: ['r-1'] }, file: '/root/inbox/notes.md', was: [], name: 'notes', from: ['r-1'] }, {}),
+    ['notes  from: r-1 — its run is handed what each concluded, as context, and waits on none (/root/inbox/notes.md)'],
+  );
+  assert.deepEqual(INBOX_FROM.print({ card, file: '/root/inbox/notes.md', was: ['r-1'], name: 'notes', from: [] }, {}), [
+    'notes  from: taken off (was r-1)',
+  ]);
 });
 
 /** A run's record of one step, `implement`, its task `t-<id>`, started from the card `card`. */
@@ -113,8 +103,6 @@ test("`INBOX`: the cards in play by default — a card whose run ended left out 
       ],
       ended: 0,
     });
-    const page = await runWith(e, INBOX_CARD.handler({ name: 'ended-c3d4' }, undefined, ROOT));
-    assert.equal(page.card.state, 'failed', "a card's page reads its ended card, in its run's phase");
   } finally {
     for (const name of ['at-work-a1b2', 'ended-c3d4']) fs.rmSync(path.join(ROOT, 'inbox', `${name}.md`));
     for (const id of ['r-at-work', 'r-ended']) fs.rmSync(path.join(ROOT, 'runs', `${id}.json`));

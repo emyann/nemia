@@ -11,7 +11,7 @@
  * (`POST /api/namespaces/<namespace>/runs`, objects/runs.ts) runs it through `runStart`. An inbox card is started by the Card's `start`
  * (objects/cards.ts) through `cardStart`, the same handler's `startFromInbox`, `nemia start <inbox>/<name>.md`'s: the same record, with
  * `from` on it, and the card kept, listed as started.
- * Nothing else here writes; the inbox's own writes are inbox.ts's, and a folder the builder puts back is builder.ts's.
+ * Nothing else here writes; a card's own writes are the Card's (objects/cards.ts), and a folder the builder puts back is builder.ts's.
  *
  * A step's page reads one step of one folder through its own router (step/step.ts), which reads the step's file with `stepSourceOf`.
  *

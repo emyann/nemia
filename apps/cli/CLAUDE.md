@@ -1,7 +1,8 @@
 # apps/cli — `nemia` (`wf`, its alias), a client of the api
 
 `nemia` and `wf` as a person types them: the moved reads (`READ_VERBS` in `contracts/route.contract.ts`: `show`, `closeout`, `ls`, the
-inbox's read and `watch`) asked of the api serving the store over HTTP, and every other verb, a help, and a read typed with `--local`
+inbox's read and `watch`) asked of the api serving the store over HTTP, the client's own verbs (`CLIENT_VERBS`: `get`, `apply`,
+`explain`, over every kind the api serves) asked of it whatever else is typed, and every other verb, a help, and a read typed with `--local`
 run on the orchestrator's own CLI, spawned with the same words (`src/local.ts`). It sits beside the board, above the api: the order is
 `web, cli → api → orchestrator → runtime` (`docs/architecture.md`, *The layers*). Which way a command goes is `routeOf`
 (`src/route.ts`), a pure decision proved by its contract (`npm run contracts` proves it, `apps/cli/src` being one of the roots `tools/contracts/legs.ts` names).
@@ -26,9 +27,15 @@ run on the orchestrator's own CLI, spawned with the same words (`src/local.ts`).
 - **The feed's stream is followed under `src/watch/` alone**: no other file names `/api/feed/stream` or an `EventSource`.
 - **Its printers hold parity with the in-process reads until those retire**: a moved read prints what the old path prints for the same
   store, line for line, and the tests beside the printers compare the two. A change to a read's output on either side changes both.
-- **`decide` and every write stay in process.** The client moves no write and judges nothing; a verb that is not in `READ_VERBS` goes
-  to the old path unchanged, and a verb moves by joining `READ_VERBS`, whose laws say the rest
-  (`apps/cli/test/route.test.ts` for the two-word names).
+- **`decide` and every write but `apply` stay in process.** The client judges nothing, and moves one write: `nemia apply -f`
+  (`src/objects/apply.ts`, resource-objects' decision 5), which writes each object a file holds through the typed client as its kind
+  takes it (`applyOf`, proved by `contracts/apply.contract.ts`). A verb in neither `READ_VERBS` nor `CLIENT_VERBS` goes to the old path
+  unchanged, and a verb moves by joining one of them, whose laws say the rest (`apps/cli/test/route.test.ts` for the two-word names).
+- **The client's own verbs, `get`, `apply` and `explain`, call each kind through `KIND_CALLS`** (`src/objects/kinds.ts`), a table total
+  over `objects`' `KINDS`: a kind added to the package fails the typecheck here until it is mapped. Each says its own `--help` and
+  refuses `--local`, naming `nemia service status`: no process has them. A word names a resource by discovery (`GET /api`,
+  `resourceNamed`), and `explain` reads the fields off `OpenApi.fromApi(Api)`, the document the api serves, computed here. YAML is read
+  and written with `yaml`.
 - **A refusal is a `Refused` (`src/refused.ts`)**: its words name the command to type next and its `code` is the exit code, 2 for a
   usage refusal; the bin prints the words and exits with the code. A test asserts the code and that a command is named, never the
   sentence.

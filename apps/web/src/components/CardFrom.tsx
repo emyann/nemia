@@ -23,7 +23,7 @@ export function CardFrom({
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const write = useMutation({
-    mutationFn: (runs: string[]) => setCardFrom(entry.name, runs),
+    mutationFn: (runs: string[]) => setCardFrom(entry, runs),
     onMutate: () => onRefused(null),
     onError: (error) => onRefused({ action: 'from', message: error.message }),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['inbox'] }),

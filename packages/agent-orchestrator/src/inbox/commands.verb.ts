@@ -1,10 +1,9 @@
 /**
  * `nemia inbox`, each of its forms an entry of the command table: the cards listed, an idea filed as one, a card queued to start on its own
  * or taken off the queue, and a card dropped. The api serves each as a verb of the Card (`objects`' Api, apps/api/src/objects/cards.ts),
- * which calls these handlers, and none on a route of the table's; a card's `from:` on the routes the table generates. One card read for
- * its page is an entry the api serves alone.
+ * which calls these handlers, and none on a route of the table's. A card's `from:` (`nemia inbox from`) is the command line's alone: the
+ * api writes it as part of the Card's whole write (`update`, `replaceCard`), and reads one card with its file as written (`get`).
  */
-import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { rooted } from '../wiring/wire.verb.ts';
@@ -12,8 +11,6 @@ import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts'
 import type { Command } from '../command/entry.verb.ts';
 import { defaultStartsAllowed } from '../factory/factory.store.ts';
 import { inboxDir } from '../record/files.store.ts';
-import { CardDoor, inboxAt } from '../cards/cards.store.ts';
-import { CardName } from './inbox.model.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { parseSelectors, SELECTOR_FORM, selectorsRefusal, selectsLabels } from '../watch/selector.ts';
 import { labelsText, type LeftOut } from '../labels/labels.ts';
@@ -377,11 +374,10 @@ export const INBOX_FROM: Command<InboxFrom & { name: string; from: string[] }> =
   },
   writes: true,
   class: 'act',
-  route: [
-    { method: 'PUT', path: '/api/inbox/:name/from', status: 200, sets: { off: false } },
-    { method: 'DELETE', path: '/api/inbox/:name/from', status: 200, sets: { off: true } },
-  ],
-  apiKeys: ['name', 'file', 'from', 'was'],
+  only: {
+    side: 'cli',
+    why: "the api serves it as the Card's `update` verb of `objects`' Api (`PUT /api/namespaces/:namespace/cards/:name`, `spec.from`): no route of its own",
+  },
   handler: (args, _env, home) =>
     rooted(
       home,
@@ -424,54 +420,5 @@ export const INBOX_RM: Command<InboxDropped> = {
   ],
 };
 
-/**
- * The text of the inbox's entry `file`, swallowing a read that fails: null for a card dropped since it was listed. A card's is read
- * through the Card door; a stray file of the inbox, listed beside the cards (`notes`), is no card, and is read in the store's inbox.
- */
-const sourceOf = (file: string, home: string) =>
-  Effect.gen(function* () {
-    if (file.endsWith('.md')) return yield* (yield* CardDoor).cards.read(CardName.read(file.slice(0, -'.md'.length)));
-    return fs.readFileSync(path.join(inboxAt(home), file), 'utf8');
-  }).pipe(Effect.catchCause(() => Effect.succeed(null)));
-
-/**
- * One card, for its page: the entry the inbox lists by `name` — a card before a stray file of the same name (`notes.md` and `notes` both
- * list as `notes`), never a path joined from the name — with its file as written (`source`). A `Missing` naming the cards there are, in
- * `noCardLine`'s words, for a name with none, and for a card dropped since the listing read it.
- */
-export const INBOX_CARD: Command<{ card: InboxListing; source: string }> = {
-  name: 'inbox show',
-  usage: '<name>',
-  help: ['one card, read for its page'],
-  spec: {
-    positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
-    flags: [],
-    unknown: (arg) => `the board's card page reads one card, and ${arg} is a second.`,
-  },
-  writes: false,
-  class: 'read',
-  route: { method: 'GET', path: '/api/inbox/:name', status: 200 },
-  only: { side: 'api', why: "the board's card page reads one card with its file as written; at the command line a person opens the file" },
-  handler: (args, env, home, kept) =>
-    rooted(
-      home,
-      'inbox show',
-      Effect.gen(function* () {
-        const name = textOf(args, 'name') ?? '';
-        const cards = yield* inboxJudged(yield* EngineService, howOf(env, home, kept));
-        const named = (c: InboxListing): boolean => c.name === name;
-        const card = cards.find((c) => named(c) && c.file.endsWith('.md')) ?? cards.find(named);
-        const source = card === undefined ? null : yield* sourceOf(card.file, home ?? '');
-        if (card === undefined || source === null) {
-          const others = cards.filter((c) => c !== card && c.file.endsWith('.md')).map((c) => c.name);
-          return yield* Effect.fail(new Missing({ message: noCardLine(name, others) }));
-        }
-        const out: { card: InboxListing; source: string } = { card, source };
-        return out;
-      }),
-    ),
-  print: () => [],
-};
-
-/** `nemia inbox`'s entries, in the order `nemia`'s help lists them, and the board's card page after them. */
-export const INBOXES: readonly Command[] = [INBOX, INBOX_ADD, INBOX_QUEUE, INBOX_FROM, INBOX_RM, INBOX_CARD] as readonly Command[];
+/** `nemia inbox`'s entries, in the order `nemia`'s help lists them. */
+export const INBOXES: readonly Command[] = [INBOX, INBOX_ADD, INBOX_QUEUE, INBOX_FROM, INBOX_RM] as readonly Command[];

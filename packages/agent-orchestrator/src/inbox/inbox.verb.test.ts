@@ -24,6 +24,7 @@ const stuckTries = (): Layer.Layer<never> => {
       read: () => null,
       filedAt: () => null,
       entryAt: () => null,
+      entryText: () => null,
       add: () => '/memory/inbox/never.md',
       rewrite: () => undefined,
       drop: () => false,

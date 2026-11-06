@@ -1,16 +1,23 @@
 /**
  * The inbox: its cards, read through the objects' client as `Card`s (`GET /api/cards`) and made the board's entries in one place
  * (`entriesOf`), and a card filed, dropped, started, queued and taken off the queue through the Card's verbs (`objects.ts`). A card's page
- * (`GET /api/inbox/:name`) and its `from:` (`PUT /api/inbox/:name/from`) stay the api's own routes (apps/api/src/inbox/inbox.ts).
+ * reads the Card by its name (`GET /api/cards/:name`), its file as written and its keys made of it here (`cardKeysOf`); its `from:` is
+ * the Card written whole (`PUT /api/namespaces/:namespace/cards/:name`).
  */
 import { queryOptions } from '@tanstack/react-query';
-import { Schema } from 'effect';
-import { type Card, type CardList, CARD_STATES, type CardState, DEFAULT_NAMESPACE } from 'objects';
-import { decodes } from './decodes.ts';
+import {
+  type Card,
+  CARD_KEY_MEANINGS,
+  CARD_KEYS,
+  type CardKey,
+  type CardList,
+  type CardSpec,
+  type CardState,
+  DEFAULT_NAMESPACE,
+} from 'objects';
 import { selectorKey } from './selector.ts';
-import { get, send } from './read.ts';
 import { cards, namespaceOf } from './objects.ts';
-import { KeyRowSchema, sourceOf, type KeyRow } from './library.ts';
+import { sourceOf, type KeyRow } from './library.ts';
 import type { Place, Started, WorkflowListing } from './workflows.ts';
 
 /**
@@ -23,8 +30,8 @@ export { CARD_STATES, type CardState } from 'objects';
 
 /**
  * A card as the board's pages draw it — or an entry of the inbox that does not read as one, `error` saying why — with its body, the brief
- * a start is prefilled with, and when its file was written, which the page orders the cards by. The list makes it of a `Card` (`entryOf`);
- * a card's page reads it, with more, from the api's `InboxEntry` (apps/api/src/inbox/inbox.ts, `InboxCardPage`).
+ * a start is prefilled with, and when its file was written, which the page orders the cards by. Made of a `Card` (`entryOf`), on the list
+ * and on a card's page (`cardQuery`) alike.
  */
 export type InboxEntry = {
   name: string;
@@ -64,27 +71,6 @@ export type InboxEntry = {
   factoryRepo: string | null;
   /** The card's own labels (its frontmatter's `labels:`), `{}` for none. */
   labels: Record<string, string>;
-};
-
-/** The keys of an `InboxEntry`, each decoded: a `gate`, a `queued` or a `tried` the api leaves out stays out. */
-const inboxEntryFields = {
-  name: Schema.String,
-  file: Schema.String,
-  title: Schema.NullOr(Schema.String),
-  workflow: Schema.NullOr(Schema.String),
-  repo: Schema.NullOr(Schema.String),
-  factory: Schema.NullOr(Schema.String),
-  from: Schema.mutable(Schema.Array(Schema.String)),
-  gate: Schema.optionalKey(Schema.String),
-  startedAs: Schema.mutable(Schema.Array(Schema.String)),
-  state: Schema.Literals(CARD_STATES),
-  error: Schema.NullOr(Schema.String),
-  body: Schema.NullOr(Schema.String),
-  filedAt: Schema.NullOr(Schema.String),
-  queued: Schema.optionalKey(Schema.Struct({ at: Schema.String, place: Schema.NullOr(Schema.Number) })),
-  tried: Schema.optionalKey(Schema.Struct({ at: Schema.String, repo: Schema.String, why: Schema.String, refused: Schema.Boolean })),
-  factoryRepo: Schema.NullOr(Schema.String),
-  labels: Schema.Record(Schema.String, Schema.String),
 };
 
 /**
@@ -168,25 +154,47 @@ export const inboxAllQuery = (selector: string | undefined) =>
 export const checkSelector = (selector: string): Promise<unknown> => cards.listAll(selector.trim());
 
 /**
- * Mirrors `InboxCardPage` in apps/api/src/inbox/inbox.ts: a card as the inbox lists it, its file as written, frontmatter included, and each
- * key a card may set, a row each — none for an entry that does not read as a card.
+ * A card's page: the card as the inbox lists it (`entryOf`), its file as written, frontmatter included (`status.source`, sent on a read of
+ * one card), and each key a card may set, a row each (`cardKeysOf`) — none for an entry that does not read as a card.
  */
 export type InboxCardPage = InboxEntry & { source: string; keys: KeyRow[] | null };
 
-/** Decodes an `InboxCardPage`. */
-const InboxCardPageSchema = decodes<InboxCardPage>()(
-  Schema.Struct({
-    ...inboxEntryFields,
-    source: Schema.String,
-    keys: Schema.NullOr(Schema.mutable(Schema.Array(KeyRowSchema))),
-  }),
-);
+/** Labels as a printer shows them, `a=b,c=d` in key order, as the orchestrator's `labelsText` does; null for none. */
+const labelsText = (labels: Readonly<Record<string, string>>): string | null => {
+  const keys = Object.keys(labels).sort();
+  return keys.length === 0 ? null : keys.map((key) => `${key}=${labels[key] ?? ''}`).join(',');
+};
 
-/** A card, for its page. Read again on each visit, as the inbox is. */
+/**
+ * The value a card's page shows for `key` of `card`: when it was queued, the runs its `from:` names, comma-joined, its labels as
+ * `a=b,c=d`, its factory (its namespace, none for `default`), or what the card writes; null for a key it does not set.
+ */
+const keyValue = (card: Card, key: CardKey): string | null => {
+  const entry = entryOf(card);
+  if (key === 'queued') return entry.queued?.at ?? null;
+  if (key === 'from') return entry.from.join(', ') || null;
+  if (key === 'labels') return labelsText(entry.labels);
+  return entry[key] ?? null;
+};
+
+/**
+ * Each key a card may set, a row each in `CARD_KEYS`' order, with its value (`keyValue`) and what it means (`CARD_KEY_MEANINGS`): the
+ * rows a card's page draws. Null for an entry that does not read as a card: its `error` says why.
+ */
+export const cardKeysOf = (card: Card): KeyRow[] | null =>
+  card.status.error === undefined ? CARD_KEYS.map((key) => ({ key, value: keyValue(card, key), meaning: CARD_KEY_MEANINGS[key] })) : null;
+
+/**
+ * A card, for its page: the Card read by its name, whichever factory holds it (`cards.getAll`). Read again on each visit, as the inbox
+ * is.
+ */
 export const cardQuery = (name: string) =>
   queryOptions({
     queryKey: ['inbox', name],
-    queryFn: () => get(`/api/inbox/${encodeURIComponent(name)}`, InboxCardPageSchema),
+    queryFn: async (): Promise<InboxCardPage> => {
+      const card = await cards.getAll(name);
+      return { ...entryOf(card), source: card.status.source ?? '', keys: cardKeysOf(card) };
+    },
   });
 
 /** A card as a verb names it: its name, and its factory, which is its namespace (`namespaceOf`). */
@@ -251,28 +259,19 @@ export const startCard = (
     .then(({ id, card: started }) => ({ id, card: started }));
 
 /**
- * Mirrors `InboxFromAnswer` in apps/api/src/inbox/inbox.ts: what the CLI's `inbox from` did — the card's `from:` as it now reads, and the
- * runs it named before.
- */
-export type FromSet = { name: string; file: string; from: string[]; was: string[] };
-
-/** Decodes a `FromSet`. */
-const FromSetSchema = decodes<FromSet>()(
-  Schema.Struct({
-    name: Schema.String,
-    file: Schema.String,
-    from: Schema.mutable(Schema.Array(Schema.String)),
-    was: Schema.mutable(Schema.Array(Schema.String)),
-  }),
-);
-
-/**
  * Set the runs a card's run is handed as context, as the CLI's `inbox from <name> <run>...` does — or, with none, take its `from:` off, as
- * `--off` does. Rejects with the api's refusal in full: the package's words for a card that is not there or was started, a run the store
- * does not have or named twice — or the api's own about the request.
+ * `--off` does: the card read as it now stands, then written whole (`cards.replace`) with its spec but `from`, `queued` as read, its labels
+ * and the `resourceVersion` it was read at, so a card changed in between is refused, not overwritten. Resolves with the card as it now
+ * reads; rejects with the api's refusal in full: a card that is not there or was started, a run the store does not have, a card changed
+ * since it was read — or the api's own about the request.
  */
-export const setCardFrom = (name: string, runs: readonly string[]): Promise<FromSet> =>
-  send(runs.length ? 'PUT' : 'DELETE', `/api/inbox/${encodeURIComponent(name)}/from`, FromSetSchema, {
-    body: runs.length ? { runs } : {},
-    may: "The card's from: may be set, or not: look at the card before asking again.",
+export async function setCardFrom(card: CardRef, runs: readonly string[]): Promise<Card> {
+  const namespace = namespaceOf(card.factory);
+  const read = await cards.get(namespace, card.name);
+  const { from: _, ...kept } = read.spec;
+  const spec: CardSpec = runs.length ? { ...kept, from: [...runs] } : kept;
+  return cards.replace(namespace, card.name, {
+    metadata: { resourceVersion: read.metadata.resourceVersion, labels: { ...read.metadata.labels } },
+    spec,
   });
+}

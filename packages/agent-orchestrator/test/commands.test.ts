@@ -54,15 +54,8 @@ test("each command is served on the api where it was before the table, the lift 
       ['inbox', 'cli'],
       ['inbox add', 'cli'],
       ['inbox queue', 'cli'],
-      [
-        'inbox from',
-        [
-          { method: 'PUT', path: '/api/inbox/:name/from', status: 200, sets: { off: false } },
-          { method: 'DELETE', path: '/api/inbox/:name/from', status: 200, sets: { off: true } },
-        ],
-      ],
+      ['inbox from', 'cli'],
       ['inbox rm', 'cli'],
-      ['inbox show', { method: 'GET', path: '/api/inbox/:name', status: 200 }],
       ['label run', { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/labels', status: 200, hand: true }],
       ['label inbox', 'cli'],
       ['factory', 'cli'],
@@ -207,7 +200,6 @@ test('every command the api posts or deletes on writes, and the api guards it; t
     [
       'concluded',
       'inbox',
-      'inbox show',
       'factory',
       'factory ls',
       'factory diff',

@@ -5,7 +5,7 @@
  * `durationWord`): `views.verb.ts` asks the engine (`consumption`). Pure, and read by nearly every other part of the run's judgement;
  * it reads the record alone.
  */
-import type { Verdict } from '../check/check.ts';
+import { onItsCheck, type Verdict } from '../check/check.ts';
 import { DEFAULT_ROUNDS, endsOnBase, JUDGE_ROUTE, LOOP_REPLIES, type Workflow } from '../step/step.ts';
 import { loopSpan } from '../workflow/index.ts';
 import { isJudge } from '../route/index.ts';
@@ -14,7 +14,6 @@ import { declaredOutput, isLoopTarget, type Closeout } from '../closeout/index.t
 import { filedOwed } from '../pinned/pinned.ts';
 import { closeoutRefusals } from '../question/index.ts';
 import { budgetOf } from '../budget/budget.ts';
-import { onItsCheck } from './on-check.ts';
 export { approvedCapsOf, budgetOf } from '../budget/budget.ts';
 import type { Retry, RetryHow } from '../retry/index.ts';
 import {

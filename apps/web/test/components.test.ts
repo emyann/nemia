@@ -7487,7 +7487,7 @@ test('a chat the api cannot stream and reads again on a beat is a quiet note at 
 
 const { ChatAsk } = await import('../src/components/chat/ChatAsk.tsx');
 const { ChatAskMany } = await import('../src/components/chat/ChatAskMany.tsx');
-const { ChatProposal } = await import('../src/components/chat/ChatProposal.tsx');
+const { ChatActions } = await import('../src/components/chat/ChatActions.tsx');
 type AskQuestion = import('../src/lib/api.ts').AskQuestion;
 type ChatAskEvent = Extract<ChatEvent, { kind: 'question' | 'proposal' }>;
 
@@ -7532,7 +7532,7 @@ test('her one question with its choices explained is drawn as the form: the choi
 
 test('her proposal is drawn as its actions, each choice said whole by its own button, and answered it says what was chosen', () => {
   const asks = renderToStaticMarkup(
-    createElement(ChatProposal, { ask: askEvent('proposal', [askQuestion(true)]), onAnswer: () => undefined }),
+    createElement(ChatActions, { ask: askEvent('proposal', [askQuestion(true)]), onAnswer: () => undefined }),
   );
   assert.match(asks, /data-chat-ask="actions"/);
   assert.match(asks, /data-chat-tag="proposes"/);
@@ -7540,7 +7540,7 @@ test('her proposal is drawn as its actions, each choice said whole by its own bu
   assert.match(asks, /data-chat-action="First line as it is"/);
   assert.doesNotMatch(asks, /data-chat-option=/, 'a choice with nothing to explain is a button, never a row of a form');
   const chose = renderToStaticMarkup(
-    createElement(ChatProposal, {
+    createElement(ChatActions, {
       ask: askEvent('proposal', [askQuestion(true)], { [askQuestion().question]: 'Cut it on read' }),
       onAnswer: () => undefined,
     }),

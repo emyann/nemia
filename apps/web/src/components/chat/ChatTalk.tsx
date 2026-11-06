@@ -11,7 +11,7 @@ import { Talk } from '@/components/conversation/Talk';
 import { ChatAsk } from './ChatAsk';
 import { ChatAskMany } from './ChatAskMany';
 import { ChatBrought } from './ChatBrought';
-import { ChatProposal } from './ChatProposal';
+import { ChatActions } from './ChatActions';
 
 /** The person's answer to an ask of hers, filed whole. */
 type Answering = (id: string, picks: readonly AskPick[]) => void;
@@ -23,7 +23,7 @@ type Answering = (id: string, picks: readonly AskPick[]) => void;
 function Asked({ ask, onAnswer }: { ask: Ask; onAnswer: Answering }) {
   const drawn = ask.kind === 'permission' ? 'form' : drawnAsk(ask.questions);
   if (drawn === 'many') return <ChatAskMany ask={ask} onAnswer={onAnswer} />;
-  if (drawn === 'actions') return <ChatProposal ask={ask} onAnswer={onAnswer} />;
+  if (drawn === 'actions') return <ChatActions ask={ask} onAnswer={onAnswer} />;
   return <ChatAsk ask={ask} onAnswer={onAnswer} />;
 }
 

@@ -480,7 +480,8 @@ export type Switched = { from: string; to: string };
 /**
  * What `nemia factory diff` prints of the merge of `name`'s upgrade from `from` to `to`: where it is a switch (`switched`), both templates
  * and that it has no common base; what merges cleanly, then each conflict, its base side where it has one, the parameters the upgrade
- * drops where any, the plan's digest, and `next`'s line, which files it.
+ * drops where any, the plan's digest, and `next`'s line, which files it; then, where there are conflicts, the line that resolves each,
+ * after the upgrade's, since a resolve is taken for an upgrade once it is filed.
  */
 export function planLines(name: string, from: string, to: string, merge: TreeMerge, next: PlanNext, switched?: Switched): string[] {
   const lines =
@@ -499,16 +500,16 @@ export function planLines(name: string, from: string, to: string, merge: TreeMer
       ...(merge.base === 'none' ? [] : sideLines('base', conflict.base)),
       ...sideLines('ours', conflict.ours),
       ...sideLines('theirs', conflict.theirs),
-      `    ${resolveLine(name, conflict.at)}`,
     );
   if (next.dropped.length) lines.push(`dropped: ${next.dropped.join(', ')}`);
-  lines.push(
-    `plan: ${next.digest}`,
-    merge.conflicts.length
-      ? `${next.line} files it; the daemon merges once each conflict is resolved.`
-      : `${next.line} files it; the daemon merges it on its next pass.`,
-  );
-  return lines;
+  lines.push(`plan: ${next.digest}`);
+  if (!merge.conflicts.length) return [...lines, `${next.line} files it; the daemon merges it on its next pass.`];
+  return [
+    ...lines,
+    `first, ${next.line} files it; then a choice for each conflict:`,
+    ...merge.conflicts.map((conflict) => `    ${resolveLine(name, conflict.at)}`),
+    'the daemon merges once each conflict is resolved.',
+  ];
 }
 
 /** Whether an upgrade from a base of the template `recorded` onto the template `now`, each by name, has a common base. */

@@ -25,10 +25,11 @@ test('a judged run decodes through `Run` and encodes back equal, its JSON what t
   assert.equal(`${JSON.stringify(encoded, null, 2)}\n`, read('run.encoded.json'), 'byte for byte');
 });
 
-test('a page of runs decodes as a RunList and encodes back equal, a run with its namespace and one served before it had one', () => {
+test('a page of runs decodes as a RunList and encodes back equal, a run with its namespace and version and one served before it had them', () => {
   const old = judged as Run;
   assert.equal(Object.hasOwn(old.metadata, 'namespace'), false, 'the fixture is a run served before the Run had a namespace');
-  const placed = { ...old, metadata: { ...old.metadata, name: 'r-2', namespace: 'foo' } };
+  assert.equal(Object.hasOwn(old.metadata, 'resourceVersion'), false, 'and before it had a resourceVersion');
+  const placed = { ...old, metadata: { ...old.metadata, name: 'r-2', namespace: 'foo', resourceVersion: '0123456789abcdef' } };
   const page = {
     apiVersion: API_VERSION,
     kind: 'RunList',
@@ -38,6 +39,7 @@ test('a page of runs decodes as a RunList and encodes back equal, a run with its
   };
   const decoded = Schema.decodeUnknownSync(RunList)(page);
   assert.equal(decoded.items[1]?.metadata.namespace, 'foo');
+  assert.equal(decoded.items[1]?.metadata.resourceVersion, '0123456789abcdef');
   assert.deepEqual(Schema.encodeSync(RunList)(decoded), page, 'encoded back equal');
   const { unjudged: _, ...judgedOnly } = page;
   assert.deepEqual(Schema.encodeSync(RunList)(Schema.decodeUnknownSync(RunList)(judgedOnly)), judgedOnly, 'unjudged is optional');

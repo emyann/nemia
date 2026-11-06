@@ -56,13 +56,16 @@ const StepReason = Schema.Literals(STEP_REASONS);
 /**
  * The run's name, the namespace it is in (its factory, `default` for one that names none; absent on an object served before the run had
  * one), when it was made, and the labels it is found by, one map (`metadataLabels`): its `workflow`, the `factory` it was started in
- * (`default` for the default one, as the feed says it), and a person's labels on it (`nemia label run`), as `-l` selects them.
+ * (`default` for the default one, as the feed says it), and a person's labels on it (`nemia label run`), as `-l` selects them; and its
+ * `resourceVersion`, an opaque word that changes whenever what the api serves of the run changes, as every other kind's (absent on an
+ * object served before the Run had one).
  */
 export const RunMetadata = Schema.Struct({
   name: Schema.String,
   namespace: Schema.optionalKey(Schema.String),
   creationTimestamp: Schema.String,
   labels: Schema.Record(Schema.String, Schema.String),
+  resourceVersion: Schema.optionalKey(Schema.String),
 }).annotate({ identifier: 'RunMetadata' });
 export type RunMetadata = typeof RunMetadata.Type;
 

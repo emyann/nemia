@@ -461,6 +461,7 @@ export { cardList, cardObject, cardWriteRefusal, replaceCard, type CardQuery, ty
 export { runIn, runList, runNamespace, type RunQuery } from './run-list/run-list.verb.ts';
 export { continueToken, continuedAfter, listPage, pageOf, type PageAsked, type Paged } from './object/page.ts';
 export { watchChanges, type Versioned } from './list-watch/list-watch.ts';
+export { measuredToNow, runWatchVersion } from './runlist/runlist.ts';
 export { resourcesOf, routeOf, type ApiRoute } from './discovery/discovery.ts';
 export { factoryCommandsOf, factoryList, factoryObject, type ObjectQuery } from './factory-object/factory.verb.ts';
 export { builtinServerList, mcpServerList, mcpServerObject } from './factory-object/mcp-server.verb.ts';

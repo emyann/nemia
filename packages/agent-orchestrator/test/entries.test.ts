@@ -570,6 +570,8 @@ const PINNED: Record<string, string[]> = {
     'listPage',
     'pageOf',
     'watchChanges',
+    'measuredToNow',
+    'runWatchVersion',
     'resourcesOf',
     'routeOf',
     'factoryCommandsOf',

@@ -29,7 +29,8 @@
  * answered 413 `{ error }` naming the limit.
  *
  * Every list is handed on through `listed`, which `watchable` wraps (src/watch/watch.ts): a list's route that does not go through it is not
- * watched; the Event lists' watch follows the feed instead of reading it again (`eventsFollowed`). `GET /api` is discovery
+ * watched; the Event lists' watch follows the feed instead of reading it again (`eventsFollowed`), and the Run lists'
+ * compares a run leaving out its frame's time measured to the read (`runWatchVersion`). `GET /api` is discovery
  * (src/discovery/discovery.ts), every resource read off the `Api`.
  *
  * `GET /api/runs/:runId` with `?raw=` (not `false`) or `?view=` is passed on to the runs' own route (runs/runs.ts), which answers both.
@@ -38,6 +39,7 @@ import { ByteSize, Context, Layer } from 'effect';
 import { HttpIncomingMessage, HttpRouter, HttpServer } from 'effect/http';
 import { HttpApiBuilder } from 'effect/http-api';
 import { type Context as RequestContext, Hono } from 'hono';
+import { runWatchVersion } from 'agent-orchestrator';
 import { Api } from 'objects';
 import { wordsAt } from '../commands/routes.ts';
 import { type Guarded, refusedBeforeReading } from '../guard.ts';
@@ -292,7 +294,8 @@ export function objectsRoutes(runtime: ApiRuntime): Hono<ApiEnv> {
     served(c, (s) => handler(request, Context.make(ServedNow, s), takes));
   const forward = (c: RequestContext<ApiEnv>) => handed(c, ONE_TAKES);
   const listed = watchable((c, request) => handed(c, LIST_TAKES, request));
-  const events = watchable((c, request) => handed(c, LIST_TAKES, request), eventsFollowed);
+  const events = watchable((c, request) => handed(c, LIST_TAKES, request), { follow: eventsFollowed });
+  const runsListed = watchable((c, request) => handed(c, LIST_TAKES, request), { versionOf: runWatchVersion });
   const guarded = (write: (c: RequestContext<ApiEnv>) => Guarded) => (c: RequestContext<ApiEnv>) => {
     const guard = write(c);
     const refused = refusedBeforeReading(guard, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
@@ -315,7 +318,7 @@ export function objectsRoutes(runtime: ApiRuntime): Hono<ApiEnv> {
     guarded: placedGuarded,
   };
   const definitions = proposalsRoutes(definitionsRoutes(new Hono<ApiEnv>(), placedHand), placedHand);
-  const runs = runsRoutes(new Hono<ApiEnv>(), { forward, listed, guarded }).post('/api/namespaces/:namespace/runs', async (c) =>
+  const runs = runsRoutes(new Hono<ApiEnv>(), { forward, listed: runsListed, guarded }).post('/api/namespaces/:namespace/runs', async (c) =>
     located(await placedGuarded((c) => startGuarded(at(c)[0]))(c)),
   );
   return partsRoutes(new Hono<ApiEnv>().route('/', definitions).route('/', runs), { forward, listed, guarded })

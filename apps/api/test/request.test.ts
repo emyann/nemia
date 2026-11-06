@@ -224,6 +224,12 @@ test("a request's trace shows its programs: the package's spans are children of 
     assert.equal(program.parent, server.spanId, "factoryCommandsOf is a child of the request's span");
     assert.equal(program.traceId, server.traceId, 'in the same trace');
   });
+  await t.test('the factories are listed once per request: one factoriesListed span for the commands and for the schedules', async () => {
+    for (const url of ['/api/factories/traced/commands', '/api/namespaces/traced/schedules']) {
+      const spans = await spansOf(url);
+      assert.equal(spans.filter((s) => s.name === 'factoriesListed').length, 1, `${url}: ${JSON.stringify(countsOf(spans))}`);
+    }
+  });
   await t.test(
     'the spans GET /api/runs and GET /api/cards export are bounded whatever the number of runs, but one judge per run judged',
     async () => {

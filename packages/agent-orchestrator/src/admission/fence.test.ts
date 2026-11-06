@@ -84,8 +84,8 @@ test("REFUSED for an agent: a factory's definition written by hand is out of her
   const fence = nemiaFence(COMMANDS);
   for (const name of PROPOSED_INSTEAD)
     assert.ok(
-      COMMANDS.some((c) => c.name === name),
-      `${name} is an entry of the table`,
+      COMMANDS.some((c) => c.name === name || name.startsWith(`${c.name} `)),
+      `${name} is an entry of the table, or a form of one`,
     );
   const denied = (line: string) => fence.deny.some((rule) => reaches(rule, line));
   for (const line of [
@@ -95,6 +95,14 @@ test("REFUSED for an agent: a factory's definition written by hand is out of her
   ])
     assert.ok(denied(line), line);
   assert.ok(!denied('nemia factory rules acme'), 'the rules still read bare');
+  const asked = (line: string) => fence.ask.some((rule) => reaches(rule, line));
+  for (const line of [
+    'nemia workflows write yours build --folder d',
+    'nemia agents write yours implementer --file implementer.md',
+    'nemia agents rm yours implementer',
+    'nemia agents copy implementer',
+  ])
+    assert.ok(asked(line) && !denied(line), `the person's library, which no proposal carries, asks as before: ${line}`);
   const allowed = (line: string) => fence.allow.some((rule) => reaches(rule, unassigned(line)));
   assert.ok(allowed('nemia propose -f change.yaml -n acme'));
   assert.ok(allowed('nemia proposals approve implementer-ab12c -n acme'));

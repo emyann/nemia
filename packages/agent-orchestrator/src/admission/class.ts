@@ -28,9 +28,12 @@ export type CommandClass =
   | { readonly bare: 'read'; readonly sets: 'ask' | 'none'; readonly setsBy: readonly string[]; readonly readsBy?: readonly string[] };
 
 /**
- * The commands that write a factory's definitions — its workflows, agents and skills, its wiring, servers, rules and instruction — which
- * an agent never types: it proposes the objects instead (`nemia propose -f <file> -n <factory>`), so for an agent each is out of reach,
- * a setter's sets among them (`agentClassOf`). The person types them as before.
+ * The commands that write a factory's definitions — its wiring, servers, rules and instruction, and the `factory` form of a workflow's, an
+ * agent's and a skill's write — which an agent never types: it proposes the objects instead (`nemia propose -f <file> -n <factory>`), so
+ * for an agent each is out of reach, a setter's sets among them (`agentClassOf`). A form (`workflows write factory`) is denied by its own
+ * rule (`proposedForms`), the command's other forms keeping their class: the `yours` form writes the person's library, which no proposal
+ * carries, and asks as before, as `workflows rm`, `agents rm` and `agents copy`, which only write the library, do. The person types them
+ * all as before.
  */
 export const PROPOSED_INSTEAD: readonly string[] = [
   'factory attach',
@@ -41,12 +44,9 @@ export const PROPOSED_INSTEAD: readonly string[] = [
   'factory server rm',
   'factory rules',
   'factory instruct',
-  'workflows write',
-  'workflows rm',
-  'agents write',
-  'agents copy',
-  'agents rm',
-  'skills write',
+  'workflows write factory',
+  'agents write factory',
+  'skills write factory',
 ];
 
 /** The class of `entry` for an agent: out of reach where it writes a factory's definitions (`PROPOSED_INSTEAD`), else its own. */
@@ -54,6 +54,10 @@ export function agentClassOf(entry: { readonly name: string; readonly class: Com
   if (!PROPOSED_INSTEAD.includes(entry.name)) return entry.class;
   return typeof entry.class === 'object' ? { ...entry.class, sets: 'none' } : 'none';
 }
+
+/** The forms of `PROPOSED_INSTEAD` that are no entry's whole name but a command of `names` with its first word: each denied by itself. */
+export const proposedForms = (names: readonly string[]): string[] =>
+  PROPOSED_INSTEAD.filter((form) => !names.includes(form) && names.some((name) => form.startsWith(`${name} `)));
 
 /**
  * The client's own verbs (`apps/cli`), which no entry of the table serves, as an agent's fence reads them: a proposal made or undone, and

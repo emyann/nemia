@@ -3,7 +3,7 @@
  * out of her reach (`nemiaFence`), and the prompts the person widened (`widened`). Pure: her task is filed with it (`nemiaSpec`), beside
  * the store's denies and her admission.
  */
-import { agentClassOf, CLIENT_CLASSES, type CommandClass } from './class.ts';
+import { agentClassOf, CLIENT_CLASSES, proposedForms, type CommandClass } from './class.ts';
 
 /** An entry of the table as her fence reads it: its name and its class. */
 type Entry = { readonly name: string; readonly class: CommandClass };
@@ -23,7 +23,8 @@ const any = (name: string): string => `Bash(nemia ${name}:*)`;
  *   person where it answers what waits (`admissionOf`): a rule cannot read the run's state;
  * - a write classed `ask` asks, whatever follows;
  * - a command that reads bare runs unasked, and asks with each word or flag that sets: a word right after its name, a flag anywhere;
- * - a command out of her reach is denied, a factory's definition written by hand among them (`agentClassOf`), which she proposes;
+ * - a command out of her reach is denied, a factory's definition written by hand among them (`agentClassOf`, and the `factory` form of a
+ *   definition's write by itself, `proposedForms`), which she proposes;
  * - the client's own verbs (`CLIENT_CLASSES`), `nemia propose` and `nemia proposals approve|decline`, run unasked;
  * - and any assignment before `nemia` is denied (`ASSIGNED`).
  *
@@ -44,6 +45,7 @@ export function nemiaFence(table: readonly Entry[]): Fence {
       (c.sets === 'none' ? fence.deny : fence.ask).push(...setting);
     } else fence.allow.push(...unasked(name));
   }
+  fence.deny.push(...proposedForms(table.map((entry) => entry.name)).map(any));
   fence.deny.push(ASSIGNED);
   return fence;
 }

@@ -4,7 +4,7 @@
  * served: the object is made), and sent to the api as one `ProposalCreate`, which names the proposal, reads who proposes from the
  * request's token and judges it. `nemia propose --undo <proposal>` asks for the objects as they stood before that proposal applied
  * (`status.before`), each at the version served now, and the removal of each object it made. `nemia proposals approve|decline <name>`
- * judge one. Each prints the proposal's name and phase, whether it widens access, and where the board shows it.
+ * judge one. Each prints the proposal's name and phase, whether it widens access, and, while it waits, the line that approves it.
  *
  * The client judges nothing: a proposal the caller may not make or approve is the api's refusal (`Forbidden`, `Unauthorized`), said in
  * its words and exited with as every refusal (`src/objects.ts`).
@@ -33,7 +33,7 @@ nemia propose --undo <proposal> [-n <factory>] [--why <text>]
 Propose a change of a factory's definitions — workflows, agents, skills, hires, MCP servers, the factory — for the person (or an agent
 the person delegated to) to approve. The file is read as nemia apply -f reads it; each object is sent at the resourceVersion served
 now where the file says none, and made where none is served. With --undo, propose the objects back as they stood before the proposal
-named applied, and the removal of each it made. Prints the proposal's name, its phase, whether it widens access, and its board page.
+named applied, and the removal of each it made. Prints the proposal's name, its phase, whether it widens access, and the line that approves it.
 
   -f, --filename <file|->      the file to read, - for stdin
   -n, --namespace <factory>    the factory proposed in; else the one the file names; default where neither does
@@ -46,7 +46,7 @@ named applied, and the removal of each it made. Prints the proposal's name, its 
 export const PROPOSALS_HELP = `nemia proposals approve <name> [-n <factory>]
 nemia proposals decline <name> [-n <factory>]
 
-Approve or decline a waiting proposal. Prints the proposal's name, its phase, whether it widens access, and its board page. List them
+Approve or decline a waiting proposal. Prints the proposal's name, its phase, whether it widens access, and the line that approves it. List them
 with nemia get proposals -n <factory>; read one with nemia get proposal <name> -n <factory> -o yaml.
 
   -n, --namespace <factory>    the factory the proposal is in; default where none is named
@@ -110,11 +110,16 @@ function parsed(args: readonly string[]): Asked {
   return asked;
 }
 
-/** A proposal as the person reads it: its name and phase, whether it widens access, and its page on the board. */
+/**
+ * A proposal as the person reads it: its name and phase, whether it widens access, and, while it waits, the line that approves it (the
+ * board draws no proposal yet).
+ */
 export const proposalLines = (proposal: Proposal, namespace: string): string => {
   const factory = proposal.metadata.namespace ?? namespace;
+  const { name } = proposal.metadata;
   const widens = proposal.status.widens ? ' (widens access)' : '';
-  return `proposals/${proposal.metadata.name} ${proposal.status.phase}${widens}\n  board: /factories/${factory}/proposals/${proposal.metadata.name}\n`;
+  const next = proposal.status.phase === 'waiting' ? `  approve: nemia proposals approve ${name} -n ${factory}\n` : '';
+  return `proposals/${name} ${proposal.status.phase}${widens}\n${next}`;
 };
 
 /** The metadata of a proposed object: its name, its namespace where its kind has one, and the version it is at where it is served. */

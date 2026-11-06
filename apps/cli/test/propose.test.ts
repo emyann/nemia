@@ -220,7 +220,7 @@ test('propose sends every request with the session token, each object at the ver
     why: 'tidy up',
   });
   assert.match(said.out, /^proposals\/implementer-ab12c waiting\b/m);
-  assert.match(said.out, /\/factories\/f1\/proposals\/implementer-ab12c$/m);
+  assert.match(said.out, /nemia proposals approve implementer-ab12c -n f1$/m, 'a waiting proposal names the line that approves it');
 });
 
 test('propose --objects: the objects given on the line, as JSON, are proposed as a file of them would be', async () => {

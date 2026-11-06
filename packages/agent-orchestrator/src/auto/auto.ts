@@ -72,8 +72,7 @@ export type PolicyRule = GateRule | ProposalPolicyRule;
 export const isProposalRule = (rule: PolicyRule): rule is ProposalPolicyRule => rule.answer === APPROVE_PROPOSAL;
 
 /** The rules of `list` that answer at a gate. Pure. */
-export const gateRules = (list: readonly PolicyRule[]): GateRule[] =>
-  list.filter((rule): rule is GateRule => !isProposalRule(rule));
+export const gateRules = (list: readonly PolicyRule[]): GateRule[] => list.filter((rule): rule is GateRule => !isProposalRule(rule));
 
 /** The rules of `list` that approve the proposals of `factory`. Pure. */
 export const proposalRulesIn = (list: readonly PolicyRule[], factory: string): ProposalPolicyRule[] =>

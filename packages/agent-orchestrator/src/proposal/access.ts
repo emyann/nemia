@@ -89,7 +89,11 @@ export function accessOf(kind: string, name: string, spec: unknown): Access {
       return joined(steps.map((step) => keysAccess(recordOf(step.keys), `${String(step.name)}: `)));
     }
     case 'Hire':
-      return { allows: typeof s.agent === 'string' ? [`hire ${String(s.workflow)}/${String(s.step)} ${s.agent}`] : [], denies: [], mode: 0 };
+      return {
+        allows: typeof s.agent === 'string' ? [`hire ${String(s.workflow)}/${String(s.step)} ${s.agent}`] : [],
+        denies: [],
+        mode: 0,
+      };
     case 'McpServer':
       return { allows: [`server ${name} ${String(s.type)} ${String(s.url)}`], denies: [], mode: 0 };
     case 'Factory':

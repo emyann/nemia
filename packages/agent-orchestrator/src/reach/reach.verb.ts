@@ -125,7 +125,12 @@ const reachOf = Effect.fnUntraced(function* (home: string, args: Args) {
       : { ...(yield* runSites(runId)), unloaded: [] };
   const factory = read.factory ?? 'default';
   const facts = read.facts;
-  const { reach, rows, suggested } = gateRows(gateRules(inForce), gateRules(proposed), read.sites, facts && ((site) => facts.get(site.step)));
+  const { reach, rows, suggested } = gateRows(
+    gateRules(inForce),
+    gateRules(proposed),
+    read.sites,
+    facts && ((site) => facts.get(site.step)),
+  );
   return {
     agent,
     factory,

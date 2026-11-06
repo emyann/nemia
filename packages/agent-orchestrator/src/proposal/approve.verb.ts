@@ -22,7 +22,9 @@ const proposalAt = (factory: string, name: string): Effect.Effect<Proposal, Refu
   Effect.gen(function* () {
     const p = yield* (yield* ProposalDoor).proposals.read(factory, name);
     if (p === undefined)
-      return yield* Effect.fail(new Missing({ message: `${factory} has no proposal ${name}: list them with nemia get proposals -n ${factory}.` }));
+      return yield* Effect.fail(
+        new Missing({ message: `${factory} has no proposal ${name}: list them with nemia get proposals -n ${factory}.` }),
+      );
     return p;
   });
 
@@ -94,7 +96,9 @@ export const declineProgram = Effect.fn('declineProgram')(function* (
     );
   const proposal = yield* proposalAt(factory, name);
   if (proposal.status.phase !== 'waiting' && proposal.status.phase !== 'approved')
-    return yield* Effect.fail(new Conflict({ message: `${name} is ${proposal.status.phase}: only a proposal waiting or approved is declined.` }));
+    return yield* Effect.fail(
+      new Conflict({ message: `${name} is ${proposal.status.phase}: only a proposal waiting or approved is declined.` }),
+    );
   return yield* (yield* ProposalDoor).proposals.write({
     ...proposal,
     status: { ...proposal.status, phase: 'declined', message: 'the person declined it.' },

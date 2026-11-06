@@ -82,9 +82,17 @@ const unassigned = (line: string): string => line.replace(/^(\w+=\S*\s+)+/, '');
 
 test("REFUSED for an agent: a factory's definition written by hand is out of her reach, and she proposes it instead", () => {
   const fence = nemiaFence(COMMANDS);
-  for (const name of PROPOSED_INSTEAD) assert.ok(COMMANDS.some((c) => c.name === name), `${name} is an entry of the table`);
+  for (const name of PROPOSED_INSTEAD)
+    assert.ok(
+      COMMANDS.some((c) => c.name === name),
+      `${name} is an entry of the table`,
+    );
   const denied = (line: string) => fence.deny.some((rule) => reaches(rule, line));
-  for (const line of ['nemia factory hire acme seldon --step build/design', 'nemia workflows write factory build --folder d', 'nemia factory rules acme --file r.md'])
+  for (const line of [
+    'nemia factory hire acme seldon --step build/design',
+    'nemia workflows write factory build --folder d',
+    'nemia factory rules acme --file r.md',
+  ])
     assert.ok(denied(line), line);
   assert.ok(!denied('nemia factory rules acme'), 'the rules still read bare');
   const allowed = (line: string) => fence.allow.some((rule) => reaches(rule, unassigned(line)));
@@ -96,7 +104,10 @@ test("REFUSED for an agent: a factory's definition written by hand is out of her
 test('REFUSED on a planted line: an assignment before nemia, which would drop her token and act as the person', () => {
   const fence = nemiaFence(COMMANDS);
   const line = 'WF_SESSION_TOKEN= nemia proposals approve p';
-  assert.ok(fence.allow.some((rule) => reaches(rule, unassigned(line))), 'an allow alone would let it through, the assignment stripped');
+  assert.ok(
+    fence.allow.some((rule) => reaches(rule, unassigned(line))),
+    'an allow alone would let it through, the assignment stripped',
+  );
   assert.deepEqual(
     fence.deny.filter((rule) => reaches(rule, line)),
     [ASSIGNED],

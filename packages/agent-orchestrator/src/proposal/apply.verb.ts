@@ -95,6 +95,7 @@ export const applyProgram = Effect.fn('applyProgram')(function* (
       : [{ kind: object.kind, metadata: { name: object.metadata.name, resourceVersion: now.version }, spec: now.spec }],
   );
   const revisions: string[] = [];
+  const written: string[] = [];
   for (const { object } of objects) {
     const wrote = yield* Effect.result(objectWritten(place, factory, object));
     if (wrote._tag === 'Failure')
@@ -103,11 +104,12 @@ export const applyProgram = Effect.fn('applyProgram')(function* (
           phase: 'failed',
           before,
           revisions,
-          written: [...revisions],
+          written,
           message: `${object.kind} ${object.metadata.name} was refused as it was written: ${wrote.failure.message} What is named in written stands; propose the rest again.`,
         }),
       );
     revisions.push(wrote.success);
+    written.push(`${object.kind} ${object.metadata.name}`);
   }
   return yield* door.write(withStatus(proposal, { phase: 'applied', before, revisions, message: 'applied as a new revision.' }));
 });

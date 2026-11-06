@@ -56,10 +56,8 @@ const proposalApplySpec = spec<(facts: ApplyFacts) => ApplyAction>({
       condition: ({ input: [f], output }) => !(f.at === 'run-end' && f.run === 'ended') || output === 'drop',
     },
     appliesWhenDue: {
-      description:
-        'An approval that holds on current objects applies at approval, or once its run ended well where it waits on the run',
-      condition: ({ input: [f], output }) =>
-        !(due(f) && f.current && (f.approvedBy === 'person' || f.stillApproved)) || output === 'apply',
+      description: 'An approval that holds on current objects applies at approval, or once its run ended well where it waits on the run',
+      condition: ({ input: [f], output }) => !(due(f) && f.current && (f.approvedBy === 'person' || f.stillApproved)) || output === 'apply',
     },
     staleWhenMoved: {
       description: 'A proposal due to apply whose objects moved is marked stale',

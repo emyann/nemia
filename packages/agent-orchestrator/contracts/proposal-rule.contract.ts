@@ -4,6 +4,11 @@
  * agent may ever approve, the rule when it approves unasked — so a rule that reaches past the agent's delegation in the rule's factory is
  * refused when the person confirms it, naming each pair of resource and verb it reaches past. A rule within it goes on. A delegation taken
  * back later leaves the rule confirmed but reaching nothing: `proposalApproval` reads the delegation at every approval. Pure.
+ *
+ * Two laws are narrowed (tsverify card p25m): in full, "a rule every pair of which its delegation covers reaches past nothing" and "a rule
+ * that covers any pair its delegation does not reaches past it" are answered `bounded` together at the default budget (out of work; no
+ * counterexample with arrays of at most 4 elements). `noneWhereCovered` is said of a rule of one verb, `someWhereUncovered` of the rule's
+ * first pair; `src/proposal/rule.test.ts` holds both full laws.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 import type { ChangeVerb, Grant, ProposalRule } from './proposal-approval.contract.ts';
@@ -37,9 +42,6 @@ const proposalRuleReachSpec = spec<(rule: ProposalRule, grants: readonly Grant[]
       description: 'Each pair named past the delegation is one no grant covers for every name the rule covers',
       condition: ({ input: [rule, grants], output }) => output.every((p) => !coveredFor(grants, rule, p.resource, p.verb)),
     },
-    // Narrowed (tsverify card p25m): the full law, over a rule of any number of verbs, is answered `bounded` (out of work; no
-    // counterexample with arrays of at most 4 elements) at the default budget. The law here says it of a rule of one verb;
-    // `src/proposal/rule.test.ts` holds the full law.
     noneWhereCovered: {
       description: 'A rule of one verb every pair of which its delegation covers reaches past nothing',
       condition: ({ input: [rule, grants], output }) =>
@@ -47,9 +49,6 @@ const proposalRuleReachSpec = spec<(rule: ProposalRule, grants: readonly Grant[]
         !rule.resources.every((r) => rule.verbs.every((v) => coveredFor(grants, rule, r, v))) ||
         output.length === 0,
     },
-    // Narrowed (tsverify card p25m): the full law, "a rule that covers any pair its delegation does not reaches past it", is answered
-    // `bounded` (out of work; no counterexample with arrays of at most 4 elements) at the default budget. The law here says it of the
-    // rule's first pair; `src/proposal/rule.test.ts` holds the full law over every pair.
     someWhereUncovered: {
       description: 'A rule whose first pair of resource and verb its delegation does not cover reaches past it',
       condition: ({ input: [rule, grants], output }) => {

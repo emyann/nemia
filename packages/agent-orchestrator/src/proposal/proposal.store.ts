@@ -48,7 +48,8 @@ export function proposalNamed(factory: string, name: string): void {
 /** The factory a proposal is in: its namespace, refused (`Invalid`) where it names none. */
 export function factoryOf(proposal: Proposal): string {
   const factory = proposal.metadata.namespace;
-  if (factory === undefined) throw new Invalid({ message: `the proposal ${proposal.metadata.name} names no namespace: give it its factory's.` });
+  if (factory === undefined)
+    throw new Invalid({ message: `the proposal ${proposal.metadata.name} names no namespace: give it its factory's.` });
   proposalNamed(factory, proposal.metadata.name);
   return factory;
 }

@@ -7,7 +7,15 @@
  */
 import path from 'node:path';
 import { Effect } from 'effect';
-import { RESOURCE_PLURALS, type AgentSpec, type HireSpec, type McpServerSpec, type ProposedObject, type SkillSpec, type WorkflowStep } from 'objects';
+import {
+  RESOURCE_PLURALS,
+  type AgentSpec,
+  type HireSpec,
+  type McpServerSpec,
+  type ProposedObject,
+  type SkillSpec,
+  type WorkflowStep,
+} from 'objects';
 import { tried } from '../runtime-client.ts';
 import type { Refusal } from '../refusal/refusal.ts';
 import { StoreRoot } from '../config/root.store.ts';
@@ -49,13 +57,16 @@ const agentDraftOf = (name: string, spec: AgentSpec): AgentDraft => ({
   ...(spec.skills !== undefined && { skills: spec.skills }),
   ...(spec.harnessPrompt !== undefined && { harnessPrompt: spec.harnessPrompt }),
   ...(spec.mcp !== undefined && { mcp: spec.mcp }),
-  keys: (spec.keys ?? {}) as AgentDraft['keys'],
+  keys: spec.keys ?? {},
   body: spec.instructions ?? '',
 });
 
 /** The revision a write of `kind`'s `name` at `version` made, the ledger's number. */
 const counted = (kind: RevisionKind, object: ProposedObject, version: string) =>
-  Effect.map(definitionRevision(kind, object.metadata.name, version), (n) => `${RESOURCE_PLURALS[object.kind]}/${object.metadata.name}#${n}`);
+  Effect.map(
+    definitionRevision(kind, object.metadata.name, version),
+    (n) => `${RESOURCE_PLURALS[object.kind]}/${object.metadata.name}#${n}`,
+  );
 
 /** The revision of a kind the ledger does not count. */
 const uncounted = (object: ProposedObject): string => `${RESOURCE_PLURALS[object.kind]}/${object.metadata.name}`;

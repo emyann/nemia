@@ -10,7 +10,9 @@ import type { ApplyAction } from '../../contracts/proposal-apply.contract.ts';
 /** One move of a proposal: from a phase to another, by the fact that makes it. */
 export type ProposalEdge = { readonly from: ProposalPhase; readonly to: ProposalPhase; readonly event: string };
 
-/** Every phase, in the order the diagram names them. Typed over `ProposalPhase`, so a phase added there with no state fails the typecheck. */
+/**
+ * Every phase, in the order the diagram names them. Typed over `ProposalPhase`, so a phase added there with no state fails the typecheck.
+ */
 export const PROPOSAL_STATES: Readonly<Record<ProposalPhase, true>> = {
   waiting: true,
   approved: true,

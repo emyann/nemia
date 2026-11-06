@@ -48,8 +48,9 @@ export function delegationNamed(factory: string, agent: string): void {
   if (bad !== undefined) throw new Invalid({ message: bad });
 }
 
-/** A delegation written: its grants as objects' `DelegationSpec` decodes them. */
-const specChecked = checked(DelegationSpec, (record: DelegationRecord) => `the delegation of ${record.agent} in ${record.factory}`);
+/** A delegation's grants written, as objects' `DelegationSpec` decodes them. */
+const specChecked = (record: DelegationRecord) =>
+  checked(DelegationSpec, () => `the delegation of ${record.agent} in ${record.factory}`)(record.spec);
 
 /** The door over `layer`: each method as `doorOf` makes it, each write's grants checked before the layer writes. */
 export function delegationDoorOver(layer: DelegationLayer): DelegationDoorShape {
@@ -71,7 +72,10 @@ export function delegationFile(home: string, factory: string, agent: string): st
   return path.join(delegationsDir(home, factory), `${agent}.json`);
 }
 
-/** `agent`'s delegation in `factory`, or undefined where none is written. Refused (`Invalid`), naming the file and its fix, where it does not read. */
+/**
+ * `agent`'s delegation in `factory`, or undefined where none is written. Refused (`Invalid`), naming the file and its fix, where it does
+ * not read.
+ */
 export function readDelegation(home: string, factory: string, agent: string): DelegationRecord | undefined {
   const file = delegationFile(home, factory, agent);
   let text: string;

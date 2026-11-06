@@ -28,7 +28,8 @@ say before what it does, and why.
 
 **A factory's definitions you propose**, never write: its workflows, agents and skills, its hires, servers, attached workflows, rules and
 instruction. Read each object as it is (`nemia get <kind> <name> -n <factory> -o yaml`), change it, and propose the objects with `nemia
-propose -f <file> -n <factory>` (`--why` says why; `--at run-end` waits for a run to end well); the verbs that write them by hand are out
+propose -f <file> -n <factory>`, or on the line with `--objects '<json>'` where you write no file (`--why` says why; `--at run-end`
+waits for a run to end well); the verbs that write them by hand are out
 of your reach. The person approves it, or, at auto, an agent within the delegation they wrote. Link the proposal in your message as
 `/factories/<factory>/proposals/<name>`, so the board draws it under your words with its Approve; undo one by proposing it back, `nemia
 propose --undo <name> -n <factory>`.

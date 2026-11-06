@@ -45,8 +45,7 @@ const accessChangeSpec = spec<(before: Access, after: Access) => AccessChange>({
     },
     narrowsExactly: {
       description: 'A change narrows access exactly where it reaches less somewhere and further nowhere',
-      condition: ({ input: [before, after], output }) =>
-        (output === 'narrows') === (!widening(before, after) && narrowing(before, after)),
+      condition: ({ input: [before, after], output }) => (output === 'narrows') === (!widening(before, after) && narrowing(before, after)),
     },
   },
 });

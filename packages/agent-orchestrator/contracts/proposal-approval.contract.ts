@@ -36,9 +36,7 @@ export type ProposalRule = Grant & { readonly id: string; readonly widens: boole
  * Who calls: the person (no session's token), or an agent's session the store started, by its agent and its factory — null for a session
  * of the store's own (Nemia's), which works in every factory and holds there only what that factory's delegation grants it.
  */
-export type Caller =
-  | { readonly kind: 'person' }
-  | { readonly kind: 'agent'; readonly agent: string; readonly factory: string | null };
+export type Caller = { readonly kind: 'person' } | { readonly kind: 'agent'; readonly agent: string; readonly factory: string | null };
 
 /** Whether `caller` acts in `factory`: the person anywhere, a factory's session in its own, a store-wide session in any. */
 const actsIn = (caller: Caller, factory: string): boolean =>
@@ -47,8 +45,7 @@ const actsIn = (caller: Caller, factory: string): boolean =>
 const mayProposeSpec = spec<(caller: Caller, factory: string) => boolean>({
   ensures: {
     anyoneInItsOwn: {
-      description:
-        'The person proposes in any factory, a session of a factory in its own and no other, a store-wide session in any',
+      description: 'The person proposes in any factory, a session of a factory in its own and no other, a store-wide session in any',
       condition: ({ input: [caller, factory], output }) => output === actsIn(caller, factory),
     },
   },
@@ -123,8 +120,7 @@ const proposalApprovalSpec = spec<(caller: Caller, proposal: ProposalFacts, stan
     },
     neverItsOwnAgents: {
       description: 'An agent never approves a proposal its own agent made, from any session of it',
-      condition: ({ input: [caller, p], output }) =>
-        caller.kind === 'person' || p.proposedBy !== caller.agent || output.kind === 'refused',
+      condition: ({ input: [caller, p], output }) => caller.kind === 'person' || p.proposedBy !== caller.agent || output.kind === 'refused',
     },
     agentsOnlyAtAuto: {
       description: 'At manual and semi-auto every proposal waits on the person: an agent approves only at auto',

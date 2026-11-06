@@ -169,7 +169,9 @@ export const currentOf = (
     case 'Factory':
       return name === factory
         ? factoryNow(place, factory)
-        : Effect.fail(new Invalid({ message: `a proposal in ${factory} changes the Factory ${factory} alone, not ${name}: name it ${factory}.` }));
+        : Effect.fail(
+            new Invalid({ message: `a proposal in ${factory} changes the Factory ${factory} alone, not ${name}: name it ${factory}.` }),
+          );
   }
 };
 

@@ -959,6 +959,13 @@ test('a step its harness ended at its budget reads budget exhausted, with the am
     assert.equal(stepStatus(CAPPED[0], r, phases({ t1: 'succeeded' }), nothingSaid, asked, CAPPED, ended), 'budget exhausted');
     assert.equal(ownStatus(CAPPED[0], r, phases({ t1: 'stopped' }), nothingSaid, asked, CAPPED, ended), 'stopped');
   });
+  await t.test('a recheck files its check on the same task: it stands on that check, the stop still said once it refuses', () => {
+    const rechecked = run({}, { steps: { implement: { taskId: 't1', check: { taskId: 'c2' } }, review: { taskId: null } } });
+    const on = (c2: TaskPhase) => ownStatus(CAPPED[0], rechecked, phases({ t1: 'failed', c2 }), nothingSaid, asked, CAPPED, ended);
+    assert.deepEqual([on('running'), on('succeeded'), on('failed')], ['checking', 'verified', 'failed (check)']);
+    const d = decided(CAPPED, rechecked, phases({ t1: 'failed', c2: 'failed' }), nothingSaid, { spent: ended, verdict: () => 1 });
+    assert.deepEqual(d.kind === 'awaiting' && [d.failedCheck, d.budgetExhausted], [['implement'], ['implement']]);
+  });
   await t.test('never tried by `retries:`, waited on by a person, offered `--budget`', () => {
     const a = assessed(CAPPED, r, p, nothingSaid, { spent: ended });
     assert.deepEqual([a.retry, a.unreachable, a.status], [[], ['review'], 'waiting']);
@@ -967,7 +974,7 @@ test('a step its harness ended at its budget reads budget exhausted, with the am
     const d = decided(CAPPED, r, p, nothingSaid, { spent: ended });
     assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.budgetExhausted, d.failed], ['waiting', ['implement'], []]);
     assert.deepEqual(retryLines(CAPPED, r, d, p, nothingSaid, asked, ended), [
-      'implement: budget exhausted, $3.02 of $3. Raise its cap above $3.02 and continue its session:  nemia retry r-1 implement --budget <amount>  (--fresh, or --model <m>, for a new session; retries: 2, 0 spent)',
+      'implement: budget exhausted, $3.02 of $3. Raise its cap above $3.02 and continue its session:  nemia retry r-1 implement --budget <amount>  (--fresh, or --model <m>, for a new session; retries: 2, 0 spent; --recheck runs its check, never run, on the work as it stands, and needs no --budget)',
     ]);
   });
   await t.test('retryable: the raise it needs; none with no `budget:`', () => {
@@ -976,7 +983,7 @@ test('a step its harness ended at its budget reads budget exhausted, with the am
       {
         status: 'budget exhausted',
         reason: 'BudgetExhausted',
-        modes: ['continue', 'fresh'],
+        modes: ['continue', 'fresh', 'recheck'],
         raise: { above: 3.02, spent: { usd: 3.02, measured: 1, unmeasured: 0 }, cap: 3 },
       },
     );

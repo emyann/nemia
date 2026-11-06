@@ -386,6 +386,38 @@ test('retryRefusal: what `nemia retry` refuses, and what it says to do instead',
     );
     names(denied, '--recheck', 'implement was denied a call', 'nemia retry r-1 implement (or --fresh)');
   });
+  await t.test(
+    '--recheck of a step ended at its budget: let through with a check, refused with none to run or its merge taken back',
+    () => {
+      const cutOff: SpendOf = (id) => (id === 't1' ? { usd: 3.02, measured: 1, unmeasured: 0, budgetEnded: true } : undefined);
+      const at = (steps: Workflow[], r: Run) =>
+        retryRefusal(
+          steps,
+          r,
+          'implement',
+          { mode: 'recheck' },
+          phases({ t1: 'failed' }),
+          () => undefined,
+          asked,
+          undefined,
+          [],
+          () => false,
+          cutOff,
+        );
+      const checked: Workflow[] = [{ ...step('implement'), check: 'npm test', budget: 3 }, step('review', ['implement'])];
+      assert.equal(at(checked, failedRun()), null);
+      const unchecked: Workflow[] = [{ ...step('implement'), budget: 3 }, step('review', ['implement'])];
+      names(at(unchecked, failedRun()), '--recheck', 'no check', 'nemia retry r-1 implement --budget <amount>', '$3.02');
+      const ending: Workflow[] = [{ ...step('implement'), check: 'npm test', budget: 3, workspace: 'base' }];
+      const aborted = run(
+        {},
+        { steps: { implement: { taskId: 't1', landed: { aborted: 'ended budget exhausted with its merge staged' } } } },
+      );
+      names(at(ending, aborted), '--recheck', 'took back the merge', 'nemia retry r-1 implement --budget <amount>');
+      const untouched = run({}, { steps: { implement: { taskId: 't1', landed: { untouched: 'nothing of it was staged' } } } });
+      assert.equal(at(ending, untouched), null, 'an ending that staged nothing — its merge made elsewhere — is rechecked');
+    },
+  );
   await t.test('a step the workflow does not have', () => {
     assert.match(refusalOf(onTry(), waiting, { mode: 'continue' }, [], 'deploy')!, /no step "deploy" — its steps are implement, review/);
   });

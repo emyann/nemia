@@ -101,6 +101,7 @@ export const STEP_EDGES: readonly StepEdge[] = [
   { from: 'failed', to: 'running', event: 'tried again' },
   { from: 'stopped', to: 'running', event: 'tried again' },
   { from: 'budget exhausted', to: 'running', event: 'tried again, with a budget' },
+  { from: 'budget exhausted', to: 'checking', event: 'its check run on your word' },
   { from: 'over budget', to: 'running', event: 'tried again, with a budget' },
   { from: 'over budget', to: 'pending', event: 'a round on your word, with a budget' },
 ];

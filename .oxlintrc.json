@@ -702,8 +702,8 @@
     {
       "files": ["packages/agent-orchestrator/src/retry/retry.ts"],
       "rules": {
-        "complexity": ["error", { "max": 46 }],
-        "sonarjs/cognitive-complexity": ["error", 35]
+        "complexity": ["error", { "max": 36 }],
+        "sonarjs/cognitive-complexity": ["error", 32]
       }
     },
     {
@@ -730,8 +730,8 @@
     {
       "files": ["packages/agent-orchestrator/src/status/status.ts"],
       "rules": {
-        "complexity": ["error", { "max": 34 }],
-        "sonarjs/cognitive-complexity": ["error", 26]
+        "complexity": ["error", { "max": 28 }],
+        "sonarjs/cognitive-complexity": ["error", 21]
       }
     },
     {

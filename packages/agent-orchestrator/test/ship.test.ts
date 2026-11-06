@@ -1178,6 +1178,60 @@ test('a result a person merged by hand before its ending ran: the run has landed
   );
 
   await s.test(
+    'an ending cut off at its budget once the result was merged elsewhere: `--recheck` files its check alone, and its pass records the commit',
+    async () => {
+      const b = stage.board();
+      const { repo, id, branch } = await at.atTheGate();
+      await stage.runWith(e(), approveRun(id, 'ship', 'Merge it.'));
+      assert.deepEqual((await at.pass(id)).filed, ['ship']);
+      at.mergedByHand(repo, branch);
+      b.end(`${id}-ship`, 'failed', { exitCode: 1, reason: 'harness', limit: 'budget', usage: { costUsd: 0.42 } });
+      await at.pass(id);
+      assert.ok('untouched' in (readRun(id).steps.ship.landed ?? {}), 'nothing of it was staged');
+      assert.deepEqual([await statusOf(id, 'ship'), (await listed(id)).waitingOnYou], ['budget exhausted $0.42', ['ship']]);
+      await stage.runWith(e(), retryRun(id, 'ship', { mode: 'recheck' }));
+      const pass = await at.pass(id);
+      assert.deepEqual([pass.tried, pass.checked, pass.filed], [['ship'], ['ship'], []]);
+      assert.deepEqual(
+        b.filings.filter((f) => f.startsWith(id)),
+        [`${id}-implement`, `${id}-ship`, `${id}-ship-try2-check`],
+        'its check, and no session',
+      );
+      assert.equal(readRun(id).steps.ship.landed, undefined, 'the try drops what the last landing recorded');
+      assert.equal(await statusOf(id, 'ship'), 'checking');
+      b.settle(`${id}-ship-try2-check`, 'succeeded', undefined, 0);
+      await at.pass(id);
+      assert.deepEqual(readRun(id).steps.ship.landed, { commit: world().head(repo) });
+      assert.deepEqual([await statusOf(id, 'ship'), (await listed(id)).waitingOnYou], ['verified ✓', []]);
+    },
+  );
+
+  await s.test(
+    'an ending cut off at its budget before anything merged: `nemia decide` offers `--recheck`, and a refusing check waits on you, the stop still said',
+    async () => {
+      const b = stage.board();
+      const { id } = await at.atTheGate();
+      await stage.runWith(e(), approveRun(id, 'ship', 'Merge it.'));
+      await at.pass(id);
+      b.end(`${id}-ship`, 'failed', { exitCode: 1, reason: 'harness', limit: 'budget', usage: { costUsd: 0.42 } });
+      await at.pass(id);
+      const asked = await stage.runWith(e(), decideRun(id));
+      assert.deepEqual(asked.decision.kind === 'awaiting' && asked.decision.budgetExhausted, ['ship']);
+      assert.ok(
+        asked.offers.some((o) => o.includes('--recheck')),
+        asked.offers.join('\n'),
+      );
+      await stage.runWith(e(), retryRun(id, 'ship', { mode: 'recheck' }));
+      await at.pass(id);
+      b.settle(`${id}-ship-try2-check`, 'failed', undefined, 1);
+      await at.pass(id);
+      const { decision: d } = await stage.runWith(e(), decideRun(id));
+      assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.failedCheck, d.budgetExhausted], ['failed', ['ship'], ['ship']]);
+      assert.ok('aborted' in (readRun(id).steps.ship.landed ?? {}), 'nothing landed');
+    },
+  );
+
+  await s.test(
     "an ending's gate is a decision again once the base branch no longer has the result: git is read each pass, and the approval is honoured",
     async () => {
       const { repo, id, branch, base } = await at.atTheGate();

@@ -5,7 +5,7 @@
  * `durationWord`): `views.verb.ts` asks the engine (`consumption`). Pure, and read by nearly every other part of the run's judgement;
  * it reads the record alone.
  */
-import type { Verdict } from '../check/check.ts';
+import { onItsCheck, type Verdict } from '../check/check.ts';
 import { DEFAULT_ROUNDS, endsOnBase, JUDGE_ROUTE, LOOP_REPLIES, type Workflow } from '../step/step.ts';
 import { loopSpan } from '../workflow/index.ts';
 import { isJudge } from '../route/index.ts';
@@ -505,10 +505,11 @@ const blockedAccepted = (step: Workflow, said: Closeout | undefined, steps: read
  * refused closeout does, `unsigned` once its session ended, so the run asks it to mend them.
  *
  * `budget exhausted` for a task its harness cut off at its cap, settled `failed` or `succeeded`: cut off, not concluded, and no attempt
- * follows (agent-runtime's README). `denied` for a signed step denied a call under `denials: fail`, before its check, which would judge
- * work done without the tool. An ending that lands on its check (`landsOnCheck`) stands where the run's landing of its merge left it
- * (`landingDue`), never on the check alone: `verified` once the run has committed the merge, and `checking` until it has committed or
- * aborted it, so nothing offers a try of it while its merge is staged in the checkout.
+ * follows (agent-runtime's README) — until a recheck files the step's check on that task (`retryable`), after which it stands on its
+ * check (`onItsCheck`) as a signed step does: the world, read with no session. `denied` for a signed step denied a call under
+ * `denials: fail`, before its check, which would judge work done without the tool. An ending that lands on its check (`landsOnCheck`)
+ * stands where the run's landing of its merge left it (`onItsCheck`), so nothing offers a try of it while its merge is staged in the
+ * checkout.
  */
 export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf) => {
   const st = run.steps[step.name];
@@ -516,8 +517,11 @@ export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseo
   const said = closeoutOf(step.name);
   if (blockedAccepted(step, said, steps)) return 'blocked';
 
+  const signed = (s: StepStatus): StepStatus =>
+    s === 'verified' && askedAgain(step, run, closeoutOf) && roundOf(run, step.name) >= capOf(step) ? 'exhausted' : s;
   const phase = phaseOf(st.taskId);
-  if ((phase === 'failed' || phase === 'succeeded') && spendOf(st.taskId)?.budgetEnded) return 'budget exhausted';
+  if ((phase === 'failed' || phase === 'succeeded') && spendOf(st.taskId)?.budgetEnded)
+    return step.check && st.check ? signed(onItsCheck(step, st, phaseOf)) : 'budget exhausted';
   const asked = askedCloseout(st.taskId);
   if (phase === 'failed' && !said && asked === 'unsigned') return 'unsigned';
   if (phase === 'failed' || phase === 'stopped') return phase;
@@ -525,18 +529,8 @@ export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseo
   if (!said && (asked || step.output)) return 'unsigned';
   if (said && unaccepted(step, run, steps, said)) return 'unsigned';
   if (step.denials === 'fail' && spendOf(st.taskId)?.denied?.length) return 'denied';
-  const signed = (s: 'verified' | 'unverified'): StepStatus =>
-    askedAgain(step, run, closeoutOf) && roundOf(run, step.name) >= capOf(step) ? 'exhausted' : s;
-  if (!step.check) return signed('unverified');
-
-  const check = st.check ? phaseOf(st.check.taskId) : undefined;
-  if (landsOnCheck(step, run)) {
-    const landed = st.landed;
-    if (!landed) return 'checking';
-    if ('commit' in landed) return signed('verified');
-    return check === 'failed' || check === 'stopped' || check === 'unknown' ? 'failed (check)' : 'failed';
-  }
-  return check === 'succeeded' ? signed('verified') : check === 'failed' || check === 'stopped' ? 'failed (check)' : 'checking';
+  if (!step.check) return askedAgain(step, run, closeoutOf) && roundOf(run, step.name) >= capOf(step) ? 'exhausted' : 'unverified';
+  return signed(onItsCheck(step, st, phaseOf));
 };
 
 /**

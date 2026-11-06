@@ -311,7 +311,10 @@ function statusRefusal(c: Judged): string {
   return why[status] ?? `${name} is ${status}, and there is nothing to try again.`;
 }
 
-/** `--recheck` where no check failed, or on an ending that lands on its check, whose merge the run aborted. */
+/**
+ * `--recheck` where no check failed, or on an ending that lands on its check, whose merge the run aborted; and on a step ended at its
+ * budget with no check to run, or whose staged merge the run took back, its session retry with `--budget` named instead.
+ */
 function modeRefusal(c: Judged): string | undefined {
   const { step, run, name, how, command, phaseOf, verdictOf, modes, status, via, sendsBack } = c;
   if (modes.includes(how.mode)) return undefined;
@@ -321,6 +324,7 @@ function modeRefusal(c: Judged): string | undefined {
       : 'did not finish';
     return `--recheck runs a step's check again on the work as it stands, and ${name}'s check was run on the merge ${name} staged in the repository's checkout, which the run aborted when its check ${why}: there is nothing staged for it to judge. Merge and check again, in a new try of ${name}: ${command}.`;
   }
+  if (status === 'budget exhausted') return budgetStopRefusal(c);
   const is =
     via === 'session'
       ? 'is running, its session blocked by its harness with nothing signed off'
@@ -332,6 +336,16 @@ function modeRefusal(c: Judged): string | undefined {
       ? `To send it back from its gate, say what to change: nemia retry ${run.id} ${name} --message "<objection>".`
       : `Ask for another session instead: nemia retry ${run.id} ${name} (or --fresh).`
   }`;
+}
+
+/** `--recheck` of a step ended at its budget that has no check to run, or whose staged merge the run took back: its session, raised. */
+function budgetStopRefusal({ step, command, raise }: Judged): string {
+  const why = step.check
+    ? `its session was ended at its budget, and the run took back the merge it staged in the repository's checkout: there is nothing staged for its check to judge`
+    : `its session was ended at its budget, and it declares no check: there is nothing to run`;
+  return `--recheck runs a step's check, and ${why}. Ask for another session, with its cap raised: ${command} --budget <amount>${
+    raise ? ` (above ${aboveWord(raise)})` : ''
+  }.`;
 }
 
 /** A send-back with no words: from an ending stopped on the base branch, from an ending's gate, or from the step's own. */
@@ -371,6 +385,9 @@ function raiseMissing(c: Judged): string | undefined {
     const withTry = `${command} --budget <amount>${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''}`;
     if (status === 'failed (check)' && modes.includes('recheck')) {
       return `${name}'s check did not finish, and ${name} ${raiseWords(status, raise)}. Run its check again, which needs no --budget: ${command} --recheck — or raise the cap for a new session, above ${aboveWord(raise)}: ${withTry}.`;
+    }
+    if (status === 'budget exhausted' && modes.includes('recheck')) {
+      return `${name} ${raiseWords(status, raise)}, before its check ran. Run its check on the work as it stands, which needs no --budget: ${command} --recheck — or raise the cap for a new session, above ${aboveWord(raise)}: ${withTry}.`;
     }
     return `${name} ${raiseWords(status, raise)}, and the run spends nothing more on it until a person raises the cap. Raise it with the try, above ${aboveWord(raise)}: ${withTry}.`;
   }

@@ -48,7 +48,8 @@
  * - `factoryList`, `factoryGet`, `factoryCommands`, `scheduleList`, `hireList`, `volumeList`, `mcpServerList`: `GET /api/factories`,
  *   and of the copy's first factory but the default by name, `GET /api/factories/:name`, `…/commands` and
  *   `GET /api/namespaces/:name/schedules`, `hires`, `volumes` and `mcpservers`, over apps as `runList` is; null where the copy has no
- *   factory of its own. `ceilings`: `GET /api/ceilings`, the same way.
+ *   factory of its own. `ceilings`: `GET /api/ceilings`, the same way, and `ceilingsAfterPass` the same asked after a pass has filled the
+ *   app's informer, as `runListAfterPass` is.
  *
  * Each read over apps carries the run records (`runs/<id>.json`) one call read, cold and warm (`records`), counted on a call of its own.
  *
@@ -506,6 +507,7 @@ async function measure(asked: Asked, root: string, fence: Fence) {
     volumeList: await ofFactory((f) => `/api/namespaces/${f}/volumes`),
     mcpServerList: await ofFactory((f) => `/api/namespaces/${f}/mcpservers`),
     ceilings: await overApps(fresh, (app) => getJson(app, '/api/ceilings'), repeat),
+    ceilingsAfterPass: await overApps(passed, (app) => getJson(app, '/api/ceilings'), repeat),
   };
   const chat = await chatMeasured(orch, place, fence, repeat);
   Object.assign(measures, chat.measures);

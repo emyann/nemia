@@ -34,6 +34,7 @@ export const MEASURES = [
   'volumeList',
   'mcpServerList',
   'ceilings',
+  'ceilingsAfterPass',
 ] as const;
 
 /** A read the report measures. */

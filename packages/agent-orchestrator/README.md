@@ -3394,13 +3394,6 @@ acts on each approved proposal every pass (`src/apply/pass.verb.ts`). Undo is pr
 ```mermaid
 stateDiagram-v2
   [*] --> waiting: proposed
-  state "waiting" as waiting
-  state "approved" as approved
-  state "applied" as applied
-  state "declined" as declined
-  state "stale" as stale
-  state "dropped" as dropped
-  state "failed" as failed
   waiting --> approved: approved, by the person or under a rule within a delegation
   waiting --> declined: declined by the person
   approved --> declined: declined by the person

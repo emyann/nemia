@@ -51,12 +51,18 @@ export const PHASE_OF_ACTION: Readonly<Record<ApplyAction, ProposalPhase | null>
 export const proposalFinal = (): ProposalPhase[] =>
   (Object.keys(PROPOSAL_STATES) as ProposalPhase[]).filter((s) => !PROPOSAL_EDGES.some((e) => e.from === s));
 
-/** A proposal's lifecycle as a Mermaid state diagram: each phase named once, then the moves, then the phases it ends in. */
+/**
+ * A proposal's lifecycle as a Mermaid state diagram: the moves, then the phases it ends in, and a phase no move names on a line of its
+ * own. A phase's word is its id, so a `state "<word>" as <id>` line would draw nothing a move does not already (the docs' drawer
+ * refuses such a line, `unreadLines`).
+ */
 export const proposalDiagram = (): string =>
   [
     'stateDiagram-v2',
     `  [*] --> ${PROPOSAL_INITIAL}: proposed`,
-    ...(Object.keys(PROPOSAL_STATES) as ProposalPhase[]).map((s) => `  state "${s}" as ${s}`),
     ...PROPOSAL_EDGES.map((e) => `  ${e.from} --> ${e.to}: ${e.event}`),
+    ...(Object.keys(PROPOSAL_STATES) as ProposalPhase[])
+      .filter((s) => s !== PROPOSAL_INITIAL && !PROPOSAL_EDGES.some((e) => e.from === s || e.to === s))
+      .map((s) => `  ${s}`),
     ...proposalFinal().map((s) => `  ${s} --> [*]`),
   ].join('\n');

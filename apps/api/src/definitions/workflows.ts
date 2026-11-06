@@ -143,7 +143,7 @@ const workflowObject = (
 export async function workflowObjectsOf(s: Served, served: ReturnType<typeof servedOf<Folder>>, namespace?: string): Promise<Workflow[]> {
   const loaded = await loadedOf(
     s.e,
-    s.placeService,
+    s,
     served.map((f) => f.item.dir),
     s.repo,
     s.home,
@@ -182,6 +182,7 @@ const draftsOf = (steps: readonly WorkflowStep[], route: string) =>
 const writing = (s: Served, name: string, changes: boolean) => ({
   e: s.e,
   placeService: s.placeService,
+  trace: s.trace,
   name,
   dir: path.join(s.home, 'workflows', name),
   repo: s.repo,

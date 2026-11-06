@@ -693,8 +693,9 @@ export const passParents = (git: BranchReader): Parents => ({ git, read: new Map
  * The runs this run waits on, each read once (`parentRead`), one at a time — and none, without a look, for a run the gate does not apply
  * to (`gated`). And the runs a person holds it until (`Run.hold`), for as long as the hold stands. A run `read` holds is answered from it,
  * and every run read is kept there. Fails with a refusal a read failed with; dies of anything else.
+ * Untraced: a list runs it once per run, and a span each would bury the list's trace under hundreds.
  */
-export const parentsRead = Effect.fn('parentsOf')(function* (run: Run, git: BranchReader, read = new Map<string, ParentRun>()) {
+export const parentsRead = Effect.fnUntraced(function* (run: Run, git: BranchReader, read = new Map<string, ParentRun>()) {
   const mine = new Map<string, ParentRun>();
   for (const id of new Set(waitedOn(run))) mine.set(id, yield* keptParent(id, git, read));
   return (id: string): ParentRun => mine.get(id) ?? { landed: false };

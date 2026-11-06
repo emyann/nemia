@@ -8,10 +8,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Effect, Layer, Logger, References } from 'effect';
+import { Effect, Layer, Logger, Option, References, Tracer } from 'effect';
+import { addFactory, attachWorkflow } from 'agent-orchestrator';
 import { appOf, liveOf } from '../src/app.ts';
 import { tookOf } from '../src/request/request.ts';
 import { until, WAITED } from 'agent-runtime/testing';
+import { scratch } from './scratch.ts';
 
 /** A line the app said: its level, its message, and the annotations the fiber carried when it was said. */
 type Said = { level: string; text: string; annotations: Record<string, unknown> };
@@ -121,4 +123,125 @@ test("a stream whose relay settles once the runtime is disposed drops its closin
   await drained();
   assert.deepEqual(unhandled, [], 'nothing was left for Node to end the process on');
   assert.equal(said.length, 1, 'and the closing line is dropped rather than said by a runtime that is gone');
+});
+
+/** A span the app's tracer was asked for: its name, the span it is a child of, and its trace. */
+type Traced = { name: string; spanId: string; traceId: string; parent: string | undefined };
+
+/** An app over the live layer whose spans are kept in `spans` rather than exported: its tracer the test's own, given last. */
+function appTracing(): { app: ReturnType<typeof appOf>['app']; spans: Traced[] } {
+  const spans: Traced[] = [];
+  const recording = Tracer.make({
+    span(options) {
+      const span = new Tracer.NativeSpan(options);
+      spans.push({
+        name: span.name,
+        spanId: span.spanId,
+        traceId: span.traceId,
+        parent: Option.getOrUndefined(Option.map(span.parent, (p) => p.spanId)),
+      });
+      return span;
+    },
+  });
+  return { ...appOf(Layer.merge(liveOf(), Layer.succeed(Tracer.Tracer)(recording))), spans };
+}
+
+/** The spans one request to `url` exported, on a fresh app (so nothing a request kept is read warm), the request a 200. */
+async function spansOf(url: string): Promise<Traced[]> {
+  const { app, spans } = appTracing();
+  const res = await app.request(url);
+  assert.equal(res.status, 200, `${url}: ${await res.text()}`);
+  return spans;
+}
+
+const repo = scratch('nemia-api-trace-');
+fs.mkdirSync(path.join(repo, 'workflows', 'make'), { recursive: true });
+fs.writeFileSync(path.join(repo, 'workflows', 'make', 'implement.md'), '---\nplace: git\n---\nImplement it.\n');
+addFactory({ name: 'traced', repos: [repo] });
+attachWorkflow({ factory: 'traced', workflow: 'make' });
+
+const at = '2026-09-25T09:00:00.000Z';
+/** A run of one step that signed off, its card beside it in the inbox: what a store holds by the hundred. */
+function aFinishedRun(id: string): void {
+  const taskId = `${id}-implement`;
+  const journal = path.join(root, 'engine', 'tasks', `${taskId}.jsonl`);
+  fs.mkdirSync(path.dirname(journal), { recursive: true });
+  const events = [
+    { kind: 'filed', at, brief: 'Do it.', cwd: repo, maxAttempts: 1, harness: 'codex' },
+    { kind: 'starting', at, attempt: 1 },
+    { kind: 'spawned', at, attempt: 1 },
+    {
+      kind: 'ended',
+      at,
+      attempt: 1,
+      sessionId: `ae/${taskId}/1`,
+      observed: 'done',
+      reason: 'harness',
+      closeout: { outcome: 'done', summary: 'Did it.', needs: null, artifacts: [] },
+    },
+    { kind: 'settled', at, outcome: 'succeeded' },
+  ];
+  fs.writeFileSync(journal, events.map((e) => `${JSON.stringify(e)}\n`).join(''));
+  fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, 'runs', `${id}.json`),
+    JSON.stringify({
+      id,
+      repo,
+      baseRef: 'main',
+      workspace: repo,
+      branch: 'main',
+      isolate: true,
+      brief: `The brief of ${id}`,
+      createdAt: at,
+      workflowDir: path.join(root, 'no-such-workflow'),
+      workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }],
+      steps: { implement: { taskId, branch: `wf/${id}/implement` } },
+    }),
+  );
+  fs.mkdirSync(path.join(root, 'inbox'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'inbox', `card-${id}.md`), `Do ${id}.\n`);
+}
+/** Runs `r-<from>` to `r-<to - 1>` planted. */
+const planted = (from: number, to: number): void => {
+  for (let n = from; n < to; n++) aFinishedRun(`r-${String(n).padStart(3, '0')}`);
+};
+
+/** How many spans of each name `spans` holds, the most first. */
+const countsOf = (spans: Traced[]): Record<string, number> => {
+  const counts = new Map<string, number>();
+  for (const { name } of spans) counts.set(name, (counts.get(name) ?? 0) + 1);
+  return Object.fromEntries([...counts].sort((a, b) => b[1] - a[1]));
+};
+
+test("a request's trace shows its programs: the package's spans are children of the request's server span", async (t) => {
+  await t.test('GET /api/factories/<f>/commands records factoryCommandsOf under the server span, in its trace', async () => {
+    const spans = await spansOf('/api/factories/traced/commands');
+    const server = spans.find((s) => s.name === 'GET /api/factories/:name/commands');
+    assert.ok(server, `the server span: ${JSON.stringify(spans.map((s) => s.name))}`);
+    const program = spans.find((s) => s.name === 'factoryCommandsOf');
+    assert.ok(program, `the program's span: ${JSON.stringify(spans.map((s) => s.name))}`);
+    assert.equal(program.parent, server.spanId, "factoryCommandsOf is a child of the request's span");
+    assert.equal(program.traceId, server.traceId, 'in the same trace');
+  });
+  await t.test('the spans GET /api/runs and GET /api/cards export are bounded whatever the number of runs: no span per run', async () => {
+    planted(0, 5);
+    const runsFew = await spansOf('/api/runs');
+    const cardsFew = await spansOf('/api/cards');
+    planted(5, 50);
+    const runsMany = await spansOf('/api/runs');
+    const cardsMany = await spansOf('/api/cards');
+    t.diagnostic(`GET /api/runs: ${runsFew.length} spans over 5 runs, ${runsMany.length} over 50: ${JSON.stringify(countsOf(runsMany))}`);
+    t.diagnostic(
+      `GET /api/cards: ${cardsFew.length} spans over 5 runs, ${cardsMany.length} over 50: ${JSON.stringify(countsOf(cardsMany))}`,
+    );
+    const server = runsMany.find((s) => s.name === 'GET /api/runs');
+    assert.ok(server, 'the server span');
+    assert.ok(
+      runsMany.some((s) => s.parent === server.spanId),
+      "the list's programs are children of the request's span",
+    );
+    assert.equal(runsMany.length, runsFew.length, `GET /api/runs: ${JSON.stringify(countsOf(runsMany))}`);
+    assert.equal(cardsMany.length, cardsFew.length, `GET /api/cards: ${JSON.stringify(countsOf(cardsMany))}`);
+  });
 });

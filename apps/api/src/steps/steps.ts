@@ -343,14 +343,14 @@ async function readAgain(
  */
 export const steps = new Hono<ApiEnv>()
   .get('/api/runs/:runId/steps/:step/log', (c) =>
-    served(c, async ({ e, placeService, env, home }) => {
+    served(c, async ({ e, placeService, env, home, trace }) => {
       const id = c.req.param('runId');
       const step = c.req.param('step');
       const found = taskOfStep(id, step, home);
       if ('error' in found) return c.json({ error: found.error }, 404);
       const { taskId } = found;
       try {
-        const { output } = await runPlaced({ placeService, home }, e, LOGS.handler({ runId: id, step }, env, home));
+        const { output } = await runPlaced({ placeService, home, trace }, e, LOGS.handler({ runId: id, step }, env, home));
         return c.json(output === undefined ? ({ lines: [], truncated: false } satisfies StepLog) : tailOf(output, LOG_LINES));
       } catch (err) {
         const why = err instanceof Error ? err.message : String(err);
@@ -364,7 +364,7 @@ export const steps = new Hono<ApiEnv>()
     }),
   )
   .get('/api/runs/:runId/steps/:step/artifacts/:name', (c) =>
-    served(c, async ({ e, placeService, home }) => {
+    served(c, async ({ e, placeService, home, trace }) => {
       const id = c.req.param('runId');
       const step = c.req.param('step');
       const name = c.req.param('name');
@@ -372,7 +372,9 @@ export const steps = new Hono<ApiEnv>()
       if ('error' in found) return c.json({ error: found.error }, 404);
       const refused = refusedName(name);
       if (refused) return c.json({ error: refused }, 400);
-      const { file } = (await runPlaced({ placeService, home }, e, ARTIFACT.handler({ runId: id, step, name }))) as { file: Buffer | null };
+      const { file } = (await runPlaced({ placeService, home, trace }, e, ARTIFACT.handler({ runId: id, step, name }))) as {
+        file: Buffer | null;
+      };
       const pruned = found.run.pruned?.artifacts;
       if (!file && pruned) {
         return c.json(
@@ -395,7 +397,7 @@ export const steps = new Hono<ApiEnv>()
     }),
   )
   .get('/api/runs/:runId/steps/:step/files/:name', (c) =>
-    served(c, async ({ e, placeService, home }) => {
+    served(c, async ({ e, placeService, home, trace }) => {
       const id = c.req.param('runId');
       const step = c.req.param('step');
       const name = c.req.param('name');
@@ -403,7 +405,7 @@ export const steps = new Hono<ApiEnv>()
       if ('error' in found) return c.json({ error: found.error }, 404);
       const refused = refusedName(name);
       if (refused) return c.json({ error: refused }, 400);
-      const { folder, file } = (await runPlaced({ placeService, home }, e, FILE.handler({ runId: id, step, name }))) as {
+      const { folder, file } = (await runPlaced({ placeService, home, trace }, e, FILE.handler({ runId: id, step, name }))) as {
         folder: string | null;
         file: Buffer | null;
       };
@@ -427,7 +429,7 @@ export const steps = new Hono<ApiEnv>()
     }),
   )
   .get('/api/runs/:runId/steps/:step/path', (c) =>
-    served(c, async ({ e, placeService, home }) => {
+    served(c, async ({ e, placeService, home, trace }) => {
       const step = c.req.param('step');
       const found = taskOfStep(c.req.param('runId'), step, home);
       if ('error' in found) return c.json({ error: found.error }, 404);
@@ -435,7 +437,11 @@ export const steps = new Hono<ApiEnv>()
       if ('error' in asked) return c.json({ error: asked.error }, asked.status);
       if (!asked.taskId) return c.json({ taskId: null, try: asked.try, path: [], lifecycle: lifecycleGraph() } satisfies StepPath);
       try {
-        const whole = (await runPlaced({ placeService, home }, e, PATH.handler({ runId: found.run.id, step, task: asked.taskId }))) as {
+        const whole = (await runPlaced(
+          { placeService, home, trace },
+          e,
+          PATH.handler({ runId: found.run.id, step, task: asked.taskId }),
+        )) as {
           path: LifecycleTransition[];
         };
         const path = pathToTurn(whole.path, asked.turn);
@@ -452,14 +458,14 @@ export const steps = new Hono<ApiEnv>()
     }),
   )
   .get('/api/runs/:runId/steps/:step/transcript', (c) =>
-    served(c, async ({ e, placeService, home }) => {
+    served(c, async ({ e, placeService, home, trace }) => {
       const id = c.req.param('runId');
       const step = c.req.param('step');
       const found = taskOfStep(id, step, home);
       if ('error' in found) return c.json({ error: found.error }, 404);
       if (!found.taskId) return c.json({ events: [], cursor: null, live: false, open: false } satisfies StepTranscript);
       try {
-        const read = await readTranscript(e, { placeService, home }, id, step, found.taskId, c.req.query('after') || undefined);
+        const read = await readTranscript(e, { placeService, home, trace }, id, step, found.taskId, c.req.query('after') || undefined);
         return c.json(read satisfies StepTranscript);
       } catch (err) {
         if (err instanceof Unread) return c.json({ error: err.message }, err.status);
@@ -468,7 +474,7 @@ export const steps = new Hono<ApiEnv>()
     }),
   )
   .get('/api/runs/:runId/steps/:step/transcript/stream', (c) =>
-    served(c, async ({ e, placeService, home, followings, beats }) => {
+    served(c, async ({ e, placeService, home, followings, beats, trace }) => {
       const id = c.req.param('runId');
       const step = c.req.param('step');
       const found = taskOfStep(id, step, home);
@@ -485,7 +491,7 @@ export const steps = new Hono<ApiEnv>()
       const after = c.req.header('Last-Event-ID') || c.req.query('after') || undefined;
       let read: Read;
       try {
-        read = await readTranscript(e, { placeService, home }, id, step, taskId, after);
+        read = await readTranscript(e, { placeService, home, trace }, id, step, taskId, after);
       } catch (err) {
         if (err instanceof Unread) return c.json({ error: err.message }, err.status);
         throw err;
@@ -496,7 +502,7 @@ export const steps = new Hono<ApiEnv>()
           runtime: c.var.runtime,
           followings,
           e,
-          at: { placeService, home },
+          at: { placeService, home, trace },
           id,
           step,
           beatMs: beats.step ?? STEP_BEAT_MS,

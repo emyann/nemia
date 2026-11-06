@@ -28,7 +28,7 @@ import {
   type DeniedRule,
   type McpServer,
 } from './capabilities.ts';
-import { runPlaced, type Engine } from '../store.ts';
+import { runPlaced, type Engine, type RunsOn } from '../store.ts';
 import { listWorkflows, type InRequest, type WorkflowListing, type WorkflowSource, type WorkflowStepSpec } from '../workflows/workflows.ts';
 import type { PlaceService } from 'agent-orchestrator';
 
@@ -482,14 +482,9 @@ function stepReach(
  * so does one whose state could not be read, which is not an absence. The read is one short-lived harness session for the whole
  * record, and none at all for a default factory that records no server, which is the common case.
  */
-const statedByFactory = async (
-  servers: readonly McpServer[],
-  e: Engine['Service'],
-  placeService: PlaceService['Service'],
-  home: string,
-): Promise<McpServer[]> => {
+const statedByFactory = async (servers: readonly McpServer[], e: Engine['Service'], on: RunsOn, home: string): Promise<McpServer[]> => {
   if (!servers.length) return [...servers];
-  const listing = await runPlaced({ placeService, home }, e, FACTORY_SERVERS.handler({ factory: DEFAULT_FACTORY }, undefined, home)).catch(
+  const listing = await runPlaced({ ...on, home }, e, FACTORY_SERVERS.handler({ factory: DEFAULT_FACTORY }, undefined, home)).catch(
     () => undefined,
   );
   const by = new Map((listing?.servers ?? []).map((s) => [s.name, s.state]));
@@ -506,6 +501,7 @@ export async function capabilitiesWithSteps(
   {
     e,
     placeService,
+    trace,
     env,
     home,
     asker,
@@ -513,6 +509,7 @@ export async function capabilitiesWithSteps(
   }: {
     e: Engine['Service'];
     placeService: PlaceService['Service'];
+    trace: RunsOn['trace'];
     env: NodeJS.ProcessEnv;
     home: string;
     asker: AskServer;
@@ -520,10 +517,10 @@ export async function capabilitiesWithSteps(
   },
 ): Promise<CapabilitiesWithSteps> {
   const capabilities = await capabilitiesOf(repo, { env, asker });
-  capabilities.mcp = await statedByFactory(capabilities.mcp, e, placeService, home);
+  capabilities.mcp = await statedByFactory(capabilities.mcp, e, { placeService, trace }, home);
   let workflows: WorkflowListing[] = [];
   try {
-    workflows = await listWorkflows(e, placeService, repo, home, inRequest);
+    workflows = await listWorkflows(e, { placeService, trace }, repo, home, inRequest);
   } catch (err) {
     capabilities.warnings.push(`${err instanceof Error ? err.message : String(err)} What each step gets is not shown for any workflow.`);
   }

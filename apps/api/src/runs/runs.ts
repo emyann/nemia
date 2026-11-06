@@ -11,7 +11,6 @@ import {
   Informer,
   judgedUnlessUnreadable,
   viewsFor,
-  runWith,
   runLines,
   type RunLines,
   type RunObject,
@@ -124,16 +123,16 @@ export const runs = new Hono<ApiEnv>()
     }),
   )
   .get('/api/runs/:runId/decision', (c) =>
-    served(c, async ({ e, placeService, home, env }) => {
+    served(c, async ({ e, placeService, home, env, trace }) => {
       const id = c.req.param('runId');
       const run = findRun(id);
       if (!run) return c.json({ error: noSuchRun(id) }, 404);
-      const { unreadable } = await runWith(e, viewsFor(e, [run]));
+      const { unreadable } = await runPlaced({ placeService, home, trace }, e, viewsFor(e, [run]));
       const read = await runPlaced(
-        { placeService, home },
+        { placeService, home, trace },
         e,
         judgedUnlessUnreadable(run, unreadable, () =>
-          Effect.tryPromise({ try: () => decisionOf(run, e, { placeService, home }, env), catch: (err) => err }),
+          Effect.tryPromise({ try: () => decisionOf(run, e, { placeService, home, trace }, env), catch: (err) => err }),
         ),
       );
       if ('unreadable' in read) return c.json({ error: read.unreadable }, 502);
@@ -141,8 +140,8 @@ export const runs = new Hono<ApiEnv>()
     }),
   )
   .get('/api/runs/:runId/concluded', (c) =>
-    served(c, async ({ e, placeService, home }) =>
-      c.json(await runPlaced({ placeService, home }, e, CONCLUDED.handler({ runId: c.req.param('runId') }))),
+    served(c, async ({ e, placeService, home, trace }) =>
+      c.json(await runPlaced({ placeService, home, trace }, e, CONCLUDED.handler({ runId: c.req.param('runId') }))),
     ),
   )
   .get('/api/listing', (c) => subResource(c, LS, selectorOf(c)))
@@ -172,10 +171,10 @@ const SHOW = commandNamed('show');
 export type RawRecord = Readonly<Record<string, unknown>>;
 
 /** `GET /api/runs/:runId?raw=…`: the record for `raw=true`, else a 422 naming it. */
-async function rawRecord(c: Context<ApiEnv>, { e, placeService, env, home }: Served, id: string, raw: string) {
+async function rawRecord(c: Context<ApiEnv>, { e, placeService, env, home, trace }: Served, id: string, raw: string) {
   if (raw !== 'true')
     return c.json({ error: `GET /api/runs/${id} takes raw=true for the run's record, or no raw for the run object: not raw=${raw}.` }, 422);
   if (!findRun(id)) return c.json({ error: noSuchRun(id) }, 404);
-  const record: RawRecord = await runPlaced({ placeService, home }, e, SHOW.handler({ runId: id, raw: true }, env, home));
+  const record: RawRecord = await runPlaced({ placeService, home, trace }, e, SHOW.handler({ runId: id, raw: true }, env, home));
   return c.json(record);
 }

@@ -441,7 +441,9 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
       });
       assert.deepEqual(
         saved.workflow,
-        (await listWorkflows(engine(), builtinGitPlace, repo, root, inRoot)).find((w) => w.name === 'fresh'),
+        (await listWorkflows(engine(), { placeService: builtinGitPlace, trace: undefined }, repo, root, inRoot)).find(
+          (w) => w.name === 'fresh',
+        ),
       );
       assert.equal(saved.workflow.from, 'yours');
       assert.deepEqual(
@@ -483,7 +485,9 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
       assert.deepEqual(snapshot(dir), before, 'byte for byte');
       assert.deepEqual(
         saved.workflow,
-        (await listWorkflows(engine(), builtinGitPlace, repo, root, inRoot)).find((w) => w.name === 'as-listed' && w.from === 'yours'),
+        (await listWorkflows(engine(), { placeService: builtinGitPlace, trace: undefined }, repo, root, inRoot)).find(
+          (w) => w.name === 'as-listed' && w.from === 'yours',
+        ),
         'answered as the listing reads it',
       );
     },
@@ -536,7 +540,9 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
       assert.equal(saved.workflow.readme, '# drawn\n\nPlan, build, review.\n', 'the README it wrote, whole');
       assert.deepEqual(
         saved.workflow,
-        (await listWorkflows(engine(), builtinGitPlace, repo, root, inRoot)).find((w) => w.name === 'drawn'),
+        (await listWorkflows(engine(), { placeService: builtinGitPlace, trace: undefined }, repo, root, inRoot)).find(
+          (w) => w.name === 'drawn',
+        ),
         'answered as the listing reads it',
       );
 
@@ -782,7 +788,7 @@ test('a step with an agent on the board: listed resolved, with its layers and se
           (e: Error) => e.message.includes('gives the skill `mind-the-cache`') && e.message.includes('no skills folder has it'),
           'read with its own place alone, the skill is not there',
         );
-        const listing = (await listWorkflows(engine(), builtinGitPlace, repo, root, inRoot)).find(
+        const listing = (await listWorkflows(engine(), { placeService: builtinGitPlace, trace: undefined }, repo, root, inRoot)).find(
           (w) => w.name === 'skilled' && w.from === 'yours',
         );
         assert.equal(
@@ -892,7 +898,9 @@ test("versionOf: what moves a folder's version — the agents its steps name, th
           }),
         );
         write(path.join(dir, 'judge.md'), `---\nplace: git\n${line}\n---\n`);
-        const listing = (await listWorkflows(engine(), builtinGitPlace, repo, root, inRoot)).find((w) => w.name === `version-${folder}`);
+        const listing = (await listWorkflows(engine(), { placeService: builtinGitPlace, trace: undefined }, repo, root, inRoot)).find(
+          (w) => w.name === `version-${folder}`,
+        );
         assert.equal(
           listing?.steps[0]?.spec.agent,
           'critic',

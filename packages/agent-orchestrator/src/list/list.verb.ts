@@ -103,8 +103,9 @@ export type RunReading = Listing & {
  * (`exitVerdicts`), never its output or logs: the check prints the code it exits with, so the two agree, and a read of either per refused
  * check would cost every poll of the list. The runs it waits on and is held until are each read once (`parentsRead`), and where its result
  * branches stand is asked once its status is known.
+ * Untraced: a list runs it once per run, and a span each would bury the list's trace under hundreds.
  */
-export const runReading = Effect.fn('runReading')(function* (e: Engine, run: Run, how: ReadingHow) {
+export const runReading = Effect.fnUntraced(function* (e: Engine, run: Run, how: ReadingHow) {
   const { git } = how;
   const steps = how.steps ?? (yield* stepsOf(run));
   const views = how.views ?? (yield* taskPhasesRead(run).pipe(over(e))).views;

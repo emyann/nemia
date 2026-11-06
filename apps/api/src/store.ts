@@ -5,7 +5,7 @@
  * tasks, its workflow and steps, the feed's filing times, the run judged as its object — is the package's (`viewsFor`, `workflowsOf`,
  * `filedTimes`, `runObject`).
  */
-import { Context, Effect, Layer } from 'effect';
+import { Context, Effect, Layer, Tracer } from 'effect';
 import {
   asked,
   type Command,
@@ -111,14 +111,37 @@ export function taskOfStep(id: string, step: string, home: string): { run: Run; 
 }
 
 /**
- * A package program run for a request: over the engine `e` (`runWith`), the place the app's layer gave and the store's root (`at`). Rejects
- * with what the program failed with or died of, as `runWith` does.
+ * A package program run for a request: over the engine `e` (`runWith`), the place the app's layer gave and the store's root (`at`), its
+ * spans children of the request's own on the app's tracer where `at.trace` names them (`RequestTrace`). Rejects with what the program
+ * failed with or died of, as `runWith` does.
  */
 export const runPlaced = <A, E>(
   at: Placed,
   e: Engine['Service'],
   program: Effect.Effect<A, E, EngineService | PlaceService | StoreRoot>,
-): Promise<A> => runWith(e, program.pipe(Effect.provideService(PlaceService, at.placeService), Effect.provideService(StoreRoot, at.home)));
+): Promise<A> =>
+  runWith(
+    e,
+    tracedIn(at.trace, program.pipe(Effect.provideService(PlaceService, at.placeService), Effect.provideService(StoreRoot, at.home))),
+  );
 
-/** Where a request's package program runs: the place the app's layer gave, and the store's root (`Served.placeService`, `Served.home`). */
-export type Placed = { readonly placeService: PlaceService['Service']; readonly home: string };
+/**
+ * The trace a request's programs join: the tracer of the app's runtime, and the request's server span (`saidRequest`,
+ * request/request.ts). A program `runWith` runs starts a fiber of its own, outside the app's runtime, so without it its spans would go to
+ * Effect's default tracer, each a root of its own, and never reach the collector.
+ */
+export type RequestTrace = { readonly tracer: Tracer.Tracer; readonly span: Tracer.AnySpan };
+
+/** `program` traced on the request's tracer under its span, or as it was where there is none. */
+const tracedIn = <A, E, R>(trace: RequestTrace | undefined, program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+  trace === undefined ? program : program.pipe(Effect.withParentSpan(trace.span), Effect.withTracer(trace.tracer));
+
+/**
+ * Where a request's package program runs: the place the app's layer gave, the store's root, and the trace its spans join
+ * (`Served.placeService`, `Served.home`, `Served.trace`). `trace` is required, so that a site that has a request's names it, and one that
+ * has none says so with `undefined`.
+ */
+export type Placed = { readonly placeService: PlaceService['Service']; readonly home: string; readonly trace: RequestTrace | undefined };
+
+/** The place a helper's package programs run on and the trace they join, without the root it takes apart: a request's `Served` is one. */
+export type RunsOn = Pick<Placed, 'placeService' | 'trace'>;

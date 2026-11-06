@@ -196,8 +196,8 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .get('/api/health', (c) => c.json({ ok: true }))
     .get('/api/version', (c) => c.json({ version: VERSION, release: RELEASE }))
     .get('/api/capabilities', (c) =>
-      served(c, async ({ e, placeService, env, repo, home, mcp, inRequest }) =>
-        c.json(await capabilitiesWithSteps(repo, { e, placeService, env, home, asker: mcp, inRequest })),
+      served(c, async ({ e, placeService, env, repo, home, mcp, inRequest, trace }) =>
+        c.json(await capabilitiesWithSteps(repo, { e, placeService, trace, env, home, asker: mcp, inRequest })),
       ),
     )
     .route('/', workflows)
@@ -213,17 +213,21 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', stats)
     .get('/api/ceilings', (c) => served(c, async (s) => c.json(await ceilingsOf(s))))
     .get('/api/passes', (c) =>
-      served(c, async ({ e, placeService, home }) => c.json(await passesOf(e, { placeService, home }, c.req.query('last')))),
+      served(c, async ({ e, placeService, home, trace }) => c.json(await passesOf(e, { placeService, home, trace }, c.req.query('last')))),
     )
     .get('/api/series', (c) =>
-      served(c, async ({ e, placeService, memo, home }) =>
-        c.json(await seriesOf(e, { placeService, home }, c.req.query('range'), memo.series)),
+      served(c, async ({ e, placeService, memo, home, trace }) =>
+        c.json(await seriesOf(e, { placeService, home, trace }, c.req.query('range'), memo.series)),
       ),
     )
     .get('/api/metrics', async (c) => c.json(metricsOf(await runtime.runPromise(Metric.snapshot))))
-    .get('/api/pause', (c) => served(c, async ({ e, placeService, home }) => c.json(await pauseOf(e, { placeService, home }))))
+    .get('/api/pause', (c) =>
+      served(c, async ({ e, placeService, home, trace }) => c.json(await pauseOf(e, { placeService, home, trace }))),
+    )
     .get('/api/pause/now', (c) =>
-      served(c, async ({ e, placeService, memo, home }) => c.json(await pauseNowOf(e, { placeService, home }, memo.records.pause))),
+      served(c, async ({ e, placeService, memo, home, trace }) =>
+        c.json(await pauseNowOf(e, { placeService, home, trace }, memo.records.pause)),
+      ),
     )
     .get('/api/daemon', (c) => c.json(readDaemon()))
     .get('/api/quota', (c) =>

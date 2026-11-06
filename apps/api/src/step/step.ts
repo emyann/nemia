@@ -232,7 +232,7 @@ const AGENTS = commandNamed('agents');
  *   into it, with those it can (`hiring`).
  */
 export const step = new Hono<ApiEnv>().get('/api/workflows/:from/:name/:step', (c) =>
-  served(c, async ({ e, placeService, env, repo, home, factory, memo, inRequest }) => {
+  served(c, async ({ e, placeService, env, repo, home, factory, memo, inRequest, trace }) => {
     const { from, name, step: asked } = c.req.param();
     if (from !== 'repo' && from !== 'yours') {
       return c.json(
@@ -247,7 +247,7 @@ export const step = new Hono<ApiEnv>().get('/api/workflows/:from/:name/:step', (
     const folder = folderOf(name, from, repo, home, factory?.tree);
     if ('status' in folder) return c.json({ error: folder.error }, folder.status);
     const args = { from, name, step: asked, dir: folder.dir, repo, ...(factory && { factory: factory.name }) };
-    const { step: found, steps } = (await runPlaced({ placeService, home }, e, STEP.handler(args, undefined, home))) as {
+    const { step: found, steps } = (await runPlaced({ placeService, home, trace }, e, STEP.handler(args, undefined, home))) as {
       step: Workflow | null;
       steps: string[];
     };
@@ -263,7 +263,8 @@ export const step = new Hono<ApiEnv>().get('/api/workflows/:from/:name/:step', (
     );
     const layers = toldLayers(found, null);
     const hired = factory ? (fillsOf(factory.hires, name)[found.name] ?? null) : null;
-    const agents = async () => ((await runPlaced({ placeService, home }, e, AGENTS.handler({ repo }, env, home))) as AgentsRead).agents;
+    const agents = async () =>
+      ((await runPlaced({ placeService, home, trace }, e, AGENTS.handler({ repo }, env, home))) as AgentsRead).agents;
     return c.json({
       workflow: name,
       from,

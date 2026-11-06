@@ -259,7 +259,7 @@ test('a repository skill linked inside the repository lists under repo, read, wi
     const inside = rowOf(places, 'repo', 'inside')!;
     assert.equal(inside.error, null);
     assert.equal(inside.entry?.description, 'Kept inside.');
-    const page = await skillDetail(engine(), builtinGitPlace, inRoot, 'repo', 'inside', repo, root);
+    const page = await skillDetail(engine(), { placeService: builtinGitPlace, trace: undefined }, inRoot, 'repo', 'inside', repo, root);
     assert.equal(page?.skill.entry?.description, 'Kept inside.');
     assert.match(page?.version ?? '', /^[0-9a-f]{16}$/);
 
@@ -268,7 +268,7 @@ test('a repository skill linked inside the repository lists under repo, read, wi
     assert.equal(apart.entry, null);
     assert.equal(apart.cost, null, 'nothing of what it points at is read');
     assert.match(apart.error ?? '', /^apart is a link, and what it points at is outside the folder of skills/);
-    const refused = await skillDetail(engine(), builtinGitPlace, inRoot, 'repo', 'apart', repo, root);
+    const refused = await skillDetail(engine(), { placeService: builtinGitPlace, trace: undefined }, inRoot, 'repo', 'apart', repo, root);
     assert.equal(refused?.skill.entry, null);
     const res = await pageOf('repo', 'apart');
     assert.equal(res.status, 200, 'its page answers, and says the refusal');
@@ -286,7 +286,7 @@ test('a repository skill linked inside the repository lists under repo, read, wi
 
 test('a builtin skill says where an agent of yours already finds its name: in your library, in the repository, or nowhere yet', async () => {
   const yoursRead = await Effect.runPromise(Effect.provideService(yourSkillsRead(repo, root, TEAM_SKILLS), StoreRoot, root));
-  const places = await listSkills(engine(), builtinGitPlace, repo, root, yoursRead);
+  const places = await listSkills(engine(), { placeService: builtinGitPlace, trace: undefined }, repo, root, yoursRead);
   assert.equal(rowOf(places, 'builtin', inLibrary)!.found, 'yours');
   assert.equal(rowOf(places, 'builtin', inRepo)!.found, 'repo');
   assert.equal(rowOf(places, 'builtin', toCopy)!.found, null);
@@ -471,7 +471,8 @@ test("a skill's page says what it says, what it costs a turn, the agents of eith
     assert.equal(broken.body, '# Scratch\n\nNo frontmatter.');
     assert.match(broken.skill.error ?? '', /has no frontmatter/);
     assert.equal(
-      (await skillDetail(engine(), builtinGitPlace, inRoot, 'builtin', toCopy, repo, root, TEAM_SKILLS))?.copyHint,
+      (await skillDetail(engine(), { placeService: builtinGitPlace, trace: undefined }, inRoot, 'builtin', toCopy, repo, root, TEAM_SKILLS))
+        ?.copyHint,
       null,
       'a builtin skill is copied with the board, not by hand',
     );

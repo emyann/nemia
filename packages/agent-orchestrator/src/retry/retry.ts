@@ -52,6 +52,7 @@ import { allowRuleOf, disallowedBy, type DeniedAt } from '../keys/index.ts';
 import { heldLater } from '../round/round.ts';
 import { answersOr } from '../question/index.ts';
 import type { MostSpent, RaiseVerdictOf } from '../../contracts/raise.contract.ts';
+import type { RaiseBy } from 'objects';
 
 /**
  * What a person may ask for a step, and the status that says why. Pure.
@@ -228,7 +229,7 @@ export type RaiseReads = {
  * `unsigned`, `failed (check)`, `failed`, `stopped`, `denied` or `budget exhausted`. Over its budget, a step's word is `over budget`, so
  * the word alone does not say which. For a round, no modes, and `own` null: a round is asked for as it is, with a budget.
  */
-export type StepRaise = { by: 'retry' | 'round'; above: number; said: string; modes: RetryMode[]; own: StepStatus | null };
+export type StepRaise = { by: RaiseBy; above: number; said: string; modes: RetryMode[]; own: StepStatus | null };
 
 /**
  * A step's raise (`StepRaise`, null for none), and what `nemia decide` words it with: `retry`, the try's raise behind a raise by retry —

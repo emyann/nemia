@@ -8,9 +8,10 @@ import type { Run } from '../record/record.ts';
 import { approvalOf, budgetOf, dollars, hasGate, runSpend, spentWord, stepSpend, type SpendOf } from '../status/status.ts';
 import type { Workflow } from '../step/step.ts';
 import { aboveTheWorkflow, budgetRefusals, ceilingsOf, proposedBudgets } from '../budget/budget.ts';
+import type { GateBudgetsFrom } from 'objects';
 
 /** Where a gate's budgets come from: its step's closeout, before the approval, or the approval itself. */
-export type GateBudgetsFrom = 'proposed' | 'approved';
+export type { GateBudgetsFrom };
 
 /**
  * One budget at a gate: the step, the amount and its words, why the step proposed it (null where the person gave the amount), the step's

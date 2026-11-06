@@ -4,12 +4,13 @@
  * its plural and one per `<plural>/<sub>`, their verbs in Kubernetes' words. Pure.
  */
 import type { ResourcesOf } from '../../contracts/discovery.contract.ts';
+import { RESOURCE_VERBS, type ResourceVerb } from 'objects';
 
 /** A method a route of the `Api` answers, as discovery reads it. */
 export type RouteMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 /** A verb of a resource, in Kubernetes' words, as `objects` names them (`RESOURCE_VERBS`). */
-export type ResourceVerb = 'get' | 'list' | 'watch' | 'create' | 'update' | 'patch' | 'delete';
+export type { ResourceVerb };
 
 /**
  * A route as its path reads: the plural after `/api/` or `/api/namespaces/:namespace/`, whether it is under a namespace, whether a name
@@ -61,7 +62,7 @@ export const routeOf = (method: string, path: string): ApiRoute | null => {
 };
 
 /** Every verb, in the order discovery names them. */
-const VERBS: readonly ResourceVerb[] = ['get', 'list', 'watch', 'create', 'update', 'patch', 'delete'];
+const VERBS: readonly ResourceVerb[] = RESOURCE_VERBS;
 
 /** The verb a method is, said of one object: what a sub-resource's route does, and a kind's route of one by its name. */
 const verbOfMethod = (method: RouteMethod): ResourceVerb =>

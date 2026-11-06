@@ -7,7 +7,7 @@
  * it may call. Pure; the file is `servers.store.ts`'s and the verbs `servers.verb.ts`'s.
  */
 import { SERVER_NAME } from '../keys/index.ts';
-import { HEADER_MASK } from 'objects';
+import { HEADER_MASK, type McpTransport } from 'objects';
 import type { HeaderWrittenOf } from '../../contracts/header-mask.contract.ts';
 
 /** The header a factory refuses to record by name: a person types no secret, and a server signs in instead. */
@@ -20,7 +20,7 @@ export const REFUSED_HEADER = 'authorization';
  * not.
  */
 export type FactoryServer = {
-  readonly type: 'http' | 'sse';
+  readonly type: McpTransport;
   readonly url: string;
   readonly headers?: Readonly<Record<string, string>>;
   readonly oauth?: { readonly clientId: string; readonly callbackPort?: number };

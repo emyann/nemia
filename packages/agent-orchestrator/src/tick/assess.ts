@@ -25,6 +25,7 @@ import type { CheckoutHold } from '../cap/cap.ts';
 import { roundsDue } from '../round/round.ts';
 import { conditionOf, nodeFate, nodeKind } from '../route/index.ts';
 import { answeredRoute, routedWords } from '../routed/index.ts';
+import type { RunStatusWord } from 'objects';
 
 export type Assessment = {
   /**
@@ -55,7 +56,7 @@ export type Assessment = {
    * gate, and `waiting` when a person's word is what stops it otherwise — a step that signed off blocked, or unsigned, a loop out of
    * rounds, a cap reached (`stoppedOnWord`). Each of the three is a run that stopped: it is at rest, and no longer in flight.
    */
-  status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'waiting';
+  status: RunStatusWord;
   /**
    * What a person has to decide about the run's result, when the run is at it and nobody has (`toDecide`). Absent while there is nothing.
    */

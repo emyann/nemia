@@ -6,16 +6,17 @@
  * Pure, and naming no agent: admission and a subscription read a factory's level against a floor the same way for any agent. The files are
  * `level.store.ts`'s, and the levels now, the store's own folded in, are `levels.verb.ts`.
  */
+import { LEVELS, type Level } from 'objects';
 
 /**
  * The levels a person sets, lowest first: `manual`, left alone; `semi-auto`, worked on, what waits on the person asked of them, and a
  * write that cannot be undone or changes their settings or a factory; `auto`, as `semi-auto`, but an answer the person's confirmed list
  * allows in the run's state is given unasked (`auto/`).
  */
-export const LEVELS = ['manual', 'semi-auto', 'auto'] as const;
+export { LEVELS };
 
 /** A level a person sets. */
-export type Level = (typeof LEVELS)[number];
+export type { Level };
 
 /** Whether `level` is `floor` or above it. Pure. */
 export const atLeast = (level: Level, floor: Level): boolean => LEVELS.indexOf(level) >= LEVELS.indexOf(floor);

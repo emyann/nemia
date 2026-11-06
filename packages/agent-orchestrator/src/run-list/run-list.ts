@@ -5,7 +5,7 @@
  * asked by `status.state=finished` answers (`finishedBefore`, proved by contracts/finished-order.contract.ts), with the `continue` token
  * that names a place in it (`finishedToken`, `finishedAfter`) and the page it cuts (`finishedPageOf`).
  */
-import { DEFAULT_NAMESPACE, type RunState } from 'objects';
+import { DEFAULT_NAMESPACE, RUN_STATES, type RunState } from 'objects';
 import type { FinishedBefore, FinishedKey } from '../../contracts/finished-order.contract.ts';
 import type { RunNamespace } from '../../contracts/run-namespace.contract.ts';
 import type { RunStateSelector, RunStateSelectorOf } from '../../contracts/run-state-selector.contract.ts';
@@ -22,7 +22,7 @@ export const runNamespace: RunNamespace = (factory) => factory ?? DEFAULT_NAMESP
 const FIELD = 'status.state';
 
 /** `word` as a run's state, or null where it is none. */
-const stateOf = (word: string): RunState | null => (word === 'waiting' || word === 'inFlight' || word === 'finished' ? word : null);
+const stateOf = (word: string): RunState | null => RUN_STATES.find((s) => s === word) ?? null;
 
 /** The selector `text` spells (`RunStateSelector`): `status.state`, then `==`, `!=` or `=`, then a run's state; null for anything else. */
 export const runStateSelector: RunStateSelectorOf = (text) => {

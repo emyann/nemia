@@ -4,9 +4,10 @@
  * Which object a key names, the order of the events and the BOOKMARK between reads are the door's. Pure.
  */
 import type { WatchChanges } from '../../contracts/watch-changes.contract.ts';
+import type { WatchEventType } from 'objects';
 
 /** What a watch says of one object, as `objects` names them (`WATCH_EVENT_TYPES` but `BOOKMARK`). */
-export type WatchChangeType = 'ADDED' | 'MODIFIED' | 'DELETED';
+export type WatchChangeType = Exclude<WatchEventType, 'BOOKMARK'>;
 
 /**
  * An object of a list, by its key, unique in the list, and its version: the object as its list's route compares it, its JSON as served

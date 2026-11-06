@@ -14,6 +14,7 @@ import { untrustedLines, type Untrusted } from '../trust/trust.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { settingLines, type SettingsAsRead } from '../harness-settings/harness-settings.ts';
+import type { ConditionStatus, FactoryConditionReason, FactoryConditionType, RevisionsPolicy } from 'objects';
 
 /** The one default factory's name: listed by `nemia factory ls`, refused to `nemia factory add` and `nemia factory rm`. */
 export const DEFAULT_FACTORY = 'default';
@@ -51,10 +52,10 @@ export type Schedule = { cron: string; brief: string; repo?: string; tz?: string
  * skills and rules as the files hold them then; `pinned` (`IfNotPresent`), a run keeps what it resolved at its first filing until
  * `nemia refresh`. Pinned when the factory says nothing.
  */
-export const REVISIONS_POLICIES = ['follow', 'pinned'] as const;
+export const REVISIONS_POLICIES = ['follow', 'pinned'] as const satisfies readonly RevisionsPolicy[];
 
 /** A factory's revisions policy: one of `REVISIONS_POLICIES`. */
-export type RevisionsPolicy = (typeof REVISIONS_POLICIES)[number];
+export type { RevisionsPolicy };
 
 /** What a factory says nothing of its revisions means: its runs keep what they resolved. */
 export const DEFAULT_REVISIONS: RevisionsPolicy = 'pinned';
@@ -164,10 +165,10 @@ export function instructionPathRefusal(p: string): string | undefined {
 export type FactoryListing = (Factory & { file: string; status?: TemplateStatus }) | { name: string; file: string; error: string };
 
 /** The conditions the controller says of a templated factory: whether its base holds the template, and whether an upgrade waits. */
-export const FACTORY_CONDITION_TYPES = ['Applied', 'ConflictsPending'] as const;
+export const FACTORY_CONDITION_TYPES = ['Applied', 'ConflictsPending'] as const satisfies readonly FactoryConditionType[];
 
 /** Which condition a factory's is (`FACTORY_CONDITION_TYPES`). */
-export type FactoryConditionType = (typeof FACTORY_CONDITION_TYPES)[number];
+export type { FactoryConditionType };
 
 /** Why a condition is what it is, one word each, as the controller writes them (`condition` in `applied/applied.verb.ts`). */
 export const FACTORY_CONDITION_REASONS = [
@@ -182,16 +183,16 @@ export const FACTORY_CONDITION_REASONS = [
   'Merged',
   'UpgradePending',
   'Conflicts',
-] as const;
+] as const satisfies readonly FactoryConditionReason[];
 
 /** Why a factory's condition holds or not (`FACTORY_CONDITION_REASONS`); the sentence a person reads is its `message`. */
-export type FactoryConditionReason = (typeof FACTORY_CONDITION_REASONS)[number];
+export type { FactoryConditionReason };
 
 /** Whether a factory's condition holds, as Kubernetes words it. */
-export const FACTORY_CONDITION_STATUSES = ['True', 'False'] as const;
+export const FACTORY_CONDITION_STATUSES = ['True', 'False'] as const satisfies readonly ConditionStatus[];
 
 /** One of `FACTORY_CONDITION_STATUSES`. */
-export type FactoryConditionStatus = (typeof FACTORY_CONDITION_STATUSES)[number];
+export type FactoryConditionStatus = ConditionStatus;
 
 /**
  * A condition of a factory made from a template, as Kubernetes words one: its type, `True` or `False`, a reason, a sentence, and when its

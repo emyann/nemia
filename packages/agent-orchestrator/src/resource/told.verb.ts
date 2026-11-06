@@ -11,6 +11,7 @@ import type { PlaceService } from '../place/place.store.ts';
 import { type Bridge, bridgeOf } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { HARNESSES, remoteAgents } from '../runtime-client.ts';
+import type { HandedHow, RunsInBy } from 'objects';
 
 /**
  * What the engine filed a step's current try with, off its record of the task: what the step runs with where its workflow
@@ -37,7 +38,7 @@ export type StepFiled = {
    * (`filed`); the harness's choice when none was — `auto` for Claude Code, `workspace-write` for Codex (`default`); or, for Codex,
    * `read-only` because `tools` has none that writes, whatever was named (`tools`). Null for a harness the api cannot ask.
    */
-  runsIn: { mode: string; by: 'filed' | 'default' | 'tools' } | null;
+  runsIn: { mode: string; by: RunsInBy } | null;
   /**
    * The remote A2A agent the try was sent to, for a step that says `harness: a2a:<name>` (`remoteOf`): its name, and its address as the
    * store's `a2a-agents.json` gives it now — origin and path, never a query or a secret, which is never in the file — or null where the
@@ -80,7 +81,7 @@ function briefOf(
  * says — `waited` for a run it waited on (`after`), `read` for one handed as context (`context`) — and none for a run the record names in
  * neither.
  */
-export type TaskPart = { kind: 'text'; text: string } | (Extract<HandedPart, { kind: 'from' }> & { how?: 'waited' | 'read' });
+export type TaskPart = { kind: 'text'; text: string } | (Extract<HandedPart, { kind: 'from' }> & { how?: HandedHow });
 
 /** `task` split into its parts (`handedParts`), each `## From run` section's `how` read off `run`. */
 function taskPartsOf(run: Run, task: string): TaskPart[] {

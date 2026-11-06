@@ -8,6 +8,7 @@ import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
 import { HARNESS_FENCE_KEYS } from '../harness/harness.ts';
 import { SKILL_NAME } from '../keys/index.ts';
 import { REVISIONS_POLICIES, type RevisionsPolicy } from '../factory/factory.ts';
+import type { TemplateParameterType } from 'objects';
 
 /** The schema every document of a template is written in. */
 export const API_VERSION = 'nemia.dev/v1alpha1';
@@ -34,7 +35,7 @@ export type Value<T> = T | ParamRef;
 export type Text = string | { path: string } | ParamRef;
 
 /** A value the person gives when the template is applied: its type, what it is for, and the value taken when they give none. */
-export type Parameter = { type: 'string' | 'number' | 'boolean'; description: string; default?: string | number | boolean };
+export type Parameter = { type: TemplateParameterType; description: string; default?: string | number | boolean };
 
 /** What a harness's block fences: the word of its fence key, and the tool lists of a harness that takes them. */
 export type Fence = Readonly<Record<string, string | readonly string[]>>;

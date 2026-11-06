@@ -21,7 +21,7 @@ import { DEFAULT_FACTORY, noFactoryLine } from '../factory/factory.ts';
 import { readFactories } from '../factory/factory.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { factoryServers, factoryServersFile } from './servers.store.ts';
-import { HEADER_MASK } from 'objects';
+import { HEADER_MASK, type McpTransport } from 'objects';
 import { factoryServerRefusal, headerWritten, maskedHeaders, serverNameRefusal, type FactoryServers } from './servers.ts';
 
 /** The text under `key`, as the spec read it. */
@@ -30,7 +30,7 @@ const textOf = (args: Args, key: string): string => (typeof args[key] === 'strin
 /** One server of a factory's record as a listing gives it: its facts, and the harness's word for its state, or `null` where unread. */
 export type ServerListed = {
   readonly name: string;
-  readonly type: 'http' | 'sse';
+  readonly type: McpTransport;
   readonly url: string;
   readonly headers?: Readonly<Record<string, string>>;
   readonly oauth?: { readonly clientId: string; readonly callbackPort?: number };
@@ -284,7 +284,7 @@ export const FACTORY_SERVER_ADD: Command<Added> = {
         const headers = headersOf(args);
         const oauth = oauthOf(args);
         const server = {
-          type: transport as 'http' | 'sse',
+          type: transport as McpTransport,
           url: textOf(args, 'url'),
           ...(headers === undefined ? {} : { headers }),
           ...(oauth === undefined ? {} : { oauth }),

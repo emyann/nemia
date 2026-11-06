@@ -23,7 +23,7 @@
  *
  * Pure: no disk, no process, no engine. `file.verb.ts` is the file that files these.
  */
-import { isRepositoryRun, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
+import { isRepositoryRun, type Run, type StepRecord, type StepStatus, type TaskPhase } from '../record/record.ts';
 import { endsOnBase, type Workflow } from '../step/step.ts';
 import { outOfMemoryWords } from '../out-of-memory/out-of-memory.ts';
 import type { KilledAtLimit } from '../../contracts/out-of-memory.contract.ts';
@@ -475,7 +475,7 @@ export const onItsCheck = (
   step: Workflow,
   record: StepRecord,
   phaseOf: (taskId: string) => TaskPhase,
-): 'verified' | 'failed (check)' | 'failed' | 'checking' => {
+): Extract<StepStatus, 'verified' | 'failed (check)' | 'failed' | 'checking'> => {
   const check = record.check ? phaseOf(record.check.taskId) : undefined;
   if (endsOnBase(step)) {
     if (!record.landed) return 'checking';

@@ -7,15 +7,16 @@
  * digest, so a number can be compared.
  */
 import { createHash } from 'node:crypto';
+import type { RevisionKind } from 'objects';
 
 /** The kinds a run resolves and a revision is kept for: its workflow folder, each step's agent, each skill, and the factory's rules. */
-export type RevisionKind = 'workflow' | 'agent' | 'skill' | 'rules';
+export type { RevisionKind };
 
 /**
  * The kinds, in the order a run's pins and the board's drift are read in: `objects`' words (`packages/objects/src/words.ts`), held
  * equal by `wordsHeld` (`object/run.model.ts`).
  */
-export const REVISION_KINDS: readonly RevisionKind[] = ['workflow', 'agent', 'skill', 'rules'];
+export const REVISION_KINDS = ['workflow', 'agent', 'skill', 'rules'] as const satisfies readonly RevisionKind[];
 
 /** One thing a revision is kept for: its kind, and its name within the kind — a workflow folder's, an agent's, a skill's, a factory's. */
 export type KindName = { kind: RevisionKind; name: string };

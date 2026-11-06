@@ -5,6 +5,7 @@
 import type { Workflow } from '../step/step.ts';
 import { fenced, prunedWords, tryOf, type Run, type TaskPhase } from '../record/record.ts';
 import { holdWord } from '../wait/wait.ts';
+import type { SaidAfter } from 'objects';
 
 /**
  * A person's words, said to a step's session while it ran (`nemia say`), as the engine journalled them: when, to which attempt of the
@@ -18,7 +19,7 @@ export type Said = { at: string; attempt: number; text: string; after?: { kind: 
  * The kind of the transcript event a said message follows: the runtime's `TranscriptEvent['kind']`, written out here because this file
  * imports no runtime, and held equal to it in `runtime-client.ts` (`saidAfterKindHeld`).
  */
-export type SaidAfterKind = 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'system';
+export type SaidAfterKind = SaidAfter;
 
 /** What was said to one of a step's tries: the engine's entry, and the try whose task it is on. */
 export type SaidTo = Said & { try: number };

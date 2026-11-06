@@ -33,6 +33,7 @@ import {
 } from '../record/record.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
 import type { OwnStatus, WhereAStepStands } from '../../contracts/standing.contract.ts';
+import type { PeakMark } from 'objects';
 
 /**
  * Whether a step's closeout waits for a person before anything after it is filed: its own `gate: true`, or a gate the run was started with.
@@ -901,7 +902,7 @@ export const LARGE_CONTEXT = 200_000;
  * of its window, or its peak got there — and `large` past `LARGE_CONTEXT` on a step with none. Null otherwise, and where nobody measured
  * either.
  */
-export function peakMark(u: Consumed | null | undefined, cap: number | undefined): 'cap' | 'large' | null {
+export function peakMark(u: Consumed | null | undefined, cap: number | undefined): PeakMark | null {
   const peak = u?.peakContextTokens;
   if (cap !== undefined) return u?.compactions || (peak !== undefined && peak >= cap) ? 'cap' : null;
   return peak !== undefined && peak > LARGE_CONTEXT ? 'large' : null;

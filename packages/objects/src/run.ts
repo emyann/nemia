@@ -9,7 +9,8 @@
  * writes each into a document that imports back into a Schema decoding the same object.
  */
 import { Schema } from 'effect';
-import { API_VERSION, ListMeta, listOf } from './meta.ts';
+import { API_VERSION, listOf } from './meta.ts';
+import { RunClock, RunListMeta } from './run-frame.ts';
 import { ObjectGraph } from './graph.ts';
 import {
   ANSWER_VIA,
@@ -411,20 +412,6 @@ export const RunDrift = Schema.Struct({
   step: Schema.optionalKey(Schema.String),
 });
 
-/**
- * Where a run's wall time went, in ms (`RunClock`): its sessions, its checks, a person's turn, waiting for a run slot, and the rest, the
- * five adding up to `wallMs`, measured to the instant the run's own `wallMs` is.
- */
-export const RunClock = Schema.Struct({
-  wallMs: Schema.Finite,
-  sessionsMs: Schema.Finite,
-  checksMs: Schema.Finite,
-  personMs: Schema.Finite,
-  slotMs: Schema.Finite,
-  restMs: Schema.Finite,
-}).annotate({ identifier: 'RunClock' });
-export type RunClock = typeof RunClock.Type;
-
 /** What one step of a run has cost, every try's session together; `cost` null until one was measured. */
 export const StepCost = Schema.Struct({ step: Schema.String, cost: Schema.NullOr(Spent) }).annotate({ identifier: 'StepCost' });
 export type StepCost = typeof StepCost.Type;
@@ -544,24 +531,12 @@ export const RunUnjudged = Schema.Struct({
 export type RunUnjudged = typeof RunUnjudged.Type;
 
 /**
- * A RunList's metadata (`ListMeta`) and, on a list asked by state alone, how many runs of its namespace and labels are in each state
- * (`counts`), counted before its `fieldSelector` and its page, which a paged list cannot otherwise give, and the instant its runs'
- * durations are measured to (`asOf`). `asOf` is no key of Kubernetes': a duration needs the instant it is measured to.
- */
-export const RunListMeta = Schema.Struct({
-  ...ListMeta.fields,
-  counts: Schema.optionalKey(Schema.Struct({ waiting: Schema.Finite, inFlight: Schema.Finite, finished: Schema.Finite })),
-  asOf: Schema.optionalKey(Schema.String),
-}).annotate({ identifier: 'RunListMeta' });
-export type RunListMeta = typeof RunListMeta.Type;
-
-/**
  * A page of the runs (`RunList`): `listOf('Run', Run)`, and beside it `unjudged`, each run of the page a task of which does not read, left
  * out of `items` since it cannot be judged into a `Run`. A departure from Kubernetes, whose list holds objects alone: a run dropped with
  * no word would read as gone, and a page refused for one journal would blank every other run of it. A run of a list is judged without
  * the reads a poll should not pay for: no harness is asked for a blocked session's last line and no drift is read, so each step's
- * `lastLine` is null and `kinds` empty there; the run read alone (`GET …/runs/<name>`) says them. Its metadata is `RunListMeta`, and a list asked by state
- * (`?fieldSelector=status.state…`) still judges its whole namespace to count it, whatever its `limit`.
+ * `lastLine` is null and `kinds` empty there; the run read alone (`GET …/runs/<name>`) says them. Its metadata is `RunListMeta`, and a
+ * list asked by state (`?fieldSelector=status.state…`) still judges its whole namespace to count it, whatever its `limit`.
  */
 export const RunList = Schema.Struct({
   ...listOf('Run', Run).fields,
@@ -688,25 +663,3 @@ export const StepTold = Schema.Struct({
   taskParts: Schema.NullOr(List(TaskPart)),
 }).annotate({ identifier: 'StepTold' });
 export type StepTold = typeof StepTold.Type;
-
-/** A person's labels: a key to its value, Kubernetes' `map[string]string`. */
-export const Labels = Schema.Record(Schema.String, Schema.String).annotate({ identifier: 'Labels' });
-
-/**
- * An edit of a run's or a card's labels: kubectl's words, `key=value` to set and `key-` to remove, and whether a set may change a
- * value.
- */
-export const LabelEdit = Schema.Struct({
-  labels: Schema.Array(Schema.String),
-  overwrite: Schema.optionalKey(Schema.Boolean),
-}).annotate({ identifier: 'LabelEdit' });
-export type LabelEdit = typeof LabelEdit.Type;
-
-/** What an edit did: the run or the card, by its name, its person labels after (`labels`) and before (`was`). */
-export const Labelled = Schema.Struct({
-  kind: Schema.Literals(['Run', 'Card']),
-  name: Schema.String,
-  labels: Labels,
-  was: Labels,
-}).annotate({ identifier: 'Labelled' });
-export type Labelled = typeof Labelled.Type;

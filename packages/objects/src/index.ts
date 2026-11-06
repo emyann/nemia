@@ -1,14 +1,9 @@
 /** The one door of `objects`: every layer above the runtime imports what it names from here, and never a file beside it. */
 export { API_VERSION, DEFAULT_NAMESPACE, ListMeta, ObjectMeta, listOf } from './meta.ts';
 export {
-  LabelEdit,
-  Labelled,
-  Labels,
   Run,
-  RunClock,
   RunDrift,
   RunList,
-  RunListMeta,
   RunMetadata,
   RunSpec,
   RunSpecStep,
@@ -29,6 +24,8 @@ export {
   TryShort,
   RunUnjudged,
 } from './run.ts';
+export { LabelEdit, Labelled, Labels } from './labels.ts';
+export { RunClock, RunListMeta } from './run-frame.ts';
 export {
   RETRY_ASKED_MODES,
   RunApprove,

@@ -44,7 +44,7 @@ import { Volume, VolumeList } from './volume.ts';
 import { Workflow, WorkflowCreate, WorkflowList, WorkflowWrite } from './workflow.ts';
 import { Agent, AgentCard, AgentList, AgentTried, AgentTry, AgentWrite } from './agent.ts';
 import { Skill, SkillFiles, SkillList, SkillWrite } from './skill.ts';
-import { LabelEdit, Labelled } from './run.ts';
+import { LabelEdit, Labelled } from './labels.ts';
 import { Template, TemplateList } from './template.ts';
 import { BadRequest, Conflict, Failed, Invalid, listQuery, Missing, Unjudged, WriteFailed } from './api-errors.ts';
 import { RunsGroup } from './run-api.ts';

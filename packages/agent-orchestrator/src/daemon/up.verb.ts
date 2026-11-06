@@ -15,8 +15,7 @@ import { PASS_SERIES } from '../meter/meter.verb.ts';
 import { seriesBorn } from '../telemetry/telemetry.store.ts';
 import { heldLines, pausedWords, RESUMED } from '../pause/pause.ts';
 import { refusalLines, tickRun, type Pass } from '../tick/tick.verb.ts';
-import { ProposalsAct } from '../apply/act.verb.ts';
-import { proposalsActed } from '../apply/pass.verb.ts';
+import { withProposalsPass } from '../apply/pass.verb.ts';
 import { beat, ceilings, heldServes, heldUrl, passed, releaseStore, stillHeld, takeStore, type TakenStore } from './daemon.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { takenFromLine, type HolderKind } from './daemon.ts';
@@ -344,10 +343,7 @@ export const up = (
     for (;;) {
       const by = stillHeld(taken.held);
       if (by) return yield* Effect.fail(new Error(takenFromLine(by, HOME, holder)));
-      const pass = yield* tickRun({ repo, quota: () => reading, disk: () => measured }).pipe(
-        Effect.provideService(ProposalsAct, proposalsActed),
-        over(e),
-      );
+      const pass = yield* withProposalsPass(tickRun({ repo, quota: () => reading, disk: () => measured })).pipe(over(e));
       passed(taken.held);
       rested = pass.runs;
       yield* Deferred.succeed(answered, undefined);

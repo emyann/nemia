@@ -6,7 +6,7 @@
  */
 import { Effect } from 'effect';
 import { StoreRoot } from '../config/root.store.ts';
-import type { ProposalsActed } from './act.verb.ts';
+import { ProposalsAct, type ProposalsActed } from './act.verb.ts';
 import type { Run } from '../record/record.ts';
 import type { RunState } from './apply.ts';
 import { applyProgram } from './apply.verb.ts';
@@ -46,3 +46,9 @@ export const proposalsActed: ProposalsActed = (repo, runs, judged) =>
     const acted = yield* Effect.result(proposalsPass({ home, repo: repo ?? home }, runStatesOf(runs, judged)));
     if (acted._tag === 'Failure') yield* Effect.logWarning(`the proposals were not acted on this pass: ${acted.failure.message}`);
   });
+
+/**
+ * `program` (a tick's pass) with the proposals pass given to it: what the daemon's loop runs each pass with (`up`), so that a test of the
+ * tick acts on proposals as the daemon does.
+ */
+export const withProposalsPass = <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.provideService(program, ProposalsAct, proposalsActed);

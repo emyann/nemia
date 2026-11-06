@@ -46,7 +46,7 @@ const run = <A, E>(program: Effect.Effect<A, E, any>): Promise<A> => runWith(e()
 
 /** The refusal a program fails with, as it was: `_tag`, `exitCode` and, for `Forbidden`, its reason. */
 const refusalOf = async (program: Effect.Effect<unknown, unknown, any>) =>
-  (await run(Effect.flip(program))) as { _tag: string; exitCode?: number; reason?: string };
+  (await run(Effect.flip(program))) as { _tag: string; exitCode?: number; reason?: string; message?: string };
 
 const STEP = '---\nplace: folder\nbudget: 5\n---\nPlan the change.\n';
 
@@ -415,7 +415,7 @@ test("REFUSED at propose: another factory's session (Forbidden), the person's se
     proposeProgram(PERSON, 'plain', { objects: [{ ...object, metadata: { name: 'dev' }, verb: 'create' }] }, PLACE),
   );
   assert.equal(untemplated._tag, 'Invalid', 'a factory made from no template has no tree a proposal writes');
-  assert.doesNotMatch(untemplated.message, /nemia propose yours/, 'it names no command that is not there');
+  assert.doesNotMatch(String(untemplated.message), /nemia propose yours/, 'it names no command that is not there');
   assert.equal(
     await run(applyProgram('refuse', 'no-such-1', PLACE, () => Effect.succeed(undefined))),
     undefined,

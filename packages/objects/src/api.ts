@@ -7,7 +7,8 @@
  * actions, each in its namespace alone: started, removed, refreshed, pruned, labelled, held and lifted, and a step of it tried again,
  * approved and said words to. Group `cards`: the inbox's
  * cards as objects, listed across namespaces or in one (a card's namespace is its factory, `default` for one that names none), read in
- * its namespace and across all by its name (each read of one carrying the card's file as written), filed, written whole, dropped, started, queued and taken off the queue, and their labels edited. Every refusal is an object with one key, `error`, the
+ * its namespace and across all by its name (each read of one carrying the card's file as written), filed, written whole, dropped,
+ * started, queued and taken off the queue, and their labels edited. Every refusal is an object with one key, `error`, the
  * sentence that says what to do next, as the api's other routes answer one; a Conflict carries the `users` that hold the thing too.
  *
  * Group `factories`: the factories, which no namespace holds, listed and read, and each one's sub-resources — its rules and its

@@ -111,15 +111,16 @@ function parsed(args: readonly string[]): Asked {
 }
 
 /**
- * A proposal as the person reads it: its name and phase, whether it widens access, and, while it waits, the line that approves it (the
- * board draws no proposal yet).
+ * A proposal as the person reads it: its name and phase, whether it widens access, its page on the board, and, while it waits, the line
+ * that approves it.
  */
 export const proposalLines = (proposal: Proposal, namespace: string): string => {
   const factory = proposal.metadata.namespace ?? namespace;
   const { name } = proposal.metadata;
   const widens = proposal.status.widens ? ' (widens access)' : '';
   const next = proposal.status.phase === 'waiting' ? `  approve: nemia proposals approve ${name} -n ${factory}\n` : '';
-  return `proposals/${name} ${proposal.status.phase}${widens}\n${next}`;
+  const board = `  board: /factories/${encodeURIComponent(factory)}/proposals/${encodeURIComponent(name)}\n`;
+  return `proposals/${name} ${proposal.status.phase}${widens}\n${board}${next}`;
 };
 
 /** The metadata of a proposed object: its name, its namespace where its kind has one, and the version it is at where it is served. */

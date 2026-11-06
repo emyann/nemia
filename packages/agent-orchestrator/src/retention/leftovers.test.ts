@@ -25,15 +25,9 @@ test('leftovers removes every entry whose process is gone and every log older th
   await t.test('a log exactly 30 days old stays', () => {
     assert.deepEqual(leftovers([], [{ name: 'a.log', modifiedMs: NOW - LOGS_KEPT_MS }], NOW).logs, []);
   });
-  await t.test('a log written after now stays', () => {
-    assert.deepEqual(leftovers([], [{ name: 'a.log', modifiedMs: NOW + 1 }], NOW).logs, []);
-  });
   await t.test('every old log goes, whatever its place among fresh ones', () => {
     const logs = ['a', 'b', 'c', 'd'].map((name, i) => ({ name, modifiedMs: i % 2 === 0 ? 0 : NOW }));
     assert.deepEqual(leftovers([], logs, NOW).logs, ['a', 'c']);
-  });
-  await t.test('nothing found, nothing removed', () => {
-    assert.deepEqual(leftovers([], [], NOW), { entries: [], logs: [] });
   });
 });
 

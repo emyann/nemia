@@ -9,12 +9,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { scratch } from './scratch.ts';
 
 process.env.WF_ROOT = scratch('wf-refusal-store-');
-const { Conflict, Invalid, Missing, isRefusal, maxRuns, unhold } = await import('../src/runner.ts');
+const { Conflict, Invalid, Missing, isRefusal } = await import('../src/refusal/refusal.ts');
+const { maxRuns } = await import('../src/config/config.store.ts');
+const { unhold } = await import('../src/wait/wait.verb.ts');
 const { WorkflowError } = await import('../src/workflow.ts');
 
 const PKG = path.join(import.meta.dirname, '..');
@@ -80,9 +83,9 @@ test('each refusal is an Error of its kind with its words and exit code 2, an Ef
 
 /**
  * The modules a fresh `node`, in the package, loads for `entry` and then for each of `more`, by URL: counted by a `registerHooks` load
- * hook, so a module is counted once however many import it.
+ * hook, so a module is counted once however many import it. Each in a `node` of its own, so two entries' counts may be taken together.
  */
-function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
+async function modulesLoaded(entry: string, more: readonly string[] = []): Promise<string[]> {
   const program = [
     "import { registerHooks } from 'node:module';",
     'const seen = [];',
@@ -90,13 +93,12 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
     ...[entry, ...more].map((m) => `await import(${JSON.stringify(m)});`),
     'process.stdout.write(JSON.stringify(seen));',
   ].join('\n');
-  const out = execFileSync(process.execPath, ['--input-type=module', '-e', program], {
+  const { stdout } = await promisify(execFile)(process.execPath, ['--input-type=module', '-e', program], {
     cwd: PKG,
     encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
     timeout: 60_000,
   });
-  return JSON.parse(out) as string[];
+  return JSON.parse(stdout) as string[];
 }
 
 /**
@@ -152,9 +154,11 @@ function loadBreaks(entry: string, loaded: readonly string[]): string[] {
   return out;
 }
 
-test('agent-orchestrator/run and agent-orchestrator/workflow load effect/Data, and no more of effect, as pinned', () => {
-  for (const entry of Object.keys(PINNED_MODULES)) {
-    const loaded = modulesLoaded(entry);
+test('agent-orchestrator/run and agent-orchestrator/workflow load effect/Data, and no more of effect, as pinned', async () => {
+  const entries = Object.keys(PINNED_MODULES);
+  const loads = await Promise.all(entries.map((entry) => modulesLoaded(entry)));
+  for (const [i, entry] of entries.entries()) {
+    const loaded = loads[i];
     assert.deepEqual(loadBreaks(entry, loaded), [], loaded.join('\n'));
     assert.ok(
       loaded.some((url) => url.endsWith('/node_modules/effect/dist/Data.js')),
@@ -163,8 +167,8 @@ test('agent-orchestrator/run and agent-orchestrator/workflow load effect/Data, a
   }
 });
 
-test('REFUSED: an entry that loads the effect barrel besides', () => {
-  const breaks = loadBreaks('agent-orchestrator/run', modulesLoaded('agent-orchestrator/run', ['effect']));
+test('REFUSED: an entry that loads the effect barrel besides', async () => {
+  const breaks = loadBreaks('agent-orchestrator/run', await modulesLoaded('agent-orchestrator/run', ['effect']));
   assert.equal(breaks.length, 3, breaks.join('\n'));
   assert.match(breaks[0], /loads the effect barrel/);
 });

@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { AWAY, ENGINE, REAL_HOME, SENTINEL, STORE } from './ambient.ts';
 import { machineTempDir, scratch } from './scratch.ts';
@@ -23,6 +23,19 @@ const PACKAGE = path.join(import.meta.dirname, '..');
 const TELEMETRY = pathToFileURL(path.join(PACKAGE, 'src', 'telemetry', 'telemetry.ts')).href;
 const CONFIG = pathToFileURL(path.join(PACKAGE, 'src', 'config', 'config.store.ts')).href;
 const script = (JSON.parse(fs.readFileSync(path.join(PACKAGE, 'package.json'), 'utf8')) as { scripts: { test: string } }).scripts.test;
+
+/** `node <args>` from the package with `env`, as `spawnSync` answers it, but without blocking: two such runs in one test go together. */
+function ran(args: string[], env: Record<string, string | undefined>): Promise<{ status: number | null; stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, args, { cwd: PACKAGE, env, stdio: ['ignore', 'pipe', 'pipe'], timeout: 60_000 });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8').on('data', (d: string) => (stdout += d));
+    child.stderr.setEncoding('utf8').on('data', (d: string) => (stderr += d));
+    child.once('error', reject);
+    child.once('close', (status) => resolve({ status, stdout, stderr }));
+  });
+}
 
 /**
  * Why `script` may run a test file with the ceilings this machine has, or null when it may not: it loads `./test/ambient.ts` with
@@ -58,7 +71,7 @@ function runFixture(reader: 'maxRuns' | 'maxConcurrent', name: string, expected:
   const flags = words.slice(1, words.indexOf('--test'));
   const env: Record<string, string | undefined> = { ...process.env, WF_MAX_RUNS: '6', WF_MAX_CONCURRENT: '50' };
   for (const key of ['NODE_TEST_CONTEXT', 'NODE_OPTIONS']) delete env[key];
-  return spawnSync(process.execPath, [...flags, '--test', file], { cwd: PACKAGE, env, encoding: 'utf8', timeout: 60_000 });
+  return ran([...flags, '--test', file], env);
 }
 
 test("the package's test script loads test/ambient.ts with --import before --test", () => {
@@ -79,26 +92,25 @@ test('REFUSED: a test script without the ambient hook, with another file, or wit
   assert.equal(scriptUnguarded("node --import=./test/ambient.ts --test 'test/*.test.ts'"), null);
 });
 
-test("REFUSED under the daemon's WF_MAX_RUNS=6: a test file that relies on WF_MAX_RUNS's default fails, naming the variable to set", () => {
-  const ran = runFixture('maxRuns', 'WF_MAX_RUNS', 0, false);
+test("REFUSED under the daemon's WF_MAX_RUNS=6: a test file that relies on WF_MAX_RUNS's default fails, naming the variable to set", async () => {
+  const ran = await runFixture('maxRuns', 'WF_MAX_RUNS', 0, false);
   assert.equal(ran.status, 1, `${ran.stdout}\n${ran.stderr}`);
   assert.ok(ran.stdout.includes(`WF_MAX_RUNS=${SENTINEL} is not a count.`), ran.stdout);
 });
 
-test("REFUSED under the daemon's WF_MAX_CONCURRENT=50: a test file that relies on WF_MAX_CONCURRENT's default fails, naming the variable", () => {
-  const ran = runFixture('maxConcurrent', 'WF_MAX_CONCURRENT', 2, false);
+test("REFUSED under the daemon's WF_MAX_CONCURRENT=50: a test file that relies on WF_MAX_CONCURRENT's default fails, naming the variable", async () => {
+  const ran = await runFixture('maxConcurrent', 'WF_MAX_CONCURRENT', 2, false);
   assert.equal(ran.status, 1, `${ran.stdout}\n${ran.stderr}`);
   assert.ok(ran.stdout.includes(`WF_MAX_CONCURRENT=${SENTINEL} is not a count from 1.`), ran.stdout);
 });
 
-test("a test file that deletes the ceiling it reads gets its default, whatever the daemon's", () => {
-  for (const [reader, name, expected] of [
+test("a test file that deletes the ceiling it reads gets its default, whatever the daemon's", async () => {
+  const ceilings = [
     ['maxRuns', 'WF_MAX_RUNS', 0],
     ['maxConcurrent', 'WF_MAX_CONCURRENT', 2],
-  ] as const) {
-    const ran = runFixture(reader, name, expected, true);
-    assert.equal(ran.status, 0, `${name}: ${ran.stdout}\n${ran.stderr}`);
-  }
+  ] as const;
+  const runs = await Promise.all(ceilings.map(([reader, name, expected]) => runFixture(reader, name, expected, true)));
+  for (const [i, [, name]] of ceilings.entries()) assert.equal(runs[i].status, 0, `${name}: ${runs[i].stdout}\n${runs[i].stderr}`);
 });
 
 test('with the switch the test script puts, a ticking command typed in a test starts no daemon, and says so', () => {
@@ -158,13 +170,15 @@ function runExporter(seated: boolean, expected: string) {
   const flags = seated ? words.slice(1, words.indexOf('--test')) : [];
   const env: Record<string, string | undefined> = { ...process.env, OTEL_EXPORTER_OTLP_ENDPOINT: NAMED };
   for (const key of ['NODE_TEST_CONTEXT', 'NODE_OPTIONS']) delete env[key];
-  return spawnSync(process.execPath, [...flags, '--test', file], { cwd: PACKAGE, env, encoding: 'utf8', timeout: 60_000 });
+  return ran([...flags, '--test', file], env);
 }
 
-test("REFUSED under the daemon's OTEL_EXPORTER_OTLP_ENDPOINT: a test file sees no collector and exports to none, and without the hook it would", () => {
-  const seated = runExporter(true, '{ address: null, exports: null }');
+test("REFUSED under the daemon's OTEL_EXPORTER_OTLP_ENDPOINT: a test file sees no collector and exports to none, and without the hook it would", async () => {
+  const [seated, bare] = await Promise.all([
+    runExporter(true, '{ address: null, exports: null }'),
+    runExporter(false, JSON.stringify({ address: NAMED, exports: NAMED })),
+  ]);
   assert.equal(seated.status, 0, `${seated.stdout}\n${seated.stderr}`);
-  const bare = runExporter(false, JSON.stringify({ address: NAMED, exports: NAMED }));
   assert.equal(bare.status, 0, `without the hook the address is the shell's: ${bare.stdout}\n${bare.stderr}`);
 });
 
@@ -172,7 +186,7 @@ test("REFUSED under the daemon's OTEL_EXPORTER_OTLP_ENDPOINT: a test file sees n
  * A test file that says where a harness keeps its files, run from the package with the person's own folder named in its environment:
  * with the flags `script` gives `node` before `--test` when `seated`, with none otherwise. Answers the run, and where it printed.
  */
-function runConfigured(seated: boolean, own: string) {
+async function runConfigured(seated: boolean, own: string) {
   const dir = scratch('wf-ambient-');
   const file = path.join(dir, 'fixture.test.mjs');
   const out = path.join(dir, 'seen.txt');
@@ -189,19 +203,19 @@ function runConfigured(seated: boolean, own: string) {
   const flags = seated ? words.slice(1, words.indexOf('--test')) : [];
   const env: Record<string, string | undefined> = { ...process.env, CLAUDE_CONFIG_DIR: own };
   for (const key of ['NODE_TEST_CONTEXT', 'NODE_OPTIONS']) delete env[key];
-  const ran = spawnSync(process.execPath, [...flags, '--test', file], { cwd: PACKAGE, env, encoding: 'utf8', timeout: 60_000 });
-  return { ran, seen: fs.existsSync(out) ? fs.readFileSync(out, 'utf8') : undefined };
+  const done = await ran([...flags, '--test', file], env);
+  return { ran: done, seen: fs.existsSync(out) ? fs.readFileSync(out, 'utf8') : undefined };
 }
 
-test("REFUSED under a person's own CLAUDE_CONFIG_DIR: a test file is given a scratch folder, and without the hook it would write theirs", () => {
+test("REFUSED under a person's own CLAUDE_CONFIG_DIR: a test file is given a scratch folder, and without the hook it would write theirs", async () => {
   const own = path.join(os.homedir(), '.claude');
-  const seated = runConfigured(true, own);
+  const [seated, bare] = await Promise.all([runConfigured(true, own), runConfigured(false, own)]);
   assert.equal(seated.ran.status, 0, `${seated.ran.stdout}\n${seated.ran.stderr}`);
   assert.ok(seated.seen, 'the fixture said no folder');
   assert.notEqual(seated.seen, own);
   assert.ok(path.basename(seated.seen).startsWith('wf-ambient-claude-'), seated.seen);
   assert.equal(path.relative(os.homedir(), seated.seen).startsWith('.claude'), false);
-  assert.equal(runConfigured(false, own).seen, own, "without the hook the folder is the shell's");
+  assert.equal(bare.seen, own, "without the hook the folder is the shell's");
 });
 
 test("this file's own process has the scratch folder too", () => {

@@ -1,6 +1,6 @@
 /**
  * Whether a run's frame says time measured to the instant its list was read at (agent-orchestrator, src/runlist/runlist.ts,
- * `measuredToNow`; no code yet). A RunList asked by state lays the frame's parts on each run's status (`framePartsOf`): of them, the wall
+ * `measuredToNow`). A RunList asked by state lays the frame's parts on each run's status (`framePartsOf`): of them, the wall
  * time (`wallMs`) and where it went (`clock`) run until `now` for a run still going — one that waits on a person or is in flight — and
  * stop where its work stopped for a finished one (`clockUntilOf`), so a finished run's stand still. A status with no state carries no
  * frame (a plain list, a run read alone). A watch compares a run leaving those two parts out exactly where this holds

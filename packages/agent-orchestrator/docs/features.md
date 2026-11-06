@@ -2296,8 +2296,8 @@ forever. What was built, in `src/retention/` and `src/release/`:
 - **No rule for trial stores**: each lives inside its build's folder, which a refused build deletes (`prepared`'s `finally`), so only a
   crash leaves one, and it goes with its folder.
 
-Tested in `src/retention/leftovers.test.ts` (the accepting side the contract narrows to "something goes", the 30 days' edge, the
-words), `src/release/release.store.test.ts` (the entries, the logs, a leftover moved aside), `retention.verb.test.ts` (a crashed first
+Tested in `src/retention/leftovers.test.ts` (the accepting side, which the contract proves whole since tsverify 0.9.0, the 30 days'
+edge, the words), `src/release/release.store.test.ts` (the entries, the logs, a leftover moved aside), `retention.verb.test.ts` (a crashed first
 upgrade swept with no pointer and an engine with no verbs, a live build kept) and `upgrade.verb.test.ts` (the next upgrade removes a
 dead build and an old log, and keeps the fresh ones).
 

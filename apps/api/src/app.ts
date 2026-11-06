@@ -211,9 +211,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', openapi)
     .route('/', referenceOf(viewerScript))
     .route('/', stats)
-    .get('/api/ceilings', (c) =>
-      served(c, async ({ e, placeService, env, home }) => c.json(await ceilingsOf(e, { placeService, home }, env))),
-    )
+    .get('/api/ceilings', (c) => served(c, async (s) => c.json(await ceilingsOf(s))))
     .get('/api/passes', (c) =>
       served(c, async ({ e, placeService, home }) => c.json(await passesOf(e, { placeService, home }, c.req.query('last')))),
     )

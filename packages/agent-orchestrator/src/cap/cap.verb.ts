@@ -3,10 +3,10 @@
  * decide`, the repository's checkout and the board's ceilings. A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
 import { Cause, Deferred, Effect, Exit, Result } from 'effect';
-import { EngineService, asked, over, unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
+import { EngineService, asked, over, tried, unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
 import type { Workflow } from '../workflow.ts';
 import type { Refusal } from '../refusal/refusal.ts';
-import { admissionOrder, heldRuns, slotNeed, type RunSlot } from './cap.ts';
+import { admissionOrder, heldRuns, slotNeed, slotSettled, type RunSlot } from './cap.ts';
 import { runTasks, type Run } from '../record/record.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { assess } from '../tick/assess.ts';
@@ -14,7 +14,9 @@ import { runStore } from '../record/files.store.ts';
 import { unloadedFolder } from '../steps/steps.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { lastCeilings } from '../daemon/daemon.store.ts';
-import { maxRuns } from '../config/config.store.ts';
+import { maxRuns, verifiesRest } from '../config/config.store.ts';
+import { Informer, informerRead } from '../rest/informer.verb.ts';
+import { sameJudgement } from '../summary/judgement.verb.ts';
 import {
   closeoutAsked,
   closeoutReader,
@@ -77,6 +79,17 @@ const needOf = Effect.fnUntraced(function* (
 });
 
 /**
+ * Refuses a run a caller left out of the cap's count as ended at rest (`slotSettled`) where, judged afresh on a verified read, it is in
+ * flight or wants a slot: leaving it out would have changed the answer.
+ */
+const leftOutRightly = (id: string, need: { inFlight: boolean; wants: boolean }): void => {
+  if (need.inFlight || need.wants)
+    throw new Error(
+      `The ceilings left ${id} out as ended and at rest, and judged afresh it ${need.inFlight ? 'is in flight' : 'wants a run slot'} (WF_VERIFY_REST): the informer's judgement of it is stale, or \`slotSettled\` trusts a word it should not.`,
+    );
+};
+
+/**
  * The cap on runs in flight, and the runs it counts and holds (`Slots`): every run of `runs` read as a pass reads it, between passes, over
  * one look at the harnesses (`e.list` of every run's tasks) — what `nemia ls`, `nemia decide`, the repository's checkout and the board's
  * ceilings say. Nothing read with no cap. A run a task of which does not read, its own or a run's it waits on, or whose unfrozen folder
@@ -86,12 +99,16 @@ const needOf = Effect.fnUntraced(function* (
  * The cap is the one the last pass ran with (`lastCeilings`), not the caller's environment, which is a shell's and not the daemon's; before
  * any pass has written it, `WF_MAX_RUNS` of `env` (`maxRuns`, refused by name when it is not a count). The runs the runs wait on are read
  * through `parents` (`passParents`): a pass's, or the caller's, over the reader it read where the branches stand through.
+ *
+ * `settled` names the runs a caller would have left out of `runs` as neither in flight nor held (`slotSettled`), handed to check that
+ * claim on a verified read (`WF_VERIFY_REST=1`): a run of them judged in flight or wanting a slot dies, naming it.
  */
 export const slotsOf = Effect.fn('slotsOf')(function* (
   e: Engine,
   runs: readonly Run[] = runStore.runs.list(),
   env: NodeJS.ProcessEnv = process.env,
   parents: Parents,
+  settled: ReadonlySet<string> = new Set(),
 ) {
   const cap = lastCeilings()?.runs ?? maxRuns(env);
   if (cap <= 0) return { cap: 0, inFlight: null, held: new Map() } satisfies Slots;
@@ -113,6 +130,7 @@ export const slotsOf = Effect.fn('slotsOf')(function* (
       if (Exit.isSuccess(judged)) need = judged.value;
       else if (unreadableJournal(Cause.squash(judged.cause)) === undefined) return yield* Effect.failCause(judged.cause);
     }
+    if (settled.has(run.id)) leftOutRightly(run.id, need);
     needs.push({ id: run.id, createdAt: run.createdAt, ...need });
   }
   return { cap, inFlight: admissionOrder(needs.filter((n) => n.inFlight)).map((n) => n.id), held: heldRuns(needs, cap) } satisfies Slots;
@@ -121,10 +139,29 @@ export const slotsOf = Effect.fn('slotsOf')(function* (
 /**
  * The run slots (`slotsOf`) of every run in the store, read through the engine in the context, the runs they wait on off the tick's last
  * reading of where the branches stand (`standingSnapshot`), with no git process: the cap and what holds it, as the board says it.
+ *
+ * Where the process keeps an informer (`Informer`, the api's), the store is listed through it as the run list reads it, a run whose files
+ * stamp as they did given as the run it kept, and a run its judgement says ended at rest (`slotSettled`) is left out, its tasks not
+ * listed: it is neither in flight nor held. On a verified read (`WF_VERIFY_REST=1` of `env`) every run is judged, and one left out
+ * that is judged in flight or wanting a slot dies, naming it (`slotsOf`'s `settled`).
  */
 export const slotsRead = Effect.fn('slotsRead')(function* (env: NodeJS.ProcessEnv = process.env) {
-  const parents = passParents(standingReader(yield* standingSnapshot()));
-  return yield* slotsOf(yield* EngineService, undefined, env, parents);
+  const git = standingReader(yield* standingSnapshot());
+  const parents = passParents(git);
+  const e = yield* EngineService;
+  const informer = yield* Informer;
+  if (!informer || (lastCeilings()?.runs ?? maxRuns(env)) <= 0) return yield* slotsOf(e, undefined, env, parents);
+  const read = yield* informerRead(e, informer, yield* tried(() => verifiesRest(env)), git, sameJudgement);
+  const all = runStore.runs.list(undefined, read.given);
+  read.only(all.map((run) => run.id));
+  const settled = new Set(all.filter((run) => slotSettled(read.kept(run)?.judged)).map((run) => run.id));
+  if (read.verify) return yield* slotsOf(e, all, env, parents, settled);
+  return yield* slotsOf(
+    e,
+    all.filter((run) => !settled.has(run.id)),
+    env,
+    parents,
+  );
 });
 
 /**

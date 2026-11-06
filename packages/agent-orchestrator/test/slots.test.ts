@@ -2,11 +2,14 @@
  * The cap on runs in flight between passes (`slotsOf`): the runs that count against it in the order a pass admits them, the runs it holds,
  * and one look at the harnesses for the whole store — never a view per task — with `runSlots` its held runs, as one table. The cap's
  * pure judgement is `src/cap/cap.test.ts`, and the cap over a store as the tick runs it `queue-store.test.ts`. Walked through the runtime
- * itself, `plainEngine` over an in-memory journal, whose `list` and `view` the test counts.
+ * itself, `plainEngine` over an in-memory journal, whose `list` and `view` the test counts. And the board's read of it (`slotsRead`)
+ * through an informer: a run it served ended at rest left out unlisted, the answer unchanged, and a wrong judgement refused on a
+ * verified read.
  *
  * `WF_ROOT` is set before the package is imported; `WF_MAX_RUNS` is set by each test, and no pass has written a cap.
  */
 import { test } from 'node:test';
+import { Effect } from 'effect';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,6 +17,8 @@ import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from './pro
 import { Engine } from 'agent-runtime';
 import { scratch } from './scratch.ts';
 import { plainEngine } from './promised.ts';
+import { runOver } from './placed.ts';
+import { testPlace } from '../place/memory/index.ts';
 
 const ROOT = scratch('wf-slots-');
 process.env.WF_ROOT = ROOT;
@@ -21,6 +26,10 @@ const { runWith, runSlots, slotsOf } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const { passParents } = await import('../src/views/views.verb.ts');
 const { NOTHING_READ, standingReader } = await import('../src/standing/standing.verb.ts');
+const { slotsRead } = await import('../src/cap/cap.verb.ts');
+const { Informer, informerMemo, informerRead, informedJudgements, passStarted } = await import('../src/rest/informer.verb.ts');
+const { sameJudgement } = await import('../src/summary/judgement.verb.ts');
+const { runStore } = await import('../src/record/files.store.ts');
 /** The runs waited on as a read with no standing reads them: none of their branches asked. */
 const noParents = () => passParents(standingReader(NOTHING_READ));
 
@@ -76,9 +85,11 @@ const engine = plainEngine(
   }),
 );
 const calls = { list: 0, view: 0 };
+/** The tasks each `list` was asked for, in order. */
+const listedTasks: string[][] = [];
 const e = {
   ...engine,
-  list: (...args: Parameters<typeof engine.list>) => (calls.list++, engine.list(...args)),
+  list: (...args: Parameters<typeof engine.list>) => (calls.list++, listedTasks.push([...(args[0] ?? [])]), engine.list(...args)),
   view: (taskId: string) => (calls.view++, engine.view(taskId)),
 };
 
@@ -159,5 +170,60 @@ test('`slotsOf` and `runSlots`: what the cap counts and holds between passes, of
       [],
     );
     assert.deepEqual(calls, { list: 0, view: 0 });
+  });
+});
+
+signedOff('r-done-implement');
+signedOff('r-done-review');
+writeRun('r-done', 0, { implement: { taskId: 'r-done-implement' }, review: { taskId: 'r-done-review' } });
+
+/** An informer filled as a pass fills it: every run of the store judged and kept, the pass started so a moving run is kept too. */
+const filledInformer = async () => {
+  const memo = informerMemo();
+  passStarted(memo);
+  const git = standingReader(NOTHING_READ);
+  await runOver(runWith, () => testPlace().layer)(
+    e,
+    Effect.gen(function* () {
+      const read = yield* informerRead(e, memo, false, git, sameJudgement);
+      yield* informedJudgements(e, ROOT, runStore.runs.list(), read, git);
+      yield* read.commit();
+    }),
+  );
+  return memo;
+};
+
+test('`slotsRead` through an informer: a run it serves ended at rest is left out, unlisted, and a wrong judgement of one refused when verified', async (t) => {
+  process.env.WF_MAX_RUNS = '2';
+
+  await t.test('the tasks of no ended run are listed, and the answer is the one read with no informer', async () => {
+    process.env.WF_VERIFY_REST = '0';
+    const memo = await filledInformer();
+    assert.equal(memo.runs.get('r-done')?.value.judged.status, 'succeeded', 'the informer serves r-done as ended');
+    const plain = await runWith(e, slotsRead(process.env));
+    listedTasks.length = 0;
+    const informed = await runWith(e, slotsRead(process.env).pipe(Effect.provideService(Informer, memo)));
+    assert.deepEqual(listedTasks.length, 1, 'one look at the harnesses');
+    assert.ok(listedTasks[0]?.includes('r-a-implement'), 'a run still open is listed');
+    assert.ok(!listedTasks[0]?.some((id) => id.startsWith('r-done-')), 'no task of the ended run is listed');
+    assert.deepEqual({ ...informed, held: [...informed.held] }, { ...plain, held: [...plain.held] });
+  });
+
+  await t.test('verified, a run served as ended at rest whose tasks are in flight dies naming it', async () => {
+    process.env.WF_VERIFY_REST = '1';
+    try {
+      const memo = await filledInformer();
+      const entry = memo.runs.get('r-a');
+      assert.ok(entry, 'the informer keeps r-a');
+      entry.value = { ...entry.value, judged: { ...entry.value.judged, status: 'succeeded', moving: false } };
+      entry.atRest = true;
+      await assert.rejects(runWith(e, slotsRead(process.env).pipe(Effect.provideService(Informer, memo))), (err: unknown) => {
+        assert.ok(err instanceof Error);
+        assert.match(err.message, /\br-a\b/);
+        return true;
+      });
+    } finally {
+      delete process.env.WF_VERIFY_REST;
+    }
   });
 });

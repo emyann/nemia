@@ -3894,7 +3894,7 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   once a pass, takes a run out of the memo when one of its tasks is on it) and its result branches' tips (read off the heads
   of the pass's one `standing` a repository, place and base branch, `passStanding`). Its record is not read again either while its stamp holds: the memo keeps the run as it read it and hands it to the
   listing (`keptOf`), so a pass reads only the records of runs in flight or whose files moved. The breakdown says how many (`, 200 runs at
-  rest answered from memory`); on a store of finished runs and a few in flight, however many (40 in the test) a pass reads 4 journals, the records of the runs in
+  rest answered from memory`); on a store of finished runs, however many (forty in the test), and a few in flight, a pass reads 4 journals, the records of the runs in
   flight and starts 2 git processes, as it does with none (`src/tick/rest-store.test.ts`). On a store of 390 finished runs and 3 in flight,
   a pass's `records` went from 393 records, 16 to 24 ms and 255 KB read to 3 records, 2 ms and 1.8 KB, and the pass from 32 to 49 ms to
   10 to 13 ms (a fixture store, measured 2026-10-02; the owner's records are larger, so it read about 130 MB a minute). The memo lives in the

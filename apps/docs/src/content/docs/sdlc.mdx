@@ -117,7 +117,7 @@ CI is then the only check its changes meet. Give roundCheck the commands your re
 sdlc 1.0.0 landed on GitHub, and had no github parameter. From 2.0.0 the default is your checkout, so a factory applied at 1.0.0
 that should stay on GitHub is given `github: true` as it upgrades: preview it with
 `nemia factory diff <name> --to 2.0.0 --set github=true`, which names each parameter the factory holds that 2.0.0 does not declare (`dropped:`), then type the upgrade line it
-prints last, which carries the same `--set` and the plan's `--plan`. A new factory is given it at apply, `--set github=true`.
+prints (`… files it`), which carries the same `--set` and the plan's `--plan`. A new factory is given it at apply, `--set github=true`.
 
 ## Moving onto it from another template
 
@@ -132,9 +132,9 @@ no common base.
 - A file both hold, different, is a conflict on each run of lines that differs, even a run only sdlc holds, so you see every line it
   would insert. The factory's file and a step's frontmatter are asked key by key.
 
-Answer each conflict with `nemia factory resolve`. To keep your factory's own prose, take `--ours` on its rules and step files. To drop
-an old file of the template you left, take `--theirs`. Then type the upgrade line the diff printed last: a switch is always filed with
-its `--plan`.
+First type the upgrade line the diff printed (`… files it`): a switch is always filed with its `--plan`, and a conflict is resolved
+only once its upgrade is filed. Then answer each conflict with the `nemia factory resolve` line the diff printed after it. To keep
+your factory's own prose, take `--ours` on its rules and step files. To drop an old file of the template you left, take `--theirs`.
 
 Once merged, the factory's base is sdlc. A later upgrade of sdlc merges three ways, and carries the prose you kept as your tree's
 edits.

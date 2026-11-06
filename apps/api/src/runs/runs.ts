@@ -51,7 +51,7 @@ export type RunAnswer = RunObject.Run;
 
 /**
  * The lines read beside the run object (`GET /api/runs/:runId/lines`): the command lines a person types about the run and each of its
- * steps (`runLines`), where it came from, and the address of its workflow's page (`workflowPageOf`), as the list gives it. Constant for a
+ * steps (`runLines`), where it came from, and the address of its workflow's page (`workflowPageOf`), as the board shows it. Constant for a
  * run, off its record alone: the board reads it once and never again on the feed.
  */
 export type RunLinesAnswer = RunLines & { workflowPage: WorkflowPageAddress | null };
@@ -86,7 +86,7 @@ const CONCLUDED = commandNamed('concluded');
  *   told at their sub-resources, and the lines at `…/lines`.
  * - `GET /api/runs/:runId/lines` — the lines beside the object (`RunLinesAnswer`): the run's `decide` and `refresh` lines, each step's
  *   `approve`, `retry` and `say` by its name, where it came from (`fromNote`, null for a run started from no card), and the address of
- *   its workflow's page (`workflowPageOf`), the one the list gives the run. Off the run's record alone (`runLines`): it judges nothing and
+ *   its workflow's page (`workflowPageOf`), the one the board links. Off the run's record alone (`runLines`): it judges nothing and
  *   reads no task, and it is constant for the run, so the board reads it once. Served by hand, as no entry of the command table answers
  *   it; a 404 when there is no such run, as the object's route.
  * - `GET /api/runs/:runId/decision` — what `nemia decide` shows a person (`decisionOf`), the route of its entry of the command table. Not

@@ -31,7 +31,7 @@ import { saidLines } from '../say/say.ts';
 import { sayRun } from '../say/say.verb.ts';
 import { budgetRefusal, budgetWord } from '../status/status.ts';
 import { decideRun, type Decided } from '../decide/decide.verb.ts';
-import { slotsRead, type Slots } from '../cap/cap.verb.ts';
+import { slotsRead, type Slots } from '../cap/slots-read.verb.ts';
 import { runsListed } from '../list/list.verb.ts';
 import { lsLines, type RunsListed } from '../list/list.ts';
 import { PAGES, labelFlags, runsShown, selectorCheck, selectorsIn } from './pages.verb.ts';

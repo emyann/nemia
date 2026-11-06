@@ -224,24 +224,28 @@ test("a request's trace shows its programs: the package's spans are children of 
     assert.equal(program.parent, server.spanId, "factoryCommandsOf is a child of the request's span");
     assert.equal(program.traceId, server.traceId, 'in the same trace');
   });
-  await t.test('the spans GET /api/runs and GET /api/cards export are bounded whatever the number of runs: no span per run', async () => {
-    planted(0, 5);
-    const runsFew = await spansOf('/api/runs');
-    const cardsFew = await spansOf('/api/cards');
-    planted(5, 50);
-    const runsMany = await spansOf('/api/runs');
-    const cardsMany = await spansOf('/api/cards');
-    t.diagnostic(`GET /api/runs: ${runsFew.length} spans over 5 runs, ${runsMany.length} over 50: ${JSON.stringify(countsOf(runsMany))}`);
-    t.diagnostic(
-      `GET /api/cards: ${cardsFew.length} spans over 5 runs, ${cardsMany.length} over 50: ${JSON.stringify(countsOf(cardsMany))}`,
-    );
-    const server = runsMany.find((s) => s.name === 'GET /api/runs');
-    assert.ok(server, 'the server span');
-    assert.ok(
-      runsMany.some((s) => s.parent === server.spanId),
-      "the list's programs are children of the request's span",
-    );
-    assert.equal(runsMany.length, runsFew.length, `GET /api/runs: ${JSON.stringify(countsOf(runsMany))}`);
-    assert.equal(cardsMany.length, cardsFew.length, `GET /api/cards: ${JSON.stringify(countsOf(cardsMany))}`);
-  });
+  await t.test(
+    'the spans GET /api/runs and GET /api/cards export are bounded whatever the number of runs, but one judge per run judged',
+    async () => {
+      planted(0, 5);
+      const runsFew = await spansOf('/api/runs');
+      const cardsFew = await spansOf('/api/cards');
+      planted(5, 50);
+      const runsMany = await spansOf('/api/runs');
+      const cardsMany = await spansOf('/api/cards');
+      t.diagnostic(`GET /api/runs: ${runsFew.length} spans over 5 runs, ${runsMany.length} over 50: ${JSON.stringify(countsOf(runsMany))}`);
+      t.diagnostic(
+        `GET /api/cards: ${cardsFew.length} spans over 5 runs, ${cardsMany.length} over 50: ${JSON.stringify(countsOf(cardsMany))}`,
+      );
+      const server = runsMany.find((s) => s.name === 'GET /api/runs');
+      assert.ok(server, 'the server span');
+      assert.ok(
+        runsMany.some((s) => s.parent === server.spanId),
+        "the list's programs are children of the request's span",
+      );
+      const unjudged = (spans: Traced[]) => spans.filter((s) => s.name !== 'judge').length;
+      assert.equal(unjudged(runsMany), unjudged(runsFew), `GET /api/runs: ${JSON.stringify(countsOf(runsMany))}`);
+      assert.equal(unjudged(cardsMany), unjudged(cardsFew), `GET /api/cards: ${JSON.stringify(countsOf(cardsMany))}`);
+    },
+  );
 });

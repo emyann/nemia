@@ -3,10 +3,10 @@
  * decide`, the repository's checkout and the board's ceilings. A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
 import { Cause, Deferred, Effect, Exit, Result } from 'effect';
-import { EngineService, asked, over, tried, unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
+import { asked, over, unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
 import type { Workflow } from '../workflow.ts';
 import type { Refusal } from '../refusal/refusal.ts';
-import { admissionOrder, heldRuns, slotNeed, slotSettled, type RunSlot } from './cap.ts';
+import { admissionOrder, heldRuns, slotNeed, type RunSlot } from './cap.ts';
 import { runTasks, type Run } from '../record/record.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { assess } from '../tick/assess.ts';
@@ -14,9 +14,7 @@ import { runStore } from '../record/files.store.ts';
 import { unloadedFolder } from '../steps/steps.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { lastCeilings } from '../daemon/daemon.store.ts';
-import { maxRuns, verifiesRest } from '../config/config.store.ts';
-import { Informer, informerRead } from '../rest/informer.verb.ts';
-import { sameJudgement } from '../summary/judgement.verb.ts';
+import { maxRuns } from '../config/config.store.ts';
 import {
   closeoutAsked,
   closeoutReader,
@@ -27,7 +25,7 @@ import {
   spendReader,
   type Parents,
 } from '../views/views.verb.ts';
-import { standingReader, standingSnapshot, type PassStanding } from '../standing/standing.verb.ts';
+import { standingReader, type PassStanding } from '../standing/standing.verb.ts';
 import type { PassRevisions } from '../revisions/pin.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 
@@ -105,7 +103,7 @@ const leftOutRightly = (id: string, need: { inFlight: boolean; wants: boolean })
  */
 export const slotsOf = Effect.fn('slotsOf')(function* (
   e: Engine,
-  runs: readonly Run[] = runStore.runs.list(),
+  runs: readonly Run[] = storeRunsGiven(),
   env: NodeJS.ProcessEnv = process.env,
   parents: Parents,
   settled: ReadonlySet<string> = new Set(),
@@ -136,33 +134,8 @@ export const slotsOf = Effect.fn('slotsOf')(function* (
   return { cap, inFlight: admissionOrder(needs.filter((n) => n.inFlight)).map((n) => n.id), held: heldRuns(needs, cap) } satisfies Slots;
 });
 
-/**
- * The run slots (`slotsOf`) of every run in the store, read through the engine in the context, the runs they wait on off the tick's last
- * reading of where the branches stand (`standingSnapshot`), with no git process: the cap and what holds it, as the board says it.
- *
- * Where the process keeps an informer (`Informer`, the api's), the store is listed through it as the run list reads it, a run whose files
- * stamp as they did given as the run it kept, and a run its judgement says ended at rest (`slotSettled`) is left out, its tasks not
- * listed: it is neither in flight nor held. On a verified read (`WF_VERIFY_REST=1` of `env`) every run is judged, and one left out
- * that is judged in flight or wanting a slot dies, naming it (`slotsOf`'s `settled`).
- */
-export const slotsRead = Effect.fn('slotsRead')(function* (env: NodeJS.ProcessEnv = process.env) {
-  const git = standingReader(yield* standingSnapshot());
-  const parents = passParents(git);
-  const e = yield* EngineService;
-  const informer = yield* Informer;
-  if (!informer || (lastCeilings()?.runs ?? maxRuns(env)) <= 0) return yield* slotsOf(e, undefined, env, parents);
-  const read = yield* informerRead(e, informer, yield* tried(() => verifiesRest(env)), git, sameJudgement);
-  const all = runStore.runs.list(undefined, read.given);
-  read.only(all.map((run) => run.id));
-  const settled = new Set(all.filter((run) => slotSettled(read.kept(run)?.judged)).map((run) => run.id));
-  if (read.verify) return yield* slotsOf(e, all, env, parents, settled);
-  return yield* slotsOf(
-    e,
-    all.filter((run) => !settled.has(run.id)),
-    env,
-    parents,
-  );
-});
+/** Every run in the store, a run `given` names answered by the record it holds rather than read again: `slotsRead`'s listing. */
+export const storeRunsGiven = (given?: (id: string) => Run | undefined): Run[] => runStore.runs.list(undefined, given);
 
 /**
  * The runs the cap on runs in flight holds now, each with the count it is held at (`slotsOf`'s `held`). None, and nothing read, with no

@@ -28,6 +28,7 @@ export const ROOTS = [
   'packages/agent-orchestrator/place',
   'apps/cli/src',
   'apps/web/src/lib/brought.ts',
+  'apps/web/src/lib/proposals.ts',
 ];
 
 /** A leg of the `contracts` job: one runner, its own verdict cache. */

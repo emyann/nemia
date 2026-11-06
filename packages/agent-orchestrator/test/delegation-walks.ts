@@ -27,12 +27,12 @@ export const DELEGATION_WALKS: Readonly<Record<string, readonly Walk[]>> = {
     {
       name: "a factory's own, by agent",
       walk: ({ door }) => {
-        done(door.delegations.write(aDelegation('seldon')));
-        done(door.delegations.write(aDelegation('agora')));
-        done(door.delegations.write(aDelegation('iris', 'other')));
+        done(door.delegations.write(aDelegation('implementer')));
+        done(door.delegations.write(aDelegation('reviewer')));
+        done(door.delegations.write(aDelegation('shipper', 'other')));
         return done(door.delegations.list('acme')).map((d) => d.agent);
       },
-      says: ['agora', 'seldon'],
+      says: ['implementer', 'reviewer'],
     },
     {
       name: 'REFUSED: a name that is no factory is Invalid',
@@ -41,14 +41,14 @@ export const DELEGATION_WALKS: Readonly<Record<string, readonly Walk[]>> = {
     },
   ],
   'delegations.read': [
-    { name: 'none where none is written', walk: ({ door }) => done(door.delegations.read('acme', 'seldon')), says: undefined },
+    { name: 'none where none is written', walk: ({ door }) => done(door.delegations.read('acme', 'implementer')), says: undefined },
     {
       name: 'the delegation written, whole',
       walk: ({ door }) => {
-        done(door.delegations.write(aDelegation('seldon')));
-        return done(door.delegations.read('acme', 'seldon'));
+        done(door.delegations.write(aDelegation('implementer')));
+        return done(door.delegations.read('acme', 'implementer'));
       },
-      says: aDelegation('seldon'),
+      says: aDelegation('implementer'),
     },
     {
       name: 'REFUSED: a name that is no agent is Invalid',
@@ -60,10 +60,10 @@ export const DELEGATION_WALKS: Readonly<Record<string, readonly Walk[]>> = {
     {
       name: 'written over what was there',
       walk: ({ door }) => {
-        done(door.delegations.write(aDelegation('seldon')));
+        done(door.delegations.write(aDelegation('implementer')));
         const wider: DelegationSpec = { rules: [{ resources: ['workflows', 'agents'], resourceNames: [], verbs: ['update', 'create'] }] };
-        done(door.delegations.write(aDelegation('seldon', 'acme', wider)));
-        return done(door.delegations.read('acme', 'seldon'))?.spec.rules[0]?.resources;
+        done(door.delegations.write(aDelegation('implementer', 'acme', wider)));
+        return done(door.delegations.read('acme', 'implementer'))?.spec.rules[0]?.resources;
       },
       says: ['workflows', 'agents'],
     },
@@ -71,18 +71,21 @@ export const DELEGATION_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       name: 'REFUSED: grants the model refuses are Invalid, and nothing is written',
       walk: ({ door }) => {
         const broken = { rules: [{ resources: ['workflows'], resourceNames: [], verbs: ['patch'] }] } as unknown as DelegationSpec;
-        return [act(door.delegations.write(aDelegation('seldon', 'acme', broken))), done(door.delegations.read('acme', 'seldon'))];
+        return [
+          act(door.delegations.write(aDelegation('implementer', 'acme', broken))),
+          done(door.delegations.read('acme', 'implementer')),
+        ];
       },
       says: [{ refused: 'Invalid' }, undefined],
     },
   ],
   'delegations.remove': [
-    { name: 'none there: false', walk: ({ door }) => done(door.delegations.remove('acme', 'seldon')), says: false },
+    { name: 'none there: false', walk: ({ door }) => done(door.delegations.remove('acme', 'implementer')), says: false },
     {
       name: 'one there: true, and it is gone',
       walk: ({ door }) => {
-        done(door.delegations.write(aDelegation('seldon')));
-        return [done(door.delegations.remove('acme', 'seldon')), done(door.delegations.read('acme', 'seldon'))];
+        done(door.delegations.write(aDelegation('implementer')));
+        return [done(door.delegations.remove('acme', 'implementer')), done(door.delegations.read('acme', 'implementer'))];
       },
       says: [true, undefined],
     },

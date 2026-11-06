@@ -52,8 +52,8 @@ const hire = (name: string, version: string, agent: string) => ({
 
 /** The hires served now, by name. */
 const HIRES: Record<string, ReturnType<typeof hire>> = {
-  'tidy.build': hire('tidy.build', '7', 'grace'),
-  'tidy.made': hire('tidy.made', '9', 'otto'),
+  'tidy.build': hire('tidy.build', '7', 'implementer'),
+  'tidy.made': hire('tidy.made', '9', 'shipper'),
 };
 
 /** A proposal as the api serves it, of `spec`, at `phase`. */
@@ -62,12 +62,12 @@ const proposal = (name: string, phase: string, spec: unknown, extra: Record<stri
   kind: 'Proposal',
   metadata: meta(name, 'f1', '1'),
   spec,
-  status: { phase, proposedBy: { agent: 'grace' }, changes: [], widens: true, ...extra },
+  status: { phase, proposedBy: { agent: 'implementer' }, changes: [], widens: true, ...extra },
 });
 
 /** The proposal that applied, which `--undo` reads: it changed `tidy.build` and made `tidy.made`. */
 const APPLIED = proposal(
-  'grace-old01',
+  'implementer-old01',
   'applied',
   { objects: [] },
   {
@@ -80,7 +80,7 @@ const APPLIED = proposal(
         apiVersion: 'nemia/v1',
         kind: 'Hire',
         metadata: { name: 'tidy.build', namespace: 'f1', resourceVersion: '3' },
-        spec: { workflow: 'tidy', step: 'build', agent: 'iris' },
+        spec: { workflow: 'tidy', step: 'build', agent: 'reviewer' },
       },
     ],
   },
@@ -118,12 +118,12 @@ function answer(method: string, url: string, body: unknown, authorization: strin
     const one = HIRES[hired[1] ?? ''];
     return one ? [200, one] : [404, { error: 'none' }];
   }
-  if (method === 'POST' && url === '/api/namespaces/f1/proposals') return [201, proposal('grace-ab12c', 'waiting', body)];
-  if (method === 'GET' && url === '/api/namespaces/f1/proposals/grace-old01') return [200, APPLIED];
+  if (method === 'POST' && url === '/api/namespaces/f1/proposals') return [201, proposal('implementer-ab12c', 'waiting', body)];
+  if (method === 'GET' && url === '/api/namespaces/f1/proposals/implementer-old01') return [200, APPLIED];
   if (method === 'GET' && url.startsWith('/api/namespaces/f1/proposals/')) return [404, { error: 'none' }];
   const judged = /^\/api\/namespaces\/f1\/proposals\/([^/]+)\/(approve|decline)$/.exec(url);
   if (method === 'POST' && judged) {
-    if (judged[1] === 'grace-nope1') return [403, { error: 'refused', reason: 'person-only' }];
+    if (judged[1] === 'implementer-nope1') return [403, { error: 'refused', reason: 'person-only' }];
     return [200, proposal(judged[1] ?? '', judged[2] === 'approve' ? 'applied' : 'declined', { objects: [] })];
   }
   const delegated = /^\/api\/namespaces\/f1\/delegations\/([^/]+)$/.exec(url);
@@ -183,8 +183,8 @@ async function sent(run: () => Promise<Said>): Promise<{ said: Said; requests: T
 }
 
 const HIRES_FILE = [
-  'apiVersion: nemia/v1\nkind: Hire\nmetadata:\n  name: tidy.build\nspec:\n  workflow: tidy\n  step: build\n  agent: otto\n',
-  'apiVersion: nemia/v1\nkind: Hire\nmetadata:\n  name: tidy.fresh\nspec:\n  workflow: tidy\n  step: fresh\n  agent: otto\n',
+  'apiVersion: nemia/v1\nkind: Hire\nmetadata:\n  name: tidy.build\nspec:\n  workflow: tidy\n  step: build\n  agent: shipper\n',
+  'apiVersion: nemia/v1\nkind: Hire\nmetadata:\n  name: tidy.fresh\nspec:\n  workflow: tidy\n  step: fresh\n  agent: shipper\n',
 ].join('---\n');
 
 test('`sessionHeaders`: Authorization: Bearer <token> where WF_SESSION_TOKEN holds one, none where it is unset or empty', () => {
@@ -207,20 +207,20 @@ test('propose sends every request with the session token, each object at the ver
         apiVersion: 'nemia/v1',
         kind: 'Hire',
         metadata: { name: 'tidy.build', namespace: 'f1', resourceVersion: '7' },
-        spec: { workflow: 'tidy', step: 'build', agent: 'otto' },
+        spec: { workflow: 'tidy', step: 'build', agent: 'shipper' },
       },
       {
         apiVersion: 'nemia/v1',
         kind: 'Hire',
         metadata: { name: 'tidy.fresh', namespace: 'f1' },
-        spec: { workflow: 'tidy', step: 'fresh', agent: 'otto' },
+        spec: { workflow: 'tidy', step: 'fresh', agent: 'shipper' },
       },
     ],
     applyAt: 'run-end',
     why: 'tidy up',
   });
-  assert.match(said.out, /^proposals\/grace-ab12c waiting\b/m);
-  assert.match(said.out, /\/factories\/f1\/proposals\/grace-ab12c$/m);
+  assert.match(said.out, /^proposals\/implementer-ab12c waiting\b/m);
+  assert.match(said.out, /\/factories\/f1\/proposals\/implementer-ab12c$/m);
 });
 
 test('propose --objects: the objects given on the line, as JSON, are proposed as a file of them would be', async () => {
@@ -228,7 +228,7 @@ test('propose --objects: the objects given on the line, as JSON, are proposed as
     apiVersion: 'nemia/v1',
     kind: 'Hire',
     metadata: { name: 'tidy.fresh' },
-    spec: { workflow: 'tidy', step: 'fresh', agent: 'otto' },
+    spec: { workflow: 'tidy', step: 'fresh', agent: 'shipper' },
   });
   const { said, requests } = await sent(() => nemia(['propose', '--objects', inline, '-n', 'f1', '--at', 'run-end'], { token: 'tok' }));
   assert.equal(said.code, 0, said.err);
@@ -239,7 +239,7 @@ test('propose --objects: the objects given on the line, as JSON, are proposed as
         apiVersion: 'nemia/v1',
         kind: 'Hire',
         metadata: { name: 'tidy.fresh', namespace: 'f1' },
-        spec: { workflow: 'tidy', step: 'fresh', agent: 'otto' },
+        spec: { workflow: 'tidy', step: 'fresh', agent: 'shipper' },
       },
     ],
     applyAt: 'run-end',
@@ -258,7 +258,7 @@ test('with WF_SESSION_TOKEN unset or empty, no request carries an Authorization 
 });
 
 test('propose --undo: the objects as they stood before, at the version served now, and a delete of each the proposal made', async () => {
-  const { said, requests } = await sent(() => nemia(['propose', '--undo', 'grace-old01', '-n', 'f1']));
+  const { said, requests } = await sent(() => nemia(['propose', '--undo', 'implementer-old01', '-n', 'f1']));
   assert.equal(said.code, 0, said.err);
   const post = requests.find((r) => r.method === 'POST' && r.path === '/api/namespaces/f1/proposals');
   assert.deepEqual(post?.body, {
@@ -267,11 +267,11 @@ test('propose --undo: the objects as they stood before, at the version served no
         apiVersion: 'nemia/v1',
         kind: 'Hire',
         metadata: { name: 'tidy.build', namespace: 'f1', resourceVersion: '7' },
-        spec: { workflow: 'tidy', step: 'build', agent: 'iris' },
+        spec: { workflow: 'tidy', step: 'build', agent: 'reviewer' },
       },
       { apiVersion: 'nemia/v1', kind: 'Hire', metadata: { name: 'tidy.made', namespace: 'f1', resourceVersion: '9' }, verb: 'delete' },
     ],
-    why: 'undo grace-old01',
+    why: 'undo implementer-old01',
   });
 });
 
@@ -280,21 +280,21 @@ test('proposals approve and decline call their endpoints, each printing the phas
     ['approve', 'applied'],
     ['decline', 'declined'],
   ] as const) {
-    const { said, requests } = await sent(() => nemia(['proposals', action, 'grace-ab12c', '-n', 'f1']));
+    const { said, requests } = await sent(() => nemia(['proposals', action, 'implementer-ab12c', '-n', 'f1']));
     assert.equal(said.code, 0, said.err);
     assert.deepEqual(
       requests.map((r) => `${r.method} ${r.path}`),
-      [`POST /api/namespaces/f1/proposals/grace-ab12c/${action}`],
+      [`POST /api/namespaces/f1/proposals/implementer-ab12c/${action}`],
     );
-    assert.match(said.out, new RegExp(`^proposals/grace-ab12c ${phase}\\b`, 'm'));
+    assert.match(said.out, new RegExp(`^proposals/implementer-ab12c ${phase}\\b`, 'm'));
   }
 });
 
 test('REFUSED: a 403 Forbidden and a 401 Unauthorized each exit 2, as every refusal of the api', async () => {
-  const forbidden = await nemia(['proposals', 'approve', 'grace-nope1', '-n', 'f1'], { token: 'tok' });
+  const forbidden = await nemia(['proposals', 'approve', 'implementer-nope1', '-n', 'f1'], { token: 'tok' });
   assert.equal(forbidden.code, 2, forbidden.err);
   assert.equal(forbidden.out, '');
-  const unknown = await nemia(['proposals', 'decline', 'grace-ab12c', '-n', 'f1'], { token: 'stale' });
+  const unknown = await nemia(['proposals', 'decline', 'implementer-ab12c', '-n', 'f1'], { token: 'stale' });
   assert.equal(unknown.code, 2, unknown.err);
   assert.equal(unknown.out, '');
 });
@@ -312,16 +312,16 @@ test('REFUSED: propose of a kind no proposal changes (a Card) exits 2 naming `ne
 
 test('apply of a Delegation: created by its PUT where none is, then configured', async () => {
   const delegation = (verbs: string) =>
-    `apiVersion: nemia/v1\nkind: Delegation\nmetadata:\n  name: seldon\n  namespace: f1\nspec:\n  rules:\n    - resources: [workflows]\n      resourceNames: []\n      verbs: [${verbs}]\n`;
+    `apiVersion: nemia/v1\nkind: Delegation\nmetadata:\n  name: reviewer\n  namespace: f1\nspec:\n  rules:\n    - resources: [workflows]\n      resourceNames: []\n      verbs: [${verbs}]\n`;
   const made = await sent(() => nemia(['apply', '-f', '-'], { stdin: delegation('update') }));
   assert.equal(made.said.code, 0, made.said.err);
-  assert.equal(made.said.out, 'delegations/seldon created\n');
-  assert.ok(made.requests.some((r) => r.method === 'PUT' && r.path === '/api/namespaces/f1/delegations/seldon'));
+  assert.equal(made.said.out, 'delegations/reviewer created\n');
+  assert.ok(made.requests.some((r) => r.method === 'PUT' && r.path === '/api/namespaces/f1/delegations/reviewer'));
   const changed = await nemia(['apply', '-f', '-'], { stdin: delegation('create, update') });
   assert.equal(changed.code, 0, changed.err);
-  assert.equal(changed.out, 'delegations/seldon configured\n');
+  assert.equal(changed.out, 'delegations/reviewer configured\n');
   const again = await nemia(['apply', '-f', '-'], { stdin: delegation('create, update') });
-  assert.equal(again.out, 'delegations/seldon unchanged\n');
+  assert.equal(again.out, 'delegations/reviewer unchanged\n');
 });
 
 test('REFUSED: apply of a Proposal exits 2 naming `nemia propose`, and writes nothing', async () => {

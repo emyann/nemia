@@ -72,7 +72,14 @@ fs.writeFileSync(
 /** A session's token for the step `design` of the run, its try the live one while `TASK` is filed and unsettled. */
 const token = Effect.runSync(
   Effect.gen(function* () {
-    return yield* (yield* TokenDoor).tokens.mint({ agent: 'seldon', factory: FACTORY, run: RUN, step: 'design', attempt: 1, task: TASK });
+    return yield* (yield* TokenDoor).tokens.mint({
+      agent: 'implementer',
+      factory: FACTORY,
+      run: RUN,
+      step: 'design',
+      attempt: 1,
+      task: TASK,
+    });
   }).pipe(Effect.provide(tokenDoorFiles(root))),
 );
 
@@ -140,7 +147,7 @@ test('a proposal filed by a live session names its agent, run and step; the pers
   await t.test('filed waiting, proposed by the session, nothing written yet', () => {
     assert.equal(proposal.kind, 'Proposal');
     assert.equal(proposal.status.phase, 'waiting');
-    assert.deepEqual(proposal.status.proposedBy, { agent: 'seldon', run: RUN, step: 'design' });
+    assert.deepEqual(proposal.status.proposedBy, { agent: 'implementer', run: RUN, step: 'design' });
     assert.equal(planText(), was);
   });
   await t.test('listed and read in its namespace', async () => {
@@ -180,25 +187,25 @@ test('a proposal filed by a live session names its agent, run and step; the pers
 test("a delegation is the person's: written, read, listed and removed by them, and refused a live session's token 403", async () => {
   sessionRunning();
   const spec = { rules: [{ resources: ['workflows'], resourceNames: [], verbs: ['update'] }] };
-  const refused = await ask(`${ns}/delegations/seldon`, 'PUT', spec, token);
+  const refused = await ask(`${ns}/delegations/implementer`, 'PUT', spec, token);
   assert.equal(refused.status, 403);
   assert.equal(((await refused.json()) as { reason?: string }).reason, 'person-only');
-  assert.equal((await app().request(`${ns}/delegations/seldon`)).status, 404, 'nothing was written');
-  const put = await ask(`${ns}/delegations/seldon`, 'PUT', spec);
+  assert.equal((await app().request(`${ns}/delegations/implementer`)).status, 404, 'nothing was written');
+  const put = await ask(`${ns}/delegations/implementer`, 'PUT', spec);
   assert.equal(put.status, 200);
-  assert.equal(((await put.json()) as Delegation).metadata.name, 'seldon');
+  assert.equal(((await put.json()) as Delegation).metadata.name, 'implementer');
   const list = (await (await app().request(`${ns}/delegations`)).json()) as { kind: string; items: Delegation[] };
   assert.equal(list.kind, 'DelegationList');
   assert.deepEqual(
     list.items.map((d) => d.metadata.name),
-    ['seldon'],
+    ['implementer'],
   );
-  const removedByToken = await ask(`${ns}/delegations/seldon`, 'DELETE', {}, token);
+  const removedByToken = await ask(`${ns}/delegations/implementer`, 'DELETE', {}, token);
   assert.equal(removedByToken.status, 403, "a session's removal is refused");
-  const removed = await ask(`${ns}/delegations/seldon`, 'DELETE', {});
+  const removed = await ask(`${ns}/delegations/implementer`, 'DELETE', {});
   assert.equal(removed.status, 200);
-  assert.equal(((await removed.json()) as Delegation).metadata.name, 'seldon', 'the removal answers what it removed');
-  assert.equal((await ask(`${ns}/delegations/seldon`, 'DELETE', {})).status, 404, 'none is there to remove');
+  assert.equal(((await removed.json()) as Delegation).metadata.name, 'implementer', 'the removal answers what it removed');
+  assert.equal((await ask(`${ns}/delegations/implementer`, 'DELETE', {})).status, 404, 'none is there to remove');
 });
 
 /** Each write of the two kinds, by its method and its path in `pmill`. */
@@ -206,8 +213,8 @@ const WRITES = [
   ['POST', `${ns}/proposals`, PROPOSAL_WRITES.createProposal(FACTORY)],
   ['POST', `${ns}/proposals/p-1/approve`, PROPOSAL_WRITES.approveProposal(FACTORY, 'p-1')],
   ['POST', `${ns}/proposals/p-1/decline`, PROPOSAL_WRITES.declineProposal(FACTORY, 'p-1')],
-  ['PUT', `${ns}/delegations/seldon`, PROPOSAL_WRITES.putDelegation(FACTORY, 'seldon')],
-  ['DELETE', `${ns}/delegations/seldon`, PROPOSAL_WRITES.deleteDelegation(FACTORY, 'seldon')],
+  ['PUT', `${ns}/delegations/implementer`, PROPOSAL_WRITES.putDelegation(FACTORY, 'implementer')],
+  ['DELETE', `${ns}/delegations/implementer`, PROPOSAL_WRITES.deleteDelegation(FACTORY, 'implementer')],
 ] as const;
 
 test('REFUSED: each write is 403 for a page on another site and 415 for a body that is not JSON, before it is read', async () => {

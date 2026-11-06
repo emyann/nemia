@@ -10,12 +10,11 @@ import { Conflict, Missing, type Refusal } from '../refusal/refusal.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { proposalApproval } from './approval.ts';
-import { applyProgram, type RunStateOf } from './apply.verb.ts';
-import type { ProposalNeeds, ProposalPlace } from './current.verb.ts';
-import { Forbidden } from './forbidden.ts';
-import { ProposalDoor } from './proposal.store.ts';
+import { applyProgram, type RunStateOf } from '../apply/apply.verb.ts';
+import type { ProposalNeeds, ProposalPlace } from '../propose/current.verb.ts';
+import { Forbidden, type ProposalCaller } from '../caller/index.ts';
+import { ProposalDoor } from '../proposal/proposal.store.ts';
 import { factsOf, standingOf } from './standing.verb.ts';
-import type { ProposalCaller } from './caller.ts';
 
 /** The proposal `name` of `factory`, refused (`Missing`) where none is. */
 const proposalAt = (factory: string, name: string): Effect.Effect<Proposal, Refusal> =>

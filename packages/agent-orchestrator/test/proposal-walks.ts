@@ -20,7 +20,7 @@ export const aProposal = (name: string, factory = 'acme'): Proposal => ({
   spec: { objects: [{ kind: 'Workflow', metadata: { name: 'dev', resourceVersion: 'abc' }, spec: { steps: [] } }] },
   status: {
     phase: 'waiting',
-    proposedBy: { agent: 'seldon' },
+    proposedBy: { agent: 'implementer' },
     changes: [{ resource: 'workflows', name: 'dev', verb: 'update', access: 'same' }],
     widens: false,
   },
@@ -36,8 +36,8 @@ export const PROPOSAL_WALKS: Readonly<Record<string, readonly Walk[]>> = {
     {
       name: 'each factory with a proposal, by name',
       walk: ({ door }) => {
-        done(door.proposals.create(aProposal('seldon-aaaaa', 'zeta')));
-        done(door.proposals.create(aProposal('seldon-bbbbb', 'acme')));
+        done(door.proposals.create(aProposal('implementer-aaaaa', 'zeta')));
+        done(door.proposals.create(aProposal('implementer-bbbbb', 'acme')));
         return done(door.proposals.factories());
       },
       says: ['acme', 'zeta'],
@@ -48,12 +48,12 @@ export const PROPOSAL_WALKS: Readonly<Record<string, readonly Walk[]>> = {
     {
       name: "a factory's own, by name",
       walk: ({ door }) => {
-        done(door.proposals.create(aProposal('seldon-bbbbb')));
-        done(door.proposals.create(aProposal('iris-aaaaa')));
-        done(door.proposals.create(aProposal('seldon-ccccc', 'other')));
+        done(door.proposals.create(aProposal('implementer-bbbbb')));
+        done(door.proposals.create(aProposal('shipper-aaaaa')));
+        done(door.proposals.create(aProposal('implementer-ccccc', 'other')));
         return done(door.proposals.list('acme')).map((p) => p.metadata.name);
       },
-      says: ['iris-aaaaa', 'seldon-bbbbb'],
+      says: ['implementer-bbbbb', 'shipper-aaaaa'],
     },
     {
       name: 'REFUSED: a name that is no factory is Invalid',
@@ -62,14 +62,14 @@ export const PROPOSAL_WALKS: Readonly<Record<string, readonly Walk[]>> = {
     },
   ],
   'proposals.read': [
-    { name: 'none where none is made', walk: ({ door }) => done(door.proposals.read('acme', 'seldon-aaaaa')), says: undefined },
+    { name: 'none where none is made', walk: ({ door }) => done(door.proposals.read('acme', 'implementer-aaaaa')), says: undefined },
     {
       name: 'the proposal made, stamped with its version',
       walk: ({ door }) => {
-        done(door.proposals.create(aProposal('seldon-aaaaa')));
-        return seen(done(door.proposals.read('acme', 'seldon-aaaaa')));
+        done(door.proposals.create(aProposal('implementer-aaaaa')));
+        return seen(done(door.proposals.read('acme', 'implementer-aaaaa')));
       },
-      says: { name: 'seldon-aaaaa', namespace: 'acme', phase: 'waiting', stamped: true },
+      says: { name: 'implementer-aaaaa', namespace: 'acme', phase: 'waiting', stamped: true },
     },
     {
       name: 'REFUSED: a name that is no proposal is Invalid',
@@ -80,31 +80,31 @@ export const PROPOSAL_WALKS: Readonly<Record<string, readonly Walk[]>> = {
   'proposals.create': [
     {
       name: 'made, and answered stamped',
-      walk: ({ door }) => seen(done(door.proposals.create(aProposal('seldon-aaaaa')))),
-      says: { name: 'seldon-aaaaa', namespace: 'acme', phase: 'waiting', stamped: true },
+      walk: ({ door }) => seen(done(door.proposals.create(aProposal('implementer-aaaaa')))),
+      says: { name: 'implementer-aaaaa', namespace: 'acme', phase: 'waiting', stamped: true },
     },
     {
       name: 'REFUSED: a name taken is Conflict',
       walk: ({ door }) => {
-        done(door.proposals.create(aProposal('seldon-aaaaa')));
-        return act(door.proposals.create(aProposal('seldon-aaaaa')));
+        done(door.proposals.create(aProposal('implementer-aaaaa')));
+        return act(door.proposals.create(aProposal('implementer-aaaaa')));
       },
       says: { refused: 'Conflict' },
     },
     {
       name: 'REFUSED: one that names no namespace is Invalid',
       walk: ({ door }) => {
-        const { namespace: _none, ...metadata } = aProposal('seldon-aaaaa').metadata;
-        return act(door.proposals.create({ ...aProposal('seldon-aaaaa'), metadata }));
+        const { namespace: _none, ...metadata } = aProposal('implementer-aaaaa').metadata;
+        return act(door.proposals.create({ ...aProposal('implementer-aaaaa'), metadata }));
       },
       says: { refused: 'Invalid' },
     },
     {
       name: 'REFUSED: one the model refuses is Invalid, and nothing is made',
       walk: ({ door }) => {
-        const p = aProposal('seldon-aaaaa');
+        const p = aProposal('implementer-aaaaa');
         const broken = { ...p, status: { ...p.status, phase: 'gone' } } as unknown as Proposal;
-        return [act(door.proposals.create(broken)), done(door.proposals.read('acme', 'seldon-aaaaa'))];
+        return [act(door.proposals.create(broken)), done(door.proposals.read('acme', 'implementer-aaaaa'))];
       },
       says: [{ refused: 'Invalid' }, undefined],
     },
@@ -113,16 +113,16 @@ export const PROPOSAL_WALKS: Readonly<Record<string, readonly Walk[]>> = {
     {
       name: 'written back: its new phase, at a new version',
       walk: ({ door }) => {
-        const made = done(door.proposals.create(aProposal('seldon-aaaaa')));
+        const made = done(door.proposals.create(aProposal('implementer-aaaaa')));
         const after = done(door.proposals.write({ ...made, status: { ...made.status, phase: 'declined' } }));
-        const read = done(door.proposals.read('acme', 'seldon-aaaaa'));
+        const read = done(door.proposals.read('acme', 'implementer-aaaaa'));
         return { phase: read?.status.phase, moved: after.metadata.resourceVersion !== made.metadata.resourceVersion };
       },
       says: { phase: 'declined', moved: true },
     },
     {
       name: 'REFUSED: one that is not there is Missing',
-      walk: ({ door }) => act(door.proposals.write(aProposal('seldon-aaaaa'))),
+      walk: ({ door }) => act(door.proposals.write(aProposal('implementer-aaaaa'))),
       says: { refused: 'Missing' },
     },
   ],

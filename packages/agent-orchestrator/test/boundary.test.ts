@@ -56,12 +56,6 @@ const STORE: readonly string[] = [];
  */
 const CONTROLLER = ['src/runner.ts', 'bin/nemia.ts', 'bin/wf.ts'];
 
-/**
- * The files in a folder that are a part of the root, `runner.ts` re-exporting each whole (`export * from …`), so a controller as it is:
- * the exports of proposals and delegations (`src/proposal/entry.ts`), kept apart since `runner.ts` is at its length's limit.
- */
-const ROOT_PARTS: readonly string[] = ['src/proposal/entry.ts'];
-
 /** The package's bins: `nemia`, and `nemia`, its alias. */
 const BINS = ['bin/nemia.ts', 'bin/wf.ts'];
 
@@ -85,7 +79,6 @@ function kindsOf(file: string): Kind[] {
     .filter(([, files]) => files.includes(file))
     .map(([kind]) => kind as Kind);
   if (listed.length || !/^src\/.+\/[^/]+\.ts$/.test(file) || file.endsWith('.test.ts')) return listed;
-  if (ROOT_PARTS.includes(file)) return ['CONTROLLER'];
   if (file.startsWith(CLI_FOLDER) || file.endsWith('.verb.ts')) return ['CONTROLLER'];
   if (file.endsWith('.model.ts')) return ['MODEL'];
   return file.endsWith('.store.ts') ? ['STORE'] : ['PURE'];

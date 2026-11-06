@@ -9,7 +9,7 @@ import type { ProposalFacts, ProposalRule, Standing } from '../../contracts/prop
 import { tried } from '../runtime-client.ts';
 import type { Refusal } from '../refusal/refusal.ts';
 import { levelOfFactory } from '../level/levels.verb.ts';
-import { listInForce, proposalRulesIn } from '../auto/auto.ts';
+import { listInForce, proposalRulesIn } from '../auto/index.ts';
 import { readConfirmed } from '../auto/auto.store.ts';
 import { DelegationDoor } from '../delegation/delegation.store.ts';
 

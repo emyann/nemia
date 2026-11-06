@@ -26,7 +26,7 @@ import {
 } from './auto.ts';
 import { confirmedFile, confirmRule, digestOf, dropRule, proposedFile, readConfirmed, readProposed, writeProposed } from './auto.store.ts';
 import { DelegationDoor } from '../delegation/delegation.store.ts';
-import { proposalRuleReach } from '../proposal/rule.ts';
+import { proposalRuleReach } from '../approval/index.ts';
 
 /** A rule with its words, as the person reads it. */
 export type WordedRule<R extends PolicyRule = GateRule> = R & { words: string };

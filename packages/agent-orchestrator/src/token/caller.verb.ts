@@ -2,7 +2,7 @@
  * Who a request is from, by the session token it presents (`sessionCaller`): the record the store keeps of it read by its digest
  * (`TokenDoor`), whether its session is still the live one judged afresh against the run's record and the engine (`liveSession`), then
  * the pure judgement (`callerOf`). Remembers nothing between requests: a token ends with its try, and no list of revoked ones is kept.
- * What the api reads of the session token, re-exported here so the package's entry names it in one line.
+ * What the api reads of the session token, re-exported here so the package's entry names it from one module.
  */
 import { Effect } from 'effect';
 import { EngineService, asked } from '../runtime-client.ts';

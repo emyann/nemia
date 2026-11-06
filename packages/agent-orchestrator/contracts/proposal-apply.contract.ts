@@ -1,5 +1,5 @@
 /**
- * What becomes of an approved proposal on a pass (agent-orchestrator, src/proposal/apply.ts, `proposalApply`), read again each time and
+ * What becomes of an approved proposal on a pass (agent-orchestrator, src/apply/apply.ts, `proposalApply`), read again each time and
  * carrying nothing between passes: it applies at approval, or at the proposing run's successful end where it says so, and is dropped where
  * that run is called off or fails; it is checked again as it applies — an object no longer at the revision the proposal read makes it
  * stale, never applied, and an agent's approval that no longer holds (its delegation taken back, its rule dropped, the factory off auto:
@@ -66,5 +66,5 @@ const proposalApplySpec = spec<(facts: ApplyFacts) => ApplyAction>({
   },
 });
 
-/** `proposalApply`'s type, which `src/proposal/apply.ts` takes. */
+/** `proposalApply`'s type, which `src/apply/apply.ts` takes. */
 export type ProposalApply = Implementation<typeof proposalApplySpec>;

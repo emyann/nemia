@@ -20,19 +20,19 @@ const ROOT = scratch('wf-proposals-');
 process.env.WF_ROOT = ROOT;
 const { runWith: runEngine } = await import('../src/runner.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
-const { proposeProgram, undoProgram } = await import('../src/proposal/propose.verb.ts');
-const { approveProgram, declineProgram, proposalGet } = await import('../src/proposal/approve.verb.ts');
-const { applyProgram } = await import('../src/proposal/apply.verb.ts');
-const { proposalsPass } = await import('../src/proposal/pass.verb.ts');
-const { currentOf } = await import('../src/proposal/current.verb.ts');
-const { PERSON } = await import('../src/proposal/caller.ts');
+const { proposeProgram, undoProgram } = await import('../src/propose/propose.verb.ts');
+const { approveProgram, declineProgram, proposalGet } = await import('../src/approval/approve.verb.ts');
+const { applyProgram } = await import('../src/apply/apply.verb.ts');
+const { proposalsPass } = await import('../src/apply/pass.verb.ts');
+const { currentOf } = await import('../src/propose/current.verb.ts');
+const { PERSON } = await import('../src/caller/caller.ts');
 const { delegationPut, delegationRemove } = await import('../src/delegation/delegation.verb.ts');
 const { writeFactoryLevel } = await import('../src/level/level.store.ts');
 const { confirmedFile, writeProposed } = await import('../src/auto/auto.store.ts');
 const { POLICY_CONFIRM, policyListOf } = await import('../src/auto/auto.verb.ts');
 const { ruleWords } = await import('../src/auto/auto.ts');
 const { RunDoor } = await import('../src/runs/runs.store.ts');
-type Caller = import('../src/proposal/caller.ts').ProposalCaller;
+type Caller = import('../src/caller/caller.ts').ProposalCaller;
 type Rule = import('../src/auto/auto.ts').ProposalPolicyRule;
 
 const stand = eachTest(testPlace);
@@ -51,7 +51,7 @@ const refusalOf = async (program: Effect.Effect<unknown, unknown, any>) =>
 const STEP = '---\nplace: folder\nbudget: 5\n---\nPlan the change.\n';
 
 /**
- * A factory `name` made from a template, its tree rendered: one workflow `dev` with a step `plan`, and an agent `seldon` beside it.
+ * A factory `name` made from a template, its tree rendered: one workflow `dev` with a step `plan`, and an agent `implementer` beside it.
  * Its level as given.
  */
 function factory(name: string, level: 'manual' | 'semi-auto' | 'auto' = 'manual'): string {
@@ -69,7 +69,7 @@ function factory(name: string, level: 'manual' | 'semi-auto' | 'auto' = 'manual'
   fs.writeFileSync(path.join(tree, 'workflows', 'dev', 'README.md'), '# dev\n\nPlan.\n');
   fs.writeFileSync(path.join(tree, 'workflows', 'dev', 'plan.md'), STEP);
   fs.writeFileSync(
-    path.join(tree, 'workflows', 'agents', 'seldon.md'),
+    path.join(tree, 'workflows', 'agents', 'implementer.md'),
     '---\nrole: Architect\nallowedTools: Read\n---\nDesign the change.\n',
   );
   writeFactoryLevel(name, { level, since: '2026-11-01T00:00:00.000Z' });
@@ -138,12 +138,12 @@ test('the proposal story: an agent proposes, the person approves, it is applied 
   const tree = factory('story');
   const was = planIn(tree);
   const proposed = await run(
-    proposeProgram(agentOf('seldon', 'story'), 'story', { objects: [await devChanged('story', 'Plan it twice.\n')] }, PLACE),
+    proposeProgram(agentOf('implementer', 'story'), 'story', { objects: [await devChanged('story', 'Plan it twice.\n')] }, PLACE),
   );
   await t.test('proposed: waiting, named by its proposer, proposed by the caller, its change an update of workflows/dev', () => {
     assert.equal(proposed.status.phase, 'waiting');
-    assert.match(proposed.metadata.name, /^seldon-[a-z0-9]{5}$/);
-    assert.deepEqual(proposed.status.proposedBy, { agent: 'seldon' });
+    assert.match(proposed.metadata.name, /^implementer-[a-z0-9]{5}$/);
+    assert.deepEqual(proposed.status.proposedBy, { agent: 'implementer' });
     assert.deepEqual(
       proposed.status.changes.map(({ resource, name, verb }) => [resource, name, verb]),
       [['workflows', 'dev', 'update']],
@@ -183,7 +183,7 @@ test('the proposal story: an agent proposes, the person approves, it is applied 
 test('REFUSED stale: the workflow written between propose and approve leaves the proposal stale and the tree as the other write left it', async () => {
   const tree = factory('stale');
   const proposed = await run(
-    proposeProgram(agentOf('seldon', 'stale'), 'stale', { objects: [await devChanged('stale', 'Mine.\n')] }, PLACE),
+    proposeProgram(agentOf('implementer', 'stale'), 'stale', { objects: [await devChanged('stale', 'Mine.\n')] }, PLACE),
   );
   fs.writeFileSync(path.join(tree, 'workflows', 'dev', 'plan.md'), '---\nplace: folder\nbudget: 5\n---\nSomeone else wrote this.\n');
   const after = await run(approveProgram(PERSON, 'stale', proposed.metadata.name, PLACE));
@@ -212,14 +212,14 @@ test('a run-end proposal stays approved while its run goes or sits failed, appli
   const make = async (body: string) =>
     run(
       proposeProgram(
-        agentOf('seldon', 'runend', 'r1'),
+        agentOf('implementer', 'runend', 'r1'),
         'runend',
         { objects: [await devChanged('runend', body)], applyAt: 'run-end' },
         PLACE,
       ),
     );
   const p = await make('At the end.\n');
-  assert.deepEqual(p.status.proposedBy, { agent: 'seldon', run: 'r1', step: 'design' });
+  assert.deepEqual(p.status.proposedBy, { agent: 'implementer', run: 'r1', step: 'design' });
   const approved = await run(approveProgram(PERSON, 'runend', p.metadata.name, PLACE));
   assert.equal(approved.status.phase, 'approved', 'its run is read on a pass, not at approval');
   for (const state of ['running', 'waiting', 'failed', undefined] as const) {
@@ -241,8 +241,8 @@ test('a run-end proposal stays approved while its run goes or sits failed, appli
 test('an agent approves at auto within its delegation under a confirmed rule; its delegation taken back sends the proposal back to the person', async () => {
   const tree = factory('deleg', 'auto');
   await plantRun('r2', 'deleg');
-  await delegated('deleg', 'agora', ['workflows'], ['update']);
-  await ruleConfirmed('agora', {
+  await delegated('deleg', 'reviewer', ['workflows'], ['update']);
+  await ruleConfirmed('reviewer', {
     factory: 'deleg',
     resources: ['workflows'],
     resourceNames: [],
@@ -252,25 +252,30 @@ test('an agent approves at auto within its delegation under a confirmed rule; it
   });
   const make = async (body: string) =>
     run(
-      proposeProgram(agentOf('seldon', 'deleg', 'r2'), 'deleg', { objects: [await devChanged('deleg', body)], applyAt: 'run-end' }, PLACE),
+      proposeProgram(
+        agentOf('implementer', 'deleg', 'r2'),
+        'deleg',
+        { objects: [await devChanged('deleg', body)], applyAt: 'run-end' },
+        PLACE,
+      ),
     );
-  const p = await make('Approved by agora.\n');
-  const approved = await run(approveProgram(agentOf('agora', 'deleg'), 'deleg', p.metadata.name, PLACE));
+  const p = await make('Approved by reviewer.\n');
+  const approved = await run(approveProgram(agentOf('reviewer', 'deleg'), 'deleg', p.metadata.name, PLACE));
   assert.equal(approved.status.phase, 'approved');
-  assert.deepEqual([approved.status.approvedBy?.by, approved.status.approvedBy?.agent], ['rule', 'agora']);
-  await run(delegationRemove(PERSON, 'deleg', 'agora'));
+  assert.deepEqual([approved.status.approvedBy?.by, approved.status.approvedBy?.agent], ['rule', 'reviewer']);
+  await run(delegationRemove(PERSON, 'deleg', 'reviewer'));
   await run(proposalsPass(PLACE, () => 'succeeded'));
   const back = await run(proposalGet('deleg', p.metadata.name));
   assert.equal(back.status.phase, 'waiting');
   assert.equal(back.status.approvedBy, undefined);
-  assert.doesNotMatch(planIn(tree), /Approved by agora/);
-  assert.equal((await refusalOf(approveProgram(agentOf('agora', 'deleg'), 'deleg', p.metadata.name, PLACE))).reason, 'not-delegated');
+  assert.doesNotMatch(planIn(tree), /Approved by reviewer/);
+  assert.equal((await refusalOf(approveProgram(agentOf('reviewer', 'deleg'), 'deleg', p.metadata.name, PLACE))).reason, 'not-delegated');
 });
 
 test("REFUSED own-agent: a session of an agent approving its own agent's proposal, even with a delegation and a rule that cover it", async () => {
   factory('own', 'auto');
-  await delegated('own', 'seldon', ['workflows'], ['update']);
-  await ruleConfirmed('seldon', {
+  await delegated('own', 'implementer', ['workflows'], ['update']);
+  await ruleConfirmed('implementer', {
     factory: 'own',
     resources: ['workflows'],
     resourceNames: [],
@@ -278,16 +283,16 @@ test("REFUSED own-agent: a session of an agent approving its own agent's proposa
     widens: true,
     proposedBy: [],
   });
-  const p = await run(proposeProgram(agentOf('seldon', 'own', 'r3'), 'own', { objects: [await devChanged('own', 'Mine.\n')] }, PLACE));
-  const refused = await refusalOf(approveProgram(agentOf('seldon', 'own', 'r4'), 'own', p.metadata.name, PLACE));
+  const p = await run(proposeProgram(agentOf('implementer', 'own', 'r3'), 'own', { objects: [await devChanged('own', 'Mine.\n')] }, PLACE));
+  const refused = await refusalOf(approveProgram(agentOf('implementer', 'own', 'r4'), 'own', p.metadata.name, PLACE));
   assert.deepEqual([refused._tag, refused.reason, refused.exitCode], ['Forbidden', 'own-agent', 2]);
   assert.equal((await run(proposalGet('own', p.metadata.name))).status.phase, 'waiting');
 });
 
 test('REFUSED not-auto: an agent at semi-auto, with a delegation and a rule that cover the proposal', async () => {
   factory('semi', 'semi-auto');
-  await delegated('semi', 'agora', ['workflows'], ['update']);
-  await ruleConfirmed('agora', {
+  await delegated('semi', 'reviewer', ['workflows'], ['update']);
+  await ruleConfirmed('reviewer', {
     factory: 'semi',
     resources: ['workflows'],
     resourceNames: [],
@@ -295,15 +300,15 @@ test('REFUSED not-auto: an agent at semi-auto, with a delegation and a rule that
     widens: false,
     proposedBy: [],
   });
-  const p = await run(proposeProgram(agentOf('seldon', 'semi'), 'semi', { objects: [await devChanged('semi', 'Semi.\n')] }, PLACE));
-  const refused = await refusalOf(approveProgram(agentOf('agora', 'semi'), 'semi', p.metadata.name, PLACE));
+  const p = await run(proposeProgram(agentOf('implementer', 'semi'), 'semi', { objects: [await devChanged('semi', 'Semi.\n')] }, PLACE));
+  const refused = await refusalOf(approveProgram(agentOf('reviewer', 'semi'), 'semi', p.metadata.name, PLACE));
   assert.deepEqual([refused._tag, refused.reason], ['Forbidden', 'not-auto']);
 });
 
 test('widening: an Agent proposal adding an allowedTools rule widens, a rule that takes no widening does not approve it, and the person still does', async () => {
   const tree = factory('widen', 'auto');
-  await delegated('widen', 'agora', ['agents'], ['update']);
-  await ruleConfirmed('agora', {
+  await delegated('widen', 'reviewer', ['agents'], ['update']);
+  await ruleConfirmed('reviewer', {
     factory: 'widen',
     resources: ['agents'],
     resourceNames: [],
@@ -311,38 +316,38 @@ test('widening: an Agent proposal adding an allowedTools rule widens, a rule tha
     widens: false,
     proposedBy: [],
   });
-  const now = await run(currentOf(PLACE, 'widen', 'Agent', 'seldon'));
+  const now = await run(currentOf(PLACE, 'widen', 'Agent', 'implementer'));
   const spec = now.spec as { keys: Record<string, unknown> };
   const wider: ProposedObject = {
     kind: 'Agent',
-    metadata: { name: 'seldon', resourceVersion: now.version ?? undefined },
+    metadata: { name: 'implementer', resourceVersion: now.version ?? undefined },
     spec: { ...spec, keys: { ...spec.keys, allowedTools: 'Read, Bash(git diff *)' } },
   };
-  const p = await run(proposeProgram(agentOf('iris', 'widen'), 'widen', { objects: [wider] }, PLACE));
+  const p = await run(proposeProgram(agentOf('shipper', 'widen'), 'widen', { objects: [wider] }, PLACE));
   assert.equal(p.status.widens, true);
   assert.deepEqual(
     p.status.changes.map((c) => [c.resource, c.access]),
     [['agents', 'widens']],
   );
-  assert.equal((await refusalOf(approveProgram(agentOf('agora', 'widen'), 'widen', p.metadata.name, PLACE))).reason, 'no-rule');
+  assert.equal((await refusalOf(approveProgram(agentOf('reviewer', 'widen'), 'widen', p.metadata.name, PLACE))).reason, 'no-rule');
   const applied = await run(approveProgram(PERSON, 'widen', p.metadata.name, PLACE));
   assert.equal(applied.status.phase, 'applied');
-  assert.match(fs.readFileSync(path.join(tree, 'workflows', 'agents', 'seldon.md'), 'utf8'), /git diff/);
+  assert.match(fs.readFileSync(path.join(tree, 'workflows', 'agents', 'implementer.md'), 'utf8'), /git diff/);
 
-  const narrower = await run(currentOf(PLACE, 'widen', 'Agent', 'seldon'));
+  const narrower = await run(currentOf(PLACE, 'widen', 'Agent', 'implementer'));
   const same: ProposedObject = {
     kind: 'Agent',
-    metadata: { name: 'seldon', resourceVersion: narrower.version ?? undefined },
+    metadata: { name: 'implementer', resourceVersion: narrower.version ?? undefined },
     spec: { ...(narrower.spec as object), instructions: 'Design it well.\n' },
   };
-  const q = await run(proposeProgram(agentOf('iris', 'widen'), 'widen', { objects: [same] }, PLACE));
+  const q = await run(proposeProgram(agentOf('shipper', 'widen'), 'widen', { objects: [same] }, PLACE));
   assert.equal(q.status.widens, false);
-  assert.equal((await run(approveProgram(agentOf('agora', 'widen'), 'widen', q.metadata.name, PLACE))).status.phase, 'applied');
+  assert.equal((await run(approveProgram(agentOf('reviewer', 'widen'), 'widen', q.metadata.name, PLACE))).status.phase, 'applied');
 });
 
 test("REFUSED at confirm: a proposal rule past the agent's delegation (Invalid), and one within it goes on", async () => {
   factory('confirm', 'auto');
-  await delegated('confirm', 'argus', ['workflows'], ['update']);
+  await delegated('confirm', 'shipper', ['workflows'], ['update']);
   const past: Rule = {
     id: 'too-far',
     answer: 'approve-proposal',
@@ -353,15 +358,15 @@ test("REFUSED at confirm: a proposal rule past the agent's delegation (Invalid),
     widens: false,
     proposedBy: [],
   };
-  writeProposed(ROOT, 'argus', { at: new Date().toISOString(), rules: [past], guidance: [], digest: null });
-  const refused = await refusalOf(POLICY_CONFIRM.handler({ name: 'argus', id: 'too-far', words: ruleWords(past) }, {}, ROOT));
+  writeProposed(ROOT, 'shipper', { at: new Date().toISOString(), rules: [past], guidance: [], digest: null });
+  const refused = await refusalOf(POLICY_CONFIRM.handler({ name: 'shipper', id: 'too-far', words: ruleWords(past) }, {}, ROOT));
   assert.deepEqual([refused._tag, refused.exitCode], ['Invalid', 2]);
-  assert.equal(fs.existsSync(confirmedFile(ROOT, 'argus')), false, 'nothing is confirmed');
+  assert.equal(fs.existsSync(confirmedFile(ROOT, 'shipper')), false, 'nothing is confirmed');
   const within = { ...past, id: 'workflows-only', resources: ['workflows'] };
-  writeProposed(ROOT, 'argus', { at: new Date().toISOString(), rules: [within], guidance: [], digest: null });
-  await run(POLICY_CONFIRM.handler({ name: 'argus', id: 'workflows-only', words: ruleWords(within) }, {}, ROOT));
-  assert.equal(fs.existsSync(confirmedFile(ROOT, 'argus')), true);
-  const list = policyListOf(ROOT, 'argus', undefined);
+  writeProposed(ROOT, 'shipper', { at: new Date().toISOString(), rules: [within], guidance: [], digest: null });
+  await run(POLICY_CONFIRM.handler({ name: 'shipper', id: 'workflows-only', words: ruleWords(within) }, {}, ROOT));
+  assert.equal(fs.existsSync(confirmedFile(ROOT, 'shipper')), true);
+  const list = policyListOf(ROOT, 'shipper', undefined);
   assert.deepEqual(
     list.proposalRules.map((r) => r.id),
     ['workflows-only'],
@@ -377,7 +382,7 @@ test("REFUSED at propose: another factory's session (Forbidden), the person's se
   factory('refuse');
   factory('other');
   const object = await devChanged('refuse', 'x\n');
-  const elsewhere = await refusalOf(proposeProgram(agentOf('seldon', 'other'), 'refuse', { objects: [object] }, PLACE));
+  const elsewhere = await refusalOf(proposeProgram(agentOf('implementer', 'other'), 'refuse', { objects: [object] }, PLACE));
   assert.deepEqual([elsewhere._tag, elsewhere.reason], ['Forbidden', 'other-factory']);
   const settings: ProposedObject = {
     kind: 'Factory',
@@ -393,10 +398,10 @@ test("REFUSED at propose: another factory's session (Forbidden), the person's se
   const moved: ProposedObject = { ...object, metadata: { ...object.metadata, resourceVersion: 'not-it' } };
   assert.equal((await refusalOf(proposeProgram(PERSON, 'refuse', { objects: [moved] }, PLACE)))._tag, 'Conflict');
   assert.equal((await refusalOf(proposeProgram(PERSON, 'default', { objects: [object] }, PLACE)))._tag, 'Invalid');
-  const p = await run(proposeProgram(agentOf('seldon', 'refuse'), 'refuse', { objects: [object] }, PLACE));
-  const decline = await refusalOf(declineProgram(agentOf('agora', 'refuse'), 'refuse', p.metadata.name));
+  const p = await run(proposeProgram(agentOf('implementer', 'refuse'), 'refuse', { objects: [object] }, PLACE));
+  const decline = await refusalOf(declineProgram(agentOf('reviewer', 'refuse'), 'refuse', p.metadata.name));
   assert.deepEqual([decline._tag, decline.reason], ['Forbidden', 'person-only']);
-  const put = await refusalOf(delegationPut(agentOf('agora', 'refuse'), 'refuse', 'agora', { rules: [] }));
+  const put = await refusalOf(delegationPut(agentOf('reviewer', 'refuse'), 'refuse', 'reviewer', { rules: [] }));
   assert.deepEqual([put._tag, put.reason], ['Forbidden', 'person-only']);
   assert.equal(
     await run(applyProgram('refuse', 'no-such-1', PLACE, () => Effect.succeed(undefined))),

@@ -158,7 +158,7 @@ export function ruleWords(rule: PolicyRule): string {
 
 /**
  * A proposal rule in the person's words, from its fields alone: `Approve proposals in acme that update workflows build or review, made by
- * seldon, that never widen access.` Pure.
+ * implementer, that never widen access.` Pure.
  */
 function proposalRuleWords(rule: ProposalPolicyRule): string {
   const names = rule.resourceNames.length ? ` ${listed(rule.resourceNames)}` : '';

@@ -62,7 +62,7 @@ import type { DiskReading } from '../disk/disk.ts';
 import { costOf, ioOf, meteredEngine, recordPassMetrics, recordStepMetrics, talliedIn } from '../meter/meter.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
-import { ProposalsAct } from '../proposal/act.verb.ts';
+import { ProposalsAct } from '../apply/act.verb.ts';
 
 /**
  * One pass: every run advanced, in the store's order, and what the pass did with the queue of inbox cards and with the factories'

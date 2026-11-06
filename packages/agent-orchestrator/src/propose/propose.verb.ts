@@ -25,12 +25,11 @@ import {
 import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
 import { brokenBy } from '../door/door.store.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
-import { mayPropose } from './approval.ts';
+import { mayPropose } from '../approval/index.ts';
 import { accessChange, accessOf } from './access.ts';
 import { currentOf, type ProposalNeeds, type ProposalPlace } from './current.verb.ts';
-import { Forbidden } from './forbidden.ts';
-import { ProposalDoor } from './proposal.store.ts';
-import { proposerOf, type ProposalCaller } from './caller.ts';
+import { ProposalDoor } from '../proposal/proposal.store.ts';
+import { Forbidden, proposerOf, type ProposalCaller } from '../caller/index.ts';
 
 /** What a proposal of the Factory may change: its attached workflows, its rules and its instruction. */
 const FactoryProposed = Schema.Struct({

@@ -3380,14 +3380,15 @@ it reads.
 ### Proposals: a factory's definitions changed by one action, `nemia propose`
 
 A factory's definitions and wiring — its tree's Workflows, Agents and Skills, its Hires and McpServers, and the Factory's attached
-workflows, rules and instruction — change through a Proposal (`src/proposal/`): the very objects apply takes, each at the
+workflows, rules and instruction — change through a Proposal (its store and machine `src/proposal/`, made in `src/propose/`,
+approved in `src/approval/` and applied in `src/apply/`, its caller `src/caller/`): the very objects apply takes, each at the
 `resourceVersion` it was read at, never the person's settings. Any agent of a factory proposes in its own (`mayPropose`); the person
 approves, or, at `auto` alone, an agent within the Delegation the person wrote it (`src/delegation/`, none by default) and under a rule
 for auto the person confirmed (`approve-proposal`, `nemia policy confirm`, refused where it reaches past the delegation:
 `proposalRuleReach`), never its own agent's proposal (`proposalApproval`). An approved proposal applies at approval, or at its run's
 successful end (`applyAt: run-end`), checked again as it applies (`proposalApply`): an object moved makes it stale, a lapsed approval sends
 it back to the person, a run called off drops it, and a failed run, which can be retried, leaves it approved. The tick's proposals pass
-acts on each approved proposal every pass (`pass.verb.ts`). Undo is proposing the objects as they stood before (`status.before`).
+acts on each approved proposal every pass (`src/apply/pass.verb.ts`). Undo is proposing the objects as they stood before (`status.before`).
 
 <!-- diagram:proposal:begin — generated, from the repository's root: node -e "import('./packages/agent-orchestrator/src/proposal/machine.ts').then((m) => console.log(m.proposalDiagram()))" -->
 ```mermaid

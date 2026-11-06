@@ -29,9 +29,9 @@ for (const [name, body] of walksOn(DELEGATION_WALKS, () => ({
 test('a delegation is kept at <store>/factories/<factory>/delegations/<agent>.json, and a file that does not read is refused Invalid', () => {
   const root = scratch('wf-delegation-door-');
   const door = doorFrom(DelegationDoor, delegationDoorFiles(root));
-  done(door.delegations.write(aDelegation('seldon')));
-  const file = path.join(root, 'factories', 'acme', 'delegations', 'seldon.json');
-  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).spec, aDelegation('seldon').spec);
+  done(door.delegations.write(aDelegation('implementer')));
+  const file = path.join(root, 'factories', 'acme', 'delegations', 'implementer.json');
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).spec, aDelegation('implementer').spec);
   fs.writeFileSync(file, '{"since": 1}');
-  assert.deepEqual(act(door.delegations.read('acme', 'seldon')), { refused: 'Invalid' });
+  assert.deepEqual(act(door.delegations.read('acme', 'implementer')), { refused: 'Invalid' });
 });

@@ -89,7 +89,7 @@ test("REFUSED for an agent: a factory's definition written by hand is out of her
     );
   const denied = (line: string) => fence.deny.some((rule) => reaches(rule, line));
   for (const line of [
-    'nemia factory hire acme seldon --step build/design',
+    'nemia factory hire acme implementer --step build/design',
     'nemia workflows write factory build --folder d',
     'nemia factory rules acme --file r.md',
   ])
@@ -97,7 +97,7 @@ test("REFUSED for an agent: a factory's definition written by hand is out of her
   assert.ok(!denied('nemia factory rules acme'), 'the rules still read bare');
   const allowed = (line: string) => fence.allow.some((rule) => reaches(rule, unassigned(line)));
   assert.ok(allowed('nemia propose -f change.yaml -n acme'));
-  assert.ok(allowed('nemia proposals approve seldon-ab12c -n acme'));
+  assert.ok(allowed('nemia proposals approve implementer-ab12c -n acme'));
   assert.ok(!denied('nemia propose -f change.yaml -n acme'));
 });
 

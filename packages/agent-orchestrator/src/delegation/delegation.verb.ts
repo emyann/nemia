@@ -6,8 +6,7 @@
 import { Effect } from 'effect';
 import { API_VERSION, type Delegation, type DelegationWrite } from 'objects';
 import { Missing, type Refusal } from '../refusal/refusal.ts';
-import { Forbidden } from '../proposal/forbidden.ts';
-import type { ProposalCaller } from '../proposal/caller.ts';
+import { Forbidden, type ProposalCaller } from '../caller/index.ts';
 import { DelegationDoor, type DelegationRecord } from './delegation.store.ts';
 
 /** A delegation as the object served: its agent's name in its factory's namespace, its grants, and when it was written. */

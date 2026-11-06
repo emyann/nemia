@@ -36,8 +36,8 @@ import { FACTORY_INSTRUCT } from '../factory/instruction.verb.ts';
 import { ownAgentRefusal } from '../wiring/own-agent.store.ts';
 import { wire } from '../wiring/wire.verb.ts';
 import { withoutEntry } from '../wiring/wiring.ts';
-import { treeDir, type ProposalNeeds, type ProposalPlace } from './current.verb.ts';
-import { verbOf } from './propose.verb.ts';
+import { treeDir, type ProposalNeeds, type ProposalPlace } from '../propose/current.verb.ts';
+import { verbOf } from '../propose/propose.verb.ts';
 
 /** A step as the object says it, as the Workflow door takes it: its keys, `output` as the file it names, and its body. */
 export const stepDraftOf = (step: WorkflowStep): StepDraft => {

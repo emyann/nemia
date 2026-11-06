@@ -9,13 +9,13 @@ import { Effect } from 'effect';
 import type { Proposal, ProposedObject } from 'objects';
 import type { ApplyAction } from '../../contracts/proposal-apply.contract.ts';
 import type { Refusal } from '../refusal/refusal.ts';
-import { proposalApproval } from './approval.ts';
+import { proposalApproval } from '../approval/index.ts';
 import { proposalApply, proposingRunOf, type RunState } from './apply.ts';
-import { currentOf, type ProposalNeeds, type ProposalPlace } from './current.verb.ts';
-import { verbOf } from './propose.verb.ts';
-import { factsOf, standingOf } from './standing.verb.ts';
+import { currentOf, type ProposalNeeds, type ProposalPlace } from '../propose/current.verb.ts';
+import { verbOf } from '../propose/propose.verb.ts';
+import { factsOf, standingOf } from '../approval/standing.verb.ts';
 import { objectWritten } from './write.verb.ts';
-import { ProposalDoor } from './proposal.store.ts';
+import { ProposalDoor } from '../proposal/proposal.store.ts';
 
 /** How a program reads the state of a proposal's run: as the tick judged it, or as its record says. */
 export type RunStateOf = (run: string) => Effect.Effect<RunState | undefined, Refusal>;

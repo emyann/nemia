@@ -2,7 +2,13 @@
  * Whether a change widens access (`contracts/proposal-access.contract.ts`): an allow gained, a deny lost or a mode that reaches further
  * widens; else an allow lost, a deny gained or a mode that reaches less narrows. Rules are compared as written. Pure.
  */
+import { fenceReach } from 'agent-runtime/vocabulary';
 import type { Access, AccessChangeOf } from '../../contracts/proposal-access.contract.ts';
+import { DEFAULT_HARNESS } from '../harness/harness.ts';
+import { FENCE_KEYS } from '../workflow/index.ts';
+
+/** A step's fence keys this reads, by the layer's own list (`FENCE_KEYS`): its allows, its denies and its permission mode. */
+const [, ALLOWS, DENIES, MODE] = FENCE_KEYS;
 
 /** Whether `after` holds a rule `before` does not. */
 const gained = (before: readonly string[], after: readonly string[]): boolean => after.some((rule) => !before.includes(rule));
@@ -17,18 +23,25 @@ export const accessChange: AccessChangeOf = (before, after) => {
 export const NO_ACCESS: Access = { allows: [], denies: [], mode: 0 };
 
 /**
- * How far each permission mode reaches, as Claude Code's modes go: `plan` reads alone, `dontAsk` runs only what is allowed, `default`
- * asks, `acceptEdits` writes unasked, `auto` acts unasked, `bypassPermissions` asks nothing. A mode not named ranks highest
- * (`UNKNOWN_MODE`), so a word the reader does not know reads as widening, and the person is asked.
+ * How far each permission mode reaches, as the runtime ranks the default harness's modes (`fenceReach`), one above it so that a mode
+ * named reaches further than an object that is not there (`NO_ACCESS`). A mode the runtime does not rank ranks above them all, so a word
+ * the reader does not know reads as widening, and the person is asked; so does every mode, should the runtime rank none.
  */
-const MODE_RANKS: Readonly<Record<string, number>> = { plan: 1, dontAsk: 2, default: 3, acceptEdits: 4, auto: 5, bypassPermissions: 6 };
+const REACH = fenceReach(DEFAULT_HARNESS);
 
-/** The rank of a mode no rank names. */
-const UNKNOWN_MODE = 7;
+/** The ranks of the modes, each one above the runtime's. */
+const MODE_RANKS: Readonly<Record<string, number>> = Object.fromEntries(
+  Object.entries(REACH?.rank ?? {}).map(([mode, rank]) => [mode, rank + 1]),
+);
 
-/** The rank of the mode `mode` names: `default`'s where none is named. */
-export const modeRank = (mode: unknown): number =>
-  mode === undefined || mode === null || mode === '' ? 3 : typeof mode === 'string' ? (MODE_RANKS[mode] ?? UNKNOWN_MODE) : UNKNOWN_MODE;
+/** The rank of a mode no rank names: above the widest. */
+const UNKNOWN_MODE = Math.max(0, ...Object.values(MODE_RANKS)) + 1;
+
+/** The rank of the mode `mode` names: the runtime's given mode's where none is named. */
+export const modeRank = (mode: unknown): number => {
+  const named = mode === undefined || mode === null || mode === '' ? REACH?.given : mode;
+  return typeof named === 'string' ? (MODE_RANKS[named] ?? UNKNOWN_MODE) : UNKNOWN_MODE;
+};
 
 /** A list of rules as a line writes them, `Read, Bash(git diff *)`, split at the commas outside parentheses; a list given as is. */
 export function rulesIn(value: unknown): string[] {
@@ -56,14 +69,14 @@ const recordOf = (value: unknown): Readonly<Record<string, unknown>> =>
 /** What one set of keys lets through and refuses, each rule led by `at`: its tools, allows, servers, sandbox and agent; its denials. */
 const keysAccess = (keys: Readonly<Record<string, unknown>>, at: string): Access => ({
   allows: [
-    ...rulesIn(keys.allowedTools).map((r) => `${at}allow ${r}`),
+    ...rulesIn(keys[ALLOWS]).map((r) => `${at}allow ${r}`),
     ...rulesIn(keys.tools).map((r) => `${at}tool ${r}`),
     ...rulesIn(keys.mcp).map((r) => `${at}server ${r}`),
     ...(typeof keys.sandbox === 'string' && keys.sandbox !== '' ? [`${at}sandbox ${keys.sandbox}`] : []),
     ...(typeof keys.agent === 'string' && keys.agent !== '' ? [`${at}agent ${keys.agent}`] : []),
   ],
-  denies: rulesIn(keys.disallowedTools).map((r) => `${at}deny ${r}`),
-  mode: modeRank(keys.permissionMode),
+  denies: rulesIn(keys[DENIES]).map((r) => `${at}deny ${r}`),
+  mode: modeRank(keys[MODE]),
 });
 
 /** Accesses joined: every rule of each, and the furthest mode. */

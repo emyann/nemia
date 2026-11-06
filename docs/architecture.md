@@ -273,12 +273,12 @@ serve them (`ProposalsGroup` and `DelegationsGroup`, `packages/objects/src/propo
 (403, with its `reason`) and `Unauthorized` (401). The judgement is the orchestrator's, pure and proved, each typed by its contract under
 `packages/agent-orchestrator/contracts/`: who may propose (`mayPropose`: any agent, in its own factory) and who may approve
 (`proposalApproval`: the person, or at `auto` alone an agent within the Delegation the person wrote it and under a rule for auto the
-person confirmed, never its own agent's proposal), in `src/proposal/approval.ts`; whether an approved proposal applies now, waits, is
-stale, lapses or is dropped (`proposalApply`, `src/proposal/apply.ts`); whether a change widens an agent's access (`accessChange`,
-`src/proposal/access.ts`); and what a rule for auto reaches past its agent's delegation (`proposalRuleReach`, `src/proposal/rule.ts`),
+person confirmed, never its own agent's proposal), in `src/approval/approval.ts`; whether an approved proposal applies now, waits, is
+stale, lapses or is dropped (`proposalApply`, `src/apply/apply.ts`); whether a change widens an agent's access (`accessChange`,
+`src/propose/access.ts`); and what a rule for auto reaches past its agent's delegation (`proposalRuleReach`, `src/approval/rule.ts`),
 which `nemia policy confirm` refuses. Its programs (`proposeProgram`, `undoProgram`, `approveProgram`, `declineProgram`, and the
 delegations' `delegationPut` and `delegationRemove`, the person's alone) each take their caller explicitly, and are named by the root
-entry through `src/proposal/entry.ts`; the tick's proposals pass (`proposalsPass`, `src/proposal/pass.verb.ts`, yielded by the tick
+entry, `src/runner.ts`, each by name; the tick's proposals pass (`proposalsPass`, `src/apply/pass.verb.ts`, yielded by the tick
 after it judged the runs) acts on every approved proposal each pass, level-triggered, its run's state as that pass judged it: a run that
 succeeded applies a run-end proposal, one called off drops it, and one that failed, which can be retried, leaves it approved. A write
 goes through the doors of the kinds it changes (the Workflow, Agent, Skill and Factory doors), the Factory's wiring judged by

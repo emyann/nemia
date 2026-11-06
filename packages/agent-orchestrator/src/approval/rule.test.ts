@@ -10,7 +10,7 @@ import type { ChangeVerb, Grant, ProposalRule } from '../../contracts/proposal-a
 import { proposalRuleReach } from './rule.ts';
 
 const RESOURCES = ['workflows', 'agents', 'skills'];
-const NAMES = ['build', 'review', 'seldon'];
+const NAMES = ['build', 'review', 'implementer'];
 const VERBS: readonly ChangeVerb[] = ['create', 'update', 'delete'];
 
 /** A seeded generator, so a failure is the same input on every run. */

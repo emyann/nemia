@@ -10,8 +10,8 @@ import type { ProposalsActed } from './act.verb.ts';
 import type { Run } from '../record/record.ts';
 import type { RunState } from './apply.ts';
 import { applyProgram } from './apply.verb.ts';
-import type { ProposalPlace } from './current.verb.ts';
-import { ProposalDoor } from './proposal.store.ts';
+import type { ProposalPlace } from '../propose/current.verb.ts';
+import { ProposalDoor } from '../proposal/proposal.store.ts';
 
 /** Each listed run's state as the pass read it: its judged status where it was judged, else unread; a run not listed is gone. */
 export const runStatesOf = (runs: readonly Pick<Run, 'id'>[], judged: ReadonlyMap<string, { readonly status: RunState }>) => {

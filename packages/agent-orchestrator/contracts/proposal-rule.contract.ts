@@ -1,5 +1,5 @@
 /**
- * Whether a rule an agent proposed for approving proposals at auto may be confirmed (agent-orchestrator, src/proposal/rule.ts,
+ * Whether a rule an agent proposed for approving proposals at auto may be confirmed (agent-orchestrator, src/approval/rule.ts,
  * `proposalRuleReach`): two layers, as Kubernetes keeps a Role apart from what a controller does under it — the delegation says what the
  * agent may ever approve, the rule when it approves unasked — so a rule that reaches past the agent's delegation in the rule's factory is
  * refused when the person confirms it, naming each pair of resource and verb it reaches past. A rule within it goes on. A delegation taken
@@ -8,7 +8,7 @@
  * Two laws are narrowed (tsverify card p25m): in full, "a rule every pair of which its delegation covers reaches past nothing" and "a rule
  * that covers any pair its delegation does not reaches past it" are answered `bounded` together at the default budget (out of work; no
  * counterexample with arrays of at most 4 elements). `noneWhereCovered` is said of a rule of one verb, `someWhereUncovered` of the rule's
- * first pair; `src/proposal/rule.test.ts` holds both full laws.
+ * first pair; `src/approval/rule.test.ts` holds both full laws.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 import type { ChangeVerb, Grant, ProposalRule } from './proposal-approval.contract.ts';
@@ -60,5 +60,5 @@ const proposalRuleReachSpec = spec<(rule: ProposalRule, grants: readonly Grant[]
   },
 });
 
-/** `proposalRuleReach`'s type, which `src/proposal/rule.ts` takes. */
+/** `proposalRuleReach`'s type, which `src/approval/rule.ts` takes. */
 export type ProposalRuleReach = Implementation<typeof proposalRuleReachSpec>;

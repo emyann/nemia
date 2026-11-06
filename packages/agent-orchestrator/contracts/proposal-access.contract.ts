@@ -1,5 +1,5 @@
 /**
- * Whether a proposal widens the access of what it changes (agent-orchestrator, src/proposal/access.ts, `accessChange`), one object at a
+ * Whether a proposal widens the access of what it changes (agent-orchestrator, src/propose/access.ts, `accessChange`), one object at a
  * time: its access before the change and after it, each reduced to the rules that let a call through (`allows`: an allow rule, a tool, a
  * server attached, an agent hired into a step), the rules that refuse one (`denies`) and its permission mode as a rank (`mode`, higher
  * reaching further; a mode the reader does not know ranks highest). A fact the machinery computes, never an agent's claim: what a rule at
@@ -50,5 +50,5 @@ const accessChangeSpec = spec<(before: Access, after: Access) => AccessChange>({
   },
 });
 
-/** `accessChange`'s type, which `src/proposal/access.ts` takes. */
+/** `accessChange`'s type, which `src/propose/access.ts` takes. */
 export type AccessChangeOf = Implementation<typeof accessChangeSpec>;

@@ -29,9 +29,9 @@ for (const [name, body] of walksOn(PROPOSAL_WALKS, () => ({
 test('a proposal is kept at <store>/factories/<factory>/proposals/<name>.json, and a file that does not read is refused Invalid', () => {
   const root = scratch('wf-proposal-door-');
   const door = doorFrom(ProposalDoor, proposalDoorFiles(root));
-  done(door.proposals.create(aProposal('seldon-aaaaa')));
-  const file = path.join(root, 'factories', 'acme', 'proposals', 'seldon-aaaaa.json');
-  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).metadata.name, 'seldon-aaaaa');
+  done(door.proposals.create(aProposal('implementer-aaaaa')));
+  const file = path.join(root, 'factories', 'acme', 'proposals', 'implementer-aaaaa.json');
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).metadata.name, 'implementer-aaaaa');
   fs.writeFileSync(file, '{');
-  assert.deepEqual(act(door.proposals.read('acme', 'seldon-aaaaa')), { refused: 'Invalid' });
+  assert.deepEqual(act(door.proposals.read('acme', 'implementer-aaaaa')), { refused: 'Invalid' });
 });

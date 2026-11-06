@@ -8,7 +8,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import { parse as parseYaml } from 'yaml';
 import type { ProposableKind } from 'objects';
 import { tried, type EngineService } from '../runtime-client.ts';
 import type { PlaceService } from '../place/place.store.ts';
@@ -19,6 +18,7 @@ import { AgentName, SkillName } from '../agents/agents.model.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
 import { workflowDirAt } from '../folder/folder.store.ts';
 import { isReadme, splitFrontmatter, AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
+import { frontmatterValues } from '../frontmatter/frontmatter.ts';
 import { templatedTreeAt, readFactoryAt } from '../factory/factory.store.ts';
 import { FactoryDoor } from '../factories/factories.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
@@ -55,7 +55,7 @@ const orNone = <A, R>(read: Effect.Effect<A, Refusal, R>, current: (a: A) => Cur
 /** The frontmatter of a file's text as a record, and its body. */
 const fileParts = (name: string, text: string): { keys: Record<string, unknown>; body: string } => {
   const { block, body } = splitFrontmatter(name, text);
-  const keys: unknown = block === null ? {} : parseYaml(block);
+  const keys: unknown = block === null ? {} : frontmatterValues(block);
   return { keys: typeof keys === 'object' && keys !== null ? (keys as Record<string, unknown>) : {}, body };
 };
 

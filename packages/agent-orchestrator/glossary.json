@@ -664,7 +664,7 @@
     },
     {
       "term": "Proposal",
-      "meaning": "one action that changes a factory's definitions and wiring, `nemia propose`: the very objects apply takes (its tree's Workflows, Agents and Skills, its Hires and McpServers, the Factory's attached workflows, rules and instruction), each at the `resourceVersion` it was read at, never the person's settings (`packages/agent-orchestrator/src/proposal/propose.verb.ts`). Any agent of a factory proposes in its own; the person approves, or, at `auto`, an agent within its Delegation and under a Proposal rule, never its own agent's (`proposalApproval`). Approved, it is applied at approval or at its run's successful end, checked again as it applies (`proposalApply`); its phases are a machine (`packages/agent-orchestrator/src/proposal/machine.ts`). Undo is proposing the objects as they stood before (`status.before`).",
+      "meaning": "one action that changes a factory's definitions and wiring, `nemia propose`: the very objects apply takes (its tree's Workflows, Agents and Skills, its Hires and McpServers, the Factory's attached workflows, rules and instruction), each at the `resourceVersion` it was read at, never the person's settings (`packages/agent-orchestrator/src/propose/propose.verb.ts`). Any agent of a factory proposes in its own; the person approves, or, at `auto`, an agent within its Delegation and under a Proposal rule, never its own agent's (`proposalApproval`). Approved, it is applied at approval or at its run's successful end, checked again as it applies (`proposalApply`); its phases are a machine (`packages/agent-orchestrator/src/proposal/machine.ts`). Undo is proposing the objects as they stood before (`status.before`).",
       "type": "ProposalEdge"
     },
     {
@@ -679,11 +679,11 @@
     },
     {
       "term": "Widens",
-      "meaning": "whether a proposal lets more through than what it changes did: an allow, tool, server or hire gained, a deny lost, or a permission mode that reaches further, read object by object by the machinery and never claimed by the agent (`accessOf`, `accessChange`, `packages/agent-orchestrator/src/proposal/access.ts`). A Proposal rule takes a widening only where it says so."
+      "meaning": "whether a proposal lets more through than what it changes did: an allow, tool, server or hire gained, a deny lost, or a permission mode that reaches further, read object by object by the machinery and never claimed by the agent (`accessOf`, `accessChange`, `packages/agent-orchestrator/src/propose/access.ts`). A Proposal rule takes a widening only where it says so."
     },
     {
       "term": "Proposing run",
-      "meaning": "the run a proposal was made from, as the tick's proposals pass reads it (`proposingRunOf`, `packages/agent-orchestrator/src/proposal/apply.ts`): a proposal that applies at run-end waits while its run goes or sits failed, since a failed run can be retried, applies once it succeeded, and is dropped once it is called off.",
+      "meaning": "the run a proposal was made from, as the tick's proposals pass reads it (`proposingRunOf`, `packages/agent-orchestrator/src/apply/apply.ts`): a proposal that applies at run-end waits while its run goes or sits failed, since a failed run can be retried, applies once it succeeded, and is dropped once it is called off.",
       "type": "RunState"
     }
   ]

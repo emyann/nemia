@@ -1,5 +1,5 @@
 /**
- * Whether a caller's approval of a proposal goes on (agent-orchestrator, src/proposal/approval.ts, `proposalApproval`), and by what: the
+ * Whether a caller's approval of a proposal goes on (agent-orchestrator, src/approval/approval.ts, `proposalApproval`), and by what: the
  * person's, or an agent's under a rule the person confirmed and within the delegation the person wrote. Any agent of a factory may
  * propose; approving is scoped as a Kubernetes Role bound to a ServiceAccount is: an agent approves only what its delegation grants, by
  * resource, name and verb, every change of the proposal covered, nothing held by default; only where the factory is at `auto`, as gates
@@ -51,7 +51,7 @@ const mayProposeSpec = spec<(caller: Caller, factory: string) => boolean>({
   },
 });
 
-/** `mayPropose`'s type, which `src/proposal/approval.ts` takes: whether a caller may make a proposal in a factory's namespace. */
+/** `mayPropose`'s type, which `src/approval/approval.ts` takes: whether a caller may make a proposal in a factory's namespace. */
 export type MayPropose = Implementation<typeof mayProposeSpec>;
 
 /** The level a factory is worked at, the store's where it says none. */
@@ -158,5 +158,5 @@ const proposalApprovalSpec = spec<(caller: Caller, proposal: ProposalFacts, stan
   open: ['output.reason', 'output.rule'],
 });
 
-/** `proposalApproval`'s type, which `src/proposal/approval.ts` takes. */
+/** `proposalApproval`'s type, which `src/approval/approval.ts` takes. */
 export type ProposalApproval = Implementation<typeof proposalApprovalSpec>;

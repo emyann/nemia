@@ -1,5 +1,5 @@
 /**
- * A RunList's `?fieldSelector=` (agent-orchestrator, src/run-list/run-list.ts, `runStateSelector`; no code yet), as Kubernetes spells a
+ * A RunList's `?fieldSelector=` (agent-orchestrator, src/run-list/run-list.ts, `runStateSelector`), as Kubernetes spells a
  * field selector: one field, `status.state`, the run's state in the list (`waiting`, it waits on a person; `inFlight`; `finished`), with
  * one of Kubernetes' three operators — `=` and `==`, which mean the same, and `!=`. Kubernetes chains terms with a comma and takes
  * `metadata.name` and `metadata.namespace` on every kind; this list takes the one term on `status.state` alone, since the namespace is

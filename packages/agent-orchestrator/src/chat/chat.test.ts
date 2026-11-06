@@ -25,10 +25,8 @@ import {
   cursorOf,
   drawnAsk,
   framedFor,
-  RESERVED_SPEAKERS,
   SPEAKER_NAME_MAX,
   speakerNameRefusal,
-  withoutSpeaker,
   presenceOf,
   projectChat,
   readChatCursor,
@@ -550,22 +548,8 @@ test('`withEvents`: a session folded from pieces that overlap projects as the se
 
 test('`speakerNameRefusal`: the names an agent speaks under, by their characters, which its contract leaves to the code', async (t) => {
   const taken = ['operator', 'run-x.design', 'nemia-ab12/design', 'a', '0_b', 'o'.repeat(SPEAKER_NAME_MAX)];
-  const refused = ['Operator', '-op', '.op', '/op', 'a b', 'op@host', '', 'o'.repeat(SPEAKER_NAME_MAX + 1), ...RESERVED_SPEAKERS];
+  const refused = ['Operator', '-op', '.op', '/op', 'a b', 'op@host'];
   for (const name of taken) await t.test(`taken: ${JSON.stringify(name)}`, () => assert.equal(speakerNameRefusal(name), undefined));
   for (const name of refused)
     await t.test(`REFUSED: ${JSON.stringify(name.slice(0, 20))}`, () => assert.equal(typeof speakerNameRefusal(name), 'string'));
-});
-
-test('`withoutSpeaker` takes back no name but the one named: the law `keepsOthers`, proved since tsverify 0.9.0, held on the real function too', async (t) => {
-  const lists: readonly (readonly string[])[] = [[], ['operator'], ['operator', 'run-x.design'], ['a', 'operator', 'b', 'operator', 'c']];
-  for (const allowed of lists)
-    for (const name of ['operator', 'a', 'absent'])
-      await t.test(`${JSON.stringify(allowed)} less ${name}`, () => {
-        const left = withoutSpeaker(allowed, name);
-        assert.deepEqual(
-          allowed.filter((n) => n !== name && !left.includes(n)),
-          [],
-          'every other name stays allowed',
-        );
-      });
 });

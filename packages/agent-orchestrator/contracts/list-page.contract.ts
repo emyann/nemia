@@ -1,5 +1,5 @@
 /**
- * A list's page (agent-orchestrator, src/object/page.ts; no code yet): where `?limit=` and `?continue=` cut a list of `total` objects in
+ * A list's page (agent-orchestrator, src/object/page.ts): where `?limit=` and `?continue=` cut a list of `total` objects in
  * its order, read from `start` — the first object after the one the `continue` token names, 0 where none is given. It answers the
  * objects `[from, to)`, how many are left after them (`remainingItemCount`), and whether a next page is there (`more`, which the door
  * answers as a `continue` token naming the object at `to - 1`). A `limit` that is no whole number from 1 is refused, the door's

@@ -107,7 +107,7 @@ test('a read keeps the runs of one factory, a run that names none being of the d
 const watched = (status: unknown): WatchedObject => ({
   apiVersion: 'nemia/v1',
   kind: 'Run',
-  metadata: { name: 'r-1', namespace: 'default' },
+  metadata: { name: 'r-1', namespace: 'default', creationTimestamp: at(10), resourceVersion: '1' },
   status,
 });
 
@@ -178,7 +178,11 @@ test("a watch compares a run leaving out its frame's time exactly where it is me
   ];
   for (const row of rows) await t.test(row.name, () => assert.equal(runWatchVersion(row.a) === runWatchVersion(row.b), row.same));
   await t.test('an object with no status, or a status that is no object, is compared as its JSON', () => {
-    const bare: WatchedObject = { apiVersion: 'nemia/v1', kind: 'Run', metadata: { name: 'r-1' } };
+    const bare: WatchedObject = {
+      apiVersion: 'nemia/v1',
+      kind: 'Run',
+      metadata: { name: 'r-1', creationTimestamp: at(10), resourceVersion: '1' },
+    };
     assert.equal(runWatchVersion(bare), JSON.stringify(bare));
     assert.equal(runWatchVersion(watched('waiting')), JSON.stringify(watched('waiting')));
   });

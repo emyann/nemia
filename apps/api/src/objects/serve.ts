@@ -28,8 +28,8 @@
  * answered 413 `{ error }` naming the limit.
  *
  * Every list is handed on through `listed`, which `watchable` wraps (src/watch/watch.ts): a list's route that does not go through it is not
- * watched; the Event lists' watch follows the feed instead of reading it again (`eventsFollowed`), and the Run lists' compares a run leaving
- * out its frame's time measured to the read (`runWatchVersion`). `GET /api` is discovery
+ * watched; the Event lists' watch follows the feed instead of reading it again (`eventsFollowed`), and the Run lists'
+ * compares a run leaving out its frame's time measured to the read (`runWatchVersion`). `GET /api` is discovery
  * (src/discovery/discovery.ts), every resource read off the `Api`.
  *
  * `GET /api/runs/:runId` with `?raw=` (not `false`) or `?view=` is passed on to the runs' own route (runs/runs.ts), which answers both.

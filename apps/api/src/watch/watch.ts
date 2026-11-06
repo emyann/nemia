@@ -9,8 +9,8 @@
  * in flight and one per `WATCH_SETTLE`, and on a resync every `Beats.watch` (`WATCH_RESYNC`) for a change no line says (a card or a
  * definition edited on disk); what changed between two reads is the package's `watchChanges`, an object's version being the one its
  * route hands (`versionOf`: a run's leaves out its frame's time measured to the read, `runWatchVersion`), its JSON as served where none,
- * so a change of its status is a change though its `resourceVersion` stands. A DELETED carries the object of the last read that held it. A BOOKMARK is sent every `BOOKMARK_EVERY`, its
- * `resourceVersion` the feed's size at the last read.
+ * so a change of its status is a change though its `resourceVersion` stands. A DELETED carries the object of the last read that held it.
+ * A BOOKMARK is sent every `BOOKMARK_EVERY`, its `resourceVersion` the feed's size at the last read.
  *
  * Level-triggered: a watch keeps nothing between connections. A read again that is no 2xx, or a feed truncated under the reader, ends the
  * stream, and the reader opens it again and is sent the state whole: no `Last-Event-ID` resume, since nothing keeps a list's old versions.
@@ -79,7 +79,7 @@ const bookmarkOf = (kind: string, at: number) =>
 /** A read again that the list refused, which ends the stream. */
 class ListRefused extends Data.TaggedError('ListRefused')<{ readonly status: number }> {}
 
-/** The frames of what changed from `sent` to `now`: ADDED and MODIFIED with the new object, DELETED with that of the last read holding it. */
+/** The frames of what changed from `sent` to `now`: ADDED and MODIFIED with the new object, DELETED with the last read's that held it. */
 const changedFrames = (sent: Read, now: Read) =>
   watchChanges(sent.versions, now.versions).flatMap((change) => {
     const object = change.type === 'DELETED' ? sent.objects.get(change.key) : now.objects.get(change.key);

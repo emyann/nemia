@@ -2,9 +2,9 @@
  * Every list watched (`?watch=true`, src/watch/watch.ts): the initial state as an ADDED per object then a BOOKMARK; a card filed,
  * relabelled, started and dropped arriving as ADDED, MODIFIED and DELETED, the DELETED carrying the last object sent; a labelSelector
  * kept on every read, a card relabelled out of it DELETED; the runs of a store holding one watched, plain and namespaced; a fieldSelector
- * of the runs' state kept on every read, a run waiting sent no MODIFIED for its clock alone and approved out of waiting DELETED; every GET list of the `Api` watchable; the watch's query
- * refused before any stream; and the feed's reader let go when the request is aborted. The resync beat is shortened (`Beats.watch`), never
- * waited out.
+ * of the runs' state kept on every read, a run waiting sent no MODIFIED for its clock alone and approved out of waiting DELETED; every
+ * GET list of the `Api` watchable; the watch's query refused before any stream; and the feed's reader let go when the request is aborted.
+ * The resync beat is shortened (`Beats.watch`), never waited out.
  */
 import { root } from '../../test/harness.ts';
 import { test, type TestContext } from 'node:test';
@@ -232,7 +232,8 @@ test('a watch of the runs by state sends no MODIFIED for the clock alone: a run 
     await waitFor(t, () => changes(w.events, other).includes('ADDED'), `${other} ADDED once it waits`);
     const receivedAt = Date.now();
     const added = w.events.find((e) => named(e) === other);
-    const status = added?.object.status as { wallMs?: number; clock?: { wallMs?: number } } | undefined;
+    assert.ok(added && added.type === 'ADDED', `${other} sent ADDED`);
+    const status = added.object.status as { wallMs?: number; clock?: { wallMs?: number } } | undefined;
     const wallMs = status?.wallMs ?? -1;
     assert.ok(wallMs >= 0 && wallMs <= receivedAt - plantedAt, `its wall time measured to the read that sent it, got ${wallMs}`);
     assert.equal(status?.clock?.wallMs, wallMs, 'its clock measured to the same instant');

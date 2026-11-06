@@ -62,9 +62,9 @@ import type { MostSpent, RaiseVerdictOf } from '../../contracts/raise.contract.t
  * (`landsOnCheck`): the run aborted the merge its check judged, so a recheck would judge the checkout
  * without it. And on a step with a `check:` whose session was ended at its budget (`budget exhausted`) once it
  * settled, its check never run: the work may be done — a land session cut off after its merge — and the check
- * reads the world with no session; but not on an ending whose staged merge the run took back. A step that signed off blocked only once its session
- * has settled: a session can outlive its closeout, and a try resuming one still running would be two agents
- * in one conversation.
+ * reads the world with no session; but not on an ending whose staged merge the run took back. A step that
+ * signed off blocked only once its session has settled: a session can outlive its closeout, and a try resuming
+ * one still running would be two agents in one conversation.
  *
  * And one try that is not over: a step whose session its harness blocked — the engine's `needs-human`, as
  * `harnessBlocked` says it — and that signed nothing: it stands as `AwaitingAnswer` via `session`. It reads `running`, and nothing in it
@@ -152,24 +152,7 @@ function triedOn(
       (satisfiesAfter(status) &&
         noneFiled &&
         followers.some((f) => waitsAtGate(f, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf))));
-  const modes: RetryMode[] =
-    tried === 'budget exhausted'
-      ? settled && step.check && !landingAborted(step, run)
-        ? ['continue', 'fresh', 'recheck']
-        : ['continue', 'fresh']
-      : tried === 'failed (check)'
-        ? landsOnCheck(step, run)
-          ? ['continue', 'fresh']
-          : ['continue', 'fresh', 'recheck']
-        : tried === 'unsigned' ||
-            tried === 'failed' ||
-            tried === 'stopped' ||
-            (tried === 'blocked' && settled) ||
-            tried === 'denied' ||
-            harnessAsks ||
-            sendsBack
-          ? ['continue', 'fresh']
-          : [];
+  const modes = modesOf(step, run, tried, settled, harnessAsks || sendsBack);
   const raise =
     settled && modes.length && (status === 'budget exhausted' || overBudget(step, run, spendOf)) ? raiseOf(step, run, spendOf) : undefined;
   return {
@@ -181,6 +164,19 @@ function triedOn(
     ...(raise ? { raise } : {}),
   };
 }
+
+/**
+ * The ways a try of a step standing `tried` on its own work may be taken (`retryable`): `recheck` beside a session where a check did not
+ * pass, or never ran on a session cut off at its budget, but on an ending whose merge the run aborted; a session alone from any other end,
+ * or where its harness asks or its gate sends it back (`other`).
+ */
+const modesOf = (step: Workflow, run: Run, tried: StepStatus, settled: boolean, other: boolean): RetryMode[] => {
+  if (tried === 'budget exhausted')
+    return settled && step.check && !landingAborted(step, run) ? ['continue', 'fresh', 'recheck'] : ['continue', 'fresh'];
+  if (tried === 'failed (check)') return landsOnCheck(step, run) ? ['continue', 'fresh'] : ['continue', 'fresh', 'recheck'];
+  const ended = tried === 'unsigned' || tried === 'failed' || tried === 'stopped' || tried === 'denied';
+  return ended || (tried === 'blocked' && settled) || other ? ['continue', 'fresh'] : [];
+};
 
 /** Whether the run took back the merge an ending that lands on its check staged (`landingDue`): nothing is staged for a check to judge. */
 const landingAborted = (step: Workflow, run: Run): boolean => {
@@ -547,6 +543,14 @@ const raiseWords = (command: string, word: string, raise: Raise, landAgain: stri
   `  (--fresh, or --model <m>, for a new session${more})`,
 ];
 
+/** What `--recheck` does, said beside a raise where it is offered (`retryOffers`): runs a check never run, or one that did not finish. */
+const recheckWords = (status: StepStatus, modes: readonly RetryMode[]): string =>
+  !modes.includes('recheck')
+    ? ''
+    : status === 'budget exhausted'
+      ? '; --recheck runs its check, never run, on the work as it stands, and needs no --budget'
+      : '; --recheck runs its check again, and needs no --budget';
+
 /**
  * The words of the offer to send a step's work back when the endings after it (`back`) stopped on the base branch (`retryOffers`): its
  * bare command, from `command`, and what comes before it in the sentence.
@@ -655,11 +659,7 @@ export function retryOffers(
         sessionNeeds(raise),
       );
     } else if (raise) {
-      const recheck = !modes.includes('recheck')
-        ? ''
-        : status === 'budget exhausted'
-          ? '; --recheck runs its check, never run, on the work as it stands, and needs no --budget'
-          : '; --recheck runs its check again, and needs no --budget';
+      const recheck = recheckWords(status, modes);
       const own = judged?.own;
       const word = status === 'over budget' ? `over budget (${own === 'failed (check)' ? 'check refused' : own})` : status;
       offer(...raiseWords(command, word, raise, landAgain, `${spent}${recheck}`));

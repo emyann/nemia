@@ -324,14 +324,7 @@ function modeRefusal(c: Judged): string | undefined {
       : 'did not finish';
     return `--recheck runs a step's check again on the work as it stands, and ${name}'s check was run on the merge ${name} staged in the repository's checkout, which the run aborted when its check ${why}: there is nothing staged for it to judge. Merge and check again, in a new try of ${name}: ${command}.`;
   }
-  if (status === 'budget exhausted') {
-    const why = step.check
-      ? `its session was ended at its budget, and the run took back the merge it staged in the repository's checkout: there is nothing staged for its check to judge`
-      : `its session was ended at its budget, and it declares no check: there is nothing to run`;
-    return `--recheck runs a step's check, and ${why}. Ask for another session, with its cap raised: ${command} --budget <amount>${
-      c.raise ? ` (above ${aboveWord(c.raise)})` : ''
-    }.`;
-  }
+  if (status === 'budget exhausted') return budgetStopRefusal(c);
   const is =
     via === 'session'
       ? 'is running, its session blocked by its harness with nothing signed off'
@@ -343,6 +336,16 @@ function modeRefusal(c: Judged): string | undefined {
       ? `To send it back from its gate, say what to change: nemia retry ${run.id} ${name} --message "<objection>".`
       : `Ask for another session instead: nemia retry ${run.id} ${name} (or --fresh).`
   }`;
+}
+
+/** `--recheck` of a step ended at its budget that has no check to run, or whose staged merge the run took back: its session, raised. */
+function budgetStopRefusal({ step, command, raise }: Judged): string {
+  const why = step.check
+    ? `its session was ended at its budget, and the run took back the merge it staged in the repository's checkout: there is nothing staged for its check to judge`
+    : `its session was ended at its budget, and it declares no check: there is nothing to run`;
+  return `--recheck runs a step's check, and ${why}. Ask for another session, with its cap raised: ${command} --budget <amount>${
+    raise ? ` (above ${aboveWord(raise)})` : ''
+  }.`;
 }
 
 /** A send-back with no words: from an ending stopped on the base branch, from an ending's gate, or from the step's own. */

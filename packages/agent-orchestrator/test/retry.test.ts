@@ -783,7 +783,6 @@ test('a session cut off at its budget before its check ran: `nemia retry --reche
   let run: RepositoryRun;
   const session = () => `${run.id}-implement`;
   const check2 = () => `${run.id}-implement-try2-check`;
-  /** `implement` (with a check unless `checked` is false) filed, then cut off by its harness at its $3 cap, at $3.02. */
   const cutOff = async (checked = true): Promise<RepositoryRun> => {
     const started = await startedRun(implementThenReview(['harness: claude', ...(checked ? ['check: npm test'] : []), 'budget: 3']));
     await tick(started.id);

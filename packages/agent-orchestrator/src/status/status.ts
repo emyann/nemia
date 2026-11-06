@@ -14,6 +14,7 @@ import { declaredOutput, isLoopTarget, type Closeout } from '../closeout/index.t
 import { filedOwed } from '../pinned/pinned.ts';
 import { closeoutRefusals } from '../question/index.ts';
 import { budgetOf } from '../budget/budget.ts';
+import { onItsCheck } from './on-check.ts';
 export { approvedCapsOf, budgetOf } from '../budget/budget.ts';
 import type { Retry, RetryHow } from '../retry/index.ts';
 import {
@@ -505,11 +506,11 @@ const blockedAccepted = (step: Workflow, said: Closeout | undefined, steps: read
  * refused closeout does, `unsigned` once its session ended, so the run asks it to mend them.
  *
  * `budget exhausted` for a task its harness cut off at its cap, settled `failed` or `succeeded`: cut off, not concluded, and no attempt
- * follows (agent-runtime's README) — until a recheck files the step's check on it (`retryable`), after which it stands on that check as
- * a signed step does: what the world says, read with no session. `denied` for a signed step denied a call under `denials: fail`, before its check, which would judge
- * work done without the tool. An ending that lands on its check (`landsOnCheck`) stands where the run's landing of its merge left it
- * (`landingDue`), never on the check alone: `verified` once the run has committed the merge, and `checking` until it has committed or
- * aborted it, so nothing offers a try of it while its merge is staged in the checkout.
+ * follows (agent-runtime's README) — until a recheck files the step's check on that task (`retryable`), after which it stands on its
+ * check (`onItsCheck`) as a signed step does: the world, read with no session. `denied` for a signed step denied a call under
+ * `denials: fail`, before its check, which would judge work done without the tool. An ending that lands on its check (`landsOnCheck`)
+ * stands where the run's landing of its merge left it (`onItsCheck`), so nothing offers a try of it while its merge is staged in the
+ * checkout.
  */
 export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf) => {
   const st = run.steps[step.name];
@@ -517,10 +518,11 @@ export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseo
   const said = closeoutOf(step.name);
   if (blockedAccepted(step, said, steps)) return 'blocked';
 
+  const signed = (s: StepStatus): StepStatus =>
+    s === 'verified' && askedAgain(step, run, closeoutOf) && roundOf(run, step.name) >= capOf(step) ? 'exhausted' : s;
   const phase = phaseOf(st.taskId);
-  const settledAtCap = (phase === 'failed' || phase === 'succeeded') && Boolean(spendOf(st.taskId)?.budgetEnded);
-  if (settledAtCap && !(step.check && st.check)) return 'budget exhausted';
-  if (settledAtCap) return checkedStatus(step, run, phaseOf, closeoutOf);
+  if ((phase === 'failed' || phase === 'succeeded') && spendOf(st.taskId)?.budgetEnded)
+    return step.check && st.check ? signed(onItsCheck(step, st, phaseOf)) : 'budget exhausted';
   const asked = askedCloseout(st.taskId);
   if (phase === 'failed' && !said && asked === 'unsigned') return 'unsigned';
   if (phase === 'failed' || phase === 'stopped') return phase;
@@ -528,50 +530,8 @@ export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseo
   if (!said && (asked || step.output)) return 'unsigned';
   if (said && unaccepted(step, run, steps, said)) return 'unsigned';
   if (step.denials === 'fail' && spendOf(st.taskId)?.denied?.length) return 'denied';
-  if (!step.check) return signedStatus(step, run, closeoutOf, 'unverified');
-  return checkedStatus(step, run, phaseOf, closeoutOf);
-};
-
-/** `verified` or `unverified` for a signed step, or `exhausted` where it asked for a round on the last its `rounds:` allows. */
-const signedStatus = (
-  step: Workflow,
-  run: Run,
-  closeoutOf: (step: string) => Closeout | undefined,
-  s: 'verified' | 'unverified',
-): StepStatus => (askedAgain(step, run, closeoutOf) && roundOf(run, step.name) >= capOf(step) ? 'exhausted' : s);
-
-/**
- * Where a step with a `check:` stands on it (`ownStatus`): its check's phase, or for an ending that lands on its check, the run's landing of
- * it. Read for a signed step, and for one whose session was ended at its budget once a recheck filed its check (`retryable`).
- */
-const checkedStatus = (
-  step: Workflow,
-  run: Run,
-  phaseOf: (taskId: string) => TaskPhase,
-  closeoutOf: (step: string) => Closeout | undefined,
-): StepStatus => {
-  const st = run.steps[step.name];
-  const check = st?.check ? phaseOf(st.check.taskId) : undefined;
-  if (landsOnCheck(step, run)) {
-    const landed = st?.landed;
-    if (!landed) return 'checking';
-    if ('commit' in landed) return signedStatus(step, run, closeoutOf, 'verified');
-    return check === 'failed' || check === 'stopped' || check === 'unknown' ? 'failed (check)' : 'failed';
-  }
-  return check === 'succeeded'
-    ? signedStatus(step, run, closeoutOf, 'verified')
-    : check === 'failed' || check === 'stopped'
-      ? 'failed (check)'
-      : 'checking';
-};
-
-/**
- * Whether the session of a step's current try was ended by its harness at its budget (`TaskSpend.budgetEnded`): its `budget exhausted`,
- * kept by a recheck, which runs the step's check on the same task. Pure.
- */
-export const budgetStopped = (run: Run, name: string, spendOf: SpendOf): boolean => {
-  const taskId = run.steps[name]?.taskId;
-  return Boolean(taskId && spendOf(taskId)?.budgetEnded);
+  if (!step.check) return askedAgain(step, run, closeoutOf) && roundOf(run, step.name) >= capOf(step) ? 'exhausted' : 'unverified';
+  return signed(onItsCheck(step, st, phaseOf));
 };
 
 /**

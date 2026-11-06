@@ -29,7 +29,7 @@ const { PERSON } = await import('../src/proposal/caller.ts');
 const { delegationPut, delegationRemove } = await import('../src/delegation/delegation.verb.ts');
 const { writeFactoryLevel } = await import('../src/level/level.store.ts');
 const { confirmedFile, writeProposed } = await import('../src/auto/auto.store.ts');
-const { POLICY_CONFIRM } = await import('../src/auto/auto.verb.ts');
+const { POLICY_CONFIRM, policyListOf } = await import('../src/auto/auto.verb.ts');
 const { ruleWords } = await import('../src/auto/auto.ts');
 const { RunDoor } = await import('../src/runs/runs.store.ts');
 type Caller = import('../src/proposal/caller.ts').ProposalCaller;
@@ -361,6 +361,16 @@ test("REFUSED at confirm: a proposal rule past the agent's delegation (Invalid),
   writeProposed(ROOT, 'argus', { at: new Date().toISOString(), rules: [within], guidance: [], digest: null });
   await run(POLICY_CONFIRM.handler({ name: 'argus', id: 'workflows-only', words: ruleWords(within) }, {}, ROOT));
   assert.equal(fs.existsSync(confirmedFile(ROOT, 'argus')), true);
+  const list = policyListOf(ROOT, 'argus', undefined);
+  assert.deepEqual(
+    list.proposalRules.map((r) => r.id),
+    ['workflows-only'],
+    'said apart from the gate rules, which a reader of a gate reads alone',
+  );
+  assert.equal(
+    list.rules.some((r) => r.id === 'workflows-only'),
+    false,
+  );
 });
 
 test("REFUSED at propose: another factory's session (Forbidden), the person's settings, a spec its kind does not read, a stale read, a decline or a delegation by an agent", async () => {

@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { dockFaceOf, expectInstant, expectKeys, expectRendered, expectSource, filesIn, sidebar, railPlace, litOf } from '../board.ts';
+import { dockFaceOf, expectCardKeys, expectInstant, expectRendered, expectSource, filesIn, sidebar, railPlace, litOf } from '../board.ts';
 import { expectCount, expectVisible, Refused } from '../checks.ts';
 import { CARDS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -9,7 +9,7 @@ export default {
   /**
    * A card's page: when it was filed, as the board writes an instant; its body rendered — a heading, a list, a table, a code block, a
    * line of raw HTML shown as text, a link that opens in a new tab and a `javascript:` one that is only its words — then its keys,
-   * each with what it means as the api says it, and Source: the file as written, frontmatter included. It writes nothing: the inbox
+   * each with what it means as `objects` says it, and Source: the file as written, frontmatter included. It writes nothing: the inbox
    * is as it was.
    */
   name: 'card',
@@ -43,7 +43,7 @@ export default {
       );
     }
 
-    await expectKeys(page, file, `/api/inbox/${rich.name}`, { workflow: rich.workflow });
+    await expectCardKeys(page, file, rich.name, { workflow: rich.workflow });
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
     const lastRow = await file.locator('section[aria-label="Keys"] tr[data-key]').last().boundingBox();
     const dock = await dockFaceOf(page).locator('..').boundingBox();

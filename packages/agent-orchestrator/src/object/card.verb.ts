@@ -6,15 +6,19 @@
  * name, then cut into a page (`pageOf`), so `remainingItemCount` counts what the selector keeps. An entry of the inbox that is no
  * markdown file (`idea.txt`, a folder `sub/`) is no card, and is listed all the same, never hidden: under its file, which is its name,
  * its `status.error` saying why, dated by when it was last written (`entryAt`); one that does not read is listed too, its error saying
- * why. Neither is read or pressed by its name: `cardObjectOf` finds a card alone.
+ * why. Either is read by its name, for its page (`cardObjectOf`), a card first, and pressed by none.
  */
-import { createHash } from 'node:crypto';
 import { Effect } from 'effect';
 import { API_VERSION, type Card, type CardList, DEFAULT_NAMESPACE } from 'objects';
 import { CardDoor } from '../cards/cards.store.ts';
 import { CardName } from '../inbox/inbox.model.ts';
 import { CARD_IN_PLAY, cardLabels, type InboxListing, parseInboxCard } from '../inbox/index.ts';
 import { inboxJudged } from '../inbox/inbox.verb.ts';
+import { cardVersion } from '../card-write/card-write.verb.ts';
+
+/** The Card's whole write, served beside its reads (`update`): the api reads it off the package's entry with them. */
+export { cardWriteRefusal } from '../card-write/index.ts';
+export { replaceCard, type CardReplaced } from '../card-write/card-write.verb.ts';
 import type { SummaryHow } from '../summary/summary.verb.ts';
 import type { Engine } from '../runtime-client.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
@@ -41,9 +45,6 @@ const keyOf = (l: InboxListing): string => `${l.name}\n${l.file}`;
 /** Entries in the order a list answers them and a token reads them: by their key's UTF-16 code units, as `<` compares. */
 const byName = (a: InboxListing, b: InboxListing): number => (keyOf(a) < keyOf(b) ? -1 : keyOf(a) > keyOf(b) ? 1 : 0);
 
-/** The digest of a card's text: its `resourceVersion`. */
-const digestOf = (text: string): string => createHash('sha256').update(text).digest('hex').slice(0, 16);
-
 /** The body a card's text holds, or none where it does not read. */
 const bodyOf = (l: InboxListing, text: string): string | undefined => {
   if (l.error !== null) return undefined;
@@ -54,8 +55,8 @@ const bodyOf = (l: InboxListing, text: string): string | undefined => {
   }
 };
 
-/** The object of the listed card `l`, of its text and filing time. */
-const cardOf = (l: InboxListing, text: string, filedAt: string): Card => {
+/** The object of the listed card `l`, of its text and filing time; its text as `status.source` where `source` (a read of one card). */
+const cardOf = (l: InboxListing, text: string, filedAt: string, source = false): Card => {
   const body = bodyOf(l, text);
   return {
     apiVersion: API_VERSION,
@@ -65,7 +66,7 @@ const cardOf = (l: InboxListing, text: string, filedAt: string): Card => {
       namespace: namespaceOf(l),
       ...(Object.keys(l.labels).length ? { labels: { ...l.labels } } : {}),
       creationTimestamp: filedAt,
-      resourceVersion: digestOf(text),
+      resourceVersion: cardVersion(text),
     },
     spec: {
       ...(l.workflow !== null ? { workflow: l.workflow } : {}),
@@ -84,24 +85,28 @@ const cardOf = (l: InboxListing, text: string, filedAt: string): Card => {
       inPlay: CARD_IN_PLAY[l.state],
       ...(l.queued !== undefined && l.queued.place !== null ? { place: l.queued.place } : {}),
       file: l.file,
+      ...(source ? { source: text } : {}),
     },
   };
 };
 
 /**
- * The object of the listed entry `l`, read through the Card door: a card, or a stray entry with no text, dated when it was last written.
- * Null for one gone since the listing.
+ * The object of the listed entry `l`, read through the Card door: a card, or a stray entry with no text, dated when it was last written;
+ * the card's file as written in its `status.source` where `source`. Null for one gone since the listing.
  */
-const objectOf = Effect.fn('objectOf')(function* (l: InboxListing) {
+const objectOf = Effect.fn('objectOf')(function* (l: InboxListing, source = false) {
   const door = yield* CardDoor;
   if (!l.file.endsWith('.md')) {
     const at = yield* door.cards.entryAt(l);
-    return at === null ? null : cardOf(l, '', at);
+    if (at === null) return null;
+    const stray = cardOf(l, '', at);
+    const text = source ? yield* door.cards.entryText(l) : null;
+    return text === null ? stray : { ...stray, status: { ...stray.status, source: text } };
   }
   const name = CardName.read(l.name);
   const text = yield* door.cards.read(name);
   const filedAt = yield* door.cards.filedAt(name);
-  return text === null || filedAt === null ? null : cardOf(l, text, filedAt);
+  return text === null || filedAt === null ? null : cardOf(l, text, filedAt, source);
 });
 
 /** The listed cards `selectors` keep, sorted by name, or `Invalid` naming the clause that is not a selector's. */
@@ -123,7 +128,7 @@ export const cardListOf = Effect.fn('cardListOf')(function* (listing: readonly I
   const kept = yield* selected(inNamespace, query.labelSelector ?? []);
   const page = pageOf(kept, keyOf, { limit: query.limit ?? null, continue: query.continue });
   if (page instanceof Invalid) return yield* Effect.fail(page);
-  const items = (yield* Effect.forEach(page.items, objectOf)).filter((c): c is Card => c !== null);
+  const items = (yield* Effect.forEach(page.items, (l) => objectOf(l))).filter((c): c is Card => c !== null);
   const answered: CardList = {
     apiVersion: API_VERSION,
     kind: 'CardList',
@@ -137,14 +142,15 @@ export const cardListOf = Effect.fn('cardListOf')(function* (listing: readonly I
 });
 
 /**
- * The card `name` of `listing` as an object, in `namespace` where one is given: `Missing` where no card has that name, or the one that
- * does is in another namespace.
+ * The card `name` of `listing` as an object, in `namespace` where one is given, its file as written in its `status.source` (a read of one
+ * card): a card before a stray entry of the same name (`notes.md` and `notes` both list as `notes`), a stray entry, its `status.error`
+ * saying why it is no card, carrying its own file's text where it is a file. `Missing` where no entry has that name, or the one that does
+ * is in another namespace.
  */
 export const cardObjectOf = Effect.fn('cardObjectOf')(function* (listing: readonly InboxListing[], name: string, namespace?: string) {
-  const l = listing.find(
-    (entry) => entry.file.endsWith('.md') && entry.name === name && (namespace === undefined || namespaceOf(entry) === namespace),
-  );
-  const card = l === undefined ? null : yield* objectOf(l);
+  const named = listing.filter((entry) => entry.name === name && (namespace === undefined || namespaceOf(entry) === namespace));
+  const l = named.find((entry) => entry.file.endsWith('.md')) ?? named[0];
+  const card = l === undefined ? null : yield* objectOf(l, true);
   if (card === null)
     return yield* Effect.fail(
       new Missing({

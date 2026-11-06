@@ -87,6 +87,7 @@ const WRITES = [
   ['POST', '/api/namespaces/default/cards/c-1/queue'],
   ['POST', '/api/namespaces/default/cards/c-1/unqueue'],
   ['POST', '/api/namespaces/default/cards/c-1/labels'],
+  ['PUT', '/api/namespaces/default/cards/c-1'],
 ] as const;
 
 test('each write of the cards group is 403 for another site and 415 for a body that is not JSON, the card left as it was', async () => {
@@ -138,4 +139,71 @@ test('a stray file of the same name as a card is passed over: the card is read a
   const headers = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' };
   const labelled = await app.request(`${at}/labels`, { method: 'POST', headers, body: JSON.stringify({ labels: ['team=core'] }) });
   assert.equal(labelled.status, 200);
+});
+
+test('GET /api/cards/:name finds a card in its factory, its file as written in status.source; a list carries no source', async () => {
+  const got = await app.request('/api/cards/f-a');
+  assert.equal(got.status, 200);
+  const object = (await got.json()) as typeof Card.Type;
+  assert.equal(object.metadata.namespace, 'a');
+  assert.equal(object.status.source, fs.readFileSync(path.join(inbox, 'f-a.md'), 'utf8'));
+  const inNamespace = (await (await app.request('/api/namespaces/a/cards/f-a')).json()) as typeof Card.Type;
+  assert.equal(inNamespace.status.source, object.status.source, 'a read in its namespace carries it too');
+  assert.equal((await app.request('/api/cards/no-such-card')).status, 404);
+  for (const url of ['/api/cards', '/api/namespaces/default/cards'])
+    for (const item of (await list(url)).body.items) assert.equal(item.status.source, undefined, `${url}: ${item.metadata.name}`);
+});
+
+test('PUT a card whole: spec.from set and answered; REFUSED: a stale resourceVersion and a started card are 409, the file as it was', async (t) => {
+  const headers = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' };
+  const runs = path.join(root, 'runs');
+  fs.mkdirSync(runs, { recursive: true });
+  const run = (id: string, from?: string) =>
+    fs.writeFileSync(
+      path.join(runs, `${id}.json`),
+      JSON.stringify({
+        id,
+        repo: '/code/app',
+        workspace: '/code/app',
+        baseRef: 'abc123',
+        branch: 'main',
+        isolate: true,
+        brief: 'A brief',
+        workflowDir: '/code/app/workflows',
+        createdAt: '2026-11-05T00:00:00.000Z',
+        workflow: [{ name: 'implement', after: [], body: 'Implement it.' }],
+        steps: { implement: { taskId: null } },
+        ...(from !== undefined ? { from: { inbox: from } } : {}),
+      }),
+    );
+  card('w-1');
+  card('w-started');
+  run('ctx-a1');
+  run('started-b2', 'w-started');
+  t.after(() => {
+    for (const name of ['w-1', 'w-started']) fs.rmSync(path.join(inbox, `${name}.md`), { force: true });
+    for (const id of ['ctx-a1', 'started-b2']) fs.rmSync(path.join(runs, `${id}.json`), { force: true });
+  });
+  const at = '/api/namespaces/default/cards/w-1';
+  const read = (await (await app.request(at)).json()) as typeof Card.Type;
+  const put = (url: string, body: unknown) => app.request(url, { method: 'PUT', headers, body: JSON.stringify(body) });
+
+  const written = await put(at, { metadata: { resourceVersion: read.metadata.resourceVersion }, spec: { ...read.spec, from: ['ctx-a1'] } });
+  assert.equal(written.status, 200);
+  const after = (await written.json()) as typeof Card.Type;
+  assert.deepEqual(after.spec.from, ['ctx-a1']);
+  assert.notEqual(after.metadata.resourceVersion, read.metadata.resourceVersion);
+  assert.equal(after.status.source, fs.readFileSync(path.join(inbox, 'w-1.md'), 'utf8'));
+  assert.match(after.status.source ?? '', /^from: ctx-a1$/m);
+
+  const now = fs.readFileSync(path.join(inbox, 'w-1.md'), 'utf8');
+  const stale = await put(at, { metadata: { resourceVersion: read.metadata.resourceVersion }, spec: { ...read.spec } });
+  assert.equal(stale.status, 409);
+  assert.equal(fs.readFileSync(path.join(inbox, 'w-1.md'), 'utf8'), now, 'a stale write writes nothing');
+
+  const startedAt = '/api/namespaces/default/cards/w-started';
+  const before = fs.readFileSync(path.join(inbox, 'w-started.md'), 'utf8');
+  const started = await put(startedAt, { metadata: {}, spec: { body: 'Do it otherwise.' } });
+  assert.equal(started.status, 409);
+  assert.equal(fs.readFileSync(path.join(inbox, 'w-started.md'), 'utf8'), before, 'a started card keeps its file');
 });

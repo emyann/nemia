@@ -28,6 +28,7 @@ import {
   type CardFile,
   CardList,
   type CardStart,
+  type CardWrite,
   Factory,
   FactoryCommands,
   FactoryInstruction,
@@ -227,6 +228,19 @@ export const cards = {
   /** Every card, of every namespace, that `labelSelector` keeps by its labels, or every card for none (`GET /api/cards`). */
   listAll: (labelSelector?: string): Promise<CardList> =>
     call((c) => c.cards.listAll({ query: labelSelector === undefined ? {} : { labelSelector } }), read(CardList)),
+  /** A card, by its namespace and its name, with its file as written (`status.source`). */
+  get: (namespace: string, name: string): Promise<Card> => call((c) => c.cards.get({ params: { namespace, name } }), read(Card)),
+  /** A card by its name alone, whichever namespace holds it, with its file as written (`GET /api/cards/:name`): a card's page's read. */
+  getAll: (name: string): Promise<Card> => call((c) => c.cards.getAll({ params: { name } }), read(Card)),
+  /**
+   * A card written whole: its spec as it is to be, its labels, and the `resourceVersion` it was read at, which refuses the write where the
+   * card has changed since. `spec.queued` goes back as read. Answers the card as it now reads.
+   */
+  replace: (namespace: string, name: string, card: CardWrite): Promise<Card> =>
+    call(
+      (c) => c.cards.update({ params: { namespace, name }, payload: card }),
+      write(Card, 'The card may be changed, or not: read the card again before sending it again.'),
+    ),
   /** A card filed in `namespace`. */
   create: (namespace: string, card: CardFile): Promise<Card> =>
     call(

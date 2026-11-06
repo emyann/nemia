@@ -102,8 +102,12 @@ const approvalRefusalSpec = spec<
     standings?: readonly BranchStanding[],
   ) => string | null
 >({
-  /** A run holds a record of each of its steps: `nemia start` writes one for each (start.verb.ts). */
-  requires: ({ input: [steps, run] }) => steps.every((s) => Object.hasOwn(run.steps, s.name)),
+  /**
+   * A run holds a record of each of its steps: `nemia start` writes one for each (start.verb.ts). Each step's name appears once among
+   * `steps`: a step's name is its file's within one folder (src/folder/folder.store.ts:66).
+   */
+  requires: ({ input: [steps, run] }) =>
+    steps.every((s) => Object.hasOwn(run.steps, s.name)) && steps.every((s, i) => !steps.some((t, j) => j !== i && t.name === s.name)),
   ensures: {
     emptyWords: {
       description: 'A message given blank is refused',

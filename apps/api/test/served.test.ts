@@ -51,6 +51,10 @@ const OWN: Readonly<Record<string, string>> = {
   'GET /api/namespaces/:namespace/runs': RUN_LIST,
   'GET /api/namespaces/:namespace/runs/:runId': RUN_LIST,
   'GET /api/cards': "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
+  'GET /api/cards/:name':
+    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
+  'PUT /api/namespaces/:namespace/cards/:name':
+    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
   'GET /api/namespaces/:namespace/cards':
     "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
   'GET /api/namespaces/:namespace/cards/:name':

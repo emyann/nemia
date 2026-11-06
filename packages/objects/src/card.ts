@@ -4,8 +4,8 @@
  * where it is in its life (`state`), the runs it was started as, the tick's last missed start of it, its title, and why an entry of the
  * inbox does not read as a card. Its labels are its `metadata.labels`, its factory its `metadata.namespace`.
  *
- * Beside it, the bodies of its verbs: a card filed (`CardFile`), a card started (`CardStart`) and its labels edited (`LabelEdit`), each
- * as the api is sent it. Plain Schemas of JSON, as every object of this package is.
+ * Beside it, the bodies of its verbs: a card filed (`CardFile`), a card written whole (`CardWrite`), a card started (`CardStart`) and its
+ * labels edited (`LabelEdit`), each as the api is sent it. Plain Schemas of JSON, as every object of this package is.
  */
 import { Schema } from 'effect';
 import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
@@ -28,14 +28,46 @@ export const CARD_STATES = [
 ] as const;
 export type CardState = (typeof CARD_STATES)[number];
 
+/**
+ * The keys a card's frontmatter may set, in the order a card's page lists them: five are its `spec`'s, `factory` is its
+ * `metadata.namespace` and `labels` its `metadata.labels`.
+ */
+export const CARD_KEYS = ['workflow', 'repo', 'queued', 'gate', 'factory', 'from', 'labels'] as const;
+
+/** A key a card's frontmatter may set. */
+export type CardKey = (typeof CARD_KEYS)[number];
+
+/**
+ * What each of a card's keys means, in one line, in `CARD_KEYS`' order: what the board shows beside a card's value, and the description
+ * of the Card's field that holds it, which `nemia explain` and the api's OpenAPI document both read.
+ */
+export const CARD_KEY_MEANINGS: Readonly<Record<CardKey, string>> = {
+  workflow:
+    "what runs the card when it is started: a workflow's name under the repository's `workflows/`, or a path to a workflow folder; else the start names one",
+  repo: 'the absolute path of the repository the idea is about: the repository the start is made in when unset',
+  queued:
+    'the time `nemia inbox queue` marked the card to start on its own: the tick starts it when a run slot frees, oldest first; unset, a person starts it',
+  gate: 'a step of its workflow whose closeout waits for a person — `nemia approve` — before anything after it is filed, in the run it starts: none when unset',
+  factory:
+    'the factory that processes the card: its run is started in it, on its repository when it has only one; required to start, unless the start names one',
+  from: 'runs whose conclusions its run is handed as context, by id, comma-separated: it does not wait on them; none when unset',
+  labels:
+    "a person's labels on the card, a map of a key to its value: what `-l key=value` selects it by, copied to the run it starts; none when unset",
+};
+
+/** A field of the card's spec, described by its key's meaning. */
+const described = <S extends Schema.Top>(schema: S, key: CardKey) => schema.annotate({ description: CARD_KEY_MEANINGS[key] });
+
 /** What a person wrote on the card: each key absent where the card does not set it; `body` absent on an entry that does not read. */
 export const CardSpec = Schema.Struct({
-  workflow: Schema.optionalKey(Schema.String),
-  repo: Schema.optionalKey(Schema.String),
-  gate: Schema.optionalKey(Schema.String),
-  from: Schema.optionalKey(Schema.Array(Schema.String)),
-  queued: Schema.optionalKey(Schema.String),
-  body: Schema.optionalKey(Schema.String),
+  workflow: Schema.optionalKey(described(Schema.String, 'workflow')),
+  repo: Schema.optionalKey(described(Schema.String, 'repo')),
+  gate: Schema.optionalKey(described(Schema.String, 'gate')),
+  from: Schema.optionalKey(described(Schema.Array(Schema.String), 'from')),
+  queued: Schema.optionalKey(described(Schema.String, 'queued')),
+  body: Schema.optionalKey(
+    Schema.String.annotate({ description: "the card's idea, in markdown, under its frontmatter: its first line is its title" }),
+  ),
 });
 export type CardSpec = typeof CardSpec.Type;
 
@@ -67,6 +99,8 @@ export const CardStatus = Schema.Struct({
    * file, which is its name, its `error` saying why it is no card.
    */
   file: Schema.optionalKey(Schema.String),
+  /** The card's file as written, frontmatter and body: on a read of one card alone, never on a list's items. */
+  source: Schema.optionalKey(Schema.String),
 });
 export type CardStatus = typeof CardStatus.Type;
 
@@ -111,3 +145,17 @@ export const CardStart = Schema.Struct({
   label: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 export type CardStart = typeof CardStart.Type;
+
+/**
+ * A card written whole (update): its spec as it is to be, its labels (absent leaves them, `{}` takes them all off), and the
+ * `resourceVersion` it was read at, which makes the write refused where the card has changed since (absent: the last writer wins).
+ * `queued` must be sent as the card has it: queueing is the card's own action.
+ */
+export const CardWrite = Schema.Struct({
+  metadata: Schema.Struct({
+    resourceVersion: Schema.optionalKey(Schema.String),
+    labels: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  }),
+  spec: CardSpec,
+});
+export type CardWrite = typeof CardWrite.Type;

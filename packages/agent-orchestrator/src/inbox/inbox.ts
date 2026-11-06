@@ -38,7 +38,7 @@
  * (inbox.store.ts and inbox.verb.ts read them).
  */
 import path from 'node:path';
-import { CARD_STATES } from 'objects';
+import { CARD_KEY_MEANINGS, CARD_KEYS, CARD_STATES } from 'objects';
 import { bodyOf, frontmatterKeys, type PlanFile } from '../plan/plan.ts';
 import { DEFAULT_FACTORY, factoryNameRefusal, type Factory } from '../factory/factory.ts';
 import type { Run } from '../record/record.ts';
@@ -81,7 +81,7 @@ export type InboxCard = {
 };
 
 /** Every key an inbox card may set, each optional. Anything else is refused by name — `after:` with where it is said instead. */
-export const INBOX_KEYS = ['workflow', 'repo', 'queued', 'gate', 'factory', 'from', 'labels'] as const;
+export const INBOX_KEYS = CARD_KEYS;
 
 /** A key an inbox card may set. */
 type InboxKey = (typeof INBOX_KEYS)[number];
@@ -102,20 +102,11 @@ type CardKeys = Partial<Record<FlatKey, string>> & { labels?: Labels };
 const isInstant = (value: string): boolean =>
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value) && !Number.isNaN(Date.parse(value));
 
-/** What each of an inbox card's keys means, in one line, in `INBOX_KEYS`' order: what the board shows beside a card's value. */
-export const INBOX_KEY_MEANINGS: Readonly<Record<InboxKey, string>> = {
-  workflow:
-    "what runs the card when it is started: a workflow's name under the repository's `workflows/`, or a path to a workflow folder; else the start names one",
-  repo: 'the absolute path of the repository the idea is about: the repository the start is made in when unset',
-  queued:
-    'the time `nemia inbox queue` marked the card to start on its own: the tick starts it when a run slot frees, oldest first; unset, a person starts it',
-  gate: 'a step of its workflow whose closeout waits for a person — `nemia approve` — before anything after it is filed, in the run it starts: none when unset',
-  factory:
-    'the factory that processes the card: its run is started in it, on its repository when it has only one; required to start, unless the start names one',
-  from: 'runs whose conclusions its run is handed as context, by id, comma-separated: it does not wait on them; none when unset',
-  labels:
-    "a person's labels on the card, a map of a key to its value: what `-l key=value` selects it by, copied to the run it starts; none when unset",
-};
+/**
+ * What each of an inbox card's keys means, in one line, in `INBOX_KEYS`' order: `objects`' `CARD_KEY_MEANINGS`, the one source of the
+ * words, which the Card's fields carry as their descriptions; kept here under its name.
+ */
+export const INBOX_KEY_MEANINGS: Readonly<Record<InboxKey, string>> = CARD_KEY_MEANINGS;
 
 function refuse(why: string): never {
   throw new WorkflowError(why);
@@ -773,7 +764,7 @@ export const labelledText = (card: InboxCard, labels: Labels, isDirectory: (at: 
  * A card's text, its keys written over by `over` and the frontmatter written again in the keys' order, its comments dropped; a body that
  * opens with a `---` rule of its own is kept from being read as the frontmatter, as `ideaCard` keeps it. Read back before it is given.
  */
-function cardText(
+export function cardText(
   card: InboxCard,
   over: Partial<Record<FlatKey, string | undefined>> & { labels?: Labels },
   isDirectory: (at: string) => boolean,

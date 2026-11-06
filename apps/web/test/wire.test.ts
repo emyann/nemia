@@ -23,7 +23,6 @@ import type * as chat from '../../api/src/nemia/chat.ts';
 import type * as custom from '../../api/src/custom/custom.ts';
 import type * as daemon from '../../api/src/factory/daemon.ts';
 import type * as decision from '../../api/src/decide/decision.ts';
-import type * as inbox from '../../api/src/inbox/inbox.ts';
 import type * as logs from '../../api/src/steps/logs.ts';
 import type * as nemia from '../../api/src/nemia/nemia.ts';
 import type * as path from '../../api/src/steps/path.ts';
@@ -162,9 +161,6 @@ export type RunLines = Holds<Same<Board.RunLines, runs.RunLinesAnswer>>;
 export type RunGraph = Holds<Same<Board.RunGraph, RunRow['graph']>>;
 export type GraphEdge = Holds<Same<Board.GraphEdge, RunRow['graph']['edges'][number]>>;
 export type GraphNode = Holds<Same<Board.GraphNode, NonNullable<RunRow['graph']['nodes']>[number]>>;
-
-export type InboxCardPage = Holds<Same<Board.InboxCardPage, inbox.InboxCardPage>>;
-export type FromSet = Holds<Same<Board.FromSet, inbox.InboxFromAnswer>>;
 
 export type PlaceKind = Holds<Same<Board.PlaceKind, RunRow['place']>>;
 export type RunStatus = Holds<Same<Board.RunStatus, RunRow['status']>>;

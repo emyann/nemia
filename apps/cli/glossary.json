@@ -8,8 +8,25 @@
   "terms": [
     {
       "term": "Route",
-      "meaning": "which way a command goes (`routeOf`, `apps/cli/src/route.ts`): `api`, for a moved read (`READ_VERBS`: `show`, `closeout`, `ls`, the inbox's read, `watch`) asked of the api over HTTP; `process`, for every other verb, a help and a read typed with `--local`, run on the orchestrator's own CLI in a process of its own (`apps/cli/src/local.ts`).",
+      "meaning": "which way a command goes (`routeOf`, `apps/cli/src/route.ts`): `api`, for a moved read (`READ_VERBS`: `show`, `closeout`, `ls`, the inbox's read, `watch`) asked of the api over HTTP, and for the client's own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`) whatever else is typed; `process`, for every other verb, a help and a moved read typed with `--local`, run on the orchestrator's own CLI in a process of its own (`apps/cli/src/local.ts`).",
       "type": "Route"
+    },
+    {
+      "term": "Client verb",
+      "meaning": "a verb this client alone has, generic over every kind the api serves (`CLIENT_VERBS` in `apps/cli/contracts/route.contract.ts`: `get`, `apply`, `explain`): no process answers it, so it asks the api whatever else is typed, says its own help, and refuses `--local`, naming `nemia service status`. Each kind is called through one table, `KIND_CALLS` (`apps/cli/src/objects/kinds.ts`), and a word names a resource by discovery (`resourceNamed`, `apps/cli/src/objects/resource.ts`).",
+      "type": "ClientVerb"
+    },
+    {
+      "term": "get",
+      "meaning": "`nemia get <resource>[/<name>] [<name>] [-n <namespace> | -A] [-l <selector>]... [-o json|yaml|name]` (`apps/cli/src/objects/get.ts`): a resource's objects as a table (NAMESPACE with `-A`, NAME, STATE, AGE), or one by its name; `-o yaml` is what `nemia apply -f` reads back."
+    },
+    {
+      "term": "apply",
+      "meaning": "`nemia apply -f <file|->` (`apps/cli/src/objects/apply.ts`): each object a YAML or JSON file holds read where it is served, then made, written or left alone as `applyOf` says by what its kind takes, printing `<plural>/<name> created|configured|unchanged`; the one write the client moves. A missing Card is refused naming `nemia inbox add`, and a kind that takes no write naming `nemia explain`."
+    },
+    {
+      "term": "explain",
+      "meaning": "`nemia explain <resource>[.<field>]...` (`apps/cli/src/objects/explain.ts`): a resource's kind, version, scope and verbs from discovery, and its fields, each with its type and description, from the package's own OpenAPI document (`OpenApi.fromApi(Api)`), picked by `explained`."
     },
     {
       "term": "--local",

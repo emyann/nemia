@@ -17,7 +17,7 @@ import type {
   Schedule,
   ScheduleList,
 } from 'objects';
-import type { Capabilities, Ceilings, Daemon, InboxCardPage, InboxEntry, PassCost, Quota, QuotaWindow, StepReach } from '../src/lib/api.ts';
+import type { Capabilities, Ceilings, Daemon, InboxEntry, PassCost, Quota, QuotaWindow, StepReach } from '../src/lib/api.ts';
 
 /**
  * A queued card whose start the tick tried and did not make, `queued` and `tried` both set, and which a record names: its state its run's
@@ -73,17 +73,6 @@ export const cardObject = (over: CardOver = {}): Card => ({
 
 /** A page of the inbox's cards holding `items`, the last. */
 export const cardList = (...items: Card[]): CardList => ({ apiVersion: 'nemia/v1', kind: 'CardList', metadata: {}, items });
-
-/** A card's page: the entry, its file as written and its key rows. */
-export const cardPage = (extra: Partial<InboxCardPage> = {}): InboxCardPage => ({
-  ...inboxEntry(),
-  source: '---\nworkflow: build\n---\nDecode the reads\n',
-  keys: [
-    { key: 'workflow', value: 'build', meaning: 'The workflow a start runs.' },
-    { key: 'repo', value: null, meaning: 'The repository a start runs in.' },
-  ],
-  ...extra,
-});
 
 /** What a Claude Code step gets, every list with a row and every null a value. */
 export const stepReach = (extra: Partial<StepReach> = {}): StepReach => ({

@@ -16,8 +16,9 @@
  * - **One process** (`spawn`): `src/local.ts` alone names the orchestrator's CLI entries (`agent-orchestrator/bin`, `/bin/wf`), which it
  *   resolves and never imports, and alone imports `node:child_process`; the daemon on demand spawns through it.
  * - **The feed's stream under `src/watch/`** (`feed`): no other file names `/api/feed/stream` or an `EventSource`.
- * - **The moved reads are the contract's** (`READ_VERBS` in `contracts/route.contract.ts`): `routeOf` sends each to the api, and the
- *   names `src/route.ts` tests are those verbs, no more and no fewer (`routedNames`).
+ * - **The moved reads and the client's own verbs are the contract's** (`READ_VERBS` and `CLIENT_VERBS` in
+ *   `contracts/route.contract.ts`): `routeOf` sends each to the api, and the names `src/route.ts` tests are those verbs, no more and
+ *   no fewer (`routedNames`).
  *
  * The lint block for `apps/cli/src` and `apps/cli/bin` in `.oxlintrc.json` refuses the same packages as they are typed, and a value
  * import of the api; `packages/agent-orchestrator/test/contract.test.ts` holds the CLI entries' resolve across the repository. A
@@ -28,7 +29,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
-import { READ_VERBS } from '../contracts/route.contract.ts';
+import { CLIENT_VERBS, READ_VERBS } from '../contracts/route.contract.ts';
 import { routeOf } from '../src/route.ts';
 
 const CLI = path.join(import.meta.dirname, '..');
@@ -232,7 +233,10 @@ const ruled = (breaks: Break[]): string[] => breaks.map((b) => `${b.file} ${b.ru
 /** `texts` with one file planted, by its path from `apps/cli`. */
 const plantedIn = (file: string, text: string): Map<string, string> => new Map([...sourceTexts(), [file, text]]);
 
-/** The names `src/route.ts`'s `routeOf` compares a command's name to. */
+/** The names the contract sends to the api: the moved reads and the client's own verbs. */
+const ROUTED = [...READ_VERBS, ...CLIENT_VERBS].sort();
+
+/** The names `src/route.ts`'s `routeOf` compares a command's name to, as its text spells them. */
 const routedNames = (text: string): string[] => [...text.matchAll(/\bname === '([^']+)'/g)].map((m) => m[1]).sort();
 
 test('the scan reads the client, its bins among it, and sees each way a file names a module', () => {
@@ -384,19 +388,21 @@ test('REFUSED: the feed followed outside src/watch/; one named in a JSDoc is let
   );
 });
 
-test("the moved reads are the contract's READ_VERBS: routeOf sends each to the api, and src/route.ts names those and no other", () => {
+test("the moved reads and the client's own verbs are the contract's: routeOf sends each to the api, and src/route.ts names those and no other", () => {
   for (const name of READ_VERBS) {
     assert.equal(routeOf({ name, local: false, help: false }), 'api', name);
     assert.equal(routeOf({ name, local: true, help: false }), 'process', `${name} --local`);
   }
   for (const name of ['approve', 'retry', 'say', 'inbox add', 'decide', ''])
     assert.equal(routeOf({ name, local: false, help: false }), 'process', name);
-  assert.deepEqual(routedNames(fs.readFileSync(path.join(CLI, 'src/route.ts'), 'utf8')), [...READ_VERBS].sort());
+  for (const name of CLIENT_VERBS) assert.equal(routeOf({ name, local: true, help: true }), 'api', `${name} --local --help`);
+  assert.deepEqual(routedNames(fs.readFileSync(path.join(CLI, 'src/route.ts'), 'utf8')), ROUTED);
 });
 
 test('REFUSED: a route that tests a name the contract does not move, or leaves one out', () => {
   const route = fs.readFileSync(path.join(CLI, 'src/route.ts'), 'utf8');
   assert.ok(route.includes("name === 'watch'"), 'the route names watch today');
-  assert.notDeepEqual(routedNames(route.replace("name === 'watch'", "name === 'approve'")), [...READ_VERBS].sort());
-  assert.notDeepEqual(routedNames(route.replace(" || name === 'watch'", '')), [...READ_VERBS].sort());
+  assert.notDeepEqual(routedNames(route.replace("name === 'watch'", "name === 'approve'")), ROUTED);
+  assert.notDeepEqual(routedNames(route.replace(" || name === 'watch'", '')), ROUTED);
+  assert.notDeepEqual(routedNames(route.replace(" || name === 'explain'", '')), ROUTED);
 });

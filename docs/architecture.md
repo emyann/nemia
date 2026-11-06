@@ -30,7 +30,9 @@ runtime's `contract.test.ts`, the web's and the cli's `structure.test.ts`):
 - the cli reaches the api over HTTP alone, the shapes of its answers by `import type` from `apps/api/src/client/client.ts`, the store's
   daemon by its lease (`daemon.json`'s `url`) in `src/where.ts`, and the in-process path by spawning `agent-orchestrator/bin` from
   `src/local.ts` (`apps/cli/test/structure.test.ts`, the cli's lint block, and the resolve in
-  `packages/agent-orchestrator/test/contract.test.ts`). What it does not move — `decide` and every write — stays on that path;
+  `packages/agent-orchestrator/test/contract.test.ts`). What it does not move — `decide` and every write but one — stays on that path;
+  the one is `nemia apply`, which writes the objects a file holds through `objects`' typed client, beside `get` and `explain`, the
+  verbs the client alone has (`CLIENT_VERBS` in `apps/cli/contracts/route.contract.ts`, resource-objects' decision 5);
 - the api reaches the orchestrator's public entries alone (the entries: `packages/agent-orchestrator/test/contract.test.ts` and the
   api's lint block; that its source imports no runtime: the api's lint block, proven by
   `packages/agent-orchestrator/test/imports.boundary.test.ts`). The api's source reaches only the orchestrator; its tests may import the

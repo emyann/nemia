@@ -37,8 +37,9 @@ const filedFieldsSpec = spec<(filed: FiledWith, now: readonly string[], gave: re
     },
     /**
      * The full law, "owes exactly the fields its step declares now that its closeout gave, in the step's order", waits on tsverify
-     * proving that a filter's result keeps every element that passes (src-a-filter-s-result-is-pro-p25m), as `retention`'s
-     * `somethingGoes` does; `src/status/status.test.ts` (`owedFields`, a moved schema) holds it until then.
+     * proving that a filter's result keeps every element that passes (src-a-filter-s-result-is-pro-p25m);
+     * `src/status/status.test.ts` (`owedFields`, a moved schema) holds it until then. tsverify 0.9.0 still
+     * leaves it `bounded`.
      */
     aMovedDefinitionOwesNoFieldItLacks: {
       description:

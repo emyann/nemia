@@ -18,7 +18,8 @@
       "source": "emyann/tsverify",
       "sourceType": "github",
       "skillPath": "skills/tsverify/SKILL.md",
-      "computedHash": "fed86fef5e1326d94af456674540ca544d21ac090588e04c212f00db48455def"
+      "computedHash": "9c88c72260019e8dc8978d74b4ad5013c93b42fbdb71dac3100ffaffec2eb419",
+      "installMode": "copy"
     }
   }
 }

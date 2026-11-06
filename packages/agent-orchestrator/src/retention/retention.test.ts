@@ -1,7 +1,7 @@
 /**
  * The retention's order and words: `newestFirst`, which the contract takes as given (`contracts/retention.contract.ts` proves which
  * releases are kept), `retentionLines`, matched on the tags and counts they name, never a whole sentence, and the rule's accepting
- * side, which the contract proves only as "something goes" until tsverify proves a filter keeps every element that passes.
+ * side, which the contract proves whole since tsverify 0.9.0 (`everyOtherGoes`) and these cases hold on the real function too.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

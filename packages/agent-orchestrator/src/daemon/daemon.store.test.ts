@@ -808,9 +808,8 @@ test('REFUSED: `nemia up` and `nemia tick` given words they do not take, each na
 });
 
 /**
- * The signals that stop `nemia up`, each with the code it exits with: one child each, run together, each on a store of its own so that no
- * one's daemon.json is another's. Each store is made before the subtests start, since scratch's `afterEach` reaps what runs in the roots
- * made since its test began, and a subtest that ends first would otherwise reap the stores of the others, made after its own.
+ * The signals that stop `nemia up`, each with the code it exits with: one child each, one after another, each on a store of its own so
+ * that no one's daemon.json is another's.
  */
 const STOPPING = [
   ['SIGINT', 130],
@@ -818,43 +817,35 @@ const STOPPING = [
   ['SIGHUP', 129],
 ] as const;
 
-test(
-  "`nemia up` stopped by a signal lets the store go on the way out, with the signal's exit code",
-  { concurrency: STOPPING.length },
-  async (t) => {
-    const cli = new URL('../cli/main.ts', import.meta.url).href;
-    const fake = new URL('../../test/promised.ts', import.meta.url).href;
-    const roots = STOPPING.map(() => scratch('wf-daemon-signal-'));
-    await Promise.all(
-      STOPPING.map(([signal, code], i) =>
-        t.test(`${signal}: ${code}`, async () => {
-          const root = roots[i];
-          const file = path.join(root, 'daemon.json');
-          const readIt = () => JSON.parse(fs.readFileSync(file, 'utf8')) as ReturnType<typeof read>;
-          const w = nodeChild(
-            `const { main } = await import(${JSON.stringify(cli)}); const { promised } = await import(${JSON.stringify(fake)}); await main(['up', '20'], promised({ tick: async () => ({ tasks: 0, actions: [], running: {}, views: [] }), admit: async () => [] }));`,
-            { ...process.env, WF_ROOT: root },
-          );
-          const { child } = w;
-          try {
-            await w.until(() => fs.existsSync(file) && readIt().pid === child.pid && Boolean(readIt().passedAt), 'the daemon wrote a pass');
-            child.kill(signal);
-            assert.equal(
-              (await w.closed).code,
-              code,
-              'a real process, since a signal stops it; its engine a fake, so no harness is asked anything',
-            );
-            const held = readIt();
-            assert.equal(held.pid, child.pid);
-            assert.ok(held.stoppedAt, 'stoppedAt written as it stopped');
-          } finally {
-            child.kill('SIGKILL');
-          }
-        }),
-      ),
-    );
-  },
-);
+test("`nemia up` stopped by a signal lets the store go on the way out, with the signal's exit code", async (t) => {
+  const cli = new URL('../cli/main.ts', import.meta.url).href;
+  const fake = new URL('../../test/promised.ts', import.meta.url).href;
+  for (const [signal, code] of STOPPING)
+    await t.test(`${signal}: ${code}`, async () => {
+      const root = scratch('wf-daemon-signal-');
+      const file = path.join(root, 'daemon.json');
+      const readIt = () => JSON.parse(fs.readFileSync(file, 'utf8')) as ReturnType<typeof read>;
+      const w = nodeChild(
+        `const { main } = await import(${JSON.stringify(cli)}); const { promised } = await import(${JSON.stringify(fake)}); await main(['up', '20'], promised({ tick: async () => ({ tasks: 0, actions: [], running: {}, views: [] }), admit: async () => [] }));`,
+        { ...process.env, WF_ROOT: root },
+      );
+      const { child } = w;
+      try {
+        await w.until(() => fs.existsSync(file) && readIt().pid === child.pid && Boolean(readIt().passedAt), 'the daemon wrote a pass');
+        child.kill(signal);
+        assert.equal(
+          (await w.closed).code,
+          code,
+          'a real process, since a signal stops it; its engine a fake, so no harness is asked anything',
+        );
+        const held = readIt();
+        assert.equal(held.pid, child.pid);
+        assert.ok(held.stoppedAt, 'stoppedAt written as it stopped');
+      } finally {
+        child.kill('SIGKILL');
+      }
+    });
+});
 
 test('`nemia up` says what its passes cost once a minute, not once a pass: nine passes twenty seconds apart are two lines, the third minute not yet over', async (t) => {
   clear();

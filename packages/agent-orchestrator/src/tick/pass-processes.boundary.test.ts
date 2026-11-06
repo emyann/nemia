@@ -2,7 +2,7 @@
  * The git processes a pass's place starts, counted by the meter on git for real (`place.spawned`): as many on a store of finished runs as
  * on none, and one more a repository whose runs' tips are read; and two factories on two repositories asking the one place the pass is
  * given, each process it starts counted once. The test place starts no process, so an equality on what it started would hold of
- * nothing: these keep the git place. The questions a pass asks (`place.calls`), on two hundred runs, are counted in rest-store.test.ts.
+ * nothing: these keep the git place. The questions a pass asks (`place.calls`), on forty finished runs, are counted in rest-store.test.ts.
  *
  * Walked through the runtime itself, `plainEngine` over an in-memory journal and a harness the test signs by hand. `WF_ROOT` is read as
  * the module loads, so it is set before the import.

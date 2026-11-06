@@ -33,8 +33,8 @@ const post = (page: Page, at: string, body: unknown): Promise<{ status: number; 
   );
 
 /**
- * The proposal made through the api's door, an update of the hire at the version it reads, then its file made Nemia's and widening, as her session would have made it: the door's own
- * decode reads it back. Its name.
+ * The proposal made through the api's door, an update of the hire at the version it reads, then its file made Nemia's and widening, as her
+ * session would have made it: the door's own decode reads it back. Its name.
  */
 async function proposed(page: Page): Promise<string> {
   const hire = await page.evaluate(

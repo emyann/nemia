@@ -8,8 +8,9 @@
  * carries and how it is refused are the door's: a test holds them.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
+import { nameFirst } from '../src/run-list/name-order.ts';
 
-/** Where a finished run stands in its list: when its work stopped, in epoch milliseconds, and its name. Declared here until src holds it. */
+/** Where a finished run stands in its list: when its work stopped, in epoch milliseconds, and its name. `run-list.ts` re-exports it. */
 export type FinishedKey = { readonly finishedMs: number; readonly name: string };
 
 const finishedBeforeSpec = spec<(a: FinishedKey, b: FinishedKey) => boolean>({
@@ -25,7 +26,7 @@ const finishedBeforeSpec = spec<(a: FinishedKey, b: FinishedKey) => boolean>({
     },
     tiesByName: {
       description: 'Of two runs whose work stopped at the same instant, the one whose name sorts first comes first, and only it',
-      condition: ({ input: [a, b], output }) => a.finishedMs !== b.finishedMs || output === a.name < b.name,
+      condition: ({ input: [a, b], output }) => a.finishedMs !== b.finishedMs || output === nameFirst(a.name, b.name),
     },
   },
 });

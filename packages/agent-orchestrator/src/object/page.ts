@@ -46,7 +46,7 @@ export type PageAsked = { readonly limit: number | null; readonly continue?: str
 export type Paged<T> = { readonly items: readonly T[]; readonly remainingItemCount: number; readonly continue?: string };
 
 /** The `limit`'s refusal: it names the fix. */
-const badLimit = (limit: number | null): Invalid =>
+export const badLimit = (limit: number | null): Invalid =>
   new Invalid({
     message: `limit ${String(limit)} is no whole number from 1: pass ?limit=<n>, n from 1, or leave limit out for the whole list`,
   });

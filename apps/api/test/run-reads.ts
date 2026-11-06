@@ -10,8 +10,8 @@
  * flight (`GET /api/runs-open`), then the finished ones (`GET /api/runs-finished`), which between them hold every run once. `GET
  * /api/runs` is the `RunList` of the objects.
  */
-import type { RunObject } from 'agent-orchestrator';
-import type { FinishedListing, OpenListing, RunAnswer, RunLinesAnswer } from '../src/runs/runs.ts';
+import type { RunObject, RunSummary } from 'agent-orchestrator';
+import type { RunAnswer, RunLinesAnswer } from '../src/runs/runs.ts';
 
 /** What a test reads through: the app, or anything that answers a request as it does. */
 export type Asked = { request: (url: string) => Response | Promise<Response> };
@@ -71,7 +71,7 @@ export const linesOf = async (app: Asked, id: string): Promise<RunLinesAnswer> =
   (await ok(app, `/api/runs/${encodeURIComponent(id)}/lines`)) as RunLinesAnswer;
 
 /** A run's summary as one of the board's views answers it: the list's own (`RunListing`), with what that view adds. */
-export type Summary = OpenListing['waiting'][number] | OpenListing['inFlight'][number] | FinishedListing['runs'][number];
+export type Summary = RunSummary & Record<string, unknown>;
 
 /**
  * Every run's summary, waiting, in flight and finished, each of the board's two views read once with `query` (`?selector=` among them):
@@ -79,7 +79,10 @@ export type Summary = OpenListing['waiting'][number] | OpenListing['inFlight'][n
  */
 export async function summariesOf(app: Asked, query = ''): Promise<Summary[]> {
   const more = query === '' ? '' : `&${query.replace(/^\?/, '')}`;
-  const open = (await ok(app, `/api/runs-open${query === '' ? '' : `?${query.replace(/^\?/, '')}`}`)) as OpenListing;
-  const finished = (await ok(app, `/api/runs-finished?size=100${more}`)) as FinishedListing;
+  const open = (await ok(app, `/api/runs-open${query === '' ? '' : `?${query.replace(/^\?/, '')}`}`)) as {
+    waiting: Summary[];
+    inFlight: Summary[];
+  };
+  const finished = (await ok(app, `/api/runs-finished?size=100${more}`)) as { runs: Summary[] };
   return [...open.waiting, ...open.inFlight, ...finished.runs];
 }

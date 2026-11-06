@@ -35,7 +35,7 @@ import {
 } from 'agent-orchestrator';
 import { runTasks } from 'agent-orchestrator/run';
 import type { RunList } from 'objects';
-import type { RunListing } from './runs.ts';
+import type { RunSummary as RunListing } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
 import { summariesOf } from '../../test/run-reads.ts';
 import { names } from '../../test/named.ts';

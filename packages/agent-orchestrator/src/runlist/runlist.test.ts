@@ -1,22 +1,11 @@
 /**
- * The rules of the two reads of the runs (`runlist.ts`): the kind of each run the bell and the floor name, when a finished run finished
- * and in what order, its outcome, a run's wall time, the factory kept, and a page with each refusal of one asked wrongly. Pure: hand-built
- * summaries, no store.
+ * The rules of a run's state in the board's list (`runlist.ts`): the state of each run the bell and the floor name, when a finished run
+ * finished, its outcome, a run's wall time and the instant its clock is read at, and the factory kept. Pure: hand-built summaries, no
+ * store. The order of the finished runs and their page are run-list.ts's (`finishedBefore`, `finishedPageOf`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  byFinished,
-  clockUntilOf,
-  finishedAtOf,
-  inFactory,
-  kindOf,
-  type Listed,
-  outcomeOf,
-  pageAsked,
-  pageOf,
-  wallMsOf,
-} from './runlist.ts';
+import { clockUntilOf, finishedAtOf, inFactory, kindOf, type Listed, outcomeOf, wallMsOf } from './runlist.ts';
 
 /** An instant `h` hours and `m` minutes into the fixtures' day. */
 const at = (h: number, m = 0) => new Date(Date.UTC(2026, 9, 4, h, m)).toISOString();
@@ -104,17 +93,6 @@ test("a run's clock is read at its finish for a finished run, and at now for one
     );
 });
 
-test('the finished runs come by when their work stopped, newest first, not by when they were created; two together by id', () => {
-  const a = listed({ id: 'a', createdAt: at(8), atWork: { endedAt: at(12) } });
-  const b = listed({ id: 'b', createdAt: at(9), atWork: { endedAt: at(10) } });
-  const c = listed({ id: 'c', createdAt: at(9, 30), atWork: { endedAt: at(10, 30) }, cancelledAt: at(11) });
-  const d = listed({ id: 'd', createdAt: at(7), atWork: { endedAt: at(11) }, status: 'failed' });
-  const ordered = [d, c, b, a].sort(byFinished).map((run) => run.id);
-  assert.deepEqual(ordered, ['a', 'c', 'd', 'b']);
-  const byCreation = [d, c, b, a].sort((x, y) => y.createdAt.localeCompare(x.createdAt)).map((run) => run.id);
-  assert.notDeepEqual(ordered, byCreation, 'the fixture finishes in another order than it was created');
-});
-
 test('a read keeps the runs of one factory, a run that names none being of the default one, and every run where none is asked', () => {
   const runs = [listed({ id: 'a', factory: 'nemia' }), listed({ id: 'b' }), listed({ id: 'c', factory: 'pipao' })];
   const kept = (factory: string | undefined) => runs.filter(inFactory(factory)).map((run) => run.id);
@@ -122,30 +100,4 @@ test('a read keeps the runs of one factory, a run that names none being of the d
   assert.deepEqual(kept('nemia'), ['a']);
   assert.deepEqual(kept('default'), ['b']);
   assert.deepEqual(kept('no-such'), []);
-});
-
-test('a page asked without a page or a size is page 1 of nine; each is read off its digits', () => {
-  assert.deepEqual(pageAsked({}), { page: 1, size: 9 });
-  assert.deepEqual(pageAsked({ page: '3', size: '100' }), { page: 3, size: 100 });
-});
-
-test('REFUSED: a page that is no whole number from 1, and a size that is none from 1 to 100, each naming its key', () => {
-  for (const page of ['0', '-1', '1.5', 'abc', '', ' 2', '1e2']) {
-    const asked = pageAsked({ page });
-    assert.ok('refused' in asked, `page ${JSON.stringify(page)}`);
-    assert.equal(asked.refused, `page takes a whole number from 1, as in page=2, and \`${page}\` is none.`);
-  }
-  for (const size of ['0', '101', 'abc', '', '2.5']) {
-    const asked = pageAsked({ size });
-    assert.ok('refused' in asked, `size ${JSON.stringify(size)}`);
-    assert.equal(asked.refused, `size takes a whole number from 1 to 100, as in size=9, and \`${size}\` is none.`);
-  }
-});
-
-test('a page is its slice of the rows, with the total and the pages there are; a page past the last is empty', () => {
-  const rows = ['a', 'b', 'c', 'd', 'e'];
-  assert.deepEqual(pageOf(rows, 1, 2), { total: 5, page: 1, size: 2, pages: 3, runs: ['a', 'b'] });
-  assert.deepEqual(pageOf(rows, 3, 2), { total: 5, page: 3, size: 2, pages: 3, runs: ['e'] });
-  assert.deepEqual(pageOf(rows, 4, 2), { total: 5, page: 4, size: 2, pages: 3, runs: [] });
-  assert.deepEqual(pageOf([], 1, 9), { total: 0, page: 1, size: 9, pages: 1, runs: [] });
 });

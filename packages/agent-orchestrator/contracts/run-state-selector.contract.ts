@@ -7,11 +7,9 @@
  * three forms it takes.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
+import type { RunState } from 'objects';
 
-/** A run's state in the list: one of `RUN_STATES` of `objects`. Declared here until src holds it. */
-export type RunState = 'waiting' | 'inFlight' | 'finished';
-
-/** What a selector asks: the runs in `state` (`equal`), or every run but those (`!equal`). Declared here until src holds it. */
+/** What a selector asks: the runs in `state` (`equal`), or every run but those (`!equal`). `run-list.ts` re-exports it. */
 export type RunStateSelector = { readonly state: RunState; readonly equal: boolean };
 
 /** The field a run's list is selected by. */
@@ -34,9 +32,7 @@ const runStateSelectorSpec = spec<(text: string) => RunStateSelector | null>({
       description: 'A selector taken says the state its text names, and takes the runs in it exactly where its operator is = or ==',
       condition: ({ input: [text], output }) =>
         output === null ||
-        (output.equal
-          ? text === `${FIELD}=${output.state}` || text === `${FIELD}==${output.state}`
-          : text === `${FIELD}!=${output.state}`),
+        (output.equal ? text === FIELD + '=' + output.state || text === FIELD + '==' + output.state : text === FIELD + '!=' + output.state),
     },
   },
 });

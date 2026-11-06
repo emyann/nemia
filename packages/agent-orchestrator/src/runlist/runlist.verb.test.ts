@@ -1,9 +1,9 @@
 /**
- * The runs in two reads (`runsOpen`, `runsFinished`), through their entries of the command table (`RUNS_OPEN`, `RUNS_FINISHED`), on a
- * store of runs started and advanced over the stand-ins: together they say what the whole list says (`RUNS`), each run once; the finished
- * runs page by when their work stopped; the light answer does not grow with the finished runs, and read warm costs no record of one,
- * each compared whole on a seeded clock, with a waiting row among them (the big quiet store of rest-store.test.ts says the same on the
- * runtime itself, without the clocks); and a page asked wrongly is refused.
+ * The RunList asked by state (`runList` with `fieldSelector`, run-list.verb.ts), on a store of runs started and advanced over the
+ * stand-ins: each selector takes exactly the runs `kindOf` puts in its state, the counts ignore the selector and the page, the finished
+ * runs come newest first by when their work stopped, each run carries the frame's parts measured to `metadata.asOf` (`framePartsOf`,
+ * runlist.verb.ts), and a warm read costs no record of a finished run (the big quiet store of rest-store.test.ts says the same on the
+ * runtime itself); a plain list carries none of it, and a selector that is none is refused before any run is judged.
  *
  * `WF_ROOT` is set before the package is imported, since the store reads it as it loads; each test empties the store's runs first, and
  * a test that compares two answers, or orders runs by time, seeds `Date`.
@@ -24,17 +24,18 @@ process.env.WF_VERIFY_REST = '1';
 process.env.WF_DEFAULT_FACTORY_STARTS = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { RUNS, RUNS_FINISHED, RUNS_OPEN } = await import('../command/pages.verb.ts');
+const { runList } = await import('../run-list/run-list.verb.ts');
+const { kindOf } = await import('./runlist.ts');
+const { judgedNow } = await import('../summary/summary.verb.ts');
 const { advanceRun, approveRun, startRun, runWith: runEngine } = await import('../runner.ts');
 const { Invalid } = await import('../refusal/refusal.ts');
 const { readRun } = await import('../record/record.store.ts');
-const { runStore } = await import('../record/files.store.ts');
 const { engineOf } = await import('../runtime-client.ts');
 const { metered } = await import('../meter/tally.store.ts');
 const { informerMemo } = await import('../rest/informer.verb.ts');
-type FinishedPage = import('./runlist.verb.ts').FinishedPage;
-type OpenRuns = import('./runlist.verb.ts').OpenRuns;
-type RunSummary = import('../summary/summary.verb.ts').RunSummary;
+type RunList = import('objects').RunList;
+type RunStatus = import('objects').RunStatus;
+type RunQuery = import('../run-list/run-list.verb.ts').RunQuery;
 
 const stand = eachTest(testPlace);
 const runWith = runOver(runEngine, () => stand().layer);
@@ -97,112 +98,146 @@ const aWaiting = async () => {
   return id;
 };
 
-/** The record of the run `id` rewritten with `more` over it, as a start in a factory writes its name. */
-const rewritten = (id: string, more: object): void => {
-  const file = path.join(RUNS_DIR, `${id}.json`);
-  fs.writeFileSync(file, `${JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), ...more }, null, 2)}\n`);
-};
-
 /** A person's cancellation of the run `id`, written beside its record as `nemia cancel` writes it. */
 const cancelled = (id: string, at: number): void => fs.writeFileSync(path.join(RUNS_DIR, `${id}.cancelled`), new Date(at).toISOString());
 
-const wholeList = async (): Promise<RunSummary[]> => await runWith(e(), RUNS.handler({}, process.env));
-const open = async (args: Record<string, string> = {}): Promise<OpenRuns> => await runWith(e(), RUNS_OPEN.handler(args, process.env));
-const finishedPage = async (args: Record<string, string> = {}): Promise<FinishedPage> =>
-  await runWith(e(), RUNS_FINISHED.handler(args, process.env));
+/** What a list keeps between requests: the informer and the feed's filing times; a fresh one for each read where none is given. */
+type Kept = { runs: import('../rest/informer.verb.ts').InformerMemo; filings: { filed: Map<string, string>; cursor: number } };
+const cold = (): Kept => ({ runs: informerMemo(), filings: { filed: new Map(), cursor: 0 } });
 
-/** Every page of the finished runs, `size` rows a page, from the first to the last the first names. */
-const everyPage = async (size: number, factory?: string): Promise<FinishedPage[]> => {
-  const given = { size: String(size), ...(factory === undefined ? {} : { factory }) };
-  const first = await finishedPage({ ...given, page: '1' });
-  const rest: FinishedPage[] = [];
-  for (let page = 2; page <= first.pages; page++) rest.push(await finishedPage({ ...given, page: String(page) }));
-  return [first, ...rest];
+/** The RunList `query` asks, read through `kept`, verified as `env` says. */
+const list = async (query: RunQuery = {}, kept = cold(), env = process.env): Promise<RunList> =>
+  await runWith(
+    e(),
+    runList(
+      e(),
+      { home: ROOT, memo: kept.runs, filings: kept.filings, verify: env.WF_VERIFY_REST === '1' },
+      { memo: { filings: kept.filings, said: new Map() } },
+      query,
+    ),
+  );
+
+/** A run of a list as a row: its name as `id`, its creation as `createdAt`, and its status. */
+type Row = RunStatus & { id: string; createdAt: string };
+const rowsOf = (answer: RunList): Row[] =>
+  answer.items.map((item) => ({ ...item.status, id: item.metadata.name, createdAt: item.metadata.creationTimestamp }));
+
+/** The frame's list of the runs not finished, split by state as the board splits it, with its counts and the instant it is read at. */
+const open = async () => {
+  const answer = await list({ fieldSelector: 'status.state!=finished' });
+  const rows = rowsOf(answer);
+  return {
+    asOf: answer.metadata.asOf ?? '',
+    counts: answer.metadata.counts,
+    waiting: rows.filter((row) => row.state === 'waiting'),
+    inFlight: rows.filter((row) => row.state === 'inFlight'),
+  };
 };
 
-/** A row of either read as the whole list answers the run: without what the two reads add. */
-const summaryOf = (row: object): object => {
-  const {
-    wallMs: _w,
-    finishedAt: _f,
-    outcome: _o,
-    clock: _c,
-    stepCosts: _s,
-    waitingSince: _p,
-    ...summary
-  } = row as Record<string, unknown>;
-  return summary;
-};
+/** A page of the finished runs, newest first, as the board asks it. */
+const finishedPage = async (query: RunQuery = {}): Promise<Row[]> =>
+  rowsOf(await list({ fieldSelector: 'status.state=finished', ...query }));
 
-/** That the two reads of `factory` say what `whole` says: each run once, the counts adding up, each row the whole list's own. */
-const assertParity = async (whole: RunSummary[], factory?: string) => {
-  const light = await open(factory === undefined ? {} : { factory });
-  const pages = await everyPage(2, factory);
-  const rows = [...light.waiting, ...light.inFlight, ...pages.flatMap((page) => page.runs)];
-  const ids = rows.map((run) => run.id);
-  assert.equal(new Set(ids).size, ids.length, `no run twice: ${ids.join(' ')}`);
-  assert.deepEqual([...ids].sort(), whole.map((run) => run.id).sort(), 'every run of the whole list, and no other');
-  const { waiting, inFlight, finished } = light.counts;
-  assert.equal(waiting + inFlight + finished, whole.length, 'the three counts add up to the whole list');
-  assert.deepEqual([waiting, inFlight], [light.waiting.length, light.inFlight.length]);
-  assert.equal(pages[0].total, finished);
-  assert.equal(pages.flatMap((page) => page.runs).length, finished);
-  for (const row of rows)
-    assert.deepEqual(
-      summaryOf(row),
-      whole.find((run) => run.id === row.id),
-      row.id,
-    );
-  return { light, pages };
+/** The frame's seven keys of a run's status. */
+const FRAME = ['state', 'wallMs', 'clock', 'stepCosts', 'waitingSince', 'finishedAt', 'outcome'] as const;
+
+/** An item without the frame's keys: what a plain list answers of the run. */
+const unframed = (item: RunList['items'][number]) => {
+  const status: Record<string, unknown> = { ...item.status };
+  for (const key of FRAME) delete status[key];
+  return { ...item, status };
 };
 
 const seeded = (t: TestContext, now = T0) => t.mock.timers.enable({ apis: ['Date'], now });
 
-test('the two reads say what the whole list says: each run in the light answer or on one finished page, once, for all factories and for one', async (t) => {
+test('each selector takes exactly the runs kindOf puts in its state; the counts ignore the selector and the limit', async (t) => {
   seeded(t);
-  const finished = [await aFinished(), await aFinished(), await aFinished(), await aFinished(), await aFinished()];
+  const finished = [await aFinished(), await aFinished(), await aFinished()];
   const waiting = [await aWaiting(), await aWaiting()];
-  const inFlight = [await anInFlight(), await anInFlight()];
-  for (const id of [finished[0], finished[1], waiting[0], inFlight[0]]) rewritten(id, { factory: 'nemia' });
-  for (const id of [finished[2], inFlight[1]]) rewritten(id, { factory: 'pipao' });
-
-  const whole = await wholeList();
-  assert.equal(whole.length, 9);
-  const all = await assertParity(whole);
-  assert.deepEqual(all.light.counts, { waiting: 2, inFlight: 2, finished: 5 });
-  assert.deepEqual(all.light.waiting.map((run) => run.id).sort(), [...waiting].sort());
-  assert.deepEqual(all.light.inFlight.map((run) => run.id).sort(), [...inFlight].sort());
-  assert.equal(all.pages.length, 3, 'five finished runs, two a page');
-
-  const ofFactory = (name: string) => whole.filter((run) => (run.factory ?? 'default') === name);
-  assert.deepEqual((await assertParity(ofFactory('nemia'), 'nemia')).light.counts, { waiting: 1, inFlight: 1, finished: 2 });
-  assert.deepEqual((await assertParity(ofFactory('pipao'), 'pipao')).light.counts, { waiting: 0, inFlight: 1, finished: 1 });
-  assert.deepEqual((await assertParity(ofFactory('default'), 'default')).light.counts, { waiting: 1, inFlight: 0, finished: 2 });
-  assert.deepEqual((await assertParity([], 'no-such-factory')).light.counts, { waiting: 0, inFlight: 0, finished: 0 });
+  const inFlight = [await anInFlight()];
+  const all = [...finished, ...waiting, ...inFlight];
+  const kinds = new Map(
+    (
+      await runWith(
+        e(),
+        judgedNow(
+          e(),
+          ROOT,
+          all.map((id) => readRun(id)),
+        ),
+      )
+    ).map((s) => [s.id, kindOf(s)]),
+  );
+  const names = (answer: RunList) => answer.items.map((item) => item.metadata.name);
+  const by = (pick: (id: string) => boolean) => all.filter(pick).sort();
+  const counts = { waiting: 2, inFlight: 1, finished: 3 };
+  for (const [fieldSelector, pick] of [
+    ['status.state=waiting', (id: string) => kinds.get(id) === 'waiting'],
+    ['status.state==inFlight', (id: string) => kinds.get(id) === 'inFlight'],
+    ['status.state!=finished', (id: string) => kinds.get(id) !== 'finished'],
+  ] as const) {
+    const answer = await list({ fieldSelector });
+    assert.deepEqual(names(answer), by(pick), fieldSelector);
+    assert.deepEqual(answer.metadata.counts, counts, `${fieldSelector}: the counts are the namespace's`);
+    assert.ok(
+      answer.items.every((item) => FRAME.every((key) => key in item.status)),
+      'every run carries the seven keys',
+    );
+  }
+  assert.deepEqual(
+    by((id) => kinds.get(id) === 'waiting'),
+    [...waiting].sort(),
+    'the fixture waits where kindOf says',
+  );
+  const done = await list({ fieldSelector: 'status.state=finished', limit: 1 });
+  assert.deepEqual(names(done).length, 1);
+  assert.equal(done.metadata.remainingItemCount, 2);
+  assert.deepEqual(done.metadata.counts, counts, 'the counts ignore the limit');
 });
 
-test('a run that moves and also waits is among the waiting, once; a cancelled run whose step waited is finished, cancelled', async (t) => {
+test('a plain list carries no counts, no asOf and no frame key, and answers each run as the list asked by state does but for them', async (t) => {
   seeded(t);
-  const both = await started({ plan: null, side: null }, ['plan'], true);
-  engine().settle(`${both}-plan`, 'succeeded', { closeout: SIGNED });
-  engine().settle(`${both}-side`, 'working');
-  await advanced(both);
-  const called = await aWaiting();
-  cancelled(called, T0 + 5 * MIN);
+  await aFinished();
+  await aWaiting();
+  await anInFlight();
+  const plain = await list();
+  assert.equal('counts' in plain.metadata, false);
+  assert.equal('asOf' in plain.metadata, false);
+  for (const item of plain.items) for (const key of FRAME) assert.equal(key in item.status, false, `${item.metadata.name} ${key}`);
+  const framed = [
+    ...(await list({ fieldSelector: 'status.state!=finished' })).items,
+    ...(await list({ fieldSelector: 'status.state=finished' })).items,
+  ].sort((a, b) => (a.metadata.name < b.metadata.name ? -1 : 1));
+  assert.deepEqual(framed.map(unframed), plain.items);
+});
 
-  const whole = await wholeList();
-  assert.equal(whole.find((run) => run.id === both)?.moving, true, 'the fixture moves');
-  assert.deepEqual(whole.find((run) => run.id === both)?.waitingOnYou, ['plan'], 'and waits');
-  const { light, pages } = await assertParity(whole);
+test('a run left unjudged is named in unjudged with its state on a list asked by state: in flight, as the whole list counts it', async (t) => {
+  seeded(t);
+  const id = await aWaiting();
+  const record = JSON.parse(fs.readFileSync(path.join(RUNS_DIR, `${id}.json`), 'utf8')) as Record<string, unknown>;
+  delete record.workflow;
+  fs.writeFileSync(path.join(RUNS_DIR, `${id}.json`), `${JSON.stringify({ ...record, workflowDir: path.join(ROOT, 'no-such-folder') })}\n`);
+  const answer = await list({ fieldSelector: 'status.state!=finished' });
   assert.deepEqual(
-    light.waiting.map((run) => run.id),
-    [both],
+    answer.unjudged?.map((one) => [one.name, one.state]),
+    [[id, 'inFlight']],
   );
-  assert.deepEqual(light.inFlight, []);
-  assert.deepEqual(
-    pages[0].runs.map((run) => [run.id, run.outcome, run.finishedAt]),
-    [[called, 'cancelled', new Date(T0 + 5 * MIN).toISOString()]],
-  );
+  assert.deepEqual(answer.metadata.counts, { waiting: 0, inFlight: 1, finished: 0 });
+});
+
+test('REFUSED Invalid, before any record is read: a field that is no state, a state that is none, a chain of terms', async (t) => {
+  seeded(t);
+  await aWaiting();
+  for (const fieldSelector of ['spec.repo=x', 'status.state=done', 'status.state=waiting,status.state=inFlight', 'status.state']) {
+    const refused = await metered(() =>
+      assert.rejects(list({ fieldSelector }), (err: Error & { exitCode?: number }) => {
+        assert.ok(err instanceof Invalid, String(err));
+        assert.equal(err.exitCode, 2);
+        return true;
+      }),
+    );
+    assert.equal(refused.tallies?.records ?? 0, 0, `${fieldSelector}: no record read`);
+  }
 });
 
 test('a waiting run and a run in flight each carry a clock whose parts add up to its wall time; the costs and the wait are the waiting row\u2019s alone', async (t) => {
@@ -234,8 +269,8 @@ test('a waiting run and a run in flight each carry a clock whose parts add up to
     row.stepCosts?.map((cost) => cost.step),
     ['plan', 'build'],
   );
-  assert.equal('stepCosts' in light.inFlight[0], false);
-  assert.equal('waitingSince' in light.inFlight[0], false);
+  assert.equal(light.inFlight[0].stepCosts, null);
+  assert.equal(light.inFlight[0].waitingSince, null);
   assert.equal(row.waitingSince, new Date(T0 + 10 * MIN).toISOString(), 'the gate was reached as plan ended');
   const moving = light.inFlight[0];
   assert.equal(moving.wallMs, 50 * MIN, 'created at 10:10, read at 11:00');
@@ -260,7 +295,7 @@ test("a finished row carries a clock frozen where its work stopped, whose parts 
   await advanced(id);
   t.mock.timers.setTime(T0 + 90 * MIN);
 
-  const [row] = (await finishedPage()).runs;
+  const [row] = await finishedPage();
   assert.equal(row.wallMs, 10 * MIN, 'created at 10:00, its work stopped at 10:10');
   assert.ok(row.clock);
   assert.equal(row.clock.wallMs, 10 * MIN, 'read at its finish and not at now: an hour and a half later it says the same');
@@ -353,44 +388,27 @@ test('the finished runs page by when their work stopped, not by when they were c
   const page = await finishedPage();
   const stamp = (min: number) => new Date(T0 + min * MIN).toISOString();
   assert.deepEqual(
-    page.runs.map((run) => [run.id, run.finishedAt, run.wallMs]),
+    page.map((run) => [run.id, run.finishedAt, run.wallMs, run.outcome]),
     [
-      [c, stamp(10), 7 * MIN],
-      [a, stamp(5), 5 * MIN],
-      [b, stamp(2), MIN],
+      [c, stamp(10), 7 * MIN, 'cancelled'],
+      [a, stamp(5), 5 * MIN, 'succeeded'],
+      [b, stamp(2), MIN, 'succeeded'],
     ],
   );
-  const byCreation = [...page.runs].sort((x, y) => y.createdAt.localeCompare(x.createdAt)).map((run) => run.id);
+  const byCreation = [...page].sort((x, y) => y.createdAt.localeCompare(x.createdAt)).map((run) => run.id);
   assert.deepEqual(byCreation, [c, b, a], 'the fixture finishes in another order than it was created');
-  assert.deepEqual([page.page, page.size, page.total, page.pages], [1, 9, 3, 1], 'asked without a page or a size: page 1 of nine');
+  const first = await list({ fieldSelector: 'status.state=finished', limit: 2 });
   assert.deepEqual(
-    (await finishedPage({ size: '2', page: '2' })).runs.map((run) => run.id),
+    first.items.map((item) => item.metadata.name),
+    [c, a],
+  );
+  assert.ok(first.metadata.continue?.startsWith('f.'), 'the finished order has its own token');
+  assert.deepEqual(
+    (await finishedPage({ limit: 2, continue: first.metadata.continue })).map((run) => run.id),
     [b],
   );
 });
 
-test('the light answer does not grow with the finished runs: the same answer, but for its count, with none and with two hundred', async (t) => {
-  seeded(t);
-  const model = await aFinished();
-  const record = fs.readFileSync(path.join(RUNS_DIR, `${model}.json`), 'utf8');
-  for (const file of fs.readdirSync(RUNS_DIR)) if (file.startsWith(model)) fs.rmSync(path.join(RUNS_DIR, file), { recursive: true });
-  await aWaiting();
-  await anInFlight();
-  await anInFlight();
-
-  const before = await open();
-  assert.deepEqual(before.counts, { waiting: 1, inFlight: 2, finished: 0 });
-  for (let n = 0; n < 200; n++) {
-    const id = `${model}-copy-${String(n).padStart(3, '0')}`;
-    fs.writeFileSync(path.join(RUNS_DIR, `${id}.json`), `${JSON.stringify({ ...JSON.parse(record), id })}\n`);
-  }
-  const after = await open();
-  assert.equal(after.counts.finished, 200);
-  assert.deepEqual({ ...after, counts: { ...after.counts, finished: 0 } }, before);
-  assert.equal((await finishedPage({ page: '23' })).runs.length, 2, 'two hundred finished runs, nine a page: two on the last');
-});
-
-/** `n` more finished runs in the store, each a copy of the record `text` under an id of its own. */
 const copies = (text: string, n: number): void => {
   for (let i = 0; i < n; i++) {
     const id = `cp-${String(i).padStart(3, '0')}`;
@@ -398,173 +416,44 @@ const copies = (text: string, n: number): void => {
   }
 };
 
-test('a warm read of the open runs costs the records of the open runs alone: as many with two hundred finished runs as with one', async (t) => {
+test('a warm read by state costs the records of the runs still moving alone: as many with two hundred finished runs as with one', async (t) => {
   seeded(t);
   const model = await aFinished();
   await aWaiting();
   await anInFlight();
-  const kept = { runs: informerMemo(), filings: { filed: new Map(), cursor: 0 } };
+  const kept = cold();
   const unverified = { ...process.env, WF_VERIFY_REST: '0' };
+  const asked = { fieldSelector: 'status.state!=finished' };
   const warm = async (): Promise<number | undefined> => {
-    await runWith(e(), RUNS_OPEN.handler({}, unverified, ROOT, kept));
-    return (await metered(() => runWith(e(), RUNS_OPEN.handler({}, unverified, ROOT, kept)))).tallies?.records;
+    await list(asked, kept, unverified);
+    return (await metered(() => list(asked, kept, unverified))).tallies?.records;
   };
 
   const few = await warm();
   copies(fs.readFileSync(path.join(RUNS_DIR, `${model}.json`), 'utf8'), 200);
   const many = await warm();
-  assert.equal(few, 3, "the run in flight, which is at rest in no memo, and the two open runs' records, read for their clocks");
+  assert.equal(few, 1, 'the run in flight alone, which is at rest in no memo: no record is read again for a clock');
   assert.equal(many, few, "a warm read reads no finished run's record, however many there are");
 
-  const warmed = await runWith(e(), RUNS_OPEN.handler({}, unverified, ROOT, kept));
-  const cold = await open();
-  assert.equal(cold.counts.finished, 201, 'the fixture holds two hundred and one finished runs');
-  assert.deepEqual(warmed, cold, "the warm answer is a cold read's own: nothing the board shows changes");
+  const warmed = await list(asked, kept, unverified);
+  const fresh = await list(asked);
+  assert.equal(fresh.metadata.counts?.finished, 201, 'the fixture holds two hundred and one finished runs');
+  assert.deepEqual(warmed, fresh, "the warm answer is a cold read's own: nothing the board shows changes");
+  const page = await metered(() => list({ fieldSelector: 'status.state=finished', limit: 9 }, kept, unverified));
+  assert.equal(page.tallies?.records, few, "a warm page of the finished runs reads no finished run's record");
 });
 
-test('REFUSED by kind: a page that is no whole number from 1, and a size that is none from 1 to 100', async (t) => {
-  const rows: Array<[string, string]> = [
-    ...['0', '-1', '1.5', 'abc', ''].map((page): [string, string] => ['page', page]),
-    ...['0', '101', 'abc'].map((size): [string, string] => ['size', size]),
-  ];
-  for (const [key, given] of rows)
-    await t.test(`${key}=${given}`, () =>
-      assert.rejects(finishedPage({ [key]: given }), (err: Error) => {
-        assert.ok(err instanceof Invalid, String(err));
-        for (const fix of [`${key} takes a whole number from 1${key === 'size' ? ' to 100' : ''}`, `\`${given}\` is none`])
-          assert.ok(err.message.includes(fix), `${err.message} names ${fix}`);
-        return true;
-      }),
-    );
-});
-
-test('a page past the last answers an empty page, with the total and the pages there are', async (t) => {
+test('a run held until a run that never lands waits on a person since the hold was placed', async (t) => {
   seeded(t);
-  await aFinished();
-  const past = await finishedPage({ page: '7' });
-  assert.deepEqual([past.runs, past.total, past.page, past.pages], [[], 1, 7, 1]);
-});
+  const parent = await anInFlight();
+  const id = await started({ work: null });
+  cancelled(parent, T0 + MIN);
+  const placed = new Date(T0 + 5 * MIN).toISOString();
+  fs.writeFileSync(path.join(RUNS_DIR, `${id}.hold`), `${JSON.stringify({ at: placed, until: [parent] })}\n`);
+  t.mock.timers.setTime(T0 + 20 * MIN);
 
-/** The labels a person put on the run `id`, planted through the Run door as `nemia label run` puts them. */
-const labelled = (id: string, labels: Record<string, string>): void => runStore.labels.put(id, labels);
-
-test('a selector keeps the runs whose labels it takes, before the finished page is cut and the open runs are counted', async (t) => {
-  seeded(t);
-  const core = await aFinished();
-  await aFinished();
-  const waiting = await aWaiting();
-  await anInFlight();
-  labelled(core, { team: 'core' });
-  labelled(waiting, { team: 'core' });
-  const selected = { selector: ['team=core'] };
-  const page = await runWith(e(), RUNS_FINISHED.handler({ ...selected, size: '1' }, process.env));
-  assert.deepEqual([page.runs.map((r) => r.id), page.total, page.pages], [[core], 1, 1], 'the finished page, counted after the selection');
-  const light = await runWith(e(), RUNS_OPEN.handler(selected, process.env));
-  assert.deepEqual(
-    [light.waiting.map((r) => r.id), light.inFlight.map((r) => r.id), light.counts],
-    [[waiting], [], { waiting: 1, inFlight: 0, finished: 1 }],
-    'the open runs and their counts, of the runs selected alone',
-  );
-  assert.deepEqual(
-    (await runWith(e(), RUNS.handler(selected, process.env))).map((r) => r.id).sort(),
-    [core, waiting].sort(),
-    'the whole list',
-  );
-  const either = await runWith(e(), RUNS.handler({ selector: ['team=core', 'team notin (core)'] }, process.env));
-  assert.equal(either.length, 4, 'two selectors are either: every run is one or the other');
-  const whole = await wholeList();
-  assert.equal(whole.length, 4, 'with no selector, every run');
-  const workflow = (id: string) => path.basename(readRun(id).workflowDir);
-  assert.deepEqual(
-    whole.find((r) => r.id === core)?.labels,
-    { team: 'core', workflow: workflow(core), factory: 'default' },
-    'a row carries the whole map',
-  );
-  const bare = whole.find((r) => r.id !== core && r.id !== waiting);
-  assert.deepEqual(
-    bare?.labels,
-    { workflow: workflow(bare?.id ?? ''), factory: 'default' },
-    'its closed keys alone where nobody labelled it',
-  );
-});
-
-test('REFUSED by kind: a selector that is none, on each read of the list', async (t) => {
-  const asked = { selector: ['no/pe=x'] };
-  const reads: Array<[string, () => Promise<unknown>]> = [
-    ['runs', () => runWith(e(), RUNS.handler(asked, process.env))],
-    ['runs open', () => runWith(e(), RUNS_OPEN.handler(asked, process.env))],
-    ['runs finished', () => runWith(e(), RUNS_FINISHED.handler(asked, process.env))],
-  ];
-  for (const [name, read] of reads)
-    await t.test(name, () =>
-      assert.rejects(read(), (err: Error & { exitCode?: number }) => {
-        assert.ok(err instanceof Invalid, String(err));
-        assert.equal(err.exitCode, 2);
-        assert.ok(err.message.includes('no/pe'), `${err.message} names the key`);
-        return true;
-      }),
-    );
-});
-
-/** What a read of a run's record meets, as `goneAsRead` stands it in. */
-type Meets = 'gone before it' | 'gone during it' | 'a failure, the record kept';
-
-/** The error `fs.readFileSync` throws for a file that is not there. */
-const enoent = (file: string): Error =>
-  Object.assign(new Error(`ENOENT: no such file or directory, open '${file}'`), { code: 'ENOENT', errno: -2, syscall: 'open', path: file });
-
-/**
- * The records of `ids` read as `meets` says, after the store was listed: removed before the read looks for it (`Missing`); removed
- * during it, after it found the record, so a file read fails (`ENOENT`) — each a run removed between the list and the read of its row,
- * as `nemia rm` removes one while the board polls; or a read that fails with the record still there. Each is put back before the next
- * listing, so every read lists it.
- */
-const goneAsRead = (t: TestContext, ids: readonly string[], meets: Meets): void => {
-  const fileOf = (id: string) => path.join(RUNS_DIR, `${id}.json`);
-  const texts = new Map(ids.map((id) => [id, fs.readFileSync(fileOf(id), 'utf8')]));
-  const { list, read } = { list: runStore.runs.list.bind(runStore.runs), read: runStore.runs.read.bind(runStore.runs) };
-  t.mock.method(runStore.runs, 'list', (...args: Parameters<typeof list>) => {
-    for (const [id, text] of texts) fs.writeFileSync(fileOf(id), text);
-    return list(...args);
-  });
-  t.mock.method(runStore.runs, 'read', (id: string) => {
-    if (!texts.has(id)) return read(id);
-    if (meets === 'a failure, the record kept') throw enoent(path.join(RUNS_DIR, `${id}.asks`));
-    fs.rmSync(fileOf(id), { force: true });
-    if (meets === 'gone during it') throw enoent(fileOf(id));
-    return read(id);
-  });
-};
-
-test('a run removed as its row is read is still its row, with no clock, on each read: neither read refuses the store over it', async (t) => {
-  for (const meets of ['gone before it', 'gone during it'] as const)
-    await t.test(meets, async (t) => {
-      fs.rmSync(RUNS_DIR, { recursive: true, force: true });
-      fs.mkdirSync(RUNS_DIR, { recursive: true });
-      const waiting = await aWaiting();
-      const moving = await anInFlight();
-      const done = await aFinished();
-      goneAsRead(t, [waiting, moving, done], meets);
-
-      const light = await open();
-      assert.deepEqual(
-        light.waiting.map((row) => [row.id, row.clock, row.stepCosts, row.waitingSince]),
-        [[waiting, null, null, null]],
-      );
-      assert.deepEqual(
-        light.inFlight.map((row) => [row.id, row.clock]),
-        [[moving, null]],
-      );
-      const page = await finishedPage();
-      assert.deepEqual(
-        page.runs.map((row) => [row.id, row.clock]),
-        [[done, null]],
-      );
-    });
-});
-
-test('REFUSED: a read of a row that fails while its record is still there fails the read, never passed over as a run removed', async (t) => {
-  const waiting = await aWaiting();
-  goneAsRead(t, [waiting], 'a failure, the record kept');
-  await assert.rejects(open(), (err: NodeJS.ErrnoException) => err.code === 'ENOENT');
+  const row = (await open()).waiting.find((run) => run.id === id);
+  assert.ok(row, 'its hold is only a person’s to lift: the run it names was called off');
+  assert.equal(row.holding?.waitingOnYou, true);
+  assert.equal(row.waitingSince, placed);
 });

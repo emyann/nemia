@@ -80,11 +80,12 @@ type ListQuery = {
   readonly continue?: string;
   readonly labelSelector?: string | readonly string[];
   readonly selector?: string | readonly string[];
+  readonly fieldSelector?: string;
 };
 
 /**
  * A page of the runs of `namespace` (every run for none) the query asks for, `?selector=` read as `?labelSelector=`: a limit, a token or a
- * selector the package refuses is its `Invalid`, a 422.
+ * selector the package refuses is its `Invalid`, a 422. `?fieldSelector=status.state…` asks the board's list by state (`runList`).
  */
 const page = (namespace: string | undefined, query: ListQuery) =>
   answered((s) =>
@@ -98,6 +99,7 @@ const page = (namespace: string | undefined, query: ListQuery) =>
           limit: query.limit === undefined ? null : Number(query.limit),
           continue: query.continue,
           labelSelector: [...listOf(query.labelSelector), ...listOf(query.selector)],
+          fieldSelector: query.fieldSelector,
         }),
       ),
     ),

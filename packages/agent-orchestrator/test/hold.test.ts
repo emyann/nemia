@@ -52,7 +52,17 @@ const {
   runWith,
 } = await import('../src/runner.ts');
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
-const { RUNS } = await import('../src/command/pages.verb.ts');
+const { howOf } = await import('../src/command/pages.verb.ts');
+const { runsSummarized } = await import('../src/summary/summary.verb.ts');
+const { EngineService: RunsEngine } = await import('../src/runtime-client.ts');
+const { Effect: RunsEffect } = await import('effect');
+/** Every run's summary, as the whole list judges it (`runsSummarized`), read through the informer and filings `kept` hands. */
+const RUNS = {
+  handler: (_args: object, env?: NodeJS.ProcessEnv, home?: string, kept?: Parameters<typeof howOf>[2]) =>
+    RunsEffect.gen(function* () {
+      return yield* runsSummarized(yield* RunsEngine, howOf(env, home, kept));
+    }),
+};
 const { passStanding } = await import('../src/standing/standing.verb.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');

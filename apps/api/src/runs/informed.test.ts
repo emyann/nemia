@@ -18,7 +18,8 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { Informer, informerMemo, type InformerMemo } from 'agent-orchestrator';
 import type { Labelled, RunList } from 'objects';
-import type { RunAnswer, RunListing } from './runs.ts';
+import type { RunSummary as RunListing } from 'agent-orchestrator';
+import type { RunAnswer } from './runs.ts';
 import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
 import { summariesOf } from '../../test/run-reads.ts';
 

@@ -236,6 +236,36 @@
       "term": "Card key meaning",
       "meaning": "one line saying what a key of a card's frontmatter means, in `CARD_KEYS`' order: the description of the Card's field that holds it, which `nemia explain` and the board's card page read (`CARD_KEY_MEANINGS`, `packages/objects/src/card.ts`).",
       "type": "CARD_KEY_MEANINGS"
+    },
+    {
+      "term": "Proposal",
+      "meaning": "a change of a factory's definitions and wiring, said as the objects apply takes, each at the `resourceVersion` it was read at, served in the factory's namespace: any agent of the factory makes one, the person approves it (or an agent at auto within its Delegation, under a rule the person confirmed), and it applies as a new revision (`Proposal`, `packages/objects/src/proposal.ts`).",
+      "type": "Proposal"
+    },
+    {
+      "term": "Delegation",
+      "meaning": "what the person lets one agent approve in a factory unasked at auto, named by the agent: Kubernetes' Role and RoleBinding in one object, its rules the resources, the names among them and the verbs; none by default (`Delegation`, `packages/objects/src/delegation.ts`).",
+      "type": "Delegation"
+    },
+    {
+      "term": "applyAt",
+      "meaning": "when an approved proposal applies: at approval, or at the successful end of the run that proposed it (`APPLY_AT`, `packages/objects/src/words.ts`).",
+      "type": "ApplyAt"
+    },
+    {
+      "term": "widens",
+      "meaning": "whether a proposal reaches further than what it changes did: an allow gained, a deny lost, or a permission mode that reaches further; computed by the machinery, never an agent's claim (`ProposalStatus`, `packages/objects/src/proposal.ts`).",
+      "type": "ProposalStatus"
+    },
+    {
+      "term": "proposedBy",
+      "meaning": "who made a proposal: the agent of the session that called, with its run and step, all absent for the person (`ProposedBy`, `packages/objects/src/proposal.ts`).",
+      "type": "ProposedBy"
+    },
+    {
+      "term": "approvedBy",
+      "meaning": "who approved a proposal: the person, or an agent under the rule named, and when (`ApprovedByOf`, `packages/objects/src/proposal.ts`).",
+      "type": "ApprovedByOf"
     }
   ]
 }

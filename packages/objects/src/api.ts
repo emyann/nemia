@@ -24,6 +24,9 @@
  * Schemas; group `subscriptions`, the feed's subscriptions, read alone here. Group `events`, the feed's lines, each in the namespace of
  * the factory it names, a daemon's and the store's that name none in no namespace. Group `discovery`, `GET /api`: every resource the
  * groups above serve, its scope and verbs.
+ *
+ * In each factory's namespace, groups `proposals` and `delegations` (`proposal-api.ts`): a change of the factory's definitions proposed,
+ * approved, declined and listed, and what the person lets an agent approve unasked.
  */
 import { Schema } from 'effect';
 import { HttpApi, HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';
@@ -47,14 +50,28 @@ import { Agent, AgentCard, AgentList, AgentTried, AgentTry, AgentWrite } from '.
 import { Skill, SkillFiles, SkillList, SkillWrite } from './skill.ts';
 import { LabelEdit, Labelled } from './run.ts';
 import { Template, TemplateList } from './template.ts';
-import { BadRequest, Conflict, Failed, Invalid, listQuery, Missing, Unjudged, WriteFailed } from './api-errors.ts';
+import { BadRequest, Conflict, Failed, Forbidden, Invalid, listQuery, Missing, Unauthorized, Unjudged, WriteFailed } from './api-errors.ts';
+import { DelegationsGroup, ProposalsGroup } from './proposal-api.ts';
 import { RunsGroup } from './run-api.ts';
 import { Subscription, SubscriptionList } from './subscription.ts';
 import { Event, EventList } from './event.ts';
 import { KINDS, type Kind } from './words.ts';
 import { APIResourceList } from './discovery.ts';
 
-export { BadRequest, Conflict, Failed, Invalid, Missing, Unjudged, WriteFailed, RunsGroup };
+export {
+  BadRequest,
+  Conflict,
+  Failed,
+  Forbidden,
+  Invalid,
+  Missing,
+  Unauthorized,
+  Unjudged,
+  WriteFailed,
+  RunsGroup,
+  ProposalsGroup,
+  DelegationsGroup,
+};
 
 export { KINDS, type Kind };
 
@@ -73,6 +90,8 @@ export const RESOURCE_PLURALS: { readonly [K in Kind]: string } = {
   Template: 'templates',
   Subscription: 'subscriptions',
   Event: 'events',
+  Proposal: 'proposals',
+  Delegation: 'delegations',
 };
 
 /** The Card and a page of them, named so that the document holds each as a component, as it holds the Run. */
@@ -567,4 +586,6 @@ export const Api = HttpApi.make('nemia')
   .add(TemplatesGroup)
   .add(SubscriptionsGroup)
   .add(EventsGroup)
+  .add(ProposalsGroup)
+  .add(DelegationsGroup)
   .add(DiscoveryGroup);

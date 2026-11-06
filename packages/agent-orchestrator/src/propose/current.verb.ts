@@ -39,8 +39,18 @@ export type Current = { readonly version: string | null; readonly spec?: unknown
 /** Nothing at the name. */
 const NONE: Current = { version: null };
 
-/** The folder of a factory's tree that holds `what`: its workflows, or the agents or skills beside them. */
+/**
+ * The folder of a factory's tree that holds `what`: its workflows, or the agents or skills beside them. Refused, `Invalid`, for a factory
+ * made from no template, which has no tree a proposal writes: its definitions are its repositories' and the person's library's.
+ */
 export const treeDir = (home: string, factory: string, what: 'workflows' | 'agents' | 'skills'): string => {
+  if (readFactoryAt(home, factory, 'Nothing was proposed.').tree === undefined)
+    throw new Invalid({
+      message:
+        `nemia propose: the factory ${factory} is made from no template, so it has no tree a proposal writes: its ${what} are its ` +
+        "repositories', changed there, and your library's, which the person writes (`nemia workflows write yours <name> --folder <draft>`, " +
+        '`nemia agents write yours`, `nemia skills write yours`). Nothing was proposed.',
+    });
   const workflows = path.join(templatedTreeAt(home, factory, 'nemia propose'), 'workflows');
   return what === 'workflows' ? workflows : path.join(workflows, what === 'agents' ? AGENTS_FOLDER : SKILLS_FOLDER);
 };

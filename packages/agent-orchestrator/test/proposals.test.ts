@@ -403,6 +403,19 @@ test("REFUSED at propose: another factory's session (Forbidden), the person's se
   assert.deepEqual([decline._tag, decline.reason], ['Forbidden', 'person-only']);
   const put = await refusalOf(delegationPut(agentOf('reviewer', 'refuse'), 'refuse', 'reviewer', { rules: [] }));
   assert.deepEqual([put._tag, put.reason], ['Forbidden', 'person-only']);
+  const every = { resources: ['*'], resourceNames: [], verbs: ['update' as const] };
+  assert.equal(
+    (await refusalOf(delegationPut(PERSON, 'refuse', 'reviewer', { rules: [every] })))._tag,
+    'Invalid',
+    'a resource no proposal changes',
+  );
+  const plain = path.join(ROOT, 'factories', 'plain.json');
+  fs.writeFileSync(plain, JSON.stringify({ repos: [scratch('wf-proposals-plain-')] }));
+  const untemplated = await refusalOf(
+    proposeProgram(PERSON, 'plain', { objects: [{ ...object, metadata: { name: 'dev' }, verb: 'create' }] }, PLACE),
+  );
+  assert.equal(untemplated._tag, 'Invalid', 'a factory made from no template has no tree a proposal writes');
+  assert.doesNotMatch(untemplated.message, /nemia propose yours/, 'it names no command that is not there');
   assert.equal(
     await run(applyProgram('refuse', 'no-such-1', PLACE, () => Effect.succeed(undefined))),
     undefined,

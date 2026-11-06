@@ -1,17 +1,20 @@
 /**
  * What becomes of an approved proposal on a pass (agent-orchestrator, src/apply/apply.ts, `proposalApply`), read again each time and
  * carrying nothing between passes: it applies at approval, or at the proposing run's successful end where it says so, and is dropped where
- * that run is called off or fails; it is checked again as it applies — an object no longer at the revision the proposal read makes it
- * stale, never applied, and an agent's approval that no longer holds (its delegation taken back, its rule dropped, the factory off auto:
- * `proposalApproval` asked again) sends it back to the person. What was applied stands, and is undone by applying an earlier revision as a
- * new one. Pure.
+ * that run is called off or gone (a failed run may be tried again, so it still goes); it is checked again as it applies — an object no
+ * longer at the revision the proposal read makes it stale, never applied, and an agent's approval that no longer holds (its delegation
+ * taken back, its rule dropped, the factory off auto: `proposalApproval` asked again) sends it back to the person. What was applied
+ * stands, and is undone by applying an earlier revision as a new one. Pure.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
 /** When an approved proposal applies: at approval, or at the proposing run's successful end. */
 export type ApplyAt = 'approval' | 'run-end';
 
-/** The proposing run, as the pass reads it: still going, ended well, ended otherwise (failed or called off), or none (the person's). */
+/**
+ * The proposing run, as the pass reads it: still going (a failed run among them, since it may be tried again), ended well, ended
+ * otherwise (called off, or gone from the store), or none (the person's).
+ */
 export type ProposingRun = 'going' | 'succeeded' | 'ended' | 'none';
 
 /**

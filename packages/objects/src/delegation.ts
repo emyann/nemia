@@ -10,7 +10,11 @@ import { Schema } from 'effect';
 import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
 import { CHANGE_VERBS } from './words.ts';
 
-/** One grant: the resources (`workflows`, `agents`, …), the names among them (every name where empty), and the verbs. */
+/**
+ * One grant: the resources (`workflows`, `agents`, …), the names among them (every name where empty), and the verbs. Where it departs from
+ * Kubernetes' PolicyRule: no `*` for every resource, nor any resource a proposal does not change — each resource is named, and the
+ * orchestrator refuses one it does not know when the delegation is written, so a grant never reads wider, or narrower, than it says.
+ */
 export const DelegationRule = Schema.Struct({
   resources: Schema.Array(Schema.String),
   resourceNames: Schema.Array(Schema.String),

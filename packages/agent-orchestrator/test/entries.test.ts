@@ -540,6 +540,8 @@ const PINNED: Record<string, string[]> = {
     'cancelRun',
     'cardList',
     'cardObject',
+    'cardWriteRefusal',
+    'replaceCard',
     'continueToken',
     'continuedAfter',
     'listPage',

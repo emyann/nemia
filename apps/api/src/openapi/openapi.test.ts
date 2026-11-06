@@ -87,7 +87,7 @@ test('the OpenAPI document is 3.1.0, defines `Run`, and imports back into a Sche
 
 test('the document is the one Effect writes of the Api, and holds, for each of KINDS, its get path and its component', async () => {
   const doc = (await (await app().request('/openapi/v3/nemia/v1')).json()) as {
-    paths: Record<string, { get?: unknown; post?: unknown }>;
+    paths: Record<string, { get?: unknown; post?: unknown; put?: unknown }>;
     components: { schemas: Record<string, unknown> };
   };
   assert.deepEqual(doc, JSON.parse(JSON.stringify(OpenApi.fromApi(Api))), 'the document is OpenApi.fromApi(Api), as JSON');
@@ -112,6 +112,8 @@ test('the document is the one Effect writes of the Api, and holds, for each of K
   }
   assert.ok(doc.paths['/api/cards']?.get, 'the cards are listed across namespaces');
   assert.ok(doc.paths['/api/namespaces/{namespace}/cards']?.get, 'and in one');
+  assert.ok(doc.paths['/api/namespaces/{namespace}/cards/{name}']?.put, 'a card is written whole');
+  assert.ok(doc.paths['/api/cards/{name}']?.get, 'and read by its name in any namespace');
   assert.ok(doc.components.schemas['CardList'], 'CardList is a component');
   for (const kind of ['Factory', 'McpServer', 'Schedule', 'Hire', 'Volume', 'Workflow', 'Agent', 'Skill'])
     assert.ok(doc.components.schemas[`${kind}List`], `${kind}List is a component`);

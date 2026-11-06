@@ -167,6 +167,14 @@ const CARD_WRITES = {
       "a card's body is what a run started from it is asked to do, in the repository it names",
       '`{ "body": "<what to do>" }`, with `workflow`, `from`, `repo`, `factory` and `label` if you like',
     ),
+  update: (ns: string, name: string) =>
+    cardWrite(
+      `PUT /api/namespaces/${ns}/cards/${name}`,
+      'writes a card whole',
+      'write one',
+      "a card's spec is what a run started from it is asked to do, on the workflow and repository it names",
+      '`{ "metadata": { "resourceVersion": "<as read>" }, "spec": { "body": "<what to do>" } }`, with the spec\'s other keys and `metadata.labels` if you like, `spec.queued` as read',
+    ),
   delete: (ns: string, name: string) =>
     cardWrite(
       `DELETE /api/namespaces/${ns}/cards/${name}`,
@@ -323,8 +331,13 @@ export function objectsRoutes(runtime: ApiRuntime): Hono<ApiEnv> {
     .get('/api/namespaces/:namespace/events', events)
     .get('/api/namespaces/:namespace/events/:name', forward)
     .get('/api/cards', listed)
+    .get('/api/cards/:name', forward)
     .get('/api/namespaces/:namespace/cards', listed)
     .get('/api/namespaces/:namespace/cards/:name', forward)
+    .put(
+      '/api/namespaces/:namespace/cards/:name',
+      guarded((c) => CARD_WRITES.update(...at(c))),
+    )
     .post(
       '/api/namespaces/:namespace/cards',
       guarded((c) => CARD_WRITES.create(at(c)[0])),

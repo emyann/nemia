@@ -90,6 +90,7 @@ test('five cards walked two at a time answer each once in name order, 3, 1 and 0
   );
   assert.equal('continue' in (pages.at(-1)?.metadata ?? {}), false);
   for (const page of pages) assert.equal(page.kind, 'CardList');
+  for (const page of pages) for (const item of page.items) assert.equal(item.status.source, undefined, "a list's items carry no file");
 });
 
 test('a card is an object: its factory its namespace, filed time, a digest of its text, its labels, spec and status', () => {
@@ -109,6 +110,11 @@ test('a card is an object: its factory its namespace, filed time, a digest of it
   assert.equal(card.status.state, 'filed');
   assert.deepEqual(card.status.runs, []);
   assert.equal(card.status.title, 'Bravo');
+  assert.equal(
+    card.status.source,
+    aCard('Bravo', { factory: 'alpha', labels: '{ team: core }' }),
+    'a read of one card carries its file as written',
+  );
   const other = valueOf(
     over(
       five,

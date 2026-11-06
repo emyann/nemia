@@ -110,11 +110,12 @@ test('REFUSED: each inbox route the Card verbs replaced answers 404, and writes 
     ['POST', '/api/inbox/kept-card/queue'],
     ['DELETE', '/api/inbox/kept-card/queue'],
     ['POST', '/api/inbox/kept-card/labels'],
+    ['GET', '/api/inbox/kept-card'],
+    ['PUT', '/api/inbox/kept-card/from'],
+    ['DELETE', '/api/inbox/kept-card/from'],
   ] as const) {
     const res = await app.request(at, { method, headers: JSON_TYPE, ...(method === 'GET' ? {} : { body: '{"body":"An idea"}' }) });
     assert.equal(res.status, 404, `${method} ${at}`);
   }
   assert.deepEqual(inboxAsIs(), before);
-  const kept = await app.request('/api/inbox/kept-card');
-  assert.equal(kept.status, 200, "a card's page stays");
 });

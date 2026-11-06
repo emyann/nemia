@@ -470,7 +470,7 @@
     },
     {
       "term": "Show",
-      "meaning": "the one spelling of a read of one thing: `nemia show` of a run, which prints the run object (`--raw` its record), the api's `skills show` and `inbox show`.",
+      "meaning": "the one spelling of a read of one thing: `nemia show` of a run, which prints the run object (`--raw` its record), the api's `skills show`.",
       "retired": [
         {
           "spelling": "skills read",

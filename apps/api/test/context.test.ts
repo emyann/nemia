@@ -1,6 +1,6 @@
 /**
  * Context without a wait, as the board reads and writes it: `GET /api/runs/:runId/concluded`, the section a run started with `--from` would
- * be handed; `PUT` and `DELETE /api/inbox/:name/from`, a card's `from:` set and taken off; and a step's `taskParts` on
+ * be handed; the Card's `PUT`, a card's `spec.from` set and taken off; and a step's `taskParts` on
  * `GET /api/runs/:id/steps/:step/told`, each `## From run` section labelled by how the run was handed it — in the harness's scratch store
  * (`root`), on the stand-ins: the runtime's test engine and the test place.
  */
@@ -10,7 +10,7 @@ import { story } from './checkpoints.ts';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { InboxFromAnswer } from '../src/inbox/inbox.ts';
+import type { Card } from 'objects';
 import { addToInbox, StoreRoot } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
@@ -85,18 +85,23 @@ test("context without a wait: a run's concluded section read, a card's from: set
     },
   );
   await s.test(
-    "PUT /api/inbox/:name/from sets a card's from:, DELETE takes it off — REFUSED: a run the store does not have is a 404, nothing written",
+    "PUT /api/namespaces/default/cards/:name sets a card's spec.from, and a write without it takes it off — REFUSED: a run the store does not have is a 404, nothing written",
     async () => {
       writeRun({ id: 'source-f1' });
       const { card } = onStore(addToInbox({ text: 'Read what source-f1 concluded' }));
       const file = path.join(root, 'inbox', `${card.name}.md`);
-      const put = (runs: string[]) =>
-        app().request(`/api/inbox/${card.name}/from`, { method: 'PUT', headers: JSON_TYPE, body: JSON.stringify({ runs }) });
+      const at = `/api/namespaces/default/cards/${card.name}`;
+      const read = (await (await app().request(at)).json()) as Card;
+      const put = (from: string[]) =>
+        app().request(at, {
+          method: 'PUT',
+          headers: JSON_TYPE,
+          body: JSON.stringify({ metadata: {}, spec: { ...read.spec, ...(from.length ? { from } : {}) } }),
+        });
 
       const set = await put(['source-f1']);
       assert.equal(set.status, 200);
-      const answer = (await set.json()) as InboxFromAnswer;
-      assert.deepEqual({ ...answer, file: undefined }, { name: card.name, file: undefined, from: ['source-f1'], was: [] });
+      assert.deepEqual(((await set.json()) as Card).spec.from, ['source-f1']);
       assert.match(fs.readFileSync(file, 'utf8'), /^from: source-f1$/m);
 
       const before = fs.readFileSync(file, 'utf8');
@@ -105,9 +110,9 @@ test("context without a wait: a run's concluded section read, a card's from: set
       assert.match(((await unknown.json()) as { error: string }).error, /nobody-z9/);
       assert.equal(fs.readFileSync(file, 'utf8'), before, 'a refused from: writes nothing');
 
-      const off = await app().request(`/api/inbox/${card.name}/from`, { method: 'DELETE', headers: JSON_TYPE, body: '{}' });
+      const off = await put([]);
       assert.equal(off.status, 200);
-      assert.deepEqual(((await off.json()) as InboxFromAnswer).was, ['source-f1']);
+      assert.equal(((await off.json()) as Card).spec.from, undefined);
       assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /^from:/m);
     },
   );

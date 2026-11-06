@@ -1,36 +1,20 @@
 /**
- * The inbox's card page, for the board: one card read as the inbox lists it, its file as written, and its keys (`GET /api/inbox/:name`);
- * and what a card filed through the Card's verb files (`filingOf`, objects/cards.ts).
+ * What a card filed through the Card's verb files (`filingOf`, objects/cards.ts), and the inbox listed with each card's body and filing
+ * time (`listInbox`).
  *
- * The package's inbox, through the entries of its command table, `nemia inbox`'s own: `$WF_ROOT/inbox/`, a card per `<name>.md`, read
- * from disk on each request, as the workflows are, so a card a person has just filed or dropped at the command line reads as it is now.
- * The cards listed, filed, dropped, started, queued and taken off the queue, and their labels edited, are the Card's verbs, served from
- * `objects`' `Api` (src/objects/cards.ts); a card's `from:` set or taken off is the route the package's command table generates from
- * `nemia inbox from`'s entry (commands/routes.ts).
+ * The package's inbox: `$WF_ROOT/inbox/`, a card per `<name>.md`, read from disk on each request, as the workflows are, so a card a person
+ * has just filed or dropped at the command line reads as it is now. Every verb of a card — listed, read alone with its file as written,
+ * written whole (its `from:` among its keys), filed, dropped, started, queued and taken off the queue, and its labels edited — is the
+ * Card's, served from `objects`' `Api` (src/objects/cards.ts). No route of the inbox's own is left: `GET /api/inbox/:name` and `PUT` and
+ * `DELETE /api/inbox/:name/from` answer 404, as the others before them.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import { Hono } from 'hono';
-import {
-  INBOX_KEY_MEANINGS,
-  INBOX_KEYS,
-  inboxNameRefusal,
-  Invalid,
-  labelsText,
-  parseInboxCard,
-  readFactory,
-  inboxEntries,
-  StoreRoot,
-  type Factory,
-  type InboxListing,
-  type InformerMemo,
-} from 'agent-orchestrator';
+import { Invalid, parseInboxCard, readFactory, inboxEntries, StoreRoot, type Factory, type InboxListing } from 'agent-orchestrator';
 import type { CardFile } from 'objects';
 import type { Refusal } from '../guard.ts';
-import { type ApiEnv, served } from '../layer.ts';
-import { folderOf, type KeyRow } from '../workflows/workflows.ts';
-import { commandNamed, runPlaced } from '../store.ts';
+import { folderOf } from '../workflows/workflows.ts';
 
 /**
  * A card as the board lists it: the package's listing (`InboxListing`) — its name, first line, workflow and repo as the card writes them,
@@ -42,39 +26,6 @@ import { commandNamed, runPlaced } from '../store.ts';
  * newest first: a card carries no time of its own. Null for an entry gone between the listing and the read.
  */
 export type InboxEntry = InboxListing & { body: string | null; filedAt: string | null };
-
-/**
- * What a card's page shows: the card as the inbox lists it (`InboxEntry`), its file as written — frontmatter and all — and each key an
- * inbox card may set, a row each, with its value and what it means. No keys for an entry that does not read as a card: its `error` says
- * why.
- */
-export type InboxCardPage = InboxEntry & { source: string; keys: KeyRow[] | null };
-
-/**
- * What `nemia inbox queue`'s entry answers (the package's `InboxQueued`) — `queued`, `taken back`, or `not queued` for a card taken off a
- * queue it was not in — the card's `queued:` as it now reads, and, once queued, its place in the queue's order and how many are in it. No
- * route answers it since the Card's `queue` and `unqueue` answer the Card; the board's mirror reads it until it moves onto the Card.
- */
-export type InboxQueueAnswer = {
-  name: string;
-  file: string;
-  was: 'queued' | 'taken back' | 'not queued';
-  queued: string | null;
-  place: number | null;
-  of: number | null;
-};
-
-/**
- * What `PUT` and `DELETE /api/inbox/:name/from` answer: what `nemia inbox from` did — the card, its file, the runs its `from:` names now
- * (none once taken off) and those it named before.
- */
-export type InboxFromAnswer = { name: string; file: string; from: string[]; was: string[] };
-
-/** One card read for its page (`inbox show`), an entry of the package's table the api serves alone: on `GET /api/inbox/:name`. */
-const CARD = commandNamed('inbox show');
-
-/** What the inbox's reads keep between requests: the app's informer, which judges each started card's run, as the runs' lists keep it. */
-const keptOf = (informer: InformerMemo | undefined) => (informer ? { runs: informer } : {});
 
 const isDirectory = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());
 
@@ -96,17 +47,6 @@ function inboxEntry(entry: InboxListing, read: { filedAt: string | null; text: s
   } catch {}
   return { ...entry, body, filedAt: read.filedAt };
 }
-
-/**
- * The value a card's page shows for `key` of the entry: when it was queued, the runs its `from:` names, its labels as `a=b,c=d`
- * (`labelsText`), or what the card writes; null for a key it does not set.
- */
-const keyValue = (entry: InboxEntry, key: (typeof INBOX_KEYS)[number]): string | null => {
-  if (key === 'queued') return entry.queued?.at ?? null;
-  if (key === 'from') return entry.from.join(', ') || null;
-  if (key === 'labels') return Object.keys(entry.labels).length ? labelsText(entry.labels) : null;
-  return entry[key] ?? null;
-};
 
 /** What a card filed hands the package: the idea, and the keys the card writes. */
 export type Filing = { text: string; workflow?: string; repo?: string; factory?: string; label?: string[] };
@@ -208,39 +148,3 @@ export function filingOf(body: CardFile, repo: string, home: string): Filing | R
   const byName = path.dirname(folder.dir) === path.join(repo, 'workflows') && (filing.repo === undefined || filing.repo === repo);
   return { ...filing, workflow: byName ? workflow : folder.dir };
 }
-
-/**
- * The inbox's routes.
- *
- * - `GET /api/inbox/:name` — one card, for its page (`InboxCardPage`). A name that would leave the inbox, or a hidden one, is refused in
- *   the package's words (400) before anything is read; a card is found among the entries the inbox lists, never by a path joined from what
- *   was sent, and a card before a stray file of the same name (`notes.md` and `notes` both list as `notes`), through the package's entry
- *   (`inbox show`). 404 for a card not there, or dropped since the listing read it, the package's `Missing` naming the cards that are.
- *   Its keys are as the listing reads them: `queued` is when it was queued (the listing carries its place too), null when unset.
- *
- * The list, the filing, the drop, the queue and the labels are the Card's (src/objects/cards.ts); `GET /api/inbox`, `POST /api/inbox`,
- * `DELETE /api/inbox/:name`, `POST` and `DELETE /api/inbox/:name/queue` and `POST /api/inbox/:name/labels` are no route of the api's,
- * and answer 404. A card's `from:` set or taken off (`PUT` and `DELETE /api/inbox/:name/from`) is the route the package's command table
- * generates (commands/routes.ts) from `nemia inbox from`'s entry.
- */
-export const inbox = new Hono<ApiEnv>().get('/api/inbox/:name', (c) => {
-  const name = c.req.param('name');
-  const wrong = inboxNameRefusal(name);
-  if (wrong) return c.json({ error: wrong }, 400);
-  return served(c, async ({ e, placeService, informer, env, home }) => {
-    const { card, source } = (await runPlaced({ placeService, home }, e, CARD.handler({ name }, env, home, keptOf(informer)))) as {
-      card: InboxListing;
-      source: string;
-    };
-    const [entry = inboxEntry(card, { filedAt: null, text: null })] = await runPlaced({ placeService, home }, e, listInbox([card], home));
-    const keys =
-      entry.error === null
-        ? INBOX_KEYS.map((key) => ({
-            key,
-            value: keyValue(entry, key),
-            meaning: INBOX_KEY_MEANINGS[key],
-          }))
-        : null;
-    return c.json({ ...entry, source, keys } satisfies InboxCardPage);
-  });
-});

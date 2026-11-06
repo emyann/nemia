@@ -1,56 +1,66 @@
 /**
- * The finished runs a page at a time, without React: the page the address names beside the factory, what Newer and Older lead to, and
- * what the pager says. Page 1 is the bare address, so an address never spells it. Pure.
+ * The finished runs a page at a time, without React: the trail of tokens the address holds beside the factory (`older`), each the
+ * `continue` of a page that led Older, what Newer and Older lead to, and what the pager says. The first page has no trail, so an
+ * address never spells one for it. Pure.
  */
 import { factorySearch } from './factories.ts';
 
-/** What the pager reads of a page of the finished runs: where it stands, and how many rows and pages there are. */
-export type PageAt = { page: number; pages: number; total: number; size: number };
+/** What joins the tokens of the trail in the address: no token of the api's holds it. */
+const JOIN = '~';
 
-/** `value` as a page number past the first: a whole number of 2 or more, given as a number or as digits; none for anything else. */
-function pageOf(value: unknown): number | undefined {
-  const page = typeof value === 'number' ? value : typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : NaN;
-  return Number.isSafeInteger(page) && page >= 2 ? page : undefined;
+/**
+ * What the pager reads of a page of the finished runs: the trail that led to it, the token of the page after it (`next`, null on the
+ * last), how many rows it holds, how many finished runs there are, and how many a page holds.
+ */
+export type PageAt = { trail: readonly string[]; next: string | null; count: number; total: number; size: number };
+
+/** `value` as a trail held in the address: tokens joined by `~`, none of them empty; none for anything else. */
+function olderOf(value: unknown): string | undefined {
+  if (typeof value !== 'string' || value === '') return undefined;
+  return value.split(JOIN).every((token) => token !== '') ? value : undefined;
 }
 
 /**
- * What a page of the finished runs reads of its address: `?factory=` as `factorySearch` reads it, and `?page=` where it names a page
- * past the first. The first page is the address without one.
+ * What a page of the finished runs reads of its address: `?factory=` as `factorySearch` reads it, and `?older=` where it holds a trail.
+ * The first page is the address without one.
  */
-export function finishedSearch(search: Record<string, unknown>): { factory?: string; page?: number } {
-  const page = pageOf(search.page);
-  return { ...factorySearch(search), ...(page === undefined ? {} : { page }) };
+export function finishedSearch(search: Record<string, unknown>): { factory?: string; older?: string } {
+  const older = olderOf(search.older);
+  return { ...factorySearch(search), ...(older === undefined ? {} : { older }) };
 }
 
-/** The page a search read by `finishedSearch` shows: the one it names, else the first. */
-export const pageAt = (search: { page?: number }): number => search.page ?? 1;
+/** The trail a search read by `finishedSearch` holds: its tokens in the order they were followed, none for the first page. */
+export const trailOf = (search: { older?: string }): string[] => (search.older ? search.older.split(JOIN) : []);
 
-/** `prev`, the address's search, at `page`: every other key kept, `page` set past the first and dropped for the first. */
-export function pageSearch<S extends Record<string, unknown>>(prev: S, page: number): Omit<S, 'page'> & { page?: number } {
-  const { page: _was, ...rest } = prev;
-  return page >= 2 ? { ...rest, page } : rest;
+/** `prev`, the address's search, at `trail`: every other key kept, `older` set for a trail and dropped for none. */
+export function trailSearch<S extends Record<string, unknown>>(prev: S, trail: readonly string[]): Omit<S, 'older'> & { older?: string } {
+  const { older: _was, ...rest } = prev;
+  return trail.length > 0 ? { ...rest, older: trail.join(JOIN) } : rest;
 }
 
-/** Whether the answer is of a page past the last: the api answers it with no row, and says the pages there are. */
-export const pastLast = (at: Pick<PageAt, 'page' | 'pages'>): boolean => at.page > at.pages;
+/** How many pages `total` rows make, `size` a page: at least one. */
+const pagesOf = (at: Pick<PageAt, 'total' | 'size'>): number => Math.max(1, Math.ceil(at.total / at.size));
 
-/** The page Newer leads to: the one before, the last from a page past it, and none from the first. */
-export function newerOf(page: number, pages: number): number | null {
-  if (page <= 1) return null;
-  return page > pages ? pages : page - 1;
-}
+/** Whether the page is past the last: a trail followed to a page that holds no row. */
+export const pastLast = (at: Pick<PageAt, 'trail' | 'count'>): boolean => at.trail.length > 0 && at.count === 0;
 
-/** The page Older leads to: the one after, and none from the last or past it. */
-export const olderOf = (page: number, pages: number): number | null => (page < pages ? page + 1 : null);
+/** The trail Newer leads to: the trail with its last token taken off, and none from the first page. */
+export const newerOf = (at: Pick<PageAt, 'trail'>): string[] | null => (at.trail.length === 0 ? null : at.trail.slice(0, -1));
+
+/** The trail Older leads to: the page's own `continue` put on the trail, and none from the last page or past it. */
+export const olderTrailOf = (at: Pick<PageAt, 'trail' | 'next' | 'count'>): string[] | null =>
+  at.next === null || pastLast(at) ? null : [...at.trail, at.next];
 
 /** The rows a page shows, in words: `Runs 19–27 of 634`; that there is none; or, past the last page, that it shows none of them. */
 export function rowsSaid(at: PageAt): string {
-  if (at.total === 0) return 'No finished runs';
+  if (at.total === 0 && at.count === 0) return 'No finished runs';
   if (pastLast(at)) return `No run on this page, of ${at.total}`;
-  const first = (at.page - 1) * at.size + 1;
-  return `Runs ${first}–${Math.min(at.page * at.size, at.total)} of ${at.total}`;
+  const first = at.trail.length * at.size + 1;
+  return `Runs ${first}–${first + at.count - 1} of ${at.total}`;
 }
 
 /** Where the pager stands, in words: `Page 3 / 71`, or, past the last page, `Page 80 is past the last, 71.` */
-export const pageSaid = (at: Pick<PageAt, 'page' | 'pages'>): string =>
-  pastLast(at) ? `Page ${at.page} is past the last, ${at.pages}.` : `Page ${at.page} / ${at.pages}`;
+export function pageSaid(at: PageAt): string {
+  const page = at.trail.length + 1;
+  return pastLast(at) ? `Page ${page} is past the last, ${pagesOf(at)}.` : `Page ${page} / ${Math.max(page, pagesOf(at))}`;
+}

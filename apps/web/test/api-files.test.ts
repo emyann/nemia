@@ -1,7 +1,7 @@
 /**
  * The board's mirror of the api is one file per concern under src/lib/api/, which src/lib/api.ts re-exports. None of them may reach the
  * re-exporting file at run time, and a sibling only one level deep: a file may import values from a sibling that imports values from no
- * sibling (the schemas of judged.ts and graph.ts, which runs.ts decodes with), so no runtime import cycle can form among them. A type
+ * sibling (the schemas of judged.ts, which decision.ts decodes with), so no runtime import cycle can form among them. A type
  * crosses by `import type`, which is erased; the other values they import are react-query's, effect's, the objects' (`objects`, by its
  * entry), the feed's pace, their reads (read.ts), `decodes` (decodes.ts) and the codes of where a step stands (reasons.ts); read.ts
  * imports effect alone, decodes.ts no value at all, and reasons.ts effect and decodes.ts. The objects' client (objects.ts) alone imports
@@ -105,7 +105,7 @@ test('the files under src/lib/api/ import values from react-query, effect, the f
   const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.ts'));
   assert.ok(files.length > 10 && files.includes('read.ts'), `the mirror's files: ${files.join(', ')}`);
   const texts = new Map(files.map((f) => [f, fs.readFileSync(path.join(DIR, f), 'utf8')]));
-  assert.ok(valueImports(texts.get('runs.ts') ?? '').includes('./judged.ts'), 'runs.ts decodes with the schemas of judged.ts');
+  assert.ok(valueImports(texts.get('decision.ts') ?? '').includes('./judged.ts'), 'decision.ts decodes with the schemas of judged.ts');
   assert.deepEqual(
     importFaults(texts),
     [],

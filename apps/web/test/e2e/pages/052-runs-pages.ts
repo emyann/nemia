@@ -1,7 +1,7 @@
 import type { Locator, Page } from 'playwright';
 import { FINISHED_SIZE } from '../../../src/lib/api/runs.ts';
 import { agoWords } from '../../../src/lib/runWords.ts';
-import { photographBothWidths } from '../board.ts';
+import { finishedAnswered, photographBothWidths } from '../board.ts';
 import { expectCount, expectNone, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FACTORIES, FOLDER, seedFinished } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -31,9 +31,24 @@ const addressOf = (page: Page): string => {
   return `${url.pathname}${url.search}`;
 };
 
+/** The trail of tokens to the factory's third page: the `continue` of its first page and of its second, as the board reads them. */
+async function trailToThird(page: Page): Promise<string[]> {
+  const first = await finishedAnswered(page, FACTORY);
+  const second = first.continue === null ? null : await finishedAnswered(page, FACTORY, first.continue);
+  if (first.continue === null || second?.continue == null) throw new Refused(`the factory's finished runs make three pages`);
+  return [first.continue, second.continue];
+}
+
+/** The trail the address holds, its tokens in order; none for the first page. */
+const trailAt = (url: URL): string[] => url.searchParams.get('older')?.split('~') ?? [];
+
+/** The address of the factory's page the trail leads to. */
+const pageAddress = (trail: readonly string[]): string =>
+  `/runs?factory=${FACTORY}${trail.length ? `&older=${encodeURIComponent(trail.join('~'))}` : ''}`;
+
 /** Page 3 of the factory, loaded by its address and loaded again, shows page 3 of that factory: its last row, and where it stands. */
-async function thirdPage(page: Page): Promise<void> {
-  await visit(page, `/runs?factory=${FACTORY}&page=3`);
+async function thirdPage(page: Page, trail: string[]): Promise<void> {
+  await visit(page, pageAddress(trail));
   for (const how of ['loaded by its address', 'loaded again']) {
     await expectTexts(page.locator('[data-pager-at]'), ['Page 3 / 3'], `${how}, the pager stands on page 3 of the factory's three`);
     await expectTexts(page.locator('[data-pager-rows]'), [`Runs 19–19 of ${WRITTEN + 1}`], 'and says its one row');
@@ -50,14 +65,16 @@ async function thirdPage(page: Page): Promise<void> {
       await idle(page);
     }
   }
-  if (addressOf(page) !== `/runs?factory=${FACTORY}&page=3`)
-    throw new Refused(`the address keeps the factory and the page — ${addressOf(page)}`);
+  const url = new URL(page.url());
+  if (url.searchParams.get('factory') !== FACTORY || trailAt(url).join() !== trail.join())
+    throw new Refused(`the address keeps the factory and the trail — ${addressOf(page)}`);
 }
 
-/** Newer and Older move a page at a time in the page, the factory kept in the address; the first page's address names no page. */
-async function newerAndOlder(page: Page): Promise<void> {
+/** Newer pops the trail and Older puts a token on it, the factory kept in the address; the first page's address holds no trail. */
+async function newerAndOlder(page: Page, trail: string[]): Promise<void> {
   await page.locator('[data-pager-newer]').click();
-  await page.waitForURL((url) => url.searchParams.get('page') === '2' && url.searchParams.get('factory') === FACTORY, { timeout: WAIT_MS });
+  const toSecond = (url: URL) => trailAt(url).join() === trail.slice(0, 1).join() && url.searchParams.get('factory') === FACTORY;
+  await page.waitForURL(toSecond, { timeout: WAIT_MS });
   await expectCount(rowsOf(page), FINISHED_SIZE, 'Newer leads to page 2, nine rows');
   await expectTexts(page.locator('[data-pager-at]'), ['Page 2 / 3'], 'where the pager stands');
   const ids = await rowsOf(page)
@@ -70,23 +87,26 @@ async function newerAndOlder(page: Page): Promise<void> {
   await photographBothWidths(page, OUT, 'runs-pages', 'second');
   await page.locator('[data-pager-newer]').focus();
   await page.keyboard.press('Enter');
-  await page.waitForURL((url) => !url.searchParams.has('page') && url.searchParams.get('factory') === FACTORY, { timeout: WAIT_MS });
+  await page.waitForURL((url) => !url.searchParams.has('older') && url.searchParams.get('factory') === FACTORY, { timeout: WAIT_MS });
   await expectVisible(rowsOf(page).locator(`[data-run-id][title="${FOLDER.id}"]`), 'Newer again, by the keyboard, leads to the first page');
   await expectVisible(page.locator('[data-pager-newer][data-disabled]'), 'where Newer leads nowhere');
   await page.locator('[data-pager-older]').click();
-  await page.waitForURL((url) => url.searchParams.get('page') === '2', { timeout: WAIT_MS });
+  await page.waitForURL(toSecond, { timeout: WAIT_MS });
   await expectCount(rowsOf(page), FINISHED_SIZE, 'and Older back to page 2');
 }
 
-/** A page past the last draws no table, says so, and Newer leads to the last. */
-async function pastTheLast(page: Page): Promise<void> {
-  await visit(page, `/runs?factory=${FACTORY}&page=7`);
+/** A token past every finished run: a finish at the epoch, which no run of the order comes after. */
+const PAST = `f.${Buffer.from(JSON.stringify(['1970-01-01T00:00:00.000Z', ''])).toString('base64url')}`;
+
+/** A token past the last gives a page that draws no table and says so, and Newer pops it. */
+async function pastTheLast(page: Page, trail: string[]): Promise<void> {
+  await visit(page, pageAddress([...trail, PAST]));
   await expectCount(rowsOf(page), 0, 'a page past the last holds no row');
-  await expectTexts(page.locator('[data-pager-at]'), ['Page 7 is past the last, 3.'], 'and the pager says so');
+  await expectTexts(page.locator('[data-pager-at]'), ['Page 4 is past the last, 3.'], 'and the pager says so');
   await expectTexts(page.locator('[data-pager-rows]'), [`No run on this page, of ${WRITTEN + 1}`], 'and how many there are');
   await page.locator('[data-pager-newer]').click();
-  await page.waitForURL((url) => url.searchParams.get('page') === '3', { timeout: WAIT_MS });
-  await expectCount(rowsOf(page), 1, 'Newer leads to the last page');
+  await page.waitForURL((url) => trailAt(url).join() === trail.join(), { timeout: WAIT_MS });
+  await expectCount(rowsOf(page), 1, 'Newer leads back to the last page');
 }
 
 /** A run that finished more than a year back, whenever the e2e runs: four hundred days ago. */
@@ -212,9 +232,10 @@ export default {
       seedFinished(store!, { id: idOf(i + 1), title: `A page of finished runs, ${i + 1}`, factory: FACTORY, finishedAgo: 30 + i }),
     );
     try {
-      await thirdPage(page);
-      await newerAndOlder(page);
-      await pastTheLast(page);
+      const trail = await trailToThird(page);
+      await thirdPage(page, trail);
+      await newerAndOlder(page, trail);
+      await pastTheLast(page, trail);
     } finally {
       for (const back of takeBack.reverse()) back();
     }

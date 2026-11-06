@@ -1,5 +1,6 @@
 import { Cell, Column, Row, Table, TableBody, TableHeader } from '@/components/ui/ds';
-import { workflowNameOf, type FinishedPage } from '@/lib/api';
+import { useQuery } from '@tanstack/react-query';
+import { FINISHED_SIZE, runLinesQuery, workflowNameOf, type FinishedPage } from '@/lib/api';
 import { factoryOf } from '@/lib/factories';
 import { titleOf } from '@/lib/factory';
 import { ink } from '@/lib/meaning';
@@ -28,9 +29,13 @@ const Ago = ({ at, asOf }: { at: string; asOf: Date }) => (
   </time>
 );
 
-/** One finished run's row: its title as a link, then its facts, each plain. Times are said against `asOf`. */
+/**
+ * One finished run's row: its title as a link, then its facts, each plain. Times are said against `asOf`; its workflow's page is its lines'
+ * (`runLinesQuery`), which the route's loader read.
+ */
 function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: Date }) {
   const ended = endedWords(run.outcome);
+  const workflowPage = useQuery(runLinesQuery(run.id)).data?.workflowPage ?? null;
   return (
     <Row id={run.id} data-run={run.id} data-outcome={run.outcome} className={FRAMED_ROW}>
       <Cell>
@@ -44,7 +49,7 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
       </Cell>
       <Cell data-workflow-cell>
         <TextLink
-          {...workflowTarget(run.workflowPage)}
+          {...workflowTarget(workflowPage)}
           title={run.workflowDir}
           data-workflow={workflowNameOf(run.workflowDir)}
           className="block truncate font-mono text-body-small"
@@ -82,10 +87,10 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
  * `WorkflowLink` links it (`workflowTarget`), how long ago it was created and how long ago it finished, each with the whole instant on
  * hover, its time at work with a preview over it breaking that clock down (`RunClockCell`), its cost with a preview of its tokens by kind
  * (`RunCostCell`), how it ended, and its id's end with a copy control, the last row with no line under it; then the pager, under a line
- * of its own. A page that holds no row draws no table and no line, and the pager says why. Narrower than its columns, the table scrolls
- * sideways inside its frame.
+ * of its own, which stands on the address' trail (`trail`). A page that holds no row draws no table and no line, and the pager says why.
+ * Narrower than its columns, the table scrolls sideways inside its frame.
  */
-export function FinishedTable({ page }: { page: FinishedPage }) {
+export function FinishedTable({ page, trail }: { page: FinishedPage; trail: readonly string[] }) {
   const asOf = new Date(page.asOf);
   return (
     <CutFrame size={24}>
@@ -130,7 +135,7 @@ export function FinishedTable({ page }: { page: FinishedPage }) {
         </div>
       )}
       <div data-pager-box className={cn('px-4 py-3', page.runs.length > 0 && 'border-t border-outline-variant')}>
-        <Pager page={page.page} pages={page.pages} total={page.total} size={page.size} />
+        <Pager trail={trail} next={page.continue} count={page.runs.length} total={page.total} size={FINISHED_SIZE} />
       </div>
     </CutFrame>
   );

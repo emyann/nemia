@@ -41,9 +41,9 @@ export default {
     const refused = await page.context().newPage();
     try {
       const { problems } = watch(refused);
-      const listed = await (await refused.request.get(new URL('/api/runs-summaries', page.url()).href)).text();
+      const listed = await (await refused.request.get(new URL('/api/runs', page.url()).href)).text();
       await refused.route(
-        (url) => url.pathname === '/api/runs-summaries',
+        (url) => url.pathname === '/api/runs' && !url.searchParams.has('fieldSelector'),
         (route) => route.fulfill({ status: 200, contentType: 'application/json', body: listed }),
       );
       await refused.goto(page.url(), { waitUntil: 'load' });

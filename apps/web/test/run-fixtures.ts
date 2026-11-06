@@ -477,7 +477,6 @@ export const summary = (steps: ReadonlyArray<readonly [string, Word]>, extra: Pa
   work: null,
   brief: 'Do the thing',
   workflowDir: '/code/app/workflows/dev',
-  workflowPage: null,
   try: null,
   createdAt: '2026-09-13T00:00:00.000Z',
   startedAt: null,
@@ -618,3 +617,23 @@ export function readsOf(view: RunView): Array<[readonly unknown[], unknown]> {
     }),
   ];
 }
+
+/**
+ * A run's object as a list answers it, off `view`'s reads (`readsOf`), in `namespace` where one is given, with `status` over its own:
+ * the frame's parts a list asked by state carries.
+ */
+export function runObject(view: RunView = detail(), status: Partial<RunObject.Run['status']> = {}, namespace?: string): RunObject.Run {
+  const object = readsOf(view)[0][1] as RunObject.Run;
+  return {
+    ...object,
+    metadata: { ...object.metadata, ...(namespace === undefined ? {} : { namespace }) },
+    status: { ...object.status, ...status },
+  };
+}
+
+/** A RunList as the api answers one: its runs, its metadata, and the runs it could not judge where there are any. */
+export const runList = (
+  items: RunObject.Run[],
+  metadata: RunObject.RunList['metadata'] = {},
+  unjudged?: RunObject.RunUnjudged[],
+): RunObject.RunList => ({ apiVersion: 'nemia/v1', kind: 'RunList', metadata, items, ...(unjudged ? { unjudged } : {}) });

@@ -20,7 +20,6 @@ const run = (id: string, extra: Partial<RunSummary> = {}, steps: readonly string
   work: null,
   brief: `# ${id}'s brief\n\nMore.`,
   workflowDir: '/code/app/workflows/dev',
-  workflowPage: null,
   try: null,
   createdAt: '2026-10-01T00:00:00.000Z',
   startedAt: '2026-10-01T00:00:00.000Z',

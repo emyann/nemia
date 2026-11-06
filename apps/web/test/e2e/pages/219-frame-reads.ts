@@ -1,22 +1,20 @@
 import type { Page } from 'playwright';
-import type { OpenRuns } from '../../../src/lib/api/runs.ts';
+import { OPEN_SELECTOR, type OpenRuns } from '../../../src/lib/api/runs.ts';
 import { barValue } from '../../../src/lib/bar.ts';
 import { openBlockOf, runsOf } from '../../../src/lib/factories.ts';
 import { atWork, atWorkWords } from '../../../src/lib/footer.ts';
-import { factoriesAnswered, gaugesOf, railPlace } from '../board.ts';
+import { factoriesAnswered, gaugesOf, openAnswered, railPlace } from '../board.ts';
 import { expectNone, expectTexts, idle, Refused } from '../checks.ts';
 import { FACTORIES } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 
 /** The factory whose bar the page opens: the one that holds a run. */
 const FACTORY = FACTORIES.hiring.name;
-/** The whole list of the runs, and the light answer, by their paths on the api. */
-const [WHOLE, LIGHT] = ['/api/runs-summaries', '/api/runs-open'];
-
-/** What the api answers at `pathname`, read apart from the page: the page's own requests do not count it. */
-async function answer<T>(page: Page, pathname: string): Promise<T> {
-  return (await (await page.request.get(new URL(pathname, page.url()).href)).json()) as T;
-}
+/**
+ * The whole list of the runs, the plain RunList, and the frame's, the RunList of the runs not finished, each by its path and query on the
+ * api as a request's address says them decoded.
+ */
+const [WHOLE, LIGHT] = ['/api/runs', `/api/runs?fieldSelector=${OPEN_SELECTOR}`];
 
 /** Goes to `to` in this tab and waits for its reads. */
 async function visit(page: Page, to: string): Promise<void> {
@@ -43,11 +41,14 @@ export default {
   route: '/agents',
   expect: async (page) => {
     const heard: string[] = [];
-    const hear = (request: { url: () => string }) => heard.push(new URL(request.url()).pathname);
+    const hear = (request: { url: () => string }) => {
+      const url = new URL(request.url());
+      heard.push(decodeURIComponent(`${url.pathname}${url.search}`));
+    };
     page.on('request', hear);
     try {
       await visit(page, '/agents');
-      const open = await answer<OpenRuns>(page, LIGHT);
+      const open = await openAnswered(page);
       await railCounts(page, open, 'Agents');
       await expectTexts(
         (await gaugesOf(page)).locator('[data-at-work-sentence]'),
@@ -57,10 +58,10 @@ export default {
 
       const bar = barValue({ kind: 'factory', factory: FACTORY });
       await visit(page, `/workflows?factory=${FACTORY}&bar=${encodeURIComponent(bar)}`);
-      await railCounts(page, await answer<OpenRuns>(page, `${LIGHT}?ofFactory=${FACTORY}`), "a factory's Workflows");
+      await railCounts(page, await openAnswered(page, FACTORY), "a factory's Workflows");
       const factory = (await factoriesAnswered(page)).find((one) => one.name === FACTORY);
       if (!factory) throw new Refused(`the seeded store has the factory ${FACTORY}`);
-      const block = openBlockOf(factory, await answer<OpenRuns>(page, `${LIGHT}?ofFactory=${FACTORY}`));
+      const block = openBlockOf(factory, await openAnswered(page, FACTORY));
       if (block.runs === 0) throw new Refused(`the factory ${FACTORY} holds a run, so its bar counts the finished`);
       await expectTexts(
         page.locator(`[data-factory-bar="${FACTORY}"] [data-runs]`),

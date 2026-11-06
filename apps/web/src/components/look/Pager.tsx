@@ -1,5 +1,5 @@
 import { Link as AriaLink } from 'react-aria-components';
-import { newerOf, olderOf, pageSaid, pageSearch, rowsSaid, type PageAt } from '@/lib/finished';
+import { newerOf, olderTrailOf, pageSaid, rowsSaid, trailSearch, type PageAt } from '@/lib/finished';
 import { cn, focusRing } from '@/components/ui/ds/utils';
 import { routeLink } from '../routeLink';
 
@@ -12,18 +12,18 @@ const BUTTON = cn(
 );
 
 /**
- * The search of the same address at `page`, as a link takes it. Typed for any route: which route the pager stands on, and so whether
- * its search declares a page, is its page's to say.
+ * The search of the same address at `trail`, as a link takes it. Typed for any route: which route the pager stands on, and so whether
+ * its search declares a trail, is its page's to say.
  */
-const searchAt = (page: number) => ((prev: Record<string, unknown>) => pageSearch(prev, page)) as never;
+const searchAt = (trail: readonly string[]) => ((prev: Record<string, unknown>) => trailSearch(prev, trail)) as never;
 
 /**
- * One end of the pager: a link to `page` of the same address, every other key of its search kept; drawn disabled, and no link, for
- * none.
+ * One end of the pager: a link to the page `trail` leads to, on the same address, every other key of its search kept; drawn disabled,
+ * and no link, for none.
  */
-function PageButton({ page, which, children }: { page: number | null; which: 'newer' | 'older'; children: string }) {
+function PageButton({ trail, which, children }: { trail: readonly string[] | null; which: 'newer' | 'older'; children: string }) {
   const mark = which === 'newer' ? { 'data-pager-newer': '' } : { 'data-pager-older': '' };
-  if (page === null) {
+  if (trail === null) {
     return (
       <AriaLink isDisabled className={BUTTON} {...mark}>
         {children}
@@ -31,7 +31,7 @@ function PageButton({ page, which, children }: { page: number | null; which: 'ne
     );
   }
   return (
-    <PageLink to="." search={searchAt(page)} className={BUTTON} {...mark}>
+    <PageLink to="." search={searchAt(trail)} className={BUTTON} {...mark}>
       {children}
     </PageLink>
   );
@@ -39,11 +39,11 @@ function PageButton({ page, which, children }: { page: number | null; which: 'ne
 
 /**
  * The pager of the finished runs: the rows this page shows, then Newer, where it stands, and Older. Newer and Older keep the address
- * and change its page alone (`pageSearch`), and each is disabled where it leads nowhere; from a page past the last, Newer leads to the
- * last.
+ * and change its trail alone (`trailSearch`): Older puts the page's `continue` on it, Newer takes its last token off; each is disabled
+ * where it leads nowhere, and from a page past the last, Newer leads back.
  */
-export function Pager({ page, pages, total, size }: PageAt) {
-  const at = { page, pages, total, size };
+export function Pager({ trail, next, count, total, size }: PageAt) {
+  const at = { trail, next, count, total, size };
   return (
     <div
       data-pager
@@ -51,13 +51,13 @@ export function Pager({ page, pages, total, size }: PageAt) {
     >
       <span data-pager-rows>{rowsSaid(at)}</span>
       <div role="group" aria-label="Pages of finished runs" className="flex items-center gap-3">
-        <PageButton page={newerOf(page, pages)} which="newer">
+        <PageButton trail={newerOf(at)} which="newer">
           Newer
         </PageButton>
         <span data-pager-at className="uppercase">
           {pageSaid(at)}
         </span>
-        <PageButton page={olderOf(page, pages)} which="older">
+        <PageButton trail={olderTrailOf(at)} which="older">
           Older
         </PageButton>
       </div>

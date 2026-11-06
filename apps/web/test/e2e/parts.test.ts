@@ -81,7 +81,7 @@ test('the pager by the keyboard: Enter on Older leads to the next page once, the
   const page = await openParts(browser, built, 'dark', alone(PAGER_FIRST));
   try {
     await tabTo(page, 'pagerOlder');
-    await entersOnce(page, story(PAGER_FIRST), '?page=2', 'Older');
+    await entersOnce(page, story(PAGER_FIRST), '?older=f.page2', 'Older');
     assert.equal(await page.locator('[data-pager-at]').textContent(), 'Page 2 / 3');
     assert.equal(await page.locator('[data-pager-rows]').textContent(), 'Runs 10–18 of 25');
     await page.keyboard.press('Shift+Tab');

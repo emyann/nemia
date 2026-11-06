@@ -1,5 +1,5 @@
 /**
- * A write that changes a run (src/lib/runWrites.ts): it reads the frame's light answer again at once, and no component that makes such a
+ * A write that changes a run (src/lib/runWrites.ts): it reads the frame's RunList again at once, and no component that makes such a
  * write invalidates the whole list by hand, which would leave the frame to the feed.
  */
 import { test } from 'node:test';
@@ -10,6 +10,7 @@ import { QueryClient, QueryObserver, type QueryKey } from '@tanstack/react-query
 import { finishedRunsQuery, openRunsQuery } from '../src/lib/api/runs.ts';
 import { runsMoved } from '../src/lib/runWrites.ts';
 import { bell, until, WAITED } from './waits.ts';
+import { runList } from './run-fixtures.ts';
 
 const SRC = path.resolve(import.meta.dirname, '../src');
 const COMPONENTS = path.join(SRC, 'components');
@@ -39,13 +40,11 @@ test("runsMoved: a write that changes a run reads the frame's answer and each pa
     globalThis.fetch = async (input) => {
       asked.push(String(input));
       rang.ring();
-      return new Response(JSON.stringify({ asOf: '2026-10-12T12:00:00.000Z', total: asked.length, page: 2, size: 9, pages: 1, runs: [] }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
+      const metadata = { asOf: '2026-10-12T12:00:00.000Z', counts: { waiting: 0, inFlight: 0, finished: asked.length } };
+      return new Response(JSON.stringify(runList([], metadata)), { status: 200, headers: { 'content-type': 'application/json' } });
     };
     const client = new QueryClient();
-    const page = new QueryObserver(client, finishedRunsQuery('harbour', 2));
+    const page = new QueryObserver(client, finishedRunsQuery('harbour', ['f.a']));
     const seen = bell();
     const stop = page.subscribe(seen.ring);
     t.after(() => {
@@ -63,7 +62,10 @@ test("runsMoved: a write that changes a run reads the frame's answer and each pa
       () => `the page read again: ${total()}`,
       { bell: seen },
     );
-    assert.deepEqual(asked, Array(2).fill('/api/runs-finished?page=2&size=9&ofFactory=harbour'));
+    assert.deepEqual(
+      asked.map(decodeURIComponent),
+      Array(2).fill('/api/namespaces/harbour/runs?limit=9&continue=f.a&fieldSelector=status.state=finished'),
+    );
   });
   await t.test("REFUSED: a write that changes a run reads the frame's answer again at once, a factory's with it", WAITED, async (t) => {
     const asked: string[] = [];
@@ -73,13 +75,8 @@ test("runsMoved: a write that changes a run reads the frame's answer and each pa
       asked.push(String(input));
       const waiting = asked.filter((url) => url === String(input)).length === 1 ? 2 : 1;
       rang.ring();
-      return new Response(
-        JSON.stringify({ asOf: '2026-10-12T12:00:00.000Z', counts: { waiting, inFlight: 0, finished: 0 }, waiting: [], inFlight: [] }),
-        {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        },
-      );
+      const metadata = { asOf: '2026-10-12T12:00:00.000Z', counts: { waiting, inFlight: 0, finished: 0 } };
+      return new Response(JSON.stringify(runList([], metadata)), { status: 200, headers: { 'content-type': 'application/json' } });
     };
     const client = new QueryClient();
     const every = new QueryObserver(client, openRunsQuery());
@@ -103,11 +100,11 @@ test("runsMoved: a write that changes a run reads the frame's answer and each pa
         bell: seen,
       },
     );
-    assert.deepEqual([...asked].sort(), [
-      '/api/runs-open',
-      '/api/runs-open',
-      '/api/runs-open?ofFactory=harbour',
-      '/api/runs-open?ofFactory=harbour',
+    assert.deepEqual(asked.map(decodeURIComponent).sort(), [
+      '/api/namespaces/harbour/runs?fieldSelector=status.state!=finished',
+      '/api/namespaces/harbour/runs?fieldSelector=status.state!=finished',
+      '/api/runs?fieldSelector=status.state!=finished',
+      '/api/runs?fieldSelector=status.state!=finished',
     ]);
   });
 });

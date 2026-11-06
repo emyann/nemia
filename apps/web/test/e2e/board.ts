@@ -4,7 +4,18 @@ import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from './checks.ts';
 import type { FactoryCommands, FactoryList, ScheduleList } from 'objects';
-import type { RunSummary } from '../../src/lib/api/runs.ts';
+import type { RunList } from 'objects';
+import {
+  FINISHED_SELECTOR,
+  FINISHED_SIZE,
+  finishedOf,
+  OPEN_SELECTOR,
+  openOf,
+  rowsOf,
+  type FinishedPage,
+  type OpenRuns,
+  type RunSummary,
+} from '../../src/lib/api/runs.ts';
 import { factoryViewOf, type Factory } from '../../src/lib/api/factories.ts';
 import { instantWhole, instantWords } from '../../src/lib/instant.ts';
 import { attachedFiles, attachedRun, DIAMOND } from './seed.ts';
@@ -508,8 +519,27 @@ export async function answered<T>(page: Page, pathname: string): Promise<T> {
   return (await (await page.request.get(new URL(pathname, page.url()).href)).json()) as T;
 }
 
-/** Every run's summary, read apart from the page as the board reads them (`GET /api/runs-summaries`). */
-export const rowsAnswered = (page: Page): Promise<RunSummary[]> => answered<RunSummary[]>(page, '/api/runs-summaries');
+/** The path of a RunList read: every factory's (`/api/runs`), or the namespace of `factory`'s, with `query` encoded as the client does. */
+export const runListPath = (factory: string | undefined, query: Record<string, string> = {}): string => {
+  const params = new URLSearchParams(query).toString();
+  return `${factory === undefined ? '/api/runs' : `/api/namespaces/${encodeURIComponent(factory)}/runs`}${params ? `?${params}` : ''}`;
+};
+
+/** Every run's row, read apart from the page as the board reads them: the plain RunList whole (`GET /api/runs`), made rows (`rowsOf`). */
+export const rowsAnswered = async (page: Page): Promise<RunSummary[]> => rowsOf(await answered<RunList>(page, '/api/runs'));
+
+/** The frame, read apart from the page as the board reads it: the RunList of the runs not finished, of every factory or `factory`'s. */
+export const openAnswered = async (page: Page, factory?: string): Promise<OpenRuns> =>
+  openOf(await answered<RunList>(page, runListPath(factory, { fieldSelector: OPEN_SELECTOR })));
+
+/** A page of the finished runs, read apart from the page as the board reads it: nine from the token `from`, the first for none. */
+export const finishedAnswered = async (page: Page, factory?: string, from?: string): Promise<FinishedPage> =>
+  finishedOf(
+    await answered<RunList>(
+      page,
+      runListPath(factory, { fieldSelector: FINISHED_SELECTOR, limit: String(FINISHED_SIZE), ...(from ? { continue: from } : {}) }),
+    ),
+  );
 
 /**
  * Whether `pathname` is the run `id` on its namespaced path, in whichever namespace it is: the run itself (its removal), or with `tail` one

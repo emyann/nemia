@@ -5,8 +5,8 @@ import { FinishedTable } from '../components/FinishedTable';
 import { FlightTable } from '../components/FlightTable';
 import { WaitingCard } from '../components/WaitingCard';
 import { SelectorField } from '../components/SelectorField';
-import { finishedRunsQuery, labelSearch, openRunsQuery } from '../lib/api';
-import { finishedSearch, pageAt } from '../lib/finished';
+import { finishedRunsQuery, labelSearch, openRunsQuery, runLinesQuery } from '../lib/api';
+import { finishedSearch, trailOf } from '../lib/finished';
 import { ink } from '../lib/meaning';
 import { Plate, ScanLines } from '../components/look';
 import { Button } from '../components/ui/ds';
@@ -14,11 +14,13 @@ import { useBar } from '../lib/useBar';
 
 export const Route = createFileRoute('/runs/')({
   validateSearch: (search: Record<string, unknown>) => ({ ...finishedSearch(search), ...labelSearch(search) }),
-  loaderDeps: ({ search }) => ({ factory: search.factory, page: pageAt(search), l: search.l }),
+  loaderDeps: ({ search }) => ({ factory: search.factory, older: search.older, l: search.l }),
   loader: ({ context, deps }) =>
     Promise.all([
       context.queryClient.ensureQueryData(openRunsQuery(deps.factory, deps.l)),
-      context.queryClient.ensureQueryData(finishedRunsQuery(deps.factory, deps.page, deps.l)),
+      context.queryClient
+        .ensureQueryData(finishedRunsQuery(deps.factory, trailOf(deps), deps.l))
+        .then((page) => Promise.all(page.runs.map((run) => context.queryClient.prefetchQuery(runLinesQuery(run.id))))),
     ]),
   component: Runs,
   staticData: { fullBleed: true },
@@ -100,14 +102,15 @@ function Nothing({ children }: { children: string }) {
 
 /**
  * The runs, in three parts, by two reads the api filters by the address' factory: what waits on a person, a card a run and never a
- * row; the runs in flight, a quiet table; and one page of the finished runs, the address' page, newest finished first. Each plate says
- * the api's own count, and under what waits a button opens the bar of what waits on you in every factory. Every time on the page
- * is a fact to the minute, said against the instant its answer was read at: nothing here counts by itself.
+ * row; the runs in flight, a quiet table; and one page of the finished runs, the one the address' trail leads to, newest finished
+ * first. Each plate says the api's own count, and under what waits a button opens the bar of what waits on you in every factory. Every
+ * time on the page is a fact to the minute, said against the instant its answer was read at: nothing here counts by itself.
  */
 function Runs() {
   const search = Route.useSearch();
   const { data: open } = useSuspenseQuery(openRunsQuery(search.factory, search.l));
-  const { data: finished } = useSuspenseQuery(finishedRunsQuery(search.factory, pageAt(search), search.l));
+  const trail = trailOf(search);
+  const { data: finished } = useSuspenseQuery(finishedRunsQuery(search.factory, trail, search.l));
   const navigate = useNavigate({ from: '/runs/' });
   const asOf = new Date(open.asOf);
   const { counts } = open;
@@ -116,7 +119,7 @@ function Runs() {
       <SelectorField
         key={search.l ?? ''}
         selector={search.l}
-        onSelect={(next) => void navigate({ search: (prev) => ({ ...prev, l: next, page: undefined }) })}
+        onSelect={(next) => void navigate({ search: (prev) => ({ ...prev, l: next, older: undefined }) })}
       />
       <Section
         name="waiting"
@@ -137,7 +140,11 @@ function Runs() {
         {open.inFlight.length === 0 ? <Nothing>Nothing is in flight.</Nothing> : <FlightTable runs={open.inFlight} asOf={asOf} />}
       </Section>
       <Section name="finished" plate={<Plate count={counts.finished} title="Finished" hue="grey" quiet={counts.finished === 0} />}>
-        {finished.total === 0 ? <Nothing>No run has finished yet.</Nothing> : <FinishedTable page={finished} />}
+        {finished.total === 0 && finished.runs.length === 0 ? (
+          <Nothing>No run has finished yet.</Nothing>
+        ) : (
+          <FinishedTable page={finished} trail={trail} />
+        )}
       </Section>
     </Page>
   );

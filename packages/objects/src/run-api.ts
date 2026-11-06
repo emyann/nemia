@@ -25,6 +25,13 @@ import {
   RunStarted,
 } from './run-actions.ts';
 
+/**
+ * The query of a list of runs: a list's (`listQuery`), and `fieldSelector`, the runs in one state, as Kubernetes spells a field
+ * selector: `status.state=<state>` (or `==`), or `status.state!=<state>`, one term, a state of `RUN_STATES`. Kept as its text, so a
+ * wrong one is refused in the package's words, a 422. A list asked by it carries the frame's parts (`RunStatus`, `RunListMeta`).
+ */
+const runListQuery = { ...listQuery, fieldSelector: Schema.optionalKey(Schema.String) };
+
 /** A namespace, for a list in it. */
 const namespaceParams = { namespace: Schema.String };
 
@@ -59,10 +66,10 @@ const takenLater = <S extends Schema.Top>(answer: S) => answer.pipe(Schema.annot
  * none: a run addressed under another is `Missing`.
  */
 export class RunsGroup extends HttpApiGroup.make('runs').add(
-  HttpApiEndpoint.get('listAll', '/api/runs', { query: listQuery, success: RunList, error: runReadErrors }),
+  HttpApiEndpoint.get('listAll', '/api/runs', { query: runListQuery, success: RunList, error: runReadErrors }),
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/runs', {
     params: namespaceParams,
-    query: listQuery,
+    query: runListQuery,
     success: RunList,
     error: runReadErrors,
   }),

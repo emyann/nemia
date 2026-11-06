@@ -9,7 +9,7 @@
  * writes each into a document that imports back into a Schema decoding the same object.
  */
 import { Schema } from 'effect';
-import { API_VERSION, listOf } from './meta.ts';
+import { API_VERSION, ListMeta, listOf } from './meta.ts';
 import { ObjectGraph } from './graph.ts';
 import {
   ANSWER_VIA,
@@ -25,8 +25,10 @@ import {
   RAISE_BY,
   RETRY_MODES,
   REVISION_KINDS,
+  RUN_OUTCOMES,
   RUN_PHASES,
   RUN_REASONS,
+  RUN_STATES,
   RUN_STATUSES,
   RUNS_IN_BY,
   SAID_AFTER,
@@ -410,6 +412,24 @@ export const RunDrift = Schema.Struct({
 });
 
 /**
+ * Where a run's wall time went, in ms (`RunClock`): its sessions, its checks, a person's turn, waiting for a run slot, and the rest, the
+ * five adding up to `wallMs`, measured to the instant the run's own `wallMs` is.
+ */
+export const RunClock = Schema.Struct({
+  wallMs: Schema.Finite,
+  sessionsMs: Schema.Finite,
+  checksMs: Schema.Finite,
+  personMs: Schema.Finite,
+  slotMs: Schema.Finite,
+  restMs: Schema.Finite,
+}).annotate({ identifier: 'RunClock' });
+export type RunClock = typeof RunClock.Type;
+
+/** What one step of a run has cost, every try's session together; `cost` null until one was measured. */
+export const StepCost = Schema.Struct({ step: Schema.String, cost: Schema.NullOr(Spent) }).annotate({ identifier: 'StepCost' });
+export type StepCost = typeof StepCost.Type;
+
+/**
  * The run now: the runs list's judged fields (`judgedFields`) — its word and codes, whether it moves, its cost, time at work and tokens,
  * what it waits on, its hold and what a person has to decide — then its graph, where its time went as a whole (`Timeline`'s rounds, run
  * and slot), and each step; and the rest of what the board shows of it but the lines to type, which are the command table's: when it
@@ -482,6 +502,21 @@ export const RunStatus = Schema.Struct({
   gates: Strings,
   warning: NullString,
   kinds: List(RunDrift),
+  /**
+   * The parts of the board's frame, present on a list asked by state (`?fieldSelector=status.state…`) alone and measured to its
+   * `metadata.asOf`: a plain list, a run read alone and their watches never carry them. Its state in the list (`RUN_STATES`); its
+   * wall time in ms, from its creation until its work stopped or until `asOf`; where that time went (`clock`, frozen at its finish
+   * for a finished run, null where a task of it does not read); each step's cost and when its present wait on a person began
+   * (`stepCosts`, `waitingSince`, for a waiting run, null otherwise or where it is not dated); when its work stopped and how it
+   * ended (`finishedAt`, `outcome`, for a finished run, null otherwise).
+   */
+  state: Schema.optionalKey(Schema.Literals(RUN_STATES)),
+  wallMs: Schema.optionalKey(Schema.Finite),
+  clock: Schema.optionalKey(Schema.NullOr(RunClock)),
+  stepCosts: Schema.optionalKey(Schema.NullOr(List(StepCost))),
+  waitingSince: Schema.optionalKey(NullString),
+  finishedAt: Schema.optionalKey(NullString),
+  outcome: Schema.optionalKey(Schema.NullOr(Schema.Literals(RUN_OUTCOMES))),
 }).annotate({ identifier: 'RunStatus' });
 export type RunStatus = typeof RunStatus.Type;
 
@@ -503,18 +538,34 @@ export const RunUnjudged = Schema.Struct({
   name: Schema.String,
   namespace: Schema.optionalKey(Schema.String),
   error: Schema.String,
+  /** Its state in the list (`RUN_STATES`), on a list asked by state alone: what its summary says, which reads without its tasks. */
+  state: Schema.optionalKey(Schema.Literals(RUN_STATES)),
 }).annotate({ identifier: 'RunUnjudged' });
 export type RunUnjudged = typeof RunUnjudged.Type;
+
+/**
+ * A RunList's metadata (`ListMeta`) and, on a list asked by state alone, how many runs of its namespace and labels are in each state
+ * (`counts`), counted before its `fieldSelector` and its page, which a paged list cannot otherwise give, and the instant its runs'
+ * durations are measured to (`asOf`). `asOf` is no key of Kubernetes': a duration needs the instant it is measured to.
+ */
+export const RunListMeta = Schema.Struct({
+  ...ListMeta.fields,
+  counts: Schema.optionalKey(Schema.Struct({ waiting: Schema.Finite, inFlight: Schema.Finite, finished: Schema.Finite })),
+  asOf: Schema.optionalKey(Schema.String),
+}).annotate({ identifier: 'RunListMeta' });
+export type RunListMeta = typeof RunListMeta.Type;
 
 /**
  * A page of the runs (`RunList`): `listOf('Run', Run)`, and beside it `unjudged`, each run of the page a task of which does not read, left
  * out of `items` since it cannot be judged into a `Run`. A departure from Kubernetes, whose list holds objects alone: a run dropped with
  * no word would read as gone, and a page refused for one journal would blank every other run of it. A run of a list is judged without
  * the reads a poll should not pay for: no harness is asked for a blocked session's last line and no drift is read, so each step's
- * `lastLine` is null and `kinds` empty there; the run read alone (`GET …/runs/<name>`) says them.
+ * `lastLine` is null and `kinds` empty there; the run read alone (`GET …/runs/<name>`) says them. Its metadata is `RunListMeta`, and a list asked by state
+ * (`?fieldSelector=status.state…`) still judges its whole namespace to count it, whatever its `limit`.
  */
 export const RunList = Schema.Struct({
   ...listOf('Run', Run).fields,
+  metadata: RunListMeta,
   unjudged: Schema.optionalKey(Schema.Array(RunUnjudged)),
 }).annotate({ identifier: 'RunList' });
 export type RunList = typeof RunList.Type;

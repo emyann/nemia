@@ -51,12 +51,13 @@ import type { Engine } from '../store.ts';
 import { placesOf, type InRequest } from '../workflows/workflows.ts';
 import { commandNamed, runPlaced } from '../store.ts';
 import type { PlaceService } from 'agent-orchestrator';
+import type { DefinitionOrigin } from 'objects';
 
 /**
  * Where a skill is: your library (the store's), the repository the board serves (its `.claude/skills/`, or `workflows/skills/` beside its
  * agents), or what is built into Nemia.
  */
-export type SkillSource = 'yours' | 'repo' | 'builtin';
+export type SkillSource = Extract<DefinitionOrigin, 'yours' | 'repo' | 'builtin'>;
 
 /** One skill as the picker lists it. `entry` is its card entry, or null with `error` saying why no agent can be given it. */
 export type SkillRow = {
@@ -72,7 +73,7 @@ export type SkillRow = {
   /** The agents of yours that give it. */
   usedBy: string[];
   /** A builtin skill's name, where an agent of yours already finds a skill of it: in your library, or in the repository. Null elsewhere. */
-  found: 'yours' | 'repo' | null;
+  found: Extract<SkillSource, 'yours' | 'repo'> | null;
 };
 
 /** One place the picker lists, in the order an agent of yours finds a name, the builtin last: its skills by name. */
@@ -222,7 +223,7 @@ export async function listSkills(
   const dirOf = ([name, at]: (typeof sorted)[number]) =>
     at instanceof WorkflowError ? (skillDirIn([yours.dir, inRepo.dir], name) ?? path.join(yours.dir, name)) : at;
   const reads = await readsOf(e, placeService, [...sorted.map(dirOf), ...builtinNames.map((name) => path.join(builtin, name))], home);
-  const where = new Map<string, 'yours' | 'repo'>();
+  const where = new Map<string, Extract<SkillSource, 'yours' | 'repo'>>();
   for (const [name, at] of sorted) {
     const dir = dirOf([name, at]);
     if (at instanceof WorkflowError) {

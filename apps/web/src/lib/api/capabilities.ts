@@ -4,6 +4,7 @@
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
+import { MCP_TRANSPORTS, type DefinitionOrigin, type McpTransport } from 'objects';
 import { decodes } from './decodes.ts';
 import { get } from './read.ts';
 
@@ -30,7 +31,7 @@ export type McpServer = {
   name: string;
   source: string;
   /** The transport a harness loads it over, or `unknown` for any other word, which `notAsked` quotes as written. */
-  type: 'stdio' | 'http' | 'sse' | 'unknown';
+  type: 'stdio' | McpTransport | 'unknown';
   command: string | null;
   args: string[];
   url: string | null;
@@ -52,7 +53,7 @@ const ReachedServerSchema = decodes<McpServer>()(
   Schema.Struct({
     name: Schema.String,
     source: Schema.String,
-    type: Schema.Literals(['stdio', 'http', 'sse', 'unknown']),
+    type: Schema.Literals(['stdio', ...MCP_TRANSPORTS, 'unknown'] as const),
     command: Schema.NullOr(Schema.String),
     args: Strings,
     url: Schema.NullOr(Schema.String),
@@ -139,7 +140,7 @@ const ReadOnlyCommandsSchema = decodes<ReadOnlyCommands>()(
  */
 export type StepReach = {
   workflow: string;
-  from: 'repo' | 'yours';
+  from: Extract<DefinitionOrigin, 'repo' | 'yours'>;
   step: string;
   harness: string;
   claudeCode: boolean;

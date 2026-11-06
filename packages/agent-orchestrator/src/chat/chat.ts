@@ -11,6 +11,7 @@
 import type { FramedFor, SpeakerNameRefusal, SpeakerRefusal, WithSpeaker, WithoutSpeaker } from '../../contracts/speaker.contract.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import type { EnginePhase } from '../views/views-words.ts';
+import type { SaidAfter } from 'objects';
 
 /**
  * Who a message is from: the task's agent (`agent`), the person, the keeper, whose words are a quiet marker, or another agent that
@@ -118,7 +119,7 @@ export type SourceEvent = {
   id: string;
   at: string;
   role: 'assistant' | 'user' | 'system';
-  kind: 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'system';
+  kind: SaidAfter;
   text?: string;
   tool?: { name: string; input: unknown };
   result?: { text: string; isError: boolean };

@@ -12,6 +12,7 @@ import { looseAt } from '../closeout/index.ts';
 import { expandShapes, SHAPE_KEY } from '../question/index.ts';
 import type { HarnessPrompt } from '../agents/agents.ts';
 import { bareSkillOf, GIVEN_SKILL_FORMS, givenSkillOf, ONE_BARE_NAME, sameBareIn } from './given-skill.ts';
+import type { PlaceKind } from 'objects';
 
 /**
  * `harness:` as written: one of `HARNESSES`, or `a2a:<name>`, or refused. `claude-detached`, retired, is refused by its name: every session
@@ -223,9 +224,10 @@ export const WORKSPACES: readonly string[] = ['base'];
 
 /**
  * The words `place:` takes: where a step works. `git`: on branches of a repository. `folder`: in a folder the run makes, in a run that
- * needs no git repository. A step file says one (`placeRequired`); no word is the default.
+ * needs no git repository. A step file says one (`placeRequired`); no word is the default. `objects`' `PLACE_KINDS` word for word
+ * (`packages/objects/src/words.ts`), held equal by `wordsHeld` (`object/run.model.ts`).
  */
-export const PLACES = ['git', 'folder'] as const;
+export const PLACES = ['git', 'folder'] as const satisfies readonly PlaceKind[];
 
 /**
  * `place:` as written: `git`, `folder`, or refused, naming both words. Undefined for a step that says nothing: a step file is refused for

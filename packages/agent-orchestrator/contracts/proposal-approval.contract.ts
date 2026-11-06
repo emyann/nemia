@@ -10,9 +10,10 @@
  * nobody's law. Pure.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
+import type { ApprovedBy, CallerKind, ChangeVerb as ObjectsChangeVerb, Level, ProposalRefusal } from 'objects';
 
 /** What a proposal does to one object: makes it, writes it, or removes it. Kubernetes' verbs for a write. */
-export type ChangeVerb = 'create' | 'update' | 'delete';
+export type ChangeVerb = ObjectsChangeVerb;
 
 /** One change a proposal carries: the resource (`workflows`, `agents`, `hires`, …), the object's name, and the verb. */
 export type Change = { readonly resource: string; readonly name: string; readonly verb: ChangeVerb };
@@ -36,7 +37,9 @@ export type ProposalRule = Grant & { readonly id: string; readonly widens: boole
  * Who calls: the person (no session's token), or an agent's session the store started, by its agent and its factory — null for a session
  * of the store's own (Nemia's), which works in every factory and holds there only what that factory's delegation grants it.
  */
-export type Caller = { readonly kind: 'person' } | { readonly kind: 'agent'; readonly agent: string; readonly factory: string | null };
+export type Caller =
+  | { readonly kind: Extract<CallerKind, 'person'> }
+  | { readonly kind: Extract<CallerKind, 'agent'>; readonly agent: string; readonly factory: string | null };
 
 /** Whether `caller` acts in `factory`: the person anywhere, a factory's session in its own, a store-wide session in any. */
 const actsIn = (caller: Caller, factory: string): boolean =>
@@ -55,7 +58,7 @@ const mayProposeSpec = spec<(caller: Caller, factory: string) => boolean>({
 export type MayPropose = Implementation<typeof mayProposeSpec>;
 
 /** The level a factory is worked at, the store's where it says none. */
-export type ProposalLevel = 'manual' | 'semi-auto' | 'auto';
+export type ProposalLevel = Level;
 
 /**
  * A proposal as approval reads it: its factory, who proposed it (null: the person), whether it waits, its changes, and whether it widens.
@@ -71,13 +74,13 @@ export type ProposalFacts = {
 /** What the calling agent stands on in the proposal's factory: the level, its delegation's grants, and its confirmed rules. */
 export type Standing = { readonly level: ProposalLevel; readonly grants: readonly Grant[]; readonly rules: readonly ProposalRule[] };
 
-/** Why an approval is refused. */
-export type ApprovalRefusedReason = 'not-waiting' | 'other-factory' | 'own-agent' | 'not-auto' | 'not-delegated' | 'no-rule';
+/** Why an approval is refused: every refusal of a proposal but `person-only`, which refuses a write, never an approval. */
+export type ApprovalRefusedReason = Exclude<ProposalRefusal, 'person-only'>;
 
 /** An approval: the person's, an agent's under the rule named, or refused with its reason. */
 export type ApprovalVerdict =
-  | { readonly kind: 'approved'; readonly by: 'person' }
-  | { readonly kind: 'approved'; readonly by: 'rule'; readonly rule: string }
+  | { readonly kind: 'approved'; readonly by: Extract<ApprovedBy, 'person'> }
+  | { readonly kind: 'approved'; readonly by: Extract<ApprovedBy, 'rule'>; readonly rule: string }
   | { readonly kind: 'refused'; readonly reason: ApprovalRefusedReason };
 
 /** Whether `grant` covers `change`: its resource, its name (every name where the grant names none), and its verb. */

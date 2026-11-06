@@ -34,6 +34,7 @@ import { filedOwed } from '../pinned/pinned.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { artifactOf, valueOf, type StepArtifact, type StepValue } from './files.store.ts';
 import { checkIn, type CheckStderr, type StepCheck } from './checks.verb.ts';
+import type { Outcome } from 'objects';
 
 /**
  * A person's approval of the try a gated step is on (`approvalOf`), off their file (`nemia approve`): the try, when, and the words given
@@ -83,7 +84,7 @@ export type StepReply = { finding: string; answer: string; why: string };
  */
 export type StepCloseout = {
   apiVersion: string | null;
-  outcome: 'done' | 'blocked';
+  outcome: Outcome;
   summary: string;
   body: string | null;
   needs: string | null;

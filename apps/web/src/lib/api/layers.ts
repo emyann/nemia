@@ -3,6 +3,7 @@
  * would be told): the type a step's view reads them as, and the schema `workflows.ts` decodes with.
  */
 import { Schema } from 'effect';
+import { HANDED_HOW, TOLD_VIA, type HandedHow, type ToldVia } from 'objects';
 import { decodes } from './decodes.ts';
 
 /**
@@ -24,7 +25,7 @@ export type StepLayers = {
   fence: Array<{ key: string; value: string }>;
   folderFiles: boolean;
   task: string | null;
-  via: 'prompt' | 'brief';
+  via: ToldVia;
 };
 
 /** Decodes a `StepLayers`. */
@@ -40,7 +41,7 @@ export const StepLayersSchema = decodes<StepLayers>()(
     fence: Schema.mutable(Schema.Array(Schema.Struct({ key: Schema.String, value: Schema.String }))),
     folderFiles: Schema.Boolean,
     task: Schema.NullOr(Schema.String),
-    via: Schema.Literals(['prompt', 'brief']),
+    via: Schema.Literals(TOLD_VIA),
   }),
 );
 
@@ -49,7 +50,7 @@ export const StepLayersSchema = decodes<StepLayers>()(
  * line that run was asked (empty where its section could not read it), the section's body, and how it was handed: waited on until it
  * landed (`--after`), or read as context (`--from`); absent where the record names it as neither.
  */
-export type TaskPart = { kind: 'from'; run: string; asked: string; body: string; how?: 'waited' | 'read' } | { kind: 'text'; text: string };
+export type TaskPart = { kind: 'from'; run: string; asked: string; body: string; how?: HandedHow } | { kind: 'text'; text: string };
 
 /** Decodes a `TaskPart`: the `from` member first, the wider one, so a part is never read as the narrower. */
 export const TaskPartSchema = decodes<TaskPart>()(
@@ -59,7 +60,7 @@ export const TaskPartSchema = decodes<TaskPart>()(
       run: Schema.String,
       asked: Schema.String,
       body: Schema.String,
-      how: Schema.optionalKey(Schema.Literals(['waited', 'read'])),
+      how: Schema.optionalKey(Schema.Literals(HANDED_HOW)),
     }),
     Schema.Struct({ kind: Schema.Literal('text'), text: Schema.String }),
   ]),

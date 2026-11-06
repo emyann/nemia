@@ -4,19 +4,20 @@
  */
 import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 import { Option, Schema } from 'effect';
+import { SAID_AFTER, type SaidAfter } from 'objects';
 import { decodes } from './decodes.ts';
 import { get } from './read.ts';
 
 /**
- * Mirrors `TranscriptEvent` in agent-runtime, as the api passes it on: one thing said in a session's
- * conversation. A `tool_result` carries its call's `id`, so an event is unique by `id` and `kind` together. A tool's `input` is absent
- * where the harness recorded the call without one (Claude Code's `input` is optional).
+ * Mirrors `TranscriptEvent` in agent-runtime, as the api passes it on: one thing said in a session's conversation, its `kind` one of
+ * `objects`' `SAID_AFTER`. A `tool_result` carries its call's `id`, so an event is unique by `id` and `kind` together. A tool's `input` is
+ * absent where the harness recorded the call without one (Claude Code's `input` is optional).
  */
 export type TranscriptEvent = {
   id: string;
   at: string;
   role: 'assistant' | 'user' | 'system';
-  kind: 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'system';
+  kind: SaidAfter;
   text?: string;
   tool?: { name: string; input?: unknown };
   result?: { text: string; isError: boolean };
@@ -26,9 +27,6 @@ export type TranscriptEvent = {
    */
   origin?: { kind: TranscriptOriginKind };
 };
-
-/** The kinds of a `TranscriptEvent`, as its schema decodes them. */
-export const TRANSCRIPT_KINDS = ['text', 'thinking', 'tool_use', 'tool_result', 'system'] as const;
 
 /** The words of a transcript event's origin, the runtime's `ORIGIN_KINDS` and `unknown`. */
 const ORIGIN_KINDS = [
@@ -51,7 +49,7 @@ const TranscriptEventSchema = decodes<TranscriptEvent>()(
     id: Schema.String,
     at: Schema.String,
     role: Schema.Literals(['assistant', 'user', 'system']),
-    kind: Schema.Literals(TRANSCRIPT_KINDS),
+    kind: Schema.Literals(SAID_AFTER),
     text: Schema.optionalKey(Schema.String),
     tool: Schema.optionalKey(Schema.Struct({ name: Schema.String, input: Schema.optionalKey(Schema.Unknown) })),
     result: Schema.optionalKey(Schema.Struct({ text: Schema.String, isError: Schema.Boolean })),

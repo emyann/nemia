@@ -30,6 +30,7 @@ import { assess } from '../tick/assess.ts';
 import { resultSteps } from '../branches/index.ts';
 import { runWords } from '../routed/index.ts';
 import { merges } from '../ending/ending.ts';
+import type { RunStatusWord } from 'objects';
 
 /**
  * What is left for a person to do about this run.
@@ -56,7 +57,7 @@ export type Decision =
   | { kind: 'landed'; branches: string[] }
   | {
       kind: 'awaiting';
-      outcome: 'succeeded' | 'failed' | 'waiting';
+      outcome: Extract<RunStatusWord, 'succeeded' | 'failed' | 'waiting'>;
       branches: string[];
       /**
        * Steps whose task failed or was stopped — over their budget or not, as each list below names a step by how it ended on its own work.

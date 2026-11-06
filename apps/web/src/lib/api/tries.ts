@@ -4,6 +4,18 @@
  * with.
  */
 import { Schema } from 'effect';
+import {
+  ARTIFACT_KINDS,
+  ATTEMPT_ENDS,
+  ENGINE_OUTCOMES,
+  OUTCOMES,
+  TRY_CAUSES,
+  type ArtifactKind,
+  type AttemptEnd,
+  type EngineOutcome,
+  type Outcome,
+  type TryCause,
+} from 'objects';
 import { decodes } from './decodes.ts';
 import {
   CheckVerdictSchema,
@@ -28,7 +40,7 @@ const StringsSchema = Schema.mutable(Schema.Array(Schema.String));
  */
 export type StepArtifact =
   | { path: string }
-  | { path: string; name: string; url: string; kind: 'image' | 'text' | 'other'; size: number }
+  | { path: string; name: string; url: string; kind: ArtifactKind; size: number }
   | { path: string; pruned: string; prunedAt: string };
 
 /**
@@ -41,7 +53,7 @@ export const StepArtifactSchema = decodes<StepArtifact>()(
       path: Schema.String,
       name: Schema.String,
       url: Schema.String,
-      kind: Schema.Literals(['image', 'text', 'other']),
+      kind: Schema.Literals(ARTIFACT_KINDS),
       size: Schema.Number,
     }),
     Schema.Struct({ path: Schema.String, pruned: Schema.String, prunedAt: Schema.String }),
@@ -113,7 +125,7 @@ export const AskedQuestionsSchema = decodes<AskedQuestions>()(
  */
 export type StepCloseout = {
   apiVersion: string | null;
-  outcome: 'done' | 'blocked';
+  outcome: Outcome;
   summary: string;
   body: string | null;
   needs: string | null;
@@ -147,7 +159,7 @@ const ObjectSchema = Schema.Record(Schema.String, Schema.Unknown);
 export const StepCloseoutSchema = decodes<StepCloseout>()(
   Schema.Struct({
     apiVersion: Schema.NullOr(Schema.String),
-    outcome: Schema.Literals(['done', 'blocked']),
+    outcome: Schema.Literals(OUTCOMES),
     summary: Schema.String,
     body: Schema.NullOr(Schema.String),
     needs: Schema.NullOr(Schema.String),
@@ -208,16 +220,14 @@ export type StepUnreadable = { error: string; raw: unknown };
 /** Decodes a `StepUnreadable`: the statement (`raw`) is read as it came. */
 export const StepUnreadableSchema = decodes<StepUnreadable>()(Schema.Struct({ error: Schema.String, raw: Schema.Unknown }));
 
-/** How an attempt ended, as the runtime records it: mirrors `EngineOutcome` in agent-orchestrator. */
-export const ATTEMPT_OUTCOMES = ['succeeded', 'failed', 'stopped'] as const;
-export type AttemptOutcome = (typeof ATTEMPT_OUTCOMES)[number];
+/** How an attempt ended, as the runtime records it: `objects`' `EngineOutcome`. */
+export type AttemptOutcome = EngineOutcome;
 
 /**
- * Why an attempt ended, in the words a person reads for it: mirrors `AttemptEnd` in agent-orchestrator (`endWords`) — the runtime's
+ * Why an attempt ended, in the words a person reads for it: `objects`' `AttemptEnd` (agent-orchestrator's `endWords`) — the runtime's
  * reasons, and the orchestrator's `budget` and `unsigned`.
  */
-export const ATTEMPT_ENDS = ['harness', 'lost', 'unstartable', 'operator', 'deadline', 'budget', 'unsigned'] as const;
-export type AttemptEnd = (typeof ATTEMPT_ENDS)[number];
+export type { AttemptEnd } from 'objects';
 
 /**
  * The release a session ran on: an install's tag, or a checkout's folder. Mirrors `SessionRelease` in agent-orchestrator (`release.ts`).
@@ -251,7 +261,7 @@ export const StepAttemptsSchema = decodes<StepAttempts>()(
     latest: Schema.NullOr(
       Schema.Struct({
         startedAt: Schema.String,
-        ended: Schema.NullOr(Schema.Literals(ATTEMPT_OUTCOMES)),
+        ended: Schema.NullOr(Schema.Literals(ENGINE_OUTCOMES)),
         endedAt: Schema.NullOr(Schema.String),
         reason: Schema.NullOr(Schema.Literals(ATTEMPT_ENDS)),
         release: Schema.NullOr(
@@ -274,7 +284,7 @@ export const StepAttemptsSchema = decodes<StepAttempts>()(
 export type StepTry = {
   try: number;
   round: number;
-  cause: 'retries' | 'continue' | 'fresh' | 'recheck' | 'round' | 'merge' | 'signoff' | 'back' | null;
+  cause: TryCause | null;
   current: boolean;
   taskId: string | null;
   note: string | null;
@@ -297,7 +307,7 @@ export const StepTrySchema = decodes<StepTry>()(
   Schema.Struct({
     try: Schema.Number,
     round: Schema.Number,
-    cause: Schema.NullOr(Schema.Literals(['retries', 'continue', 'fresh', 'recheck', 'round', 'merge', 'signoff', 'back'])),
+    cause: Schema.NullOr(Schema.Literals(TRY_CAUSES)),
     current: Schema.Boolean,
     taskId: Schema.NullOr(Schema.String),
     note: Schema.NullOr(Schema.String),

@@ -25,7 +25,7 @@ import { container, hairline } from '@/lib/meaning';
 import { CHIP } from './Reach';
 import { ServerSignIn } from './ServerSignIn';
 import { stateDrawn } from '../lib/serverState';
-import { HEADER_MASK } from 'objects';
+import { HEADER_MASK, MCP_TRANSPORTS } from 'objects';
 import { factoryServersQuery, recordServer, removeServer, type BuiltinServer, type FactoryServer, type McpServerWrite } from '../lib/api';
 
 /** What a person asks of a factory's record: one server recorded, or one taken off. */
@@ -164,13 +164,10 @@ function SignInFields({ draft, set }: Fills) {
   );
 }
 
-/** The transports a draft may name, as the api takes them. */
-const TRANSPORTS = ['http', 'sse'] as const;
-
 /** The transport `draft` names, `http` where none is typed; null for a word the api takes no server from. */
 const transportOf = (draft: Draft): McpServerWrite['type'] | null => {
   const typed = draft.transport.trim() || 'http';
-  return TRANSPORTS.find((one) => one === typed) ?? null;
+  return MCP_TRANSPORTS.find((one) => one === typed) ?? null;
 };
 
 /** `name=value`, as a header field holds one, split at its first `=`; null for one with none. */

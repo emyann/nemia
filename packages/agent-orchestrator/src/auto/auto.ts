@@ -7,6 +7,7 @@
  * Pure, and naming no agent: admission reads a list for whichever agent it is given (`admissionOf`). The files are `auto.store.ts`'s, the
  * facts `facts.ts`'s, the commands `auto.verb.ts`'s.
  */
+import { CHANGE_VERBS, type ChangeVerb } from 'objects';
 
 /**
  * The conditions a rule may need, each a fact admission reads of a run at the call: the step's agent recommends (`recommends`), its check
@@ -42,10 +43,10 @@ export type GateRule = {
 export const APPROVE_PROPOSAL = 'approve-proposal';
 
 /** What a proposal does to one object, Kubernetes' verbs for a write. */
-export const PROPOSAL_VERBS = ['create', 'update', 'delete'] as const;
+export const PROPOSAL_VERBS = CHANGE_VERBS;
 
 /** A verb of a proposal's change. */
-export type ProposalVerb = (typeof PROPOSAL_VERBS)[number];
+export type ProposalVerb = ChangeVerb;
 
 /**
  * A rule under which the agent approves a proposal of one factory unasked at auto: the `factory`; what it covers, as a delegation's grant

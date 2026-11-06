@@ -1,6 +1,7 @@
 import { nodeKind, type NodeKind } from '../route/index.ts';
 import { DEFAULT_ROUNDS, type Workflow } from '../step/step.ts';
 import type { TypedGraphOf } from '../../contracts/workflow-graph.contract.ts';
+import type { EdgeKind } from 'objects';
 
 export type { TypedGraph } from '../../contracts/workflow-graph.contract.ts';
 
@@ -11,15 +12,15 @@ export type { TypedGraph } from '../../contracts/workflow-graph.contract.ts';
  * the `after` edge between them.
  */
 export type GraphEdge =
-  | { from: string; to: string; kind: 'after' }
-  | { from: string; to: string; kind: 'loop'; rounds: number }
-  | { from: string; to: string; kind: 'route'; route: string };
+  | { from: string; to: string; kind: Extract<EdgeKind, 'after'> }
+  | { from: string; to: string; kind: Extract<EdgeKind, 'loop'>; rounds: number }
+  | { from: string; to: string; kind: Extract<EdgeKind, 'route'>; route: string };
 
 /** One node of a routed graph: its kind (`nodeKind`), the routes a condition ends the run on, the workflow a workflow node files for. */
 export type GraphNode = { name: string; kind: NodeKind; ends?: string[]; workflow?: string };
 
 /** `input`: `to` is handed `from`'s declared output (its `input:`). Drawn on the run object's graph alone until the board draws it. */
-export type InputEdge = { from: string; to: string; kind: 'input' };
+export type InputEdge = { from: string; to: string; kind: Extract<EdgeKind, 'input'> };
 
 /**
  * A run's steps as a graph: where the run's card leads, and every edge between its steps. `nodes`, each step with its kind, only on a

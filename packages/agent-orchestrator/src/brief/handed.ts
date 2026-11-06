@@ -6,6 +6,7 @@
 import { outputFields, type Workflow } from '../step/step.ts';
 import { dataBlock, fenced, type Mount } from '../record/record.ts';
 import { declaredOutput, type Closeout } from '../closeout/index.ts';
+import type { HandedHow } from 'objects';
 
 /**
  * A terminal step of a run another waited on: its step and how it signed off, and for a run that routed on to this one its artifacts
@@ -19,7 +20,7 @@ export type ParentStep = { step: Workflow; said: Closeout; files?: string } | { 
  * cannot be read; `how` it was given, `waited` on or `read` as context, and whether it had `landed` when it was read.
  */
 export type ParentCloseout = ({ run: string; asked: string; steps: readonly ParentStep[] } | { run: string; unreadable: string }) & {
-  how: 'waited' | 'read';
+  how: HandedHow;
   landed: boolean;
 };
 

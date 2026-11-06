@@ -27,25 +27,27 @@ import { SLOT_WAIT } from '../cap/cap.ts';
 import { PAUSE_WAIT } from '../list/list.ts';
 import { PERSON_WAITS, type AnswerVia, type WaitOn } from '../phase/phase.ts';
 import { firstPiece } from '../piece/piece.ts';
+import type { EventSource, EventType, InvolvedKind } from 'objects';
 
 /**
  * The kinds of thing the feed writes a line about: a run, one of its steps, a daemon that took the store, or the store itself — its
  * pause, put by `nemia pause` and lifted by `nemia resume`, and a factory's level in force, set by `nemia level`, which are no run's and
  * no daemon's.
  */
-export type InvolvedKind = 'Run' | 'Step' | 'Daemon' | 'Store';
+export type { InvolvedKind };
 
 /** How serious a line is, as Kubernetes types an `Event`: routine news, or something gone wrong. */
-export type LineType = 'Normal' | 'Warning';
+export type LineType = EventType;
 
 /**
  * Who a line is the deed of: the tick's own judgement, the runtime's journal read through the client, a person's verb, or a daemon that
  * took the store. A property of the reason (`sourceOf`), since a machine selects on it — and so the table's, not a branch in the stamp.
+ * `objects`' `EVENT_SOURCES` word for word (`packages/objects/src/words.ts`), held equal by `wordsHeld` (`object/run.model.ts`).
  */
-export const LINE_SOURCES = ['tick', 'runtime', 'person', 'daemon'] as const;
+export const LINE_SOURCES = ['tick', 'runtime', 'person', 'daemon'] as const satisfies readonly EventSource[];
 
 /** One of `LINE_SOURCES`. */
-export type LineSource = (typeof LINE_SOURCES)[number];
+export type LineSource = EventSource;
 
 /** What a line of the feed says of a thing, without its time: the word the tick judged, and the note beside it. */
 export type Said = { word: string; note?: string };

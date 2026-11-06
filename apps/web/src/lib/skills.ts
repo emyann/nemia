@@ -1,3 +1,4 @@
+import type { DefinitionOrigin } from 'objects';
 import type { GivenSkill, SkillCost, SkillDetail, SkillDraft, SkillPlace, SkillRow, SkillSource, SkillUser } from './api';
 
 /** What each place of skills is called on the board. */
@@ -51,7 +52,7 @@ export type SkillOffer =
   | { kind: 'add' }
   | { kind: 'copy' }
   | { kind: 'given' }
-  | { kind: 'found'; where: 'yours' | 'repo' }
+  | { kind: 'found'; where: Extract<DefinitionOrigin, 'yours' | 'repo'> }
   | { kind: 'refused'; why: string };
 
 export function offerOf(row: SkillRow, given: readonly string[]): SkillOffer {

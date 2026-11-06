@@ -53,6 +53,7 @@ import {
 } from './reason.ts';
 import { currentOf } from '../former-reason/former-reason.ts';
 import type { FactoryLevel } from '../level/level.ts';
+import type { EventWaits } from 'objects';
 
 export { DAEMON_STARTED, REMOVED, LINE_WORDS };
 export type { InvolvedKind, Reason, LineSource, LineType };
@@ -94,7 +95,7 @@ type Line = {
   on?: WaitOn;
   via?: AnswerVia;
   type?: LineType;
-  waits?: 'person';
+  waits?: EventWaits;
   source?: LineSource;
   message?: string;
   call?: string;

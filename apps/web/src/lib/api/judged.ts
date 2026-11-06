@@ -4,27 +4,26 @@
  * (`runRowOf`). A type a read of the board's own decodes has its schema beside it, which `get` decodes the api's answer with.
  */
 import { Schema } from 'effect';
+import { RUN_STATUSES, type RunStatusWord } from 'objects';
 import { decodes } from './decodes.ts';
 
 /** A list of strings, as a decoded answer holds it: mutable, as the plain types say. */
 export const StringsSchema = Schema.mutable(Schema.Array(Schema.String));
 
 /**
- * Mirrors `PlaceKind` in agent-orchestrator's place/place.model.ts: the kind of place a run's steps work in — `git`, branches of a
- * repository, or `folder`, folders the run makes — as a step's `place:` says it.
+ * `objects`' `PlaceKind`: the kind of place a run's steps work in — `git`, branches of a repository, or `folder`, folders the run makes —
+ * as a step's `place:` says it.
  */
-export type PlaceKind = 'git' | 'folder';
+export type { PlaceKind } from 'objects';
 
 /**
- * Mirrors `RunStatus` in agent-orchestrator: where `assess` puts the run. `failed` is a run in which a step broke; one a person alone
- * stops is `awaiting approval`, at its gates, or `waiting`, on anything else.
+ * `objects`' `RunStatusWord`, by the board's name: where `assess` puts the run. `failed` is a run in which a step broke; one a person
+ * alone stops is `awaiting approval`, at its gates, or `waiting`, on anything else.
  */
-export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'waiting';
+export type RunStatus = RunStatusWord;
 
 /** Decodes a `RunStatus`. */
-export const RunStatusSchema = decodes<RunStatus>()(
-  Schema.Literals(['running', 'succeeded', 'failed', 'cancelled', 'awaiting approval', 'waiting']),
-);
+export const RunStatusSchema = decodes<RunStatus>()(Schema.Literals(RUN_STATUSES));
 
 /**
  * Mirrors `RunToDecide` in agent-orchestrator: what a person has to decide about a run's result, the fifth reason a run waits on

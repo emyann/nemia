@@ -3,9 +3,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { artifactsDir } from '../record/record.store.ts';
 import { artifactPlace, filesPrunedWords, GIVEN, HANDED_CLOSEOUT, isRepositoryRun, type Run } from '../run.ts';
+import type { ArtifactKind } from 'objects';
 
 /** What the board does with a file: draws it inline, links it to be read in a tab, or links it with its size. */
-export type ArtifactKind = 'image' | 'text' | 'other';
+export type { ArtifactKind };
 
 /**
  * A file a closeout named. A file in the step's files directory (`artifactsDir`), by a name the artifacts route serves, is

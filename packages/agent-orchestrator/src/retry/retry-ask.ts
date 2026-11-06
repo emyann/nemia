@@ -6,6 +6,7 @@
  */
 import { lackedOf, tryOf, type CloseoutAsked, type Run, type StepRecord } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
+import type { RetryMode, TryCause } from 'objects';
 
 /**
  * How a person asks for another try of a step, with `nemia retry`.
@@ -14,7 +15,7 @@ import type { Workflow } from '../step/step.ts';
  *   fresh    a new session on the same branch; on another model, when the ask names one
  *   recheck  the step's check, run again on the work as it stands, and no session at all
  */
-export type RetryMode = 'continue' | 'fresh' | 'recheck';
+export type { RetryMode };
 
 /**
  * Each mode's former spelling, by the mode it is now: a record, an ask file or a caller written before decision 7 says `nudge` for
@@ -46,11 +47,17 @@ export const continuesFrom = (
  * Why a try was moved behind the one that replaced it (`EarlierTry.cause`): the run's word, a person's mode, a round, a merge, a sending
  * back.
  */
-export type TryCause = 'retries' | 'signoff' | RetryMode | 'round' | 'merge' | 'back';
+export type { TryCause };
 
 /** An ask file's JSON with its mode in the word it has now (`upgradeMode`), before its schema reads it. Pure. */
 export const upgradeAsk = (read: unknown): unknown =>
   isObject(read) && !Array.isArray(read) && Object.hasOwn(read, 'mode') ? { ...read, mode: upgradeMode(Reflect.get(read, 'mode')) } : read;
+
+/**
+ * Every `RetryMode`, as the record's schema reads an ask file's: `objects`' list word for word, held equal by `wordsHeld`
+ * (`object/run.model.ts`).
+ */
+export const RETRY_MODES = ['continue', 'fresh', 'recheck'] as const satisfies readonly RetryMode[];
 
 /**
  * Every `TryCause`, as the record's schema reads one: `objects`' list word for word (`packages/objects/src/words.ts`), held equal by

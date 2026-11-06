@@ -5,11 +5,12 @@
 import { LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
 import { declaredOutput, type Closeout } from './closeout.ts';
 import { CLOSEOUT_V1 } from './envelope.ts';
+import type { Outcome } from 'objects';
 
 /** A closeout as a later step reads it in `closeout.json`: an artifact is a file by its absolute path, or a value by its name. */
 export type HandedCloseout = {
   apiVersion: typeof CLOSEOUT_V1;
-  outcome: 'done' | 'blocked';
+  outcome: Outcome;
   summary: string;
   body: string | null;
   artifacts: Array<{ path: string } | { name: string; value: string }>;

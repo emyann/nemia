@@ -325,7 +325,7 @@ function SendBackForm({
         <Choice
           legend={`How to send ${backName} back`}
           name={`${field}-mode`}
-          options={RETRY_MODES}
+          options={GATE_MODES}
           value={mode}
           onChange={setMode}
           label={modeLabel}
@@ -339,7 +339,8 @@ function SendBackForm({
   );
 }
 
-const RETRY_MODES = ['continue', 'fresh'] as const;
+/** The modes a send-back offers, in its radios' order. */
+const GATE_MODES: readonly RetryMode[] = ['continue', 'fresh'];
 
 /** A send-back's mode as its radio says it: what it does, and the CLI's flag for it. */
 const modeLabel = (m: RetryMode): ReactNode => (

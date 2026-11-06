@@ -33,8 +33,11 @@ export const definitionServed: DefinitionServedOf = (held, asked) => {
   return held.includes(asked) ? { origin: asked, shadowedBy: first === asked ? null : first } : null;
 };
 
-/** The order a factory looks a name up in: its own tree, the repository, yours, then Nemia's builtin. */
-const LOOKUP: readonly DefinitionOrigin[] = ['factory', 'repo', 'yours', 'builtin'];
+/**
+ * The order a factory looks a name up in: its own tree, the repository, yours, then Nemia's builtin. `objects`' `DEFINITION_ORIGINS` word
+ * for word (`packages/objects/src/words.ts`), held equal by `wordsHeld` (`object/run.model.ts`).
+ */
+export const LOOKUP = ['factory', 'repo', 'yours', 'builtin'] as const satisfies readonly DefinitionOrigin[];
 
 /** The origins that hold `name` among `found`, in the lookup order. */
 export const heldOrigins: HeldOriginsOf = (found, name) => LOOKUP.filter((o) => found.some((f) => f.name === name && f.origin === o));

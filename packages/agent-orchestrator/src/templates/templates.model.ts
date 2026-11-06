@@ -5,6 +5,7 @@
  * before the check still reads.
  */
 import { Schema } from 'effect';
+import { TEMPLATE_PARAMETER_TYPES } from 'objects';
 import { brandedId, type Id } from '../model/brand.model.ts';
 import type { ErModel } from '../model/er.model.ts';
 import { WorkflowName } from '../record/record.model.ts';
@@ -21,7 +22,7 @@ const TemplateName = Schema.String.check(Schema.makeFilter((name: string) => tem
 
 /** A parameter a template declares in its manifest (`Parameter`, `layout.ts`). */
 const Parameter = Schema.Struct({
-  type: Schema.Literals(['string', 'number', 'boolean']),
+  type: Schema.Literals(TEMPLATE_PARAMETER_TYPES),
   description: Schema.String,
   default: Schema.optional(Schema.Union([Schema.String, Schema.Number, Schema.Boolean])),
 });

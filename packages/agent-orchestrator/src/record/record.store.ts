@@ -12,7 +12,7 @@ import { Result, Schema, SchemaIssue } from 'effect';
 import { BY_CAP, oneLine, WHY_CAP, type Acceptance, type Approval, type Hold, type Pruned, type Run } from './record.ts';
 import { personRoutes, spentAcceptances, spentApprovals, unrouted, withRoutes, type RoundAsk } from '../status/status.ts';
 import { spentRoundAsks } from '../round/round.ts';
-import { spentAsks, TRY_CAUSES, upgradeAsk, upgradeTries, type RetryAsk } from '../retry/index.ts';
+import { RETRY_MODES, spentAsks, TRY_CAUSES, upgradeAsk, upgradeTries, type RetryAsk } from '../retry/index.ts';
 import { asNamed } from '../workflow.ts';
 import { keptDeclared } from '../pinned/pinned.ts';
 import { FrozenStepSchema } from '../folder/folder.store.ts';
@@ -416,7 +416,7 @@ const ApprovalFileSchema = Kept({ at: When, message: Schema.optionalKey(Said), b
 const AcceptanceFileSchema = Kept({ at: When, message: Said });
 const RoundAskFileSchema = Kept({ budget: Schema.optionalKey(Dollars), at: Schema.optionalKey(Schema.Unknown) });
 const RetryAskFileSchema = Kept({
-  mode: Schema.Literals(['continue', 'fresh', 'recheck']),
+  mode: Schema.Literals(RETRY_MODES),
   model: Schema.optionalKey(Schema.NonEmptyString),
   message: Schema.optionalKey(Said),
   budget: Schema.optionalKey(Dollars),

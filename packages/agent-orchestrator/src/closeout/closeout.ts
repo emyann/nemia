@@ -8,6 +8,7 @@
  */
 import { isObject, JUDGE_ROUTE, LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
 import { digestOf } from '../revisions/revisions.ts';
+import type { Outcome } from 'objects';
 import {
   artifactsOf,
   bodyOf,
@@ -87,7 +88,7 @@ export type Closeout = {
   /** `nemia/v1` for a closeout given in v1's envelope; absent for one given before it (v0), converted on read. */
   apiVersion?: typeof CLOSEOUT_V1;
   /** `done` finished the work. `blocked` finished the SESSION and needs a person. */
-  outcome: 'done' | 'blocked';
+  outcome: Outcome;
   /** One line, cut to `SUMMARY_MAX` characters (`summaryLine`). */
   summary: string;
   /** Markdown, what the summary has no room for: led by the whole summary when the cut changed it. */

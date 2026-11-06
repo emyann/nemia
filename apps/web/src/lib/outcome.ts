@@ -1,3 +1,4 @@
+import type { Outcome as SignedOff } from 'objects';
 import type { StepArtifact, StepTry } from './api';
 import type { AttemptEnd } from './api/tries.ts';
 import type { Frozen } from './frozen.ts';
@@ -86,7 +87,7 @@ export const descriptionOf = (schema: unknown): string | null =>
  * attempt ended without one; or nobody yet — still running, or not filed — in the words the inspector has for that.
  */
 export type Outcome =
-  | { by: 'agent'; outcome: 'done' | 'blocked'; cut: string | null }
+  | { by: 'agent'; outcome: SignedOff; cut: string | null }
   | { by: 'machine'; reason: string; words: string }
   | { by: 'unreadable'; words: string }
   | { by: 'nobody'; words: string };

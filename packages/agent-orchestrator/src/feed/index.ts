@@ -48,7 +48,20 @@ export type {
   LineType,
   StoreLine,
 } from './feed.ts';
-export { codesOf, DENIED, isOnce, kindsOf, messageOf, reasonOf, REASONS, REASON_CODES, sourceOf, typeOf, waitsOf } from './reason.ts';
+export {
+  codesOf,
+  DENIED,
+  isOnce,
+  kindsOf,
+  LINE_SOURCES,
+  messageOf,
+  reasonOf,
+  REASONS,
+  REASON_CODES,
+  sourceOf,
+  typeOf,
+  waitsOf,
+} from './reason.ts';
 export type { Codes, Said } from './reason.ts';
 export {
   ANSWER_VIA,

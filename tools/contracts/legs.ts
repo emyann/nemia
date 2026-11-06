@@ -9,6 +9,8 @@
  * Measured on CI (run 41961131487, every verdict cold): `observe` 667.8 s, `approvalRefusal` 878.2 s, and every other contract
  * seconds — the runtime's nine together under a minute, each of the orchestrator's other proofs under 30 s. Proved one after another
  * in one job, those two set CI's time; proved beside the rest, the slowest single one does.
+ * On tsverify 0.9.0, which finds a pure function's examples by running it, the `npm run contracts` step of each leg took, cold (run
+ * 42137684319): `rest` 228 s, `observe` 73 s, `approval-refusal` 56 s.
  *
  * Each leg is proved by tsverify's own CLI, never in a process of ours: a verdict is not yet the same in every process (the first item
  * of tsverify's roadmap, "The same verdict on every run"), and the laws here are each one its CLI proved on three runs.

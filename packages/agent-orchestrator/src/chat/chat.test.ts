@@ -556,7 +556,7 @@ test('`speakerNameRefusal`: the names an agent speaks under, by their characters
     await t.test(`REFUSED: ${JSON.stringify(name.slice(0, 20))}`, () => assert.equal(typeof speakerNameRefusal(name), 'string'));
 });
 
-test('`withoutSpeaker` takes back no name but the one named: the full law its contract narrows until tsverify proves a filter keeps every element that passes (src-a-filter-s-result-is-pro-p25m)', async (t) => {
+test('`withoutSpeaker` takes back no name but the one named: the law `keepsOthers`, proved since tsverify 0.9.0, held on the real function too', async (t) => {
   const lists: readonly (readonly string[])[] = [[], ['operator'], ['operator', 'run-x.design'], ['a', 'operator', 'b', 'operator', 'c']];
   for (const allowed of lists)
     for (const name of ['operator', 'a', 'absent'])

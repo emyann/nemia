@@ -55,6 +55,15 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   handler (`serve.ts`) that Hono's routes hand exactly the paths it serves, each inside `served`, guarded first where it writes: a handler
   reads the request's services (`ServedNow`, the app's informer among them), never a layer of its own. A path added to the `Api` gets its
   forwarding route there, or Hono answers it 404. The feed, `watch` and every other route stay Hono's.
+- **Every list is watched by `watchable`** (`src/watch/watch.ts`, `?watch=true`): a list's route goes through `listed` in `serve.ts`
+  (and `partsRoutes`' and `definitionsRoutes`' `listed`), or it is not watched, which `src/watch/watch.test.ts` refuses for every GET
+  list of the `Api`. A watch reads its list again through its own route, so each open one costs a list read per feed line (at most
+  one per 500 ms) and per resync: a watch of runs on a busy feed reads the RunList about a third of the time (the measure below).
+  The Event lists are the exception: their watch follows the feed (`eventsFollowed`, `src/feed-objects/events-watch.ts`) and never reads
+  the list again, since a read of it is a read of the whole feed. Discovery (`GET /api`,
+  `src/discovery/discovery.ts`) is read off the `Api`, so a path added there is discovered with nothing to change. SSE under HttpApi was
+  measured on 2026-11-05 (`docs/measure-2026-11-05-sse-under-httpapi.md`): the watch's frames are already HttpApi's and it can move;
+  the feed can once its opening comment and its `Last-Event-ID` resume are written through `StreamSse({ events })`. Neither moved yet.
 - **A request body is decoded by its route's schema** (`readBody` in `body.ts`) and refused in the route's own words, the first wrong
   key named: no schema message reaches a response. A new key goes into the schema and its `*_SHAPE`, with a test that makes it refuse.
 - **A feed fixture writes the events the runtime writes**: the runtime decodes its feed, so a fixture event missing a field the

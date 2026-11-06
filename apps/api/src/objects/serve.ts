@@ -27,6 +27,10 @@
  * A write's body is read up to `OBJECT_BODY_LIMIT` (effect's `MaxBodySize`, which it otherwise leaves unset), and one over it is
  * answered 413 `{ error }` naming the limit.
  *
+ * Every list is handed on through `listed`, which `watchable` wraps (src/watch/watch.ts): a list's route that does not go through it is not
+ * watched; the Event lists' watch follows the feed instead of reading it again (`eventsFollowed`). `GET /api` is discovery
+ * (src/discovery/discovery.ts), every resource read off the `Api`.
+ *
  * `GET /api/runs/:runId` with `?raw=` (not `false`) or `?view=` is passed on to the runs' own route (runs/runs.ts), which answers both.
  */
 import { ByteSize, Context, Layer } from 'effect';
@@ -52,7 +56,9 @@ import { agentsHandlers, definitionsRoutes, skillsHandlers, workflowsHandlers } 
 import { placeFor } from '../factories/place.ts';
 import { ServedNow } from './refused.ts';
 import { runsHandlers } from './runs.ts';
-import { eventsHandlers, subscriptionsHandlers } from '../feed-objects/index.ts';
+import { watchable } from '../watch/watch.ts';
+import { discoveryHandlers } from '../discovery/discovery.ts';
+import { eventsFollowed, eventsHandlers, subscriptionsHandlers } from '../feed-objects/index.ts';
 import { templatesHandlers } from '../template-objects/templates.ts';
 
 /** Where every path the objects are served on is listed, with what each takes. */
@@ -126,6 +132,7 @@ export const objectsHandler = (runtime: ApiRuntime) => {
         templatesHandlers,
         subscriptionsHandlers,
         eventsHandlers,
+        discoveryHandlers,
       ]),
       Layer.provide(HttpServer.layerServices),
       Layer.provideMerge(Layer.succeed(HttpIncomingMessage.MaxBodySize, OBJECT_BODY_LIMIT)),
@@ -269,19 +276,21 @@ function runsRoutes(router: Hono<ApiEnv>, { forward, listed, guarded }: Hand): H
 /** The routes that hand the objects' handler each path it serves, built over the app's runtime. */
 export function objectsRoutes(runtime: ApiRuntime): Hono<ApiEnv> {
   const { handler } = objectsHandler(runtime);
-  const handed = (c: RequestContext<ApiEnv>, takes: string) => served(c, (s) => handler(c.req.raw, Context.make(ServedNow, s), takes));
+  const handed = (c: RequestContext<ApiEnv>, takes: string, request: Request = c.req.raw) =>
+    served(c, (s) => handler(request, Context.make(ServedNow, s), takes));
   const forward = (c: RequestContext<ApiEnv>) => handed(c, ONE_TAKES);
-  const listed = (c: RequestContext<ApiEnv>) => handed(c, LIST_TAKES);
+  const listed = watchable((c, request) => handed(c, LIST_TAKES, request));
+  const events = watchable((c, request) => handed(c, LIST_TAKES, request), eventsFollowed);
   const guarded = (write: (c: RequestContext<ApiEnv>) => Guarded) => (c: RequestContext<ApiEnv>) => {
     const guard = write(c);
     const refused = refusedBeforeReading(guard, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
     return refused ? c.json({ error: refused.error }, refused.status) : handed(c, guard.shape);
   };
   const at = (c: RequestContext<ApiEnv>) => [c.req.param('namespace') ?? '', c.req.param('name') ?? ''] as const;
-  const placed = (c: RequestContext<ApiEnv>, takes: string) =>
+  const placed = (c: RequestContext<ApiEnv>, takes: string, request: Request = c.req.raw) =>
     served(c, (s) => {
       const place = placeFor({ factory: c.req.param('namespace'), repo: c.req.query('repo') }, s.env, s.running);
-      return handler(c.req.raw, Context.make(ServedNow, { ...s, repo: place.repo, factory: place.factory }), takes);
+      return handler(request, Context.make(ServedNow, { ...s, repo: place.repo, factory: place.factory }), takes);
     });
   const placedGuarded = (write: (c: RequestContext<ApiEnv>) => Guarded) => (c: RequestContext<ApiEnv>) => {
     const guard = write(c);
@@ -290,13 +299,14 @@ export function objectsRoutes(runtime: ApiRuntime): Hono<ApiEnv> {
   };
   const definitions = definitionsRoutes(new Hono<ApiEnv>(), {
     forward: (c) => placed(c, ONE_TAKES),
-    listed: (c) => placed(c, LIST_TAKES),
+    listed: watchable((c, request) => placed(c, LIST_TAKES, request)),
     guarded: placedGuarded,
   });
   const runs = runsRoutes(new Hono<ApiEnv>(), { forward, listed, guarded }).post('/api/namespaces/:namespace/runs', async (c) =>
     located(await placedGuarded((c) => startGuarded(at(c)[0]))(c)),
   );
   return partsRoutes(new Hono<ApiEnv>().route('/', definitions).route('/', runs), { forward, listed, guarded })
+    .get('/api', forward)
     .get('/api/runs/:runId', (c, next) => (notTheObject(c) ? next() : forward(c)))
     .get('/api/runs/:runId/steps/:step/tries', forward)
     .get('/api/runs/:runId/steps/:step/tries/:try', forward)
@@ -308,9 +318,9 @@ export function objectsRoutes(runtime: ApiRuntime): Hono<ApiEnv> {
     .get('/api/templates/:name/:plural{workflows|agents|skills}/:doc', forward)
     .get('/api/subscriptions', listed)
     .get('/api/subscriptions/:name', forward)
-    .get('/api/events', listed)
+    .get('/api/events', events)
     .get('/api/events/:name', forward)
-    .get('/api/namespaces/:namespace/events', listed)
+    .get('/api/namespaces/:namespace/events', events)
     .get('/api/namespaces/:namespace/events/:name', forward)
     .get('/api/cards', listed)
     .get('/api/namespaces/:namespace/cards', listed)

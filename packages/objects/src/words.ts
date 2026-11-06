@@ -350,3 +350,37 @@ export const TEMPLATE_PARAMETER_TYPES = ['string', 'number', 'boolean'] as const
 
 /** One of `TEMPLATE_PARAMETER_TYPES`. */
 export type TemplateParameterType = (typeof TEMPLATE_PARAMETER_TYPES)[number];
+
+/**
+ * What a watch of a list says, in Kubernetes' words: an object it holds that the watcher was not sent (`ADDED`), one sent that changed
+ * (`MODIFIED`), one sent that it no longer holds (`DELETED`), and a mark that every change up to a `resourceVersion` was sent
+ * (`BOOKMARK`), the first of which ends the initial state.
+ */
+export const WATCH_EVENT_TYPES = ['ADDED', 'MODIFIED', 'DELETED', 'BOOKMARK'] as const;
+
+/** One of `WATCH_EVENT_TYPES`. */
+export type WatchEventType = (typeof WATCH_EVENT_TYPES)[number];
+
+/** What a resource of the api can be asked, in Kubernetes' words, as discovery says them (`APIResource`). */
+export const RESOURCE_VERBS = ['get', 'list', 'watch', 'create', 'update', 'patch', 'delete'] as const;
+
+/** One of `RESOURCE_VERBS`. */
+export type ResourceVerb = (typeof RESOURCE_VERBS)[number];
+
+/** The kinds the api serves as objects, each with its object Schema, its `<Kind>List` and its get endpoint here. */
+export const KINDS = [
+  'Run',
+  'Card',
+  'Factory',
+  'McpServer',
+  'Schedule',
+  'Hire',
+  'Volume',
+  'Workflow',
+  'Agent',
+  'Skill',
+  'Template',
+  'Subscription',
+  'Event',
+] as const;
+export type Kind = (typeof KINDS)[number];

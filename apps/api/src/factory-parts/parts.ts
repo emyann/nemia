@@ -202,7 +202,7 @@ export function partsRoutes(app: Hono<ApiEnv>, h: Handing): Hono<ApiEnv> {
     '/api/factories/:name/instruction/words',
     h.guarded((c) => PART_WRITES.deleteWords(factory(c))),
   );
-  app.get('/api/builtin/mcpservers', h.forward);
+  app.get('/api/builtin/mcpservers', h.listed);
   for (const kind of ['mcpservers', 'schedules', 'hires', 'volumes']) {
     app.get(`${ns}/${kind}`, h.listed);
     app.get(`${ns}/${kind}/:name`, h.forward);

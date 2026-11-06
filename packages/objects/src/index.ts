@@ -183,6 +183,8 @@ export {
   VolumesGroup,
   WriteFailed,
   WorkflowsGroup,
+  DiscoveryGroup,
+  RESOURCE_PLURALS,
 } from './api.ts';
 export { GraphEdge, GraphNode, ObjectGraph, TypedGraph } from './graph.ts';
 export { CardSkill, Origin, SkillCost, WriteMeta } from './definition.ts';
@@ -216,3 +218,6 @@ export { Skill, SkillFiles, SkillList, SkillSpec, SkillStatus, SkillUser, SkillW
 export { Template, TemplateList, TemplateParameter, TemplateSpec, TemplateStatus, TemplateText } from './template.ts';
 export { Subscription, SubscriptionList, SubscriptionScope, SubscriptionSpec, SubscriptionStatus } from './subscription.ts';
 export { Event, EventInvolved, EventList } from './event.ts';
+export { WATCH_EVENT_TYPES, type WatchEventType, RESOURCE_VERBS, type ResourceVerb } from './words.ts';
+export { AnyObjectList, BookmarkObject, WatchedObject, watchEventOf } from './watch.ts';
+export { APIResource, APIResourceList } from './discovery.ts';

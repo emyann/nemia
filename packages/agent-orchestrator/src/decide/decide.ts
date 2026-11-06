@@ -19,6 +19,7 @@ import {
   stepSpend,
   type RoundAsk,
   type SpendOf,
+  budgetStopped,
   budgetWord,
   dollars,
   readWords,
@@ -79,7 +80,10 @@ export type Decision =
        * one (`stepStatus`).
        */
       overBudget: string[];
-      /** Steps whose harness ended their session at their `budget:`. */
+      /**
+       * Steps whose harness ended their session at their `budget:`, and those of them a recheck then failed (`budgetStopped`): the
+       * stop stays said beside the check.
+       */
       budgetExhausted: string[];
       /**
        * Steps that signed off having been denied a call, and say `denials: fail`: nothing after them is filed, and no check of them ran.
@@ -236,7 +240,9 @@ export function decision(
     .filter((s) => statusOf.get(s.name) === 'over budget')
     .map((s) => s.name)
     .sort();
-  const budgetExhausted = named('budget exhausted');
+  const budgetExhausted = [
+    ...new Set([...named('budget exhausted'), ...checkFailed.filter((name) => budgetStopped(run, name, spendOf))]),
+  ].sort();
   const denied = named('denied');
   const outcome =
     failed.length || checkFailed.length

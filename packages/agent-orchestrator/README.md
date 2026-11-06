@@ -1910,6 +1910,7 @@ stateDiagram-v2
   failed --> running: tried again
   stopped --> running: tried again
   budget_exhausted --> running: tried again, with a budget
+  budget_exhausted --> checking: its check run on your word
   over_budget --> running: tried again, with a budget
   over_budget --> pending: a round on your word, with a budget
 ```

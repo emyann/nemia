@@ -60,7 +60,9 @@ import type { MostSpent, RaiseVerdictOf } from '../../contracts/raise.contract.t
  * closeout, it signed off blocked, or its session failed or was stopped. `recheck` only where a check did not
  * pass, since nothing else has a check to run again, and never on an ending that lands on its check
  * (`landsOnCheck`): the run aborted the merge its check judged, so a recheck would judge the checkout
- * without it. A step that signed off blocked only once its session
+ * without it. And on a step with a `check:` whose session was ended at its budget (`budget exhausted`) once it
+ * settled, its check never run: the work may be done — a land session cut off after its merge — and the check
+ * reads the world with no session; but not on an ending whose staged merge the run took back. A step that signed off blocked only once its session
  * has settled: a session can outlive its closeout, and a try resuming one still running would be two agents
  * in one conversation.
  *
@@ -151,20 +153,23 @@ function triedOn(
         noneFiled &&
         followers.some((f) => waitsAtGate(f, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf))));
   const modes: RetryMode[] =
-    tried === 'failed (check)'
-      ? landsOnCheck(step, run)
-        ? ['continue', 'fresh']
-        : ['continue', 'fresh', 'recheck']
-      : tried === 'unsigned' ||
-          tried === 'failed' ||
-          tried === 'stopped' ||
-          (tried === 'blocked' && settled) ||
-          tried === 'budget exhausted' ||
-          tried === 'denied' ||
-          harnessAsks ||
-          sendsBack
-        ? ['continue', 'fresh']
-        : [];
+    tried === 'budget exhausted'
+      ? settled && step.check && !landingAborted(step, run)
+        ? ['continue', 'fresh', 'recheck']
+        : ['continue', 'fresh']
+      : tried === 'failed (check)'
+        ? landsOnCheck(step, run)
+          ? ['continue', 'fresh']
+          : ['continue', 'fresh', 'recheck']
+        : tried === 'unsigned' ||
+            tried === 'failed' ||
+            tried === 'stopped' ||
+            (tried === 'blocked' && settled) ||
+            tried === 'denied' ||
+            harnessAsks ||
+            sendsBack
+          ? ['continue', 'fresh']
+          : [];
   const raise =
     settled && modes.length && (status === 'budget exhausted' || overBudget(step, run, spendOf)) ? raiseOf(step, run, spendOf) : undefined;
   return {
@@ -176,6 +181,12 @@ function triedOn(
     ...(raise ? { raise } : {}),
   };
 }
+
+/** Whether the run took back the merge an ending that lands on its check staged (`landingDue`): nothing is staged for a check to judge. */
+const landingAborted = (step: Workflow, run: Run): boolean => {
+  const landed = run.steps[step.name]?.landed;
+  return landsOnCheck(step, run) && landed !== undefined && 'aborted' in landed;
+};
 
 /**
  * A step's raise of its cap, judged from what its gatherer read (`stepRaise`): a try's, where its try carries one and may be taken, else a
@@ -644,7 +655,11 @@ export function retryOffers(
         sessionNeeds(raise),
       );
     } else if (raise) {
-      const recheck = modes.includes('recheck') ? '; --recheck runs its check again, and needs no --budget' : '';
+      const recheck = !modes.includes('recheck')
+        ? ''
+        : status === 'budget exhausted'
+          ? '; --recheck runs its check, never run, on the work as it stands, and needs no --budget'
+          : '; --recheck runs its check again, and needs no --budget';
       const own = judged?.own;
       const word = status === 'over budget' ? `over budget (${own === 'failed (check)' ? 'check refused' : own})` : status;
       offer(...raiseWords(command, word, raise, landAgain, `${spent}${recheck}`));

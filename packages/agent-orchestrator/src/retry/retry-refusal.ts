@@ -311,7 +311,10 @@ function statusRefusal(c: Judged): string {
   return why[status] ?? `${name} is ${status}, and there is nothing to try again.`;
 }
 
-/** `--recheck` where no check failed, or on an ending that lands on its check, whose merge the run aborted. */
+/**
+ * `--recheck` where no check failed, or on an ending that lands on its check, whose merge the run aborted; and on a step ended at its
+ * budget with no check to run, or whose staged merge the run took back, its session retry with `--budget` named instead.
+ */
 function modeRefusal(c: Judged): string | undefined {
   const { step, run, name, how, command, phaseOf, verdictOf, modes, status, via, sendsBack } = c;
   if (modes.includes(how.mode)) return undefined;
@@ -320,6 +323,14 @@ function modeRefusal(c: Judged): string | undefined {
       ? 'refused it'
       : 'did not finish';
     return `--recheck runs a step's check again on the work as it stands, and ${name}'s check was run on the merge ${name} staged in the repository's checkout, which the run aborted when its check ${why}: there is nothing staged for it to judge. Merge and check again, in a new try of ${name}: ${command}.`;
+  }
+  if (status === 'budget exhausted') {
+    const why = step.check
+      ? `its session was ended at its budget, and the run took back the merge it staged in the repository's checkout: there is nothing staged for its check to judge`
+      : `its session was ended at its budget, and it declares no check: there is nothing to run`;
+    return `--recheck runs a step's check, and ${why}. Ask for another session, with its cap raised: ${command} --budget <amount>${
+      c.raise ? ` (above ${aboveWord(c.raise)})` : ''
+    }.`;
   }
   const is =
     via === 'session'
@@ -371,6 +382,9 @@ function raiseMissing(c: Judged): string | undefined {
     const withTry = `${command} --budget <amount>${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''}`;
     if (status === 'failed (check)' && modes.includes('recheck')) {
       return `${name}'s check did not finish, and ${name} ${raiseWords(status, raise)}. Run its check again, which needs no --budget: ${command} --recheck — or raise the cap for a new session, above ${aboveWord(raise)}: ${withTry}.`;
+    }
+    if (status === 'budget exhausted' && modes.includes('recheck')) {
+      return `${name} ${raiseWords(status, raise)}, before its check ran. Run its check on the work as it stands, which needs no --budget: ${command} --recheck — or raise the cap for a new session, above ${aboveWord(raise)}: ${withTry}.`;
     }
     return `${name} ${raiseWords(status, raise)}, and the run spends nothing more on it until a person raises the cap. Raise it with the try, above ${aboveWord(raise)}: ${withTry}.`;
   }

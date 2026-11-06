@@ -21,7 +21,7 @@ import { templatePlace } from '../templates/templates.store.ts';
 import { nameOfSource, sourceGiven } from '../templates/templates.ts';
 import { Effect } from 'effect';
 import type { Factory, FactoryTemplate } from '../factory/factory.ts';
-import { renderedAt, renderedOrNot, sameParams, setsOf, type RenderedAt } from '../applied/applied.verb.ts';
+import { renderedAt, renderedOrNot, sameParams, setsOf, type RenderedAt, type Unrendered } from '../applied/applied.verb.ts';
 import {
   appliedDir,
   digestOf,
@@ -155,6 +155,18 @@ const renderTo = Effect.fn('renderTo')(function* (
 ) {
   const params = factory.template.params;
   const read = yield* renderedOrNot(sets === undefined ? renderedAt(source, setsOf(params)) : renderedAt(source, sets, params));
+  return yield* judgedTo(verb, factory, source, to, notDone, read);
+});
+
+/** The render `read` of the template at `source`, refused where it is at another version than `to`, or does not render (`renderTo`). */
+const judgedTo = Effect.fn('judgedTo')(function* (
+  verb: string,
+  factory: Templated,
+  source: string,
+  to: string,
+  notDone: string,
+  read: RenderedAt | Unrendered,
+) {
   if (read.version !== undefined && read.version !== to)
     return yield* Effect.fail(
       new Conflict({
@@ -525,7 +537,8 @@ type Resolved = { name: string; at: string; to: string; file: string; left: stri
 /**
  * The choice `args` give, written for one conflict of the upgrade under way — another version wanted, or a template of another name
  * than the base's (a switch) — for that version and that template. Refused, nothing written: the factory as an upgrade is (`rendered`);
- * a base whose version no status names, a template that no longer renders at the version wanted, or no upgrade under way (`Conflict`);
+ * a base whose version no status names, the template at a version no upgrade is filed to yet (naming that upgrade, to file first), a
+ * template that no longer renders at the version wanted, or no upgrade under way (`Conflict`);
  * an address that is no conflict of the merge (`Missing`, naming those there are); and a `--file` that is not there (`Invalid`).
  */
 const resolved = Effect.fn('resolved')(function* (args: Args) {
@@ -539,9 +552,19 @@ const resolved = Effect.fn('resolved')(function* (args: Args) {
         message: `${verb}: no status names the version ${factory.name}'s base was applied at, so no upgrade of it can be merged: name it, nemia factory upgrade ${factory.name} --to <it> [--template <name|folder|archive>], and upgrade again once nemia factory ls shows it applied. ${notDone}`,
       }),
     );
-  const render = yield* renderTo(verb, factory, factory.template.source, to, notDone);
+  const source = factory.template.source;
+  const read = yield* renderedOrNot(renderedAt(source, setsOf(factory.template.params)));
+  const ahead = read.version !== undefined && read.version !== to ? read.version : undefined;
+  const sameTemplate = read.name === undefined || status?.template === undefined || mergeBaseOf(status.template, read.name) === 'common';
+  if (ahead !== undefined && to === from && sameTemplate)
+    return yield* Effect.fail(
+      new Conflict({
+        message: `${verb}: no upgrade of ${factory.name} to ${ahead} is filed yet, and a conflict nemia factory diff showed for it is resolved for that upgrade: file it first, nemia factory upgrade ${factory.name} --to ${ahead}, then resolve the conflict again. ${notDone}`,
+      }),
+    );
+  const render = yield* judgedTo(verb, factory, source, to, notDone, read);
   const switched = switchOf(status, render);
-  const same = yield* sameVersionOf(factory.template.source, status, base, render, switched);
+  const same = yield* sameVersionOf(source, status, base, render, switched);
   if (to === from && switched === undefined && same !== 'params')
     return yield* Effect.fail(
       new Conflict({

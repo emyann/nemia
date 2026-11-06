@@ -172,8 +172,9 @@ test('a switch onto another template: previewed with no common base, held to its
         assert.equal(from, 'from the template', `nothing the tree holds is taken silently: ${line}`);
         assert.ok(!tree.includes(at ?? ''), `${at} is a file only the new template holds`);
       }
-      assert.match(printed.at(-1) ?? '', /--template .* --plan sha256:[0-9a-f]{64} files it/, 'a switch is filed with its plan');
-      plan = /--plan (sha256:[0-9a-f]{64})/.exec(printed.at(-1) ?? '')?.[1] ?? '';
+      const files = printed.find((line) => line.includes(' files it')) ?? '';
+      assert.match(files, /--template .* --plan sha256:[0-9a-f]{64} files it/, 'a switch is filed with its plan');
+      plan = /--plan (sha256:[0-9a-f]{64})/.exec(files)?.[1] ?? '';
     },
   );
 

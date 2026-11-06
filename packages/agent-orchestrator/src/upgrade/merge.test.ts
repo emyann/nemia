@@ -171,7 +171,7 @@ test("a templated factory's tree merged three ways, row by row: by file, by key,
     assert.equal(compareVersions('1.2.3', '1.2.3'), 0);
   });
   await t.test(
-    'the plan says what merges and each conflict with its sides and the line that resolves it; a status keeps a side cut',
+    'the plan says what merges and each conflict with its sides, then the upgrade to file and after it the line that resolves each; a status keeps a side cut',
     () => {
       const merge = mergeTrees(
         tree({ 'a.md': 'a\n', 'b.md': 'b\n' }),
@@ -191,10 +191,11 @@ test("a templated factory's tree merged three ways, row by row: by file, by key,
         '      | x',
         '    theirs:',
         '      | A',
-        "    nemia factory resolve made 'a.md:1-1' --ours|--theirs|--file <path>",
         'dropped: b, c',
         'plan: sha256:d',
-        'nemia factory upgrade made --to 1.1.0 --set a=1 --plan sha256:d files it; the daemon merges once each conflict is resolved.',
+        'first, nemia factory upgrade made --to 1.1.0 --set a=1 --plan sha256:d files it; then a choice for each conflict:',
+        "    nemia factory resolve made 'a.md:1-1' --ours|--theirs|--file <path>",
+        'the daemon merges once each conflict is resolved.',
       ]);
       assert.ok(
         !planLines('made', '1.0.0', '1.1.0', merge, { ...next, dropped: [] }).some((l) => l.startsWith('dropped:')),

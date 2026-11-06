@@ -13,7 +13,8 @@ import {
   telemetryLayer,
   VERSION,
 } from 'agent-orchestrator';
-import { isRefusal, type Refusal } from 'agent-orchestrator';
+import { Forbidden, isRefusal, type Refusal } from 'agent-orchestrator';
+import { callerGate, Unauthorized } from './caller/caller.ts';
 import { agents } from './agents/index.ts';
 import { customInstructions } from './custom/custom.ts';
 import { commands } from './commands/index.ts';
@@ -33,22 +34,27 @@ import { builder, workflows, yours } from './workflows/index.ts';
 
 /**
  * The status each kind of the orchestrator's refusal answers, whichever route it came through: what is asked of is not there (404), the
- * state of a run or of the store forbids it (409), what is given is wrong (422). A kind left out is refused by the compiler.
+ * state of a run or of the store forbids it (409), what is given is wrong (422); and who asks: a caller who may not do what it asks of a
+ * proposal or a delegation (the orchestrator's `Forbidden`, 403), and a session token the api refuses (`Unauthorized`, caller/caller.ts,
+ * 401). A kind left out is refused by the compiler.
  */
-export const REFUSAL_STATUS = { Missing: 404, Conflict: 409, Invalid: 422 } as const satisfies Record<
-  Refusal['_tag'],
+export const REFUSAL_STATUS = { Missing: 404, Conflict: 409, Invalid: 422, Forbidden: 403, Unauthorized: 401 } as const satisfies Record<
+  Refusal['_tag'] | Forbidden['_tag'] | Unauthorized['_tag'],
   ContentfulStatusCode
 >;
 
 /**
  * What the api answers an error a route threw: a refusal of the orchestrator's (`isRefusal`, by its class) its status in `REFUSAL_STATUS`,
- * `{ error }` in its words, and `users` beside it where a `Conflict` names the steps that hold what was asked of; an `HTTPException` its
+ * `{ error }` in its words, and `users` beside it where a `Conflict` names the steps that hold what was asked of; a caller refused
+ * (`Forbidden`, `Unauthorized`) its status there too, `{ error, reason }`; an `HTTPException` its
  * own response; anything else a 500, `{ error }` its message, said on stderr — an `Error` carrying `exitCode` 2 by hand among them, since
  * only a kind says what a refusal is.
  */
 export const answerError: ErrorHandler = (err, c) => {
   if (isRefusal(err))
     return c.json({ error: err.message, ...(err._tag === 'Conflict' && err.users && { users: err.users }) }, REFUSAL_STATUS[err._tag]);
+  if (err instanceof Forbidden || err instanceof Unauthorized)
+    return c.json({ error: err.message, ...(err.reason !== undefined && { reason: err.reason }) }, REFUSAL_STATUS[err._tag]);
   if (err instanceof HTTPException) return err.getResponse();
   console.error(err);
   return c.json({ error: err.message }, 500);
@@ -115,6 +121,9 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  *   tools once while the app runs (`McpAsker`); one that fails is an `error` on its entry, never a failed request.
  * - definitions/ — the Workflows, Agents and Skills as objects, each in a namespace (`default`, the api's repository and your library, or a
  *   factory's), served through `objects`' Api (objects/serve.ts): listed, read by origin, and yours written in `default` alone.
+ * - proposals/ — a factory's Proposals, made by any caller of the factory, approved by the person or a delegated agent at auto and
+ *   applied, declined by the person; and its Delegations, written by the person alone; served through `objects`' Api (objects/serve.ts),
+ *   each judged by who calls (`caller`, caller/caller.ts).
  * - workflows/workflows.ts — a run of a workflow started, the board's first write, or of an inbox card.
  * - workflows/builder.ts — what a step's form is drawn from (`GET /api/workflows/keys`), and the builder's write the Workflow's PUT calls.
  * - workflows/yours.ts — your store's folders under the store root, and the line that files a factory in it.
@@ -171,7 +180,9 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  * (`answerError`). Any other error is a 500 there: a route that has better words for one, or a truer status, answers it itself.
  *
  * Every request, whichever route answers it, says one line and is traced as a server span: `saidRequest` (request/request.ts), registered
- * after the runtime's middleware and before every router, on the runtime the request carries.
+ * after the runtime's middleware and before every router, on the runtime the request carries. Then who it is from (`callerGate`,
+ * caller/caller.ts): the person with no `Authorization`, an agent's session by the token it presents, a token refused 401 whatever the
+ * route.
  */
 export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtime: ApiRuntime } {
   const runtime = ManagedRuntime.make(layer);
@@ -181,6 +192,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
       await next();
     })
     .use(saidRequest)
+    .use(callerGate)
     .get('/api/health', (c) => c.json({ ok: true }))
     .get('/api/version', (c) => c.json({ version: VERSION, release: RELEASE }))
     .get('/api/capabilities', (c) =>

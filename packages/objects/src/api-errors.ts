@@ -3,7 +3,7 @@
  * the query every list of the `Api` takes. Shared by every group (`api.ts`, `run-api.ts`).
  */
 import { Schema } from 'effect';
-import { WRITE_WAYS } from './words.ts';
+import { PROPOSAL_REFUSALS, TOKEN_REFUSALS, WRITE_WAYS } from './words.ts';
 
 /** Nothing by that name, or not in that namespace: a 404. */
 export class Missing extends Schema.Class<Missing>('Missing')({ error: Schema.String }, { httpApiStatus: 404 }) {}
@@ -22,6 +22,21 @@ export class Conflict extends Schema.Class<Conflict>('Conflict')(
 export class Invalid extends Schema.Class<Invalid>('Invalid')(
   { error: Schema.String, way: Schema.optionalKey(Schema.Literals(WRITE_WAYS)), steps: Schema.optionalKey(Schema.Array(Schema.String)) },
   { httpApiStatus: 422 },
+) {}
+
+/**
+ * A caller the api knows, refused what it asks: an approval its standing does not reach, a proposal in another factory, a write only the
+ * person makes — a 403, with its reason (`PROPOSAL_REFUSALS`).
+ */
+export class Forbidden extends Schema.Class<Forbidden>('Forbidden')(
+  { error: Schema.String, reason: Schema.optionalKey(Schema.Literals(PROPOSAL_REFUSALS)) },
+  { httpApiStatus: 403 },
+) {}
+
+/** A session token the api refuses — never minted, or its session's try no longer live: a 401, with its reason (`TOKEN_REFUSALS`). */
+export class Unauthorized extends Schema.Class<Unauthorized>('Unauthorized')(
+  { error: Schema.String, reason: Schema.optionalKey(Schema.Literals(TOKEN_REFUSALS)) },
+  { httpApiStatus: 401 },
 ) {}
 
 /** A write the package let through and the disk then refused (a file that is a folder, one read-only): a 500, saying what failed. */

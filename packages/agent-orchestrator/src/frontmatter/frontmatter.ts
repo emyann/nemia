@@ -157,6 +157,18 @@ export function readFrontmatter(name: string, block: string): Frontmatter {
 }
 
 /**
+ * A block as YAML's own values, a number a number and a list a list, where `readFrontmatter` reads every scalar as its text: for a
+ * reader that serves a file's keys as the objects type them (`currentOf`, a Workflow's spec as its files write it). Throws YAML's own
+ * error on a block YAML refuses, as the loader's `readFrontmatter` refuses it with the fix.
+ */
+export function frontmatterValues(block: string): unknown {
+  const doc = parseDocument(block);
+  const [error] = doc.errors;
+  if (error !== undefined) throw error;
+  return doc.toJS();
+}
+
+/**
  * A block read as `readFrontmatter` reads it, or null where it refuses it: for a reader that never refuses, as a file's one key is read
  * for a listing (`frontmatterKey`), or a file that is a card only when its block reads as one (`cardToStart`).
  */

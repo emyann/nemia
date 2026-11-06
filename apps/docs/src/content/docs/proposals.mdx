@@ -1,0 +1,126 @@
+---
+title: Proposals
+description: How a factory's definitions change by an agent's hand - an agent proposes, the person approves (or, at auto, an agent the person delegated to), and Nemia applies it when it is due.
+---
+
+A proposal is a change to a factory's definitions, made in one action: the very objects `nemia apply -f` takes, each read at the
+version it is changing, written together once the change is approved. It is how an agent changes what a factory is made of. An agent
+never writes a definition itself: the commands that would (`nemia factory hire`, `nemia agents write` and the others that write a
+factory's definitions) are out of an agent's reach, and it proposes instead.
+
+**It owns** the objects it carries, who proposed them and why, when they apply, and what became of them.
+
+**It never touches** your settings of a factory: its repositories, volumes, harness settings, revisions, template and level, and an
+agent's custom instructions. A proposal that carries one is refused, naming the command you type to change it yourself.
+
+**It is reached through** `nemia propose` and `nemia proposals`, and the api's routes under `/api/namespaces/<factory>/proposals`. Each
+proposal is a file in your store, `~/.agent-workflows/factories/<factory>/proposals/<name>.json` (`WF_ROOT`), named after who proposed
+it. The board does not show proposals yet: until it does, you read and approve them from the command line or the api.
+
+## What a proposal can change
+
+A proposal lives in a factory's namespace and changes that factory alone. It carries one object or more of these kinds
+(`PROPOSABLE_KINDS`, in `packages/objects/src/words.ts`): a Workflow, an Agent or a Skill of the factory's tree, a Hire, an McpServer,
+and the Factory itself, for the workflows it offers, its rules and its instruction. Each object is created, updated or deleted, as
+Kubernetes says it: an object with a `resourceVersion` is an update at that version, one with none is created, and one marked
+`verb: delete` is removed.
+
+For each object, Nemia works out whether the change widens access: whether the agent it changes would let through a rule it did not
+before, stop refusing one it refused, or run in a permission mode that reaches further. A proposal that widens access says so when
+it is listed, and a rule for auto has to accept that outright (see [below](#delegations-and-rules-at-auto)).
+
+## Who proposes, and who approves
+
+Any agent at work in a factory may propose a change to that factory, and so may you. An agent proposes from its session: Nemia knows
+which agent, run and step is asking from the session's own token (below), never from what the proposal says.
+
+You approve, or decline. Nothing an agent proposes is applied before someone approves it, and only you decline. An agent approves
+only at `auto`, within what you delegated to it, and never a proposal of its own.
+
+```bash
+nemia propose -f change.yaml -n pipao               # propose the objects of a file in the factory pipao
+nemia propose -f change.yaml -n pipao --at run-end  # applied only once the proposing run has succeeded
+nemia get proposals -n pipao                        # what waits, what applied
+nemia get proposal ada-k3x9q -n pipao -o yaml       # one proposal whole: its objects, its changes, who proposed it
+nemia proposals approve ada-k3x9q -n pipao
+nemia proposals decline ada-k3x9q -n pipao
+```
+
+`nemia propose` takes the objects from a file (`-f -` for standard input), or on the line with `--objects`, as JSON or YAML, for a
+session that writes no file; `--why` says why. Where a file gives no `resourceVersion`, the client reads the version of the object as
+it is served now and proposes against it. Each verb prints the proposal's name and its phase.
+
+## What becomes of a proposal
+
+A proposal starts `waiting`. Once approved, it applies when it is due: at once by default (`applyAt` of `approval`), or, with
+`--at run-end`, once the run that proposed it has succeeded. A run that fails can be retried, so a failed run leaves its proposal
+approved, waiting; a run you call off drops it.
+
+As it applies, it is checked again. If any of its objects moved since the proposal read it, the proposal goes `stale` and writes
+nothing: read the object again and propose anew. If an agent approved it and that approval no longer holds (its delegation taken back,
+its rule dropped, the factory no longer at `auto`), it goes back to `waiting`, for you. Otherwise every object is written, and the
+proposal is `applied`; a write refused midway leaves it `failed`, naming what was written. The tick acts on every approved proposal on
+each of its passes, so a proposal waiting on its run applies on the pass after the run succeeds.
+
+```mermaid diagram=proposal
+
+```
+
+## Undo
+
+What applied stands. To take it back, propose the objects as they stood before it applied: Nemia keeps them on the proposal
+(`status.before`), and the client builds that proposal for you, each object back at the version served now and each object the
+proposal created deleted. The undo is a proposal like any other, and waits on an approval.
+
+```bash
+nemia propose --undo ada-k3x9q -n pipao
+```
+
+## Delegations and rules at auto
+
+By default no agent approves anything. To let one, you write it a Delegation: what it may approve in one factory, as Kubernetes'
+PolicyRule says it, its `resources` (`workflows`, `agents`, `skills`, `hires`, `mcpservers`, `factories`), their names (every name
+where none is given) and the `verbs` (`create`, `update`, `delete`). A delegation is named after its agent, lives in the factory's
+namespace, and is yours alone to write or take back.
+
+```yaml
+apiVersion: nemia/v1
+kind: Delegation
+metadata:
+  name: ada
+  namespace: pipao
+spec:
+  rules:
+    - resources: [skills]
+      resourceNames: []
+      verbs: [create, update]
+```
+
+```bash
+nemia apply -f delegation.yaml
+```
+
+A delegation alone approves nothing. At `auto`, the agent approves a proposal only under a rule you confirmed for it, among the rules
+of its policy: a rule whose answer is `approve-proposal`, naming the factory, the resources, names and verbs it takes, whether it takes a
+proposal that widens access (`widens`), and whose proposals it takes (`proposedBy`, every agent where empty). It is proposed and
+confirmed as every rule of a policy is, with `nemia policy propose` and `nemia policy confirm`, and the confirm is refused where the
+rule reaches past the agent's delegation. So an agent approves a proposal when all of it holds: the factory is at `auto`, the change
+is within its delegation, a confirmed rule takes it, and it did not propose it.
+
+## The session token
+
+Each session Nemia starts for a step's try is handed a token of its own, `WF_SESSION_TOKEN`, and so is Nemia's own session. The
+client sends it with every request, and the api reads who is asking from it: that agent, in that factory, run and step, while the try
+is live. A token whose try has ended, or that Nemia never gave, is refused. A request with no token is you.
+
+That means a process of yours on the machine is you, and so is a session that drops its token. Nemia's fence and the read-only agents
+of [sdlc](/sdlc/) refuse any command that sets a variable before `nemia`, which is how a session would drop it. You have no credential
+of your own yet.
+
+## Sources
+
+This page is written from `packages/agent-orchestrator/README.md` (_Proposals: a factory's definitions changed by one action_), and from
+`packages/objects/src/proposal.ts`, `packages/objects/src/delegation.ts`, `packages/objects/src/proposal-api.ts`,
+`packages/agent-orchestrator/src/proposal/`, `packages/agent-orchestrator/src/propose/`, `packages/agent-orchestrator/src/approval/`,
+`packages/agent-orchestrator/src/apply/`, `packages/agent-orchestrator/src/caller/`, `packages/agent-orchestrator/src/delegation/`, `packages/agent-orchestrator/src/token/`,
+`packages/agent-orchestrator/src/auto/auto.ts` and `apps/cli/src/objects/propose.ts`.

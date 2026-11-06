@@ -11,10 +11,20 @@ import { Result, Schema } from 'effect';
 import { agentNameRefusal } from '../agents/agents.ts';
 import { firstRefusal, When } from '../record/record.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
-import { RULE_ANSWERS, POLICY_FOLDER, CONDITIONS, DEFAULT_POLICY, DEFAULT_ID, ruleWords, type PolicyRule } from './auto.ts';
+import {
+  RULE_ANSWERS,
+  POLICY_FOLDER,
+  CONDITIONS,
+  DEFAULT_POLICY,
+  DEFAULT_ID,
+  APPROVE_PROPOSAL,
+  PROPOSAL_VERBS,
+  ruleWords,
+  type PolicyRule,
+} from './auto.ts';
 
-/** A rule as the files keep it. */
-const RuleSchema = Schema.Struct({
+/** A rule at a gate as the files keep it. */
+const GateRuleSchema = Schema.Struct({
   id: Schema.String,
   answer: Schema.Literals(RULE_ANSWERS),
   steps: Schema.optionalKey(Schema.Array(Schema.String)),
@@ -22,6 +32,21 @@ const RuleSchema = Schema.Struct({
   under: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0))),
   from: Schema.optionalKey(Schema.Literals(['default', 'proposed'])),
 });
+
+/** A rule under which the agent approves a factory's proposals (`ProposalPolicyRule`). */
+const ProposalRuleSchema = Schema.Struct({
+  id: Schema.String,
+  answer: Schema.Literal(APPROVE_PROPOSAL),
+  factory: Schema.String,
+  resources: Schema.Array(Schema.String),
+  resourceNames: Schema.Array(Schema.String),
+  verbs: Schema.Array(Schema.Literals(PROPOSAL_VERBS)),
+  widens: Schema.Boolean,
+  proposedBy: Schema.Array(Schema.String),
+  from: Schema.optionalKey(Schema.Literal('proposed')),
+});
+
+const RuleSchema = Schema.Union([GateRuleSchema, ProposalRuleSchema]);
 
 /** The person's confirmed list: when it was last written, and its rules, in order; a key it does not name is read past. */
 const ConfirmedSchema = Schema.StructWithRest(Schema.Struct({ since: When, rules: Schema.Array(RuleSchema) }), [
@@ -64,14 +89,27 @@ export const digestOf = (words: string | undefined): string | null =>
   words === undefined ? null : createHash('sha256').update(words).digest('hex').slice(0, 16);
 
 /** A rule as decoded, its optional keys left out where absent. */
-const ruleOf = (rule: Schema.Schema.Type<typeof RuleSchema>): PolicyRule => ({
-  id: rule.id,
-  answer: rule.answer,
-  ...(rule.steps === undefined ? {} : { steps: [...rule.steps] }),
-  when: [...rule.when],
-  ...(rule.under === undefined ? {} : { under: rule.under }),
-  ...(rule.from === undefined ? {} : { from: rule.from }),
-});
+const ruleOf = (rule: Schema.Schema.Type<typeof RuleSchema>): PolicyRule =>
+  rule.answer === APPROVE_PROPOSAL
+    ? {
+        id: rule.id,
+        answer: rule.answer,
+        factory: rule.factory,
+        resources: [...rule.resources],
+        resourceNames: [...rule.resourceNames],
+        verbs: [...rule.verbs],
+        widens: rule.widens,
+        proposedBy: [...rule.proposedBy],
+        ...(rule.from === undefined ? {} : { from: rule.from }),
+      }
+    : {
+        id: rule.id,
+        answer: rule.answer,
+        ...(rule.steps === undefined ? {} : { steps: [...rule.steps] }),
+        when: [...rule.when],
+        ...(rule.under === undefined ? {} : { under: rule.under }),
+        ...(rule.from === undefined ? {} : { from: rule.from }),
+      };
 
 /** The JSON in `file`, or undefined where no file is there; refused (`Invalid`), naming `fix`, where it is no JSON. */
 function jsonIn(file: string, fix: string): unknown {

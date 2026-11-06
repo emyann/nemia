@@ -15,8 +15,8 @@ const page = (figures: string[]): string =>
   `<html><body>${figures.map((words) => `<svg viewBox="0 0 10 10"><title>${words}</title></svg>`).join('')}</body></html>`;
 
 /**
- * A fixture `dist/` as the build writes it: every page, the lifecycle on the runtime's, Nemia's machine on hers, the models on theirs,
- * a sequence.
+ * A fixture `dist/` as the build writes it: every page, the lifecycle on the runtime's, Nemia's machine on hers, a proposal's on its,
+ * the models on theirs, a sequence.
  */
 const built = (figuresOf: Record<string, string[]> = {}): string => {
   const dist = scratch('docs-built-');
@@ -25,6 +25,7 @@ const built = (figuresOf: Record<string, string[]> = {}): string => {
     nemia: ['a folder is untrusted'],
     model: ['a task counts its AttemptNumber', 'a step counts its TryNumber'],
     'how-a-run-lives': ['a run files its first step'],
+    proposals: ['a write refused midway'],
     ...figuresOf,
   };
   for (const name of PAGES) {
@@ -48,6 +49,7 @@ test('REFUSED: a page not built, a figure printing its style, a machine or a mod
   );
   assert.deepEqual(faultsOf(built({ nemia: ['a folder is trusted'] })), ["Nemia's machine is drawn on no page, not on nemia alone"]);
   assert.deepEqual(faultsOf(built({ 'how-a-run-lives': [] })), ['how a run lives draws no sequence']);
+  assert.deepEqual(faultsOf(built({ proposals: [] })), ["a proposal's machine is drawn on no page, not on proposals alone"]);
   assert.deepEqual(faultsOf(built({ model: ['a task counts its AttemptNumber'] })), [
     "the orchestrator's model is drawn on no page, not on model alone",
   ]);

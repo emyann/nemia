@@ -8,6 +8,15 @@ import { Refused } from './refused.ts';
 
 export { Refused } from './refused.ts';
 
+/**
+ * The header that says who calls: `Authorization: Bearer <token>` where `WF_SESSION_TOKEN` holds the token the orchestrator handed a
+ * session, none where it is unset or empty, which the api reads as the person. Every request of this client carries it.
+ */
+export const sessionHeaders = (env: NodeJS.ProcessEnv = process.env): Readonly<Record<string, string>> => {
+  const token = env.WF_SESSION_TOKEN;
+  return token !== undefined && token !== '' ? { authorization: `Bearer ${token}` } : {};
+};
+
 /** A query's words: each key once, or several times for a list (`selector`). */
 export type Query = Readonly<Record<string, string | readonly string[] | undefined>>;
 
@@ -57,11 +66,11 @@ export async function get<T>(verb: string, path: string, query: Query = {}, env:
   let base = await served(verb, env);
   let response: Response;
   try {
-    response = await fetch(urlOf(base, path, query));
+    response = await fetch(urlOf(base, path, query), { headers: sessionHeaders(env) });
   } catch {
     base = await daemonStarted(verb, env);
     try {
-      response = await fetch(urlOf(base, path, query));
+      response = await fetch(urlOf(base, path, query), { headers: sessionHeaders(env) });
     } catch (err) {
       throw unanswered(verb, base, err);
     }

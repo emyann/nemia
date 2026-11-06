@@ -47,9 +47,9 @@ export const definitionsServed = (found: readonly DefinitionFound[], asked: Defi
       return one === null ? [] : [{ name: f.name, origin: one.origin, shadowedBy: one.shadowedBy }];
     });
 
-/** A factory's own definitions are its tree: today `nemia workflows write factory` writes it. */
+/** A factory's own definitions are its tree, changed by a proposal the person, or an agent within its delegation, approves. */
 const FACTORYS_WAY =
-  "A factory's own definitions are its tree, and change the factory's way, never through this path: write them with `nemia workflows write factory <factory>`.";
+  "A factory's own definitions are its tree, and change the factory's way, never through this path: propose the objects with `nemia propose -f <file> -n <factory>`.";
 
 /** Yours are written in `default`, where every one of them is served. */
 const DEFAULTS_WAY =

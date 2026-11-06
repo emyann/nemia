@@ -66,3 +66,9 @@ repository. Where the change rests on such a page — a claim of the card or of 
 nobody reads the change after you to check it: sign off `blocked`, with `needs` naming each claim and its page, and a person answers
 with `nemia retry <run> review --message "<what the page says>"`. A claim you could check, against the repository or a page your fence
 allows, is checked and is no reason to stop.
+
+**A change to this factory's definitions that the work needs** — an allow or a deny on a step, a line of a step's overlay — you
+propose, never name in your closeout for someone to write by hand: `nemia propose -f <file> -n <factory> --at run-end`, `<factory>`
+this factory's name and the objects in the file, or, where you write no file, the objects on the line as JSON: `nemia propose -n
+<factory> --at run-end --objects '<json>'`. It applies once it is approved and this run has succeeded; name the proposal in your
+summary.

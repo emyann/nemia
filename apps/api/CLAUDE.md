@@ -55,6 +55,10 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   handler (`serve.ts`) that Hono's routes hand exactly the paths it serves, each inside `served`, guarded first where it writes: a handler
   reads the request's services (`ServedNow`, the app's informer among them), never a layer of its own. A path added to the `Api` gets its
   forwarding route there, or Hono answers it 404. The feed, `watch` and every other route stay Hono's.
+- **Who a request is from is resolved before any router** (`callerGate`, `src/caller/caller.ts`): a handler reads `caller` off `Served`,
+  never the `Authorization` header, and hands it to the package's program, which judges it (`src/proposals/`). A token refused is a 401
+  on every route, not the proposals' alone. A test that presents a live token mints it through the package's `TokenDoor`, its run
+  planted and its task filed on the stand-in (`src/proposals/proposals.test.ts`).
 - **Every list is watched by `watchable`** (`src/watch/watch.ts`, `?watch=true`): a list's route goes through `listed` in `serve.ts`
   (and `partsRoutes`' and `definitionsRoutes`' `listed`), or it is not watched, which `src/watch/watch.test.ts` refuses for every GET
   list of the `Api`. A watch reads its list again through its own route, so each open one costs a list read per feed line (at most

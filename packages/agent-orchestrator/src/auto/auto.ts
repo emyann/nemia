@@ -25,11 +25,11 @@ export const RULE_ANSWERS = ['approve', 'retry'] as const;
 export type RuleAnswer = (typeof RULE_ANSWERS)[number];
 
 /**
- * A rule: its `id`; the `answer` it gives unasked; the `steps` it covers, by name, every step where absent; the conditions it needs
- * (`when`), all of them; a dollar line the run's spend stays under (`under`), none where absent; and where it came from (`from`): the
- * builtin default, or an agent's proposal the person confirmed.
+ * A rule at a gate: its `id`; the `answer` it gives unasked; the `steps` it covers, by name, every step where absent; the conditions it
+ * needs (`when`), all of them; a dollar line the run's spend stays under (`under`), none where absent; and where it came from (`from`):
+ * the builtin default, or an agent's proposal the person confirmed.
  */
-export type PolicyRule = {
+export type GateRule = {
   id: string;
   answer: RuleAnswer;
   steps?: string[];
@@ -37,6 +37,46 @@ export type PolicyRule = {
   under?: number;
   from?: 'default' | 'proposed';
 };
+
+/** The answer of a rule under which the agent approves a proposal of its factory unasked (`contracts/proposal-approval.contract.ts`). */
+export const APPROVE_PROPOSAL = 'approve-proposal';
+
+/** What a proposal does to one object, Kubernetes' verbs for a write. */
+export const PROPOSAL_VERBS = ['create', 'update', 'delete'] as const;
+
+/** A verb of a proposal's change. */
+export type ProposalVerb = (typeof PROPOSAL_VERBS)[number];
+
+/**
+ * A rule under which the agent approves a proposal of one factory unasked at auto: the `factory`; what it covers, as a delegation's grant
+ * does (`resources`, `resourceNames` — every name where empty — and `verbs`); whether it takes a proposal that widens access (`widens`,
+ * said outright); and the agents whose proposals it takes (`proposedBy`, every agent where empty). It reaches no further than the agent's
+ * delegation: `nemia policy confirm` refuses one that does (`proposalRuleReach`).
+ */
+export type ProposalPolicyRule = {
+  id: string;
+  answer: typeof APPROVE_PROPOSAL;
+  factory: string;
+  resources: string[];
+  resourceNames: string[];
+  verbs: ProposalVerb[];
+  widens: boolean;
+  proposedBy: string[];
+  from?: 'proposed';
+};
+
+/** A rule the person confirms for auto: at a gate, or over a factory's proposals. */
+export type PolicyRule = GateRule | ProposalPolicyRule;
+
+/** Whether `rule` approves proposals rather than answering at a gate. Pure. */
+export const isProposalRule = (rule: PolicyRule): rule is ProposalPolicyRule => rule.answer === APPROVE_PROPOSAL;
+
+/** The rules of `list` that answer at a gate. Pure. */
+export const gateRules = (list: readonly PolicyRule[]): GateRule[] => list.filter((rule): rule is GateRule => !isProposalRule(rule));
+
+/** The rules of `list` that approve the proposals of `factory`. Pure. */
+export const proposalRulesIn = (list: readonly PolicyRule[], factory: string): ProposalPolicyRule[] =>
+  list.filter((rule): rule is ProposalPolicyRule => isProposalRule(rule) && rule.factory === factory);
 
 /** A run's facts at a call, for one step: each condition, whether it holds, and what the run has spent (`spend`, in dollars). */
 export type Facts = Record<Condition, boolean> & { spend: number };
@@ -61,7 +101,7 @@ export const POLICY_FOLDER = 'auto';
 export const DEFAULT_ID = 'default';
 
 /** The builtin rule, decide when all agree: approve any step unasked when every condition holds. */
-export const DEFAULT_POLICY: PolicyRule = { id: DEFAULT_ID, answer: 'approve', when: [...CONDITIONS], from: 'default' };
+export const DEFAULT_POLICY: GateRule = { id: DEFAULT_ID, answer: 'approve', when: [...CONDITIONS], from: 'default' };
 
 /** The list in force: the builtin rule while the person has confirmed none, else their confirmed list, which replaces it. Pure. */
 export const listInForce = (confirmed: readonly PolicyRule[] | undefined): PolicyRule[] =>
@@ -69,6 +109,7 @@ export const listInForce = (confirmed: readonly PolicyRule[] | undefined): Polic
 
 /** Whether `rule` allows `answer` at `step` in `facts`: its answer, a step it covers, each condition it needs, and under its line. */
 const allows = (rule: PolicyRule, answer: string, step: string, facts: Facts): boolean =>
+  !isProposalRule(rule) &&
   rule.answer === answer &&
   (rule.steps === undefined || rule.steps.includes(step)) &&
   rule.when.every((c) => facts[c]) &&
@@ -107,11 +148,23 @@ const listed = (words: readonly string[]): string =>
  * `Approve design and land on their own, whatever their state.` Pure.
  */
 export function ruleWords(rule: PolicyRule): string {
+  if (isProposalRule(rule)) return proposalRuleWords(rule);
   const several = rule.steps !== undefined && rule.steps.length > 1;
   const steps = rule.steps === undefined ? 'any step' : listed(rule.steps);
   const when = [...rule.when.map((c) => CONDITION_WORDS[c]), ...(rule.under === undefined ? [] : [`it has cost under $${rule.under}`])];
   const own = several ? 'on their own' : 'on its own';
   return `${ANSWER_WORDS[rule.answer](steps)} ${own}${when.length ? ` once ${listed(when)}` : `, whatever ${several ? 'their' : 'its'} state`}.`;
+}
+
+/**
+ * A proposal rule in the person's words, from its fields alone: `Approve proposals in acme that update workflows build or review, made by
+ * implementer, that never widen access.` Pure.
+ */
+function proposalRuleWords(rule: ProposalPolicyRule): string {
+  const names = rule.resourceNames.length ? ` ${listed(rule.resourceNames)}` : '';
+  const by = rule.proposedBy.length ? `, made by ${listed(rule.proposedBy)}` : ', made by any agent or you';
+  const widening = rule.widens ? ', even where they widen access' : ', that never widen access';
+  return `Approve proposals in ${rule.factory} that ${listed(rule.verbs)} ${listed(rule.resources)}${names}${by}${widening}.`;
 }
 
 /** A value read as a list of names, or undefined where it is not one. */
@@ -143,7 +196,24 @@ export function ruleRefusal(rule: unknown, at: string): string | undefined {
   if (typeof r.id !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(r.id))
     return `${at}: id is a name of lowercase letters, digits and dashes; ${JSON.stringify(r.id)} is not.`;
   if (r.id === DEFAULT_ID) return `${at}: the id ${DEFAULT_ID} is the builtin rule: give the rule an id of its own.`;
+  if (r.answer === APPROVE_PROPOSAL) return proposalShapeRefusal(r, at);
   if (!(RULE_ANSWERS as readonly unknown[]).includes(r.answer))
-    return `${at}: answer is one of ${RULE_ANSWERS.join(', ')}; ${JSON.stringify(r.answer)} is not one a rule may give unasked.`;
+    return `${at}: answer is one of ${[...RULE_ANSWERS, APPROVE_PROPOSAL].join(', ')}; ${JSON.stringify(r.answer)} is not one a rule may give unasked.`;
   return shapeRefusal(r, at);
+}
+
+/** Why the fields of a proposal rule are no rule's, or undefined where they are. */
+function proposalShapeRefusal(r: Record<string, unknown>, at: string): string | undefined {
+  const form = '{ "id", "answer": "approve-proposal", "factory", "resources", "resourceNames", "verbs", "widens", "proposedBy" }';
+  if (typeof r.factory !== 'string' || !r.factory.trim()) return `${at}: factory names the factory whose proposals it approves: ${form}.`;
+  const resources = namesOf(r.resources);
+  if (resources === undefined || resources.length === 0)
+    return `${at}: resources is a list of what it covers (workflows, agents, skills, hires, mcpservers, factories): ${form}.`;
+  if (namesOf(r.resourceNames) === undefined) return `${at}: resourceNames is a list of names, empty for every name: ${form}.`;
+  const verbs = r.verbs;
+  if (!Array.isArray(verbs) || verbs.length === 0 || verbs.some((v) => !(PROPOSAL_VERBS as readonly unknown[]).includes(v)))
+    return `${at}: verbs is a list of ${PROPOSAL_VERBS.join(', ')}: ${form}.`;
+  if (typeof r.widens !== 'boolean') return `${at}: widens says outright, true or false, whether it takes a proposal that widens access.`;
+  if (namesOf(r.proposedBy) === undefined) return `${at}: proposedBy is a list of agents, empty for every agent and you: ${form}.`;
+  return undefined;
 }

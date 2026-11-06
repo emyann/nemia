@@ -24,6 +24,7 @@ import {
   type RecordMemo,
   type ScheduleRuns,
   PlaceService,
+  type ProposalCaller,
 } from 'agent-orchestrator';
 import { McpAsker } from './capabilities/capabilities.ts';
 import type { LastSaid } from './steps/logs.ts';
@@ -105,8 +106,11 @@ export type Services = ApiConfig | Engine | StoreRoot | McpAsker | QuotaAsker | 
 /** The runtime an app runs its handlers on, built once from its layer. */
 export type ApiRuntime = ManagedRuntime.ManagedRuntime<Services, never>;
 
-/** The api's Hono environment: the app's runtime on every request, put there by app.ts before any router is reached. */
-export type ApiEnv = { Variables: { runtime: ApiRuntime } };
+/**
+ * The api's Hono environment: the app's runtime on every request, and who the request is from (`caller`, by the session token it presents,
+ * caller/caller.ts), each put there by app.ts before any router is reached.
+ */
+export type ApiEnv = { Variables: { runtime: ApiRuntime; caller: ProposalCaller } };
 
 /**
  * The services as a handler reads them, each under the name the helpers it calls take it by (`placeService` the place a package program
@@ -132,6 +136,8 @@ export type Served = {
   informer: InformerMemo | undefined;
   followings: Followings['Service'];
   beats: BeatsShape;
+  /** Who the request is from: the person, or the agent's session its token names (`callerGate`, caller/caller.ts). */
+  caller: ProposalCaller;
   /**
    * `program` run over the request's own services, its answer or its rejection with the failure itself, as `served` rejects: how a
    * handler reads a door of the package (`AgentDoor`, `SkillDoor`). A door's default reads the files at the app's `StoreRoot`, and a door a
@@ -184,6 +190,7 @@ export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | 
         informer: yield* Informer,
         followings: yield* Followings,
         beats: yield* Beats,
+        caller: c.var.caller,
         inRequest,
       };
       const before = yield* readsOf(services.e);

@@ -8,7 +8,7 @@
  * in a run's facts at the call. The words a person reads, and the read that gathers a factory's gates, are the code's, held by tests.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import type { Condition, Facts, PolicyRule } from '../src/auto/auto.ts';
+import type { Condition, Facts, GateRule as PolicyRule } from '../src/auto/auto.ts';
 import { type GateSite, type NeverWhy, neverHolds, ruleReaches, type Unmet } from '../src/reach/reach.ts';
 
 /** The conditions a rule may need, in `CONDITIONS`' order (src/auto/auto.ts): written here, since a law reads none of the code's lists. */

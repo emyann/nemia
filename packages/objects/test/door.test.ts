@@ -47,6 +47,8 @@ const GET_PATHS: Record<(typeof KINDS)[number], string> = {
   Template: '/api/templates/:name',
   Subscription: '/api/subscriptions/:name',
   Event: '/api/events/:name',
+  Proposal: '/api/namespaces/:namespace/proposals/:name',
+  Delegation: '/api/namespaces/:namespace/delegations/:name',
 };
 
 for (const kind of KINDS) {

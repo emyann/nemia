@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { nemiaFence, widened } from './fence.ts';
+import { ASSIGNED, nemiaFence, widened } from './fence.ts';
+import { PROPOSED_INSTEAD } from './class.ts';
 import type { CommandClass } from './class.ts';
 import { TABLE as COMMANDS } from '../command/commands.verb.ts';
 
@@ -28,9 +29,15 @@ test('her fence is derived from the classes: reads, her writes and answers run u
       'Bash(nemia level:*)',
       'Bash(nemia agents custom)',
       'Bash(nemia agents custom:*)',
+      'Bash(nemia propose)',
+      'Bash(nemia propose:*)',
+      'Bash(nemia proposals approve)',
+      'Bash(nemia proposals approve:*)',
+      'Bash(nemia proposals decline)',
+      'Bash(nemia proposals decline:*)',
     ],
     ask: ['Bash(nemia cancel:*)', 'Bash(nemia level manual:*)', 'Bash(nemia agents custom *--clear*)'],
-    deny: ['Bash(nemia tick:*)'],
+    deny: ['Bash(nemia tick:*)', ASSIGNED],
   });
 });
 
@@ -60,4 +67,60 @@ test("REFUSED to run unasked: a factory's level set, raised or its raise ended, 
     'Bash(nemia level *--end*)',
   ])
     assert.ok(ask.includes(rule), rule);
+});
+
+/** Whether the rule `rule`, `Bash(<pattern>)`, reaches the shell line `line`: `<prefix>:*` a prefix, else a glob whose `*` is any text. */
+const reaches = (rule: string, line: string): boolean => {
+  const pattern = rule.slice('Bash('.length, -1);
+  if (pattern.endsWith(':*')) return line === pattern.slice(0, -2) || line.startsWith(`${pattern.slice(0, -2)} `);
+  const glob = pattern.split('*').map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'));
+  return new RegExp(`^${glob.join('.*')}$`).test(line);
+};
+
+/** A line as an allow reads it: its leading assignments stripped, as Claude Code strips them before it matches an allow. */
+const unassigned = (line: string): string => line.replace(/^(\w+=\S*\s+)+/, '');
+
+test("REFUSED for an agent: a factory's definition written by hand is out of her reach, and she proposes it instead", () => {
+  const fence = nemiaFence(COMMANDS);
+  for (const name of PROPOSED_INSTEAD)
+    assert.ok(
+      COMMANDS.some((c) => c.name === name || name.startsWith(`${c.name} `)),
+      `${name} is an entry of the table, or a form of one`,
+    );
+  const denied = (line: string) => fence.deny.some((rule) => reaches(rule, line));
+  for (const line of [
+    'nemia factory hire acme implementer --step build/design',
+    'nemia workflows write factory build --folder d',
+    'nemia factory rules acme --file r.md',
+  ])
+    assert.ok(denied(line), line);
+  assert.ok(!denied('nemia factory rules acme'), 'the rules still read bare');
+  const asked = (line: string) => fence.ask.some((rule) => reaches(rule, line));
+  for (const line of [
+    'nemia workflows write yours build --folder d',
+    'nemia agents write yours implementer --file implementer.md',
+    'nemia agents rm yours implementer',
+    'nemia agents copy implementer',
+  ])
+    assert.ok(asked(line) && !denied(line), `the person's library, which no proposal carries, asks as before: ${line}`);
+  const allowed = (line: string) => fence.allow.some((rule) => reaches(rule, unassigned(line)));
+  assert.ok(allowed('nemia propose -f change.yaml -n acme'));
+  assert.ok(allowed('nemia proposals approve implementer-ab12c -n acme'));
+  assert.ok(!denied('nemia propose -f change.yaml -n acme'));
+});
+
+test('REFUSED on a planted line: an assignment before nemia, which would drop her token and act as the person', () => {
+  const fence = nemiaFence(COMMANDS);
+  const line = 'WF_SESSION_TOKEN= nemia proposals approve p';
+  assert.ok(
+    fence.allow.some((rule) => reaches(rule, unassigned(line))),
+    'an allow alone would let it through, the assignment stripped',
+  );
+  assert.deepEqual(
+    fence.deny.filter((rule) => reaches(rule, line)),
+    [ASSIGNED],
+  );
+  for (const planted of ['HOME=/tmp nemia propose -f x', 'A=1 B=2 nemia proposals decline p', 'timeout 5 X=1 nemia ls'])
+    assert.ok(reaches(ASSIGNED, planted), planted);
+  assert.ok(!reaches(ASSIGNED, 'nemia inbox add --body "a=b"'), 'an = after nemia is a word of its own');
 });

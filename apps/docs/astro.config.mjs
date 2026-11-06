@@ -45,6 +45,7 @@ export default defineConfig({
         { label: 'Workflows', link: '/workflows/' },
         { label: 'Agents', link: '/agents/' },
         { label: 'Factories', link: '/factories/' },
+        { label: 'Proposals', link: '/proposals/' },
         { label: 'sdlc, the builtin template', link: '/sdlc/' },
         { label: 'How a run lives', link: '/how-a-run-lives/' },
         { label: 'Nemia', link: '/nemia/' },

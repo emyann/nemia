@@ -72,6 +72,7 @@ import { answerHeld, stopAsked } from './held.verb.ts';
 import { forStep } from '../telemetry/telemetry.store.ts';
 import { stepLabels } from '../telemetry/telemetry.ts';
 import { localFields } from './assess.ts';
+import { stepToken } from '../token/token.store.ts';
 import { sendCards, type Due } from '../send/send.verb.ts';
 import { answerTables, fileScripts } from '../script/script.verb.ts';
 import { filedAt, foldersTold, placeTold, toldOf, type PlaceTold, type StepTold, type Told } from './told.verb.ts';
@@ -309,6 +310,7 @@ const trySpec = (
       model: tryModel(step, record, r),
       budgetUsd: t.budgetUsd,
       ...filedAt(f.run, f.reads.home),
+      ...stepToken(f.reads.home, f.run, step, t.taskId, r.try),
       own: t.told.own,
       landingDenied: () => t.told.words?.denied ?? [],
     }),
@@ -425,6 +427,7 @@ function roundSpec(
       config: filedConfig(target, reads.steps, run, {
         model: sessionModel(target, record),
         ...filedAt(run, f.reads.home),
+        ...stepToken(f.reads.home, run, target, taskId, tryOf(run, r.target) + 1),
         budgetUsd: budgetUsdFor(
           r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, run),
           stepSpend(run, r.target, reads.spendOf),
@@ -609,6 +612,7 @@ function readySpec(
       config: filedConfig(step, reads.steps, run, {
         model: step.model,
         ...filedAt(run, f.reads.home),
+        ...stepToken(f.reads.home, run, step, stepTaskId(run, step.name, tryOf(run, step.name)), tryOf(run, step.name)),
         caller: callerMounts(step, parents),
         budgetUsd: budgetUsdFor(budgetOf(step, run), stepSpend(run, step.name, reads.spendOf)),
         own: told.own,

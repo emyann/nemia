@@ -12,7 +12,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseWorkflow, type Workflow } from '../workflow.ts';
-import { filedConfig, RUN_LABELS, STEP_FILES, WORKFLOW_FILES, workflowMounts } from './filed.ts';
+import { filedConfig, RUN_LABELS, SESSION_TOKEN, STEP_FILES, WORKFLOW_FILES, workflowMounts } from './filed.ts';
 import type { Run } from '../record/record.ts';
 import type { FactoryServers } from '../servers/servers.ts';
 import { configRefusal } from '../runtime-client.ts';
@@ -55,6 +55,27 @@ test('filedConfig: what a local step is filed beside its fence, its files direct
   await t.test("a step's session is filed its files directory, the run's artifacts folder of that step, as WF_STEP_FILES", () => {
     assert.equal(STEP_FILES, 'WF_STEP_FILES');
     assert.deepEqual(filed(stepOf()).env, { WF_STEP_FILES: '/runs/r/artifacts/look', WF_LABELS: '{}' });
+  });
+
+  await t.test('a session filed with a token is handed it as WF_SESSION_TOKEN; a config only checked is handed none', () => {
+    assert.equal(SESSION_TOKEN, 'WF_SESSION_TOKEN');
+    const step = stepOf();
+    const config = filedConfig(
+      step,
+      [step],
+      { gates: [] },
+      {
+        model: undefined,
+        budgetUsd: undefined,
+        runArtifacts: '/runs/r/artifacts',
+        inbox: '/inbox',
+        own: {},
+        landingDenied: () => [],
+        sessionToken: 'minted',
+      },
+    );
+    assert.equal(config.env[SESSION_TOKEN], 'minted');
+    assert.equal(SESSION_TOKEN in filed(step).env, false);
   });
 
   await t.test("a step's session is told its run's labels as WF_LABELS, as its check is: a JSON object of strings, `{}` with none", () => {

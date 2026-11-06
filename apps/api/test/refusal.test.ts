@@ -1,6 +1,7 @@
 /**
  * The api's one answer to an error a route threw (`answerError`, app.ts): a refusal of the orchestrator's by its kind, from
- * `REFUSAL_STATUS` — `Missing` 404, `Conflict` 409, `Invalid` 422 — in its own words, and anything else a 500. A router mounted as app.ts
+ * `REFUSAL_STATUS` — `Missing` 404, `Conflict` 409, `Invalid` 422, and a caller refused, `Forbidden` 403 and `Unauthorized` 401, with its
+ * reason — in its own words, and anything else a 500. A router mounted as app.ts
  * mounts its routers throws to it, and the api's own app answers with it.
  */
 import './harness.ts';
@@ -10,7 +11,8 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { answerError, app, REFUSAL_STATUS } from '../src/app.ts';
-import { Conflict, Invalid, Missing } from 'agent-orchestrator';
+import { Conflict, Forbidden, Invalid, Missing } from 'agent-orchestrator';
+import { Unauthorized } from '../src/caller/caller.ts';
 import { WorkflowError } from 'agent-orchestrator/workflow';
 
 type Refusal = import('agent-orchestrator').Refusal;
@@ -43,10 +45,29 @@ test('REFUSED: each kind thrown in a mounted router is answered its status, in i
 });
 
 test('answerError: what each thrown thing is answered with, a refusal by its kind and anything else a 500', async (t) => {
-  await t.test('REFUSAL_STATUS answers every kind of refusal, each once: 404 for Missing, 409 for Conflict, 422 for Invalid', () => {
-    const kinds = [new Missing({ message: 'm' }), new Conflict({ message: 'c' }), new Invalid({ message: 'i' })].map((r) => r._tag);
-    assert.deepEqual(Object.keys(REFUSAL_STATUS).sort(), [...kinds].sort());
-    assert.deepEqual(REFUSAL_STATUS, { Missing: 404, Conflict: 409, Invalid: 422 });
+  await t.test(
+    'REFUSAL_STATUS answers every kind of refusal, each once: 404 for Missing, 409 for Conflict, 422 for Invalid, 403 for Forbidden, 401 for Unauthorized',
+    () => {
+      const kinds = [
+        new Missing({ message: 'm' }),
+        new Conflict({ message: 'c' }),
+        new Invalid({ message: 'i' }),
+        new Forbidden({ message: 'f', reason: 'person-only' }),
+        new Unauthorized({ message: 'u', reason: 'unknown-token' }),
+      ].map((r) => r._tag);
+      assert.deepEqual(Object.keys(REFUSAL_STATUS).sort(), [...kinds].sort());
+      assert.deepEqual(REFUSAL_STATUS, { Missing: 404, Conflict: 409, Invalid: 422, Forbidden: 403, Unauthorized: 401 });
+    },
+  );
+  await t.test('a caller refused is answered by its kind, its reason beside its words: Forbidden 403, Unauthorized 401', async () => {
+    const forbidden = await answered(new Forbidden({ message: 'f', reason: 'person-only' }));
+    assert.equal(forbidden.status, 403);
+    assert.equal((forbidden.body as { reason?: string }).reason, 'person-only');
+    const unauthorized = await answered(new Unauthorized({ message: 'u', reason: 'session-ended' }));
+    assert.equal(unauthorized.status, 401);
+    assert.equal((unauthorized.body as { reason?: string }).reason, 'session-ended');
+  });
+  await t.test('a table that leaves out a kind is refused by the compiler', () => {
     // @ts-expect-error -- REFUSED by the compiler: a table that leaves out a kind, as REFUSAL_STATUS is checked
     const partial = { Missing: 404, Conflict: 409 } as const satisfies Record<Refusal['_tag'], ContentfulStatusCode>;
     assert.equal(Object.keys(partial).length, 2);

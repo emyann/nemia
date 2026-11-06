@@ -1,13 +1,14 @@
 /**
  * The package's `test` script loads `test/ambient.ts` into every test file's process, so a test that reads `WF_MAX_RUNS` or
  * `WF_MAX_CONCURRENT` without setting it is refused, whatever the shell or the daemon that runs the check has set. Proven on fixtures run
- * by `node --test` with the script's own flags, from the package, with the daemon's ceilings in their environment: one that relies on
- * a default fails naming the sentinel, and one that deletes the variable first passes. And a command that ticks, typed in such a file on a
+ * by `node --test` with the script's own flags, from the package, with the daemon's ceilings in their environment: one that relies on a
+ * default fails naming the sentinel, and one that deletes the variable first passes. And a command that ticks, typed in such a file on a
  * store no daemon holds, starts none: the script turns the start off (`NEMIA_DAEMON_START=off`). And a collector the shell or the daemon
- * names is not one a test file exports to: the script drops `OTEL_EXPORTER_OTLP_ENDPOINT`. And a harness's own files are never the
- * person's: the script sets `CLAUDE_CONFIG_DIR` to a scratch folder. And neither store is the person's: the script points `WF_ROOT`,
- * `AE_ROOT` and `HOME` at scratch folders, so a module that pins a root as it loads pins a throwaway one and `os.homedir()` answers a
- * throwaway too.
+ * names is not one a test file exports to: the script drops `OTEL_EXPORTER_OTLP_ENDPOINT`. And the daemon's per-session variables
+ * (`WF_SESSION_TOKEN`, `WF_MEMORY_LIMIT`, `WF_CGROUP_PARENT`) are dropped too, so a step's own run reads what CI reads. And a harness's
+ * own files are never the person's: the script sets `CLAUDE_CONFIG_DIR` to a scratch folder. And neither store is the person's: the script
+ * points `WF_ROOT`, `AE_ROOT` and `HOME` at scratch folders, so a module that pins a root as it loads pins a throwaway one and
+ * `os.homedir()` answers a throwaway too.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,7 +17,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { AWAY, ENGINE, REAL_HOME, SENTINEL, STORE } from './ambient.ts';
+import { AWAY, DAEMON_ONLY, ENGINE, REAL_HOME, SENTINEL, STORE } from './ambient.ts';
 import { machineTempDir, scratch } from './scratch.ts';
 
 const PACKAGE = path.join(import.meta.dirname, '..');
@@ -166,6 +167,40 @@ test("REFUSED under the daemon's OTEL_EXPORTER_OTLP_ENDPOINT: a test file sees n
   assert.equal(seated.status, 0, `${seated.stdout}\n${seated.stderr}`);
   const bare = runExporter(false, JSON.stringify({ address: NAMED, exports: NAMED }));
   assert.equal(bare.status, 0, `without the hook the address is the shell's: ${bare.stdout}\n${bare.stderr}`);
+});
+
+/** What the daemon sets for each session it files, as a step's own run of the suite inherits it. */
+const DAEMONS: Record<(typeof DAEMON_ONLY)[number], string> = {
+  WF_SESSION_TOKEN: 'a-token-no-test-minted',
+  WF_MEMORY_LIMIT: '6Gi',
+  WF_CGROUP_PARENT: 'sessions.slice',
+};
+
+test("REFUSED under the daemon's per-session variables: a test file sees none of them, and without the hook it would", () => {
+  const dir = scratch('wf-ambient-');
+  const file = path.join(dir, 'fixture.test.mjs');
+  const out = path.join(dir, 'seen.json');
+  const names = Object.keys(DAEMONS);
+  fs.writeFileSync(
+    file,
+    [
+      "import { test } from 'node:test';",
+      "import fs from 'node:fs';",
+      `const seen = Object.fromEntries(${JSON.stringify(names)}.map((n) => [n, process.env[n] ?? null]));`,
+      `test('the daemon', () => fs.writeFileSync(${JSON.stringify(out)}, JSON.stringify(seen)));`,
+      '',
+    ].join('\n'),
+  );
+  const words = script.trim().split(/\s+/);
+  const env: Record<string, string | undefined> = { ...process.env, ...DAEMONS };
+  for (const key of ['NODE_TEST_CONTEXT', 'NODE_OPTIONS']) delete env[key];
+  const seen = (flags: string[]): unknown => {
+    const ran = spawnSync(process.execPath, [...flags, '--test', file], { cwd: PACKAGE, env, encoding: 'utf8', timeout: 60_000 });
+    assert.equal(ran.status, 0, `${ran.stdout}\n${ran.stderr}`);
+    return JSON.parse(fs.readFileSync(out, 'utf8'));
+  };
+  assert.deepEqual(seen(words.slice(1, words.indexOf('--test'))), Object.fromEntries(names.map((n) => [n, null])));
+  assert.deepEqual(seen([]), DAEMONS, "without the hook the fixture reads the daemon's, so the absence above is the hook");
 });
 
 /**

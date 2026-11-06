@@ -14,7 +14,10 @@
  * default factory: a test of the refusal those starts meet by default deletes it first. And it sets `NEMIA_DAEMON_START=off`, so a `nemia`
  * a test spawns, or a command that ticks it types, starts no daemon of this checkout. And it deletes `OTEL_EXPORTER_OTLP_ENDPOINT`: the api
  * is the daemon, and one a test starts would post its spans to the collector the shell names; a test that exports sets the address of a
- * collector it made itself. And neither store is the person's and neither is their home: it points `WF_ROOT`, `AE_ROOT` and `HOME` each at
+ * collector it made itself. And it deletes the daemon's per-session variables (`DAEMON_ONLY`): `WF_SESSION_TOKEN`, minted for each
+ * session, which a `nemia` a test spawns would send to an api that never minted it, and `WF_MEMORY_LIMIT` and `WF_CGROUP_PARENT`, the
+ * daemon unit's, which a test that files through the real engine would inherit; CI sets none, and a test that means one sets it in its
+ * own scope. And neither store is the person's and neither is their home: it points `WF_ROOT`, `AE_ROOT` and `HOME` each at
  * a scratch folder (`root`, `engineRoot`, `away`), so a module that pins a root as it loads pins a throwaway one and `os.homedir()`
  * answers a throwaway too — the engine's store and `~/.claude.json` with it. A test that needs something of the person's own `$HOME`
  * reads it from `realHome`.
@@ -59,6 +62,9 @@ process.env.WF_MAX_CONCURRENT = 'set-it-in-the-test';
 process.env.WF_DEFAULT_FACTORY_STARTS = '1';
 process.env.NEMIA_DAEMON_START = 'off';
 delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+/** The daemon's per-session variables, which no api test starts with: a test that means one sets it itself. */
+export const DAEMON_ONLY = ['WF_SESSION_TOKEN', 'WF_MEMORY_LIMIT', 'WF_CGROUP_PARENT'] as const;
+for (const name of DAEMON_ONLY) delete process.env[name];
 
 fs.writeFileSync(calls, '');
 fs.writeFileSync(answer, recorded('plan'));

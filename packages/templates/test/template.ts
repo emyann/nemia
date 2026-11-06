@@ -22,7 +22,10 @@ export const SDLC = path.join(TEMPLATES, 'sdlc');
 /** The orchestrator's CLI, `nemia`, at the entry its package exports for a spawn (`agent-orchestrator/bin`). */
 export const BIN = fileURLToPath(import.meta.resolve('agent-orchestrator/bin'));
 
-/** An environment on its own scratch store and home, with nothing of the test runner's. */
+/**
+ * An environment on its own scratch store and home, with nothing of the test runner's: no telemetry, and none of the daemon's
+ * per-session variables (`WF_SESSION_TOKEN`, `WF_MEMORY_LIMIT`, `WF_CGROUP_PARENT`), which CI never sets and a step's session does.
+ */
 export function storeEnv(root: string): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
@@ -34,7 +37,7 @@ export function storeEnv(root: string): NodeJS.ProcessEnv {
     WF_MAX_RUNS: '2',
   };
   delete env.NODE_TEST_CONTEXT;
-  delete env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  for (const name of ['OTEL_EXPORTER_OTLP_ENDPOINT', 'WF_SESSION_TOKEN', 'WF_MEMORY_LIMIT', 'WF_CGROUP_PARENT']) delete env[name];
   fs.mkdirSync(env.HOME!, { recursive: true });
   return env;
 }

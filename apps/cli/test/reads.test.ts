@@ -18,6 +18,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
+import { ambient } from './ambient.ts';
 import { scratch } from '../../api/test/scratch.ts';
 import { get, Refused } from '../src/client.ts';
 
@@ -30,9 +31,8 @@ const engineRoot = scratch('nemia-cli-engine-');
 
 /** The environment of every child: the scratch stores and home, no telemetry, no daemon started on demand, the ceilings set. */
 const ENV: NodeJS.ProcessEnv = (() => {
-  const { OTEL_EXPORTER_OTLP_ENDPOINT: _otel, NEMIA_ON_INSTALLED: _installed, ...ambient } = process.env;
   return {
-    ...ambient,
+    ...ambient('NEMIA_ON_INSTALLED'),
     WF_ROOT: root,
     AE_ROOT: engineRoot,
     HOME: away,

@@ -14,6 +14,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { ambient } from './ambient.ts';
 
 const CLI = path.join(import.meta.dirname, '..');
 const NEMIA = path.join(CLI, 'bin', 'nemia.ts');
@@ -88,8 +89,7 @@ function child(t: TestContext, proc: ChildProcess) {
 
 /** The api over `root`, `--no-tick` on a free port, its url written into the store's lease once it listens. */
 async function apiOver(t: TestContext, root: string) {
-  const { NEMIA_ON_INSTALLED: _set, ...ambient } = process.env;
-  const env = { ...ambient, PORT: '0', WF_ROOT: root, HKB_REPO: root, OTEL_EXPORTER_OTLP_ENDPOINT: '' };
+  const env = { ...ambient('NEMIA_ON_INSTALLED'), PORT: '0', WF_ROOT: root, HKB_REPO: root };
   const api = child(t, spawn(process.execPath, ['src/main.ts', '--no-tick'], { cwd: API, env, timeout: 120_000 }));
   const url = await api.said((out) => /api listening on (http:\/\/127\.0\.0\.1:\d+)/.exec(out)?.[1]);
   fs.writeFileSync(path.join(root, 'daemon.json'), `${JSON.stringify({ url })}\n`);
@@ -98,7 +98,7 @@ async function apiOver(t: TestContext, root: string) {
 
 /** `nemia <args>` in the store `root`, starting no daemon. */
 const nemia = (t: TestContext, root: string, args: readonly string[]) => {
-  const env = { ...process.env, WF_ROOT: root, NEMIA_DAEMON_START: 'off', OTEL_EXPORTER_OTLP_ENDPOINT: '' };
+  const env = { ...ambient(), WF_ROOT: root, NEMIA_DAEMON_START: 'off' };
   return child(t, spawn(process.execPath, [NEMIA, ...args], { cwd: root, env, timeout: 120_000 }));
 };
 

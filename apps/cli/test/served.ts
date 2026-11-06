@@ -7,6 +7,7 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { ambient } from './ambient.ts';
 import { scratch } from '../../api/test/scratch.ts';
 
 const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
@@ -26,9 +27,8 @@ export async function servedStore(prefix: string, seed: (root: string) => void) 
   const root = scratch(`${prefix}store-`);
   const home = scratch(`${prefix}home-`);
   const env: NodeJS.ProcessEnv = (() => {
-    const { OTEL_EXPORTER_OTLP_ENDPOINT: _otel, NEMIA_ON_INSTALLED: _installed, ...ambient } = process.env;
     return {
-      ...ambient,
+      ...ambient('NEMIA_ON_INSTALLED'),
       WF_ROOT: root,
       AE_ROOT: scratch(`${prefix}engine-`),
       HOME: home,

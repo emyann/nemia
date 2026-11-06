@@ -30,7 +30,7 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 const { retryRun, runWith, startRun, tickRun } = await import('../src/runner.ts');
 const { readRun, runFile } = await import('../src/record/record.store.ts');
-const { slotsRead } = await import('../src/cap/cap.verb.ts');
+const { slotsRead } = await import('../src/cap/slots-read.verb.ts');
 const { readFeed } = await import('../src/feed/feed.store.ts');
 const { REMOVED } = await import('../src/feed/feed.ts');
 const { putPause, resumePause } = await import('../src/pause/pause.store.ts');

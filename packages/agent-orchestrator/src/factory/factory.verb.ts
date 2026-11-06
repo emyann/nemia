@@ -28,10 +28,9 @@ import { FACTORY_INSTRUCT, FACTORY_INSTRUCTION } from './instruction.verb.ts';
 import { FACTORY_RULES } from '../rules/rules.verb.ts';
 import { TEMPLATED_FACTORY_VERBS } from '../adopt/templated.verb.ts';
 import { FACTORY_SCHEDULES } from '../schedule/schedule.verb.ts';
-import { schedulesListed, type ScheduleRun, type ScheduleRuns } from '../schedule/listed.store.ts';
+import { scheduleRun, schedulesListed, type ScheduleRuns } from '../schedule/listed.store.ts';
 import type { ScheduleListed } from '../schedule/schedule.ts';
 import { keptRuns } from '../record/files.store.ts';
-import type { Run } from '../record/record.ts';
 import { trustedLines, type PlaceTrust, type Untrusted } from '../trust/trust.ts';
 import { FACTORY_TRUST, NO_TRUST, trustPlaces, untrustedPlaces } from '../trust/trust.verb.ts';
 import { FACTORY_SERVER_VERBS } from '../servers/servers.verb.ts';
@@ -184,13 +183,6 @@ const textOf = (args: Args, key: string): string => (typeof args[key] === 'strin
  * their places a harness does not trust now, as `untrustedPlaces` reads them.
  */
 type Listed = { factories: FactoryListing[]; schedules: ScheduleListed[]; untrusted: Untrusted[] };
-
-/** A run as a schedule's listing reads it: which fire of which schedule started it, and when the run was created. */
-const scheduleRun = (run: Run): ScheduleRun => ({
-  id: run.id,
-  createdAt: run.createdAt,
-  ...(run.scheduled === undefined ? {} : { scheduled: run.scheduled }),
-});
 
 /**
  * The store's factories, their schedules with the runs they started, and their places not trusted, each read now. A schedule reads of a

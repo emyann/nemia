@@ -28,7 +28,6 @@ import {
   type RunHolding,
   type RunWaiting,
   runWaitingOf,
-  runWith,
   runStore,
   standingWhen,
 } from 'agent-orchestrator';
@@ -226,15 +225,15 @@ const MERGES = commandNamed('merges');
  */
 export async function decisionOf(run: Run, e: Engine['Service'], at: Placed, env: NodeJS.ProcessEnv): Promise<RunDecision> {
   const live = await runPlaced(at, e, standingWhen(runStore.runs.list(), run.id));
-  const parent = await runPlaced(at, e, parentsRead(run, await runWith(e, live.when(waitedOn(run).length > 0))));
+  const parent = await runPlaced(at, e, parentsRead(run, await runPlaced(at, e, live.when(waitedOn(run).length > 0))));
   const waiting = runWaitingOf(run, waitsOf(run, parent));
   const holding = holdingOf(run, holdsOf(run, parent));
   if (waiting) return { waiting, ...(holding ? { holding } : {}) };
   if (holding) return { holding };
   const folder = workflowsOf(run, at.home).steps;
-  const views = await runWith(e, viewsOf(run, e));
+  const views = await runPlaced(at, e, viewsOf(run, e));
   const judgedOver = (git: BranchReader) => runPlaced(at, e, judge(run, stepNames(run, folder), folder, views, { reader: e, git, parent }));
-  const { judged, git } = await judgedLive(judgedOver, (need) => runWith(e, live.when(need)));
+  const { judged, git } = await judgedLive(judgedOver, (need) => runPlaced(at, e, live.when(need)));
   if (judged.status === 'cancelled') return { nothing: `cancelled at ${run.cancelledAt} — nothing to decide` };
   const decided = await runPlaced(at, e, decideRun(run.id, env, live));
   if (judged.status === 'running' && !judged.waitingOnYou.length) return { running: true, ...(decided.held ? { held: decided.held } : {}) };

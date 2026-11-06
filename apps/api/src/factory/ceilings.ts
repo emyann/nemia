@@ -2,8 +2,9 @@
  * The cap on runs in flight, and the runs it counts and holds, and what the last pass cost: what the Factory says over its floor
  * (`GET /api/ceilings`, app.ts). And the process's metrics as JSON (`GET /api/metrics`, `metricsOf`).
  */
-import type { Metric } from 'effect';
+import { Effect, type Metric } from 'effect';
 import {
+  Informer,
   lastCeilings,
   lastPassCost,
   type PassCostRead,
@@ -16,6 +17,7 @@ import {
 import type { Engine } from '../store.ts';
 import type { Placed } from '../store.ts';
 import { commandNamed, runPlaced } from '../store.ts';
+import type { Served } from '../layer.ts';
 
 /**
  * The cap on runs in flight, as the board says it over the Factory: `2 of 4 run slots taken`, or `no cap`.
@@ -48,10 +50,13 @@ const CEILINGS = commandNamed('ceilings');
 /**
  * The cap on runs in flight, and the runs it counts and holds (`Ceilings`), as the package judges them between passes (`CEILINGS`, the
  * table's entry whose handler is `slotsOf`) — every run read as a pass reads it, off one look at the harnesses — with what the last pass
- * ran with and cost. Read through `e`; the cap, before any pass wrote one, is `WF_MAX_RUNS` of `env`, the app's environment.
+ * ran with and cost. Read through the request's engine `s.e`; the cap, before any pass wrote one, is `WF_MAX_RUNS` of `s.env`, the app's
+ * environment. Over the app's informer (`s.informer`, `Informer`), a run it serves as ended at rest is left out unjudged (`slotsRead`);
+ * every run is judged where the app keeps none, or under `WF_VERIFY_REST=1`.
  */
-export async function ceilingsOf(e: Engine['Service'], at: Placed, env: NodeJS.ProcessEnv): Promise<Ceilings> {
-  const { cap, inFlight, held } = (await runPlaced(at, e, CEILINGS.handler({}, env))) as Slots;
+export async function ceilingsOf(s: Served): Promise<Ceilings> {
+  const program = Effect.provideService(CEILINGS.handler({}, s.env), Informer, s.informer);
+  const { cap, inFlight, held } = (await runPlaced(s, s.e, program)) as Slots;
   return {
     last: lastCeilings() ?? null,
     cap,

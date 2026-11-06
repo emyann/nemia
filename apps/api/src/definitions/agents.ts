@@ -196,7 +196,7 @@ export const agentsHandlers = HttpApiBuilder.group(Api, 'agents', (handlers) =>
         const name = named(route, payload.metadata.name);
         writeGoes(namespace, 'create', thereOf(await heldIn(s), name));
         const yours = { from: 'yours' as const, repo: s.repo, home: s.home };
-        await saved(s.e, s.placeService, s.inRequest, yours, agentDraftOf(draftBodyOf(payload.spec), name), 201);
+        await saved(s.e, s, s.inRequest, yours, agentDraftOf(draftBodyOf(payload.spec), name), 201);
         return agentAt(s, namespace, name, 'yours');
       }),
     )
@@ -207,7 +207,7 @@ export const agentsHandlers = HttpApiBuilder.group(Api, 'agents', (handlers) =>
         const version = versioned(route, payload.metadata.resourceVersion);
         const to = payload.metadata.name === undefined ? name : named(route, payload.metadata.name);
         const given = agentDraftOf(draftBodyOf(payload.spec), to);
-        await saved(s.e, s.placeService, s.inRequest, { from: 'yours', repo: s.repo, home: s.home }, { ...given, version, name }, 200);
+        await saved(s.e, s, s.inRequest, { from: 'yours', repo: s.repo, home: s.home }, { ...given, version, name }, 200);
         return agentAt(s, namespace, to, 'yours');
       }),
     )

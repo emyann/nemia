@@ -1,6 +1,7 @@
 /**
  * The schedules group's handlers (`objects`' `Api`): a factory's schedules as objects, in its namespace, each named by its workflow — a
- * page of them (`scheduleList`), one (`scheduleObject`) — written (`nemia factory schedule`) and taken back (`factory unschedule`).
+ * page of them (`scheduleList`), one (`scheduleObject`), the runs they fired read through the app's memo (`ReadMemo.records.factories`),
+ * so a warm read reads no finished run's record — written (`nemia factory schedule`) and taken back (`factory unschedule`).
  */
 import { HttpApiBuilder } from 'effect/http-api';
 import { scheduleList, scheduleObject } from 'agent-orchestrator';
@@ -13,16 +14,16 @@ import { answered } from '../objects/refused.ts';
 const SCHEDULE = commandNamed('factory schedule');
 const UNSCHEDULE = commandNamed('factory unschedule');
 
-/** The schedule `name` of `namespace`, read now. */
+/** The schedule `name` of `namespace`, read now, the runs it fired through the app's memo. */
 const scheduleIn = (s: Served, namespace: string, name: string) =>
-  runPlaced(s, s.e, scheduleObject(s.home, defaultRepo(s), namespace, name));
+  runPlaced(s, s.e, scheduleObject(s.home, defaultRepo(s), namespace, name, s.memo.records.factories));
 
 export const schedulesHandlers = HttpApiBuilder.group(Api, 'schedules', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
       answered((s) => {
         factoryNamed(`GET /api/namespaces/${namespace}/schedules`, namespace);
-        return runPlaced(s, s.e, scheduleList(s.home, defaultRepo(s), namespace, queryOf(query)));
+        return runPlaced(s, s.e, scheduleList(s.home, defaultRepo(s), namespace, queryOf(query), s.memo.records.factories));
       }),
     )
     .handle('get', ({ params: { namespace, name } }) =>

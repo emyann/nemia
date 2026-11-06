@@ -62,8 +62,9 @@ export type JudgedOrNot<T> = { judged: T } | { unreadable: string };
  * workflow folder that does not load (`unloadedOf`), in the folder's words (`unloadedWords`); a task of its own the read left out
  * (`unreadableOf`); or one of a run it waits on, whose view fails in the runtime's words (`unreadableJournal`). As the tick leaves such a
  * run unjudged and counts it in flight. Any other failure fails the same.
+ * Untraced: a list runs it once per run, and a span each would bury the list's trace under hundreds.
  */
-export const judgedUnlessUnreadable = Effect.fn('judgedUnlessUnreadable')(function* <T, E, R>(
+export const judgedUnlessUnreadable = Effect.fnUntraced(function* <T, E, R>(
   run: Run,
   unreadable: Unreadable,
   judge: () => Effect.Effect<T, E, R>,

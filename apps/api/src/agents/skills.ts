@@ -47,10 +47,9 @@ import {
 } from 'agent-orchestrator/workflow';
 import { type Guarded, type Refusal } from '../guard.ts';
 
-import type { Engine } from '../store.ts';
+import type { Engine, RunsOn } from '../store.ts';
 import { placesOf, type InRequest } from '../workflows/workflows.ts';
 import { commandNamed, runPlaced } from '../store.ts';
-import type { PlaceService } from 'agent-orchestrator';
 import type { DefinitionOrigin } from 'objects';
 
 /**
@@ -154,18 +153,13 @@ const READ = commandNamed('skills show');
 const WRITE = commandNamed('skills write');
 
 /** Each skill folder of `dirs` read now, through the table's `skills` at the store's root `home`, by folder. */
-export const readsOf = async (e: Engine['Service'], placeService: PlaceService['Service'], dirs: readonly string[], home: string) =>
-  (await runPlaced({ placeService, home }, e, LIST.handler({ skills: dirs }, undefined, home))) as Record<string, SkillRead>;
+export const readsOf = async (e: Engine['Service'], on: RunsOn, dirs: readonly string[], home: string) =>
+  (await runPlaced({ ...on, home }, e, LIST.handler({ skills: dirs }, undefined, home))) as Record<string, SkillRead>;
 
 /** The version of the skill in the folder `dir`, as the package reads it through its Skill door (`skills show`): null where none reads. */
-export const skillVersionAt = async (e: Engine['Service'], placeService: PlaceService['Service'], dir: string, home: string) =>
-  (
-    (await runPlaced(
-      { placeService, home },
-      e,
-      READ.handler({ from: 'yours', name: path.basename(dir), dir }, undefined, home),
-    )) as SkillPage
-  ).version;
+export const skillVersionAt = async (e: Engine['Service'], on: RunsOn, dir: string, home: string) =>
+  ((await runPlaced({ ...on, home }, e, READ.handler({ from: 'yours', name: path.basename(dir), dir }, undefined, home))) as SkillPage)
+    .version;
 
 /**
  * The reading of the folder `dir` among `reads`, which the table's `skills` gives for each folder it was asked: thrown, naming the
@@ -205,7 +199,7 @@ export function yourAgentsSkills(agents: Agents): Array<[string, string[]]> {
  */
 export async function listSkills(
   e: Engine['Service'],
-  placeService: PlaceService['Service'],
+  on: RunsOn,
   repo: string,
   home: string,
   yoursRead: YourSkills,
@@ -222,7 +216,7 @@ export async function listSkills(
     .sort(([a], [b]) => a.localeCompare(b));
   const dirOf = ([name, at]: (typeof sorted)[number]) =>
     at instanceof WorkflowError ? (skillDirIn([yours.dir, inRepo.dir], name) ?? path.join(yours.dir, name)) : at;
-  const reads = await readsOf(e, placeService, [...sorted.map(dirOf), ...builtinNames.map((name) => path.join(builtin, name))], home);
+  const reads = await readsOf(e, on, [...sorted.map(dirOf), ...builtinNames.map((name) => path.join(builtin, name))], home);
   const where = new Map<string, Extract<SkillSource, 'yours' | 'repo'>>();
   for (const [name, at] of sorted) {
     const dir = dirOf([name, at]);
@@ -387,7 +381,7 @@ export const skillUsers = Effect.fnUntraced(function* (dir: string, name: string
  */
 export async function skillDetail(
   e: Engine['Service'],
-  placeService: PlaceService['Service'],
+  on: RunsOn,
   inRequest: InRequest,
   from: SkillSource,
   name: string,
@@ -398,11 +392,7 @@ export async function skillDetail(
   const dir = skillDirOf(from, name, repo, home, builtin);
   if (dir === null) return null;
   const users = await inRequest(skillUsers(dir, name, repo, home));
-  const { text, version, ...read } = (await runPlaced(
-    { placeService, home },
-    e,
-    READ.handler({ from, name, dir }, undefined, home),
-  )) as SkillPage;
+  const { text, version, ...read } = (await runPlaced({ ...on, home }, e, READ.handler({ from, name, dir }, undefined, home))) as SkillPage;
   const skill = skillRow(
     name,
     dir,
@@ -451,7 +441,7 @@ export function skillDraftFrom(skill: typeof SKILL_DRAFT.Type, route: string, sh
  */
 export async function written(
   e: Engine['Service'],
-  placeService: PlaceService['Service'],
+  on: RunsOn,
   inRequest: InRequest,
   change: SkillChange,
   { version, name }: { version: string | null; name?: string },
@@ -464,8 +454,8 @@ export async function written(
     ...(version !== null && { version }),
     ...(name !== undefined && { name }),
   };
-  const wrote = (await runPlaced({ placeService, home }, e, WRITE.handler(args, undefined, home))) as SkillWritten;
-  const detail = await skillDetail(e, placeService, inRequest, 'yours', wrote.name, repo, home);
+  const wrote = (await runPlaced({ ...on, home }, e, WRITE.handler(args, undefined, home))) as SkillWritten;
+  const detail = await skillDetail(e, on, inRequest, 'yours', wrote.name, repo, home);
   if (detail === null) return { status: 500, error: `${wrote.dir} was written, and then could not be read back.` };
   return { status: version === null ? 201 : 200, body: { ...detail, written: wrote.written } };
 }

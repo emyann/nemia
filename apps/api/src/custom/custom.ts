@@ -33,13 +33,17 @@ export type CustomInstructionsCleared = { name: string; file: string; removed: b
  * frontmatter block 422 (`Invalid`), each writing nothing. A save carries no version: the last write wins.
  */
 export const customInstructions = new Hono<ApiEnv>().get('/api/custom-instructions/:name', (c) =>
-  served(c, async ({ e, placeService, repo, home }) => {
+  served(c, async ({ e, placeService, repo, home, trace }) => {
     const { name } = c.req.param();
     const wrong = agentNameRefusal(name);
     if (wrong !== undefined) return c.json({ error: `GET /api/custom-instructions/${name}: ${wrong}` }, 400);
     try {
       return c.json(
-        (await runPlaced({ placeService, home }, e, AGENTS_CUSTOM.handler({ name, repo }, undefined, home))) as CustomInstructionsAnswer,
+        (await runPlaced(
+          { placeService, home, trace },
+          e,
+          AGENTS_CUSTOM.handler({ name, repo }, undefined, home),
+        )) as CustomInstructionsAnswer,
       );
     } catch (err) {
       if (!(err instanceof WorkflowError)) throw err;

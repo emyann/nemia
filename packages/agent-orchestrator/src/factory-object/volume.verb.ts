@@ -15,7 +15,7 @@ import { Missing, type Invalid } from '../refusal/refusal.ts';
 import type { Engine } from '../runtime-client.ts';
 import { mountingRuns, type MountingRun, type SummaryHow } from '../summary/summary.verb.ts';
 import { factoryVolumesNamed, volumeRefusal } from '../volume/volume.ts';
-import { factoriesListed, factoryObject, objectsListed, versionOf, type ObjectQuery } from './factory.verb.ts';
+import { factoryFiled, objectsListed, versionOf, type ObjectQuery } from './factory.verb.ts';
 
 /** The phases of a run still in play: one that has not ended, and may yet run a step that mounts its volumes. */
 const IN_PLAY: readonly RunPhase[] = ['pending', 'running', 'waiting'];
@@ -57,8 +57,7 @@ const volumesNow = Effect.fn('volumesNow')(function* (
   namespace: string,
   isDirectory: (at: string) => boolean,
 ) {
-  const factory = yield* factoryObject(how.home, repo, namespace);
-  const listing = (yield* factoriesListed(how.home)).factories.find((l) => l.name === namespace);
+  const { factory, listing } = yield* factoryFiled(how.home, repo, namespace);
   if (listing === undefined || 'error' in listing) return [];
   const runs = yield* mountingRuns(e, how);
   return volumesOf(listing, factory.metadata.creationTimestamp, { home: how.home, isDirectory, runs });

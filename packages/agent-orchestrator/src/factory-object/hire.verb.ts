@@ -14,14 +14,14 @@ import { Effect } from 'effect';
 import { API_VERSION, type Hire, type HireList, HireSettings } from 'objects';
 import { workflowDirAt } from '../folder/folder.store.ts';
 import type { Fills } from '../folder/folder.ts';
-import { DEFAULT_FACTORY, fillsOf, type Factory } from '../factory/factory.ts';
+import { fillsOf, type Factory } from '../factory/factory.ts';
 import { hireNamed, hiresCollided, hireStatusOf, type HiredStep, type HireRead } from '../hire/hire.ts';
 
 /** The settings a Hire says the origin of, as `objects` names them. */
 const SETTING_KEYS: readonly string[] = Object.keys(HireSettings.fields);
 import { Conflict, type Invalid, Missing } from '../refusal/refusal.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
-import { factoriesListed, factoryObject, objectsListed, versionOf, type ObjectQuery } from './factory.verb.ts';
+import { factoryFiled, objectsListed, versionOf, type ObjectQuery } from './factory.verb.ts';
 
 /** A factory as a Hire reads it: its name, its hires, its workflows (none for every one found), its tree and repository. */
 export type HiringFactory = Pick<Factory, 'name' | 'hires' | 'tree'> & {
@@ -149,8 +149,7 @@ export const hiresOf = Effect.fn('hiresOf')(function* (f: HiringFactory, home: s
 
 /** The factory `namespace` as a Hire reads it, the default on `repo`; `Missing` where no factory has the name. */
 const hiringOf = Effect.fn('hiringOf')(function* (home: string, repo: string, namespace: string) {
-  const object = yield* factoryObject(home, repo, namespace);
-  const listing = namespace === DEFAULT_FACTORY ? undefined : (yield* factoriesListed(home)).factories.find((l) => l.name === namespace);
+  const { factory: object, listing } = yield* factoryFiled(home, repo, namespace);
   const tree = listing !== undefined && !('error' in listing) ? listing.tree : undefined;
   const factory: HiringFactory = {
     name: namespace,

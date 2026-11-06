@@ -7,6 +7,7 @@ import type { Workflow } from '../step/step.ts';
 import type { Run, TaskPhase } from '../record/record.ts';
 import { hasStarted, runReady } from '../wait/wait.ts';
 import type { Assessment } from '../tick/assess.ts';
+import type { SlotSettled } from '../../contracts/slot-settled.contract.ts';
 
 /**
  * Which run's `workspace: base` step is working in a repository's own checkout while another run's waits for it (`heldCheckouts`): the run,
@@ -180,3 +181,11 @@ export function inFlight(run: Run, phaseOf: (taskId: string) => TaskPhase): InFl
   }
   return live;
 }
+
+/**
+ * Whether the cap may leave a run out of its count without judging it again (`slot-settled.contract.ts`): its judgement as the informer
+ * serves it, none where the informer judges it again, says it ended — succeeded, failed or called off — and nothing of it moves or is
+ * due. Such a run is neither in flight nor held (`slotNeed`); every other run is judged as a pass judges it. Pure.
+ */
+export const slotSettled: SlotSettled = (kept) =>
+  kept !== undefined && !kept.moving && (kept.status === 'succeeded' || kept.status === 'failed' || kept.status === 'cancelled');

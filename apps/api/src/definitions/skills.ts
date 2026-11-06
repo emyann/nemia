@@ -50,7 +50,7 @@ export async function treeSkillsHeld(s: Served, origin: Origin): Promise<Held<Ro
   const tree = s.factory?.tree === undefined ? undefined : path.join(s.factory.tree, 'workflows', SKILLS_FOLDER);
   const names = tree === undefined ? [] : skillFoldersIn(tree);
   const dirs = names.map((name) => path.join(tree ?? '', name));
-  const reads = dirs.length ? await readsOf(s.e, s.placeService, dirs, s.home) : {};
+  const reads = dirs.length ? await readsOf(s.e, s, dirs, s.home) : {};
   return dirs.map((dir, i) => ({ name: names[i] ?? '', origin, item: { dir, ...readAt(reads, dir) } }));
 }
 
@@ -60,13 +60,13 @@ export async function treeSkillsHeld(s: Served, origin: Origin): Promise<Held<Ro
  */
 async function heldIn(s: Served): Promise<Held<Row>[]> {
   const own = await treeSkillsHeld(s, 'factory');
-  const places = await listSkills(s.e, s.placeService, s.repo, s.home, await s.inRequest(yourSkillsRead(s.repo, s.home)));
+  const places = await listSkills(s.e, s, s.repo, s.home, await s.inRequest(yourSkillsRead(s.repo, s.home)));
   const theirs = repoSkillsDir(s.repo);
   const listedRepo = new Set(places.flatMap((p) => (p.from === 'repo' ? p.skills.map((row) => row.name) : [])));
   const folded = skillFoldersIn(theirs)
     .filter((name) => !listedRepo.has(name))
     .map((name) => path.join(theirs, name));
-  const foldedReads = folded.length ? await readsOf(s.e, s.placeService, folded, s.home) : {};
+  const foldedReads = folded.length ? await readsOf(s.e, s, folded, s.home) : {};
   return [
     ...own,
     ...folded.map((dir) => ({ name: path.basename(dir), origin: 'repo' as const, item: { dir, ...readAt(foldedReads, dir) } })),
@@ -100,9 +100,7 @@ function specOf({ dir, error }: Row, name: string): SkillSpec {
  */
 export async function skillObjectsOf(s: Served, served: ReturnType<typeof servedOf<Row>>, namespace?: string): Promise<Skill[]> {
   const read = served.filter(({ item }) => item.error === null).map(({ item }) => item.dir);
-  const versions = new Map(
-    await Promise.all(read.map(async (dir) => [dir, await skillVersionAt(s.e, s.placeService, dir, s.home)] as const)),
-  );
+  const versions = new Map(await Promise.all(read.map(async (dir) => [dir, await skillVersionAt(s.e, s, dir, s.home)] as const)));
   return s.inRequest(
     Effect.forEach(served, ({ name, origin, shadowedBy, item: row }) =>
       Effect.gen(function* () {
@@ -177,7 +175,7 @@ export const skillsHandlers = HttpApiBuilder.group(Api, 'skills', (handlers) =>
         if (name === undefined || !('spec' in payload))
           throw new Invalid({ error: `${route} makes a skill from its name and its spec: ${SHAPE}.` });
         writeGoes(namespace, 'create', thereOf(await heldIn(s), name));
-        await written(s.e, s.placeService, s.inRequest, draftOf(payload.spec, name, route), { version: null }, s.repo, s.home);
+        await written(s.e, s, s.inRequest, draftOf(payload.spec, name, route), { version: null }, s.repo, s.home);
         return skillAt(s, namespace, name, 'yours');
       }),
     )
@@ -195,7 +193,7 @@ export const skillsHandlers = HttpApiBuilder.group(Api, 'skills', (handlers) =>
             error: `${route}: a skill's name is its folder, and every agent that gives it names it: write a new skill under the new name, and give it in their place.`,
           });
         const change = 'spec' in payload ? draftOf(payload.spec, name, route) : { name, preload: payload.preload };
-        await written(s.e, s.placeService, s.inRequest, change, { version, name }, s.repo, s.home);
+        await written(s.e, s, s.inRequest, change, { version, name }, s.repo, s.home);
         return skillAt(s, namespace, name, 'yours');
       }),
     )

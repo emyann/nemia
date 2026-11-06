@@ -454,6 +454,8 @@ export type JudgeHow = {
  *
  * Where the run's result branches stand is asked once the run's status is known (`standings`): left out, no branch is read, only a gate
  * says a run is one nobody has decided, and a finished run whose branch nobody merged says there is nothing to decide.
+ * Traced: its span is how a reader counts the runs judged. A warm list through the informer judges only the runs moving, so its trace
+ * holds a few; a cold or verified one holds one per run.
  */
 export const judge = Effect.fn('judge')(function* (
   run: Run,

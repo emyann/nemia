@@ -50,7 +50,6 @@ fs.writeFileSync(
 
 const listed: FactoryListed = {
   factories: [acme, stray],
-  schedules: [],
   untrusted: [{ factory: 'acme', place: repo, harness: 'Claude Code', folder: repo, withheld: 'its hooks', never: null }],
 };
 

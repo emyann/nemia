@@ -14,7 +14,7 @@ import { PROPOSAL_WORDS } from '../src/lib/words.ts';
 const proposal = (name: string, phase: ProposalPhase, at: string): Proposal => ({
   apiVersion: 'nemia/v1',
   kind: 'Proposal',
-  metadata: { name, namespace: 'acme', uid: name, resourceVersion: '1', creationTimestamp: at },
+  metadata: { name, namespace: 'acme', resourceVersion: '1', creationTimestamp: at },
   spec: { objects: [] },
   status: { phase, proposedBy: { agent: 'nemia' }, changes: [], widens: false },
 });

@@ -3,7 +3,7 @@
  * every key of a step, and a key's row on a card's or a step's page — each type with the schema `get` decodes it with.
  */
 import { Schema, SchemaTransformation, Struct } from 'effect';
-import type { DefinitionOrigin } from 'objects';
+import { DEFINITION_ORIGINS, PLACE_KINDS, type DefinitionOrigin, type PlaceKind } from 'objects';
 import { decodes } from './decodes.ts';
 
 /** A list of strings, as a decoded answer holds it: mutable, as the plain types say. */
@@ -46,7 +46,7 @@ export type SkillSource = DefinitionOrigin;
  * The word a route kept on Hono — a step's page, a start, a card's `from:` — reads where a workflow is from: `yours`, or `repo` for any
  * other origin, the factory's own tree among them, which those routes read under `repo`.
  */
-export const sourceOf = (from: string): 'repo' | 'yours' => (from === 'yours' ? 'yours' : 'repo');
+export const sourceOf = (from: string): Extract<DefinitionOrigin, 'repo' | 'yours'> => (from === 'yours' ? 'yours' : 'repo');
 
 /** A card entry as an object says it, its lists copied into the board's plain type. */
 export const cardEntryOf = (entry: {
@@ -68,8 +68,7 @@ export const cardEntryOf = (entry: {
 });
 
 /** The origin a page's address names (its `$from`), as the api reads `?origin=`: one of its words, else none, the one it serves. */
-export const originWord = (from: string): DefinitionOrigin | undefined =>
-  from === 'factory' || from === 'repo' || from === 'yours' || from === 'builtin' ? from : undefined;
+export const originWord = (from: string): DefinitionOrigin | undefined => DEFINITION_ORIGINS.find((origin) => origin === from);
 
 /**
  * Mirrors `SkillCost` in the package: what a skill costs a turn, about, at four characters a token. Named, a turn carries its listing (its
@@ -109,7 +108,7 @@ export type WorkflowStepSpec = {
    * `place: folder`: the step works in a folder the run makes, with no git repository; `git`: on branches of a repository. Every step
    * file says one; null only for a step frozen on a run before the key, which worked on a repository, and for a draft yet to choose.
    */
-  place: 'git' | 'folder' | null;
+  place: PlaceKind | null;
   /** `workspace: base`: the step runs in the repository's own checkout, on the base branch. Null for a step without the line. */
   workspace: 'base' | null;
   /** The factory's folders the step may write (`writable:`), by their directory names: empty where it only reads them. */
@@ -237,7 +236,7 @@ export const WorkflowStepSpecSchema = decodes<WorkflowStepSpec>()(
     after: Strings,
     resume: Schema.NullOr(Schema.String),
     input: Strings,
-    place: Schema.NullOr(Schema.Literals(['git', 'folder'])),
+    place: Schema.NullOr(Schema.Literals(PLACE_KINDS)),
     workspace: Schema.NullOr(BaseWorkspace),
     writable: Strings,
     reads: Strings,

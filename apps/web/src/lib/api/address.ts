@@ -3,13 +3,19 @@
  * its page, so a run links to the page of the workflow it was started from without the board reading a folder's path.
  */
 import { Schema } from 'effect';
+import type { DefinitionOrigin } from 'objects';
 import { decodes } from './decodes.ts';
 
 /**
  * Mirrors `WorkflowPageAddress` in apps/api/src/step/step.ts: where the workflow is read from, its name, and the place it is read in — the
  * factory, null for the default, and the repository, null for the api's own or the factory's only one.
  */
-export type WorkflowPageAddress = { from: 'repo' | 'yours'; workflow: string; factory: string | null; repo: string | null };
+export type WorkflowPageAddress = {
+  from: Extract<DefinitionOrigin, 'repo' | 'yours'>;
+  workflow: string;
+  factory: string | null;
+  repo: string | null;
+};
 
 /** Decodes a `WorkflowPageAddress`. */
 export const WorkflowPageAddressSchema = decodes<WorkflowPageAddress>()(

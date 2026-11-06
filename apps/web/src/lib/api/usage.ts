@@ -1,5 +1,6 @@
 /** What sessions consumed, in the CLI `decide`'s words (apps/api/src/runs/runs.ts), each type with the schema `get` decodes it with. */
 import { Schema } from 'effect';
+import { PEAK_MARKS, type PeakMark as PeakMarkWord } from 'objects';
 import { decodes } from './decodes.ts';
 
 /** Mirrors `Usage` in apps/api/src/runs/runs.ts: a count nobody measured is absent, never 0. */
@@ -45,11 +46,14 @@ export const UsageSchema = decodes<Usage>()(
   }),
 );
 
-/** Where a peak context stands: at the step's `context:` cap, or past 200k on a step with none. */
-export type PeakMark = 'cap' | 'large' | null;
+/**
+ * Where a peak context stands (`objects`' `PeakMark`): at the step's `context:` cap, or past 200k on a step with none; null where
+ * neither.
+ */
+export type PeakMark = PeakMarkWord | null;
 
 /** Decodes a `PeakMark`. */
-export const PeakMarkSchema = decodes<PeakMark>()(Schema.NullOr(Schema.Literals(['cap', 'large'])));
+export const PeakMarkSchema = decodes<PeakMark>()(Schema.NullOr(Schema.Literals(PEAK_MARKS)));
 
 /**
  * Mirrors `StepUsed` in apps/api/src/runs/runs.ts: the usage, and the CLI `decide`'s words for it — `used` and `cost`, `not measured`

@@ -3,7 +3,8 @@
  * from the orchestrator's facts alone — her level, her task, whether it is filed, the lines that reach it, whether it was stopped — and
  * never from the runtime's phase, which is shown as it came.
  */
-import type { FactoryLevel, Level, NemiaLevel, Spend } from './api/nemia.ts';
+import type { Level } from 'objects';
+import type { FactoryLevel, NemiaLevel, Spend } from './api/nemia.ts';
 import type { Presence } from './presence.ts';
 import { clockWord } from './quota.ts';
 

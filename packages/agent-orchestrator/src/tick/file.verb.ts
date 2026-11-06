@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import { asked, over, type Engine, type TaskView } from '../runtime-client.ts';
+import { asked, over, type Engine } from '../runtime-client.ts';
 import {
   CHECK_DEADLINE_SECONDS,
   CHECK_NICENESS,
@@ -18,20 +18,10 @@ import {
   REFUSAL_LINES,
   type CheckHanded,
   type LandingSaid,
-  type Verdict,
 } from '../check/check.ts';
 import { isRemoteHarness, type Workflow } from '../workflow.ts';
 import { holdsOpen } from '../gate/gate.ts';
-import {
-  checkTaskId,
-  isRepositoryRun,
-  stepTaskId,
-  tryOf,
-  type CloseoutAsked,
-  type Run,
-  type StepRecord,
-  type TaskPhase,
-} from '../record/record.ts';
+import { checkTaskId, isRepositoryRun, stepTaskId, tryOf, type Run, type StepRecord, type StepStatus } from '../record/record.ts';
 import {
   askingTry,
   budgetOf,
@@ -44,10 +34,8 @@ import {
   stepSpend,
   triedFrom,
   type Round,
-  type RoundAsk,
-  type SpendOf,
 } from '../status/status.ts';
-import { callerMounts, composeBrief, remoteBrief, type ParentCloseout } from '../brief/index.ts';
+import { callerMounts, composeBrief, remoteBrief, type ParentCloseout, type RetryBriefing } from '../brief/index.ts';
 import { handedOf } from '../brief/handed.verb.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
 import { roundBriefed, roundFiled, roundFiledNote } from '../round/round.ts';
@@ -55,7 +43,7 @@ import { closeoutsAfterMerge } from '../merge/merge.verb.ts';
 import { filedConfig, tryModel } from '../filed/filed.ts';
 import { filedOn, resumeOn } from '../pinned/pinned.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from '../closeout/index.ts';
-import { modeWord, nextTry, sessionModel, tryWord, type Retry, type RetryAsk } from '../retry/index.ts';
+import { modeWord, nextTry, sessionModel, tryWord, type Retry } from '../retry/index.ts';
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
 import { workflowFilesDir } from '../frozen/frozen.store.ts';
 import { checkCloseout, writeCheckCloseout } from '../check/check.store.ts';
@@ -75,7 +63,7 @@ import { localFields } from './assess.ts';
 import { stepToken } from '../token/token.store.ts';
 import { sendCards, type Due } from '../send/send.verb.ts';
 import { answerTables, fileScripts } from '../script/script.verb.ts';
-import { filedAt, foldersTold, placeTold, toldOf, type PlaceTold, type StepTold, type Told } from './told.verb.ts';
+import { filedAt, foldersTold, placeTold, toldOf, type PassReads, type PlaceTold, type StepTold, type Told } from './told.verb.ts';
 import { found, recordNamed, stepNamed, taskToStop, tryTold } from './told.verb.ts';
 
 /** A task as the engine is asked to file it (`e.file`). */
@@ -88,25 +76,6 @@ type Spec = Parameters<Engine['file']>[0];
  */
 const limitsOf = (step: Workflow): Pick<Spec, 'resources'> =>
   step.memory === undefined ? {} : { resources: { limits: { memory: step.memory } } };
-
-/**
- * What a pass read of a run before it filed anything (`advanceRun`): the run's steps, the engine's views of its tasks and the readers made
- * of them, and a person's asks. One for the pass: every phase of it reads the same.
- */
-export type PassReads = {
-  steps: Workflow[];
-  views: Map<string, TaskView>;
-  phaseOf: (taskId: string) => TaskPhase;
-  signedOff: (step: string) => Closeout | undefined;
-  asked: (taskId: string) => CloseoutAsked;
-  verdictOf: (step: string) => Verdict | undefined;
-  sessionBlocked: (taskId: string) => boolean;
-  spendOf: SpendOf;
-  asks: RetryAsk[];
-  roundAsks: RoundAsk[];
-  /** The store's root, as the pass was given it (`StoreRoot`): where a filing reads the run's factory's MCP server record. */
-  home: string;
-};
 
 /**
  * The pass's closer of the tasks held open that wait for a word: `closeWaiting` closes one, and answers with the engine's refusal as a
@@ -229,6 +198,16 @@ const costsFor = Effect.fnUntraced(function* (f: Filing, step: Workflow, resumed
   return yield* costsRead(f.e, f.run);
 });
 
+/** What a try of a step on a remote agent is told of itself (`remoteBrief`): a new task, never a session continued. */
+const remoteTry = (r: Retry, status: StepStatus): RetryBriefing => ({
+  try: r.try,
+  by: r.by,
+  mode: r.mode,
+  resumed: false,
+  status,
+  ...(r.message !== undefined ? { message: r.message } : {}),
+});
+
 /**
  * Send a try to the engine, told what its place says to it (`PlaceTold`): filed as a task of its own, or given as the answer to the
  * task held open (`answers`). Answers with the engine's refusal of the answer, or undefined.
@@ -248,14 +227,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow
   const status = triedFrom(step, run, reads.phaseOf, reads.signedOff, reads.asked, reads.steps, reads.spendOf);
   const told: Told = { ...(yield* toldOf(run, step)), ...landing };
   const brief = remote
-    ? remoteBrief(step, run, reads.steps, closeouts, {
-        try: r.try,
-        by: r.by,
-        mode: r.mode,
-        resumed: false,
-        status,
-        ...(r.message !== undefined ? { message: r.message } : {}),
-      })
+    ? remoteBrief(step, run, reads.steps, closeouts, remoteTry(r, status), undefined, reads.answers)
     : composeBrief(
         told.step,
         run,
@@ -271,6 +243,8 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow
         foldersTold(run, reads, told.step),
         yield* costsFor(f, step, Boolean(resumeFrom)),
         { words: told.words, say: told.say, targets: told.targets },
+        undefined,
+        reads.answers,
       );
   const budgetUsd = budgetUsdFor(r.budget ?? budgetOf(step, run), stepSpend(run, r.step, reads.spendOf));
   if (answers) return yield* answerHeld(e, taskId, brief, budgetUsd);
@@ -418,6 +392,8 @@ function roundSpec(
       foldersTold(run, reads, told.step),
       said.costs,
       { words: said.words, say: said.say },
+      undefined,
+      reads.answers,
     ),
     cwd: record.workspace ?? run.workspace,
     harness: target.harness,
@@ -585,7 +561,7 @@ function readySpec(
      * nothing of this machine (`remoteBrief`).
      */
     brief: isRemoteHarness(step.harness)
-      ? remoteBrief(step, run, reads.steps, closeoutOf, undefined, step.after.length ? undefined : parents)
+      ? remoteBrief(step, run, reads.steps, closeoutOf, undefined, step.after.length ? undefined : parents, reads.answers)
       : composeBrief(
           told.step,
           run,
@@ -602,6 +578,7 @@ function readySpec(
           said.costs,
           { words: said.words, say: said.say, targets: said.targets },
           place.merge,
+          reads.answers,
         ),
     cwd: place.workspace,
     harness: step.harness,

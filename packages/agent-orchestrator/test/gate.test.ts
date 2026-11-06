@@ -421,6 +421,16 @@ test('a send-back from a gate spends the approval given before it', async (t) =>
     assert.deepEqual((await tick(gate.e, id)).filed, ['implement']);
     assert.equal(gate.filings.filter((f) => f === `${id}-implement`).length, 1);
   });
+  await s.test("implement, after plan, is handed plan's answer under `## Answered`, read off the ask consumed into done/", () => {
+    const told = gate.tasks.get(`${id}-implement`)!.spec.brief;
+    const at = JSON.parse(fs.readFileSync(path.join(asksDir(id), 'done', 'retry-plan-2'), 'utf8')).at;
+    assert.ok(
+      told.includes('\n## Answered\n\n') &&
+        told.includes(`plan, try 2, answered at ${at}:\n\n\`\`\`text\nStore the flag before you parse it.\n\`\`\``),
+      told,
+    );
+    assert.ok(!gate.tasks.get(try2())!.spec.brief.includes('## Answered'), "not the answered step: its answer is its try's own");
+  });
 });
 
 test('`nemia cancel` and `nemia rm` at a gate', async (t) => {

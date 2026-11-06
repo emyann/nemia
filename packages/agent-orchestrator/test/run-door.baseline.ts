@@ -40,6 +40,6 @@ export const RUN_DOOR_DEBT: Readonly<Record<string, number>> = {
   'src/stats/stats.verb.ts': 3,
   'src/summary/reads.verb.ts': 1,
   'src/summary/summary.verb.ts': 1,
-  'src/tick/advance.verb.ts': 6,
+  'src/tick/advance.verb.ts': 5,
   'src/try/try.verb.ts': 1,
 };

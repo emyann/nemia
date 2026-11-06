@@ -66,7 +66,7 @@ export function factoryWords(row: FactoryLevel, byDefault: boolean, now: Date): 
 }
 
 /** The levels a person picks among, lowest first. */
-export const LEVELS: readonly Level[] = ['manual', 'semi-auto', 'auto'];
+export { LEVELS } from 'objects';
 
 /** The level a fresh session is asked at, from `level`, hers: that level where above Manual, else Semi-auto. */
 export const freshLevel = (level: Level): Level => (level === 'manual' ? 'semi-auto' : level);

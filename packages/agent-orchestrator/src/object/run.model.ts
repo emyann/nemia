@@ -25,6 +25,7 @@ import {
   RUN_REASONS,
   STEP_PHASES,
   STEP_REASONS,
+  RETRY_MODES,
   TRY_CAUSES,
   WAIT_ON,
 } from 'objects';
@@ -81,6 +82,7 @@ export const wordsHeld = {
   placeKinds: true satisfies Same<typeof PLACE_KINDS, typeof Records.PLACE_KINDS>,
   places: true satisfies Same<typeof PLACE_KINDS, typeof Keys.PLACES>,
   tryCauses: true satisfies Same<typeof TRY_CAUSES, typeof Retry.TRY_CAUSES>,
+  retryModes: true satisfies Same<typeof RETRY_MODES, typeof Retry.RETRY_MODES>,
   revisionKinds: true satisfies Same<typeof REVISION_KINDS, typeof Revisions.REVISION_KINDS>,
   outcomes: true satisfies Same<typeof OUTCOMES, typeof Closeouts.CLOSEOUT_OUTCOMES>,
   definitionOrigins: true satisfies Same<typeof DEFINITION_ORIGINS, typeof Served.LOOKUP>,

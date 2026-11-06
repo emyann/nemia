@@ -7686,3 +7686,53 @@ test('a link to a factory definition given no place is read in the factory of th
   );
   assert.match(html, /href="\/agents\/factory\/drafter\?factory=treed"/, "the page's factory is carried");
 });
+
+/** A proposal of `acme` named `nemia-ab12c` in `phase`, changing one hire to widen access where `widens`. */
+const proposalIn = (phase: import('objects').ProposalPhase, widens: boolean, applyAt?: 'run-end'): import('objects').Proposal => ({
+  apiVersion: 'nemia/v1',
+  kind: 'Proposal',
+  metadata: { name: 'nemia-ab12c', namespace: 'acme', resourceVersion: '3', creationTimestamp: '2026-11-06T10:00:00Z' },
+  spec: { objects: [], why: 'the planner reads more', ...(applyAt ? { applyAt } : {}) },
+  status: {
+    phase,
+    proposedBy: { agent: 'nemia' },
+    changes: [{ resource: 'hires', name: 'build.plan', verb: 'update', access: widens ? 'widens' : 'same' }],
+    widens,
+    ...(phase === 'applied' ? { approvedBy: { by: 'person' as const, at: '2026-11-06T10:05:00Z' } } : {}),
+  },
+});
+
+/** `element` rendered with the proposal `proposal` read already, as the page's loader leaves it. */
+async function withProposal(proposal: import('objects').Proposal, element: Parameters<typeof renderToStaticMarkup>[0]): Promise<string> {
+  const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
+  const client = new QueryClient();
+  client.setQueryData(['proposal', 'acme', 'nemia-ab12c'], proposal);
+  return renderToStaticMarkup(createElement(QueryClientProvider, { client }, element));
+}
+
+test('a proposal shows its phase, its widens mark, its changes and the buttons its phase takes', async () => {
+  const { ProposalCard } = await import('../src/components/ProposalCard.tsx');
+  const card = createElement(ProposalCard, { factory: 'acme', name: 'nemia-ab12c' });
+  const waiting = await withProposal(proposalIn('waiting', true), card);
+  assert.match(waiting, /data-proposal-phase="waiting"/);
+  assert.match(waiting, /data-proposal-widens/);
+  assert.match(waiting, /data-proposal-change="hires\/build.plan"/);
+  assert.match(waiting, /data-proposal-approve=/);
+  assert.match(waiting, /data-proposal-decline/);
+  const approved = await withProposal(proposalIn('approved', false, 'run-end'), card);
+  assert.doesNotMatch(approved, /data-proposal-approve=/, 'an approved proposal is approved no more');
+  assert.match(approved, /data-proposal-decline/, 'it is declined until its run ends');
+  assert.doesNotMatch(approved, /data-proposal-widens/);
+  const applied = await withProposal(proposalIn('applied', true), card);
+  assert.doesNotMatch(applied, /data-proposal-approve=|data-proposal-decline=/);
+  assert.match(applied, />applied</);
+  assert.match(applied, /data-proposal-approver/);
+});
+
+test('her chat draws a proposal she links as the page\'s own part, in her frame', async () => {
+  const { ChatProposal } = await import('../src/components/chat/ChatProposal.tsx');
+  const html = await withProposal(proposalIn('waiting', true), createElement(ChatProposal, { factory: 'acme', name: 'nemia-ab12c' }));
+  assert.match(html, /^<div data-chat-proposal="nemia-ab12c" data-factory="acme"/);
+  assert.match(html, /data-proposal="nemia-ab12c"/);
+  assert.match(html, /data-proposal-widens/);
+});

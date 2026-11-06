@@ -4,8 +4,9 @@
  * (`changedChat`, `followChat`), the one translation of the api's presence into the board's (`presenceOf`), her
  * consecutive calls folded into a turn (`foldChat`) and that fold mapped onto the one shape both conversations draw (`chatItems`, her
  * adapter onto `lib/conversation.ts`, a step's session having one of its own), the links read out of her words (`linksOf`) and the
- * steps of runs and the proposals they bring (`broughtOf`, `lib/stepLink.ts`; `proposalLinkOf`, `lib/proposalLink.ts`), how an ask of hers is drawn (`drawnAsk`) and what is left to answer of
- * one of several questions (`askLeft`, `askAnswered`, `asksOpen`), which of them the composer's own words answer (`askInWords`,
+ * steps of runs and the proposals they bring (`broughtOf`, `lib/stepLink.ts`; `proposalLinkOf`, `lib/proposalLink.ts`), how an ask of
+ * hers is drawn (`drawnAsk`) and what is left to answer of one of several questions (`askLeft`, `askAnswered`, `asksOpen`), which of
+ * them the composer's own words answer (`askInWords`,
  * `wordsAnswer`), and which of her messages are new to the person (`newFrom`, `readableFrom`).
  *
  * Beside the effect in `lib/useNemiaChat.ts`, as `lib/following.ts` sits beside `lib/useStepTranscript.ts`. The transport under

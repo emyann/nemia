@@ -1,25 +1,29 @@
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { FactoryCanvas } from '@/components/FactoryCanvas';
+import { FactoryProposals } from '@/components/FactoryProposals';
 import { TemplateCard } from '@/components/TemplateCard';
 import { LinkButton } from '@/components/ui/button';
 import { routeLink } from '@/components/routeLink';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { factoriesQuery, inboxQuery, runsQuery, storeQuery } from '@/lib/api';
+import { factoriesQuery, inboxQuery, proposalsQuery, runsQuery, storeQuery } from '@/lib/api';
 import { runsIn } from '@/lib/factories';
 
 export const Route = createFileRoute('/factories/$factory')({
   /**
    * Waits for the factories and the runs, and prefetches the inbox for the queue's ghosts beside the floor, so the floor is fitted beside
-   * them with the first cards. A prefetch never throws: what cannot be read says so over
-   * the floor, and the runs are drawn all the same.
+   * them with the first cards, and the proposals of a factory a person made, listed above the floor before it is fitted. A prefetch never
+   * throws: what cannot be read says so over the floor, and the runs are drawn all the same.
    */
-  loader: ({ context }) =>
-    Promise.all([
+  loader: async ({ context, params }) => {
+    const [factories] = await Promise.all([
       context.queryClient.ensureQueryData(factoriesQuery),
       context.queryClient.ensureQueryData(runsQuery),
       context.queryClient.prefetchQuery(inboxQuery),
-    ]),
+    ]);
+    if (factories.some((f) => f.name === params.factory && !f.default))
+      await context.queryClient.prefetchQuery(proposalsQuery(params.factory));
+  },
   staticData: { fullBleed: true },
   component: FactoryPage,
   errorComponent: ({ error }) => (
@@ -32,7 +36,8 @@ export const Route = createFileRoute('/factories/$factory')({
 
 /**
  * Inside a factory: its floor, the runs it holds and the cards queued in it (`FactoryCanvas`), the factory named in the top bar's picker
- * (`FactoryPicker`), and above the floor the template it is made from, where it is (`TemplateCard`). A name the api lists no factory by
+ * (`FactoryPicker`), and above the floor the template it is made from, where it is (`TemplateCard`), and the factory's proposals while it
+ * has any (`FactoryProposals`). A name the api lists no factory by
  * says so: no route of the api is asked about it.
  */
 function FactoryPage() {
@@ -41,7 +46,12 @@ function FactoryPage() {
   const { data: runs } = useSuspenseQuery(runsQuery);
   const factory = factories.find((f) => f.name === name);
   if (!factory) return <NoSuchFactory name={name} />;
-  const above = factory.template ? <TemplateCard template={factory.template} /> : undefined;
+  const above = (
+    <>
+      {factory.template ? <TemplateCard template={factory.template} /> : null}
+      {factory.default ? null : <FactoryProposals factory={factory.name} />}
+    </>
+  );
   return <FactoryCanvas runs={runsIn(runs, factory)} factory={factory} above={above} />;
 }
 

@@ -1,7 +1,7 @@
 /**
- * The leftovers' rule on its accepting side, which the contract proves whole since tsverify 0.9.0
- * (`contracts/leftovers.contract.ts`) and these cases hold on the real function too, the 30 days' edge, and `leftoverLines`, matched on the names they
- * carry, never a whole sentence.
+ * The leftovers' rule on its accepting side, which the contract proves whole since tsverify 0.9.0 (`contracts/leftovers.contract.ts`)
+ * and these cases hold on the real function too, the 30 days' edge, and `leftoverLines`, matched on the names they carry, never a whole
+ * sentence.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

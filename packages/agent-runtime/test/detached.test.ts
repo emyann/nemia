@@ -682,10 +682,10 @@ const stopped = async (t: Waiter, ops: ReturnType<typeof detachedOps>, name: str
 };
 
 /**
- * How long a test waits for the worker to have looked at the inbox at least once: the worker's `INBOX_MS` (500, a bound with no seam)
- * and a half of it besides for a timer that fires late.
+ * How long a test waits for the worker to have looked at the inbox: over two of the worker's `INBOX_MS` (500, a bound with no seam), so
+ * a timer that fires late still leaves one look inside the wait. Shortened only through a seam for `INBOX_MS`, never by a thinner margin.
  */
-const INBOX_LOOKED_MS = 750;
+const INBOX_LOOKED_MS = 1_200;
 
 test('a harness that reads its stdin hears its brief, then each word said, until its closing line closes its input', WAITED, async (t) => {
   const s = story(t);

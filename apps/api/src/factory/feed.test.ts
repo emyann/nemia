@@ -468,6 +468,11 @@ test(
 
 /** The reader's beat the tests below give their app (`Beats.feed`): a few of them are waited for, never the package's second. */
 const BEAT_MS = 50;
+/**
+ * How long a read is kept failing in the test below before the feed is made readable again: 500 ms, ten of `BEAT_MS` and many more than
+ * the two beats the test's claim needs, so a slow machine still sees the failing read repeated.
+ */
+const FAILING_FOR_MS = 500;
 /** An app whose feed reader beats every `BEAT_MS` (`Beats.feed`), disposed after the test that built it. */
 const beatenApp = (t: { after: (fn: () => unknown) => void }) => {
   const own = appOf(Layer.merge(liveOf(), Layer.succeed(Beats)({ ...Beats.defaultValue(), feed: `${BEAT_MS} millis` })));
@@ -548,7 +553,7 @@ test(
         const { error, retrying } = JSON.parse(failed[0].data!);
         assert.equal(retrying, true, 'a read that failed, not a feed that cannot be read from again');
         assert.match(error, /EACCES/);
-        await new Promise((r) => setTimeout(r, BEAT_MS * 5));
+        await new Promise((r) => setTimeout(r, FAILING_FOR_MS));
       } finally {
         fs.chmodSync(feedFile(), 0o644);
       }

@@ -401,6 +401,7 @@ const WRITE = commandNamed('workflows write');
 export type Writing = {
   e: Engine['Service'];
   placeService: PlaceService['Service'];
+  trace: Served['trace'];
   name: string;
   dir: string;
   repo: string;
@@ -423,7 +424,7 @@ export type Writing = {
  * a write that fails partway has changed the file all the same, so a schema counts as written before its write, not after it.
  */
 export async function write(
-  { e, placeService, name, dir, repo, home, changes, inRequest }: Writing,
+  { e, placeService, trace, name, dir, repo, home, changes, inRequest }: Writing,
   steps: readonly StepDraft[],
   readme: string | undefined,
   schemas: readonly SchemaFile[] = [],
@@ -470,7 +471,7 @@ export async function write(
       ...(readme !== undefined && { readme }),
       ...(changes && { version: await inRequest(workflowVersion(dir, places)) }),
     };
-    result = (await runPlaced({ placeService, home }, e, WRITE.handler(args, undefined, home))) as WorkflowWritten;
+    result = (await runPlaced({ placeService, home, trace }, e, WRITE.handler(args, undefined, home))) as WorkflowWritten;
   } catch (err) {
     putSchemasBack(dir, written);
     if (err instanceof WorkflowError) return refused(err.message);
@@ -482,7 +483,7 @@ export async function write(
       name,
       'yours',
       dir,
-      loadedAt(await loadedOf(e, placeService, [dir], repo, home), dir),
+      loadedAt(await loadedOf(e, { placeService, trace }, [dir], repo, home), dir),
       await inRequest(workflowVersion(dir, places)),
     ),
     written: [...result.written, ...schemasWritten].sort(),

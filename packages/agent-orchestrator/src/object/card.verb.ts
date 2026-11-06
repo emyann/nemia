@@ -93,8 +93,9 @@ const cardOf = (l: InboxListing, text: string, filedAt: string, source = false):
 /**
  * The object of the listed entry `l`, read through the Card door: a card, or a stray entry with no text, dated when it was last written;
  * the card's file as written in its `status.source` where `source`. Null for one gone since the listing.
+ * Untraced: the cards list runs it once per card, and a span each would bury the list's trace under hundreds.
  */
-const objectOf = Effect.fn('objectOf')(function* (l: InboxListing, source = false) {
+const objectOf = Effect.fnUntraced(function* (l: InboxListing, source = false) {
   const door = yield* CardDoor;
   if (!l.file.endsWith('.md')) {
     const at = yield* door.cards.entryAt(l);

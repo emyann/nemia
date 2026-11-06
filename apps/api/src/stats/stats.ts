@@ -45,7 +45,7 @@ const QUERY_KEYS: Record<QueryKey, string> = {
  *   grammar refuses is a 422 naming the key or the clause.
  */
 export const stats = new Hono<ApiEnv>().get('/api/stats', (c) =>
-  served(c, async ({ e, placeService, env, home, memo }) => {
+  served(c, async ({ e, placeService, env, home, memo, trace }) => {
     const given = Object.fromEntries(
       Object.entries(QUERY_KEYS).flatMap(([key, name]) => {
         const value = c.req.query(name);
@@ -55,7 +55,7 @@ export const stats = new Hono<ApiEnv>().get('/api/stats', (c) =>
     statsQueryOf(given, (key) => `?${QUERY_KEYS[key]}=`);
     return c.json(
       await runPlaced(
-        { placeService, home },
+        { placeService, home, trace },
         e,
         STATS.handler({ ...given, ...selectorOf(c) }, env, home, { stats: memo.stats, series: memo.series }),
       ),

@@ -757,7 +757,9 @@ test('POST /api/namespaces/default/runs: what a start refuses, writing nothing, 
       write(path.join(clash, 'build.md'), '---\nplace: git\ncheck: npm run build\n---\nBuild it.\n');
       write(path.join(clash, 'build-check.md'), '---\nafter: build\nplace: git\n---\nCheck the build by hand.\n');
       assert.equal(
-        (await listWorkflows(engine(), builtinGitPlace, repo, root, inRoot)).find((w) => w.name === 'clash')?.error,
+        (await listWorkflows(engine(), { placeService: builtinGitPlace, trace: undefined }, repo, root, inRoot)).find(
+          (w) => w.name === 'clash',
+        )?.error,
         null,
         "the loader reads this folder; `nemia start` refuses it, as the run files build's check as `build-check`",
       );

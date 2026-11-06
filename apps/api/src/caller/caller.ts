@@ -13,7 +13,7 @@ import { TaggedError } from 'effect/Data';
 import type { MiddlewareHandler } from 'hono';
 import { PERSON, PlaceService, sessionCaller, type ProposalCaller } from 'agent-orchestrator';
 import type { TokenRefusal } from 'objects';
-import type { ApiEnv } from '../layer.ts';
+import { type ApiEnv, traceOf } from '../layer.ts';
 import { Engine, runPlaced, StoreRoot } from '../store.ts';
 
 /** A request whose token the api refuses, with the reason where it presented one: the api's 401 (`objects`' `Unauthorized`). */
@@ -37,12 +37,12 @@ const REFUSED_WORDS: Readonly<Record<TokenRefusal, string>> = {
 /** The caller `token` is (`undefined`: none presented), asked of the package over the app's engine and store; refused, `Unauthorized`. */
 export async function callerBy(c: Parameters<MiddlewareHandler<ApiEnv>>[0], token: string | undefined): Promise<ProposalCaller> {
   if (token === undefined) return PERSON;
-  const { e, placeService, home } = await c.var.runtime.runPromise(
+  const { e, placed } = await c.var.runtime.runPromise(
     Effect.gen(function* () {
-      return { e: yield* Engine, placeService: yield* PlaceService, home: yield* StoreRoot };
+      return { e: yield* Engine, placed: { placeService: yield* PlaceService, home: yield* StoreRoot, trace: yield* traceOf(c) } };
     }),
   );
-  const caller = await runPlaced({ placeService, home }, e, sessionCaller(token));
+  const caller = await runPlaced(placed, e, sessionCaller(token));
   if (caller.kind !== 'refused') return caller;
   throw new Unauthorized({
     reason: caller.reason,

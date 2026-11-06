@@ -6,7 +6,7 @@
  * store.ts; `storeRootLayer` at `app.ts`): what the package still reads off a root of its own as it loads is named in its
  * `test/global-roots.baseline.ts`.
  */
-import { Context, type Duration, Effect, Layer, type ManagedRuntime, Metric } from 'effect';
+import { Context, type Duration, Effect, Layer, type ManagedRuntime, Metric, Tracer } from 'effect';
 import type { Context as RequestContext } from 'hono';
 import { routePath } from 'hono/route';
 import {
@@ -31,7 +31,7 @@ import type { LastSaid } from './steps/logs.ts';
 import { placeFor } from './factories/place.ts';
 import { QuotaAsker } from './factory/quota.ts';
 import { Followings } from './steps/following.ts';
-import { Engine, StoreRoot } from './store.ts';
+import { Engine, type RequestTrace, StoreRoot } from './store.ts';
 import type { StepRun } from './step/step.ts';
 
 /**
@@ -107,10 +107,24 @@ export type Services = ApiConfig | Engine | StoreRoot | McpAsker | QuotaAsker | 
 export type ApiRuntime = ManagedRuntime.ManagedRuntime<Services, never>;
 
 /**
- * The api's Hono environment: the app's runtime on every request, and who the request is from (`caller`, by the session token it presents,
- * caller/caller.ts), each put there by app.ts before any router is reached.
+ * The api's Hono environment: the app's runtime on every request, the request's server span (`span`, put there by `saidRequest`,
+ * request/request.ts, none before it), and who the request is from (`caller`, by the session token it presents, caller/caller.ts), each
+ * put there by app.ts before any router is reached.
  */
-export type ApiEnv = { Variables: { runtime: ApiRuntime; caller: ProposalCaller } };
+export type ApiEnv = { Variables: { runtime: ApiRuntime; span?: Tracer.Span; caller: ProposalCaller } };
+
+/**
+ * The trace the request's programs join (`RequestTrace`, store.ts): the tracer of the runtime `trace` is read on, and the request's server
+ * span; none before `saidRequest` has opened one.
+ */
+export const traceOf = Effect.fnUntraced(function* (c: RequestContext<ApiEnv>) {
+  const span = c.var.span;
+  return span === undefined ? undefined : ({ tracer: yield* Tracer.Tracer, span } satisfies RequestTrace);
+});
+
+/** `program` under the request's server span, where `saidRequest` opened one. */
+const underRequest = <A, E, R>(c: RequestContext<ApiEnv>, program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+  c.var.span === undefined ? program : Effect.withParentSpan(program, c.var.span);
 
 /**
  * The services as a handler reads them, each under the name the helpers it calls take it by (`placeService` the place a package program
@@ -138,6 +152,8 @@ export type Served = {
   beats: BeatsShape;
   /** Who the request is from: the person, or the agent's session its token names (`callerGate`, caller/caller.ts). */
   caller: ProposalCaller;
+  /** The trace the request's programs join (`runPlaced`, store.ts): the app's tracer and the request's server span; none outside one. */
+  trace: RequestTrace | undefined;
   /**
    * `program` run over the request's own services, its answer or its rejection with the failure itself, as `served` rejects: how a
    * handler reads a door of the package (`AgentDoor`, `SkillDoor`). A door's default reads the files at the app's `StoreRoot`, and a door a
@@ -170,40 +186,45 @@ const readsOf = (e: Engine['Service']): Effect.Effect<number | undefined> =>
  * what it returns, or its rejection itself, so a refusal thrown inside it — the place's among them, before `handle` runs — reaches
  * `app.onError` as the instance it was and is answered by its kind. The handler's body stays a plain function: a failure yielded inside
  * `Effect.gen` never reaches a `try` around it, and the routes catch what they word themselves. The files the runtime read for it are
- * counted into `POLL_READS`, whether it answered or threw.
+ * counted into `POLL_READS`, whether it answered or threw. It runs under the request's server span, so a program it runs on the app's
+ * runtime (`inRequest`) is that span's child, and one run apart (`runPlaced`) is made so by `trace`.
  */
 export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | Promise<A>): Promise<A> =>
   c.var.runtime.runPromise(
-    Effect.gen(function* () {
-      const { env, running } = yield* ApiConfig;
-      const context = yield* Effect.context<Services>();
-      const inRequest = <A, E>(program: Effect.Effect<A, E, Services>): Promise<A> => Effect.runPromiseWith(context)(program);
-      const services = {
-        env,
-        running,
-        e: yield* Engine,
-        placeService: yield* PlaceService,
-        home: yield* StoreRoot,
-        mcp: yield* McpAsker,
-        quota: yield* QuotaAsker,
-        memo: yield* ReadMemo,
-        informer: yield* Informer,
-        followings: yield* Followings,
-        beats: yield* Beats,
-        caller: c.var.caller,
-        inRequest,
-      };
-      const before = yield* readsOf(services.e);
-      return yield* Effect.promise(async () =>
-        handle({ ...services, ...placeFor({ factory: c.req.query('factory'), repo: c.req.query('repo') }, env, running) }),
-      ).pipe(
-        Effect.ensuring(
-          Effect.flatMap(readsOf(services.e), (after) =>
-            before === undefined || after === undefined
-              ? Effect.void
-              : Metric.update(Metric.withAttributes(POLL_READS, { route: routePath(c) }), after - before),
+    underRequest(
+      c,
+      Effect.gen(function* () {
+        const { env, running } = yield* ApiConfig;
+        const context = yield* Effect.context<Services>();
+        const inRequest = <A, E>(program: Effect.Effect<A, E, Services>): Promise<A> => Effect.runPromiseWith(context)(program);
+        const services = {
+          env,
+          running,
+          e: yield* Engine,
+          placeService: yield* PlaceService,
+          home: yield* StoreRoot,
+          mcp: yield* McpAsker,
+          quota: yield* QuotaAsker,
+          memo: yield* ReadMemo,
+          informer: yield* Informer,
+          followings: yield* Followings,
+          beats: yield* Beats,
+          caller: c.var.caller,
+          trace: yield* traceOf(c),
+          inRequest,
+        };
+        const before = yield* readsOf(services.e);
+        return yield* Effect.promise(async () =>
+          handle({ ...services, ...placeFor({ factory: c.req.query('factory'), repo: c.req.query('repo') }, env, running) }),
+        ).pipe(
+          Effect.ensuring(
+            Effect.flatMap(readsOf(services.e), (after) =>
+              before === undefined || after === undefined
+                ? Effect.void
+                : Metric.update(Metric.withAttributes(POLL_READS, { route: routePath(c) }), after - before),
+            ),
           ),
-        ),
-      );
-    }),
+        );
+      }),
+    ),
   );

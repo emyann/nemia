@@ -454,8 +454,9 @@ export type JudgeHow = {
  *
  * Where the run's result branches stand is asked once the run's status is known (`standings`): left out, no branch is read, only a gate
  * says a run is one nobody has decided, and a finished run whose branch nobody merged says there is nothing to decide.
+ * Untraced: a list runs it once per run, and a span each would bury the list's trace under hundreds.
  */
-export const judge = Effect.fn('judge')(function* (
+export const judge = Effect.fnUntraced(function* (
   run: Run,
   names: readonly string[],
   folder: readonly Workflow[] | null,

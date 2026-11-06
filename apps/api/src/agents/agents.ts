@@ -24,11 +24,10 @@ import { agentNameRefusal, type AgentCardShape, type AgentDraft } from 'agent-or
 
 import { type Guarded } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
-import type { Engine } from '../store.ts';
+import type { Engine, RunsOn } from '../store.ts';
 import { givenSkills, type GivenSkill } from './skills.ts';
 import type { InRequest, WorkflowSource } from '../workflows/workflows.ts';
 import { commandNamed, runPlaced } from '../store.ts';
-import type { PlaceService } from 'agent-orchestrator';
 
 export type { AgentUser } from 'agent-orchestrator';
 
@@ -169,9 +168,9 @@ export function agentDraftOf(body: AgentDraftBody, name: string): { draft: Agent
  *   `POST /api/agents/yours/copy` takes.
  */
 export const agents = new Hono<ApiEnv>().get('/api/agents/sources', (c) =>
-  served(c, async ({ e, placeService, env, home }) => {
+  served(c, async ({ e, placeService, env, home, trace }) => {
     const at = c.req.query('path');
-    return c.json(await runPlaced({ placeService, home }, e, SOURCES.handler(at === undefined ? {} : { path: at }, env, home)));
+    return c.json(await runPlaced({ placeService, home, trace }, e, SOURCES.handler(at === undefined ? {} : { path: at }, env, home)));
   }),
 );
 
@@ -185,7 +184,7 @@ type AgentAt = { from: string; repo: string; home: string };
  */
 export async function saved(
   e: Engine['Service'],
-  placeService: PlaceService['Service'],
+  on: RunsOn,
   inRequest: InRequest,
   { from, repo, home }: AgentAt,
   { draft, schema, version, name }: { draft: AgentDraft; schema: AgentSchema | null; version?: string; name?: string },
@@ -199,7 +198,7 @@ export async function saved(
     ...(version !== undefined && { version }),
     ...(name !== undefined && { name }),
   };
-  const done = (await runPlaced({ placeService, home }, e, WRITE.handler(args, undefined, home))) as AgentWritten;
+  const done = (await runPlaced({ ...on, home }, e, WRITE.handler(args, undefined, home))) as AgentWritten;
   const agent = await inRequest(listedAgent('yours', done.dir, done.agent.name, repo, home));
   if (agent === null)
     throw new Error(

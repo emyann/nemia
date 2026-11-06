@@ -52,10 +52,9 @@ import { toldLayers, type ToldLayers } from 'agent-orchestrator/run';
 import { NotBlank, readBody, valueAt, type BodyIssue } from '../body.ts';
 import type { Guarded, Refusal } from '../guard.ts';
 import { type ApiEnv, served, type Served } from '../layer.ts';
-import { StoreRoot, type Engine } from '../store.ts';
+import { StoreRoot, type Engine, type RunsOn } from '../store.ts';
 import { graphOf, workflowVersion, type RunGraph } from 'agent-orchestrator';
 import { runPlaced } from '../store.ts';
-import type { PlaceService } from 'agent-orchestrator';
 import type { DefinitionOrigin, PlaceKind } from 'objects';
 
 /** Where a workflow is read from: the repository's `workflows/`, or yours, in the store. */
@@ -266,14 +265,8 @@ const unshadowed = <T extends { from: WorkflowSource }>(found: readonly T[], nam
  * table's `workflows` runs), by folder. The factory is handed whole, so one the store does not hold — a template's render — loads as a
  * factory applied from it would.
  */
-export const loadedOf = async (
-  e: Engine['Service'],
-  placeService: PlaceService['Service'],
-  dirs: readonly string[],
-  repo: string,
-  home: string,
-  factory?: Factory,
-) => (await runPlaced({ placeService, home }, e, foldersLoaded(dirs, { repo, home }, factory))) as Record<string, FolderLoaded>;
+export const loadedOf = async (e: Engine['Service'], on: RunsOn, dirs: readonly string[], repo: string, home: string, factory?: Factory) =>
+  (await runPlaced({ ...on, home }, e, foldersLoaded(dirs, { repo, home }, factory))) as Record<string, FolderLoaded>;
 
 /** The loading of the folder `dir` among `loaded`, which `loadedOf` gives for each folder it was asked: thrown, naming it, where none. */
 export function loadedAt(loaded: Readonly<Record<string, FolderLoaded>>, dir: string): FolderLoaded {
@@ -290,7 +283,7 @@ export function loadedAt(loaded: Readonly<Record<string, FolderLoaded>>, dir: st
  */
 export async function listWorkflows(
   e: Engine['Service'],
-  placeService: PlaceService['Service'],
+  on: RunsOn,
   repo: string,
   home: string,
   inRequest: InRequest,
@@ -306,7 +299,7 @@ export async function listWorkflows(
   );
   const loaded = await loadedOf(
     e,
-    placeService,
+    on,
     folders.map((f) => f.dir),
     repo,
     home,
@@ -652,7 +645,7 @@ export function agentSkillsOf(step: Workflow, found: { readonly agents: Agents; 
  * its refusal, by its status. A card whose `repo:` the run looked at none of carries it as `ignoredRepo`, as `nemia start` prints it.
  */
 export async function cardStart(
-  { e, placeService, repo, home, factory: at }: Served,
+  { e, placeService, trace, repo, home, factory: at }: Served,
   card: string,
   body: Omit<typeof START_BODY.Type, 'card'>,
   factory: string | undefined,
@@ -660,7 +653,7 @@ export async function cardStart(
   const asked = startOf({ ...body, card }, repo, home, at?.tree);
   if ('status' in asked) return asked;
   if (!('card' in asked) || asked.card === undefined) return { status: 422, error: NO_BRIEF };
-  const started = await cardStarted(e, placeService, asked, repo, factory, home);
+  const started = await cardStarted(e, { placeService, trace }, asked, repo, factory, home);
   return {
     id: started.id,
     card: started.card ?? card,
@@ -676,14 +669,14 @@ export async function cardStart(
  */
 async function cardStarted(
   e: Engine['Service'],
-  placeService: PlaceService['Service'],
+  on: RunsOn,
   asked: Extract<Asked, { card: string }>,
   repo: string,
   factory: string | undefined,
   home: string,
 ) {
   const started = await runPlaced(
-    { placeService, home },
+    { ...on, home },
     e,
     START_ENTRY.handler(
       {
@@ -732,7 +725,7 @@ const jsonFrom = (text: string | undefined) => ({
  * or two do, naming the namespace to start it in.
  */
 export async function runStart(
-  { e, placeService, repo, home, factory }: Served,
+  { e, placeService, trace, repo, home, factory }: Served,
   namespace: string,
   text: string | undefined,
 ): Promise<{ id: string } | Refusal> {
@@ -748,7 +741,7 @@ export async function runStart(
   if ('status' in asked) return asked;
   const found = factory ? { factory, repo } : startFactory(undefined, repo, 'POST /api/namespaces/<name>/runs');
   const { id } = await runPlaced(
-    { placeService, home },
+    { placeService, home, trace },
     e,
     START_ENTRY.handler(
       {

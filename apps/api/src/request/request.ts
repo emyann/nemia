@@ -99,8 +99,13 @@ const piped = (c: Context<ApiEnv>, body: ReadableStream<Uint8Array>, attributes:
   return new Response(relay.readable, { status: c.res.status, headers: c.res.headers });
 };
 
-/** The request answered, then said and annotated on the span it runs in: one line, and a second one due where the answer is a stream. */
+/**
+ * The request answered, then said and annotated on the span it runs in: one line, and a second one due where the answer is a stream. The
+ * span is put on the request first (`span`), as the parent of what its handler runs (`served`, layer.ts): the handler runs on fibers of
+ * its own, which read nothing of this one's.
+ */
 const answered = Effect.fnUntraced(function* (c: Context<ApiEnv>, next: () => Promise<void>) {
+  c.set('span', yield* Effect.currentSpan);
   const began = performance.now();
   yield* Effect.promise(() => next());
   const took = performance.now() - began;

@@ -386,6 +386,74 @@ export const RESOURCE_VERBS = ['get', 'list', 'watch', 'create', 'update', 'patc
 /** One of `RESOURCE_VERBS`. */
 export type ResourceVerb = (typeof RESOURCE_VERBS)[number];
 
+/**
+ * Where a proposal stands: waiting on an approval, approved and not yet applied (at its run's end, or a write in flight), applied as a
+ * new revision, declined by the person, stale (an object moved since it was read), dropped (its run called off), or failed midway.
+ */
+export const PROPOSAL_PHASES = ['waiting', 'approved', 'applied', 'declined', 'stale', 'dropped', 'failed'] as const;
+
+/** One of `PROPOSAL_PHASES`. */
+export type ProposalPhase = (typeof PROPOSAL_PHASES)[number];
+
+/** When an approved proposal applies: at approval, or at the successful end of the run that proposed it. */
+export const APPLY_AT = ['approval', 'run-end'] as const;
+
+/** One of `APPLY_AT`. */
+export type ApplyAt = (typeof APPLY_AT)[number];
+
+/** What a proposal does to one object, Kubernetes' verbs for a write: makes it, writes it, or removes it. */
+export const CHANGE_VERBS = ['create', 'update', 'delete'] as const;
+
+/** One of `CHANGE_VERBS`. */
+export type ChangeVerb = (typeof CHANGE_VERBS)[number];
+
+/** What one change does to access, as the machinery computes it: reaches further, reaches less, or leaves it as it was. */
+export const ACCESS_CHANGES = ['widens', 'narrows', 'same'] as const;
+
+/** One of `ACCESS_CHANGES`. */
+export type AccessChange = (typeof ACCESS_CHANGES)[number];
+
+/** Who calls the api: the person (no session's token), or an agent's session the store started. */
+export const CALLER_KINDS = ['person', 'agent'] as const;
+
+/** One of `CALLER_KINDS`. */
+export type CallerKind = (typeof CALLER_KINDS)[number];
+
+/** Who approved a proposal: the person, or an agent under a rule the person confirmed. */
+export const APPROVED_BY = ['person', 'rule'] as const;
+
+/** One of `APPROVED_BY`. */
+export type ApprovedBy = (typeof APPROVED_BY)[number];
+
+/** The kinds a proposal carries: a factory's definitions and wiring, never the person's settings. */
+export const PROPOSABLE_KINDS = ['Workflow', 'Agent', 'Skill', 'Hire', 'McpServer', 'Factory'] as const;
+
+/** One of `PROPOSABLE_KINDS`. */
+export type ProposableKind = (typeof PROPOSABLE_KINDS)[number];
+
+/**
+ * Why a call on a proposal is refused where the caller may not make it (a 403): an approval refused (`proposalApproval`), a proposal in
+ * another factory than the caller's (`mayPropose`), or a write only the person makes (a delegation, a decline).
+ */
+export const PROPOSAL_REFUSALS = [
+  'not-waiting',
+  'other-factory',
+  'own-agent',
+  'not-auto',
+  'not-delegated',
+  'no-rule',
+  'person-only',
+] as const;
+
+/** One of `PROPOSAL_REFUSALS`. */
+export type ProposalRefusal = (typeof PROPOSAL_REFUSALS)[number];
+
+/** Why a presented session token is refused (a 401): the store never minted it, or its session's try is no longer live. */
+export const TOKEN_REFUSALS = ['unknown-token', 'session-ended'] as const;
+
+/** One of `TOKEN_REFUSALS`. */
+export type TokenRefusal = (typeof TOKEN_REFUSALS)[number];
+
 /** The kinds the api serves as objects, each with its object Schema, its `<Kind>List` and its get endpoint here. */
 export const KINDS = [
   'Run',
@@ -401,5 +469,7 @@ export const KINDS = [
   'Template',
   'Subscription',
   'Event',
+  'Proposal',
+  'Delegation',
 ] as const;
 export type Kind = (typeof KINDS)[number];

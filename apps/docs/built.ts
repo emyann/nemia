@@ -20,6 +20,7 @@ export const PAGES = [
   'workflows',
   'agents',
   'factories',
+  'proposals',
   'how-a-run-lives',
   'nemia',
   'glossary',
@@ -54,6 +55,7 @@ export const faultsOf = (dist: string): string[] => {
     ...(figures('how-a-run-lives').length > 0 ? [] : ['how a run lives draws no sequence']),
     ...homeOf('input-required', 'runtime', 'the lifecycle'),
     ...homeOf('untrusted', 'nemia', "Nemia's machine"),
+    ...homeOf('refused midway', 'proposals', "a proposal's machine"),
     ...homeOf('AttemptNumber', 'model', "the runtime's model"),
     ...homeOf('TryNumber', 'model', "the orchestrator's model"),
   ];

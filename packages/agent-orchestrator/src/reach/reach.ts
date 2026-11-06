@@ -5,7 +5,7 @@
  * closeout and no check when it is approved, and a step with no check never has one that passed. Pure; the laws are its contract's.
  */
 import type { NeverHolds, RuleReaches, SuggestedFor, UnmetNow } from '../../contracts/reach.contract.ts';
-import { CONDITION_WORDS, CONDITIONS, type Condition, type Facts, type PolicyRule } from '../auto/index.ts';
+import { CONDITION_WORDS, CONDITIONS, type Condition, type Facts, type GateRule as PolicyRule } from '../auto/index.ts';
 
 /**
  * A gate of a workflow, as reach reads it: the workflow and the step gated, whether the step is approved before it is filed, an ending

@@ -9,12 +9,15 @@
  *
  * - `read`: writes nothing, and runs unasked;
  * - `act`: a write that runs unasked;
- * - `ask`: a write that asks the person each time — what cannot be undone, the person's own settings, a factory's definition;
+ * - `ask`: a write that asks the person each time — what cannot be undone, the person's own settings;
  * - `answer`: an answer to what waits on the person — a step at its gate, a step's question, a loop out of rounds — which admission asks
  *   the person of where the run's state says it waits on them;
  * - `none`: refused, out of the agent's reach;
  * - a command that reads bare and sets with some words: a read, but a write that asks given one of `setsBy` — a flag (`--clear`) or a
- *   positional word (`manual`); `readsBy`, the flags it takes that only read.
+ *   positional word (`manual`) — or, `sets: 'none'`, one out of reach; `readsBy`, the flags it takes that only read.
+ *
+ * A factory's definition written by hand is the person's: an agent proposes it (`nemia propose`) and the person, or an agent within its
+ * delegation, approves (`PROPOSED_INSTEAD`, `agentClassOf`).
  */
 export type CommandClass =
   | 'read'
@@ -22,7 +25,49 @@ export type CommandClass =
   | 'ask'
   | 'answer'
   | 'none'
-  | { readonly bare: 'read'; readonly sets: 'ask'; readonly setsBy: readonly string[]; readonly readsBy?: readonly string[] };
+  | { readonly bare: 'read'; readonly sets: 'ask' | 'none'; readonly setsBy: readonly string[]; readonly readsBy?: readonly string[] };
+
+/**
+ * The commands that write a factory's definitions — its wiring, servers, rules and instruction, and the `factory` form of a workflow's, an
+ * agent's and a skill's write — which an agent never types: it proposes the objects instead (`nemia propose -f <file> -n <factory>`), so
+ * for an agent each is out of reach, a setter's sets among them (`agentClassOf`). A form (`workflows write factory`) is denied by its own
+ * rule (`proposedForms`), the command's other forms keeping their class: the `yours` form writes the person's library, which no proposal
+ * carries, and asks as before, as `workflows rm`, `agents rm` and `agents copy`, which only write the library, do. The person types them
+ * all as before.
+ */
+export const PROPOSED_INSTEAD: readonly string[] = [
+  'factory attach',
+  'factory detach',
+  'factory hire',
+  'factory fire',
+  'factory server add',
+  'factory server rm',
+  'factory rules',
+  'factory instruct',
+  'workflows write factory',
+  'agents write factory',
+  'skills write factory',
+];
+
+/** The class of `entry` for an agent: out of reach where it writes a factory's definitions (`PROPOSED_INSTEAD`), else its own. */
+export function agentClassOf(entry: { readonly name: string; readonly class: CommandClass }): CommandClass {
+  if (!PROPOSED_INSTEAD.includes(entry.name)) return entry.class;
+  return typeof entry.class === 'object' ? { ...entry.class, sets: 'none' } : 'none';
+}
+
+/** The forms of `PROPOSED_INSTEAD` that are no entry's whole name but a command of `names` with its first word: each denied by itself. */
+export const proposedForms = (names: readonly string[]): string[] =>
+  PROPOSED_INSTEAD.filter((form) => !names.includes(form) && names.some((name) => form.startsWith(`${name} `)));
+
+/**
+ * The client's own verbs (`apps/cli`), which no entry of the table serves, as an agent's fence reads them: a proposal made or undone, and
+ * a proposal approved or declined — each an act, which the api judges by who calls (`proposalApproval`; a decline is the person's).
+ */
+export const CLIENT_CLASSES: readonly { readonly name: string; readonly class: CommandClass }[] = [
+  { name: 'propose', class: 'act' },
+  { name: 'proposals approve', class: 'act' },
+  { name: 'proposals decline', class: 'act' },
+];
 
 /** An entry as `classBreaks` reads it: its name, whether it writes, its class, whether it is asked every time and its spec's flags. */
 type Classed = {

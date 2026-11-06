@@ -13,27 +13,42 @@ import { AgentName } from '../agents/agents.model.ts';
 import { HOME } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { rooted } from '../wiring/wire.verb.ts';
-import { DEFAULT_POLICY, listInForce, ruleRefusal, ruleWords, type PolicyRule } from './auto.ts';
+import {
+  DEFAULT_POLICY,
+  gateRules,
+  isProposalRule,
+  listInForce,
+  ruleRefusal,
+  ruleWords,
+  type GateRule,
+  type PolicyRule,
+  type ProposalPolicyRule,
+} from './auto.ts';
 import { confirmedFile, confirmRule, digestOf, dropRule, proposedFile, readConfirmed, readProposed, writeProposed } from './auto.store.ts';
+import { DelegationDoor } from '../delegation/delegation.store.ts';
+import { proposalRuleReach } from '../approval/index.ts';
 
 /** A rule with its words, as the person reads it. */
-export type WordedRule = PolicyRule & { words: string };
+export type WordedRule<R extends PolicyRule = GateRule> = R & { words: string };
 
 /**
  * An agent's rules, read: the agent, the file of the person's list, whether the builtin rule is in force for want of one (`isDefault`),
  * the rules in force, what the agent proposed, each rule saying whether it is in force, with the words it keeps as guidance and whether the
  * custom instruction changed since (`stale`), or null for nothing proposed; the custom instruction, or null for none; and the builtin
- * rule, with its words, to be confirmed again (`builtin`).
+ * rule, with its words, to be confirmed again (`builtin`). A rule for approving proposals (`approve-proposal`) is said apart, in
+ * `proposalRules` beside each `rules`, so a reader of a gate's rules reads gate rules alone.
  */
 export type PolicyList = {
   agent: string;
   file: string;
   isDefault: boolean;
   rules: WordedRule[];
+  proposalRules: WordedRule<ProposalPolicyRule>[];
   proposed: {
     file: string;
     at: string;
     rules: (WordedRule & { confirmed: boolean })[];
+    proposalRules: (WordedRule<ProposalPolicyRule> & { confirmed: boolean })[];
     guidance: string[];
     stale: boolean;
   } | null;
@@ -51,7 +66,10 @@ const idIn = (args: Args): string => String(args.id ?? '');
 const wordsIn = (args: Args): string => String(args.words ?? '');
 
 /** A rule with its words. */
-const worded = (rule: PolicyRule): WordedRule => ({ ...rule, words: ruleWords(rule) });
+const worded = <R extends PolicyRule>(rule: R): WordedRule<R> => ({ ...rule, words: ruleWords(rule) });
+
+/** The proposal rules of `list`. */
+const proposalRulesOf = (list: readonly PolicyRule[]): ProposalPolicyRule[] => list.filter(isProposalRule);
 
 /**
  * `agent`'s rules in the store `home`, composed from the person's list, the agent's proposal and its custom instruction, `instruction`
@@ -65,14 +83,19 @@ export function policyListOf(home: string, agent: string, instruction: string | 
     agent,
     file: confirmedFile(home, agent),
     isDefault: confirmed === undefined,
-    rules: rules.map(worded),
+    rules: gateRules(rules).map(worded),
+    proposalRules: proposalRulesOf(rules).map(worded),
     proposed:
       proposed === undefined
         ? null
         : {
             file: proposedFile(home, agent),
             at: proposed.at,
-            rules: proposed.rules.map((r) => ({ ...worded(r), confirmed: rules.some((c) => c.id === r.id) })),
+            rules: gateRules(proposed.rules).map((r) => ({ ...worded(r), confirmed: rules.some((c) => c.id === r.id) })),
+            proposalRules: proposalRulesOf(proposed.rules).map((r) => ({
+              ...worded(r),
+              confirmed: rules.some((c) => c.id === r.id),
+            })),
             guidance: proposed.guidance,
             stale: proposed.digest !== digestOf(instruction),
           },
@@ -96,6 +119,7 @@ function listLines(list: PolicyList): string[] {
   const inForce = list.rules.length
     ? list.rules.map((r) => `  ${r.id}${r.from === 'default' ? ' (default)' : ''}: ${r.words}`)
     : ['  none: every answer is asked'];
+  inForce.push(...list.proposalRules.map((r) => `  ${r.id}: ${r.words}`));
   const lines = [
     `${list.agent}, rules in force at auto${list.isDefault ? ', the default for want of any you confirmed' : ''}:`,
     ...inForce,
@@ -105,7 +129,7 @@ function listLines(list: PolicyList): string[] {
   return [
     ...lines,
     `proposed at ${p.at}${p.stale ? ', before the custom instruction last changed' : ''}:`,
-    ...p.rules.map((r) => `  ${r.id}${r.confirmed ? ' (in force)' : ''}: ${r.words}`),
+    ...[...p.rules, ...p.proposalRules].map((r) => `  ${r.id}${r.confirmed ? ' (in force)' : ''}: ${r.words}`),
     ...(p.guidance.length ? ['kept as guidance, which the machinery cannot hold:', ...p.guidance.map((g) => `  ${g}`)] : []),
     `confirm one with nemia policy confirm ${list.agent} <id> --words '<its words, as read here>'; drop one in force with nemia policy rm ${list.agent} <id>.`,
   ];
@@ -168,13 +192,25 @@ export function proposalOf(words: string): { rules: PolicyRule[]; guidance: stri
   if (new Set(ids).size !== ids.length) throw proposalRefusal('the proposal names a rule id twice');
   if (!Array.isArray(guidance) || guidance.some((g) => typeof g !== 'string' || !g.trim()))
     throw proposalRefusal('its guidance is a list of words the machinery cannot hold');
-  const kept = (rule: PolicyRule): PolicyRule => ({
-    id: rule.id,
-    answer: rule.answer,
-    ...(rule.steps === undefined ? {} : { steps: rule.steps }),
-    when: rule.when,
-    ...(rule.under === undefined ? {} : { under: rule.under }),
-  });
+  const kept = (rule: PolicyRule): PolicyRule =>
+    isProposalRule(rule)
+      ? {
+          id: rule.id,
+          answer: rule.answer,
+          factory: rule.factory,
+          resources: rule.resources,
+          resourceNames: rule.resourceNames,
+          verbs: rule.verbs,
+          widens: rule.widens,
+          proposedBy: rule.proposedBy,
+        }
+      : {
+          id: rule.id,
+          answer: rule.answer,
+          ...(rule.steps === undefined ? {} : { steps: rule.steps }),
+          when: rule.when,
+          ...(rule.under === undefined ? {} : { under: rule.under }),
+        };
   return { rules: rules.map(kept), guidance };
 }
 
@@ -220,10 +256,28 @@ export const POLICY_PROPOSE: Command<PolicyList> = {
       }),
     ),
   print: (list) => [
-    `${list.agent} proposed ${list.proposed?.rules.length ?? 0} rule(s), none in force until confirmed.`,
+    `${list.agent} proposed ${(list.proposed?.rules.length ?? 0) + (list.proposed?.proposalRules.length ?? 0)} rule(s), none in force until confirmed.`,
     ...listLines(list),
   ],
 };
+
+/**
+ * A proposal rule `agent` proposed under `id` refused (`Invalid`) where it reaches past the agent's delegation in its factory
+ * (`proposalRuleReach`), naming each pair of resource and verb and the delegation to write; any other rule, and one within it, goes on.
+ */
+const withinDelegation = Effect.fnUntraced(function* (home: string, agent: string, id: string) {
+  const rule = (yield* tried(() => readProposed(home, agent)))?.rules.find((r) => r.id === id);
+  if (rule === undefined || !isProposalRule(rule)) return;
+  const delegation = yield* (yield* DelegationDoor).delegations.read(rule.factory, agent);
+  const past = proposalRuleReach(rule, delegation?.spec.rules ?? []);
+  if (past.length === 0) return;
+  const pairs = past.map((p) => `${p.verb} ${p.resource}`).join(', ');
+  return yield* Effect.fail(
+    new Invalid({
+      message: `${agent}'s rule ${id} reaches past what its delegation in ${rule.factory} grants (${pairs}), and is not confirmed: write the delegation first, a PUT of /api/namespaces/${rule.factory}/delegations/${agent} granting them, or ask ${agent} to propose a narrower rule.`,
+    }),
+  );
+});
 
 /**
  * `nemia policy confirm <agent> <id> --words <words>`: a rule the agent proposed put in force as the person read it, the person's; asked of
@@ -265,10 +319,11 @@ export const POLICY_CONFIRM: Command<PolicyList> = {
     rooted(
       home,
       'policy confirm',
-      Effect.andThen(
-        tried(() => confirmRule(home, agentIn(args), idIn(args), wordsIn(args), new Date())),
-        listed(home, agentIn(args)),
-      ),
+      Effect.gen(function* () {
+        yield* withinDelegation(home, agentIn(args), idIn(args));
+        yield* tried(() => confirmRule(home, agentIn(args), idIn(args), wordsIn(args), new Date()));
+        return yield* listed(home, agentIn(args));
+      }),
     ),
   print: (list, args) => [`${list.agent}: the rule ${idIn(args)} is in force at auto.`, ...listLines(list)],
 };

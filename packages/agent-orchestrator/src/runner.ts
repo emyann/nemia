@@ -278,7 +278,7 @@ export {
 } from './record/record.store.ts';
 export { parentRecord, stepsOf } from './steps/steps.verb.ts';
 export { inboxDir, keptRuns, runStore } from './record/files.store.ts';
-export type { RunStore } from './record/record.ts';
+export { type RunStore, lackedOf } from './record/record.ts';
 export {
   alive,
   beat,
@@ -325,11 +325,10 @@ export type { Followed } from './feed/feed.verb.ts';
 export { lockfileParts, provisionDeps } from './workspace/worktree.store.ts';
 export { artifactFiles, missingArtifacts } from './artifacts/artifacts.store.ts';
 export { lackLines } from './artifacts/artifacts.ts';
-export { lackedOf } from './record/record.ts';
 export { branchStandings, resultBranches, type BranchReader } from './branches/branches.store.ts';
 export { passStanding, standingLive, standingLiveOf, standingReader, standingSnapshot, standingWhen } from './standing/standing.verb.ts';
 export { changesOf, type BranchChanges, type Note } from './branches/changes.store.ts';
-export { evictedBy } from './rest/index.ts';
+export { evictedBy, recordMemo, type RecordMemo } from './rest/index.ts';
 export { removeAgent, writeAgent, type AgentSchema, type AgentSidecar, type AgentWritten } from './agents/agents.store.ts';
 export { copySkill, givenSkills, skillDirIn, skillFolders, skillRead, skillText, writeSkill } from './skills/skills.store.ts';
 export { PlaceService, type Place } from './place/place.store.ts';
@@ -415,10 +414,8 @@ export { endWords, phaseOfView, wordOfView, type AttemptEnd, type EngineOutcome 
 export type { Bridge, CheckReport } from './views/views.verb.ts';
 export { readPlan } from './plan/plan.store.ts';
 export { leftOutMounts, repoFor, startRun } from './start/start.verb.ts';
-export { startFromInbox, startQueued } from './inbox/inbox.verb.ts';
-export { startPlan } from './plan/plan.verb.ts';
-export type { InboxStart, InboxStarted } from './inbox/inbox.verb.ts';
-export type { PlanStarted } from './plan/plan.verb.ts';
+export { startFromInbox, startQueued, type InboxStart, type InboxStarted } from './inbox/inbox.verb.ts';
+export { startPlan, type PlanStarted } from './plan/plan.verb.ts';
 export { advanceRun, type Advanced } from './tick/advance.verb.ts';
 export { refusalLines, tickRun, type Pass } from './tick/tick.verb.ts';
 export { checkoutHold } from './ending/ending.verb.ts';
@@ -452,7 +449,7 @@ export {
   type PauseStaged,
 } from './pause/pause.ts';
 export { readPause } from './pause/pause.store.ts';
-export { retryRun } from './retry/retry.verb.ts';
+export { retryRun, type Asked } from './retry/retry.verb.ts';
 export { sayRun, type Told } from './say/say.verb.ts';
 export { COMMANDS, TABLE } from './command/commands.verb.ts';
 export { admitted } from './admission/admit.verb.ts';
@@ -480,8 +477,7 @@ export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction, type Factory
 export { FACTORY_RULES, factoryRules, type FactoryRules } from './rules/rules.verb.ts';
 /** A factory's own MCP servers: the entry that lists its record with each server's state, and the name rule the board shares. */
 export { FACTORY_SERVERS } from './servers/servers.verb.ts';
-export { serverNameRefusal } from './servers/index.ts';
-export type { BuiltinServer } from './servers/index.ts';
+export { serverNameRefusal, type BuiltinServer } from './servers/index.ts';
 export { BUILTIN_SERVERS, builtinServers } from './servers/servers.store.ts';
 /** A factory's server signed in to and out of from the board, through the engine; the builtin secret stays inside the package. */
 export { serverSignIn, serverSignInState, serverSignOut } from './servers/sign-in.verb.ts';
@@ -492,16 +488,13 @@ export type { Command, Ran } from './command/entry.verb.ts';
 export { CLI, CLI_VERBS, commandBreaks, commandLine, generated, helpOf, leftOut, parseArgv, routeList } from './command/command.ts';
 export { renamedIn, renamedValues } from './command/command.ts';
 export type { Args, CommandSpec, Flag, Positional, Route, Spec } from './command/command.ts';
-export type { Asked } from './retry/retry.verb.ts';
 export { forgetRun, runsForgetting } from './forget/forget.verb.ts';
 export { freeingMany, judgingMany, prune, type Listed, type Turned } from './prune/prune.verb.ts';
 export { decideRun, type Answered, type Decided } from './decide/decide.verb.ts';
 export { freshStatsMemo, statsRun, type StatsMemo, type StatsOptions } from './stats/stats.verb.ts';
-export { seriesMemo } from './series/series.ts';
-export type { Health, SeriesMemo, SeriesPoint, SeriesRead } from './series/series.ts';
+export { seriesMemo, type Health, type SeriesMemo, type SeriesPoint, type SeriesRead } from './series/series.ts';
 export { BY_KEYS, statsLine, statsLines, statsQueryOf, type ByKey, type QueryKey, type Stats, type StatsQuery } from './stats/index.ts';
-export { list, pausedRead, runReading, unjudgedOf } from './list/list.verb.ts';
-export type { ReadingHow, RunReading } from './list/list.verb.ts';
+export { list, pausedRead, runReading, unjudgedOf, type ReadingHow, type RunReading } from './list/list.verb.ts';
 export type { DecideCommand } from './decide/decide.ts';
 export type { RunsListed, Unjudged } from './list/list.ts';
 export { graphOf, runGraph, typedGraphOf, type GraphEdge, type GraphStep, type RunGraph, type TypedGraph } from './summary/graph.ts';
@@ -525,11 +518,9 @@ export type { GitAsked, JudgeHow, RunHolding, RunStatus, RunToDecide, RunWaiting
 export { dropInformed, Informer, informerLayer, informerMemo, informerRead } from './rest/informer.verb.ts';
 export type { InformerMemo, InformerRead } from './rest/informer.verb.ts';
 export type { Judgement } from './summary/judgement.verb.ts';
-export { recordMemo, type RecordMemo } from './rest/index.ts';
 export type { ScheduleRuns } from './schedule/listed.store.ts';
 export type { PauseRuns } from './pause/pause.ts';
-export { judgedNow, runsSummarized } from './summary/summary.verb.ts';
-export type { RunSummary, SummaryHow } from './summary/summary.verb.ts';
+export { judgedNow, runsSummarized, type RunSummary, type SummaryHow } from './summary/summary.verb.ts';
 /**
  * The types of a step's tries, what it was told and what its sessions used, as the run object's sub-resources answer them, and what the
  * api reads besides: a step's file routes (`refusedName`, `typeOf`), its log's tail (`tailOf`), its try's turn (`turnOfTry`) and
@@ -558,3 +549,13 @@ import * as RunObject from './object/run.model.ts';
  * (`RunObject`, object/run.model.ts). One namespace each, imported and exported by name.
  */
 export { RunModel, RunObject };
+
+export { callerOf, liveSession, sessionCaller, SESSION_TOKEN, TokenDoor, tokenDigest, tokenDoorFiles } from './token/caller.verb.ts';
+export type { CallerOf, TokenDoorShape, TokenFiled, TokenRecord } from './token/caller.verb.ts';
+export { Forbidden, PERSON, type Caller, type ProposalCaller } from './caller/index.ts';
+export { proposeProgram, undoProgram } from './propose/propose.verb.ts';
+export type { ProposalNeeds, ProposalPlace } from './propose/current.verb.ts';
+export { approveProgram, declineProgram, proposalGet, proposalsList } from './approval/approve.verb.ts';
+export { ProposalDoor, proposalDoorFiles, type ProposalDoorShape } from './proposal/proposal.store.ts';
+export { delegationGet, delegationPut, delegationRemove, delegationsList } from './delegation/delegation.verb.ts';
+export { DelegationDoor, delegationDoorFiles, type DelegationDoorShape } from './delegation/delegation.store.ts';

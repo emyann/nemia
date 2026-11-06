@@ -56,7 +56,7 @@ import { readSkillRules, RULES_FILE } from '../src/skills/read.store.ts';
 import { appliesMatch, appliesOf } from '../src/skills/skills.ts';
 import { scratch } from './scratch.ts';
 import { levelFile, promptFile, readNemia, storeDenies, toldFile } from '../src/nemia/level.store.ts';
-import { admissionOf, nemiaFence, widened } from '../src/admission/index.ts';
+import { admissionOf, agentClassOf, nemiaFence, widened } from '../src/admission/index.ts';
 import { TABLE } from '../src/command/commands.verb.ts';
 import { rulesOfTry } from '../src/stats/discipline.ts';
 import { REPO, TEAM, TEAM_DEV, teamCopy } from './team.ts';
@@ -1540,6 +1540,38 @@ test("REFUSED: a settings allow of gh's reads reaches every step, so a read-only
   assert.deepEqual(runs(planted(), GH_REFUSED_CALLS, settings, []), GH_REFUSED_CALLS.map(shown), 'without them, the settings open each');
 });
 
+/** The proposal of a change to the factory's definitions, which each read-only agent allows itself. sdlc's own is held as written there. */
+const PROPOSE_ALLOW = 'Bash(nemia propose *)';
+
+/**
+ * The deny of any assignment before nemia. An allow is matched with a leading assignment stripped, so without it a session's
+ * `WF_SESSION_TOKEN= nemia …` drops its token and the api takes the call for the person's.
+ */
+const ASSIGNED_BEFORE_NEMIA_DENY = 'Bash(*=* nemia *)';
+
+/**
+ * A proposal as a step types it: from a file, and with its objects on the line as JSON (`--objects`), the way a step with no `Write`
+ * tool hands them over. A heredoc (`-f - <<'EOF'`) is a redirection this matcher does not model, so sdlc's notes name `--objects`.
+ */
+const PROPOSALS: Call[] = [
+  'nemia propose -f x.yaml -n f',
+  'nemia propose -f x.yaml -n f --at run-end',
+  `nemia propose -n f --at run-end --objects '{"kind":"Agent","metadata":{"name":"reviewer","resourceVersion":"a4"},"spec":{"allowedTools":["Read","Bash(git log *)"]}}'`,
+].map((command) => ({ tool: 'Bash', command }));
+
+/** What a step must not type with its token dropped: the person's own approval, and its own proposal as the person. */
+const TOKEN_DROPPED: Call[] = ['WF_SESSION_TOKEN= nemia proposals approve p', 'WF_SESSION_TOKEN= nemia propose -f x.yaml -n f'].map(
+  (command) => ({ tool: 'Bash', command }),
+);
+
+test('a dontAsk step with nemia propose planted proposes, and REFUSED: without the deny of an assignment before nemia it proposes as the person', () => {
+  const step = planted({ allows: [...READ_SET_ALLOWS, PROPOSE_ALLOW], denies: [...READ_SET_DENIES, ASSIGNED_BEFORE_NEMIA_DENY] });
+  assert.deepEqual(runs(step, PROPOSALS, {}, []), PROPOSALS.map(shown), 'by its own allow, no settings read');
+  assert.deepEqual(runs(step, TOKEN_DROPPED, {}, []), []);
+  const bare = planted({ allows: [...READ_SET_ALLOWS, PROPOSE_ALLOW] });
+  assert.deepEqual(runs(bare, TOKEN_DROPPED, {}, []), ['Bash(WF_SESSION_TOKEN= nemia propose -f x.yaml -n f)']);
+});
+
 /** The folders a walk of the checkout leaves out: what an install, a build or git writes, none of them a file a change is on. */
 const NOT_CHECKOUT = new Set(['node_modules', '.git', 'dist', '.turbo']);
 
@@ -1744,14 +1776,16 @@ const editVerdictOf = (rules: Rules, file: string): Verdict =>
   rules.deny.some((rule) => editReaches(rule, file)) ? 'deny' : rules.allow.some((rule) => editReaches(rule, file)) ? 'allow' : 'unmatched';
 
 /**
- * Each call the command line serves of every command of `table`, and the verdict its class owes: a write that prompts asks, bare and with
- * an argument, one out of her reach is denied, a read, her own write and an answer run unasked by her rules alone; a command that reads
+ * Each call the command line serves of every command of `table`, and the verdict its class for an agent owes (`agentClassOf`: a
+ * factory's definition write is proposed instead, so out of her reach): a write that prompts asks, bare and with an argument, one out of
+ * her reach is denied, a read, her own write and an answer run unasked by her rules alone; a command that reads
  * bare runs unasked with an argument and with a flag it reads by, and asks with each word or flag that sets, after its argument and
  * before it.
  */
 function owedOf(table: readonly (typeof TABLE)[number][]): [string, Verdict][] {
   return table
     .filter((entry) => entry.only?.side !== 'api')
+    .map((entry) => ({ name: entry.name, class: agentClassOf(entry) }))
     .flatMap(({ name, class: c }): [string, Verdict][] => {
       const forms = [`nemia ${name}`, `nemia ${name} r-1`];
       if (c === 'none' || c === 'ask') return forms.map((form) => [form, c === 'none' ? 'deny' : 'ask']);
@@ -1760,7 +1794,7 @@ function owedOf(table: readonly (typeof TABLE)[number][]): [string, Verdict][] {
       return [
         ...forms.map((form): [string, Verdict] => [form, 'allow']),
         ...(c.readsBy ?? []).map((s): [string, Verdict] => [`nemia ${name} r-1 ${s} v`, 'allow']),
-        ...c.setsBy.flatMap(set).map((form): [string, Verdict] => [form, 'ask']),
+        ...c.setsBy.flatMap(set).map((form): [string, Verdict] => [form, c.sets === 'none' ? 'deny' : 'ask']),
       ];
     });
 }
@@ -1787,12 +1821,13 @@ test('her fence asks every write that prompts and every write form of a command 
     ['nemia level manual', 'ask'],
     ['nemia cancel r-1', 'ask'],
     ['nemia rm r-1', 'ask'],
-    ['nemia factory instruct f --text t', 'ask'],
+    ['nemia factory instruct f --text t', 'deny'],
     ['nemia factory instruction f --path NEMIA.md', 'ask'],
     ['nemia factory instruction --store f', 'ask'],
     ['nemia agents custom --clear ada', 'ask'],
     ['nemia agents custom ada --file -', 'ask'],
     ['nemia agents write ada', 'ask'],
+    ['nemia agents write factory scribe --file scribe.md', 'deny'],
     ['nemia tick', 'deny'],
     ['nemia up --port 8787', 'deny'],
     ['wf approve r-1 design', 'deny'],

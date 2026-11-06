@@ -14,7 +14,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Cause, Effect, Exit, Fiber, Schedule } from 'effect';
 import type { FeedLine, Paused } from '../../../api/src/client/client.ts';
-import { get, served, urlOf } from '../client.ts';
+import { get, served, sessionHeaders, urlOf } from '../client.ts';
 import { daemonStarted } from '../daemon.ts';
 import { spawned } from '../local.ts';
 import { Refused } from '../refused.ts';
@@ -106,7 +106,7 @@ async function opened(base: string, asked: Asked, from: number, signal?: AbortSi
   let response: Response;
   try {
     response = await fetch(urlOf(base, '/api/feed/stream', query), {
-      headers: { accept: 'text/event-stream' },
+      headers: { accept: 'text/event-stream', ...sessionHeaders() },
       ...(signal ? { signal } : {}),
     });
   } catch (err) {

@@ -266,6 +266,45 @@ command line reads a person's file or draft folder into the form the board sends
 words the board's answer. Both sides hand a handler only what its one spec gives it (`test/writers-cli.test.ts`,
 `apps/api/src/commands/writers.test.ts`).
 
+**A proposal is how a factory's definitions change by an agent's hand**, and each layer owns one part of it. The kinds are
+`objects`'s (`Proposal` and `Delegation`, `packages/objects/src/proposal.ts` and `delegation.ts`, their words closed in `words.ts`:
+`PROPOSAL_PHASES`, `APPLY_AT`, `CHANGE_VERBS`, `PROPOSABLE_KINDS`, `PROPOSAL_REFUSALS`, `TOKEN_REFUSALS`), and so are the routes that
+serve them (`ProposalsGroup` and `DelegationsGroup`, `packages/objects/src/proposal-api.ts`) and the two refusals by who calls, `Forbidden`
+(403, with its `reason`) and `Unauthorized` (401). The judgement is the orchestrator's, pure and proved, each typed by its contract under
+`packages/agent-orchestrator/contracts/`: who may propose (`mayPropose`: any agent, in its own factory) and who may approve
+(`proposalApproval`: the person, or at `auto` alone an agent within the Delegation the person wrote it and under a rule for auto the
+person confirmed, never its own agent's proposal), in `src/approval/approval.ts`; whether an approved proposal applies now, waits, is
+stale, lapses or is dropped (`proposalApply`, `src/apply/apply.ts`); whether a change widens an agent's access (`accessChange`,
+`src/propose/access.ts`); and what a rule for auto reaches past its agent's delegation (`proposalRuleReach`, `src/approval/rule.ts`),
+which `nemia policy confirm` refuses. Its programs (`proposeProgram`, `undoProgram`, `approveProgram`, `declineProgram`, and the
+delegations' `delegationPut` and `delegationRemove`, the person's alone) each take their caller explicitly, and are named by the root
+entry, `src/runner.ts`, each by name; the tick's proposals pass (`proposalsPass`, `src/apply/pass.verb.ts`, yielded by the tick
+after it judged the runs) acts on every approved proposal each pass, level-triggered, its run's state as that pass judged it: a run that
+succeeded applies a run-end proposal, one called off drops it, and one that failed, which can be retried, leaves it approved. A write
+goes through the doors of the kinds it changes (the Workflow, Agent, Skill and Factory doors), the Factory's wiring judged by
+`wiringRefusal` as a person's is; the person's settings of a factory — its repositories, volumes, harness settings, revisions,
+template, level, and an agent's custom instructions — no proposal carries. An agent's fence no longer reaches the commands that write a
+factory's definitions (`PROPOSED_INSTEAD` and `agentClassOf`, `src/admission/class.ts`): it proposes instead. The api's handlers serve
+the two groups over those programs, reading the caller off the request; the client's verbs are `nemia propose` (`-f <file>`, `--objects
+'<json>'`, `--undo <proposal>`, `--at run-end`) and `nemia proposals approve|decline` (`apps/cli/src/objects/propose.ts`). The board
+shows none of it yet: a person approves by the CLI or the api.
+
+**The caller is the session token's to say** (`src/token/`). The orchestrator mints a random token for each try it files, and one for
+Nemia's keeper session, hands it to the session as `WF_SESSION_TOKEN`, and keeps only its sha-256 as the name of its record
+(`<WF_ROOT>/tokens/<digest>.json`: the agent, factory, run, step and attempt, and the engine's task). The client sends it as
+`Authorization: Bearer <token>` whenever the variable is set. Who calls is pure (`callerOf`, `src/token/token.ts`,
+`contracts/session-caller.contract.ts`), judged afresh on every request by `sessionCaller` (`src/token/caller.verb.ts`): **a request
+with no token is the person; a token, even an empty one, is never the person**; a token is its agent while its try is live — its run
+there, not called off, the step's current task the one it was minted for, and that task filed and not settled (Nemia's, while her
+keeper session is the live one) — and refused otherwise, `unknown-token` or `session-ended`, which the api answers 401. A caller the
+deciders refuse is a 403 with its reason. The person has no credential of their own yet: the person is whoever reaches the api with no
+token, which is a process of the same user on the machine, as every verb of the store is today. **So a session that drops its token
+acts as the person.** Every process in a session inherits the variable, and an allow is matched with a leading assignment stripped, so
+`WF_SESSION_TOKEN= nemia proposals approve <p>` would pass an allow of `nemia proposals approve`. Nemia's fence and the four read-only
+agents of sdlc deny any assignment before `nemia`, `Bash(*=* nemia *)` (`ASSIGNED`, `src/admission/fence.ts`;
+`packages/templates/test/fences.test.ts` and the planted lines of `packages/agent-orchestrator/test/agent-fences.test.ts`), as git's
+and gh's are denied; a writer running `auto`, or a spelling the shell rejoins, is not held by it.
+
 **In the orchestrator today, a candidate for the runtime**:
 
 - rendering agents and skills for Claude Code (`src/agents/agents.ts`, `src/agents/agents.store.ts`, `toldOf` in

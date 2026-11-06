@@ -8,6 +8,8 @@
  * - Agora, the reviewer, alone allows `gh pr view` and `gh pr checks` (`GH_READS`), on either way sdlc lands, and the four deny beside
  *   them every form of gh that opens a browser, never returns, reads beyond the answer or another repository, bundles a short option to
  *   reach one, or is typed after an assignment (`GH_DENIES`): a repository's own allow of gh reaches every step, so each is fenced.
+ * - The four propose a change of the factory's definitions they need (`PROPOSES`), one and the same allow on each, and deny any
+ *   assignment before nemia (`NEMIA_DENIES`), which would drop the session's token and act as the person.
  * - Every agent is refused an edit and a write of the store's factories, workflows and inbox, under the store the factory names
  *   (`storeRoot`), and none of its runs: a step writes its own run's folder.
  * - The two writers, Grace and Otto, each deny `git push`, a forced branch delete, a kill by name, every `gh`, a session started by
@@ -111,6 +113,15 @@ const GH_DENIES = [
   'Bash(*=* gh *)',
 ];
 
+/** The proposal of a change to the factory's definitions, which each read-only agent allows itself, the same on each. */
+const PROPOSES = 'Bash(nemia propose *)';
+
+/**
+ * Each read-only agent's deny of any assignment before nemia: an allow is matched with a leading assignment stripped, so
+ * `WF_SESSION_TOKEN= nemia propose …` would pass `PROPOSES` with the session's token dropped, as the person.
+ */
+const NEMIA_DENIES = ['Bash(*=* nemia *)'];
+
 /** The reviewer, the one read-only agent whose steps read the pull request. */
 const READS_THE_PULL_REQUEST = 'agora';
 
@@ -201,6 +212,8 @@ function shortOf(fences: Record<string, Fence>, root: string): string[] {
         ...lacks(agent, READ_SET, allowed, 'allows no'),
         ...lacks(agent, READ_SET_DENIES, denied, 'denies no'),
         ...lacks(agent, GH_DENIES, denied, 'denies no'),
+        ...lacks(agent, [PROPOSES], allowed, 'allows no'),
+        ...lacks(agent, NEMIA_DENIES, denied, 'denies no'),
         ...(agent === READS_THE_PULL_REQUEST
           ? lacks(agent, GH_READS, allowed, 'allows no')
           : allowed.filter((rule) => rule.startsWith('Bash(gh')).map((rule) => `${agent}: allows gh, ${rule}`)),
@@ -219,7 +232,7 @@ function shortOf(fences: Record<string, Fence>, root: string): string[] {
 }
 
 /**
- * sdlc as it ships, on either way it lands, and a copy with one line cut from five agents' fences, rendered on one store with the store
+ * sdlc as it ships, on either way it lands, and a copy with one line cut from six agents' fences, rendered on one store with the store
  * `STORE`.
  */
 const TREES = await rendered([
@@ -231,7 +244,9 @@ const TREES = await rendered([
       'agents/otto/agent.yaml': (text) => text.replace('        - Edit(${{ parameters.storeRoot }}/inbox/**)\n', ''),
       'agents/agora/agent.yaml': (text) =>
         text.replace('        - Bash(git *--output*)\n', '').replace('        - Bash(gh pr checks:*)\n', ''),
-      'agents/iris/agent.yaml': (text) => text.replace('        - Bash(git merge-base:*)\n', ''),
+      'agents/iris/agent.yaml': (text) =>
+        text.replace('        - Bash(git merge-base:*)\n', '').replace('        - Bash(nemia propose *)\n', ''),
+      'agents/argus/agent.yaml': (text) => text.replace('        - Bash(*=* nemia *)\n', ''),
       'agents/seldon/agent.yaml': (text) => text.replace('        - Bash(gh *--jq*)\n', '').replace('        - Bash(*=* git *)\n', ''),
       'agents/grace/agent.yaml': (text) => text.replace('        - Bash(git push:*)\n', ''),
     }),
@@ -250,8 +265,10 @@ test('REFUSED: an agent with a line of its fence cut is named, with the rule it 
   assert.deepEqual(shortOf(fencesOf('cut'), STORE).sort(), [
     `agora: allows no Bash(gh pr checks:*)`,
     `agora: denies no Bash(git *--output*)`,
+    `argus: denies no Bash(*=* nemia *)`,
     `grace: denies no Bash(git push:*)`,
     `iris: allows no Bash(git merge-base:*)`,
+    `iris: allows no Bash(nemia propose *)`,
     `otto: denies no Edit(${STORE}/inbox/**)`,
     `seldon: denies no Bash(*=* git *)`,
     `seldon: denies no Bash(gh *--jq*)`,
@@ -300,4 +317,22 @@ test('the four read-only agents allow one and the same read set, and nothing els
       READ_SET,
       agent,
     );
+});
+
+test('the four read-only agents allow one and the same proposal of a change, and deny any assignment before nemia', () => {
+  for (const way of ['shipped', 'github']) {
+    const fences = fencesOf(way);
+    for (const agent of READ_ONLY) {
+      assert.deepEqual(
+        fences[agent].allowed.filter((rule) => rule.startsWith('Bash(nemia propose')),
+        [PROPOSES],
+        `${way}: ${agent}`,
+      );
+      assert.deepEqual(
+        fences[agent].denied.filter((rule) => /^Bash\(.*\bnemia\b/.test(rule)),
+        NEMIA_DENIES,
+        `${way}: ${agent}`,
+      );
+    }
+  }
 });

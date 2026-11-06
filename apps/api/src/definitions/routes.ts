@@ -1,7 +1,8 @@
 /**
  * The routes that hand the objects' handler each path of the Workflows, Agents and Skills, and the words each write is guarded in
  * (`DEFINITION_WRITES`), moved from the routes they replace: a write is refused 403 for another site and 415 for a body that is not JSON
- * before its body is read (`refusedBeforeReading`, guard.ts), as the Card's and the factory's parts' are.
+ * before its body is read (`refusedBeforeReading`, guard.ts), as the Card's and the factory's parts' are. A factory's own definitions and
+ * wiring change through a proposal instead, the factory's way (proposals/routes.ts, `PROPOSAL_WRITES`).
  */
 import type { Context as RequestContext, Hono } from 'hono';
 import type { Guarded } from '../guard.ts';

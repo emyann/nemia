@@ -192,6 +192,10 @@ export {
   type Kind,
   McpServersGroup,
   Missing,
+  Forbidden,
+  Unauthorized,
+  ProposalsGroup,
+  DelegationsGroup,
   RunsGroup,
   SchedulesGroup,
   SkillsGroup,
@@ -239,3 +243,35 @@ export { Event, EventInvolved, EventList } from './event.ts';
 export { WATCH_EVENT_TYPES, type WatchEventType, RESOURCE_VERBS, type ResourceVerb } from './words.ts';
 export { AnyObjectList, BookmarkObject, WatchedObject, watchEventOf } from './watch.ts';
 export { APIResource, APIResourceList } from './discovery.ts';
+export {
+  ApprovedByOf,
+  Proposal,
+  ProposalChange,
+  ProposalCreate,
+  ProposalList,
+  ProposalSpec,
+  ProposalStatus,
+  ProposedBy,
+  ProposedObject,
+} from './proposal.ts';
+export { Delegation, DelegationList, DelegationRule, DelegationSpec, DelegationWrite } from './delegation.ts';
+export {
+  PROPOSAL_PHASES,
+  type ProposalPhase,
+  APPLY_AT,
+  type ApplyAt,
+  CHANGE_VERBS,
+  type ChangeVerb,
+  ACCESS_CHANGES,
+  type AccessChange,
+  CALLER_KINDS,
+  type CallerKind,
+  APPROVED_BY,
+  type ApprovedBy,
+  PROPOSABLE_KINDS,
+  type ProposableKind,
+  PROPOSAL_REFUSALS,
+  type ProposalRefusal,
+  TOKEN_REFUSALS,
+  type TokenRefusal,
+} from './words.ts';

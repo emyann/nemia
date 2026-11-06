@@ -170,7 +170,11 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   `Bash(gh * -R*)` and `Bash(gh *//*)` for another repository, `Bash(gh * -c*)`, after which a short option bundles, and `Bash(*=* gh
   *)` for any assignment before gh (`GH_PAGER`, `PAGER`, `BROWSER`, `GH_CONFIG_DIR`, `HOME`). They are on all four because a settings
   allow of gh reaches every step, and
-  a spelling the shell rejoins passes these as it passes git's. The set is on the agents rather than in `.claude/settings.json` so
+  a spelling the shell rejoins passes these as it passes git's. **The four allow `Bash(nemia propose *)`**, a definition change their
+  work needs proposed rather than named in a closeout, and deny `Bash(*=* nemia *)`, any assignment before nemia, so a session cannot
+  drop its `WF_SESSION_TOKEN` and act as the person (`docs/architecture.md`, *The caller is the session token's to say*), both held by
+  the two tests named below, the deny shown refusing a dropped token on planted lines. The set is on the agents rather than in
+  `.claude/settings.json` so
   that the team travels to a factory that is not this checkout; `packages/templates/test/fences.test.ts` holds sdlc's rules as written
   and the four lines equal, and `packages/agent-orchestrator/test/agent-fences.test.ts`, on planted lines, every read open, every write
   refused and every spelling of `--output` and of a read outside it can read refused. The nemia factory's overlays, in its own tree

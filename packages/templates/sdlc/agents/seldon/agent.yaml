@@ -64,6 +64,7 @@ spec:
         - Bash(tail:*)
         - Bash(cat:*)
         - Bash(ls:*)
+        - Bash(nemia propose *)
         - mcp__playwright__browser_click
         - mcp__playwright__browser_close
         - mcp__playwright__browser_console_messages
@@ -111,6 +112,7 @@ spec:
         - Bash(gh *//*)
         - Bash(gh * -c*)
         - Bash(*=* gh *)
+        - Bash(*=* nemia *)
         - mcp__playwright__browser_run_code_unsafe
         - mcp__playwright__browser_console_messages(filename:*)
         - mcp__playwright__browser_evaluate(filename:*)

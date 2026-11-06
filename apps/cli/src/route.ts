@@ -1,13 +1,13 @@
 /**
- * Which way a command goes, pure: the api for a moved read and for the client's own verbs (`get`, `apply`, `explain`, whatever else is
- * typed), the orchestrator's own CLI for the rest (`contracts/route.contract.ts`).
+ * Which way a command goes, pure: the api for a moved read and for the client's own verbs (`get`, `apply`, `explain`, `propose`,
+ * `proposals`, whatever else is typed), the orchestrator's own CLI for the rest (`contracts/route.contract.ts`).
  */
 import type { RouteOf } from '../contracts/route.contract.ts';
 
 export { CLIENT_VERBS, type ClientVerb, READ_VERBS, type ReadVerb, type Route, type Routed } from '../contracts/route.contract.ts';
 
 export const routeOf: RouteOf = ({ name, local, help }) =>
-  name === 'get' || name === 'apply' || name === 'explain'
+  name === 'get' || name === 'apply' || name === 'explain' || name === 'propose' || name === 'proposals'
     ? 'api'
     : !local && !help && (name === 'show' || name === 'closeout' || name === 'ls' || name === 'inbox' || name === 'watch')
       ? 'api'

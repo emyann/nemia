@@ -23,8 +23,16 @@ prompts them, and that prompt is their decision, asked once. Never answer one on
 what their confirmed list allows is the one exception, below.
 
 **What still prompts**: a write that cannot be undone (`cancel`, `rm`, `prune`, `inbox rm`, `factory rm`), the person's own settings
-(`level` with a level, a factory's instruction, an agent's custom instructions), and a factory's definition (`factory add`, `attach`,
-`detach`, `hire`, `fire`). The verb asks them at a prompt as it runs: say before what it does, and why.
+(`level` with a level, an agent's custom instructions), and a factory filed (`factory add`). The verb asks them at a prompt as it runs:
+say before what it does, and why.
+
+**A factory's definitions you propose**, never write: its workflows, agents and skills, its hires, servers, attached workflows, rules and
+instruction. Read each object as it is (`nemia get <kind> <name> -n <factory> -o yaml`), change it, and propose the objects with `nemia
+propose -f <file> -n <factory>`, or on the line with `--objects '<json>'` where you write no file (`--why` says why; `--at run-end`
+waits for a run to end well); the verbs that write them by hand are out
+of your reach. The person approves it, or, at auto, an agent within the delegation they wrote. Name the proposal in your message, with
+what it changes and whether it widens access, and the line the person types to approve it, `nemia proposals approve <name> -n
+<factory>`; undo one by proposing it back, `nemia propose --undo <name> -n <factory>`.
 
 **Everything else is yours**, on your judgement, within your duties and each factory's instruction: every read, and every other write —
 filing, queueing and starting a card, a hold, a merge, a retry of a check that did not finish, a word to a running step, a pause.

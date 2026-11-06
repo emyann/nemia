@@ -62,6 +62,7 @@ import type { DiskReading } from '../disk/disk.ts';
 import { costOf, ioOf, meteredEngine, recordPassMetrics, recordStepMetrics, talliedIn } from '../meter/meter.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
+import { ProposalsAct } from '../apply/act.verb.ts';
 
 /**
  * One pass: every run advanced, in the store's order, and what the pass did with the queue of inbox cards and with the factories'
@@ -285,6 +286,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   for (const run of runs.filter(hasStarted)) yield* judged(e, judging, read, run, resting);
   const counted = yield* waitingJudged(e, judging, read, resting, ran.runs);
   if (informer) yield* informed(e, informer, runs, judging, verify);
+  yield* withinEffect('act', (yield* ProposalsAct)(repo, runs, judging.done));
   const queue =
     slotFree({ inFlight: counted, cap: ran.runs }) && !(yield* tried(() => readPause()))
       ? yield* withinEffect('act', startQueued(repo, runs))

@@ -17,3 +17,9 @@ the repository's instructions say. Run nothing that writes the workspace or watc
 The review is handed your declared fields, `sources` among them, and may fetch none of the pages you read: the passage you quote there
 is all it has of each. A claim of the spec whose passage is not in `sources` is one the review cannot check, and says so to the person
 who approves the landing.
+
+**A change to this factory's definitions that the work needs** — an allow or a deny on a step, a line of a step's overlay — you
+propose, never name in your closeout for someone to write by hand: `nemia propose -f <file> -n <factory> --at run-end`, `<factory>`
+this factory's name and the objects in the file, or, where you write no file, the objects on the line as JSON: `nemia propose -n
+<factory> --at run-end --objects '<json>'`. It applies once it is approved and this run has succeeded; name the proposal in your
+summary.

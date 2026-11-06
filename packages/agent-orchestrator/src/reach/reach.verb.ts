@@ -23,7 +23,7 @@ import { approvedFirst, hasGate } from '../status/status.ts';
 import { levelOfFactory } from '../level/levels.verb.ts';
 import type { Level } from '../level/level.ts';
 import { seenOf } from '../admission/seen.verb.ts';
-import { factsOf, listInForce, ruleWords, type Facts, type PolicyRule } from '../auto/index.ts';
+import { factsOf, gateRules, listInForce, ruleWords, type Facts, type PolicyRule } from '../auto/index.ts';
 import { readConfirmed, readProposed } from '../auto/auto.store.ts';
 import { gateRows, type GateReach, type GateSite, type Reach } from './reach.ts';
 
@@ -125,7 +125,12 @@ const reachOf = Effect.fnUntraced(function* (home: string, args: Args) {
       : { ...(yield* runSites(runId)), unloaded: [] };
   const factory = read.factory ?? 'default';
   const facts = read.facts;
-  const { reach, rows, suggested } = gateRows(inForce, proposed, read.sites, facts && ((site) => facts.get(site.step)));
+  const { reach, rows, suggested } = gateRows(
+    gateRules(inForce),
+    gateRules(proposed),
+    read.sites,
+    facts && ((site) => facts.get(site.step)),
+  );
   return {
     agent,
     factory,

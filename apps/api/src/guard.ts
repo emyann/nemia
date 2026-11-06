@@ -29,7 +29,12 @@
  * agent written (`PUT /api/custom-instructions/:name`) or cleared (`DELETE /api/custom-instructions/:name`), custom.ts, each of which
  * writes the store's `custom-instructions/`, what every run started after is told after the agent's instructions; and the store paused
  * (`POST /api/pause`) or its pause lifted (`DELETE /api/pause`), commands/routes.ts, the routes of `nemia pause` and `nemia resume`, which
- * write or remove the store's pause file, so no pass starts new work until the lift. Each is what an agent acts on in the repository — once
+ * write or remove the store's pause file, so no pass starts new work until the lift; and a factory's Proposals and Delegations
+ * (proposals/routes.ts, `PROPOSAL_WRITES`): a proposal filed (`POST /api/namespaces/:namespace/proposals`), approved (`POST
+ * …/proposals/:name/approve`), which applies it at once where it is due and so writes the factory's definitions and wiring, or declined
+ * (`POST …/proposals/:name/decline`), each of which writes the factory's `proposals/`; and an agent's delegation written whole (`PUT
+ * …/delegations/:name`) or removed (`DELETE …/delegations/:name`), each of which writes the factory's `delegations/`, what that agent may
+ * approve with no person asked. Each is what an agent acts on in the repository — once
  * a tick files it, or at once, or once a person starts the card or the workflow, or once a run slot frees for a queued card — or a person's
  * idea or step gone, or its place, so a page on another site must not be able to make any of them; and a `fetch` with a body, from any
  * page, reaches the api without the browser asking it first, unless the body is JSON.

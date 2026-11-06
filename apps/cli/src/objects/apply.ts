@@ -6,9 +6,10 @@
  * `<plural>/<name> created|configured|unchanged`.
  *
  * Refused, exit 2, each naming the command to type next: an object of a kind that is made no other way than its own (the Card's `nemia
- * inbox add`) or takes no create, missing; one of a kind that takes no write, changed (`nemia explain` says the kind's verbs); an
- * `apiVersion` other than `nemia/v1`; a kind the api does not serve; a namespace in the file other than `-n`'s; a spec that is not the
- * kind's. A refusal of one object does not stop the next: the command exits 2 once every object was tried.
+ * inbox add`, the Proposal's `nemia propose`) or takes no create, missing; one of a kind that takes no write, changed (`nemia explain`
+ * says the kind's verbs, and the Proposal's refusal names `nemia propose`); an `apiVersion` other than `nemia/v1`; a kind the api does
+ * not serve; a namespace in the file other than `-n`'s; a spec that is not the kind's. A refusal of one object does not stop the next:
+ * the command exits 2 once every object was tried.
  */
 import fs from 'node:fs';
 import { parseAllDocuments } from 'yaml';
@@ -51,7 +52,8 @@ export const canonical = (value: unknown): string =>
   );
 
 /** Whether `value` is a plain object. */
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+export const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /** A record of strings, or undefined where `value` is none. */
 const stringsOf = (value: unknown): Record<string, string> | undefined =>
@@ -59,14 +61,19 @@ const stringsOf = (value: unknown): Record<string, string> | undefined =>
     ? Object.fromEntries(Object.entries(value).map(([k, v]) => [k, String(v)]))
     : undefined;
 
-/** The objects of `text`, each document's, a `List`'s items in its place; refused where a document does not parse. */
-export function objectsOf(text: string, file: string): unknown[] {
+/**
+ * The objects of `text`, each document's, a `List`'s items in its place; refused where a document does not parse, naming the verb that
+ * read it (`apply`, `propose`).
+ */
+export function objectsOf(text: string, file: string, verb = 'apply'): unknown[] {
   const objects: unknown[] = [];
   for (const doc of parseAllDocuments(text)) {
     if (!('errors' in doc)) continue;
     const [error] = doc.errors;
     if (error !== undefined)
-      throw new Refused(`nemia apply: ${file} is not YAML or JSON (${error.message}): fix it, and type \`nemia apply -f ${file}\` again`);
+      throw new Refused(
+        `nemia ${verb}: ${file} is not YAML or JSON (${error.message}): fix it, and type \`nemia ${verb} -f ${file}\` again`,
+      );
     const value: unknown = doc.toJS();
     if (value === null || value === undefined) continue;
     if (isRecord(value) && typeof value.kind === 'string' && value.kind.endsWith('List') && Array.isArray(value.items))
@@ -105,7 +112,7 @@ const kindsOf = (resources: readonly APIResource[]): string =>
     .join(', ');
 
 /** An object of the file, read: its resource, its name, its metadata, its spec, and the namespace it or `-n` names. */
-type Read = {
+export type Read = {
   resource: APIResource;
   name: string;
   meta: Record<string, unknown>;
@@ -113,49 +120,57 @@ type Read = {
   where: string | undefined;
 };
 
-/** `object` read against `resources` and `-n`'s `namespace`; refused, naming what to type, where it is not one apply writes. */
-function readOf(object: unknown, resources: readonly APIResource[], namespace: string | undefined): Read {
-  if (!isRecord(object)) throw new Refused('nemia apply: a document is no object: each holds apiVersion, kind, metadata and spec');
+/**
+ * `object` read against `resources` and `-n`'s `namespace`; refused, naming what to type, where it is not one the verb (`apply`,
+ * `propose`) writes.
+ */
+export function readOf(object: unknown, resources: readonly APIResource[], namespace: string | undefined, verb = 'apply'): Read {
+  if (!isRecord(object)) throw new Refused(`nemia ${verb}: a document is no object: each holds apiVersion, kind, metadata and spec`);
   const { apiVersion, kind, metadata, spec } = object;
   if (apiVersion !== API_VERSION)
     throw new Refused(
-      `nemia apply: apiVersion ${String(apiVersion)} is not served: set \`apiVersion: ${API_VERSION}\`, the one version \`nemia explain <resource>\` says`,
+      `nemia ${verb}: apiVersion ${String(apiVersion)} is not served: set \`apiVersion: ${API_VERSION}\`, the one version \`nemia explain <resource>\` says`,
     );
   const resource = resources.find((r) => r.kind === kind && !r.name.includes('/'));
   if (resource === undefined)
     throw new Refused(
-      `nemia apply: the api serves no kind ${String(kind)}. It serves ${kindsOf(resources)}: see one with \`nemia explain <resource>\``,
+      `nemia ${verb}: the api serves no kind ${String(kind)}. It serves ${kindsOf(resources)}: see one with \`nemia explain <resource>\``,
     );
   const meta = isRecord(metadata) ? metadata : {};
   const name = meta.name;
   if (typeof name !== 'string' || name === '')
     throw new Refused(
-      `nemia apply: a ${resource.kind} names itself by metadata.name: set it; see \`nemia explain ${resource.singularName}.metadata\``,
+      `nemia ${verb}: a ${resource.kind} names itself by metadata.name: set it; see \`nemia explain ${resource.singularName}.metadata\``,
     );
   const filed = typeof meta.namespace === 'string' ? meta.namespace : undefined;
   if (resource.namespaced && filed !== undefined && namespace !== undefined && filed !== namespace)
     throw new Refused(
-      `nemia apply: ${resource.name}/${name} is in namespace ${filed} in the file, and -n says ${namespace}: drop -n, or type \`nemia apply -f <file> -n ${filed}\``,
+      `nemia ${verb}: ${resource.name}/${name} is in namespace ${filed} in the file, and -n says ${namespace}: drop -n, or type \`nemia ${verb} -f <file> -n ${filed}\``,
     );
   return { resource, name, meta, spec, where: filed ?? namespace };
 }
 
 /** The object `read` names as it is served, or null where none is: in its namespace, else across all where the kind is read so. */
-async function servedOf({ resource, name, where }: Read): Promise<Served | null> {
+export async function servedOf({ resource, name, where }: Read, verb = 'apply'): Promise<Served | null> {
   const calls = KIND_CALLS[resource.kind];
   const call =
     !resource.namespaced || (where === undefined && calls.get.all !== undefined)
       ? calls.get.all?.(name)
       : calls.get.in?.(where ?? DEFAULT_NAMESPACE, name);
-  if (call === undefined) throw new Refused(`nemia apply: ${resource.name} are not read by name; see \`nemia explain ${resource.name}\``);
-  return asked('apply', orNone(call));
+  if (call === undefined) throw new Refused(`nemia ${verb}: ${resource.name} are not read by name; see \`nemia explain ${resource.name}\``);
+  return asked(verb, orNone(call));
 }
 
-/** Why apply does not write `read`, as `action` says, naming the command that does or that says the kind's verbs. */
+/**
+ * Why apply does not write `read`, as `action` says, naming the command that does (`madeBy`: the Card's `nemia inbox add`, the
+ * Proposal's `nemia propose`) or that says the kind's verbs.
+ */
 function refusal({ resource, name }: Read, action: 'no-create' | 'no-update', madeBy: string | undefined): Refused {
   if (action === 'no-update')
     return new Refused(
-      `nemia apply: ${resource.name}/${name} differs from what is served, and the api writes no ${resource.kind}: see what it takes, \`nemia explain ${resource.name}\``,
+      madeBy !== undefined
+        ? `nemia apply: ${resource.name}/${name} differs from what is served, and a ${resource.kind} is not written by apply: make another with \`${madeBy}\``
+        : `nemia apply: ${resource.name}/${name} differs from what is served, and the api writes no ${resource.kind}: see what it takes, \`nemia explain ${resource.name}\``,
     );
   return new Refused(
     madeBy !== undefined
@@ -208,13 +223,13 @@ async function applied(object: unknown, resources: readonly APIResource[], names
   return said(action === 'unchanged' ? 'unchanged' : action === 'update' && served !== null ? 'configured' : 'created');
 }
 
-/** The text of `file`, stdin's for `-`; refused, naming the file, where it does not read. */
-function textOf(file: string): string {
+/** The text of `file`, stdin's for `-`; refused, naming the file and the verb that read it, where it does not read. */
+export function textOf(file: string, verb = 'apply'): string {
   try {
     return fs.readFileSync(file === '-' ? 0 : file, 'utf8');
   } catch (err) {
     throw new Refused(
-      `nemia apply: ${file} does not read (${err instanceof Error ? err.message : String(err)}): name a file that is there, \`nemia apply -f <file>\``,
+      `nemia ${verb}: ${file} does not read (${err instanceof Error ? err.message : String(err)}): name a file that is there, \`nemia ${verb} -f <file>\``,
     );
   }
 }

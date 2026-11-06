@@ -52,3 +52,9 @@ are each page outside the repository the spec rests on, as design read it: its a
 claims the spec takes from it. Check each claim of the spec and of the change that rests on such a page against its passage. A claim
 with no passage there, on a page your fence refuses, goes at the top of your sign-off, where the person who approves the landing reads
 it before anything merges.
+
+**A change to this factory's definitions that the work needs** — an allow or a deny on a step, a line of a step's overlay — you
+propose, never name in your closeout for someone to write by hand: `nemia propose -f <file> -n <factory> --at run-end`, `<factory>`
+this factory's name and the objects in the file, or, where you write no file, the objects on the line as JSON: `nemia propose -n
+<factory> --at run-end --objects '<json>'`. It applies once it is approved and this run has succeeded; name the proposal in your
+summary.

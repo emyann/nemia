@@ -1540,6 +1540,38 @@ test("REFUSED: a settings allow of gh's reads reaches every step, so a read-only
   assert.deepEqual(runs(planted(), GH_REFUSED_CALLS, settings, []), GH_REFUSED_CALLS.map(shown), 'without them, the settings open each');
 });
 
+/** The proposal of a change to the factory's definitions, which each read-only agent allows itself. sdlc's own is held as written there. */
+const PROPOSE_ALLOW = 'Bash(nemia propose *)';
+
+/**
+ * The deny of any assignment before nemia. An allow is matched with a leading assignment stripped, so without it a session's
+ * `WF_SESSION_TOKEN= nemia …` drops its token and the api takes the call for the person's.
+ */
+const ASSIGNED_BEFORE_NEMIA_DENY = 'Bash(*=* nemia *)';
+
+/**
+ * A proposal as a step types it: from a file, and with its objects on the line as JSON (`--objects`), the way a step with no `Write`
+ * tool hands them over. A heredoc (`-f - <<'EOF'`) is a redirection this matcher does not model, so sdlc's notes name `--objects`.
+ */
+const PROPOSALS: Call[] = [
+  'nemia propose -f x.yaml -n f',
+  'nemia propose -f x.yaml -n f --at run-end',
+  `nemia propose -n f --at run-end --objects '{"kind":"Agent","metadata":{"name":"reviewer","resourceVersion":"a4"},"spec":{"allowedTools":["Read","Bash(git log *)"]}}'`,
+].map((command) => ({ tool: 'Bash', command }));
+
+/** What a step must not type with its token dropped: the person's own approval, and its own proposal as the person. */
+const TOKEN_DROPPED: Call[] = ['WF_SESSION_TOKEN= nemia proposals approve p', 'WF_SESSION_TOKEN= nemia propose -f x.yaml -n f'].map(
+  (command) => ({ tool: 'Bash', command }),
+);
+
+test('a dontAsk step with nemia propose planted proposes, and REFUSED: without the deny of an assignment before nemia it proposes as the person', () => {
+  const step = planted({ allows: [...READ_SET_ALLOWS, PROPOSE_ALLOW], denies: [...READ_SET_DENIES, ASSIGNED_BEFORE_NEMIA_DENY] });
+  assert.deepEqual(runs(step, PROPOSALS, {}, []), PROPOSALS.map(shown), 'by its own allow, no settings read');
+  assert.deepEqual(runs(step, TOKEN_DROPPED, {}, []), []);
+  const bare = planted({ allows: [...READ_SET_ALLOWS, PROPOSE_ALLOW] });
+  assert.deepEqual(runs(bare, TOKEN_DROPPED, {}, []), ['Bash(WF_SESSION_TOKEN= nemia propose -f x.yaml -n f)']);
+});
+
 /** The folders a walk of the checkout leaves out: what an install, a build or git writes, none of them a file a change is on. */
 const NOT_CHECKOUT = new Set(['node_modules', '.git', 'dist', '.turbo']);
 

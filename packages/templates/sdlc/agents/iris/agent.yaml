@@ -66,6 +66,7 @@ spec:
         - Bash(tail:*)
         - Bash(cat:*)
         - Bash(ls:*)
+        - Bash(nemia propose *)
       disallowedTools:
         - Bash(cd:*)
         - Bash(git grep *O*)
@@ -90,6 +91,7 @@ spec:
         - Bash(gh *//*)
         - Bash(gh * -c*)
         - Bash(*=* gh *)
+        - Bash(*=* nemia *)
         - Edit(${{ parameters.storeRoot }}/factories/**)
         - Edit(${{ parameters.storeRoot }}/workflows/**)
         - Edit(${{ parameters.storeRoot }}/inbox/**)

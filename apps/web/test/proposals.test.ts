@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PROPOSABLE_KINDS, PROPOSAL_PHASES, RESOURCE_PLURALS, type Proposal, type ProposalPhase } from 'objects';
 import { proposalLinkOf } from '../src/lib/proposalLink.ts';
-import { DELEGABLE, proposalOffers, proposalsInOrder, widensHue } from '../src/lib/proposals.ts';
+import { DELEGABLE, proposalsInOrder, widensHue } from '../src/lib/proposals.ts';
 import { PROPOSAL_WORDS } from '../src/lib/words.ts';
 
 /** A proposal named `name` in `phase`, made at `at`. */
@@ -47,12 +47,6 @@ test('the factory lists what waits first, the newer of each kind first', () => {
     proposalsInOrder(list).map((p) => p.metadata.name),
     ['new-waiting', 'old-waiting', 'new-applied', 'old-applied'],
   );
-});
-
-test('a proposal offers Approve while it waits, and Decline until it applies', () => {
-  assert.deepEqual(proposalOffers('waiting'), { approve: true, decline: true });
-  assert.deepEqual(proposalOffers('approved'), { approve: false, decline: true });
-  assert.deepEqual(proposalOffers('applied'), { approve: false, decline: false });
 });
 
 test('a delegation may grant every kind a proposal changes, by its plural', () => {

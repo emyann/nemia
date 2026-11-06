@@ -5,7 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { broughtFacts, broughtPart } from '../src/lib/brought.ts';
+import { broughtFacts } from '../src/lib/brought.ts';
 import type { RunView } from '../src/lib/runView.ts';
 import { coded, detail, step as fixtureStep, type Word } from './run-fixtures.ts';
 
@@ -21,7 +21,7 @@ const run = (steps: Step[], waiting: string[], over: Partial<RunView> = {}): Run
 
 const ASKED = { try: 2, mode: 'continue', model: null, message: null, stopFirst: false } as const;
 
-test("broughtFacts: a step she brings, read as the run's page reads it, and the part each state draws", () => {
+test("broughtFacts: a step she brings, read as the run's page reads it", () => {
   const gated = step('design', 'awaiting approval', { approve: 'approve design' });
   const blocked = step('implement', 'succeeded · BLOCKED', { needs: 'Which way?' });
   const raise = step('lint', 'budget exhausted $3.02 of $3', {
@@ -36,15 +36,15 @@ test("broughtFacts: a step she brings, read as the run's page reads it, and the 
   const waiting = ['design', 'implement', 'lint', 'test', 'review', 'plan'];
   const live = run(steps, waiting);
 
-  const rows: Array<[string, RunView, string, ReturnType<typeof broughtFacts>, string]> = [
-    ['a step at its gate, waiting on you', live, 'design', { found: true, atGate: true, offer: null, asked: false }, 'gate'],
-    ['signed off blocked', live, 'implement', { found: true, atGate: false, offer: 'answer', asked: false }, 'answer'],
-    ['held on its budget', live, 'lint', { found: true, atGate: false, offer: 'raise', asked: false }, 'answer'],
-    ['refused by its check', live, 'test', { found: true, atGate: false, offer: 'try-again', asked: false }, 'answer'],
-    ['its session blocked by the harness', live, 'build', { found: true, atGate: false, offer: 'continue', asked: false }, 'continue'],
-    ['a loop out of rounds', live, 'review', { found: true, atGate: false, offer: 'enough', asked: false }, 'answer'],
-    ['its next try asked already', live, 'plan', { found: true, atGate: false, offer: null, asked: true }, 'asked'],
-    ['waiting on nobody', live, 'ship', { found: true, atGate: false, offer: null, asked: false }, 'settled'],
+  const rows: Array<[string, RunView, string, ReturnType<typeof broughtFacts>]> = [
+    ['a step at its gate, waiting on you', live, 'design', { found: true, atGate: true, offer: null, asked: false }],
+    ['signed off blocked', live, 'implement', { found: true, atGate: false, offer: 'answer', asked: false }],
+    ['held on its budget', live, 'lint', { found: true, atGate: false, offer: 'raise', asked: false }],
+    ['refused by its check', live, 'test', { found: true, atGate: false, offer: 'try-again', asked: false }],
+    ['its session blocked by the harness', live, 'build', { found: true, atGate: false, offer: 'continue', asked: false }],
+    ['a loop out of rounds', live, 'review', { found: true, atGate: false, offer: 'enough', asked: false }],
+    ['its next try asked already', live, 'plan', { found: true, atGate: false, offer: null, asked: true }],
+    ['waiting on nobody', live, 'ship', { found: true, atGate: false, offer: null, asked: false }],
     [
       'approved elsewhere: no longer waiting on you',
       run(
@@ -53,33 +53,26 @@ test("broughtFacts: a step she brings, read as the run's page reads it, and the 
       ),
       'design',
       { found: true, atGate: false, offer: null, asked: false },
-      'settled',
     ],
     [
       'on a run a person holds, blocked: nothing offered',
       run(steps, waiting, { holding: detail().holding }),
       'implement',
       { found: true, atGate: false, offer: null, asked: false },
-      'settled',
     ],
     [
       'its try asked, on a run a person holds: the tick files nothing',
       run(steps, waiting, { holding: detail().holding }),
       'plan',
       { found: true, atGate: false, offer: null, asked: false },
-      'settled',
     ],
     [
       'on a run called off, at its gate: nothing waits',
       run(steps, waiting, { cancelledAt: '2026-09-30T07:00:00.000Z' }),
       'design',
       { found: true, atGate: false, offer: null, asked: false },
-      'settled',
     ],
-    ['a name the run has no step of', live, 'deploy', { found: false, atGate: false, offer: null, asked: false }, 'missing'],
+    ['a name the run has no step of', live, 'deploy', { found: false, atGate: false, offer: null, asked: false }],
   ];
-  for (const [said, view, name, facts, part] of rows) {
-    assert.deepEqual(broughtFacts(view, name), facts, said);
-    assert.equal(broughtPart(facts), part, said);
-  }
+  for (const [said, view, name, facts] of rows) assert.deepEqual(broughtFacts(view, name), facts, said);
 });

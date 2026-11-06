@@ -125,7 +125,21 @@ export type {
   WaitOn,
   WriteWay,
 } from './words.ts';
-export { CARD_STATES, Card, CardFile, CardLastStart, CardList, CardSpec, CardStart, CardStatus, type CardState } from './card.ts';
+export {
+  CARD_KEYS,
+  CARD_KEY_MEANINGS,
+  CARD_STATES,
+  Card,
+  CardFile,
+  CardLastStart,
+  CardList,
+  CardSpec,
+  CardStart,
+  CardStatus,
+  CardWrite,
+  type CardKey,
+  type CardState,
+} from './card.ts';
 export {
   Factory,
   FactoryCommands,

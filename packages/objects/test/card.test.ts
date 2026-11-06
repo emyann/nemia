@@ -5,7 +5,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import { API_VERSION, CARD_STATES, Card, CardFile, CardList, CardStart, LabelEdit } from 'objects';
+import { OpenApi } from 'effect/http-api';
+import {
+  API_VERSION,
+  Api,
+  CARD_KEYS,
+  CARD_KEY_MEANINGS,
+  CARD_STATES,
+  Card,
+  CardFile,
+  CardList,
+  CardStart,
+  CardWrite,
+  LabelEdit,
+} from 'objects';
 
 const filed = {
   apiVersion: API_VERSION,
@@ -80,4 +93,28 @@ test('REFUSED: a card whose state is no card state, whose kind is another, or a 
   assert.throws(() => decode({ ...filed, kind: 'Run' }));
   assert.throws(() => Schema.decodeUnknownSync(CardFile)({ workflow: 'build' }));
   assert.throws(() => Schema.decodeUnknownSync(CardFile)({ body: 'x', from: 'elsewhere' }));
+});
+
+test("a card's whole write decodes as the api is sent it, and refuses a spec.from that is no list of ids", () => {
+  const write = { metadata: { resourceVersion: 'd1', labels: { team: 'core' } }, spec: { workflow: 'build', from: ['r-1'], body: 'x\n' } };
+  assert.deepEqual(Schema.decodeUnknownSync(CardWrite)(write), write);
+  assert.deepEqual(Schema.decodeUnknownSync(CardWrite)({ metadata: {}, spec: {} }), { metadata: {}, spec: {} });
+  assert.throws(() => Schema.decodeUnknownSync(CardWrite)({ metadata: {}, spec: { from: [1] } }));
+  assert.throws(() => Schema.decodeUnknownSync(CardWrite)({ spec: {} }));
+});
+
+test("a read of one card carries its file as written in status.source; a list's items need none", () => {
+  const one = { ...filed, status: { ...filed.status, source: '---\nworkflow: build\n---\nCache the views.\n' } };
+  assert.deepEqual(roundTrip(Card, one), one);
+  assert.deepEqual(roundTrip(Card, filed), filed);
+});
+
+test("each of a card's keys has one meaning, and the Card's spec fields carry theirs as the document's description", () => {
+  assert.deepEqual(Object.keys(CARD_KEY_MEANINGS), [...CARD_KEYS]);
+  for (const key of CARD_KEYS) assert.ok(CARD_KEY_MEANINGS[key].length > 0, key);
+  const schemas = OpenApi.fromApi(Api).components.schemas as Record<string, any>;
+  const resolve = (s: any): any => (s?.$ref ? resolve(schemas[s.$ref.split('/').pop()]) : s);
+  const spec = resolve(resolve(schemas['Card']).properties.spec);
+  for (const key of ['workflow', 'repo', 'gate', 'from', 'queued'] as const)
+    assert.equal(spec.properties[key].description, CARD_KEY_MEANINGS[key], key);
 });

@@ -675,7 +675,7 @@ export function retryOffers(
       offer(
         command,
         `${status}.${landAgain} Continue its session, told what happened`,
-        `  (--fresh, or --model <m>, for a new session${spent})`,
+        `  (--fresh, or --model <m>, for a new session${spent}${recheckWords(status, modes)})`,
       );
     }
   }

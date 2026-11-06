@@ -1,9 +1,10 @@
 /**
- * A task whose journal holds an entry no runtime wrote costs the runs that read it, never the list: the board's views (`summariesOf`)
- * answer every other run as it would, and the run whose task does not read off its record, saying why in the runtime's words (`unjudged` in
- * runs.ts) — as the tick leaves such a run where it is and counts it in flight. So does a run waiting on it, whose parent's task is read to
- * see if it landed. A run's own page refuses in those words, and the cap on runs in flight counts both, unjudged, as the tick counts them.
- * A pass has read where the runs' branches stand (`passStanding`), which the list reads off `standing.json`.
+ * A task whose journal holds an entry no runtime wrote costs the runs that read it, never the list: the RunList (`runListOf`) answers
+ * every other run as it would, and leaves the run whose task does not read unjudged, saying why in the runtime's words (its `unjudged`
+ * entry) — in flight on a list asked by state, as the tick leaves such a run where it is and counts it; `nemia ls` lists it off its
+ * record. So does a run waiting on it, whose parent's task is read to see if it landed. A run's own page refuses in those words, and the
+ * cap on runs in flight counts both, unjudged, as the tick counts them. A pass has read where the runs' branches stand (`passStanding`),
+ * which the list reads off `standing.json`.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */
@@ -18,7 +19,7 @@ import type { Ceilings } from '../factory/ceilings.ts';
 import { app } from '../app.ts';
 import { engine, passStanding, runStore } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
-import { summariesOf } from '../../test/run-reads.ts';
+import { lsOf, runListOf } from '../../test/run-reads.ts';
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(
@@ -114,55 +115,63 @@ test('a run whose task journal holds an entry no runtime wrote is answered off i
   await s.test(
     'GET /api/runs answers every run while one task journal holds an entry no runtime wrote, and says of the runs that read it why',
     async () => {
-      const runs = new Map((await summariesOf(app)).map((run) => [run.id, run]));
-      assert.deepEqual([...runs.keys()].sort(), ['r-bad', 'r-child', 'r-good', 'r-sibling']);
+      const list = await runListOf(app);
+      const runs = new Map(list.items.map((run) => [run.metadata.name, run]));
+      const unjudged = new Map((list.unjudged ?? []).map((entry) => [entry.name, { namespace: entry.namespace, unreadable: entry.error }]));
+      assert.deepEqual([...runs.keys(), ...unjudged.keys()].sort(), ['r-bad', 'r-child', 'r-good', 'r-sibling']);
 
       const good = runs.get('r-good')!;
-      assert.equal(good.status, 'succeeded');
-      assert.equal(good.unreadable, null);
-      assert.equal(runs.get('r-sibling')!.unreadable, null, 'a run waiting on a run whose tasks read is judged as ever');
-      assert.equal(good.factory, 'pipao', 'judged, a run names the factory its record names');
-      assert.equal(runs.get('r-sibling')!.factory, null, 'and a record that names none is the default factory, null');
+      assert.equal(good.status.status, 'succeeded');
+      assert.ok(!unjudged.has('r-good'), 'judged');
+      assert.ok(runs.has('r-sibling'), 'a run waiting on a run whose tasks read is judged as ever');
+      assert.equal(good.metadata.namespace, 'pipao', 'judged, a run names the factory its record names');
+      assert.equal(runs.get('r-sibling')!.metadata.namespace, 'default', 'and a record that names none is the default factory');
 
-      const bad = runs.get('r-bad')!;
+      const bad = unjudged.get('r-bad')!;
       const said = `${journal('r-bad-implement')}), entry 6 is a \`measured\` event, and its \`usage.responses\` is "three", where the runtime writes number.`;
       assert.ok(
-        bad.unreadable?.startsWith(
+        bad.unreadable.startsWith(
           `r-bad's record reads, but the journal of its task r-bad-implement does not: r-bad-implement's journal (${said}`,
         ),
-        bad.unreadable ?? 'null',
+        bad.unreadable,
       );
-      assert.ok(bad.unreadable?.includes('the tick does not advance it, until that journal reads again'), bad.unreadable ?? 'null');
-      assert.equal(bad.brief, 'The brief of r-bad', 'what its record says');
-      assert.equal(bad.factory, 'pipao', 'its factory among it');
+      assert.ok(bad.unreadable.includes('the tick does not advance it, until that journal reads again'), bad.unreadable);
+      assert.equal(bad.namespace, 'pipao', 'its factory among it');
+      const ls = await lsOf(app, 'r-bad');
+      assert.equal(ls.run.brief, 'The brief of r-bad', 'what its record says, as `nemia ls` lists it');
       assert.deepEqual(
-        bad.steps.map((s) => [s.name, s.taskId, s.message]),
+        ls.listed.steps.map((s) => [s.name, ls.run.steps[s.name]?.taskId, s.message]),
         [['implement', 'r-bad-implement', 'unreadable']],
       );
-      assert.equal(bad.status, 'running', 'counted in flight, as the tick counts it');
-      assert.equal(bad.moving, true);
-      assert.deepEqual([bad.atWork, bad.tokens], [null, null], 'nothing judged: no time at work and no tokens, which are not 0');
-      assert.deepEqual(bad.waitingOnYou, []);
+      const byState = await runListOf(app, 'fieldSelector=status.state!%3Dfinished');
+      assert.deepEqual(
+        byState.unjudged?.map((entry) => [entry.name, entry.state]).sort(),
+        [
+          ['r-bad', 'inFlight'],
+          ['r-child', 'inFlight'],
+        ],
+        'counted in flight, as the tick counts it',
+      );
 
-      const child = runs.get('r-child')!;
+      const child = unjudged.get('r-child')!;
       assert.ok(
-        child.unreadable?.startsWith(
+        child.unreadable.startsWith(
           `r-child's record reads, but the journal of a task of a run it waits on does not: r-bad-implement's journal (`,
         ),
-        child.unreadable ?? 'null',
+        child.unreadable,
       );
-      assert.deepEqual(child.after, ['r-bad']);
+      assert.deepEqual((await lsOf(app, 'r-child')).run.after, ['r-bad']);
     },
   );
   await s.test(
     "a run a task of which does not read has its page refused in the list's words, and every other run answered in full",
     async () => {
-      const list = new Map((await summariesOf(app)).map((run) => [run.id, run]));
+      const list = new Map(((await runListOf(app)).unjudged ?? []).map((entry) => [entry.name, entry.error]));
       for (const id of ['r-bad', 'r-child']) {
         const res = await app.request(`/api/runs/${id}`);
         const body = (await res.json()) as { error?: string };
         assert.equal(res.status, 502, JSON.stringify(body));
-        assert.equal(body.error, list.get(id)!.unreadable, `${id}'s page and the list say one thing`);
+        assert.equal(body.error, list.get(id), `${id}'s page and the list say one thing`);
       }
       for (const id of ['r-good', 'r-sibling']) {
         const res = await app.request(`/api/runs/${id}`);

@@ -214,13 +214,15 @@ test('the Machines page retired with its two routes: GET /api/machines and GET /
   assert.equal((await app.request('/api/machines/lifecycle')).status, 404);
 });
 
-test("the runs' list is the RunList, the objects' own; runs, an entry the api serves alone, routes none; ls's answer, which nemia prints, is ls's own, on /api/listing", () => {
-  const runs = COMMANDS.find((c) => c.name === 'runs');
+test("the runs' list is the RunList, the objects' own; the entries runs, runs open and runs finished are retired with it; ls's answer, which nemia prints, is ls's own, on /api/listing", () => {
   const ls = COMMANDS.find((c) => c.name === 'ls');
   assert.equal(declaredBy(COMMANDS).get('GET /api/runs'), undefined, 'no entry declares the list');
   assert.ok(OWN['GET /api/runs'], "the RunList is the api's own, with its why");
-  assert.equal(runs?.only?.side, 'api', 'the runs entry is served on the api alone');
-  assert.ok(runs?.only?.why.trim(), 'and says why');
+  assert.deepEqual(
+    COMMANDS.filter((c) => ['runs', 'runs open', 'runs finished'].includes(c.name)),
+    [],
+    "the board's three reads of the list retired with their entries",
+  );
   assert.equal(declaredBy(COMMANDS).get('GET /api/listing'), 'ls', 'every run, as nemia ls lists them');
   assert.equal(declaredBy(COMMANDS).get('GET /api/listing/:runId'), 'ls', 'the one named');
   assert.equal(ls?.only, undefined, 'ls is served on both sides');

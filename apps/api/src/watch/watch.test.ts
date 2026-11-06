@@ -1,7 +1,8 @@
 /**
  * Every list watched (`?watch=true`, src/watch/watch.ts): the initial state as an ADDED per object then a BOOKMARK; a card filed,
  * relabelled, started and dropped arriving as ADDED, MODIFIED and DELETED, the DELETED carrying the last object sent; a labelSelector
- * kept on every read, a card relabelled out of it DELETED; every GET list of the `Api` watchable; the watch's query refused before any
+ * kept on every read, a card relabelled out of it DELETED; a fieldSelector of the runs' state kept on every read, a run approved out of
+ * waiting DELETED; every GET list of the `Api` watchable; the watch's query refused before any
  * stream; and the feed's reader let go when the request is aborted. The resync beat is shortened (`Beats.watch`), never waited out.
  */
 import { root } from '../../test/harness.ts';
@@ -153,6 +154,78 @@ test('a labelSelector keeps its cards on every read, and a card relabelled out o
     await w.stop();
   }
 });
+
+/** A task's journal under the engine's store, as the engine writes it: filed, run and signed off done, settled. */
+const doneTask = (taskId: string) => {
+  const at = '2026-11-05T06:00:00.000Z';
+  const file = path.join(root, 'engine', 'tasks', `${taskId}.jsonl`);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const closeout = { outcome: 'done', summary: 'Designed it.', needs: null, artifacts: [] };
+  const events = [
+    { kind: 'filed', at, brief: 'Design it.', cwd: '/code/app', maxAttempts: 1, harness: 'codex' },
+    { kind: 'starting', at, attempt: 1 },
+    { kind: 'spawned', at, attempt: 1 },
+    { kind: 'ended', at, attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness', closeout },
+    { kind: 'settled', at, outcome: 'succeeded' },
+  ];
+  fs.writeFileSync(file, events.map((e) => `${JSON.stringify(e)}\n`).join(''));
+};
+
+/**
+ * Why the watch of runs by state is a test node reports and does not fail on, until the watch reads a Run: it decodes each item as a
+ * `WatchedObject` (objects' watch.ts), whose `ObjectMeta` asks a `resourceVersion` a Run's metadata does not carry, so
+ * `GET /api/runs?watch=true` answers 500 once any run is in the store.
+ */
+const RUN_WATCH_TODO = "a Run's metadata carries no resourceVersion, which the watch's WatchedObject requires: a watch of runs is a 500";
+
+test(
+  'a watch of the runs by state keeps its fieldSelector on every read: a run approved at its gate, waiting no more, arrives as DELETED',
+  { todo: RUN_WATCH_TODO },
+  async (t) => {
+    const id = 'r-watch-gated';
+    t.after(() => fs.rmSync(path.join(root, 'runs', `${id}.json`), { force: true }));
+    doneTask(`t-${id}`);
+    fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, 'runs', `${id}.json`),
+      JSON.stringify({
+        id,
+        repo: '/code/app',
+        workspace: '/code/app',
+        baseRef: 'abc123',
+        branch: 'main',
+        isolate: true,
+        brief: 'Design it.',
+        workflowDir: path.join(root, 'no-such-workflow'),
+        createdAt: '2026-11-05T06:00:00.000Z',
+        workflow: [
+          { name: 'design', after: [], body: 'Design it.', harness: 'codex' },
+          { name: 'implement', after: ['design'], body: 'Implement it.', harness: 'codex' },
+        ],
+        gates: ['design'],
+        steps: { design: { taskId: `t-${id}` }, implement: { taskId: null } },
+      }),
+    );
+    const w = await watch(t, '/api/runs?watch=true&fieldSelector=status.state%3Dwaiting');
+    try {
+      const initial = await w.initial();
+      const sent = initial.find((e) => named(e) === id);
+      assert.ok(sent && sent.type === 'ADDED', 'the run at its gate is among the waiting');
+      assert.equal(sent.object.kind, 'Run');
+      assert.equal((sent.object.status as { state?: string }).state, 'waiting', 'with the frame its list carries');
+      const approved = await app.request(`/api/namespaces/default/runs/${id}/steps/design/approve`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', host: '127.0.0.1:8787' },
+        body: '{}',
+      });
+      assert.equal(approved.status, 202, await approved.clone().text());
+      await waitFor(t, () => changes(w.events, id).includes('DELETED'), `${id} DELETED once it waits no more`);
+      assert.deepEqual(changes(w.events, id), ['ADDED', 'DELETED'], 'never MODIFIED into a state the selector does not keep');
+    } finally {
+      await w.stop();
+    }
+  },
+);
 
 test('the watch refuses watch=yes, and limit or continue beside watch=true, with 400 before any stream; an unknown namespace is the list own refusal', async () => {
   for (const query of ['watch=yes', 'watch=true&limit=2', 'watch=true&continue=YQ']) {

@@ -6,11 +6,14 @@
  * `linesOf` is the lines read beside the object (`…/lines`, `RunLinesAnswer`), for what the object leaves out on purpose — the lines a
  * person types (`decide`, `refresh`, each step's `approve`, `retry` and `say`), `fromNote` and `workflowPage`.
  *
- * `summariesOf` is every run's summary (`RunListing`), as the board's two views of the list answer them: the runs that wait and those in
- * flight (`GET /api/runs-open`), then the finished ones (`GET /api/runs-finished`), which between them hold every run once. `GET
- * /api/runs` is the `RunList` of the objects.
+ * `runListOf` is the RunList (`GET /api/runs`), plain and whole unless a query says otherwise: its items are `Run` objects, a run
+ * read by `metadata.name`, `spec.*` and `status.*`, and beside them the runs it leaves unjudged (`unjudged`, each with why). `listedOf`
+ * is one run of the plain list, `unjudgedOf` why the list leaves one unjudged, and `framedOf` one run as a list asked by state has it,
+ * with the board's frame parts (`status.state`, `wallMs`, `clock`, …). `lsOf` is one run as `nemia ls` lists it (`GET
+ * /api/listing/:runId`), its record and its steps' words whether judged or not: what the RunList leaves out of a run it cannot judge.
  */
-import type { RunObject, RunSummary } from 'agent-orchestrator';
+import type { RunObject, RunsListed } from 'agent-orchestrator';
+import type { Run, RunList } from 'objects';
 import type { RunAnswer, RunLinesAnswer } from '../src/runs/runs.ts';
 
 /** What a test reads through: the app, or anything that answers a request as it does. */
@@ -70,19 +73,54 @@ export const toldOf = async (app: Asked, id: string, step: string): Promise<RunO
 export const linesOf = async (app: Asked, id: string): Promise<RunLinesAnswer> =>
   (await ok(app, `/api/runs/${encodeURIComponent(id)}/lines`)) as RunLinesAnswer;
 
-/** A run's summary as one of the board's views answers it: the list's own (`RunListing`), with what that view adds. */
-export type Summary = RunSummary & Record<string, unknown>;
+/**
+ * The RunList `GET /api/runs` answers with `query` (`labelSelector=`, `fieldSelector=`, … without its `?`): every run where it says no
+ * limit.
+ */
+export const runListOf = async (app: Asked, query = ''): Promise<RunList> =>
+  (await ok(app, `/api/runs${query === '' ? '' : `?${query.replace(/^\?/, '')}`}`)) as RunList;
+
+/** Every run the plain RunList judges (`items`), in its order: none of those it leaves unjudged. */
+export const listedRuns = async (app: Asked, query = ''): Promise<Run[]> => [...(await runListOf(app, query)).items];
+
+/** Why the plain RunList leaves the run `name` unjudged (its `unjudged` entry's `error`); null where it has no such entry. */
+export const unjudgedOf = async (app: Asked, name: string): Promise<string | null> =>
+  (await runListOf(app)).unjudged?.find((entry) => entry.name === name)?.error ?? null;
+
+/** The run `name` as the plain RunList judges it, thrown where the list does not hold it judged. */
+export async function listedOf(app: Asked, name: string): Promise<Run> {
+  const list = await runListOf(app);
+  const run = list.items.find((item) => item.metadata.name === name);
+  if (run) return run;
+  const unjudged = list.unjudged?.find((entry) => entry.name === name);
+  throw new Error(`the RunList has no judged run '${name}'${unjudged ? `: it is unjudged, ${unjudged.error}` : ''}`);
+}
 
 /**
- * Every run's summary, waiting, in flight and finished, each of the board's two views read once with `query` (`?selector=` among them):
- * the finished in one page of a hundred, which every test's store fits in.
+ * The run `name` as a list asked by state has it (`fieldSelector=status.state!=finished`, then `=finished`), with the board's frame parts
+ * on its status, thrown where neither holds it judged.
  */
-export async function summariesOf(app: Asked, query = ''): Promise<Summary[]> {
-  const more = query === '' ? '' : `&${query.replace(/^\?/, '')}`;
-  const open = (await ok(app, `/api/runs-open${query === '' ? '' : `?${query.replace(/^\?/, '')}`}`)) as {
-    waiting: Summary[];
-    inFlight: Summary[];
-  };
-  const finished = (await ok(app, `/api/runs-finished?size=100${more}`)) as { runs: Summary[] };
-  return [...open.waiting, ...open.inFlight, ...finished.runs];
+export async function framedOf(app: Asked, name: string): Promise<Run> {
+  for (const selector of ['status.state!%3Dfinished', 'status.state%3Dfinished']) {
+    const run = (await runListOf(app, `fieldSelector=${selector}`)).items.find((item) => item.metadata.name === name);
+    if (run) return run;
+  }
+  throw new Error(`no list asked by state holds the run '${name}' judged`);
+}
+
+/**
+ * The run `id` as `nemia ls` lists it (`GET /api/listing/:runId`): its record, and its judgement or why it is left unjudged. `ls` reads the
+ * daemon's two ceilings, which the harness sets to a word it refuses: the read is made with neither set (no cap), each put back after.
+ */
+export async function lsOf(app: Asked, id: string): Promise<RunsListed['runs'][number]> {
+  const ceilings = { WF_MAX_RUNS: process.env.WF_MAX_RUNS, WF_MAX_CONCURRENT: process.env.WF_MAX_CONCURRENT };
+  delete process.env.WF_MAX_RUNS;
+  delete process.env.WF_MAX_CONCURRENT;
+  try {
+    const [run] = ((await ok(app, `/api/listing/${encodeURIComponent(id)}`)) as RunsListed).runs;
+    if (!run) throw new Error(`GET /api/listing/${id} lists no run`);
+    return run;
+  } finally {
+    for (const [key, value] of Object.entries(ceilings)) if (value !== undefined) process.env[key] = value;
+  }
 }

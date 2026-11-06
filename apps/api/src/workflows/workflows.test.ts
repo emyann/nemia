@@ -19,7 +19,7 @@ import { ReadMemo } from '../layer.ts';
 import { Effect } from 'effect';
 import { StoreRoot, workflowVersion as versionIn } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
-import { objectOf, summariesOf } from '../../test/run-reads.ts';
+import { listedOf, objectOf } from '../../test/run-reads.ts';
 import { listWorkflows, specOf } from './workflows.ts';
 import { engine, builtinGitPlace, hireRefusalOf, loadWorkflows, passStanding, runStore } from 'agent-orchestrator';
 import { AGENTS_FOLDER, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
@@ -555,10 +555,10 @@ test('a person starts runs from the board: the record as `nemia start` writes it
       assert.deepEqual(filedTasks(), [], "nothing filed: no task in the engine's store — `nemia tick` files the first step");
       assert.equal(fs.existsSync(path.join(root, 'worktrees')), false, 'and no worktree cut');
 
-      const listed = (await summariesOf(app)).find((r) => r.id === id)!;
-      assert.equal(listed.workflowDir, good, 'the board lists it, with the folder it was started from');
+      const listed = await listedOf(app, id);
+      assert.equal(listed.spec.workflowDir, good, 'the board lists it, with the folder it was started from');
       assert.deepEqual(
-        listed.steps.map((s) => s.message),
+        listed.status.steps.map((s) => s.message),
         ['pending', 'pending'],
       );
     },

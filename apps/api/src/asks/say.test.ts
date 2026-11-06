@@ -20,7 +20,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import type { Said } from 'agent-orchestrator';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
-import { objectOf, summariesOf, type ObjectStep } from '../../test/run-reads.ts';
+import { listedOf, objectOf, type ObjectStep } from '../../test/run-reads.ts';
 import { list, runStore, sayRun } from 'agent-orchestrator';
 import { story } from '../../test/checkpoints.ts';
 
@@ -201,7 +201,7 @@ test("a person's words to a working session: the package's `sayRun` hands them t
         'said to 1×',
         "`nemia ls`'s words",
       );
-      const summary = (await summariesOf(app())).find((r) => r.id === R)!;
+      const summary = (await listedOf(app(), R)).status;
       assert.equal(summary.steps.find((s) => s.name === 'implement')!.note, 'said to 1×', 'and on the list');
       assert.deepEqual(written().files, records, "the runs' records untouched, and no file of the api's");
     },

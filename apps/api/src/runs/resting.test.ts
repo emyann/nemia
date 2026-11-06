@@ -33,11 +33,9 @@ import {
   standingSnapshot,
   verifiesRest,
 } from 'agent-orchestrator';
-import { runTasks } from 'agent-orchestrator/run';
 import type { RunList } from 'objects';
-import type { RunSummary as RunListing } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
-import { summariesOf } from '../../test/run-reads.ts';
+import { listedRuns } from '../../test/run-reads.ts';
 import { names } from '../../test/named.ts';
 
 /** The engine the app's requests read through: its reads are what a poll costs. */
@@ -231,10 +229,14 @@ const poll = async () => {
 };
 
 /**
- * Every run's summary, off the same memo, as the board's views answer them (`summariesOf`): what a run's facts are read from. Its wall
- * time and its clock, which grow between two reads, are left out: a test here compares two reads of one run.
+ * Every run of the RunList (`GET /api/runs`), off the same memo, as a run's facts are read from it: its name (`id`), its brief and its
+ * `status`. A plain list carries no wall time and no clock, which grow between two reads: a test here compares two reads of one run.
  */
-const list = async () => (await summariesOf(app)).map(({ wallMs: _wall, clock: _clock, ...row }) => row);
+const list = async () => (await listedRuns(app)).map((r) => ({ id: r.metadata.name, brief: r.spec.brief, ...r.status }));
+
+/** The board's two lists, the RunList asked by state: the runs not finished, and the finished ones (the board asks nine at a time). */
+const OPEN = '/api/runs?fieldSelector=status.state!%3Dfinished';
+const FINISHED = '/api/runs?fieldSelector=status.state%3Dfinished';
 const listed = async (id: string) => (await list()).find((r) => r.id === id);
 
 /** With the memo's check off: what the memo alone answers. */
@@ -270,14 +272,19 @@ test('a polled list keeps a run at rest and judges it afresh the moment anything
     assert.equal(asked, 1, "the moving run's one journal, and not the finished run's");
     assert.equal(resting.hits - hits, 1);
 
-    const summaries = async () => {
-      const res = await app.request('/api/runs-summaries');
-      assert.equal(res.status, 200, await res.clone().text());
-      return ((await res.json()) as RunListing[]).map((r) => r.id).sort();
+    const byState = async () => {
+      const lists = await Promise.all(
+        [OPEN, FINISHED].map(async (address) => {
+          const res = await app.request(address);
+          assert.equal(res.status, 200, await res.clone().text());
+          return (await res.json()) as RunList;
+        }),
+      );
+      return lists.flatMap((l) => l.items.map((r) => r.metadata.name)).sort();
     };
-    const board = await journalsAsked(() => unverified(summaries));
-    assert.deepEqual(board.value, ['r-moving', 'r-rest'], 'every run, once');
-    assert.equal(board.asked, 1, "the board's whole list, off the informer's summaries: the moving run's one journal again");
+    const board = await journalsAsked(() => unverified(byState));
+    assert.deepEqual(board.value, ['r-moving', 'r-rest'], 'every run, once, between the two');
+    assert.equal(board.asked, 2, "the board's two lists by state, off the informer: the moving run's one journal, once for each");
   });
   await s.test('a record rewritten is judged afresh', async () => {
     await list();
@@ -520,8 +527,14 @@ test("WF_VERIFY_REST: the memo's check fails a request it answered wrong, and a 
     await list();
     const kept = resting.runs.get('r-poisoned');
     assert.ok(kept);
-    resting.runs.set('r-poisoned', { ...kept, value: { ...kept.value, run: { ...kept.value.run, brief: 'not what the record says' } } });
-    assert.equal((await unverified(() => listed('r-poisoned')))?.brief, 'not what the record says', 'the memo answers, unchecked');
+    const wrong = 'not what the record says';
+    assert.ok(kept.object, 'the RunList kept its listed object beside the judgement');
+    resting.runs.set('r-poisoned', {
+      ...kept,
+      value: { ...kept.value, run: { ...kept.value.run, brief: wrong } },
+      object: { ...kept.object, spec: { ...kept.object.spec, brief: wrong } },
+    });
+    assert.equal((await unverified(() => listed('r-poisoned')))?.brief, wrong, 'the memo answers, unchecked');
     const res = await app.request('/api/runs');
     assert.equal(res.status, 500);
     resting.runs.delete('r-poisoned');
@@ -550,7 +563,7 @@ test("WF_VERIFY_REST: the memo's check fails a request it answered wrong, and a 
   );
 });
 
-test("what a poll costs: the journals of the runs still moving, of a page's own rows, of the runs waiting on a person, and no more", async (t) => {
+test('what a poll costs: the journals of the runs still moving, and no more, on the plain list and on a list asked by state', async (t) => {
   const s = story(t);
   await s.test("a poll's reads are counted into api.poll.reads under /api/runs as the engine counts them, every file it read", async () => {
     const readsOf = async (): Promise<{ count: number; sum: number }> => {
@@ -597,7 +610,7 @@ test("what a poll costs: the journals of the runs still moving, of a page's own 
       );
     child('r-child-1');
     await list();
-    const cost = async () => (await journalsAsked(() => unverified(async () => app.request('/api/runs-open')))).asked;
+    const cost = async () => (await journalsAsked(() => unverified(async () => app.request(OPEN)))).asked;
     const one = await cost();
     child('r-child-2');
     await list();
@@ -625,14 +638,21 @@ test("what a poll costs: the journals of the runs still moving, of a page's own 
       assert.ok(resting.runs.has('r-count-refused'), 'a refused run is at rest');
     },
   );
-  await s.test("a refused check's verdict on a poll is its exit, off the journal: neither its output nor its logs are read", async (t) => {
-    aRefusedRun('r-verdict');
-    const output = t.mock.method(e, 'output');
-    const logs = t.mock.method(e, 'logs');
-    const run = await unverified(() => listed('r-verdict'));
-    assert.equal(run?.steps.find((s) => s.name === 'implement')?.message, 'failed ✗ check (exit 1)');
-    assert.deepEqual([output.mock.callCount(), logs.mock.callCount()], [0, 0]);
-  });
+  await s.test(
+    "a refused check's verdict on a poll is its exit; the RunList reads its output and logs once, for the step's check, and a warm poll neither",
+    async (t) => {
+      aRefusedRun('r-verdict');
+      const output = t.mock.method(e, 'output');
+      const logs = t.mock.method(e, 'logs');
+      const run = await unverified(() => listed('r-verdict'));
+      assert.equal(run?.steps.find((s) => s.name === 'implement')?.message, 'failed ✗ check (exit 1)');
+      assert.ok(run?.steps.find((s) => s.name === 'implement')?.check?.refused, "a list's Run carries the refused check whole");
+      const cold = [output.mock.callCount(), logs.mock.callCount()];
+      assert.ok(resting.runs.get('r-verdict')?.object, 'kept, with its listed object');
+      await unverified(() => listed('r-verdict'));
+      assert.deepEqual([output.mock.callCount(), logs.mock.callCount()], cold, 'warm: neither its output nor its logs read again');
+    },
+  );
   await s.test(
     "a held run's decision reads what holds it and none of its own tasks: a session in flight is not viewed to say `holding`",
     async () => {
@@ -656,7 +676,7 @@ test("what a poll costs: the journals of the runs still moving, of a page's own 
     },
   );
   await s.test(
-    'a finished page read warm adds the journals of that page\u2019s own rows and no other, a smaller page asking less; the light answer adds the journals of the runs that wait on a person, alone',
+    'a list asked by state, read warm, costs what the plain poll costs whatever its limit, off the same informer, each row with its clock read',
     async () => {
       aFinishedRun('r-paged');
       aFinishedRun('r-paged-too');
@@ -668,54 +688,44 @@ test("what a poll costs: the journals of the runs still moving, of a page's own 
       await aPass();
       try {
         await list();
-        const whole = await journalsAsked(() => unverified(async () => app.request('/api/runs-finished?size=100&page=1000')));
-        assert.ok(resting.runs.has('r-paged') && resting.runs.has('r-asks'), 'both at rest, and kept');
-        const read = <T>(address: string) =>
+        const read = (address: string) =>
           journalsAsked(() =>
             unverified(async () => {
               const res = await app.request(address);
               assert.equal(res.status, 200, await res.clone().text());
-              return (await res.json()) as T;
+              return (await res.json()) as RunList;
             }),
           );
-        const page = await read<{ runs: { id: string; clock: unknown }[] }>('/api/runs-finished?size=100');
+        const plain = await read('/api/runs');
+        assert.ok(resting.runs.has('r-paged') && resting.runs.has('r-asks'), 'both at rest, and kept');
+        const finished = await read(FINISHED);
         assert.ok(
-          page.value.runs.some((run) => run.id === 'r-paged'),
-          'the finished run is on the page',
+          finished.value.items.some((run) => run.metadata.name === 'r-paged'),
+          'the finished run is on the list',
         );
         assert.ok(
-          page.value.runs.every((run) => run.clock !== null),
+          finished.value.items.every((run) => run.status.clock !== null),
           'each row with its clock read: its Clock cell breaks it down',
         );
-        const journalsOf = (ids: readonly string[]) => new Set(ids.flatMap((id) => runTasks(runStore.runs.read(id))));
-        const paged = journalsOf(page.value.runs.map((run) => run.id));
-        assert.equal(
-          page.asked,
-          whole.asked + paged.size,
-          "the summaries' read alone (a page past the last, cut before any row is read), and the journals of that page's own rows",
-        );
-        const one = await read<{ runs: { id: string }[] }>('/api/runs-finished?size=1');
-        const first = journalsOf(one.value.runs.map((run) => run.id));
-        assert.ok(first.size < paged.size, `the fixture holds more rows than a page of one — ${first.size} of ${paged.size}`);
-        assert.equal(one.asked, whole.asked + first.size, "a page of one asks less: what the read costs is the page's, never the store's");
-        type Row = { id: string; clock: unknown };
-        const open = await read<{ waiting: Row[]; inFlight: Row[] }>('/api/runs-open');
-        const theirs = journalsOf([...open.value.waiting, ...open.value.inFlight].map((run) => run.id));
+        assert.equal(finished.asked, plain.asked, 'the finished runs by state: what the plain poll costs, off the same informer');
+        const one = await read(`${FINISHED}&limit=1`);
+        assert.equal(one.value.items.length, 1, 'a page of one');
+        assert.equal(one.asked, plain.asked, 'asks the same: a list by state judges its whole namespace to count it, off the informer');
+        const open = await read(OPEN);
         assert.ok(
-          open.value.waiting.some((run) => run.id === 'r-asks'),
+          open.value.items.some((run) => run.metadata.name === 'r-asks' && run.status.state === 'waiting'),
           'the run that waits on a person is among the waiting',
         );
         assert.ok(
-          [...open.value.waiting, ...open.value.inFlight].every((run) => run.clock !== null),
+          open.value.items.every((run) => run.status.clock !== null),
           'each row with its clock read, in flight as much as waiting',
         );
-        assert.ok(theirs.has('r-asks-implement') && !theirs.has('r-paged-implement'));
         assert.deepEqual(
           runStore.runs.read('r-asks').after,
           ['r-paged'],
           'it was started after the finished run, whose journal is not read',
         );
-        assert.equal(open.asked, whole.asked + theirs.size, "the whole list's, and the journals of the open runs alone: no finished run's");
+        assert.equal(open.asked, plain.asked, "the open runs by state: what the plain poll costs, no finished run's journal");
       } finally {
         for (const file of ['r-paged.json', 'r-paged-too.json', 'r-asks.json']) fs.rmSync(path.join(root, 'runs', file));
       }

@@ -6,7 +6,21 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 import { until } from './waits.ts';
-import { closeoutOf, linesOf, objectOf, specOf, stepOf, summariesOf, toldOf, triesOf } from './run-reads.ts';
+import {
+  closeoutOf,
+  framedOf,
+  linesOf,
+  listedOf,
+  listedRuns,
+  lsOf,
+  objectOf,
+  runListOf,
+  specOf,
+  stepOf,
+  toldOf,
+  triesOf,
+  unjudgedOf,
+} from './run-reads.ts';
 import { app } from '../src/app.ts';
 import {
   atWork,
@@ -185,16 +199,12 @@ const filedBare = {
   deadlineSeconds: null,
 };
 
-/** A run as GET /api/runs lists it. */
-const listed = async (id: string) => {
-  const run = (await summariesOf(app)).find((r) => r.id === id);
-  assert.ok(run, `${id} is on the list`);
-  return run;
-};
+/** A run as the RunList (`GET /api/runs`) judges it: its `status`. */
+const listed = async (id: string) => (await listedOf(app, id)).status;
 
 /** That run `id`'s page and its decision are refused as the list leaves it unjudged, in the list's words. */
 const saysAsListed = async (id: string) => {
-  const { unreadable } = await listed(id);
+  const unreadable = await unjudgedOf(app, id);
   assert.ok(unreadable, `${id} is unjudged on the list`);
   for (const route of [`/api/runs/${id}`, `/api/runs/${id}/decision`]) {
     const res = await app.request(route);
@@ -303,7 +313,13 @@ test("a store's runs read on the list and on a run's page: each summarized with 
     const res = await app.request('/api/runs');
     const list = (await res.json()) as RunList;
     assert.deepEqual([list.kind, list.items], ['RunList', []], 'the RunList holds no run');
-    assert.deepEqual(await summariesOf(app), [], "and the board's views none");
+    const byState = await Promise.all(
+      ['status.state!%3Dfinished', 'status.state%3Dfinished'].map(async (selector) => {
+        const res = await app.request(`/api/runs?fieldSelector=${selector}`);
+        return ((await res.json()) as RunList).items;
+      }),
+    );
+    assert.deepEqual(byState, [[], []], "and the board's lists by state none");
   });
   await s.test('runs are read from the workflow store and summarized, with what each step is doing', async () => {
     writeRun({
@@ -324,101 +340,173 @@ test("a store's runs read on the list and on a run's page: each summarized with 
     });
     fs.writeFileSync(path.join(root, 'runs', 'r-1.cancelled'), '2026-09-12T01:00:00.000Z');
 
-    assert.deepEqual(await summariesOf(app), [
+    const [run, ...others] = await listedRuns(app);
+    assert.deepEqual(others, [], 'the one run');
+    assert.ok(run);
+    const { status, spec } = run;
+    const stepAsListed = (step: (typeof status.steps)[number]) => ({
+      name: step.name,
+      taskId: step.taskId,
+      branch: step.branch,
+      phase: step.phase,
+      reason: step.reason,
+      on: step.on,
+      via: step.via,
+      message: step.message,
+      verdict: step.verdict,
+      note: step.note,
+      roundDue: step.roundDue,
+      needs: step.needs,
+      waitingFor: step.waitingFor,
+      approve: step.approve,
+      denied: step.denied,
+      sessionUnread: step.sessionUnread,
+    });
+    assert.deepEqual(
       {
-        id: 'r-1',
-        repo: '/code/app',
-        factory: null,
-        place: 'git',
-        work: null,
-        brief: 'Do the thing',
-        workflowDir: '/code/app/workflows',
-        labels: { workflow: 'workflows', factory: 'default' },
-        try: null,
-        createdAt: '2026-09-12T00:00:00.000Z',
-        /** Started, and none of its filings on the feed (there is none here): when it was created. */
-        startedAt: '2026-09-12T00:00:00.000Z',
-        cancelledAt: '2026-09-12T01:00:00.000Z',
-        /** Finished, as `GET /api/runs-finished` lists it: when its work stopped, how, and its wall time in five parts. */
-        finishedAt: '2026-09-12T01:00:00.000Z',
-        outcome: 'cancelled',
-        wallMs: 3600000,
-        clock: { checksMs: 0, personMs: 0, restMs: 3600000, sessionsMs: 0, slotMs: 0, wallMs: 3600000 },
-        /** Nobody pruned it: no mark beside its status. */
-        pruned: null,
-        /** Started without `--after`: it waits on no run. */
-        after: [],
-        context: [],
-        waiting: null,
-        holdUntil: [],
-        holding: null,
-        status: 'cancelled',
-        phase: 'cancelled',
-        reason: 'Cancelled',
-        on: null,
-        via: null,
-        moving: false,
-        /** Nothing of it was measured: no cost, which is not $0. */
-        cost: null,
-        /** Its one task is on no engine here: nothing of it ran, so nothing at work, and no end. */
-        atWork: { ms: 0, since: null, endedAt: null },
-        /** No session measured tokens: no figure, which is not 0. */
-        tokens: null,
-        steps: [
-          {
-            name: 'implement',
-            taskId: 't-1',
-            branch: 'wf/r-1/implement',
-            /** `t-1` is on the record and not in this engine's store: a fresh `WF_ROOT` has no tasks at all. */
-            phase: 'pending',
-            reason: 'Unknown',
-            on: null,
-            via: null,
-            message: 'unknown',
-            verdict: null,
-            note: null,
-            roundDue: false,
-            agent: null,
-            since: null,
-            needs: null,
-            waitingFor: null,
-            approve: null,
-            denied: null,
-            sessionUnread: null,
-          },
-          {
-            name: 'review',
-            taskId: null,
-            branch: null,
-            phase: 'pending',
-            reason: 'Pending',
-            on: null,
-            via: null,
-            message: 'pending',
-            verdict: null,
-            note: null,
-            roundDue: false,
-            agent: null,
-            since: null,
-            needs: null,
-            waitingFor: null,
-            approve: null,
-            denied: null,
-            sessionUnread: null,
-          },
-        ],
-        /** Neither step it froze waits on the other: every step is a root, as on the run's page. */
-        graph: { roots: ['implement', 'review'], edges: [] },
-        waitingOnYou: [],
-        waitingOnYouWords: [],
-        /** Called off: nothing to decide about a result nobody is waiting for. */
-        toDecide: null,
-        /** Every task of it reads, or has no journal at all: judged. */
-        unreadable: null,
-        /** Another repository's folder, in no factory: the board pages it on no address. */
-        workflowPage: null,
+        metadata: run.metadata,
+        spec: {
+          repo: spec.repo,
+          place: spec.place,
+          work: spec.work,
+          brief: spec.brief,
+          workflowDir: spec.workflowDir,
+          try: spec.try,
+          after: spec.after,
+          context: spec.context,
+          agents: spec.steps.map((step) => step.agent),
+        },
+        status: {
+          startedAt: status.startedAt,
+          cancelledAt: status.cancelledAt,
+          pruned: status.pruned,
+          waiting: status.waiting,
+          holdUntil: status.holdUntil,
+          holding: status.holding,
+          status: status.status,
+          phase: status.phase,
+          reason: status.reason,
+          on: status.on,
+          via: status.via,
+          moving: status.moving,
+          cost: status.cost,
+          atWork: status.atWork,
+          tokens: status.tokens,
+          steps: status.steps.map(stepAsListed),
+          graph: status.graph,
+          waitingOnYou: status.waitingOnYou,
+          waitingOnYouWords: status.waitingOnYouWords,
+          toDecide: status.toDecide,
+        },
       },
-    ]);
+      {
+        /** In no factory: the default namespace, and its labels its workflow's and the default factory's. */
+        metadata: {
+          name: 'r-1',
+          namespace: 'default',
+          creationTimestamp: '2026-09-12T00:00:00.000Z',
+          labels: { workflow: 'workflows', factory: 'default' },
+        },
+        spec: {
+          repo: '/code/app',
+          place: 'git',
+          work: null,
+          brief: 'Do the thing',
+          workflowDir: '/code/app/workflows',
+          try: null,
+          /** Started without `--after`: it waits on no run. */
+          after: [],
+          context: [],
+          /** Neither step is given an agent. */
+          agents: [undefined, undefined],
+        },
+        status: {
+          /** Started, and none of its filings on the feed (there is none here): when it was created. */
+          startedAt: '2026-09-12T00:00:00.000Z',
+          cancelledAt: '2026-09-12T01:00:00.000Z',
+          /** Nobody pruned it: no mark beside its status. */
+          pruned: null,
+          waiting: null,
+          holdUntil: [],
+          holding: null,
+          status: 'cancelled',
+          phase: 'cancelled',
+          reason: 'Cancelled',
+          on: null,
+          via: null,
+          moving: false,
+          /** Nothing of it was measured: no cost, which is not $0. */
+          cost: null,
+          /** Its one task is on no engine here: nothing of it ran, so nothing at work, and no end. */
+          atWork: { ms: 0, since: null, endedAt: null },
+          /** No session measured tokens: no figure, which is not 0. */
+          tokens: null,
+          steps: [
+            {
+              name: 'implement',
+              taskId: 't-1',
+              branch: 'wf/r-1/implement',
+              /** `t-1` is on the record and not in this engine's store: a fresh `WF_ROOT` has no tasks at all. */
+              phase: 'pending',
+              reason: 'Unknown',
+              on: null,
+              via: null,
+              message: 'unknown',
+              verdict: null,
+              note: null,
+              roundDue: false,
+              needs: null,
+              waitingFor: null,
+              approve: null,
+              denied: null,
+              sessionUnread: null,
+            },
+            {
+              name: 'review',
+              taskId: null,
+              branch: null,
+              phase: 'pending',
+              reason: 'Pending',
+              on: null,
+              via: null,
+              message: 'pending',
+              verdict: null,
+              note: null,
+              roundDue: false,
+              needs: null,
+              waitingFor: null,
+              approve: null,
+              denied: null,
+              sessionUnread: null,
+            },
+          ],
+          /** Neither step it froze waits on the other: every step is a root, as on the run's page. */
+          graph: { roots: ['implement', 'review'], edges: [] },
+          waitingOnYou: [],
+          waitingOnYouWords: [],
+          /** Called off: nothing to decide about a result nobody is waiting for. */
+          toDecide: null,
+        },
+      },
+    );
+    assert.equal(await unjudgedOf(app, 'r-1'), null, 'every task of it reads, or has no journal at all: judged, left out of unjudged');
+    assert.equal(
+      (await linesOf(app, 'r-1')).workflowPage,
+      null,
+      "another repository's folder, in no factory: the board pages it on no address (the lines read beside the object)",
+    );
+    const framed = (await framedOf(app, 'r-1')).status;
+    assert.deepEqual(
+      [framed.state, framed.finishedAt, framed.outcome, framed.wallMs, framed.clock],
+      [
+        'finished',
+        '2026-09-12T01:00:00.000Z',
+        'cancelled',
+        3600000,
+        { checksMs: 0, personMs: 0, restMs: 3600000, sessionsMs: 0, slotMs: 0, wallMs: 3600000 },
+      ],
+      'finished, as the list asked by state has it: when its work stopped, how, and its wall time in five parts',
+    );
   });
   await s.test("a run in full: the brief, each step's spec and prose, what it was told, and how it went", async () => {
     settledTask('t-2', blocked);
@@ -773,21 +861,16 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
       const gone = path.join(NOWHERE, 'no-such-workflow');
       writeRun({ ...r2, id: 'r-3', workflowDir: gone });
 
-      const listing = await listed('r-3');
-      assert.deepEqual(
-        listing.graph,
-        { roots: ['implement', 'review'], edges: [] },
-        'a record with no frozen workflow and its folder gone: nothing says what waits on what, so every step is a root',
-      );
       await saysAsListed('r-3');
 
-      const unjudged = (listing: RunSummary, why: string) => {
-        const said = listing.unreadable ?? '';
+      const unjudged = async (why: string) => {
+        const said = (await unjudgedOf(app, 'r-3')) ?? '';
         assert.ok(said.startsWith("r-3's workflow folder does not load, so the board does not judge the run"), why);
         assert.ok(said.includes(`does not load: no workflow folder at ${gone}`), said);
-        assert.deepEqual([listing.status, listing.moving, listing.waitingOnYou], ['running', true, []], why);
+        const byState = await runListOf(app, 'fieldSelector=status.state!%3Dfinished');
+        assert.equal(byState.unjudged?.find((entry) => entry.name === 'r-3')?.state, 'inFlight', why);
         assert.deepEqual(
-          listing.steps.map((s) => [s.name, s.message]),
+          (await lsOf(app, 'r-3')).listed.steps.map((s) => [s.name, s.message]),
           [
             ['implement', 'succeeded'],
             ['review', 'pending'],
@@ -795,16 +878,16 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
           why,
         );
       };
-      let [withFolder, withoutFolder] = [await listed('r-2'), await listed('r-3')];
+      let withFolder = await listed('r-2');
       assert.deepEqual(withFolder.waitingOnYou, ['implement']);
-      unjudged(withoutFolder, 'the list says it as the tick leaves it, unjudged and in flight, its steps off its record');
+      await unjudged('the list says it as the tick leaves it, unjudged and in flight, its steps off its record');
 
       fs.writeFileSync(path.join(root, 'runs', 'r-2.cancelled'), '2026-09-12T03:00:00.000Z');
       fs.writeFileSync(path.join(root, 'runs', 'r-3.cancelled'), '2026-09-12T03:00:00.000Z');
-      [withFolder, withoutFolder] = [await listed('r-2'), await listed('r-3')];
+      withFolder = await listed('r-2');
       assert.deepEqual(withFolder.waitingOnYou, [], 'a run somebody called off waits on nobody');
       assert.equal(withFolder.steps[0].message, 'succeeded · BLOCKED', 'a called-off step still says how it signed off');
-      unjudged(withoutFolder, 'called off, it is still unjudged: the tick reads its steps to stop it');
+      await unjudged('called off, it is still unjudged: the tick reads its steps to stop it');
     },
   );
   await s.test('a folder changed since the run started keeps the steps that ran, and names what moved', async () => {
@@ -1181,29 +1264,17 @@ test("a step's attempts and its log: how many, when the latest began and ended, 
       'a task the engine has no record of has had no attempts it can speak for',
     );
 
+    const [listedStep] = (await listed('r-7')).steps;
+    assert.ok(listedStep);
     assert.deepEqual(
-      Object.keys((await listed('r-7')).steps[0]),
-      [
-        'name',
-        'taskId',
-        'branch',
-        'phase',
-        'reason',
-        'on',
-        'via',
-        'message',
-        'verdict',
-        'note',
-        'roundDue',
-        'agent',
-        'since',
-        'needs',
-        'waitingFor',
-        'approve',
-        'denied',
-        'sessionUnread',
-      ],
-      'the list carries the note `nemia ls` prints beside a step, its agent and since when it works, and what a person has to know to act on it',
+      Object.keys(listedStep),
+      Object.keys(stepOf(await objectOf(app, 'r-7'), listedStep.name)),
+      'the list says a step with every key the run object says it with',
+    );
+    assert.deepEqual(
+      ['note', 'roundDue', 'needs', 'waitingFor', 'approve', 'denied', 'sessionUnread'].filter((key) => !(key in listedStep)),
+      [],
+      'the list carries the note `nemia ls` prints beside a step, and what a person has to know to act on it',
     );
     assert.equal((await listed('r-7')).steps[0].note, null, 'no note for a step on its first try');
   });
@@ -1609,9 +1680,9 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
         assert.deepEqual(['stoppedOn' in row, 'stoppedOn' in full], [false, false], `${id}: the word has one key`);
       }
       assert.equal(
-        (await listed('r-3')).status,
-        'running',
-        'called off, its folder gone and no workflow frozen: unjudged, as the tick leaves it',
+        (await runListOf(app, 'fieldSelector=status.state!%3Dfinished')).unjudged?.find((entry) => entry.name === 'r-3')?.state,
+        'inFlight',
+        'called off, its folder gone and no workflow frozen: unjudged and in flight, as the tick leaves it',
       );
       await saysAsListed('r-3');
     },
@@ -1693,10 +1764,9 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
       assert.deepEqual([summary.status, summary.moving], [status, moving], `${id} listed: ${why}`);
       assert.deepEqual([detail.status, detail.moving], [status, moving], `${id} in full: ${why}`);
     }
-    const summary = await listed('r-26');
-    assert.deepEqual(
-      [summary.status, summary.moving],
-      ['running', true],
+    assert.equal(
+      (await runListOf(app, 'fieldSelector=status.state!%3Dfinished')).unjudged?.find((entry) => entry.name === 'r-26')?.state,
+      'inFlight',
       'a record with no frozen workflow, its folder gone and not called off: unjudged and in flight, as the tick leaves it',
     );
     await saysAsListed('r-26');

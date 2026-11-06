@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import type { RunDecision } from './decision.ts';
-import { objectOf, specOf, summariesOf } from '../../test/run-reads.ts';
+import { listedOf as listed, objectOf, specOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
 import { engine, passStanding, runStore } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
@@ -139,11 +139,8 @@ function writeRun(run: { id: string; repo: string; baseRef: string } & Record<st
 
 /** The run object of `id` (`GET /api/runs/:id`), what `nemia show` prints. */
 const detailOf = (id: string) => objectOf(app, id);
-const listedOf = async (id: string) => {
-  const run = (await summariesOf(app)).find((r) => r.id === id);
-  assert.ok(run, `${id} is on the list`);
-  return run;
-};
+/** The status of `id` as the RunList (`GET /api/runs`) judges it. */
+const listedOf = async (id: string) => (await listed(app, id)).status;
 const decisionOf = async (id: string) => (await (await app.request(`/api/runs/${id}/decision`)).json()) as RunDecision;
 /** A decision with something to decide: where the branches stand, and the commands. */
 const decidableOf = async (id: string) => {

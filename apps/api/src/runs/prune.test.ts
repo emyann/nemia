@@ -20,9 +20,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Pruning } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
-import { objectOf, summariesOf } from '../../test/run-reads.ts';
+import { listedRuns, objectOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
-import { engine, prune, prunedKept, prunedWords, runStore, type RunSummary } from 'agent-orchestrator';
+import { engine, prune, prunedKept, prunedWords, runStore } from 'agent-orchestrator';
 
 const git = (...args: string[]) =>
   execFileSync(
@@ -166,10 +166,8 @@ const pruneOn = (id: string, body: unknown = {}, headers: Record<string, string>
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
 
-/** Each run on the list, by id. */
-const listed = async (): Promise<Map<string, RunSummary>> => {
-  return new Map((await summariesOf(app)).map((r) => [r.id, r]));
-};
+/** Each run's status on the RunList, by name. */
+const listed = async () => new Map((await listedRuns(app)).map((r) => [r.metadata.name, r.status]));
 /** The run object of `id` (`GET /api/runs/:id`, a 200 or it throws), what `nemia show` prints. */
 const detail = (id: string) => objectOf(app, id);
 /** What a prune that went through answers (`runs.ts`), the package's `Pruning` as the route words it. */
@@ -255,9 +253,9 @@ test('a finished run pruned on the board as `nemia prune` prunes it: what it ref
       const pruned = runStore.runs.read('p-merged').pruned!;
       assert.ok(pruned.artifacts, 'the marker says the files went');
       const run = (await listed()).get('p-merged')!;
-      assert.deepEqual(run.pruned, { said: `${prunedWords(pruned)}; ${prunedKept(pruned)}` });
+      assert.equal(run.pruned?.said, `${prunedWords(pruned)}; ${prunedKept(pruned)}`);
       assert.match(
-        run.pruned.said,
+        run.pruned?.said ?? '',
         /its worktrees were removed \(nemia prune\), and its files were removed at .* \(nemia prune --artifacts\); its branches and record are kept$/,
       );
       const shown = await detail('p-merged');
@@ -317,8 +315,8 @@ test('a finished run pruned on the board as `nemia prune` prunes it: what it ref
       assert.ok(fs.existsSync(filesDir('p-unmerged')), 'its files are kept without `artifacts`');
       const pruned = runStore.runs.read('p-unmerged').pruned!;
       assert.equal(pruned.artifacts, undefined);
-      assert.deepEqual((await listed()).get('p-unmerged')!.pruned, { said: `${prunedWords(pruned)}; ${prunedKept(pruned)}` });
-      assert.match((await listed()).get('p-unmerged')!.pruned!.said, /; its branches, record and files are kept$/);
+      assert.equal((await listed()).get('p-unmerged')!.pruned?.said, `${prunedWords(pruned)}; ${prunedKept(pruned)}`);
+      assert.match((await listed()).get('p-unmerged')!.pruned?.said ?? '', /; its branches, record and files are kept$/);
       assert.deepEqual(
         (await detail('p-unmerged')).status.onDisk,
         { worktrees: false, files: true },

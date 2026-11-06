@@ -7727,6 +7727,8 @@ test('a proposal shows its phase, its widens mark, its changes and the buttons i
   assert.doesNotMatch(applied, /data-proposal-approve=|data-proposal-decline=/);
   assert.match(applied, />applied</);
   assert.match(applied, /data-proposal-approver/);
+  assert.match(waiting, /data-proposal-widens[^>]*ring-yours/, 'waiting, the mark says it is yours to judge');
+  assert.doesNotMatch(applied, /yours/, 'judged, nothing of it says it waits on you');
 });
 
 test("her chat draws a proposal she links as the page's own part, in her frame", async () => {

@@ -6,14 +6,14 @@
  * person's: the answer is set as the proposal's own read, and the factory's list is read again.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AccessChange, ChangeVerb, Proposal, ProposalChange } from 'objects';
+import type { AccessChange, ChangeVerb, Proposal, ProposalChange, ProposalPhase } from 'objects';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Instant } from '@/components/Instant';
 import { approveProposal, declineProposal, proposalKey, proposalQuery, proposalsKey, ReadRefusal } from '@/lib/api';
-import { filled, ringed } from '@/lib/meaning';
-import { proposalOffers, type ProposalOffers } from '@/lib/proposals';
+import { filled, ink, ringed } from '@/lib/meaning';
+import { proposalOffers, widensHue, type ProposalOffers } from '@/lib/proposals';
 import { cn } from '@/lib/utils';
 import { PROPOSAL_WORDS } from '@/lib/words';
 
@@ -62,7 +62,7 @@ export function ProposalCard({ factory, name }: { factory: string; name: string 
 }
 
 /** One change of a proposal: its object, what it does to it and what it does to access. */
-function ChangeRow({ change }: { change: ProposalChange }) {
+function ChangeRow({ change, phase }: { change: ProposalChange; phase: ProposalPhase }) {
   return (
     <li
       data-proposal-change={`${change.resource}/${change.name}`}
@@ -73,7 +73,7 @@ function ChangeRow({ change }: { change: ProposalChange }) {
       <code className="font-mono break-all">
         {change.resource}/{change.name}
       </code>
-      <span className={cn('text-body-small', change.access === 'widens' ? 'text-yours' : 'text-muted-foreground')}>
+      <span className={cn('text-body-small', change.access === 'widens' ? ink[widensHue(phase)] : 'text-muted-foreground')}>
         {ACCESS_WORDS[change.access]}
       </span>
     </li>
@@ -123,7 +123,7 @@ export function ProposalView({
             <span
               data-proposal-widens
               title="An object it changes reaches further than it did: read each change before approving it."
-              className={cn('rounded px-2 py-0.5 text-label-medium', ringed.yours)}
+              className={cn('rounded px-2 py-0.5 text-label-medium', ringed[widensHue(phase)])}
             >
               Widens access
             </span>
@@ -148,7 +148,7 @@ export function ProposalView({
         )}
         <ul className="flex flex-col gap-1" aria-label="What it changes">
           {changes.map((change) => (
-            <ChangeRow key={`${change.resource}/${change.name}`} change={change} />
+            <ChangeRow key={`${change.resource}/${change.name}`} change={change} phase={phase} />
           ))}
         </ul>
         {message && (

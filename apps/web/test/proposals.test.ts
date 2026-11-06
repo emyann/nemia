@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PROPOSABLE_KINDS, PROPOSAL_PHASES, RESOURCE_PLURALS, type Proposal, type ProposalPhase } from 'objects';
 import { proposalLinkOf } from '../src/lib/proposalLink.ts';
-import { DELEGABLE, proposalOffers, proposalsInOrder } from '../src/lib/proposals.ts';
+import { DELEGABLE, proposalOffers, proposalsInOrder, widensHue } from '../src/lib/proposals.ts';
 import { PROPOSAL_WORDS } from '../src/lib/words.ts';
 
 /** A proposal named `name` in `phase`, made at `at`. */
@@ -65,4 +65,9 @@ test('a delegation may grant every kind a proposal changes, by its plural', () =
 
 test('every phase of a proposal has its word', () => {
   for (const phase of PROPOSAL_PHASES) assert.ok(PROPOSAL_WORDS[phase].word, phase);
+});
+
+test('a widening proposal is drawn in the colour of what waits on you while it waits, and grey once judged', () => {
+  assert.equal(widensHue('waiting'), 'yours');
+  for (const phase of PROPOSAL_PHASES.filter((p) => p !== 'waiting')) assert.equal(widensHue(phase), 'grey', phase);
 });

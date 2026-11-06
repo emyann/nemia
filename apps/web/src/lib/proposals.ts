@@ -4,6 +4,7 @@
  * resources a delegation may grant (`DELEGABLE`). Pure.
  */
 import { PROPOSABLE_KINDS, RESOURCE_PLURALS, type Proposal, type ProposalPhase } from 'objects';
+import type { Hue } from './meaning.ts';
 import type { ProposalBefore, ProposalOffers, ProposalOffersOf, ProposalOrderFacts } from '../../contracts/proposal.contract.ts';
 
 export type { ProposalOffers, ProposalOrderFacts } from '../../contracts/proposal.contract.ts';
@@ -33,3 +34,9 @@ export const proposalsInOrder = (list: readonly Proposal[]): Proposal[] =>
 
 /** The resources a delegation may grant: each kind a proposal may change, by its plural, as the orchestrator computes them. */
 export const DELEGABLE: readonly string[] = PROPOSABLE_KINDS.map((kind) => RESOURCE_PLURALS[kind]);
+
+/**
+ * The hue a proposal's *Widens access* mark and its widening changes are drawn in: `yours` while it waits on the person, who judges it,
+ * and grey once it is judged, since `yours` says only what waits on them.
+ */
+export const widensHue = (phase: ProposalPhase): Hue => (phase === 'waiting' ? 'yours' : 'grey');

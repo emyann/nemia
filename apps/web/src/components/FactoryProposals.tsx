@@ -9,7 +9,7 @@ import { RouteLink } from '@/components/AgentParts';
 import { TEXT_LINK } from '@/components/look';
 import { proposalsQuery } from '@/lib/api';
 import { filled, ringed } from '@/lib/meaning';
-import { proposalsInOrder } from '@/lib/proposals';
+import { proposalsInOrder, widensHue } from '@/lib/proposals';
 import { cn } from '@/lib/utils';
 import { PROPOSAL_WORDS } from '@/lib/words';
 
@@ -45,7 +45,7 @@ export function FactoryProposals({ factory }: { factory: string }) {
                 {words.word}
               </span>
               {proposal.status.widens && (
-                <span data-proposal-widens className={cn('rounded px-2 py-0.5 text-label-small', ringed.yours)}>
+                <span data-proposal-widens className={cn('rounded px-2 py-0.5 text-label-small', ringed[widensHue(proposal.status.phase)])}>
                   Widens access
                 </span>
               )}

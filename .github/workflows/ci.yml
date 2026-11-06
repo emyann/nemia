@@ -204,18 +204,33 @@ jobs:
           node-version: '24.16.0'
       - run: npm ci
         timeout-minutes: 10
+      - name: Read the Playwright the lockfile pins
+        id: playwright
+        # The browsers' cache key: the version of playwright package-lock.json pins, whose browsers.json names the builds it downloads,
+        # and the runner's image (ImageOS, ubuntu24), since a build is made for one distribution. A lockfile change that moves no
+        # Playwright keeps the key; either moved misses it. A missing version fails here rather than keying on "undefined".
+        run: |
+          node -e '
+            const version = require("./package-lock.json").packages["node_modules/playwright"]?.version;
+            if (!version || !process.env.ImageOS) throw new Error("no playwright in package-lock.json or no ImageOS on the runner: the browsers cache key needs both");
+            console.log(`key=playwright-${process.env.ImageOS}-${version}`);
+          ' >> "$GITHUB_OUTPUT"
       - name: Cache Playwright's browsers
-        # Keyed on the lockfile, which pins playwright: a dependency change downloads Chromium again, which is minutes and not
-        # correctness. The restore-key gives a near miss the last build rather than none.
+        id: browsers
+        # The browsers alone, never the build or the pages' results: nothing a shard decides is read from a cache. No restore-keys: a
+        # near miss would hold another Playwright's builds, which the install would download past and the save would then carry too.
+        # Saved at the job's end on a miss, when the job passed (actions/cache's post step); a red shard on a miss saves nothing.
         uses: actions/cache@v6
         timeout-minutes: 5
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: playwright-${{ runner.os }}-
+          key: ${{ steps.playwright.outputs.key }}
       - name: Install Chromium
-        # From the checkout's own playwright, never an npx download, as apps/web/CLAUDE.md says: an install from elsewhere deletes the
-        # builds of every Playwright it does not see. --with-deps runs apt even on a cache hit, which is minutes and not correctness.
+        # On a miss alone. From the checkout's own playwright, never an npx download, as apps/web/CLAUDE.md says: an install from
+        # elsewhere deletes the builds of every Playwright it does not see. --with-deps runs apt, which is where shards stalled: on hits
+        # of the old lockfile-hashed key this step still ran it, and took 415 to 702 s on 8 of main's 48 shard-runs (2026-11-06) against
+        # 10 to 36 s on the rest. A hit runs no apt: ubuntu-latest's image carries the libraries Chromium loads (it ships Chrome).
+        if: steps.browsers.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
         timeout-minutes: 15
         working-directory: apps/web

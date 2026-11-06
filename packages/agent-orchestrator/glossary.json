@@ -523,7 +523,7 @@
     },
     {
       "term": "Sub-resource",
-      "meaning": "what the run object leaves out and serves on a path under its step: its `tries`, one `try`, a try's `closeout`, and what the step was `told`. Each is an entry of the command table, on the api and, for the closeout, the CLI, and answers with a Schema of its own beside the object's (`StepTries`, `StepTry`, `TryCloseout`, `StepTold`, in `packages/objects/src/run.ts`, re-exported by `packages/agent-orchestrator/src/object/run.model.ts`)."
+      "meaning": "what the run object leaves out and serves on a path under its step: its `tries`, one `try`, a try's `closeout`, and what the step was `told`. Each is an entry of the command table, on the api and, for the closeout, the CLI, and answers with a Schema of its own beside the object's (`StepTries`, `StepTry`, `TryCloseout`, `StepTold`, in `packages/objects/src/run.ts` and `packages/objects/src/run-told.ts`, re-exported by `packages/agent-orchestrator/src/object/run.model.ts`)."
     },
     {
       "term": "TaskId",

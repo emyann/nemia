@@ -1,14 +1,14 @@
 /**
  * The package's `test` script loads `test/ambient.ts` into every test file's process, so a test that reads `WF_MAX_RUNS` or
  * `WF_MAX_CONCURRENT` without setting it is refused, whatever the shell or the daemon that runs the check has set. Proven on fixtures run
- * by `node --test` with the script's own flags, from the package, with the daemon's ceilings in their environment: one that relies on
- * a default fails naming the sentinel, and one that deletes the variable first passes. And a command that ticks, typed in such a file on a
+ * by `node --test` with the script's own flags, from the package, with the daemon's ceilings in their environment: one that relies on a
+ * default fails naming the sentinel, and one that deletes the variable first passes. And a command that ticks, typed in such a file on a
  * store no daemon holds, starts none: the script turns the start off (`NEMIA_DAEMON_START=off`). And a collector the shell or the daemon
  * names is not one a test file exports to: the script drops `OTEL_EXPORTER_OTLP_ENDPOINT`. And the daemon's per-session variables
- * (`WF_SESSION_TOKEN`, `WF_MEMORY_LIMIT`, `WF_CGROUP_PARENT`) are dropped too, so a step's own run reads what CI reads. And a harness's own files are never the
- * person's: the script sets `CLAUDE_CONFIG_DIR` to a scratch folder. And neither store is the person's: the script points `WF_ROOT`,
- * `AE_ROOT` and `HOME` at scratch folders, so a module that pins a root as it loads pins a throwaway one and `os.homedir()` answers a
- * throwaway too.
+ * (`WF_SESSION_TOKEN`, `WF_MEMORY_LIMIT`, `WF_CGROUP_PARENT`) are dropped too, so a step's own run reads what CI reads. And a harness's
+ * own files are never the person's: the script sets `CLAUDE_CONFIG_DIR` to a scratch folder. And neither store is the person's: the script
+ * points `WF_ROOT`, `AE_ROOT` and `HOME` at scratch folders, so a module that pins a root as it loads pins a throwaway one and
+ * `os.homedir()` answers a throwaway too.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

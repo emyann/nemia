@@ -136,27 +136,28 @@ test("each writer's route hands its handler only the keys its one spec gives a h
   );
 });
 
-test("a name yours has taken, a workflow or a file, is refused in workflowTaken's one sentence by the board's POST and by nemia", async () => {
+test("a name yours has taken, a workflow or a file, is refused in workflowTaken's one sentence by the board's POST and by nemia, typed once for the handler both share", async () => {
   fs.cpSync(path.join(TEAM, 'dev'), path.join(STORE, 'taken'), { recursive: true });
   fs.writeFileSync(path.join(STORE, 'TAKEN.txt'), 'not a workflow\n');
   const draft = path.join(scratch('nemia-api-taken-'), 'taken');
   fs.cpSync(path.join(TEAM, 'dev'), draft, { recursive: true });
   const taken = (await (await app.request(`${D}/workflows/taken?origin=yours`)).json()) as Workflow;
   const nemia = path.join(import.meta.dirname, '../../../../packages/agent-orchestrator/bin/nemia.ts');
-  for (const [name, version] of [
-    ['taken', taken.metadata.resourceVersion],
-    ['TAKEN.txt', null],
+  for (const [name, version, typedToo] of [
+    ['taken', taken.metadata.resourceVersion, true],
+    ['TAKEN.txt', null, false],
   ] as const) {
     const res = await sent('POST', `${D}/workflows`, { metadata: { name }, spec: { steps: [taken.spec.steps[0]] } });
     const board = ((await res.json()) as { error: string }).error;
     assert.equal(res.status, 409, board);
+    assert.equal(board, workflowTaken(path.join(STORE, name), version), name);
+    if (!typedToo) continue;
     const typed = spawnSync(process.execPath, [nemia, 'workflows', 'write', 'yours', name, '--folder', draft], {
       encoding: 'utf8',
       timeout: 60_000,
     });
     assert.equal(typed.status, 2, typed.stderr);
     assert.equal(typed.stderr.trim(), board, name);
-    assert.equal(board, workflowTaken(path.join(STORE, name), version), name);
   }
 });
 

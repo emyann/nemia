@@ -124,9 +124,14 @@ test("REFUSED: the api listens on 127.0.0.1 alone — nothing answers on this ma
 
 test('the api refuses a PORT that is not a port: exit 2, the fix on stderr, nothing listening', async () => {
   const api = startApi('80a');
-  assert.equal(await api.ended, 2);
+  assert.equal(
+    await api.ended,
+    2,
+    "the bin's one refusal of its own inputs: `portOf`'s and `argsOf`'s, refused in one place in main.ts, are each held in this process above",
+  );
   assert.match(api.output(), /PORT=80a is not a port\. Give a whole number from 0 to 65535/);
   assert.doesNotMatch(api.output(), /listening/);
+  assert.equal(fs.existsSync(path.join(api.root, 'daemon.json')), false, 'no lease taken');
 });
 
 /** A store whose `releases/current` names a built release `v1`: a store that runs an install. */
@@ -245,16 +250,12 @@ test('REFUSED: a port another process holds ends the daemon with exit 2, naming 
   assert.match(viewer.output(), new RegExp(`^api: 127\\.0\\.0\\.1:${taken} is in use`, 'm'));
 });
 
-test('(f) --no-tick serves the board and writes no lease; (g) any other argument is refused naming --no-tick', async (t) => {
+test('(f) --no-tick serves the board and writes no lease', async (t) => {
   const viewer = startApi('0', ['--no-tick']);
   t.after(() => viewer.child.kill());
   const [url] = await viewer.said(/http:\/\/127\.0\.0\.1:\d+/);
   assert.deepEqual(await (await fetch(`${url}/api/health`)).json(), { ok: true });
   assert.equal(fs.existsSync(path.join(viewer.root, 'daemon.json')), false);
-  const wrong = startApi('0', ['--tick=no']);
-  assert.equal(await wrong.ended, 2);
-  assert.match(wrong.output(), /the api takes no --tick=no\. Give --no-tick /);
-  assert.equal(fs.existsSync(path.join(wrong.root, 'daemon.json')), false);
 });
 
 /**

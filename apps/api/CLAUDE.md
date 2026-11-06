@@ -60,7 +60,9 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   list of the `Api`. A watch reads its list again through its own route, so each open one costs a list read per feed line (at most
   one per 500 ms) and per resync: a watch of runs on a busy feed reads the RunList about a third of the time (the measure below).
   The Event lists are the exception: their watch follows the feed (`eventsFollowed`, `src/feed-objects/events-watch.ts`) and never reads
-  the list again, since a read of it is a read of the whole feed. Discovery (`GET /api`,
+  the list again, since a read of it is a read of the whole feed. A list whose objects carry parts measured to the read hands
+  `watchable` the version it compares them at (`versionOf`; the runs' `runWatchVersion`, which leaves out a going run's `wallMs` and
+  `clock`), or its watch sends a MODIFIED of each on every read. Discovery (`GET /api`,
   `src/discovery/discovery.ts`) is read off the `Api`, so a path added there is discovered with nothing to change. SSE under HttpApi was
   measured on 2026-11-05 (`docs/measure-2026-11-05-sse-under-httpapi.md`): the watch's frames are already HttpApi's and it can move;
   the feed can once its opening comment and its `Last-Event-ID` resume are written through `StreamSse({ events })`. Neither moved yet.

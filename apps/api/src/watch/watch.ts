@@ -7,9 +7,10 @@
  * namespace's refusal with it: a first read that is no 2xx is answered as it is, before any stream. Then each object is sent ADDED, then a
  * BOOKMARK, Kubernetes' initial state. The list is read again on a feed line (`followFeed`, on the app's `Beats.feed`), at most one read
  * in flight and one per `WATCH_SETTLE`, and on a resync every `Beats.watch` (`WATCH_RESYNC`) for a change no line says (a card or a
- * definition edited on disk); what changed between two reads is the package's `watchChanges`, an object's version being its JSON as
- * served, so a change of its status is a change though its `resourceVersion` stands. A BOOKMARK is sent every `BOOKMARK_EVERY`, its
- * `resourceVersion` the feed's size at the last read.
+ * definition edited on disk); what changed between two reads is the package's `watchChanges`, an object's version being the one its
+ * route hands (`versionOf`: a run's leaves out its frame's time measured to the read, `runWatchVersion`), its JSON as served where none,
+ * so a change of its status is a change though its `resourceVersion` stands. A DELETED carries the object of the last read that held it.
+ * A BOOKMARK is sent every `BOOKMARK_EVERY`, its `resourceVersion` the feed's size at the last read.
  *
  * Level-triggered: a watch keeps nothing between connections. A read again that is no 2xx, or a feed truncated under the reader, ends the
  * stream, and the reader opens it again and is sent the state whole: no `Last-Event-ID` resume, since nothing keeps a list's old versions.
@@ -53,13 +54,16 @@ type Read = { readonly kind: string; readonly versions: Versioned[]; readonly ob
 /** The key an object is watched by: its namespace and its name. */
 const keyOf = (o: WatchedObject): string => `${o.metadata.namespace ?? ''}/${o.metadata.name}`;
 
-/** `answer`, a 2xx of the list, read as its objects. */
-async function readOf(answer: Response, at: number): Promise<Read> {
+/** The version a list's objects are compared at between two reads: its JSON as served where its route hands none. */
+export type VersionOf = (o: WatchedObject) => string;
+
+/** `answer`, a 2xx of the list, read as its objects, each keyed and versioned by `versionOf`. */
+async function readOf(answer: Response, at: number, versionOf: VersionOf): Promise<Read> {
   const list = Schema.decodeUnknownSync(AnyObjectList)(await answer.json());
   const objects = new Map(list.items.map((o) => [keyOf(o), o] as const));
   return {
     kind: list.kind.replace(/List$/, ''),
-    versions: list.items.map((o) => ({ key: keyOf(o), version: JSON.stringify(o) })),
+    versions: list.items.map((o) => ({ key: keyOf(o), version: versionOf(o) })),
     objects,
     at,
   };
@@ -75,7 +79,7 @@ const bookmarkOf = (kind: string, at: number) =>
 /** A read again that the list refused, which ends the stream. */
 class ListRefused extends Data.TaggedError('ListRefused')<{ readonly status: number }> {}
 
-/** The frames of what changed from `sent` to `now`: ADDED and MODIFIED with the new object, DELETED with the last one sent. */
+/** The frames of what changed from `sent` to `now`: ADDED and MODIFIED with the new object, DELETED with the last read's that held it. */
 const changedFrames = (sent: Read, now: Read) =>
   watchChanges(sent.versions, now.versions).flatMap((change) => {
     const object = change.type === 'DELETED' ? sent.objects.get(change.key) : now.objects.get(change.key);
@@ -96,10 +100,11 @@ export type Follow = (
  * `list` watched: without `watch` (or with `watch=false`) the request handed on as it is; with `watch=true` the stream above; any other
  * `watch`, or `limit` or `continue` beside it, refused 400 `{ error }` before anything is read. Given `follow`, a list whose objects are
  * the feed's own lines: after the initial state each line the list keeps is sent ADDED as it is followed, once, and the list is never
- * read again.
+ * read again. Given `versionOf`, the list's objects are compared at it between reads rather than as served: a list whose objects carry
+ * parts measured to the read hands it, or its watch sends a MODIFIED of each on every read.
  */
 export const watchable =
-  (list: Listed, follow?: Follow) =>
+  (list: Listed, { follow, versionOf = JSON.stringify }: { readonly follow?: Follow; readonly versionOf?: VersionOf } = {}) =>
   async (c: RequestContext<ApiEnv>): Promise<Response> => {
     const asked = c.req.query('watch');
     if (asked === undefined || asked === 'false') return list(c);
@@ -111,7 +116,7 @@ export const watchable =
     const at = feedSize();
     const first = await list(c, request());
     if (!first.ok) return first;
-    const initial = await readOf(first, at);
+    const initial = await readOf(first, at, versionOf);
     return streamSSE(c, async (stream: SSEStreamingApi) => {
       const gone = new AbortController();
       stream.onAbort(() => gone.abort());
@@ -124,7 +129,7 @@ export const watchable =
         const at = feedSize();
         const answer = yield* Effect.promise(async () => list(c, request()));
         if (!answer.ok) return yield* new ListRefused({ status: answer.status });
-        const now = yield* Effect.promise(() => readOf(answer, at));
+        const now = yield* Effect.promise(() => readOf(answer, at, versionOf));
         const frames = changedFrames(state.sent, now);
         state.sent = now;
         state.at = now.at;

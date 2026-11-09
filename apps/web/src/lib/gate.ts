@@ -65,6 +65,13 @@ export function gateOfStep(
 export const backName = (back: readonly string[]): string => (back.length === 1 ? back[0] : 'the work');
 
 /**
+ * What approving an ending does, said before a person approves it, on the card and at the run page's gate alike: it runs in the
+ * repository's own checkout, on the base branch where it is known (`onto`), and cannot be taken back.
+ */
+export const endingWarning = (step: string, onto: string | null): string =>
+  `This runs ${step} in the repository's own checkout${onto ? ` on ${onto}` : ''}, and it cannot be taken back.`;
+
+/**
  * The card's words for a gate, in its one row: what approving does, and where a send-back goes.
  * `approve to run ship on main, or send review back`; for a gate that holds after its step ran,
  * `approve what review handed on, or send it back`. Long names cut it short on the card, which has it whole on hover beside the step's own

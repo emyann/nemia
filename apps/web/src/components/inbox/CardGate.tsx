@@ -1,11 +1,11 @@
 import { useId, useState, type ReactNode } from 'react';
 import { Button as AriaButton, Dialog, DialogTrigger, Heading, Popover } from 'react-aria-components';
 import { barValue } from '../../lib/bar';
-import { backName, gateCardLine, readLink, takenLine, type GateAsk } from '../../lib/gate';
+import { backName, endingWarning, gateCardLine, readLink, takenLine, type GateAsk } from '../../lib/gate';
 import { cn } from '../../lib/utils';
 import { RouteLink } from '../agent/AgentParts';
 import { Refusal, useAsk } from '../gate/Ask';
-import { useApprove } from '../gate/Gate';
+import { useApprove } from '../../lib/useApprove';
 import type { RunAt } from '@/lib/runNamespace';
 import { BUTTON, BUTTON_SECONDARY, BUTTON_SMALL, TEXTAREA, POPOVER } from '../../lib/classes';
 
@@ -40,7 +40,7 @@ export function CardGate({
   stamp: string;
   onTaken: (taken: Taken) => void;
 }) {
-  const approval = useApprove(run.id, gate.step, () => undefined, run.namespace);
+  const approval = useApprove(run.id, gate.step, { namespace: run.namespace });
   const [to, setTo] = useState(gate.back[0] ?? gate.step);
   const sendBack = useAsk(run.id, gate.step, () => undefined, run.namespace);
   const line = gateCardLine(gate);
@@ -182,9 +182,7 @@ function ApproveForm({
     >
       <Heading slot="title" className="font-semibold">{`Approve ${gate.step}?`}</Heading>
       <p className="text-body-small text-muted-foreground">
-        {gate.ends
-          ? `This runs ${gate.step} in the repository's own checkout${gate.onto ? ` on ${gate.onto}` : ''}, and it cannot be taken back.`
-          : `What waits on ${gate.step} is filed next, handed what it handed on.`}
+        {gate.ends ? endingWarning(gate.step, gate.onto) : `What waits on ${gate.step} is filed next, handed what it handed on.`}
       </p>
       <label htmlFor={field} className="sr-only">{`Words to approve ${gate.step} with, if any`}</label>
       <textarea

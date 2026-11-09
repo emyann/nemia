@@ -1,7 +1,8 @@
 import { useId, useState } from 'react';
 import type { Answer } from '../../lib/asks';
 import { OFFERS } from '../../lib/words';
-import { Refusal, useApprove } from '../gate/Ask';
+import { Refusal } from '../gate/Ask';
+import { useApprove } from '../../lib/useApprove';
 import { AskedRow } from '../gate/Questions';
 import { BUTTON, TEXTAREA } from '../../lib/classes';
 

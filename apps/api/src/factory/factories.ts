@@ -10,8 +10,8 @@ import { factoryCommandsOf, factoryList, factoryObject, FACTORY_INSTRUCT, FACTOR
 import { Api } from 'objects';
 import type { Served } from '../layer.ts';
 import { runPlaced } from '../store.ts';
-import { defaultRepo, factoryNamed, queryOf } from '../factory-parts/index.ts';
-import { answered } from './refused.ts';
+import { defaultRepo, factoryNamed, queryOf } from './parts/index.ts';
+import { answered } from '../objects/refused.ts';
 
 /** The rules of the factory `name`, read, written (`words`) or cleared, as `nemia factory rules` does it. */
 const rules = (method: string, name: string, args: { words?: string; clear?: boolean }) =>

@@ -2017,7 +2017,7 @@ selector, and it is why no attempt can ever run twice.
 ## Files
 
 Folders by feature, held by path in `test/layout.test.ts`: the two entries alone sit flat in `src/`; `core/` is the
-judgement and `core/engine/` its shell; `harness/` is the seam and each harness's driver; `a2a/` alone imports the A2A SDK;
+judgement and `core/engine/` its shell; `harness/` is the seam and each harness's driver; `a2a/` alone imports the A2A SDK; `process/` is a leaf every folder may import, reading the machine's processes;
 `service/` is the engine as an Effect service, and `cli/` the `ae` command. A folder another folder reads has a face, `index.ts`, and a test
 of pure code sits beside it.
 
@@ -2027,6 +2027,7 @@ of pure code sits beside it.
 | `src/testing.ts` | the testing entry's export list: what `agent-runtime/testing` gives a test of a layer above, the engine's stand-in and the wait |
 | `src/waits/index.ts` | the wait's face: `until`, `bell` and `WAITED`, as a test of this package and the testing entry read them |
 | `src/waits/waits.ts` | the one copy of the wait a test makes on the event it counts, never on a length of time (`until`), the bell its source rings (`bell`) and the bound a waiting test takes (`WAITED`) |
+| `src/process/alive.ts` | whether a process is there, as signal 0 finds it (`alive`): it answers, or it is another user's (`EPERM`); the runtime's one copy, a leaf every folder may import |
 | `src/index.ts` | the export list of `agent-runtime`, by name, all Effect — the boundary; `decide` is not on it |
 | `src/core/session.ts` | a session's state in A2A's names, the end each records and the phase a person reads (`endOf`, `TaskPhase`, `LIVE_PHASE`): read by both `domain.ts` and `lifecycle.ts`, so neither imports the other's values |
 | `src/core/domain.ts` | events, `fold`, **`decide`** and what it reads — `lifecycleOf`, `observe` — pure, no I/O, the whole judgement, and the session name read back (`nameParts`) |

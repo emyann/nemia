@@ -17,10 +17,10 @@ import {
   Invalid as Refused,
 } from 'agent-orchestrator';
 import { Api, type McpServerWrite } from 'objects';
-import type { Served } from '../layer.ts';
-import { commandNamed, runPlaced } from '../store.ts';
+import type { Served } from '../../layer.ts';
+import { commandNamed, runPlaced } from '../../store.ts';
 import { defaultRepo, factoryNamed, queryOf } from './parts.ts';
-import { answered } from '../objects/refused.ts';
+import { answered } from '../../objects/refused.ts';
 
 const SERVER_ADD = commandNamed('factory server add');
 const SERVER_RM = commandNamed('factory server rm');

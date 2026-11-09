@@ -17,7 +17,7 @@ import { HttpApiBuilder } from 'effect/http-api';
 import { definitionRevision, foldersIn, typedGraphOf, workflowStale, workflowVersion, type FolderLoaded } from 'agent-orchestrator';
 import { Api, API_VERSION, Conflict, Invalid, type Workflow, type WorkflowStep } from 'objects';
 import type { Served } from '../layer.ts';
-import { queryOf } from '../factory-parts/index.ts';
+import { queryOf } from '../factory/parts/index.ts';
 import { answeredWrite as answered, statusRefused } from '../objects/refused.ts';
 import { commandNamed, runPlaced } from '../store.ts';
 import { draftOf, isRoleKey, schemasOf, write, type StepBody } from '../workflows/builder.ts';

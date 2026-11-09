@@ -1,6 +1,6 @@
 /**
  * A send under way, as the registry records it: the lease its entry holds while the send is made, measured on the clock seam
- * (`core/clock.ts`), and whether the process making it lives.
+ * (`core/clock.ts`); whether the process making it lives is `alive` (`process/alive.ts`).
  */
 import { elapsedMs, type Instant, type Monotonic } from '../core/clock.ts';
 
@@ -16,13 +16,3 @@ export const sendHeld = (e: Leased, now: Instant, sendMs: number): boolean =>
   e.sending !== undefined &&
   e.taskId === undefined &&
   elapsedMs({ at: Date.parse(e.sentAt), ...(e.sending.mono ? { mono: e.sending.mono } : {}) }, now) < sendMs;
-
-/** Whether a process lives: one this user cannot signal lives too. */
-export const alive = (pid: number): boolean => {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (e) {
-    return (e as NodeJS.ErrnoException).code === 'EPERM';
-  }
-};

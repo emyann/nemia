@@ -6,10 +6,10 @@
 import { HttpApiBuilder } from 'effect/http-api';
 import { hireList, hireObject } from 'agent-orchestrator';
 import { Api } from 'objects';
-import type { Served } from '../layer.ts';
-import { commandNamed, runPlaced } from '../store.ts';
+import type { Served } from '../../layer.ts';
+import { commandNamed, runPlaced } from '../../store.ts';
 import { defaultRepo, factoryNamed, queryOf } from './parts.ts';
-import { answered } from '../objects/refused.ts';
+import { answered } from '../../objects/refused.ts';
 
 const HIRE = commandNamed('factory hire');
 const FIRE = commandNamed('factory fire');

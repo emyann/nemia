@@ -49,7 +49,7 @@ git('init', '-q', '-b', 'main');
 git('commit', '-q', '--allow-empty', '-m', 'init');
 const base = git('rev-parse', 'HEAD').trim();
 
-type Ceilings = import('../factory/ceilings.ts').Ceilings;
+type Ceilings = import('../gauges/ceilings.ts').Ceilings;
 
 const inbox = path.join(root, 'inbox');
 const JSON_TYPE = { 'content-type': 'application/json' };

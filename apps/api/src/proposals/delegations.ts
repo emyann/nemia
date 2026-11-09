@@ -8,7 +8,7 @@ import { Effect } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
 import { delegationGet, delegationPut, delegationRemove, delegationsList } from 'agent-orchestrator';
 import { Api } from 'objects';
-import { queryOf } from '../factory-parts/index.ts';
+import { queryOf } from '../factory/parts/index.ts';
 import { listed } from '../definitions/served.ts';
 import { runPlaced } from '../store.ts';
 import { proposalAnswered } from './proposals.ts';

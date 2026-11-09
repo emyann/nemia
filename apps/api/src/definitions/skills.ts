@@ -27,7 +27,7 @@ import {
   yourSkillsRead,
   type SkillRow,
 } from '../agents/skills.ts';
-import { queryOf } from '../factory-parts/index.ts';
+import { queryOf } from '../factory/parts/index.ts';
 import { answeredWrite as answered, statusRefused } from '../objects/refused.ts';
 import { filesUnder, skillFoldersIn, skillTextOf } from '../workflows/builder.ts';
 import { commandNamed, runPlaced } from '../store.ts';

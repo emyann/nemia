@@ -13,8 +13,8 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import { query, type CanUseTool, type HookCallbackMatcher, type HookEvent, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { attachedOptions } from './attached-options.ts';
+import { alive } from '../../process/alive.ts';
 import {
-  alive,
   appendAsk,
   childFacts,
   cutAsks,

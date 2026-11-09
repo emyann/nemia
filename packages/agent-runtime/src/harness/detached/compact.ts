@@ -10,19 +10,10 @@ import { RunnerError, type RunnerOps, type SessionsCompacted } from '../seam.ts'
 import type { HarnessSpec } from './detached.ts';
 import { runFileIn, type RunFile } from './run-file.ts';
 import { captureAt, keepSaid, keptText, replaceCapture, type SaidKey } from './said.ts';
+import { alive as pidAlive } from '../../process/alive.ts';
 
 /** The ends of the captures a run keeps that its readers read: its log, and its stdout kept whole. */
 const CAPTURE_ENDS = ['.log', '.stdout'];
-
-/** Whether the process `pid` is there, as a signal 0 finds it: one this process may not signal is there. */
-const pidAlive = (pid: number): boolean => {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (e) {
-    return (e as NodeJS.ErrnoException).code === 'EPERM';
-  }
-};
 
 /**
  * The run files in `dir` and the captures beside them, each by the run's file name less its end: a run's name is kept with no dot

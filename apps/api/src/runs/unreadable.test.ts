@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Ceilings } from '../factory/ceilings.ts';
+import type { Ceilings } from '../gauges/ceilings.ts';
 import { app } from '../app.ts';
 import { engine, passStanding, runStore } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';

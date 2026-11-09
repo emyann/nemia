@@ -5,15 +5,15 @@
  * And the schedules, which find the run each fired among every run's record, read them through the app's memo: a warm list is answered
  * from it, and judged afresh under `WF_VERIFY_REST=1`.
  */
-import { root } from '../../test/harness.ts';
+import { root } from '../../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { addFactory, attachWorkflow, setSchedule } from 'agent-orchestrator';
 import { scratch } from 'test-kit/scratch';
-import { app, appOf, liveOf, runtime } from '../app.ts';
-import { ReadMemo } from '../layer.ts';
+import { app, appOf, liveOf, runtime } from '../../app.ts';
+import { ReadMemo } from '../../layer.ts';
 
 const repo = scratch('nemia-api-parts-');
 fs.mkdirSync(path.join(repo, 'workflows', 'make'), { recursive: true });

@@ -1,9 +1,10 @@
 /**
  * The runtime's layout, held by path (`docs/architecture.md`): the core knows of the harnesses only their seam, a harness knows
- * nothing of A2A, of the engine service or of the entries, and the CLI reaches the runtime through its face alone. No two files
- * need each other's values, no source file imports a test, a face re-exports by name, and only the entries sit flat in `src/`. The
- * folder rule (`docs/architecture.md`, *Folders, in every package*) holds here as everywhere, judged by `test-kit/layout`: a folder is
- * a concept at most `src/<concept>/<part>/` deep, named for what it holds; this package reads its folders by path, not by face.
+ * nothing of A2A, of the engine service or of the entries, the CLI reaches the runtime through its face alone, and `src/process/`
+ * is a leaf every folder may import. No two files need each other's values, no source file imports a test, a face re-exports by
+ * name, and only the entries sit flat in `src/`. The folder rule (`docs/architecture.md`, *Folders, in every package*) holds here as
+ * everywhere, judged by `test-kit/layout`: a folder is a concept at most `src/<concept>/<part>/` deep, named for what it holds; this
+ * package reads its folders by path, not by face.
  *
  * Each rule is made to refuse a planted import first: a rule that reads nothing passes too.
  */
@@ -40,6 +41,7 @@ const WHY = {
   core: `the core knows a harness only by ${SEAM.join(', ')} — put what it needs in the seam`,
   below: 'the core and the harnesses sit below A2A, the engine service and the entries — move what both need down',
   cli: `the CLI reaches the runtime through its face, ${DOORS.join(' and ')}, alone — export what it needs there`,
+  leaf: 'src/process/ is a leaf every folder imports, and imports no other file of src — keep what it needs inside it',
 };
 
 /** Where `file` imports what its folder may not: each breach, worded with what to do instead. */
@@ -53,6 +55,8 @@ function pathBreaches(file: string, imports: Import[]): string[] {
       out.push(`${file} imports ${target}: ${WHY.core}`);
     } else if ((under(file, 'core') || under(file, 'harness')) && above) {
       out.push(`${file} imports ${target}: ${WHY.below}`);
+    } else if (under(file, 'process') && !under(target, 'process')) {
+      out.push(`${file} imports ${target}: ${WHY.leaf}`);
     } else if (under(file, 'cli') && !DOORS.includes(target) && !under(target, 'cli')) {
       out.push(`${file} imports ${target}: ${WHY.cli}`);
     }
@@ -60,7 +64,7 @@ function pathBreaches(file: string, imports: Import[]): string[] {
   return out;
 }
 
-test('REFUSED: the core reaching a driver, A2A, the engine service or an entry; a harness reaching A2A, the service or an entry; the CLI reaching past its face', () => {
+test('REFUSED: the core reaching a driver, A2A, the engine service or an entry; a harness reaching A2A, the service or an entry; the CLI reaching past its face; process/ reaching out of itself', () => {
   const planted: Array<[string, string, string, string]> = [
     ['src/core/engine/engine.ts', "import { claudeOps } from '../../harness/claude/bg.ts';", 'src/harness/claude/bg.ts', WHY.core],
     [
@@ -80,6 +84,7 @@ test('REFUSED: the core reaching a driver, A2A, the engine service or an entry; 
     ['src/cli/main.ts', "import { fold } from '../core/domain.ts';", 'src/core/domain.ts', WHY.cli],
     ['src/cli/main.ts', "import { configRefusal } from '../service/options.ts';", 'src/service/options.ts', WHY.cli],
     ['src/cli/main.ts', "import { Engine } from '../service/index.ts';", 'src/service/index.ts', WHY.cli],
+    ['src/process/alive.ts', "import { elapsedMs } from '../core/clock.ts';", 'src/core/clock.ts', WHY.leaf],
   ];
   for (const [file, line, target, why] of planted) {
     assert.deepEqual(
@@ -98,6 +103,9 @@ test('REFUSED: the core reaching a driver, A2A, the engine service or an entry; 
     ['src/cli/main.ts', "import type { Event } from '../index.ts';"],
     ['src/cli/main.ts', "import { BRIEF_KEYS } from './brief.ts';"],
     ['src/core/domain.ts', "// import { nameParts } from '../a2a/map.ts';"],
+    ['src/core/engine/feed.ts', "import { alive } from '../../process/alive.ts';"],
+    ['src/harness/detached/compact.ts', "import { alive } from '../../process/alive.ts';"],
+    ['src/a2a/remote.ts', "import { alive } from '../process/alive.ts';"],
   ];
   for (const [file, line] of allowed) assert.deepEqual(pathBreaches(file, importsIn(line)), [], `not refused: ${file}: ${line}`);
 });

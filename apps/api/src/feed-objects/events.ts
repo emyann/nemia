@@ -7,7 +7,7 @@
 import { HttpApiBuilder } from 'effect/http-api';
 import { eventList, eventObject } from 'agent-orchestrator';
 import { Api } from 'objects';
-import { factoryNamed, queryOf } from '../factory-parts/parts.ts';
+import { factoryNamed, queryOf } from '../factory/parts/parts.ts';
 import { runPlaced } from '../store.ts';
 import { answered } from '../objects/refused.ts';
 

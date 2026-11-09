@@ -714,5 +714,5 @@ test('REFUSED: the quota read starts no process: the engine asks', () => {
   ]);
   const text = fs.readFileSync(path.join(import.meta.dirname, 'quota.ts'), 'utf8');
   assert.match(text, /export function makeQuota\s*\(/, 'the file read is the quota asker');
-  assert.deepEqual(starts(text), [], 'factory/quota.ts asks the engine, and starts no claude itself');
+  assert.deepEqual(starts(text), [], 'gauges/quota.ts asks the engine, and starts no claude itself');
 });

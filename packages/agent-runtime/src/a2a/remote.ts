@@ -56,7 +56,8 @@ import { turnOver } from './remote-events.ts';
 import type { SeamOps } from './client.ts';
 import { pacesOf, remoteFollowOf, remoteTranscriptByName, remoteTranscriptOf, type FollowDeps } from './remote-follow.ts';
 import { authOf, connectionOf, type Credentials, type MissingCredential, type RemoteAgent } from './remote-client.ts';
-import { alive, sendHeld } from './sending.ts';
+import { alive } from '../process/alive.ts';
+import { sendHeld } from './sending.ts';
 import { Doubt, late, Refusal, sendRefused, untaken, wordsOf } from './said.ts';
 
 export type { Credentials, MissingCredential, RemoteAgent } from './remote-client.ts';

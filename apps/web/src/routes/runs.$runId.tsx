@@ -30,7 +30,7 @@ import { untrustedFor, type UntrustedPlace } from '../lib/factories';
 import { askedIn, decideDrawn, gateOffered, stepAnchor } from '../lib/asks';
 import { barValue } from '../lib/bar';
 import { spentTitle } from '../lib/cost';
-import { duration } from '../lib/canvas';
+import { durationWords } from '../lib/duration';
 import { clockCounts, inFlight, runClock, waitedMs } from '../lib/factory';
 import { useNow } from '../lib/useNow';
 import { ink } from '../lib/meaning';
@@ -438,7 +438,7 @@ function startedRow(run: RunView): ReactNode {
   return (
     <span data-started>
       {when(run.startedAt)}
-      {waited >= 1000 && `, after waiting ${duration(waited)}`}
+      {waited >= 1000 && `, after waiting ${durationWords(waited, 'second')}`}
     </span>
   );
 }

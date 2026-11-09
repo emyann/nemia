@@ -10,9 +10,6 @@ import type { Frozen } from './frozen.ts';
 import { durationWords } from './duration.ts';
 import { forgetStored, readStored, store } from './stored.ts';
 
-/** A duration to the second, as `durationWords` says it: kept only for the run page's started row until it imports that writer. */
-export const duration = (ms: number): string => durationWords(ms, 'second');
-
 /** A session is going, so its attempt's time is still counting. */
 export const isLive = (state: StepState): boolean => state === 'working' || state === 'asks-in-session';
 

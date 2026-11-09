@@ -58,14 +58,16 @@ const SLOW = today((i) => i % 4, 3);
 
 const sumOf = (timings: readonly PageTiming[]): number => timings.reduce((sum, t) => sum + t.ms, 0);
 
+/** `ms` in the seconds a refusal says them in: one decimal, then ` s`. */
+const secondsOf = (ms: number): string => `${(ms / 1000).toFixed(1)} s`;
+
 test("the shipped bound is what four workers draw inside the time that keeps a whole run under a step's tool", () => {
-  assert.equal(BOUND_WORKERS, 4);
-  assert.equal(E2E_BOUND_MS, 480_000);
-  assert.equal(PAGES_BOUND_MS, E2E_BOUND_MS * BOUND_WORKERS);
+  const full = Array.from({ length: BOUND_WORKERS }, (_, i) => timed(`page${i}`, E2E_BOUND_MS, i));
+  assert.equal(overBound(full, true), null, 'each worker drawing for the whole of that time passes');
+  assert.ok(overBound([...full, timed('one-more', 1)], true) !== null, 'one millisecond more is refused');
 });
 
 test("a whole run of pages as fast as today that one worker drew alone is not refused, though it took longer than a step's tool", () => {
-  assert.equal(sumOf(TODAY), 676_000);
   assert.ok(sumOf(TODAY) > E2E_BOUND_MS, 'one worker drew them in more time than the run was once held to');
   assert.equal(overBound(TODAY, true), null);
 });
@@ -73,11 +75,14 @@ test("a whole run of pages as fast as today that one worker drew alone is not re
 test('REFUSED: the same pages each three times slower fail at four workers, naming the five slowest, slowest first, with their seconds', () => {
   const why = overBound(SLOW, true);
   assert.ok(why !== null, 'a whole run whose pages cost more than the bound, summed, is refused');
-  assert.match(why, /^the pages of the whole e2e cost 2028\.0 s summed, over their bound of 1920\.0 s: /);
-  assert.match(
-    why,
-    /at 4 workers that is 507\.0 s at least, against the 480\.0 s that keeps a whole run well under a step's ten-minute tool/,
+  const head = why.split('\n')[0];
+  const says = [sumOf(SLOW), PAGES_BOUND_MS, sumOf(SLOW) / BOUND_WORKERS, E2E_BOUND_MS].map(secondsOf);
+  assert.deepEqual(
+    says.map((seconds) => head.indexOf(seconds)),
+    [...says.map((seconds) => head.indexOf(seconds))].sort((a, b) => a - b),
+    "the sum, its bound, then each worker's share and its bound, in that order",
   );
+  assert.ok(says.every((seconds) => head.includes(seconds)) && head.includes(`${BOUND_WORKERS} workers`), head);
   const named = [...why.matchAll(/^ {4}(\w+) \(dark, worker (\d)\): (\d+\.\d) s \(load /gm)].map((m) => `${m[1]} ${m[2]} ${m[3]}`);
   assert.deepEqual(named, ['page006 2 26.4', 'page013 1 26.4', 'page020 0 26.4', 'page027 3 26.4', 'page034 2 26.4']);
   assert.doesNotMatch(why, /--workers/);

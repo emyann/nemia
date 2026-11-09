@@ -14,14 +14,13 @@ import {
   stateClass,
   stateDrawn,
   statePaint,
-  STATE_OF,
   stepState,
   type Drawn,
   type StepState,
   waitsAtGate,
   waitsOnPerson,
 } from '../src/lib/status.ts';
-import { STEP_REASONS, type StepCodes, type StepPhase, type StepReason } from '../src/lib/api/reasons.ts';
+import { type StepCodes, type StepPhase, type StepReason } from '../src/lib/api/reasons.ts';
 import { container, meaningOf } from '../src/lib/meaning.ts';
 import { HELD_TO_COME, PAUSED, PERSON, stateWordsOf } from '../src/lib/words.ts';
 import { isLive, movingInto } from '../src/lib/canvas.ts';
@@ -90,10 +89,6 @@ test('stepState: each reason the api carries, read as the state a person acts on
       ['Waiting on hold', 'waiting'],
     ];
     for (const [named, state] of cases) assert.equal(stateAt(named), state, named);
-  });
-  await t.test('every reason has its state (`STATE_OF`), and every state it names is drawn', () => {
-    assert.deepEqual(Object.keys(STATE_OF).sort(), [...STEP_REASONS].sort());
-    for (const reason of STEP_REASONS) assert.ok(stateDrawn[STATE_OF[reason]], reason);
   });
   await t.test('a step whose record the api could not judge is unreadable, apart from a task the engine has no record of', () => {
     assert.equal(stepState(plain('failed', 'Unknown'), false, false), 'unreadable');

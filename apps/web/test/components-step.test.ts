@@ -13,12 +13,12 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import { coded, type Word } from './run-fixtures.ts';
 import './tsx.ts';
 import {
   at,
   atGate,
+  classesAt,
   closeoutSaying,
   cut,
   endingRun,
@@ -820,7 +820,7 @@ test('a line the harness wrote on its own is a quiet note; one between two calls
   );
 });
 
-test('the Activity tab draws the session compact, over the last of its turns, and links to the whole of it', () => {
+test('the Activity tab draws the session compact, over the last of its turns, and links to the whole of it', async () => {
   const compact = renderToStaticMarkup(createElement(SessionTalk, { who: 'implement', turns: [], live: false, density: 'compact' }));
   assert.match(compact, /data-session-talk="latest"[^>]*class="[^"]*gap-2"/, 'the tab stands its items closer than the page does');
   assert.doesNotMatch(
@@ -829,14 +829,40 @@ test('the Activity tab draws the session compact, over the last of its turns, an
     'and the page stands them at the room they want',
   );
 
-  const inspector = fs.readFileSync(new URL('../src/components/step/StepInspector.tsx', import.meta.url), 'utf8');
-  assert.match(inspector, /const tail = turns\.slice\(-ACTIVITY_TURNS\);/, 'the tab draws the tail of the conversation, not the whole');
-  assert.match(
-    inspector,
-    /<SessionTalk who=\{step\.name\} turns=\{tail\} live=\{following\.live\} density="compact" \/>/,
-    'drawn by the family, compact, over that tail',
+  const { ActivityTail, ACTIVITY_TURNS } = await import('../src/components/step/StepInspector.tsx');
+  const { unread } = await import('../src/lib/following.ts');
+  const { prerender } = await import('react-dom/static');
+  const { createMemoryHistory, createRootRoute, createRouter, RouterContextProvider } = await import('@tanstack/react-router');
+  const said = (i: number) => `turn-${String(i).padStart(2, '0')}`;
+  const events: TranscriptEvent[] = Array.from({ length: ACTIVITY_TURNS + 5 }, (_, i) => ({
+    id: `a-${i}:0`,
+    at,
+    role: 'assistant',
+    kind: 'text',
+    text: said(i),
+  }));
+  const run = runWith(null);
+  const step = { ...run.steps[0], taskId: 't-1', attempts: ranOnce };
+  const router = createRouter({ routeTree: createRootRoute(), history: createMemoryHistory() });
+  const tab = createElement(ActivityTail, { run, step, following: { ...unread(false), events } });
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  const { prelude } = await prerender(createElement(RouterContextProvider, { router, children: tab }));
+  const html = await new Response(prelude).text();
+
+  const shown = [...html.matchAll(/turn-\d\d/g)].map((m) => m[0]);
+  assert.deepEqual(
+    shown,
+    Array.from({ length: ACTIVITY_TURNS }, (_, i) => said(i + 5)),
+    'the tab draws the tail of the conversation, in its order, not the whole',
   );
-  assert.match(inspector, /Open the session/, 'and the whole of it is one click away');
+  assert.ok(
+    textsOf(html)
+      .join(' ')
+      .includes(`The last ${ACTIVITY_TURNS} of ${ACTIVITY_TURNS + 5}.`),
+    'and says it is the tail',
+  );
+  assert.ok(classesAt(html, 'data-session-talk="latest"').includes('gap-2'), 'drawn compact');
+  assert.ok(textsOf(html).includes('Open the session'), 'and the whole of it is one click away');
 });
 
 test('the message being written is drawn after the turns, until the whole of it takes its place', () => {

@@ -40,6 +40,8 @@ import { stepClock } from './clock.ts';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 import { TaskId } from '../src/core/model.ts';
+import { Engine } from '../src/index.ts';
+import { builtEngine } from './engine.ts';
 
 /**
  * One board: a journal and a fake harness whose session states a test moves by hand — and the pass's memo of the settled
@@ -1993,4 +1995,23 @@ test('a harness unread for a pass: neither there nor gone — nothing ended, spa
       assert.deepEqual((await run(tick())).unobserved, [], 'the next pass that reads says nothing: nothing is kept from the last');
     },
   );
+});
+
+test("a view whose harness could not be read says its task's session unread, with the look's words, as the pass keeps it unread", async () => {
+  const sessions = new Map<string, Sighting>();
+  let fails = false;
+  const ops = testOps({ sessions });
+  const failing = Effect.suspend(() =>
+    fails ? Effect.fail(new RunnerError({ verb: 'observe', message: 'registry: timed out' })) : ops.observe,
+  );
+  const engine = builtEngine(
+    Engine.layer({ root: scratch('ae-view-unread-'), harnesses: { flaky: { ...ops, observe: failing, find: undefined } } }),
+  );
+  const id = await Effect.runPromise(engine.file({ ...spec, id: 'v' }));
+  await Effect.runPromise(engine.tick());
+  assert.equal((await Effect.runPromise(engine.view(id))).unreadWhy, undefined, 'read: nothing unread');
+  fails = true;
+  const unread = await Effect.runPromise(engine.view(id));
+  assert.match(unread.unreadWhy ?? '', /registry: timed out/, 'the failed look kept as unread, in its words');
+  assert.equal(unread.state.settled, null, 'and nothing settled by it');
 });

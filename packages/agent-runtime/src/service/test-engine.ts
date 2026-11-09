@@ -17,7 +17,20 @@
  * alone, and by no file of a `src`.
  */
 import { Effect, Layer } from 'effect';
-import type { Attempt, Input, Outcome, Said, SessionAsk, State, TaskPhase } from '../core/index.ts';
+import { turnOf } from '../core/turn.ts';
+import {
+  fold,
+  unknownTask,
+  type Attempt,
+  type Input,
+  type Outcome,
+  type Said,
+  type SessionAsk,
+  type State,
+  type TaskPhase,
+} from '../core/index.ts';
+import { cursorOf } from '../harness/transcript.ts';
+import type { HarnessDeclared } from '../harness/declaration.ts';
 import { answerRefusalOf, InputRefused, StopRefused, type TaskView } from '../core/engine/index.ts';
 import {
   attemptRefusal,
@@ -27,10 +40,10 @@ import {
   isTranscriptCursor,
   ListRefused,
   listRefusalOf,
-  TRANSCRIPT_START,
   TranscriptRefused,
   type EngineShape,
 } from './engine.ts';
+import { declaredVerbsOf, TEST_HARNESS, testHarnesses, testHarnessesOf, unkeptVerbs, type TestHarnesses } from './test-verbs.ts';
 
 /** One event of a session's transcript, as `transcript` answers it. */
 type TranscriptEvent = Effect.Success<ReturnType<EngineShape['transcript']>>['events'][number];
@@ -45,8 +58,8 @@ export type { TestKeeps } from './test-kept.ts';
 export type { TestMcpState } from './test-mcp-state.ts';
 import { notACount, notAStream, OutputRefused } from './output.ts';
 import { SayRefused } from './say.ts';
-import { InterruptRefused } from './interrupt.ts';
-import { AnswerRefused, type Answering } from './answer.ts';
+import { InterruptRefused, notInterruptible } from './interrupt.ts';
+import { AnswerRefused, noCallHeld, type Answering } from './answer.ts';
 import { answerOptionsRefusalOf } from './answer-options.ts';
 
 /** One answer asked of the stand-in: the task, the ask by its id, and each question's answer by the question's own text. */
@@ -95,18 +108,8 @@ const settledOf = (phase: TaskPhase): Outcome | null => (phase === 'succeeded' |
 /** The session a started task of the stand-in runs in. */
 const sessionOf = (id: string): string => `native-${id}`;
 
-/** The state of a task nothing was filed under, as the engine folds an empty journal. */
-const blank = (taskId: string): State => ({
-  taskId,
-  brief: '',
-  cwd: '',
-  attempts: [],
-  said: [],
-  inputs: [],
-  closed: false,
-  stopRequested: false,
-  settled: null,
-});
+/** The state of a task nothing was filed under: the engine's fold of an empty journal. */
+const blank = (taskId: string): State => fold(taskId, []);
 
 /** The state of a held task, as the engine folds its filing, its one attempt and what was said to it. */
 const stateOf = (id: string, t: TestTask): State => ({
@@ -114,7 +117,7 @@ const stateOf = (id: string, t: TestTask): State => ({
   filedAt: t.filedAt,
   brief: t.spec.brief,
   cwd: t.spec.cwd,
-  harness: t.spec.harness ?? 'test',
+  harness: t.spec.harness ?? TEST_HARNESS,
   deadlineSeconds: t.spec.deadlineSeconds,
   resumeFrom: t.spec.resumeFrom,
   config: t.spec.config,
@@ -161,14 +164,9 @@ const endedOf = (phase: TaskPhase): Outcome | null => (phase === 'input-required
  * `turn`, the answers given since the turn before it (`nudge`), and the session that turn ended in, which it continues (`resumeFrom`).
  */
 const turnFieldsOf = (t: TestTask): Partial<Attempt> => {
-  const turn = t.inputs.length;
-  if (turn === 0) return {};
-  const before = t.earlier.filter((a) => (a.turn ?? 0) < turn).at(-1);
-  const nudge = t.inputs
-    .slice(before?.turn ?? 0)
-    .map((input) => input.text)
-    .join('\n\n');
-  return { turn, nudge, ...(before?.nativeId ? { resumeFrom: before.nativeId } : {}) };
+  const turn = turnOf({ ...stateOf(t.spec.id, t), attempts: t.earlier });
+  if (turn.n === 0) return {};
+  return { turn: turn.n, nudge: turn.words ?? '', ...(turn.continues ? { resumeFrom: turn.continues } : {}) };
 };
 
 /**
@@ -207,8 +205,8 @@ const turnedOf = (t: TestTask): TestTask => {
   return t;
 };
 
-/** The cursor after the first `count` events of a planted transcript: the real reader's shape, its offset the count. */
-const plantedCursor = (count: number): string => (count === 0 ? TRANSCRIPT_START : `${count}.${'0'.repeat(16)}`);
+/** The cursor after the first `count` events of a planted transcript: the real reader's (`cursorOf`), its offset the count. */
+const plantedCursor = (count: number): string => cursorOf(count, new Uint8Array());
 
 /**
  * `transcript` over the tasks a stand-in holds: refuses a task not held, an attempt it has not and a cursor no read gave, as the engine
@@ -220,7 +218,7 @@ const transcriptOf =
   (id, after, options = {}) => {
     const refuse = (message: string) => Effect.fail(new TranscriptRefused({ message }));
     const t = tasks.get(id);
-    if (!t) return refuse(unknown(id));
+    if (!t) return refuse(unknownTask(id));
     if (after !== undefined && !isTranscriptCursor(after))
       return refuse(
         `\`${after}\` is not a cursor a transcript read gave. Pass the \`cursor\` the last read returned, or none to read from the start.`,
@@ -258,15 +256,6 @@ const countedOf = <V extends Pick<EngineShape, (typeof READS)[number]>>(verbs: V
   return { ...verbs, ...counted, io };
 };
 
-/** A verb the stand-in does not keep: a test that reaches it has outgrown the stand-in. */
-const unkept = (verb: string) => () =>
-  Effect.die(
-    new Error(`the test engine keeps no \`${verb}\`: add it to src/service/test-engine.ts, with its walk in test/engine-walks.ts`),
-  );
-
-/** The words the engine refuses a task it holds nothing of with. */
-const unknown = (id: string): string => `\`${id}\` is not a task in this store.`;
-
 /**
  * `answer` over what a stand-in holds: refused, and nothing kept, as the engine refuses it (`answerOptionsRefusalOf`, then
  * `answerRefusalOf`: their words and their order), else the answer kept on the task as the engine journals it, which `view` carries
@@ -280,7 +269,7 @@ const answerVerbOf =
       const t = tasks.get(taskId);
       const config = options?.config;
       const refused = answerOptionsRefusalOf(options ?? {}) ?? answerRefusalOf(taskId, t ? stateOf(taskId, t) : undefined, text, config);
-      if (refused !== undefined || !t) return yield* Effect.fail(new InputRefused({ message: refused ?? unknown(taskId) }));
+      if (refused !== undefined || !t) return yield* Effect.fail(new InputRefused({ message: refused ?? unknownTask(taskId) }));
       const input: Input = { at: new Date().toISOString(), text, ...(config ? { config } : {}) };
       t.inputs.push(input);
       t.phase = 'between-attempts';
@@ -377,7 +366,7 @@ const outputOf =
     if (stream !== 'stdout' && stream !== 'stderr') return refuse(notAStream(stream));
     if (lastBytes !== undefined && !(Number.isSafeInteger(lastBytes) && lastBytes > 0)) return refuse(notACount(lastBytes));
     const t = tasks.get(id);
-    if (!t) return refuse(unknown(id));
+    if (!t) return refuse(unknownTask(id));
     const text = t.attempt ? t.printed[stream] : undefined;
     return Effect.succeed(text === undefined || lastBytes === undefined ? text : Buffer.from(text).subarray(-lastBytes).toString());
   };
@@ -410,12 +399,15 @@ const forgetVerbOf =
  * a stand-in holds no sighting to read a session between turns by.
  */
 const interruptAskedOf =
-  (tasks: Map<string, TestTask>, interrupts: string[], settledIn: (id: string) => string | null) => (taskId: string) =>
+  (tasks: Map<string, TestTask>, interrupts: string[], settledIn: (id: string) => string | null, harnesses: TestHarnesses) =>
+  (taskId: string) =>
     Effect.gen(function* () {
       interrupts.push(taskId);
       const refuse = (message: string) => Effect.fail(new InterruptRefused({ message }));
       const t = tasks.get(taskId);
-      if (!t) return yield* refuse(unknown(taskId));
+      if (!t) return yield* refuse(unknownTask(taskId));
+      const on = harnesses.runsOn(t.spec.harness);
+      if (!harnesses.takes('interrupt', on)) return yield* refuse(notInterruptible(on));
       if (settledIn(taskId))
         return yield* refuse(`\`${taskId}\` has settled (${t.phase}): no session of it is running, and no turn is in it.`);
       if (!t.attempt) return yield* refuse(`\`${taskId}\` has not started an attempt yet, so there is no turn to end.`);
@@ -429,12 +421,15 @@ const interruptAskedOf =
  * held call that took an answer leaves it on the session's record.
  */
 const answerAskedOf =
-  (tasks: Map<string, TestTask>, answered: TestAnswer[], settledIn: (id: string) => string | null) => (taskId: string, given: Answering) =>
+  (tasks: Map<string, TestTask>, answered: TestAnswer[], settledIn: (id: string) => string | null, harnesses: TestHarnesses) =>
+  (taskId: string, given: Answering) =>
     Effect.gen(function* () {
       answered.push({ taskId, id: given.id, answers: given.answers });
       const refuse = (message: string) => Effect.fail(new AnswerRefused({ message }));
       const t = tasks.get(taskId);
-      if (!t) return yield* refuse(unknown(taskId));
+      if (!t) return yield* refuse(unknownTask(taskId));
+      const on = harnesses.runsOn(t.spec.harness);
+      if (!harnesses.takes('answerAsk', on)) return yield* refuse(noCallHeld(on));
       if (settledIn(taskId))
         return yield* refuse(`\`${taskId}\` has settled (${t.phase}): no session of it is running, and no turn is in it.`);
       if (!t.attempt) return yield* refuse(`\`${taskId}\` has not started an attempt yet, so there is no turn to end.`);
@@ -464,7 +459,7 @@ const sayAskedOf =
       const refuse = (message: string) => Effect.fail(new SayRefused({ message }));
       if (typeof text !== 'string' || !text.trim()) return yield* refuse('`text` is empty. Give the words the session should hear.');
       const t = tasks.get(taskId);
-      if (!t) return yield* refuse(unknown(taskId));
+      if (!t) return yield* refuse(unknownTask(taskId));
       if (settledIn(taskId)) return yield* refuse(`\`${taskId}\` has settled (${t.phase}): no session of it is running to hear anything.`);
       if (!t.attempt) return yield* refuse(`\`${taskId}\` has not started an attempt yet, so there is no session to hear anything.`);
       if (sayRefusals.left > 0) {
@@ -483,29 +478,33 @@ const sayAskedOf =
       return heard;
     });
 
+/** What a stand-in holds that its kept verbs read and write: the tasks, and what each verb was asked. */
+type Held = Omit<
+  TestEngine,
+  | 'layer'
+  | 'refuseSay'
+  | 'settle'
+  | 'keeps'
+  | 'failKept'
+  | 'plantAsk'
+  | 'cutAsks'
+  | 'plantTranscript'
+  | 'restart'
+  | 'plantMcpState'
+  | 'failMcpState'
+  | 'mcpReads'
+  | 'signIns'
+  | 'signOuts'
+  | 'settleSignIn'
+>;
+
 /** The kept verbs over what a stand-in holds. */
 const keptOf = (
-  held: Omit<
-    TestEngine,
-    | 'layer'
-    | 'refuseSay'
-    | 'settle'
-    | 'keeps'
-    | 'failKept'
-    | 'plantAsk'
-    | 'cutAsks'
-    | 'plantTranscript'
-    | 'restart'
-    | 'plantMcpState'
-    | 'failMcpState'
-    | 'mcpReads'
-    | 'signIns'
-    | 'signOuts'
-    | 'settleSignIn'
-  >,
+  held: Held,
   sayRefusals: { left: number },
   sizes: Map<string, TestKeeps>,
   keptFailures: { left: number },
+  harnesses: TestHarnesses,
 ) => {
   const { tasks, filings, specs, stopped, forgets, said, interrupts, answered } = held;
   const settledIn = (id: string) => {
@@ -546,7 +545,7 @@ const keptOf = (
     stop: (id) =>
       Effect.gen(function* () {
         const t = tasks.get(id);
-        if (!t) return yield* Effect.fail(new StopRefused({ message: unknown(id) }));
+        if (!t) return yield* Effect.fail(new StopRefused({ message: unknownTask(id) }));
         if (settledIn(id))
           return yield* Effect.fail(new StopRefused({ message: `\`${id}\` has settled (${t.phase}): there is nothing left to stop.` }));
         t.stopRequested = true;
@@ -556,8 +555,8 @@ const keptOf = (
     feed: () => Effect.succeed({ entries: [], cursor: 0 }),
     output: outputOf(tasks),
     say: sayAskedOf(tasks, said, sayRefusals, settledIn),
-    interrupt: interruptAskedOf(tasks, interrupts, settledIn),
-    answerAsk: answerAskedOf(tasks, answered, settledIn),
+    interrupt: interruptAskedOf(tasks, interrupts, settledIn, harnesses),
+    answerAsk: answerAskedOf(tasks, answered, settledIn, harnesses),
     answer: answerVerbOf(tasks),
     transcript: transcriptOf(tasks),
     forget: forgetVerbOf(tasks, forgets, settledIn),
@@ -591,7 +590,8 @@ const restartIn = (tasks: Map<string, TestTask>, id: string): TestTask => {
  *
  * @returns The layer a test gives where the `Engine` service is asked, and what it reads back and moves by hand (`TestEngine`).
  */
-export const testEngine = (): TestEngine => {
+export const testEngine = (options: { readonly harnesses?: readonly HarnessDeclared[] } = {}): TestEngine => {
+  const harnesses = testHarnessesOf(options.harnesses ?? testHarnesses());
   const held = {
     tasks: new Map<string, TestTask>(),
     filings: [] as string[],
@@ -611,23 +611,11 @@ export const testEngine = (): TestEngine => {
   const signIn = signInHeld();
   const layer = Layer.succeed(Engine)(
     Engine.of({
-      ...countedOf(keptOf(held, sayRefusals, sizes, keptFailures)),
-      mcpState: mcp.mcpState,
-      ...signIn.verbs,
-      tick: unkept('tick'),
-      admit: unkept('admit'),
-      follow: unkept('follow'),
-      path: unkept('path'),
-      quota: unkept('quota'),
-      close: unkept('close'),
-      watch: unkept('watch'),
-      tallied: unkept('tallied'),
-      ...((loop) => ({ up: loop, start: loop }))(unkept('up')),
-      sweep: unkept('sweep'),
-      removeBody: unkept('removeBody'),
-      compact: unkept('compact'),
-      hold: () => Effect.succeed(null),
+      ...countedOf(keptOf(held, sayRefusals, sizes, keptFailures, harnesses)),
+      ...declaredVerbsOf(harnesses, { mcpState: mcp.mcpState, ...signIn.verbs }),
       ...drainsOf(held),
+      ...unkeptVerbs(),
+      hold: () => Effect.succeed(null),
     }),
   );
   const settle = (id: string, phase: TaskPhase, end?: TestEnd): TestTask => {

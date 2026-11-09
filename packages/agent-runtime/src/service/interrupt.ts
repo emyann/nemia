@@ -27,16 +27,20 @@ export class InterruptUnsent extends Schema.TaggedError<InterruptUnsent>()('Inte
 /** What to do instead of ending a turn that cannot be ended. */
 const STOP = 'Stop the task (`ae stop`) to end its session, or leave the turn to finish.';
 
+/** Why the harness `name` is refused an interrupt: it declares none, or its runner has none. */
+export const notInterruptible = (name: string): string =>
+  `the \`${name}\` harness cannot end a turn without ending its session: only a session on streaming input takes it. ${STOP}`;
+
 /** `interrupt`'s refusal, in its words. */
 const refused = (message: string) => new InterruptRefused({ message });
 
 /** `interrupt` as a verb written to a session: its reach is the runner's `interrupt`, which only a session on streaming input has. */
 const INTERRUPT: WrittenVerb<InterruptRefused, InterruptUnsent, NonNullable<Harnessed['runner']['interrupt']>> = {
+  capability: 'interrupt',
   refused,
   unsent: (message, cause) => new InterruptUnsent({ message, cause }),
   reachOf: ({ runner }) => runner.interrupt,
-  unreached: ({ name }) =>
-    `the \`${name}\` harness cannot end a turn without ending its session: only a session on streaming input takes it. ${STOP}`,
+  unreached: ({ name }) => notInterruptible(name),
   looked: 'harness',
   undone: 'sent',
   open: { settled: ', and no turn is in it', unstarted: 'no turn to end.' },

@@ -12,7 +12,7 @@
  * A long-lived session runs attached, in the process that holds the sessions (a daemon), and nowhere else: with no holder its spawn
  * is refused, `unstartable`, in words naming the holder to start (`LONG_LIVED_UNHELD`).
  *
- * Either is bridged to claude.ai where its task asks (`claude.remoteControl`), on its first message (`attached-bridge.ts`): a held
+ * Either is bridged to claude.ai where its task asks (`claude.remoteControl`), on its first message (`session-bridge.ts`): a held
  * session's bridge is on its run file, a job's on the bridge file its own process writes beside its run (`HarnessIO.bridgeFile`),
  * which this runner reads into the job's sighting on every look.
  *
@@ -41,13 +41,14 @@ import {
   type HarnessSpec,
   type StartEvent,
 } from '../detached/detached.ts';
-import { sessionDrainFile, sessionDrainOf, readJobHold, type JobHold } from './job-hold.ts';
+import { readJobHold, type JobHold } from './job-hold.ts';
+import { sessionDrainFile, sessionDrainOf } from '../../core/engine/drain.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile, claudeTranscriptRecords } from './transcript.ts';
-import { CLAUDE_CONTEXT_TOKENS, CLAUDE_DECLARATION, bridgeAsked, claudeCodeRefuses, claudeRefuses } from './vocabulary.ts';
+import { CLAUDE_CONTEXT_TOKENS, CLAUDE_DECLARATION, bridgeAsked, claudeRefuses } from './vocabulary.ts';
 import { claudePartials, claudeStreamKept, claudeStreamOutput } from '../detached/output.ts';
 import { projectMcpConfig } from '../mcp.ts';
 import { RunnerError } from '../error.ts';
-import { BridgeFactsSchema, bridgeOf, type AttachedBridge } from './attached-bridge.ts';
+import { BridgeFactsSchema, bridgeOf, type AttachedBridge } from './session-bridge.ts';
 import type { Attached } from './attached.ts';
 
 /** What Claude Code's runner is built from (`claudeCodeOps`). */
@@ -179,6 +180,7 @@ export const claudeJobSpec = (executable?: string, hold?: JobHoldOptions): Harne
   partials: claudePartials,
   prepare: (r, beside) => claudePrepare(r, beside, hold),
   refuses: claudeRefuses,
+  bridgeAsked,
   can: CLAUDE_DECLARATION.can,
   contextTokens: CLAUDE_CONTEXT_TOKENS,
   resumeCostCarried: true,
@@ -315,7 +317,8 @@ export const claudeCodeOps = (options: ClaudeOptions, attached?: Attached): Runn
       r.restartPolicy === 'Always' && !attachedLongLived(r, attached)
         ? Effect.fail(new RunnerError({ verb: 'spawn', message: LONG_LIVED_UNHELD(r.name), refused: true }))
         : job.spawn(r),
-    refuses: claudeCodeRefuses,
+    refuses: claudeRefuses,
+    bridgeAsked,
     interrupt: (session) => interruptThrough(job, session),
     ...answerOf(attached),
     quota: claudeQuota(),

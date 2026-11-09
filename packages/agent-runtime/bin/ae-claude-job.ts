@@ -50,8 +50,8 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import readline from 'node:readline';
 import { query, type HookCallbackMatcher, type HookEvent, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
-import { attachedOptions } from '../src/harness/claude/attached-options.ts';
-import { bridgeDue, bridgeStateOf, enableBridge, type AttachedBridge } from '../src/harness/claude/attached-bridge.ts';
+import { attachedOptions } from '../src/harness/claude/session-options.ts';
+import { bridgeDue, bridgeStateOf, enableBridge, type AttachedBridge } from '../src/harness/claude/session-bridge.ts';
 import { bridgeAsked } from '../src/harness/claude/vocabulary.ts';
 import { heldAtHook, type HookHold } from '../src/harness/claude/attached-session.ts';
 import {
@@ -60,13 +60,13 @@ import {
   inside,
   JOB_HOLD_MS,
   JOB_HOLD_POLL_MS,
-  sessionDrainOf,
   writeJobHold,
   type Call,
   type CallsInFlight,
   type JobHold,
 } from '../src/harness/claude/job-hold.ts';
 import { elapsedMs } from '../src/core/clock.ts';
+import { sessionDrainOf } from '../src/core/engine/drain.ts';
 import { replaceFile } from '../src/core/replace.ts';
 import { instantNow } from '../src/core/engine/now.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';

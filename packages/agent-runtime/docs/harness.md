@@ -167,7 +167,7 @@ the orchestrator's code holds a fact today, it is named beside it.
 - **An MCP server's tools are deferred only where the session has `ToolSearch`** (SDK 0.3.308, Claude Code 2.1.308, 2026-11-02): a
   closed `tools` list without it sends every server's tools whole on every request — a design step's 23 Playwright tools, 4.1k tokens
   of its first request — and one with it sends them as names, each definition loaded on demand. So `attachedOptions` adds `ToolSearch`
-  to a closed list where the session has a server (`TOOL_SEARCH`, `harness/claude/attached-options.ts`). In `dontAsk`, with the tool
+  to a closed list where the session has a server (`TOOL_SEARCH`, `harness/claude/session-options.ts`). In `dontAsk`, with the tool
   on `allowedTools`, the session loaded it and called it; `ToolSearch` itself needed no allow. Read off the transcript's first
   `api-request-shape`, by `test/live.test.ts` and its control on the code before it.
 - **`claudeMdExcludes` in `Options.settings` keeps a folder's `CLAUDE.md` out of a session** (2.1.308, 2026-11-02):
@@ -206,7 +206,7 @@ with `updatedPermissions` set to the `suggestions` it was handed, as an always a
 
 **Any Claude Code session's bridge to claude.ai is opened on its `system`/`init` message, through the Agent SDK** (SDK 0.3.308,
 Claude Code 2.1.308, 2026-10-24): `enableRemoteControl(true, name, { keepSessionOnExit })`, undeclared on `Query`, read off the object
-in `harness/claude/attached-bridge.ts` alone (`bridgeDue`, `enableBridge`). A job asked at init (`keepSessionOnExit: false`) was answered
+in `harness/claude/session-bridge.ts` alone (`bridgeDue`, `enableBridge`). A job asked at init (`keepSessionOnExit: false`) was answered
 its facts 0.5 s later — `bridge_state: ready` and the answer at 1.5 s, `connected` at 1.7 s — long before its result at 21.1 s, during
 a tool call: the answer is not queued behind the turn, and the bridge closes with the job. A long-lived session asked at init
 (`keepSessionOnExit: true`) was answered the same way (init 2.8 s, answer 3.3 s, connected 3.4 s), and a second process resuming it

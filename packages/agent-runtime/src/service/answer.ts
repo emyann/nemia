@@ -33,16 +33,20 @@ export type Answering = { id: string; answers: Record<string, string> };
 /** What an ask answered came to: when it was answered, and of which attempt. Nothing of it is journalled. */
 export type AskAnswered = { at: string; attempt: number };
 
+/** Why the harness `name` is refused an answer to an ask: it declares none, or its runner holds no call open. */
+export const noCallHeld = (name: string): string =>
+  `the \`${name}\` harness holds no call open for a person to answer: a question of its session's is denied where no person is there.`;
+
 /** `answerAsk`'s refusal, in its words. */
 const refused = (message: string) => new AnswerRefused({ message });
 
 /** `answerAsk` as a verb written to a session: its reach is the runner's `answer`, which only a harness that holds a call open has. */
 const ANSWER: WrittenVerb<AnswerRefused, AnswerUnsent, NonNullable<Harnessed['runner']['answer']>> = {
+  capability: 'answerAsk',
   refused,
   unsent: (message, cause) => new AnswerUnsent({ message, cause }),
   reachOf: ({ runner }) => runner.answer,
-  unreached: ({ name }) =>
-    `the \`${name}\` harness holds no call open for a person to answer: a question of its session's is denied where no person is there.`,
+  unreached: ({ name }) => noCallHeld(name),
   looked: 'harness',
   undone: 'answered',
   open: {

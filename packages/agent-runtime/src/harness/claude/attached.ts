@@ -76,10 +76,10 @@ import {
   type Live,
 } from './attached-session.ts';
 import type { ScopeAt } from '../scope.ts';
-import { sessionDrainFile, sessionDrainOf } from './job-hold.ts';
+import { sessionDrainFile, sessionDrainOf } from '../../core/engine/drain.ts';
 import { cutWords } from '../../core/restart.ts';
 import { pushesOf, type Pushes } from './attached-follow.ts';
-import { bridgeOf } from './attached-bridge.ts';
+import { bridgeOf } from './session-bridge.ts';
 
 /**
  * The attached sessions of one engine: the runner's verbs, `hold`, which makes this process their holder for a scope, and

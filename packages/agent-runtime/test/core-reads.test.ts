@@ -1,5 +1,10 @@
 /**
- * The runtime's core never opens a task's harness arguments.
+ * The runtime's core never opens a task's harness arguments, and reaches no harness but through the seam.
+ *
+ * What the core imports from `src/harness/` is read as a graph (`test-kit/imports`): the seam (`seam.ts`), its error (`error.ts`), a
+ * type, which loads nothing, and the generic config helpers of `args.ts` named in `ARGS_HELPERS`; any other value is a harness's
+ * vocabulary read in the core, as the core once read Claude Code's bridge flag through `args.ts`, which no text check of the core's
+ * own lines could see.
  *
  * `domain.ts` decides, `lifecycle.ts` holds the edges it decides by, and `engine.ts` applies; how a session is started — its model, its
  * tools, its window — is the adapter's, carried on the task as one `config` (`src/harness/args.ts`) and handed to the runner at spawn and
@@ -15,6 +20,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
+import { importsIn, resolved, withoutComments } from 'test-kit/imports';
 import { HARNESS_ARGS } from '../src/harness/args.ts';
 
 const CORE = [
@@ -109,4 +116,66 @@ test('domain.ts, lifecycle.ts and engine.ts know no budget: the cap is a harness
   for (const line of ["if (sighting.limit === 'budget') return settle('failed');", 'budgetSpent?: boolean;', "reason: 'budget',"]) {
     assert.ok(BUDGET.test(codeOf(line)), `not refused: ${line}`);
   }
+});
+
+/** The harness files the core may take values from whole: the seam, and its error. */
+const SEAM = ['src/harness/seam.ts', 'src/harness/error.ts'];
+
+/** The values of `args.ts` the core may take: the generic helpers of a task's config, which name no harness. */
+const ARGS_HELPERS = ['argsRefusalOf', 'configForTurn', 'turnArgsRefusalOf', 'FORMER_ARGS', 'HARNESS_ARGS', 'RENAMED_ARGS', 'TAKEN_ARGS'];
+
+/** The values an import statement of `text` from `spec` names, its `type` members left out. */
+const valuesFrom = (text: string, spec: string): string[] =>
+  [...withoutComments(text).matchAll(/^\s*import\s+(?!type\s)\{([^}]*)\}\s*from\s*['"]([^'"]+)['"]/gm)]
+    .filter((m) => m[2] === spec)
+    .flatMap((m) =>
+      (m[1] ?? '')
+        .split(',')
+        .map((n) => n.trim())
+        .filter((n) => n !== '' && !n.startsWith('type ')),
+    );
+
+/** Each value the core file `file`, holding `text`, takes from a harness file it may not, as `file: spec (names)`. */
+const harnessReads = (file: string, text: string): string[] =>
+  importsIn(text).flatMap(({ spec, typeOnly }) => {
+    const target = resolved(file, spec);
+    if (typeOnly || target === undefined || !target.startsWith('src/harness/') || SEAM.includes(target)) return [];
+    const values = valuesFrom(text, spec);
+    if (target === 'src/harness/args.ts' && values.length > 0 && values.every((v) => ARGS_HELPERS.includes(v))) return [];
+    return [`${file}: ${spec} (${values.join(', ') || 'a value'})`];
+  });
+
+/** Every source file of the core, from the package's folder: `src/core/**`, its tests left out. */
+const coreFiles = (dir = 'src/core'): string[] =>
+  fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const file = path.posix.join(dir, e.name);
+    return e.isDirectory() ? coreFiles(file) : file.endsWith('.ts') && !file.endsWith('.test.ts') ? [file] : [];
+  });
+
+test('the core imports from harness/ only the seam, its error, types, and the generic config helpers of args.ts', async (t) => {
+  await t.test('src/core/** as it is', () => {
+    const files = coreFiles();
+    assert.ok(files.includes('src/core/engine/engine.ts') && files.includes('src/core/domain.ts'), 'the core is read');
+    assert.deepEqual(
+      files.flatMap((f) => harnessReads(f, fs.readFileSync(f, 'utf8'))),
+      [],
+    );
+  });
+  await t.test('a planted read is refused: a harness vocabulary, a value of args.ts off the list, a whole module', () => {
+    const at = 'src/core/engine/engine.ts';
+    for (const line of [
+      "import { bridgeAsked } from '../../harness/claude/vocabulary.ts';",
+      "import { configForTurn, bridgeOfTask } from '../../harness/args.ts';",
+      "import * as args from '../../harness/args.ts';",
+      "import { claudeCodeOps } from '../../harness/claude/code.ts';",
+    ])
+      assert.equal(harnessReads(at, line).length, 1, `not refused: ${line}`);
+    for (const line of [
+      "import { Runner, type SpawnRequest } from '../../harness/seam.ts';",
+      "import type { ClaudeFlags } from '../../harness/claude/vocabulary.ts';",
+      "import { type HarnessArgs, configForTurn } from '../../harness/args.ts';",
+      "import { RunnerError } from '../../harness/error.ts';",
+    ])
+      assert.deepEqual(harnessReads(at, line), [], `refused, and it is allowed: ${line}`);
+  });
 });

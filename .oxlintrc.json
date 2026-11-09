@@ -834,13 +834,6 @@
       }
     },
     {
-      "files": ["packages/agent-runtime/src/service/harness-refusal.ts"],
-      "rules": {
-        "complexity": ["error", { "max": 22 }],
-        "sonarjs/cognitive-complexity": ["error", 22]
-      }
-    },
-    {
       "files": ["packages/agent-runtime/src/harness/args.ts"],
       "rules": {
         "complexity": ["error", { "max": 28 }],
@@ -870,7 +863,7 @@
     {
       "files": ["packages/agent-runtime/src/service/engine.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 147, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 125, "skipBlankLines": true, "skipComments": true }]
       }
     }
   ],

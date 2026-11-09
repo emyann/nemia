@@ -121,7 +121,7 @@ export type ClaudeFlags = {
   /**
    * Bridge the session to claude.ai, where anyone signed in to the account can drive it — type into it, answer its prompts, stop
    * it — from a browser or a phone. Never a default, for that reason. Opened on the SDK's control request at the session's first
-   * message (`attached-bridge.ts`), never as a flag: a job's bridge ends with the job, a long-lived session's outlives its holder and
+   * message (`session-bridge.ts`), never as a flag: a job's bridge ends with the job, a long-lived session's outlives its holder and
    * is re-attached by the next. A journal an older runtime wrote may carry it as a harness argument of its own, which `upgrade` moves
    * here (`FORMER_ARGS`). Taken on any `'claude'` task, and refused on a `HarnessSpec`; a harness brought as a `RunnerOps` is handed
    * it on the spawn, and asked only its own `refuses`.
@@ -245,7 +245,7 @@ export const settingsObject = (settings: string): Record<string, unknown> | unde
 
 /**
  * Whether a task asks for its session bridged to claude.ai (`config.claude.remoteControl`): opened on the SDK's control request at the
- * session's first message, a job's and a long-lived session's alike (`attached-bridge.ts`), and never spelt as a flag.
+ * session's first message, a job's and a long-lived session's alike (`session-bridge.ts`), and never spelt as a flag.
  */
 export const bridgeAsked = (task: { config?: { claude?: ClaudeFlags } }): boolean => task.config?.claude?.remoteControl !== undefined;
 
@@ -270,12 +270,6 @@ export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefi
   }
   return claudeMountRefusal(task) ?? claudeAdmissionRefusal(task);
 };
-
-/**
- * What Claude Code cannot be asked for as the engine runs it (`'claude'`): what Claude Code cannot (`claudeRefuses`), and nothing
- * more. A job and a long-lived session alike take a spend cap, a closed list of skills and a bridge to claude.ai, on the Agent SDK.
- */
-export const claudeCodeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined => claudeRefuses(task);
 
 /**
  * A worktree name for this attempt. Derived from the session name when the task did not pick one,

@@ -27,7 +27,7 @@ import {
 } from '../src/index.ts';
 import { Engine } from '../src/index.ts';
 import { refusalWords } from '../src/service/refusal.ts';
-import { claudeCodeRefuses } from '../src/harness/claude/vocabulary.ts';
+import { claudeRefuses } from '../src/harness/claude/vocabulary.ts';
 import { claudeJob } from '../src/harness/claude/code.ts';
 import { scratch } from 'test-kit/scratch';
 import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
@@ -869,14 +869,14 @@ test("REFUSED: a list in `enabledSkills` on a road that cannot close a session's
   for (const harness of ['bare', 'codex']) {
     assert.ok(await Effect.runPromise(engine.file({ ...ok, harness, config: { enabledSkills: 'default' } })), `'default' on ${harness}`);
   }
-  assert.equal(claudeCodeRefuses(listed), undefined, "and Claude Code's job takes it");
+  assert.equal(claudeRefuses(listed), undefined, "and Claude Code's job takes it");
 });
 
 test("Claude Code's own runners refuse Codex's arguments, so a runner reached without the engine's door refuses them too", () => {
   const task = { ...ok, config: { codex: { trustFrom: '/repo' } } };
   const says =
     '`codex: {"trustFrom":"/repo"}` gives Codex arguments of its own, and Claude Code is not Codex. Leave `codex` off a Claude Code task.';
-  assert.equal(claudeCodeRefuses(task), says);
+  assert.equal(claudeRefuses(task), says);
   assert.equal(claudeJob.refuses!(task), says);
   assert.equal(codex.refuses!(task), undefined);
 });

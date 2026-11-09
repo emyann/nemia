@@ -28,7 +28,6 @@ import { attachedSessions, letGoOf, type Attached } from '../src/harness/claude/
 import { IMAGE } from '../src/harness/image.ts';
 import { alive } from '../src/process/alive.ts';
 import {
-  attachedDir,
   attachedStateOf,
   crashNote,
   CARRY_ON,
@@ -41,7 +40,7 @@ import {
 } from '../src/harness/claude/attached-file.ts';
 import { fold, idleOf, type Event, type Sighting } from '../src/core/index.ts';
 import { cutWords } from '../src/core/restart.ts';
-import { liftSessionDrain, putSessionDrain } from '../src/harness/claude/job-hold.ts';
+import { holderDrainFile, liftSessionDrain, putSessionDrain } from '../src/core/engine/drain.ts';
 import { respawning } from '../src/core/domain.ts';
 import { purseOf } from '../src/core/clock.ts';
 import { instantNow } from '../src/core/engine/now.ts';
@@ -798,11 +797,8 @@ test(
       const { root, dir, request } = place({ call: 'Read', output: {} });
       fs.writeFileSync(path.join(dir, 'release'), '');
       putDrain(root, process.pid);
-      assert.ok(
-        JSON.parse(fs.readFileSync(path.join(attachedDir(root), 'drain.json'), 'utf8')).start,
-        'a drain says when its holder started',
-      );
-      fs.writeFileSync(path.join(attachedDir(root), 'drain.json'), JSON.stringify({ pid: process.pid, start: 'an earlier process' }));
+      assert.ok(JSON.parse(fs.readFileSync(holderDrainFile(root), 'utf8')).start, 'a drain says when its holder started');
+      fs.writeFileSync(holderDrainFile(root), JSON.stringify({ pid: process.pid, start: 'an earlier process' }));
       const h = await holder(root);
       rt.after(h.close);
       await Effect.runPromise(h.attached.ops.spawn(request));
@@ -813,7 +809,7 @@ test(
       const { root, dir, request } = place({ call: 'Read', output: {} });
       fs.writeFileSync(path.join(dir, 'release'), '');
       putDrain(root, process.pid);
-      const file = path.join(attachedDir(root), 'drain.json');
+      const file = holderDrainFile(root);
       assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).by?.pid, process.pid, 'a drain names the process that put it');
       const gone = spawnSync(process.execPath, ['-e', '']).pid;
       assert.ok(gone, 'a child was spawned and has exited');

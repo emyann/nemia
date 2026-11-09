@@ -12,7 +12,7 @@ import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import { query, type CanUseTool, type HookCallbackMatcher, type HookEvent, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
-import { attachedOptions } from './attached-options.ts';
+import { attachedOptions } from './session-options.ts';
 import { alive } from '../../process/alive.ts';
 import {
   appendAsk,
@@ -25,7 +25,7 @@ import {
   type AttachedRun,
   type AttachedState,
 } from './attached-file.ts';
-import { bridgeDue, bridgeStateOf, enableBridge } from './attached-bridge.ts';
+import { bridgeDue, bridgeStateOf, enableBridge } from './session-bridge.ts';
 import { bridgeAsked } from './vocabulary.ts';
 import { callStarted, firstCall, HOOK_HOLD_S, inside, type CallsInFlight } from './job-hold.ts';
 import { claudeStreamKept, initLineKept } from '../detached/output.ts';
@@ -657,7 +657,7 @@ export const startSession = (
 
 /**
  * Opens the session's claude.ai bridge on its first message (`bridgeDue`, its `system`/`init`), where its request asked for one, and
- * writes what came of it on the run file — the bridge's facts, or why there is none (`attached-bridge.ts`). Asked once a session, and
+ * writes what came of it on the run file — the bridge's facts, or why there is none (`session-bridge.ts`). Asked once a session, and
  * awaited before its next message is taken, so the `bridge_state` messages the answer drives are written after it. A long-lived
  * session keeps its claude.ai session past this process (`keepSessionOnExit`), and a resume re-attaches the one its run file kept; a
  * job's claude.ai session ends with it, and re-attaches none.

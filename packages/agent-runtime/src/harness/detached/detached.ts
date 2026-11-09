@@ -83,6 +83,8 @@ export type HarnessSpec = {
    * without one is asked nothing.
    */
   refuses?: (task: Omit<SpawnRequest, 'name'>) => string | undefined;
+  /** Whether a task asked this harness to bridge its session (`RunnerOps.bridgeAsked`), in its flag. A spec without one bridges none. */
+  bridgeAsked?: (task: { readonly config?: SpawnRequest['config'] }) => boolean;
   /**
    * What the harness says in its own output, for one that prints its final answer rather than
    * writing it where the runner chose. Handed the worker's capture of the harness's stdout and
@@ -594,6 +596,7 @@ const runFileOps = (spec: HarnessSpec, root: string, dir: string) => ({
   ...compactOps(spec, dir),
   forget: forgetRunOf(spec, root),
   kept: keptRunOf(spec, root),
+  ...(spec.bridgeAsked ? { bridgeAsked: spec.bridgeAsked } : {}),
 });
 
 /**

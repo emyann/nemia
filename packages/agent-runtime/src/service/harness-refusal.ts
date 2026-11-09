@@ -3,7 +3,7 @@
  * declaration does not list (`misplacedOf`), its fix naming the harnesses of this engine that list it (`takersOf`), a call held for a
  * person on a session that is not held, and what the harness's own `refuses` says.
  */
-import { bridgeAsked, claudeCodeRefuses } from '../harness/claude/index.ts';
+import { bridgeAsked, claudeRefuses } from '../harness/claude/index.ts';
 import { remoteRefuses } from '../a2a/index.ts';
 import { own } from '../core/index.ts';
 import { misplacedOf, takersOf, type Capability } from '../harness/declaration.ts';
@@ -210,7 +210,7 @@ const rangeRefusalOf = (spec: Filed, range: { least: number; most: number } | un
  * own, nothing here.
  */
 const ownRefuses = (h: HarnessConfig, name: string): ((task: TaskSpec) => string | undefined) | undefined =>
-  h === 'claude' ? claudeCodeRefuses : isSpec(h) ? h.refuses : isRemote(h) ? remoteRefuses(name) : undefined;
+  h === 'claude' ? claudeRefuses : isSpec(h) ? h.refuses : isRemote(h) ? remoteRefuses(name) : undefined;
 
 /**
  * Why a task cannot be filed on its harness, in that harness's words — or `undefined`. Asked after `refusalOf`, what `file` refuses of

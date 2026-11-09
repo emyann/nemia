@@ -7,6 +7,7 @@ import { Cause, Effect } from 'effect';
 import { fold, nameFor, unknownTask, type Attempt, type Event, type Sighting, type State } from '../core/index.ts';
 import type { Journal, JournalError } from '../core/engine/index.ts';
 import type { Runner } from '../harness/index.ts';
+import { verbHarnessOf, type Capability } from '../harness/declaration.ts';
 import type { Harnessed } from './harnessed.ts';
 
 /** What failed, in words, off a cause: its error's message, or the value itself. */
@@ -46,6 +47,8 @@ export type WrittenPorts = {
 
 /** A verb written to a session: its two failures, made from words, and what it says where it cannot reach one. */
 export type WrittenVerb<Refused, Unsent, Reach> = {
+  /** The Engine verb a harness declares to be asked this one (`verbHarnessOf`); none where every harness is asked it (`say`). */
+  readonly capability?: Capability;
   /** The verb's refusal: nothing was done, and asking again as it was asked will not change that. */
   readonly refused: (message: string) => Refused;
   /** The verb's failure that may pass, with what failed. */
@@ -99,8 +102,9 @@ export const handedOver =
 
 /**
  * The session of `taskId`'s attempt in flight that `verb` is written to, reached over `ports`: refused, in this order, for a task the
- * store has no record of, a harness without the verb's reach, a task with no attempt open (`openAttemptOf`) and a session its harness
- * does not list; a harness that could not be read is the verb's unsent. What the verb then asks of the session's state is its own.
+ * store has no record of, a harness that does not declare the verb or has not its reach, a task with no attempt open
+ * (`openAttemptOf`) and a session its harness does not list; a harness that could not be read is the verb's unsent. What the verb
+ * then asks of the session's state is its own.
  */
 export const sessionReached = <Refused, Unsent, Reach>(
   ports: WrittenPorts,
@@ -112,7 +116,8 @@ export const sessionReached = <Refused, Unsent, Reach>(
     if (!events.length) return yield* Effect.fail(verb.refused(unknownTask(taskId)));
     const state = fold(taskId, events);
     const harnessed = ports.harnessOf(state);
-    const reach = verb.reachOf(harnessed);
+    const taken = verb.capability === undefined || verbHarnessOf(verb.capability, harnessed.name, [harnessed]).kind === 'taken';
+    const reach = taken ? verb.reachOf(harnessed) : undefined;
     if (reach === undefined) return yield* Effect.fail(verb.refused(verb.unreached(harnessed)));
     const open = openAttemptOf(taskId, state, verb.open);
     if ('refused' in open) return yield* Effect.fail(verb.refused(open.refused));

@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { McpServer, TaskSpec } from '../src/index.ts';
 import { Engine } from '../src/index.ts';
-import { attachedOptions } from '../src/harness/claude/attached-options.ts';
+import { attachedOptions } from '../src/harness/claude/session-options.ts';
 import { detachedOps, type HarnessIO, type HarnessSpec } from '../src/harness/detached/detached.ts';
 import { codex } from '../src/harness/codex/codex.ts';
 import { codexMcpServerNames, codexMcpServers, everyMcpServer, mcpRefuses, mcpServerOf } from '../src/harness/mcp.ts';

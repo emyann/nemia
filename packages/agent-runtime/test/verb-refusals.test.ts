@@ -136,7 +136,6 @@ const VERBS = [
   'quota',
   'removeBody',
   'say',
-  'start',
   'stop',
   'sweep',
   'tallied',
@@ -170,7 +169,7 @@ test('one store, two engines — one built once, one provided its layer for each
     );
   });
 
-  await s.test('watch and start run through either engine, and each stops', async () => {
+  await s.test('watch and up run through either engine, and each stops', async () => {
     type Handle = { stop: () => void };
     const firstOf = async <A>(begin: (got: (a: A) => void, failed: (e: unknown) => void) => Promise<Handle>): Promise<A> => {
       const got: A[] = [];
@@ -190,9 +189,9 @@ test('one store, two engines — one built once, one provided its layer for each
 
     const tickedByService = await firstOf<TickReport>((onTick, onError) => effect((e) => e.up({ intervalMs: 1, onTick, onError })));
     const tickedByPromise = await firstOf<TickReport>(async (onTick, onError) =>
-      Effect.runSync(built.start({ intervalMs: 1, onTick, onError })),
+      Effect.runSync(built.up({ intervalMs: 1, onTick, onError })),
     );
-    assert.deepEqual([tickedByService.tasks, tickedByPromise.tasks], [2, 2], '`up` through the service, and `start`, its old name');
+    assert.deepEqual([tickedByService.tasks, tickedByPromise.tasks], [2, 2], '`up` through the service, and through the engine built once');
     assert.equal(sessions.size, 0, 'queued, neither started');
   });
 

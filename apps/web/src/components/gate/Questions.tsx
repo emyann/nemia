@@ -9,9 +9,10 @@ import type { Question, QuestionAnswer, RetryMode } from '../../lib/api';
 import { askedSaid, type Answer } from '../../lib/asks';
 import { cn } from '../../lib/utils';
 import { OFFERS } from '../../lib/words';
-import { BUTTON, MODES, Refusal, TEXTAREA, useAsk } from './Ask';
+import { MODES, Refusal, useAsk } from './Ask';
 import { Markdown } from '../markdown/Markdown';
 import type { Frozen } from '../../lib/frozen';
+import { BUTTON, TEXTAREA } from '../../lib/classes';
 
 /** What a person has said so far of each question, by its title: the labels chosen, and words of their own. */
 export type Draft = Readonly<Record<string, { chose: readonly string[]; own: string }>>;

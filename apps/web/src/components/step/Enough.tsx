@@ -1,8 +1,9 @@
 import { useId, useState } from 'react';
 import type { Answer } from '../../lib/asks';
 import { OFFERS } from '../../lib/words';
-import { BUTTON, Refusal, TEXTAREA, useApprove } from '../gate/Ask';
+import { Refusal, useApprove } from '../gate/Ask';
 import { AskedRow } from '../gate/Questions';
+import { BUTTON, TEXTAREA } from '../../lib/classes';
 
 /**
  * A loop out of rounds, approved as it stands: the step's own `approve` line with the reason it requires (`--message`), a box for that

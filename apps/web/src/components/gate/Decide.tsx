@@ -16,7 +16,7 @@ import type { RunView, StepView } from '../../lib/runView';
 import { answersOf, askedOf, askedSaid, type Answer } from '../../lib/asks';
 import { barOf, changeOf, decidableRun, decisionStamp, diffLine, isDecidable, mostLines, type DiffLine } from '../../lib/decide';
 import { cn } from '../../lib/utils';
-import { BUTTON, MODES, Refusal, TEXTAREA, useAsk } from './Ask';
+import { MODES, Refusal, useAsk } from './Ask';
 import { CommandLine } from '../command/CommandLine';
 import { Facts, HEADING, pathRow, readRows, TrialMerges } from '../step/Facts';
 import { AskedRow, Asks, QuestionsForm } from './Questions';
@@ -24,6 +24,7 @@ import { EnoughRow } from '../step/Enough';
 import { RaiseRow } from './Raise';
 import { container, dashed, hairline, ringed } from '../../lib/meaning';
 import { OFFERS } from '../../lib/words';
+import { BUTTON, TEXTAREA } from '../../lib/classes';
 
 /**
  * The Decide section of a run's page: the answer each step waiting on you can be given (`answersOf`), then what the CLI's `decide` shows a

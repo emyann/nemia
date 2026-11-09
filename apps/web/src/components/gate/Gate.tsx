@@ -7,12 +7,13 @@ import { askedSaid } from '../../lib/asks';
 import { decidableRun, decisionStamp, isDecidable } from '../../lib/decide';
 import { cn } from '../../lib/utils';
 import { Artifacts, HandedOn, Statement } from '../step/Closeout';
-import { BUTTON, MODES, Refusal, TEXTAREA, useAsk } from './Ask';
+import { MODES, Refusal, useAsk } from './Ask';
 import { answersFrom, QuestionFields, RecommendButton, unanswered, type Draft } from './Questions';
 import { when } from '../step/Facts';
 import { runsMoved } from '@/lib/runWrites';
 import type { Frozen } from '../../lib/frozen';
 import { budgetsGiven, GateBudgetFields, GateBudgetRows, type Amounts, type GateBudgets, type GivenBudget } from './GateBudgets';
+import { BUTTON, BUTTON_SECONDARY, TEXTAREA } from '../../lib/classes';
 
 /** A gated step's gate, as its object's status holds it. */
 type StepGate = NonNullable<StepView['gate']>;
@@ -247,7 +248,7 @@ function ApproveForm({
           {approval.isPending ? 'Approving…' : confirming ? `Run ${step} now` : 'Approve'}
         </button>
         {confirming && !approval.isPending && (
-          <button type="button" onClick={() => setConfirming(false)} className={cn(BUTTON, SECONDARY)}>
+          <button type="button" onClick={() => setConfirming(false)} className={cn(BUTTON, BUTTON_SECONDARY)}>
             Not yet
           </button>
         )}
@@ -318,7 +319,7 @@ function SendBackForm({
           type="submit"
           disabled={busy || waits.length > 0 || !(body.message?.trim() || body.answers)}
           title={notAnswered(waits)}
-          className={cn(BUTTON, SECONDARY)}
+          className={cn(BUTTON, BUTTON_SECONDARY)}
         >
           {sendBack.isPending ? 'Sending back…' : 'Send back'}
         </button>
@@ -618,9 +619,6 @@ export function Approved({
     </section>
   );
 }
-
-/** The look of a gate's second button: outlined, beside the filled one that answers. */
-export const SECONDARY = 'bg-card text-foreground ring-1 ring-outline ring-inset hover:bg-accent disabled:hover:bg-card';
 
 /**
  * An approval of a step at its gate through the api (`approveStep`), and the run read again once the api has it — its detail, and the

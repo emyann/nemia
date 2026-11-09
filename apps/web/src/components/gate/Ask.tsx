@@ -15,12 +15,6 @@ export const MODES: Record<RetryMode, string> = {
   recheck: 'its check again, and no session',
 };
 
-export const BUTTON =
-  'rounded bg-primary px-3 py-1.5 text-body-medium font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary';
-
-export const TEXTAREA =
-  'block w-full resize-y rounded border border-outline bg-background px-2 py-1.5 text-body-medium placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none';
-
 /**
  * An ask for a step's next try through the api (`askTry`), and the run read again once the api has it: its own record alone (`exact`),
  * never its decisions, which are keyed by the state of the run they were read for (`decisionStamp`) — a refetch of the key the page is on

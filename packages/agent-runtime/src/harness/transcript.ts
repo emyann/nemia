@@ -12,7 +12,7 @@ import type { Transcript, TranscriptCursor, TranscriptEvent } from './seam.ts';
  * session repeats — its cwd, session id, version and branch come to a few hundred bytes — so the hash
  * covers the line's own id and time.
  */
-export const CURSOR_TAIL_BYTES = 4096;
+const CURSOR_TAIL_BYTES = 4096;
 
 /**
  * The cursor after `offset` bytes of a transcript whose last `CURSOR_TAIL_BYTES` before it, or all of them where there are fewer, are

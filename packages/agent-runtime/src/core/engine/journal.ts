@@ -39,7 +39,7 @@ import { APPEND_REFUSALS, appendRefusal, type AppendRefusalReason } from './appe
 export type FeedEntry = { taskId: string; event: Event };
 
 /** A feed entry as the Task door gives it: its task by its `TaskId`, branded nominally where the door decodes the feed. */
-export type TaskFeedEntry = { taskId: TaskId; event: Event };
+type TaskFeedEntry = { taskId: TaskId; event: Event };
 
 /**
  * Where a reader got to. Opaque, monotonic, and it never expires — that is the whole contract.
@@ -156,6 +156,7 @@ export type SweepReport = { removable: number; bytes: number; kept: number; remo
  * The Task door: the journal as the engine reads and writes it, whole events whatever the store keeps, each task by its `TaskId`
  * (`Journal.layer`). A store implements `JournalOps` with plain strings; the door brands what it gives back, nominally, so a journal
  * written under any id still reads (decision Q22), and holds a new filing's id to `taskIdRefusal`.
+ * Exported only for the tests that import it.
  */
 export type JournalShape = Omit<PlainJournalOps, 'append' | 'read' | 'list' | 'feed' | 'forget' | 'feedLines' | 'bodies'> & {
   /**
@@ -345,7 +346,7 @@ const renamed = (config: Record<string, unknown>): Record<string, unknown> => {
  *   session loads), under a `filed` or an `input` event's `config` or at a `filed` event's top level: read by today's name,
  *   `projectMcp`, where a value already given by it is kept.
  */
-export const upgrade = (event: Resolved): Event => {
+const upgrade = (event: Resolved): Event => {
   if (event.kind === 'input') return upgradedInput(event);
   if (event.kind === 'ended') return upgradedEnd(event);
   if (event.kind === 'measured' || event.kind === 'counted') {
@@ -508,7 +509,10 @@ const appendSplit = (ops: BodiedJournalOps, taskId: TaskId, event: Event, briefP
 const noBodies = (ref: unknown) =>
   Effect.fail(new BodyRefused({ message: `This store keeps no bodies, so there is no body ${String(ref)} to remove.` }));
 
-/** What an append says of itself, on its span and its log: its `task`, its event's `kind`, and its `attempt` where the event has one. */
+/**
+ * What an append says of itself, on its span and its log: its `task`, its event's `kind`, and its `attempt` where the event has one.
+ * Exported only for the tests that import it.
+ */
 export const appendFields = (taskId: string, event: Event): { task: string; kind: Event['kind']; attempt?: number } => ({
   task: taskId,
   kind: event.kind,

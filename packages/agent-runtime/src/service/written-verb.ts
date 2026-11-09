@@ -14,7 +14,7 @@ import type { Harnessed } from './harnessed.ts';
 export const wordsOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 /** What a verb written to a session says where no session of a task is there to take it. */
-export type OpenWords = {
+type OpenWords = {
   /** Said of a task settled, after "no session of it is running". */
   readonly settled: string;
   /** Said of a task that has started no attempt, after "so there is". */
@@ -27,7 +27,7 @@ export type OpenWords = {
  * The attempt a verb written from outside a session acts on, read off the journal: the last, still running. Refused, in the verb's
  * `words`, for a task settled, asked to stop, not started, or whose last attempt has ended.
  */
-export const openAttemptOf = (taskId: string, state: State, words: OpenWords): { last: Attempt } | { refused: string } => {
+const openAttemptOf = (taskId: string, state: State, words: OpenWords): { last: Attempt } | { refused: string } => {
   const last = state.attempts.at(-1);
   const instead = words.instead === undefined ? '' : ` ${words.instead}`;
   if (state.settled)
@@ -39,7 +39,7 @@ export const openAttemptOf = (taskId: string, state: State, words: OpenWords): {
 };
 
 /** The engine's reads a verb written to a session is made over: its journal (`read`, `go`) and the harness a task runs on. */
-export type WrittenPorts = {
+type WrittenPorts = {
   readonly go: <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.Effect<A, E>;
   readonly read: (taskId: string) => Effect.Effect<readonly Event[], JournalError>;
   readonly harnessOf: (state: State) => Harnessed;
@@ -66,7 +66,7 @@ export type WrittenVerb<Refused, Unsent, Reach> = {
 };
 
 /** The session a verb written to it found: its task's state, harness, the verb's reach there, the attempt, its name and sighting. */
-export type Reached<Reach> = {
+type Reached<Reach> = {
   readonly state: State;
   readonly harnessed: Harnessed;
   readonly reach: Reach;

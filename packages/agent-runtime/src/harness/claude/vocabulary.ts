@@ -31,7 +31,7 @@ export const CLAUDE_PERMISSION_MODES: readonly string[] = [
  * `acceptEdits` writes in its directory unasked; `auto` lets a classifier allow what it judges safe; `bypassPermissions` asks about
  * nothing. Every word of `CLAUDE_PERMISSION_MODES` has one (`test/fence-reach.test.ts`).
  */
-export const CLAUDE_MODE_RANK = {
+const CLAUDE_MODE_RANK = {
   plan: 0,
   dontAsk: 1,
   default: 1,
@@ -49,21 +49,21 @@ export const CLAUDE_MODE_RANK = {
  * (`bypassPermissions`) allows what no rule names, which no list can model; `plan` refuses by its own kind, and what it does with a tool
  * that neither reads nor writes is unmeasured, so neither is here.
  */
-export const CLAUDE_REFUSING_MODES: readonly string[] = ['default', 'dontAsk', 'manual', 'acceptEdits'];
+const CLAUDE_REFUSING_MODES: readonly string[] = ['default', 'dontAsk', 'manual', 'acceptEdits'];
 
 /**
  * The tools a session calls inside its own directory with no allow rule naming them, in every permission mode: the three that only read,
  * and the load of a skill. Every other tool is refused under a mode of `CLAUDE_REFUSING_MODES` until a rule allows it or the mode grants
  * it (`CLAUDE_GRANTED`) — `Bash` among them, whose built-in read-only commands run with no rule without making the tool itself unruled.
  */
-export const CLAUDE_UNFENCED: readonly string[] = ['Read', 'Grep', 'Glob', 'Skill'];
+const CLAUDE_UNFENCED: readonly string[] = ['Read', 'Grep', 'Glob', 'Skill'];
 
 /**
  * The tools a mode grants with no allow rule naming them, beyond `CLAUDE_UNFENCED`, by the mode that grants them; a mode that grants
  * none is absent. `acceptEdits` approves a write in the session's directory itself, so the Edit tool's family needs no rule there — and
  * nothing else does: a command it would ask about is still denied a job.
  */
-export const CLAUDE_GRANTED: Readonly<Record<string, readonly string[]>> = {
+const CLAUDE_GRANTED: Readonly<Record<string, readonly string[]>> = {
   acceptEdits: ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'],
 };
 
@@ -71,13 +71,13 @@ export const CLAUDE_GRANTED: Readonly<Record<string, readonly string[]>> = {
 export const CLAUDE_DEFAULT_MODE = 'auto';
 
 /** The permission mode a session held to its directory runs in: what its rules allow, and nothing it would ask about. */
-export const CLAUDE_HELD_MODE = 'dontAsk';
+const CLAUDE_HELD_MODE = 'dontAsk';
 
 /**
  * The permission modes a session runs in without stopping to ask a person, the held mode first: every other mode can stop on a
  * prompt, which a session nobody watches leaves waiting for someone to answer it.
  */
-export const CLAUDE_UNASKING_MODES: readonly string[] = [CLAUDE_HELD_MODE, 'bypassPermissions'];
+const CLAUDE_UNASKING_MODES: readonly string[] = [CLAUDE_HELD_MODE, 'bypassPermissions'];
 
 /**
  * The models on which Claude Code drops `auto`: the session starts in `auto` and says `default` from its first turn. Each matches the
@@ -138,6 +138,7 @@ export type ClaudeFlags = {
  * `settingSources` is given to every session, which reads its checkout's shared settings and neither the operator's nor the
  * checkout's local file (`attachedOptions`). `print`, `p` and the stream flags stay refused: a session the runtime runs on the
  * Agent SDK prints its own stream, and a task that named one would ask for another.
+ * Exported only for the tests that import it.
  */
 export const CLAUDE_OWNED_FLAGS: readonly string[] = [
   'print',
@@ -207,7 +208,7 @@ export const claudeAllows = (config: SpawnRequest['config']): string[] => [
  * sibling the glob matches be read, and one named with a backslash before a letter let the sibling without the backslash be read, and
  * not itself. An escape is read: a rule naming `\*` let the folder named with the `*` be read, and not its sibling.
  */
-export const CLAUDE_UNRULED = /[()*?[\]\\]|[^\S ]/;
+const CLAUDE_UNRULED = /[()*?[\]\\]|[^\S ]/;
 
 /**
  * Why a task's mount cannot be held by Claude Code — or `undefined`: its path has a character the permission rule that denies an
@@ -226,7 +227,7 @@ const claudeMountRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefine
  * Why a task's admission cannot be merged into its Claude Code settings — or `undefined`: settings given as a file, which the runtime
  * does not rewrite, or JSON that is no object.
  */
-export const claudeAdmissionRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
+const claudeAdmissionRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
   const settings = task.config?.claude?.settings;
   if (task.config?.callAdmission === undefined || settings === undefined) return undefined;
   if (settingsObject(settings) !== undefined) return undefined;

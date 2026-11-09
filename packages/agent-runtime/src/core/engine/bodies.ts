@@ -22,7 +22,10 @@ export type BodyRef = string;
 /** The shape of a `BodyRef`. */
 export const BODY_REF = /^[0-9a-f]{64}$/;
 
-/** The size, in bytes of UTF-8, from which a text is kept as a body rather than in its line. */
+/**
+ * The size, in bytes of UTF-8, from which a text is kept as a body rather than in its line.
+ * Exported only for the tests that import it.
+ */
 export const BODY_MIN_BYTES = 1024;
 
 /**
@@ -57,7 +60,10 @@ export type BodyOps = {
   readonly located?: (ref: BodyRef) => string;
 };
 
-/** The reference of `text`: the sha256 of its UTF-8. */
+/**
+ * The reference of `text`: the sha256 of its UTF-8.
+ * Exported only for the tests that import it.
+ */
 export const refOf = (text: string): BodyRef => crypto.createHash('sha256').update(text, 'utf8').digest('hex');
 
 const wellFormed = (text: string) => Buffer.from(text, 'utf8').toString('utf8') === text;

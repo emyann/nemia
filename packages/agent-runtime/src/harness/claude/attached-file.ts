@@ -39,6 +39,7 @@ export type { AttachedBridge } from './session-bridge.ts';
  * When a process started, as `/proc/<pid>/stat` counts it (its 22nd field): what a run file names its holder and its Claude Code by,
  * so a pid another process has taken since is not read as either. `undefined` where there is no `/proc`. The second field is the
  * command's name in parentheses, which may hold spaces and parentheses, so the fields are counted from the last `)`.
+ * Exported only for the tests that import it.
  */
 export const processStart = (pid: number): string | undefined => {
   let stat: string;
@@ -118,7 +119,7 @@ export type AttachedRun = typeof RunFileSchema.Type;
 const decode = Schema.decodeUnknownOption(RunFileSchema);
 
 /** The folder of an engine's attached sessions: the store's drains' folder too (`drainFolder`), where they are kept beside them. */
-export const attachedDir = (root: string): string => drainFolder(root);
+const attachedDir = (root: string): string => drainFolder(root);
 
 /** A session's name as a file name: the engine's `ae/<task>/<n>`, its slashes taken out. */
 const safe = (name: string): string => name.replace(/[^A-Za-z0-9._-]/g, '_');
@@ -182,7 +183,7 @@ const askOf = (l: AskLine & { questions: AskQuestion[] }): SessionAsk[] => {
 };
 
 /** One line of a session's answers file: a person's answer to the ask `id`, each question's by the question's own text. */
-export type AnswerLine = { id: string; at: string; answers: Record<string, string> };
+type AnswerLine = { id: string; at: string; answers: Record<string, string> };
 
 /** A question as an asks file holds it (`AskQuestion`). */
 const AskQuestionSchema = Schema.Struct({
@@ -207,7 +208,7 @@ const AskLineSchema = Schema.Struct({
 const AnswerLineSchema = Schema.Struct({ id: Schema.String, at: Schema.String, answers: Schema.Record(Schema.String, Schema.String) });
 
 /** The lines of a JSONL file read through a schema, and how many it left unread: lines that do not parse, or do not decode. */
-export type DecodedLines<A> = { readonly lines: A[]; readonly unread: number };
+type DecodedLines<A> = { readonly lines: A[]; readonly unread: number };
 
 /** The lines of the JSONL file `file`, each decoded by `schema` (`DecodedLines`); none, and none unread, where there is no file. */
 const jsonLines = <A>(file: string, schema: Schema.Decoder<A>): DecodedLines<A> => {
@@ -236,7 +237,10 @@ const jsonLines = <A>(file: string, schema: Schema.Decoder<A>): DecodedLines<A> 
   return { lines, unread };
 };
 
-/** The lines of the asks file of the session `name`, decoded (`AskLineSchema`), and how many did not decode. */
+/**
+ * The lines of the asks file of the session `name`, decoded (`AskLineSchema`), and how many did not decode.
+ * Exported only for the tests that import it.
+ */
 export const askLinesOf = (root: string, name: string): DecodedLines<AskLine> => {
   const read = jsonLines(filesOf(root, name).asks, AskLineSchema);
   return {
@@ -353,7 +357,7 @@ export const attachedStateOf = (run: AttachedRun): SessionState =>
   run.state === 'parked' ? 'working' : run.state === 'idle' ? 'input-required' : run.state;
 
 /** The states a holder still runs a session in: one it works, one it waits in with its input open, and one it was let go in. */
-export const OPEN_STATES: readonly AttachedState[] = ['working', 'idle', 'parked'];
+const OPEN_STATES: readonly AttachedState[] = ['working', 'idle', 'parked'];
 
 /** Whether `state` is one a holder still runs the session in (`OPEN_STATES`). */
 export const isOpen = (state: AttachedState): boolean => OPEN_STATES.includes(state);

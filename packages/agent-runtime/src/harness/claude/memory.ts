@@ -13,7 +13,7 @@ import { settingsObject } from './vocabulary.ts';
  * Claude Code's setting that reads and writes no auto-memory: no `MEMORY.md` in the session's first request, and no `# Memory`
  * section in its system prompt.
  */
-export const AUTO_MEMORY_OFF: Readonly<Record<string, boolean>> = { autoMemoryEnabled: false };
+const AUTO_MEMORY_OFF: Readonly<Record<string, boolean>> = { autoMemoryEnabled: false };
 
 /**
  * The `CLAUDE.md` files no session loads, as Claude Code's `claudeMdExcludes` takes them (`sdk.d.ts:9603`): picomatch globs matched
@@ -21,7 +21,7 @@ export const AUTO_MEMORY_OFF: Readonly<Record<string, boolean>> = { autoMemoryEn
  * (`test/live.test.ts`): a session that reads under `node_modules/<dep>/` gets no `nested_memory` attachment for its `CLAUDE.md`, while
  * one beside it outside `node_modules` is attached.
  */
-export const DEPENDENCY_CLAUDE_MD: readonly string[] = ['**/node_modules/**/CLAUDE.md'];
+const DEPENDENCY_CLAUDE_MD: readonly string[] = ['**/node_modules/**/CLAUDE.md'];
 
 /**
  * The globs of `claudeMdExcludes` a task's own settings give, kept whole; refused, saying what to write, where they are not a list of

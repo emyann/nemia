@@ -29,6 +29,7 @@ const count = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ?
 /**
  * What an attempt consumed, for a person — and when its runner measured nothing, saying so. A zero
  * would read as "cost nothing"; the truth is "nobody counted".
+ * Exported only for the tests that import it.
  */
 export const usageLine = (u: Usage | null): string => (u ? `${countsLine(u)} · ${costLine(u)}${readLine(u)}` : 'usage not measured');
 
@@ -63,7 +64,10 @@ const readLine = (u: Usage): string => {
   return ` · ${classes} · ${peak}${compacted}`;
 };
 
-/** Dollars for a person, to the cent: $3.01. Under a cent is `<$0.01` — `$0.00` would read as free. */
+/**
+ * Dollars for a person, to the cent: $3.01. Under a cent is `<$0.01` — `$0.00` would read as free.
+ * Exported only for the tests that import it.
+ */
 export const usd = (n: number): string => (n > 0 && n < 0.01 ? '<$0.01' : `$${n.toFixed(2)}`);
 
 /** What an attempt cost, for a person: dollars, or that nobody measured it — and why, when the harness said. */

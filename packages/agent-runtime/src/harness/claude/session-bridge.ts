@@ -45,15 +45,24 @@ const AnswerSchema = Schema.Struct({
 
 const decode = Schema.decodeUnknownResult(AnswerSchema);
 
-/** What a run file says where the SDK this runtime runs on has no such control request. */
+/**
+ * What a run file says where the SDK this runtime runs on has no such control request.
+ * Exported only for the tests that import it.
+ */
 export const BRIDGE_ABSENT =
   'this Agent SDK has no `enableRemoteControl` on its `query()` object, so the session is not bridged to claude.ai: it runs on without one.';
 
-/** What a run file says where the control request answered something this runtime does not read. */
+/**
+ * What a run file says where the control request answered something this runtime does not read.
+ * Exported only for the tests that import it.
+ */
 export const bridgeUnread = (why: string): string =>
   `the \`enableRemoteControl\` control request answered what this runtime does not read (${why}): the session runs on with no bridge.`;
 
-/** What a run file says where the control request itself failed. */
+/**
+ * What a run file says where the control request itself failed.
+ * Exported only for the tests that import it.
+ */
 export const bridgeFailed = (why: string): string => `the claude.ai bridge was not opened (${why}): the session runs on without one.`;
 
 /** How a resume re-attaches the bridge the run file kept, and whether its claude.ai session outlives this process. */
@@ -64,7 +73,7 @@ type Options = { reattachSessionId?: string; keepSessionOnExit?: boolean };
  * session, which a later holder resumes and re-attaches, false for a job, whose claude.ai session ends with it — and `reattach`, the
  * claude.ai session a resume re-attaches, given only where it is kept.
  */
-export type BridgeAsk = { keepSessionOnExit: boolean; reattach?: string };
+type BridgeAsk = { keepSessionOnExit: boolean; reattach?: string };
 
 /** The undeclared control request, as it is read off a `query()` object. */
 type Enable = (enabled: boolean, name?: string, options?: Options) => Promise<unknown>;
@@ -78,7 +87,10 @@ const enableOf = (q: unknown): Enable | undefined => {
   return typeof found === 'function' ? (found as Enable).bind(q as object) : undefined;
 };
 
-/** Whether the SDK's `query()` object `q` can be bridged at all: the guard a caller asks before it asks for a bridge. */
+/**
+ * Whether the SDK's `query()` object `q` can be bridged at all: the guard a caller asks before it asks for a bridge.
+ * Exported only for the tests that import it.
+ */
 export const bridgeable = (q: unknown): boolean => enableOf(q) !== undefined;
 
 /**

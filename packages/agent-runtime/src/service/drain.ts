@@ -51,6 +51,7 @@ export const drainSessionsChecked = (args: readonly unknown[]): Effect.Effect<vo
  * default, `fallback`): it stands, and the harness declares `drain`. A harness that does not — a Codex task, a command's, a remote
  * agent's — is never held by it, its deadline counted on; a runner of the consumer's, which declares nothing, is held, as every
  * harness was before harnesses declared, since the runtime cannot tell its parked end from another.
+ * Exported only for the tests that import it.
  */
 export const drainHolds =
   (stands: boolean, harnesses: Record<string, HarnessConfig>, fallback: string) =>

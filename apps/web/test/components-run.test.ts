@@ -374,7 +374,7 @@ test('a card that reads runs as context says how many in a chip, each run on hov
   assert.doesNotMatch(await cardMarkup(atGate(), false), /data-context/);
 });
 
-test("a ghost's card writes the api's word for what it waits on, then each run it waits on as a link to that run's page", async () => {
+test("a ghost's card writes the api's word for what it waits on, then an arrow to each run it waits on, the word naming each run once", async () => {
   const base = atGate({}, { waitingOnYou: [], waitingOnYouWords: [] });
   const ghost: RunView = {
     ...base,
@@ -392,12 +392,12 @@ test("a ghost's card writes the api's word for what it waits on, then each run i
   const html = await cardMarkup(ghost, false);
   assert.match(html, /data-ghost-run="true"/, 'the card is a ghost');
   const line = /<p[^>]*data-waiting="on-runs"[^>]*>([\s\S]*?)<\/p>/.exec(html)![1];
-  assert.ok(line.startsWith('after a-1x2y and b-3z land'), `the line opens with the api's word as it is: ${line}`);
+  assert.equal(line.replace(/<[^>]+>/g, ''), 'after a-1x2y and b-3z land', "the line reads the api's word as it is, each run named once");
   assert.deepEqual(
-    [...line.matchAll(/<a [^>]*href="\/runs\/([^"]+)"[^>]*>([^<]+)<\/a>/g)].map((m) => [m[1], m[2]]),
+    [...line.matchAll(/<a [^>]*>/g)].map((m) => [/href="\/runs\/([^"]+)"/.exec(m[0])?.[1], /aria-label="([^"]+)"/.exec(m[0])?.[1]]),
     [
-      ['a-1x2y', 'a-1x2y'],
-      ['b-3z', 'b-3z'],
+      ['a-1x2y', 'Open a-1x2y'],
+      ['b-3z', 'Open b-3z'],
     ],
     'each run it waits on is a link to its page',
   );

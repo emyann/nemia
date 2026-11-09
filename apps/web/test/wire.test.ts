@@ -110,9 +110,9 @@ export type KeyForm = Holds<Same<Board.KeyForm, builder.KeyForm>>;
 export type Described = Holds<Same<Board.Described, capabilities.Described>>;
 export type McpServer = Holds<Same<Board.McpServer, capabilities.McpServer>>;
 export type StepReach = Holds<Same<Board.StepReach, reach.StepReach>>;
-/** The two tables are dated data the api types `as const`; the board reads their words. */
-export type MeasuredTools = Holds<Same<Board.MeasuredTools, Widened<typeof capabilities.MEASURED_TOOLS>>>;
-export type ReadOnlyCommands = Holds<Same<Board.ReadOnlyCommands, Widened<typeof capabilities.READ_ONLY_COMMANDS>>>;
+/** The two tables are dated data the runtime types `as const` and the api serves on its capabilities; the board reads their words. */
+export type MeasuredTools = Holds<Same<Board.MeasuredTools, Widened<reach.CapabilitiesWithSteps['measured']>>>;
+export type ReadOnlyCommands = Holds<Same<Board.ReadOnlyCommands, Widened<reach.CapabilitiesWithSteps['readOnly']>>>;
 export type Capabilities = Holds<
   Same<
     Board.Capabilities,

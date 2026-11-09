@@ -127,8 +127,8 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
  * own so that the listing does not load `views/views-words.ts` and the timeline behind it.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 192, effect: 15 },
-  'agent-orchestrator/workflow': { all: 141, effect: 15 },
+  'agent-orchestrator/run': { all: 197, effect: 15 },
+  'agent-orchestrator/workflow': { all: 146, effect: 15 },
 };
 
 const isEffectModule = (url: string): boolean => url.includes('/node_modules/effect/');

@@ -20,6 +20,7 @@ import fs from 'node:fs';
 import { isDeepStrictEqual } from 'node:util';
 import { UsageSchema } from '../../core/event-schema.ts';
 import { readText } from '../../core/engine/tally.ts';
+import { replaceFile } from '../../core/replace.ts';
 import type { HarnessOutput, HarnessSpec } from './detached.ts';
 import { overNow, type RunFile } from './run-file.ts';
 
@@ -87,15 +88,9 @@ export const keptSaid = (file: string, key: SaidKey): HarnessOutput | undefined 
 
 /** Keeps `read` in `file`, known by `key`: written beside it under this process's name, then renamed over it. A failure is none. */
 export const keepSaid = (file: string, key: SaidKey, read: HarnessOutput): void => {
-  const own = `${file}.${process.pid}.tmp`;
   try {
-    fs.writeFileSync(own, JSON.stringify({ version: SAID_VERSION, ...key, read }));
-    fs.renameSync(own, file);
-  } catch {
-    try {
-      fs.rmSync(own, { force: true });
-    } catch {}
-  }
+    replaceFile(file, JSON.stringify({ version: SAID_VERSION, ...key, read }));
+  } catch {}
 };
 
 /** What `reader` says of `text`: what it read, or why it refused it, in its words. */
@@ -136,19 +131,13 @@ export const keptText = (
  * modification times, then renamed over it, so a reader finds the whole capture or the kept one, never a part.
  */
 export const replaceCapture = (file: string, key: SaidKey, kept: string): SaidKey | undefined => {
-  const own = `${file}.${process.pid}.tmp`;
   try {
     const { size, mtimeMs, atimeMs } = fs.statSync(file);
     if (size !== key.size || mtimeMs !== key.mtimeMs) return undefined;
-    fs.writeFileSync(own, kept);
-    fs.utimesSync(own, atimeMs / 1000, mtimeMs / 1000);
-    fs.renameSync(own, file);
+    replaceFile(file, kept, { times: { atimeMs, mtimeMs } });
     const now = fs.statSync(file);
     return { size: now.size, mtimeMs: now.mtimeMs };
   } catch {
-    try {
-      fs.rmSync(own, { force: true });
-    } catch {}
     return undefined;
   }
 };

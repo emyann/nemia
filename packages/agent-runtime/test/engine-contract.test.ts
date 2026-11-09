@@ -191,3 +191,43 @@ test('a transcript planted for each attempt reads by its cursor, a restart start
     ],
   );
 });
+
+/** The verb rows of `verb-harness.boundary.test.ts`, on the stand-in told the same declarations: the same refusals by the same tags. */
+/** The tag a call failed with; one that succeeded fails the test. */
+const verbTagOf = async (asked: Effect.Effect<unknown, { _tag: string }>): Promise<string> =>
+  (await Effect.runPromise(Effect.flip(asked)))._tag;
+
+test('a verb only some harnesses answer: unknown, undeclared and none refused in its own error, on the stand-in', async () => {
+  {
+    const engine = builtEngine(
+      testEngine({
+        harnesses: [
+          { name: 'plain', can: ['interrupt', 'answerAsk'] },
+          { name: 'cmd', can: ['commandArgs', 'env', 'memoryLimit'] },
+        ],
+      }).layer,
+    );
+    {
+      await Effect.runPromise(
+        engine.file({ brief: 'b', cwd: '/r', id: 'on-cmd', harness: 'cmd', queued: true, config: { command: ['true'] } }),
+      );
+      const rows: Array<[string, Effect.Effect<unknown, { _tag: string }>, string]> = [
+        ['quota of a harness the engine has not: unknown', engine.quota('nope'), 'QuotaRefused'],
+        ['quota of one that declares none: undeclared', engine.quota('cmd'), 'QuotaRefused'],
+        ['quota with none named, and none declaring it: none', engine.quota(), 'QuotaRefused'],
+        ['interrupt of a task on a harness that declares none: undeclared', engine.interrupt('on-cmd'), 'InterruptRefused'],
+        [
+          'answerAsk of a task on a harness that declares none: undeclared',
+          engine.answerAsk('on-cmd', { id: 'a', answers: {} }),
+          'AnswerRefused',
+        ],
+        [
+          'mcpState with no harness declaring mcp: none',
+          engine.mcpState({ s: { type: 'http', url: 'https://e.example/mcp' } }),
+          'McpStateRefused',
+        ],
+      ];
+      for (const [name, asked, tag] of rows) assert.equal(await verbTagOf(asked), tag, name);
+    }
+  }
+});

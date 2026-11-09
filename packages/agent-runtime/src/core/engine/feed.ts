@@ -24,6 +24,7 @@ import { randomUUID } from 'node:crypto';
 import { elapsedMs } from '../clock.ts';
 import { instantNow } from './now.ts';
 import { countLock, countRead, countWrite } from './tally.ts';
+import { replaceFile } from '../replace.ts';
 import { alive } from '../../process/alive.ts';
 
 /** How long an append or a rotation waits for the feed's lock held by a live process before it fails, naming the holder. */
@@ -423,22 +424,10 @@ const sizeOf = (seen: Seen) => (seen.head?.size ?? 0) + (seen.sealed?.size ?? 0)
 /** A sealed file being written beside the sealed one: where it stands, its path, and the cursor it reached. */
 type Built = { w: Writing; tmp: string; reached: number };
 
-/** What `write` writes, to a new file beside `file`, flushed, and renamed over `file`. */
-const replaceWith = (file: string, write: (fd: number) => void): void => {
-  const tmp = `${file}.${randomUUID()}.tmp`;
-  try {
-    const fd = fs.openSync(tmp, 'w');
-    try {
-      write(fd);
-      fs.fsyncSync(fd);
-    } finally {
-      fs.closeSync(fd);
-    }
-    fs.renameSync(tmp, file);
-    countWrite();
-  } finally {
-    fs.rmSync(tmp, { force: true });
-  }
+/** `bytes` written to a new file beside `file`, flushed, and renamed over `file` (`replaceFile`): one write counted. */
+const replaceWith = (file: string, bytes: Uint8Array): void => {
+  replaceFile(file, bytes, { fsync: true });
+  countWrite();
 };
 
 /**
@@ -487,10 +476,7 @@ const sealTail = (root: string, now: Seen, built: Built, forget: ReadonlySet<str
     renamed = true;
     countWrite();
     const rest = head ? bytesOf(head, head.at + end - head.base, head.size - head.at - (end - head.base)) : Buffer.alloc(0);
-    replaceWith(files.head, (fd) => {
-      fs.writeSync(fd, headerLine('feedBase', end));
-      if (rest.length) fs.writeSync(fd, rest);
-    });
+    replaceWith(files.head, Buffer.concat([Buffer.from(headerLine('feedBase', end)), rest]));
     return w.forgotten;
   } finally {
     if (w.fd >= 0) fs.closeSync(w.fd);

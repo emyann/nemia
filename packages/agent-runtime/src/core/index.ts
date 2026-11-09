@@ -10,7 +10,7 @@ export type { Outcome, SessionState, TaskPhase } from './session.ts';
 export { lifecycleGraph } from './lifecycle.ts';
 export type { LifecycleEdge, LifecycleGraph, LifecycleState, LifecycleVerb } from './lifecycle.ts';
 export { own } from './own.ts';
-export { firstPiece } from './text.ts';
+export { firstPiece, unknownTask } from './text.ts';
 export { pathOf } from './path.ts';
 export { firstRefusal } from './event-schema.ts';
 export { firstOf, quote, VALUE_QUOTE, WORDS_QUOTE } from './quote.ts';

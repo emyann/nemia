@@ -3,7 +3,9 @@
  * asked for, as sentences. Harness vocabulary, so it lives beside the runners
  * that speak it and never in `domain.ts`.
  */
+import type { FenceReach, HarnessDeclaration } from '../declaration.ts';
 import type { SpawnRequest } from '../seam.ts';
+import { CLAUDE_RULES } from './rules.ts';
 
 /**
  * The permission modes Claude Code takes. Harness vocabulary, so it lives beside the runner that
@@ -119,7 +121,7 @@ export type ClaudeFlags = {
   /**
    * Bridge the session to claude.ai, where anyone signed in to the account can drive it — type into it, answer its prompts, stop
    * it — from a browser or a phone. Never a default, for that reason. Opened on the SDK's control request at the session's first
-   * message (`attached-bridge.ts`), never as a flag: a job's bridge ends with the job, a long-lived session's outlives its holder and
+   * message (`session-bridge.ts`), never as a flag: a job's bridge ends with the job, a long-lived session's outlives its holder and
    * is re-attached by the next. A journal an older runtime wrote may carry it as a harness argument of its own, which `upgrade` moves
    * here (`FORMER_ARGS`). Taken on any `'claude'` task, and refused on a `HarnessSpec`; a harness brought as a `RunnerOps` is handed
    * it on the spawn, and asked only its own `refuses`.
@@ -243,7 +245,7 @@ export const settingsObject = (settings: string): Record<string, unknown> | unde
 
 /**
  * Whether a task asks for its session bridged to claude.ai (`config.claude.remoteControl`): opened on the SDK's control request at the
- * session's first message, a job's and a long-lived session's alike (`attached-bridge.ts`), and never spelt as a flag.
+ * session's first message, a job's and a long-lived session's alike (`session-bridge.ts`), and never spelt as a flag.
  */
 export const bridgeAsked = (task: { config?: { claude?: ClaudeFlags } }): boolean => task.config?.claude?.remoteControl !== undefined;
 
@@ -270,12 +272,6 @@ export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefi
 };
 
 /**
- * What Claude Code cannot be asked for as the engine runs it (`'claude'`): what Claude Code cannot (`claudeRefuses`), and nothing
- * more. A job and a long-lived session alike take a spend cap, a closed list of skills and a bridge to claude.ai, on the Agent SDK.
- */
-export const claudeCodeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined => claudeRefuses(task);
-
-/**
  * A worktree name for this attempt. Derived from the session name when the task did not pick one,
  * so it is stable, greppable, and — the point — never absent.
  */
@@ -287,3 +283,63 @@ export const worktreeName = (r: SpawnRequest): string =>
  * in the session (its `CLAUDE.md` is not read). Taken whole, since what it does with the folder's other subfolders is unmeasured.
  */
 export const CLAUDE_CONFIG_FOLDERS: readonly [string, ...string[]] = ['.claude'];
+
+/** Whether Claude Code drops `auto` on `model`: one of `CLAUDE_AUTO_DROPPED`, as named or with a `-` suffix. */
+const dropsAuto = (model: string | undefined): boolean =>
+  model !== undefined && CLAUDE_AUTO_DROPPED.some((m) => model === m || model.startsWith(`${m}-`));
+
+/** Claude Code's fence on `model`, run as a job or a background session alike. */
+const claudeReach = (model: string | undefined): FenceReach => ({
+  by: 'mode',
+  rank: CLAUDE_MODE_RANK,
+  given: CLAUDE_DEFAULT_MODE,
+  writes: CLAUDE_MODE_RANK.acceptEdits,
+  held: CLAUDE_HELD_MODE,
+  unasking: CLAUDE_UNASKING_MODES,
+  dropped: dropsAuto(model) ? ['auto'] : [],
+  refusing: CLAUDE_REFUSING_MODES,
+  unfenced: CLAUDE_UNFENCED,
+  granted: CLAUDE_GRANTED,
+});
+
+/**
+ * What Claude Code declares, as the engine runs it (`'claude'`), a job and a long-lived session alike: every key of a task's config
+ * but Codex's and a command's, a session kept open and a call held for a person (attached, in the holder), and every Engine verb that is
+ * not a task's. Its job's `HarnessSpec` declares the same `can` (`claudeJobSpec`, held equal by `test/declaration.test.ts`).
+ */
+export const CLAUDE_DECLARATION: HarnessDeclaration = {
+  can: [
+    'contextTokens',
+    'claudeFlags',
+    'env',
+    'readOnlyMount',
+    'writableMount',
+    'callAdmission',
+    'projectMcp',
+    'enabledSkills',
+    'memoryLimit',
+    'bridge',
+    'keepsOpen',
+    'holdsCalls',
+    'interrupt',
+    'answerAsk',
+    'quota',
+    'mcp',
+    'hold',
+    'drain',
+  ],
+  ownKey: 'claude',
+  knobs: {
+    effort: CLAUDE_EFFORTS,
+    fence: { key: 'permissionMode', words: CLAUDE_PERMISSION_MODES, lists: ['tools', 'allowedTools', 'disallowedTools'] },
+    context: true,
+    flags: { owned: CLAUDE_OWNED_FLAGS },
+  },
+  contextTokens: CLAUDE_CONTEXT_TOKENS,
+  reach: claudeReach,
+  unruled: CLAUDE_UNRULED,
+  asks: { remoteControl: { claude: { remoteControl: true } } },
+  runsBrief: true,
+  recordsDenials: true,
+  rules: CLAUDE_RULES,
+};

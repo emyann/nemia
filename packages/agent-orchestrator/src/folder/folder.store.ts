@@ -47,6 +47,7 @@ import {
 } from './folder.ts';
 import { WorkflowDir } from './folder.model.ts';
 import { HARNESS_PROMPTS } from '../agents/agents.ts';
+import { fenceKeyOf } from '../harness/harness.ts';
 import { entriesOf } from '../skills/read.store.ts';
 
 /**
@@ -154,7 +155,7 @@ const agentAt = (dir: string, agent: string): string => path.join(agentsDir(dir)
 
 /** The word a file on `harness` names its sandbox under as `permissionMode:`, the former name of `sandbox:` there; else undefined. */
 const formerModeOf = (text: string, harness: string | undefined): string | undefined =>
-  harness === 'codex' ? frontmatterKey(text, 'permissionMode', true) : undefined;
+  fenceKeyOf(harness) === 'sandbox' ? frontmatterKey(text, 'permissionMode', true) : undefined;
 
 /**
  * Each step file of the workflow in `dir` with its text, the agent it names and the harness it runs on: its own `harness:`, else its

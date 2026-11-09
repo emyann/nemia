@@ -974,7 +974,7 @@ test(
   'an attached session is given its servers, Claude Code’s own prompt with the agent’s after it, and writes no MEMORY.md',
   { skip, timeout: 12 * 60_000 },
   async (t) => {
-    const root = tmp('attached-options');
+    const root = tmp('session-options');
     const cwd = tmp('attached-cwd');
     const server = path.join(tmp('attached-server'), 'server.mjs');
     fs.writeFileSync(server, PROBE_SERVER);

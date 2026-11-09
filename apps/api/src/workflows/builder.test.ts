@@ -17,13 +17,14 @@ import { Effect, Layer } from 'effect';
 import { AgentDoor, type AgentDoorShape } from 'agent-orchestrator';
 import { agentDoorMemory } from 'agent-orchestrator/testing';
 import { app, appOf, liveOf } from '../app.ts';
-import { DEFAULT_HARNESS, isRoleKey, putSchemasBack, stepsNamed } from './builder.ts';
+import { isRoleKey, putSchemasBack, stepsNamed } from './builder.ts';
 import { asWorkflowListing, listedIn } from '../../test/definitions.ts';
 import { StoreRoot, workflowVersion as versionIn } from 'agent-orchestrator';
 import { listWorkflows } from './workflows.ts';
 import { engine, builtinGitPlace, HARNESS_CHOICES, loadWorkflows, workflowTaken, writeWorkflow } from 'agent-orchestrator';
 import {
   AGENT_KEYS,
+  DEFAULT_HARNESS,
   HARNESSES,
   parseFolder,
   parseWorkflow,

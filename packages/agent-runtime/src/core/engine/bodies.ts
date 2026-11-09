@@ -14,6 +14,7 @@ import path from 'node:path';
 import type { Event } from '../domain.ts';
 import type { StoredEvent } from '../event-schema.ts';
 import { readText } from './tally.ts';
+import { replaceFile } from '../replace.ts';
 
 /** A body's name: the sha256 of its text's UTF-8, in 64 lowercase hex digits. */
 export type BodyRef = string;
@@ -85,9 +86,7 @@ export const filesBodies = (root: string): BodyOps => {
             if (!missing(cause)) throw cause;
           }
           fs.mkdirSync(dir, { recursive: true });
-          const temp = path.join(dir, `.${ref}.${process.pid}.${crypto.randomUUID()}`);
-          fs.writeFileSync(temp, text);
-          fs.renameSync(temp, at(ref));
+          replaceFile(at(ref), text);
         },
         catch: failure,
       }),

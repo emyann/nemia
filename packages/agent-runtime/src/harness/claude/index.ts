@@ -10,9 +10,8 @@ export {
   CLAUDE_EFFORTS,
   CLAUDE_PERMISSION_MODES,
   bridgeAsked,
-  claudeCodeRefuses,
+  claudeRefuses,
 } from './vocabulary.ts';
 export type { ClaudeFlags } from './vocabulary.ts';
 export { attachedSessions, LET_GO_MS, type Attached } from './attached.ts';
-export { putDrain, liftDrain } from './attached-file.ts';
-export { sessionDrainFile, sessionDrainOf, liftSessionDrain, putSessionDrain, type SessionDrain } from './job-hold.ts';
+export { putDrain } from './attached-file.ts';

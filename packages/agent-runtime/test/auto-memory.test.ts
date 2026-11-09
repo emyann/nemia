@@ -6,7 +6,7 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { attachedOptions } from '../src/harness/claude/attached-options.ts';
+import { attachedOptions } from '../src/harness/claude/session-options.ts';
 import { memorylessSettings } from '../src/harness/claude/memory.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
 import type { ClaudeFlags } from '../src/harness/claude/vocabulary.ts';

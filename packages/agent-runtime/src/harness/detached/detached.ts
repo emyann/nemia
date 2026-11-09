@@ -38,6 +38,7 @@ import { startable, startWorker } from './start-worker.ts';
 import type { ScopeAt } from '../scope.ts';
 import { spawnFiles, spawnInput } from './spawn-files.ts';
 import type { HarnessIO } from './harness-io.ts';
+import type { Capability } from '../declaration.ts';
 
 export { detachedStateOf, STALE_MS } from './run-file.ts';
 export { WORKER_BEAT_MS, WORKER_STOP_GRACE_MS } from './worker-bounds.ts';
@@ -82,6 +83,8 @@ export type HarnessSpec = {
    * without one is asked nothing.
    */
   refuses?: (task: Omit<SpawnRequest, 'name'>) => string | undefined;
+  /** Whether a task asked this harness to bridge its session (`RunnerOps.bridgeAsked`), in its flag. A spec without one bridges none. */
+  bridgeAsked?: (task: { readonly config?: SpawnRequest['config'] }) => boolean;
   /**
    * What the harness says in its own output, for one that prints its final answer rather than
    * writing it where the runner chose. Handed the worker's capture of the harness's stdout and
@@ -127,21 +130,19 @@ export type HarnessSpec = {
     closesOn: { key: string; value: string };
   };
   /**
-   * The context windows this harness can be given, in tokens, both ends included: a task's `contextTokens` is handed to
-   * `command`, and `file()` refuses one outside the range. Absent: the harness has no such knob, and `file()` refuses a
-   * task that sets one rather than let it run on a window it did not ask for.
+   * What this harness takes and does, as its declaration's words (`Capability`): the keys of a task's config it reads, the sessions it
+   * keeps and the Engine verbs it answers. `file()` refuses a task that asks for a word the list leaves out, rather than start a session
+   * without it (`harnessRefusalOf`), and names the harnesses that list it. The shipped specs take their harness's declaration's
+   * (`CLAUDE_DECLARATION`, `CODEX_DECLARATION`, `COMMAND_DECLARATION`). The booleans this list replaced (`claudeFlags`, `codexArgs`,
+   * `commandArgs`, `env`, `projectMcp`, `enabledSkills`, `mounts`, `callAdmission`) are refused at `Engine.layer`, naming it.
+   */
+  can: readonly Capability[];
+  /**
+   * The context windows this harness can be given, in tokens, both ends included, where `can` lists `contextTokens`: a task's
+   * `contextTokens` is handed to `command`, and `file()` refuses one outside the range. Refused at `Engine.layer` without that word,
+   * and that word without it.
    */
   contextTokens?: { least: number; most: number };
-  /**
-   * The harness is Claude Code, and its process hands a task's `config.claude` to it as flags (`attachedOptions`). Absent: the
-   * harness has no such flags, and `file()` refuses a task that carries any rather than start a session without them.
-   */
-  claudeFlags?: true;
-  /**
-   * The harness is Codex, and `prepare` reads a task's `config.codex` (`CodexArgs`). Absent: the harness has no such
-   * arguments, and `file()` refuses a task that carries them rather than start a session without them.
-   */
-  codexArgs?: true;
   /**
    * The harness prints a resumed session's cost and API time as totals that carry its parent's on, not as its own:
    * a resumed Claude Code job does. Set, the run file keeps the id it resumed and, read once at its spawn, the parent's printed
@@ -149,39 +150,6 @@ export type HarnessSpec = {
    * off. Where there is no such run, or it printed no total, the attempt carries no cost rather than its parent's too.
    */
   resumeCostCarried?: true;
-  /**
-   * The harness runs the process a task's `config.command` names, with its `config.env` and `config.niceness` (`commandHarness`), and
-   * reads its `config.terminationMessagePath` once at its exit.
-   * Absent: the harness has no such arguments, and `file()` refuses a task that carries them rather than run something else.
-   */
-  commandArgs?: true;
-  /**
-   * The harness lays a task's `config.env` under its own environment, in the process it spawns. Absent, and no `commandArgs`:
-   * `file()` refuses a task that carries one rather than start its session without it.
-   */
-  env?: true;
-  /**
-   * The harness can leave the checkout's `.mcp.json` out of a session, whole or but for the entries a task's `config.projectMcp`
-   * names, and loads those it names. Absent: `file()` refuses a task that carries it rather than start a session with servers it
-   * did not ask for, or without those it did.
-   */
-  projectMcp?: true;
-  /**
-   * The harness gives a session exactly the skills a task's `config.enabledSkills` lists, and hides and refuses every other. Absent:
-   * `file()` refuses a task with a list rather than start a session that holds skills it was not given.
-   */
-  enabledSkills?: true;
-  /**
-   * The modes of a task's `config.mounts` this harness holds, and `command` renders: `readOnly`, a folder the session can read and
-   * not write; `writable`, one it can write too. Absent, or a mode left out: `file()` refuses a task with such a mount rather than
-   * start a session that would not see the folder, or could write where it was told it may only read.
-   */
-  mounts?: { readOnly?: true; writable?: true };
-  /**
-   * The harness runs a task's `config.callAdmission` before each call to the tools it names, and does what it answers (`Admission`).
-   * Absent: `file()` refuses a task that carries one rather than run its calls unadmitted.
-   */
-  callAdmission?: true;
   /**
    * The worker keeps the harness's stdout and its stderr each whole, in a file of its own beside the log (`.stdout`, `.stderr`),
    * and the runner reads them (`output`), until its session has ended: then stdout as `keepOutput` keeps it, where the spec has one.
@@ -279,7 +247,7 @@ const sightingOf = (
 
 /** The file a command's worker reads once at its exit, for a spec that runs a task's command and a task that names one. */
 const terminationOf = (spec: HarnessSpec, r: SpawnRequest): { terminationMessagePath?: string } =>
-  spec.commandArgs && r.config?.terminationMessagePath ? { terminationMessagePath: r.config.terminationMessagePath } : {};
+  spec.can.includes('commandArgs') && r.config?.terminationMessagePath ? { terminationMessagePath: r.config.terminationMessagePath } : {};
 
 /** What a spec's reader said of a run's output (`outputIn`): what it read, why it refused it, or nothing, with no output yet. */
 type Told = { read: HarnessOutput } | { wrong: string } | undefined;
@@ -628,6 +596,7 @@ const runFileOps = (spec: HarnessSpec, root: string, dir: string) => ({
   ...compactOps(spec, dir),
   forget: forgetRunOf(spec, root),
   kept: keptRunOf(spec, root),
+  ...(spec.bridgeAsked ? { bridgeAsked: spec.bridgeAsked } : {}),
 });
 
 /**

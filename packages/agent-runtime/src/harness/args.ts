@@ -10,8 +10,8 @@
  */
 import path from 'node:path';
 import type { McpServer } from './seam.ts';
-import { bridgeAsked, type ClaudeFlags } from './claude/vocabulary.ts';
-import type { Bridge } from '../core/domain.ts';
+import type { ClaudeFlags } from './claude/vocabulary.ts';
+import { CODEX_DECLARATION } from './codex/vocabulary.ts';
 import { mcpRefuses } from './mcp.ts';
 import { mountsRefusalOf, type Mount } from './mounts.ts';
 import { admissionRefusalOf, type Admission } from './admission.ts';
@@ -99,15 +99,15 @@ export type HarnessArgs = {
   codex?: CodexArgs;
   /**
    * The process the session is, as a Pod's container gives its `command` and `args`: the program first, then each argument as it
-   * reaches it, no shell between — `['sh', '-c', 'npm test']`. Read by a `HarnessSpec` with `commandArgs` alone (`commandHarness`),
+   * reaches it, no shell between — `['sh', '-c', 'npm test']`. Read by a harness that declares `commandArgs` alone (`commandHarness`),
    * which runs it in the task's `cwd`; refused on any other harness, which would start its session without it, and unless a list
    * whose first entry names a program and whose every entry is a string with no NUL in it.
    */
   command?: string[];
   /**
    * What the session's process holds in its environment on top of the worker's own, as a Pod's container gives its `env`:
-   * `{ "CI": "1" }`. Read by every harness that spawns the session as a process of its own — a `HarnessSpec` with `commandArgs` or
-   * `env`, and Claude Code, a job and a long-lived session alike — and laid under the harness's own variables, which it never
+   * `{ "CI": "1" }`. Read by every harness that spawns the session as a process of its own — a harness that declares `env`: a
+   * command, Codex, and Claude Code, a job and a long-lived session alike — and laid under the harness's own variables, which it never
    * overrides. Refused on a remote agent. Journalled with the
    * task, so it carries no secret. Refused unless an object whose keys are variable names and whose values are strings with no
    * NUL in them.
@@ -115,15 +115,15 @@ export type HarnessArgs = {
   env?: Record<string, string>;
   /**
    * How far the command's priority is lowered: `nice -n` with it, and the idle IO class where `ionice -c3` runs on the machine.
-   * Read by a `HarnessSpec` with `commandArgs` alone, and refused on any other harness. Absent or 0: the worker's own priority.
+   * Read by a harness that declares `commandArgs` alone, and refused on any other. Absent or 0: the worker's own priority.
    * Refused unless a whole number from 0 to 19.
    */
   niceness?: number;
   /**
    * A file the command may write its last words to, as a Pod's container gives its `terminationMessagePath`: read once by the
    * runtime when the process exits, at most `TERMINATION_MESSAGE_BYTES`, and kept on the attempt as its `terminationMessage`, none
-   * where the file is missing or no regular file. Its stdout never answers for it. Read by a `HarnessSpec` with `commandArgs` alone,
-   * and refused on any other harness. Refused unless an absolute path with no NUL in it.
+   * where the file is missing or no regular file. Its stdout never answers for it. Read by a harness that declares `commandArgs`
+   * alone, and refused on any other harness. Refused unless an absolute path with no NUL in it.
    */
   terminationMessagePath?: string;
   /**
@@ -234,22 +234,6 @@ const shown = (v: unknown) => (typeof v === 'number' ? String(v) : JSON.stringif
  */
 export const configForTurn = (base: HarnessArgs | undefined, turn: HarnessArgs | undefined): HarnessArgs | undefined =>
   turn === undefined ? base : { ...base, ...turn };
-
-/**
- * A task's bridge as its view says it, from its configuration (`config`) and what its harness saw of the session (`seen`): `undefined`
- * for a task that did not ask for one (`bridgeAsked`), whatever was seen; else the bridge seen, a link or why there is none; else no
- * link, and why, by whether the task is `settled`. Never `undefined` for a task that asked: an absent link is not "not bridged".
- */
-export const bridgeOfTask = (config: HarnessArgs | undefined, settled: boolean, seen: Bridge | undefined): Bridge | undefined => {
-  if (!bridgeAsked({ config })) return undefined;
-  if (seen) return seen;
-  return {
-    url: null,
-    why: settled
-      ? 'its session has ended, and its bridge with it.'
-      : 'no process of its session is seen yet to read its bridge from: it is starting, restarting, or between attempts.',
-  };
-};
 
 /**
  * Why what an answer gives its turn cannot be journalled — or `undefined`. Only the turn's own arguments (`TURN_ARGS`), in
@@ -438,6 +422,11 @@ const claudeFlagsRefusalOf = (flags: unknown): string | undefined => {
   return undefined;
 };
 
+/** The keys of `config.codex`: the flags Codex's declaration says it reads (`CODEX_DECLARATION.knobs.flags.only`), and no other. */
+const CODEX_FLAGS: readonly string[] = ((flags) => (flags !== undefined && 'only' in flags ? flags.only : []))(
+  CODEX_DECLARATION.knobs?.flags,
+);
+
 /**
  * Why `config.codex` cannot be handed to Codex — or `undefined`. An object holding only `trustFrom`, whose value is an
  * absolute path: a key misspelled would name no directory, and a relative one would be read against a `cwd` it was not
@@ -448,7 +437,7 @@ const codexArgsRefusalOf = (args: unknown): string | undefined => {
   if (typeof args !== 'object' || args === null || Array.isArray(args)) {
     return `\`codex: ${JSON.stringify(args)}\` is not a set of Codex's arguments. Give an object, like { "trustFrom": "/path/to/repo" }, or leave it out.`;
   }
-  const stray = Object.keys(args).find((key) => key !== 'trustFrom');
+  const stray = Object.keys(args).find((key) => !CODEX_FLAGS.includes(key));
   if (stray) {
     return `\`codex.${stray}\` is not one of Codex's arguments. Its only one is \`trustFrom\`, the directory whose trust in your Codex config extends to the cwd.`;
   }

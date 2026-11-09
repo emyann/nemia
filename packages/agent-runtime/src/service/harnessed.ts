@@ -1,16 +1,26 @@
 import { own } from '../core/index.ts';
 import type { SeamOps } from '../a2a/index.ts';
+import type { Capability } from '../harness/declaration.ts';
 import { isRemote, type HarnessConfig } from './options.ts';
+import { canOf } from './verb-harness.ts';
 
-/** A harness this engine has, as a verb asks it: its name, the runner the engine runs it through, and how it was configured. */
-export type Harnessed = { readonly name: string; readonly runner: SeamOps; readonly config: HarnessConfig };
+/**
+ * A harness this engine has, as a verb asks it: its name, the runner the engine runs it through, how it was configured, and what it
+ * declares it answers (`canOf`), which picks the harness of a verb only some answer (`verbHarnessOf`).
+ */
+export type Harnessed = {
+  readonly name: string;
+  readonly runner: SeamOps;
+  readonly config: HarnessConfig;
+  readonly can: readonly Capability[];
+};
 
 /** Each harness of `harnesses` with the runner the engine made for it, by name. */
 export const harnessedOf = (harnesses: Record<string, HarnessConfig>, runners: Record<string, SeamOps>): Record<string, Harnessed> =>
   Object.fromEntries(
     Object.entries(harnesses).flatMap(([name, config]) => {
       const runner = own(runners, name);
-      return runner === undefined ? [] : [[name, { name, runner, config }]];
+      return runner === undefined ? [] : [[name, { name, runner, config, can: canOf(config) }]];
     }),
   );
 

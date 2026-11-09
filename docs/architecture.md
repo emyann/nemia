@@ -72,7 +72,7 @@ not that session's end — its run file says `idle`, its input stays open, and a
 idle (`idleOf`), with `held` and the holder's `pid` on it.
 
 **The claude.ai bridge of any Claude Code session is the runtime's**, opened through the Agent SDK's own control request on the
-`query()` object at the session's `system`/`init` message (`enableBridge`, `bridgeDue`, `src/harness/claude/attached-bridge.ts`), for
+`query()` object at the session's `system`/`init` message (`enableBridge`, `bridgeDue`, `src/harness/claude/session-bridge.ts`), for
 a job and a held session alike; its facts kept on the run file (a job's on the bridge file beside its run) and its link answered on the
 sighting. A job's bridge closes with it. A session whose SDK carries no such request runs on without one and says why.
 
@@ -342,7 +342,12 @@ informer), and its OpenAPI 3.1 document is `OpenApi.fromApi(Api)` (`apps/api/src
 reference, its script served by the api from the installed package, reading the document at its route). The board reads the Run and
 the Card through a client made from the same `Api` (`apps/web/src/lib/api/objects.ts`), with no schema of its own for either.
 
-**In the api today, below its layer**: `src/capabilities/reach.ts` re-implementing permission matching. Its readers that touch the machine
+**What a harness can do is the runtime's**: each harness declares it once (`HarnessDeclaration`, agent-runtime's
+`src/harness/declaration.ts`), and every check above that used to name a harness reads the declaration — the orchestrator through
+`agent-runtime/vocabulary`, the api through the orchestrator. Claude Code's permission matching and the tool sets measured on it have
+moved there too (`src/harness/claude/rules.ts`, `CLAUDE_DECLARATION.rules`); the api's `src/capabilities/reach.ts` keeps only `reachOf`.
+
+**In the api today, below its layer**: what remains of it is counted. Its readers that touch the machine
 are counted against a baseline that only shrinks (`MOVES` in `apps/api/test/kinds.test.ts`), each entry naming the card that moves it,
 else the move and where it goes.
 

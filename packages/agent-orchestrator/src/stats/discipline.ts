@@ -9,21 +9,21 @@
  * matched", not "followed" (`rulesOfTry`, `ruleRowsOf`). Pure: `stats.verb.ts` hands the views and each step's frozen skills' rules here,
  * and words each call with the runtime's `denialText`.
  */
-import { DEFAULT_HARNESS } from '../harness/harness.ts';
+import { declarationOf } from '../harness/harness.ts';
 import { bareSkillOf, disallowedBy } from '../keys/index.ts';
 import { appliesMatch, type SkillRule } from '../skills/skills.ts';
 import type { Workflow } from '../step/step.ts';
 import type { TaskSpan } from '../timeline/index.ts';
 
 /**
- * Whether a step's sessions record what they were denied, read off its frozen `harness:` (`DEFAULT_HARNESS` where it names none): true on
- * `claude`, a job on the Agent SDK. False on `codex`, whose sandbox refuses a call nowhere the run reads, and on a remote agent
- * (`a2a:<name>`), which reports none — the harnesses `denialsOf` refuses `denials: fail` on. False too for a step a run froze with
- * `background: true`, a key no step has now, which a record keeps (`FrozenStepSchema`): its sessions ran as Claude Code background
- * sessions, which recorded none.
+ * Whether a step's sessions record what they were denied, read off its frozen `harness:` (`DEFAULT_HARNESS` where it names none): true
+ * where its declaration says a job of it records them (`recordsDenials`), as `claude`'s, a job on the Agent SDK. False on `codex`,
+ * whose sandbox refuses a call nowhere the run reads, and on a remote agent (`a2a:<name>`), which reports none — the harnesses
+ * `denialsOf` refuses `denials: fail` on. False too for a step a run froze with `background: true`, a key no step has now, which a
+ * record keeps (`FrozenStepSchema`): its sessions ran as Claude Code background sessions, which recorded none.
  */
 export const deniesRecorded = (step: Pick<Workflow, 'harness'> & { readonly background?: unknown }): boolean =>
-  (step.harness ?? DEFAULT_HARNESS) === 'claude' && step.background !== true;
+  declarationOf(step.harness)?.recordsDenials === true && step.background !== true;
 
 /**
  * The moment a `claude` step's sessions began to run as jobs, which record what they were denied: a session filed before it ran as a

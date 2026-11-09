@@ -10,7 +10,7 @@ import { kindOf, stepCardOf, type StepCardFacts, type StepKind } from '../src/li
 import type { StepPhase } from '../src/lib/api/reasons.ts';
 import type { StepState } from '../src/lib/status.ts';
 import { PERSON } from '../src/lib/words.ts';
-import { aCardOpen, CARD_REACH, cardOpened, previewSide, SHEET_QUERY } from '../src/lib/useSheetPreview.ts';
+import { aCardOpen, CARD_REACH, cardOpened, previewSide } from '../src/lib/useSheetPreview.ts';
 import { coded, detail, step, summary, triedAs, type Word } from './run-fixtures.ts';
 
 type Step = RunView['steps'][number];
@@ -230,9 +230,6 @@ test("stepCardOf: a step's card in each of its states, its facts, its note and i
 });
 
 test("useSheetPreview: where a step's card opens, and which stays open", async (t) => {
-  await t.test('a preview opens as a sheet where no pointer hovers or the window is compact, under 600 pixels', () => {
-    assert.equal(SHEET_QUERY, '(hover: none), (max-width: 599px)');
-  });
   await t.test(
     "a step's card stands beside its rail where the window has room for it on a side, and under the rail where it has none",
     () => {

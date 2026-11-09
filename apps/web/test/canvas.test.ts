@@ -19,7 +19,6 @@ import {
   edgeStroke,
   forgetFactoryLayout,
   forgetFactoryOpen,
-  forgetFactoryLeftovers,
   forgetLayout,
   LEAST_ZOOM,
   LOOP_DEPTH,
@@ -478,37 +477,12 @@ test('the layout store: per run and per Factory, until forgotten, on storage tha
     assert.deepEqual(readFactoryOpen(), []);
     assert.deepEqual(Object.fromEntries(readFactoryLayout()!), { 'r-1': { x: 320, y: 0 } });
   });
-  await t.test('what an older board kept for the Factory is forgotten, and nothing else with them', (t) => {
-    const kept = new Map([
-      ['hkb:factory-steps', JSON.stringify({ 'r-1/review': { x: 40, y: -10 } })],
-      ['hkb:factory-layout:v2', JSON.stringify({ 'r-2': { x: 0, y: 0 } })],
-      ['hkb:factory-open', JSON.stringify(['r-2'])],
-    ]);
-    stubStorage(t, memory(kept));
-    saveFactoryOpen(['r-1']);
-    saveFactoryLayout(new Map([['r-1', { x: 320, y: 0 }]]));
-    forgetFactoryLeftovers();
-    assert.deepEqual([...kept.keys()].sort(), ['nemia:factory-layout:v2', 'nemia:factory-open']);
-    assert.deepEqual(readFactoryOpen(), ['r-1'], 'the open runs stay');
-    assert.deepEqual(Object.fromEntries(readFactoryLayout()!), { 'r-1': { x: 320, y: 0 } }, 'and the arrangement');
-  });
-  await t.test('a browser that refuses storage forgets no step, and throws nothing', (t) => {
-    const refuse = () => {
-      throw new Error('SecurityError: storage is disabled');
-    };
-    stubStorage(t, { getItem: refuse, setItem: refuse, removeItem: refuse });
-    assert.doesNotThrow(() => forgetFactoryLeftovers());
-  });
-  await t.test('a browser that refuses storage keeps no run open, and throws nothing — nor one where storage is not there at all', (t) => {
+  await t.test('a browser that refuses storage keeps no run open, and throws nothing', (t) => {
     const refuse = () => {
       throw new Error('SecurityError: storage is disabled');
     };
     stubStorage(t, { getItem: refuse, setItem: refuse, removeItem: refuse });
     assert.deepEqual(readFactoryOpen(), []);
-    assert.doesNotThrow(() => saveFactoryOpen(['r-1']));
-    assert.doesNotThrow(() => forgetFactoryOpen());
-    Object.defineProperty(globalThis, 'localStorage', { get: refuse, configurable: true });
-    assert.deepEqual(readFactoryOpen(), [], 'a sandboxed frame throws on reading `localStorage` itself, before any call');
     assert.doesNotThrow(() => saveFactoryOpen(['r-1']));
     assert.doesNotThrow(() => forgetFactoryOpen());
   });

@@ -5,6 +5,7 @@
 import { useCallback, useState, useSyncExternalStore } from 'react';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { BAR_KEY, barMost, barOf, barValue, barWidth, nextBar, parseWidth, type Bar } from './bar.ts';
+import { readStored, store } from './stored.ts';
 
 /**
  * What the bar shows (`open`, none while it is closed), and the verbs that change it on this page, keeping its path and every other key of
@@ -45,18 +46,12 @@ const viewportWidth = () => window.innerWidth;
 
 /** The width this browser keeps for the bar: the default where nothing is kept or storage is refused. */
 function storedWidth(): number {
-  try {
-    return parseWidth(localStorage.getItem(BAR_KEY));
-  } catch {
-    return parseWidth(null);
-  }
+  return readStored(BAR_KEY, parseWidth, parseWidth(null));
 }
 
 /** Keeps `width` for every page: where storage is refused or full, nothing is kept, and the width lasts as long as the page does. */
 function storeWidth(width: number): void {
-  try {
-    localStorage.setItem(BAR_KEY, String(width));
-  } catch {}
+  store(BAR_KEY, String(width));
 }
 
 /**

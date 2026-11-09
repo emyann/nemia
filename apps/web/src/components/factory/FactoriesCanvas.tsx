@@ -10,6 +10,7 @@ import type { FactoryBlock } from '@/lib/factories';
 import { revealView, sizeOf } from '@/lib/frame';
 import { useBarOver } from '@/lib/useBarOver';
 import { useCanvasPress } from '@/lib/useCanvasPress';
+import { useFrameSize } from '@/lib/useFrameSize';
 import { anyAbove, sessionOf } from '@/lib/nemia';
 import { useContent } from '@/lib/useContent';
 import { BLOCK_SIZE, FactoryBlockNode, type FactoryFlowNode } from './FactoryBlock';
@@ -128,18 +129,12 @@ function useKeepClear(frame: RefObject<HTMLDivElement | null>, inspected: string
   useEffect(() => {
     if (inspected) reveal(inspected);
   }, [inspected]);
+  const { width } = useFrameSize(frame, true);
+  const was = useRef(0);
   useEffect(() => {
-    const el = frame.current;
-    if (!el) return;
-    let width = el.clientWidth;
-    const observer = new ResizeObserver(() => {
-      if (el.clientWidth === width) return;
-      width = el.clientWidth;
-      resized();
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [frame]);
+    if (was.current !== 0 && width !== was.current) resized();
+    was.current = width;
+  }, [width]);
 }
 
 /**

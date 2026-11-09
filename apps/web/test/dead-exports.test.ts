@@ -14,7 +14,8 @@
  *
  * Exempt (`exempt`): the vendored folders `components/ui/` (shadcn's, with the kit under `ui/ds/`) and `components/ai-elements/`, kept
  * as shipped, whose unused parts are the vendor's; a story's exports, which Storybook reads by its glob; `main.tsx`, the page's entry
- * that nothing imports; `routeTree.gen.ts`, written by TanStack's plugin; and a route file's `Route`, which the plugin reads by name.
+ * that nothing imports; `routeTree.gen.ts`, written by TanStack's plugin; a route file's `Route`, which the plugin reads by name; and a
+ * type the board's glossary table names (`glossary.json`), which the docs' tests require its workspace to export.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -35,8 +36,16 @@ const CONFIG = 'vite.config.ts';
  */
 const OFFERED = ['src/components/look/index.ts'];
 
+/** The types the board's glossary table names, each of which the docs' tests require `src` to export. */
+const GLOSSARY_TYPES = new Set(
+  (JSON.parse(fs.readFileSync(path.join(WEB, 'glossary.json'), 'utf8')) as { terms: Array<{ type?: string }> }).terms.flatMap((t) =>
+    t.type ? [t.type] : [],
+  ),
+);
+
 /** Whether an export of `file` named `name` is spared the guard (the module's comment says why for each). */
 const exempt = (file: string, name: string): boolean =>
+  GLOSSARY_TYPES.has(name) ||
   file.startsWith('src/components/ui/') ||
   file.startsWith('src/components/ai-elements/') ||
   file.endsWith('.stories.tsx') ||

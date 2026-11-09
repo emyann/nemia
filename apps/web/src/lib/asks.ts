@@ -144,7 +144,7 @@ export type OfferKind = keyof StepView['commands'];
  * Every case but `enough` presses `retry`; no case presses `say` yet. A raise carries `questions` as an answer does (`askedIn`): what its
  * closeout asks as data, which a raise of a step that signed off blocked answers by choosing, beside the budget, rather than in words.
  */
-type Offer =
+export type Offer =
   | { step: string; case: 'answer'; kind: 'retry'; needs: string | null; questions: readonly Frozen<Question>[] }
   | { step: string; case: 'try-again'; kind: 'retry'; recheck: boolean; unfinished: boolean }
   | { step: string; case: 'denied'; kind: 'retry'; calls: string | null }

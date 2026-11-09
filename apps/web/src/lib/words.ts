@@ -26,7 +26,7 @@ export interface WaitWords {
  * A person's words for a state: the rail's short word (on the chip, the rail and the card's tag), what it means on hover, and, for a
  * state the api lists as waiting on a person, the words of that wait; null for a state that waits on nobody.
  */
-interface PersonWords {
+export interface PersonWords {
   readonly rail: string;
   readonly meaning: string;
   readonly tag: WaitWords['tag'] | null;

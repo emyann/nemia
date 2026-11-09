@@ -5,6 +5,7 @@
  */
 import type { Level } from 'objects';
 import type { FactoryLevel, NemiaLevel, Spend } from './api/nemia.ts';
+import { dollars } from './money.ts';
 import type { Presence } from './presence.ts';
 import { clockWord } from './quota.ts';
 
@@ -74,9 +75,6 @@ export const freshLevel = (level: Level): Level => (level === 'manual' ? 'semi-a
 /** The levels a factory is raised to over its default `level`, lowest first: none over Auto. */
 export const raisesOver = (level: Level): readonly Level[] =>
   level === 'manual' ? ['semi-auto', 'auto'] : level === 'semi-auto' ? ['auto'] : [];
-
-/** A cost in dollars, as the package's `dollars` says it: three figures under a cent, cents above. */
-const dollars = (usd: number): string => `$${usd > 0 && usd < 0.01 ? Number(usd.toPrecision(3)) : usd.toFixed(2)}`;
 
 /** What her sessions cost, as her level's own line says it: each counted as it ends, her open one not yet. */
 export const spendWords = ({ usd, measured, unmeasured }: Spend): string =>

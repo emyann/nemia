@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { workflowNameOf, type InboxEntry } from '@/lib/api';
-import { duration } from '@/lib/canvas';
+import { agoWords } from '@/lib/runWords';
 import { repoName } from '@/lib/factory';
 import { ordinal } from '@/lib/inbox';
 import { instantWhole } from '@/lib/instant';
@@ -10,8 +10,8 @@ import { useNow } from '@/lib/useNow';
  * The queue on the Factory: every queued inbox card, in the order the tick starts them (`queueOf`), drawn as a ghost of the card its run
  * will be — at the floor's left edge, where work comes in, and off the floor itself: a ghost is no node, so nothing waits on it and it
  * waits on nothing, and it neither moves nor is moved by the cards. Each says its place, its first line, its workflow and repository, and
- * how long it has been queued, to the minute; a start the tick tried and did not make is marked, refused or failed, with why on hover. A
- * ghost opens the card's page.
+ * how long ago it was queued, as every page says an age (`agoWords`); a start the tick tried and did not make is marked, refused or
+ * failed, with why on hover. A ghost opens the card's page.
  *
  * Beside the floor on a wide screen, a column that scrolls; above it on a narrow one, a row that does.
  */
@@ -36,9 +36,6 @@ export function QueueLane({ cards }: { cards: readonly InboxEntry[] }) {
   );
 }
 
-/** How long a card has been queued, to the minute: `just now`, `12m ago`, `3h 12m ago`, `2d 4h ago`. */
-const waited = (ms: number): string => (ms < 60_000 ? 'just now' : `${duration(ms).replace(/ \d+s$/, '')} ago`);
-
 function Ghost({ card, now }: { card: InboxEntry; now: number }) {
   const { queued, tried } = card;
   const place = queued!.place!;
@@ -57,7 +54,7 @@ function Ghost({ card, now }: { card: InboxEntry; now: number }) {
           {ordinal(place)}
         </span>
         <time dateTime={queued!.at} title={`Queued at ${instantWhole(new Date(queued!.at))}`} className="font-mono">
-          queued {waited(now - Date.parse(queued!.at))}
+          queued {agoWords(new Date(queued!.at), new Date(now))}
         </time>
       </span>
       <span data-ghost-title title={title} className="mt-1 line-clamp-2 text-body-medium font-medium break-words text-foreground/80">

@@ -5,6 +5,7 @@
  * says only when what finishes is cut.
  */
 import type { Finishing, Interrupt, Parked, Pause, Paused, PauseHeld, PauseStaged } from './api';
+import { durationWords } from './duration.ts';
 import { clockWord } from './quota.ts';
 
 /** What a timed pause does, the package's words: each working session stops at its call's end, cut once the timeout passes. */
@@ -72,11 +73,12 @@ export const parkedSentence = ({ run, step, after, cut }: Parked): string =>
   `${run}'s ${step} is paused${after ? ` after its call to ${after}` : cut ? `, its call to ${cut} cut` : ''}`;
 
 /**
- * How many sessions still finish a tool call and when what is left is cut, as the package's `pausingWords` says it: "Pausing: 2 sessions
- * finishing a tool call, cut in 9 min", `leftMs` rounded up to whole minutes; "…, cut now" once none is left.
+ * How many sessions still finish a tool call and when what is left is cut, after the package's `pausingWords`: "Pausing: 2 sessions
+ * finishing a tool call, cut in 1h 30m", `leftMs` to the minute as every duration is said (`durationWords`); "…, cut now" once none is
+ * left.
  */
 export const pausingLine = (sessions: number, leftMs: number): string =>
-  `Pausing: ${sessions} session${sessions === 1 ? '' : 's'} finishing a tool call, cut ${leftMs > 0 ? `in ${Math.ceil(leftMs / 60_000)} min` : 'now'}`;
+  `Pausing: ${sessions} session${sessions === 1 ? '' : 's'} finishing a tool call, cut ${leftMs > 0 ? `in ${durationWords(leftMs, 'minute')}` : 'now'}`;
 
 /**
  * The head of the Pausing line: under a pause with a timeout while sessions finish, how many and when they are cut (`pausingLine`);

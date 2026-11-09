@@ -7,25 +7,13 @@ import type { GraphEdge, RunGraph, StepAttempts } from './api';
 import type { Point } from './layout';
 import { satisfiesAfter, type StepState } from './status.ts';
 import type { Frozen } from './frozen.ts';
+import { durationWords } from './duration.ts';
+
+/** A duration to the second, as `durationWords` says it: kept only for the run page's started row until it imports that writer. */
+export const duration = (ms: number): string => durationWords(ms, 'second');
 
 /** A session is going, so its attempt's time is still counting. */
 export const isLive = (state: StepState): boolean => state === 'working' || state === 'asks-in-session';
-
-/**
- * A duration in its two largest units: `42s`, `12m 04s`, `3h 12m`, `2d 4h`; one below zero, where this clock is behind the engine's, is
- * `0s`.
- */
-export function duration(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ${pad(s % 60)}s`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ${pad(m % 60)}m`;
-  return `${Math.floor(h / 24)}d ${h % 24}h`;
-}
-
-const pad = (n: number) => String(n).padStart(2, '0');
 
 /**
  * `#<attempts> · <time>` for a step's latest attempt, or null before its first.
@@ -38,9 +26,9 @@ export function attemptLine(attempts: StepAttempts, live: boolean, now: number):
   const { count, latest } = attempts;
   if (!latest) return null;
   const started = Date.parse(latest.startedAt);
-  if (latest.ended === null && live) return `#${count} · ${duration(now - started)}`;
-  if (latest.endedAt) return `#${count} · ${duration(Date.parse(latest.endedAt) - started)}`;
-  return `#${count} · started ${duration(now - started)} ago`;
+  if (latest.ended === null && live) return `#${count} · ${durationWords(now - started, 'second')}`;
+  if (latest.endedAt) return `#${count} · ${durationWords(Date.parse(latest.endedAt) - started, 'second')}`;
+  return `#${count} · started ${durationWords(now - started, 'second')} ago`;
 }
 
 /**

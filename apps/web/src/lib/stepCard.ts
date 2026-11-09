@@ -8,7 +8,8 @@ import type { StepPhase } from './api/reasons.ts';
 import type { RunView, StepView } from './runView.ts';
 import type { RunSummary } from './api/runs.ts';
 import { meaningOf } from './meaning.ts';
-import { sinceShort, sinceWords, whenWords } from './runWords.ts';
+import { durationWords } from './duration.ts';
+import { whenWords } from './runWords.ts';
 import { stateDrawn, stepState, type StepState } from './status.ts';
 import { stateWordsOf } from './words.ts';
 
@@ -124,7 +125,7 @@ const untimed = (label: string, ink: CardTime['ink']): CardTime => ({ label, val
 
 /** How long its last session ran, said under an ended step's instant. */
 const ranNote = (step: DetailStep, ranMs: number | null): string =>
-  ranMs === null ? '' : `${step.tries.length > 1 ? 'its last try ran' : 'ran'} ${sinceWords(ranMs)}`;
+  ranMs === null ? '' : `${step.tries.length > 1 ? 'its last try ran' : 'ran'} ${durationWords(ranMs, 'minute')}`;
 
 /**
  * The time box of each kind: at work for how long and since when, waiting since its session ended, done or failed at its end and how long
@@ -134,7 +135,7 @@ export function timeOf(step: DetailStep, kind: StepKind, now: Date): CardTime {
   const { start, end, ranMs } = sessionOf(step);
   const since = (from: string, label: string, ink: CardTime['ink']): CardTime => ({
     label,
-    value: sinceShort(now.getTime() - Date.parse(from)),
+    value: durationWords(now.getTime() - Date.parse(from), 'minute'),
     note: `since ${whenWords(new Date(from), now)}`,
     ink,
   });

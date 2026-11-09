@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Cell, Column, Row, Table, TableBody, TableHeader } from '@/components/ui/ds';
-import { endedWords, sinceCreated, waitSentence } from '@/lib/runWords';
+import { durationWords } from '@/lib/duration';
+import { waitSentence } from '@/lib/runWords';
+import { ENDED } from '@/lib/words';
 import { CopyId } from './CopyId';
 import { CutFrame, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE } from './CutFrame';
 import { RunSteps } from './RunSteps';
@@ -30,7 +32,7 @@ export const Yours: StoryObj = {
           </TextLink>
           <span>{waitSentence(WAITING)}</span>
           <RunSteps steps={GATE} cancelled={false} held={false} names />
-          <span>{sinceCreated(27 * 60_000 + 40_000)}</span>
+          <span>{durationWords(27 * 60_000 + 40_000, 'minute')} since it was created</span>
         </div>
       </CutFrame>
     </div>
@@ -58,7 +60,7 @@ export const Quiet: StoryObj = {
       <CutFrame size={24}>
         <div style={CARD}>
           <span>
-            {endedWords('undecided').word}: {endedWords('undecided').title}
+            {ENDED.undecided.word}: {ENDED.undecided.title}
           </span>
           <RunSteps steps={REFUSED} cancelled={false} held={false} />
         </div>

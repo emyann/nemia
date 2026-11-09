@@ -115,3 +115,12 @@ test("the box preset to the address's factory says its one repository as text, a
   );
   assert.match(pair, /data-needs-repo="true"/, 'its workflows are read once a repository is picked');
 });
+
+test("a queued card's ghost says how long ago it was queued as every page says an age: just now under a minute, then in minutes", async () => {
+  const { QueueLane } = await import('../src/components/inbox/QueueLane.tsx');
+  const queuedAgo = (ms: number, name: string) =>
+    inboxCard({ name, workflow: 'dev', state: 'queued', queued: { at: new Date(Date.now() - ms).toISOString(), place: 1 } });
+  const html = await routedWith(createElement(QueueLane, { cards: [queuedAgo(20_000, 'fresh'), queuedAgo(3 * 60_000 + 20_000, 'older')] }));
+  const ages = [...html.matchAll(/<time[^>]*>([^<]*)<\/time>/g)].map((m) => m[1]);
+  assert.deepEqual(ages, ['queued just now', 'queued 3 minutes ago']);
+});

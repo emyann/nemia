@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { Locator } from 'playwright';
 import { fed, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
+import { budgetWord } from '../../../src/lib/money.ts';
 import { BUDGETING, writeBudgeting } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -22,13 +23,13 @@ async function expectRows(budgets: Locator, usd: { above: string; under: string 
   const high = budgets.locator(`[data-budget="${above.step}"]`);
   const low = budgets.locator(`[data-budget="${under.step}"]`);
   await expectVisible(
-    high.locator('[data-above-words]', { hasText: `above the workflow's $${above.budget.toFixed(2)}` }),
+    high.locator('[data-above-words]', { hasText: `above the workflow's ${budgetWord(above.budget)}` }),
     `${when}: ${above.step}'s ${usd.above} is said above the workflow's own $${above.budget}, never applied silently`,
   );
-  await expectVisible(high.locator('[data-own]', { hasText: `its own budget $${above.budget.toFixed(2)}` }), `${when}: its own budget`);
+  await expectVisible(high.locator('[data-own]', { hasText: `its own budget ${budgetWord(above.budget)}` }), `${when}: its own budget`);
   await expectVisible(high.locator('[data-why]', { hasText: above.why }), `${when}: and why the step proposed it`);
   await expectVisible(
-    low.locator('[data-own]', { hasText: `its own budget $${under.budget.toFixed(2)}` }),
+    low.locator('[data-own]', { hasText: `its own budget ${budgetWord(under.budget)}` }),
     `${when}: ${under.step}'s own budget`,
   );
   await expectCount(low.locator('[data-above-words]'), 0, `${when}: ${under.step}'s ${usd.under} is under it, and says nothing above`);
@@ -38,7 +39,7 @@ async function expectRows(budgets: Locator, usd: { above: string; under: string 
 export default {
   /**
    * A gate whose step proposes the budgets of the steps after it as data: drawn beside Approve, a row a step — its amount in a field, its
-   * own budget, `above the workflow's $40.00` where it is above it, why — and the run's line. Review's amount changed from $8 to $6,
+   * own budget, `above the workflow's $40` where it is above it, why — and the run's line. Review's amount changed from $8 to $6,
    * Approve sends that change alone (`budgets: [{ step: 'review', usd: 6 }]`); the api writes the caps into the approval, and the step,
    * read again, shows the caps its approval set (`gate.budgets.from === 'approved'`), implement's $60 still said above. Taken back, and
    * the run with it.

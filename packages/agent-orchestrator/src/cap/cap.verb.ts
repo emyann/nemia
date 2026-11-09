@@ -64,7 +64,7 @@ const needOf = Effect.fnUntraced(function* (
     steps,
     run,
     phaseOf,
-    closeoutReader(listed, run),
+    closeoutReader(listed, run, steps),
     closeoutAsked(listed),
     exitVerdicts(listed, run),
     asks,

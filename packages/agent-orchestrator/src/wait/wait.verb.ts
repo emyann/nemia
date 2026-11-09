@@ -79,7 +79,7 @@ export const hold = Effect.fn('hold')(function* (id: string, until: readonly str
         steps,
         run,
         phaseOf,
-        closeoutReader(views, run),
+        closeoutReader(views, run, steps),
         closeoutAsked(views),
         exitVerdicts(views, run),
         asks,

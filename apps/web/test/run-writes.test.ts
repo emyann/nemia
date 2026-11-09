@@ -16,16 +16,16 @@ import { runList } from './run-fixtures.ts';
 const SRC = path.resolve(import.meta.dirname, '../src');
 const COMPONENTS = path.join(SRC, 'components');
 
-/** The components that make a write that changes a run. */
+/** The files that make a write that changes a run, by their path from the source. */
 const WRITES = [
-  'gate/Ask.tsx',
-  'gate/Gate.tsx',
-  'run/HoldRun.tsx',
-  'run/LiftHold.tsx',
-  'run/PruneRun.tsx',
-  'run/RemoveRun.tsx',
-  'run/StartRun.tsx',
-  'agent/TryAgent.tsx',
+  'components/gate/Ask.tsx',
+  'lib/useApprove.ts',
+  'components/run/HoldRun.tsx',
+  'components/run/LiftHold.tsx',
+  'components/run/PruneRun.tsx',
+  'components/run/RemoveRun.tsx',
+  'components/run/StartRun.tsx',
+  'components/agent/TryAgent.tsx',
 ];
 
 /**
@@ -166,7 +166,7 @@ test("runsMoved with a run: the run's own record, and its steps' reads, since a 
 test('the writes that change a run, in src: none invalidates the whole list by hand', async (t) => {
   await t.test('no write that changes a run invalidates the whole list by hand: each calls runsMoved', () => {
     for (const file of WRITES) {
-      const text = fs.readFileSync(path.join(COMPONENTS, file), 'utf8');
+      const text = fs.readFileSync(path.join(SRC, file), 'utf8');
       assert.ok(text.includes('runsMoved('), `${file} calls runsMoved`);
       assert.equal(byHand(text), false, `${file} invalidates ['runs'] by hand: call runsMoved, which reads the frame's answer too`);
     }

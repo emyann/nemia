@@ -2,11 +2,12 @@ import { lazy, Suspense, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import type { StepTry } from '../../lib/api';
 import type { RunView, StepView } from '../../lib/runView';
-import { duration, isLive } from '../../lib/canvas';
+import { isLive } from '../../lib/canvas';
+import { durationWords } from '../../lib/duration';
 import { waitsAtGate, stepState, type StepState } from '../../lib/status';
 import { gateOfStep } from '../../lib/gate';
 import { foldTranscript, sessionToRead } from '../../lib/transcript';
-import { useStepTranscript } from '../../lib/useStepTranscript';
+import { useStepTranscript, type Following } from '../../lib/useStepTranscript';
 import { cn } from '../../lib/utils';
 import { Rounds, TryCloseouts, tryLabel } from './Closeout';
 import { Check, code, Facts, readRows, specRows, spentRows, when } from './Facts';
@@ -33,7 +34,7 @@ type Tab = (typeof TABS)[number];
  * at its gate, blocked or done — since what it handed on is what there is to read, and at a gate what a person approves; Details before
  * that.
  */
-export const openingTab = (step: Pick<Step, 'closeout'>): Tab => (step.closeout ? 'Output' : 'Details');
+const openingTab = (step: Pick<Step, 'closeout'>): Tab => (step.closeout ? 'Output' : 'Details');
 
 /**
  * What is going on in one step, in three tabs. It opens on the step's `openingTab`, and a tab a person picks is kept while it stays
@@ -157,7 +158,7 @@ function Details({ run, step, state, runCancelled, current, selected, onSelect }
                   'still running'
                 ) : null),
             ],
-            ['latest took', latest?.endedAt ? duration(Date.parse(latest.endedAt) - Date.parse(latest.startedAt)) : null],
+            ['latest took', latest?.endedAt ? durationWords(Date.parse(latest.endedAt) - Date.parse(latest.startedAt), 'second') : null],
             ['ran on', ranOnWords(latest)],
             ['used', step.used?.used],
             ['cost', step.used?.cost],
@@ -213,7 +214,7 @@ function Output({ step, state, selected }: { step: Step; state: StepState; selec
 }
 
 /** How many of the conversation's last turns the tab draws: its tail, with the whole of it a click away. */
-const ACTIVITY_TURNS = 30;
+export const ACTIVITY_TURNS = 30;
 
 /**
  * The tail of the step's conversation — the session page's, read and followed the same way — and the way to the whole of it. It is followed
@@ -223,6 +224,14 @@ const ACTIVITY_TURNS = 30;
 function Activity({ run, step }: { run: RunView; step: Step }) {
   const cancelled = run.cancelledAt !== null;
   const following = useStepTranscript(run.id, step.name, sessionToRead(step), waitsAtGate(stepState(step, cancelled, false), cancelled));
+  return <ActivityTail run={run} step={step} following={following} />;
+}
+
+/**
+ * What the Activity tab draws of the conversation `following` holds: its last `ACTIVITY_TURNS` turns, compact, and the way to the
+ * whole of it.
+ */
+export function ActivityTail({ run, step, following }: { run: RunView; step: Step; following: Following }) {
   const turns = useMemo(() => foldTranscript(following.events), [following.events]);
   const tail = turns.slice(-ACTIVITY_TURNS);
 

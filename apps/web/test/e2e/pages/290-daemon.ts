@@ -73,11 +73,11 @@ export default {
         "a daemon's start line on the feed is read on the line itself: the dot is ok with no reload, and long before the minute's fallback",
       );
 
-      fs.writeFileSync(file, daemonFile(20 * MIN + 30_000));
+      fs.writeFileSync(file, daemonFile(20 * MIN));
       await reload(page);
       const stalled = page.locator('[data-daemon="stalled"]', {
         hasText: new RegExp(
-          `^Nothing ticks this store, so no run moves: the nemia up of pid ${process.pid} is alive but silent, last heard from 20 min ago\\. ${START} — it takes the store over\\.$`,
+          `^Nothing ticks this store, so no run moves: the nemia up of pid ${process.pid} is alive but silent, last heard from 20 minutes ago\\. ${START} — it takes the store over\\.$`,
         ),
       });
       await expectVisible(

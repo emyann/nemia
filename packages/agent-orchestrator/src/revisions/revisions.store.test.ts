@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { debtBreaks as heldTo, seamUses as usesOf, sourcesUnder } from 'test-kit/debt';
+import { debtBreaks, seamUses, sourcesUnder, type DebtBreak } from 'test-kit/debt';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { act, done, doorFrom, walksOn } from '../../test/door-walks.ts';
@@ -82,37 +82,34 @@ const SEAM = ['ledgerOf', 'appendRevision'];
 /** The door's own files: where the seam is defined, not a debt. */
 const OWN = ['src/revisions/revisions.store.ts', 'src/revisions/memory.store.ts'];
 
-/** Every file of `src` but the tests and the door's own, by its path from the package. */
-const sourcesOfSrc = (): Record<string, string> => sourcesUnder(PKG, 'src', OWN);
-
 /** The seam's uses in each file — a call, or the function handed on — comment lines and bindings left out. */
-const seamUses = (sources: Record<string, string>): Map<string, number> =>
-  usesOf(sources, new RegExp(`(?<![\\w$.])(?:${SEAM.join('|')})(?![\\w$])`, 'g'), { bindings: true });
+const SEAM_USE = new RegExp(`(?<![\\w$.])(?:${SEAM.join('|')})(?![\\w$])`, 'g');
 
-/** Why the uses of `sources` break the baseline `debt`: a file it does not name, a count grown, a count fallen. */
-function debtBreaks(sources: Record<string, string>, debt: Readonly<Record<string, number>>): string[] {
-  return heldTo(seamUses(sources), debt).map(({ file, uses: n, owed, kind }) =>
-    kind === 'grown'
-      ? `${file} uses the ledger's synchronous spellings ${n} time(s) where test/ledger-door.baseline.ts names ${owed}: yield LedgerDoor (src/revisions/revisions.store.ts) instead`
-      : kind === 'fallen'
-        ? `${file} uses the ledger's synchronous spellings ${n} time(s): lower its count in test/ledger-door.baseline.ts to ${n}, which only shrinks`
-        : `${file} uses the ledger's synchronous spellings no more: take its line out of test/ledger-door.baseline.ts`,
-  );
-}
+/** What a break of the baseline says: a file it does not name or a count grown, a count fallen, a file with none left. */
+const inWords = ({ file, uses: n, owed, kind }: DebtBreak): string =>
+  kind === 'grown'
+    ? `${file} uses the ledger's synchronous spellings ${n} time(s) where test/ledger-door.baseline.ts names ${owed}: yield LedgerDoor (src/revisions/revisions.store.ts) instead`
+    : kind === 'fallen'
+      ? `${file} uses the ledger's synchronous spellings ${n} time(s): lower its count in test/ledger-door.baseline.ts to ${n}, which only shrinks`
+      : `${file} uses the ledger's synchronous spellings no more: take its line out of test/ledger-door.baseline.ts`;
 
 test("no file of src uses the ledger's synchronous spellings but as test/ledger-door.baseline.ts counts it, and the count only shrinks", async () => {
   const { LEDGER_DOOR_DEBT } = await import('../../test/ledger-door.baseline.ts');
-  assert.deepEqual(debtBreaks(sourcesOfSrc(), LEDGER_DOOR_DEBT), []);
+  assert.deepEqual(debtBreaks(seamUses(sourcesUnder(PKG, 'src', OWN), SEAM_USE, { bindings: true }), LEDGER_DOOR_DEBT).map(inWords), []);
 });
 
 test('REFUSED: a converted file that uses a spelling again, and a count the baseline holds above what is left', async () => {
   const { LEDGER_DOOR_DEBT } = await import('../../test/ledger-door.baseline.ts');
-  const sources = sourcesOfSrc();
+  const sources = sourcesUnder(PKG, 'src', OWN);
   const again = {
     ...sources,
     'src/revisions/revisions.ts': `${sources['src/revisions/revisions.ts']}\nconst x = ledgerOf('agent', 'coder');\n`,
   };
-  assert.equal(debtBreaks(again, LEDGER_DOOR_DEBT).length, 1);
+  assert.equal(debtBreaks(seamUses(again, SEAM_USE, { bindings: true }), LEDGER_DOOR_DEBT).length, 1);
   const [first] = Object.keys(LEDGER_DOOR_DEBT);
-  assert.equal(debtBreaks(sources, { ...LEDGER_DOOR_DEBT, [first]: (LEDGER_DOOR_DEBT[first] ?? 0) + 1 }).length, 1);
+  assert.equal(
+    debtBreaks(seamUses(sources, SEAM_USE, { bindings: true }), { ...LEDGER_DOOR_DEBT, [first]: (LEDGER_DOOR_DEBT[first] ?? 0) + 1 })
+      .length,
+    1,
+  );
 });

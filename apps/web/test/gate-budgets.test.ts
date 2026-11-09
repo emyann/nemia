@@ -48,8 +48,8 @@ test("the gate's budgets are drawn per step: its amount, its own budget, the 'ab
   );
   assert.match(html, /data-gate-budgets="proposed"/);
   assert.match(html, /data-budget="implement" data-above=""/);
-  assert.match(html, /above the workflow&#x27;s \$40\.00/);
-  assert.match(html, /its own budget \$16\.00/);
+  assert.match(html, /above the workflow&#x27;s \$40</);
+  assert.match(html, /its own budget \$16</);
   assert.equal(html.match(/above the workflow/g)?.length, 1, "review's row says no 'above'");
   assert.match(html, /Five parts, as the two wide runs took\./);
   assert.match(html, /spent \$3\.10 so far; at most \$81\.10 under these caps/);

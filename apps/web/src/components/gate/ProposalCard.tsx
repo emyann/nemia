@@ -11,11 +11,11 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Instant } from '@/components/time/Instant';
-import { approveProposal, declineProposal, proposalKey, proposalQuery, proposalsKey, ReadRefusal } from '@/lib/api';
-import { filled, ink, ringed } from '@/lib/meaning';
+import { approveProposal, declineProposal, proposalKey, proposalQuery, proposalsKey, readGone } from '@/lib/api';
+import { ink } from '@/lib/meaning';
 import { proposalOffers, widensHue, type ProposalOffers } from '@/lib/proposals';
 import { cn } from '@/lib/utils';
-import { PROPOSAL_WORDS } from '@/lib/words';
+import { ProposalTags } from './ProposalTags';
 
 /** What a change does to its object, in the person's words. */
 const VERB_WORDS: Record<ChangeVerb, string> = { create: 'makes', update: 'changes', delete: 'removes' };
@@ -42,7 +42,7 @@ export function ProposalCard({ factory, name }: { factory: string; name: string 
     },
   });
   if (!proposal) {
-    if (error instanceof ReadRefusal && error.status === 404)
+    if (readGone(error))
       return (
         <p data-no-proposal={name} className="text-body-medium text-muted-foreground">
           {factory} has no proposal named {name}: it was never made, or its factory is gone.
@@ -96,7 +96,7 @@ const approverOf = (proposal: Proposal): string | null => {
 };
 
 /** A proposal as it reads, with the buttons its phase offers; a refusal of the last click in the api's words. */
-export function ProposalView({
+function ProposalView({
   proposal,
   pending,
   refused,
@@ -108,7 +108,6 @@ export function ProposalView({
   onJudge: (asked: Judgement) => void;
 }) {
   const { phase, widens, changes, message } = proposal.status;
-  const words = PROPOSAL_WORDS[phase];
   const offers = proposalOffers(phase);
   const approver = approverOf(proposal);
   return (
@@ -116,18 +115,7 @@ export function ProposalView({
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2">
           <span className="font-mono break-all">{proposal.metadata.name}</span>
-          <span data-proposal-word title={words.title} className={cn('rounded px-2 py-0.5 text-label-medium', filled[words.hue])}>
-            {words.word}
-          </span>
-          {widens && (
-            <span
-              data-proposal-widens
-              title="An object it changes reaches further than it did: read each change before approving it."
-              className={cn('rounded px-2 py-0.5 text-label-medium', ringed[widensHue(phase)])}
-            >
-              Widens access
-            </span>
-          )}
+          <ProposalTags phase={phase} widens={widens} size="medium" />
         </CardTitle>
         <CardDescription>
           Proposed by <span data-proposal-by>{proposerOf(proposal)}</span>, <Instant at={proposal.metadata.creationTimestamp} />

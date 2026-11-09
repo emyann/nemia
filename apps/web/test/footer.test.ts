@@ -145,7 +145,7 @@ test("daemonDot: the daemon's dot and its title", async (t) => {
     assert.equal(dot.word, 'stalled');
     assert.match(
       dot.title,
-      /^Nothing ticks this store, so no run moves: the api of pid 4242 is alive but silent, last heard from 30 min ago\./,
+      /^Nothing ticks this store, so no run moves: the api of pid 4242 is alive but silent, last heard from 30 minutes ago\./,
     );
     assert.match(dot.title, /npm start in apps\/api — it takes the store over\.$/);
   });

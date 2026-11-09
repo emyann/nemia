@@ -110,10 +110,10 @@ const PATHED = new RegExp(`[/\\\\-]${OLD_V}|path\\.join\\([^)]*['"\`]${OLD_V}['"
 
 /**
  * The keys an older board wrote in a person's browser, each quoted whole: the board reads or forgets what is under them, so their names
- * are the browser's and stay. A key the board writes today is refused: this allows the Factory's narrow arrangement, its dragged steps,
- * its arrangement and open runs, and a run's arrangement from before `v2`, and no other.
+ * are the browser's and stay. A key the board writes today is refused: this allows the Factory's narrow arrangement and a run's
+ * arrangement from before `v2`, and no other.
  */
-const LEFT_IN_BROWSER = new RegExp(`'${OLD}:(?:factory-(?:layout(?::v2)?|steps|open)|canvas-layout:[^':]+)'`, 'g');
+const LEFT_IN_BROWSER = new RegExp(`'${OLD}:(?:factory-layout|canvas-layout:[^':]+)'`, 'g');
 
 /**
  * The board's own files, by path from the repository's root: what it shows is its name, so the lower-case word alone (`BARE`) is refused
@@ -274,6 +274,9 @@ test('REFUSED: the former project name in a title, a package, a label, a plugin,
     `const layoutKey = (runId: string) => \`${OLD}:canvas-layout:v2:\${runId}\`;`,
     `kept.set('${OLD}:canvas-layout:v2:r-1', saved);`,
     `const KEY = "${OLD}:factory-open";`,
+    `const KEY = '${OLD}:factory-open';`,
+    `const KEY = '${OLD}:factory-steps';`,
+    `const KEY = '${OLD}:factory-layout:v2';`,
     `new Client({ name: '${OLD}-api', version: '0.0.0' })`,
     `const tmp = scratch('${OLD}-api-read-');`,
     `pluginDir: ['/a/${OLD}-x']`,
@@ -300,7 +303,6 @@ test('a path that names the checkout, the earlier project, a store, a key an old
     `sh${OLD}-x and ${OLD}s: a word of its own`,
     'Nemia — the name alone',
     `const NARROW_FACTORY_KEY = '${OLD}:factory-layout';`,
-    `const FACTORY_LEFTOVER_KEYS = ['${OLD}:factory-steps', '${OLD}:factory-layout:v2', '${OLD}:factory-open'];`,
     `const kept = new Map([['${OLD}:canvas-layout:r-1', saved]]);`,
   ])
     assert.deepEqual(projectNames(line), [], line);

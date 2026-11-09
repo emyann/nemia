@@ -12,7 +12,7 @@ import { acceptAsk, acceptWordsRefusal, roundAsk } from './round.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { runStore } from '../record/files.store.ts';
 import { strayAsk } from '../say/say.verb.ts';
-import { closeoutAsked, closeoutReader, spendReader, taskPhasesRead } from '../views/views.verb.ts';
+import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
@@ -36,7 +36,18 @@ export const roundRun = Effect.fn('round')(function* (id: string, stepName?: str
   const steps = yield* stepsOf(run);
   const { views, phaseOf } = yield* taskPhasesRead(run);
   const answer = (asks: readonly RoundAsk[]) =>
-    roundAsk(steps, run, stepName, phaseOf, closeoutReader(views, run, steps), closeoutAsked(views), asks, spendReader(views), budget);
+    roundAsk(
+      steps,
+      run,
+      stepName,
+      phaseOf,
+      closeoutReader(views, run, steps),
+      closeoutAsked(views),
+      asks,
+      spendReader(views),
+      budget,
+      exitVerdicts(views, run),
+    );
 
   const first = answer((yield* (yield* RunDoor).asks.read(RunId.read(id))).rounds);
   if ('refusal' in first) return yield* Effect.fail(new Conflict({ message: first.refusal }));
@@ -88,7 +99,18 @@ export const acceptRun = Effect.fn('accept')(function* (id: string, stepName?: s
   const steps = yield* stepsOf(run);
   const { views, phaseOf } = yield* taskPhasesRead(run);
   const answer = (now: Run, rounds: readonly RoundAsk[]) =>
-    acceptAsk(steps, now, stepName, message, phaseOf, closeoutReader(views, now), closeoutAsked(views), rounds, spendReader(views));
+    acceptAsk(
+      steps,
+      now,
+      stepName,
+      message,
+      phaseOf,
+      closeoutReader(views, now, steps),
+      closeoutAsked(views),
+      rounds,
+      spendReader(views),
+      exitVerdicts(views, now),
+    );
 
   const first = answer(run, (yield* (yield* RunDoor).asks.read(RunId.read(id))).rounds);
   if ('refusal' in first) return yield* Effect.fail(new Conflict({ message: first.refusal }));

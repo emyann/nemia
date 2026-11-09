@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { BAR, GRAIN_TAIL, failing, grainedOf, hex, lookOf, ratio, ratioOf, tableOf, under, type Pair, type Sheet } from './e2e/contrast.ts';
+import { BAR, failing, grainedOf, hex, lookOf, ratio, ratioOf, tableOf, under, type Pair, type Sheet } from './e2e/contrast.ts';
 import { scratch } from 'test-kit/scratch';
 
 const WHITE = [255, 255, 255] as const;
@@ -68,7 +68,6 @@ test('the table names each failing pair once a scheme, worst first, with its col
 });
 
 test('REFUSED: a pair under the bar at a grain’s far end: it fails as any measured pair, and the table says it is a grain’s', () => {
-  assert.equal(GRAIN_TAIL, 0.02);
   const far = pair([0x6a, 0x6a, 0x6a], { ground: [0xc9, 0xc9, 0xc9], grained: true });
   assert.equal(under(far), true);
   assert.equal(under(pair([0x6a, 0x6a, 0x6a])), false, 'the same ink on the plain ground holds');

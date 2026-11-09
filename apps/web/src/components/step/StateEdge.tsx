@@ -6,7 +6,7 @@ import { useReducedMotion } from '../../lib/useReducedMotion';
  * What an edge on a canvas is drawn from: what it says (`CanvasEdge.state`), whether it is a loop's edge back, and whether it is a line of
  * what a run reads as context (`read`), faint and dotted, which no run waits on.
  */
-export type StateEdgeData = { state: EdgeState; loop: boolean; read?: boolean; untaken?: boolean };
+type StateEdgeData = { state: EdgeState; loop: boolean; read?: boolean; untaken?: boolean };
 export type StateFlowEdge = Edge<StateEdgeData, 'state'>;
 
 /**
@@ -56,7 +56,7 @@ export function StateEdge({
 }
 
 /** A route not taken: a hairline, faint, dashed as work that will not come. */
-export const UNTAKEN = { strokeWidth: 0.75, opacity: 0.4 } as const;
+const UNTAKEN = { strokeWidth: 0.75, opacity: 0.4 } as const;
 
 /** A line of what a run reads as context: faint and dotted, beneath every wait. */
 export const READ_LINE = {

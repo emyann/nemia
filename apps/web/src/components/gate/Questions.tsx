@@ -9,9 +9,10 @@ import type { Question, QuestionAnswer, RetryMode } from '../../lib/api';
 import { askedSaid, type Answer } from '../../lib/asks';
 import { cn } from '../../lib/utils';
 import { OFFERS } from '../../lib/words';
-import { BUTTON, MODES, Refusal, TEXTAREA, useAsk } from './Ask';
+import { MODES, Refusal, useAsk } from './Ask';
 import { Markdown } from '../markdown/Markdown';
 import type { Frozen } from '../../lib/frozen';
+import { BUTTON, TEXTAREA } from '../../lib/classes';
 
 /** What a person has said so far of each question, by its title: the labels chosen, and words of their own. */
 export type Draft = Readonly<Record<string, { chose: readonly string[]; own: string }>>;
@@ -22,7 +23,7 @@ const said = (draft: Draft, q: Frozen<Question>) => draft[q.title] ?? { chose: [
  * The labels `q` recommends, as a list: none for null, one for a label, and every label of a list, which a question that takes several
  * may recommend.
  */
-export const recommendedOf = (q: Frozen<Question>): readonly string[] =>
+const recommendedOf = (q: Frozen<Question>): readonly string[] =>
   q.recommended === null ? [] : typeof q.recommended === 'string' ? [q.recommended] : q.recommended;
 
 /** `draft` with every question that has a recommendation set to it, and their words kept; a question without one is left as it was. */
@@ -97,7 +98,7 @@ export function Questions({ field, questions }: { field: string; questions: read
 }
 
 /** One question to answer: its options as radios, or checkboxes where it takes several, and a line for words of the person's own. */
-export function QuestionField({ q, n, draft, onDraft }: { q: Frozen<Question>; n: number; draft: Draft; onDraft: (next: Draft) => void }) {
+function QuestionField({ q, n, draft, onDraft }: { q: Frozen<Question>; n: number; draft: Draft; onDraft: (next: Draft) => void }) {
   const id = useId();
   const { chose, own } = said(draft, q);
   return (

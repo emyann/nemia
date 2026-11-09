@@ -8,7 +8,8 @@ import type { StepPhase } from './api/reasons.ts';
 import type { RunView, StepView } from './runView.ts';
 import type { RunSummary } from './api/runs.ts';
 import { meaningOf } from './meaning.ts';
-import { sinceShort, sinceWords, whenWords } from './runWords.ts';
+import { durationWords } from './duration.ts';
+import { whenWords } from './runWords.ts';
 import { stateDrawn, stepState, type StepState } from './status.ts';
 import { stateWordsOf } from './words.ts';
 
@@ -16,10 +17,10 @@ import { stateWordsOf } from './words.ts';
 export type StepKind = 'work' | 'gate' | 'done' | 'come' | 'failed';
 
 /** The hue of the card's frame: the look's `FrameHue`, said here where no component is loaded. */
-export type CardHue = 'alive' | 'yours' | 'none';
+type CardHue = 'alive' | 'yours' | 'none';
 
 /** The kit's `Tag` a kind is drawn with. */
-export type CardTag = { word: string; color: 'secondary' | 'primary' | 'neutral' | 'error'; variant: 'tonal' | 'filled' | 'outlined' };
+type CardTag = { word: string; color: 'secondary' | 'primary' | 'neutral' | 'error'; variant: 'tonal' | 'filled' | 'outlined' };
 
 /** The time box: what it measures, its figure, a note beside it, and the ink of its figure. */
 export type CardTime = { label: string; value: string; note: string; ink: 'alive' | 'yours' | 'failure' | 'plain' | 'muted' };
@@ -86,7 +87,7 @@ export function kindOf(phase: StepPhase, state: StepState, ran: boolean): StepKi
 }
 
 /** The frame's hue for a state, its drawing's own: `alive` at work, `yours` where it waits on a person, and none for every other. */
-export function hueOf(state: StepState): CardHue {
+function hueOf(state: StepState): CardHue {
   const meaning = meaningOf(stateDrawn[state].hue);
   return meaning === 'alive' || meaning === 'yours' ? meaning : 'none';
 }
@@ -100,7 +101,7 @@ function roundsOf(step: DetailStep, steps: readonly DetailStep[]): number | null
  * The step's tries and rounds, never its place among the run's steps (the rail says it): `try 1 · round 1 of 3`, `2 tries` for a step
  * done after more than one, `up to 3 rounds` for a step to come in a loop, and `not started` for one outside it.
  */
-export function placeOf(step: DetailStep, steps: readonly DetailStep[], kind: StepKind): string {
+function placeOf(step: DetailStep, steps: readonly DetailStep[], kind: StepKind): string {
   const rounds = roundsOf(step, steps);
   const current = step.tries.at(-1);
   if (!current) return rounds === null ? 'not started' : `up to ${rounds} rounds`;
@@ -124,17 +125,17 @@ const untimed = (label: string, ink: CardTime['ink']): CardTime => ({ label, val
 
 /** How long its last session ran, said under an ended step's instant. */
 const ranNote = (step: DetailStep, ranMs: number | null): string =>
-  ranMs === null ? '' : `${step.tries.length > 1 ? 'its last try ran' : 'ran'} ${sinceWords(ranMs)}`;
+  ranMs === null ? '' : `${step.tries.length > 1 ? 'its last try ran' : 'ran'} ${durationWords(ranMs, 'minute')}`;
 
 /**
  * The time box of each kind: at work for how long and since when, waiting since its session ended, done or failed at its end and how long
  * it ran, and to come after the steps it waits for.
  */
-export function timeOf(step: DetailStep, kind: StepKind, now: Date): CardTime {
+function timeOf(step: DetailStep, kind: StepKind, now: Date): CardTime {
   const { start, end, ranMs } = sessionOf(step);
   const since = (from: string, label: string, ink: CardTime['ink']): CardTime => ({
     label,
-    value: sinceShort(now.getTime() - Date.parse(from)),
+    value: durationWords(now.getTime() - Date.parse(from), 'minute'),
     note: `since ${whenWords(new Date(from), now)}`,
     ink,
   });
@@ -156,7 +157,7 @@ const contextSaid = (tokens: number | null): string =>
   tokens === null ? 'whole window' : tokens >= 1000 ? `${Math.round(tokens / 1000)}k tokens` : `${tokens} tokens`;
 
 /** The session's five facts, whole: its harness, model, effort, context and permission, from what its try was filed with first. */
-export function factsOf(step: DetailStep): Array<{ key: string; value: string }> {
+function factsOf(step: DetailStep): Array<{ key: string; value: string }> {
   const { spec, filed } = step;
   const first = (...values: Array<string | null | undefined>): string => values.find((value) => value != null) ?? 'default';
   return [
@@ -172,7 +173,7 @@ export function factsOf(step: DetailStep): Array<{ key: string; value: string }>
  * The spend: at work, not measured yet, since a session's spend is measured when it ends; to come, its budget; else the kit's meter of
  * its spend against its budget, or its spend alone where it has none, or not measured where nothing was.
  */
-export function spendOf(step: DetailStep, kind: StepKind): CardSpend {
+function spendOf(step: DetailStep, kind: StepKind): CardSpend {
   const { spent, budget } = step;
   const of = budget ? `of ${budget.said}` : '';
   if (kind === 'work') return { kind: 'words', label: 'Spent', said: 'not measured yet', note: of };
@@ -195,7 +196,7 @@ function gateWords(step: DetailStep, now: Date): string | null {
  * The card's one note, the first that says something: the agent's last line, the calls its harness denied, its check's refusal, then
  * its gate's words; null when none does.
  */
-export function noteOf(step: DetailStep, now: Date): CardNote | null {
+function noteOf(step: DetailStep, now: Date): CardNote | null {
   if (step.lastLine) return { text: step.lastLine, icon: 'info' };
   if (step.denied) return { text: step.denied.words, icon: 'shield' };
   const refused = refusalOf(step);

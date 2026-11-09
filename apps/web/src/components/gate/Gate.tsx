@@ -1,18 +1,19 @@
 import { useId, useState, type ReactNode } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { approveStep, decisionQuery, type Question, type QuestionAnswer, type RetryMode, type StepCloseout } from '../../lib/api';
-import { useRunNamespace } from '@/lib/runNamespace';
+import { useQuery } from '@tanstack/react-query';
+import { decisionQuery, type Question, type QuestionAnswer, type RetryMode, type StepCloseout } from '../../lib/api';
 import type { RunView, StepView } from '../../lib/runView';
 import { askedSaid } from '../../lib/asks';
 import { decidableRun, decisionStamp, isDecidable } from '../../lib/decide';
 import { cn } from '../../lib/utils';
 import { Artifacts, HandedOn, Statement } from '../step/Closeout';
-import { BUTTON, MODES, Refusal, TEXTAREA, useAsk } from './Ask';
+import { MODES, Refusal, useAsk } from './Ask';
 import { answersFrom, QuestionFields, RecommendButton, unanswered, type Draft } from './Questions';
 import { when } from '../step/Facts';
-import { runsMoved } from '@/lib/runWrites';
+import { useApprove } from '../../lib/useApprove';
+import { backName, endingWarning } from '../../lib/gate';
 import type { Frozen } from '../../lib/frozen';
 import { budgetsGiven, GateBudgetFields, GateBudgetRows, type Amounts, type GateBudgets, type GivenBudget } from './GateBudgets';
+import { BUTTON, BUTTON_SECONDARY, TEXTAREA } from '../../lib/classes';
 
 /** A gated step's gate, as its object's status holds it. */
 type StepGate = NonNullable<StepView['gate']>;
@@ -60,6 +61,7 @@ export function Gate({
   approveLine,
   back = [step],
   acts = false,
+  onto = null,
   framed = true,
   closeout = null,
   questions = [],
@@ -71,6 +73,8 @@ export function Gate({
   approveLine: string;
   back?: readonly string[];
   acts?: boolean;
+  /** The base branch an ending runs on, where the run knows it (`branch`), named in the warning its second press reads. */
+  onto?: string | null;
   /** False where what the gate asks is said above it already (the inspector's brief): no sentence of its own, and no box around it. */
   framed?: boolean;
   closeout?: Frozen<StepCloseout> | null;
@@ -82,10 +86,11 @@ export function Gate({
   const [amounts, setAmounts] = useState<Amounts>({});
   const [to, setTo] = useState(back[0] ?? step);
   const field = useId();
-  const approval = useApprove(runId, step, () => {
+  const forget = () => {
     setDraft({});
     setAmounts({});
-  });
+  };
+  const approval = useApprove(runId, step, { onApproved: forget });
   const sendBack = useAsk(runId, step, () => setDraft({}));
   const busy = approval.isPending || sendBack.isPending;
   const answering = { questions, draft, left: unanswered(questions, draft) };
@@ -121,6 +126,7 @@ export function Gate({
           <ApproveForm
             step={step}
             acts={acts}
+            onto={onto}
             approveLine={approveLine}
             field={field}
             approval={approval}
@@ -139,12 +145,11 @@ export function Gate({
 
 /** What a gate asks of a person, said above it where nothing else says it. */
 function GateSentence({ step, back, acts }: { step: string; back: readonly string[]; acts: boolean }) {
-  const backName = back.length === 1 ? back[0] : 'the work';
   return (
     <p className="break-words">
       <strong>{step}</strong> waits at its gate:{' '}
       {acts
-        ? `nothing of it runs until you approve it — your approval is what files it${back.length ? ` — or you send ${backName} back` : ''}.`
+        ? `nothing of it runs until you approve it — your approval is what files it${back.length ? ` — or you send ${backName(back)} back` : ''}.`
         : 'nothing after it is filed until you approve what it handed on, or send it back.'}
     </p>
   );
@@ -190,6 +195,7 @@ const approveWaits = (left: readonly string[], unread: readonly string[]): strin
 function ApproveForm({
   step,
   acts,
+  onto,
   approveLine,
   field,
   approval,
@@ -201,6 +207,7 @@ function ApproveForm({
 }: Answering & {
   step: string;
   acts: boolean;
+  onto: string | null;
   approveLine: string;
   field: string;
   approval: ReturnType<typeof useApprove>;
@@ -247,7 +254,7 @@ function ApproveForm({
           {approval.isPending ? 'Approving…' : confirming ? `Run ${step} now` : 'Approve'}
         </button>
         {confirming && !approval.isPending && (
-          <button type="button" onClick={() => setConfirming(false)} className={cn(BUTTON, SECONDARY)}>
+          <button type="button" onClick={() => setConfirming(false)} className={cn(BUTTON, BUTTON_SECONDARY)}>
             Not yet
           </button>
         )}
@@ -255,13 +262,21 @@ function ApproveForm({
           as <code>{approveLine}</code> approves it: the next tick files {acts ? 'it' : 'what waits on it'}
         </p>
       </div>
-      {confirming && (
-        <p data-confirm className="text-body-small font-medium text-yours">
-          {`This runs ${step} in the repository's own checkout, and it cannot be taken back: press Run ${step} now to approve it.`}
-        </p>
-      )}
+      {confirming && <EndingConfirm step={step} onto={onto} />}
       {approval.isError && <Refusal error={approval.error} not="Not approved" />}
     </form>
+  );
+}
+
+/**
+ * What an ending's second press asks, once Approve was pressed: the warning the card says too (`endingWarning`), then the press that
+ * approves it.
+ */
+export function EndingConfirm({ step, onto }: { step: string; onto: string | null }) {
+  return (
+    <p data-confirm className="text-body-small font-medium text-yours">
+      {`${endingWarning(step, onto)} Press Run ${step} now to approve it.`}
+    </p>
   );
 }
 
@@ -290,12 +305,11 @@ function SendBackForm({
 }) {
   const [objection, setObjection] = useState('');
   const [mode, setMode] = useState<RetryMode>('continue');
-  const backName = back.length === 1 ? back[0] : 'the work';
   const body = sendBackBody({ step, to, mode, objection, questions, draft });
   const waits = sendBackWaits({ step, to, questions, draft });
   return (
     <form
-      aria-label={`Send ${backName} back`}
+      aria-label={`Send ${backName(back)} back`}
       className="space-y-2 border-t border-outline-variant pt-3"
       onSubmit={(event) => {
         event.preventDefault();
@@ -303,7 +317,7 @@ function SendBackForm({
       }}
     >
       <label htmlFor={`${field}-objection`} className="sr-only">
-        {`What to change, sent back to ${backName}`}
+        {`What to change, sent back to ${backName(back)}`}
       </label>
       <textarea
         id={`${field}-objection`}
@@ -318,12 +332,12 @@ function SendBackForm({
           type="submit"
           disabled={busy || waits.length > 0 || !(body.message?.trim() || body.answers)}
           title={notAnswered(waits)}
-          className={cn(BUTTON, SECONDARY)}
+          className={cn(BUTTON, BUTTON_SECONDARY)}
         >
           {sendBack.isPending ? 'Sending back…' : 'Send back'}
         </button>
         <Choice
-          legend={`How to send ${backName} back`}
+          legend={`How to send ${backName(back)} back`}
           name={`${field}-mode`}
           options={GATE_MODES}
           value={mode}
@@ -617,26 +631,4 @@ export function Approved({
       {budgets?.from === 'approved' && <GateBudgetRows step={step} budgets={budgets} />}
     </section>
   );
-}
-
-/** The look of a gate's second button: outlined, beside the filled one that answers. */
-export const SECONDARY = 'bg-card text-foreground ring-1 ring-outline ring-inset hover:bg-accent disabled:hover:bg-card';
-
-/**
- * An approval of a step at its gate through the api (`approveStep`), and the run read again once the api has it — its detail, and the
- * list the Factory's card reads, each by its own key (`exact`), never a decision: a decision is keyed by the state it was read for, and
- * refetching the key the page is on would fill it with the answer for the state after this write. Sent in the run's namespace:
- * `namespace` where the caller holds it, as a card on the floor does, else the run's own (`useRunNamespace`).
- */
-export function useApprove(runId: string, step: string, onApproved: () => void, namespace?: string) {
-  const queryClient = useQueryClient();
-  const namespaceNow = useRunNamespace(runId, namespace);
-  return useMutation({
-    mutationFn: (how: { message?: string; answers?: readonly QuestionAnswer[]; budgets?: readonly GivenBudget[] }) =>
-      namespaceNow().then((ns) => approveStep(ns, runId, step, how)),
-    onSuccess: () => {
-      onApproved();
-      void runsMoved(queryClient, runId);
-    },
-  });
 }

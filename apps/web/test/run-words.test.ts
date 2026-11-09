@@ -1,25 +1,21 @@
 /**
- * The runs page's plain words (src/lib/runWords.ts): one sentence per kind of wait, how a finished run ended, a time to the minute and
+ * The runs page's plain words (src/lib/runWords.ts): one sentence per kind of wait, how a finished run ended (`ENDED`), how long ago and
  * what the rail says, each over a row as the light answer gives it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { RunSummary } from '../src/lib/api.ts';
 import type { StepState } from '../src/lib/status.ts';
-import { PAUSED, PERSON } from '../src/lib/words.ts';
+import { ENDED, PAUSED, PERSON } from '../src/lib/words.ts';
 import {
   agoWords,
   barSaid,
-  endedWords,
   JUST_NOW,
   nowOf,
   openWord,
   presentWait,
   railSaid,
   sentenceOf,
-  sinceCreated,
-  sinceShort,
-  sinceWords,
   WAIT_KINDS,
   waitKindOf,
   waitOf,
@@ -233,7 +229,7 @@ test("waitOf, waitSentence, openWord, waitTag: the one sentence and the button's
     const unknown = summary([['plan', 'running']], { waitingOnYou: ['plan'] });
     assert.doesNotMatch(`${waitSentence(unknown)} ${waitTag(unknown)}`, words);
     for (const outcome of ['succeeded', 'failed', 'cancelled', 'undecided'] as const) {
-      assert.doesNotMatch(`${endedWords(outcome).word} ${endedWords(outcome).title}`, words, outcome);
+      assert.doesNotMatch(`${ENDED[outcome].word} ${ENDED[outcome].title}`, words, outcome);
     }
   });
   await t.test("a waiting card's tag names the step where the person acts on one, and says a wait the board has no kind for", () => {
@@ -246,26 +242,14 @@ test("waitOf, waitSentence, openWord, waitTag: the one sentence and the button's
 /** No character but printable ASCII: a narrow no-break space before AM or PM is refused. */
 const PLAIN = /^[ -~]+$/;
 
-test('endedWords, whenWords, presentWait, sinceCreated: how a run ended, and when, in plain words', async (t) => {
-  await t.test('how a finished run ended is drawn in its hue, and a run called off is said as its steps are', () => {
+test('ENDED, whenWords, presentWait: how a run ended, and when, in plain words', async (t) => {
+  await t.test("how a finished run ended is drawn in its outcome's hue, and a run called off is said as its steps are", () => {
     const outcomes = ['succeeded', 'cancelled', 'failed', 'undecided'] as const;
     assert.deepEqual(
-      outcomes.map((outcome) => endedWords(outcome).hue),
+      outcomes.map((outcome) => ENDED[outcome].hue),
       ['sage', 'grey', 'failure', 'yours'],
     );
-    assert.equal(endedWords('cancelled').word, PERSON.cancelled.rail);
-  });
-  await t.test('a time is a fact to the minute, wall time', () => {
-    const [S, M, H, D] = [1_000, 60_000, 3_600_000, 86_400_000];
-    assert.equal(sinceCreated(0), 'under a minute since it was created');
-    assert.equal(sinceCreated(59 * S), 'under a minute since it was created');
-    assert.equal(sinceCreated(27 * M + 40 * S), '27m since it was created');
-    assert.equal(sinceCreated(3 * H + 12 * M), '3h 12m since it was created');
-    assert.equal(sinceCreated(2 * D + 4 * H + 59 * M), '2d 4h since it was created');
-    assert.equal(sinceWords(3 * H), '3h');
-    assert.equal(sinceWords(2 * D), '2d');
-    assert.equal(sinceWords(-5), 'under a minute');
-    assert.deepEqual([0, 59 * S, M, 3 * H + 12 * M].map(sinceShort), ['under 1m', 'under 1m', '1m', '3h 12m'], 'short, where room is');
+    assert.equal(ENDED.cancelled.word, PERSON.cancelled.rail);
   });
   await t.test('the present wait is said since the instant it began, to the minute, and not at all where none is dated', () => {
     const asOf = new Date('2026-10-12T12:00:00.000Z');
@@ -275,7 +259,7 @@ test('endedWords, whenWords, presentWait, sinceCreated: how a run ended, and whe
     assert.equal(
       presentWait(since(-300_000), asOf),
       'under 1m',
-      'an instant after the answer was read is under a minute, as `sinceShort` says any figure below one',
+      'an instant after the answer was read is under a minute, as `durationWords` says any figure below one to the minute',
     );
     assert.equal(presentWait({ waitingSince: null }, asOf), null);
   });
@@ -376,7 +360,7 @@ test('railSaid, barSaid, nowOf: what the rail and a run in flight say of its ste
     const paused = summary([...DONE.slice(0, 1), ['implement', 'waiting on the pause']]);
     assert.equal(nowOf(paused)?.word, PAUSED.rail, 'a check the pause holds says so, as its chip does');
     assert.equal(nowOf(summary([...DONE])), null, 'every step done: nothing to say');
-    const DURATION = /\b\d+[dhms]\b|under a minute/;
+    const DURATION = /\b\d+[dhms]\b|under (a minute|1m)/;
     assert.match(`implement (2 of 4), 2m`, DURATION, 'the pattern finds the duration the note used to carry');
     for (const row of [working, checking, queued])
       assert.doesNotMatch(

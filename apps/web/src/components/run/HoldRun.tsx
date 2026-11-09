@@ -11,9 +11,9 @@ import type { RunView } from '../../lib/runView';
 import { titleOf } from '../../lib/factory';
 import { holdable, holdCandidates } from '../../lib/hold.ts';
 import { cn } from '../../lib/utils';
-import { POPOVER } from '../inbox/CardGate';
 import { Refusal } from '../gate/Ask';
 import { runsMoved } from '@/lib/runWrites';
+import { POPOVER } from '../../lib/classes';
 
 /**
  * Hold, on a run's page: the button opens a popover where a person ticks the runs to wait on, or none, and may say why, and the hold is

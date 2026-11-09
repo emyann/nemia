@@ -73,28 +73,28 @@ test('daemonSentence and daemonWords: what is said of the daemon, kind by kind',
   await t.test('REFUSED: a daemon that stopped is said by its kind, the api or a nemia up, with when', () => {
     assert.equal(
       said(held({ kind: 'stopped', ticking: false, stoppedAt: at(12), lastHeardAt: at(12) })),
-      'Nothing ticks this store, so no run moves: the nemia up of pid 4242 stopped 12 min ago. Start one with npm start in apps/api.',
+      'Nothing ticks this store, so no run moves: the nemia up of pid 4242 stopped 12 minutes ago. Start one with npm start in apps/api.',
     );
     assert.match(
       said(held({ kind: 'stopped', by: 'api', url: 'http://127.0.0.1:8787', ticking: false, stoppedAt: at(12) }))!,
-      /: the api of pid 4242 stopped 12 min ago\. /,
+      /: the api of pid 4242 stopped 12 minutes ago\. /,
     );
     assert.match(
       said(held({ kind: 'stopped', ticking: false, stoppedAt: at(0.2) }))!,
-      /stopped under a minute ago\./,
-      'never `just now`, which reads as fine',
+      /stopped just now\./,
+      'an age under a minute as every page says it (`agoWords`)',
     );
   });
   await t.test('REFUSED: a daemon whose process is gone is said, with when it was last heard from', () => {
     assert.equal(
       said(held({ kind: 'gone', by: 'api', ticking: false, identity: 'gone', lastHeardAt: at(3) })),
-      'Nothing ticks this store, so no run moves: the api of pid 4242 is gone, last heard from 3 min ago. Start one with npm start in apps/api.',
+      'Nothing ticks this store, so no run moves: the api of pid 4242 is gone, last heard from 3 minutes ago. Start one with npm start in apps/api.',
     );
   });
   await t.test('REFUSED: a daemon alive but silent past its stale mark is said as stalled, and the next daemon takes it over', () => {
     assert.equal(
       said(held({ kind: 'stalled', ticking: false, passedAt: at(20), lastHeardAt: at(20) })),
-      'Nothing ticks this store, so no run moves: the nemia up of pid 4242 is alive but silent, last heard from 20 min ago. Start one with npm start in apps/api — it takes the store over.',
+      'Nothing ticks this store, so no run moves: the nemia up of pid 4242 is alive but silent, last heard from 20 minutes ago. Start one with npm start in apps/api — it takes the store over.',
     );
   });
   await t.test("the command is the api's own start, its own part, for the page to set as code", () => {

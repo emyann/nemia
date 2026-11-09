@@ -11,7 +11,7 @@ import { lastWords, quotaTitle, type WindowWords, windowWords } from './quota.ts
 import { stepState } from './status.ts';
 
 /** What is at work across every factory: the runs in flight, and the sessions working or checking. */
-export type AtWork = { runs: number; sessions: number };
+type AtWork = { runs: number; sessions: number };
 
 /**
  * What is at work in `open`, the light answer of every factory: the runs in flight by the api's own count (`counts.inFlight`), which counts

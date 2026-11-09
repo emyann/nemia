@@ -2,7 +2,7 @@
  * The frame's floating bar for a run: what a person needs to see of it without leaving the floor — what it asks of them, its steps and
  * their statuses, and its brief — read from the run's record, which a read again keeps current. Its page, which Open visits, has the rest.
  */
-import { runGone } from '@/lib/api';
+import { readGone } from '@/lib/api';
 import { useRunRead, type RunView } from '@/lib/runView';
 import { titleOf } from '@/lib/factory';
 import { useBar } from '@/lib/useBar';
@@ -34,7 +34,7 @@ export function RunBar({ run: id }: { run: string }) {
  */
 export function RunBody({ id, run, error }: { id: string; run: RunView | undefined; error: unknown }) {
   const { show } = useBar();
-  if (run && runGone(error)) return <RunGone run={run} />;
+  if (run && readGone(error)) return <RunGone run={run} />;
   if (!run) return <Unread id={id} error={error} />;
   const onStep = (step: string) => show({ kind: 'step', run: id, step });
   return (

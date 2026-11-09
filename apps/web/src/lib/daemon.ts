@@ -3,20 +3,16 @@
  * (`Daemon`). Pure: the time is handed in, the browser's own on the page, so an age moves between reads.
  */
 import type { Daemon } from './api';
-import { agoWord } from './quota.ts';
+import { agoWords } from './runWords.ts';
 
 /**
  * The line in three parts, `before` + `command` + `after`, so the page can set the command — the api's `start` — as code and a test can
  * read the sentence whole.
  */
-export type DaemonWords = { before: string; command: string; after: string };
+type DaemonWords = { before: string; command: string; after: string };
 
-/** How long ago the daemon did something, as the line says it: never `just now`, which reads as a daemon that is fine. */
-const heard = (at: string | null, now: Date): string => {
-  if (!at) return 'at a time its file does not say';
-  const ms = now.getTime() - Date.parse(at);
-  return ms < 60_000 ? 'under a minute ago' : agoWord(ms);
-};
+/** How long ago the daemon did something, as every page says an age (`agoWords`): `20 minutes ago`, `just now`. */
+const heard = (at: string | null, now: Date): string => (at ? agoWords(new Date(at), now) : 'at a time its file does not say');
 
 /**
  * Why nothing ticks the store and how to start what does, or null when a daemon ticks it — nothing to say then. The holder is named by

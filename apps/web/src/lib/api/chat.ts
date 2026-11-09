@@ -4,9 +4,10 @@
  * same followed as server-sent events, the person's words put in her outbox, a question of hers answered, their read mark moved, and
  * the turn she is answering ended. Each type with the schema `get` and `send` decode it with.
  */
-import { Option, Schema } from 'effect';
+import { Schema } from 'effect';
 import { decodes } from './decodes.ts';
 import { get, send } from './read.ts';
+import { UnreadableSchema, type StreamUnreadable } from './stream.ts';
 
 /**
  * Mirrors the package's `ChatFrom`: who a message is from — her, the person, the keeper, whose words are a quiet marker, or another
@@ -254,31 +255,15 @@ const ChatReadMarkSchema = decodes<ChatReadMark>()(
 export type ChatStreamData = {
   presence: ChatPresence;
   chat: ChatEvent;
-  unreadable: { error: string; retrying: boolean };
+  unreadable: StreamUnreadable;
 };
 
-/** Decodes the data of each event of `ChatStreamData`, by its name. */
-const CHAT_SCHEMAS: { readonly [K in keyof ChatStreamData]: Schema.Decoder<ChatStreamData[K]> } = {
+/** Decodes the data of each event of `ChatStreamData`, by its name, for `streamDataOf` (`stream.ts`). */
+export const CHAT_STREAM_SCHEMAS: { readonly [K in keyof ChatStreamData]: Schema.Decoder<ChatStreamData[K]> } = {
   presence: ChatPresenceSchema,
   chat: ChatEventSchema,
-  unreadable: decodes<ChatStreamData['unreadable']>()(
-    Schema.Struct({
-      error: Schema.String,
-      retrying: Schema.Boolean,
-    }),
-  ),
+  unreadable: UnreadableSchema,
 };
-
-/** The data `data` of a stream event named `event`, decoded by its schema: undefined for data that is no JSON or not of its shape. */
-export function chatDataOf<K extends keyof ChatStreamData>(event: K, data: string): ChatStreamData[K] | undefined {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(data);
-  } catch {
-    return undefined;
-  }
-  return Option.getOrUndefined(Schema.decodeUnknownOption(CHAT_SCHEMAS[event])(parsed));
-}
 
 /** Where her chat is read. */
 export const chatPath = '/api/nemia/chat';

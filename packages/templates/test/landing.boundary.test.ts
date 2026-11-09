@@ -1,5 +1,5 @@
 /**
- * sdlc's landing, its two acts (`sdlc/workflows/build/landing.ts`, which `quick/` carries byte for byte): the merge of a run's own
+ * sdlc's landing, its two acts (`sdlc/carried/landing.ts`, which `build` and `quick` both run): the merge of a run's own
  * green pull request on GitHub, which the landing session types once its step is filed, and the receipt the land step's `check:` runs.
  * Driven in a scratch checkout whose `origin` is a bare repository holding the merge GitHub would have made, so the fast-forward is a
  * real fast-forward and a diverged checkout a real refusal, with a stub `gh` first on the PATH that records each call and answers from
@@ -7,7 +7,7 @@
  * name is the repository's a factory is applied to, never the script's.
  *
  * The land steps' checks are read off sdlc as a factory gets it — rendered by `nemia factory apply` and the controller on a scratch
- * store — and run as the run runs one (`checkArgv`). On GitHub (`github=true`): the receipt alone, from the run's frozen workflow files,
+ * store — and run as the run runs one (`checkArgv`). On GitHub (`github=true`): the receipt alone, from the run's frozen carried files,
  * no suite and no e2e, and a refusal where those files are not named. In the checkout, sdlc's default: the local check, on the tree a
  * landing staged, calling no `gh`.
  *
@@ -33,9 +33,10 @@ import { type Called, type Gh, type Rule, bareOrigin, ghStub, gitIn } from './or
 /** The template these scripts ship in. */
 const SDLC = path.join(import.meta.dirname, '..', 'sdlc');
 
-const BUILD = path.join(SDLC, 'workflows', 'build');
+/** The carried folder, where the landing and the helpers it shares with the pull-request script are kept once. */
+const CARRIED = path.join(SDLC, 'carried');
 
-const SCRIPT = path.join(BUILD, 'landing.ts');
+const SCRIPT = path.join(CARRIED, 'landing.ts');
 
 /** sdlc as a factory gets it: the factory's rendered tree, and the scratch store it is in. */
 type Rendered = { tree: string; store: string };
@@ -1001,13 +1002,15 @@ test('a receipt told not to wait on ci reads no check, saying so by landingWaits
 });
 
 test("the receipt's wait fits the landing check's deadline: the start bound under the whole, and the whole 300 s under the deadline", () => {
-  const source = fs.readFileSync(SCRIPT, 'utf8');
-  const end = source.indexOf('function ciAt(');
-  assert.ok(end > 0, 'landing.ts has its ciAt');
-  const head = source.slice(0, end);
+  assert.match(
+    fs.readFileSync(SCRIPT, 'utf8'),
+    /\bSTART_SECONDS, WHOLE_SECONDS\b[^;]*from '\.\/exec\.ts'/,
+    'landing.ts waits by the shared bounds',
+  );
+  const head = fs.readFileSync(path.join(CARRIED, 'exec.ts'), 'utf8');
   const bound = (name: string): number => {
-    const found = new RegExp(`const ${name} = ([\\d_]+);`).exec(head);
-    assert.ok(found, `landing.ts declares ${name} before ciAt`);
+    const found = new RegExp(`export const ${name} = ([\\d_]+);`).exec(head);
+    assert.ok(found, `exec.ts declares ${name}`);
     return Number(found[1].replaceAll('_', ''));
   };
   assert.ok(bound('START_SECONDS') < bound('WHOLE_SECONDS'));
@@ -1017,19 +1020,16 @@ test("the receipt's wait fits the landing check's deadline: the start bound unde
   );
 });
 
-test("both land steps' checks, rendered on GitHub, are the receipt alone, run from the run's frozen workflow files, and run no suite and no e2e", async () => {
+test("both land steps' checks, rendered on GitHub, are the receipt alone, run from the run's frozen carried files, and run no suite and no e2e", async () => {
   const at = (await renders()).github;
   for (const workflow of ['build', 'quick']) {
     const step = stepsOf(at, workflow).find((s) => s.name === 'land');
     assert.equal(typeof step?.check, 'string', `sdlc's ${workflow} has a land step with a check`);
     const frozen = step!.check!;
     assert.ok(
-      frozen.startsWith(
-        'if [ "true" = true ]; then { if [ -n "${WF_WORKFLOW_FILES:-}" ]; then node "$WF_WORKFLOW_FILES/landing.ts" receipt --run "$WF_RUN" --check "ci" --wait-on-ci "true";',
-      ),
-      `on GitHub, the receipt is run from the run's frozen workflow files first:\n${frozen}`,
+      frozen.includes('/landing.ts" receipt --run "$WF_RUN" --check "ci" --wait-on-ci "true"; else'),
+      `on GitHub, the receipt is the whole of the check, run on the run the check names:\n${frozen}`,
     );
-    assert.ok(frozen.includes('landing.ts" receipt --run "$WF_RUN"'), `and run on the run the check names:\n${frozen}`);
     assert.doesNotMatch(frozen, /\$WF_BASE_REF/, 'a workspace: base step is given no base ref');
     assert.doesNotMatch(frozen, /turbo run test|npm test/, "the suite is ci's, on the head the review read");
     assert.doesNotMatch(frozen, /npm run e2e/, 'and so is the whole e2e');
@@ -1064,11 +1064,11 @@ test("both land steps' checks, rendered on GitHub, are the receipt alone, run fr
     assert.notEqual(
       unset.code,
       0,
-      `with no frozen workflow files named the check refuses, never reads the receipt from elsewhere:\n${unset.out}`,
+      `with no frozen carried files named the check refuses, never reads the receipt from elsewhere:\n${unset.out}`,
     );
-    assert.match(unset.err, /WF_WORKFLOW_FILES/, 'naming the variable');
+    assert.match(unset.err, /WF_CARRIED_FILES/, 'naming the variable');
     assert.equal(w.gh.calls().length, calls, 'and no receipt ran');
-    const passed = check({ WF_WORKFLOW_FILES: path.join(at.tree, 'workflows', workflow) });
+    const passed = check({ WF_CARRIED_FILES: path.join(at.tree, 'workflows', 'carried') });
     assert.equal(passed.code, 0, passed.err);
     assert.match(passed.out, /nemia land: #7 is merged as [0-9a-f]{12}, a merge commit/, 'the receipt, from the frozen files');
     assert.ok(waited(w.gh.calls(), `commits/${w.merged}`).length > 0, 'and its wait on ci at the merge commit');
@@ -1077,7 +1077,7 @@ test("both land steps' checks, rendered on GitHub, are the receipt alone, run fr
   const unwaited = (await renders()).unwaited;
   for (const workflow of ['build', 'quick']) {
     const frozen = stepsOf(unwaited, workflow).find((s) => s.name === 'land')?.check ?? '';
-    assert.ok(frozen.includes('receipt --run "$WF_RUN" --check "ci" --wait-on-ci "false";'), `${workflow}: ${frozen}`);
+    assert.ok(frozen.includes('receipt --run "$WF_RUN" --check "ci" --wait-on-ci "false"; else'), `${workflow}: ${frozen}`);
   }
 });
 

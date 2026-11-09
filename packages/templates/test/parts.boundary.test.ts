@@ -1,5 +1,5 @@
 /**
- * sdlc's parts door (`sdlc/workflows/build/parts.ts`, which `quick/` carries byte for byte): before the implement step signs off, every
+ * sdlc's parts door (`sdlc/carried/parts.ts`, which `build` and `quick` both run): before the implement step signs off, every
  * other branch of its run is held by its own, by patch as the landing reads it, or declared replaced and removed by the script, its tip
  * kept. Driven as the step and its check drive it, in a scratch repository on a run's branch, each call a bounded subprocess.
  *
@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 
-const SCRIPT = path.join(import.meta.dirname, '..', 'sdlc', 'workflows', 'build', 'parts.ts');
+const SCRIPT = path.join(import.meta.dirname, '..', 'sdlc', 'carried', 'parts.ts');
 
 /** Run git in `dir`, as nobody in particular. */
 const git = (dir: string, ...args: string[]): string =>

@@ -1,11 +1,11 @@
 /**
- * sdlc's probe door (`sdlc/workflows/build/probe.ts`, which `quick/` carries byte for byte): a session a step starts to measure
+ * sdlc's probe door (`sdlc/carried/probe.ts`, which `build` and `quick` both run): a session a step starts to measure
  * something is named for its run, says in its first message whether the person must act, runs in the machinery's trusted folder,
  * reaches the person's phone (Remote Control) only when it asks for an answer, and is refused by implement's check while it is live.
  * Driven as a step and the check drive it, in a scratch repository on a run's branch, with a stub `claude` first on the PATH that
  * records each call and lists the rows it is given, a scratch `HOME` and `WF_ROOT`, each a bounded subprocess; and build's implement
  * check, as sdlc renders it for a factory (`nemia factory apply` and the controller on a scratch store, its checks set to a stub),
- * is run whole as the run runs a check (`checkArgv`), from the rendered folder as the run's frozen workflow files, with the pull
+ * is run whole as the run runs a check (`checkArgv`), from the rendered carried folder as the run's frozen carried files, with the pull
  * request's world stood up (`test/origin.ts`), so the clause is proven wired and not only written.
  */
 import { test } from 'node:test';
@@ -22,9 +22,10 @@ import { bareOrigin, ghIn, passing } from './origin.ts';
 /** The template these scripts ship in. */
 const SDLC = path.join(import.meta.dirname, '..', 'sdlc');
 
-const BUILD = path.join(SDLC, 'workflows', 'build');
+/** The carried folder, where the scripts the checks run are kept once. */
+const CARRIED = path.join(SDLC, 'carried');
 
-const SCRIPT = path.join(BUILD, 'probe.ts');
+const SCRIPT = path.join(CARRIED, 'probe.ts');
 
 /** sdlc as a factory gets it: the factory's rendered tree, and the scratch store it is in. */
 type Rendered = { tree: string; store: string };
@@ -226,7 +227,7 @@ test("REFUSED: the check, while a probe of the run is live, naming stop; it pass
   assert.equal(refused.code, 1, refused.out);
   assert.match(refused.err, /a probe of run r-1 is still live/);
   assert.match(refused.err, /r-1-probe-a blocked/);
-  assert.match(refused.err, /WF_WORKFLOW_FILES[^`]*\/probe\.ts"\sstop/, 'it names stop on the frozen probe.ts');
+  assert.match(refused.err, /WF_CARRIED_FILES[^`]*\/probe\.ts"\sstop/, 'it names stop on the frozen probe.ts');
   assert.ok(!refused.err.includes('r-2-probe-a'), refused.err);
   for (const state of ['stopped', 'done', 'failed']) {
     const ended = probe(placed({ rows: [row('r-1-probe-a', state), row('r-2-probe-a', 'working')] }), ['check'], { WF_RUN: 'r-1' });
@@ -270,15 +271,18 @@ function based(files: Record<string, string>): { repo: string; base: string } {
   return { repo, base };
 }
 
-test("REFUSED at shipped defaults: implement's check, rendered, refuses a live probe of its run and passes once it is stopped; with no frozen workflow files it refuses, never skips", async () => {
+test("REFUSED at shipped defaults: implement's check, rendered, refuses a live probe of its run and passes once it is stopped; with no frozen carried files it refuses, never skips", async () => {
   const rendering = await renderedSdlc(['roundCheck=round-check', 'localCheck=round-check']);
   const check = stepsOf(rendering, 'build').find((step) => step.name === 'implement')?.check;
   assert.equal(typeof check, 'string', "sdlc's build has an implement step with a check");
   const scripts = Object.fromEntries(
-    ['landing.ts', 'parts.ts', 'probe.ts', 'pull-request.ts'].map((name) => [
-      `workflows/build/${name}`,
-      fs.readFileSync(path.join(BUILD, name), 'utf8'),
-    ]),
+    fs.readdirSync(CARRIED).flatMap((name) => {
+      const text = fs.readFileSync(path.join(CARRIED, name), 'utf8');
+      return [
+        [`carried/${name}`, text],
+        [name, text],
+      ];
+    }),
   );
   const { repo, base } = based(scripts);
   const closeout = path.join(scratch('wf-probe-closeout-'), 'closeout.json');
@@ -301,7 +305,7 @@ test("REFUSED at shipped defaults: implement's check, rendered, refuses a live p
     const r = spawnSync(cmd, args, { cwd: repo, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120_000 });
     return { status: r.status, out: `${r.stdout}${r.stderr}`, err: r.stderr };
   };
-  const frozen = { WF_WORKFLOW_FILES: path.join(rendering.tree, 'workflows', 'build') };
+  const frozen = { WF_CARRIED_FILES: path.join(rendering.tree, 'workflows', 'carried') };
   const refused = run(frozen);
   assert.notEqual(refused.status, 0, refused.out);
   assert.match(refused.out, /a probe of run r-1 is still live/);
@@ -310,7 +314,7 @@ test("REFUSED at shipped defaults: implement's check, rendered, refuses a live p
   assert.equal(passed.status, 0, passed.out);
   const unset = run({});
   assert.notEqual(unset.status, 0, unset.out);
-  assert.match(unset.err, /WF_WORKFLOW_FILES/, 'a check with no frozen workflow files refuses, never skips');
+  assert.match(unset.err, /WF_CARRIED_FILES/, 'a check with no frozen carried files refuses, never skips');
   assert.deepEqual(
     unset.err
       .trim()
@@ -319,5 +323,9 @@ test("REFUSED at shipped defaults: implement's check, rendered, refuses a live p
     [true],
     `it refuses at the probe clause, on one line naming probe.ts, and runs no clause after it:\n${unset.err}`,
   );
-  assert.doesNotMatch(unset.out, /no live probe of run r-1/, "nor reads probe.ts from the run's base, which holds it");
+  assert.doesNotMatch(
+    unset.out,
+    /no live probe of run r-1/,
+    "nor reads probe.ts from the run's base, which holds it at its root and in carried/",
+  );
 });

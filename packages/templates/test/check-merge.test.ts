@@ -15,11 +15,10 @@ import { copyOf, nemia, rendered, SDLC, storeEnv } from './template.ts';
 const TEMPLATE = copyOf(SDLC);
 
 /** The end of the parts.ts clause in a workflow.yaml's check line, its quotes escaped as the YAML string writes them. */
-const PARTS_END =
-  'parts.ts\\" check; else echo \\"nemia check: WF_WORKFLOW_FILES is not set, so parts.ts is read from the run\'s frozen workflow files alone: this check runs in a run, which sets it\\" >&2; false; fi; } && ';
+const PARTS_END = '/parts.ts\\" check && ';
 
-/** The opening of the probe.ts clause in a rendered step file's check. */
-const PROBE_START = '{ if [ -n "${WF_WORKFLOW_FILES:-}" ]; then node "$WF_WORKFLOW_FILES/probe.ts" check;';
+/** The end of the probe.ts clause in a rendered step file's check. */
+const PROBE_END = '/probe.ts" check && ';
 
 /** The sentence of build's implement note that lists the check's scripts on GitHub, as sdlc writes it. */
 const LISTED = 'Your check runs `probe.ts`, `parts.ts` and the factory';
@@ -47,7 +46,7 @@ function rewrite(folder: string, file: string, from: string, to: string): void {
 function leftByOperators(): void {
   const spliced = factory('spliced').tree;
   for (const workflow of ['build', 'quick'])
-    rewrite(spliced, `workflows/${workflow}/implement.md`, PROBE_START, `{ own-check; } && ${PROBE_START}`);
+    rewrite(spliced, `workflows/${workflow}/implement.md`, PROBE_END, `${PROBE_END}{ own-check; } && `);
   rewrite(spliced, 'workflows/build/implement.md', LISTED, LISTED.replace('`probe.ts`', '`own-check`, `probe.ts`'));
   fs.appendFileSync(path.join(factory('parameter').tree, 'RULES.md'), '\nA rule of our own.\n');
 }

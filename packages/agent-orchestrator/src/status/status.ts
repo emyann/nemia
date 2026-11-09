@@ -1001,3 +1001,10 @@ export function usedLines(u: Consumed | undefined): string[] {
     cost,
   ];
 }
+
+/**
+ * The try a refusal points a person to for a step that stopped, as `nemia retry` takes it: with `--budget <amount>` where the step reads
+ * `over budget`, since a try of it without one is refused (`retryRefusal`). Pure.
+ */
+export const tryCommand = (run: Run, step: string, status: StepStatus): string =>
+  `nemia retry ${run.id} ${step}${status === 'over budget' ? ' --budget <amount>' : ''}`;

@@ -29,6 +29,7 @@ import {
   loopOf,
   roundOf,
   roundWord,
+  tryCommand,
   type MergeLanding,
   type MergeOf,
   type Round,
@@ -36,7 +37,6 @@ import {
 } from '../status/status.ts';
 import { landingSaidSection, type LandingSaid } from '../check/check.ts';
 import { heldRefusal, prunedRefusal } from '../forget/prune/prune.ts';
-import { tryCommand } from '../retry/retry-ask.ts';
 import { sayFilled, skillSaid, type PlaceSay } from '../place/place.ts';
 import type { Offer } from '../decide/decide.ts';
 

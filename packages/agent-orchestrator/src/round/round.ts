@@ -34,6 +34,7 @@ import {
   sentBack,
   spentWord,
   standing,
+  tryCommand,
   waitsAtGate,
   type Round,
   type RoundAsk,
@@ -44,7 +45,6 @@ import {
 } from '../status/status.ts';
 import { loopSpan } from '../workflow/index.ts';
 import type { EarlierTry, TryCause } from '../retry/index.ts';
-import { tryCommand } from '../retry/retry-ask.ts';
 import { heldRefusal, prunedRefusal } from '../forget/prune/prune.ts';
 import { holdWord } from '../wait/wait.ts';
 import type { Decision, Offer } from '../decide/decide.ts';
@@ -295,23 +295,8 @@ export function roundAsk(
   if (waits) return no(waits);
 
   const at = (s: Workflow) => standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
-  const span = spanSteps(steps, looping);
-  const stopping = span.find((s) => at(s).own !== 'exhausted' && stopsFollowers(at(s).own));
-  if (stopping) {
-    return no(
-      `${stopping.name} is ${at(stopping).status} in round ${now} of ${looping.name}'s loop, so the round cannot end, and there is no round to go again. Try ${stopping.name} again: ${tryCommand(run, stopping.name, at(stopping).status)} — or see why: nemia decide ${run.id}.`,
-    );
-  }
-  const gate = span.find((s) => at(s).status === 'awaiting approval')?.name;
-  if (gate) {
-    const handedOn =
-      gate === looping.name
-        ? `${gate} signed off without asking for another round (\`again: false\`), and waits at its gate`
-        : `${gate} waits at its gate in round ${now} of ${looping.name}'s loop`;
-    return no(
-      `${handedOn}: a person's word moves it, not a round. Approve it — nemia approve ${run.id} ${gate} — or send it back: nemia retry ${run.id} ${gate} --message "<objection>".`,
-    );
-  }
+  const held = spanRefusal(spanSteps(steps, looping), looping, run, now, at);
+  if (held) return no(held);
   const { status, own } = at(looping);
   if (status === 'exhausted' || (status === 'over budget' && satisfiesAfter(own))) {
     if (filed) {
@@ -425,6 +410,31 @@ function acceptWaits(run: Run, looping: Workflow, asks: readonly RoundAsk[]): st
     'accepting now would end a loop whose work the merge sends back, and the merge would move the accepted try behind',
     `nemia approve ${run.id} ${looping.name} --message "<why>"`,
   );
+}
+
+/**
+ * Why a step of the loop's round holds a round off, each step read where it stands (`at`): one that stopped, pointed to its try as
+ * `nemia retry` takes it (`tryCommand`), or one at its gate, pointed to a person's word — or undefined.
+ */
+function spanRefusal(
+  span: readonly Workflow[],
+  looping: Workflow,
+  run: Run,
+  now: number,
+  at: (s: Workflow) => { status: StepStatus; own: StepStatus },
+): string | undefined {
+  const stopping = span.find((s) => at(s).own !== 'exhausted' && stopsFollowers(at(s).own));
+  if (stopping) {
+    const { status } = at(stopping);
+    return `${stopping.name} is ${status} in round ${now} of ${looping.name}'s loop, so the round cannot end, and there is no round to go again. Try ${stopping.name} again: ${tryCommand(run, stopping.name, status)} — or see why: nemia decide ${run.id}.`;
+  }
+  const gate = span.find((s) => at(s).status === 'awaiting approval')?.name;
+  if (!gate) return undefined;
+  const handedOn =
+    gate === looping.name
+      ? `${gate} signed off without asking for another round (\`again: false\`), and waits at its gate`
+      : `${gate} waits at its gate in round ${now} of ${looping.name}'s loop`;
+  return `${handedOn}: a person's word moves it, not a round. Approve it — nemia approve ${run.id} ${gate} — or send it back: nemia retry ${run.id} ${gate} --message "<objection>".`;
 }
 
 /**

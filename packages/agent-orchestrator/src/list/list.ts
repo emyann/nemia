@@ -366,7 +366,7 @@ function listedSteps(
       ? []
       : retriesDue(steps, run, settledOf, readable, askedCloseout, verdictOf, asks, (taskId) => phaseOf(taskId) === 'needs-human', spendOf);
   const rounds =
-    run.cancelledAt || run.pruned || run.hold ? [] : roundsDue(steps, run, settledOf, readable, askedCloseout, roundAsks, spendOf, verdictOf);
+    run.cancelledAt || run.pruned || run.hold ? [] : roundsDue(steps, run, settledOf, readable, askedCloseout, roundAsks, spendOf);
   const refiled = roundSpans(steps, rounds);
   const waitingAgain = unheld(steps, run, due, rounds);
   const assessed = assess(

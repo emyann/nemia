@@ -4,9 +4,10 @@
  * with `--local`. Reads move first and writes keep their path until a later card moves each (the intent's Q5); `--local` reads a store
  * that is not served (Q14).
  *
- * The client's own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`, resource-objects' decision 5, and `propose` and `proposals`, a
- * change of a factory's definitions proposed and judged) are verbs the orchestrator's table
- * has none of: they ask the api alone, whatever else is typed, and say their own help and refuse `--local` themselves.
+ * The client's own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`, resource-objects' decision 5, `propose` and `proposals`, a
+ * change of a factory's definitions proposed and judged, and `decide`, the one decide read model the api serves, read and prompted on
+ * here — the untangle intent's Q14) are verbs the orchestrator's table has none of: they ask the api alone, whatever else is typed, and
+ * say their own help and refuse `--local` themselves.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
@@ -17,7 +18,7 @@ export const READ_VERBS = ['show', 'closeout', 'ls', 'inbox', 'watch'] as const;
 export type ReadVerb = (typeof READ_VERBS)[number];
 
 /** The verbs this client alone has, generic over every kind the api serves: no process answers them. */
-export const CLIENT_VERBS = ['get', 'apply', 'explain', 'propose', 'proposals'] as const;
+export const CLIENT_VERBS = ['get', 'apply', 'explain', 'propose', 'proposals', 'decide'] as const;
 
 /** One of `CLIENT_VERBS`. */
 export type ClientVerb = (typeof CLIENT_VERBS)[number];
@@ -33,7 +34,7 @@ const moved = (name: string): boolean => name === 'show' || name === 'closeout' 
 
 /** Whether `name` is one of `CLIENT_VERBS`. */
 const own = (name: string): boolean =>
-  name === 'get' || name === 'apply' || name === 'explain' || name === 'propose' || name === 'proposals';
+  name === 'get' || name === 'apply' || name === 'explain' || name === 'propose' || name === 'proposals' || name === 'decide';
 
 const routeSpec = spec<(command: Routed) => Route>({
   ensures: {

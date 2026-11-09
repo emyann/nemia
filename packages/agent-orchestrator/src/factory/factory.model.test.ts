@@ -6,7 +6,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Option, Schema } from 'effect';
-import { AppliedTemplate, Factory, FactoryName, factoryModel, Hire, Volume } from './factory.model.ts';
+import { Factory, FactoryName, factoryModel, Hire } from './factory.model.ts';
+import { erDiagram } from '../model/er.model.ts';
 
 /** A factory as `readFactory` answers one: attached, hiring and scheduling, its instruction in the store. */
 const PIPAO = {
@@ -60,8 +61,13 @@ test('a factory decodes as its store reads one, and one whose wiring outlives a 
 test('a hire names its factory, its workflow and step, and its agent, each by id', () => {
   assert.equal(Schema.is(Hire)({ factory: 'pipao', workflow: 'build', step: 'implement', agent: 'ada' }), true);
   assert.equal(Schema.is(Hire)({ factory: 'pipao', step: 'build/implement', agent: 'ada' }), false, 'the workflow is its own field');
-  assert.deepEqual(factoryModel.ids, { FactoryName: 'Factory' });
-  assert.deepEqual(factoryModel.entities, [Factory, AppliedTemplate, Hire, Volume]);
+});
+
+test("the factory's part of the diagram draws its four entities, and a FactoryName as the factory it names", () => {
+  const lines = erDiagram(factoryModel).split('\n');
+  for (const entity of ['Factory', 'AppliedTemplate', 'Hire', 'Volume'])
+    assert.ok(lines.includes(`  ${entity} {`), `${entity} has a block`);
+  assert.ok(lines.includes('  Factory ||--o{ Hire : factory'), lines.join('\n'));
 });
 
 test('a factory mounts volumes beside its repositories, and one that is a repository or named twice is refused', async (t) => {

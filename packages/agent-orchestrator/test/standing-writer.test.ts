@@ -4,25 +4,14 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import path from 'node:path';
+import { sourcesUnder } from 'test-kit/debt';
 
 const PKG = path.join(import.meta.dirname, '..');
 
 /** The file that defines `writeStanding`, and the one file that may call it. */
 const STORE = 'src/standing/standing.store.ts';
 const WRITER = 'src/standing/standing.verb.ts';
-
-/** Every file of `src` but the tests beside the code and the store's own, by its path from the package. */
-function sourcesOfSrc(): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const entry of fs.readdirSync(path.join(PKG, 'src'), { recursive: true, withFileTypes: true })) {
-    if (!entry.isFile() || !entry.name.endsWith('.ts') || entry.name.endsWith('.test.ts')) continue;
-    const file = path.relative(PKG, path.join(entry.parentPath, entry.name)).split(path.sep).join('/');
-    if (file !== STORE) out[file] = fs.readFileSync(path.join(PKG, file), 'utf8');
-  }
-  return out;
-}
 
 /** The files among `sources` that name `writeStanding`, sorted. */
 const writersIn = (sources: Record<string, string>): string[] =>
@@ -42,5 +31,5 @@ test('REFUSED: a second file that imports writeStanding, across line breaks, is 
 });
 
 test('the pass is the one writer of standing.json: no file of src but standing.verb.ts names writeStanding', () => {
-  assert.deepEqual(writersIn(sourcesOfSrc()), [WRITER]);
+  assert.deepEqual(writersIn(sourcesUnder(PKG, 'src', [STORE])), [WRITER]);
 });

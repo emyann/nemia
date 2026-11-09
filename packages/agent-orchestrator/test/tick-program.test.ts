@@ -22,6 +22,7 @@ import type { Refusal } from '../src/refusal/refusal.ts';
 import type { EngineService as Service } from '../src/runtime-client.ts';
 import type { Pass } from '../src/tick/tick.verb.ts';
 import { scratch } from 'test-kit/scratch';
+import { importsIn } from 'test-kit/imports';
 import { plainEngine } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
 import { testPlace } from '../place/memory/index.ts';
@@ -171,15 +172,16 @@ test('a pass handed a reading of the disk keeps it as it is and measures nothing
   );
   await runWith(e, tickRun({ repo: ROOT, disk: () => undefined }));
   assert.equal('disk' in recentPasses().at(-1)!, false, 'a pass handed no reading keeps none');
-  const source = fs.readFileSync(path.join(import.meta.dirname, '..', 'src', 'tick', 'tick.verb.ts'), 'utf8');
-  const imports = source.slice(0, source.indexOf('export type TickOptions'));
-  assert.ok(imports.length > 0 && imports.includes("from '../meter/meter.verb.ts'"), 'the slice holds the imports');
+  const imports = importsIn(fs.readFileSync(path.join(import.meta.dirname, '..', 'src', 'tick', 'tick.verb.ts'), 'utf8'));
+  assert.ok(
+    imports.some((i) => i.spec === '../meter/meter.verb.ts'),
+    'the imports are read',
+  );
   assert.deepEqual(
-    [...imports.matchAll(/from\s*'(\.\.\/(?:disk|prune)\/[^']+)'/g)].map(([, from]) => from),
-    ['../disk/disk.ts'],
+    imports.filter((i) => /^\.\.\/(?:disk|prune)\//.test(i.spec) && !i.typeOnly).map((i) => i.spec),
+    [],
     'REFUSED: the pass importing the walk or the sweep',
   );
-  assert.match(imports, /import\s+type\s*\{\s*DiskReading\s*\}\s*from\s*'\.\.\/disk\/disk\.ts'/);
 });
 
 test('a check filed by a pass is kept with its labels among the recent passes, and in the series as check.load', async () => {

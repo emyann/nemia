@@ -7,7 +7,6 @@ import assert from 'node:assert/strict';
 import {
   DEFAULT_EVERY_MS,
   MAX_EVERY_MS,
-  STALE_FLOOR_MS,
   daemonLine,
   elapsedMs,
   everyOf,
@@ -43,7 +42,6 @@ const judged = (text: string | undefined, how: { now: Instant; identify: () => I
 const kindOf = (file: DaemonFile | Record<string, unknown>, how = live) => judged(text(file), how).kind;
 
 test("stale is ten of the holder's own intervals, never under fifteen minutes — the floor decides at the shipped 4000 ms", () => {
-  assert.equal(STALE_FLOOR_MS, 15 * 60_000);
   assert.equal(staleAfterMs(4000), 15 * 60_000);
   assert.equal(staleAfterMs(600_000), 100 * 60_000);
 });

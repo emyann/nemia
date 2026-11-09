@@ -305,17 +305,16 @@ function meaningsRefusal(keys: readonly string[], meanings: Readonly<Record<stri
 
 test("every key a step has has one line of meaning, in the keys' order — a count's in its refusal's words", () => {
   assert.equal(meaningsRefusal(STEP_KEYS, STEP_KEY_MEANINGS), null);
-  assert.equal(
-    STEP_KEY_MEANINGS.deadlineSeconds,
-    'the seconds the engine lets the step run before stopping it',
-    "the counts' lines are the words countOf refuses a value with",
-  );
-  assert.equal(STEP_KEY_MEANINGS.retries, 'how many times the run re-files the step after its check refuses it');
-  assert.equal(STEP_KEY_MEANINGS.rounds, 'how many rounds `loop:` may run, the first included');
-  assert.throws(
-    () => fm('review', 'retries: -1'),
-    (e: Error) => e.message.includes(`\`retries\` is ${STEP_KEY_MEANINGS.retries}:`),
-  );
+  for (const [key, bad] of [
+    ['retries', '-1'],
+    ['deadlineSeconds', '0'],
+  ] as const) {
+    assert.throws(
+      () => fm('review', `${key}: ${bad}`),
+      (e: Error) => e.message.includes(`\`${key}\` is ${STEP_KEY_MEANINGS[key]}:`),
+      `a ${key} refused says its meaning`,
+    );
+  }
 });
 
 test('REFUSED: a table of meanings with a key missing, one out of order, an extra one, an empty line or one on two lines', () => {

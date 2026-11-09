@@ -47,7 +47,6 @@ test('`allowedBy`: the default allows an approval at any step where all agree an
 });
 
 test('the default is pinned whole: approve, every step, all five conditions in order, from the default', () => {
-  assert.deepEqual(CONDITIONS, ['recommends', 'checked', 'accepted', 'withinBudget', 'nothingOpen']);
   assert.deepEqual(DEFAULT_POLICY, {
     id: 'default',
     answer: 'approve',

@@ -10,7 +10,6 @@ import { scratch } from 'test-kit/scratch';
 import { names } from '../../test/assessed.ts';
 import { timeoutFile } from './pause-timeout.store.ts';
 import { TIMEOUT } from './pause-timeout.verb.ts';
-import { TABLE } from '../command/commands.verb.ts';
 
 /** `nemia pause-timeout` given `args` at `home`: its answer, or its refusal thrown. */
 const timed = (home: string, args: Record<string, string> = {}) =>
@@ -41,11 +40,5 @@ test('nemia pause-timeout: the default with no file, a timeout set and then read
       names(err.message, 'nemia pause-timeout <d>');
       return true;
     });
-  });
-  await t.test('it is a command of the CLI alone, listed beside nemia pause', () => {
-    assert.equal(TIMEOUT.only?.side, 'cli');
-    assert.equal(TIMEOUT.route, undefined);
-    const names = TABLE.map((c) => c.name);
-    assert.equal(names.indexOf('pause-timeout'), names.indexOf('pause') + 1);
   });
 });

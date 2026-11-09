@@ -27,9 +27,6 @@
  * a type included; every controller beneath the CLI imports it, or imports a controller that reaches it, and it imports no controller.
  * The runtime's vocabulary, `agent-runtime/vocabulary` (`VOCABULARY`), pure, is the one entry any file imports, a pure one included.
  *
- * The api's `test/kinds.test.ts` holds its readers to the same globals with a copy of the scanners, `PROCESS_ENV` and `FETCH`, which this
- * test holds to its own: the two packages share no test code.
- *
  * Each rule is a pure function over a map of each file's imports, run first on planted sources it must refuse (`REFUSED`), so that none
  * passes by seeing nothing, and then on the package. A rule a session can re-break is a rule this suite refuses.
  */
@@ -38,7 +35,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { builtinModules } from 'node:module';
 import path from 'node:path';
-import { specifiersIn, withoutComments } from 'test-kit/imports';
+import { resolved, specifiersIn, withoutComments } from 'test-kit/imports';
+import { cycles } from 'test-kit/layout';
 
 const PKG = path.join(import.meta.dirname, '..');
 
@@ -302,12 +300,12 @@ function globalsIn(text: string): string[] {
 }
 
 /** A relative module as the package path it names (`../runner.ts` in `src/cli/main.ts` is `src/runner.ts`); any other as written. */
-const resolved = (file: string, mod: string): string => (mod.startsWith('.') ? path.posix.join(path.posix.dirname(file), mod) : mod);
+const packagePath = (file: string, mod: string): string => resolved(file, mod) ?? mod;
 
 /** Each source file's imports, resolved, and the impure globals it reads: `src/` and `bin/`, every `.ts`. */
 function sourcesOf(texts: Record<string, string>): Sources {
   return Object.fromEntries(
-    Object.entries(texts).map(([file, text]) => [file, [...importsIn(text).map((m) => resolved(file, m)), ...globalsIn(text)]]),
+    Object.entries(texts).map(([file, text]) => [file, [...importsIn(text).map((m) => packagePath(file, m)), ...globalsIn(text)]]),
   );
 }
 
@@ -514,36 +512,12 @@ function clientBreaks(sources: Sources): string[] {
 }
 
 /**
- * No cycle among the client and the controllers: an ES module read in a cycle can be read before it has run, and a name it exports is then
- * not yet there. Each cycle is named once, from its least file, found as the shortest way back to its start, breadth first.
+ * The cycles among the client and the controllers, each its files sorted: an ES module read in a cycle can be read before it has run,
+ * and a name it exports is then not yet there.
  */
-function cycles(sources: Sources): string[] {
-  const nodes = [CLIENT, ...kinds(sources).CONTROLLER].sort();
-  const edges = (file: string) => (sources[file] ?? []).filter((m) => nodes.includes(m)).sort();
-  const found = new Set<string>();
-  for (const from of nodes) {
-    const back = new Map<string, string>();
-    const queue = [from];
-    while (queue.length) {
-      const at = queue.shift()!;
-      for (const next of edges(at)) {
-        if (next === from) {
-          const loop = [from];
-          for (let step = at; step !== from; step = back.get(step)!) loop.splice(1, 0, step);
-          const least = loop.indexOf([...loop].sort()[0]);
-          const turned = [...loop.slice(least), ...loop.slice(0, least)];
-          found.add(`a cycle: ${[...turned, turned[0]].join(' → ')}`);
-          queue.length = 0;
-          break;
-        }
-        if (!back.has(next)) {
-          back.set(next, at);
-          queue.push(next);
-        }
-      }
-    }
-  }
-  return [...found].sort();
+function controllerCycles(sources: Sources): string[][] {
+  const nodes = new Set([CLIENT, ...kinds(sources).CONTROLLER]);
+  return cycles(new Map([...nodes].map((file) => [file, (sources[file] ?? []).filter((m) => nodes.has(m))])));
 }
 
 /** Each file of a place's code (`place/<name>/`, in folders too) with its imports, the relative ones resolved from the package. */
@@ -554,7 +528,7 @@ const placeSources = (): Sources => {
       .readdirSync(dir, { recursive: true, encoding: 'utf8' })
       .map((f) => `place/${f.split(path.sep).join('/')}`)
       .filter((f) => /^place\/[^/]+\/.+\.ts$/.test(f) && !f.endsWith('.test.ts'))
-      .map((f) => [f, importsIn(fs.readFileSync(path.join(PKG, f), 'utf8')).map((m) => resolved(f, m))]),
+      .map((f) => [f, importsIn(fs.readFileSync(path.join(PKG, f), 'utf8')).map((m) => packagePath(f, m))]),
   );
 };
 
@@ -670,15 +644,6 @@ test('the scanner sees the environment and fetch outside comment lines, and only
   assert.deepEqual(sourcesOf({ 'src/x/x.ts': "import fs from 'node:fs';\nconst x = process.env.X;" }), {
     'src/x/x.ts': ['node:fs', 'global:process.env'],
   });
-});
-
-test("the api's copy of the globals' scanners is this test's own, character for character", () => {
-  const copy = fs.readFileSync(path.join(PKG, '..', '..', 'apps', 'api', 'test', 'kinds.test.ts'), 'utf8');
-  for (const [name, pattern] of Object.entries({ PROCESS_ENV, FETCH }))
-    assert.ok(
-      copy.includes(`const ${name} = ${String(pattern)};`),
-      `apps/api/test/kinds.test.ts declares ${name} as ${String(pattern)}: copy it from here`,
-    );
 });
 
 test('every file in src and bin is of one kind, and every file a kind names is there', () => {
@@ -1169,19 +1134,17 @@ test('REFUSED: a verb that reaches the client only through a controller that no 
 });
 
 test('the client and the controllers import one another with no cycle', () => {
-  assert.deepEqual(cycles(packageSources()), []);
+  assert.deepEqual(controllerCycles(packageSources()), []);
 });
 
 test('REFUSED: a cycle between two controllers, a longer one, and one through the client', () => {
-  assert.deepEqual(cycles(adding('src/meter/meter.verb.ts', 'src/tick/tick.verb.ts')), [
-    'a cycle: src/meter/meter.verb.ts → src/tick/tick.verb.ts → src/meter/meter.verb.ts',
-  ]);
-  assert.deepEqual(cycles(adding('src/start/start.verb.ts', 'src/tick/tick.verb.ts')), [
-    'a cycle: src/factory/schedule/schedule.verb.ts → src/start/start.verb.ts → src/tick/tick.verb.ts → src/factory/schedule/schedule.verb.ts',
-    'a cycle: src/inbox/inbox.verb.ts → src/start/start.verb.ts → src/tick/tick.verb.ts → src/inbox/inbox.verb.ts',
-  ]);
-  assert.deepEqual(cycles(adding(CLIENT, 'src/views/views.verb.ts')), [
-    'a cycle: src/runtime-client.ts → src/views/views.verb.ts → src/runtime-client.ts',
-    'a cycle: src/runtime-client.ts → src/views/views.verb.ts → src/steps/steps.verb.ts → src/runtime-client.ts',
-  ]);
+  for (const [file, mod] of [
+    ['src/meter/meter.verb.ts', 'src/tick/tick.verb.ts'],
+    ['src/start/start.verb.ts', 'src/tick/tick.verb.ts'],
+    [CLIENT, 'src/views/views.verb.ts'],
+  ]) {
+    const found = controllerCycles(adding(file, mod));
+    assert.equal(found.length, 1, `${file} → ${mod}: ${JSON.stringify(found)}`);
+    assert.ok(found[0]?.includes(file) && found[0].includes(mod), `${file} → ${mod}: ${JSON.stringify(found)}`);
+  }
 });

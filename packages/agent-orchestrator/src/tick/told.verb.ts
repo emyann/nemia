@@ -46,7 +46,7 @@ import type { Place } from '../place/place.store.ts';
 import type { PlaceSay } from '../place/place.ts';
 import { composeBrief } from '../brief/index.ts';
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
-import { workflowFilesDir } from '../frozen/frozen.store.ts';
+import { carriedFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { factoryServers } from '../factory/servers/servers.store.ts';
 import type { FactoryServers } from '../factory/servers/index.ts';
@@ -183,16 +183,17 @@ export function placeTold(
 /**
  * The folders a step of `run` is filed from (`filedFolders`): the run's artifacts folder, the store's inbox, the run's inputs
  * folder (`inputsDir`) only when its record names an input, so a run given none is filed and told as before, and the run's copy of its
- * workflow folder (`workflowFilesDir`) only when its record names one. What a *brief* reads, which asks for no server; `filedAt` is what
- * a filing takes.
+ * workflow folder (`workflowFilesDir`) and of its carried files (`carriedFilesDir`), each only when its record names one. What a *brief*
+ * reads, which asks for no server; `filedAt` is what a filing takes.
  */
 export const filedFoldersAt = (
-  run: Pick<Run, 'id' | 'inputs' | 'workflowFiles'>,
-): { runArtifacts: string; inbox: string; inputs?: string; workflowFiles?: string } => ({
+  run: Pick<Run, 'id' | 'inputs' | 'workflowFiles' | 'carriedFiles'>,
+): { runArtifacts: string; inbox: string; inputs?: string; workflowFiles?: string; carriedFiles?: string } => ({
   runArtifacts: path.dirname(artifactsDir(run, 'step')),
   inbox: inboxDir(),
   ...(run.inputs?.length ? { inputs: inputsDir(run) } : {}),
   ...(run.workflowFiles === undefined ? {} : { workflowFiles: workflowFilesDir(run, run.workflowFiles) }),
+  ...(run.carriedFiles === undefined ? {} : { carriedFiles: carriedFilesDir(run, run.carriedFiles) }),
 });
 
 /**
@@ -201,9 +202,16 @@ export const filedFoldersAt = (
  * reads a store nobody named (`test/root-given.test.ts`).
  */
 export const filedAt = (
-  run: Pick<Run, 'id' | 'inputs' | 'factory' | 'workflowFiles'>,
+  run: Pick<Run, 'id' | 'inputs' | 'factory' | 'workflowFiles' | 'carriedFiles'>,
   home: string,
-): { runArtifacts: string; inbox: string; inputs?: string; workflowFiles?: string; servers: FactoryServers } => ({
+): {
+  runArtifacts: string;
+  inbox: string;
+  inputs?: string;
+  workflowFiles?: string;
+  carriedFiles?: string;
+  servers: FactoryServers;
+} => ({
   ...filedFoldersAt(run),
   servers: recordedServers(run.factory, home),
 });

@@ -13,7 +13,8 @@
     "types": [
       "node"
     ],
-    "noUncheckedIndexedAccess": true
+    "noUncheckedIndexedAccess": true,
+    "resolveJsonModule": true
   },
   "include": [
     "src",

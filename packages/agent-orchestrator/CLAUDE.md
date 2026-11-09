@@ -133,7 +133,8 @@ too, which holds parity with this one until the in-process reads retire.
   Factory door is**, and addressed by a `WorkflowDir` minted where a folder is resolved (`workflowFolder`, `workflowDirAt`), never
   branded from a plain string with `WorkflowDir.read` outside the model and a stored record. A test that only needs a workflow to exist
   gives its program one `workflowDoorMemory()` (`src/workflows/memory.store.ts`) and writes it through the door (`aWorkflow`,
-  `test/workflow-walks.ts`); code still on the folder's stores (`test/workflow-door.baseline.ts`) reads the disk whatever door was given. A
+  `test/workflow-walks.ts`); no file of `src` calls the folder's stores, which read the disk whatever door was given
+  (`src/workflows/workflows.store.test.ts` refuses one). A
   run's steps are a program (`stepsOf`, `src/steps/steps.verb.ts`): a frozen record's need no door and no root, and an unfrozen one's
   folder is read through the door at the program's `StoreRoot`, refused `UnloadedFolder` where it does not load. A
   write's version is judged by `workflowVersionRefusal` (`src/folder/folder.ts`), whose contract a new rule of the version is a law of.
@@ -148,8 +149,8 @@ too, which holds parity with this one until the in-process reads retire.
 - **An agent and a skill are read and written through the Agent and Skill doors (`AgentDoor`, `src/agents/agent-door.store.ts`;
   `SkillDoor`, `src/skills/skill-door.store.ts`), rooted as the Factory door is**: a handler that yields one runs through `rooted`, and a
   test that only needs an agent or a skill to exist gives its program `agentDoorMemory()` or `skillDoorMemory()` (`anAgent`,
-  `test/agent-walks.ts`; `aSkill`, `test/skill-walks.ts`). Code still on their stores (`test/agent-door.baseline.ts`) reads the disk
-  whatever door was given. A new rule of which root wins is a law of `contracts/lookup.contract.ts`, and of a definition's version a
+  `test/agent-walks.ts`; `aSkill`, `test/skill-walks.ts`). No file of `src` calls their stores, which read the disk whatever door was
+  given (`src/agents/agent-door.store.test.ts` refuses one). A new rule of which root wins is a law of `contracts/lookup.contract.ts`, and of a definition's version a
   law of `contracts/definition-version.contract.ts`, not a row of a test.
 - **A template is read and written through the Template door (`TemplateDoor`, `src/template/door/templates.store.ts`), whose default is
   rooted** as the Factory door's: a program that yields it — the template verbs, `nemia factory apply`, diff, upgrade and resolve, the
@@ -163,8 +164,8 @@ too, which holds parity with this one until the in-process reads retire.
   and the feed through the Feed door (`FeedDoor`, `src/feed/feed.store.ts`), each rooted as the Factory door is**: a program that yields
   one is given `StoreRoot`, or a test gives it `subscriptionDoorMemory()`, `ledgerDoorMemory()` or `feedDoorMemory()` (each a
   `memory.store.ts` beside its store). A synchronous caller still on the module spellings (`listSubscriptions`, `ledgerOf`, `readFeed`, …)
-  reads the module's root whatever door was given, counted per door in `test/subscription-door.baseline.ts`,
-  `test/ledger-door.baseline.ts` and `test/feed-door.baseline.ts`. The feed's fold memo is `emitFeed`'s, never the layer's.
+  reads the module's root whatever door was given, counted per door in `test/ledger-door.baseline.ts` and `test/feed-door.baseline.ts`;
+  none is left on the subscriptions' (`src/subscription/subscription.store.test.ts` refuses one). The feed's fold memo is `emitFeed`'s, never the layer's.
 - **A file written back is decoded by a `StructWithRest`**: a `Struct` strips the keys it does not name, and a record written by a newer
   tick keeps them. `Struct({})` accepts an array; a struct with a key refuses one. A frozen step is decoded by `FrozenStepSchema`
   (`folder/folder.store.ts`), a field per `StepKey`: a key added without one fails the typecheck.

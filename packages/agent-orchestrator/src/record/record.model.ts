@@ -169,6 +169,7 @@ export const Run = Schema.Struct({
   context: Schema.optional(Schema.Array(RunId.OnRead)),
   inputs: Schema.optional(Schema.Array(Schema.String)),
   workflowFiles: Schema.optional(Schema.String),
+  carriedFiles: Schema.optional(Schema.String),
   from: Schema.optional(Schema.Struct({ inbox: CardName.OnRead })),
   scheduled: Schema.optional(Schema.Struct({ factory: FactoryName.OnRead, workflow: WorkflowName.OnRead, due: Schema.String })),
   gates: Schema.optional(Schema.Array(StepName.OnRead)),

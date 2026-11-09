@@ -2,14 +2,14 @@
  * The Subscription door's files layer: the door's walks (`test/subscription-walks.ts`) on a fresh scratch store each, and what only the
  * files can be asked — a delivery written today read back whole, every field of its lines kept and a v0 line upgraded, with no hidden
  * file left; a deliverer's file that does not read; a subscription file that does not read, or whose filter does not, left out with its
- * words, never a stop; a scope's floor; a stored wake list converted on read (`selectorsOfWake`); the default door's root; and the
- * debt of `src` still on the module's spellings (`test/subscription-door.baseline.ts`).
+ * words, never a stop; a scope's floor; a stored wake list converted on read (`selectorsOfWake`); the default door's root; and no file
+ * of `src` on the module's spellings, refused.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { debtBreaks as heldTo, seamUses as usesOf, sourcesUnder } from 'test-kit/debt';
+import { seamUses as usesOf, sourcesUnder } from 'test-kit/debt';
 import { Effect } from 'effect';
 import { names } from '../../test/assessed.ts';
 import { scratch } from 'test-kit/scratch';
@@ -188,33 +188,29 @@ const OWN = ['src/subscription/subscription.store.ts', 'src/subscription/memory.
 /** Every file of `src` but the tests and the door's, by its path from the package. */
 const sourcesOfSrc = (): Record<string, string> => sourcesUnder(PKG, 'src', OWN);
 
-/** The seam's calls in each file, comment lines left out: what `SUBSCRIPTION_DOOR_DEBT` counts. */
+/** The seam's calls in each file, comment lines left out: what `seamRefusals` refuses. */
 const seamUses = (sources: Record<string, string>): Map<string, number> =>
   usesOf(sources, new RegExp(`(?<![\\w$.])(?:${SEAM.join('|')})\\s*\\(`, 'g'));
 
-/** Why the uses of `sources` break the baseline `debt`: a file it does not name, a count grown, a count fallen. */
-function debtBreaks(sources: Record<string, string>, debt: Readonly<Record<string, number>>): string[] {
-  return heldTo(seamUses(sources), debt).map(({ file, uses: n, owed, kind }) =>
-    kind === 'grown'
-      ? `${file} calls the subscriptions' module spellings ${n} time(s) where test/subscription-door.baseline.ts names ${owed}: yield SubscriptionDoor (src/subscription/subscription.store.ts) instead`
-      : kind === 'fallen'
-        ? `${file} calls the subscriptions' module spellings ${n} time(s): lower its count in test/subscription-door.baseline.ts to ${n}, which only shrinks`
-        : `${file} calls the subscriptions' module spellings no more: take its line out of test/subscription-door.baseline.ts`,
+/**
+ * Each file of `sources` that calls the module's spellings rather than yielding the door, with how many times: a refusal, since every
+ * caller is converted and none may come back.
+ */
+const seamRefusals = (sources: Record<string, string>): string[] =>
+  [...seamUses(sources)].map(
+    ([file, n]) =>
+      `${file} calls the subscriptions' module spellings ${n} time(s): yield SubscriptionDoor (src/subscription/subscription.store.ts) instead`,
   );
-}
 
-test("no file of src calls the subscriptions' module spellings but as test/subscription-door.baseline.ts counts it, and the count only shrinks", async () => {
-  const { SUBSCRIPTION_DOOR_DEBT } = await import('../../test/subscription-door.baseline.ts');
-  assert.deepEqual(debtBreaks(sourcesOfSrc(), SUBSCRIPTION_DOOR_DEBT), []);
+test("no file of src calls the subscriptions' module spellings: every caller yields SubscriptionDoor", () => {
+  assert.deepEqual(seamRefusals(sourcesOfSrc()), []);
 });
 
-test('REFUSED: a converted file that calls a module spelling again, and a count the baseline holds above what is left', async () => {
-  const { SUBSCRIPTION_DOOR_DEBT } = await import('../../test/subscription-door.baseline.ts');
+test('REFUSED: a file that calls a module spelling again', () => {
   const sources = sourcesOfSrc();
   const again = {
     ...sources,
     'src/subscription/deliver.verb.ts': `${sources['src/subscription/deliver.verb.ts']}\nconst x = listSubscriptions();\n`,
   };
-  assert.equal(debtBreaks(again, SUBSCRIPTION_DOOR_DEBT).length, 1);
-  assert.equal(debtBreaks(sources, { ...SUBSCRIPTION_DOOR_DEBT, 'src/subscription/deliver.verb.ts': 1 }).length, 1);
+  assert.equal(seamRefusals(again).length, 1);
 });

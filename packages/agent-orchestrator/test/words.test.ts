@@ -48,6 +48,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { CLAUDE_PERMISSION_MODES, CODEX_SANDBOXES } from 'agent-runtime';
 import { workflowsIn } from '../src/folder/folder.store.ts';
+import { ours } from 'test-kit/repo';
 import { scratch } from 'test-kit/scratch';
 import { FORMER_TEAM, TEAM_NAMES, TEAM_PATHS } from './team-names.baseline.ts';
 
@@ -414,14 +415,16 @@ const TEAM_GUARD_FILES: ReadonlySet<string> = new Set([
   'packages/agent-orchestrator/test/team-names.baseline.ts',
 ]);
 
-/** The board's vendored and generated files, which no rule reads. */
-const vendored = (file: string): boolean =>
-  file.startsWith('apps/web/src/components/ui/') || file === 'apps/web/src/routeTree.gen.ts' || file.split('/').includes('node_modules');
+/**
+ * The files no rule reads: what `.gitattributes` marks vendored or generated (`ours`, from git), and an installed package's. Not ours to
+ * rewrite, so no rule of ours can hold them.
+ */
+const vendored = (file: string): boolean => file.split('/').includes('node_modules') || !ours(file);
 
-/** The files a layer's rule leaves out: tests, and the board's vendored and generated files. */
+/** The files a layer's rule leaves out: tests, and the vendored and generated files. */
 const skipped = (file: string): boolean => file.endsWith('.test.ts') || file.split('/').includes('test') || vendored(file);
 
-/** The files the team's rules leave out: the board's vendored and generated files, and this guard's own two. Tests are read. */
+/** The files the team's rules leave out: the vendored and generated files, and this guard's own two. Tests are read. */
 const teamSkipped = (file: string): boolean => vendored(file) || TEAM_GUARD_FILES.has(file);
 
 /** A source file, which every rule reads. */

@@ -128,6 +128,12 @@ type RunBase = {
    */
   workflowFiles?: string;
   /**
+   * The digest's hex of the run's own copy of the carried folder beside its workflow's (`carriedFilesDir` in frozen.store.ts): every check
+   * and session is told it as `WF_CARRIED_FILES`. Taken with `workflowFiles`, at `nemia start` and wherever the run's pins move
+   * (`renderAgain`); absent where no `carried/` stands beside the workflow's folder.
+   */
+  carriedFiles?: string;
+  /**
    * Where the run came from, when it was not typed at `nemia start`: `{ inbox: <name> }` for a card started out of the inbox
    * (`startFromInbox` in inbox.verb.ts), which keeps the card. The inbox's listing reads it to give the card its state, `started` while
    * this record stands, and `nemia inbox` to say it was `started as` this run, and `nemia decide` names the card under the run's line.

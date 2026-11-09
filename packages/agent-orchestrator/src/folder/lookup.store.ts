@@ -4,7 +4,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
+import { AGENTS_FOLDER, CARRIED_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
 import { HOME } from '../record/record.store.ts';
 import type { Places } from '../skills/read.store.ts';
 
@@ -31,7 +31,7 @@ export function foldersIn(dir: string): string[] {
   }
   return names
     .filter((name) => {
-      if (name.startsWith('.') || name === AGENTS_FOLDER || name === SKILLS_FOLDER) return false;
+      if (name.startsWith('.') || name === AGENTS_FOLDER || name === SKILLS_FOLDER || name === CARRIED_FOLDER) return false;
       try {
         return fs.statSync(path.join(dir, name)).isDirectory();
       } catch {

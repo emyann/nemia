@@ -3,7 +3,7 @@
  * step and the folders beside it may take, and `parseFolder`, which reads every step and checks them together.
  */
 import path from 'node:path';
-import { AGENTS_FOLDER, FRONTMATTER, isReadme, SKILLS_FOLDER, type Workflow } from '../step/step.ts';
+import { AGENTS_FOLDER, CARRIED_FOLDER, FRONTMATTER, isReadme, SKILLS_FOLDER, type Workflow } from '../step/step.ts';
 import { orderSteps, parseWorkflow, validate, type Hire } from '../workflow/index.ts';
 import type { Agents, SkillsFound } from '../agents/agents.ts';
 import type { WorkflowDirRefusal } from '../../contracts/workflow-dir.contract.ts';
@@ -38,8 +38,14 @@ export function stepNameRefusal(name: unknown): string | undefined {
 /** Where the agents a workflow's steps name are: `agents/`, beside the workflow's folder — `workflows/agents` for `workflows/dev`. */
 export const agentsDir = (workflowDir: string): string => path.join(path.dirname(path.resolve(workflowDir)), AGENTS_FOLDER);
 
-/** Why `dir` is not a workflow because it is the folder of agents or of skills, or `undefined` for a folder with another name. */
+/**
+ * Why `dir` is not a workflow because it is the folder of agents, of skills or of carried files, or `undefined` for one with another
+ * name.
+ */
 export function agentsFolderRefusal(dir: string): string | undefined {
+  if (path.basename(path.resolve(dir)) === CARRIED_FOLDER) {
+    return `${dir} is ${CARRIED_FOLDER}/, the folder of the files the workflows beside it share — a run freezes it beside its workflow's folder, so no workflow has its name. Name a workflow beside it, or give yours another name.`;
+  }
   if (path.basename(path.resolve(dir)) === SKILLS_FOLDER) {
     return `${dir} is ${SKILLS_FOLDER}/, the folder of the skills the agents beside it give — each folder in it is a skill, not a step, so no workflow has its name. Name a workflow beside it, or give yours another name.`;
   }
@@ -216,8 +222,8 @@ export const workflowDirRefusal: WorkflowDirRefusal = (dir) => {
   )
     return `${JSON.stringify(dir)} is not a workflow's folder: resolving it would change it. ${fix}`;
   if (dir === '/') return `/ is not a workflow's folder: a workflow is a folder with a name. ${fix}`;
-  if (dir === AGENTS_FOLDER || dir.endsWith('/' + AGENTS_FOLDER) || dir === SKILLS_FOLDER || dir.endsWith('/' + SKILLS_FOLDER))
-    return `${dir} is the folder of the agents or the skills beside the workflows, not a workflow. Name a workflow beside it.`;
+  if ([AGENTS_FOLDER, SKILLS_FOLDER, CARRIED_FOLDER].some((held) => dir === held || dir.endsWith(`/${held}`)))
+    return `${dir} is the folder of the agents, the skills or the carried files beside the workflows, not a workflow. Name a workflow beside it.`;
   return null;
 };
 

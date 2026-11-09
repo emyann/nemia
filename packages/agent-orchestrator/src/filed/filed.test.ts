@@ -12,7 +12,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseWorkflow, type Workflow } from '../workflow.ts';
-import { filedConfig, RUN_LABELS, SESSION_TOKEN, STEP_FILES, WORKFLOW_FILES, workflowMounts } from './filed.ts';
+import { CARRIED_FILES, filedConfig, RUN_LABELS, SESSION_TOKEN, STEP_FILES, WORKFLOW_FILES, workflowMounts } from './filed.ts';
 import type { Run } from '../record/record.ts';
 import type { FactoryServers } from '../factory/servers/servers.ts';
 import { configRefusal } from '../runtime-client.ts';
@@ -178,6 +178,39 @@ test('filedConfig: what a local step is filed beside its fence, its files direct
       assert.deepEqual(workflowMounts({ harness: 'claude' }, '/runs (old)/r/workflow/ab12'), [], 'a path no rule carries is not mounted');
       assert.deepEqual(filed(stepOf()).env, { WF_STEP_FILES: '/runs/r/artifacts/look', WF_LABELS: '{}' }, 'no copy: the key is absent');
       assert.equal(Object.hasOwn(filed(stepOf()), 'mounts'), false, 'and no mount');
+    },
+  );
+
+  await t.test(
+    "a local step is filed the run's copy of its carried files as WF_CARRIED_FILES, mounted read-only; a run that froze none, nothing",
+    () => {
+      const [workflow, carried] = ['/runs/r/workflow/ab12', '/runs/r/carried/cd34'];
+      const config = (carriedFiles: string | undefined) =>
+        filedConfig(
+          stepOf(),
+          [stepOf()],
+          { gates: [] },
+          {
+            model: undefined,
+            budgetUsd: undefined,
+            runArtifacts: '/runs/r/artifacts',
+            inbox: '/inbox',
+            workflowFiles: workflow,
+            ...(carriedFiles === undefined ? {} : { carriedFiles }),
+            own: {},
+            landingDenied: () => [],
+          },
+        );
+      assert.equal(CARRIED_FILES, 'WF_CARRIED_FILES');
+      const given = config(carried);
+      assert.equal(given.env.WF_CARRIED_FILES, carried);
+      assert.deepEqual(given.mounts, [
+        { path: workflow, readOnly: true },
+        { path: carried, readOnly: true },
+      ]);
+      const none = config(undefined);
+      assert.equal('WF_CARRIED_FILES' in none.env, false, 'no copy: the key is absent');
+      assert.deepEqual(none.mounts, [{ path: workflow, readOnly: true }], 'and no mount of it');
     },
   );
 

@@ -1,5 +1,7 @@
 /**
- * The orchestrator's version: the `version` its package.json says, as a constant the api serves (`GET /api/version`) and the board shows
- * in its bottom bar. Pure: `version.test.ts` holds it equal to package.json, so a bump of one without the other fails the suite.
+ * The orchestrator's version: the `version` its package.json says, read from that file as the module loads, so a bump there is the one
+ * edit; the api serves it (`GET /api/version`) and the board shows it in its bottom bar.
  */
-export const VERSION = '1.0.0';
+import manifest from '../../package.json' with { type: 'json' };
+
+export const VERSION: string = manifest.version;

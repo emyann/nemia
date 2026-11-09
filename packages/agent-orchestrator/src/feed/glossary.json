@@ -96,27 +96,63 @@
       "retired": [
         {
           "spelling": "NeedsHuman",
-          "card": "The former wait codes are read no more"
+          "card": "The former wait codes are read no more",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/former-reason/former-reason.ts",
+              "why": "a key of `FORMER_REASONS`, which reads a feed line or a stored selector that still names it"
+            }
+          ]
         },
         {
           "spelling": "RoundsExhausted",
-          "card": "The former wait codes are read no more"
+          "card": "The former wait codes are read no more",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/former-reason/former-reason.ts",
+              "why": "a key of `FORMER_REASONS`, which reads a feed line or a stored selector that still names it"
+            }
+          ]
         },
         {
           "spelling": "WaitingForSlot",
-          "card": "The former wait codes are read no more"
+          "card": "The former wait codes are read no more",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/former-reason/former-reason.ts",
+              "why": "a key of `FORMER_REASONS`, which reads a feed line or a stored selector that still names it"
+            }
+          ]
         },
         {
           "spelling": "WaitingForCheckout",
-          "card": "The former wait codes are read no more"
+          "card": "The former wait codes are read no more",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/former-reason/former-reason.ts",
+              "why": "a key of `FORMER_REASONS`, which reads a feed line or a stored selector that still names it"
+            }
+          ]
         },
         {
           "spelling": "WaitingForPause",
-          "card": "The former wait codes are read no more"
+          "card": "The former wait codes are read no more",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/former-reason/former-reason.ts",
+              "why": "a key of `FORMER_REASONS`, which reads a feed line or a stored selector that still names it"
+            }
+          ]
         },
         {
           "spelling": "CheckDenied",
-          "card": "The former wait codes are read no more"
+          "card": "The former wait codes are read no more",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/former-reason/former-reason.ts",
+              "why": "a key of `FORMER_REASONS`, which reads a feed line or a stored selector that still names it"
+            }
+          ]
         }
       ]
     },

@@ -9,8 +9,12 @@ import path from 'node:path';
 import ts from 'typescript';
 import type { Heading, List, ListItem, Paragraph, PhrasingContent, Root, RootContent } from 'mdast';
 
-/** A spelling a term no longer has, and the card that retires it. */
-type Retired = { spelling: string; card: string };
+/**
+ * A spelling a term no longer has, and the card that retires it. `kept` names each path, from the repository's root, where the old
+ * spelling stays on purpose — a value a record on disk still holds, a former spelling read with a hint, another sense of the word — each
+ * with why: the glossary guard (`tools/guards/test/glossary.test.ts`) counts the spelling everywhere else under the table's paths.
+ */
+export type Retired = { spelling: string; card: string; kept?: { path: string; why: string }[] };
 
 /** One row of a table: the word, what it means, the code's type for it, and the page that explains it. */
 export type Term = { term: string; meaning: string; type?: string; see?: { label: string; href: string }; retired?: Retired[] };
@@ -52,7 +56,14 @@ export const tablesIn = (root: string): Table[] =>
   filesOf(root, ['packages', 'apps'])
     .filter((f) => path.posix.basename(f) === 'glossary.json')
     .sort()
-    .map((file) => ({ ...(JSON.parse(fs.readFileSync(path.join(root, file), 'utf8')) as Omit<Table, 'file'>), file }));
+    .map((file) => {
+      const text = fs.readFileSync(path.join(root, file), 'utf8');
+      try {
+        return { ...(JSON.parse(text) as Omit<Table, 'file'>), file };
+      } catch (err) {
+        throw new Error(`${file} is no JSON: write it as a glossary table (${String(err)})`, { cause: err });
+      }
+    });
 
 /** The ids a ```glossary fence lists, one a line, in its order. */
 export const idsOf = (fence: string): string[] =>

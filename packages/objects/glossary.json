@@ -66,7 +66,13 @@
       "retired": [
         {
           "spelling": "checkout",
-          "card": "resource objects, P7: the Run's double spellings go before v1 — one approve, one retry, one refresh, and `base` for what a step waits on"
+          "card": "resource objects, P7: the Run's double spellings go before v1 — one approve, one retry, one refresh, and `base` for what a step waits on",
+          "kept": [
+            {
+              "path": "packages/objects/src/run.ts",
+              "why": "another sense: the release a session ran on (`SessionRelease`), a checkout's folder, not a wait"
+            }
+          ]
         }
       ]
     },

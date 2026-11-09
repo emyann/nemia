@@ -57,6 +57,7 @@ const { feedDoorMemory } = await import('../src/feed/memory.store.ts');
 const { emitFeed, FEED_FOLLOW_LINES, FEED_FOLLOWERS, feedHubLayer } = await import('../src/feed/feed.verb.ts');
 const { addFactory } = await import('../src/factory/factory.store.ts');
 const { writeFactoryLevel } = await import('../src/level/level.store.ts');
+const { levelFile, writeLevel } = await import('../src/nemia/level.store.ts');
 const { over, engineOf } = await import('../src/runtime-client.ts');
 const { RunDoor } = await import('../src/runs/runs.store.ts');
 const { runDoorMemory } = await import('../src/runs/memory.store.ts');
@@ -745,6 +746,37 @@ test(
         await held(t, () => readDelivery(w, 'scoped-s')?.cursor === feedSize(w), "the scoped one's cursor past the line");
         assert.deepEqual(readDelivery(w, 'scoped-s')?.digest, [upgraded(paused)], 'a line of no factory is no line below the floor');
         assert.equal(toldTo(scoped).length, 0, 'routine by the default words');
+      },
+    );
+    await s.test(
+      'REFUSED: a level that does not read holds a scoped line back, read again each beat, and the beat after it is mended says it',
+      async () => {
+        await d.stop();
+        dropSubscription(w, 'scoped-s');
+        dropSubscription(w, 'woken-s');
+        const from = feedSize(w);
+        const manual = await longLived('t-manual');
+        kept(t, w, 'manual', { task: manual, selectors: [...DEFAULT_SELECTORS], digestEvery: 60, from, scope: { atLeast: 'manual' } });
+        fs.mkdirSync(path.dirname(levelFile()), { recursive: true });
+        fs.writeFileSync(levelFile(), '{ not json');
+        t.after(() => fs.rmSync(levelFile(), { force: true }));
+        d.start();
+        await d.quiet(3);
+        const handed = () => Effect.runSync(Metric.value(FEED_FOLLOW_LINES)).count;
+        const before = handed();
+        appended(w, line('r-gone', 'awaiting approval'), line('r-hkb', 'awaiting approval'));
+        for (const reads of [1, 2, 3]) {
+          await d.clock.adjust('1 second');
+          await held(t, () => handed() >= before + 2 * reads, `the two lines read ${reads} times`);
+          await d.quiet(3);
+        }
+        assert.equal(toldTo(manual).length, 0, 'nothing said while the level does not read');
+        assert.equal(readDelivery(w, 'manual')?.cursor ?? from, from, 'the cursor not kept past the lines');
+        writeLevel({ level: 'manual', since: '2026-10-06T08:00:00.000Z' });
+        await d.clock.adjust('1 second');
+        await held(t, () => toldTo(manual).length === 1, 'the line said once the level reads');
+        assert.deepEqual(fieldsOf(toldTo(manual)[0]), ['r-hkb build awaiting approval'], 'the line of a run gone still passed over');
+        await held(t, () => readDelivery(w, 'manual')?.cursor === feedSize(w), 'the cursor kept past both lines');
       },
     );
   },

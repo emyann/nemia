@@ -88,6 +88,7 @@
     "agent-runtime#test": {
       "dependsOn": ["^transit"],
       "inputs": [
+        "$TURBO_ROOT$/docs/plan-hold-the-bar.md",
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/lint/**",
         "$TURBO_ROOT$/tools/**/*.ts",

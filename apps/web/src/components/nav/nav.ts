@@ -1,4 +1,5 @@
 import { Bot, ChartColumn, Factory, House, Inbox, List, type LucideIcon, MessageCircle, Settings, Waypoints } from 'lucide-react';
+import { openRunsQuery } from '../../lib/api/runs.ts';
 import { factorySearch } from '../../lib/factories.ts';
 
 /** Whether `path` is `to` or a page under it: `/agents/new` is under `/agents`, `/agentsx` is not. */
@@ -103,6 +104,13 @@ export function destinationHref(id: string, picked: string | undefined, first: s
 export function pickedOf(path: string, search: Record<string, unknown>): string | undefined {
   return ownerOf(path) ?? (isListing(path) || workflowPageAt(path) || ownDefinitionAt(path) ? factorySearch(search).factory : undefined);
 }
+
+/**
+ * The open runs the frame counts at `path` with `search`: the run list of the factory the address picks (`pickedOf`), every factory's
+ * under none — the one query the rail's Runs badge and Nemia's cue read their `counts.waiting` from, and the Runs page's own when no
+ * label selector narrows it, so the three say one number and are read again together.
+ */
+export const frameRunsQuery = (path: string, search: Record<string, unknown>) => openRunsQuery(pickedOf(path, search));
 
 /** `search` without its `repo`. */
 const withoutRepo = ({ repo: _repo, ...kept }: Record<string, unknown>): Record<string, unknown> => kept;

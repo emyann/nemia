@@ -62,7 +62,7 @@ function Root() {
           </div>
         </SidebarProvider>
         <OpenBar feed={feed} />
-        {!ownsChat && <NemiaDock />}
+        {!ownsChat && <NemiaDock path={path} search={search} />}
       </NemiaChatProvider>
       <ReactQueryDevtools buttonPosition="bottom-left" />
       <TanStackRouterDevtools position="bottom-right" />

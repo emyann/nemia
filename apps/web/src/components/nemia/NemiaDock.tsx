@@ -1,13 +1,16 @@
 /**
  * Nemia's face docked at the bottom right of every page of the board but the chat's own, every cue that holds beside it, and the panel
  * it opens above it (`ChatPanel`). It is the frame's, not a page's: it reads her chat from the frame's one holder of it (`useNemiaChat`,
- * under `NemiaChatProvider`), whose stream follows her whatever page a person is on and whether its panel is open or not, and her presence
- * is read from that stream alone — never from the whole list of the runs, which `frameReach` refuses the frame.
+ * under `NemiaChatProvider`), whose stream follows her whatever page a person is on and whether its panel is open or not. The runs her cue
+ * says wait on the person are the frame's run list's `counts.waiting` (`frameRunsQuery`), the query the rail's Runs badge and the Runs
+ * page read, so the three say one number and are read again together; the rest of her presence is read from her stream — never from the
+ * whole list of the runs, which `frameReach` refuses the frame.
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from 'react-aria-components';
 import { CutCue } from '@/components/look';
+import { frameRunsQuery } from '@/components/nav/nav';
 import { levelQuery, openRunsQuery } from '@/lib/api';
 import { presenceOf } from '@/lib/chatFollowing';
 import { atWork } from '@/lib/footer';
@@ -22,16 +25,18 @@ import type { ChatMode } from './chat/ChatHeader';
 const DOCK_FACE = 60;
 
 /**
- * Her face at the bottom right, its cues, and the panel over it, open as the person last left it on this page. Her face alone takes a
- * press: the cues beside it are words, and a page's own control under one is still reached, as the step's Send is.
+ * Her face at the bottom right of the page at `path` with `search`, its cues, and the panel over it, open as the person last left it on
+ * this page. Her face alone takes a press: the cues beside it are words, and a page's own control under one is still reached, as the
+ * step's Send is.
  */
-export function NemiaDock() {
+export function NemiaDock({ path, search }: { path: string; search: Record<string, unknown> }) {
   const [mode, setMode] = useState<ChatMode | null>(null);
   const chat = useNemiaChat();
   const nemia = useQuery(levelQuery).data;
   const open = useQuery(openRunsQuery()).data;
+  const counted = useQuery(frameRunsQuery(path, search)).data;
   const now = new Date(useNow(30_000));
-  const presence = presenceOf(chat.state.presence, chat.kept !== null);
+  const presence = presenceOf(chat.state.presence, chat.kept !== null, counted?.counts.waiting ?? 0, chat.state.events);
   const cues = cuesOf(presence);
 
   return (

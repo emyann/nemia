@@ -26,7 +26,7 @@ function useLift(id: string, namespace: string | undefined, onLifted: () => void
     mutationFn: () => namespaceNow().then((ns) => liftHold(ns, id)),
     onSuccess: async () => {
       onLifted();
-      await Promise.all([queryClient.invalidateQueries({ queryKey: ['runs', id], exact: true }), runsMoved(queryClient, id)]);
+      await runsMoved(queryClient, id);
     },
   });
 }

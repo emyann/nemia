@@ -98,9 +98,7 @@ function RunRead({ runId }: { runId: string }) {
 function RunLabels({ run }: { run: RunView }) {
   const queryClient = useQueryClient();
   const edit = (edits: readonly string[]) =>
-    labelRun(namespaceOf(run.labels.factory), run.id, edits).then(() =>
-      Promise.all([queryClient.invalidateQueries({ queryKey: ['runs', run.id], exact: true }), runsMoved(queryClient, run.id)]),
-    );
+    labelRun(namespaceOf(run.labels.factory), run.id, edits).then(() => runsMoved(queryClient, run.id));
   return <Labels labels={run.labels} edit={edit} />;
 }
 

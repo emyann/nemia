@@ -7,7 +7,7 @@ import { useRunNamespace } from './runNamespace';
 import { runsMoved } from './runWrites';
 
 /** What an approval carries: its words, the answers to what the step asks, and the budgets a person changed. */
-export type ApprovalBody = { message?: string; answers?: readonly QuestionAnswer[]; budgets?: readonly { step: string; usd: number }[] };
+type ApprovalBody = { message?: string; answers?: readonly QuestionAnswer[]; budgets?: readonly { step: string; usd: number }[] };
 
 /**
  * An approval of a step through the api (`approveStep`) — at its gate, or of a loop out of rounds as it stands, which the package ends

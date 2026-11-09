@@ -68,8 +68,6 @@ import {
   SignedOut,
   SignInStarted,
   SignInState,
-  Volume,
-  VolumeList,
   StepTold,
   StepTries,
   Skill,
@@ -448,17 +446,11 @@ export const delegations = {
     call((c) => c.delegations.delete({ params: { namespace, name } }), write(Delegation, DELEGATION_WRITTEN)),
 };
 
-/** A factory's volumes, read-only: each folder its runs reach beside its repositories. */
-export const volumes = {
-  list: (namespace: string): Promise<VolumeList> => call((c) => c.volumes.list({ params: { namespace }, query: {} }), read(VolumeList)),
-  get: (namespace: string, name: string): Promise<Volume> => call((c) => c.volumes.get({ params: { namespace, name } }), read(Volume)),
-};
-
 /**
  * Which definition a read is of, beside its namespace: `origin`, the place it is read from, shadowed or not (none: the one the namespace
  * serves at each name); and `repo`, the factory's repository it is read on, sent as `?repo=` as every read of a factory's says it.
  */
-export type DefinitionRead = { origin?: DefinitionOrigin; repo?: string };
+type DefinitionRead = { origin?: DefinitionOrigin; repo?: string };
 
 /** The `?origin=` of `at`, none for none. */
 const originOf = (at: DefinitionRead | undefined): { origin?: string } => (at?.origin ? { origin: at.origin } : {});

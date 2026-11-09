@@ -14,7 +14,7 @@
 import { Graph, layout } from '@dagrejs/dagre';
 import type { MachineEdge, MachineGraph, MachineVerb } from './api/steps.ts';
 
-export type Point = { x: number; y: number };
+type Point = { x: number; y: number };
 
 /** The edges one list gathers that take the same action: each edge's event with its guard (`eventOf`), and the action. */
 export type ByAction = { action: string; events: string[] };
@@ -32,7 +32,7 @@ export type StateBox = {
 };
 
 /** A stretch of a route drawn straight, at `x` from the `enter` y to the `leave` y, down or back up: where it crosses one rank. */
-export type Leg = { x: number; enter: number; leave: number };
+type Leg = { x: number; enter: number; leave: number };
 
 /**
  * The edges and verbs from one state to another, drawn as one: its SVG path, its edges by action, its verbs (`verbOf`), whether it is
@@ -59,11 +59,11 @@ export const LINE_HEIGHT = 16;
 /** How tall a state's head is: what kind of state it is, and its name. */
 export const HEAD_HEIGHT = 52;
 /** How much a list adds to its lines across: its padding and its border. */
-export const PAD_X = 22;
+const PAD_X = 22;
 /** How much a list adds to its lines down: its padding and its border. */
 export const PAD_Y = 10;
 /** A state's box is never narrower than its name and its kind need. */
-export const MIN_WIDTH = 128;
+const MIN_WIDTH = 128;
 
 /** An edge's event, with its guard in brackets when it has one. */
 export const eventOf = (edge: MachineEdge): string => `${edge.event}${edge.guard ? ` [${edge.guard}]` : ''}`;
@@ -83,7 +83,7 @@ export function byAction(edges: readonly MachineEdge[]): ByAction[] {
 }
 
 /** How many lines a list takes: one per event, and one per action. */
-export const linesOf = (list: readonly ByAction[]): number => list.reduce((n, g) => n + g.events.length + 1, 0);
+const linesOf = (list: readonly ByAction[]): number => list.reduce((n, g) => n + g.events.length + 1, 0);
 
 /** How wide a list is drawn: its longest event, or its longest action behind its arrow. */
 const widthOf = (list: readonly ByAction[]) =>
@@ -105,7 +105,7 @@ export const labelSize = (edges: readonly ByAction[], verbs: readonly string[] =
  * How much more a route an edge takes weighs than one only a person's verb takes, when dagre orders each rank: the machine's own routes
  * hold the layout, and the verbs' are laid round them.
  */
-export const EDGE_WEIGHT = 2;
+const EDGE_WEIGHT = 2;
 
 /** How far a route's end stays from either side of its state's box. */
 export const END_INSET = 12;

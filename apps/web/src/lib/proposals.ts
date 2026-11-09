@@ -7,7 +7,7 @@ import { PROPOSABLE_KINDS, RESOURCE_PLURALS, type Proposal, type ProposalPhase }
 import type { Hue } from './meaning.ts';
 import type { ProposalBefore, ProposalOffers, ProposalOffersOf, ProposalOrderFacts } from '../../contracts/proposal.contract.ts';
 
-export type { ProposalOffers, ProposalOrderFacts } from '../../contracts/proposal.contract.ts';
+export type { ProposalOffers } from '../../contracts/proposal.contract.ts';
 
 /** Approve while it waits; Decline while it waits or stands approved and not yet applied (the verbs' own refusals, said before a click). */
 export const proposalOffers: ProposalOffersOf = (phase: ProposalPhase): ProposalOffers => ({
@@ -16,7 +16,7 @@ export const proposalOffers: ProposalOffersOf = (phase: ProposalPhase): Proposal
 });
 
 /** What waits on the person first, then the newer of one kind first; even where nothing tells them apart. */
-export const proposalBefore: ProposalBefore = (a: ProposalOrderFacts, b: ProposalOrderFacts): number => {
+const proposalBefore: ProposalBefore = (a: ProposalOrderFacts, b: ProposalOrderFacts): number => {
   if (a.waiting !== b.waiting) return a.waiting ? -1 : 1;
   if (a.at === b.at) return 0;
   return a.at > b.at ? -1 : 1;

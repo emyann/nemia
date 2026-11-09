@@ -12,10 +12,10 @@ import { clockWord } from './quota.ts';
 import { stepState } from './status.ts';
 
 /** The rows of agents at work the strip shows before it says how many more there are. */
-export const ROWS_SHOWN = 3;
+const ROWS_SHOWN = 3;
 
 /** One step at work by an agent: who, which step of which run, and since when, in whole minutes and in words. */
-export type AgentRow = { agent: string; step: string; run: string; title: string; minutes: number; atWork: string };
+type AgentRow = { agent: string; step: string; run: string; title: string; minutes: number; atWork: string };
 
 /**
  * The strip's numbers. `waitsOnYou` and `inFlight` are the open runs, a run that waits on a person counted with the waiting alone;
@@ -42,7 +42,7 @@ export type Strip = {
 };
 
 /** What the strip reads: the whole list, the factories, the caps, now and the day's start in epoch ms, and the factory in view if any. */
-export type StripIn = {
+type StripIn = {
   runs: readonly RunSummary[];
   factories: readonly Factory[];
   ceilings: Ceilings | undefined;
@@ -59,13 +59,13 @@ export const dayStartOf = (now: number): number => {
 };
 
 /** When a finished run's work stopped: the later of its last task's end and its cancellation, else its creation (the api's own rule). */
-export const finishedAtOf = (run: Pick<RunSummary, 'atWork' | 'cancelledAt' | 'createdAt'>): string => {
+const finishedAtOf = (run: Pick<RunSummary, 'atWork' | 'cancelledAt' | 'createdAt'>): string => {
   const ends = [run.atWork?.endedAt ?? null, run.cancelledAt].filter((at): at is string => at !== null);
   return ends.sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? run.createdAt;
 };
 
 /** How a finished run ended (the api's own rule): called off, its result undecided, landed, or failed. */
-export const outcomeOf = (run: Pick<RunSummary, 'cancelledAt' | 'toDecide' | 'status'>): RunOutcome => {
+const outcomeOf = (run: Pick<RunSummary, 'cancelledAt' | 'toDecide' | 'status'>): RunOutcome => {
   if (run.cancelledAt) return 'cancelled';
   if (run.toDecide?.kind === 'result') return 'undecided';
   return run.status === 'succeeded' ? 'succeeded' : 'failed';

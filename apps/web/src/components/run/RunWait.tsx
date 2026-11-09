@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router';
 import { container } from '../../lib/meaning';
 
 /** What a run waits on other runs for, in the package's words: a start `--after` runs (`waiting`) or a person's hold (`holding`). */
-export type RunWaitFacts = {
+type RunWaitFacts = {
   runs: ReadonlyArray<{ run: string; missing: boolean }>;
   word: string;
   advice: string;

@@ -47,7 +47,7 @@ export type StepArtifact =
  * Decodes a `StepArtifact`. A union takes the first member that decodes and drops the keys it does not know, so the members that own more
  * keys come before the bare path they extend.
  */
-export const StepArtifactSchema = decodes<StepArtifact>()(
+const StepArtifactSchema = decodes<StepArtifact>()(
   Schema.Union([
     Schema.Struct({
       path: Schema.String,
@@ -65,7 +65,7 @@ export const StepArtifactSchema = decodes<StepArtifact>()(
 export type StepReply = { finding: string; answer: string; why: string };
 
 /** Decodes a `StepReply`. */
-export const StepReplySchema = decodes<StepReply>()(
+const StepReplySchema = decodes<StepReply>()(
   Schema.Struct({
     finding: Schema.String,
     answer: Schema.String,
@@ -79,7 +79,7 @@ export const StepReplySchema = decodes<StepReply>()(
 export type QuestionOption = { label: string; meaning: string };
 
 /** Decodes a `QuestionOption`. */
-export const QuestionOptionSchema = decodes<QuestionOption>()(Schema.Struct({ label: Schema.String, meaning: Schema.String }));
+const QuestionOptionSchema = decodes<QuestionOption>()(Schema.Struct({ label: Schema.String, meaning: Schema.String }));
 
 /**
  * Mirrors `Question` in agent-orchestrator's question/question.ts: its `title`, which an answer names; its `body`; its `options`; what
@@ -95,7 +95,7 @@ export type Question = {
 };
 
 /** Decodes a `Question`. */
-export const QuestionSchema = decodes<Question>()(
+const QuestionSchema = decodes<Question>()(
   Schema.Struct({
     title: Schema.String,
     body: Schema.String,
@@ -109,7 +109,7 @@ export const QuestionSchema = decodes<Question>()(
 export type AskedQuestions = { field: string; questions: Question[] };
 
 /** Decodes an `AskedQuestions`. */
-export const AskedQuestionsSchema = decodes<AskedQuestions>()(
+const AskedQuestionsSchema = decodes<AskedQuestions>()(
   Schema.Struct({
     field: Schema.String,
     questions: Schema.mutable(Schema.Array(QuestionSchema)),
@@ -144,7 +144,7 @@ export type StepCloseout = {
 export type StepValue = { name: string; value: string; link: string | null };
 
 /** Decodes a `StepValue`. */
-export const StepValueSchema = decodes<StepValue>()(
+const StepValueSchema = decodes<StepValue>()(
   Schema.Struct({
     name: Schema.String,
     value: Schema.String,
@@ -156,7 +156,7 @@ export const StepValueSchema = decodes<StepValue>()(
 const ObjectSchema = Schema.Record(Schema.String, Schema.Unknown);
 
 /** Decodes a `StepCloseout`: its output, its fields' schemas and the statement itself (`raw`) are read as they came. */
-export const StepCloseoutSchema = decodes<StepCloseout>()(
+const StepCloseoutSchema = decodes<StepCloseout>()(
   Schema.Struct({
     apiVersion: Schema.NullOr(Schema.String),
     outcome: Schema.Literals(OUTCOMES),
@@ -179,7 +179,7 @@ export const StepCloseoutSchema = decodes<StepCloseout>()(
 export type StepLog = { lines: string[]; truncated: boolean };
 
 /** Decodes a `StepLog`. */
-export const StepLogSchema = decodes<StepLog>()(Schema.Struct({ lines: StringsSchema, truncated: Schema.Boolean }));
+const StepLogSchema = decodes<StepLog>()(Schema.Struct({ lines: StringsSchema, truncated: Schema.Boolean }));
 
 /**
  * Mirrors `StepCheck` in apps/api/src/steps/logs.ts: the command a step is judged by, from the workflow the run
@@ -195,7 +195,7 @@ export type StepCheck = {
 };
 
 /** Decodes a `StepCheck`. */
-export const StepCheckSchema = decodes<StepCheck>()(
+const StepCheckSchema = decodes<StepCheck>()(
   Schema.Struct({
     command: Schema.String,
     taskId: Schema.NullOr(Schema.String),
@@ -218,7 +218,7 @@ export const StepCheckSchema = decodes<StepCheck>()(
 export type StepUnreadable = { error: string; raw: unknown };
 
 /** Decodes a `StepUnreadable`: the statement (`raw`) is read as it came. */
-export const StepUnreadableSchema = decodes<StepUnreadable>()(Schema.Struct({ error: Schema.String, raw: Schema.Unknown }));
+const StepUnreadableSchema = decodes<StepUnreadable>()(Schema.Struct({ error: Schema.String, raw: Schema.Unknown }));
 
 /** How an attempt ended, as the runtime records it: `objects`' `EngineOutcome`. */
 export type AttemptOutcome = EngineOutcome;
@@ -255,7 +255,7 @@ export type StepAttempts = {
 };
 
 /** Decodes a `StepAttempts`. */
-export const StepAttemptsSchema = decodes<StepAttempts>()(
+const StepAttemptsSchema = decodes<StepAttempts>()(
   Schema.Struct({
     count: Schema.Number,
     latest: Schema.NullOr(

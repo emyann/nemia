@@ -142,7 +142,7 @@ function workedTitle(run: Clocked & { startedAt: string; atWork: AtWork }, now: 
 }
 
 /** Where a run's clock is drawn: on a card of the Factory's floor or a run's page, or in a row of the runs page's tables. */
-export type ClockPlace = 'card' | 'row';
+type ClockPlace = 'card' | 'row';
 
 /** What a run's clock says in a table's column, where there is room for one short fact: the time at work, to the minute. */
 const rowWords = (run: Clocked, now: number): string => {
@@ -238,7 +238,7 @@ type Waits = Pick<RunSummary, 'id' | 'waiting'> & { holding?: RunSummary['holdin
  * a person holds it until that has not landed (`holding`). None once the run has started and nobody holds it: a wait it was started with
  * is over, and a run it reads as context is never one.
  */
-export const liveWaits = (run: Waits): string[] => [
+const liveWaits = (run: Waits): string[] => [
   ...new Set([...(run.waiting?.runs ?? []).map((w) => w.run), ...(run.holding?.runs ?? []).filter((h) => !h.landed).map((h) => h.run)]),
 ];
 
@@ -246,7 +246,7 @@ export const liveWaits = (run: Waits): string[] => [
  * An edge between two cards on the Factory: from a run to one that still waits on it (`after:`), or that a person holds until it lands
  * (`hold:`). Always dashed, to come: a wait that is over draws nothing.
  */
-export type RunEdge = { id: string; source: string; target: string; state: Extract<EdgeState, 'to-come'> };
+type RunEdge = { id: string; source: string; target: string; state: Extract<EdgeState, 'to-come'> };
 
 /**
  * The edges between the cards on the floor that are live waits: one from each run a card's roots still wait on (`waiting`), and one from
@@ -284,7 +284,7 @@ function reachesAround(edges: readonly RunEdge[], edge: RunEdge): boolean {
 }
 
 /** A faint line on the Factory from a run another reads as context (`--from`) to the card that reads it. */
-export type ContextEdge = { id: string; source: string; target: string };
+type ContextEdge = { id: string; source: string; target: string };
 
 /**
  * The lines of what the focused card reads: one from each run in its `context` that is on the floor, to it. None without a focus — the

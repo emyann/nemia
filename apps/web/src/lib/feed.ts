@@ -11,10 +11,10 @@ export type FeedStatus = 'connecting' | 'open' | 'down';
  * What the feed's stream names each event, as the api's `feedEventOf` does: the store's pause put or lifted, a daemon that took the
  * store, a step's word, a run gone from the store, or a run's own word.
  */
-export type FeedEvent = 'run' | 'step' | 'removed' | 'daemon' | 'store';
+type FeedEvent = 'run' | 'step' | 'removed' | 'daemon' | 'store';
 
 /** The events of the feed that are a run's, each line naming the run it is about; a daemon's and the store's name none. */
-export type RunEvent = Exclude<FeedEvent, 'daemon' | 'store'>;
+type RunEvent = Exclude<FeedEvent, 'daemon' | 'store'>;
 
 /** How often what the feed answers for is read all the same while its stream is open: a slow fallback, in case an event is ever missed. */
 export const FALLBACK_MS = 60_000;
@@ -128,10 +128,10 @@ export type FeedStart = 'end' | { after: string };
 const startAt = (after: string | undefined): FeedStart => (after === undefined ? 'end' : { after });
 
 /** What `followFeed` tells the page: the queries to read again, and whether it follows. */
-export type FeedSink = { invalidate: (keys: QueryKey[]) => void; status: (status: FeedStatus) => void };
+type FeedSink = { invalidate: (keys: QueryKey[]) => void; status: (status: FeedStatus) => void };
 
 /** The timers `followFeed` sets: the browser's, or a test's own. */
-export type Timers = {
+type Timers = {
   set: (f: () => void, ms: number) => ReturnType<typeof setTimeout>;
   clear: (t: ReturnType<typeof setTimeout>) => void;
 };

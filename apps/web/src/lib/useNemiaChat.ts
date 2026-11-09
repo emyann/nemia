@@ -27,7 +27,7 @@ import { animationFrames } from './follow.ts';
 import { browserSharing, sharedStream, type Sharing } from './sharedStream.ts';
 
 /** How long the board waits before it reads her chat again, or tries a kept message again, after one that did not work. */
-export const CHAT_RETRY_MS = 3_000;
+const CHAT_RETRY_MS = 3_000;
 
 /** The person's words, drawn as their own at once, under the id her chat gives the outbox entry, which the stream replaces by. */
 const personEvent = (entry: ChatSent): ChatEvent => ({
@@ -57,10 +57,10 @@ export type NemiaChat = {
 };
 
 /** What the read and the stream write into: the state they change, and the try they ask for again. */
-export type Reader = { setState: Dispatch<SetStateAction<ChatFollowed>>; tryAgain: () => void };
+type Reader = { setState: Dispatch<SetStateAction<ChatFollowed>>; tryAgain: () => void };
 
 /** The name the board's tabs share her chat's one stream under (`sharedStream`): its Web Lock and its channel. */
-export const CHAT_SHARED = 'nemia-chat-stream';
+const CHAT_SHARED = 'nemia-chat-stream';
 
 /**
  * Reads her chat once and follows it from the cursor it answered, and asks for another try after `CHAT_RETRY_MS` where the read did not

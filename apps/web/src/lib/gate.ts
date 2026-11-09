@@ -232,13 +232,6 @@ export function collisionFacts(collisions: Collisions): GateFact[] {
 }
 
 /**
- * What a run waits on a person for other than a gate, in words, for the card and the inspector: a step's question, a session the harness
- * blocked, or a result nobody decided — each answered on the run's page, which these link to (`step` names the section, or none for the
- * Decide section). Inline answers are for gates alone.
- */
-export type Waits = { said: string; step: string | null };
-
-/**
  * The card's line for a result nobody decided, which fits whatever the branch is called: `decide its result: a branch ahead of the base
  * that nothing merges`. The CLI `ls`'s own words, with the branch and the command, are the card's title and the run page's Decide section.
  */

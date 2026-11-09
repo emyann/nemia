@@ -24,7 +24,7 @@ export function tryLabel(t: Frozen<StepTry>, tries: readonly Frozen<StepTry>[]):
 }
 
 /** A try's sessions as its row says them: how many, and how long the latest took, or that it runs. */
-export function attemptsWord({ count, latest }: StepAttempts): string {
+function attemptsWord({ count, latest }: StepAttempts): string {
   if (!latest) return 'no session';
   const took = latest.endedAt
     ? durationWords(Date.parse(latest.endedAt) - Date.parse(latest.startedAt), 'second')
@@ -196,7 +196,7 @@ function TryOutcome({ t, none }: { t: Frozen<StepTry>; none: string }) {
  * replies, what it did not give, and its files. The Raw switch shows the statement as the engine recorded it instead, whole; its word is a
  * label of its own beside it, naming the switch's input, since React Aria's switch is a label round its input.
  */
-export function CloseoutView({ closeout, outcome }: { closeout: Frozen<StepCloseout>; outcome: Outcome }) {
+function CloseoutView({ closeout, outcome }: { closeout: Frozen<StepCloseout>; outcome: Outcome }) {
   const [raw, setRaw] = useState(false);
   const switchId = useId();
   const toggle = (

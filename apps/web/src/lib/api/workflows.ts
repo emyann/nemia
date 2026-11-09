@@ -117,7 +117,7 @@ const stepOf = (step: WorkflowStepStatus): ListedStep => ({
 const drawnEdge = (edge: Workflow['status']['graph']['edges'][number]): edge is GraphEdge => edge.kind !== 'input';
 
 /** A Workflow, as the board reads it (`WorkflowListing`). */
-export const workflowViewOf = (workflow: Workflow): WorkflowListing => ({
+const workflowViewOf = (workflow: Workflow): WorkflowListing => ({
   name: workflow.metadata.name,
   from: workflow.status.origin,
   dir: workflow.status.dir,

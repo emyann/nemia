@@ -21,7 +21,7 @@ const BUCKETS: ReadonlyArray<{ bucket: Bucket; hue: Hue }> = [
 ];
 
 /** The bucket of `run`: a person's first, then its phase. */
-export const bucketOf = (run: Pick<RunSummary, 'phase' | 'waitingOnYou'>): Bucket => {
+const bucketOf = (run: Pick<RunSummary, 'phase' | 'waitingOnYou'>): Bucket => {
   if (run.waitingOnYou.length > 0) return 'needs a person';
   switch (run.phase) {
     case 'running':

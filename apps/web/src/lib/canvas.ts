@@ -51,7 +51,7 @@ export const edgeState = (sourceDone: boolean, target: StepState): EdgeState =>
  * may yet come: `running` while its next round is due, and `to-come` otherwise. `label`: on a `loop` edge past its first
  * round, the round it is on.
  */
-export type CanvasEdge = {
+type CanvasEdge = {
   id: string;
   source: string;
   target: string;
@@ -207,7 +207,7 @@ export function besideBar(width: number, over: number, nodes: number): Beside | 
 }
 
 /** The padding of a fit beside the floating bar (`besideBar`). */
-export type Beside = { left: '10%'; right: `${number}px`; y: '20%' };
+type Beside = { left: '10%'; right: `${number}px`; y: '20%' };
 
 /**
  * How a canvas `width` pixels wide, the bar `over` pixels over its right edge, is fitted as a step opens in the bar: the run's nodes,

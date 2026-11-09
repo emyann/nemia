@@ -26,7 +26,7 @@ export interface WaitWords {
  * A person's words for a state: the rail's short word (on the chip, the rail and the card's tag), what it means on hover, and, for a
  * state the api lists as waiting on a person, the words of that wait; null for a state that waits on nobody.
  */
-export interface PersonWords {
+interface PersonWords {
   readonly rail: string;
   readonly meaning: string;
   readonly tag: WaitWords['tag'] | null;
@@ -218,7 +218,7 @@ export const RUN_WAITS: Record<'hold' | 'after' | 'unfinished', WaitWords> = {
 export const ANY_WAIT: WaitWords = { tag: () => GATE, sentence: () => 'It waits on you.', open: opens };
 
 /** How a finished run ended, as every page says it: a word, its whole sentence, and the hue it is drawn in. */
-export type Ended = { word: string; title: string; hue: Hue };
+type Ended = { word: string; title: string; hue: Hue };
 
 /** How a finished run of each outcome ended (`Ended`): the one table of an outcome's word and hue. */
 export const ENDED: Record<RunOutcome, Ended> = {
@@ -335,7 +335,7 @@ export const OFFERS = {
 } as const satisfies Record<OfferCase, OfferWords & Readonly<Record<string, unknown>>>;
 
 /** What every offer's words hold (`OFFERS`). */
-export interface OfferWords {
+interface OfferWords {
   readonly said: string | null | Readonly<Record<string, string>> | ((calls: string | null) => string);
   readonly form: (step: string) => string;
   readonly field: (step: string) => string;

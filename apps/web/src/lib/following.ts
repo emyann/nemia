@@ -56,7 +56,7 @@ const wholeText = (event: TranscriptEvent) => event.role === 'assistant' && even
  * block, and the message dropped and its block closed at its `last`; a piece of a closed block ignored; a move to another attempt or
  * task (`moved`) starts the conversation afresh, its history to come; and `streamed` says whether the api pushes the session.
  */
-export function changed(s: Following, c: Change, closed: Set<string>): Following {
+function changed(s: Following, c: Change, closed: Set<string>): Following {
   if (c.kind === 'streamed') return { ...s, streamed: c.streamed };
   if (c.kind === 'moved') return { ...s, events: [], partial: null };
   if (c.kind === 'events') {

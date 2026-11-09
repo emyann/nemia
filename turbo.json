@@ -81,6 +81,7 @@
         "$TURBO_ROOT$/.claude/settings.json",
         "$TURBO_ROOT$/.claude/skills/**",
         "$TURBO_ROOT$/packages/templates/sdlc/skills/**",
+        "$TURBO_ROOT$/packages/templates/sdlc/fences/**",
         "$TURBO_ROOT$/apps/web/.claude/skills/**"
       ]
     },

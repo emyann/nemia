@@ -57,7 +57,8 @@ A proposal starts `waiting`. Once approved, it applies when it is due: at once b
 approved, waiting; a run you call off drops it.
 
 As it applies, it is checked again. If any of its objects moved since the proposal read it, the proposal goes `stale` and writes
-nothing: read the object again and propose anew. If an agent approved it and that approval no longer holds (its delegation taken back,
+nothing: read the object again and propose anew. A Factory's version covers its rules and its instruction as well as its spec and
+status, so a Factory proposal goes stale when either is edited, or its status moves, after it was read. If an agent approved it and that approval no longer holds (its delegation taken back,
 its rule dropped, the factory no longer at `auto`), it goes back to `waiting`, for you. Otherwise every object is written, and the
 proposal is `applied`; a write refused midway leaves it `failed`, naming what was written. The tick acts on every approved proposal on
 each of its passes, so a proposal waiting on its run applies on the pass after the run succeeds.

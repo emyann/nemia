@@ -2,7 +2,8 @@
  * Proposals on a scratch store, over a templated factory whose tree is rendered by hand: an agent proposes a factory's Workflow at the
  * version it read, the person approves, and it is applied into the tree with what it held before; an undo applies that back as a new
  * revision. Then one fixture per rule: stale, a run-end proposal and its run, a delegation taken back, an agent's own proposal, a level
- * short of auto, a widening, a confirm past the delegation, and the Proposal door's own refusals. Kinds and `_tag`s are asserted, never
+ * short of auto, a widening, a confirm past the delegation, a Factory read before its rules, its instruction or its status moved, and
+ * the Proposal door's own refusals. Kinds and `_tag`s are asserted, never
  * a sentence. `WF_ROOT` is set before `src` is imported, which reads it as it loads.
  */
 import { test } from 'node:test';
@@ -32,6 +33,9 @@ const { confirmedFile, writeProposed } = await import('../src/auto/auto.store.ts
 const { POLICY_CONFIRM, policyListOf } = await import('../src/auto/auto.verb.ts');
 const { ruleWords } = await import('../src/auto/auto.ts');
 const { RunDoor } = await import('../src/runs/runs.store.ts');
+const { FactoryDoor } = await import('../src/factories/factories.store.ts');
+const { FactoryName } = await import('../src/factory/factory.model.ts');
+const { FACTORY_INSTRUCT } = await import('../src/factory/instruction.verb.ts');
 type Caller = import('../src/caller/caller.ts').ProposalCaller;
 type Rule = import('../src/auto/auto.ts').ProposalPolicyRule;
 
@@ -190,6 +194,73 @@ test('REFUSED stale: the workflow written between propose and approve leaves the
   assert.equal(after.status.phase, 'stale');
   assert.match(planIn(tree), /Someone else wrote this\./);
   assert.equal((await refusalOf(approveProgram(PERSON, 'stale', proposed.metadata.name, PLACE))).reason, 'not-waiting');
+});
+
+/** The Factory `name` read now, proposed with its parts `spec` names over it, at the version it was read. */
+async function factoryChanged(name: string, spec: { rules?: string; instruction?: string }): Promise<ProposedObject> {
+  const now = await run(currentOf(PLACE, name, 'Factory', name));
+  return { kind: 'Factory', metadata: { name, resourceVersion: now.version ?? undefined }, spec };
+}
+
+/** The person's rules of the factory `name` written, as `nemia factory rules` writes them. */
+const personRules = (name: string, words: string) => run(Effect.flatMap(FactoryDoor, (d) => d.rules.write(FactoryName.read(name), words)));
+
+/** The person's instruction of the factory `name` written, as `nemia factory instruct` writes it. */
+const personInstruction = (name: string, words: string) => run(FACTORY_INSTRUCT.handler({ factory: name, words }, {}, ROOT));
+
+/** What the factory `name` keeps of its rules and its instruction, each read off its tree. */
+const factoryParts = (tree: string) => ({
+  rules: fs.readFileSync(path.join(tree, 'RULES.md'), 'utf8').trim(),
+  instruction: fs.readFileSync(path.join(tree, 'NEMIA.md'), 'utf8').trim(),
+});
+
+test('a Factory proposal read and approved with nothing moved between applies its rules; one read before the rules moved is refused at filing', async () => {
+  const tree = factory('wired');
+  const object = await factoryChanged('wired', { rules: 'Ours.' });
+  const proposed = await run(proposeProgram(agentOf('implementer', 'wired'), 'wired', { objects: [object] }, PLACE));
+  assert.equal((await run(approveProgram(PERSON, 'wired', proposed.metadata.name, PLACE))).status.phase, 'applied');
+  assert.equal(fs.readFileSync(path.join(tree, 'RULES.md'), 'utf8').trim(), 'Ours.');
+  const before = await factoryChanged('wired', { rules: 'Theirs.' });
+  await personRules('wired', 'The person wrote these.');
+  const late = await refusalOf(proposeProgram(agentOf('implementer', 'wired'), 'wired', { objects: [before] }, PLACE));
+  assert.equal(late._tag, 'Conflict');
+});
+
+test("REFUSED stale: the rules or the instruction written after the Factory was read leave its proposal stale and the person's words standing", async () => {
+  const tree = factory('edited');
+  await personRules('edited', 'First rules.');
+  await personInstruction('edited', 'First instruction.');
+  for (const [part, write] of [
+    ['rules', () => personRules('edited', 'The person wrote these.')],
+    ['instruction', () => personInstruction('edited', 'The person wrote this.')],
+  ] as const) {
+    const object = await factoryChanged('edited', { [part]: 'Mine.' });
+    const proposed = await run(proposeProgram(agentOf('implementer', 'edited'), 'edited', { objects: [object] }, PLACE));
+    const was = factoryParts(tree);
+    await write();
+    const written = factoryParts(tree);
+    assert.notDeepEqual(written, was, part);
+    const after = await run(approveProgram(PERSON, 'edited', proposed.metadata.name, PLACE));
+    assert.equal(after.status.phase, 'stale', part);
+    assert.deepEqual(factoryParts(tree), written, `the person's ${part} stands`);
+  }
+});
+
+test("a status move alone makes a Factory proposal stale: its version is the served object's, status and all", async () => {
+  factory('moving');
+  const object = await factoryChanged('moving', { rules: 'Mine.' });
+  const proposed = await run(proposeProgram(agentOf('implementer', 'moving'), 'moving', { objects: [object] }, PLACE));
+  fs.writeFileSync(
+    path.join(ROOT, 'factories', 'moving', 'status.json'),
+    JSON.stringify({
+      version: '0.1.0',
+      digest: null,
+      params: {},
+      conditions: [{ type: 'Applied', status: 'True', reason: 'Rendered', message: 'ok', lastTransitionTime: '2026-11-09T00:00:00.000Z' }],
+      observedGeneration: 1,
+    }),
+  );
+  assert.equal((await run(approveProgram(PERSON, 'moving', proposed.metadata.name, PLACE))).status.phase, 'stale');
 });
 
 test('REFUSED as it is written: a workflow the Workflow door refuses leaves the proposal failed, naming nothing written, and the tree as it was', async () => {

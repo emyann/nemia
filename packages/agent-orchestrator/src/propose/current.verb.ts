@@ -133,7 +133,10 @@ const servedNow = (object: { metadata: { resourceVersion: string }; spec: unknow
   spec: object.spec,
 });
 
-/** The Factory's proposable parts now: its attached workflows, its rules and its instruction; its version the served object's. */
+/**
+ * The Factory's proposable parts now: its attached workflows, its rules and its instruction; its version the served object's, which
+ * digests its rules and its instruction beside its spec and status, so an edit of any of them makes a proposal read before it stale.
+ */
 const factoryNow = (place: ProposalPlace, factory: string) =>
   orNone(factoryObject(place.home, place.repo, factory), servedNow).pipe(
     Effect.flatMap((served) =>

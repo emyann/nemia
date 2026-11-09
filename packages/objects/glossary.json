@@ -82,7 +82,7 @@
     },
     {
       "term": "Factory",
-      "meaning": "a factory served as an object, which no namespace holds since it is the namespace its parts are in: its spec is what its file says (repositories, workflows, hires, volumes, harness settings, revisions, template, level), its status what the controller last observed (conditions, the applied version, an upgrade waiting, places not trusted, why its file does not read), at `/api/factories/<name>` (`Factory`, `packages/objects/src/factory.ts`).",
+      "meaning": "a factory served as an object, which no namespace holds since it is the namespace its parts are in: its spec is what its file says (repositories, workflows, hires, volumes, harness settings, revisions, template, level), its status what the controller last observed (conditions, the applied version, an upgrade waiting, places not trusted, why its file does not read), its `resourceVersion` moving on a change of its spec, its status, its rules or its instruction, at `/api/factories/<name>` (`Factory`, `packages/objects/src/factory.ts`).",
       "type": "Factory"
     },
     {

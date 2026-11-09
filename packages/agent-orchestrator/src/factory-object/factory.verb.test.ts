@@ -96,6 +96,31 @@ test('every object decodes as the objects say a Factory is, and its resourceVers
   );
 });
 
+test("a Factory's resourceVersion moves with its rules and its instruction, read beside its spec and status", () => {
+  const versionOf = (name: string) => factoryObjectsOf(listed, repo, home).find((o) => o.metadata.name === name)?.metadata.resourceVersion;
+  const rules = path.join(home, 'factories', 'acme', 'RULES.md');
+  const instruction = path.join(repo, 'NEMIA.md');
+  const plain = versionOf('acme');
+  const seen = [plain];
+  const moves = (what: string) => {
+    const now = versionOf('acme');
+    assert.ok(!seen.includes(now), what);
+    assert.equal(versionOf('acme'), now, `the same read is the same version, ${what}`);
+    seen.push(now);
+  };
+  fs.writeFileSync(rules, 'Be kind.\n');
+  moves('rules written');
+  fs.writeFileSync(instruction, 'We build tools.\n');
+  moves('instruction written');
+  fs.writeFileSync(rules, 'Be brief.\n');
+  moves('rules edited');
+  fs.rmSync(rules);
+  moves('rules removed');
+  fs.rmSync(instruction);
+  assert.equal(versionOf('acme'), plain, 'a factory that keeps neither again has the version of its spec and status alone');
+  assert.equal(versionOf('default'), byName('default')?.metadata.resourceVersion, "the default factory's version does not move");
+});
+
 test('a page is cut by limit and continue, sorted by name, and counts what remains', async () => {
   const first = await Effect.runPromise(objectsListed('Factory', objects, { limit: 2 }, 'factory'));
   assert.ok(Schema.is(FactoryList)(first));

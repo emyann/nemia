@@ -14,14 +14,20 @@ import { HOME } from '../record/record.store.ts';
 export type InstructionRead = { words: string | null; error: string | null };
 
 /** The folder the store keeps the factory `name`'s instruction in, beside its file: `$WF_ROOT/factories/<name>`. Refused: a bad name. */
-export function instructionFolder(name: string): string {
+export const instructionFolder = (name: string): string => instructionFolderAt(HOME, name);
+
+/** The folder the store `home` keeps the factory `name`'s instruction in (`instructionFolder`). Refused: a bad name (`Invalid`). */
+export function instructionFolderAt(home: string, name: string): string {
   const bad = factoryNameRefusal(name);
   if (bad) throw new Invalid({ message: bad });
-  return path.join(HOME, 'factories', name);
+  return path.join(home, 'factories', name);
 }
 
 /** The file the store keeps the factory `name`'s instruction in: `NEMIA.md` in its folder (`instructionFolder`). */
 export const instructionFile = (name: string): string => path.join(instructionFolder(name), DEFAULT_INSTRUCTION);
+
+/** The file the store `home` keeps the factory `name`'s instruction in (`instructionFile`). */
+export const instructionFileAt = (home: string, name: string): string => path.join(instructionFolderAt(home, name), DEFAULT_INSTRUCTION);
 
 /** Whether the folder `inner` is `outer` or inside it, both as `path.resolve` spells them: on a separator, never a prefix. */
 const inside = (outer: string, inner: string): boolean => {

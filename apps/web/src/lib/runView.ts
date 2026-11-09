@@ -16,7 +16,7 @@ import {
 import type { Run, RunSpec, RunSpecStep, RunStatus, RunStepStatus, StepTold, StepTry } from 'objects';
 import type { StepCloseout, StepTry as StepTryRead, StepUnreadable } from './api/tries.ts';
 import type { WorkflowPageAddress } from './api/address.ts';
-import { runGone, runLinesQuery, runObjectQuery, stepToldQuery, stepTriesQuery, type RunLines, type StepCommands } from './api/run.ts';
+import { readGone, runLinesQuery, runObjectQuery, stepToldQuery, stepTriesQuery, type RunLines, type StepCommands } from './api/run.ts';
 import { stepStamp } from './lifecyclePath.ts';
 import type { Frozen } from './frozen.ts';
 
@@ -222,7 +222,7 @@ const viewOf = (
 };
 
 /**
- * The view of the run `id`, and the error of its object's last read — a run gone (`runGone`) is said by the page, which keeps what it
+ * The view of the run `id`, and the error of its object's last read — a run gone (`readGone`) is said by the page, which keeps what it
  * last read. Its object and lines are suspense reads, which the route's loader has read (`loadRun`); each step's tries and told are read
  * under its stamp (`useStepReads`).
  */
@@ -255,7 +255,7 @@ export function useRunRead(id: string): { view: RunView | undefined; error: unkn
 
 /**
  * What a run's page loads before it draws: the run object into `client`'s cache (`runObjectQuery`), then its lines and every step's tries
- * and told at once, so the page draws whole on its first paint; and `gone` when the store has no such run (`runGone`), so the page says so
+ * and told at once, so the page draws whole on its first paint; and `gone` when the store has no such run (`readGone`), so the page says so
  * in place of a failure. Any other failure is thrown, for the route's error to say.
  */
 export const loadRun = (client: QueryClient, id: string): Promise<{ gone: boolean }> =>
@@ -272,7 +272,7 @@ export const loadRun = (client: QueryClient, id: string): Promise<{ gone: boolea
         }),
       ]).then(() => ({ gone: false })),
     (error: unknown) => {
-      if (runGone(error)) return { gone: true };
+      if (readGone(error)) return { gone: true };
       throw error;
     },
   );

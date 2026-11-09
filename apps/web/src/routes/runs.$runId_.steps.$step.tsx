@@ -6,7 +6,7 @@ import { SessionComposer } from '@/components/step/session/SessionComposer';
 import { SessionQuiet, SessionTalk } from '@/components/step/session/SessionTalk';
 import { RunGone } from '@/components/run/RunGone';
 import { StatusChip, StepNote } from '@/components/step/StatusChip';
-import { runGone, type Said } from '@/lib/api';
+import { readGone, type Said } from '@/lib/api';
 import { loadRun, useRunView, type RunView, type StepView } from '@/lib/runView';
 import { titleOf } from '@/lib/factory';
 import { mergeSaid, sayable } from '@/lib/say';
@@ -61,7 +61,7 @@ function SessionPage() {
  */
 function SessionRead({ runId, name }: { runId: string; name: string }) {
   const { view: run, error } = useRunView(runId);
-  if (runGone(error)) {
+  if (readGone(error)) {
     return (
       <div className="space-y-3 p-4">
         <Link to="/runs" className="text-body-medium text-muted-foreground hover:text-foreground">

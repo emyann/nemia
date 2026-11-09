@@ -2,7 +2,17 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isDeepStrictEqual } from 'node:util';
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
-import { decisionQuery, ReadRefusal, retryRun, WriteRefusal, runGone, runObjectQuery, sayToStep, type RunObject } from '../src/lib/api.ts';
+import {
+  decisionQuery,
+  proposalQuery,
+  ReadRefusal,
+  readGone,
+  retryUnlessGone,
+  runObjectQuery,
+  sayToStep,
+  WriteRefusal,
+  type RunObject,
+} from '../src/lib/api.ts';
 import { decisionStamp } from '../src/lib/decide.ts';
 import { coded, decidable, type Word } from './run-fixtures.ts';
 import { bell, until, WAITED } from './waits.ts';
@@ -372,24 +382,30 @@ test("a run's reads: gone on a 404 alone, its last read kept, any other failure 
       t.after(observer.subscribe(() => {}));
       await client.invalidateQueries({ queryKey: ['runs', 'r-1'], exact: true });
       const result = observer.getCurrentResult();
-      assert.equal(runGone(result.error), true, String(result.error));
+      assert.equal(readGone(result.error), true, String(result.error));
       assert.ok(result.error instanceof ReadRefusal);
       assert.equal(result.data, last, 'the last read is kept by the query — the page, not the query, stops drawing it');
       assert.deepEqual(asked, ['/api/runs/r-1'], "read once, the object at the run's own route: a run gone is not tried again");
     },
   );
-  await t.test('only a 404 is a run gone: any other failure is tried again three times, as before', () => {
-    assert.equal(runGone(new ReadRefusal('No run', 404)), true);
+  await t.test('only a 404 is a read gone (readGone): any other failure is tried again three times, as before (retryUnlessGone)', () => {
+    assert.equal(readGone(new ReadRefusal('No run', 404)), true);
     for (const other of [
       new ReadRefusal('the api is down', 502),
       new ReadRefusal('refused', 400),
       new Error('without its graph'),
       undefined,
     ]) {
-      assert.equal(runGone(other), false, String(other));
-      assert.equal(retryRun(0, other), true, `${String(other)} is tried again`);
-      assert.equal(retryRun(3, other), false, `${String(other)} three times, and no more`);
+      assert.equal(readGone(other), false, String(other));
+      assert.equal(retryUnlessGone(0, other), true, `${String(other)} is tried again`);
+      assert.equal(retryUnlessGone(3, other), false, `${String(other)} three times, and no more`);
     }
-    assert.equal(retryRun(0, new ReadRefusal('No run', 404)), false, 'a run gone is not tried again');
+    assert.equal(retryUnlessGone(0, new ReadRefusal('No run', 404)), false, 'a run gone is not tried again');
+  });
+  await t.test('REFUSED: a proposal the api says is not there is not asked again; any other failure is, three times', () => {
+    const retry = proposalQuery('acme', 'nemia-ab12c').retry as (failures: number, error: unknown) => boolean;
+    assert.equal(retry(0, new ReadRefusal('no such proposal', 404)), false);
+    assert.equal(retry(0, new ReadRefusal('down', 502)), true);
+    assert.equal(retry(3, new ReadRefusal('down', 502)), false, 'three tries, as by default');
   });
 });

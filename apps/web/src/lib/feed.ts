@@ -37,7 +37,7 @@ export const FLUSH_MS = 1_000;
  * the inbox: a card started shows its run's phase, which a step moves — to `waiting` on a person, say — and the feed carries no card
  * events. A run's own word does that, and moves what counts against the cap, and may be a queued card started. A run removed is gone
  * from the list and from the cap, and frees the card it was started from, and its record is read again too: the read that finds none is
- * how a page open on the run learns it is gone (`runGone`).
+ * how a page open on the run learns it is gone (`readGone`).
  *
  * A run's object (`['runs', id]`) is read again on each of them. A step's tries and told (`['runs', id, 'steps', …]`) are keyed by the
  * step's state in the object (`stepStamp`), so a step's event, which moves that state, never names them; a run's own event and a removal

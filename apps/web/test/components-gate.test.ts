@@ -1292,6 +1292,26 @@ test("REFUSED: a banner that says a person is waited on is drawn in an amount's 
   assert.equal(drawnYours(`rounded ${container.yours} ${container.failure}`), false);
 });
 
+test('a proposal the api says is not there (404) is said so, and one it could not read otherwise is a reading notice', async () => {
+  const { ProposalCard } = await import('../src/components/gate/ProposalCard.tsx');
+  const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
+  const { ReadRefusal } = await import('../src/lib/api/read.ts');
+  const failed = (error: Error) => {
+    const client = new QueryClient({ defaultOptions: { queries: { retryOnMount: false } } });
+    client
+      .getQueryCache()
+      .build(client, { queryKey: ['proposal', 'acme', 'nemia-ab12c'] })
+      .setState({ status: 'error', error, fetchStatus: 'idle' });
+    return renderToStaticMarkup(
+      createElement(QueryClientProvider, { client }, createElement(ProposalCard, { factory: 'acme', name: 'nemia-ab12c' })),
+    );
+  };
+  assert.match(failed(new ReadRefusal('no such proposal', 404)), /data-no-proposal="nemia-ab12c"/);
+  const down = failed(new ReadRefusal('the api is down', 502));
+  assert.doesNotMatch(down, /data-no-proposal=/, 'only a 404 is a proposal gone');
+  assert.match(down, /data-proposal-reading="nemia-ab12c"/);
+});
+
 test('a proposal shows its phase, its widens mark, its changes and the buttons its phase takes', async () => {
   const { ProposalCard } = await import('../src/components/gate/ProposalCard.tsx');
   const card = createElement(ProposalCard, { factory: 'acme', name: 'nemia-ab12c' });

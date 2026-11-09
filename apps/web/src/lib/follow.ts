@@ -10,6 +10,7 @@
  * a status of its own and invalidates queries, and what this core would have to grow to hold that is more than the two conversations
  * need. It takes the three bits of transport that are plainly shared — `StreamLike`, `Frames` and `END_GRACE_MS` — from here.
  */
+import { UnreadAnswer } from './api/read.ts';
 
 /** The three facts this core itself writes: whether the stream is still open, why it ended, and why it is being read again. */
 export type Followed = {
@@ -26,8 +27,11 @@ export type Followed = {
  * leaves behind, what a connection made leaves, how an `unreadable` event reads, and the words for what the api did not name.
  */
 export type Follower<S extends Followed, C> = {
-  /** Each named event of the stream and what it brings: no arrival where its data does not decode. */
-  readonly reads: Readonly<Record<string, (message: MessageEvent) => readonly C[]>>;
+  /**
+   * Each named event of the stream and what it brings: its arrivals, and, where its data does not decode, the `UnreadAnswer` its decode
+   * words (`streamDataOf`), which `follow` says as a notice while the stream goes on.
+   */
+  readonly reads: Readonly<Record<string, (message: MessageEvent) => readonly (C | UnreadAnswer)[]>>;
   /** The names of the events that end the following with no error: a step's `settled`. */
   readonly over: readonly string[];
   /** `s` after the arrival `c`, taken in the order they came. */
@@ -75,7 +79,8 @@ export const END_GRACE_MS = 2_000;
 /**
  * The conversation `follower` describes, followed on `stream`, each change written through `update`, apart from React so it is tested
  * without a browser: a hook opens the EventSource and hands it here. Each event named in `follower.reads` brings its arrivals, and one
- * whose data does not decode is ignored; the arrivals that come together are folded once a frame, as a stream opened on a long
+ * whose data does not decode is said as the could-not-be-read line, a notice in `retrying` in its decode's words, and the stream goes on;
+ * the arrivals that come together are folded once a frame, as a stream opened on a long
  * conversation sends hundreds at once, and two of one kind join as they queue (`joined`). An event of `follower.over` ends it with no
  * error.
  *
@@ -125,7 +130,10 @@ export function follow<S extends Followed, C>(
   const cleared = (s: S): S => (s.error === null && s.retrying === null ? s : { ...s, error: null, retrying: null });
   for (const [name, read] of Object.entries(follower.reads)) {
     stream.addEventListener(name, (message) => {
-      for (const c of read(message)) arrive(c);
+      for (const got of read(message)) {
+        if (got instanceof UnreadAnswer) update((s) => ({ ...cleared(s), retrying: got.message }));
+        else arrive(got);
+      }
     });
   }
   for (const name of follower.over) stream.addEventListener(name, () => end(null));

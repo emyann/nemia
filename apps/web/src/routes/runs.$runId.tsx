@@ -22,7 +22,7 @@ import { PruneRun } from '../components/run/PruneRun';
 import { KindsBehind } from '../components/run/KindsBehind';
 import { Labels } from '../components/field/Labels';
 import { runsMoved } from '../lib/runWrites';
-import { factoriesQuery, labelRun, runGone } from '../lib/api';
+import { factoriesQuery, labelRun, readGone } from '../lib/api';
 import { loadRun, useRunView, type RunView, type StepView } from '../lib/runView';
 import { namespaceOf } from '../lib/runNamespace';
 import { untrustedFor, type UntrustedPlace } from '../lib/factories';
@@ -80,7 +80,7 @@ function RunPage() {
  */
 function RunRead({ runId }: { runId: string }) {
   const { view: run, error } = useRunView(runId);
-  if (runGone(error)) {
+  if (readGone(error)) {
     return (
       <div className="space-y-3">
         <BackToRuns />

@@ -196,18 +196,23 @@ test('followStep, a frame at a time: the message being written drawn by its bloc
     );
   });
   await t.test(
-    'REFUSED: an event whose data is not of its shape is ignored — a piece with no key, a transcript event of no known kind',
+    'REFUSED: an event whose data is not of its shape is said, naming its key, and the stream goes on — a later event still arrives',
     () => {
       const { stream, now, flush } = batched();
-      stream.send('partial', { delta: 'Hello', last: false });
-      stream.send('partial', { key: 'm1:0', delta: 7, last: false });
       stream.send('transcript', { ...said('e1', 1, 'x'), kind: 'shout' });
       stream.send('following', { streamed: 'yes' });
+      stream.send('partial', { delta: 'Hello', last: false });
       flush();
-      assert.deepEqual([now().partial, now().events.length, now().streamed], [null, 0, false]);
+      assert.deepEqual([now().partial, now().events.length, now().streamed], [null, 0, false], 'what does not decode changes nothing');
+      assert.match(now().retrying ?? '', /\bkey\b/, 'it is said, in the words of its decode, which name the key it lacks');
+      assert.deepEqual([now().error, now().live], [null, true], 'a notice, not an end');
       stream.dispatchEvent(new MessageEvent('partial', { data: 'not json' }));
       flush();
       assert.equal(now().partial, null);
+      assert.notEqual(now().retrying, null, 'data that is no JSON is said too');
+      stream.send('partial', { key: 'm1:0', delta: 'Hello', last: false });
+      flush();
+      assert.deepEqual(now().partial, { key: 'm1:0', text: 'Hello' }, 'and an event of its shape still arrives after it');
     },
   );
 });

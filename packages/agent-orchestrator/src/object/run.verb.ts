@@ -138,7 +138,7 @@ function costOf(run: Run, name: string, at: RunReading): Pick<RunStepStatus, 'sp
           over: Boolean(overBudget(step, run, judged.spendOf)),
         }
       : null;
-  return { spent, budget, raise: step ? stepRaise(step, run, steps, raiseReads(run, views), judged.spendOf) : null };
+  return { spent, budget, raise: step ? stepRaise(step, run, steps, raiseReads(run, views, steps), judged.spendOf) : null };
 }
 
 /**
@@ -215,7 +215,7 @@ type StepAt = RunReading & {
 
 /** The step `name`'s word, as `nemia decide` says it (`stepStatus`), off the views already read. */
 const stepWord = ({ run, steps, views, judged }: StepAt, name: string): RunStepStatus['status'] => {
-  const reads = raiseReads(run, views);
+  const reads = raiseReads(run, views, steps);
   return stepStatus(
     steps.find((s) => s.name === name) ?? bare(name),
     run,
@@ -261,7 +261,7 @@ const stepStatusOf = Effect.fnUntraced(function* (name: string, at: StepAt) {
       steps.find((s) => s.name === name) ?? bare(name),
       current.reason,
       steps,
-      raiseReads(run, views).closeoutOf,
+      raiseReads(run, views, steps).closeoutOf,
       judged.spendOf,
     ),
     said: taskId ? [...(views.get(taskId)?.state.said ?? [])] : [],

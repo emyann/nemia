@@ -765,6 +765,27 @@ test('after a prune: a retry, a round, an approval and an acceptance are refused
   );
 });
 
+test('a script condition that answered a route no pass has copied yet: prune reads the route as the pass does, and keeps the run that files it', async () => {
+  const b = board();
+  const dir = fs.mkdtempSync(path.join(ROOT, 'routed-'));
+  const write = (name: string, lines: string[]) =>
+    fs.writeFileSync(path.join(dir, `${name}.md`), `---\n${['place: git', ...lines].join('\n')}\n---\n${name} it\n`);
+  write('implement', []);
+  write('pick', ['after: implement', 'routes: [web, docs]', 'route: { script: pick.ts }']);
+  write('web', ['after: pick', 'when: [web]']);
+  write('docs', ['after: pick', 'when: [docs]']);
+  fs.writeFileSync(path.join(dir, 'pick.ts'), "console.log('never run on the test engine');\n");
+  const run = await runPlaced(startRun({ brief: 'route it', repo: aRepo(), workflowDir: dir }));
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  stage.board().end(`${run.id}-pick`, 'succeeded', { exitCode: 0, terminationMessage: '{"route":"web"}' });
+  assert.equal(readRun(run.id).steps.pick?.route, undefined, 'no pass has copied the route onto the record');
+  const judged = await runWith(b.e, judging(run.id, { unmerged: true }));
+  assert.equal(judged.facts?.decided, 'running', 'web is ready to file');
+  assert.ok('pruning' in judged && judged.pruning.kind === 'refused', 'kept, --unmerged or not');
+});
+
 test('REFUSED before anything is read: what `nemia prune` does not take, and an id that is not a name — and the lines `pruneLines` and `sizeOf` say', async (t) => {
   const b = board();
   await t.test('REFUSED: a flag it does not take, and one near a flag it does, exit 2, naming the flag', async () => {

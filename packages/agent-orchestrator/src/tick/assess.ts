@@ -134,7 +134,7 @@ export function assess(
   const retry = due.filter((r) => !waitsOnCheckout(steps, r.step, checkout));
   const waitingOnCheckout: string[] = due.filter((r) => waitsOnCheckout(steps, r.step, checkout)).map((r) => r.step);
   for (const r of due) status.set(r.step, 'running');
-  const round = roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, roundAsks, spendOf);
+  const round = roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, roundAsks, spendOf, verdictOf);
   unspent(status, stood, roundSpans(steps, round));
   for (const r of round) status.set(r.step, 'running');
   for (const name of unheld(steps, run, retry, round)) status.set(name, 'pending');

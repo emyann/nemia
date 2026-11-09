@@ -15,7 +15,8 @@ import { stepsOf } from '../steps/steps.verb.ts';
 import { PlaceService, trialMerges, type Place } from '../place/place.store.ts';
 import { mergeWordOf } from '../branches/index.ts';
 import { strayAsk } from '../say/say.verb.ts';
-import { closeoutAsked, closeoutReader, spendReader, taskPhasesRead } from '../views/views.verb.ts';
+import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRead } from '../views/views.verb.ts';
+import type { Verdict } from '../check/check.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import type { Workflow } from '../step/step.ts';
 import { mergeAsk, mergeOffer, type MergeAsk, type MergeReads, type Tried } from './merge.ts';
@@ -25,7 +26,10 @@ import { RunId } from '../record/record.model.ts';
 
 export type MergeAsked = { run: Run; ask: MergeAsk; file: string };
 
-/** What a merge decides on of a run's steps (`MergeReads`), off their tasks as `nemia ls` reads them. */
+/**
+ * What a merge decides on of a run's steps (`MergeReads`), off their tasks as `nemia ls` reads them: the closeouts read with the run's
+ * steps, and each check's verdict.
+ */
 function mergeReads(
   steps: readonly Workflow[],
   run: Run,
@@ -33,11 +37,13 @@ function mergeReads(
   closeoutOf: (step: string) => Closeout | undefined,
   asked: (taskId: string) => CloseoutAsked,
   spendOf: SpendOf,
+  verdictOf: (step: string) => Verdict | undefined,
 ): MergeReads {
   return {
-    standingOf: (step: Workflow) => standing(step, run, phaseOf, closeoutOf, asked, steps, spendOf),
+    standingOf: (step: Workflow) => standing(step, run, phaseOf, closeoutOf, asked, steps, spendOf, verdictOf),
     stopped: (step: Workflow) => endingStopped(step, run, phaseOf, closeoutOf, asked, steps, spendOf),
-    goesRound: (looping: Workflow) => roundsDue(steps, run, phaseOf, closeoutOf, asked, [], spendOf).some((r) => r.step === looping.name),
+    goesRound: (looping: Workflow) =>
+      roundsDue(steps, run, phaseOf, closeoutOf, asked, [], spendOf, verdictOf).some((r) => r.step === looping.name),
   };
 }
 
@@ -71,6 +77,7 @@ export function mergeOffers(
     closeoutOf: (step: string) => Closeout | undefined,
     asked: (taskId: string) => CloseoutAsked,
     spendOf: SpendOf,
+    verdictOf: (step: string) => Verdict | undefined,
   ]
 ): Offer[] {
   if (d.kind !== 'awaiting' || !isRepositoryRun(run)) return [];
@@ -104,7 +111,15 @@ export const mergeRun = Effect.fn('merge')(function* (id: string, stepName?: str
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
   const steps = yield* stepsOf(run);
   const { views, phaseOf } = yield* taskPhasesRead(run);
-  const reads = mergeReads(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), spendReader(views));
+  const reads = mergeReads(
+    steps,
+    run,
+    phaseOf,
+    closeoutReader(views, run, steps),
+    closeoutAsked(views),
+    spendReader(views),
+    exitVerdicts(views, run),
+  );
   const at = new Date().toISOString();
   const place = yield* PlaceService;
   const answer = (asks: readonly RoundAsk[]) => mergeAsk(steps, run, stepName, reads, asks, trialOf(run, place), at);

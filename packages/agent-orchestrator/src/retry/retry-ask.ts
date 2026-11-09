@@ -4,7 +4,7 @@
  * them. Pure; what reads a step's standing to judge a try — `retryable` and `retriesDue` — is `retry.ts`'s, and `retryRefusal`
  * `retry-refusal.ts`'s.
  */
-import { lackedOf, tryOf, type CloseoutAsked, type Run, type StepRecord } from '../record/record.ts';
+import { lackedOf, tryOf, type CloseoutAsked, type Run, type StepRecord, type StepStatus } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import type { RetryMode, TryCause } from 'objects';
 
@@ -329,3 +329,10 @@ export function answerOf(run: Run, step: string, answers: readonly RetryAsk[]): 
   const n = tryOf(run, step);
   return answers.find((a) => a.step === step && a.try === n && a.message !== undefined && a.mode === last.cause && a.model === last.model);
 }
+
+/**
+ * The try a refusal points a person to for a step that stopped, as `nemia retry` takes it: with `--budget <amount>` where the step reads
+ * `over budget`, since a try of it without one is refused (`retryRefusal`). Pure.
+ */
+export const tryCommand = (run: Run, step: string, status: StepStatus): string =>
+  `nemia retry ${run.id} ${step}${status === 'over budget' ? ' --budget <amount>' : ''}`;

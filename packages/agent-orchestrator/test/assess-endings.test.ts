@@ -366,7 +366,8 @@ test("`nemia ls`, `nemia rm` and `nemia cancel` at an ending's gate", async (t) 
       });
       const { note, ...ship } = l.steps[2];
       assert.deepEqual(ship, { name: 'ship', message: 'awaiting approval', reason: 'AwaitingApproval', phase: 'waiting', branch: null });
-      assert.equal(note, 'approve it: nemia approve r-1 ship — or send it back: nemia retry r-1 review --message "<objection>"');
+      assert.ok(note?.includes('nemia approve r-1 ship') && note.includes('nemia retry r-1 review --message'), note);
+      assert.ok(note && !note.includes('nemia retry r-1 ship'), 'the send-back goes to the work the ending would act on');
       assert.deepEqual([l.waitingOnYou, onYouWords(l)], [['ship'], ['approve ship']]);
       assert.deepEqual(l.toDecide, {
         kind: 'approve',

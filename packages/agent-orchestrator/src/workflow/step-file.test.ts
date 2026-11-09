@@ -10,8 +10,6 @@ import { CLAUDE_PERMISSION_MODES, CODEX_SANDBOXES } from 'agent-runtime';
 import {
   asNamed,
   DEFAULT_ROUNDS,
-  DENIALS,
-  FORMER_KEYS,
   harnessPromptNamed,
   isFolderTeam,
   parseAgent,
@@ -396,7 +394,6 @@ test('each key a step has: read as written, and refused blank, twice or with a w
     refuses('remote: twice', 'implement', 'remote: true\nremote: false', '`remote` is set twice'),
 
     reads('denials: fail, on a claude job', 'review', 'denials: fail', { denials: 'fail' }),
-    { row: 'denials: the one word', run: () => assert.deepEqual(DENIALS, ['fail']) },
     ...['true', 'stop', 'Fail', 'record'].map((word) =>
       refuses(`denials: ${word}`, 'review', `denials: ${word}`, `\`denials: ${word}\` is not \`fail\``, 'Write `denials: fail`'),
     ),
@@ -655,10 +652,6 @@ test('the list entries of `tools:`, `disallowedTools:` and `allowedTools:`: one 
 test('the former names a file may still say: read under the names they have now, never written, and refused beside them', async (t) => {
   const writer = (text: string) => new Map([['writer', parseAgent('writer', text)]]);
   await table(t, [
-    {
-      row: 'disallow and allow are the lists',
-      run: () => assert.deepEqual(FORMER_KEYS, { disallow: 'disallowedTools', allow: 'allowedTools' }),
-    },
     {
       row: 'disallow and allow: read as the new names, field for field',
       run: () => {

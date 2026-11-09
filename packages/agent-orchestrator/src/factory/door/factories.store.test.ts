@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { debtBreaks as heldTo, seamUses as usesOf, sourcesUnder } from 'test-kit/debt';
+import { debtBreaks, seamUses, sourcesUnder, type DebtBreak } from 'test-kit/debt';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { act, done, doorFrom, walksOn } from '../../../test/door-walks.ts';
@@ -120,39 +120,32 @@ const OWN = [
   'src/factory/door/factories.store.ts',
 ];
 
-/** Every file of `src` but the tests and the stores, by its path from the package. */
-const sourcesOfSrc = (): Record<string, string> => sourcesUnder(PKG, 'src', OWN);
-
 /** The seam's calls in each file, comment lines left out: what `FACTORY_DOOR_DEBT` counts. */
-const seamUses = (sources: Record<string, string>): Map<string, number> =>
-  usesOf(sources, new RegExp(`(?<![\\w$.])(?:${SEAM.join('|')})\\s*\\(`, 'g'));
+const SEAM_CALL = new RegExp(`(?<![\\w$.])(?:${SEAM.join('|')})\\s*\\(`, 'g');
 
-/** Why the uses of `sources` break the baseline `debt`: a file it does not name, a count grown, a count fallen. */
-function debtBreaks(sources: Record<string, string>, debt: Readonly<Record<string, number>>): string[] {
-  return heldTo(seamUses(sources), debt).map(({ file, uses: n, owed, kind }) =>
-    kind === 'grown'
-      ? `${file} calls the factories' stores ${n} time(s) where test/factory-door.baseline.ts names ${owed}: yield FactoryDoor (src/factory/door/factories.store.ts) instead`
-      : kind === 'fallen'
-        ? `${file} calls the factories' stores ${n} time(s): lower its count in test/factory-door.baseline.ts to ${n}, which only shrinks`
-        : `${file} calls the factories' stores no more: take its line out of test/factory-door.baseline.ts`,
-  );
-}
+/** What a break of the baseline says: a file it does not name or a count grown, a count fallen, a file with none left. */
+const inWords = ({ file, uses: n, owed, kind }: DebtBreak): string =>
+  kind === 'grown'
+    ? `${file} calls the factories' stores ${n} time(s) where test/factory-door.baseline.ts names ${owed}: yield FactoryDoor (src/factory/door/factories.store.ts) instead`
+    : kind === 'fallen'
+      ? `${file} calls the factories' stores ${n} time(s): lower its count in test/factory-door.baseline.ts to ${n}, which only shrinks`
+      : `${file} calls the factories' stores no more: take its line out of test/factory-door.baseline.ts`;
 
 test("no file of src calls the factories' stores but as test/factory-door.baseline.ts counts it, and the count only shrinks", async () => {
   const { FACTORY_DOOR_DEBT } = await import('../../../test/factory-door.baseline.ts');
-  assert.deepEqual(debtBreaks(sourcesOfSrc(), FACTORY_DOOR_DEBT), []);
+  assert.deepEqual(debtBreaks(seamUses(sourcesUnder(PKG, 'src', OWN), SEAM_CALL), FACTORY_DOOR_DEBT).map(inWords), []);
 });
 
 test('REFUSED: a converted file that calls a store again, and a count the baseline holds above what is left', async () => {
   const { FACTORY_DOOR_DEBT } = await import('../../../test/factory-door.baseline.ts');
-  const sources = sourcesOfSrc();
+  const sources = sourcesUnder(PKG, 'src', OWN);
   const again = {
     ...sources,
     'src/factory/wiring/wire.verb.ts': `${sources['src/factory/wiring/wire.verb.ts']}\nconst x = readFactory('a');\n`,
   };
-  assert.equal(debtBreaks(again, FACTORY_DOOR_DEBT).length, 1);
+  assert.equal(debtBreaks(seamUses(again, SEAM_CALL), FACTORY_DOOR_DEBT).length, 1);
   const [first] = Object.keys(FACTORY_DOOR_DEBT);
-  assert.equal(debtBreaks(sources, { ...FACTORY_DOOR_DEBT, [first]: (FACTORY_DOOR_DEBT[first] ?? 0) + 1 }).length, 1);
+  assert.equal(debtBreaks(seamUses(sources, SEAM_CALL), { ...FACTORY_DOOR_DEBT, [first]: (FACTORY_DOOR_DEBT[first] ?? 0) + 1 }).length, 1);
 });
 
 /** How many changes `write` counts on the file of `acme`, a factory filed with a level file at manual. */

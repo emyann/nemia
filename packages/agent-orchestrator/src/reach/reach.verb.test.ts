@@ -20,6 +20,7 @@ const ROOT = scratch('wf-policy-reach-');
 process.env.WF_ROOT = ROOT;
 const { POLICY_REACH } = await import('./reach.verb.ts');
 const { TABLE } = await import('../command/commands.verb.ts');
+const { nemiaFence } = await import('../admission/fence.ts');
 const { attachWorkflowAt, createFactoryAt } = await import('../factory/factory.store.ts');
 const { writeFactoryLevel } = await import('../level/level.store.ts');
 const { confirmRule, readProposed, writeProposed } = await import('../auto/auto.store.ts');
@@ -167,9 +168,10 @@ test('`nemia policy reach`: which steps at their gate her rules can approve in a
     assert.equal(await refusedKind({ factory: 'nope' }), 'Missing');
   });
 
-  await t.test('it is the policy group’s read, served by the CLI alone', () => {
-    assert.ok(TABLE.some((e) => e.name === 'policy reach'));
-    assert.equal(POLICY_REACH.class, 'read');
-    assert.equal(POLICY_REACH.only?.side, 'cli');
+  await t.test('a read: an agent runs it unasked, bare and with any words', () => {
+    const fence = nemiaFence(TABLE);
+    assert.ok(fence.allow.includes('Bash(nemia policy reach:*)'), fence.allow.join('\n'));
+    const named = (rule: string) => rule.startsWith('Bash(nemia policy reach');
+    assert.deepEqual([...fence.ask, ...fence.deny].filter(named), [], 'no rule asks or refuses it');
   });
 });

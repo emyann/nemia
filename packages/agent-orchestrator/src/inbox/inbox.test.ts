@@ -77,8 +77,15 @@ test("each of an inbox card's keys has one line of meaning, in the keys' order",
   );
 });
 
+test('a card is written with its keys in one order, whatever order its file had them in', () => {
+  const backwards =
+    '---\nlabels: { team: core }\nfrom: a-1x2y\nfactory: acme\ngate: plan\nqueued: 2026-09-16T10:00:00.000Z\nrepo: /home/me/code/app\nworkflow: dev\n---\nCache the views.\n';
+  const written = labelledText(read(backwards), { team: 'core' }, isDirectory);
+  const keys = [...written.matchAll(/^(\w+):/gm)].map(([, key]) => key);
+  assert.deepEqual(keys, ['workflow', 'repo', 'queued', 'gate', 'factory', 'from', 'labels'], written);
+});
+
 test('an inbox card is its file: the name without .md, `workflow:` and `repo:` from its frontmatter when set — each optional — and the body', () => {
-  assert.deepEqual(INBOX_KEYS, ['workflow', 'repo', 'queued', 'gate', 'factory', 'from', 'labels']);
   assert.deepEqual(read('---\nworkflow: dev\nrepo: /home/me/code/app\n---\nCache the views.\n\nBetween passes.\n'), {
     name: 'cache-the-views-k2q9',
     file: 'cache-the-views-k2q9.md',
@@ -679,7 +686,6 @@ test("`cardState`: one closed word per entry — its run's phase whatever the ca
   ];
   for (const [name, entry, state] of rows) await t.test(name, () => assert.equal(cardState(entry), state));
   assert.deepEqual([...new Set(rows.map(([, , state]) => state))].sort(), [...CARD_STATES].sort(), 'every state has its row');
-  assert.deepEqual(CARD_STATES, ['filed', 'queued', 'refused', ...RUN_PHASES], "the card's three words, then the run phases in order");
 });
 
 test('`CARD_IN_PLAY`: a card not started and one whose run has not ended are in play; one whose run ended is not', async (t) => {

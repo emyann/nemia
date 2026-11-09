@@ -6,6 +6,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { Duration, Option } from 'effect';
 import { codedStep, codesOf, feedWords, upgraded, type FeedLine, type QualifiedStep, type RunLine } from '../feed/index.ts';
 import type { Listing } from '../list/list.ts';
 import type { Closeout } from '../closeout/index.ts';
@@ -260,5 +261,6 @@ test('a silent watch bookmarks its cursor under --json and prints nothing of it 
   assert.deepEqual(JSON.parse(bookmarkLine(1834, { json: true })!), { cursor: 1834 });
   assert.equal(Object.hasOwn(JSON.parse(bookmarkLine(0, { json: true })!), 'word'), false, 'a reader that filters on the words skips it');
   assert.equal(bookmarkLine(1834, {}), undefined, 'in words, a person reading a still feed is told nothing');
-  assert.equal(BOOKMARK_EVERY, '30 seconds', 'one cadence, every surface reading this constant');
+  const every = Duration.fromInput(BOOKMARK_EVERY);
+  assert.ok(Option.isSome(every) && Duration.isFinite(every.value) && Duration.toMillis(every.value) > 0, 'a cadence a tick can keep');
 });

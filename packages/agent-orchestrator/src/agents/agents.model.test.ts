@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Option, Schema } from 'effect';
 import { Agent, AgentName, agentsModel, Skill, SkillName, StepAgent } from './agents.model.ts';
+import { erDiagram } from '../model/er.model.ts';
 import { skillDraftOf } from '../skills/skills.ts';
 import { parseAgent } from './agents.ts';
 import { overridesOf } from '../workflow/index.ts';
@@ -79,9 +80,11 @@ test("each step of the tests' team names its agent by id", async (t) => {
     assert.equal(Schema.is(StepAgent)({ workflow: 'dev', step: 'x', agent: 'a', overrides: ['check'] }), false),
   );
   await t.test('REFUSED: a step with no agent', () => assert.equal(Schema.is(StepAgent)({ workflow: 'dev', step: 'x' }), false));
-  await t.test('the model', () => {
-    assert.deepEqual(agentsModel.ids, { AgentName: 'Agent', SkillName: 'Skill' });
-    assert.deepEqual(agentsModel.entities, [Agent, Skill, StepAgent]);
+  await t.test("the agents' part of the diagram draws its three entities, an AgentName and a SkillName as what each names", () => {
+    const lines = erDiagram(agentsModel).split('\n');
+    for (const entity of ['Agent', 'Skill', 'StepAgent']) assert.ok(lines.includes(`  ${entity} {`), `${entity} has a block`);
+    assert.ok(lines.includes('  Skill ||--o{ Agent : skills'), lines.join('\n'));
+    assert.ok(lines.includes('  Agent ||--o{ StepAgent : agent'), lines.join('\n'));
   });
 });
 

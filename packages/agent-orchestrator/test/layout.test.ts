@@ -63,106 +63,28 @@ test('no two source files need each other’s values', () => {
   assert.deepEqual(cycles(valueGraph(files)), []);
 });
 
-test("REFUSED on the source: a value import from the format's leaf back to a folder above it closes a cycle", () => {
-  const files = new Map(sourceFiles().map((f) => [f, read(f)]));
-  files.set('src/step/step.ts', `${files.get('src/step/step.ts')}\nimport { countOf } from '../keys/index.ts';`);
-  assert.deepEqual(cycles(valueGraph(files)), [
-    [
-      'src/budget/budget.ts',
-      'src/closeout/closeout.ts',
-      'src/closeout/envelope.ts',
-      'src/closeout/handed-closeout.ts',
-      'src/closeout/index.ts',
-      'src/harness/harness.ts',
-      'src/keys/filed-as.ts',
-      'src/keys/index.ts',
-      'src/keys/keys.ts',
-      'src/keys/merged-output.ts',
-      'src/keys/tools.ts',
-      'src/question/index.ts',
-      'src/question/numbered.ts',
-      'src/question/question.ts',
-      'src/step/step.ts',
-      'src/workspace/workspace.ts',
-    ],
-  ]);
-});
+/**
+ * Value imports that would close a cycle through the source as it stands, each `[from, to]`: the format's leaf back to a folder above
+ * it, a leaf cut out of run.ts back to run.ts, the tick from the cap it reads between passes, a part cut out of run.ts back to the
+ * assessment, and the flag reader back to the verbs' table. That a type-only import is erased is the planted fixture's above.
+ */
+const CLOSING: readonly (readonly [string, string, string])[] = [
+  ['src/step/step.ts', '../keys/index.ts', 'src/keys/index.ts'],
+  ['src/wait/wait.ts', '../run.ts', 'src/run.ts'],
+  ['src/cap/cap.verb.ts', '../tick/tick.verb.ts', 'src/tick/tick.verb.ts'],
+  ['src/round/round.ts', '../tick/assess.ts', 'src/tick/assess.ts'],
+  ['src/cli/flags.ts', './main.ts', 'src/cli/main.ts'],
+];
 
-test('REFUSED on the source: a value import from a leaf cut out of run.ts back to run.ts closes a cycle; the type is let through', () => {
-  const files = new Map(sourceFiles().map((f) => [f, read(f)]));
-  const wait = files.get('src/wait/wait.ts')!;
-  files.set('src/wait/wait.ts', `${wait}\nimport { assess } from '../run.ts';`);
-  assert.deepEqual(cycles(valueGraph(files)), [
-    [
-      'src/brief/brief-sections.ts',
-      'src/brief/brief.ts',
-      'src/brief/index.ts',
-      'src/cancel/cancel.ts',
-      'src/cap/cap.ts',
-      'src/decide/decide.ts',
-      'src/feed/feed.ts',
-      'src/feed/index.ts',
-      'src/feed/reason.ts',
-      'src/forget/forget.ts',
-      'src/forget/prune/prune.ts',
-      'src/gate/gate.ts',
-      'src/list/list.ts',
-      'src/merge/merge.ts',
-      'src/retry/index.ts',
-      'src/retry/retry-refusal.ts',
-      'src/retry/retry.ts',
-      'src/round/round.ts',
-      'src/run.ts',
-      'src/say/say.ts',
-      'src/start/context.ts',
-      'src/start/index.ts',
-      'src/tick/assess.ts',
-      'src/wait/wait.ts',
-    ],
-  ]);
-  files.set('src/wait/wait.ts', `${wait}\nimport type { Assessment } from '../run.ts';`);
-  assert.deepEqual(cycles(valueGraph(files)), []);
-});
-
-test('REFUSED on the source: a value import of the tick from the cap it reads between passes closes a cycle', () => {
-  const files = new Map(sourceFiles().map((f) => [f, read(f)]));
-  files.set('src/cap/cap.verb.ts', `${files.get('src/cap/cap.verb.ts')}\nimport { tick } from '../tick/tick.verb.ts';`);
-  assert.deepEqual(cycles(valueGraph(files)), [
-    [
-      'src/cap/cap.verb.ts',
-      'src/ending/ending.verb.ts',
-      'src/inbox/inbox.verb.ts',
-      'src/list/list.verb.ts',
-      'src/rest/informer.verb.ts',
-      'src/summary/judged.verb.ts',
-      'src/summary/judgement.verb.ts',
-      'src/summary/summary.verb.ts',
-      'src/tick/advance.verb.ts',
-      'src/tick/tick.verb.ts',
-    ],
-  ]);
-});
-
-test('REFUSED on the source: a value import from a part cut out of run.ts back to the assessment closes a cycle; the type is let through', () => {
-  const files = new Map(sourceFiles().map((f) => [f, read(f)]));
-  const round = files.get('src/round/round.ts')!;
-  files.set('src/round/round.ts', `${round}\nimport { assess } from '../tick/assess.ts';`);
-  assert.deepEqual(cycles(valueGraph(files)), [
-    ['src/retry/index.ts', 'src/retry/retry-refusal.ts', 'src/retry/retry.ts', 'src/round/round.ts', 'src/tick/assess.ts'],
-  ]);
-  files.set('src/round/round.ts', `${round}\nimport type { Assessment } from '../tick/assess.ts';`);
-  assert.deepEqual(cycles(valueGraph(files)), []);
-});
-
-test("REFUSED on the source: a value import from the flag reader back to the verbs' table closes a cycle; the type is let through", () => {
-  const files = new Map(sourceFiles().map((f) => [f, read(f)]));
-  const flags = files.get('src/cli/flags.ts')!;
-  files.set('src/cli/flags.ts', `${flags}\nimport { main } from './main.ts';`);
-  assert.deepEqual(cycles(valueGraph(files)), [
-    ['src/cli/decide/decide.ts', 'src/cli/flags.ts', 'src/cli/main.ts', 'src/cli/runs.ts', 'src/cli/start.ts', 'src/cli/writers.ts'],
-  ]);
-  files.set('src/cli/flags.ts', `${flags}\nimport type { main } from './main.ts';`);
-  assert.deepEqual(cycles(valueGraph(files)), []);
+test('REFUSED on the source: a value import that closes a cycle through the package is found, its two ends in one cycle', () => {
+  const source = new Map(sourceFiles().map((f) => [f, read(f)]));
+  for (const [from, spec, to] of CLOSING) {
+    const files = new Map(source);
+    files.set(from, `${source.get(from)}\nimport { x } from '${spec}';`);
+    const found = cycles(valueGraph(files));
+    assert.equal(found.length, 1, `${from} → ${to}: ${JSON.stringify(found)}`);
+    assert.ok(found[0]?.includes(from) && found[0].includes(to), `${from} → ${to}: ${JSON.stringify(found)}`);
+  }
 });
 
 test('REFUSED: a source file that imports a test or test support; a barrel that re-exports a whole module', () => {

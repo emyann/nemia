@@ -1,5 +1,17 @@
 import path from 'node:path';
-import { chatFieldOf, chatPanelOf, dockFaceOf, dockOf, expectPanelHeld, herChat, openChat, photograph, themeOf } from '../board.ts';
+import {
+  chatFieldOf,
+  chatPanelOf,
+  dockFaceOf,
+  dockOf,
+  expectPanelHeld,
+  herChat,
+  openAnswered,
+  openChat,
+  photograph,
+  railPlace,
+  themeOf,
+} from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
@@ -10,8 +22,10 @@ const STARTERS = ['What is waiting on me?', 'What is at work?', 'What did today 
 
 /**
  * Her face docked and closed: her expression and every cue beside it are the ones her presence picks (`faceOf`, `cuesOf`) from what the
- * api answers of her, her face says what pressing it does (`dockWords`), and no panel is drawn until it is pressed. Read against the
- * api rather than against a presence written here: the seed's own waiting runs are hers to show, and their count moves with the seed.
+ * api answers of her and from the run list's runs that wait on the person — the count the rail's Runs badge says beside it, never her
+ * presence's own `waitsOnYou` — her face says what pressing it does (`dockWords`), and no panel is drawn until it is pressed. Read against
+ * the api rather than against a presence written here: the seed's own waiting runs are hers to show, and their count moves with the seed.
+ * Her chat here holds no ask, so none is said.
  */
 async function expectClosed(page: Parameters<PageSpec['expect']>[0]): Promise<void> {
   const dock = dockOf(page);
@@ -22,7 +36,21 @@ async function expectClosed(page: Parameters<PageSpec['expect']>[0]): Promise<vo
   };
   const api = read.presence;
   if (!api.up) throw new Refused(`her session reads up on the api — it answered ${JSON.stringify(api)}`);
-  const presence: Presence = { waitsOnYou: api.waitsOnYou, notSent: false, down: false, answering: api.answering, unread: api.unread };
+  const waiting = (await openAnswered(page)).counts.waiting;
+  if (waiting === 0) throw new Refused('the seed holds runs that wait on the person, for her cue to count');
+  const presence: Presence = {
+    runsWaiting: waiting,
+    asksWaiting: 0,
+    notSent: false,
+    down: false,
+    answering: api.answering,
+    unread: api.unread,
+  };
+  await expectTexts(
+    railPlace(page, 'Runs').locator('[data-slot="badge"]'),
+    [String(waiting)],
+    'the rail counts the runs that wait on you as her cue does',
+  );
   const wearing = await dock.locator('[data-nemia-face]').getAttribute('data-nemia-face');
   if (wearing !== faceOf(presence))
     throw new Refused(`her face wears the expression her presence picks, ${faceOf(presence)} — it wears ${wearing}`);

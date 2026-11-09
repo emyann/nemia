@@ -185,13 +185,17 @@ export const followChat = (stream: StreamLike, update: (change: (s: ChatFollowed
   follow(stream, chatFollower, update, frames);
 
 /**
- * Where she is as her face and its cues read it (`lib/presence.ts`), the one writer of it: the api's presence `api`, and whether this
- * browser keeps a message the api would not take (`notSent`). She reads as down when her session is not up, and only then: no level
- * says it, since a factory raised above Manual keeps her session up while the store's own level is at Manual. Whether she is at
- * Manual everywhere is `anyAbove` (`lib/nemia.ts`), off every factory's level the api answers.
+ * Where she is as her face and its cues read it (`lib/presence.ts`), the one writer of it: the api's presence `api`, whether this
+ * browser keeps a message the api would not take (`notSent`), the runs that wait on the person as the run list counts them
+ * (`runsWaiting`, its `counts.waiting`, the number the Runs page and the rail say: `frameRunsQuery`), and her asks the person has not
+ * answered among `events` (`asksOpen`). The api's own `waitsOnYou` adds those two into one number of its own, from a reading of the runs
+ * that is not the run list's, so neither part is read from it. She reads as down when her session is not up, and only then: no level
+ * says it, since a factory raised above Manual keeps her session up while the store's own level is at Manual. Whether she is at Manual
+ * everywhere is `anyAbove` (`lib/nemia.ts`), off every factory's level the api answers.
  */
-export const presenceOf = (api: ChatPresence, notSent: boolean): Presence => ({
-  waitsOnYou: api.waitsOnYou,
+export const presenceOf = (api: ChatPresence, notSent: boolean, runsWaiting: number, events: readonly ChatEvent[]): Presence => ({
+  runsWaiting,
+  asksWaiting: asksOpen(events).length,
   notSent,
   down: !api.up,
   answering: api.answering,

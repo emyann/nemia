@@ -44,7 +44,7 @@ const {
 const stand = eachTest(testPlace);
 const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
-const { artifactsDir, readAsks, readRun } = await import('../src/record/record.store.ts');
+const { artifactsDir, readAsks, readRun, rewriteRun } = await import('../src/record/record.store.ts');
 const { phaseOfView } = await import('../src/views/views-words.ts');
 const { lackedOf } = await import('../src/record/record.ts');
 
@@ -292,6 +292,10 @@ test('a pass that answered and died before writing the run down is adopted: the 
   await Effect.runPromise(e.answer(plan, 'the --dry-run flag'));
   await Effect.runPromise(e.tick());
   assert.equal((await stateOf(e, plan)).phase, 'working', 'what the pass did before it died: the answer, and nothing on the record');
+  const filedOn = ({ declared, closeoutHash }: { declared?: readonly string[]; closeoutHash?: string }) => ({ declared, closeoutHash });
+  const now = filedOn(readRun(run.id).steps.plan);
+  const stale = readRun(run.id);
+  rewriteRun({ ...stale, steps: { ...stale.steps, plan: { ...stale.steps.plan, declared: ['stale'], closeoutHash: 'stale' } } });
   const adopted = await runWith(e, advanceRun(readRun(run.id)));
   assert.deepEqual([adopted.tried, adopted.filed], [[], []]);
   const view = await stateOf(e, plan);
@@ -300,6 +304,11 @@ test('a pass that answered and died before writing the run down is adopted: the 
     readRun(run.id).steps.plan.tries?.map((t) => t.taskId),
     [plan],
     'written down as the turn it was',
+  );
+  assert.deepEqual(
+    filedOn(readRun(run.id).steps.plan),
+    now,
+    'on what filing the turn writes, never on what the record held of the try before it',
   );
   assert.deepEqual(readAsks(run.id).asks, [], 'and the ask consumed');
   await pass(run.id);

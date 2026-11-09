@@ -4,7 +4,8 @@
  * What is proven here, each at shipped defaults: a run that has filed nothing resolves the folder afresh on every pass, so an edit made
  * while it waits `--after` reaches its first step's prompt and its pins; a run that has filed keeps its freeze; the ledger appends only
  * where the digest moved; the verb re-pins and the next try is filed on the new revision with the prompt re-rendered; a filing whose
- * closeout schema has moved starts a fresh session, and one whose schema has not still resumes; a folder whose steps are a set
+ * closeout schema has moved starts a fresh session, and one whose schema has not still resumes; a try a pass filed and died before writing
+ * down is adopted on the fields, schema and pins its filing wrote; a folder whose steps are a set
  * `nemia start` refuses is not taken, and a kind that stops reading between passes stops that run alone; and the verb's refusals.
  *
  * The place is the stand-in (`testPlace`): the subject is the ledger and the pin, not git, and the steps work in the checkout itself. Each
@@ -39,7 +40,8 @@ const { engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');
 const stage = staged({ runWith: runEngine, main, engineOf });
 const { runWith, runPlaced } = stage;
-const { readRun } = await import('../src/record/record.store.ts');
+const { asksDir, readRun, rewriteRun } = await import('../src/record/record.store.ts');
+const { stepTaskId } = await import('../src/record/record.ts');
 const { stepsNow: stepsOf } = await import('./steps-now.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 const { ledgerOf } = await import('../src/revisions/revisions.store.ts');
@@ -776,6 +778,47 @@ test('a round files its target on the closeout schema the folder declares now: c
     undefined,
     'and asks a fresh session, since the schema it is now given is not the one its last try answered in',
   );
+});
+
+test('a try a pass filed and died before writing down is adopted on what filing it records: the fields, the schema and the pins of now, never of the try before it', async () => {
+  const t = team();
+  fs.writeFileSync(t.stepFile, `---\nplace: git\nagent: ${t.agent}\noutput: build.schema.json\n---\nBuild it.\n`);
+  fs.writeFileSync(path.join(t.dir, 'build.schema.json'), JSON.stringify(schemaOf('a')));
+  const run = await started(t.dir, aRepo());
+  const b = board();
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  const first = readRun(run.id).steps.build;
+  assert.deepEqual(first?.declared, ['a'], 'try 1 is filed declaring `a`');
+  b.settle(`${run.id}-build`, 'failed');
+
+  fs.writeFileSync(path.join(t.dir, 'build.schema.json'), JSON.stringify(schemaOf('b')));
+  fs.writeFileSync(t.agentFile, `---\nskills: ${t.skill}\n---\nYou build it differently.\n`);
+  await runPlaced(refreshRun(run.id));
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  assert.equal(pinOf(readRun(run.id).pinned, 'agent', t.agent)!.n, 2, 'a pass takes the refresh, with nothing yet to file');
+  await runWith(b.e, retryRun(run.id, 'build', { mode: 'continue' }));
+  const beforeFiling = readRun(run.id);
+  const asked = fs.readdirSync(asksDir(run.id)).map((name) => [name, fs.readFileSync(path.join(asksDir(run.id), name))] as const);
+
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  const filed = readRun(run.id).steps.build;
+  const try2 = stepTaskId(run, 'build', 2);
+  assert.equal(filed?.taskId, try2);
+  rewriteRun(beforeFiling);
+  for (const [name, text] of asked) fs.writeFileSync(path.join(asksDir(run.id), name), text);
+  assert.ok(b.tasks.get(try2)?.spec.brief, 'the pass filed try 2 and died: the engine holds it briefed, the record does not name it');
+
+  const adopted = await runWith(b.e, advanceRun(readRun(run.id)));
+  assert.deepEqual(adopted.tried, [], 'adopted, not filed again');
+  const build = readRun(run.id).steps.build;
+  assert.equal(build?.taskId, try2);
+  assert.deepEqual(
+    [build?.declared, build?.closeoutHash, build?.pinned],
+    [['b'], filed?.closeoutHash, filed?.pinned],
+    'the record reads what filing try 2 wrote',
+  );
+  assert.notEqual(build?.closeoutHash, first?.closeoutHash, "never try 1's schema");
+  assert.notDeepEqual(build?.pinned, first?.pinned, "nor try 1's pins");
 });
 
 test('a step that ended is judged by the fields it was filed with: a run that follows a schema gaining a field never unsigns it', async (t) => {

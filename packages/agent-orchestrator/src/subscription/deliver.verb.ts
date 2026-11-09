@@ -19,11 +19,13 @@
  *
  * A scoped subscription carries only the lines of runs whose factory is at its floor or above (`atLeast`), read as each line comes: the
  * run's factory once per run, frozen at its start, and the factory's level each time, so a raise counts from its start to its end. A
- * line below the floor, or of a run that does not read, is passed: the cursor moves on, and nothing is said or folded of it.
+ * line below the floor, or of a run that does not read, is passed: the cursor moves on, and nothing is said or folded of it. A factory's
+ * level that does not read fails the read instead (`LevelUnread`), said once as a warning: the cursor is not kept, and the feed is read
+ * again from it a beat later, so the line is said once the level reads.
  *
  * A controller: it reaches the runtime through the client (`EngineService`), run by `up` (`daemon/up.verb.ts`) once it holds the store.
  */
-import { Cause, Effect, FiberMap, Metric, Ref, Schedule, Semaphore, Stream, type Duration } from 'effect';
+import { Cause, Data, Effect, FiberMap, Metric, Ref, Schedule, Semaphore, Stream, type Duration } from 'effect';
 import type { NonEmptyReadonlyArray } from 'effect/Array';
 import { instantNow } from '../daemon/daemon.store.ts';
 import { isRunLine, type FeedLine } from '../feed/index.ts';
@@ -31,6 +33,7 @@ import { followFeed, type Followed } from '../feed/feed.verb.ts';
 import { EngineService } from '../runtime-client.ts';
 import { atLeast } from '../level/level.ts';
 import { levelOfFactory, runFactory } from '../level/levels.verb.ts';
+import type { Refusal } from '../refusal/refusal.ts';
 import { SubscriptionDoor } from './subscription.store.ts';
 import { SubscriptionName } from '../feed/feed.model.ts';
 import { digestDue, digestOf, readDelivered, resumedAt, type Delivery, type Subscription } from './subscription.ts';
@@ -108,7 +111,11 @@ type Delivering = {
   state: Ref.Ref<Delivery>;
   lock: Semaphore.Semaphore;
   factories: Map<string, string>;
+  say: SaidOnce;
 };
+
+/** A line's run whose factory's level does not read: the read of the feed fails, and its lines are read again a beat later. */
+class LevelUnread extends Data.TaggedError('LevelUnread')<{ readonly run: string; readonly factory: string; readonly message: string }> {}
 
 /**
  * `next` kept: in memory, and through the door stamped with the subscription it is for. A write the door refuses is the deliverer's
@@ -139,22 +146,29 @@ const saidOnce = (): SaidOnce => {
     });
 };
 
-/** Whether the subscription carries a line of the run `run`: unscoped, always; scoped, where the run's factory is at its floor now. */
-const carries = (d: Delivering, run: string): Effect.Effect<boolean> => {
+/**
+ * Whether the subscription carries a line of the run `run`: unscoped, always; scoped, where the run's factory is at its floor now. A run
+ * that does not read is not carried; a level that does not read fails (`LevelUnread`), and a defect is not caught.
+ */
+const carries = (d: Delivering, run: string): Effect.Effect<boolean, LevelUnread> => {
   const floor = d.sub.scope?.atLeast;
   if (floor === undefined) return Effect.succeed(true);
   return Effect.gen(function* () {
-    const factory = d.factories.get(run) ?? (yield* runFactory(run));
+    const factory = d.factories.get(run) ?? (yield* runFactory(run).pipe(Effect.catch(() => Effect.succeed(undefined))));
+    if (factory === undefined) return false;
     d.factories.set(run, factory);
-    return atLeast(yield* levelOfFactory(factory), floor);
-  }).pipe(Effect.catchCause(() => Effect.succeed(false)));
+    const level = yield* levelOfFactory(factory).pipe(
+      Effect.mapError((err: Refusal) => new LevelUnread({ run, factory, message: err.message })),
+    );
+    return atLeast(level, floor);
+  });
 };
 
 /**
  * One read of the feed, its lines ending at `cursor`, delivered: a run's line the subscription does not carry passed, a daemon's carried
  * by every one; where a carried line wakes, the message said, then the cursor kept; else the routine lines folded into the digest.
  */
-const onLines = (d: Delivering, lines: readonly FeedLine[], cursor: number): Effect.Effect<void, never, EngineService> =>
+const onLines = (d: Delivering, lines: readonly FeedLine[], cursor: number): Effect.Effect<void, LevelUnread, EngineService> =>
   Effect.gen(function* () {
     const at = yield* Ref.get(d.state);
     const carried = yield* Effect.filter(lines, (line) => (isRunLine(line) ? carries(d, line.run) : Effect.succeed(true)));
@@ -182,7 +196,7 @@ const digestPass = (d: Delivering): Effect.Effect<void, never, EngineService> =>
  */
 const onRead =
   (d: Delivering) =>
-  (items: NonEmptyReadonlyArray<Followed>): Effect.Effect<void, never, EngineService> =>
+  (items: NonEmptyReadonlyArray<Followed>): Effect.Effect<void, LevelUnread, EngineService> =>
     Effect.gen(function* () {
       for (const item of items)
         if (item.kind === 'unreadable') yield* Effect.logWarning(`the subscription ${d.name} waits for the feed to read: ${item.error}`);
@@ -201,7 +215,10 @@ const onRead =
 /** How many items of the feed a deliverer gathers while it says a message: the hub's own capacity (`feedHubLayer`). */
 const GATHERED = 1024;
 
-/** The feed followed from the cursor, for ever, a read at a time; cut under it, read again from its start. */
+/**
+ * The feed followed from the cursor, for ever, a read at a time; cut under it, read again from its start; a read whose level does not
+ * read, said once and read again from the cursor kept a beat later.
+ */
 const reading = (d: Delivering): Effect.Effect<never, never, EngineService> =>
   Effect.suspend(() => Ref.get(d.state)).pipe(
     Effect.flatMap((at) =>
@@ -209,6 +226,13 @@ const reading = (d: Delivering): Effect.Effect<never, never, EngineService> =>
         Stream.buffer({ capacity: GATHERED, strategy: 'suspend' }),
         Stream.runForEachArray(onRead(d)),
       ),
+    ),
+    Effect.catchTag('LevelUnread', (unread) =>
+      d
+        .say(
+          `the subscription ${d.name} waits for the level of ${unread.factory} to read, to judge a line of ${unread.run}: ${unread.message}`,
+        )
+        .pipe(Effect.andThen(Effect.sleep(d.o.beat))),
     ),
     Effect.catch((cut) =>
       Effect.logWarning(`the subscription ${d.name} reads the feed again from its start: ${cut.message}`).pipe(
@@ -235,6 +259,7 @@ const delivering = (name: string, sub: Subscription, o: DeliverOptions, say: Sai
       state,
       lock: yield* Semaphore.make(1),
       factories: new Map(),
+      say,
     };
     const check = d.lock.withPermit(digestPass(d)).pipe(Effect.andThen(Metric.update(SUBSCRIPTION_DIGEST_CHECKS, 1)));
     yield* Effect.forkChild(Effect.forever(check.pipe(Effect.andThen(Effect.sleep(o.digestCheck)))));

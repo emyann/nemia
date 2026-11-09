@@ -66,12 +66,12 @@ test("REFUSED: no reader of the frame applies the whole list's rule to the light
   const frame = [
     'lib/footer.ts',
     'lib/bell.ts',
-    'components/GaugesButton.tsx',
-    'components/GaugesBar.tsx',
-    'components/FrameHeader.tsx',
-    'components/FrameRail.tsx',
+    'components/frame/GaugesButton.tsx',
+    'components/frame/GaugesBar.tsx',
+    'components/frame/FrameHeader.tsx',
+    'components/frame/FrameRail.tsx',
   ];
-  for (const file of [...frame, 'components/FactoryBar.tsx', 'components/WaitingBar.tsx']) {
+  for (const file of [...frame, 'components/factory/FactoryBar.tsx', 'components/run/WaitingBar.tsx']) {
     assert.deepEqual(wholeListRule(read(file)), [], `${file} reads the api's counts, never inFlight nor waitsOnYou`);
   }
   const bar = declared(read('lib/factories.ts'), 'openBlockOf');

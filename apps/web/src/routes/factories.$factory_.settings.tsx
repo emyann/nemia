@@ -1,13 +1,13 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { FactoryDelegations } from '@/components/FactoryDelegations';
-import { FactoryInstruction } from '@/components/FactoryInstruction';
-import { FactoryRules } from '@/components/FactoryRules';
-import { FactoryTrust } from '@/components/FactoryTrust';
-import { FactorySchedules } from '@/components/FactorySchedules';
-import { FactoryServers } from '@/components/FactoryServers';
-import { FactoryVolumes } from '@/components/FactoryVolumes';
-import { routeLink } from '@/components/routeLink';
+import { FactoryDelegations } from '@/components/factory/FactoryDelegations';
+import { FactoryInstruction } from '@/components/factory/FactoryInstruction';
+import { FactoryRules } from '@/components/factory/FactoryRules';
+import { FactoryTrust } from '@/components/factory/FactoryTrust';
+import { FactorySchedules } from '@/components/factory/FactorySchedules';
+import { FactoryServers } from '@/components/factory/FactoryServers';
+import { FactoryVolumes } from '@/components/factory/FactoryVolumes';
+import { routeLink } from '@/components/nav/routeLink';
 import { LinkButton } from '@/components/ui/button';
 import { delegationsQuery, factoriesQuery, factoryInstructionQuery, factoryRulesQuery, factoryServersQuery } from '@/lib/api';
 

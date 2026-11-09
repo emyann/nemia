@@ -10,8 +10,8 @@ import { detailOf, tailStart, type FoldedTurn, type SystemTurn, type ThinkingTur
 
 /**
  * What a step's session has that the family's turn shape has no arm for, carried on its `own` arm and drawn by the step's own parts
- * (`components/session/SessionOwn.tsx`): the brief it was told, folded to a line that opens; the words a person said to it while it ran;
- * and its closeout.
+ * (`components/step/session/SessionOwn.tsx`): the brief it was told, folded to a line that opens; the words a person said to it while
+ * it ran; and its closeout.
  */
 export type SessionOwn =
   | { what: 'brief'; text: string }
@@ -90,7 +90,7 @@ const workOf = (key: string, turns: readonly FoldedTurn[], running: boolean): Co
  * A step's session on the one shape the family draws (`lib/conversation.ts`), its adapter onto it, `who` naming whoever says its words:
  * its calls, the thoughts among them and the lines the harness wrote into `work` turns a line each; its own words into `said`, drawn as
  * markdown; a line the harness wrote between two things said into a `note`; and its brief, the words a person told it and its closeout
- * onto the shape's `own` arm, which `components/session/` draws.
+ * onto the shape's `own` arm, which `components/step/session/` draws.
  *
  * `live` is whether the session may still add to it: a call with no result in the conversation's tail (`tailStart`) may still be answered
  * while it is, since a batch of parallel calls is answered after all of it, and had no answer once it is not. Pure: a node test proves the

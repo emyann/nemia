@@ -16,7 +16,7 @@
     },
     {
       "term": "Brought",
-      "meaning": "a step of a run her chat message links to (`/runs/<run>?step=<step>`), drawn under her words as the run's page's own part for what it waits on, read live: its gate, the Answer section's row, the banner's Continue, the note of a try asked, or its state alone, as `broughtPart` names it (`apps/web/src/lib/brought.ts`, proved by `apps/web/contracts/brought.contract.ts`), drawn by `apps/web/src/components/chat/ChatBrought.tsx`. A proposal her message links to (`/factories/<factory>/proposals/<name>`, read by `proposalLinkOf`, `apps/web/src/lib/proposalLink.ts`) is brought the same way, as the proposal page's own part (`ProposalCard`, `apps/web/src/components/ProposalCard.tsx`), drawn by `apps/web/src/components/chat/ChatProposal.tsx`; her action ask is `ChatActions` (`apps/web/src/components/chat/ChatActions.tsx`).",
+      "meaning": "a step of a run her chat message links to (`/runs/<run>?step=<step>`), drawn under her words as the run's page's own part for what it waits on, read live: its gate, the Answer section's row, the banner's Continue, the note of a try asked, or its state alone, as `broughtPart` names it (`apps/web/src/lib/brought.ts`, proved by `apps/web/contracts/brought.contract.ts`), drawn by `apps/web/src/components/nemia/chat/ChatBrought.tsx`. A proposal her message links to (`/factories/<factory>/proposals/<name>`, read by `proposalLinkOf`, `apps/web/src/lib/proposalLink.ts`) is brought the same way, as the proposal page's own part (`ProposalCard`, `apps/web/src/components/gate/ProposalCard.tsx`), drawn by `apps/web/src/components/nemia/chat/ChatProposal.tsx`; her action ask is `ChatActions` (`apps/web/src/components/nemia/chat/ChatActions.tsx`).",
       "type": "BroughtPart"
     },
     {
@@ -129,7 +129,7 @@
     },
     {
       "term": "Policy rules",
-      "meaning": "an agent's rules at Auto as Nemia's settings show them (`PolicyRules`, `apps/web/src/components/PolicyRules.tsx`), read and written through `GET /api/policy/:name` and its rules' routes (`apps/web/src/lib/api/policy.ts`); her rules over a factory's proposals (`approve-proposal`) are listed apart, as `proposalRules`.",
+      "meaning": "an agent's rules at Auto as Nemia's settings show them (`PolicyRules`, `apps/web/src/components/nemia/PolicyRules.tsx`), read and written through `GET /api/policy/:name` and its rules' routes (`apps/web/src/lib/api/policy.ts`); her rules over a factory's proposals (`approve-proposal`) are listed apart, as `proposalRules`.",
       "type": "PolicyRule",
       "retired": [
         {
@@ -167,7 +167,7 @@
     },
     {
       "term": "Label filter",
-      "meaning": "the field over the Inbox and the Runs (`SelectorField`, `apps/web/src/components/SelectorField.tsx`) that keeps the cards or the runs a label selector takes (`team=core`, Kubernetes' spelling), written to the address as `?l=` and sent to the api as `?selector=`; a selector the api refuses is said in its words under the field."
+      "meaning": "the field over the Inbox and the Runs (`SelectorField`, `apps/web/src/components/field/SelectorField.tsx`) that keeps the cards or the runs a label selector takes (`team=core`, Kubernetes' spelling), written to the address as `?l=` and sent to the api as `?selector=`; a selector the api refuses is said in its words under the field."
     },
     {
       "term": "Label page",

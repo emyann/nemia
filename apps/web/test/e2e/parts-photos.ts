@@ -46,8 +46,16 @@ async function enlarged(page: Page, selector: string, times: number, name: strin
   console.log(`parts: ${file}`);
 }
 
-/** Presses Tab until what has the focus is inside what `selector` finds. */
+/**
+ * Presses Tab until what has the focus is inside what `selector` finds, from the story it stands in: every story of the board is on
+ * the page, and the walk from its top would pass each of their links and controls first.
+ */
 async function tabInto(page: Page, selector: string): Promise<void> {
+  await page.locator(selector).evaluate((found) => {
+    const from = found.closest<HTMLElement>('[data-story]') ?? (found as HTMLElement);
+    from.tabIndex = -1;
+    from.focus({ preventScroll: true });
+  });
   for (let i = 0; i < 200; i += 1) {
     await page.keyboard.press('Tab');
     if (await page.locator(selector).evaluate((found) => found.contains(document.activeElement))) return;

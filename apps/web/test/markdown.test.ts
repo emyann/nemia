@@ -1,6 +1,6 @@
 /**
  * The pure half of the board's markdown: which language a fenced block is highlighted in, its code, and its footnotes' label.
- * The component itself is rendered in components.test.ts.
+ * The component itself is rendered in components-markdown.test.ts.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

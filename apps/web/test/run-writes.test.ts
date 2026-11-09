@@ -16,7 +16,16 @@ const SRC = path.resolve(import.meta.dirname, '../src');
 const COMPONENTS = path.join(SRC, 'components');
 
 /** The components that make a write that changes a run. */
-const WRITES = ['Ask.tsx', 'Gate.tsx', 'HoldRun.tsx', 'LiftHold.tsx', 'PruneRun.tsx', 'RemoveRun.tsx', 'StartRun.tsx', 'TryAgent.tsx'];
+const WRITES = [
+  'gate/Ask.tsx',
+  'gate/Gate.tsx',
+  'run/HoldRun.tsx',
+  'run/LiftHold.tsx',
+  'run/PruneRun.tsx',
+  'run/RemoveRun.tsx',
+  'run/StartRun.tsx',
+  'agent/TryAgent.tsx',
+];
 
 /** Whether `text` invalidates the whole list of the runs by its bare key, in place of `runsMoved`. */
 const byHand = (text: string): boolean => /queryKey:\s*\[\s*'runs'\s*\]/.test(text);

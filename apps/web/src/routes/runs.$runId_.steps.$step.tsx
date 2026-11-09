@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { DebugPanel } from '@/components/DebugPanel';
-import { SessionRetryingBand, SessionStoppedBand, SessionUnreadableBand } from '@/components/session/SessionBand';
-import { SessionComposer } from '@/components/session/SessionComposer';
-import { SessionQuiet, SessionTalk } from '@/components/session/SessionTalk';
-import { RunGone } from '@/components/RunGone';
-import { StatusChip, StepNote } from '@/components/StatusChip';
+import { DebugPanel } from '@/components/step/DebugPanel';
+import { SessionRetryingBand, SessionStoppedBand, SessionUnreadableBand } from '@/components/step/session/SessionBand';
+import { SessionComposer } from '@/components/step/session/SessionComposer';
+import { SessionQuiet, SessionTalk } from '@/components/step/session/SessionTalk';
+import { RunGone } from '@/components/run/RunGone';
+import { StatusChip, StepNote } from '@/components/step/StatusChip';
 import { runGone, type Said } from '@/lib/api';
 import { loadRun, useRunView, type RunView, type StepView } from '@/lib/runView';
 import { titleOf } from '@/lib/factory';

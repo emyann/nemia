@@ -1,10 +1,10 @@
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { AsWritten, KeyTable } from '../components/FilePage';
-import { Instant } from '../components/Instant';
-import { StartedAs } from '../components/InboxParts';
-import { Markdown } from '../components/Markdown';
-import { Labels } from '../components/Labels';
+import { AsWritten, KeyTable } from '../components/field/FilePage';
+import { Instant } from '../components/time/Instant';
+import { StartedAs } from '../components/inbox/InboxParts';
+import { Markdown } from '../components/markdown/Markdown';
+import { Labels } from '../components/field/Labels';
 import { cardQuery, labelCard, workflowNameOf } from '../lib/api';
 import { startedCard } from '../lib/inbox';
 

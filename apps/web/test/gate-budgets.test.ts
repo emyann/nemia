@@ -9,8 +9,8 @@ import './tsx.ts';
 
 const { createElement } = await import('react');
 const { renderToStaticMarkup } = await import('react-dom/server');
-const Gates = await import('../src/components/Gate.tsx');
-const { budgetsGiven, GateBudgetRows } = await import('../src/components/GateBudgets.tsx');
+const Gates = await import('../src/components/gate/Gate.tsx');
+const { budgetsGiven, GateBudgetRows } = await import('../src/components/gate/GateBudgets.tsx');
 
 const proposal = (from: 'proposed' | 'approved' = 'proposed') => ({
   from,

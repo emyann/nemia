@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { when } from '../components/Facts';
-import { ServerState } from '../components/FactoryServers';
-import { AllowedReach, ASKS, CHIP, PLAIN, Reach, STRUCK } from '../components/Reach';
+import { when } from '../components/step/Facts';
+import { ServerState } from '../components/factory/FactoryServers';
+import { AllowedReach, ASKS, CHIP, PLAIN, Reach, STRUCK } from '../components/step/Reach';
 import {
   capabilitiesQuery,
   type Capabilities,

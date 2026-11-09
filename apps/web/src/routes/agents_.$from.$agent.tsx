@@ -2,11 +2,11 @@ import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
-import { AgentForm } from '../components/AgentForm';
-import { AgentFace, AgentRefused, FromBadge, personOf, UsedBy } from '../components/AgentParts';
-import { CustomInstructions } from '../components/CustomInstructions';
-import { AsWritten } from '../components/FilePage';
-import { TryAgent, TryYours } from '../components/TryAgent';
+import { AgentForm } from '../components/agent/AgentForm';
+import { AgentFace, AgentRefused, FromBadge, personOf, UsedBy } from '../components/agent/AgentParts';
+import { CustomInstructions } from '../components/step/CustomInstructions';
+import { AsWritten } from '../components/field/FilePage';
+import { TryAgent, TryYours } from '../components/agent/TryAgent';
 import {
   agentQuery,
   AgentRefusal,

@@ -1,10 +1,10 @@
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { FactoryCanvas } from '@/components/FactoryCanvas';
-import { FactoryProposals } from '@/components/FactoryProposals';
-import { TemplateCard } from '@/components/TemplateCard';
+import { FactoryCanvas } from '@/components/factory/FactoryCanvas';
+import { FactoryProposals } from '@/components/factory/FactoryProposals';
+import { TemplateCard } from '@/components/factory/TemplateCard';
 import { LinkButton } from '@/components/ui/button';
-import { routeLink } from '@/components/routeLink';
+import { routeLink } from '@/components/nav/routeLink';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { factoriesQuery, inboxQuery, proposalsQuery, runsQuery, storeQuery } from '@/lib/api';
 import { runsIn } from '@/lib/factories';

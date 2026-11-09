@@ -1,7 +1,7 @@
 /**
  * The board's readers of a run's status (`RunStatus`): what each gives for a run stopped at a gate alone, one waiting on an answer alone
  * and one in which a step broke, and that no file of `src` compares a status to one of the run's words but those listed here
- * (`READERS`, `unlistedReaders`). `TryRun`, the one place that prints the word, is held by `components.test.ts`.
+ * (`READERS`, `unlistedReaders`). `TryRun`, the one place that prints the word, is held by `components-agent.test.ts`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

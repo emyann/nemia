@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { ProposalCard } from '@/components/ProposalCard';
-import { routeLink } from '@/components/routeLink';
+import { ProposalCard } from '@/components/gate/ProposalCard';
+import { routeLink } from '@/components/nav/routeLink';
 import { LinkButton } from '@/components/ui/button';
 import { proposalQuery } from '@/lib/api';
 

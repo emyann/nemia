@@ -13,7 +13,7 @@ import { atWork } from '@/lib/footer';
 import { useNemiaChat } from '@/lib/useNemiaChat';
 import { useNow } from '@/lib/useNow';
 
-export const Route = createFileRoute('/chat')({ component: ChatPage, staticData: { fullBleed: true } });
+export const Route = createFileRoute('/chat')({ component: ChatPage, staticData: { fullBleed: true, ownsChat: true } });
 
 /** The chat, the whole page: her panel over the look's scan lines, as the board's other full-bleed pages stand. */
 function ChatPage() {

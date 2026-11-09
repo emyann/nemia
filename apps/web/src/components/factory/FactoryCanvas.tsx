@@ -26,7 +26,6 @@ import { ceilingsQuery, inboxQuery, runObjectQuery, type RunObject, type RunSumm
 import {
   forgetFactoryLayout,
   forgetFactoryOpen,
-  forgetFactoryLeftovers,
   readFactoryLayout,
   readFactoryOpen,
   readNarrowFactoryLayout,
@@ -221,7 +220,6 @@ const placing = (change: NodeChange<RunFlowNode>): change is NodePositionChange 
  *   closing, and Reset layout. The open cards claim their cells first, the one opened last first; a card on the floor stays put unless   an
  *   opening card covers it, and one coming back takes its saved cell. A card moved is saved in this browser (`keepLayout`), where a   card
  *   off the floor keeps its place and a run the store no longer lists does not; nor is such a run kept open.
- * - On mount it forgets what this browser keeps for the Factory that nothing reads (`forgetFactoryLeftovers`).
  * - A card opened is brought into view once the floor is laid out for it, and the run the bar shows, or a step of, is brought into view as
  *   the bar shows it and kept in view whenever the floor's frame changes size, across or down (`useFrameSize`): panned to its middle, if
  *   any of it is off screen, and zoomed out only as far as it must be, to `REVEAL_MIN_ZOOM` at most (`revealView`); a card taller than the
@@ -322,8 +320,6 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
     if (kept.length) saveFactoryOpen(kept);
     else forgetFactoryOpen();
   }, [open, known]);
-
-  useEffect(() => forgetFactoryLeftovers(), []);
 
   const frame = useRef<HTMLDivElement>(null);
   const whole = useRef<HTMLDivElement>(null);

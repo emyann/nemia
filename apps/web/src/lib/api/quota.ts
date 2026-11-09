@@ -1,11 +1,11 @@
-/** The subscription's quota (`GET /api/quota`, apps/api/src/factory/quota.ts). */
+/** The subscription's quota (`GET /api/quota`, apps/api/src/gauges/quota.ts). */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
 import { decodes } from './decodes.ts';
 import { get } from './read.ts';
 
 /**
- * Mirrors `QuotaWindow` in apps/api/src/factory/quota.ts: one limit of the subscription as Claude Code reported it — `key` Claude Code's,
+ * Mirrors `QuotaWindow` in apps/api/src/gauges/quota.ts: one limit of the subscription as Claude Code reported it — `key` Claude Code's,
  * `label` the board's word, `resetsAt` ISO, `reset` whether that time has passed since the answer, `marked` whether it is used past
  * `Quota.markAt`.
  */
@@ -27,7 +27,7 @@ const QuotaWindowSchema = decodes<QuotaWindow>()(
 const QuotaWindowsSchema = Schema.mutable(Schema.Array(QuotaWindowSchema));
 
 /**
- * Mirrors `Quota` in apps/api/src/factory/quota.ts: the plan's usage as the api last asked Claude Code for it (`get_usage`), judged at the
+ * Mirrors `Quota` in apps/api/src/gauges/quota.ts: the plan's usage as the api last asked Claude Code for it (`get_usage`), judged at the
  * request — `fresh` to show, `asking`, or `no-plan`, `unanswered` (signed in, and Anthropic's usage service gave nothing), `no-claude`,
  * `timeout`, `failed` or `unknown`, each with `said`, the sentence to show in its place. `last` is the last answer with windows, up to six
  * hours old, shown dimmed with its time; `againAt` when a read will next ask; `keepMs` how long a good reading is kept.

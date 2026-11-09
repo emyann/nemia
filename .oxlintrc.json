@@ -478,50 +478,50 @@
       }
     },
     {
-      "files": ["apps/web/src/components/AgentForm.tsx"],
+      "files": ["apps/web/src/components/agent/AgentForm.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 141, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
-      "files": ["apps/web/src/components/CardGate.tsx"],
+      "files": ["apps/web/src/components/inbox/CardGate.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 90, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
-      "files": ["apps/web/src/components/FactoryCanvas.tsx"],
+      "files": ["apps/web/src/components/factory/FactoryCanvas.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 249, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
-      "files": ["apps/web/src/components/NewWorkflow.tsx"],
+      "files": ["apps/web/src/components/workflow/NewWorkflow.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 104, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
-      "files": ["apps/web/src/components/PruneRun.tsx"],
+      "files": ["apps/web/src/components/run/PruneRun.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 94, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
-      "files": ["apps/web/src/components/Reach.tsx"],
+      "files": ["apps/web/src/components/step/Reach.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 114, "skipBlankLines": true, "skipComments": true }],
         "sonarjs/cognitive-complexity": ["error", 17]
       }
     },
     {
-      "files": ["apps/web/src/components/RunCanvas.tsx"],
+      "files": ["apps/web/src/components/run/RunCanvas.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 85, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
-      "files": ["apps/web/src/components/RunNode.tsx"],
+      "files": ["apps/web/src/components/run/RunNode.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 111, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 31 }],
@@ -529,19 +529,19 @@
       }
     },
     {
-      "files": ["apps/web/src/components/SkillForm.tsx"],
+      "files": ["apps/web/src/components/agent/SkillForm.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 111, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
-      "files": ["apps/web/src/components/StartRun.tsx"],
+      "files": ["apps/web/src/components/run/StartRun.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 95, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
-      "files": ["apps/web/src/components/StepForm.tsx"],
+      "files": ["apps/web/src/components/step/StepForm.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 182, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 50 }],
@@ -549,26 +549,26 @@
       }
     },
     {
-      "files": ["apps/web/src/components/StepInspector.tsx"],
+      "files": ["apps/web/src/components/step/StepInspector.tsx"],
       "rules": {
         "sonarjs/cognitive-complexity": ["error", 16]
       }
     },
     {
-      "files": ["apps/web/src/components/StepNode.tsx"],
+      "files": ["apps/web/src/components/step/StepNode.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 84, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 25 }]
       }
     },
     {
-      "files": ["apps/web/src/components/StepRail.tsx"],
+      "files": ["apps/web/src/components/step/StepRail.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 86, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
-      "files": ["apps/web/src/components/WorkflowBuilder.tsx"],
+      "files": ["apps/web/src/components/workflow/WorkflowBuilder.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 196, "skipBlankLines": true, "skipComments": true }]
       }

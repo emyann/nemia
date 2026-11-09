@@ -142,7 +142,7 @@ export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, num
     'packages/agent-orchestrator/src/workspace/worktree.store.ts': 1,
   },
   'workspace: main': {
-    'packages/agent-orchestrator/src/applied/render.ts': 1,
+    'packages/agent-orchestrator/src/factory/applied/render.ts': 1,
     'packages/agent-orchestrator/src/folder/folder.store.ts': 1,
     'packages/agent-orchestrator/src/former/former.ts': 7,
     'packages/agent-orchestrator/src/step/step.ts': 1,

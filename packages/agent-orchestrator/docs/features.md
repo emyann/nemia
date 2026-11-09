@@ -2061,7 +2061,7 @@ that leaves its timer holds `node --test` open, so run that mutant under `timeou
 
 ### Shipped: the api streams the feed
 
-The api's half of what was sketched here. What was built, in `apps/api/src/factory/feed.ts` beside the transcript stream (`steps.ts`):
+The api's half of what was sketched here. What was built, in `apps/api/src/gauges/feed.ts` beside the transcript stream (`steps.ts`):
 
 - **`GET /api/feed/stream`**, server-sent events over `watchFeed` from the package root: pushed by its `fs.watch` and backed by its 1 s
   timer, so the api keeps no poll of its own. One event a line: its name what the line is about (`feedEventOf`) — `step` for a line with
@@ -2085,7 +2085,7 @@ The api's half of what was sketched here. What was built, in `apps/api/src/facto
   Neither feed carries a session's live words, its cost, a harness's `waitingFor` or a git standing, so the board keeps a slow poll
   either way.
 
-Tested in `apps/api/src/factory/feed.test.ts`: a gate, a run's word and a `removed` written by `recordFeed` arriving as `step`, `run` and
+Tested in `apps/api/src/gauges/feed.test.ts`: a gate, a run's word and a `removed` written by `recordFeed` arriving as `step`, `run` and
 `removed` with the feed's end as each id; a reconnect by `Last-Event-ID` over `?after`; a cursor inside a line, past the end, and not a
 number refused by address and by header, each a 400; a truncated feed ending the stream; three streams holding three watchers and none
 once their readers go, and a closed socket giving its watcher back. And in the package's `src/feed/feed.test.ts`: each line's cursor is one
@@ -2147,7 +2147,7 @@ deleted in turn and failed a test; the link claim's retry on `EEXIST` is not cov
 The api and the board could not tell `waiting` from nothing ticking: on 2026-09-22 cards read `waiting` for minutes because the daemon was
 stopped, and it was read as the machine being slow. What was built, in `apps/`:
 
-- **`GET /api/daemon`** (`apps/api/src/factory/daemon.ts`) judges it as `wf ls` does: `daemonStanding()` from the package's root, one file read,
+- **`GET /api/daemon`** (`apps/api/src/gauges/daemon.ts`) judges it as `wf ls` does: `daemonStanding()` from the package's root, one file read,
   one `kill(pid, 0)` and one `/proc/<pid>/stat` read per request, never per run, and never a write. It answers the kind, `ticking`, the
   pid, `cwd`, `every`, `startedAt` (since when), `passedAt` (the last pass), `lastHeardAt` (the latest of start, pass and beat), `stoppedAt`,
   `staleAfterMs`, the process table's `identity`, and `line`, which is `daemonLine`'s. A file that is there and cannot be read is a 500
@@ -2161,7 +2161,7 @@ stopped, and it was read as the machine being slow. What was built, in `apps/`:
 - **Polled, not streamed**: the feed carries no pass of the daemon (a pass writes a line only where a word changed), so `daemonQuery`
   reads on `pace(5_000)`, the cap's fallback — every minute while the feed is followed — and `polled()` counts it.
 
-Tested in `apps/api/src/factory/daemon.test.ts` (each kind through the route, a long pass read as ticking by its beat, a 500 for a directory in
+Tested in `apps/api/src/gauges/daemon.test.ts` (each kind through the route, a long pass read as ticking by its beat, a 500 for a directory in
 the file's place, and after every read the file's bytes and mtime unchanged and no file made where there was none),
 `apps/web/test/daemon.test.ts` (the words of each kind, nothing for ticking) and the e2e's `daemon` page (the seeded store's `none` line, a
 stalled file's line and the floor fitted clear of it, no line for a fresh one, the file taken back).
@@ -2374,7 +2374,7 @@ Not as planned: `nemia watch` keeps `watchFeedFile`. It runs in a process of its
 Tested in `src/feed/feed.verb.test.ts` (a reader that takes nothing never holds up the writer; a lagging one gets every line once and in
 order, with one read for what the hub dropped; a line another process wrote, read before the next item and on the beat; the beat reading
 nothing while the file stands; a cursor refused before the reader is counted; a cut under an open reader; the log's annotations),
-`src/feed/feed.test.ts` (the bytes published, and none among another writer's) and `apps/api/src/factory/feed.test.ts` (the stream's
+`src/feed/feed.test.ts` (the bytes published, and none among another writer's) and `apps/api/src/gauges/feed.test.ts` (the stream's
 events, a line written by a process with no hub, a failed read said once and cleared, and the readers counted out once their client
 goes).
 
@@ -3087,7 +3087,7 @@ What was built:
   a DELETE of a card not in the queue, which writes nothing. The card's file keeps its mtime across the write: the package renames a new file
   over the card, and the mtime is the `filedAt` the Inbox page orders the cards by, so a card queued or taken back from the board would have
   jumped to the top of the list with the queue's time as its own. From review, round 2.
-- **`GET /api/ceilings`** (`apps/api/src/factory/ceilings.ts`, `Ceilings`) is `{ last, cap, inFlight, held }`. `last` is `lastCeilings()`, or null
+- **`GET /api/ceilings`** (`apps/api/src/gauges/ceilings.ts`, `Ceilings`) is `{ last, cap, inFlight, held }`. `last` is `lastCeilings()`, or null
   before any pass has written them. `cap` is what `runSlots` judges by: the last pass's cap, or before any pass, the api's own `WF_MAX_RUNS`,
   whose non-count is a 500 in `runCapOf`'s sentence (now `maxRuns`'s). `inFlight` lists the runs counted against the cap, oldest first.
   `held` lists the runs
@@ -4646,7 +4646,7 @@ backoff stay in the api.
   it has, with the no-plan recording's session block) and drives the ask through a fake `claude`: the flags exactly, the scrubbed env
   and cwd, the id match past decoy lines, stdin closed; no claude on PATH (`missing`), an exit (`failed`, with its code and stderr's
   last line), a silence killed at the timeout, an interruption that ends its claude; the verb at both doors and its refusals.
-  `apps/api/src/factory/quota.test.ts` holds the board's judgement of each state and its sentence; one ask for concurrent reads; the
+  `apps/api/src/gauges/quota.test.ts` holds the board's judgement of each state and its sentence; one ask for concurrent reads; the
   keep and its override; the backoff on a fake clock — twelve reads at once inside each wait ask nothing, the waits grow, a good
   reading begins them again — and its override; an ask the engine rejected, held as `failed` in its own words and asked again past
   the keep; the route through the engine to the harness's fake `claude`; and that the read starts no process. No test starts the
@@ -4856,7 +4856,7 @@ chose the rule already there: a folder run's `runs/<id>/work/<step>` lives exact
 ## Shipped: a node's outcome drawn, not printed — the Output tab
 
 The step inspector's Output tab printed a closeout: the summary, then each declared field as the JSON it came as. Now it opens on how
-the try ended, in words, and draws each field by its shape (`apps/web/src/lib/outcome.ts`, `apps/web/src/components/Outcome.tsx`).
+the try ended, in words, and draws each field by its shape (`apps/web/src/lib/outcome.ts`, `apps/web/src/components/step/Outcome.tsx`).
 
 - **The head.** `done` or `blocked`, `said by the agent`, with what it needs; or, for an attempt that ended with no statement, the
   machine's reason in a sentence: `unsigned`, `lost`, `unstartable`, `budget`, `operator`, `deadline` (the engine's `EndReason`), or a
@@ -5928,7 +5928,7 @@ nothing, so a reader could not tell a quiet feed from a lost socket nor say wher
 grammar the package already owns, and says where it has read to at the one cadence every surface reads. **The board is unchanged**: with
 no selector it reads what it read before, and it has no `bookmark` listener.
 
-- **`?selector=`, given again for each further selector** (`apps/api/src/factory/feed.ts`), in the same grammar as `nemia watch`'s `-l`:
+- **`?selector=`, given again for each further selector** (`apps/api/src/gauges/feed.ts`), in the same grammar as `nemia watch`'s `-l`:
   every clause of one selector holds of a line it takes, and one selector of them does. The api adds no grammar of its own — it reads
   `selectorsRefusal`, `parseSelectors` and `selects` off `agent-orchestrator`'s root, and the package's source did not change.
 - **Selected at the source**: `feedEvents(from, selectors, bookmarkEvery)` keeps the cursor of every line the package's live reader hands
@@ -5965,7 +5965,7 @@ Where it departs from the spec, and why:
 - **The api does not list the levels** in its 400 for an `atLeast` of the wrong type: `LEVELS` is not on the package's root, and the
   package's own 422 names them. Widening the pinned contract for one sentence was not worth it.
 
-Tested in `apps/api/src/factory/feed.test.ts` (a selector sends only the lines it takes, each with its own cursor as its id, with the
+Tested in `apps/api/src/gauges/feed.test.ts` (a selector sends only the lines it takes, each with its own cursor as its id, with the
 unselected lines written between them as the fixture; AND within one selector and OR across two, each with the line that must be absent;
 a bookmark's id is the feed's whole length, past a line the selector dropped, with an empty data field; its id taken back as
 `Last-Event-ID` resumes and resends nothing; a bare key opens the stream; five malformed selectors each a 422 naming it and the query

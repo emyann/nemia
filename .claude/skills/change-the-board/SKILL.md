@@ -168,7 +168,7 @@ is written, the commands, and what its own code promises — and this section ho
   package's program requires, run `npm run e2e -- --pages runs`, which seeds through it.
 - A story of a part lays out with inline styles, never a class of its own, and a node test imports a part by its own file: the look's door
   loads the kit's folder, which Node refuses. A component of the board that needs a state proven in a browser has its stories beside it
-  too (`apps/web/src/components/<Name>.stories.tsx`, `WaitingCard`'s): both hosts read that folder beside the look's.
+  too (`apps/web/src/components/<noun>/<Name>.stories.tsx`, `run/WaitingCard`'s): both hosts read every folder under `components/` but `ui/` and `ai-elements/`.
 
 ### React, Query and the compiler
 

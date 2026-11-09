@@ -88,7 +88,7 @@ place's to answer** (its `root` verb). The orchestrator asks both when a place j
 runtime's, carried whole (`HARNESS_WORDS` in `packages/agent-orchestrator/test/words.test.ts`).
 
 **A factory's MCP servers are the orchestrator's record and the runtime's bytes.** The record is a file beside the factory,
-`factories/<name>/servers.json`, read and written by `packages/agent-orchestrator/src/servers/` — its store taking the store's root as
+`factories/<name>/servers.json`, read and written by `packages/agent-orchestrator/src/factory/servers/` — its store taking the store's root as
 a required `home: string`, as every store function does since the root became a service (`StoreRoot`). What a session is handed is the
 runtime's: `mcpServerOf` (`agent-runtime/src/harness/mcp.ts`) is the one producer of a server object's bytes, in one fixed key order,
 feeding both the session's `Options.mcpServers` and the state read, because the harness files a sign-in under those bytes and two
@@ -102,7 +102,7 @@ again above, and a look that failed says the state is unread, which is not an ab
 or holds an SDK session: it stores a client secret it is handed in the harness's own store through a `claude mcp add --scope local`
 child under the engine's root, holds a session asked `mcpAuthenticate` in memory by its callback port until the server reads
 `connected`, and signs out through a `claude mcp add` with no secret then a `claude mcp remove --scope local`. Which secret a server is handed is the orchestrator's
-(`src/servers/clients.ts`, keyed by client id, exported by no entry), and the api and the board carry an address to open and a state
+(`src/factory/servers/clients.ts`, keyed by client id, exported by no entry), and the api and the board carry an address to open and a state
 word, never a secret or a token.
 
 **Where a run's work lives is the place's**, an interface the orchestrator owns and asks (`PlaceService`, `src/place/place.store.ts`:
@@ -169,7 +169,7 @@ read off the run by a controller (`seenOf`, `src/admission/seen.verb.ts`), and a
 holds `daemon.json` (its pid, `by` and the `url` an api serves at) and ticks. The api's process is that daemon unless started with
 `--no-tick` (`apps/api/src/main.ts`), and `wf up` is it on a machine that serves no board; each refuses the other while it ticks. A board
 served by the daemon keeps its store ticking; a board served with `--no-tick` ticks nothing, and a run filed on it moves on the daemon's
-next pass. Beside its passes it frees the worktrees of finished runs (`free` in `src/prune/free.verb.ts`, forked by `up`), asking
+next pass. Beside its passes it frees the worktrees of finished runs (`free` in `src/forget/prune/free.verb.ts`, forked by `up`), asking
 `nemia prune`'s own judgement of each, a few runs a sweep; and it measures what the store takes on the disk, part by part and by factory
 (`disk` in `src/disk/disk.verb.ts`, forked by `up`: a sweep of its own after the first pass and every ten minutes, whose reading each
 pass keeps in the series and no pass walks; it asks the runtime what it keeps by task, `kept`, and says the engine's folder and the
@@ -202,7 +202,7 @@ read and removed only by `sweep` (`agent-runtime/src/core/engine/bodies.ts`, `ae
 (`briefParts`, `src/brief/parts.ts`), filed beside the whole brief as a hint the runtime refuses unless the parts join into it.
 A task's journal, its session files and its feed lines are removed only by `forget` (`agent-runtime/src/service/forget.ts`,
 `ae forget`), and only of a settled task; a body still only by `sweep`. Which tasks a run removed had is the orchestrator's: `nemia rm`
-asks `forget` of every task its record names, and the tick asks again for one that had not settled (`src/forgetting/forgetting.verb.ts`).
+asks `forget` of every task its record names, and the tick asks again for one that had not settled (`src/forget/forgetting/forgetting.verb.ts`).
 What all of it takes on the disk is the runtime's to say, by task (`kept`, `agent-runtime/src/service/kept.ts`): the harness it was
 filed on, a task's journal, the bodies it is first to name, its sessions' output kept whole, its harness's other files, and the harness's own record of each session its journal names by id, never one
 found by its folder, where a person's own sessions live too. Which factory a task is of, and which output is a check's, are the orchestrator's (`withKept`,
@@ -396,14 +396,14 @@ same, or one from another card — a crash between the two writes — is stale a
 its map. It is the Run door's to hold, not the Card door's: only this door can tell whether a claim's run still has a record.
 
 **The Factory door.** A factory — its file, and the level, rules and servers the store keeps beside it — is read and written through
-`FactoryDoor` (`packages/agent-orchestrator/src/factories/factories.store.ts`), on the Run door's pattern: two layers built the one way
+`FactoryDoor` (`packages/agent-orchestrator/src/factory/door/factories.store.ts`), on the Run door's pattern: two layers built the one way
 (`factoryDoorOver`), the files (`factoryFiles(home)`, over `factory.store.ts`, `level.store.ts`, `rules.store.ts` and
 `servers.store.ts`, so a file keeps its bytes and a key the model does not name) and a memory stand-in (`factoryDoorMemory`,
-`src/factories/memory.store.ts`, in `STAND_INS`), held to one table of walks (`test/factory-walks.ts`). A new factory's name is checked
+`src/factory/door/memory.store.ts`, in `STAND_INS`), held to one table of walks (`test/factory-walks.ts`). A new factory's name is checked
 as `FactoryName.OnCreate` checks it, the default factory is `Conflict`, and a factory written decodes through the model's `Factory`,
 whose checks are its invariants (one repository at least, hires and schedules only into a workflow it offers), or is `Invalid`. A
 person's change of a factory's wiring — attach, detach, hire, fire, schedule, unschedule — is read, judged by a pure function
-(`wiringRefusal` and `rewired`, `src/wiring/wiring.ts`, whose contract proves a change that would break that invariant refused) and
+(`wiringRefusal` and `rewired`, `src/factory/wiring/wiring.ts`, whose contract proves a change that would break that invariant refused) and
 written back through the door, whose decode refuses a factory that breaks it; only the disk's facts (a step's own agent, a cron that fires, a repository that is a directory) stay the
 verb's. Its default departs from the Run door's on one point, which the pattern now carries for every door after it: it is *rooted*
 (`rootedDoor`, `src/door/door.store.ts`), the door over the files at the `StoreRoot` the program is given, read when a method runs,
@@ -441,10 +441,10 @@ root reads a workflow on the files whose step names an agent the memory holds. T
 agents and skills, and moves with the revisions' pin.
 
 **The Template door.** A factory template — a folder that holds its `nemia.yaml`, or an archive `nemia template pack` wrote — is read,
-written as a new folder and packed as a new archive through `TemplateDoor` (`packages/agent-orchestrator/src/templates/templates.store.ts`),
+written as a new folder and packed as a new archive through `TemplateDoor` (`packages/agent-orchestrator/src/template/door/templates.store.ts`),
 on the Factory door's pattern: two layers built the one way (`templateDoorOver`), the files (`templateFiles`, today's folders and
 archives, each file with its bytes and mode, a write staged beside its place and renamed into it) and a memory stand-in
-(`templateDoorMemory`, `src/templates/memory.store.ts`, in `STAND_INS`), held to one table of walks (`test/template-walks.ts`). Its id
+(`templateDoorMemory`, `src/template/door/memory.store.ts`, in `STAND_INS`), held to one table of walks (`test/template-walks.ts`). Its id
 is where the template is read from, `TemplateSource`, checked whole on a write and read by name alone; a tree written decodes through
 `TemplateTreeWrite` — a template's name, the folder's own, each path one in its folder and short enough for an archive — or is
 `Invalid`, and a place taken is `Conflict`. Its default is rooted, as the Factory door's, though its files are outside the store: one
@@ -457,7 +457,7 @@ factory controller reads a template through the door on every pass (`renderedAt`
 workspace (`test/contract.test.ts`). A parameter's value reaches inside text: a render writes each `${{ parameters.<name> }}` with it in
 every string of a document and in every text it writes (a step's and an agent's instructions, `NEMIA.md`, `RULES.md`), copies a carried
 file (a script, a skill's files, a schema) byte for byte, and the lint refuses a name `nemia.yaml` does not declare
-(`packages/agent-orchestrator/src/applied/params.ts`, `src/template/check.ts`).
+(`packages/agent-orchestrator/src/factory/applied/params.ts`, `src/template/check.ts`).
 
 **The Agent and Skill doors.** An agent and a skill, one context read through the same lookup roots, are each read and written through
 a door of its own, on the Workflow door's pattern and rooted as it is: `AgentDoor` (`packages/agent-orchestrator/src/agents/agent-door.store.ts`),
@@ -585,12 +585,14 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
 - **store** is the I/O beneath the controllers. It imports no agent-runtime, never a controller and not the client:
   branches and artifacts at the top, and record.store, folder.store, write.store, worktree.store, agents.store,
   custom.store, read.store (in agents and in skills), skills.store, plan.store, daemon.store, feed.store, inbox.store, tally.store,
-  places.store, config.store, series.store, subscription.store, level.store, disk.store, a2a.store and frozen.store in the folders. They load as a tree. At
+  places.store, config.store, whole-file.store, alive.store, series.store, subscription.store, level.store, disk.store, a2a.store and frozen.store in the folders. They load as a tree. At
   the bottom are record/places.store.ts, skills/read.store.ts (where agents and skills are looked for, and the skills read there),
-  meter/tally.store.ts (the pass's meter) and config/config.store.ts, which import no store file; config/root.store.ts, the store's
+  meter/tally.store.ts (the pass's meter), whole-file/whole-file.store.ts (`writeWhole`, a file's text written to a hidden file beside
+  it and renamed over it), process/alive.store.ts (`alive`, whether a pid is there, a refusal for want of permission counting as there)
+  and config/config.store.ts, which import no store file; config/root.store.ts, the store's
   root as the service a program is given, imports config.store.ts and nothing else. agents/read.store.ts (the
   agents read, and a person's custom instructions) imports only skills/read.store.ts; folder/folder.store.ts imports only
-  agents/read.store.ts and skills/read.store.ts; record/record.store.ts imports only the bottom four, folder.store.ts and
+  agents/read.store.ts and skills/read.store.ts; record/record.store.ts imports only the bottom stores, folder.store.ts and
   revisions/revisions.store.ts; workspace/worktree.store.ts imports only record.store.ts, places.store.ts, tally.store.ts and place/place.store.ts; folder/write.store.ts
   imports only record.store.ts, the two reads and factory/factory.store.ts. Any other store file imports only these, and none imports it.
   Outside the store, only the client and the controllers beneath the CLI import a store file, and one of them imports

@@ -98,7 +98,7 @@ sequenceDiagram
    it can be followed live again. It gives up on no step: it ends when the step's task settles, or when nobody is reading.
 
 The board follows the store as a whole the same way: the feed, the line of everything the daemon writes, is relayed as server-sent
-events on `/api/feed/stream` (`apps/api/src/factory/feed.ts`, read by `apps/web/src/lib/useFeed.ts`).
+events on `/api/feed/stream` (`apps/api/src/gauges/feed.ts`, read by `apps/web/src/lib/useFeed.ts`).
 
 ## Sources
 

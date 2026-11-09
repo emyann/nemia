@@ -407,7 +407,7 @@ test('outputLines and placeText: `nemia decide` of a declared output', async (t)
     "a finding's `where` as a place, never as JSON: file:line, page · theme, a string as it is, any other object as its keys and values",
     () => {
       const findings = [
-        { where: { file: 'apps/web/src/components/StepNode.tsx', line: 12 }, what: 'the legend covers a node' },
+        { where: { file: 'apps/web/src/components/step/StepNode.tsx', line: 12 }, what: 'the legend covers a node' },
         { where: { file: 'apps/web/test/components.test.ts', line: null }, what: 'nothing tests it' },
         { where: { page: '/workflows', theme: 'dark' }, what: 'the label cannot be read' },
         { where: { url: 'http://localhost:5173/runs', selector: '.legend' }, what: 'off the screen' },
@@ -416,7 +416,7 @@ test('outputLines and placeText: `nemia decide` of a declared output', async (t)
       const lines = outputLines(REVIEW, reviewSaid({ findings }));
       assert.deepEqual(lines, [
         'findings:',
-        '  - apps/web/src/components/StepNode.tsx:12',
+        '  - apps/web/src/components/step/StepNode.tsx:12',
         '    what: the legend covers a node',
         '  - apps/web/test/components.test.ts',
         '    what: nothing tests it',

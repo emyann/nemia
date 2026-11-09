@@ -104,8 +104,9 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - What a run's Clock says has one writer, `runClock` (`lib/factory.ts`): a card says a sentence, a table's row the time at work alone
   and `not started` for a run nothing of which is filed (`place: 'row'`). The breakdown under it is `clockBreakdown`
   (`lib/breakdown.ts`), whose head is verbatim the words the tile or the cell shows and whose foot is the wall time its rows add up to.
-- A write that changes a run calls `runsMoved` (`lib/runWrites.ts`), never `['runs']` by hand; a key that stands for every key under it
-  is said by `filterOf` (`lib/feed.ts`), which the feed invalidates through. `['runs-finished']` stands for every page of the finished
+- A write that changes a run calls `runsMoved` (`lib/runWrites.ts`), once, given the run where it has one, which reads the run's record
+  (`exact`) with the list: never `['runs']` nor `['runs', id]` by hand (`test/run-writes.test.ts`); a key that stands for every key
+  under it is said by `filterOf` (`lib/feed.ts`), which the feed invalidates through. `['runs-finished']` stands for every page of the finished
   runs' RunList read (`status.state=finished`), each factory's and from whichever token (`filterOf`, `polled`, `runsMoved`).
 - Both conversations follow their stream through the one `follow` of `lib/follow.ts`, each handing it a `Follower`: a step's is
   `lib/following.ts`, her chat's `lib/chatFollowing.ts`.

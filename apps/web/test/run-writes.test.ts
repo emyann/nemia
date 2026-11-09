@@ -1,12 +1,13 @@
 /**
- * A write that changes a run (src/lib/runWrites.ts): it reads the frame's RunList again at once, and no component that makes such a
- * write invalidates the whole list by hand, which would leave the frame to the feed.
+ * A write that changes a run (src/lib/runWrites.ts): it reads the frame's RunList again at once, and the run's own record with it in the
+ * one call, and no file that makes such a write invalidates the whole list or a run's record by hand, which would leave the frame to the
+ * feed.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { QueryClient, QueryObserver, type QueryKey } from '@tanstack/react-query';
+import { MutationObserver, QueryClient, QueryObserver, type QueryKey } from '@tanstack/react-query';
 import { finishedRunsQuery, openRunsQuery } from '../src/lib/api/runs.ts';
 import { runsMoved } from '../src/lib/runWrites.ts';
 import { bell, until, WAITED } from './waits.ts';
@@ -26,6 +27,27 @@ const WRITES = [
   'run/StartRun.tsx',
   'agent/TryAgent.tsx',
 ];
+
+/**
+ * Every invalidation of one run's own record (`['runs', id]`) written by hand in `text`, across line breaks: `runsMoved` given the run
+ * reads it, with the list, so a write that refreshes it by hand is one that forgot the list or calls twice.
+ */
+const recordByHand = (text: string): number =>
+  [...text.matchAll(/invalidateQueries\(\s*\{\s*queryKey:\s*\[\s*'runs'\s*,\s*[^,\]\s]+\s*\]/g)].length;
+
+/** Every source file under `dir` that refreshes a run's record by hand, by its path from `dir`, and how many times. */
+const recordByHandIn = (dir: string): Array<{ file: string; times: number }> =>
+  fs
+    .readdirSync(dir, { recursive: true, encoding: 'utf8' })
+    .filter((file) => /\.tsx?$/.test(file))
+    .map((file) => ({ file: file.split(path.sep).join('/'), times: recordByHand(fs.readFileSync(path.join(dir, file), 'utf8')) }))
+    .filter((found) => found.times > 0);
+
+/**
+ * The one write that refreshes a run's record and not the list: words said to a step's session change nothing the list shows at once
+ * (`SessionComposer`'s own comment says so).
+ */
+const RECORD_ALONE = [{ file: 'components/step/session/SessionComposer.tsx', times: 1 }];
 
 /** Whether `text` invalidates the whole list of the runs by its bare key, in place of `runsMoved`. */
 const byHand = (text: string): boolean => /queryKey:\s*\[\s*'runs'\s*\]/.test(text);
@@ -118,8 +140,9 @@ test("runsMoved: a write that changes a run reads the frame's answer and each pa
   });
 });
 
-test("runsMoved with a run: a write that changes a try without moving its step reads that run's steps again", async () => {
+test("runsMoved with a run: the run's own record, and its steps' reads, since a write can change a try without moving its step", async () => {
   const subs: QueryKey[] = [
+    ['runs', 'a'],
     ['runs', 'a', 'steps', 'plan', 'tries', 's'],
     ['runs', 'a', 'steps', 'plan', 'told', 's'],
   ];
@@ -135,7 +158,7 @@ test("runsMoved with a run: a write that changes a try without moving its step r
   assert.deepEqual(
     seeded.filter((key) => client.getQueryState(key)?.isInvalidated),
     subs,
-    "its steps' tries and told at every stamp; never its lines, its decision or another run's",
+    "its record, exactly, and its steps' tries and told at every stamp; never its lines, its decision or another run's",
   );
   client.clear();
 });
@@ -164,5 +187,69 @@ test('the writes that change a run, in src: none invalidates the whole list by h
       assert.equal(byHand("queryClient.invalidateQueries({\n  queryKey:\n    ['runs'],\n});"), true);
       assert.equal(byHand("void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });"), false);
     },
+  );
+});
+
+test("the writes that change a run, in src: none refreshes a run's record by hand, without the list", async (t) => {
+  await t.test("every write that refreshes a run's record does it through runsMoved, in one call, whichever file it is in", () => {
+    assert.deepEqual(
+      recordByHandIn(SRC),
+      RECORD_ALONE,
+      "a write that changes a run calls runsMoved(queryClient, id), which reads the run's record and the list: never the record by hand",
+    );
+  });
+  await t.test("REFUSED: a planted write hook that refreshes a run's record alone is found, across a line break too", () => {
+    const planted = `export function useNudge(runId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => nudge(runId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['runs', runId],
+        exact: true,
+      });
+    },
+  });
+}`;
+    assert.equal(recordByHand(planted), 1);
+    assert.equal(recordByHand("void queryClient.invalidateQueries({ queryKey: ['runs', run.id], exact: true });"), 1);
+    assert.equal(recordByHand('void runsMoved(queryClient, runId);'), 0, 'the one call is not a hand-written refresh');
+    assert.equal(recordByHand("queryClient.invalidateQueries({ queryKey: ['runs'] });"), 0, "the whole list's key is byHand's to find");
+  });
+});
+
+test("useRound: a round asked for reads the run's record and the run list again, since the api changes what the list shows at once", async (t) => {
+  await import('./tsx.ts');
+  const { roundAsk } = await import('../src/components/gate/Ask.tsx');
+  const before = globalThis.fetch;
+  const sent: string[] = [];
+  globalThis.fetch = async (input) => {
+    sent.push(String(input));
+    return new Response(JSON.stringify({ step: 'review', round: 3, file: '/store/runs/r-1.asks/round-review-3' }), {
+      status: 202,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  const client = new QueryClient();
+  t.after(() => {
+    client.clear();
+    globalThis.fetch = before;
+  });
+  const moved: QueryKey[] = [['runs'], ['runs-open', 'harbour'], ['runs-finished', 'harbour', 'f.a'], ['runs', 'r-1']];
+  const kept: QueryKey[] = [
+    ['runs', 'r-1', 'decision', 's'],
+    ['runs', 'r-2'],
+  ];
+  for (const key of [...moved, ...kept]) client.setQueryData(key, {});
+  const ask = new MutationObserver(
+    client,
+    roundAsk(client, 'r-1', () => Promise.resolve('harbour')),
+  );
+  await ask.mutate({ step: 'review', budget: 3 });
+  assert.equal(sent.length, 1, 'the round was asked of the api');
+  assert.deepEqual(
+    [...moved, ...kept].filter((key) => client.getQueryState(key)?.isInvalidated),
+    moved,
+    "the list, the frame's answer, the finished pages and the run's record; never its decision or another run",
   );
 });

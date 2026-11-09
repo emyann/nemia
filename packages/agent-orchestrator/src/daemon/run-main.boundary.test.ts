@@ -13,7 +13,7 @@ import { Effect } from 'effect';
 import { Conflict } from '../refusal/refusal.ts';
 import { runMain } from './up.verb.ts';
 import { nodeChild } from '../../test/child.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
 const listening = () => SIGNALS.map((s) => process.listenerCount(s));

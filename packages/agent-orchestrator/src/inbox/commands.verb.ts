@@ -6,7 +6,7 @@
  */
 import path from 'node:path';
 import { Effect } from 'effect';
-import { rooted } from '../wiring/wire.verb.ts';
+import { rooted } from '../factory/wiring/wire.verb.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { defaultStartsAllowed } from '../factory/factory.store.ts';

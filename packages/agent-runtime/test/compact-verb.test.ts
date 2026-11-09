@@ -9,7 +9,7 @@ import { a2aOps } from '../src/a2a/index.ts';
 import { RunnerError, testOps, type RunnerOps, type SessionsCompacted } from '../src/harness/index.ts';
 import { compactVerbOf } from '../src/service/compact.ts';
 import { compactAsked, compactLines } from '../src/cli/compact.ts';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 
 const SAID: SessionsCompacted = {
   captures: 3,

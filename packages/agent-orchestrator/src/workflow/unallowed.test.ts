@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { unallowedRefusal } from './unallowed.ts';
 import { loadWorkflows } from '../workflows/workflows.store.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 /** An agent file's frontmatter keys, as its file writes them. */
 type Keys = Readonly<Record<string, string>>;

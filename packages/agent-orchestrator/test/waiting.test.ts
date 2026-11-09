@@ -19,7 +19,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import type { RepositoryRun, Run } from '../src/run.ts';
 import type { BranchReader } from '../src/branches/branches.store.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { staged, story, type Board } from './story.ts';
 import { names, namesFor } from './assessed.ts';
 

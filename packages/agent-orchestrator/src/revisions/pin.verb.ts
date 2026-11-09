@@ -29,7 +29,7 @@ import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { WorkflowDir } from '../folder/folder.model.ts';
 import { AgentName, SkillName } from '../agents/agents.model.ts';
 import type { Refusal } from '../refusal/refusal.ts';
-import { factoryFills, rulesVersion } from '../rules/rules.store.ts';
+import { factoryFills, rulesVersion } from '../factory/rules/rules.store.ts';
 import { DEFAULT_FACTORY, revisionsOf, type Factory } from '../factory/factory.ts';
 import { readFactory } from '../factory/factory.store.ts';
 import { runStore } from '../record/files.store.ts';

@@ -475,7 +475,7 @@ the group is empty (review, round 2). What that leaves (`bin/ae-worker.ts`, `tes
   renames its new copy into place, so a file removed in between is written again and the worker runs on as before. The
   window is a few microseconds on each write. Nothing in the runtime removes a run file; a person or a test does.
 - **The parent going is not a stop.** The worker is detached to outlive the engine that started it, and an engine restarted
-  adopts it by its run file. A test that starts a worker stops it itself: every test root comes from `test/scratch.ts`,
+  adopts it by its run file. A test that starts a worker stops it itself: every test root comes from `test-kit/scratch`,
   whose hooks stop what runs in a root and remove it, and `test/leaks.test.ts` runs a failing test file to prove that
   nothing is left.
 

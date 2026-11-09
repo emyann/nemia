@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import type { TaskView } from 'agent-runtime';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
 
 const ROOT = scratch('wf-subscribe-');

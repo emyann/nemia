@@ -16,13 +16,13 @@ import type { Command } from '../command/entry.verb.ts';
 import { Conflict, Invalid } from '../refusal/refusal.ts';
 import { refuseName } from '../factory/factory.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
-import { FactoryDoor } from '../factories/factories.store.ts';
-import { rooted } from '../wiring/wire.verb.ts';
+import { FactoryDoor } from '../factory/door/factories.store.ts';
+import { rooted } from '../factory/wiring/wire.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import type { Factory, FactoryTemplate } from '../factory/factory.ts';
-import { renderedAt } from '../applied/applied.verb.ts';
-import { treeDirAt } from '../applied/applied.store.ts';
-import { sourceGiven } from '../templates/templates.ts';
+import { renderedAt } from '../factory/applied/applied.verb.ts';
+import { treeDirAt } from '../factory/applied/applied.store.ts';
+import { sourceGiven } from '../template/door/templates.ts';
 import { adopted, adoptPlan, adoptRefusal, templatedAdoptRefusal, type AdoptPlan } from './adopt.ts';
 import { adoptionAt, planDigest, stageAdoption } from './adopt.store.ts';
 

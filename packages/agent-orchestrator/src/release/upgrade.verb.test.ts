@@ -12,11 +12,11 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import type { DaemonStanding } from '../daemon/daemon.ts';
 import type { Args } from '../command/command.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 import { testEngine } from 'agent-runtime/testing';
-import { story } from '../../test/checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 
 const ROOT = fs.realpathSync(scratch('wf-upgrade-'));
 process.env.WF_ROOT = ROOT;

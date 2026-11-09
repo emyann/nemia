@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { Effect } from 'effect';
 import type { DaemonStanding } from '../src/daemon/daemon.ts';
 import type { FeedLine } from '../src/feed/feed.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { staged, story, type Board } from './story.ts';
 import { nodeChild } from './child.ts';
 

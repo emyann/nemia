@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runOver } from './placed.ts';
 import type { ProposedObject } from 'objects';
@@ -33,7 +33,7 @@ const { confirmedFile, writeProposed } = await import('../src/auto/auto.store.ts
 const { POLICY_CONFIRM, policyListOf } = await import('../src/auto/auto.verb.ts');
 const { ruleWords } = await import('../src/auto/auto.ts');
 const { RunDoor } = await import('../src/runs/runs.store.ts');
-const { FactoryDoor } = await import('../src/factories/factories.store.ts');
+const { FactoryDoor } = await import('../src/factory/door/factories.store.ts');
 const { FactoryName } = await import('../src/factory/factory.model.ts');
 const { FACTORY_INSTRUCT } = await import('../src/factory/instruction.verb.ts');
 type Caller = import('../src/caller/caller.ts').ProposalCaller;

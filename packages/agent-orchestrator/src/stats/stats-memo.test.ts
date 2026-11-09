@@ -12,13 +12,13 @@
  * store loads, so it is set before the import.
  */
 import { test } from 'node:test';
-import { story } from '../../test/checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from '../../test/promised.ts';
 import { Engine } from 'agent-runtime';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { Effect } from 'effect';
 import { plainEngine } from '../../test/promised.ts';
 

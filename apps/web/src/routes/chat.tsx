@@ -5,7 +5,7 @@
  */
 import { createFileRoute } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { ChatPanel } from '@/components/chat/ChatPanel';
+import { ChatPanel } from '@/components/nemia/chat/ChatPanel';
 import { ScanLines } from '@/components/look';
 import { levelQuery, openRunsQuery } from '@/lib/api';
 import { presenceOf } from '@/lib/chatFollowing';

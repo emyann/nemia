@@ -5,7 +5,7 @@
   "paths": [
     "packages/agent-orchestrator/src/daemon",
     "packages/agent-orchestrator/src/pause",
-    "packages/agent-orchestrator/src/prune",
+    "packages/agent-orchestrator/src/forget/prune",
     "packages/agent-orchestrator/src/disk",
     "packages/agent-orchestrator/src/cap",
     "packages/agent-orchestrator/src/admission"

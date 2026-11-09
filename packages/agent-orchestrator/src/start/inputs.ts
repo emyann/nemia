@@ -10,7 +10,7 @@ import type { Workflow } from '../step/step.ts';
 import type { Mount, Run } from '../record/record.ts';
 import { stepMounts } from '../factory/factory.ts';
 import type { FiledFolders } from '../filed/filed.ts';
-import { volumeMounts } from '../volume/volume.ts';
+import { volumeMounts } from '../factory/volume/volume.ts';
 import type { Fenced } from '../workflow/index.ts';
 import { HANDED_CLOSEOUT, type HandedFiles } from '../artifacts/artifacts.ts';
 

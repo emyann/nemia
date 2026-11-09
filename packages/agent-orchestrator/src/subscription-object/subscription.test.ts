@@ -14,7 +14,7 @@ import { subscriptionDoorMemory } from '../subscription/memory.store.ts';
 import { SubscriptionName } from '../feed/feed.model.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { aDelivery, aSubscription } from '../../test/subscription-walks.ts';
 import type { KeptDelivery, Subscription as Asked } from '../subscription/subscription.ts';
 import { subscriptionList, subscriptionObject } from './subscription.verb.ts';

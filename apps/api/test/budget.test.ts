@@ -33,7 +33,7 @@ import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from './placed.ts';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import { listedOf, objectOf, stepOf } from './run-reads.ts';
 
 const stand = eachTest(testPlace);

@@ -61,7 +61,6 @@ type Allowance = { count: number; not: string };
  * each no test's wait; a file not here has none. A count only shrinks.
  */
 const DEADLINES: Readonly<Record<string, Allowance>> = {
-  'test/scratch.ts': { count: 1, not: "the reaper's bound on a test run's leftover processes, after its end" },
   'test/e2e/checks.ts': {
     count: 3,
     not: "the e2e's assertion timeouts, `expectDrawn`, `settled` and `expectNone`: run.ts's pages run under no test runner whose signal could end a wait",
@@ -107,7 +106,7 @@ const measured = () =>
 
 test("the board's tests and e2e pages hold no hand-written deadline but those `DEADLINES` allows, each no wait, and none allowed that is gone", () => {
   assert.ok(testFiles().includes('test/e2e/pages/130-say.ts'), "the e2e's pages are read");
-  assert.ok(testFiles().includes('test/scratch.ts'), "and the tests' helpers");
+  assert.ok(testFiles().includes('test/waits.ts'), "and the tests' helpers");
   assert.deepEqual(deadlineBreaks(measured(), DEADLINES), []);
 });
 

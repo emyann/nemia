@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { forgetLine, type Forgot } from '../forget/forget.ts';
-import type { Pruning } from '../prune/prune.ts';
+import type { Pruning } from '../forget/prune/prune.ts';
 import { commandLine, parseArgv } from './command.ts';
 import { PRUNE, RM } from './runs.verb.ts';
 

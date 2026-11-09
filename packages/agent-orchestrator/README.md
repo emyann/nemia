@@ -328,12 +328,12 @@ files. What has not moved onto it yet is counted in `test/run-door.baseline.ts`.
 
 ## The Factory door
 
-A factory is read and written through `FactoryDoor` (`src/factories/factories.store.ts`), on the same pattern: its file, and the level,
+A factory is read and written through `FactoryDoor` (`src/factory/door/factories.store.ts`), on the same pattern: its file, and the level,
 rules and servers the store keeps beside it, each method taking a `FactoryName`. Behind it are today's files under the store's root,
 unchanged on disk (a key the model does not name is kept), and a memory stand-in a test gives with `Effect.provide(program,
 factoryDoorMemory())`. A new factory under a name that is no slug, or under `default`, and a factory written that breaks the model's
 `Factory` — no repository, a hire or a schedule into a workflow it does not offer — are refused, and nothing is written. A person's
-attach, detach, hire, fire, schedule and unschedule are judged by one pure function (`wiringRefusal`, `src/wiring/wiring.ts`), whose
+attach, detach, hire, fire, schedule and unschedule are judged by one pure function (`wiringRefusal`, `src/factory/wiring/wiring.ts`), whose
 refusals `contracts/wiring.contract.ts` proves, then written back through the door, which decodes what it writes. Unlike the Run door, a program given no door reads the files at
 the store's root it was given (`StoreRoot`), and is refused where it was given none. What has not moved onto it yet is counted in
 `test/factory-door.baseline.ts`.
@@ -3859,7 +3859,7 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
 - **What the store takes on the disk is measured on a sweep of the daemon's, never in a pass** (`disk`, `diskOnce` in
   `src/disk/disk.verb.ts`): once the first pass has answered and every 10 minutes after (`DISK_EVERY`), it lists the store's root and
   walks every name under it, a burst of `WALK_BURST` names at a time, with `lstat` and `readdir` and no process (`walk` in
-  `src/prune/freed.store.ts`). Each name is in one part: `worktrees`, `runs`, `engine` (the folder handed to the runtime),
+  `src/forget/prune/freed.store.ts`). Each name is in one part: `worktrees`, `runs`, `engine` (the folder handed to the runtime),
   `checks`, `series` (`metrics/`) or `other`; a name under `runs/` or `worktrees/` is its run's, and through it its factory's, the
   default factory's for a run of none, and its part's alone for a folder of no run the last pass answered. The sweep asks the runtime,
   through the client, what it keeps by task (`kept`), and gives each task to the factory of the run that filed it (`runTasks`,
@@ -3986,7 +3986,7 @@ the engine forgets them; only a person removes the marker, with the `rm` the lin
 those tasks is wanted. A marker that does not read is said on every pass, the same way.
 A run held lifts its marker and forgets nothing: it is still there to be read.
 
-The marker's code is a feature folder of its own, `src/forgetting/`, beside `src/forget/`, which removes
+The marker's code is a feature folder of its own, `src/forget/forgetting/`, beside `src/forget/`, which removes
 the run: `forgetting.ts` (pure) shares the engine's answer out by run and words it; `forgetting.verb.ts`
 (a controller) asks the engine to forget and lifts the marker, for `wf rm` (`forgetTasks`) and the tick
 (`finishForgetting`). `wf prune` asks it dry through `runsForgetting`, in `src/forget/forget.verb.ts`
@@ -4080,7 +4080,7 @@ else it removes only with `--yes`. With no run named it reads every run in the s
 are summed up on one line, a run with nothing to prune is not said, and the rest are listed.
 
 **Many runs are judged side by side, and removed a few a turn.** The listing judges and sizes 4 runs at
-once (`PRUNE_A_TURN`, `judgingMany` in `src/prune/prune.verb.ts`) and prints them in the order named,
+once (`PRUNE_A_TURN`, `judgingMany` in `src/forget/prune/prune.verb.ts`) and prints them in the order named,
 whatever order they ended in. The removal goes in turns of 4 runs in that order, one turn after another
 (`freeingMany`): within a turn the runs of one repository go by one `remove` asked of the place
 (`freedByRepo`, which the daemon's sweep shares), repositories side by side, so a repository's own git
@@ -4101,7 +4101,7 @@ one process, not a lock: two processes can still cross inside it.
 **The daemon frees a finished run itself.** A run that is finished — every result branch on its base,
 landed by its ending or merged by hand, or cancelled with its tasks settled — has its worktrees removed
 with no person's act: beside its passes the daemon sweeps every 5 seconds (`free`, `freeOnce` in
-`src/prune/free.verb.ts`), and asks of each such run exactly what `wf prune <id> --yes` asks, with no flag.
+`src/forget/prune/free.verb.ts`), and asks of each such run exactly what `wf prune <id> --yes` asks, with no flag.
 So everything below holds for it: what is kept is kept, what is refused is refused, and the run is marked
 `(pruned)` the same way. It is at once, with no delay to set, and it reads the state, never the landing: a
 finished run whose `worktrees/<id>` is still on disk is freed on a later sweep whatever happened between, a
@@ -4273,7 +4273,7 @@ holding a concurrency slot forever.
 | `src/tick/assess.ts` | **`assess`** — pure: which steps are ready, due a check, another try or another round, blocked, done, off each step's standing (`stepStatus`, `status/status.ts`), and the run's one word (`status`): `failed` where a step broke, `awaiting approval` or `waiting` where only a person stops it (`stoppedOnWord`) |
 | `src/round/round.ts` | a loop's rounds — pure: those due (`roundsDue`) and the steps once one is filed (`roundFiled`), what `nemia retry --round` and `nemia approve` of a loop ask and refuse (`roundAsk`, `acceptAsk`), and what `wf ls` and `wf decide` say of a loop (`roundDueNote`, `roundLines`) |
 | `src/cancel/cancel.ts` | what cancelling a run has to do, and what to tell the person who asked (`cancelPlan`) — pure |
-| `src/forgetting/forgetting.ts` | what the engine forgot of a run's tasks, pure: each run's share of one answer (`forgettingOf`), whether nothing is left (`forgettingDone`), and its words (`engineWords`, `uncountedWords`) |
+| `src/forget/forgetting/forgetting.ts` | what the engine forgot of a run's tasks, pure: each run's share of one answer (`forgettingOf`), whether nothing is left (`forgettingDone`), and its words (`engineWords`, `uncountedWords`) |
 | `src/forget/forget.ts` | `wf rm` from the run's side — pure: **`forgetRefusal`**, whether a run may be forgotten, which worktrees, branches and check logs are its own (`runWorktrees`, `branchFates`, `checkLogsOf`), and the line that says what was done (`forgetLine`) |
 | `src/start/inputs.ts` | the files `wf start --input` gives a run — pure: why one is refused (`inputRefusal`), how a brief and `wf decide` name them (`inputsLine`, `inputsNote`), and where a run came from (`fromNote`) |
 | `src/decide/decide.ts` | what is left for a person to do about a run (`decision`), and the cost lines `wf decide` prints (`costLine`, `runCostLines`) — pure |
@@ -4287,7 +4287,7 @@ holding a concurrency slot forever.
 | `src/step-machine/step-machine.ts` | a step's lifecycle as a machine — pure: **`stepMove`**, whether two words read on two passes are a move it draws (`STEP_EDGES`), and its drawing (`stepMachineGraph`, `stepDiagram`); it decides nothing, held to `stepStatus` by its replay |
 | `src/wait/wait.ts` | what a run waits on before its steps are filed — pure: **`runReady`**, whether a run's roots may be filed yet (`--after`, `waitsOf`), the holds a person put on it (`holdsOf`), their words and advice, and what they refuse (`holdRefusal`, `afterRefusal`) |
 | `src/artifacts/artifacts.ts` | the files a step leaves — pure: what its brief says of them (`artifactsContract`), where one it names is found (`artifactPlace`), and the lines that list them (`artifactLines`); `artifacts/artifacts.store.ts` copies them |
-| `src/prune/prune.ts` | a finished run pruned — pure: what a prune kept (`prunedKept`), whether it may run again (`pruneAgain`), what it refuses (`pruneRefusal`), what a pruned or a held run refuses (`prunedRefusal`, `heldRefusal`), and what it frees (`pruneLines`) |
+| `src/forget/prune/prune.ts` | a finished run pruned — pure: what a prune kept (`prunedKept`), whether it may run again (`pruneAgain`), what it refuses (`pruneRefusal`), what a pruned or a held run refuses (`prunedRefusal`, `heldRefusal`), and what it frees (`pruneLines`) |
 | `src/ending/ending.ts` | a run's ending — pure: when its merge lands on its check (`landingDue`, `landingOpen`), what landed (`landedWords`), the checkout it holds (`checkoutLine`), the denies it is filed with (`filedDenies`), and what is left for a person to decide (`toDecide`, `gateRefusal`) |
 | `src/gate/gate.ts` | a gate from a person's side — pure: **`approvalRefusal`**, whether `wf approve` may approve a step at its gate, the words refused with an approval (`approvalWordsRefusal`), and whether a task held open waits for a person's word (`holdsOpen`) |
 | `src/branches/branches.ts` | a run's result branches — pure: the steps whose branch is its result (`resultSteps`), the checks its work was judged by (`workChecks`), the tips a pass records (`tipBranches`, `tipsSeen`), and what `wf decide` shows of a branch: the numstat grouped by blast radius (`radius`), the agent-facing, check-affecting and lesson lists, and the lesson line; `branches/branches.store.ts` reads git |
@@ -4326,7 +4326,7 @@ holding a concurrency slot forever.
 | `src/config/config.store.ts` | the `WF_` environment, each variable an Effect `Config` with its default, read by a plain reader that refuses a value the variable does not take by name, exit 2 (`wfRoot`, `maxConcurrent`, `maxRuns`, `verifiesRest`); at the bottom of the store's tree, and reads no disk |
 | `src/inbox/inbox.store.ts` | the inbox's cards read, filed, queued, dropped (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`) through `runStore.inbox`, and a path named as a card (`inboxNameAt`, which asks `runStore.inbox.nameAt`) |
 | `src/factory/factory.store.ts` | the factories on disk (`factoriesDir`): read, a file that does not decode listed with why (`readFactories`), one read for a start (`readFactory`), filed through a hidden file linked onto its name (`addFactory`), given workflows and relieved of them, hired into and fired from, the file rewritten whole (`attachWorkflow`, `detachWorkflow`, `hireAgent`, `fireAgent`), removed (`removeFactory`) |
-| `src/rules/rules.ts`, `rules.store.ts`, `rules.verb.ts` | a factory's rules — the file's name and where it is kept (`FACTORY_RULES_FILE`, `rulesFile`) and what it may not open with (`factoryRulesRefusal`), pure; read without throwing, written whole and removed (`readRules`, `writeRules`, `clearRules`), store; and `nemia factory rules` (`FACTORY_RULES`, `factoryRules`), controller |
+| `src/factory/rules/rules.ts`, `rules.store.ts`, `rules.verb.ts` | a factory's rules — the file's name and where it is kept (`FACTORY_RULES_FILE`, `rulesFile`) and what it may not open with (`factoryRulesRefusal`), pure; read without throwing, written whole and removed (`readRules`, `writeRules`, `clearRules`), store; and `nemia factory rules` (`FACTORY_RULES`, `factoryRules`), controller |
 | `src/runtime-client.ts` | the runtime client, the one file that imports agent-runtime: the engine (`engine`, over the runtime's `Engine` service as a layer; `engineOf` over any such layer, as `testEngine` of `agent-runtime/testing` gives one to a test), which files every task `queued` and is built with no ceiling, the harnesses it runs (`HARNESSES`), `nameFor`, the lifecycle as data the board draws (`lifecycleGraph`), and the runtime's types, passed through |
 | `src/views/views.verb.ts` | the programs `taskPhasesRead`, `checkReportsRead`, `refusalRead`, `parentRead`, `parentsRead` and `filingsRead`; what the engine's views of a run's tasks say: whether its closeout was asked and signed (`closeoutAsked`), its check's exit (`exitVerdicts`), what it consumed (`consumption`), its closeout (`closeoutOf`), a parent run (`parentRead`), and when each task was filed (`filingsRead`) — what a consumer that words a step as `wf ls` does uses off the views it already has, with no `logs` call |
 | `src/views/views-words.ts` | a step's phase off its view (`phaseOfView`), and the words `wf ls` and `wf decide` say of how its session ended (`endWords`, `wordOfView`) — pure |
@@ -4341,8 +4341,8 @@ holding a concurrency slot forever.
 | `src/meter/meter.verb.ts` | the engine metered, each verb counted in its phase (`meteredEngine`), and a pass's cost (`costOf`) |
 | `src/cancel/cancel.verb.ts`, `src/retry/retry.verb.ts`, `src/gate/gate.verb.ts`, `src/say/say.verb.ts`, `src/wait/wait.verb.ts`, `src/round/round.verb.ts` | what a person asks of a run: the programs `cancelRun`, `retryRun`, `approveRun`, `sayRun`, `roundRun`, `acceptRun`, `hold` and `unhold` |
 | `src/forget/forget.verb.ts` | a run forgotten (`wf rm`): the program `forgetRun`, and what it would forget of the engine's tasks of each run, counted dry for `wf prune` (`runsForgetting`) |
-| `src/forgetting/forgetting.verb.ts` | the engine's tasks of a removed run forgotten through the runtime's `forget`: by `wf rm` (`forgetTasks`), and by the tick for what had not settled (`finishForgetting`); asked dry by `runsForgetting` (`engineForgetting`) |
-| `src/prune/prune.verb.ts` | a finished run's worktrees pruned (`prune`, `wf prune`) |
+| `src/forget/forgetting/forgetting.verb.ts` | the engine's tasks of a removed run forgotten through the runtime's `forget`: by `wf rm` (`forgetTasks`), and by the tick for what had not settled (`finishForgetting`); asked dry by `runsForgetting` (`engineForgetting`) |
+| `src/forget/prune/prune.verb.ts` | a finished run's worktrees pruned (`prune`, `wf prune`) |
 | `src/list/list.verb.ts` | what a person reads of the runs: `wf ls` (`list`) |
 | `src/decide/decide.verb.ts` | what a person reads of a run: `wf decide` (`decideRun`) |
 | `src/runner.ts` | the package's root: each name it exports re-exported by name from the file that holds it, and nothing else |
@@ -4406,10 +4406,11 @@ re-exports; the tick (`tick/tick.verb.ts`, `tick/advance.verb.ts`) and the verbs
 the bins, `bin/nemia.ts` and its alias `bin/wf.ts` — a file of `src/cli/` reaches the package only through `runner.ts`, `workflow.ts` and
 its own folder, and each bin only through `cli/main.ts` and `cli/exit.ts`, which it imports first, so a refusal thrown as the package loads exits 2 too. **The client**, `runtime-client.ts`, alone imports agent-runtime, a type included: the runtime is reached
 through one client (`CLIENT` in the same test), which every controller beneath the CLI reaches, itself or through a
-controller it imports, and which imports no controller. `test/layout.test.ts` holds the folders: at most six source
-files in one, no folder named `utils` or the like, no two files that need each other's values, no source file that
-imports a test, and a folder's pure code imported from outside it through its face — its `index.ts`, or its one pure
-file. A test sits beside the file it tests (`src/<feature>/x.test.ts`), and `test/` keeps the tests of the top-level
+controller it imports, and which imports no controller. `test/layout.test.ts` holds the folders by the rule every
+package keeps (`docs/architecture.md`, *Folders, in every package*): a concept at most `src/<concept>/<part>/` deep with no
+count of its files, no folder named `utils` or the like, no two files that need each other's values, no source file that
+imports a test, and a part's pure code imported from outside its concept through the part's face — its `index.ts`, or its
+one pure file. A test sits beside the file it tests (`src/<feature>/x.test.ts`), and `test/` keeps the tests of the top-level
 files and those across folders. Outside the package, the apps reach it through `agent-orchestrator`,
 `agent-orchestrator/run` and `agent-orchestrator/workflow` alone (`test/contract.test.ts`), whose names
 `test/entries.test.ts` pins.

@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { SkillRefused } from '../components/AgentParts';
-import { SkillForm } from '../components/SkillForm';
+import { SkillRefused } from '../components/agent/AgentParts';
+import { SkillForm } from '../components/agent/SkillForm';
 import { createSkill, storeQuery, type SkillDraft } from '../lib/api';
 import { invalidateSkills } from '../lib/agentWrites';
 import { BackToAgents } from './agents_.new';

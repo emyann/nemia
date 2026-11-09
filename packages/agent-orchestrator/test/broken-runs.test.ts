@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { JournalError } from 'agent-runtime';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 
 const ROOT = scratch('wf-broken-runs-');

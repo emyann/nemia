@@ -18,7 +18,7 @@ import { BuiltinTemplates, testPlace } from 'agent-orchestrator/testing';
 import { TemplateRenders } from 'agent-orchestrator';
 import { Agent, AgentList, Skill, SkillList, Template, TemplateList, Workflow, WorkflowList } from 'objects';
 import { appOver, eachTest } from '../../test/placed.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });

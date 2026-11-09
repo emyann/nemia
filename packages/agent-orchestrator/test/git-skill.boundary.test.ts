@@ -15,7 +15,7 @@ import { SKILL_SECTIONS, unknownHoles } from '../src/place/place.ts';
 import { STOP_GRACE_MS } from '../src/place/place.store.ts';
 import { running } from './running.ts';
 import { steppingClock } from './clock.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 /** The git place the package ships. */
 const GIT_SKILL = path.join(import.meta.dirname, '..', 'place', 'git');

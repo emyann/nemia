@@ -27,7 +27,7 @@ import type { StoreRoot } from '../src/config/root.store.ts';
 import type { BranchReader } from '../src/branches/branches.store.ts';
 import type { RepositoryRun, Run, TaskPhase } from '../src/run.ts';
 import type { EnginePhase } from '../src/views/views-words.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { TEAM_DEV } from './team.ts';
 import { givenPlace } from './placed.ts';
 import { staged, type Board } from './story.ts';

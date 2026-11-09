@@ -21,7 +21,7 @@ import { testEngine } from 'agent-runtime/testing';
 import type { Engine } from '../src/runtime-client.ts';
 import type { Run } from '../src/run.ts';
 import { queueLine } from '../src/inbox/inbox.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { TEAM } from './team.ts';
 import { decideScreen } from './screens.ts';
 import { names } from './assessed.ts';

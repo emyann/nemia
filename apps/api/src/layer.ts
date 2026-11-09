@@ -28,8 +28,8 @@ import {
 } from 'agent-orchestrator';
 import { McpAsker } from './capabilities/capabilities.ts';
 import type { LastSaid } from './steps/logs.ts';
-import { placeFor } from './factories/place.ts';
-import { QuotaAsker } from './factory/quota.ts';
+import { placeFor } from './factory/place.ts';
+import { QuotaAsker } from './gauges/quota.ts';
 import { Followings } from './steps/following.ts';
 import { Engine, type RequestTrace, StoreRoot } from './store.ts';
 import type { StepRun } from './step/step.ts';
@@ -128,7 +128,7 @@ const underRequest = <A, E, R>(c: RequestContext<ApiEnv>, program: Effect.Effect
 
 /**
  * The services as a handler reads them, each under the name the helpers it calls take it by (`placeService` the place a package program
- * asks, given with `runPlaced`), and where the request is answered (`placeFor`, factories/place.ts): `repo`, the repository it is answered
+ * asks, given with `runPlaced`), and where the request is answered (`placeFor`, factory/place.ts): `repo`, the repository it is answered
  * on, and `factory`, the factory it names, none for the default.
  */
 export type Served = {

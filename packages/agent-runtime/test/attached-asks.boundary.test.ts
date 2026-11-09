@@ -27,13 +27,14 @@ import { Effect, Exit, Scope } from 'effect';
 import { attachedSessions } from '../src/harness/claude/attached.ts';
 import { Engine } from '../src/index.ts';
 import { builtEngine } from './engine.ts';
-import { alive, appendAsk, crashNote, filesOf, openAsks, processStart, readRun, writeRun } from '../src/harness/claude/attached-file.ts';
+import { appendAsk, crashNote, filesOf, openAsks, processStart, readRun, writeRun } from '../src/harness/claude/attached-file.ts';
+import { alive } from '../src/process/alive.ts';
 import { ASK_ANSWERED, ASK_CUT, askHookOutput, DENIED_HERE } from '../src/harness/claude/attached-session.ts';
 import { PERMISSION_ALWAYS, PERMISSION_DENY, PERMISSION_ONCE } from '../src/harness/claude/permission.ts';
 import type { AskQuestion, PermissionFacts } from '../src/core/index.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
-import { scratch } from './scratch.ts';
-import { story } from './checkpoints.ts';
+import { scratch } from 'test-kit/scratch';
+import { story } from 'test-kit/checkpoints';
 import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 
 const STAND_IN = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'stand-in-claude.ts');

@@ -1,7 +1,7 @@
 /**
  * The Workflow door: the one way a program reads and writes a workflow — its folder of markdown, its steps and its README — an Effect
  * service, `WorkflowDoor`, whose methods take a workflow's folder as `WorkflowDir` and answer an Effect failing with a refusal. Its pattern
- * is the Factory door's (`src/door/door.store.ts`, `src/factories/factories.store.ts`).
+ * is the Factory door's (`src/door/door.store.ts`, `src/factory/door/factories.store.ts`).
  *
  * Two layers: the files (`workflowFiles`, over `folder.store.ts`, `version.store.ts` and `write.store.ts` at a store's root, so a folder is
  * the very bytes today's writer writes), and the memory stand-in (`workflowDoorMemory`, `memory.store.ts`), which a test gives its
@@ -281,7 +281,7 @@ export function workflowFiles(home: string): WorkflowLayer {
 /**
  * The Workflow door, as the service a program yields: a reference whose default is rooted (`rootedDoor`) — the door over the files at
  * the store's root the program is given, refused `Invalid` where it was given none — so a handler that yields it is run through
- * `rooted(home, verb, program)` (`src/wiring/wire.verb.ts`), and a test gives `workflowDoorMemory()` with no root at all.
+ * `rooted(home, verb, program)` (`src/factory/wiring/wire.verb.ts`), and a test gives `workflowDoorMemory()` with no root at all.
  */
 export const WorkflowDoor = Context.Reference<WorkflowDoorShape>('agent-orchestrator/WorkflowDoor', {
   defaultValue: () => rootedDoor((root) => workflowDoorOver(workflowFiles(root)), 'Workflow door'),

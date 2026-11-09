@@ -18,15 +18,15 @@ The diagram below is printed by the code (`src/model/diagram.model.ts`, through 
 - **S4, the Task and its Journal**, the runtime's: its model is its own (`agent-runtime/src/core/model.ts`), and run-core keeps holding
   `TaskId` by key alone; S4 picks the pattern a task's id is checked by on create.
 - **S5, the definitions**, each read and written through a door on the Run door's pattern, its files today's. **S5a**, the Factory door
-  (`FactoryDoor`, `src/factories/factories.store.ts`): a factory, its level, rules and servers, rooted at the store's root a program is
+  (`FactoryDoor`, `src/factory/door/factories.store.ts`): a factory, its level, rules and servers, rooted at the store's root a program is
   given (`rootedDoor`), its wiring judged by `wiring.ts`, whose refusals `contracts/wiring.contract.ts` proves; the callers still on its stores are
   counted in `test/factory-door.baseline.ts`. **S5b**, the Workflow door (`WorkflowDoor`, `src/workflows/workflows.store.ts`): a workflow
   and its steps (`src/folder/folder.model.ts`), addressed by its folder, `WorkflowDir`, over `folder.store.ts` and `write.store.ts`,
   rooted as S5a's, a write judged against the version it was read at by `workflowVersionRefusal`, which
   `contracts/workflow-version.contract.ts` proves; a run names the folder it started on and the steps it froze (`Run.workflow`, read
   loosely); the callers still on the folder's stores are counted in `test/workflow-door.baseline.ts`. **S5d**, the Template door
-  (`TemplateDoor`, `src/templates/templates.store.ts`): a template's folder or archive read, written and packed, rooted as S5a's, each
-  tree written checked by `TemplateTreeWrite`; the model's `Template` (`src/templates/templates.model.ts`) is keyed by its source, and a
+  (`TemplateDoor`, `src/template/door/templates.store.ts`): a template's folder or archive read, written and packed, rooted as S5a's, each
+  tree written checked by `TemplateTreeWrite`; the model's `Template` (`src/template/door/templates.model.ts`) is keyed by its source, and a
   factory's `template` is an `AppliedTemplate`, whose source names it. **S5c**, the Agent and Skill doors (`AgentDoor`,
   `src/agents/agent-door.store.ts`; `SkillDoor`, `src/skills/skill-door.store.ts`): one context read through the same lookup roots, the
   model's `Skill` beside its `Agent`, whose `skills` are `SkillName`s (a skill as its door writes it: its `applies:` line and its

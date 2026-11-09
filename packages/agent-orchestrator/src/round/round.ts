@@ -20,7 +20,7 @@ import {
   type TaskPhase,
 } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
-import { runWords } from '../routed/index.ts';
+import { runWords } from '../route/routed/index.ts';
 import {
   acceptanceOf,
   askedAgain,
@@ -44,7 +44,7 @@ import {
 } from '../status/status.ts';
 import { loopSpan } from '../workflow/index.ts';
 import type { EarlierTry, TryCause } from '../retry/index.ts';
-import { heldRefusal, prunedRefusal } from '../prune/prune.ts';
+import { heldRefusal, prunedRefusal } from '../forget/prune/prune.ts';
 import { holdWord } from '../wait/wait.ts';
 import type { Decision, Offer } from '../decide/decide.ts';
 import { mergeDue, mergeDueNote, mergeNote, mergeSpent, mergeWaits } from '../merge/merge.ts';

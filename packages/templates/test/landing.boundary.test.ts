@@ -26,7 +26,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadWorkflows } from 'agent-orchestrator';
 import { LANDING_CHECK_DEADLINE_SECONDS, checkArgv } from 'agent-orchestrator/run';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { copyOf, rendered } from './template.ts';
 import { type Called, type Gh, type Rule, bareOrigin, ghStub, gitIn } from './origin.ts';
 

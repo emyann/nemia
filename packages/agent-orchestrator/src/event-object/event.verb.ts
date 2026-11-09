@@ -9,7 +9,7 @@
 import { Effect } from 'effect';
 import { API_VERSION, type Event, type EventList } from 'objects';
 import { FeedDoor } from '../feed/feed.store.ts';
-import type { ObjectQuery } from '../factory-object/factory.verb.ts';
+import type { ObjectQuery } from '../object/listed.verb.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { parseSelectors, selectorsRefusal, selects } from '../watch/selector.ts';
 import type { FeedLine } from '../feed/index.ts';

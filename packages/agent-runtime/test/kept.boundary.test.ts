@@ -13,8 +13,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import type { Event, RunnerOps } from '../src/index.ts';
-import { scratch } from './scratch.ts';
-import { story } from './checkpoints.ts';
+import { scratch } from 'test-kit/scratch';
+import { story } from 'test-kit/checkpoints';
 import { TaskId } from '../src/core/model.ts';
 
 const config = scratch('ae-kept-config-');

@@ -20,7 +20,7 @@ import path from 'node:path';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { Effect, Exit, Scope } from 'effect';
 import type { RunnerOps } from '../src/harness/seam.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { bell, until, WAITED } from '../src/waits/index.ts';
 
 const VIEWER = path.join(import.meta.dirname, 'fixtures', 'viewer-engine.ts');

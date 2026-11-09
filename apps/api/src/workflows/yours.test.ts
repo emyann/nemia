@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { Layer } from 'effect';
 import { COMMANDS, commandLine } from 'agent-orchestrator';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { app, appOf, liveOf } from '../app.ts';
 import { StoreRoot } from '../store.ts';
 import type { YourStore } from './yours.ts';

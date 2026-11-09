@@ -13,7 +13,7 @@ import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import type { Place } from '../src/place/place.store.ts';
 import type { PlaceRequests, PlaceVerb } from '../src/place/place.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { names } from './assessed.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
 
@@ -24,7 +24,7 @@ delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 const { advanceRun, prune, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
-const { freeingMany, judgingMany } = await import('../src/prune/prune.verb.ts');
+const { freeingMany, judgingMany } = await import('../src/forget/prune/prune.verb.ts');
 const { PlaceService } = await import('../src/place/place.store.ts');
 const { builtinGitPlace } = await import('../src/place/builtin.store.ts');
 const { engineOf } = await import('../src/runtime-client.ts');

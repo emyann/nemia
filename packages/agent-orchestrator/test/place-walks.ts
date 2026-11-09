@@ -13,7 +13,7 @@ import path from 'node:path';
 import type { World } from '../place/memory/index.ts';
 import type { Place } from '../src/place/place.store.ts';
 import type { PlaceOutcome, PlaceRequests, PlaceVerb } from '../src/place/place.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 /** One side of the contract: a place, and the handle on the repositories it answers of. */
 export type Side = { readonly place: Place; readonly world: World };

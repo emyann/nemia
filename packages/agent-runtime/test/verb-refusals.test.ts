@@ -18,10 +18,10 @@ import {
   type TickReport,
 } from '../src/index.ts';
 import { VERBS as LIFECYCLE_VERBS } from '../src/core/lifecycle.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { asyncOps, asyncStore, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 
 /** A store in memory, which both engines are handed. */
 const memoryJournal = (): AsyncJournal => {

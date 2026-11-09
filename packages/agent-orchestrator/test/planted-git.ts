@@ -6,7 +6,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 /**
  * The planted git: `env`, the environment given with the planted git first on its `PATH`, and `said()`, each call's arguments so far, one

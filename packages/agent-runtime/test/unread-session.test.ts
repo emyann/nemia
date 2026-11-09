@@ -19,11 +19,11 @@ import { codex } from '../src/harness/codex/codex.ts';
 import { CODEX_START, codexOutput } from '../src/harness/codex/stream.ts';
 import type { Sighting } from '../src/core/domain.ts';
 import { Engine, type TaskView } from '../src/index.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { warned } from './warned.ts';
 import { builtEngine } from './engine.ts';
 import { until, WAITED, type Waiter } from '../src/waits/index.ts';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import { printed as printedLines, ran, runFile, runFileOr, sh, THREAD, threadStarted } from './start-runs.ts';
 
 const CODEX_USED = { input_tokens: 1200, cached_input_tokens: 1000, cache_write_input_tokens: 0, output_tokens: 80 };

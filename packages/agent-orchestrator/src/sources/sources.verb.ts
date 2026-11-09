@@ -5,7 +5,7 @@
 import { Effect } from 'effect';
 import type { Command } from '../command/entry.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import { rooted } from '../wiring/wire.verb.ts';
+import { rooted } from '../factory/wiring/wire.verb.ts';
 import { agentSources } from './sources.store.ts';
 import { sourcesLines, type AgentSource } from './sources.ts';
 

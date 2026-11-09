@@ -32,7 +32,7 @@
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 /** Where the fake `claude` is, first on PATH. */
 export const bin = scratch('nemia-api-harness-');

@@ -15,6 +15,7 @@ import { BridgeFactsSchema } from './attached-bridge.ts';
 import { CarriedSchema } from '../detached/run-file.ts';
 import type { SpawnRequest } from '../seam.ts';
 import { IMAGE } from '../image.ts';
+import { alive } from '../../process/alive.ts';
 
 /**
  * What a holder writes of a session: `working` while a holder runs it, `idle` once a long-lived session's turn ended and it waits with
@@ -281,16 +282,6 @@ export const everyRun = (root: string): Map<string, AttachedRun> => {
 
 /** The spawn as a run file keeps it: everything but the brief, which a resume does not say again. */
 export const keptRequest = ({ brief: _, ...kept }: SpawnRequest): Record<string, unknown> => kept;
-
-/** Whether the process `pid` is there: signal 0 reaches it, or it is another user's. */
-export const alive = (pid: number): boolean => {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    return (err as NodeJS.ErrnoException).code === 'EPERM';
-  }
-};
 
 /** This process, as a run file names its holder: its pid, when it started, and the code it runs (`IMAGE`). */
 export const thisHolder = (): { owner: number; ownerStart?: string; image: string } => {

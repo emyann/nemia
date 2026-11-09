@@ -25,7 +25,7 @@ import {
 } from './domain.ts';
 import type { Outcome, SessionState } from './session.ts';
 import type { HarnessArgs } from '../harness/args.ts';
-import { story } from '../../test/checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import { Result, Schema } from 'effect';
 import { StoredEventSchema } from './event-schema.ts';
 

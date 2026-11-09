@@ -507,7 +507,7 @@ export async function openDebug(page: Page, taskId: string): Promise<{ panel: Lo
 
 /**
  * How old the clock the board drew an instant with can be when the assertion reads its words: `Instant` reads its clock every
- * 60 s (`useNow`, src/components/Instant.tsx), and a render and this read follow it. A midnight or a new year inside that window
+ * 60 s (`useNow`, src/components/time/Instant.tsx), and a render and this read follow it. A midnight or a new year inside that window
  * gives the page's words and the assertion's two forms, and both are the board's.
  */
 export const DREW_WITHIN_MS = 90_000;

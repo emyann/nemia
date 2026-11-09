@@ -12,7 +12,7 @@ import { Engine, nameFor, testOps, type RunnerOps, type Sighting } from '../src/
 import { noTranscript } from '../src/harness/transcript.ts';
 import { builtEngine } from './engine.ts';
 import { APART, apartOn, UNKEPT, unwalked, walksOn, type End, type Moved, type Side } from './engine-walks.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 /** A stream's text as a harness keeps it: whole, or its last `lastBytes` bytes, and `undefined` for none. */
 const tailOf = (text: string | undefined, lastBytes?: number): string | undefined =>

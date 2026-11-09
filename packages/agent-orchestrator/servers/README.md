@@ -1,7 +1,7 @@
 # Nemia's builtin MCP servers
 
 One `<name>.json` per server, each the facts a factory would record of it, so a person adds it to a factory of theirs without typing
-an address or a client id. The package holds this folder and names it `BUILTIN_SERVERS` (`src/servers/servers.store.ts`), beside
+an address or a client id. The package holds this folder and names it `BUILTIN_SERVERS` (`src/factory/servers/servers.store.ts`), beside
 `BUILTIN_SKILLS`, the package's `skills/` (`src/skills/read.store.ts`), whose skills every step that names one finds last; the api
 offers what this folder holds on a factory's settings page.
 
@@ -29,5 +29,5 @@ The file's name is the server's name, by the same rule a `.mcp.json` keys one â€
 `name|sha256({type,url,headers})[:16]`: changing any of them asks for a new sign-in, and `oauth`, which sits outside that hash, does
 not. A client **secret** is no part of a file here: the board's read answers every key of a file, and the harness reads a secret from
 its own store alone. A builtin server's secret is built into Nemia, as `gh` publishes its own, in
-`src/servers/clients.ts`, keyed by client id: a sign-in from the board to a server whose `oauth.clientId`
+`src/factory/servers/clients.ts`, keyed by client id: a sign-in from the board to a server whose `oauth.clientId`
 is one of those hands the runtime that secret, which stores it in Claude Code's store, and a person never types one.

@@ -10,7 +10,7 @@ import { attachedOptions } from './claude/attached-options.ts';
 import { claudeRefuses } from './claude/vocabulary.ts';
 import { admitCall, type AdmissionRun } from './claude/admission.ts';
 import type { SpawnRequest } from './seam.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { builtEngine } from '../../test/engine.ts';
 
 /** The tag a refusal is failed with, or the class of an error that has none. */

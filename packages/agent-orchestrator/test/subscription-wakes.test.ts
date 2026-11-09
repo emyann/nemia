@@ -33,7 +33,7 @@ import type { FeedLine, FeedWords } from '../src/feed/feed.ts';
 import type { FeedDoorShape } from '../src/feed/feed.store.ts';
 import type { SubscriptionDoorShape } from '../src/subscription/subscription.store.ts';
 import type { KeptDelivery, Subscription } from '../src/subscription/subscription.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
 

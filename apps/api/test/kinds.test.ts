@@ -17,6 +17,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { specifiersIn, withoutComments } from 'test-kit/imports';
 
 const API = path.join(import.meta.dirname, '..');
 
@@ -56,7 +57,7 @@ const MOVES: Readonly<Record<string, Entry>> = {
     move: "reading a harness's settings and servers off the machine",
     to: 'packages/agent-runtime, answered per harness through the orchestrator',
   },
-  'src/factory/quota.ts': {
+  'src/gauges/quota.ts': {
     reaches: ['global:process.env'],
     move: "the quota asker's default environment, read off the process",
     to: 'the environment `served` gives each handler (src/layer.ts), passed to the asker by its route',
@@ -70,22 +71,8 @@ const MOVES: Readonly<Record<string, Entry>> = {
   'src/workflows/workflows.ts': { reaches: ['node:fs'], ...FOLDER_STORE },
 };
 
-/** Source text with each comment line blanked: a line that opens with `//`, `/*` or `*`. */
-const withoutComments = (text: string): string =>
-  text
-    .split('\n')
-    .map((line) => (/^\s*(\/\/|\/\*|\*)/.test(line) ? '' : line))
-    .join('\n');
-
-/** Every module a piece of source names outside its comment lines: imports and re-exports, type-only included, and `import()`. */
-function importsIn(text: string): string[] {
-  const code = withoutComments(text);
-  const found = new Set<string>();
-  for (const m of code.matchAll(/^\s*(?:import|export)\b[^'"`;]*?\bfrom\s*['"]([^'"]+)['"]/gm)) found.add(m[1]);
-  for (const m of code.matchAll(/^\s*import\s*['"]([^'"]+)['"]/gm)) found.add(m[1]);
-  for (const m of code.matchAll(/\bimport\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/g)) found.add(m[1]);
-  return [...found];
-}
+/** Every module a piece of source names outside its comment lines: imports and re-exports, type-only included, and a whole `import()`. */
+const importsIn = (text: string): string[] => specifiersIn(withoutComments(text), { calls: ['import'], closed: true });
 
 /** The impure globals a piece of source reads outside its comment lines. */
 function globalsIn(text: string): string[] {

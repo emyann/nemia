@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import type { CoverageRecord } from '../../coverage/coverage.ts';
 
 const RECORD = path.join(import.meta.dirname, '..', '..', 'coverage', 'record.ts');

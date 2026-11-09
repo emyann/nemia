@@ -28,7 +28,7 @@ import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
-import { story } from '../../test/checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);

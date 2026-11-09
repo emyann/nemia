@@ -14,15 +14,15 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { scratch } from 'test-kit/scratch';
 import { ambient } from './ambient.ts';
 
 const CLI = path.join(import.meta.dirname, '..');
 const NEMIA = path.join(CLI, 'bin', 'nemia.ts');
 const API = path.join(CLI, '..', 'api');
 
-const SCRATCH = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-cli-watch-'));
+const SCRATCH = scratch('nemia-cli-watch-');
 process.env.WF_ROOT = path.join(SCRATCH, 'unused');
-test.after(() => fs.rmSync(SCRATCH, { recursive: true, force: true }));
 
 const { emitFeed, freshFeedMemo, StoreRoot } = await import('agent-orchestrator');
 const { Effect, Layer, Logger } = await import('effect');

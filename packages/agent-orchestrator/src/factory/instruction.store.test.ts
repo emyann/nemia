@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
@@ -34,7 +34,7 @@ const {
 const stand = eachTest(testPlace);
 const runWith = runOver(runEngine, () => stand().layer);
 const { readInstructionAt, writeInstructionText } = await import('./instruction.store.ts');
-const { clearRules, readRules, writeRules } = await import('../rules/rules.store.ts');
+const { clearRules, readRules, writeRules } = await import('./rules/rules.store.ts');
 const { main: cli } = await import('../cli/main.ts');
 /** `nemia`, as a person types it, its commands given this test's place. */
 const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place);

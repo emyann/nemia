@@ -9,7 +9,7 @@ import path from 'node:path';
 import { after, test } from 'node:test';
 import { fed } from './e2e/board.ts';
 import { REPO, setStore } from './e2e/world.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 type Line = { at: string; run: string; step?: string; word: string; note?: string };
 

@@ -58,7 +58,7 @@ log, evaluation and experiment, and every commit's metadata. Audited on 2026-09-
   reports, `plan-hold-the-bar.md`, the Jev experiments' scripts and datasets, one judge test). Harmless, but a username. With the
   Jev experiments out of the tree (below), 16 were left, the cost scripts' transcript globs and one test among them. **Generalised at
   HEAD on 2026-09-29** (`~/…`, `<repo>/…`, `<user>`); the history is not rewritten, and
-  `packages/agent-orchestrator/test/local-paths.test.ts` refuses a new one.
+  `tools/guards/test/local-paths.test.ts` refuses a new one.
 - **Recorded agent output.** The Jev experiments under `docs/pivot-2026-09-18/experiments/` keep real closeouts, needs and
   judgements from this repository's runs (`e5-closeouts.json`, `judge-runs-2026-09-19.json`, the design dataset, 0.6 MB). They
   describe this repository only. **Decided 2026-09-25: moved out of the tree** — `jev/`, `jev-design/` and `jev-split/` are kept

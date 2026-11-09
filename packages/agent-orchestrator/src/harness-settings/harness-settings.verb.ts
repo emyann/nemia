@@ -6,8 +6,8 @@
 import { Effect } from 'effect';
 import type { Args, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { FactoryDoor } from '../factories/factories.store.ts';
-import { rooted } from '../wiring/wire.verb.ts';
+import { FactoryDoor } from '../factory/door/factories.store.ts';
+import { rooted } from '../factory/wiring/wire.verb.ts';
 import { tried } from '../runtime-client.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { FactoryName } from '../factory/factory.model.ts';

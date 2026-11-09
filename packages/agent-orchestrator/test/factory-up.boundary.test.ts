@@ -9,7 +9,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { nodeChild } from './child.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { teamCopy } from './team.ts';
 import { WAITED } from 'agent-runtime/testing';
 

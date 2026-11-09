@@ -20,7 +20,7 @@ import { parseWorkflow } from '../workflow/index.ts';
 import { parseFolder } from '../folder/folder.ts';
 import { parseAgent, type Agents } from '../agents/agents.ts';
 import { envNameOf, readRemoteAgents } from './a2a.store.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';

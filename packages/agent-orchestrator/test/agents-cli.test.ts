@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { names } from './assessed.ts';
 import { story } from './story.ts';
 import { testEngine } from 'agent-runtime/testing';

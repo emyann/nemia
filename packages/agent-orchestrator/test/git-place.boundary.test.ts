@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import { gitPlace } from '../place/git/place.ts';
 import { GIT_ENV, gitWorld } from './git-world.ts';
 import { walksOn } from './place-walks.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 for (const [name, walk] of walksOn(() => ({ place: gitPlace({ env: GIT_ENV }), world: gitWorld }))) test(name, walk);
 

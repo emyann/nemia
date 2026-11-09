@@ -5,7 +5,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 /** The team's folder, laid out as a `workflows/` is: `agents/`, `skills/` and `dev/`. */
 export const TEAM = path.join(import.meta.dirname, 'fixtures', 'team');

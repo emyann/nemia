@@ -15,7 +15,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BRIEF_KEYS, main, parseBrief, type BriefKey } from '../src/cli/main.ts';
 import { HARNESS_ARGS } from '../src/index.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const brief = (front: string, body = 'do the thing') => `---\n${front}\n---\n${body}`;
 const parse = (text: string) => parseBrief(text, '/fallback');

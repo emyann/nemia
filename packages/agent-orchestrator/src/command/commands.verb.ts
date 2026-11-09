@@ -25,7 +25,7 @@ import { stepsOf } from '../steps/steps.verb.ts';
 import { messageRefusal, modeWord, type RetryHow } from '../retry/index.ts';
 import { retryRun } from '../retry/retry.verb.ts';
 import { rootGiven, StoreRoot } from '../config/root.store.ts';
-import { rooted } from '../wiring/wire.verb.ts';
+import { rooted } from '../factory/wiring/wire.verb.ts';
 import { roundRun } from '../round/round.verb.ts';
 import { saidLines } from '../say/say.ts';
 import { sayRun } from '../say/say.verb.ts';

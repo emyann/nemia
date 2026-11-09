@@ -54,7 +54,7 @@ import ts from 'typescript';
 import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { readSkillRules, RULES_FILE } from '../src/skills/read.store.ts';
 import { appliesMatch, appliesOf } from '../src/skills/skills.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { levelFile, promptFile, readNemia, storeDenies, toldFile } from '../src/nemia/level.store.ts';
 import { admissionOf, agentClassOf, nemiaFence, widened } from '../src/admission/index.ts';
 import { TABLE } from '../src/command/commands.verb.ts';

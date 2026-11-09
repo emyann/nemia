@@ -20,6 +20,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { withoutComments, specifiersIn } from 'test-kit/imports';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 const PKG = path.join(import.meta.dirname, '..');
@@ -32,22 +33,6 @@ const GUARDED = {
 } as const;
 
 const SOURCE = /\.(ts|tsx|mts|cts|js|mjs|cjs)$/;
-
-/** A line of prose — a `//` line, or a line of a block comment — read as nothing, with the line kept so numbers still count. */
-const withoutComments = (text: string): string =>
-  text
-    .split('\n')
-    .map((line) => (/^\s*(\/\/|\/\*|\*)/.test(line) ? '' : line))
-    .join('\n');
-
-/** Every module a piece of source names: imports and re-exports, type-only included, `import()`, `require()` and the two resolvers. */
-function specifiersIn(text: string): string[] {
-  const found = new Set<string>();
-  for (const m of text.matchAll(/^\s*(?:import|export)\b[^'"`;]*?\bfrom\s*['"]([^'"]+)['"]/gm)) found.add(m[1]);
-  for (const m of text.matchAll(/^\s*import\s*['"]([^'"]+)['"]/gm)) found.add(m[1]);
-  for (const m of text.matchAll(/\b(?:import|require|import\.meta\.resolve|require\.resolve)\s*\(\s*['"`]([^'"`]+)['"`]/g)) found.add(m[1]);
-  return [...found].sort();
-}
 
 type Guarded = { name: string; dir: string; entries: readonly string[] };
 

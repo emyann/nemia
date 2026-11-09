@@ -1,5 +1,5 @@
 /**
- * When a factory's condition last moved (agent-orchestrator, src/applied/condition-time.ts): the `lastTransitionTime` the
+ * When a factory's condition last moved (agent-orchestrator, src/factory/applied/condition-time.ts): the `lastTransitionTime` the
  * controller writes on each condition of a templated factory's `status.json`, as Kubernetes' SetStatusCondition keeps it. `before`
  * is the condition of the same `type` the file held, null where it held none; its time null on a file written before the field. A reason
  * or a message that changes moves no time: only the status does.
@@ -32,5 +32,5 @@ const transitionedAtSpec = spec<(before: HeldCondition | null, status: Condition
   },
 });
 
-/** `transitionedAt`'s type, which `src/applied/condition-time.ts` takes. */
+/** `transitionedAt`'s type, which `src/factory/applied/condition-time.ts` takes. */
 export type TransitionedAt = Implementation<typeof transitionedAtSpec>;

@@ -1,6 +1,7 @@
 /**
  * The api's layout, held by path (`docs/architecture.md`): the root of `src` holds the process, the mount, the guard, the store and the
- * body reader; every other file sits in a feature folder of at most six source files, which has a face (`index.ts`) when it has two or
+ * body reader; every other file sits in a concept's folder (`docs/architecture.md`, *Folders, in every package*, judged by
+ * `test-kit/layout`: at most `src/<concept>/<part>/` deep, no count of its files), which has a face (`index.ts`) when it has two files or
  * more and none when it has one; `app.ts` mounts a folder through its face; a face holds nothing but re-exports by name. No two source
  * files need each other's values, no source file imports a test, no file or folder is named `utils`, `helpers`, `common`, `shared` or
  * `misc`, and every api path `.oxlintrc.json` names is a file that is there.
@@ -13,41 +14,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
+import { importsIn, resolved, withoutComments, type Import } from 'test-kit/imports';
+import { cycles, depthBreaks, namelessBreaks, starExports, testImports, valueGraph } from 'test-kit/layout';
 
 const API = path.join(import.meta.dirname, '..');
 const ROOT = path.join(API, '..', '..');
-
-/** A line of prose read as nothing, as the runtime's `layout.test.ts` reads one, the line kept so numbers still count. */
-const withoutComments = (text: string): string =>
-  text
-    .split('\n')
-    .map((line) => (/^\s*(\/\/|\/\*|\*)/.test(line) ? '' : line))
-    .join('\n');
-
-type Import = { spec: string; typeOnly: boolean };
-
-/** Every module a piece of source names, and whether the import is erased: `import type`, `export type`, or braces of `type` names only. */
-function importsIn(text: string): Import[] {
-  const code = withoutComments(text);
-  const out: Import[] = [];
-  for (const m of code.matchAll(/^\s*(?:import|export)\s+(type\s+)?([^'"`;]*?)\s*\bfrom\s*['"]([^'"]+)['"]/gm)) {
-    const braces = /^\{([\s\S]*)\}$/.exec(m[2].trim());
-    const members = braces
-      ? braces[1]
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean)
-      : [];
-    out.push({ spec: m[3], typeOnly: Boolean(m[1]) || (members.length > 0 && members.every((s) => /^type\s/.test(s))) });
-  }
-  for (const m of code.matchAll(/^\s*import\s*['"]([^'"]+)['"]/gm)) out.push({ spec: m[1], typeOnly: false });
-  for (const m of code.matchAll(/\bimport\s*\(\s*['"`]([^'"`]+)['"`]/g)) out.push({ spec: m[1], typeOnly: false });
-  return out;
-}
-
-/** The package path a relative specifier in `file` names, or undefined for a package or a builtin. */
-const resolved = (file: string, spec: string): string | undefined =>
-  spec.startsWith('.') ? path.posix.normalize(path.posix.join(path.posix.dirname(file), spec)) : undefined;
 
 const isTest = (file: string) => file.endsWith('.test.ts') || file.startsWith('test/');
 
@@ -59,66 +30,6 @@ const sourceFiles = (): string[] =>
     .filter((f) => f.endsWith('.ts') && !isTest(f));
 
 const read = (file: string) => fs.readFileSync(path.join(API, file), 'utf8');
-
-/** Every set of two files or more that need each other's values, by Tarjan's strongly connected components. */
-function cycles(graph: Map<string, string[]>): string[][] {
-  const index = new Map<string, number>();
-  const low = new Map<string, number>();
-  const stack: string[] = [];
-  const onStack = new Set<string>();
-  const found: string[][] = [];
-  const visit = (node: string) => {
-    index.set(node, index.size);
-    low.set(node, index.get(node)!);
-    stack.push(node);
-    onStack.add(node);
-    for (const next of graph.get(node) ?? []) {
-      if (!index.has(next)) {
-        visit(next);
-        low.set(node, Math.min(low.get(node)!, low.get(next)!));
-      } else if (onStack.has(next)) {
-        low.set(node, Math.min(low.get(node)!, index.get(next)!));
-      }
-    }
-    if (low.get(node) === index.get(node)) {
-      const component: string[] = [];
-      let member: string;
-      do {
-        member = stack.pop()!;
-        onStack.delete(member);
-        component.push(member);
-      } while (member !== node);
-      if (component.length > 1) found.push(component.sort());
-    }
-  };
-  for (const node of [...graph.keys()].sort()) if (!index.has(node)) visit(node);
-  return found.sort((a, b) => a[0].localeCompare(b[0]));
-}
-
-/** The value imports among `files`: a type-only import is erased, so it may cycle. */
-const valueGraph = (files: Map<string, string>): Map<string, string[]> =>
-  new Map(
-    [...files].map(([file, text]) => [
-      file,
-      importsIn(text).flatMap(({ spec, typeOnly }) => {
-        const target = resolved(file, spec);
-        return !typeOnly && target !== undefined && files.has(target) ? [target] : [];
-      }),
-    ]),
-  );
-
-/** Where a source file imports a test: a test is imported by nothing but the runner. */
-const testImports = (file: string, imports: Import[]): string[] =>
-  imports
-    .map(({ spec }) => resolved(file, spec))
-    .filter((target): target is string => target !== undefined && isTest(target))
-    .map((target) => `${file} imports ${target}: nothing but node --test loads a test — move what both need into the source`);
-
-/** Where a face re-exports a whole module: a face names what it re-exports, so a name is added on purpose. */
-const starExports = (file: string, text: string): string[] =>
-  [...withoutComments(text).matchAll(/^\s*export\s*\*[^'"`;]*from\s*['"]([^'"]+)['"]/gm)].map(
-    (m) => `${file} re-exports all of ${m[1]}: re-export by name`,
-  );
 
 /** Every path under `apps/api/` an override of the lint config names by file, a glob left out, from the config's text. */
 function apiPathsIn(config: string): string[] {
@@ -161,10 +72,10 @@ test('no two source files need each other’s values', () => {
 
 test('REFUSED: a source file that imports a test; a face that re-exports a whole module', () => {
   assert.deepEqual(testImports('src/runs.ts', importsIn("import { scratch } from '../test/scratch.ts';")), [
-    'src/runs.ts imports test/scratch.ts: nothing but node --test loads a test — move what both need into the source',
+    'src/runs.ts imports test/scratch.ts: nothing but a test imports a test — move what both need into the source',
   ]);
   assert.deepEqual(testImports('src/runs/runs.ts', importsIn("const { aRun } = await import('./runs.test.ts');")), [
-    'src/runs/runs.ts imports src/runs/runs.test.ts: nothing but node --test loads a test — move what both need into the source',
+    'src/runs/runs.ts imports src/runs/runs.test.ts: nothing but a test imports a test — move what both need into the source',
   ]);
   assert.deepEqual(starExports('src/runs/index.ts', "export { runs } from './runs.ts';\nexport * from './graph.ts';"), [
     'src/runs/index.ts re-exports all of ./graph.ts: re-export by name',
@@ -202,14 +113,11 @@ test('every api path .oxlintrc.json names is there', () => {
 /** What the root of `src` holds: the process, the mount, the port, the guard every route passes, the shared store, the body reader. */
 const ROOT_FILES = ['src/app.ts', 'src/body.ts', 'src/guard.ts', 'src/layer.ts', 'src/main.ts', 'src/port.ts', 'src/store.ts'];
 
-/** The most source files a feature folder holds, its face included: a folder that needs another holds two features. */
-const FOLDER_MAX = 6;
-
 /** The folder of `src` a file sits in, or undefined for a file at the root. */
 const folderOf = (file: string): string | undefined => /^src\/([^/]+)\//.exec(file)?.[1];
 
 /**
- * Where the tree breaks the layout: a stray file at the root, a folder too big, a folder with a face it needs not or without one it needs.
+ * Where the tree breaks the layout: a stray file at the root, a folder with a face it needs not or without one it needs.
  */
 function layoutBreaches(files: string[]): string[] {
   const out = files
@@ -222,28 +130,11 @@ function layoutBreaches(files: string[]): string[] {
   }
   for (const [folder, inside] of [...byFolder].sort(([a], [b]) => a.localeCompare(b))) {
     const face = inside.includes(`src/${folder}/index.ts`);
-    if (inside.length > FOLDER_MAX) {
-      out.push(`src/${folder}/ holds ${inside.length} source files, more than ${FOLDER_MAX}: it holds two features — split it`);
-    }
     if (!face && inside.length > 1) out.push(`src/${folder}/ has ${inside.length} source files and no index.ts: give it a face`);
     if (face && inside.length < 3) out.push(`src/${folder}/index.ts re-exports one file: import that file, and remove the face`);
   }
   return out;
 }
-
-/** The names of a module about nothing in particular: a split follows the feature, and what a feature shares lives in its own file. */
-const GENERIC = ['utils', 'helpers', 'common', 'shared', 'misc'];
-
-/** Where a folder or a file of `src` is named for no feature: its whole name, the `.ts` aside, is one of `GENERIC`. */
-const genericNames = (files: string[]): string[] =>
-  files.flatMap((f) =>
-    f
-      .replace(/\.ts$/, '')
-      .split('/')
-      .slice(1)
-      .filter((part) => GENERIC.includes(part))
-      .map((part) => `${f} is named \`${part}\`, which says no feature: name it for what it does, beside the code that uses it`),
-  );
 
 /** Where `app.ts` mounts a folder past its face: a folder with an `index.ts` is reached through it. */
 const pastFaces = (file: string, imports: Import[], files: string[]): string[] =>
@@ -262,25 +153,21 @@ const faceBody = (file: string, text: string): string[] =>
     .filter((s) => s !== '' && !/^export\s+(type\s+)?\{[^}]*\}\s*from\s*['"][^'"]+['"]$/.test(s))
     .map((s) => `${file} holds \`${s.split('\n')[0]}\`: a face holds only re-exports by name`);
 
-test('REFUSED: a stray file at the root, a seventh source file in a folder, a folder of two without a face, a face over one file', () => {
+test('REFUSED: a stray file at the root, a folder of two without a face, a face over one file; a folder of forty is let through', () => {
   const tree = [...ROOT_FILES, 'src/runs/index.ts', 'src/runs/runs.ts', 'src/runs/graph.ts', 'src/asks/asks.ts'];
   assert.deepEqual(layoutBreaches(tree), []);
   assert.deepEqual(layoutBreaches([...tree, 'src/tries.ts']), [
     `src/tries.ts sits at the root of src, which holds ${ROOT_FILES.join(', ')}: move it into its feature's folder`,
   ]);
-  const seven = ['a', 'b', 'c', 'd', 'e'].map((f) => `src/runs/${f}.ts`);
-  assert.deepEqual(layoutBreaches([...tree, ...seven]), ['src/runs/ holds 8 source files, more than 6: it holds two features — split it']);
-  assert.deepEqual(layoutBreaches([...tree, ...seven.slice(0, 3)]), []);
-  assert.deepEqual(layoutBreaches([...tree, ...seven.slice(0, 4)]), [
-    'src/runs/ holds 7 source files, more than 6: it holds two features — split it',
-  ]);
+  const forty = Array.from({ length: 40 }, (_, i) => `src/runs/f${i}.ts`);
+  assert.deepEqual(layoutBreaches([...tree, ...forty]), []);
   assert.deepEqual(layoutBreaches([...tree, 'src/asks/said.ts']), ['src/asks/ has 2 source files and no index.ts: give it a face']);
   assert.deepEqual(layoutBreaches([...tree, 'src/asks/index.ts']), [
     'src/asks/index.ts re-exports one file: import that file, and remove the face',
   ]);
 });
 
-test('the root of src holds its six files, and each folder is a feature of at most six source files with a face where it has two', () => {
+test('the root of src holds its files, and each folder has a face where it has two', () => {
   const files = sourceFiles();
   assert.ok(files.includes('src/runs/runs.ts') && files.includes('src/app.ts'), 'the scan reads the folders');
   assert.deepEqual(layoutBreaches(files), []);
@@ -326,17 +213,15 @@ test('every face holds only re-exports by name', () => {
   );
 });
 
-test('REFUSED: a file or a folder named utils, helpers, common, shared or misc; a name that only holds one is let through', () => {
-  assert.deepEqual(genericNames(['src/runs/utils.ts', 'src/helpers.ts', 'src/shared/runs.ts']), [
-    'src/runs/utils.ts is named `utils`, which says no feature: name it for what it does, beside the code that uses it',
-    'src/helpers.ts is named `helpers`, which says no feature: name it for what it does, beside the code that uses it',
-    'src/shared/runs.ts is named `shared`, which says no feature: name it for what it does, beside the code that uses it',
-  ]);
-  assert.deepEqual(genericNames(['src/runs/utility-words.ts', 'src/steps/logs.ts', 'src/common-runs/misc-free.ts', 'src/utils.tsx']), []);
+test('REFUSED: a file or a folder named utils, helpers, common, shared or misc, or a third folder under src', () => {
+  assert.equal(namelessBreaks(['src/runs/utils.ts', 'src/helpers.ts', 'src/shared/runs.ts'], 'src').length, 3);
+  assert.deepEqual(namelessBreaks(['src/runs/utility-words.ts', 'src/steps/logs.ts', 'src/common-runs/misc-free.ts'], 'src'), []);
+  assert.equal(depthBreaks(['src/factory/parts/x/y.ts'], 'src').length, 1);
+  assert.deepEqual(depthBreaks(['src/factory/parts/hires.ts'], 'src'), []);
 });
 
-test('no file or folder of src is named for no feature', () => {
+test('no file or folder of src is named for no concept, and none sits deeper than src/<concept>/<part>/', () => {
   const files = sourceFiles();
   assert.ok(files.length >= 30, 'the scan reads the folders');
-  assert.deepEqual(genericNames(files), []);
+  assert.deepEqual([...namelessBreaks(files, 'src'), ...depthBreaks(files, 'src')], []);
 });

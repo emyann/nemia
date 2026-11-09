@@ -321,14 +321,14 @@ const unwritten = (look: string): string[] => {
 const HUE = /\b(?:sky|blue|orange|amber|yellow|emerald|green|red|violet)-\d{2,3}\b/;
 
 const STATE_DRAWERS = [
-  'StepNode.tsx',
-  'StepRail.tsx',
-  'RunNode.tsx',
-  'CanvasLegend.tsx',
-  'MachineNode.tsx',
-  'MachineEdge.tsx',
-  'FactoryCanvas.tsx',
-  'QueueLane.tsx',
+  'step/StepNode.tsx',
+  'step/StepRail.tsx',
+  'run/RunNode.tsx',
+  'step/CanvasLegend.tsx',
+  'step/MachineNode.tsx',
+  'step/MachineEdge.tsx',
+  'factory/FactoryCanvas.tsx',
+  'inbox/QueueLane.tsx',
   'look/RunSteps.tsx',
 ];
 

@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Exit } from 'effect';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { CHAT_ALLOW, CHAT_DISALLOW, CHAT_SPEAKERS } from './speakers.verb.ts';
 import { speakersFile } from './chat.store.ts';
 

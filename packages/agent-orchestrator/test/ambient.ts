@@ -38,7 +38,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 /** The value both ceilings start with in a test: not a count, so `maxRuns` and `maxConcurrent` refuse it with exit 2. */
 export const SENTINEL = 'set-it-in-the-test';

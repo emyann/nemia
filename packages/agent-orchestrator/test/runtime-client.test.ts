@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { Effect, Layer } from 'effect';
 import { Engine, EngineRefused, StopRefused } from 'agent-runtime';
 import { testEngine } from 'agent-runtime/testing';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 process.env.WF_ROOT = scratch('wf-runtime-client-');
 const { asked, engineOf, runWith } = await import('../src/runtime-client.ts');

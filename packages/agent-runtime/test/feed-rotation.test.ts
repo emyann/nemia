@@ -16,8 +16,8 @@ import { FEED_LOCK_WAIT_MS, HEADER_BYTES, rotateFeed } from '../src/core/engine/
 import { instantNow } from '../src/core/engine/now.ts';
 import { elapsedMs } from '../src/core/clock.ts';
 import { ioCounts } from '../src/core/engine/tally.ts';
-import { scratch } from './scratch.ts';
-import { story } from './checkpoints.ts';
+import { scratch } from 'test-kit/scratch';
+import { story } from 'test-kit/checkpoints';
 import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 
 const PACKAGE = path.join(import.meta.dirname, '..');

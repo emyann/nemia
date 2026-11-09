@@ -6,8 +6,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { debtBreaks as heldTo, seamUses as usesOf, sourcesUnder } from 'test-kit/debt';
 import { Effect } from 'effect';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { act, done, doorFrom, walksOn } from '../../test/door-walks.ts';
 import { AGENT_WALKS, anAgent, yoursAt } from '../../test/agent-walks.ts';
 import { AgentDoor, agentDoorFiles } from './agent-door.store.ts';
@@ -106,15 +107,7 @@ const OWN = [
 const PKG = path.join(import.meta.dirname, '..', '..');
 
 /** Every file of `src` but the tests and the stores, by its path from the package. */
-function sourcesOfSrc(): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const entry of fs.readdirSync(path.join(PKG, 'src'), { recursive: true, withFileTypes: true })) {
-    if (!entry.isFile() || !entry.name.endsWith('.ts') || entry.name.endsWith('.test.ts')) continue;
-    const file = path.relative(PKG, path.join(entry.parentPath, entry.name)).split(path.sep).join('/');
-    if (!OWN.includes(file)) out[file] = fs.readFileSync(path.join(PKG, file), 'utf8');
-  }
-  return out;
-}
+const sourcesOfSrc = (): Record<string, string> => sourcesUnder(PKG, 'src', OWN);
 
 /**
  * A call of a `SEAM` name, not a method of the same name (`x.loadAgents(`). `src`'s count passes over a spread call too
@@ -125,31 +118,13 @@ const SPREAD_TOO = `(?<![\\w$]|[^.]\\.)(?:${SEAM.join('|')})\\s*\\(`;
 
 /** Why the uses of `sources` break the baseline `debt`: a file it does not name, a count grown, a count fallen. */
 function debtBreaks(sources: Record<string, string>, debt: Readonly<Record<string, number>>, calls = SEAM_CALL): string[] {
-  const call = new RegExp(calls, 'g');
-  const uses = new Map<string, number>();
-  for (const [file, text] of Object.entries(sources)) {
-    const code = text
-      .split('\n')
-      .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))
-      .join('\n');
-    const n = [...code.matchAll(call)].length;
-    if (n) uses.set(file, n);
-  }
-  const out: string[] = [];
-  for (const [file, n] of uses) {
-    const owed = debt[file] ?? 0;
-    if (n > owed)
-      out.push(
-        `${file} calls the agent and skill stores ${n} time(s) where test/agent-door.baseline.ts names ${owed}: yield AgentDoor or SkillDoor instead`,
-      );
-    if (n < owed)
-      out.push(
-        `${file} calls the agent and skill stores ${n} time(s): lower its count in test/agent-door.baseline.ts to ${n}, which only shrinks`,
-      );
-  }
-  for (const file of Object.keys(debt))
-    if (!uses.has(file)) out.push(`${file} calls the agent and skill stores no more: take its line out of test/agent-door.baseline.ts`);
-  return out;
+  return heldTo(usesOf(sources, new RegExp(calls, 'g')), debt).map(({ file, uses: n, owed, kind }) =>
+    kind === 'grown'
+      ? `${file} calls the agent and skill stores ${n} time(s) where test/agent-door.baseline.ts names ${owed}: yield AgentDoor or SkillDoor instead`
+      : kind === 'fallen'
+        ? `${file} calls the agent and skill stores ${n} time(s): lower its count in test/agent-door.baseline.ts to ${n}, which only shrinks`
+        : `${file} calls the agent and skill stores no more: take its line out of test/agent-door.baseline.ts`,
+  );
 }
 
 test('no file of src calls the agent and skill stores but as test/agent-door.baseline.ts counts it, and the count only shrinks', async () => {
@@ -169,15 +144,7 @@ test('REFUSED: a converted file that calls a store again, and a count the baseli
 const API = path.join(PKG, '..', '..', 'apps', 'api');
 
 /** Every file of the api's `src` but its tests, by its path from the api. */
-function sourcesOfApi(): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const entry of fs.readdirSync(path.join(API, 'src'), { recursive: true, withFileTypes: true })) {
-    if (!entry.isFile() || !entry.name.endsWith('.ts') || entry.name.endsWith('.test.ts')) continue;
-    const file = path.relative(API, path.join(entry.parentPath, entry.name)).split(path.sep).join('/');
-    out[file] = fs.readFileSync(path.join(API, file), 'utf8');
-  }
-  return out;
-}
+const sourcesOfApi = (): Record<string, string> => sourcesUnder(API, 'src');
 
 test("no file of the api's src calls the agent and skill stores: its handlers read them through AgentDoor and SkillDoor, its debt none", () => {
   assert.deepEqual(debtBreaks(sourcesOfApi(), {}, SPREAD_TOO), []);

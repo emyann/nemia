@@ -48,7 +48,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { CLAUDE_PERMISSION_MODES, CODEX_SANDBOXES } from 'agent-runtime';
 import { workflowsIn } from '../src/folder/folder.store.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { FORMER_TEAM, TEAM_NAMES, TEAM_PATHS } from './team-names.baseline.ts';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
@@ -195,10 +195,10 @@ const FENCE_WORDS: Baseline = {
   'apps/api/src/workflows/builder.ts': { count: 2, ...MOVES.fenceForm },
   'apps/api/src/workflows/words.ts': { count: 5, ...MOVES.fenceForm },
   'apps/api/src/workflows/workflows.ts': { count: 13, ...MOVES.fenceForm },
-  'apps/web/src/components/AgentForm.tsx': { count: 5, ...MOVES.fenceForm },
-  'apps/web/src/components/Facts.tsx': { count: 1, ...MOVES.fenceForm },
-  'apps/web/src/components/StepForm.tsx': { count: 1, ...MOVES.fenceForm },
-  'apps/web/src/components/StepNode.tsx': { count: 2, ...MOVES.fenceForm },
+  'apps/web/src/components/agent/AgentForm.tsx': { count: 5, ...MOVES.fenceForm },
+  'apps/web/src/components/step/Facts.tsx': { count: 1, ...MOVES.fenceForm },
+  'apps/web/src/components/step/StepForm.tsx': { count: 1, ...MOVES.fenceForm },
+  'apps/web/src/components/step/StepNode.tsx': { count: 2, ...MOVES.fenceForm },
   'apps/web/src/lib/agents.ts': { count: 11, ...MOVES.fenceForm },
   'apps/web/src/lib/api/agents.ts': { count: 6, ...MOVES.fenceForm },
   'apps/web/src/lib/api/capabilities.ts': { count: 7, ...MOVES.fenceForm },
@@ -208,7 +208,7 @@ const FENCE_WORDS: Baseline = {
   'apps/web/src/lib/words.ts': { count: 2, ...MOVES.fenceForm },
   'apps/web/src/routes/capabilities.tsx': { count: 3, ...MOVES.fenceForm },
   'packages/agent-orchestrator/src/agents/agents.ts': { count: 8, ...MOVES.fenceFields },
-  'packages/agent-orchestrator/src/applied/render.ts': { count: 1, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/factory/applied/render.ts': { count: 1, ...MOVES.fenceFields },
   'packages/agent-orchestrator/src/brief/brief.ts': { count: 3, ...MOVES.fenceFields },
   'packages/agent-orchestrator/src/cli/flags.ts': { count: 3, ...MOVES.fenceFields },
   'packages/agent-orchestrator/src/ending/ending.ts': { count: 6, ...MOVES.fenceFields },
@@ -228,7 +228,7 @@ const FENCE_WORDS: Baseline = {
   'packages/agent-orchestrator/src/retry/retry-refusal.ts': { count: 3, ...MOVES.fenceFields },
   'packages/agent-orchestrator/src/retry/retry.ts': { count: 10, ...MOVES.fenceFields },
   'packages/agent-orchestrator/src/roster/roster.ts': { count: 1, ...MOVES.fenceFields },
-  'packages/agent-orchestrator/src/servers/servers.ts': { count: 2, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/factory/servers/servers.ts': { count: 2, ...MOVES.fenceFields },
   'packages/agent-orchestrator/src/skills/read.store.ts': { count: 1, ...MOVES.fenceFields },
   'packages/agent-orchestrator/src/skills/skills.ts': { count: 1, ...MOVES.fenceFields },
   'packages/agent-orchestrator/src/start/start.verb.ts': { count: 3, ...MOVES.fenceFields },
@@ -255,19 +255,19 @@ const HARNESS_WORDS: Baseline = {
   'apps/api/src/app.ts': { count: 3, ...MOVES.quota },
   'apps/api/src/capabilities/capabilities.ts': { count: 27, ...MOVES.reach },
   'apps/api/src/capabilities/reach.ts': { count: 44, ...MOVES.reach },
-  'apps/api/src/factory/quota.ts': { count: 36, ...MOVES.quota },
+  'apps/api/src/gauges/quota.ts': { count: 36, ...MOVES.quota },
   'apps/api/src/stats/stats.ts': { count: 1, card: 'u42s' },
   'apps/api/src/workflows/builder.ts': { count: 2, ...MOVES.defaults },
   'apps/api/src/workflows/workflows.ts': { count: 8, ...MOVES.api },
-  'apps/web/src/components/AgentCard.tsx': { count: 1, ...MOVES.prompt },
-  'apps/web/src/components/AgentForm.tsx': { count: 7, ...MOVES.web },
-  'apps/web/src/components/Decide.tsx': { count: 1, ...MOVES.checkout },
-  'apps/web/src/components/Facts.tsx': { count: 17, card: 'u42s' },
-  'apps/web/src/components/Needs.tsx': { count: 1, ...MOVES.wait },
-  'apps/web/src/components/QuotaLine.tsx': { count: 1, ...MOVES.quota },
-  'apps/web/src/components/Reach.tsx': { count: 10, ...MOVES.reach },
-  'apps/web/src/components/SkillPicker.tsx': { count: 2, ...MOVES.checkout },
-  'apps/web/src/components/StepForm.tsx': { count: 2, ...MOVES.web },
+  'apps/web/src/components/agent/AgentCard.tsx': { count: 1, ...MOVES.prompt },
+  'apps/web/src/components/agent/AgentForm.tsx': { count: 7, ...MOVES.web },
+  'apps/web/src/components/gate/Decide.tsx': { count: 1, ...MOVES.checkout },
+  'apps/web/src/components/step/Facts.tsx': { count: 17, card: 'u42s' },
+  'apps/web/src/components/gate/Needs.tsx': { count: 1, ...MOVES.wait },
+  'apps/web/src/components/frame/QuotaLine.tsx': { count: 1, ...MOVES.quota },
+  'apps/web/src/components/step/Reach.tsx': { count: 10, ...MOVES.reach },
+  'apps/web/src/components/agent/SkillPicker.tsx': { count: 2, ...MOVES.checkout },
+  'apps/web/src/components/step/StepForm.tsx': { count: 2, ...MOVES.web },
   'apps/web/src/lib/agents.ts': { count: 7, ...MOVES.web },
   'apps/web/src/lib/api/agents.ts': { count: 2, ...MOVES.web },
   'apps/web/src/lib/api/capabilities.ts': { count: 13, ...MOVES.reach },
@@ -768,9 +768,9 @@ test('REFUSED: a count above or below the baseline, an entry gone or clean, one 
 test("the team's rules read every package's and app's source and tests, but this guard's own two files and the board's vendored ones", () => {
   const read = [...repository().team.keys()];
   for (const file of [
-    'packages/agent-orchestrator/test/scratch.ts',
+    'packages/agent-orchestrator/test/ambient.ts',
     'packages/agent-orchestrator/src/factory/factory.test.ts',
-    'packages/agent-runtime/test/scratch.ts',
+    'packages/agent-runtime/test/clock.ts',
     'apps/api/test/harness.ts',
     'apps/web/test/gate.test.ts',
     'apps/web/src/lib/gate.ts',

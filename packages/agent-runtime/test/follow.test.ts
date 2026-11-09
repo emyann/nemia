@@ -12,9 +12,9 @@ import { claudeJob } from '../src/harness/claude/code.ts';
 import type { RunnerError } from '../src/harness/error.ts';
 import { claudeTranscriptEvents } from '../src/harness/claude/transcript.ts';
 import type { Followed } from '../src/harness/seam.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { bell, until, WAITED } from '../src/waits/index.ts';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 
 const line = (o: object) => `${JSON.stringify(o)}\n`;
 const event = (e: object) => line({ type: 'stream_event', event: e, session_id: 'sid-1' });

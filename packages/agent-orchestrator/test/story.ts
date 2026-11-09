@@ -8,8 +8,7 @@
  *       await s.test('the tick holds the gated step', async () => { … });
  *     });
  *
- * The checkpoints themselves, skipped after one fails, are `story` of `checkpoints.ts`, re-exported here; that file imports nothing,
- * so the api and the web keep copies of it.
+ * The checkpoints themselves, skipped after one fails, are `story` of `test-kit/checkpoints`, re-exported here.
  *
  * The stage is what a story's checkpoints share, made new for each top-level test (`eachTest`): the test place, the engine's stand-in
  * and the controllers' engine over it, `runWith`/`runPlaced`/`main` given that place, and a steered clock made on first ask. It
@@ -27,7 +26,7 @@ import { eachTest, runGiven, runOver } from './placed.ts';
 import { steeredClock, type Steered } from './steered.ts';
 import type { EnginePhase } from '../src/views/views-words.ts';
 
-export { story, type Story, type Teller } from './checkpoints.ts';
+export { story, type Story, type Teller } from 'test-kit/checkpoints';
 
 /** The runner's `runWith`, as a test hands it on. */
 type RunWith = <A, E>(e: Engine, program: Effect.Effect<A, E, EngineService>) => Promise<A>;

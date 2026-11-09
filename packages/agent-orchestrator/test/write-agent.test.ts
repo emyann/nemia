@@ -15,7 +15,7 @@ import { Effect } from 'effect';
 import { parseAgent, renderAgent, type Agent, type AgentDraft } from '../src/workflow.ts';
 import { agentUsers } from '../src/folder/folder.store.ts';
 import { agentVersion, loadAgents } from '../src/agents/read.store.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { TEAM } from './team.ts';
 import { names } from './assessed.ts';
 import { staged, story } from './story.ts';

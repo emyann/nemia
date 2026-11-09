@@ -26,8 +26,8 @@ import test, { type TestContext } from 'node:test';
 import { Effect, Exit, Logger, Scope } from 'effect';
 import { attachedSessions, letGoOf, type Attached } from '../src/harness/claude/attached.ts';
 import { IMAGE } from '../src/harness/image.ts';
+import { alive } from '../src/process/alive.ts';
 import {
-  alive,
   attachedDir,
   attachedStateOf,
   crashNote,
@@ -49,8 +49,8 @@ import type { Live } from '../src/harness/claude/attached-session.ts';
 import { claudeCodeOps } from '../src/harness/claude/code.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
 import { Engine } from '../src/index.ts';
-import { scratch } from './scratch.ts';
-import { story } from './checkpoints.ts';
+import { scratch } from 'test-kit/scratch';
+import { story } from 'test-kit/checkpoints';
 import { sdkArgGiven, sdkArgValue } from './sdk-argv.ts';
 import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 import { holder, inCall, kept, lines, NAME, place, run, STAND_IN } from './attached-held.ts';

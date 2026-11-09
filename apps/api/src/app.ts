@@ -19,7 +19,7 @@ import { agents } from './agents/index.ts';
 import { customInstructions } from './custom/custom.ts';
 import { commands } from './commands/index.ts';
 import { capabilitiesWithSteps, McpAsker } from './capabilities/index.ts';
-import { ceilingsOf, metricsOf, passesOf, seriesOf, pauseNowOf, pauseOf, feed, QuotaAsker, readDaemon } from './factory/index.ts';
+import { ceilingsOf, metricsOf, passesOf, seriesOf, pauseNowOf, pauseOf, feed, QuotaAsker, readDaemon } from './gauges/index.ts';
 import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Services } from './layer.ts';
 import { nemia, nemiaChat } from './nemia/index.ts';
 import { objectsRoutes } from './objects/index.ts';
@@ -112,10 +112,11 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  * - `GET /api/health` — `{ ok: true }` while the api answers.
  * - `GET /api/version` — `{ version, release }`, the orchestrator's package version (`VERSION`) and the code the api runs (`RELEASE`), a
  *   checkout or an install: what the board's bottom bar says.
- * - objects/factories.ts, mcp-servers.ts, schedules.ts, hires.ts, volumes.ts — the factories as objects, and their servers, schedules,
- *   hires and volumes in each factory's namespace, served through `objects`' Api (objects/serve.ts). Every route is answered in the
- *   factory and on the repository its query names (`?factory=`, `?repo=`), resolved before its handler runs, and refused when it names a
- *   repository no factory has (`placeFor`, factories/place.ts); a request naming neither is answered on the api's own.
+ * - factory/factories.ts, and factory/parts/: mcp-servers.ts, schedules.ts, hires.ts, volumes.ts — the factories as objects, and their
+ *   servers, schedules, hires and volumes in each factory's namespace, served through `objects`' Api (objects/serve.ts, through
+ *   factory/index.ts). Every route is answered in the factory and on the repository its query names (`?factory=`, `?repo=`), resolved
+ *   before its handler runs, and refused when it names a repository no factory has (`placeFor`, factory/place.ts); a request naming
+ *   neither is answered on the api's own.
  * - `GET /api/capabilities` — what the repository offers a step, read from the checkout on each request (capabilities/capabilities.ts), and
  *   what each step of each workflow gets of it (capabilities/reach.ts). Each MCP server the settings enable is started and asked for its
  *   tools once while the app runs (`McpAsker`); one that fails is an `error` on its entry, never a failed request.
@@ -146,7 +147,7 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  *   off the store's `metrics/` minute lines for `?range=24h` (the default) and its hour lines for `7d`, `30d` and `all`, which the ticking
  *   process keeps; a past day off the app's memo while its file has not moved. 422 for a range it does not take.
  * - `GET /api/metrics` — the process's metrics, each `{ name, type, description, attributes }` and its value (`MetricRead`,
- *   factory/ceilings.ts), in the registry of the app's runtime: the files the runtime read for each request, its journals and every
+ *   gauges/ceilings.ts), in the registry of the app's runtime: the files the runtime read for each request, its journals and every
  *   other, by its route's pattern (`api.poll.reads`, about, since a pass or another request reading at the same time is counted too),
  *   and the pass's (`pass.duration`, `pass.phase.duration`, `pass.journal_reads`, `store.runs`, `sessions.queued`, `sessions.admitted`)
  *   only where this process ticks: an api started with `--no-tick`, or beside a `nemia up`, has none of them.
@@ -163,7 +164,7 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  *   500 for a daemon.json that is there and cannot be read — a directory in its place, a permission: the package throws rather than call
  *   it free.
  * - `GET /api/quota` — the subscription's quota, as the engine's `quota` answers it for the `claude` harness (Claude Code's get_usage
- *   request), asked at most once a keep however many boards read (`QuotaAsker`, factory/quota.ts): what the Factory says over its floor.
+ *   request), asked at most once a keep however many boards read (`QuotaAsker`, gauges/quota.ts): what the Factory says over its floor.
  *   Every case is a 200 with a sentence, the harness's failures and the engine's refusals included.
  * - commands/routes.ts — the pipeline every command of the package's table is served through: the run's named actions, a try (with answers
  *   to its questions, commands/extend.ts and asks/answers.ts), a round, words for a running session, an approval and an acceptance, served
@@ -171,7 +172,7 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  *   `nemia pause` and `nemia resume`'s routes; an agent's custom instructions
  *   written and cleared; and a factory's instruction put where it is kept, and written and cleared.
  * - steps/steps.ts — a step's own reads: its output, its files, and its conversation, once or followed.
- * - factory/feed.ts — the workflow feed followed, as server-sent events.
+ * - gauges/feed.ts — the workflow feed followed, as server-sent events.
  * - nemia/nemia.ts — Nemia, the store's own agent: where she is (`nemia level`'s read), and the facts she keeps (`nemia memory`). Her
  *   level is set on the route the table generates from `nemia level`.
  * - nemia/chat.ts — Nemia's chat: her history paged and followed, the person's words sent, and their read mark moved.

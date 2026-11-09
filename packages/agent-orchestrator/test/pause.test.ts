@@ -27,7 +27,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import type { Run } from '../src/run.ts';
 import type { RunTasks } from '../src/pause/pause.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { TEAM } from './team.ts';
 import { staged, story, type Board } from './story.ts';
 import { names } from './assessed.ts';

@@ -18,7 +18,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Stream } from 'effect';
 import { bell, until } from 'agent-runtime/testing';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
 import type { EnginePhase } from '../src/views/views-words.ts';

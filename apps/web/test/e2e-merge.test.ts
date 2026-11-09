@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { NAMES, namesIn, PAGES_DIR, pageFiles } from './e2e/pages.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const REPO = path.resolve(import.meta.dirname, '..', '..', '..');
 

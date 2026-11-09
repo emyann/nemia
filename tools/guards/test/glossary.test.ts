@@ -24,8 +24,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { RETIRED_COUNTS } from './glossary.baseline.ts';
-import { files, REPO } from './repo-files.ts';
-import { scratch } from './scratch.ts';
+import { files, REPO } from 'test-kit/repo';
+import { scratch } from 'test-kit/scratch';
 
 type Retired = { spelling: string; card: string };
 type Term = { term: string; meaning: string; type?: string; see?: { label: string; href: string }; retired?: Retired[] };

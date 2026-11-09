@@ -18,6 +18,7 @@ import { firstRefusal } from '../record/record.store.ts';
 import { POLICY_FOLDER } from '../auto/index.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { LEVELS, nemiaPrompt, type LevelFile, type ToldCustom } from './nemia.ts';
+import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /** The store she is kept in, read once as the package loads, as `subscription.store.ts` reads its `ROOT`. */
 const ROOT = wfRoot();
@@ -79,9 +80,7 @@ export function readLevel(): LevelFile | undefined {
 /** Writes the person's level whole, through a hidden file renamed over it, so the keeper never reads half of it. */
 export function writeLevel(level: LevelFile): void {
   fs.mkdirSync(nemiaDir(), { recursive: true });
-  const hidden = path.join(nemiaDir(), `.level.json.${process.pid}`);
-  fs.writeFileSync(hidden, `${JSON.stringify(level)}\n`);
-  fs.renameSync(hidden, levelFile());
+  writeWhole(levelFile(), `${JSON.stringify(level)}\n`);
 }
 
 /**

@@ -24,8 +24,8 @@ import {
 } from '../level/level.ts';
 import { readFactoryLevel } from '../level/level.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
-import { FactoryDoor } from '../factories/factories.store.ts';
-import { rooted } from '../wiring/wire.verb.ts';
+import { FactoryDoor } from '../factory/door/factories.store.ts';
+import { rooted } from '../factory/wiring/wire.verb.ts';
 import { levelsNow } from '../level/levels.verb.ts';
 import { EngineService, asked, tried, trustedFolder, type Engine } from '../runtime-client.ts';
 import { dollars, taskSpend, type Spend } from '../status/status.ts';

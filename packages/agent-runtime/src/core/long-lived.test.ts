@@ -24,7 +24,7 @@ import {
 } from './domain.ts';
 import { viewOfState } from './engine/engine.ts';
 import { TRANSIENT_ERRNOS } from '../harness/error.ts';
-import { story } from '../../test/checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 
 const T0 = new Date('2026-01-01T00:00:00Z');
 const at = (ms: number) => new Date(T0.getTime() + ms).toISOString();

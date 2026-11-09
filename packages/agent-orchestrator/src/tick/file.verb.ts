@@ -54,7 +54,7 @@ import { PlaceService } from '../place/place.store.ts';
 import { keysOf } from '../stats/index.ts';
 import type { WorkflowCosts } from '../costs/index.ts';
 import { costsRead } from '../costs/costs.verb.ts';
-import { serversFiling, unsignedStep } from '../servers/servers.verb.ts';
+import { serversFiling, unsignedStep } from '../factory/servers/servers.verb.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { answerHeld, stopAsked } from './held.verb.ts';
 import { forStep } from '../telemetry/telemetry.store.ts';

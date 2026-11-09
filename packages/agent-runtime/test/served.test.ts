@@ -24,8 +24,8 @@ import { heldHarnessesOf, optionsRefusalOf } from '../src/service/options.ts';
 import { Engine } from '../src/index.ts';
 import { builtEngine } from './engine.ts';
 import { codex } from '../src/harness/codex/codex.ts';
-import { scratch } from './scratch.ts';
-import { story } from './checkpoints.ts';
+import { scratch } from 'test-kit/scratch';
+import { story } from 'test-kit/checkpoints';
 import { RunnerError, type Followed, type RunnerOps } from '../src/harness/seam.ts';
 import type { Sighting } from '../src/core/domain.ts';
 

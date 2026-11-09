@@ -118,7 +118,7 @@ try: the last `ended` event's `closeout`. A check's output is in `~/.agent-workf
 tool calls, is the harness's own, under `~/.claude/projects/<folder>/<session>.jsonl`.
 
 Never report what a closeout claims without checking it against git where git can say: the commits on the branch
-(`git log main..<branch>`), the ceilings changed (`git diff main...<branch> -- .oxlintrc.json packages/agent-orchestrator/test/limits.test.ts`),
+(`git log main..<branch>`), the ceilings changed (`git diff main...<branch> -- .oxlintrc.json tools/guards/test/limits.test.ts`),
 what was removed from tests (`git diff main...<branch> -- '*/test/*' | grep '^-[^-]'`), what a name still appears in (`git grep`).
 
 Know what each step could and could not see. A reviewer that says "I could not read the pictures" or "my test run had not finished" has

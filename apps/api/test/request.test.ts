@@ -13,7 +13,7 @@ import { addFactory, attachWorkflow } from 'agent-orchestrator';
 import { appOf, liveOf } from '../src/app.ts';
 import { tookOf } from '../src/request/request.ts';
 import { until, WAITED } from 'agent-runtime/testing';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 /** A line the app said: its level, its message, and the annotations the fiber carried when it was said. */
 type Said = { level: string; text: string; annotations: Record<string, unknown> };

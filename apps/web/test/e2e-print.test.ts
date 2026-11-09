@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { drift, fingerprint, leftOver } from './e2e/print.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 /** A store with a run, a card and a repository, as the seed writes them. */
 function store(): string {

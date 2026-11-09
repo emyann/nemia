@@ -20,12 +20,12 @@ import { workflowDirAt } from '../folder/folder.store.ts';
 import { isReadme, splitFrontmatter, AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
 import { frontmatterValues } from '../frontmatter/frontmatter.ts';
 import { templatedTreeAt, readFactoryAt } from '../factory/factory.store.ts';
-import { FactoryDoor } from '../factories/factories.store.ts';
+import { FactoryDoor } from '../factory/door/factories.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
 import { factoryInstruction } from '../factory/instruction.verb.ts';
-import { factoryObject } from '../factory-object/factory.verb.ts';
-import { hireObject } from '../factory-object/hire.verb.ts';
-import { mcpServerObject } from '../factory-object/mcp-server.verb.ts';
+import { factoryObject } from '../factory/object/factory.verb.ts';
+import { hireObject } from '../factory/object/hire.verb.ts';
+import { mcpServerObject } from '../factory/object/mcp-server.verb.ts';
 
 /** Where a proposal is read and applied: the store's root, and the repository the api serves (the default factory's). */
 export type ProposalPlace = { readonly home: string; readonly repo: string };

@@ -1,14 +1,14 @@
 import type { ReactNode } from 'react';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
-import { FactoryTags } from '../components/FactoryTag';
-import { Markdown } from '../components/Markdown';
-import { RemoveWorkflow } from '../components/RemoveWorkflow';
-import { StartRun } from '../components/StartRun';
-import { StepRows } from '../components/StepRows';
-import { WorkflowBuilder } from '../components/WorkflowBuilder';
-import { WorkflowCanvas } from '../components/WorkflowCanvas';
-import { FromBadge, NoBuilder, Unplaced } from '../components/WorkflowParts';
+import { FactoryTags } from '../components/factory/FactoryTag';
+import { Markdown } from '../components/markdown/Markdown';
+import { RemoveWorkflow } from '../components/workflow/RemoveWorkflow';
+import { StartRun } from '../components/run/StartRun';
+import { StepRows } from '../components/step/StepRows';
+import { WorkflowBuilder } from '../components/workflow/WorkflowBuilder';
+import { WorkflowCanvas } from '../components/workflow/WorkflowCanvas';
+import { FromBadge, NoBuilder, Unplaced } from '../components/workflow/WorkflowParts';
 import {
   factoriesQuery,
   fromMatches,

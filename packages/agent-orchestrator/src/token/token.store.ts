@@ -44,7 +44,8 @@ const tokenFile = (home: string, digest: string): string => path.join(tokensDir(
 
 /**
  * Mints a session's token: 32 random bytes in base64url, its record written under its digest (`tokenFile`) through a hidden file renamed
- * over it, readable by its owner alone. Answers the token itself, which is written nowhere: the caller hands it to the session.
+ * over it, readable by its owner alone. Answers the token itself, which is written nowhere: the caller hands it to the session. Not through
+ * `writeWhole`: the hidden file is made readable by its owner alone as it is created, so the record is never open to another.
  */
 export function mintToken(home: string, record: TokenFiled): string {
   const token = crypto.randomBytes(32).toString('base64url');

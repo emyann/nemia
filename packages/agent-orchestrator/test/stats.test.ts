@@ -17,7 +17,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import type { TestEnd } from 'agent-runtime/testing';
 import type { Stats } from '../src/runner.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 
 const ROOT = scratch('wf-stats-');

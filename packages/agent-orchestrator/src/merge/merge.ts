@@ -35,7 +35,7 @@ import {
   type RoundAsk,
 } from '../status/status.ts';
 import { landingSaidSection, type LandingSaid } from '../check/check.ts';
-import { heldRefusal, prunedRefusal } from '../prune/prune.ts';
+import { heldRefusal, prunedRefusal } from '../forget/prune/prune.ts';
 import { sayFilled, skillSaid, type PlaceSay } from '../place/place.ts';
 import type { Offer } from '../decide/decide.ts';
 

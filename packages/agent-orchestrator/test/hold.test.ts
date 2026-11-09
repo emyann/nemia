@@ -22,7 +22,7 @@ import type { Effect as EffectOf } from 'effect/Effect';
 import type { Run } from '../src/run.ts';
 import type { PlaceService } from '../src/place/place.store.ts';
 import { Effect } from 'effect';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { decideScreen } from './screens.ts';
 import { staged, story, type Board } from './story.ts';
 import { names } from './assessed.ts';

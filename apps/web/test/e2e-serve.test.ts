@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { alive, changedOver, folderOf, keeping, linesOf, servedIn, standsFor, treeOf, usable } from './e2e/serve.ts';
 
 test('a workspace is served from one folder of its own under the temp directory, whatever way its path is written', () => {

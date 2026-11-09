@@ -23,6 +23,7 @@ import { revisionNow, REVISION_KINDS, type Revision, type RevisionKind } from '.
 import { RevisionAppended, RevisionOnRead, type RevisionOf } from './revisions.model.ts';
 import { checked, doorOf, rootedDoor, type DoorOf } from '../door/door.store.ts';
 import { wfRoot } from '../config/config.store.ts';
+import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 export type { RevisionOf } from './revisions.model.ts';
 
@@ -102,9 +103,7 @@ const ledgerFile = (dir: string, { kind, name }: RevisionOf): string => path.joi
 /** The entries written to `file`, whole, through a temporary file beside it so a reader never sees half of one. */
 function writeLedger(file: string, entries: readonly Revision[]): void {
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  const temp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(temp, `${JSON.stringify(entries, null, 2)}\n`);
-  fs.renameSync(temp, file);
+  writeWhole(file, `${JSON.stringify(entries, null, 2)}\n`);
 }
 
 /** The entries `file` holds, as `LedgerLayer['entries']['of']` reads them. */

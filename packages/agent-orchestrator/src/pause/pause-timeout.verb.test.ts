@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { Effect } from 'effect';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { names } from '../../test/assessed.ts';
 import { timeoutFile } from './pause-timeout.store.ts';
 import { TIMEOUT } from './pause-timeout.verb.ts';

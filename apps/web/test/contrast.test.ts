@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { BAR, GRAIN_TAIL, failing, grainedOf, hex, lookOf, ratio, ratioOf, tableOf, under, type Pair, type Sheet } from './e2e/contrast.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const WHITE = [255, 255, 255] as const;
 const pair = (ink: Pair['ink'], rest: Partial<Pair> = {}): Pair => ({

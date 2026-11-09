@@ -9,7 +9,7 @@ import { AGENTS_FOLDER, SKILLS_FOLDER, type Workflow } from '../step/step.ts';
 import { stepNameRefusal } from '../folder/folder.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import type { Mount } from '../record/record.ts';
-import { fireWord, type ScheduleListed } from '../schedule/schedule.ts';
+import { fireWord, type ScheduleListed } from './schedule/schedule.ts';
 import { untrustedLines, type Untrusted } from '../trust/trust.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { firstPiece } from '../piece/piece.ts';
@@ -69,7 +69,7 @@ export const DEFAULT_REVISIONS: RevisionsPolicy = 'pinned';
  * mount for every local step beside its repositories, each read-only or writable as it was named (`Volume`), when it names any.
  * `harnessSettings`: the settings of a harness every session of its runs' steps on it is given, when it names any (`HarnessSettings`), as
  * the file holds them: judged at a start and at the door's write, not on read. `generation`: the count of changes to its spec, Kubernetes'
- * `metadata.generation`, counted by the door's writes (`generationWritten`, `factories/generation.ts`), when its file holds one; a file
+ * `metadata.generation`, counted by the door's writes (`generationWritten`, `door/generation.ts`), when its file holds one; a file
  * written before the counter reads as 1 (`generationOf`).
  */
 export type Factory = {

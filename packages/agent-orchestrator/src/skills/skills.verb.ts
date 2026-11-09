@@ -12,7 +12,7 @@ import type { Args, Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { cliPath, factoryFlag, FROM, versionFlag, writerSpec, writerText, yoursOrRefused } from '../yours/yours.ts';
 import { templatedTree } from '../factory/factory.store.ts';
-import { rooted } from '../wiring/wire.verb.ts';
+import { rooted } from '../factory/wiring/wire.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { SkillName } from '../agents/agents.model.ts';
 import { SkillDoor, type SkillPage } from './skill-door.store.ts';

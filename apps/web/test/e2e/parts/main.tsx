@@ -1,7 +1,6 @@
 /**
- * The page the checks read the stories on: every story beside a part of `src/components/look`, of the conversation family
- * (`src/components/conversation`) or a component of `src/components`, drawn
- * as Storybook draws it
+ * The page the checks read the stories on: every story beside a part of `src/components` — the look's, the conversation family's, a
+ * component's in its noun's folder — but the vendored `ui/` and `ai-elements/`, drawn as Storybook draws it
  * (`composeStories`, under the annotations of `.storybook/preview.tsx`), each in a section of its own named by Storybook's id for it.
  * The bare address draws an index and every story; `?part=<name>` every story of one part; `?story=<id>` one story. A story that
  * throws is said in its place by the preview (`data-broken`). It holds no part's props: a state is shown by writing its story. Built
@@ -22,11 +21,7 @@ type Shown = { id: string; part: string; name: string; Story: ComponentType };
 type Composed = ComponentType & { id: string; storyName: string };
 
 const MODULES = import.meta.glob<Stories>(
-  [
-    '../../../src/components/look/*.stories.tsx',
-    '../../../src/components/conversation/*.stories.tsx',
-    '../../../src/components/*.stories.tsx',
-  ],
+  ['../../../src/components/**/*.stories.tsx', '!../../../src/components/ui/**', '!../../../src/components/ai-elements/**'],
   { eager: true },
 );
 

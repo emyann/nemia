@@ -8,8 +8,7 @@
  * among them, and the runtime's contract test reads the `.ts` files at each app's root too, and both contract scans an app's code beside
  * its `src/`, the client's `bin/` and `contracts/` (`APP_BESIDE`). The vocabulary test here reads the
  * names of the agents and workflows sdlc ships, under `packages/templates/sdlc/` (`words.test.ts`, `nemia-shipped.test.ts`), which
- * the orchestrator's own files do not reach, and its whole-repository scans
- * (`names.test.ts`, `others.test.ts`) read the root's and the apps' `CLAUDE.md` among every file. The orchestrator's tests read the side
+ * the orchestrator's own files do not reach. The orchestrator's tests read the side
  * Grafana's files and the guards' manifest (`observe.test.ts`, `profile.test.ts`, `contract.test.ts`), the runtime's contract test a
  * file of `tools/observe/render/`, and the docs' name test every file under `tools/` (`names.test.ts`), so those three tasks and the
  * guards' list `tools/`. The docs' tests read the packages' docs for the diagrams they draw, every source for the names their pages
@@ -21,7 +20,9 @@
  * `.gitattributes` (`apps/web/test/e2e-merge.test.ts`), so the web's test lists all three; the client's reads nothing outside it,
  * and needs no task of its own, since the api and the orchestrator it runs reach its hash through its dependencies (`^transit`). The
  * repository's own guards read
- * the files they hold (`guards#test`): the CI guard reads the Actions workflow, the secret scan's allowlist, the stub secrets of the
+ * the files they hold (`guards#test`): the whole-repository scans (`names.test.ts`, `others.test.ts`, `local-paths.test.ts`) and the
+ * lint guards (`comments.test.ts`, `limits.test.ts`) read `.oxlintrc.json`, `.oxfmtrc.json`, `lint/` and every package's tests, bins,
+ * places and contracts; the CI guard reads the Actions workflow, the secret scan's allowlist, the stub secrets of the
  * runtime's `remote-agent.test.ts`, the e2e's page names, the board's generated paths and every workspace's manifest
  * (`tools/guards/test/ci-workflow.test.ts`, `tools/guards/test/ci-scan.boundary.test.ts`), and `tools/guards/test/repo-guards.test.ts`
  * reads `CODEOWNERS`, under `.github/`, and the packages' manifests. The citation guard reads every `CLAUDE.md` and every test file, the
@@ -75,6 +76,12 @@ const CLAUDE_FILES = ['$TURBO_ROOT$/CLAUDE.md', '$TURBO_ROOT$/apps/*/CLAUDE.md',
 /** The trigger skill of a change to the board, which `apps/web/test/look.test.ts` reads for the look's parts. */
 const BOARD_SKILL = '$TURBO_ROOT$/.claude/skills/change-the-board/SKILL.md';
 
+/**
+ * The test kit, which every workspace's tests import (`test-kit/scratch`, `test-kit/layout`, …): a task that lists its inputs lists it,
+ * through `tools/**` or by name, so a change to the kit re-runs the tests that take it.
+ */
+const KIT = '$TURBO_ROOT$/tools/test-kit/**';
+
 /** Each task that reads files outside its package, and the inputs it lists: its own files, and what it reads outside them. */
 const INPUTS: Record<string, readonly string[]> = {
   'agent-orchestrator#test': [
@@ -105,6 +112,10 @@ const INPUTS: Record<string, readonly string[]> = {
     '$TURBO_ROOT$/packages/*/package.json',
     '$TURBO_ROOT$/apps/*/package.json',
     '$TURBO_ROOT$/packages/*/src/**',
+    ...['test', 'bin', 'place', 'contracts'].map((dir) => `$TURBO_ROOT$/packages/*/${dir}/**`),
+    '$TURBO_ROOT$/.oxlintrc.json',
+    '$TURBO_ROOT$/.oxfmtrc.json',
+    '$TURBO_ROOT$/lint/**',
     '$TURBO_ROOT$/packages/agent-runtime/test/remote-agent.test.ts',
     '$TURBO_ROOT$/apps/web/test/e2e/pages/NAMES',
     '$TURBO_ROOT$/apps/web/src/routeTree.gen.ts',
@@ -130,10 +141,11 @@ const INPUTS: Record<string, readonly string[]> = {
   ],
   'api#test': [
     '$TURBO_DEFAULT$',
+    KIT,
     ...['src', 'place', 'servers', 'skills'].map((dir) => `$TURBO_ROOT$/packages/*/${dir}/**`),
     '$TURBO_ROOT$/packages/*/package.json',
   ],
-  'web#test': ['$TURBO_DEFAULT$', BOARD_SKILL, '$TURBO_ROOT$/CLAUDE.md', '$TURBO_ROOT$/.gitattributes'],
+  'web#test': ['$TURBO_DEFAULT$', KIT, BOARD_SKILL, '$TURBO_ROOT$/CLAUDE.md', '$TURBO_ROOT$/.gitattributes'],
   'docs#test': [
     '$TURBO_DEFAULT$',
     '$TURBO_ROOT$/tools/**',

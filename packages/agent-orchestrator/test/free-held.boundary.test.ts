@@ -13,7 +13,7 @@ import { execFileSync } from 'node:child_process';
 import { Effect, Logger, References } from 'effect';
 import { Engine, type Sighting } from 'agent-runtime';
 import { asyncOps, asyncStore, plainEngine, type AsyncJournal, type AsyncRunner } from './promised.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { runGiven } from './placed.ts';
 import type { PlaceRequests, PlaceVerb } from '../src/place/place.ts';
 import { storeRootLayer } from '../src/config/root.store.ts';
@@ -32,7 +32,7 @@ const { readRun } = await import('../src/record/record.store.ts');
 const { tickRun, freshRestMemo } = await import('../src/tick/tick.verb.ts');
 const { PlaceService } = await import('../src/place/place.store.ts');
 const { builtinGitPlace } = await import('../src/place/builtin.store.ts');
-const { freeOnce, freshFreeMemory } = await import('../src/prune/free.verb.ts');
+const { freeOnce, freshFreeMemory } = await import('../src/forget/prune/free.verb.ts');
 
 type Pass = Awaited<ReturnType<typeof tick>>;
 type Memory = ReturnType<typeof freshFreeMemory>;

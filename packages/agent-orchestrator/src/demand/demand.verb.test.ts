@@ -9,10 +9,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { steeredClock } from '../../test/steered.ts';
 import { until, WAITED } from 'agent-runtime/testing';
-import { story } from '../../test/checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 
 const ROOT = scratch('wf-demand-');
 process.env.WF_ROOT = ROOT;

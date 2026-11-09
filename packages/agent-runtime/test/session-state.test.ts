@@ -23,7 +23,7 @@ import { viewOfState } from '../src/core/engine/engine.ts';
 import { detachedStateOf } from '../src/harness/detached/detached.ts';
 import { Engine } from '../src/index.ts';
 import { at, corpusOf, ended, filed, S, spawned, starting, TASK, type Case } from './lifecycle-corpus.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { asyncOps, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
 

@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { REAL_REACH } from './stand-ins.baseline.ts';
 import {
   CLAUSES,
@@ -292,7 +292,7 @@ test('REFUSED: a reach through a helper the file imports, and the helper that on
   );
 });
 
-test('how far a helper is followed: no type import, no file of a src or of another test, no scratch.ts, and no file that is not there', () => {
+test('how far a helper is followed: no type import, no file of a src or of another test, no package, and no file that is not there', () => {
   const kindsOf = (text: string, more: Readonly<Record<string, string>> = {}): readonly Kind[] =>
     reachOf(`${T}/a.test.ts`, over({ ...CHAIN, ...more, [`${T}/a.test.ts`]: text })).kinds;
   assert.deepEqual(kindsOf("import { two } from './two.ts';\n"), ['git', 'process'], 'the helper is followed');
@@ -300,11 +300,7 @@ test('how far a helper is followed: no type import, no file of a src or of anoth
   assert.deepEqual(kindsOf("import { x } from '../src/x.ts';\n", { 'packages/agent-orchestrator/src/x.ts': TWO }), []);
   assert.deepEqual(kindsOf("import { x } from './b.test.ts';\n", { [`${T}/b.test.ts`]: TWO }), []);
   assert.deepEqual(kindsOf("import { x } from '../place/git/x.ts';\n", { 'packages/agent-orchestrator/place/git/x.ts': TWO }), ['place']);
-  assert.deepEqual(
-    kindsOf("import { scratch } from './scratch.ts';\n", { [`${T}/scratch.ts`]: TWO }),
-    [],
-    'scratch.ts is left out by name',
-  );
+  assert.deepEqual(kindsOf("import { scratch } from 'test-kit/scratch';\n"), [], 'the test kit is a package, never followed');
   assert.deepEqual(kindsOf("import { scratch } from './scratchy.ts';\n", { [`${T}/scratchy.ts`]: TWO }), ['git', 'process']);
   assert.deepEqual(kindsOf("import { scratch } from './lib/scratch.ts';\n", { [`${T}/lib/scratch.ts`]: TWO }), ['git', 'process']);
   assert.deepEqual(kindsOf("import { gone } from './gone.ts';\n"), []);

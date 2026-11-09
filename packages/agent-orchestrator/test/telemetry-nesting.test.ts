@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Engine as RuntimeEngine, type Event, type Sighting } from 'agent-runtime';
 import { Effect, Logger, Option, References, Tracer } from 'effect';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { asyncOps, asyncStore, type AsyncJournal, type AsyncRunner } from './promised.ts';
 import { runGiven } from './placed.ts';
 import { story } from './story.ts';

@@ -30,7 +30,7 @@ import {
 } from '../src/agents/agents.ts';
 import { composeBrief, PRECEDENCE, toldLayers, type RepositoryRun } from '../src/run.ts';
 import { headedLayers } from '../src/workflow/index.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { names } from './assessed.ts';
 
 const ROOT = scratch('wf-render-');

@@ -14,7 +14,7 @@ import { gitPlace } from '../place/git/place.ts';
 import type { PlaceOutcome } from '../src/runner.ts';
 import { landedOver } from '../src/branches/branches.ts';
 import { knownOf, toldOf } from '../src/standing/standing.verb.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { columnsListed, plantedGit } from './planted-git.ts';
 
 /** The environment git runs in: this process's, without its git variables, with no configuration read and one identity. */

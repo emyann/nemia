@@ -7,7 +7,7 @@
  * proposal made at a name taken is `Conflict`, one written back that is not there `Missing`. The walks of `test/proposal-walks.ts` hold
  * both layers to one table.
  *
- * Every function here takes the store's root as a required `home: string`, as `src/servers/` does.
+ * Every function here takes the store's root as a required `home: string`, as `src/factory/servers/` does.
  */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -18,6 +18,7 @@ import { checked, doorOf, rootedDoor, type DoorOf } from '../door/door.store.ts'
 import { factoryNameRefusal } from '../factory/factory.ts';
 import { firstRefusal } from '../record/record.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
+import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /** A layer of the Proposal door, as plain synchronous methods: a factory's proposals, one read, one made, one written back. */
 export type ProposalLayer = {
@@ -125,12 +126,10 @@ function readProposal(home: string, factory: string, name: string): Proposal | u
 }
 
 /** `proposal` written whole at its file, through a hidden file renamed over it. */
-function writeWhole(home: string, proposal: Proposal): Proposal {
+function proposalWritten(home: string, proposal: Proposal): Proposal {
   const file = proposalFile(home, factoryOf(proposal), proposal.metadata.name);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  const hidden = path.join(path.dirname(file), `.${proposal.metadata.name}.json.${process.pid}`);
-  fs.writeFileSync(hidden, `${JSON.stringify(proposal, null, 2)}\n`);
-  fs.renameSync(hidden, file);
+  writeWhole(file, `${JSON.stringify(proposal, null, 2)}\n`);
   return proposal;
 }
 
@@ -165,12 +164,12 @@ export function proposalFiles(home: string): ProposalLayer {
       create: (proposal) => {
         const factory = factoryOf(proposal);
         if (readProposal(home, factory, proposal.metadata.name) !== undefined) throw takenProposal(factory, proposal.metadata.name);
-        return writeWhole(home, proposal);
+        return proposalWritten(home, proposal);
       },
       write: (proposal) => {
         const factory = factoryOf(proposal);
         if (readProposal(home, factory, proposal.metadata.name) === undefined) throw noProposal(factory, proposal.metadata.name);
-        return writeWhole(home, proposal);
+        return proposalWritten(home, proposal);
       },
     },
   };

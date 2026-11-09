@@ -13,10 +13,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Engine, Journal, TaskId } from '../src/index.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { asyncOps, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 
 const refusing: AsyncRunner = {
   spawn: async () => {

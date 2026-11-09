@@ -9,7 +9,7 @@ import { Effect } from 'effect';
 import { RunnerError } from '../src/harness/error.ts';
 import { filesOf, writeRun } from '../src/harness/claude/attached-file.ts';
 import { scopeRefusal } from '../src/harness/cgroup.ts';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import { until, WAITED } from '../src/waits/index.ts';
 import { holder, kept, lines, NAME, run } from './attached-held.ts';
 import fs from 'node:fs';

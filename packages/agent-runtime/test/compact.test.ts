@@ -13,8 +13,8 @@ import type { HarnessSpec } from '../src/harness/detached/detached.ts';
 import { claudeStreamKept, claudeStreamOutput } from '../src/harness/detached/output.ts';
 import { keptSaid, replaceCapture } from '../src/harness/detached/said.ts';
 import { CONVERSATION_STREAM, resultLine, stream } from './reader-streams.ts';
-import { scratch } from './scratch.ts';
-import { story } from './checkpoints.ts';
+import { scratch } from 'test-kit/scratch';
+import { story } from 'test-kit/checkpoints';
 
 const spec: HarnessSpec = {
   name: 'sh',

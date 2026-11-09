@@ -6,7 +6,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import {
   askAnswered,
   broughtOf,
@@ -354,7 +354,7 @@ test('a permission of hers is an ask: waiting, drawn as the form, answered in wo
   });
   await t.test('its tag says it asks to run while it waits, and that it was answered once chosen', async () => {
     await import('./tsx.ts');
-    const { askTag } = await import('../src/components/chat/ChatAsk.tsx');
+    const { askTag } = await import('../src/components/nemia/chat/ChatAsk.tsx');
     assert.deepEqual(askTag(permission()), { words: 'Asks to run', hue: 'yours' });
     assert.deepEqual(askTag(permission(FACTS, { [PERMISSION_QUESTION.question]: 'Allow once' })), { words: 'Answered', hue: 'grey' });
   });
@@ -362,7 +362,7 @@ test('a permission of hers is an ask: waiting, drawn as the form, answered in wo
     await import('./tsx.ts');
     const { createElement } = await import('react');
     const { renderToStaticMarkup } = await import('react-dom/server');
-    const { ChatAsk: Drawn } = await import('../src/components/chat/ChatAsk.tsx');
+    const { ChatAsk: Drawn } = await import('../src/components/nemia/chat/ChatAsk.tsx');
     const draw = (ask: ChatAsk) => renderToStaticMarkup(createElement(Drawn, { ask, onAnswer: () => undefined }));
     const html = draw(permission());
     assert.match(html, /data-chat-ask="form"/);

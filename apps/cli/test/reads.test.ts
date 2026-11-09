@@ -8,7 +8,7 @@
  * unknown run exits 2 with the api's refusal; no api serving the store, and none started (`NEMIA_DAEMON_START=off`), exits 2 naming
  * `--local`.
  *
- * The store is a scratch folder (the api's `scratch.ts`, which reaps what runs in it), never this machine's; the api writes no lease with
+ * The store is a scratch folder (`test-kit/scratch`, which reaps what runs in it), never this machine's; the api writes no lease with
  * `--no-tick`, so the test writes the one the client reads, its `url` alone: a lease that names no holder, which both paths word alike.
  * Every child is waited on for its end, or for the line it says, never for a length of time.
  */
@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { ambient } from './ambient.ts';
-import { scratch } from '../../api/test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { get, Refused } from '../src/client.ts';
 
 const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');

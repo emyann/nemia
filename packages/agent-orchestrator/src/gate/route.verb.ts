@@ -16,6 +16,7 @@ import { RunDoor } from '../runs/runs.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { routeAsk } from '../status/status.ts';
 import { writerText as textOf } from '../yours/yours.ts';
+import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /** The follower of a condition already filed or sent its card, which settles its route; undefined while none is. */
 export const settledBy = (condition: string, run: Run, steps: readonly Workflow[]): string | undefined =>
@@ -92,8 +93,7 @@ export const ROUTE: Command<{ step: string; try: number; route: string; at: stri
     const at = new Date().toISOString();
     const file = path.join(asksDir(id), routeAsk(step, n));
     fs.mkdirSync(asksDir(id), { recursive: true });
-    fs.writeFileSync(`${file}.tmp`, `${JSON.stringify({ route, at })}\n`);
-    fs.renameSync(`${file}.tmp`, file);
+    writeWhole(file, `${JSON.stringify({ route, at })}\n`);
     return { step, try: n, route, at, file };
   }),
   print: ({ step, try: n, route, file }, args) => [

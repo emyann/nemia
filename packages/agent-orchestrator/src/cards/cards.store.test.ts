@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { act, done, doorFrom, walksOn } from '../../test/door-walks.ts';
 import { aCard, CARD_WALKS } from '../../test/card-walks.ts';
 import { CardDoor, cardDoorFiles, cardNameAt } from './cards.store.ts';

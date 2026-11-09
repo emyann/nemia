@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Exit, Layer } from 'effect';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { doorFrom, done } from '../../test/door-walks.ts';
 import { aRun } from '../../test/run-walks.ts';
 import { anAgent } from '../../test/agent-walks.ts';

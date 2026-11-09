@@ -18,7 +18,7 @@ import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
-import { story } from '../../test/checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import { closeoutOf, objectOf, stepOf } from '../../test/run-reads.ts';
 import { askFile } from 'agent-orchestrator';
 import { answerText, type Question } from 'agent-orchestrator/run';

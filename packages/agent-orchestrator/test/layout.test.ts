@@ -1,12 +1,12 @@
 /**
- * The package's layout, held by path (`docs/architecture.md`): no two files need each other's values, no source file imports a test, a
- * barrel re-exports by name, and a feature folder is small, named for its feature, and read from outside through its face.
+ * The package's layout, held by path: the folder rule written once in `docs/architecture.md`, *Folders, in every package*, and judged
+ * by `test-kit/layout`, over this package's source. No two files need each other's values, no source file imports a test, a barrel
+ * re-exports by name, a folder is a concept at most `src/<concept>/<part>/` deep with no count of its files, named for what it holds,
+ * and a file outside a concept reads a part's pure code through the part's face.
  *
- * A feature folder holds at most six source files, tests beside them not counted. Its face is its `index.ts`, or its one pure file when
- * it has no `index.ts`; a file outside the folder imports the folder's pure code through the face alone, and a store, a verb or a model
- * by its own path. A folder holding a context's glossary leaves its one `<folder>.model.ts` out of its six, and a door's memory stand-in
- * (`memory.store.ts`, a test's alone: `STAND_INS`, `boundary.test.ts`) is out of them as the tests beside it are. The CLI's folder,
- * `src/cli/`, is controllers and has no face. The kinds themselves are held by `boundary.test.ts`.
+ * The face is a part's `index.ts`, or its one pure file when it has no `index.ts`; a file outside the concept imports the part's pure
+ * code through the face alone, and a store, a verb or a model by its own path; a file anywhere in the concept imports any file of it
+ * by path. The CLI's folder, `src/cli/`, is controllers and has no face. The kinds themselves are held by `boundary.test.ts`.
  *
  * Each rule is made to refuse a planted source first: a rule that reads nothing passes too.
  */
@@ -14,40 +14,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { importsIn } from 'test-kit/imports';
+import { cycles, depthBreaks, faceBreaks, namelessBreaks, starExports, testImports, valueGraph } from 'test-kit/layout';
 
 const PKG = path.join(import.meta.dirname, '..');
-
-/** A line of prose read as nothing, as `contract.test.ts` reads one, the line kept so numbers still count. */
-const withoutComments = (text: string): string =>
-  text
-    .split('\n')
-    .map((line) => (/^\s*(\/\/|\/\*|\*)/.test(line) ? '' : line))
-    .join('\n');
-
-type Import = { spec: string; typeOnly: boolean };
-
-/** Every module a piece of source names, and whether the import is erased: `import type`, `export type`, or braces of `type` names only. */
-function importsIn(text: string): Import[] {
-  const code = withoutComments(text);
-  const out: Import[] = [];
-  for (const m of code.matchAll(/^\s*(?:import|export)\s+(type\s+)?([^'"`;]*?)\s*\bfrom\s*['"]([^'"]+)['"]/gm)) {
-    const braces = /^\{([\s\S]*)\}$/.exec(m[2].trim());
-    const members = braces
-      ? braces[1]
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean)
-      : [];
-    out.push({ spec: m[3], typeOnly: Boolean(m[1]) || (members.length > 0 && members.every((s) => /^type\s/.test(s))) });
-  }
-  for (const m of code.matchAll(/^\s*import\s*['"]([^'"]+)['"]/gm)) out.push({ spec: m[1], typeOnly: false });
-  for (const m of code.matchAll(/\bimport\s*\(\s*['"`]([^'"`]+)['"`]/g)) out.push({ spec: m[1], typeOnly: false });
-  return out;
-}
-
-/** The package path a relative specifier in `file` names, or undefined for a package or a builtin. */
-const resolved = (file: string, spec: string): string | undefined =>
-  spec.startsWith('.') ? path.posix.normalize(path.posix.join(path.posix.dirname(file), spec)) : undefined;
 
 const isTest = (file: string) => file.endsWith('.test.ts') || file.startsWith('test/');
 
@@ -60,163 +30,14 @@ const sourceFiles = (): string[] =>
 
 const read = (file: string) => fs.readFileSync(path.join(PKG, file), 'utf8');
 
-/** The feature folder `file` sits in, or undefined for a file at the root of `src`. */
-const folderOf = (file: string): string | undefined => {
-  const dir = path.posix.dirname(file);
-  return dir.startsWith('src/') ? dir : undefined;
-};
-
 /**
- * A folder's pure code: every file that is not a store, a verb, a model or a test, outside the CLI's folder, which is controllers. A
- * model is imported by its own path, as a store or a verb is.
+ * A part's pure code, read from outside its concept through the part's face: every file that is not a store, a verb, a model or a test,
+ * outside the CLI's folder, which is controllers. A model is imported by its own path, as a store or a verb is.
  */
-const isFolderPure = (file: string): boolean =>
-  folderOf(file) !== undefined && !/\.(store|verb|model|test)\.ts$/.test(file) && !file.startsWith('src/cli/');
+const isFolderPure = (file: string): boolean => !/\.(store|verb|model|test)\.ts$/.test(file) && !file.startsWith('src/cli/');
 
-/** The most source files a feature folder holds, its `index.ts` included and its tests not. */
-const FOLDER_MAX = 6;
-
-/** Names that say nothing of a feature: code split into them has no home. */
-const NAMELESS = ['utils', 'helpers', 'common', 'shared', 'misc'];
-
-/** Every set of two files or more that need each other's values, by Tarjan's strongly connected components. */
-function cycles(graph: Map<string, string[]>): string[][] {
-  const index = new Map<string, number>();
-  const low = new Map<string, number>();
-  const stack: string[] = [];
-  const onStack = new Set<string>();
-  const found: string[][] = [];
-  const visit = (node: string) => {
-    index.set(node, index.size);
-    low.set(node, index.get(node)!);
-    stack.push(node);
-    onStack.add(node);
-    for (const next of graph.get(node) ?? []) {
-      if (!index.has(next)) {
-        visit(next);
-        low.set(node, Math.min(low.get(node)!, low.get(next)!));
-      } else if (onStack.has(next)) {
-        low.set(node, Math.min(low.get(node)!, index.get(next)!));
-      }
-    }
-    if (low.get(node) === index.get(node)) {
-      const component: string[] = [];
-      let member: string;
-      do {
-        member = stack.pop()!;
-        onStack.delete(member);
-        component.push(member);
-      } while (member !== node);
-      if (component.length > 1) found.push(component.sort());
-    }
-  };
-  for (const node of [...graph.keys()].sort()) if (!index.has(node)) visit(node);
-  return found.sort((a, b) => a[0].localeCompare(b[0]));
-}
-
-/** The value imports among `files`: a type-only import is erased, so it may cycle. */
-const valueGraph = (files: Map<string, string>): Map<string, string[]> =>
-  new Map(
-    [...files].map(([file, text]) => [
-      file,
-      importsIn(text).flatMap(({ spec, typeOnly }) => {
-        const target = resolved(file, spec);
-        return !typeOnly && target !== undefined && files.has(target) ? [target] : [];
-      }),
-    ]),
-  );
-
-/** Where a source file imports a test: a test beside the code, or anything under `test/`, is imported by nothing but a test. */
-const testImports = (file: string, imports: Import[]): string[] =>
-  imports
-    .map(({ spec }) => resolved(file, spec))
-    .filter((target): target is string => target !== undefined && isTest(target))
-    .map((target) => `${file} imports ${target}: nothing but a test imports a test — move what both need into the source`);
-
-/** Where a face or an entry re-exports a whole module: a barrel names what it re-exports, so a name is added on purpose. */
-const starExports = (file: string, text: string): string[] =>
-  [...withoutComments(text).matchAll(/^\s*export\s*\*[^'"`;]*from\s*['"]([^'"]+)['"]/gm)].map(
-    (m) => `${file} re-exports all of ${m[1]}: re-export by name`,
-  );
-
-/** The folders under `src/` that hold a context's glossary (`glossary.json`), by path from the package. */
-const glossaryFolders = (): Set<string> =>
-  new Set(
-    fs
-      .readdirSync(path.join(PKG, 'src'), { recursive: true, encoding: 'utf8' })
-      .map((f) => f.split(path.sep).join('/'))
-      .filter((f) => path.posix.basename(f) === 'glossary.json')
-      .map((f) => path.posix.dirname(`src/${f}`)),
-  );
-
-/** Whether `file` is the context's own model, `<folder>/<folder>.model.ts` in a folder holding a glossary: not counted in its six. */
-const isContextModel = (file: string, glossaries: ReadonlySet<string>): boolean => {
-  const folder = folderOf(file);
-  return folder !== undefined && glossaries.has(folder) && file === `${folder}/${path.posix.basename(folder)}.model.ts`;
-};
-
-/** Whether `file` is a door's memory stand-in, `<folder>/memory.store.ts`: a test's alone, so not counted in its folder's six. */
-const isStandIn = (file: string): boolean => path.posix.basename(file) === 'memory.store.ts';
-
-/**
- * Each feature folder past `FOLDER_MAX` source files, and each folder or file whose name says no feature. A folder holding a
- * glossary leaves its one `<folder>.model.ts` out of the count: the context's model stands beside its words. A door's memory stand-in
- * is out of it too (`isStandIn`).
- */
-function folderBreaks(files: readonly string[], glossaries: ReadonlySet<string> = glossaryFolders()): string[] {
-  const sizes = new Map<string, number>();
-  for (const file of files.filter((f) => !isTest(f) && !isStandIn(f) && !isContextModel(f, glossaries))) {
-    const folder = folderOf(file);
-    if (folder !== undefined) sizes.set(folder, (sizes.get(folder) ?? 0) + 1);
-  }
-  const out = [...sizes]
-    .filter(([, size]) => size > FOLDER_MAX)
-    .map(
-      ([folder, size]) =>
-        `${folder}/ holds ${size} source files, past ${FOLDER_MAX}: a folder that needs more holds two features — split it along them`,
-    );
-  for (const file of files) {
-    const named = path.posix
-      .relative('src', file)
-      .split('/')
-      .map((part) => part.split('.')[0]);
-    const nameless = named.find((part) => NAMELESS.includes(part));
-    if (nameless !== undefined)
-      out.push(`${file} is named ${nameless}, which says no feature: put each part beside the feature that uses it`);
-  }
-  return out.sort();
-}
-
-/**
- * Where a file outside a folder imports the folder's pure code past its face: the face is the folder's `index.ts`, or its one pure file
- * when it has no `index.ts`.
- */
-function faceBreaks(files: readonly string[], importsOf: (file: string) => Import[]): string[] {
-  const pureBy = new Map<string, string[]>();
-  for (const file of files.filter(isFolderPure)) pureBy.set(folderOf(file)!, [...(pureBy.get(folderOf(file)!) ?? []), file]);
-  const faceOf = (folder: string): string | undefined => {
-    const pure = pureBy.get(folder) ?? [];
-    if (pure.includes(`${folder}/index.ts`)) return `${folder}/index.ts`;
-    return pure.length === 1 ? pure[0] : undefined;
-  };
-  const out: string[] = [];
-  for (const file of files) {
-    for (const { spec } of importsOf(file)) {
-      const target = resolved(file, spec);
-      if (target === undefined || !files.includes(target) || !isFolderPure(target)) continue;
-      const folder = folderOf(target)!;
-      if (folderOf(file) === folder) continue;
-      const face = faceOf(folder);
-      if (target === face) continue;
-      out.push(
-        face === undefined
-          ? `${file} imports ${target}: ${folder}/ has ${pureBy.get(folder)!.length} pure files and no index.ts — write one that re-exports them by name, and import it`
-          : `${file} imports ${target}: import ${face}, the face of ${folder}/`,
-      );
-    }
-  }
-  return out.sort();
-}
+/** The face rule as this package reads it: concepts under `src`, a part's pure code faced. */
+const FACES = { root: 'src', faced: isFolderPure };
 
 test('REFUSED: a cycle of value imports; a cycle through a type-only import is erased and let through', () => {
   const planted = new Map([
@@ -283,10 +104,10 @@ test('REFUSED on the source: a value import from a leaf cut out of run.ts back t
       'src/feed/index.ts',
       'src/feed/reason.ts',
       'src/forget/forget.ts',
+      'src/forget/prune/prune.ts',
       'src/gate/gate.ts',
       'src/list/list.ts',
       'src/merge/merge.ts',
-      'src/prune/prune.ts',
       'src/retry/index.ts',
       'src/retry/retry-refusal.ts',
       'src/retry/retry.ts',
@@ -365,67 +186,32 @@ test('no source file imports a test, and every barrel re-exports by name', () =>
   );
 });
 
-test('REFUSED: a seventh source file in a folder, and a folder or a file named for no feature', () => {
-  const six = ['a.ts', 'b.ts', 'index.ts', 'a.store.ts', 'a.verb.ts', 'b.verb.ts'].map((f) => `src/retry/${f}`);
-  assert.deepEqual(folderBreaks([...six, 'src/retry/a.test.ts', 'src/run.ts']), [], 'six, a test beside them, and the root: let through');
-  assert.deepEqual(folderBreaks([...six, 'src/retry/c.ts']), [
-    'src/retry/ holds 7 source files, past 6: a folder that needs more holds two features — split it along them',
-  ]);
-  assert.deepEqual(folderBreaks(['src/utils/words.ts', 'src/retry/helpers.ts', 'src/feed/shared.store.ts', 'src/misc.ts']), [
-    'src/feed/shared.store.ts is named shared, which says no feature: put each part beside the feature that uses it',
-    'src/misc.ts is named misc, which says no feature: put each part beside the feature that uses it',
-    'src/retry/helpers.ts is named helpers, which says no feature: put each part beside the feature that uses it',
-    'src/utils/words.ts is named utils, which says no feature: put each part beside the feature that uses it',
-  ]);
-  assert.deepEqual(folderBreaks(['src/common-words/words.ts', 'src/feed/sharedness.ts']), [], 'a name that only starts so: let through');
+test('REFUSED: src/factory/door/x/y.ts, a third folder under src; a part of a concept is let through', () => {
+  assert.equal(depthBreaks(['src/factory/door/x/y.ts'], 'src').length, 1);
+  assert.deepEqual(depthBreaks(['src/factory/door/door.ts', 'src/factory/factory.ts', 'src/run.ts', 'bin/a/b/c/d.ts'], 'src'), []);
 });
 
-test("REFUSED: a seventh file beside a door's memory stand-in; the stand-in itself is not counted", () => {
-  const six = ['a.ts', 'b.ts', 'index.ts', 'a.store.ts', 'a.verb.ts', 'b.verb.ts'].map((f) => `src/retry/${f}`);
-  assert.deepEqual(folderBreaks([...six, 'src/retry/memory.store.ts'], new Set()), [], 'six and a stand-in: let through');
-  assert.deepEqual(folderBreaks([...six, 'src/retry/memory.store.ts', 'src/retry/c.ts'], new Set()), [
-    'src/retry/ holds 7 source files, past 6: a folder that needs more holds two features — split it along them',
-  ]);
-});
-
-test("REFUSED: a seventh file beside a context's model, and a second model counted; one <folder>.model.ts beside a glossary is not", () => {
-  const six = ['a.ts', 'b.ts', 'index.ts', 'a.store.ts', 'a.verb.ts', 'b.verb.ts'].map((f) => `src/inbox/${f}`);
-  const glossaries = new Set(['src/inbox']);
-  assert.deepEqual(folderBreaks([...six, 'src/inbox/inbox.model.ts'], glossaries), [], 'six and the context’s model: let through');
-  assert.deepEqual(folderBreaks([...six, 'src/inbox/inbox.model.ts', 'src/inbox/c.ts'], glossaries), [
-    'src/inbox/ holds 7 source files, past 6: a folder that needs more holds two features — split it along them',
-  ]);
-  assert.deepEqual(folderBreaks([...six, 'src/inbox/inbox.model.ts', 'src/inbox/card.model.ts'], glossaries), [
-    'src/inbox/ holds 7 source files, past 6: a folder that needs more holds two features — split it along them',
-  ]);
+test('let through: a folder past six files', () => {
+  const seven = ['a.ts', 'b.ts', 'c.ts', 'index.ts', 'a.store.ts', 'a.verb.ts', 'b.verb.ts'].map((f) => `src/retry/${f}`);
+  assert.deepEqual([...depthBreaks(seven, 'src'), ...namelessBreaks(seven, 'src')], []);
   assert.deepEqual(
-    folderBreaks([...six, 'src/inbox/inbox.model.ts'], new Set()),
-    ['src/inbox/ holds 7 source files, past 6: a folder that needs more holds two features — split it along them'],
-    'a folder with no glossary counts its model',
-  );
-  assert.ok(
-    ['src/inbox', 'src/factory', 'src/place', 'src/agents', 'src/feed'].every((f) => glossaryFolders().has(f)),
-    'the folders holding a glossary are read off the disk',
+    faceBreaks(seven, () => [], FACES),
+    [],
   );
 });
 
-test("REFUSED on the source: a seventh source file in the CLI's folder", () => {
+test('REFUSED: a folder or a file named for no concept', () => {
+  assert.equal(namelessBreaks(['src/utils/words.ts', 'src/retry/helpers.ts', 'src/feed/shared.store.ts', 'src/misc.ts'], 'src').length, 4);
+  assert.deepEqual(namelessBreaks(['src/common-words/words.ts', 'src/feed/sharedness.ts'], 'src'), [], 'a name that only starts so');
+});
+
+test('every file sits at most at src/<concept>/<part>/, and every name says a concept', () => {
   const files = sourceFiles();
-  assert.deepEqual(
-    files.filter((f) => f.startsWith('src/cli/') && !f.endsWith('.test.ts')),
-    ['exit', 'flags', 'main', 'runs', 'start', 'writers', 'decide/decide'].map((f) => `src/cli/${f}.ts`),
-    "the CLI's folder holds its six today, and decide/ one",
-  );
-  assert.deepEqual(folderBreaks([...files, 'src/cli/extra.ts']), [
-    'src/cli/ holds 7 source files, past 6: a folder that needs more holds two features — split it along them',
-  ]);
+  assert.ok(files.includes('src/cli/decide/decide.ts'), 'the scan reads the parts');
+  assert.deepEqual([...depthBreaks(files, 'src'), ...namelessBreaks(files, 'src')], []);
 });
 
-test('each feature folder holds at most six source files, and every name says a feature', () => {
-  assert.deepEqual(folderBreaks(sourceFiles()), []);
-});
-
-test("REFUSED: a file outside a folder importing the folder's pure code past its face", () => {
+test("REFUSED: a file outside a concept importing a part's pure code past its face", () => {
   const planted: Record<string, string> = {
     'src/retry/index.ts': "export { retryable } from './retry.ts';\nexport { answerOf } from './retry-ask.ts';",
     'src/retry/retry.ts': "import { answerOf } from './retry-ask.ts';",
@@ -452,7 +238,7 @@ test("REFUSED: a file outside a folder importing the folder's pure code past its
   };
   const files = Object.keys(planted);
   assert.deepEqual(
-    faceBreaks(files, (f) => importsIn(planted[f])),
+    faceBreaks(files, (f) => importsIn(planted[f] ?? ''), FACES),
     [
       'src/run.ts imports src/retry/retry.ts: import src/retry/index.ts, the face of src/retry/',
       'src/tick/tick.verb.ts imports src/brief/brief.ts: src/brief/ has 2 pure files and no index.ts — write one that re-exports them by name, and import it',
@@ -464,8 +250,10 @@ test("REFUSED: a file outside a folder importing the folder's pure code past its
 test('REFUSED on the source: a file outside keys/ importing its readers past keys/index.ts', () => {
   const files = sourceFiles();
   assert.deepEqual(
-    faceBreaks(files, (f) =>
-      importsIn(f === 'src/tick/tick.verb.ts' ? `${read(f)}\nimport { toolsOf } from '../keys/tools.ts';` : read(f)),
+    faceBreaks(
+      files,
+      (f) => importsIn(f === 'src/tick/tick.verb.ts' ? `${read(f)}\nimport { toolsOf } from '../keys/tools.ts';` : read(f)),
+      FACES,
     ),
     ['src/tick/tick.verb.ts imports src/keys/tools.ts: import src/keys/index.ts, the face of src/keys/'],
   );
@@ -475,7 +263,7 @@ test('REFUSED on the source: a file outside retry/ or brief/ importing their pur
   const files = sourceFiles();
   const planted = `import { retryable } from '../retry/retry.ts';\nimport { composeBrief } from '../brief/brief.ts';`;
   assert.deepEqual(
-    faceBreaks(files, (f) => importsIn(f === 'src/cancel/cancel.verb.ts' ? `${read(f)}\n${planted}` : read(f))),
+    faceBreaks(files, (f) => importsIn(f === 'src/cancel/cancel.verb.ts' ? `${read(f)}\n${planted}` : read(f)), FACES),
     [
       'src/cancel/cancel.verb.ts imports src/brief/brief.ts: import src/brief/index.ts, the face of src/brief/',
       'src/cancel/cancel.verb.ts imports src/retry/retry.ts: import src/retry/index.ts, the face of src/retry/',
@@ -483,10 +271,10 @@ test('REFUSED on the source: a file outside retry/ or brief/ importing their pur
   );
 });
 
-test("a file outside a folder imports the folder's pure code through its face alone", () => {
+test("a file outside a concept imports a part's pure code through its face alone", () => {
   const files = sourceFiles();
   assert.deepEqual(
-    faceBreaks(files, (f) => importsIn(read(f))),
+    faceBreaks(files, (f) => importsIn(read(f)), FACES),
     [],
   );
 });

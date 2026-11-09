@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright';
-import { scratch } from '../scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { photograph } from './board.ts';
 
 let browser: Browser;

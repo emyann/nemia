@@ -30,7 +30,7 @@ import { formerKeyLines } from '../src/folder/folder.store.ts';
 import { Schema } from 'effect';
 import { WorkflowDir } from '../src/folder/folder.model.ts';
 import { baseLine, formerFenceLine, placeLine } from '../src/former/former.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { TEAM_DEV, teamCopy } from './team.ts';
 
 /**

@@ -5,7 +5,7 @@
   },
   // The design system kit is another repository's code (french-tech-homies/design-system): the shadcn CLI writes it into the board from
   // the `@ds` registry, its skills beside it, and an update fetches it again and is read as a diff. Nothing here shapes it, so no rule
-  // reads it. packages/agent-orchestrator/test/comments.test.ts holds this list and refuses a folder that joins it.
+  // reads it. tools/guards/test/comments.test.ts holds this list and refuses a folder that joins it.
   "ignorePatterns": ["apps/web/src/components/ui/ds/**", "apps/web/.claude/**"],
   "jsPlugins": [
     { "name": "comments", "specifier": "./lint/comments.ts" },
@@ -63,11 +63,13 @@
     // An `as T` or a `!` that tells tsc what it already knows is noise that hides the casts that matter.
     "typescript/no-unnecessary-type-assertion": "error",
     "unicorn/no-array-fill-with-reference-type": "error",
-    // The size and complexity limits (docs/design-2026-09-28-feature-folders.md, "The limits"). The sizes skip blank lines and comments,
-    // so a JSDoc is never a reason to split. A file over one today has its own ceiling in an override below, and never a higher one.
-    // packages/agent-orchestrator/test/limits.test.ts holds these thresholds and the per-file ceilings, and refuses a disable that
-    // names a limit.
-    "max-lines": ["error", { "max": 500, "skipBlankLines": true, "skipComments": true }],
+    // The size and complexity limits. The sizes skip blank lines and comments, so a JSDoc is never a reason to split. max-lines is a stop
+    // at 800 code lines for every file, with no ceiling for any one (docs/architecture.md, "Folders, in every package"): a file that
+    // reaches it is cut along its concepts, and no file under it is split for its size. A file over a function limit today has its own
+    // ceiling in an override below, and never a higher one (docs/design-2026-09-28-feature-folders.md, "The limits").
+    // tools/guards/test/limits.test.ts holds these thresholds and the per-file ceilings, refuses a ceiling on max-lines, and refuses a
+    // disable that names a limit.
+    "max-lines": ["error", { "max": 800, "skipBlankLines": true, "skipComments": true }],
     "max-lines-per-function": ["error", { "max": 80, "skipBlankLines": true, "skipComments": true }],
     // Cyclomatic counts the paths, so it says how many tests a function needs; cognitive weighs the nesting, which cyclomatic does not.
     "complexity": ["error", { "max": 20 }],
@@ -136,7 +138,7 @@
     },
     // The comment guards (lint/comments.ts), one block per package, the same rules in each, none with an `excludeFiles`. The runtime's
     // block also covers the folders beside the packages: lint/**, the guards' own plugin, and tools/**, the repository's test tooling.
-    // packages/agent-orchestrator/test/comments.test.ts holds this file's shape for them.
+    // tools/guards/test/comments.test.ts holds this file's shape for them.
     {
       "files": ["apps/api/**"],
       "rules": {
@@ -465,7 +467,7 @@
       }
     },
     // Each file over a limit today, at its own ceiling: its measure, rule by rule, and nothing higher. Lint refuses the file that grows.
-    // The ceilings only fall: a limit is met by cutting, never by raising a ceiling. packages/agent-orchestrator/test/limits.test.ts
+    // The ceilings only fall: a limit is met by cutting, never by raising a ceiling. tools/guards/test/limits.test.ts
     // ratchets them: it refuses a ceiling above the measure, and holds each file's count of offenders.
     {
       "files": ["apps/api/src/capabilities/reach.ts"],
@@ -476,50 +478,50 @@
       }
     },
     {
-      "files": ["apps/web/src/components/AgentForm.tsx"],
+      "files": ["apps/web/src/components/agent/AgentForm.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 141, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
-      "files": ["apps/web/src/components/CardGate.tsx"],
+      "files": ["apps/web/src/components/inbox/CardGate.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 90, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
-      "files": ["apps/web/src/components/FactoryCanvas.tsx"],
+      "files": ["apps/web/src/components/factory/FactoryCanvas.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 249, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
-      "files": ["apps/web/src/components/NewWorkflow.tsx"],
+      "files": ["apps/web/src/components/workflow/NewWorkflow.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 104, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
-      "files": ["apps/web/src/components/PruneRun.tsx"],
+      "files": ["apps/web/src/components/run/PruneRun.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 94, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
-      "files": ["apps/web/src/components/Reach.tsx"],
+      "files": ["apps/web/src/components/step/Reach.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 114, "skipBlankLines": true, "skipComments": true }],
         "sonarjs/cognitive-complexity": ["error", 17]
       }
     },
     {
-      "files": ["apps/web/src/components/RunCanvas.tsx"],
+      "files": ["apps/web/src/components/run/RunCanvas.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 85, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
-      "files": ["apps/web/src/components/RunNode.tsx"],
+      "files": ["apps/web/src/components/run/RunNode.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 111, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 31 }],
@@ -527,19 +529,19 @@
       }
     },
     {
-      "files": ["apps/web/src/components/SkillForm.tsx"],
+      "files": ["apps/web/src/components/agent/SkillForm.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 111, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
-      "files": ["apps/web/src/components/StartRun.tsx"],
+      "files": ["apps/web/src/components/run/StartRun.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 95, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
-      "files": ["apps/web/src/components/StepForm.tsx"],
+      "files": ["apps/web/src/components/step/StepForm.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 182, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 50 }],
@@ -547,26 +549,26 @@
       }
     },
     {
-      "files": ["apps/web/src/components/StepInspector.tsx"],
+      "files": ["apps/web/src/components/step/StepInspector.tsx"],
       "rules": {
         "sonarjs/cognitive-complexity": ["error", 16]
       }
     },
     {
-      "files": ["apps/web/src/components/StepNode.tsx"],
+      "files": ["apps/web/src/components/step/StepNode.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 84, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 25 }]
       }
     },
     {
-      "files": ["apps/web/src/components/StepRail.tsx"],
+      "files": ["apps/web/src/components/step/StepRail.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 86, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
-      "files": ["apps/web/src/components/WorkflowBuilder.tsx"],
+      "files": ["apps/web/src/components/workflow/WorkflowBuilder.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 196, "skipBlankLines": true, "skipComments": true }]
       }
@@ -738,12 +740,6 @@
       "files": ["packages/agent-orchestrator/src/wait/wait.ts"],
       "rules": {
         "sonarjs/cognitive-complexity": ["error", 29]
-      }
-    },
-    {
-      "files": ["packages/agent-orchestrator/src/record/record.store.ts"],
-      "rules": {
-        "max-lines": ["error", { "max": 508, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

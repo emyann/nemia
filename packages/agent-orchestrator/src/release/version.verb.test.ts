@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { eachTest } from '../../test/placed.ts';
 
 const ROOT = scratch('wf-version-');

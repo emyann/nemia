@@ -11,7 +11,7 @@ import { API_VERSION, type Subscription, type SubscriptionList } from 'objects';
 import type { DeliveryKept } from '../../contracts/subscription-status.contract.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { SubscriptionName } from '../feed/feed.model.ts';
-import { bornAt, objectsListed, versionOf, type ObjectQuery } from '../factory-object/factory.verb.ts';
+import { bornAt, objectsListed, versionOf, type ObjectQuery } from '../object/listed.verb.ts';
 import { noSubscription, subscriptionFileAt, SubscriptionDoor, type Listed } from '../subscription/subscription.store.ts';
 import { deliveryKept, subscriptionDelivered } from './subscription.ts';
 

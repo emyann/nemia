@@ -34,6 +34,7 @@ import type { KeptDelivery, Subscription } from './subscription.ts';
 import { selectorsOfWake } from './former-wake.ts';
 import { SELECTOR_FORM, selectorsRefusal } from '../watch/selector.ts';
 import { LEVELS } from '../level/level.ts';
+import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /** A subscription listed: its name and what its file holds. */
 export type Listed = { name: string; subscription: Subscription };
@@ -326,9 +327,7 @@ export function subscriptionFiles(home: string): SubscriptionLayer {
       /** Through a hidden file renamed over it, so a reader never reads half of it. */
       write: (name, delivery) => {
         fs.mkdirSync(dir, { recursive: true });
-        const hidden = path.join(dir, `.${name}${STATE}.${process.pid}`);
-        fs.writeFileSync(hidden, `${JSON.stringify(delivery)}\n`);
-        fs.renameSync(hidden, stateOf(name));
+        writeWhole(stateOf(name), `${JSON.stringify(delivery)}\n`);
       },
       drop: (name) => fs.rmSync(stateOf(name), { force: true }),
     },

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const web = path.resolve(import.meta.dirname, '..');
 const GENERATED = ['theme.css', 'theme.v4.css', 'DESIGN.resolved.md'] as const;

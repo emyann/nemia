@@ -11,7 +11,7 @@ import { outOfMemory, outOfMemoryWords } from '../out-of-memory/out-of-memory.ts
 import { DENIED_CAP, DENIED_SHOWN, oneLine, satisfiesAfter, type CloseoutAsked, type Run, type StepStatus } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { checkVerdictOf, verdictWord, type CheckVerdict, type Verdict } from '../check/check.ts';
-import { routedRows, routedWords, settledOf as settledWord } from '../routed/index.ts';
+import { routedRows, routedWords, settledOf as settledWord } from '../route/routed/index.ts';
 import type { WhereAStepStands } from '../../contracts/standing.contract.ts';
 import { codedStep, ENGINE_REASON, holdsTheRun, REASON_OF, type CodedStep, type QualifiedStep } from '../phase/phase.ts';
 import { answerOf, dueNote, modeWord, retriesDue, tryNote, type RetryAsk } from '../retry/index.ts';
@@ -40,11 +40,11 @@ import { acceptedNote, exhaustedNote, heldLater, heldNote, roundDueNote, roundsD
 import { saidWord } from '../say/say.ts';
 import { askedQuestions } from '../question/index.ts';
 import { assess } from '../tick/assess.ts';
-import { neverApproved } from '../prune/prune.ts';
+import { neverApproved } from '../forget/prune/prune.ts';
 import { daemonLine, staleAfterMs, type DaemonStanding } from '../daemon/daemon.ts';
 import type { Paused } from '../pause/pause.ts';
 import { firstPiece } from '../piece/piece.ts';
-import { fireWord, scheduleLines, type ScheduleListed } from '../schedule/schedule.ts';
+import { fireWord, scheduleLines, type ScheduleListed } from '../factory/schedule/schedule.ts';
 
 export type Listing = {
   /**

@@ -10,7 +10,7 @@ import { customInstructionsFile } from '../agents/read.store.ts';
 import { isStoreAgent } from './custom.store.ts';
 import { AgentDoor } from '../agents/agent-door.store.ts';
 import { AgentName } from '../agents/agents.model.ts';
-import { rooted } from '../wiring/wire.verb.ts';
+import { rooted } from '../factory/wiring/wire.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 
 /** The text under `key`, or undefined where none was given. */

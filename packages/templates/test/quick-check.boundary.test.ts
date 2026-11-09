@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadWorkflows } from 'agent-orchestrator';
 import { checkArgv } from 'agent-orchestrator/run';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { copyOf, rendered } from './template.ts';
 import { type Rule, bareOrigin, ghIn, passing, rollup } from './origin.ts';
 

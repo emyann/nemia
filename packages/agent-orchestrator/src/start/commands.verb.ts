@@ -5,7 +5,7 @@
  * take.
  */
 import { Effect } from 'effect';
-import { rooted } from '../wiring/wire.verb.ts';
+import { rooted } from '../factory/wiring/wire.verb.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { endingSteps } from '../ending/ending.ts';
@@ -22,7 +22,7 @@ import type { Workflow } from '../workflow.ts';
 import { approvedFirst, gatesOf } from '../status/status.ts';
 import { fromNote } from './inputs.ts';
 import { leftOutMounts, leftOutVolumes, startRun, type StartedRun } from './start.verb.ts';
-import { volumeMounts } from '../volume/volume.ts';
+import { volumeMounts } from '../factory/volume/volume.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { labelsText } from '../labels/labels.ts';
 import { pausedRead } from '../list/list.verb.ts';

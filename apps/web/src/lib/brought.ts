@@ -1,7 +1,7 @@
 /**
  * A step of a run her message links to (`/runs/<run>?step=<step>`), as her chat draws it under her words: the facts the run's page reads
  * of it (`broughtFacts`) and which of the run's page's own parts answers it (`broughtPart`, proved by `contracts/brought.contract.ts`).
- * Pure: the drawing is `components/chat/ChatBrought.tsx`.
+ * Pure: the drawing is `components/nemia/chat/ChatBrought.tsx`.
  */
 import type { BroughtFacts, BroughtPart, BroughtPartOf } from '../../contracts/brought.contract.ts';
 import { askedOf, offersOf } from './asks.ts';

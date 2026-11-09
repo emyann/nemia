@@ -29,7 +29,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import type { Engine } from '../src/runtime-client.ts';
 import { decideScreen } from './screens.ts';
 import { promised } from './promised.ts';

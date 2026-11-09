@@ -1,12 +1,12 @@
 /**
- * The rail lights one destination on every page (`destinationsLit`, src/components/nav.ts): each route of the board's route tree, read from
- * `src/routeTree.gen.ts`, lights exactly one, and a route that lights none or two is refused.
+ * The rail lights one destination on every page (`destinationsLit`, src/components/nav/nav.ts): each route of the board's route tree,
+ * read from `src/routeTree.gen.ts`, lights exactly one, and a route that lights none or two is refused.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { type Destination, DESTINATIONS, destinationsLit } from '../src/components/nav.ts';
+import { type Destination, DESTINATIONS, destinationsLit } from '../src/components/nav/nav.ts';
 
 /** Every full path of the board's routes, as the router's generated tree declares them, each parameter given a value. */
 function routePaths(): string[] {

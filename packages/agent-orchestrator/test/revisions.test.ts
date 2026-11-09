@@ -17,7 +17,7 @@ import path from 'node:path';
 import { Effect, Layer } from 'effect';
 import type { StoreRoot as Root } from '../src/config/root.store.ts';
 import type { Kept, Resolved } from '../src/revisions/pin.verb.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { digestOf, kindsDrift, revisionNow, stepsDrift, type Pin } from '../src/revisions/revisions.ts';
 
@@ -46,7 +46,7 @@ const { ledgerOf } = await import('../src/revisions/revisions.store.ts');
 const { followPass, passRevisions, pinPass, resolvedNow } = await import('../src/revisions/pin.verb.ts');
 const { refreshRun } = await import('../src/revisions/pin.verb.ts');
 const { metered } = await import('../src/meter/tally.store.ts');
-const { writeRules } = await import('../src/rules/rules.store.ts');
+const { writeRules } = await import('../src/factory/rules/rules.store.ts');
 const { setRevisions } = await import('../src/factory/factory.store.ts');
 const { StoreRoot } = await import('../src/config/root.store.ts');
 const { agentDoorMemory } = await import('../src/agents/agent-memory.store.ts');

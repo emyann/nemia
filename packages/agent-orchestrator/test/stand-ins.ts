@@ -15,9 +15,9 @@
  * destructured or kept whole. A module is named by its package or by its path from the repository root (`moduleOf`).
  *
  * A test inherits what its helpers reach (`reachOver`): each `.ts` file under a package's `test/` that is no test, reached by a
- * relative value import, and theirs in turn. No file of a `src`, of `place/` or of another package is followed. One helper is left
- * out by name (`EXEMPT`): `test/scratch.ts`, which every test imports and which imports `node:child_process` for the `ps` its reaper
- * falls back on, and for nothing a test asks of it.
+ * relative value import, and theirs in turn. No file of a `src`, of `place/` or of another package is followed: the test kit
+ * (`test-kit/scratch`, which every test imports and which imports `node:child_process` for the `ps` its reaper falls back on) is a
+ * package, so it is not.
  *
  * `JUDGED` says the kinds refused in each package: all five above the runtime, `git` and `process` in it, where the engine is the
  * package's own code. A boundary test earns its name by any of the five, judged in its package or not (`Reach.named`), so the
@@ -109,9 +109,6 @@ const GIVERS = ['succeed', 'sync', 'effect'];
 
 /** The modules `Layer` is imported from. */
 const LAYER: Names = { modules: ['effect', 'effect/Layer'], names: ['Layer', '*'] };
-
-/** The helper no test inherits from, in each package: see the file's head. */
-const EXEMPT = /^(?:packages|apps)\/[^/]+\/test\/scratch\.ts$/;
 
 /** A helper of a package's tests: a `.ts` file under its `test/` that is no test. */
 const HELPER = /^(?:packages|apps)\/[^/]+\/test\/.+\.ts$/;
@@ -381,7 +378,7 @@ function ownOf(file: string, text: string, clauses: readonly Clause[]): Own {
 export const reachIn = (file: string, text: string, clauses: readonly Clause[] = CLAUSES): Site[] => [...ownOf(file, text, clauses).sites];
 
 /** Whether a module is a helper a test inherits from. */
-const isHelper = (module: string): boolean => HELPER.test(module) && !module.endsWith('.test.ts') && !EXEMPT.test(module);
+const isHelper = (module: string): boolean => HELPER.test(module) && !module.endsWith('.test.ts');
 
 /** A site, with the file that holds it. */
 export type Located = Site & { readonly file: string };

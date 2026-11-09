@@ -27,7 +27,7 @@ import type { Event, Sighting, SpawnRequest } from '../src/index.ts';
 import { Engine } from '../src/index.ts';
 import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 /**
  * A store in memory, and a harness whose sessions a test moves by hand, behind the engine as a consumer builds it. Its

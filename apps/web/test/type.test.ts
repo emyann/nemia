@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const WEB = path.resolve(import.meta.dirname, '..');
 
@@ -64,12 +64,12 @@ export const OUTSIDE: Outside[] = [
   { file: 'src/components/look/Plate.tsx', size: 'tracking-[-0.02em]', why: NUMERAL },
   { file: 'src/components/look/Sticker.tsx', size: 'text-[22px]', why: NUMERAL },
   { file: 'src/components/look/Sticker.tsx', size: 'leading-[26px]', why: NUMERAL },
-  { file: 'src/components/Markdown.tsx', size: 'text-[1.15em]', why: PROSE },
-  { file: 'src/components/Markdown.tsx', size: 'text-[1.08em]', why: PROSE },
-  { file: 'src/components/Markdown.tsx', size: 'text-[0.95em]', why: PROSE },
-  { file: 'src/components/Markdown.tsx', size: 'text-[0.9em]', why: PROSE },
+  { file: 'src/components/markdown/Markdown.tsx', size: 'text-[1.15em]', why: PROSE },
+  { file: 'src/components/markdown/Markdown.tsx', size: 'text-[1.08em]', why: PROSE },
+  { file: 'src/components/markdown/Markdown.tsx', size: 'text-[0.95em]', why: PROSE },
+  { file: 'src/components/markdown/Markdown.tsx', size: 'text-[0.9em]', why: PROSE },
   {
-    file: 'src/components/FrameTabs.tsx',
+    file: 'src/components/frame/FrameTabs.tsx',
     size: 'text-[length:inherit]',
     why: 'it gives the size back to where the content stands, and names none',
   },
@@ -217,12 +217,12 @@ test('REFUSED: a size in any file of src, a stylesheet included; the vendored ki
     'src/routes/z.tsx': '<a className="text-[11px]">\n',
     'src/components/m.tsx': '<a className="text-[1.15em]">\n',
     'src/routes/s.css': 'a { font-size: 12px }\n',
-    'src/components/Markdown.tsx': '<a className="text-[1.15em] text-xs">\n',
+    'src/components/markdown/Markdown.tsx': '<a className="text-[1.15em] text-xs">\n',
     'src/lib/clean.ts': 'export const a = "text-body-small text-on-surface";\n',
   });
   assert.deepEqual(sizesIn(root), [
-    'src/components/Markdown.tsx:1:29 (text-xs)',
     'src/components/m.tsx:1:15 (text-[1.15em])',
+    'src/components/markdown/Markdown.tsx:1:29 (text-xs)',
     'src/components/ui/y.tsx:1:15 (text-sm)',
     'src/routes/s.css:1:5 (font-size: 12px)',
     'src/routes/z.tsx:1:15 (text-[11px])',

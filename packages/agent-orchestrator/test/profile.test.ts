@@ -12,8 +12,8 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { workspaces } from './workspaces.ts';
-import { scratch } from './scratch.ts';
+import { workspaces } from 'test-kit/repo';
+import { scratch } from 'test-kit/scratch';
 import { DEFAULT_SERVICE_NAME } from '../src/telemetry/telemetry.ts';
 import { DEFAULT_SERVICE, ENDPOINT_KEY, FLUSH_MS, PROFILER, profilingOf } from '../../../tools/observe/profile/profiling.ts';
 

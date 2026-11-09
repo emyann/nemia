@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import type { ProposedObject } from 'objects';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { staged } from './story.ts';
 
 const ROOT = scratch('wf-proposals-tick-');

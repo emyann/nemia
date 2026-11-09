@@ -19,8 +19,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { TranscriptEvent } from '../src/harness/seam.ts';
-import { scratch } from './scratch.ts';
-import { story } from './checkpoints.ts';
+import { scratch } from 'test-kit/scratch';
+import { story } from 'test-kit/checkpoints';
 import { until, WAITED } from '../src/waits/index.ts';
 import type { AsyncRunner } from './promise-runner.ts';
 

@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import { parseWorkflow, type Workflow } from '../workflow.ts';
 import { filedConfig, RUN_LABELS, SESSION_TOKEN, STEP_FILES, WORKFLOW_FILES, workflowMounts } from './filed.ts';
 import type { Run } from '../record/record.ts';
-import type { FactoryServers } from '../servers/servers.ts';
+import type { FactoryServers } from '../factory/servers/servers.ts';
 import { configRefusal } from '../runtime-client.ts';
 import { filedRefusal, lineOf, type FiledFlags, type FiledStep } from '../keys/index.ts';
 import { names } from '../../test/assessed.ts';

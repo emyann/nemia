@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 process.env.WF_ROOT = scratch('wf-try-root-');
 const { TRY_STEP, triesDir, tryDir, writeTryFolder } = await import('./try.store.ts');

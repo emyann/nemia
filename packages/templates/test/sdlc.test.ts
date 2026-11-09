@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import { parseAgent, parseFolder, parseWorkflow, splitFrontmatter } from 'agent-orchestrator/workflow';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { copyOf, filesUnder, nemia, rendered, SDLC, storeEnv } from './template.ts';
 
 /** The template, copied once, and applied twice on one store: with every parameter set, and with none. */

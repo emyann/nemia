@@ -28,6 +28,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { withoutComments } from 'test-kit/imports';
 import ts from 'typescript';
 import { CLIENT_VERBS, READ_VERBS } from '../contracts/route.contract.ts';
 import { routeOf } from '../src/route.ts';
@@ -90,13 +91,6 @@ const sourceTexts = (): Map<string, string> =>
       .sort()
       .map((f) => [f, fs.readFileSync(path.join(CLI, f), 'utf8')]),
   );
-
-/** Source text with each comment line blanked: a line that opens with `//`, `/*` or `*`. */
-const withoutComments = (text: string): string =>
-  text
-    .split('\n')
-    .map((line) => (/^\s*(\/\/|\/\*|\*)/.test(line) ? '' : line))
-    .join('\n');
 
 /** Whether an import or export's bindings are all types: `import type`, `export type`, or every named binding `type`. */
 function typesOnly(node: ts.ImportDeclaration | ts.ExportDeclaration): boolean {

@@ -11,7 +11,7 @@ import path from 'node:path';
 import { parseAgent, parseWorkflow, WorkflowError, type Agent } from '../src/workflow.ts';
 import { formerKeyLines } from '../src/folder/folder.store.ts';
 import { formerFenceLine, overridableLine } from '../src/former/former.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const ROOT = scratch('wf-overrides-');
 process.env.WF_ROOT = ROOT;

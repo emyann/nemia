@@ -1,10 +1,10 @@
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
-import { RouteLink } from '../components/AgentParts';
-import { FactoryTags } from '../components/FactoryTag';
-import { Markdown } from '../components/Markdown';
-import { NewWorkflow } from '../components/NewWorkflow';
-import { FromBadge, Unplaced, YoursFolder } from '../components/WorkflowParts';
+import { RouteLink } from '../components/agent/AgentParts';
+import { FactoryTags } from '../components/factory/FactoryTag';
+import { Markdown } from '../components/markdown/Markdown';
+import { NewWorkflow } from '../components/workflow/NewWorkflow';
+import { FromBadge, Unplaced, YoursFolder } from '../components/workflow/WorkflowParts';
 import { factoriesQuery, storeQuery, workflowsInQuery, workflowsQuery, type PagePlace, type Place, type WorkflowListing } from '../lib/api';
 import { listPlace, pagePlaceOf, workflowFactories } from '../lib/factories';
 import { loadWorkflowsIn } from '../lib/placed';

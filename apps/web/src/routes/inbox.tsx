@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
-import { FactoryCardStart, UnassignedStart } from '../components/FactoryCardStart';
-import { FileCard } from '../components/FileCard';
+import { FactoryCardStart, UnassignedStart } from '../components/factory/FactoryCardStart';
+import { FileCard } from '../components/inbox/FileCard';
 import {
   CardMeta,
   GoneItem,
@@ -14,10 +14,10 @@ import {
   SECONDARY,
   StartedAs,
   Tried,
-} from '../components/InboxParts';
-import { CardFrom } from '../components/CardFrom';
-import { Instant } from '../components/Instant';
-import { SelectorField } from '../components/SelectorField';
+} from '../components/inbox/InboxParts';
+import { CardFrom } from '../components/inbox/CardFrom';
+import { Instant } from '../components/time/Instant';
+import { SelectorField } from '../components/field/SelectorField';
 import { Segment, SegmentedButton } from '../components/ui/ds/components/SegmentedButton';
 import { dropCard, factoriesQuery, inboxAllQuery, labelSearch, queueCard, type InboxEntry, type Started } from '../lib/api';
 import { factorySearch, keptBy, shownIn } from '../lib/factories';

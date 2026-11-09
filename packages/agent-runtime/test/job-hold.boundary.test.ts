@@ -18,8 +18,8 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { scratch } from './scratch.ts';
-import { story } from './checkpoints.ts';
+import { scratch } from 'test-kit/scratch';
+import { story } from 'test-kit/checkpoints';
 import { until, WAITED } from '../src/waits/index.ts';
 import { sessionDrainFile, sessionDrainOf, liftSessionDrain, putSessionDrain, readJobHold } from '../src/harness/claude/job-hold.ts';
 

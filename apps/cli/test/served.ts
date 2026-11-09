@@ -1,6 +1,6 @@
 /**
  * A store served for the tests of the client's own verbs (`get`, `apply`, `explain`), as the moved reads' test serves one
- * (`reads.test.ts`): a scratch store (the api's `scratch.ts`, which reaps what runs in it), the api on it started with `--no-tick` on a
+ * (`reads.test.ts`): a scratch store (`test-kit/scratch`, which reaps what runs in it), the api on it started with `--no-tick` on a
  * free port, and the lease the client reads, its `url` alone. `nemia` runs the bin on it, waited on for its end, never for a length of
  * time.
  */
@@ -8,7 +8,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ambient } from './ambient.ts';
-import { scratch } from '../../api/test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 const API = path.join(import.meta.dirname, '..', '..', 'api');

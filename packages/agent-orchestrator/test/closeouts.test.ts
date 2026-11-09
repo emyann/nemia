@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import type { Engine } from '../src/runtime-client.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
 import { answerText, type Question } from '../src/question/question.ts';

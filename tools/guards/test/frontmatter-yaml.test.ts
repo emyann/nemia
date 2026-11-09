@@ -15,8 +15,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import jsyaml from 'js-yaml';
-import { files, REPO } from './repo-files.ts';
-import { scratch } from './scratch.ts';
+import { files, REPO } from 'test-kit/repo';
+import { scratch } from 'test-kit/scratch';
 
 /** The folders whose markdown is read by a harness or by Nemia as frontmatter and a body. */
 const HELD = ['.claude/skills/', 'apps/web/.claude/skills/', 'packages/agent-orchestrator/skills/', 'packages/templates/sdlc/skills/'];

@@ -84,7 +84,7 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   (`isSameDay`, `isSameYear`) and take the time from it; `agoWords` decides no day and takes no zone, a distance having neither.
 - A whole instant has one writer, `lib/instant.ts`: text on a page is `instantWords` (`7:08 PM` today, `9 Oct 5:30 PM`, `31 Dec 2025,
   4:10 PM`: a comma after a year alone), a `title` is `instantWhole` (`12 Oct 2026, 7:08:53 PM`), the Timeline's cell is
-  `timeToTheSecond`; a component draws one with `Instant` (`components/Instant.tsx`). date-fns is imported only in the four files that
+  `timeToTheSecond`; a component draws one with `Instant` (`components/time/Instant.tsx`). date-fns is imported only in the four files that
   write a moment (`lib/timeOfDay.ts`, `lib/instant.ts`, `lib/runWords.ts`, `lib/quota.ts`); a fifth that needs it joins the list with
   its reason.
 - A time on the runs page is `whenWords`, and how long ago something was, in a table's column, is `agoWords` (`3 minutes ago`,
@@ -99,7 +99,7 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - The look's own parts are `src/components/look`, taken through its door (`index.ts`) by every file outside it; each has its stories
   beside it (`<Part>.stories.tsx`), one a state. A breakdown is drawn once, by `look/Breakdown.tsx`: `BreakdownRows` for its rows and
   its foot, `BreakdownPreview` for the kit's rich tooltip over a focusable trigger the caller gives — the look's `StatTile` hangs its
-  sticker there and both runs tables their Clock cell (`components/RunClockCell.tsx`) and their Cost cell (`components/RunCostCell.tsx`,
+  sticker there and both runs tables their Clock cell (`components/run/RunClockCell.tsx`) and their Cost cell (`components/run/RunCostCell.tsx`,
   the run's tokens by kind, `tokensBreakdown`), and the Overview's Spent tile today's tokens, so the card and the rows say one thing.
 - What a run's Clock says has one writer, `runClock` (`lib/factory.ts`): a card says a sentence, a table's row the time at work alone
   and `not started` for a run nothing of which is filed (`place: 'row'`). The breakdown under it is `clockBreakdown`
@@ -114,14 +114,14 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   session's is `sessionItems` (`lib/sessionItems.ts`, beside the fold it reads, `lib/transcript.ts`). A family part writes every data
   mark under the prefix its caller names (`mark`), never a `data-chat-` of its own and never a prefix quoted at the call — hers names
   `chat`, a step's session `session`, and `test/conversation.test.ts` reads both forms off every `.tsx` of the folder — and what is one
-  conversation's alone stays in that conversation's folder: hers is `components/chat/` (her kept message, her asks), a step's session's
-  is `components/session/` (its brief, its told turns, its closeout, its bands, its composer).
+  conversation's alone stays in that conversation's folder: hers is `components/nemia/chat/` (her kept message, her asks), a step's session's
+  is `components/step/session/` (its brief, its told turns, its closeout, its bands, its composer).
 - A step her message links to (`/runs/<run>?step=<step>`, read by `broughtOf` in `lib/stepLink.ts`) is drawn under her words by
-  `components/chat/ChatBrought.tsx` from the run's page's own parts, never a copy: `GateBrief`, Decide's `AnswerRow`, `Continue`,
+  `components/nemia/chat/ChatBrought.tsx` from the run's page's own parts, never a copy: `GateBrief`, Decide's `AnswerRow`, `Continue`,
   `AskedRow`. Which one is `broughtPart` (`lib/brought.ts`, proved by `contracts/brought.contract.ts`), off the run's page's own reads.
 - A proposal her message links to (`/factories/<factory>/proposals/<name>`, read by `proposalLinkOf` in `lib/proposalLink.ts`, held to
-  the link `nemia.md` teaches by `tools/guards/test/proposal-link.test.ts`) is drawn under her words by `components/chat/ChatProposal.tsx`
-  from the proposal page's own part, `components/ProposalCard.tsx`, never a copy; its Approve and Decline are `proposalOffers`
+  the link `nemia.md` teaches by `tools/guards/test/proposal-link.test.ts`) is drawn under her words by `components/nemia/chat/ChatProposal.tsx`
+  from the proposal page's own part, `components/gate/ProposalCard.tsx`, never a copy; its Approve and Decline are `proposalOffers`
   (`lib/proposals.ts`, proved by `contracts/proposal.contract.ts`). Her action ask, the chat event kind `proposal`, is `ChatActions`.
 - A person's word for a step's state has one writer, `PERSON` in `lib/words.ts`, a total `Record<StepState, PersonWords>`: its rail word
   (on the chip, the rail and the card's tag), what it means on hover, and the words of its wait for a state that waits on a person. The
@@ -152,7 +152,7 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   and before `react()`, in `vite.config.ts`); the node tests load `src` uncompiled, so only the build and the e2e test the compiled app.
   A function it skips is logged at build as `React Compiler skipped <file>:<line>: <why>`: read the build's output. A memo lists what its
   body reads, and an array rebuilt on every refetch goes through `useContent`.
-- A link to a route is `routeLink` (`components/routeLink.tsx`), under the root's `RouterProvider`: Enter on a React Aria link is two
+- A link to a route is `routeLink` (`components/nav/routeLink.tsx`), under the root's `RouterProvider`: Enter on a React Aria link is two
   clicks, and each would navigate.
 - A suspense query keeps what it showed when a read fails: a page that must say a thing is gone reads the query's `error`, and a query
   whose 404 is an answer does not retry it (`runGone`, `retryRun` in `lib/api/gone.ts`).

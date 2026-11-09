@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { claudeCodeOps } from '../src/harness/claude/code.ts';
 import { putSessionDrain, writeJobHold, type JobHold } from '../src/harness/claude/job-hold.ts';
 import { STALE_MS } from '../src/harness/detached/detached.ts';

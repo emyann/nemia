@@ -23,7 +23,7 @@ import type { Services } from './layer.ts';
 import { repoOf } from './capabilities/capabilities.ts';
 import { argsOf, HOST, portOf } from './port.ts';
 import { STEP_FOLLOWS } from './steps/following.ts';
-import { daemonQuota, QuotaAsker } from './factory/quota.ts';
+import { daemonQuota, QuotaAsker } from './gauges/quota.ts';
 import { Engine, engineRead } from './store.ts';
 
 /** Prints `err`'s message and exits with its code: 2 for a refusal, 1 for anything else. */

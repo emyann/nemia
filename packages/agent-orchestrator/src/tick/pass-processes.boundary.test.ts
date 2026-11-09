@@ -16,7 +16,7 @@ import { nameFor, Engine, type Sighting } from 'agent-runtime';
 import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from '../../test/promised.ts';
 import type { Run } from '../run.ts';
 import type { PassCost } from '../meter/meter.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { Effect } from 'effect';
 import { plainEngine } from '../../test/promised.ts';
 import { runGiven, runOver } from '../../test/placed.ts';

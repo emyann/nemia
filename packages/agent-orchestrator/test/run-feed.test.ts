@@ -20,7 +20,7 @@ import { Effect } from 'effect';
 import { bell, until, WAITED } from 'agent-runtime/testing';
 import type { Run } from '../src/record/record.ts';
 import type { FeedLine, Reason, RunLine } from '../src/feed/feed.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
 import type { EnginePhase } from '../src/views/views-words.ts';

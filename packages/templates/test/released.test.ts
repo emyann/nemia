@@ -15,7 +15,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { nemia, storeEnv, TEMPLATES } from './template.ts';
 
 /** The record of what is released: by template, its version and the digest of its content. */

@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { assess } from '../src/tick/assess.ts';
-import { runWords } from '../src/routed/routed-words.ts';
+import { runWords } from '../src/route/routed/routed-words.ts';
 import { closeoutSchemaOf, type Closeout } from '../src/closeout/closeout.ts';
 import { composeBrief } from '../src/brief/brief.ts';
 import { stepSetRefusal, validate } from '../src/workflow/validate.ts';
@@ -16,7 +16,7 @@ import type { Workflow } from '../src/step/step.ts';
 import { phases, run, step } from './assessed.ts';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { workflowTargets } from '../src/tick/told.verb.ts';
 
 const READER = { name: 'reviewer', keys: [], body: 'Read the change and choose.', given: {} };

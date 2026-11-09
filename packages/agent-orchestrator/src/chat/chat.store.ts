@@ -16,6 +16,7 @@ import path from 'node:path';
 import { Result, Schema } from 'effect';
 import { Invalid } from '../refusal/refusal.ts';
 import type { AnswerMark, Ask, AskAnswer, AskClose, DeliveredMark, OutboxEntry, ReadMark, SourceStop } from './chat.ts';
+import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /** The chat's folder within `dir`. */
 export const chatDir = (dir: string): string => path.join(dir, 'chat');
@@ -237,15 +238,11 @@ function speakersRead(dir: string): (typeof SpeakersSchema)['Type'] {
 export function writeSpeakers(dir: string, allowed: readonly string[]): void {
   const kept = speakersRead(dir);
   fs.mkdirSync(chatDir(dir), { recursive: true });
-  const hidden = path.join(chatDir(dir), `.speakers.json.${process.pid}`);
-  fs.writeFileSync(hidden, `${JSON.stringify({ ...kept, allowed })}\n`);
-  fs.renameSync(hidden, speakersFile(dir));
+  writeWhole(speakersFile(dir), `${JSON.stringify({ ...kept, allowed })}\n`);
 }
 
 /** Writes the person's read mark whole, through a hidden file renamed over it. The person's verb is its one writer. */
 export function writeReadMark(dir: string, mark: ReadMark): void {
   fs.mkdirSync(chatDir(dir), { recursive: true });
-  const hidden = path.join(chatDir(dir), `.read.json.${process.pid}`);
-  fs.writeFileSync(hidden, `${JSON.stringify(mark)}\n`);
-  fs.renameSync(hidden, readMarkFile(dir));
+  writeWhole(readMarkFile(dir), `${JSON.stringify(mark)}\n`);
 }

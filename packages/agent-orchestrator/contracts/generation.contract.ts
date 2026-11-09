@@ -1,5 +1,5 @@
 /**
- * A factory's generation after a write (agent-orchestrator, src/factories/generation.ts): `metadata.generation`, the count of
+ * A factory's generation after a write (agent-orchestrator, src/factory/door/generation.ts): `metadata.generation`, the count of
  * changes to its spec, kept on its file as `generation`. A file written before the counter reads as generation 1. A write that changes
  * the spec counts one more; a write that changes nothing of it (its status, a key no spec holds) keeps the count. What "changes the spec"
  * compares is the door's, held by a test: this law says only what the count does with the answer.
@@ -29,5 +29,5 @@ const generationAfterSpec = spec<(before: number | null, specChanged: boolean) =
   },
 });
 
-/** `generationAfter`'s type, which `src/factories/generation.ts` takes. */
+/** `generationAfter`'s type, which `src/factory/door/generation.ts` takes. */
 export type GenerationAfter = Implementation<typeof generationAfterSpec>;

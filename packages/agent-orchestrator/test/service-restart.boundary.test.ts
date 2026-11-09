@@ -16,7 +16,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { Effect } from 'effect';
 import type { DaemonStanding } from '../src/daemon/daemon.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runOver } from './placed.ts';

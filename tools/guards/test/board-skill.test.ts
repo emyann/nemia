@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillEntryOf, splitFrontmatter } from 'agent-orchestrator/workflow';
-import { REPO } from './workspaces.ts';
+import { REPO } from 'test-kit/repo';
 
 const FILE = '.claude/skills/change-the-board/SKILL.md';
 const TEXT = fs.readFileSync(path.join(REPO, FILE), 'utf8');

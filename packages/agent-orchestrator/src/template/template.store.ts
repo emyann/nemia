@@ -1,6 +1,6 @@
 /**
  * A factory template's tree, checked: each YAML document parsed with the line every value stands on, and every problem at once
- * (`checkedTree`), pure over a tree the Template door read (`src/templates/templates.store.ts`); a tree opened for a render
+ * (`checkedTree`), pure over a tree the Template door read (`src/template/door/templates.store.ts`); a tree opened for a render
  * (`openedTree`); and the tree a repository's workflows, agents and skills and a factory's hires, instruction and rules make
  * (`exportTree`), read through the loader's own readers and checked before the door writes it. What a template is read from and
  * written to is the door's: nothing here writes the disk.
@@ -28,11 +28,11 @@ import {
 import { splitFrontmatter, WorkflowError } from '../step/step.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { contentDigest, pathRefusals, type TreeFile } from '../archive/archive.ts';
-import { walkFolder, type TemplateTree } from '../templates/templates.store.ts';
-import { templateNameRefusal, type Problem } from '../templates/templates.ts';
+import { walkFolder, type TemplateTree } from './door/templates.store.ts';
+import { templateNameRefusal, type Problem } from './door/templates.ts';
 import { checkTemplate, documentFile, draftOf, type Draft, type ReadFolder, type Source, type StepSource } from './index.ts';
 
-export type { Problem } from '../templates/templates.ts';
+export type { Problem } from './door/templates.ts';
 
 /** A document as parsed, with what turns its offsets into lines. */
 type Parsed = { doc: Document.Parsed | undefined; lines: LineCounter };

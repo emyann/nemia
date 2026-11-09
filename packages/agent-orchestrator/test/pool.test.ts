@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { checkArgv } from '../src/check/check.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { gatedJob } from './gated-job.ts';
 import { until, WAITED, type Waiter } from 'agent-runtime/testing';
 import { Effect } from 'effect';

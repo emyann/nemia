@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import { testEngine } from 'agent-runtime/testing';
 import { eachTest } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 process.env.WF_ROOT = scratch('wf-passes-');
 process.env.WF_VERIFY_REST = '1';

@@ -18,7 +18,7 @@ import { agentObjectsOf, treeAgentsHeld } from '../definitions/agents.ts';
 import { listed, servedNamed, servedOf } from '../definitions/served.ts';
 import { skillObjectsOf, treeSkillsHeld } from '../definitions/skills.ts';
 import { treeWorkflowsHeld, workflowObjectsOf } from '../definitions/workflows.ts';
-import { queryOf } from '../factory-parts/parts.ts';
+import { queryOf } from '../factory/parts/parts.ts';
 import { answered, answeredWrite } from '../objects/refused.ts';
 
 /**

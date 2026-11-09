@@ -23,7 +23,7 @@ import { Effect } from 'effect';
 import { Invalid } from '../src/refusal/refusal.ts';
 import type { Run, TaskPhase } from '../src/run.ts';
 import { promised } from './promised.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { TEAM, TEAM_DEV } from './team.ts';
 import { columnsListed, plantedGit } from './planted-git.ts';
 import { runGiven, runOver } from './placed.ts';

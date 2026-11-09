@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Code, Html, Root } from 'mdast';
 import { diagramFrom, diagramIn, remarkMermaid, unreadLines } from '../src/mermaid.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 

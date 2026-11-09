@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { staged, story } from '../../test/story.ts';
 import { teamCopy } from '../../test/team.ts';
 
@@ -22,7 +22,7 @@ const INBOX = path.join(ROOT, 'inbox');
 const { templated: programsAt } = await import('../../test/templated.ts');
 const { exportTemplate, reconciled } = programsAt(ROOT);
 const { readFactory } = await import('../runner.ts');
-const { appliedDir, treeDir } = await import('../applied/applied.store.ts');
+const { appliedDir, treeDir } = await import('../factory/applied/applied.store.ts');
 const { readRun } = await import('../record/record.store.ts');
 const { advanceRun, startRun } = await import('../runner.ts');
 const { main } = await import('../cli/main.ts');
@@ -287,7 +287,7 @@ test('what nemia factory adopt refuses, each with nothing written', async (t) =>
   });
 });
 
-const { FACTORY_PLAN } = await import('../upgrade/upgrade.verb.ts');
+const { FACTORY_PLAN } = await import('../factory/upgrade/upgrade.verb.ts');
 const { FACTORY_ADOPT } = await import('./adopt.verb.ts');
 const { withBuiltins } = await import('../../test/templated.ts');
 

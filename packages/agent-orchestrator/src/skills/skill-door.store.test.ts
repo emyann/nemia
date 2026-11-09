@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { act, done, doorFrom, walksOn } from '../../test/door-walks.ts';
 import { aSkill, SKILL_WALKS } from '../../test/skill-walks.ts';
 import { SkillDoor, skillDoorFiles, skillDoorOver, type SkillLayer } from './skill-door.store.ts';

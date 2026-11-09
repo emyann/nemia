@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { storeEnv } from './template.ts';
 
 const DAEMONS = {

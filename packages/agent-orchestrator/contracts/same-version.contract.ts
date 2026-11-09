@@ -1,5 +1,5 @@
 /**
- * A templated factory changed at the version its base holds (agent-orchestrator, src/upgrade/same-version.ts). `sameVersionChange`
+ * A templated factory changed at the version its base holds (agent-orchestrator, src/factory/upgrade/same-version.ts). `sameVersionChange`
  * tells, by digests alone, what wanting the version the base already holds asks: nothing, where the base is already the render wanted;
  * a change of the factory's parameters alone, where the base is still the template at that version rendered with the parameters it was
  * rendered with (so the template did not change under its version, and the render wanted differs only by the parameters); else a
@@ -43,7 +43,7 @@ const sameVersionChangeSpec = spec<(seen: SameVersionSeen) => SameVersionKind>({
   },
 });
 
-/** `sameVersionChange`'s type, which `src/upgrade/same-version.ts` takes. */
+/** `sameVersionChange`'s type, which `src/factory/upgrade/same-version.ts` takes. */
 export type SameVersionChange = Implementation<typeof sameVersionChangeSpec>;
 
 /**
@@ -89,5 +89,8 @@ const choicesApplySpec = spec<(recorded: ChoicesRecorded, merge: MergeAt) => boo
   },
 });
 
-/** `choicesApply`'s type, which `src/upgrade/same-version.ts` takes and `choicesFor` (`src/applied/applied.store.ts`) calls. */
+/**
+ * `choicesApply`'s type, which `src/factory/upgrade/same-version.ts` takes and `choicesFor` (`src/factory/applied/applied.store.ts`)
+ * calls.
+ */
 export type ChoicesApply = Implementation<typeof choicesApplySpec>;

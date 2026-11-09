@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { REPO as ROOT, workspaces } from './workspaces.ts';
+import { REPO as ROOT, workspaces } from 'test-kit/repo';
 
 /** What this repository is under, as a `license` field says it (an SPDX identifier). */
 const LICENSE = 'MIT';

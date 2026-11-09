@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { nodeChild } from './child.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const PKG = path.join(import.meta.dirname, '..');
 const BIN = path.join(PKG, 'bin', 'nemia.ts');

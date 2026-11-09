@@ -120,7 +120,7 @@ version, and the version above must be the pin. An upgrade re-measures the table
 - What an api route holds is let go in its scope too. A live reader is a stream that takes what it holds in its own scope: `followFeed`
   in `packages/agent-orchestrator/src/feed/feed.verb.ts` subscribes to the process's `PubSub.sliding` (`FeedHub`), so a slow reader never
   holds up the writer, reads what the hub dropped from the file, and is counted while it is open; `feedEvents` in
-  `apps/api/src/factory/feed.ts` maps it to the stream's events. Hono's `streamSSE` runs it with the app's `runtime.runPromiseExit(program, { signal })`, the signal
+  `apps/api/src/gauges/feed.ts` maps it to the stream's events. Hono's `streamSSE` runs it with the app's `runtime.runPromiseExit(program, { signal })`, the signal
   aborted from `stream.onAbort`: `runPromiseExit`, since `streamSSE` prints a rejection. A child process is `acquireRelease` with its
   release reading the `Exit`, under `Effect.timeoutOrElse`, which waits for the release: `claudeQuota` in
   `packages/agent-runtime/src/harness/claude/quota.ts`, `serverAsk` in `apps/api/src/capabilities/capabilities.ts`.

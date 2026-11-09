@@ -18,6 +18,7 @@ import type { VersionRefused } from '../folder/folder.ts';
 import { isWorkflowsHolderAt } from '../folder/write.store.ts';
 import { definitionVersionRefusal, type DefinitionThere } from '../agents/agents.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
+import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /** One skill folder read now: its card entry, or null with `error` saying why no agent can be given it; and what it costs a turn. */
 export type SkillRead = {
@@ -297,14 +298,7 @@ export function writeSkill(
   } else {
     refuseVersion(definitionVersionRefusal('skill', name, 'write', skillThere(target), version));
     const text = rendered(fs.readFileSync(file, 'utf8'));
-    const staging = path.join(target, `.SKILL.md.writing-${process.pid}-${Date.now()}`);
-    try {
-      fs.writeFileSync(staging, text);
-      fs.renameSync(staging, file);
-    } catch (err) {
-      fs.rmSync(staging, { force: true });
-      throw err;
-    }
+    writeWhole(file, text);
   }
   return { dir: target, name, version: versionWritten(target, `${named} is not in ${at}`), written: ['SKILL.md'] };
 }

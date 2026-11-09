@@ -16,7 +16,7 @@
  * Each package's `test` script bounds how many test files `node --test` runs at once, the same `--test-concurrency=<n>` in each:
  * unbounded, a suite runs about as many processes as the machine has cores in every package, and several suites at once swap.
  *
- * A package here is each workspace the root `package.json` names (`workspaces` in `repo-files.ts`): `tools/guards`, the home of the
+ * A package here is each workspace the root `package.json` names (`workspaces` of `test-kit/repo`): `tools/guards`, the home of the
  * repository's own guards, is held as every package is.
  */
 import { test } from 'node:test';
@@ -24,8 +24,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
-import { REPO, workspaces } from './workspaces.ts';
-import { scratch } from './scratch.ts';
+import { REPO, workspaces } from 'test-kit/repo';
+import { scratch } from 'test-kit/scratch';
 
 test("the workspaces are the root package.json's: a dir/* glob as its folders with a package.json, a folder as it is", () => {
   assert.ok(workspaces().includes('tools/guards'), 'the sweeps below read the home of the guards');

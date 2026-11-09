@@ -18,7 +18,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { AWAY, DAEMON_ONLY, ENGINE, REAL_HOME, SENTINEL, STORE } from './ambient.ts';
-import { machineTempDir, scratch } from './scratch.ts';
+import { machineTempDir, scratch } from 'test-kit/scratch';
 
 const PACKAGE = path.join(import.meta.dirname, '..');
 const TELEMETRY = pathToFileURL(path.join(PACKAGE, 'src', 'telemetry', 'telemetry.ts')).href;

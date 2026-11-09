@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { isDeepStrictEqual } from 'node:util';
 import path from 'node:path';
+import { withoutComments, specifiersIn } from 'test-kit/imports';
 
 const PKG = path.join(import.meta.dirname, '..');
 const ROOT = path.join(PKG, '..', '..');
@@ -19,24 +20,6 @@ const XSTATE = 'xstate';
 const LIFECYCLE = 'src/core/lifecycle.ts';
 /** This file reads XState's exports to refuse them, and is the one test let import it. */
 const SELF = 'packages/agent-runtime/test/xstate-boundary.test.ts';
-
-/** A line of prose read as nothing, as `contract.test.ts` reads one, the line kept so numbers still count. */
-const withoutComments = (text: string): string =>
-  text
-    .split('\n')
-    .map((line) => (/^\s*(\/\/|\/\*|\*)/.test(line) ? '' : line))
-    .join('\n');
-
-/**
- * Every module a piece of source names: imports and re-exports, type-only included, `import()` and `require()` (as `a2a-boundary.test.ts`).
- */
-function specifiersIn(text: string): string[] {
-  const found = new Set<string>();
-  for (const m of text.matchAll(/^\s*(?:import|export)\b[^'"`;]*?\bfrom\s*['"]([^'"]+)['"]/gm)) found.add(m[1]);
-  for (const m of text.matchAll(/^\s*import\s*['"]([^'"]+)['"]/gm)) found.add(m[1]);
-  for (const m of text.matchAll(/\b(?:import|require|import\.meta\.resolve|require\.resolve)\s*\(\s*['"`]([^'"`]+)['"`]/g)) found.add(m[1]);
-  return [...found].sort();
-}
 
 /** Where `file` (a path from the repository's root) reaches XState outside the lifecycle: each breach, worded with what to do instead. */
 function xstateBreaches(file: string, text: string): string[] {

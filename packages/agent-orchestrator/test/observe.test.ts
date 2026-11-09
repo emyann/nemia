@@ -29,7 +29,7 @@ import path from 'node:path';
 import yaml from 'js-yaml';
 import { Engine as RuntimeEngine, type Event, type Sighting } from 'agent-runtime';
 import { Duration, Effect, Logger, Option, References, Tracer } from 'effect';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { asyncOps, asyncStore, type AsyncJournal, type AsyncRunner } from './promised.ts';
 import { testPlace } from '../place/memory/index.ts';
 import { runGiven } from './placed.ts';

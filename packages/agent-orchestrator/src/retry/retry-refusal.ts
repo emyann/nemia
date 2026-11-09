@@ -39,7 +39,7 @@ import { carries, heard, pauseAskVoid, retriesDue, retryable } from './retry.ts'
 import { remoteRetryRefusal } from '../harness/harness.ts';
 import { autoDropped } from '../workflow/index.ts';
 import { modeOf } from '../former/former.ts';
-import { heldRefusal, prunedRefusal } from '../prune/prune.ts';
+import { heldRefusal, prunedRefusal } from '../forget/prune/prune.ts';
 
 /** What `retryRefusal` was asked: its arguments, and the command its refusals name. */
 type Asked = {

@@ -11,7 +11,7 @@ import { Effect, Exit, Schema } from 'effect';
 import { Event, EventList } from 'objects';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { meteredPass } from '../meter/tally.store.ts';
 import { FeedDoor, feedDoorFiles } from '../feed/feed.store.ts';
 import { feedDoorMemory } from '../feed/memory.store.ts';

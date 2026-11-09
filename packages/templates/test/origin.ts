@@ -11,7 +11,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 /** A call the stub `gh` was given: the folder it ran in, and its arguments. */
 export type Called = { cwd: string; argv: string[] };

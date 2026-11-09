@@ -7,7 +7,7 @@
 import type { Context as RequestContext, Hono } from 'hono';
 import type { Guarded } from '../guard.ts';
 import type { ApiEnv } from '../layer.ts';
-import type { Handing } from '../factory-parts/parts.ts';
+import type { Handing } from '../factory/parts/parts.ts';
 
 const PROPOSAL_SHAPE =
   '`{ "objects": [{ "kind", "metadata": { "name", "resourceVersion"? }, "spec"?, "verb"? }], "applyAt"?: "approval" | "run-end", "why"? }`';

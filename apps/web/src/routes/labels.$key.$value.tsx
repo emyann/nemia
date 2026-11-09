@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { CardStateChip } from '../components/InboxParts';
+import { CardStateChip } from '../components/inbox/InboxParts';
 import { PageName, Plate, ScanLines, StatTile, Sticker, TextLink } from '../components/look';
 import { inboxSelectedQuery, labelStatsQuery, runsSelectedQuery, spentOf, type RunSummary } from '../lib/api';
 import { startedCard } from '../lib/inbox';

@@ -40,12 +40,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
-      # Every leg runs: one package's failure on one node says nothing about the other seventeen.
+      # Every leg runs: one package's failure on one node says nothing about the other nineteen.
       fail-fast: false
       matrix:
         # The orchestrator is not here: its suite is run in halves, and a matrix cannot split one combination, so its four legs arrive
         # through include below.
-        workspace: [agent-runtime, objects, api, cli, web, docs, templates]
+        workspace: [agent-runtime, objects, api, cli, web, docs, templates, test-kit]
         # Quoted, both of them: YAML reads 24.16 as a number and setup-node then installs the wrong Node. 24.16.0 is the floor
         # engines.node claims; 24 is its line's latest.
         node: ['24.16.0', '24']

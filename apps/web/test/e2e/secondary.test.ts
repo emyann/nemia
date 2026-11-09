@@ -7,7 +7,7 @@
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium, type Browser, type Page } from 'playwright';
-import { scratch } from '../scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { WAITED } from '../waits.ts';
 import { buildParts, openParts } from './parts/gallery.ts';
 

@@ -5,7 +5,7 @@ Agent sessions on one harness each, durably (README). `decide` (`src/core/domain
 (`test/contract.test.ts`), and the vocabulary loads no Effect and no I/O (`test/vocabulary-door.test.ts`). The runtime imports nothing
 above it. Most of its rules are said in a comment at the code they hold: read that comment before you change the code.
 
-- **A person's story is one test, its checkpoints `story` subtests** (`test/checkpoints.ts`), and a function's inputs are one test whose
+- **A person's story is one test, its checkpoints `story` subtests** (`test-kit/checkpoints`), and a function's inputs are one test whose
   rows are `t.test` subtests. A focused test of its own is for a race, a crash window, a real boundary or an invariant of a pure function.
 
 ## The pass

@@ -1,4 +1,4 @@
-/** Whether a daemon — the api's process or the headless one — ticks the store (`GET /api/daemon`, apps/api/src/factory/daemon.ts). */
+/** Whether a daemon — the api's process or the headless one — ticks the store (`GET /api/daemon`, apps/api/src/gauges/daemon.ts). */
 import { queryOptions } from '@tanstack/react-query';
 import { pace } from '../feed.ts';
 import { Schema } from 'effect';
@@ -6,7 +6,7 @@ import { decodes } from './decodes.ts';
 import { get } from './read.ts';
 
 /**
- * Mirrors `Daemon` in apps/api/src/factory/daemon.ts: whether a daemon ticks the store, as the package judges `daemon.json` — `ticking`
+ * Mirrors `Daemon` in apps/api/src/gauges/daemon.ts: whether a daemon ticks the store, as the package judges `daemon.json` — `ticking`
  * alone moves the runs; `none`, `unreadable`, `stopped`, `gone` and `stalled` (alive, silent past `staleAfterMs`) do not. `by` is the
  * holder's kind as the api names it, `url` where an api holder serves the board, and `start` how a person starts one. Times are ISO, null
  * where the file says none; `lastHeardAt` is the latest of its start, its last pass and its beat. `line` is the CLI `ls`'s own sentence.

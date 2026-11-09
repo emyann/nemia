@@ -16,7 +16,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import type { Run } from '../src/record/record.ts';
 import { nodeChild } from './child.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { staged } from './story.ts';
 import { names } from './assessed.ts';
 

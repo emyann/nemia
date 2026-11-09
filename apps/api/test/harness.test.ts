@@ -24,7 +24,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import ts from 'typescript';
-import { machineTempDir, scratch } from './scratch.ts';
+import { machineTempDir, scratch } from 'test-kit/scratch';
 import { app } from '../src/app.ts';
 import { engine, tickRun } from 'agent-orchestrator';
 import { runWith } from './builtin-place.ts';

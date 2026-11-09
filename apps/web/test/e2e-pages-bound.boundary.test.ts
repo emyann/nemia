@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { PAGES_BOUND_MS, PHASES, type PageTiming, type ShardPages } from './e2e/timing.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 /** A page's timing whose phases are its whole time, split evenly: made up here, as `timing.ts` asks, never a wait. */
 const timed = (name: string, ms: number): PageTiming => ({

@@ -23,6 +23,7 @@ import { Conflict, Missing } from '../refusal/refusal.ts';
 import { inboxNameOf, parseInboxCard, type MissedStart } from '../inbox/index.ts';
 import { CardName, MissedStart as MissedStartModel } from '../inbox/inbox.model.ts';
 import { isDirectory } from '../record/record.store.ts';
+import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /**
  * A layer of the Card door, as plain synchronous methods: the inbox's cards (its entries, a card's text, its filing time, filed, written
@@ -226,9 +227,7 @@ export function cardFiles(home: string): CardLayer {
         const at = fileOf(name);
         const filed = fs.statSync(at, { throwIfNoEntry: false })?.mtime;
         if (!filed) throw noCardToRewrite(name);
-        const hidden = path.join(inbox, `.${name}.md.${process.pid}`);
-        fs.writeFileSync(hidden, text);
-        fs.renameSync(hidden, at);
+        writeWhole(at, text);
         try {
           fs.utimesSync(at, filed, filed);
         } catch {}

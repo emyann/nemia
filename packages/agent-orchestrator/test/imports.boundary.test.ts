@@ -21,7 +21,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 const OXLINT = path.join(ROOT, 'node_modules', '.bin', 'oxlint');

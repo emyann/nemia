@@ -13,6 +13,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { wfRoot } from '../config/config.store.ts';
 import { Missing } from '../refusal/refusal.ts';
 import type { Machine } from './service.ts';
+import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /** The package's own folder, whose checkout the service runs until a release is installed. */
 const PACKAGE = path.join(import.meta.dirname, '..', '..');
@@ -116,9 +117,7 @@ export const readUnit = (file: string): string | null => textOf(file);
 /** Writes the service's file whole, through a hidden file renamed over it, so the system never reads half of it. */
 export function writeUnit(file: string, text: string): void {
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  const hidden = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}`);
-  fs.writeFileSync(hidden, text);
-  fs.renameSync(hidden, file);
+  writeWhole(file, text);
 }
 
 /** Removes the service's file; answers whether there was one. */

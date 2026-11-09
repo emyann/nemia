@@ -16,7 +16,7 @@ import type { RetryAsk } from '../src/retry/index.ts';
 import type { Workflow } from '../src/step/step.ts';
 import { retryable } from '../src/retry/retry.ts';
 import { type BranchStanding, notHandedOn, type SpendOf, standing } from '../src/status/status.ts';
-import { runWords } from '../src/routed/routed-words.ts';
+import { runWords } from '../src/route/routed/routed-words.ts';
 import { approved, gated, tryNow } from './laws.ts';
 
 export const sendBack = assume(retryable, { pure: true });

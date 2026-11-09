@@ -1,9 +1,9 @@
 /**
- * A template switch (agent-orchestrator, src/upgrade/merge.ts): an upgrade onto a template of another name than the one a factory's base
- * was rendered from, merged with no common base. `mergeBaseOf` says whether an upgrade has one, by the templates' names alone, never
- * their sources; `baseTemplateOf` names the template a base holds, as the controller records it; and with no base, `unrelatedKey`
- * merges one key (of `factory.json`, a hire, a step's frontmatter) and `unrelatedSet` a set of names (the workflows), where nothing
- * tells the factory's own value from the old template's, so the factory's is never kept over the template's without a choice.
+ * A template switch (agent-orchestrator, src/factory/upgrade/merge.ts): an upgrade onto a template of another name than the one a factory's
+ * base was rendered from, merged with no common base. `mergeBaseOf` says whether an upgrade has one, by the templates' names alone, never
+ * their sources; `baseTemplateOf` names the template a base holds, as the controller records it; and with no base, `unrelatedKey` merges
+ * one key (of `factory.json`, a hire, a step's frontmatter) and `unrelatedSet` a set of names (the workflows), where nothing tells the
+ * factory's own value from the old template's, so the factory's is never kept over the template's without a choice.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 

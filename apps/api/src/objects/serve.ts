@@ -12,7 +12,7 @@
  * what its route takes, and a path it serves nothing on (404) says where the paths it serves are listed. Its own refusals, already
  * `{ error }`, pass as they are.
  *
- * The factories and their parts are handed on by `partsRoutes` (factory-parts/parts.ts), which says each of their writes as the guard does;
+ * The factories and their parts are handed on by `partsRoutes` (factory/parts/parts.ts), which says each of their writes as the guard does;
  * the Workflows, Agents and Skills by `definitionsRoutes` (definitions/routes.ts), each request placed in the factory its namespace names
  * and on the repository its `?repo=` names (`placeFor`), so `default` is the api's repository and your library; a factory's Proposals and
  * Delegations by `proposalsRoutes` (proposals/routes.ts), placed the same way, each judged by who calls (`caller`, caller/caller.ts).
@@ -46,18 +46,18 @@ import { type Guarded, refusedBeforeReading } from '../guard.ts';
 import { startGuarded } from '../workflows/workflows.ts';
 import { type ApiEnv, type ApiRuntime, served } from '../layer.ts';
 import { cardsHandlers } from './cards.ts';
-import { factoriesHandlers } from './factories.ts';
 import {
   builtinHandlers,
+  factoriesHandlers,
   hiresHandlers,
   mcpServersHandlers,
   partsRoutes,
   schedulesHandlers,
+  placeFor,
   volumesHandlers,
-} from '../factory-parts/index.ts';
+} from '../factory/index.ts';
 import { agentsHandlers, definitionsRoutes, skillsHandlers, workflowsHandlers } from '../definitions/index.ts';
 import { delegationsHandlers, proposalsHandlers, proposalsRoutes } from '../proposals/index.ts';
-import { placeFor } from '../factories/place.ts';
 import { ServedNow } from './refused.ts';
 import { runsHandlers } from './runs.ts';
 import { watchable } from '../watch/watch.ts';

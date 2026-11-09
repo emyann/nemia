@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { AgentForm } from '../components/AgentForm';
-import { AgentRefused, RouteLink } from '../components/AgentParts';
+import { AgentForm } from '../components/agent/AgentForm';
+import { AgentRefused, RouteLink } from '../components/agent/AgentParts';
 import { AgentRefusal, createAgent, hireAgent, keyFormQuery, storeQuery, type AgentDraft } from '../lib/api';
 import { invalidateAgents, invalidateHires } from '../lib/agentWrites';
 import { hireOnCreate, hirePlaceOf, type HirePlace } from '../lib/factories';

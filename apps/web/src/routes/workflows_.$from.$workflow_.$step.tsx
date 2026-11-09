@@ -1,8 +1,8 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { Skills } from '../components/AgentParts';
-import { StepHire } from '../components/StepHire';
-import { RecentRuns, StepAgent, StepTold, StepWritten } from '../components/StepParts';
+import { Skills } from '../components/agent/AgentParts';
+import { StepHire } from '../components/step/StepHire';
+import { RecentRuns, StepAgent, StepTold, StepWritten } from '../components/step/StepParts';
 import { stepQuery } from '../lib/api';
 import { fromWord, pagePlaceOf } from '../lib/factories';
 import { container } from '../lib/meaning';

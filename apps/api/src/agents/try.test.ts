@@ -22,13 +22,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { startRun, tryFolder } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, eachTest, engineFor, runOver } from '../../test/placed.ts';
-import { story } from '../../test/checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import { listedRuns, objectOf } from '../../test/run-reads.ts';
 
 const stand = eachTest(testPlace);

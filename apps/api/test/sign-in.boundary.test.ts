@@ -1,5 +1,5 @@
 /**
- * A factory's server signed in to and out of from the board (src/factory-parts/mcp-servers.ts), over the runtime's stand-in for the three
+ * A factory's server signed in to and out of from the board (src/factory/parts/mcp-servers.ts), over the runtime's stand-in for the three
  * sign-in verbs: the real ones spawn Claude Code and wait on a browser, which no api test does.
  *
  * The rule the card rests on is that no answer carries the builtin secret: every body of the three routes, and the servers' read with
@@ -16,7 +16,7 @@ import { Engine as RuntimeEngine } from 'agent-runtime';
 import { testEngine } from 'agent-runtime/testing';
 import { appOf, liveOf } from '../src/app.ts';
 import { Engine } from '../src/store.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 addFactory({ name: 'signmill', repos: [scratch('nemia-api-sign-in-')] });
 fs.mkdirSync(path.join(root, 'factories', 'signmill'), { recursive: true });

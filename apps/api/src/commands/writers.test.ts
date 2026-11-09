@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { TEAM } from '../../test/team.ts';
 import { addFactory, COMMANDS, workflowTaken } from 'agent-orchestrator';
 import type { Workflow } from 'objects';

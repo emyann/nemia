@@ -48,8 +48,8 @@ import { composeBrief } from '../brief/index.ts';
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
 import { workflowFilesDir } from '../frozen/frozen.store.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
-import { factoryServers } from '../servers/servers.store.ts';
-import type { FactoryServers } from '../servers/index.ts';
+import { factoryServers } from '../factory/servers/servers.store.ts';
+import type { FactoryServers } from '../factory/servers/index.ts';
 import { inboxDir } from '../record/files.store.ts';
 
 /**

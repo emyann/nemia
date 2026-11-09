@@ -11,7 +11,7 @@ import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { Effect } from 'effect';
 import { nodeChild } from './child.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { teamCopy } from './team.ts';
 import { placeOver } from './place-over.ts';
 

@@ -18,10 +18,10 @@ import {
   usageOptions,
 } from '../src/harness/claude/index.ts';
 import { Engine, type EngineShape } from '../src/index.ts';
-import { machineTempDir, scratch } from './scratch.ts';
+import { machineTempDir, scratch } from 'test-kit/scratch';
 import { asyncOps, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 
 /** Claude Code 2.1.278's answers to `get_usage`, recorded by hand (`fixtures/get-usage-*.json`): the control response it printed. */
 const recorded = (name: 'plan' | 'no-plan' | 'unsupported' | 'unanswered'): { response?: unknown; error?: string } =>

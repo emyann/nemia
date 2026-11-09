@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { Effect, Exit, Layer } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { app, appOf, liveOf } from '../app.ts';
 import { ApiConfig } from '../layer.ts';
 import {

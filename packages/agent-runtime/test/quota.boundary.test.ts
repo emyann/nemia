@@ -12,11 +12,11 @@ import path from 'node:path';
 import { Effect, Exit } from 'effect';
 import { claudeQuota } from '../src/harness/claude/index.ts';
 import { Engine } from '../src/index.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { asyncOps, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
 import { until } from '../src/waits/index.ts';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 
 /** A harness in Promises, which the engine spawns nothing on: this test is about the quota alone. */
 const idle: AsyncRunner = {

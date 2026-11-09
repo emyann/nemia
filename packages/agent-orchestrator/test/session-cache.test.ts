@@ -23,7 +23,7 @@ import path from 'node:path';
 import type { EnginePhase } from '../src/views/views-words.ts';
 import { CLOSEOUT_SCHEMA, closeoutSchemaOf } from '../src/closeout/closeout.ts';
 import type { Workflow } from '../src/workflow.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { TEAM } from './team.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../place/memory/index.ts';

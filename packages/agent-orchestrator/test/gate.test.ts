@@ -16,7 +16,7 @@ import path from 'node:path';
 import { testEngine } from 'agent-runtime/testing';
 import { Effect } from 'effect';
 import type { Engine } from '../src/runtime-client.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { unasked } from './unasked.ts';
 import type { EnginePhase } from '../src/views/views-words.ts';
 

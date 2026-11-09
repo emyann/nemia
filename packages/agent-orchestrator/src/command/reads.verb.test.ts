@@ -6,7 +6,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { statsLine, statsLines } from '../stats/index.ts';
 import { statsOf } from '../stats/stats.ts';
 

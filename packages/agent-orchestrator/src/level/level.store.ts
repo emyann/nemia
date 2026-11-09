@@ -11,6 +11,7 @@ import { factoryNameRefusal } from '../factory/factory.ts';
 import { firstRefusal, HOME, When } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { LEVELS, type FactoryLevelFile } from './level.ts';
+import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /** A factory's level file as `nemia level --factory` writes it; a key it does not name is read past. */
 const FactoryLevelSchema = Schema.StructWithRest(
@@ -81,7 +82,5 @@ function levelWritten(file: string, level: FactoryLevelFile): void {
     return;
   }
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  const hidden = path.join(path.dirname(file), `.level.json.${process.pid}`);
-  fs.writeFileSync(hidden, `${JSON.stringify(level)}\n`);
-  fs.renameSync(hidden, file);
+  writeWhole(file, `${JSON.stringify(level)}\n`);
 }

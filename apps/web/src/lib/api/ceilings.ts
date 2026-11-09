@@ -1,4 +1,4 @@
-/** The cap on runs in flight and what the daemon's last pass cost (`GET /api/ceilings`, apps/api/src/factory/ceilings.ts). */
+/** The cap on runs in flight and what the daemon's last pass cost (`GET /api/ceilings`, apps/api/src/gauges/ceilings.ts). */
 import { queryOptions } from '@tanstack/react-query';
 import { pace } from '../feed.ts';
 import { Schema } from 'effect';
@@ -85,7 +85,7 @@ const PassCostSchema = decodes<PassCost>()(
 );
 
 /**
- * Mirrors `Ceilings` in apps/api/src/factory/ceilings.ts: the cap on runs in flight the daemon's last pass ran with (`last`, null before
+ * Mirrors `Ceilings` in apps/api/src/gauges/ceilings.ts: the cap on runs in flight the daemon's last pass ran with (`last`, null before
  * any pass wrote it), the cap a run is judged by (0 for none), the runs that count against it — null with no cap, when the api reads none —
  * the runs it holds, and what the last pass cost (`pass`, null before any pass wrote it).
  */

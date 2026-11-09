@@ -19,13 +19,13 @@ import { Effect } from 'effect';
 import type { RefusedMove, TickReport } from 'agent-runtime';
 import type { Engine } from '../runtime-client.ts';
 import { nodeChild } from '../../test/child.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { promised } from '../../test/promised.ts';
 import { until, WAITED } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven } from '../../test/placed.ts';
 import { collector, seriesOf } from '../../test/collector.ts';
-import { story } from '../../test/checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 
 const ROOT = scratch('wf-daemon-');
 process.env.WF_ROOT = ROOT;

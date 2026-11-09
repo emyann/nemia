@@ -3,7 +3,7 @@
  * package but the objects' one entry, `objects`, the shapes of what the api serves, and no path into them; no node built-in, and no
  * relative path that leaves `apps/web` (`importBreaks`); the lint block for `apps/web/src` in
  * `.oxlintrc.json` refuses the same packages as they are typed. Only `lib/useFeed.ts` and `lib/useStepTranscript.ts` open an
- * `EventSource`, the api's two streams (`eventSourceBreaks`), and only `components/Markdown.tsx` imports a markdown renderer
+ * `EventSource`, the api's two streams (`eventSourceBreaks`), and only `components/markdown/Markdown.tsx` imports a markdown renderer
  * (`rendererBreaks`). Its reads go through `lib/api/read.ts` (`unschemedReads`, `read.test.ts`).
  *
  * The frame, what the root route mounts on every page, never asks for the whole list of the runs: no file the root reaches names
@@ -28,6 +28,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { builtinModules } from 'node:module';
 import path from 'node:path';
+import { specifiersIn, withoutComments } from 'test-kit/imports';
 import ts from 'typescript';
 import { KINDS } from 'objects';
 import { OFFERS, PAUSED, PERSON } from '../src/lib/words.ts';
@@ -38,7 +39,7 @@ const WEB = path.join(import.meta.dirname, '..');
 const STREAMS = ['src/lib/useFeed.ts', 'src/lib/useStepTranscript.ts', 'src/lib/useNemiaChat.ts'];
 
 /** The one file that renders markdown: every surface that shows a text written in markdown draws it through its `Markdown`. */
-const RENDERER = 'src/components/Markdown.tsx';
+const RENDERER = 'src/components/markdown/Markdown.tsx';
 
 /** A markdown renderer or a plugin of one: react-markdown, a remark or rehype plugin, Streamdown, marked. */
 const MARKDOWN_MODULE = /^(?:react-markdown|streamdown|marked|remark(?:-[\w-]+)?|rehype(?:-[\w-]+)?)(?:\/|$)/;
@@ -56,7 +57,7 @@ const ROOT = 'src/routes/__root.tsx';
  * The pickers a person opens that the frame reaches, each of which reads the whole list of the runs while it is open, and only then: the
  * start form, with its runs to wait on, and behind it the runs to read as context. The guard does not look past them.
  */
-const OPENED = ['src/components/StartRun.tsx'];
+const OPENED = ['src/components/run/StartRun.tsx'];
 
 /** The board's mirror of the api, which defines the read of the whole list: the guard reads who names it, not the mirror. */
 const MIRROR = /^src\/lib\/api(?:\.ts$|\/)/;
@@ -80,22 +81,8 @@ const sourceTexts = (): Map<string, string> =>
       .map((f) => [f, fs.readFileSync(path.join(WEB, f), 'utf8')]),
   );
 
-/** Source text with each comment line blanked: a line that opens with `//`, `/*` or `*`. */
-const withoutComments = (text: string): string =>
-  text
-    .split('\n')
-    .map((line) => (/^\s*(\/\/|\/\*|\*)/.test(line) ? '' : line))
-    .join('\n');
-
-/** Every module a piece of source names: imports and re-exports, type-only included, `import()` and `require()`. */
-function importsIn(text: string): string[] {
-  const code = withoutComments(text);
-  const found = new Set<string>();
-  for (const m of code.matchAll(/^\s*(?:import|export)\b[^'"`;]*?\bfrom\s*['"]([^'"]+)['"]/gm)) found.add(m[1]);
-  for (const m of code.matchAll(/^\s*import\s*['"]([^'"]+)['"]/gm)) found.add(m[1]);
-  for (const m of code.matchAll(/\b(?:import|require)\s*\(\s*['"`]([^'"`]+)['"`]/g)) found.add(m[1]);
-  return [...found].sort();
-}
+/** Every module a piece of source names outside its comment lines: imports and re-exports, type-only included, `import()`, `require()`. */
+const importsIn = (text: string): string[] => specifiersIn(withoutComments(text), { calls: ['import', 'require'] });
 
 /** Whether a relative module named in `file` leaves `apps/web`. */
 const leavesWeb = (file: string, mod: string): boolean =>
@@ -359,7 +346,11 @@ test('nothing the frame reaches reads the whole list of the runs, but the picker
   const texts = sourceTexts();
   const { frame, opened } = frameReach(texts);
   assert.deepEqual(wholeListBreaks(texts), []);
-  for (const file of ['src/components/FrameHeader.tsx', 'src/components/FrameRail.tsx', 'src/components/GaugesButton.tsx'])
+  for (const file of [
+    'src/components/frame/FrameHeader.tsx',
+    'src/components/frame/FrameRail.tsx',
+    'src/components/frame/GaugesButton.tsx',
+  ])
     assert.ok(frame.includes(file), `the scan reaches ${file} from ${ROOT}`);
   assert.ok(frame.includes('src/lib/footer.ts'), "and what the frame's components read in turn");
   assert.deepEqual(opened, OPENED, 'every picker let through is still reached from the root: take one that is not off the list');
@@ -369,17 +360,17 @@ test('nothing the frame reaches reads the whole list of the runs, but the picker
 
 test('REFUSED: a read of the whole list in a file of the frame, or in one a file of the frame imports; a JSDoc and a page are let through', () => {
   const texts = sourceTexts();
-  const footer = 'src/components/GaugesButton.tsx';
-  const header = 'src/components/FrameHeader.tsx';
+  const footer = 'src/components/frame/GaugesButton.tsx';
+  const header = 'src/components/frame/FrameHeader.tsx';
   const why = 'names runsQuery: the frame is drawn on every page and reads the light answer (openRunsQuery), never the whole list';
   const direct = new Map([...texts, [footer, `${texts.get(footer)!}\nimport { runsQuery } from '@/lib/api';\nvoid runsQuery;\n`]]);
   assert.deepEqual(wholeListBreaks(direct), [`${footer} ${why}`]);
   const through = new Map([
     ...texts,
     [header, `import { x } from './x';\n${texts.get(header)!}\nvoid x;\n`],
-    ['src/components/x.tsx', "import { runsQuery } from '../lib/api';\nexport const x = runsQuery;\n"],
+    ['src/components/frame/x.tsx', "import { runsQuery } from '../../lib/api';\nexport const x = runsQuery;\n"],
   ]);
-  assert.deepEqual(wholeListBreaks(through), [`src/components/x.tsx ${why}`]);
+  assert.deepEqual(wholeListBreaks(through), [`src/components/frame/x.tsx ${why}`]);
   const said = new Map([...texts, [footer, `${texts.get(footer)!}\n/** Not \`runsQuery\`: the light answer. */\nexport const y = 1;\n`]]);
   assert.deepEqual(wholeListBreaks(said), []);
   assert.match(texts.get('src/routes/index.tsx')!, /\brunsQuery\b/, 'a page the root does not reach keeps the whole list');
@@ -398,14 +389,14 @@ const runsPageBreaks = (texts: ReadonlyMap<string, string>): string[] =>
 test('REFUSED: a read of the whole list on the Runs page, or in a part it draws', () => {
   const texts = sourceTexts();
   const reach = frameReach(texts, RUNS).frame;
-  for (const file of ['src/components/WaitingCard.tsx', 'src/components/FlightTable.tsx', 'src/components/FinishedTable.tsx'])
+  for (const file of ['src/components/run/WaitingCard.tsx', 'src/components/run/FlightTable.tsx', 'src/components/run/FinishedTable.tsx'])
     assert.ok(reach.includes(file), `the scan reaches ${file} from ${RUNS}`);
   assert.match(withoutComments(texts.get(RUNS)!), /\bopenRunsQuery\b[\s\S]*\bfinishedRunsQuery\b/, 'the page asks its two reads');
   assert.deepEqual(runsPageBreaks(texts), []);
   const why = 'names runsQuery: the Runs page reads the light answer and a page of the finished runs, never the whole list';
   const direct = new Map([...texts, [RUNS, `${texts.get(RUNS)!}\nimport { runsQuery } from '../lib/api';\nvoid runsQuery;\n`]]);
   assert.deepEqual(runsPageBreaks(direct), [`${RUNS} ${why}`]);
-  const card = 'src/components/WaitingCard.tsx';
+  const card = 'src/components/run/WaitingCard.tsx';
   const through = new Map([...texts, [card, `${texts.get(card)!}\nimport { runsQuery } from '@/lib/api';\nvoid runsQuery;\n`]]);
   assert.deepEqual(runsPageBreaks(through), [`${card} ${why}`]);
 });
@@ -422,7 +413,7 @@ const waitedBreaks = (text: string): string[] => {
 };
 
 test('REFUSED: a waiting card whose figure reads the sum of the run’s waits on a person', () => {
-  const card = sourceTexts().get('src/components/WaitingCard.tsx')!;
+  const card = sourceTexts().get('src/components/run/WaitingCard.tsx')!;
   assert.deepEqual(waitedBreaks(card), []);
   const summed = card.replace(/\{\s*waited\s*\}/, '{sinceShort(run.clock.personMs)}');
   assert.notEqual(summed, card, 'the figure is planted over');
@@ -484,14 +475,14 @@ test(`only ${RENDERER} imports a markdown renderer, and it does`, () => {
 test('REFUSED: a second markdown renderer, or a plugin of one, imported outside the one renderer', () => {
   const planted = (text: string): string[] => rendererBreaks(new Map([...sourceTexts(), ['src/x.tsx', text]]));
   assert.deepEqual(planted("import { Streamdown } from 'streamdown';\n"), [
-    'src/x.tsx imports streamdown: the board renders markdown in src/components/Markdown.tsx alone, so draw the text with its Markdown',
+    'src/x.tsx imports streamdown: the board renders markdown in src/components/markdown/Markdown.tsx alone, so draw the text with its Markdown',
   ]);
   assert.deepEqual(planted("import ReactMarkdown from 'react-markdown';\n"), [
-    'src/x.tsx imports react-markdown: the board renders markdown in src/components/Markdown.tsx alone, so draw the text with its Markdown',
+    'src/x.tsx imports react-markdown: the board renders markdown in src/components/markdown/Markdown.tsx alone, so draw the text with its Markdown',
   ]);
   for (const mod of ['marked', 'remark-gfm', 'rehype-raw', 'rehype-sanitize/lib'])
     assert.match(planted(`import x from '${mod}';\n`).join('\n'), new RegExp(`^src/x\\.tsx imports ${mod}:`), mod);
-  for (const mod of ['./Markdown', '@/components/Markdown', 'remarks'])
+  for (const mod of ['./Markdown', '@/components/markdown/Markdown', 'remarks'])
     assert.deepEqual(planted(`import x from '${mod}';\n`), [], `${mod} is let through`);
 });
 

@@ -6,7 +6,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 process.env.WF_ROOT = scratch('wf-entries-');
 

@@ -20,7 +20,7 @@ import type { EnginePhase } from '../src/views/views-words.ts';
 import type { Place } from '../src/place/place.store.ts';
 import type { PlaceRequests, PlaceVerb } from '../src/place/place.ts';
 import type { Turned } from '../src/runner.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { decideScreen } from './screens.ts';
 import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
@@ -48,7 +48,7 @@ const {
 } = await import('../src/runner.ts');
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
 const { runStore } = await import('../src/record/files.store.ts');
-const { freeing, freeingMany, judging, judgingMany, PRUNE_A_TURN, sized } = await import('../src/prune/prune.verb.ts');
+const { freeing, freeingMany, judging, judgingMany, PRUNE_A_TURN, sized } = await import('../src/forget/prune/prune.verb.ts');
 const { PlaceService } = await import('../src/place/place.store.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');

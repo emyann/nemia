@@ -13,7 +13,7 @@ import { cardDoorMemory } from '../cards/memory.store.ts';
 import { cardDoorFiles } from '../cards/cards.store.ts';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { CardName } from '../inbox/inbox.model.ts';
 import { inboxListing } from '../inbox/inbox.ts';
 import { aCard } from '../../test/card-walks.ts';

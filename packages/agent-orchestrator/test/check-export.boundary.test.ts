@@ -15,7 +15,7 @@ import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { CHECK_NICENESS, checkArgv } from '../src/check/check.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { until, WAITED, type Waiter } from 'agent-runtime/testing';
 
 /** Every body posted to the scratch collector, by path. */

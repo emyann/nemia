@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import path from 'node:path';
-import { scratch } from '../../api/test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { asked } from '../src/objects.ts';
 import { Refused } from '../src/refused.ts';
 

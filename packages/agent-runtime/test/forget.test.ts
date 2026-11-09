@@ -15,9 +15,9 @@ import path from 'node:path';
 import { Engine, Journal, type EngineShape, type HarnessSpec, type Sighting } from '../src/index.ts';
 import { RunnerError, type RunnerOps } from '../src/harness/index.ts';
 import { forgetAsked, forgetLines, main, sweepAsked, sweepLine } from '../src/cli/main.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { builtEngine } from './engine.ts';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import { until, WAITED } from '../src/waits/index.ts';
 import { asyncOps, type AsyncRunner } from './promise-runner.ts';
 

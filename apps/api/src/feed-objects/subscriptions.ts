@@ -6,7 +6,7 @@
 import { HttpApiBuilder } from 'effect/http-api';
 import { subscriptionList, subscriptionObject } from 'agent-orchestrator';
 import { Api } from 'objects';
-import { queryOf } from '../factory-parts/parts.ts';
+import { queryOf } from '../factory/parts/parts.ts';
 import { runPlaced } from '../store.ts';
 import { answered } from '../objects/refused.ts';
 

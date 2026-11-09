@@ -7,10 +7,10 @@ import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
-import type { MetricRead } from '../src/factory/ceilings.ts';
-import { OPENED } from '../src/factory/feed.ts';
+import type { MetricRead } from '../src/gauges/ceilings.ts';
+import { OPENED } from '../src/gauges/feed.ts';
 import { argsOf, DEFAULT_PORT, portOf, ticksOf, VIEWER_PORT } from '../src/port.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { DEFAULT_EVERY_MS } from 'agent-orchestrator';
 
 const API = path.join(import.meta.dirname, '..');

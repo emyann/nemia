@@ -17,14 +17,14 @@ import fs from 'node:fs';
 
 import path from 'node:path';
 
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 import { ioCounts } from '../src/core/engine/tally.ts';
 
 import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 
 import { refusedOsError, TRANSIENT_ERRNOS } from '../src/harness/error.ts';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 
 const tmp = (label: string) => scratch(`ae-claude-code-${label}-`);
 

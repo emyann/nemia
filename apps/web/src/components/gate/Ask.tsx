@@ -3,7 +3,7 @@
  * ask itself through the api (`useAsk`), and the api's refusal of it, verbatim (`Refusal`); and the asks of a loop's round (`useRound`)
  * and of its approval as it stands (`useApprove`).
  */
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { approveStep, askRound, askTry, type QuestionAnswer, type RetryMode } from '../../lib/api';
 import { runsMoved } from '@/lib/runWrites';
 import { useRunNamespace } from '@/lib/runNamespace';
@@ -49,7 +49,6 @@ export function useAsk(runId: string, step: string, onAsked: () => void, namespa
     }) => namespaceNow().then((ns) => askTry(ns, runId, to ?? step, how)),
     onSuccess: () => {
       onAsked();
-      void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
       void runsMoved(queryClient, runId);
     },
   });
@@ -66,26 +65,28 @@ export function useApprove(runId: string, step: string) {
   return useMutation({
     mutationFn: (how: { message: string }) => namespaceNow().then((ns) => approveStep(ns, runId, step, how)),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
       void runsMoved(queryClient, runId);
     },
   });
 }
 
 /**
- * An ask for another round of a run's loop through the api (`askRound`), and the run read again once the api has it: its record alone
- * (`exact`), as for a try, since a decision is keyed by the state it was read for.
+ * An ask for another round of a run's loop through the api (`askRound`), and the run read again once the api has it, as for a try
+ * (`runsMoved`): its own record, and the list the frame reads, since the api drops the step from those waiting on you and marks the round
+ * due at once.
  */
 export function useRound(runId: string) {
   const queryClient = useQueryClient();
-  const namespaceNow = useRunNamespace(runId);
-  return useMutation({
-    mutationFn: ({ step, ...how }: { step: string; budget?: number }) => namespaceNow().then((ns) => askRound(ns, runId, step, how)),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
-    },
-  });
+  return useMutation(roundAsk(queryClient, runId, useRunNamespace(runId)));
 }
+
+/** What `useRound` hands `useMutation`: the ask in the run's namespace, as `namespaceNow` answers it, and the reads it makes again. */
+export const roundAsk = (queryClient: QueryClient, runId: string, namespaceNow: () => Promise<string>) => ({
+  mutationFn: ({ step, ...how }: { step: string; budget?: number }) => namespaceNow().then((ns) => askRound(ns, runId, step, how)),
+  onSuccess: () => {
+    void runsMoved(queryClient, runId);
+  },
+});
 
 /**
  * The api's refusal of an ask, beside what made it, verbatim: the package's sentence, or the api's own about the request. `not` says what

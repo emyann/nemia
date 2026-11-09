@@ -41,7 +41,7 @@ are removed. Issues 3, 4, 11 to 14, 16 to 18 and 28, whose subject was one of th
 
 ### 39. The claude.ai bridge is an undeclared control request, and two things about it are unmeasured
 
-**Where.** `src/harness/claude/attached-bridge.ts`, the one door; `src/harness/claude/attached-session.ts`, which opens the bridge
+**Where.** `src/harness/claude/session-bridge.ts`, the one door; `src/harness/claude/attached-session.ts`, which opens the bridge
 of a held session on its `system`/`init` message, and `bin/ae-claude-job.ts`, which opens a job's there too and writes its facts on a
 file beside the run (`bridgeDue`).
 
@@ -239,7 +239,7 @@ off, no process seen, an id not of the form `session_…`), and nothing for a ta
 
 **What changed again** (2026-10-24). The `--bg` road is gone, and with it `--remote-control` and `harness/claude/bridge.ts`'s
 registration read. The bridge is opened on the Agent SDK's `enableRemoteControl` at the session's `system`/`init` message, for a job
-and a session held attached alike (`bridgeDue`, `harness/claude/attached-bridge.ts`; issue 39, measured), its facts on a held
+and a session held attached alike (`bridgeDue`, `harness/claude/session-bridge.ts`; issue 39, measured), its facts on a held
 session's run file or a job's bridge file, which each look reads into the sighting. A `HarnessSpec` still refuses it.
 
 **What is left.**
@@ -547,6 +547,9 @@ its registry). `decide` reads an unread name as `UNREAD` — nothing in `working
 finished session as listed, so the memo keeps it. Each observe that left something unread is counted (`ObserveCount.unread`, on
 `wf up --stats`). The tests are in `test/engine.test.ts` (a refused release asked again after a failed read; no `lost` on one),
 `src/core/lifecycle.test.ts`, `test/detached.test.ts`, `test/claude-code.test.ts`, the two A2A files and `test/io.test.ts`.
+`view` reads a failed observe or find the same way since 2026-11-09: the task it asked about is reported unread, never as nothing
+observed (`src/service/engine.ts`). `harness/claude/bg.ts`, named below and in issue 27, was deleted with the `--bg` road (2026-10-24):
+its paragraphs say what the code did then.
 
 A `--bg` transcript, and a detached run's output, are read per session (2026-10-06). A transcript line that does not decode
 (`lines.ts`), a transcript found and then not read, and a `codex exec --json` line that does not decode (`stream.ts`) leave that

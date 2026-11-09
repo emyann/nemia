@@ -222,7 +222,14 @@ export const workflowDirRefusal: WorkflowDirRefusal = (dir) => {
   )
     return `${JSON.stringify(dir)} is not a workflow's folder: resolving it would change it. ${fix}`;
   if (dir === '/') return `/ is not a workflow's folder: a workflow is a folder with a name. ${fix}`;
-  if ([AGENTS_FOLDER, SKILLS_FOLDER, CARRIED_FOLDER].some((held) => dir === held || dir.endsWith(`/${held}`)))
+  if (
+    dir === AGENTS_FOLDER ||
+    dir.endsWith('/' + AGENTS_FOLDER) ||
+    dir === SKILLS_FOLDER ||
+    dir.endsWith('/' + SKILLS_FOLDER) ||
+    dir === CARRIED_FOLDER ||
+    dir.endsWith('/' + CARRIED_FOLDER)
+  )
     return `${dir} is the folder of the agents, the skills or the carried files beside the workflows, not a workflow. Name a workflow beside it.`;
   return null;
 };

@@ -242,7 +242,8 @@ const FENCE_WORDS: Baseline = {
   'packages/agent-runtime/src/cli/main.ts': { count: 4, ...MOVES.fenceArgs },
   'packages/agent-runtime/src/core/event-schema.ts': { count: 3, ...MOVES.fenceArgs },
   'packages/agent-runtime/src/harness/args.ts': { count: 19, ...MOVES.fenceArgs },
-  'packages/agent-runtime/src/harness/choices.ts': { count: 6, ...MOVES.fenceArgs },
+  'packages/agent-runtime/src/harness/choices.ts': { count: 5, ...MOVES.fenceArgs },
+  'packages/agent-runtime/src/harness/declaration.ts': { count: 1, ...MOVES.fenceArgs },
   'packages/agent-runtime/src/harness/codex/codex.ts': { count: 21, ...MOVES.fenceArgs },
   'packages/agent-runtime/src/harness/codex/vocabulary.ts': { count: 1, ...MOVES.fenceArgs },
   'packages/agent-runtime/src/harness/sdk.ts': { count: 4, ...MOVES.fenceArgs },
@@ -329,7 +330,6 @@ const WORKFLOW_WORDS: Baseline = {
   'packages/agent-runtime/src/a2a/remote.ts': { count: 1, ...MOVES.reword },
   'packages/agent-runtime/src/core/domain.ts': { count: 14, ...MOVES.closeout },
   'packages/agent-runtime/src/core/engine/engine.ts': { count: 14, ...MOVES.reword },
-  'packages/agent-runtime/src/core/engine/filing.ts': { count: 6, ...MOVES.reword },
   'packages/agent-runtime/src/core/engine/journal.ts': { count: 1, ...MOVES.reword },
   'packages/agent-runtime/src/core/event-schema.ts': { count: 1, ...MOVES.closeout },
   'packages/agent-runtime/src/core/lifecycle.ts': { count: 7, ...MOVES.closeout },
@@ -339,13 +339,12 @@ const WORKFLOW_WORDS: Baseline = {
   'packages/agent-runtime/src/harness/claude/transcript.ts': { count: 1, ...MOVES.closeout },
   'packages/agent-runtime/src/harness/claude/rules.ts': { count: 1, ...MOVES.reword },
   'packages/agent-runtime/src/harness/claude/vocabulary.ts': { count: 1, ...MOVES.reword },
-  'packages/agent-runtime/src/harness/codex/codex.ts': { count: 3, ...MOVES.reword },
+  'packages/agent-runtime/src/harness/codex/codex.ts': { count: 2, ...MOVES.reword },
   'packages/agent-runtime/src/harness/detached/detached.ts': { count: 18, ...MOVES.closeout },
   'packages/agent-runtime/src/harness/detached/output.ts': { count: 2, ...MOVES.closeout },
   'packages/agent-runtime/src/harness/detached/said.ts': { count: 1, ...MOVES.closeout },
   'packages/agent-runtime/src/harness/sdk.ts': { count: 2, ...MOVES.reword },
   'packages/agent-runtime/src/index.ts': { count: 2, ...MOVES.reword },
-  'packages/agent-runtime/src/service/say.ts': { count: 1, ...MOVES.reword },
 };
 
 /** Each runtime file that says the layer above's word for an end, the store or an attempt today, its count and what removes them. */

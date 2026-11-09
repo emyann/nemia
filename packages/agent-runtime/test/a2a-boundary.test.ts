@@ -17,9 +17,10 @@ const SDK_ENTRIES = [SDK, `${SDK}/client`, `${SDK}/server`, `${SDK}/errors`];
 
 /**
  * The seam's files that name no type or value of the SDK's: the registry's entry, the holder's token, a send's lease read off it,
- * and the viewer's dialled follow, which speaks the protocol through the client and the card the rest of the seam reads for it.
+ * the viewer's dialled follow, which speaks the protocol through the client and the card the rest of the seam reads for it, and a
+ * remote agent's declaration, which the vocabulary door carries.
  */
-const SDK_FREE = ['src/a2a/entry.ts', 'src/a2a/holder-follow.ts', 'src/a2a/holder-token.ts', 'src/a2a/sending.ts'];
+const SDK_FREE = ['src/a2a/entry.ts', 'src/a2a/holder-follow.ts', 'src/a2a/holder-token.ts', 'src/a2a/sending.ts', 'src/a2a/vocabulary.ts'];
 
 /** The seam's files, by their path in the package. */
 const inSeam = (file: string) => /^src\/a2a\/[a-z0-9-]+\.ts$/.test(file) && file !== 'src/a2a/index.ts';
@@ -63,6 +64,7 @@ test('the scan reads the seam and the rest of the package — or it would pass b
     'src/a2a/said.ts',
     'src/a2a/sending.ts',
     'src/a2a/served.ts',
+    'src/a2a/vocabulary.ts',
   ]);
   assert.ok(files.includes('src/index.ts') && files.includes('src/core/engine/engine.ts') && files.includes('bin/ae.ts'));
   const sdkOf = (f: string) => specifiersIn(fs.readFileSync(path.join(PKG, f), 'utf8')).some((s) => s.startsWith(SDK));

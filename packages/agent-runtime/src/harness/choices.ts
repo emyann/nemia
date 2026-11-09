@@ -17,7 +17,7 @@ export const HARNESS_KNOBS: Readonly<Record<string, HarnessKnobs>> = Object.from
 const fencedBy = (key: HarnessKnobs['fence']['key']): Record<string, readonly string[]> =>
   Object.fromEntries(Object.entries(HARNESS_KNOBS).flatMap(([name, k]) => (k.fence.key === key ? [[name, k.fence.words] as const] : [])));
 
-/** Each default harness's words for `effort`, `permissionMode` and `sandbox`, by key, then by harness. */
+/** Each default harness's words for its effort and its fence, by key, then by harness. */
 export const HARNESS_CHOICES: Readonly<Record<'effort' | 'permissionMode' | 'sandbox', Readonly<Record<string, readonly string[]>>>> = {
   effort: Object.fromEntries(Object.entries(HARNESS_KNOBS).map(([name, k]) => [name, k.effort])),
   permissionMode: fencedBy('permissionMode'),

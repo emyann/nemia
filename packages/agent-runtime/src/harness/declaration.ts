@@ -80,8 +80,8 @@ export type VerbHarness =
 /**
  * One harness's knobs, as a caller writing settings for it names them:
  * - `effort`: the words its effort takes;
- * - `fence`: the key its fence is named by (`permissionMode` or `sandbox`), that key's words, and the tool lists the fence also takes
- *   (`tools`, `allowedTools`, `disallowedTools`), none where its fence is one word;
+ * - `fence`: the key its fence is named by (a mode's or a sandbox's), that key's words, and the tool lists the fence also takes, none
+ *   where its fence is one word;
  * - `context`: whether it takes a context window;
  * - `flags`: the flags of its own handed to it as they are — any but those the runtime gives itself (`owned`), or only those it reads
  *   (`only`).
@@ -129,7 +129,7 @@ export type OwnArgs = { readonly claude?: { readonly remoteControl: true }; read
  * - `unruled`: the characters its permission rules cannot carry in a path;
  * - `asks`: what each neutral ask becomes in its own config — a function of the repository for `trustRepository`, the config itself for
  *   `remoteControl` — an ask it has none for being dropped;
- * - `runsBrief`: it runs a step's brief as an agent (what a workflow's step may name), as a command or a remote agent does not;
+ * - `runsBrief`: it runs a task's brief as an agent session, as a command or a remote agent does not;
  * - `recordsDenials`: a job of it records the calls its fence denied;
  * - `rules`: how its permission rules are matched and the tool sets measured on it (`ClaudeRules`), for a caller that shows a reach.
  */
@@ -156,7 +156,7 @@ export const HARNESS_DECLARATIONS: Readonly<Record<string, HarnessDeclaration>> 
   command: COMMAND_DECLARATION,
 };
 
-/** The harness a task or a step that names none runs on: the first of `HARNESS_DECLARATIONS`. */
+/** The harness a task that names none runs on: the first of `HARNESS_DECLARATIONS`. */
 export const DEFAULT_HARNESS = 'claude';
 
 /** Whether a declaration lists `capability`: a runner of the consumer's (`undefined`) declares nothing. */

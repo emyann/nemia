@@ -442,7 +442,7 @@ export const attachedSessions = (
       live.set(run.name, placeholder);
       void adopt(run).catch((cause: unknown) => {
         live.delete(run.name);
-        recorded(context, `${run.name} was not taken up; the next look tries again`)(cause);
+        recorded(context, `${run.name} was not taken up; the next look takes it up again`)(cause);
       });
       return { ...run, state: 'working' };
     }

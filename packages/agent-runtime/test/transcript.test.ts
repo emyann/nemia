@@ -663,7 +663,7 @@ test("a poller reads a Claude session's transcript as it is written: each read g
       const root = tmp('root');
       runFile(root, 'claude', 'ae/d1/1', { nativeId: sessionId });
       assert.deepEqual((await detachedRead(detachedOps(claudeJob, root), 'ae/d1/1')).events, CLAUDE_EVENTS);
-      assert.equal(detachedOps({ name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) }, root).transcript, undefined);
+      assert.equal(detachedOps({ name: 'sh', can: [], command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) }, root).transcript, undefined);
     },
   );
 });
@@ -891,7 +891,7 @@ test('REFUSED: a read of a transcript, each refusal naming what to fix', async (
       'a harness brought as an AsyncRunner with no `transcript`',
     );
     const sh = builtEngine(
-      Engine.layer({ root: tmp('root'), harnesses: { sh: { name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) } } }),
+      Engine.layer({ root: tmp('root'), harnesses: { sh: { name: 'sh', can: [], command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) } } }),
     );
     await assert.rejects(
       Effect.runPromise(sh.transcript(await Effect.runPromise(sh.file({ brief: 'the prompt', cwd: '/repo' })))),

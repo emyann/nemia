@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { fenceReach, unruledIn } from '../src/harness/reach.ts';
 import { CLAUDE_PERMISSION_MODES } from '../src/harness/claude/vocabulary.ts';
 import { CODEX_SANDBOXES } from '../src/harness/codex/vocabulary.ts';
-import { attachedOptions } from '../src/harness/claude/attached-options.ts';
+import { attachedOptions } from '../src/harness/claude/session-options.ts';
 import { codex } from '../src/harness/codex/codex.ts';
 
 /** The harness names that run Claude Code; `claude-detached`, the `claude -p` road, is no longer one, and reaches nothing. */

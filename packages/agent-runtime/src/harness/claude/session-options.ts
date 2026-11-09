@@ -117,7 +117,7 @@ const promptOf = (cwd: string, append: string | undefined, replace: string | und
  * with the session's auto-memory off in them (`memorylessSettings`), as the SDK's own `settings` option takes them (an object, or a
  * file's path as given, which the runtime does not rewrite), and its prompt files apart as the SDK's own `systemPrompt`
  * (`promptOf`), each of those paths taken from `cwd` where it is relative. `remoteControl` is no flag: the bridge it asks for is opened
- * on the SDK's control request at the session's first message (`attached-bridge.ts`), so it is left off the command line.
+ * on the SDK's control request at the session's first message (`session-bridge.ts`), so it is left off the command line.
  *
  * The settings go apart because `Options.settings` overwrites a `settings` left on `extraArgs`, and `extraArgs` stringifies its
  * values (`sdk.mjs`): an object left in that bag would reach the CLI as `[object Object]`.

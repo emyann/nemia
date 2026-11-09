@@ -4,10 +4,11 @@
  * any other — and so it is no lifecycle verb: no entry of it is on the record, and no state is read from one.
  */
 import type { Harnessed } from './harnessed.ts';
-import { Cause, Effect, Schema } from 'effect';
-import { fold, idleOf, isLive, nameFor, type Attempt, type Event, type State } from '../core/index.ts';
+import { Effect, Schema } from 'effect';
+import { idleOf, isLive, type Event, type State } from '../core/index.ts';
 import { Journal, type JournalError } from '../core/engine/index.ts';
 import type { Runner } from '../harness/index.ts';
+import { handedOver, sessionReached, type WrittenVerb } from './written-verb.ts';
 
 /** A turn `interrupt` will not end, and why, in words that say what to do instead. Nothing was sent. */
 export class InterruptRefused extends Schema.TaggedError<InterruptRefused>()('InterruptRefused', {
@@ -26,21 +27,24 @@ export class InterruptUnsent extends Schema.TaggedError<InterruptUnsent>()('Inte
 /** What to do instead of ending a turn that cannot be ended. */
 const STOP = 'Stop the task (`ae stop`) to end its session, or leave the turn to finish.';
 
-/**
- * The attempt a verb written from outside a session acts on, read off the journal. Refused, in words that say what to do, for a task
- * settled, asked to stop, not started, or whose last attempt has ended.
- */
-export const openAttemptOf = (taskId: string, state: State): { last: Attempt } | { refused: string } => {
-  const last = state.attempts.at(-1);
-  if (state.settled) return { refused: `\`${taskId}\` has settled (${state.settled}): no session of it is running, and no turn is in it.` };
-  if (state.stopRequested) return { refused: `\`${taskId}\` has been asked to stop: its session is being stopped, not steered.` };
-  if (!last) return { refused: `\`${taskId}\` has not started an attempt yet, so there is no turn to end.` };
-  if (last.ended !== null) return { refused: `\`${taskId}\` has no attempt running: attempt ${last.n} ended \`${last.ended}\`.` };
-  return { last };
-};
+/** Why the harness `name` is refused an interrupt: it declares none, or its runner has none. */
+export const notInterruptible = (name: string): string =>
+  `the \`${name}\` harness cannot end a turn without ending its session: only a session on streaming input takes it. ${STOP}`;
 
-/** What failed, in words, off a cause: its error's message, or the value itself. */
-const wordsOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+/** `interrupt`'s refusal, in its words. */
+const refused = (message: string) => new InterruptRefused({ message });
+
+/** `interrupt` as a verb written to a session: its reach is the runner's `interrupt`, which only a session on streaming input has. */
+const INTERRUPT: WrittenVerb<InterruptRefused, InterruptUnsent, NonNullable<Harnessed['runner']['interrupt']>> = {
+  capability: 'interrupt',
+  refused,
+  unsent: (message, cause) => new InterruptUnsent({ message, cause }),
+  reachOf: ({ runner }) => runner.interrupt,
+  unreached: ({ name }) => notInterruptible(name),
+  looked: 'harness',
+  undone: 'sent',
+  open: { settled: ', and no turn is in it', unstarted: 'no turn to end.' },
+};
 
 /**
  * `interrupt` over the engine's journal (`read`, `go`), its runners and harnesses, and the harness a task runs on (`harnessOf`), as
@@ -52,53 +56,19 @@ export const interruptVerbOf = (
   harnessOf: (state: State) => Harnessed,
 ) =>
   Effect.fn('Engine.interrupt')(function* (taskId: string) {
-    const refuse = (message: string) => Effect.fail(new InterruptRefused({ message }));
-    const events = yield* read(taskId);
-    if (!events.length) return yield* refuse(`\`${taskId}\` is not a task in this store. \`ae ls\`, or \`list()\`, gives the ones it has.`);
-    const state = fold(taskId, events);
-    const { name: harness, runner } = harnessOf(state);
-    const end = runner?.interrupt;
-    if (!end) {
-      return yield* refuse(
-        `the \`${harness}\` harness cannot end a turn without ending its session: only a session on streaming input takes it. ${STOP}`,
-      );
-    }
-    const open = openAttemptOf(taskId, state);
-    if ('refused' in open) return yield* refuse(open.refused);
-    const { last } = open;
-    const name = nameFor(taskId, last.n);
-    const unsent = (message: (e: unknown) => string) =>
-      Effect.catchCause((cause: Cause.Cause<unknown>) => {
-        const e = Cause.squash(cause);
-        return Effect.fail(new InterruptUnsent({ message: message(e), cause: e }));
-      });
-    const observed = yield* go(runner.observe).pipe(
-      unsent(
-        (e) => `the \`${harness}\` harness could not be read (${wordsOf(e)}), so ${name} could not be found. Nothing was sent; ask again.`,
-      ),
-    );
-    const sighting = observed.get(name);
-    if (!sighting) {
-      return yield* refuse(
-        `\`${taskId}\`'s attempt ${last.n} is not running yet: its harness lists no \`${name}\`. Ask again once \`ae ls\` shows it running.`,
-      );
-    }
+    const { state, reach: end, last, name, sighting } = yield* sessionReached({ go, read, harnessOf }, INTERRUPT, taskId);
     if (!isLive(sighting.state)) {
-      return yield* refuse(`\`${taskId}\`'s session is \`${sighting.state}\` on its harness, not running: there is no turn in it. ${STOP}`);
+      return yield* Effect.fail(
+        refused(`\`${taskId}\`'s session is \`${sighting.state}\` on its harness, not running: there is no turn in it. ${STOP}`),
+      );
     }
     if (idleOf(state, sighting)) {
-      return yield* refuse(
-        `\`${taskId}\`'s session is open and waiting for its next words, not answering: there is no turn to end. ${STOP}`,
+      return yield* Effect.fail(
+        refused(`\`${taskId}\`'s session is open and waiting for its next words, not answering: there is no turn to end. ${STOP}`),
       );
     }
     yield* go(end({ name, sessionId: sighting.sessionId })).pipe(
-      Effect.catchCause((cause: Cause.Cause<unknown>): Effect.Effect<never, InterruptRefused | InterruptUnsent> => {
-        const e = Cause.squash(cause) as { refused?: boolean };
-        if (e.refused === true) return Effect.fail(new InterruptRefused({ message: wordsOf(e) }));
-        return Effect.fail(
-          new InterruptUnsent({ message: `${name}'s turn was not ended (${wordsOf(e)}). Nothing was changed; ask again.`, cause: e }),
-        );
-      }),
+      handedOver(INTERRUPT, (words) => `${name}'s turn was not ended (${words}). Nothing was changed; ask again.`),
     );
     return { at: new Date().toISOString(), attempt: last.n };
   });

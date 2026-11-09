@@ -21,7 +21,8 @@ import { fileURLToPath } from 'node:url';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 import { until, WAITED } from '../src/waits/index.ts';
-import { sessionDrainFile, sessionDrainOf, liftSessionDrain, putSessionDrain, readJobHold } from '../src/harness/claude/job-hold.ts';
+import { readJobHold } from '../src/harness/claude/job-hold.ts';
+import { sessionDrainFile, sessionDrainOf, liftSessionDrain, putSessionDrain } from '../src/core/engine/drain.ts';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const BIN = path.join(HERE, '..', 'bin', 'ae-claude-job.ts');

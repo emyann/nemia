@@ -86,9 +86,7 @@ export type Sighting = {
    * The time is not decoration. A resumed session can carry a statement its parent made, and the
    * engine keeps one only if it was made after this attempt began. A runner whose session cannot carry
    * another attempt's statement gives no time, and the engine keeps the statement whatever the clock says:
-   * a remote agent's, and a detached run's, whose spawn cleared the last one's before it launched it. So
-   * does a runner that told the statement is its session's own: Claude Code's `--bg`, by the call's id,
-   * against the parent's last call it recorded at spawn.
+   * a remote agent's, and a detached run's, whose spawn cleared the last one's before it launched it.
    */
   closeout?: { payload: unknown; at?: number };
   /**
@@ -131,7 +129,7 @@ export type Sighting = {
   /**
    * Every tool call the harness denied the session, as the harness recorded it, in the order it first did: a session
    * with no approval surface carries on past a denial, and this is the only trace of it. Absent when the harness denied
-   * nothing, or cannot say (`claude --bg` records no denial anywhere the runner reads). **Carried, never judged**:
+   * nothing, or cannot say. **Carried, never judged**:
    * `decide` does not read it; a person, and the upper layer, do.
    */
   denials?: Denial[];

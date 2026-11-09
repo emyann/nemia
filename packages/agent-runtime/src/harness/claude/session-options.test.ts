@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { attachedOptions } from './attached-options.ts';
+import { attachedOptions } from './session-options.ts';
 import { CLAUDE_JOB_ENV } from './job-env.ts';
 import type { SpawnRequest } from '../seam.ts';
 import type { ClaudeFlags } from './vocabulary.ts';
@@ -26,7 +26,7 @@ import { story } from 'test-kit/checkpoints';
 const SCHEMA = { type: 'object', properties: { anything: { 'x-no-runtime-reads-this': true } } };
 
 /** The agent's own prompt, and the checkout's servers: a task's cwd, as a session really finds it. */
-const CWD = scratch('ae-attached-options-');
+const CWD = scratch('ae-session-options-');
 const APPEND = path.join(CWD, 'agent.md');
 const REPLACE = path.join(CWD, 'whole.md');
 fs.writeFileSync(APPEND, 'you are the agent');
@@ -188,7 +188,7 @@ const ROWS: { name: string; check: () => void }[] = [
   {
     name: 'a closed tool list is given ToolSearch only where the session has a server, once, and no list is left no list',
     check: () => {
-      const bare = scratch('ae-attached-options-tools-');
+      const bare = scratch('ae-session-options-tools-');
       const unserved = { name: 'ae/t/1', brief: 'work', cwd: bare };
       assert.deepEqual(attachedOptions({ ...unserved, config: { tools: ['Read'] } }).tools, ['Read'], 'no server: nothing to defer');
       assert.deepEqual(
@@ -208,7 +208,7 @@ const ROWS: { name: string; check: () => void }[] = [
   {
     name: 'a task with no server of its own and no .mcp.json is given no servers at all, and no file is written for it',
     check: () => {
-      const bare = scratch('ae-attached-options-bare-');
+      const bare = scratch('ae-session-options-bare-');
       const given = attachedOptions({ name: 'ae/t/1', brief: 'work', cwd: bare });
       assert.equal(given.mcpServers, undefined, 'absent, not an empty map: there is nothing to name');
       assert.equal(given.strictMcpConfig, true, 'still strict: no server is loaded for it either way');

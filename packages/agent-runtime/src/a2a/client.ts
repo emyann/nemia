@@ -441,9 +441,10 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
  * for. A2A has no call for either, and an adapter that rebuilt the ops without them would drop the verb silently
  * (`Engine.answerAsk` then refuses every answer), which is why they are carried in one place.
  */
-const carried = (ops: RunnerOps): Pick<SeamOps, 'answer' | 'refuses'> => ({
+const carried = (ops: RunnerOps): Pick<SeamOps, 'answer' | 'refuses' | 'bridgeAsked'> => ({
   ...(ops.answer ? { answer: ops.answer } : {}),
   ...(ops.refuses ? { refuses: ops.refuses } : {}),
+  ...(ops.bridgeAsked ? { bridgeAsked: ops.bridgeAsked } : {}),
 });
 
 /**

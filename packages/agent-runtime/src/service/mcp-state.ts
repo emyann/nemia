@@ -5,7 +5,9 @@
 import { Effect, Schema } from 'effect';
 import { mcpServersRead, type McpServersRead, type McpStatusAsk } from '../harness/mcp-state.ts';
 import type { RemoteMcpServer } from '../harness/seam.ts';
-import { heldHarnessesOf, mcpStateRefusal, type HarnessConfig } from './options.ts';
+import { verbHarnessOf, type HarnessDeclared } from '../harness/declaration.ts';
+import { mcpStateRefusal, type HarnessConfig } from './options.ts';
+import { declaredOf } from './verb-harness.ts';
 
 /**
  * A state read this engine will not make, and why: a record that is no map of remote servers, an empty one, an entry with no `url`,
@@ -15,10 +17,14 @@ export class McpStateRefused extends Schema.TaggedError<McpStateRefused>()('McpS
   message: Schema.String,
 }) {}
 
+/** Why `mcpState` is refused by an engine none of whose harnesses, `declared`, declares `mcp`: the harnesses it has. */
+export const noMcpHarness = (declared: readonly HarnessDeclared[]): string =>
+  `a server's state is read inside a Claude Code session, and this engine runs no Claude Code harness. Its harnesses are: ${declared.map((h) => h.name).join(', ') || 'none'}.`;
+
 /**
  * `mcpState` over the harnesses this engine has: refused where the record is no record of remote servers (`mcpStateRefusal`), then
  * where the engine runs no Claude Code harness — the state is read through the Agent SDK's own `query()`, which is the road a harness
- * configured as `claude` runs on (`heldHarnessesOf`), so an engine with none has nothing to read it through.
+ * that declares `mcp` runs on (`verbHarnessOf`), so an engine with none has nothing to read it through.
  *
  * Traced where it opens a session, as `Engine.mcpState` with how many servers were asked: a refusal opens nothing and makes no span.
  *
@@ -36,12 +42,8 @@ export const mcpStateVerbOf = (
     const refuse = (message: string) => Effect.fail(new McpStateRefused({ message }));
     const refused = mcpStateRefusal(servers);
     if (refused) return yield* refuse(refused);
-    const held = heldHarnessesOf(harnesses);
-    if (!held.length) {
-      return yield* refuse(
-        `a server's state is read inside a Claude Code session, and this engine runs no Claude Code harness. Its harnesses are: ${Object.keys(harnesses).join(', ') || 'none'}.`,
-      );
-    }
+    const declared = declaredOf(harnesses);
+    if (verbHarnessOf('mcp', undefined, declared).kind === 'refused') return yield* refuse(noMcpHarness(declared));
     return yield* Effect.promise(() =>
       mcpServersRead(servers, cwd, { ...(executable === undefined ? {} : { executable }), ...(ask === undefined ? {} : { ask }) }),
     ).pipe(Effect.withSpan('Engine.mcpState', { attributes: { servers: Object.keys(servers).length } }));

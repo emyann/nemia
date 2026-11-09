@@ -27,7 +27,7 @@ import {
 } from '../src/index.ts';
 import { Engine } from '../src/index.ts';
 import { refusalWords } from '../src/service/refusal.ts';
-import { claudeCodeRefuses } from '../src/harness/claude/vocabulary.ts';
+import { claudeRefuses } from '../src/harness/claude/vocabulary.ts';
 import { claudeJob } from '../src/harness/claude/code.ts';
 import { scratch } from 'test-kit/scratch';
 import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
@@ -98,10 +98,13 @@ const REFUSALS: Array<[Record<string, unknown>, RegExp]> = [
   [{ cwd: '~/repo' }, /^`cwd: ~\/repo` is not an absolute path/],
   [
     { maxAttempts: 1 },
-    /^`maxAttempts` is retired: the runtime makes one attempt per start.*file it again.*`resumeFrom: <session id>`.*`retries:`.*`wf retry <run> <step>`/,
+    /^`maxAttempts` is retired: the runtime makes one attempt per start.*file it again.*`resumeFrom: <session id>`(?![^]*(?:\bwf |retries:|--continue|--fresh))/,
   ],
   [{ maxAttempts: 2 }, /^`maxAttempts` is retired:/],
-  [{ resume: 'interrupted' }, /^`resume` is retired: the runtime makes one attempt per start.*`retries:`.*`wf retry <run> <step>`/],
+  [
+    { resume: 'interrupted' },
+    /^`resume` is retired: the runtime makes one attempt per start.*`resumeFrom: <session id>`(?![^]*(?:\bwf |retries:))/,
+  ],
   [{ resume: 'always' }, /^`resume` is retired:/],
   [{ deadlineSeconds: Number.NaN }, /^`deadlineSeconds: NaN` is not a number of seconds\./],
   [{ deadlineSeconds: 0 }, /^`deadlineSeconds: 0` is not a number of seconds\./],
@@ -283,7 +286,7 @@ const fakeHarness = (sessions: Map<string, Sighting>): AsyncRunner => ({
 });
 
 /** A command a test harness runs: nothing. */
-const check: HarnessSpec = { name: 'check', command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) };
+const check: HarnessSpec = { name: 'check', can: [], command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) };
 
 /**
  * The engines the harness rows file through, each over a store in memory a row can read, built once per test: the doors a
@@ -305,12 +308,13 @@ const harnessDoors = () => {
   };
   const picky: HarnessSpec = {
     name: 'picky',
+    can: [],
     command: () => ({ cmd: 'true', args: [] }),
     refuses: (task) => (task.config?.model === 'huge' ? 'picky runs no huge models' : undefined),
   };
   const own = { ...asyncOps(fakeHarness(new Map())), refuses: (task: TaskSpec) => (task.brief === 'no' ? 'own runs no "no"' : undefined) };
-  const bare: HarnessSpec = { name: 'bare', command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) };
-  const windowed: HarnessSpec = { ...bare, name: 'windowed', contextTokens: { least: 8_000, most: 32_000 } };
+  const bare: HarnessSpec = { name: 'bare', can: [], command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) };
+  const windowed: HarnessSpec = { ...bare, name: 'windowed', can: ['contextTokens'], contextTokens: { least: 8_000, most: 32_000 } };
   const runner: AsyncRunner = { spawn: async () => {}, observe: async () => new Map(), stop: async () => {}, logs: async () => '' };
   return {
     shipped: over(),
@@ -838,7 +842,7 @@ test('REFUSED: `mayAsk: true` on a session this runtime does not hold attached, 
 });
 
 test("REFUSED: a list in `enabledSkills` on a road that cannot close a session's skills, and taken on Claude Code's SDK roads", async () => {
-  const bare: HarnessSpec = { name: 'bare', command: () => ({ cmd: 'true', args: [] }) };
+  const bare: HarnessSpec = { name: 'bare', can: [], command: () => ({ cmd: 'true', args: [] }) };
   const options = {
     root: scratch('ae-enabled-skills-'),
     journal: asyncStore(memoryStore()),
@@ -865,14 +869,14 @@ test("REFUSED: a list in `enabledSkills` on a road that cannot close a session's
   for (const harness of ['bare', 'codex']) {
     assert.ok(await Effect.runPromise(engine.file({ ...ok, harness, config: { enabledSkills: 'default' } })), `'default' on ${harness}`);
   }
-  assert.equal(claudeCodeRefuses(listed), undefined, "and Claude Code's job takes it");
+  assert.equal(claudeRefuses(listed), undefined, "and Claude Code's job takes it");
 });
 
 test("Claude Code's own runners refuse Codex's arguments, so a runner reached without the engine's door refuses them too", () => {
   const task = { ...ok, config: { codex: { trustFrom: '/repo' } } };
   const says =
     '`codex: {"trustFrom":"/repo"}` gives Codex arguments of its own, and Claude Code is not Codex. Leave `codex` off a Claude Code task.';
-  assert.equal(claudeCodeRefuses(task), says);
+  assert.equal(claudeRefuses(task), says);
   assert.equal(claudeJob.refuses!(task), says);
   assert.equal(codex.refuses!(task), undefined);
 });

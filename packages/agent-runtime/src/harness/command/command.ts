@@ -4,6 +4,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import type { HarnessSpec } from '../detached/detached.ts';
+import { COMMAND_DECLARATION } from './vocabulary.ts';
 
 /** The arguments of a task the command harness reads; any other is refused (`commandHarness.refuses`). */
 const OWN: readonly string[] = ['command', 'env', 'niceness', 'terminationMessagePath'];
@@ -33,7 +34,7 @@ const idleIoProbe = (niceness: number): boolean => {
  */
 export const commandHarness: HarnessSpec = {
   name: 'command',
-  commandArgs: true,
+  can: COMMAND_DECLARATION.can,
   streams: true,
   prepare: (r) => {
     const command = r.config?.command;

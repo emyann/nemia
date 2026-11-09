@@ -19,7 +19,7 @@ import {
 import { fenceReach } from 'agent-runtime/vocabulary';
 import { renderFrontmatter, type FrontmatterPair } from '../frontmatter/frontmatter.ts';
 import { routeWritten, routingOf } from '../route/index.ts';
-import { DEFAULT_HARNESS, isRemoteHarness, remoteRefusal } from '../harness/harness.ts';
+import { DEFAULT_HARNESS, fenceKeyOf, isRemoteHarness, remoteRefusal } from '../harness/harness.ts';
 import {
   budgetOf,
   checkOf,
@@ -489,7 +489,7 @@ export function renderStep(step: StepDraft): string {
   );
   if (unknown !== undefined)
     refuse(Object.hasOwn(FORMER_KEYS, unknown) ? formerKeyWritten(step.name, unknown) : unknownKey(step.name, unknown));
-  if (step.harness === 'codex' && step.permissionMode != null) refuse(codexModeWritten(step.name, step.permissionMode));
+  if (fenceKeyOf(step.harness) === 'sandbox' && step.permissionMode != null) refuse(codexModeWritten(step.name, step.permissionMode));
   if ((step.workspace as string | undefined) === 'folder') refuse(placeWritten(step.name));
   if ((step.workspace as string | undefined) === 'main') refuse(baseWritten(step.name));
   const provenance = step.agent != null && typeof step.agent === 'object' ? step.agent : undefined;

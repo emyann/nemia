@@ -8,7 +8,9 @@
  */
 import path from 'node:path';
 import { Effect, Result } from 'effect';
+import { ownArgsOf } from 'agent-runtime/vocabulary';
 import { refusedTold } from './assess.ts';
+import { declarationOf, DEFAULT_HARNESS } from '../harness/harness.ts';
 import { mcpServerOf, over, type ClaudeFlags, type CodexArgs, type Engine, type TaskView } from '../runtime-client.ts';
 import {
   isRepositoryRun,
@@ -114,15 +116,21 @@ function skillAgainOf(name: string, from: string, text: string, why: string): Sk
 }
 
 /**
- * The harness's own arguments a step is filed with (`toldOf`), off the flags its agent rendered to and its repository's real path, which
- * is asked only of a step whose harness takes it. Pure but for `repoOf`.
+ * The harness's own arguments a step is filed with (`toldOf`): what its harness's declaration makes of the neutral asks (`ownArgsOf`) —
+ * trust the repository, at its real path, asked only of a step whose harness takes it; a remote control where the step says `remote:
+ * true` — with the flags its agent rendered to spread over them. A remote control its harness has no word for is filed in the words of
+ * the default harness's, which has one, so the runtime refuses it by its line at `nemia start` rather than the run dropping it. Pure but
+ * for `repoOf`.
  */
 export const ownOf = (step: Pick<Workflow, 'harness' | 'remote'>, rendered: ClaudeFlags | undefined, repoOf: () => string | undefined) => {
-  const repo = step.harness === 'codex' ? repoOf() : undefined;
-  return {
-    claude: step.remote ? { remoteControl: true as const, ...rendered } : rendered,
-    ...(repo === undefined ? {} : { codex: { trustFrom: repo } }),
+  const declaration = declarationOf(step.harness);
+  const remoteControl = step.remote === true;
+  const unanswered = remoteControl && declaration?.asks?.remoteControl === undefined;
+  const asked = {
+    ...(unanswered ? ownArgsOf(declarationOf(DEFAULT_HARNESS), { remoteControl }) : {}),
+    ...ownArgsOf(declaration, { trustRepository: repoOf, remoteControl }),
   };
+  return { ...asked, claude: asked.claude === undefined ? rendered : { ...asked.claude, ...rendered } };
 };
 
 /**

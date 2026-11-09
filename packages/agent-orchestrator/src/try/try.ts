@@ -7,7 +7,7 @@
  * be tried; the store writes the folder (`tryFolder`).
  */
 import path from 'node:path';
-import { isRemoteHarness } from '../harness/harness.ts';
+import { fenceListsOf, HARNESSES, isRemoteHarness } from '../harness/harness.ts';
 import { renderFrontmatter } from '../frontmatter/frontmatter.ts';
 import { fencedPairs, frontmatterKey } from '../former/former.ts';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
@@ -80,8 +80,11 @@ export function tryNameRefusal(name: string, home: string): string | null {
   return `An agent named \`${name}\` cannot be tried: its try's folder would be ${tryDir(name, home)}, where every try looks for its ${name} first, and a folder named \`${name}\` is not a workflow. Rename the agent to try it.`;
 }
 
-/** The harnesses a try's fence is written for: Claude Code's `permissionMode:`, which no other takes. No `harness:` line is `claude`. */
-const FENCED_HARNESSES: readonly string[] = ['claude'];
+/**
+ * The harnesses a try's fence is written for: a step harness whose fence takes allow rules beside its word (`fenceListsOf`), as the try's
+ * `Edit(**)` is. No `harness:` line is the default harness.
+ */
+const FENCED_HARNESSES: readonly string[] = HARNESSES.filter((harness) => fenceListsOf(harness)?.includes('allowedTools') === true);
 
 /**
  * Why an agent cannot be tried, and the command that makes it one that can when a copy does (the repository's), or null when nothing here

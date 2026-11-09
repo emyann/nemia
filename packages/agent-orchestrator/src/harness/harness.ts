@@ -1,13 +1,45 @@
 /**
- * The harnesses a step runs on (`HARNESSES`), and a step on a remote agent: how it is named (`remoteNameOf`) and the keys it may not set
+ * The harnesses a step runs on (`HARNESSES`), what each declares (`declarationOf`, the runtime's declarations read here for the layers
+ * above, which import no runtime), and a step on a remote agent: how it is named (`remoteNameOf`) and the keys it may not set
  * (`remoteRefusal`, `REMOTE_REFUSED_KEYS`). The words each harness takes are the runtime's, asked at `nemia start` (`configRefused` in
  * start.verb.ts).
  */
 import { refuse, STEP_KEYS, type StepKey, type Workflow } from '../step/step.ts';
-import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
+import { DEFAULT_HARNESS, HARNESS_DECLARATIONS, HARNESS_KNOBS, type HarnessDeclaration, type HarnessKnobs } from 'agent-runtime/vocabulary';
 
-/** The harness a step runs on when it names none. */
-export const DEFAULT_HARNESS = 'claude';
+/** The harness a step runs on when it names none: the runtime's. */
+export { DEFAULT_HARNESS };
+
+/**
+ * Claude Code's permission matching and measured tool sets, as the runtime declares them (`rulesOf` reads them off a harness's
+ * declaration), for the api, which imports no runtime.
+ */
+export { CLAUDE_RULES, type ClaudeRules, type Dated } from 'agent-runtime/vocabulary';
+
+/**
+ * What harness `harness` declares, `DEFAULT_HARNESS` where it is `undefined`: `undefined` for a name the runtime has no declaration
+ * for, a remote agent's among them. Pure.
+ */
+export const declarationOf = (harness: string | undefined): HarnessDeclaration | undefined => {
+  const name = harness ?? DEFAULT_HARNESS;
+  return Object.hasOwn(HARNESS_DECLARATIONS, name) ? HARNESS_DECLARATIONS[name] : undefined;
+};
+
+/** How harness `harness` matches its permission rules, and the tool sets measured on it: `undefined` where it declares none. Pure. */
+export const rulesOf = (harness: string | undefined): HarnessDeclaration['rules'] => declarationOf(harness)?.rules;
+
+/**
+ * The key harness `harness`'s fence is named by — its mode, or `sandbox` — `DEFAULT_HARNESS`'s where it is `undefined`, and `undefined`
+ * for a harness with no knobs. Pure.
+ */
+export const fenceKeyOf = (harness: string | undefined): HarnessKnobs['fence']['key'] | undefined =>
+  declarationOf(harness)?.knobs?.fence.key;
+
+/**
+ * The tool lists harness `harness`'s fence takes (`tools` and its allow and deny rules), `DEFAULT_HARNESS`'s where it is
+ * `undefined`: none where its fence is one word, and `undefined` for a harness with no knobs. Pure.
+ */
+export const fenceListsOf = (harness: string | undefined): readonly string[] | undefined => declarationOf(harness)?.knobs?.fence.lists;
 
 /**
  * How a step names a remote A2A agent, one another party runs: `harness: a2a:<name>`, the name one the store's `a2a-agents.json` declares
@@ -99,7 +131,8 @@ export function remoteRefusal(step: string, meta: Partial<Record<StepKey, string
 }
 
 /**
- * The harnesses a step may run on.
+ * The harnesses a step may run on: those whose declaration says it runs a brief as an agent (`runsBrief`), in the runtime's order, the
+ * default first.
  *
  * Checked here because nothing below checks it early enough: an unknown `harness` falls silently to the
  * default.
@@ -107,7 +140,9 @@ export function remoteRefusal(step: string, meta: Partial<Record<StepKey, string
  * `check` is not on the list. That harness is the run's own: it executes a step's `check:`
  * command, and no step runs on it.
  */
-export const HARNESSES: readonly string[] = ['claude', 'codex'];
+export const HARNESSES: readonly string[] = Object.entries(HARNESS_DECLARATIONS)
+  .filter(([, declaration]) => declaration.runsBrief === true)
+  .map(([name]) => name);
 
 /**
  * The fence keys of every harness: each one's own key and its tool lists. One list for the package, read by the template and by the

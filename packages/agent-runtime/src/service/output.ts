@@ -1,7 +1,7 @@
 /** The engine's `output` verb, and what refuses it: one stream of a task's latest attempt, kept whole by its harness. */
 import type { Harnessed } from './harnessed.ts';
 import { Effect, Schema } from 'effect';
-import { fold, nameFor, type Event, type State } from '../core/index.ts';
+import { fold, nameFor, unknownTask, type Event, type State } from '../core/index.ts';
 import type { JournalError } from '../core/engine/index.ts';
 
 /** A stream `output` will not read, and why: a stream that is neither, a count of bytes that is none, a task or harness without one. */
@@ -30,7 +30,7 @@ export const outputVerbOf = (
     if (stream !== 'stdout' && stream !== 'stderr') return yield* refuse(notAStream(stream));
     if (lastBytes !== undefined && !(Number.isSafeInteger(lastBytes) && lastBytes > 0)) return yield* refuse(notACount(lastBytes));
     const events = yield* read(taskId);
-    if (!events.length) return yield* refuse(`\`${taskId}\` is not a task in this store. \`ae ls\`, or \`list()\`, gives the ones it has.`);
+    if (!events.length) return yield* refuse(unknownTask(taskId));
     const state = fold(taskId, events);
     const { name: harness, runner } = harnessOf(state);
     const output = runner.output;

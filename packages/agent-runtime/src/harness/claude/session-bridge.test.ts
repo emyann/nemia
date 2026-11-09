@@ -1,5 +1,5 @@
 /**
- * The claude.ai bridge's one door (`attached-bridge.ts`): the undeclared control request read off a `query()` object, its answer
+ * The claude.ai bridge's one door (`session-bridge.ts`): the undeclared control request read off a `query()` object, its answer
  * decoded before anything is written from it, and refused in words — never thrown — where the method is not there, where its answer
  * says something this runtime does not read, or where the request itself failed. One table: each row makes one of them.
  */
@@ -14,7 +14,7 @@ import {
   bridgeUnread,
   enableBridge,
   BRIDGE_ABSENT,
-} from './attached-bridge.ts';
+} from './session-bridge.ts';
 
 /** The facts the SDK's bridge answers with, whole. */
 const ANSWER = {

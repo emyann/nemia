@@ -27,6 +27,7 @@ import {
   AGENT_KEYS,
   AGENT_OWN_KEYS,
   AGENTS_FOLDER,
+  DEFAULT_HARNESS,
   HARNESSES,
   parseFolder,
   parseWorkflow,
@@ -50,12 +51,6 @@ import type { Engine } from '../store.ts';
 import { listed, loadedAt, loadedOf, placesOf, specOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
 import { commandNamed, runPlaced } from '../store.ts';
 import type { PlaceService } from 'agent-orchestrator';
-
-/**
- * The harness a step runs on when it names none, whose words `effort` and `permissionMode` take then — and which takes no `sandbox`. The
- * parser's, which it does not export.
- */
-export const DEFAULT_HARNESS = 'claude';
 
 /**
  * One key of a step's form: the key, the package's line of what it means, how it is set, and the words it may be set to where there are

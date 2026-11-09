@@ -10,6 +10,7 @@ import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { isReadme, WorkflowError, type Workflow } from '../step/step.ts';
 import { codexModeWritten } from '../former/former.ts';
+import { fenceKeyOf } from '../harness/harness.ts';
 import { agentDeniesOf, parseWorkflow, renderStep, type StepDraft } from '../workflow/index.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import {
@@ -175,7 +176,8 @@ function linkedRefusal(
  */
 function codexModeRefusal(steps: readonly StepDraft[], agents: Agents): string | undefined {
   for (const step of steps)
-    if (step.permissionMode != null && harnessOfDraft(step, agents) === 'codex') return codexModeWritten(step.name, step.permissionMode);
+    if (step.permissionMode != null && fenceKeyOf(harnessOfDraft(step, agents)) === 'sandbox')
+      return codexModeWritten(step.name, step.permissionMode);
   return undefined;
 }
 

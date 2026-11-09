@@ -11,7 +11,8 @@ import { testEngine } from 'agent-runtime/testing';
 import { scratch } from 'test-kit/scratch';
 
 process.env.WF_ROOT = scratch('wf-runtime-client-');
-const { asked, engineOf, runWith } = await import('../src/runtime-client.ts');
+const { asked, engineOf, HARNESSES, quotaHarnesses, runWith } = await import('../src/runtime-client.ts');
+const { HARNESSES: STEP_HARNESSES } = await import('../src/harness/harness.ts');
 
 /** What `run` was rejected or thrown with: the error, and the exit code it carries. */
 const failure = async (run: () => unknown): Promise<Error & { exitCode?: number }> => {
@@ -65,4 +66,9 @@ test('REFUSED: a program run through runWith says no Info line, and still says i
   assert.equal(said.filter((s) => s.includes('a feed line')).length, 0, said.join('\n'));
   assert.equal(said.filter((s) => s.includes('a warning a command must not swallow')).length, 1, said.join('\n'));
   assert.equal(said.filter((s) => s.includes('an error a command must not swallow')).length, 1, said.join('\n'));
+});
+
+test("the engine runs each step harness, then the run's check; the daemon asks for the quota of a harness that declares one, and no other", () => {
+  assert.deepEqual(Object.keys(HARNESSES), [...STEP_HARNESSES, 'check']);
+  assert.deepEqual(quotaHarnesses(), ['claude'], 'codex and the check report no quota');
 });

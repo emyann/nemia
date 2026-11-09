@@ -2,7 +2,7 @@
  * An attached session's face to every other process: its run file under `<root>/runs/attached/`, written by the process that holds the
  * session alone, and the files another process writes beside it, each its own: a stop (`<name>.stop`), the words said to the session
  * (`<name>.say.jsonl`, appended, which its holder hands it as it looks), the person's answers to the questions it holds open
- * (`<name>.answers.jsonl`, appended by the answer verb), and the drain (`drain.json`), which names the holder whose new calls wait.
+ * (`<name>.answers.jsonl`, appended by the answer verb), and the store's two drains (`core/engine/drain.ts`), kept in the same folder.
  * The questions it asked, each opened and closed, are its own (`<name>.asks.jsonl`), written by its holder alone and composed on read
  * (`openAsks`, `asksTaken`). What the session said is its capture (`<name>.out.jsonl`), the SDK's
  * messages a reader reads (`claudeStreamKept`), appended as they come.
@@ -11,11 +11,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
 import type { AskQuestion, PermissionFacts, SessionAsk, SessionState } from '../../core/index.ts';
-import { BridgeFactsSchema } from './attached-bridge.ts';
+import { BridgeFactsSchema } from './session-bridge.ts';
 import { CarriedSchema } from '../detached/run-file.ts';
 import type { SpawnRequest } from '../seam.ts';
 import { IMAGE } from '../image.ts';
 import { alive } from '../../process/alive.ts';
+import {
+  DRAIN_FILE,
+  SESSION_DRAIN_FILE,
+  drainFolder,
+  holderDrainOf,
+  putHolderDrain,
+  writeWhole,
+  type HolderDrain,
+} from '../../core/engine/drain.ts';
 
 /**
  * What a holder writes of a session: `working` while a holder runs it, `idle` once a long-lived session's turn ended and it waits with
@@ -24,7 +33,7 @@ import { alive } from '../../process/alive.ts';
  */
 export type AttachedState = 'working' | 'idle' | 'parked' | 'completed' | 'failed' | 'canceled';
 
-export type { AttachedBridge } from './attached-bridge.ts';
+export type { AttachedBridge } from './session-bridge.ts';
 
 /**
  * When a process started, as `/proc/<pid>/stat` counts it (its 22nd field): what a run file names its holder and its Claude Code by,
@@ -108,8 +117,8 @@ export type AttachedRun = typeof RunFileSchema.Type;
 
 const decode = Schema.decodeUnknownOption(RunFileSchema);
 
-/** The folder of an engine's attached sessions. */
-export const attachedDir = (root: string): string => path.join(root, 'runs', 'attached');
+/** The folder of an engine's attached sessions: the store's drains' folder too (`drainFolder`), where they are kept beside them. */
+export const attachedDir = (root: string): string => drainFolder(root);
 
 /** A session's name as a file name: the engine's `ae/<task>/<n>`, its slashes taken out. */
 const safe = (name: string): string => name.replace(/[^A-Za-z0-9._-]/g, '_');
@@ -117,7 +126,7 @@ const safe = (name: string): string => name.replace(/[^A-Za-z0-9._-]/g, '_');
 /**
  * The files of the session under `name`: its run file, its stop, the interrupt another process asks its turn's end with, the words said
  * to it, its capture, and its MCP config — which nothing writes any more, an attached session's servers riding `Options.mcpServers`
- * (`attached-options.ts`), and which the spawn clears so a session started by an older runtime leaves none behind unread.
+ * (`session-options.ts`), and which the spawn clears so a session started by an older runtime leaves none behind unread.
  */
 export const filesOf = (root: string, name: string) => {
   const base = path.join(attachedDir(root), safe(name));
@@ -175,24 +184,65 @@ const askOf = (l: AskLine & { questions: AskQuestion[] }): SessionAsk[] => {
 /** One line of a session's answers file: a person's answer to the ask `id`, each question's by the question's own text. */
 export type AnswerLine = { id: string; at: string; answers: Record<string, string> };
 
-/** The lines of the JSONL file `file`, each parsed, a line that does not parse left out; none where there is no file. */
-const jsonLines = <A>(file: string): A[] => {
+/** A question as an asks file holds it (`AskQuestion`). */
+const AskQuestionSchema = Schema.Struct({
+  question: Schema.String,
+  header: Schema.String,
+  options: Schema.Array(Schema.Struct({ label: Schema.String, description: Schema.String, preview: Schema.optional(Schema.String) })),
+  multiSelect: Schema.Boolean,
+});
+
+/** A line of an asks file (`AskLine`): a permission's facts decoded apart (`askOf`), so a line whose facts do not is unread alone. */
+const AskLineSchema = Schema.Struct({
+  id: Schema.String,
+  at: Schema.String,
+  questions: Schema.optional(Schema.Array(AskQuestionSchema)),
+  kind: Schema.optional(Schema.Literal('permission')),
+  permission: Schema.optional(Schema.Unknown),
+  closed: Schema.optional(Schema.String),
+  how: Schema.optional(Schema.Literals(['taken', 'cut'])),
+});
+
+/** A line of an answers file (`AnswerLine`). */
+const AnswerLineSchema = Schema.Struct({ id: Schema.String, at: Schema.String, answers: Schema.Record(Schema.String, Schema.String) });
+
+/** The lines of a JSONL file read through a schema, and how many it left unread: lines that do not parse, or do not decode. */
+export type DecodedLines<A> = { readonly lines: A[]; readonly unread: number };
+
+/** The lines of the JSONL file `file`, each decoded by `schema` (`DecodedLines`); none, and none unread, where there is no file. */
+const jsonLines = <A>(file: string, schema: Schema.Decoder<A>): DecodedLines<A> => {
   let text: string;
   try {
     text = fs.readFileSync(file, 'utf8');
   } catch {
-    return [];
+    return { lines: [], unread: 0 };
   }
-  return text
-    .split('\n')
-    .filter((line) => line.trim() !== '')
-    .flatMap((line) => {
-      try {
-        return [JSON.parse(line) as A];
-      } catch {
-        return [];
-      }
-    });
+  const decode = Schema.decodeUnknownOption(schema);
+  const lines: A[] = [];
+  let unread = 0;
+  for (const line of text.split('\n')) {
+    if (line.trim() === '') continue;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      unread++;
+      continue;
+    }
+    const decoded = decode(parsed);
+    if (decoded._tag === 'Some') lines.push(decoded.value);
+    else unread++;
+  }
+  return { lines, unread };
+};
+
+/** The lines of the asks file of the session `name`, decoded (`AskLineSchema`), and how many did not decode. */
+export const askLinesOf = (root: string, name: string): DecodedLines<AskLine> => {
+  const read = jsonLines(filesOf(root, name).asks, AskLineSchema);
+  return {
+    lines: read.lines.map((l) => ({ ...l, ...(l.questions ? { questions: [...l.questions] } : {}) }) as AskLine),
+    unread: read.unread,
+  };
 };
 
 /** Appends `line` to `file`, its folder made first. */
@@ -208,7 +258,7 @@ export const appendAsk = (root: string, name: string, line: AskLine): void => ap
 export const appendAnswer = (root: string, name: string, line: AnswerLine): void => append(filesOf(root, name).answers, line);
 
 /** Every answer written for the session `name`, oldest first. */
-export const readAnswers = (root: string, name: string): AnswerLine[] => jsonLines<AnswerLine>(filesOf(root, name).answers);
+export const readAnswers = (root: string, name: string): AnswerLine[] => jsonLines(filesOf(root, name).answers, AnswerLineSchema).lines;
 
 /**
  * The asks of the session `name` still waiting on a person: each opened and not closed, oldest first, in the order they were asked.
@@ -216,7 +266,7 @@ export const readAnswers = (root: string, name: string): AnswerLine[] => jsonLin
  * the answer is owed as words rather than through the call.
  */
 export const openAsks = (root: string, name: string): SessionAsk[] => {
-  const lines = jsonLines<AskLine>(filesOf(root, name).asks);
+  const { lines } = askLinesOf(root, name);
   const closed = new Set(lines.filter((l) => l.closed !== undefined).map((l) => l.id));
   return lines.flatMap((l) => (l.questions === undefined || closed.has(l.id) ? [] : askOf({ ...l, questions: l.questions })));
 };
@@ -226,8 +276,8 @@ export const openAsks = (root: string, name: string): SessionAsk[] => {
  * through its own call from one whose call was cut, which is owed to the session as words instead.
  */
 export const asksTaken = (root: string, name: string): string[] =>
-  jsonLines<AskLine>(filesOf(root, name).asks)
-    .filter((l) => l.how === 'taken')
+  askLinesOf(root, name)
+    .lines.filter((l) => l.how === 'taken')
     .map((l) => l.id);
 
 /**
@@ -257,23 +307,17 @@ export const readRun = (file: string): AttachedRun | undefined => {
   }
 };
 
-/** Writes `run` whole, through a file beside it renamed over it, so no reader sees half of it. */
-export const writeRun = (root: string, run: AttachedRun): void => {
-  const { run: file } = filesOf(root, run.name);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(run));
-  fs.renameSync(tmp, file);
-};
+/** Writes `run` whole (`writeWhole`, `replaceFile`), so no reader sees half of it. */
+export const writeRun = (root: string, run: AttachedRun): void => writeWhole(filesOf(root, run.name).run, run);
 
-/** Every attached run file under `root`, by its session's name: neither drain's file (`DRAIN`, the jobs' `sessionDrainFile`) is one. */
+/** Every attached run file under `root`, by its session's name: neither drain's file (`DRAIN_FILE`, `SESSION_DRAIN_FILE`) is one. */
 export const everyRun = (root: string): Map<string, AttachedRun> => {
   const dir = attachedDir(root);
   let names: string[];
   try {
     names = fs
       .readdirSync(dir)
-      .filter((f) => f.endsWith('.json') && !f.endsWith('.mcp.json') && f !== DRAIN && f !== 'sessions-drain.json');
+      .filter((f) => f.endsWith('.json') && !f.endsWith('.mcp.json') && f !== DRAIN_FILE && f !== SESSION_DRAIN_FILE);
   } catch {
     return new Map();
   }
@@ -314,9 +358,6 @@ export const OPEN_STATES: readonly AttachedState[] = ['working', 'idle', 'parked
 /** Whether `state` is one a holder still runs the session in (`OPEN_STATES`). */
 export const isOpen = (state: AttachedState): boolean => OPEN_STATES.includes(state);
 
-/** The drain's file name, beside the run files. */
-const DRAIN = 'drain.json';
-
 /**
  * The drain put for the holder `pid`: its new calls wait until it is lifted, or until the process that put it ends. Written by that
  * process, with when `pid` started, so a later process given the same pid is not held, and with who put it (`by`: its pid and start),
@@ -325,37 +366,26 @@ const DRAIN = 'drain.json';
 export const putDrain = (root: string, pid: number): void => {
   const start = processStart(pid);
   const byStart = processStart(process.pid);
-  const by = { pid: process.pid, ...(byStart ? { start: byStart } : {}) };
-  fs.mkdirSync(attachedDir(root), { recursive: true });
-  fs.writeFileSync(path.join(attachedDir(root), DRAIN), JSON.stringify({ pid, ...(start ? { start } : {}), by }));
+  putHolderDrain(root, { pid, ...(start ? { start } : {}), by: { pid: process.pid, ...(byStart ? { start: byStart } : {}) } });
 };
 
-/** The drain lifted: none waits. */
-export const liftDrain = (root: string): void => fs.rmSync(path.join(attachedDir(root), DRAIN), { force: true });
-
-/**
- * Whether the process that put a drain is gone: its pid dead, or another process's now, where the drain says when it started. A drain
- * that names no putter (`by`), written before it did, is never read as gone.
- */
-const putterGone = (by: unknown): boolean => {
-  if (typeof by !== 'object' || by === null || !('pid' in by) || typeof by.pid !== 'number') return false;
-  if (!alive(by.pid)) return true;
-  const start = 'start' in by ? by.start : undefined;
-  return start !== undefined && processStart(by.pid) !== start;
-};
+/** Whether the process that put a drain (`by`) is gone: its pid dead, or another process's now, where the drain says when it started. */
+const putterGone = (by: HolderDrain['by']): boolean =>
+  by !== undefined && (!alive(by.pid) || (by.start !== undefined && processStart(by.pid) !== by.start));
 
 /**
  * Whether the drain put names this very process: its pid, and, where the drain says it, when it started; and its putter still runs
- * (`putterGone`), so a take-over killed before it lifted its drain leaves nothing held.
+ * (`putterGone`), so a take-over killed before it lifted its drain leaves nothing held. A drain that names no putter, written before it
+ * did, is never read as one whose putter is gone; one whose file does not decode drains nothing.
  */
 export const drainsThis = (root: string): boolean => {
-  let drain: { pid?: unknown; start?: unknown; by?: unknown };
-  try {
-    drain = JSON.parse(fs.readFileSync(path.join(attachedDir(root), DRAIN), 'utf8')) as typeof drain;
-  } catch {
-    return false;
-  }
-  return drain.pid === process.pid && (drain.start === undefined || drain.start === processStart(process.pid)) && !putterGone(drain.by);
+  const drain = holderDrainOf(root);
+  return (
+    drain !== null &&
+    drain.pid === process.pid &&
+    (drain.start === undefined || drain.start === processStart(process.pid)) &&
+    !putterGone(drain.by)
+  );
 };
 
 /**

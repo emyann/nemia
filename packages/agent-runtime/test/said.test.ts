@@ -26,6 +26,7 @@ const counted = () => {
   const reads = { n: 0 };
   const spec: HarnessSpec = {
     name: 'sh',
+    can: [],
     command: () => ({ cmd: 'sh', args: ['-c', 'true'] }),
     readOutput: (text) => (reads.n++, claudeStreamOutput(text)),
   };

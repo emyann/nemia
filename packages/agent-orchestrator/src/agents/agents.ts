@@ -54,7 +54,7 @@ import {
 import { headedLayers, OVERRIDABLE, stepFrom, type Overridable } from '../workflow/index.ts';
 import type { AgentSkill } from '../skills/skills.ts';
 import { frontmatterOrNull, renderFrontmatter, type FrontmatterPair } from '../frontmatter/frontmatter.ts';
-import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
+import { declarationOf, fenceKeyOf } from '../harness/harness.ts';
 
 /**
  * The keys an agent file sets: the job it holds (`role:`, as `Product engineer`; its own name is its file's); what it is for, in a line;
@@ -449,7 +449,8 @@ export function renderAgent(draft: AgentDraft): string {
     const refused = agentKeyRefusal(file, key);
     if (refused !== undefined) refuse(refused);
   }
-  if (keys.harness === 'codex' && keys.permissionMode != null) refuse(codexModeWritten(file, keys.permissionMode));
+  if (fenceKeyOf(keys.harness ?? undefined) === 'sandbox' && keys.permissionMode != null)
+    refuse(codexModeWritten(file, keys.permissionMode));
   refuseStale(file, draft);
   const own: Record<AgentOwnKey, string | null | undefined> = {
     role: draft.role,
@@ -593,16 +594,16 @@ export const pluginOf = (agent: string): string => `nemia-${agent}`;
 const toldWords = (agent: StepAgent): boolean => Boolean(agent.instructions || agent.customInstructions || agent.factoryRules);
 
 /**
- * Whether `nemia start` renders the step's agent and the tick files the step with it: a step of Claude Code's — codex loads no plugin and
- * takes no prompt of ours — whose record gives its agent instructions, custom instructions, its factory's rules, skills or a harness
- * prompt other than `keep` (`StepAgent.instructions`, `customInstructions`, `factoryRules`, `skills`, `harnessPrompt`; a record without
- * them renders nothing), and which starts a
+ * Whether `nemia start` renders the step's agent and the tick files the step with it: a step whose harness declares it takes Claude
+ * Code's flags (`claudeFlags`) — codex and a remote agent load no plugin and take no prompt of ours — whose record gives its agent
+ * instructions, custom instructions, its factory's rules, skills or a harness prompt other than `keep` (`StepAgent.instructions`,
+ * `customInstructions`, `factoryRules`, `skills`, `harnessPrompt`; a record without them renders nothing), and which starts a
  * session of its own. A step that continues another's session keeps that session's prompt, so it is told its agent's instructions in its
  * brief (and may give no skills, nor a harness prompt: `composedRefusal`).
  */
 export const rendersAgent = (step: Workflow): boolean => {
   const agent = step.agent;
-  if (!agent || step.harness === 'codex' || isRemoteHarness(step.harness) || step.resume) return false;
+  if (!agent || declarationOf(step.harness)?.can.includes('claudeFlags') !== true || step.resume) return false;
   return Boolean(toldWords(agent) || agent.skills?.length || (agent.harnessPrompt ?? 'keep') !== 'keep');
 };
 
@@ -731,11 +732,11 @@ function sessionSettings(agent: StepAgent): string | undefined {
  * session loads it, `nemia-<agent>:<bare name>` — its agent's and those its `skills:` line adds — so every other skill, the harness's
  * built-in ones, the person's, the repository's and another plugin's, is hidden from it and refused. `[]` for a step whose agent is not
  * rendered (`rendersAgent`): one with no agent or no skill, one that continues another's session, and one whose rendered folder is gone
- * and is told its skills whole in its brief (`unrendered`). A session on a harness the run names besides the default holds no closed
- * list, and is given the harness's own skills (`'default'`), with no list of names turned off. Pure.
+ * and is told its skills whole in its brief (`unrendered`). A session on a harness that declares no closed list (`enabledSkills`) holds
+ * none, and is given the harness's own skills (`'default'`), with no list of names turned off. Pure.
  */
 export const enabledSkillsOf = (step: Workflow): string[] | 'default' => {
-  if ((step.harness ?? DEFAULT_HARNESS) !== DEFAULT_HARNESS) return 'default';
+  if (declarationOf(step.harness)?.can.includes('enabledSkills') !== true) return 'default';
   const agent = step.agent;
   if (!rendersAgent(step) || agent === undefined) return [];
   const plugin = pluginOf(agent.name);

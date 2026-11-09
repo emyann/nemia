@@ -36,9 +36,9 @@ const { claudeCodeOps, claudeJob } = await import('../src/harness/claude/code.ts
 
 const { STAND_IN } = await import('./attached-held.ts');
 
-const { attachedOptions } = await import('../src/harness/claude/attached-options.ts');
+const { attachedOptions } = await import('../src/harness/claude/session-options.ts');
 
-const { claudeCodeRefuses, claudeRefuses } = await import('../src/harness/claude/vocabulary.ts');
+const { claudeRefuses } = await import('../src/harness/claude/vocabulary.ts');
 
 const JOB_ID = '5e551011-0000-4000-8000-00000000000a';
 
@@ -439,7 +439,7 @@ test("Claude Code's road, pinned: a job's command and options — its own flags,
       model: 'opus',
     };
     const { env, ...given } = attachedOptions({ name: 'ae/t/1', brief: 'the brief', cwd: '/r', config });
-    assert.ok(env, "a job's environment is its own, and is read where it is laid (`attached-options.test.ts`)");
+    assert.ok(env, "a job's environment is its own, and is read where it is laid (`session-options.test.ts`)");
     assert.deepEqual(given, PINNED_JOB_OPTIONS);
   });
   await t.test("a job reads its checkout's shared settings and neither the operator's nor a `settings.local.json`", () => {
@@ -481,30 +481,27 @@ test("REFUSED at the door: Claude Code's flags on the wrong harness, a flag the 
   await t.test(
     'what Claude Code refuses as the engine runs it is what Claude Code cannot: a job and a long-lived session take a bridge and a spend cap',
     () => {
-      assert.equal(claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { budgetUsd: 1 } }), undefined, 'a job keeps a cap');
+      assert.equal(claudeRefuses({ brief: 'b', cwd: '/r', config: { budgetUsd: 1 } }), undefined, 'a job keeps a cap');
       assert.equal(
-        claudeCodeRefuses({ brief: 'b', cwd: '/r', restartPolicy: 'Always', config: { budgetUsd: 1 } }),
+        claudeRefuses({ brief: 'b', cwd: '/r', restartPolicy: 'Always', config: { budgetUsd: 1 } }),
         undefined,
         'and so does a long-lived session',
       );
       for (const remoteControl of [true, 'phone'] as const) {
         assert.equal(
-          claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { claude: { remoteControl } } }),
+          claudeRefuses({ brief: 'b', cwd: '/r', config: { claude: { remoteControl } } }),
           undefined,
           `a job bridged: ${remoteControl}`,
         );
-        assert.equal(
-          claudeCodeRefuses({ brief: 'b', cwd: '/r', restartPolicy: 'Always', config: { claude: { remoteControl } } }),
-          undefined,
-        );
+        assert.equal(claudeRefuses({ brief: 'b', cwd: '/r', restartPolicy: 'Always', config: { claude: { remoteControl } } }), undefined);
       }
-      assert.equal(claudeCodeRefuses({ brief: 'b', cwd: '/r' }), undefined);
+      assert.equal(claudeRefuses({ brief: 'b', cwd: '/r' }), undefined);
       assert.match(
-        claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { effort: 'huge' } }) ?? '',
+        claudeRefuses({ brief: 'b', cwd: '/r', config: { effort: 'huge' } }) ?? '',
         /^`effort: huge` is not an effort Claude Code has/,
       );
       assert.match(
-        claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { permissionMode: 'yolo' } }) ?? '',
+        claudeRefuses({ brief: 'b', cwd: '/r', config: { permissionMode: 'yolo' } }) ?? '',
         /^`permissionMode: yolo` is not a mode/,
       );
     },
@@ -581,10 +578,8 @@ test("REFUSED at the door: Claude Code's flags on the wrong harness, a flag the 
       );
       assert.deepEqual(stray, [], 'every flag a job hands Claude Code on `extraArgs` is on the list');
       for (const owned of CLAUDE_OWNED_FLAGS) {
-        for (const refuses of [claudeRefuses, claudeCodeRefuses]) {
-          const says = refuses({ brief: 'b', cwd: '/r', config: { claude: { [owned]: 'x' } } }) ?? '';
-          assert.ok(says.startsWith(`\`claude.${owned}\` is a flag the runtime gives Claude Code itself`), `${owned}: ${says}`);
-        }
+        const says = claudeRefuses({ brief: 'b', cwd: '/r', config: { claude: { [owned]: 'x' } } }) ?? '';
+        assert.ok(says.startsWith(`\`claude.${owned}\` is a flag the runtime gives Claude Code itself`), `${owned}: ${says}`);
       }
       assert.equal(
         claudeRefuses({ brief: 'b', cwd: '/r', config: { claude: { appendSystemPromptFile: 'p.md', pluginDir: ['d'] } } }),
@@ -599,7 +594,7 @@ test("REFUSED at the door: Claude Code's flags on the wrong harness, a flag the 
       const { codex } = await import('../src/index.ts');
       const { Engine } = await import('../src/index.ts');
       const { builtEngine } = await import('./engine.ts');
-      const other = { name: 'other', command: () => ({ cmd: 'true', args: [] }) };
+      const other = { name: 'other', can: [], command: () => ({ cmd: 'true', args: [] }) };
       const e = builtEngine(Engine.layer({ root: tmp('root'), harnesses: { claude: 'claude', codex, other } }));
       const claude = { appendSystemPromptFile: '/a/prompt.md' };
       for (const harness of ['codex', 'other']) {

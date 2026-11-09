@@ -79,7 +79,7 @@ test('REFUSED: the same pages each three times slower fail at four workers, nami
   const says = [sumOf(SLOW), PAGES_BOUND_MS, sumOf(SLOW) / BOUND_WORKERS, E2E_BOUND_MS].map(secondsOf);
   assert.deepEqual(
     says.map((seconds) => head.indexOf(seconds)),
-    [...says.map((seconds) => head.indexOf(seconds))].sort((a, b) => a - b),
+    says.map((seconds) => head.indexOf(seconds)).sort((a, b) => a - b),
     "the sum, its bound, then each worker's share and its bound, in that order",
   );
   assert.ok(says.every((seconds) => head.includes(seconds)) && head.includes(`${BOUND_WORKERS} workers`), head);

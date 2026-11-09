@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Exit, Layer } from 'effect';
 import type { CardWrite } from 'objects';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 process.env.WF_ROOT = scratch('wf-card-write-');
 const { replaceCard, cardVersion } = await import('./card-write.verb.ts');

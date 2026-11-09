@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { teamCopy } from './team.ts';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven } from './placed.ts';

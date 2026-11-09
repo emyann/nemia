@@ -34,7 +34,7 @@ import {
   type RunLine,
   type StoreLine,
 } from './feed.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { listing as coded } from '../../test/assessed.ts';
 import { reasonOf } from './reason.ts';
 import { factoryLevelOf, type FactoryLevel, type FactoryLevelFile } from '../level/level.ts';

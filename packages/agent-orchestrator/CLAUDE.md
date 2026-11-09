@@ -17,7 +17,8 @@ too, which holds parity with this one until the in-process reads retire.
   never a cast or a default the contract does not give. A dictionary read stays a plain read, its `undefined` handled, with no
   `Object.hasOwn` guard put in front of it: that changes what a prototype key reads. The tests' own `test/tsconfig.json` leaves the
   flag off. `text.split(sep)[0]` is `firstPiece` (`src/piece/piece.ts`).
-- **A test beside its file reaches the helpers one folder further up** (`../../test/scratch.ts`).
+- **A test beside its file reaches the package's helpers one folder further up** (`../../test/door-walks.ts`), and the shared ones by the
+  test kit's entries (`test-kit/scratch`, `test-kit/checkpoints`), never by a path.
 - **The store's root is a service, `StoreRoot` (`src/config/root.store.ts`), given where a program is composed** —
   `src/cli/main.ts` and the api's `app.ts`, each from `WF_ROOT` through `storeRootLayer(env)` — and a store function takes it as a
   required `home: string` with no default. `test/root-given.test.ts` refuses by name a new module-level root, a parameter defaulted to

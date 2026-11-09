@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { faultsOf, PAGES } from '../built.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 /** A built page holding `figures`, each the words of one SVG. */
 const page = (figures: string[]): string =>

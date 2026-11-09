@@ -19,7 +19,7 @@ import type { Refusal } from '../src/refusal/refusal.ts';
 import type { EngineService } from '../src/runtime-client.ts';
 import type { PlaceService } from '../src/place/place.store.ts';
 import type { EnginePhase } from '../src/views/views-words.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { decideScreen } from './screens.ts';
 import { placeOver, unreadBy } from './place-over.ts';
 import { staged, story } from './story.ts';

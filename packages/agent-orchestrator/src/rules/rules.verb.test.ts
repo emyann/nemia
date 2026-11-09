@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import type { Args } from '../command/command.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { done, doorFrom } from '../../test/door-walks.ts';
 import { aFactory } from '../../test/factory-walks.ts';
 import { testEngine } from 'agent-runtime/testing';

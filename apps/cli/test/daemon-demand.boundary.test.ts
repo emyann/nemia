@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { ambient } from './ambient.ts';
-import { scratch } from '../../api/test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const BIN = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 const SCRATCH = scratch('nemia-demand-');

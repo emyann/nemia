@@ -14,7 +14,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest } from '../../test/placed.ts';
 import { placeOver, unreadBy } from '../../test/place-over.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { heldUnasked } from '../../test/unasked.ts';
 import { story } from '../../test/story.ts';
 

@@ -21,7 +21,7 @@ import { a2aOps } from '../src/a2a/client.ts';
 import { HarnessHandler } from '../src/a2a/handler.ts';
 import type { Sighting } from '../src/index.ts';
 import { Engine } from '../src/index.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { asyncOps, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
 

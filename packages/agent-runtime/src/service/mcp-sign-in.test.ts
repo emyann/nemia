@@ -9,12 +9,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Exit } from 'effect';
-import { story } from '../../test/checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import { mcpSignInVerbsOf, SIGN_IN_FOLDER, type McpSignInRefused } from './mcp-sign-in.ts';
 import type { HarnessConfig } from './options.ts';
 import type { McpCli, McpSignInAsk, SignInSettled } from '../harness/mcp-sign-in.ts';
 import type { RemoteMcpServer } from '../harness/seam.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { codex } from '../harness/codex/codex.ts';
 
 const CLAUDE: Record<string, HarnessConfig> = { claude: 'claude' };

@@ -22,7 +22,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { files, textOf } from './repo-files.ts';
+import { files, textOf } from 'test-kit/repo';
 
 const MARK = 'renamed on 2026-09-23';
 /** The packages' former names, spelled in parts so that this line is not one that names them. */

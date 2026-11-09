@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { SDLC } from './template.ts';
 
 /** The scripts of `build` that `quick`'s checks run, which `quick` carries as copies of its own. */

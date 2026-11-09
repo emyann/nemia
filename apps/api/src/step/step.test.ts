@@ -11,7 +11,7 @@ import { Effect } from 'effect';
 import { hireRefusalOf, SkillDoor, type FactoryListing } from 'agent-orchestrator';
 import { StoreRoot } from '../store.ts';
 import type { Run, ToldLayers } from 'agent-orchestrator/run';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { hiredInOf, hiringOf, RECENT_RUNS, recentRunsOf, skillsFromOf, unreadAgentsRefusal, workflowPageOf } from './step.ts';
 
 const home = '/store';

@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { loadPages, NAMES, namesIn, orderOf, PAGES_DIR, pageFiles, planOf, shardOf } from './e2e/pages.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 /**
  * A directory of pages: each file's name and what it holds — a page named as given, or any text. And a NAMES naming each file that is named

@@ -16,7 +16,7 @@ import { Engine as RuntimeEngine } from 'agent-runtime';
 import { testEngine } from 'agent-runtime/testing';
 import { appOf, liveOf } from '../src/app.ts';
 import { Engine } from '../src/store.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 addFactory({ name: 'signmill', repos: [scratch('nemia-api-sign-in-')] });
 fs.mkdirSync(path.join(root, 'factories', 'signmill'), { recursive: true });

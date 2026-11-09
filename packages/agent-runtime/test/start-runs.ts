@@ -6,7 +6,7 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { detachedOps, type HarnessSpec, type StartEvent } from '../src/harness/detached/detached.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { until, type Waiter } from '../src/waits/index.ts';
 
 /** A Codex thread's id, of the shape Codex prints. */

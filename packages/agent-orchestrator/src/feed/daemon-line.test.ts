@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { DaemonFile, DaemonStanding } from '../daemon/daemon.ts';
 import { feedChanges, feedLineWords, foldFeed, freshFold, startedLine, upgraded, type FeedLine, type FeedWords } from './feed.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const ROOT = scratch('wf-daemon-line-');
 process.env.WF_ROOT = ROOT;

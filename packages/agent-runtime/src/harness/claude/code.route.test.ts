@@ -10,7 +10,7 @@ import { attachedLongLived, claudeCodeOps } from './code.ts';
 import type { Attached } from './attached.ts';
 import { Engine } from '../../index.ts';
 import { builtEngine } from '../../../test/engine.ts';
-import { scratch } from '../../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 /** An attached runner that holds, or does not. */
 const holder = (holding: boolean) => ({ holding: () => holding });

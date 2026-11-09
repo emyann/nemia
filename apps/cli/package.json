@@ -21,6 +21,7 @@
   "devDependencies": {
     "@types/node": "^24.19.2",
     "api": "*",
+    "test-kit": "*",
     "typescript": "^6.0.3"
   }
 }

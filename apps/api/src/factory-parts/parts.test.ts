@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { addFactory, attachWorkflow, setSchedule } from 'agent-orchestrator';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { app, appOf, liveOf, runtime } from '../app.ts';
 import { ReadMemo } from '../layer.ts';
 

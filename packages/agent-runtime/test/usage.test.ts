@@ -12,7 +12,7 @@ import { codexOutput } from '../src/harness/codex/stream.ts';
 import { attemptLine, entryLine, limitLines, taskLine, usageLine, usd } from '../src/cli/lines.ts';
 import { fold, type Event } from '../src/core/domain.ts';
 import { codexStream, completed, item, THREAD, TURN, USED } from './reader-streams.ts';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 
 const line = (o: object) => JSON.stringify(o);
 const TOKENS = { input_tokens: 10, cache_creation_input_tokens: 100, cache_read_input_tokens: 1000, output_tokens: 5 };

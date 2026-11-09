@@ -20,8 +20,8 @@ import { attachedOptions } from './attached-options.ts';
 import { CLAUDE_JOB_ENV } from './job-env.ts';
 import type { SpawnRequest } from '../seam.ts';
 import type { ClaudeFlags } from './vocabulary.ts';
-import { scratch } from '../../../test/scratch.ts';
-import { story } from '../../../test/checkpoints.ts';
+import { scratch } from 'test-kit/scratch';
+import { story } from 'test-kit/checkpoints';
 
 const SCHEMA = { type: 'object', properties: { anything: { 'x-no-runtime-reads-this': true } } };
 

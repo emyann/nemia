@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { Engine } from 'agent-runtime';
 import { Effect, Exit, Tracer } from 'effect';
 import { asyncOps, plainEngine, type AsyncRunner } from '../../test/promised.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 process.env.WF_ROOT = scratch('wf-quota-spans-');
 const { askedQuota } = await import('./up.verb.ts');

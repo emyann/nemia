@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { TaskSpec } from 'agent-runtime';
 import type { TaskPhase } from '../src/run.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
 import { testPlace } from '../place/memory/index.ts';

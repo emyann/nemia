@@ -16,12 +16,12 @@ import { execFileSync } from 'node:child_process';
 import { type TaskSpec, ForgetRefused } from 'agent-runtime';
 import type { Engine } from '../src/runtime-client.ts';
 import type { RepositoryRun, Run, TaskPhase } from '../src/run.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { decideScreen } from './screens.ts';
 import { isRepositoryRun, shownNote } from '../src/run.ts';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 
 const ROOT = scratch('wf-screens-git-');
 const WORKFLOW = path.join(ROOT, 'workflow');

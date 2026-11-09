@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runOver } from './placed.ts';
 import type { ProposedObject } from 'objects';

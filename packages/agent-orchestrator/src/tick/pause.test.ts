@@ -21,7 +21,7 @@ import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from '../..
 import { Engine } from 'agent-runtime';
 import type { Run } from '../run.ts';
 import type { Finishing } from '../pause/pause.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { testEngine, until, WAITED } from 'agent-runtime/testing';
 import { Effect } from 'effect';
 import { testPlace } from '../../place/memory/index.ts';

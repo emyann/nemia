@@ -14,7 +14,7 @@ import path from 'node:path';
 import { parse, stringify } from 'yaml';
 import { Cause, Effect, Exit, Schema } from 'effect';
 import { Template, TemplateList } from 'objects';
-import { machineTempDir, scratch } from '../../test/scratch.ts';
+import { machineTempDir, scratch } from 'test-kit/scratch';
 import { teamCopy } from '../../test/team.ts';
 
 const ROOT = scratch('wf-template-object-');

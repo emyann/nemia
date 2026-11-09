@@ -22,7 +22,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { files, REPO, textOf } from './repo-files.ts';
+import { files, REPO, textOf } from 'test-kit/repo';
 
 /** A begin marker, whose command is `node -e` on one script that imports one module by its path from the root and prints one call. */
 const BEGIN =

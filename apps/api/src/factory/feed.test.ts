@@ -9,7 +9,7 @@
  * `createServer`, is a plain `http.Server`, not one of the HTTP/2 servers its type also allows.
  */
 import '../../test/harness.ts';
-import { story } from '../../test/checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import { until, WAITED, type Waiter } from '../../test/waits.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

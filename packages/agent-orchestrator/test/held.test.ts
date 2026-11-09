@@ -19,7 +19,7 @@ import path from 'node:path';
 import { nameFor, type Sighting, type SpawnRequest, type TaskView, Engine as EngineService } from 'agent-runtime';
 import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from './promised.ts';
 import type { Engine } from '../src/runtime-client.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { Effect } from 'effect';
 import { plainEngine } from './promised.ts';
 import { testPlace } from '../place/memory/index.ts';

@@ -13,7 +13,7 @@ import { parseAgent, parseWorkflow, WorkflowError, type Agents, type Workflow } 
 import { fenceReach } from 'agent-runtime/vocabulary';
 import { directoryFence } from '../src/workflow/fence.ts';
 import { renderedFlags } from '../src/agents/agents.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { names } from './assessed.ts';
 
 const ROOT = scratch('wf-fence-');

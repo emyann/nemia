@@ -1,10 +1,10 @@
 import { root } from './harness.ts';
 import { test } from 'node:test';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { until } from './waits.ts';
 import {
   closeoutOf,

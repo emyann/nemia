@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { Effect, Exit } from 'effect';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { collisionsAt } from './collisions.verb.ts';
 import { HOME, writeRun } from '../record/record.store.ts';
 import { StoreRoot } from '../config/root.store.ts';

@@ -20,7 +20,7 @@ import type { TestEnd } from 'agent-runtime/testing';
 import type { Engine } from '../src/runtime-client.ts';
 import type { RepositoryRun, Run, StepRecord } from '../src/run.ts';
 import type { EnginePhase } from '../src/views/views-words.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
 import { answerText, approvedAnswerText, type Question } from '../src/question/question.ts';

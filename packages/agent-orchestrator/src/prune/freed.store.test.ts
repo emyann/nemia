@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Fiber } from 'effect';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { freedBytes, walk, WALK_BURST, WHOLE, type Sort } from './freed.store.ts';
 
 const ROOT = scratch('wf-freed-');

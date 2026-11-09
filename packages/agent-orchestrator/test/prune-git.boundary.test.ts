@@ -13,7 +13,7 @@ import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import type { Place } from '../src/place/place.store.ts';
 import type { PlaceRequests, PlaceVerb } from '../src/place/place.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { names } from './assessed.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
 

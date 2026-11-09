@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Exit, Fiber, Layer, Logger, ManagedRuntime, Metric, PubSub, References, Stream, type Duration } from 'effect';
 import { isRunLine, type FeedWords } from './feed.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { bell, until, WAITED } from 'agent-runtime/testing';
 import { StoreRoot } from '../config/root.store.ts';
 

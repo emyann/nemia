@@ -21,7 +21,7 @@ import type { Effect as EffectOf } from 'effect/Effect';
 import type { Refusal } from '../src/refusal/refusal.ts';
 import type { EngineService as Service } from '../src/runtime-client.ts';
 import type { Pass } from '../src/tick/tick.verb.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { plainEngine } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
 import { testPlace } from '../place/memory/index.ts';

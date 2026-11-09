@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { projectAllows } from './settings.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 /** A scratch directory holding `.claude/settings.json` with `settings` as its text (none when undefined), and its local file beside. */
 const dirWith = (settings: string | undefined, local?: string): string => {

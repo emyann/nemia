@@ -20,7 +20,7 @@ import { Effect } from 'effect';
 import { nameFor, Engine as EngineService, type RunnerOps, type Sighting, type SpawnRequest } from 'agent-runtime';
 import { asyncOps, plainEngine, type AsyncRunner } from './promised.ts';
 import type { Engine } from '../src/runtime-client.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { runGiven, runOver } from './placed.ts';
 
 const ROOT = scratch('wf-forget-runtime-');

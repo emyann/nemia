@@ -19,9 +19,9 @@ import { fold, type Event, type Usage } from '../domain.ts';
 import { HarnessArgsSchema, type StoredEvent } from '../event-schema.ts';
 import type { HarnessArgs } from '../../harness/args.ts';
 import { ioCounts } from './tally.ts';
-import { scratch } from '../../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { asyncOps, asyncStore, type AsyncRunner, type AsyncSighting } from '../../../test/promise-runner.ts';
-import { story } from '../../../test/checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import { TaskId } from '../model.ts';
 
 const root = () => scratch('ae-journal-');

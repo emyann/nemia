@@ -22,7 +22,7 @@ import { ForgetRefused } from 'agent-runtime';
 import type { Engine } from '../src/runtime-client.ts';
 import type { Run } from '../src/run.ts';
 import type { ForgetHow } from '../src/forget/forget.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { staged, story, type Board } from './story.ts';
 import { names } from './assessed.ts';
 import { placeOver, unreadBy } from './place-over.ts';

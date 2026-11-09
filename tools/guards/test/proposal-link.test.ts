@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { proposalLinkOf } from '../../../apps/web/src/lib/proposalLink.ts';
-import { REPO } from './workspaces.ts';
+import { REPO } from 'test-kit/repo';
 
 const AGENT = 'packages/agent-orchestrator/nemia/nemia.md';
 

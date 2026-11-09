@@ -30,8 +30,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 import { argumentsOf, calleeName, calleeRoot, factsOf, literalParts, runsGit, SPAWNS, stringOf, type FileFacts } from './git-spawns.ts';
-import { workspaces } from './workspaces.ts';
-import { scratch } from './scratch.ts';
+import { workspaces } from 'test-kit/repo';
+import { scratch } from 'test-kit/scratch';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 

@@ -28,7 +28,7 @@ import type { Cancelled } from '../src/cancel/cancel.verb.ts';
 import type { CheckReport } from '../src/views/views.verb.ts';
 import type { CheckRefusal } from '../src/check/check.ts';
 import type { ParentRun } from '../src/wait/wait.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { isRepositoryRun, shownStatus } from '../src/run.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';

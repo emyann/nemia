@@ -14,7 +14,7 @@ import { nameFor, type Sighting, type TaskSpec, Engine as RuntimeEngine, ForgetR
 import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from './promised.ts';
 import type { Engine } from '../src/runtime-client.ts';
 import type { RepositoryRun, Run, TaskPhase } from '../src/run.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { isRepositoryRun } from '../src/run.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';

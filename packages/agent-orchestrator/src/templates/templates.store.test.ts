@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { act, done, doorFrom, walksOn } from '../../test/door-walks.ts';
 import { aTree, TEMPLATE_WALKS } from '../../test/template-walks.ts';
 import { BuiltinTemplates, builtinTemplatesIn, TemplateDoor, templateDoorFiles, templatePlace } from './templates.store.ts';

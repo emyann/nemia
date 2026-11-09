@@ -13,7 +13,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { REPO, workspaces } from './workspaces.ts';
+import { REPO, workspaces } from 'test-kit/repo';
 
 /** The verifier, by its npm name. */
 const VERIFIER = '@emyann/tsverify';

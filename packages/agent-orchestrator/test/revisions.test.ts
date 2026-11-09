@@ -17,7 +17,7 @@ import path from 'node:path';
 import { Effect, Layer } from 'effect';
 import type { StoreRoot as Root } from '../src/config/root.store.ts';
 import type { Kept, Resolved } from '../src/revisions/pin.verb.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { digestOf, kindsDrift, revisionNow, stepsDrift, type Pin } from '../src/revisions/revisions.ts';
 

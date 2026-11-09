@@ -14,7 +14,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { files, NOT_OURS, ours, textOf } from './repo-files.ts';
+import { files, NOT_OURS, ours, textOf } from 'test-kit/repo';
 
 /** Each name, and the one tool-call prefix that names the kanban as well as its name does. */
 const NAMES = ['aGVybWVz', 'bm91c3Jlc2VhcmNo', 'Z29vZ2xlL2F4', 'c3Vic3RyYXRl', 'Y2xhdWRlLWEyYQ==', 'amN3YXRzb24=', 'a2FuYmFuXw=='].map(

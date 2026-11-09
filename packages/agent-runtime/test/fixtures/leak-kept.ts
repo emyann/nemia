@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from '../scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 test('a test that leaves its root holding what cannot be removed', () => {
   const locked = path.join(scratch('ae-detached-'), 'locked');

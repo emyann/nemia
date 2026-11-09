@@ -16,8 +16,8 @@ import { Engine } from '../src/index.ts';
 import type { RunnerOps } from '../src/harness/seam.ts';
 import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
-import { scratch } from './scratch.ts';
-import { story } from './checkpoints.ts';
+import { scratch } from 'test-kit/scratch';
+import { story } from 'test-kit/checkpoints';
 
 /**
  * A journal in memory and a harness whose sessions a test moves by hand: what outlives a runtime's process. With

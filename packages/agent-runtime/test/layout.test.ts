@@ -1,7 +1,9 @@
 /**
  * The runtime's layout, held by path (`docs/architecture.md`): the core knows of the harnesses only their seam, a harness knows
  * nothing of A2A, of the engine service or of the entries, and the CLI reaches the runtime through its face alone. No two files
- * need each other's values, no source file imports a test, a face re-exports by name, and only the entries sit flat in `src/`.
+ * need each other's values, no source file imports a test, a face re-exports by name, and only the entries sit flat in `src/`. The
+ * folder rule (`docs/architecture.md`, *Folders, in every package*) holds here as everywhere, judged by `test-kit/layout`: a folder is
+ * a concept at most `src/<concept>/<part>/` deep, named for what it holds; this package reads its folders by path, not by face.
  *
  * Each rule is made to refuse a planted import first: a rule that reads nothing passes too.
  */
@@ -9,41 +11,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { importsIn, resolved, withoutComments, type Import } from 'test-kit/imports';
+import { cycles, depthBreaks, namelessBreaks, starExports, testImports, valueGraph } from 'test-kit/layout';
 import { WORKER } from '../src/harness/detached/detached.ts';
 
 const PKG = path.join(import.meta.dirname, '..');
-
-/** A line of prose read as nothing, as `contract.test.ts` reads one, the line kept so numbers still count. */
-const withoutComments = (text: string): string =>
-  text
-    .split('\n')
-    .map((line) => (/^\s*(\/\/|\/\*|\*)/.test(line) ? '' : line))
-    .join('\n');
-
-type Import = { spec: string; typeOnly: boolean };
-
-/** Every module a piece of source names, and whether the import is erased: `import type`, `export type`, or braces of `type` names only. */
-function importsIn(text: string): Import[] {
-  const code = withoutComments(text);
-  const out: Import[] = [];
-  for (const m of code.matchAll(/^\s*(?:import|export)\s+(type\s+)?([^'"`;]*?)\s*\bfrom\s*['"]([^'"]+)['"]/gm)) {
-    const braces = /^\{([\s\S]*)\}$/.exec(m[2].trim());
-    const members = braces
-      ? braces[1]
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean)
-      : [];
-    out.push({ spec: m[3], typeOnly: Boolean(m[1]) || (members.length > 0 && members.every((s) => /^type\s/.test(s))) });
-  }
-  for (const m of code.matchAll(/^\s*import\s*['"]([^'"]+)['"]/gm)) out.push({ spec: m[1], typeOnly: false });
-  for (const m of code.matchAll(/\bimport\s*\(\s*['"`]([^'"`]+)['"`]/g)) out.push({ spec: m[1], typeOnly: false });
-  return out;
-}
-
-/** The package path a relative specifier in `file` names, or undefined for a package or a builtin. */
-const resolved = (file: string, spec: string): string | undefined =>
-  spec.startsWith('.') ? path.posix.normalize(path.posix.join(path.posix.dirname(file), spec)) : undefined;
 
 const isTest = (file: string) => file.endsWith('.test.ts');
 
@@ -87,66 +59,6 @@ function pathBreaches(file: string, imports: Import[]): string[] {
   }
   return out;
 }
-
-/** Every set of two files or more that need each other's values, by Tarjan's strongly connected components. */
-function cycles(graph: Map<string, string[]>): string[][] {
-  const index = new Map<string, number>();
-  const low = new Map<string, number>();
-  const stack: string[] = [];
-  const onStack = new Set<string>();
-  const found: string[][] = [];
-  const visit = (node: string) => {
-    index.set(node, index.size);
-    low.set(node, index.get(node)!);
-    stack.push(node);
-    onStack.add(node);
-    for (const next of graph.get(node) ?? []) {
-      if (!index.has(next)) {
-        visit(next);
-        low.set(node, Math.min(low.get(node)!, low.get(next)!));
-      } else if (onStack.has(next)) {
-        low.set(node, Math.min(low.get(node)!, index.get(next)!));
-      }
-    }
-    if (low.get(node) === index.get(node)) {
-      const component: string[] = [];
-      let member: string;
-      do {
-        member = stack.pop()!;
-        onStack.delete(member);
-        component.push(member);
-      } while (member !== node);
-      if (component.length > 1) found.push(component.sort());
-    }
-  };
-  for (const node of [...graph.keys()].sort()) if (!index.has(node)) visit(node);
-  return found.sort((a, b) => a[0].localeCompare(b[0]));
-}
-
-/** The value imports among `files`: a type-only import is erased, so it may cycle. */
-const valueGraph = (files: Map<string, string>): Map<string, string[]> =>
-  new Map(
-    [...files].map(([file, text]) => [
-      file,
-      importsIn(text).flatMap(({ spec, typeOnly }) => {
-        const target = resolved(file, spec);
-        return !typeOnly && target !== undefined && files.has(target) ? [target] : [];
-      }),
-    ]),
-  );
-
-/** Where a source file imports a test: a test beside the code is imported by nothing but the runner. */
-const testImports = (file: string, imports: Import[]): string[] =>
-  imports
-    .map(({ spec }) => resolved(file, spec))
-    .filter((target): target is string => target !== undefined && isTest(target))
-    .map((target) => `${file} imports ${target}: nothing but node --test loads a test — move what both need into the source`);
-
-/** Where a face or an entry re-exports a whole module: a barrel names what it re-exports, so a name is added on purpose. */
-const starExports = (file: string, text: string): string[] =>
-  [...withoutComments(text).matchAll(/^\s*export\s*\*[^'"`;]*from\s*['"]([^'"]+)['"]/gm)].map(
-    (m) => `${file} re-exports all of ${m[1]}: re-export by name`,
-  );
 
 test('REFUSED: the core reaching a driver, A2A, the engine service or an entry; a harness reaching A2A, the service or an entry; the CLI reaching past its face', () => {
   const planted: Array<[string, string, string, string]> = [
@@ -305,7 +217,7 @@ test('no two source files need each other’s values', () => {
 
 test('REFUSED: a source file that imports a test; a barrel that re-exports a whole module', () => {
   assert.deepEqual(testImports('src/core/domain.ts', importsIn("import { corpus } from './decide.test.ts';")), [
-    'src/core/domain.ts imports src/core/decide.test.ts: nothing but node --test loads a test — move what both need into the source',
+    'src/core/domain.ts imports src/core/decide.test.ts: nothing but a test imports a test — move what both need into the source',
   ]);
   assert.deepEqual(starExports('src/core/index.ts', "export { fold } from './domain.ts';\nexport * from './lifecycle.ts';"), [
     'src/core/index.ts re-exports all of ./lifecycle.ts: re-export by name',
@@ -323,4 +235,17 @@ test('no source file imports a test, and every barrel re-exports by name', () =>
 test("the detached worker's path, built from its caller's place, names a file that is there", () => {
   assert.ok(fs.existsSync(WORKER), `${WORKER} is not there: the path is built from the runner's own folder, so a move changes its \`..\``);
   assert.equal(path.relative(PKG, WORKER), path.join('bin', 'ae-worker.ts'));
+});
+
+test('REFUSED: a file a third folder under src, and a folder or a file named for no concept', () => {
+  assert.equal(depthBreaks(['src/harness/claude/x/y.ts'], 'src').length, 1);
+  assert.deepEqual(depthBreaks(['src/harness/claude/bg.ts', 'src/core/domain.ts', 'src/index.ts'], 'src'), []);
+  assert.equal(namelessBreaks(['src/harness/utils.ts', 'src/shared/x.ts'], 'src').length, 2);
+  assert.deepEqual(namelessBreaks(['src/harness/utility-words.ts'], 'src'), []);
+});
+
+test('every file sits at most at src/<concept>/<part>/, and every name says a concept', () => {
+  const files = sourceFiles();
+  assert.ok(files.includes('src/harness/claude/attached.ts'), 'the scan reads the parts');
+  assert.deepEqual([...depthBreaks(files, 'src'), ...namelessBreaks(files, 'src')], []);
 });

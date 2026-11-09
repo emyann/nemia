@@ -15,7 +15,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import type { Run } from '../src/run.ts';
 import type { PlaceOutcome } from '../src/place/place.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { namesFor } from './assessed.ts';
 import { placeOver, unreadBy } from './place-over.ts';

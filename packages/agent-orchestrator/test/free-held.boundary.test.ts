@@ -13,7 +13,7 @@ import { execFileSync } from 'node:child_process';
 import { Effect, Logger, References } from 'effect';
 import { Engine, type Sighting } from 'agent-runtime';
 import { asyncOps, asyncStore, plainEngine, type AsyncJournal, type AsyncRunner } from './promised.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { runGiven } from './placed.ts';
 import type { PlaceRequests, PlaceVerb } from '../src/place/place.ts';
 import { storeRootLayer } from '../src/config/root.store.ts';

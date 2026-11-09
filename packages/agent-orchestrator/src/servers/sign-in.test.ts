@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { testEngine } from 'agent-runtime/testing';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const ROOT = scratch('wf-sign-in-');
 process.env.WF_ROOT = ROOT;

@@ -11,7 +11,7 @@
  */
 import { root } from './harness.ts';
 import { test } from 'node:test';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import { names } from './named.ts';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

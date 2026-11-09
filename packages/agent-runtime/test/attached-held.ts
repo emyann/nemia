@@ -13,7 +13,7 @@ import { attachedSessions } from '../src/harness/claude/attached.ts';
 import { filesOf, readRun } from '../src/harness/claude/attached-file.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
 import type { ScopeAt } from '../src/harness/scope.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { until } from '../src/waits/index.ts';
 
 export const STAND_IN = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'stand-in-claude.ts');

@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { readWorkflow, type Workflow } from './ci-workflow.ts';
 import ts from 'typescript';
 import { loadProject, readContract, sourceFile } from '@emyann/tsverify/api';

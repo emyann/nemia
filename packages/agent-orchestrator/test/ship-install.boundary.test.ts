@@ -16,7 +16,7 @@ import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import type { TaskSpec } from 'agent-runtime';
 import type { TaskPhase } from '../src/run.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { TEAM, TEAM_DEV } from './team.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';

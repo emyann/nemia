@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 import { WF_HINT } from '../src/cli/flags.ts';
 

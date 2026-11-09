@@ -14,7 +14,7 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import { ambient } from './ambient.ts';
-import { scratch } from '../../api/test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { sessionHeaders } from '../src/client.ts';
 import type { Said } from './served.ts';
 

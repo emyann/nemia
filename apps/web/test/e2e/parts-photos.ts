@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import type { Browser, Page } from 'playwright';
-import { scratch } from '../scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { photograph } from './board.ts';
 import { buildParts, openParts, story, typeOf } from './parts/gallery.ts';
 import { launch } from './visit.ts';

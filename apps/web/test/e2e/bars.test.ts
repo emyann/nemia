@@ -10,7 +10,7 @@ import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import type { Browser, Page } from 'playwright';
-import { scratch } from '../scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { WAITED } from '../waits.ts';
 import { expectNone } from './checks.ts';
 import { buildParts, openParts, story } from './parts/gallery.ts';

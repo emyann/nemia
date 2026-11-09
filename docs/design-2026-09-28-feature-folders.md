@@ -2,6 +2,10 @@
 
 > **Status (2026-10-23): landed.** The packages were put into feature folders on 2026-09-28 (`05da9c41e`, `f23438191`,
 > `742d857ee`), and the orchestrator's last slices, 3 to 7, followed on 2026-09-29 (`c82e9b81e` to `a52928fc4`).
+>
+> **Superseded in part (2026-11-09).** The six-file folder and the 500-line file limit below are superseded by `docs/architecture.md`,
+> *Folders, in every package*: a folder is a concept at most `src/<concept>/<part>/` deep with no count of its files, and a file stops at
+> 800 code lines with no ceiling for any one. The rest of this record stands as it was written.
 
 A design note for the owner to approve. It changes no code. It rests on the owner's decisions of 2026-09-28 and on measurements taken on
 `694f45c` with oxlint 1.86 and eslint-plugin-sonarjs 4.2.2.

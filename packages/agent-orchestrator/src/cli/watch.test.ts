@@ -19,7 +19,7 @@ import { parseSelectors, selects } from '../watch/selector.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { testEngine, bell, until, WAITED } from 'agent-runtime/testing';
 import { steeredClock } from '../../test/steered.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { eachTest } from '../../test/placed.ts';
 import { names } from '../../test/assessed.ts';
 import { heldUnasked } from '../../test/unasked.ts';

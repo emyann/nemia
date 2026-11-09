@@ -38,8 +38,8 @@ import { composite } from '../src/harness/seam.ts';
 import { monoNow } from '../src/core/engine/now.ts';
 import { engineAt } from '../src/cli/main.ts';
 import { stepClock } from './clock.ts';
-import { scratch } from './scratch.ts';
-import { story } from './checkpoints.ts';
+import { scratch } from 'test-kit/scratch';
+import { story } from 'test-kit/checkpoints';
 import { TaskId } from '../src/core/model.ts';
 
 /**

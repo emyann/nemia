@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { leftBehind, reap, runningIn, scratch } from './scratch.ts';
+import { leftBehind, reap, runningIn, scratch } from 'test-kit/scratch';
 import { until, WAITED } from '../src/waits/index.ts';
 
 const PACKAGE = path.join(import.meta.dirname, '..');

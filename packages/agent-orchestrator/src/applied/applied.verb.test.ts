@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { parse, stringify } from 'yaml';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { testEngine, until, WAITED } from 'agent-runtime/testing';
 import { teamCopy } from '../../test/team.ts';
 import { testPlace } from '../../place/memory/index.ts';

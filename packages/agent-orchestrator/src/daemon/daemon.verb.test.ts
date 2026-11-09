@@ -5,7 +5,7 @@
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
 import { eachTest } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';

@@ -43,7 +43,7 @@ import { fileURLToPath } from 'node:url';
 import { Effect } from 'effect';
 import { Engine as EngineService, type TaskView } from '../src/index.ts';
 import { builtEngine } from './engine.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { until, WAITED } from '../src/waits/index.ts';
 import { claudeStreamOutput } from '../src/harness/detached/output.ts';
 import { CLAUDE_CODE_VERSION, OPUS_TODAY, SDK_VERSION } from './sdk-pin.ts';

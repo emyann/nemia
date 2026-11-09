@@ -1,0 +1,24 @@
+{
+  "name": "test-kit",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The mechanics every workspace's tests share: scratch roots, story checkpoints, the repository's files, the import scanners, the folder rule's judgement and the door-debt counter. Never shipped.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    "./scratch": "./scratch.ts",
+    "./checkpoints": "./checkpoints.ts",
+    "./repo": "./repo.ts",
+    "./imports": "./imports.ts",
+    "./layout": "./layout.ts",
+    "./debt": "./debt.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "node --test --test-concurrency=2 --test-timeout=120000 'test/*.test.ts'",
+    "typecheck": "tsrs --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2"
+  }
+}

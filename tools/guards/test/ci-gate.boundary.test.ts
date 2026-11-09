@@ -16,7 +16,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { gateSteps, readWorkflow } from './ci-workflow.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 /** The gate's script, run as GitHub runs it: `bash -e` over a file, with the results in the environment and nothing else of the run's. */
 function verdictOf(run: string, results: string): { status: number; said: string } {

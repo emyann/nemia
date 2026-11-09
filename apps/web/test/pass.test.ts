@@ -10,7 +10,7 @@ import path from 'node:path';
 import type { PassCost } from '../src/lib/api.ts';
 import { bytesWord, msWord, PASS_PHASES, passLine, passTitle, seenWords } from '../src/lib/pass.ts';
 import { REPO } from './e2e/world.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const phase = (ms: number, over: Partial<PassCost['phases']['act']> = {}) => ({ ms, calls: 1, bytes: 0, reads: 0, spawned: 0, ...over });
 

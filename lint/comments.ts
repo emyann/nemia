@@ -2,7 +2,7 @@
  * The oxlint plugin `comments`: the rules that keep a comment to a JSDoc contract.
  *
  * `.oxlintrc.json` loads it and switches its rules on package by package, in the override blocks that name them; the runtime's
- * block also covers this folder. `packages/agent-orchestrator/test/comments.test.ts` runs oxlint on fixtures that each rule refuses.
+ * block also covers this folder. `tools/guards/test/comments.test.ts` runs oxlint on fixtures that each rule refuses.
  */
 import type { RuleTester } from 'oxlint/plugins-dev';
 
@@ -158,7 +158,7 @@ const noHistoryInComments: Rule = {
 
 /**
  * The widest a line that holds any part of a comment may be, in code points: oxfmt's print width, which rewraps no comment.
- * `packages/agent-orchestrator/test/comments.test.ts` holds it equal to the width oxfmt is configured with.
+ * `tools/guards/test/comments.test.ts` holds it equal to the width oxfmt is configured with.
  */
 export const COMMENT_WIDTH = 140;
 

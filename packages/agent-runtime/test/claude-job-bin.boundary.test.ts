@@ -22,7 +22,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { sdkArgValue } from './sdk-argv.ts';
 import { until, WAITED } from '../src/waits/index.ts';
 

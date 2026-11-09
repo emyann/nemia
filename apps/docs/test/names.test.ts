@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 import { tablesIn } from '../src/glossary.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const APP = path.join(import.meta.dirname, '..');
 const ROOT = path.join(APP, '..', '..');

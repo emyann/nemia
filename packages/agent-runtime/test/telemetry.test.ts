@@ -19,8 +19,8 @@ import { attachedOptions } from '../src/harness/claude/attached-options.ts';
 import { STAND_IN } from './attached-held.ts';
 import { commandHarness } from '../src/harness/command/command.ts';
 import { asyncOps } from './promise-runner.ts';
-import { scratch } from './scratch.ts';
-import { story } from './checkpoints.ts';
+import { scratch } from 'test-kit/scratch';
+import { story } from 'test-kit/checkpoints';
 import { builtEngine } from './engine.ts';
 
 type Engine = ReturnType<typeof builtEngine>;

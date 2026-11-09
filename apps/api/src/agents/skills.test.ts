@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { engine, builtinGitPlace, skillCopyCommand } from 'agent-orchestrator';
 import { skillTurnCost } from 'agent-orchestrator/workflow';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { Effect, Layer } from 'effect';
 import { AgentDoor, SkillDoor, type AgentDoorShape, type SkillDoorShape } from 'agent-orchestrator';
 import { agentDoorMemory, skillDoorMemory } from 'agent-orchestrator/testing';

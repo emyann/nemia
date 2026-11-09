@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { gitPlace } from '../place/git/place.ts';
 import type { PlaceOutcome, PlaceVerb } from '../src/runner.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 /** The environment git runs in: this process's, without its git variables, with no configuration read and one identity. */
 const ENV: NodeJS.ProcessEnv = {

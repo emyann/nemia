@@ -63,8 +63,9 @@ holds what every change needs.
 - Turbo sees the docs only through `guards#test`'s inputs, though tests elsewhere read them too: a step's session runs the tests that
   read the doc it touched, and `ci` runs them all, on clean runners with no cache of this machine's, on the commit the round's check
   pushed; outside a run, type `npx turbo run test --force --continue` after touching one. The tests that read files of every package —
-  `tools/guards`' `claude-md-cites.test.ts` over every `CLAUDE.md` and `test-rules.test.ts` over every test file, and
-  `agent-orchestrator`'s `comments.test.ts` — are re-run the same way after a test, a doc or a name moves anywhere.
+  `tools/guards`' `claude-md-cites.test.ts` over every `CLAUDE.md`, `test-rules.test.ts` over every test file, `test-kit.test.ts` over
+  every workspace's tests and `comments.test.ts` over every source — are re-run the same way after a test, a doc or a name moves
+  anywhere.
 - A change to tests alone shows that no source file's coverage dropped: `node tools/coverage/record.ts <package-dir> --out
   before.json` before it and `after.json` after, then `node tools/coverage/compare.ts before.json after.json`, which exits 1 naming
   each file whose hit lines or branches fell; records on each side of a `--` say apart, as varying, a line they disagree on. A session's measure, never run by the suite or CI: it runs the package's whole suite.
@@ -244,7 +245,13 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   from their markers at build; it imports no package (`apps/docs/CLAUDE.md`).
 - `tools/guards/` — the repository's own guards, never shipped: the tests that hold its CI, docs, workflows and test infrastructure
   rather than a layer's code, a workspace of their own (`guards`) whose `ci` job runs them only when `tools/guards/due.ts` says a push
-  touched what they read (`tools/guards/CLAUDE.md`). A config guard that imports the orchestrator past its three entries stays in it.
+  touched what they read (`tools/guards/CLAUDE.md`), the repository-wide ones among them (`names`, `others`, `local-paths`,
+  `comments`, `limits`). A config guard that imports the orchestrator past its three entries stays in it.
+- `tools/test-kit/` — the test kit (`test-kit`), never shipped: what every workspace's tests share, each by its own entry —
+  `test-kit/scratch` (every temporary root, reaped with what runs in it), `test-kit/checkpoints` (a story's checkpoints), `test-kit/repo`
+  (the root, the workspaces, git's file list), `test-kit/imports` (the import scanners), `test-kit/layout` (the folder rule's judgement,
+  `docs/architecture.md`, *Folders, in every package*) and `test-kit/debt` (the door-debt counter). It imports only Node's built-ins and
+  TypeScript, only tests import it, and each workspace lists it under `devDependencies` (`tools/guards/test/test-kit.test.ts`).
 - `tools/coverage/` — a package's line and branch coverage per source file (`record.ts`) and the comparison of two records
   (`compare.ts`), a session's measure; held by `tools/guards/test/coverage.test.ts` and its boundary.
 - `tools/contracts/` — what `npm run contracts` runs (`prove.ts`): every contract proved by tsverify, in the legs `legs.ts` names, which

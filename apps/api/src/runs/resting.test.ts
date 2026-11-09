@@ -12,7 +12,7 @@
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
-import { story } from '../../test/checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { execFileSync } from 'node:child_process';

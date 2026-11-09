@@ -28,7 +28,7 @@ import {
 import { PASS_METRICS, recordStepMetrics } from '../meter/meter.verb.ts';
 import { EXPORT_BOUND_MS, exportedNow, lineLogger, seriesBorn, telemetryLayer } from './telemetry.store.ts';
 import { collector, seriesOf, type Attributes } from '../../test/collector.ts';
-import { story } from '../../test/checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import { steeredClock } from '../../test/steered.ts';
 import { until, WAITED, type Waiter } from 'agent-runtime/testing';
 

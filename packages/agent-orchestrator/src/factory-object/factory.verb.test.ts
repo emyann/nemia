@@ -10,7 +10,7 @@ import path from 'node:path';
 import { Effect, Exit } from 'effect';
 import { Factory as FactorySchema, FactoryList } from 'objects';
 import { Schema } from 'effect';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { commandLine } from '../command/command.ts';
 import { COMMANDS } from '../command/commands.verb.ts';
 import type { FactoryListing } from '../factory/factory.ts';

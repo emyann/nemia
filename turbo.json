@@ -47,6 +47,13 @@
         "$TURBO_ROOT$/packages/*/package.json",
         "$TURBO_ROOT$/apps/*/package.json",
         "$TURBO_ROOT$/packages/*/src/**",
+        "$TURBO_ROOT$/packages/*/test/**",
+        "$TURBO_ROOT$/packages/*/bin/**",
+        "$TURBO_ROOT$/packages/*/place/**",
+        "$TURBO_ROOT$/packages/*/contracts/**",
+        "$TURBO_ROOT$/.oxlintrc.json",
+        "$TURBO_ROOT$/.oxfmtrc.json",
+        "$TURBO_ROOT$/lint/**",
         "$TURBO_ROOT$/packages/agent-runtime/test/remote-agent.test.ts",
         "$TURBO_ROOT$/apps/web/test/e2e/pages/NAMES",
         "$TURBO_ROOT$/packages/agent-orchestrator/nemia/skills/bring-what-waits/SKILL.md",
@@ -95,6 +102,7 @@
       "dependsOn": ["^transit"],
       "inputs": [
         "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/tools/test-kit/**",
         "$TURBO_ROOT$/packages/*/src/**",
         "$TURBO_ROOT$/packages/*/place/**",
         "$TURBO_ROOT$/packages/*/servers/**",
@@ -106,6 +114,7 @@
       "dependsOn": ["^transit"],
       "inputs": [
         "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/tools/test-kit/**",
         "$TURBO_ROOT$/.claude/skills/change-the-board/SKILL.md",
         "$TURBO_ROOT$/CLAUDE.md",
         "$TURBO_ROOT$/.gitattributes"

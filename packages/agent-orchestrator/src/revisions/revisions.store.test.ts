@@ -7,8 +7,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { debtBreaks as heldTo, seamUses as usesOf, sourcesUnder } from 'test-kit/debt';
 import { Effect } from 'effect';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { act, done, doorFrom, walksOn } from '../../test/door-walks.ts';
 import { LEDGER_WALKS } from '../../test/ledger-walks.ts';
 import { LedgerDoor, ledgerDoorFiles } from './revisions.store.ts';
@@ -82,54 +83,21 @@ const SEAM = ['ledgerOf', 'appendRevision'];
 const OWN = ['src/revisions/revisions.store.ts', 'src/revisions/memory.store.ts'];
 
 /** Every file of `src` but the tests and the door's own, by its path from the package. */
-function sourcesOfSrc(): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const entry of fs.readdirSync(path.join(PKG, 'src'), { recursive: true, withFileTypes: true })) {
-    if (!entry.isFile() || !entry.name.endsWith('.ts') || entry.name.endsWith('.test.ts')) continue;
-    const file = path.relative(PKG, path.join(entry.parentPath, entry.name)).split(path.sep).join('/');
-    if (!OWN.includes(file)) out[file] = fs.readFileSync(path.join(PKG, file), 'utf8');
-  }
-  return out;
-}
-
-/** A binding of a name, an `import … from` or an `export { … } from`, over as many lines as it takes: plumbing, not a use. */
-const BINDINGS = /^[ \t]*(?:import|export)\b[^;]*?\bfrom\s*['"][^'"]*['"]\s*;?/gm;
+const sourcesOfSrc = (): Record<string, string> => sourcesUnder(PKG, 'src', OWN);
 
 /** The seam's uses in each file — a call, or the function handed on — comment lines and bindings left out. */
-function seamUses(sources: Record<string, string>): Map<string, number> {
-  const use = new RegExp(`(?<![\\w$.])(?:${SEAM.join('|')})(?![\\w$])`, 'g');
-  const uses = new Map<string, number>();
-  for (const [file, text] of Object.entries(sources)) {
-    const code = text
-      .replace(BINDINGS, '')
-      .split('\n')
-      .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))
-      .join('\n');
-    const n = [...code.matchAll(use)].length;
-    if (n) uses.set(file, n);
-  }
-  return uses;
-}
+const seamUses = (sources: Record<string, string>): Map<string, number> =>
+  usesOf(sources, new RegExp(`(?<![\\w$.])(?:${SEAM.join('|')})(?![\\w$])`, 'g'), { bindings: true });
 
 /** Why the uses of `sources` break the baseline `debt`: a file it does not name, a count grown, a count fallen. */
 function debtBreaks(sources: Record<string, string>, debt: Readonly<Record<string, number>>): string[] {
-  const uses = seamUses(sources);
-  const out: string[] = [];
-  for (const [file, n] of uses) {
-    const owed = debt[file] ?? 0;
-    if (n > owed)
-      out.push(
-        `${file} uses the ledger's synchronous spellings ${n} time(s) where test/ledger-door.baseline.ts names ${owed}: yield LedgerDoor (src/revisions/revisions.store.ts) instead`,
-      );
-    if (n < owed)
-      out.push(
-        `${file} uses the ledger's synchronous spellings ${n} time(s): lower its count in test/ledger-door.baseline.ts to ${n}, which only shrinks`,
-      );
-  }
-  for (const file of Object.keys(debt))
-    if (!uses.has(file))
-      out.push(`${file} uses the ledger's synchronous spellings no more: take its line out of test/ledger-door.baseline.ts`);
-  return out;
+  return heldTo(seamUses(sources), debt).map(({ file, uses: n, owed, kind }) =>
+    kind === 'grown'
+      ? `${file} uses the ledger's synchronous spellings ${n} time(s) where test/ledger-door.baseline.ts names ${owed}: yield LedgerDoor (src/revisions/revisions.store.ts) instead`
+      : kind === 'fallen'
+        ? `${file} uses the ledger's synchronous spellings ${n} time(s): lower its count in test/ledger-door.baseline.ts to ${n}, which only shrinks`
+        : `${file} uses the ledger's synchronous spellings no more: take its line out of test/ledger-door.baseline.ts`,
+  );
 }
 
 test("no file of src uses the ledger's synchronous spellings but as test/ledger-door.baseline.ts counts it, and the count only shrinks", async () => {

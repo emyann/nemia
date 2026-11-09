@@ -17,7 +17,7 @@ import { STOP_GRACE_MS } from '../src/place/place.store.ts';
 import { builtinGitPlace } from '../src/place/builtin.store.ts';
 import { meteredPass } from '../src/meter/tally.store.ts';
 import { running } from './running.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { until, WAITED } from 'agent-runtime/testing';
 
 /** The environment git runs in: this process's, without its git variables, with no configuration read and one identity. */

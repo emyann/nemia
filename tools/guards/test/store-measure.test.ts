@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { argsOf, invariantRefusals, MEASURES, rootAsWritten, type StoreMeasure } from '../../store-measure/report.ts';
 import { copyStore, destinationRefusal, gitVerdict, installFence, LEFT_OUT, readOnlyPlace } from '../../store-measure/fence.ts';
 import type { Place } from 'agent-orchestrator';

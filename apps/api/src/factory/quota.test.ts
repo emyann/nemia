@@ -4,7 +4,7 @@
  * sentence; the pure judgement under it (`quotaOf`); and that the read starts no process of its own.
  */
 import { asks, recorded, usageAnswer } from '../../test/harness.ts';
-import { story } from '../../test/checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import { until, WAITED } from '../../test/waits.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

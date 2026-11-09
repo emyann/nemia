@@ -18,8 +18,8 @@ import { SAID_DIGEST, SAID_EXTENDED, SAID_VERSION } from '../src/harness/detache
 import { codexOutput } from '../src/harness/codex/stream.ts';
 import { ioCounts } from '../src/core/engine/tally.ts';
 import { CONVERSATION_STREAM, FILES_STREAM, MODEL, READER_STREAMS, resultLine, stream } from './reader-streams.ts';
-import { scratch } from './scratch.ts';
-import { story } from './checkpoints.ts';
+import { scratch } from 'test-kit/scratch';
+import { story } from 'test-kit/checkpoints';
 
 /** A spec of `claude -p`'s stream, whose reads of an output are counted. */
 const counted = () => {

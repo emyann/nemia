@@ -22,7 +22,7 @@ import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import type { RunDecision } from '../decide/decision.ts';
 import { acceptFile, acceptRun, list, roundRun, runStore } from 'agent-orchestrator';
-import { story } from '../../test/checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import { objectOf, stepOf } from '../../test/run-reads.ts';
 
 const stand = eachTest(testPlace);

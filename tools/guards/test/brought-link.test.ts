@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { broughtOf } from '../../../apps/web/src/lib/stepLink.ts';
-import { REPO } from './workspaces.ts';
+import { REPO } from 'test-kit/repo';
 
 const SKILL = 'packages/agent-orchestrator/nemia/skills/bring-what-waits/SKILL.md';
 

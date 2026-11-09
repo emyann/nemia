@@ -10,7 +10,7 @@ import path from 'node:path';
 import { Cause, Effect, Exit, Layer, Logger, ManagedRuntime, Stream } from 'effect';
 import type { Engine } from '../runtime-client.ts';
 import { nextOf, type StepMoment } from './following.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { StoreRoot } from '../config/root.store.ts';
 import { eachTest } from '../../test/placed.ts';
 import type { Run } from '../record/record.ts';

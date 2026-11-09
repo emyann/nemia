@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Code, Heading, List, Root, RootContent } from 'mdast';
 import { fenceFaults, glossarySections, idsOf, remarkGlossary, tablesIn, typeFaults, type Fault } from '../src/glossary.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 const PAGE = path.join(ROOT, 'apps', 'docs', 'src', 'content', 'docs', 'glossary.mdx');

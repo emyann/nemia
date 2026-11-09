@@ -20,7 +20,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { GENERATED, readWorkflow, staleStep } from './ci-workflow.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 /** The two files the step must notice, each under one of `GENERATED`'s paths: the route tree, and a file of the generated theme. */
 const ROUTE_TREE = 'apps/web/src/routeTree.gen.ts';

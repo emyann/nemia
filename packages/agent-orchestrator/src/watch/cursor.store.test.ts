@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { names } from '../../test/assessed.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { cursorFileStart, cutCursorFile, keepCursor } from './cursor.store.ts';
 
 const ROOT = scratch('wf-cursor-file-');

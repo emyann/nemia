@@ -10,7 +10,7 @@ import { attachedOptions } from '../src/harness/claude/attached-options.ts';
 import { memorylessSettings } from '../src/harness/claude/memory.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
 import type { ClaudeFlags } from '../src/harness/claude/vocabulary.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 /** A task on `cwd`, with the Claude Code flags `claude`. */
 const taskOf = (cwd: string, claude?: ClaudeFlags): SpawnRequest => ({

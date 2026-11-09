@@ -32,8 +32,8 @@ import { ASK_ANSWERED, ASK_CUT, askHookOutput, DENIED_HERE } from '../src/harnes
 import { PERMISSION_ALWAYS, PERMISSION_DENY, PERMISSION_ONCE } from '../src/harness/claude/permission.ts';
 import type { AskQuestion, PermissionFacts } from '../src/core/index.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
-import { scratch } from './scratch.ts';
-import { story } from './checkpoints.ts';
+import { scratch } from 'test-kit/scratch';
+import { story } from 'test-kit/checkpoints';
 import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 
 const STAND_IN = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'stand-in-claude.ts');

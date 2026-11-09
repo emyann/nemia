@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 process.env.WF_ROOT = scratch('wf-verbs-skill-');
 const { REGENERATE, verbsSkill, verbsSkillOf } = await import('../src/nemia/verbs.verb.ts');

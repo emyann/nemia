@@ -11,7 +11,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { addFactory, attachWorkflow, runStore } from 'agent-orchestrator';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { app } from '../app.ts';
 
 const repo = scratch('nemia-api-definitions-');

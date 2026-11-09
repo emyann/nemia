@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Exit, Schema } from 'effect';
 import { Hire } from 'objects';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { StoreRoot } from '../config/root.store.ts';
 import { hireNamedIn, hiresOf, type HiringFactory } from './hire.verb.ts';
 

@@ -1,21 +1,24 @@
 /**
- * The size and complexity limits, and the ratchet that holds each file over one today to its own measure
- * (the feature-folders design under docs/, "The limits" and "The ratchet").
+ * The size and complexity limits, and the ratchet that holds each file over a function limit today to its own measure
+ * (`docs/architecture.md`, *Folders, in every package*, for the size of a file; the feature-folders design under docs/, "The limits"
+ * and "The ratchet", for the functions).
  *
  * `.oxlintrc.json` turns four rules on for every file at their thresholds, `THRESHOLDS` below; turns them off only in tests, vendored
- * and generated files, `EXEMPT`; and gives each file over a limit today a block of its own, its ceiling: its measure, rule by rule. Lint
- * refuses the file that grows past it. A ceiling holds only the worst function, so `RECORD` holds each such file's count of offenders
- * per rule. These tests measure the files with the four rules at their thresholds, and `refusals` refuses a ceiling above the measure,
- * a count of offenders other than the measure, a ceiling `RECORD` does not know, an entry with no ceiling, and an entry for a file with
- * no offender left. Oxlint accepts a rule name it does not know without a word, so plants over each threshold prove every rule runs.
- * No directive in the code may turn a limit off, by naming it or by naming no rule.
+ * and generated files, `EXEMPT`. `max-lines` is a stop at 800 code lines, with no ceiling for any file: a file that reaches it is cut
+ * along its concepts, and a block that sets `max-lines` for one file is refused. Each file over a function limit today has a block of
+ * its own, its ceiling: its measure, rule by rule. Lint refuses the file that grows past it. A ceiling holds only the worst function,
+ * so `RECORD` holds each such file's count of offenders per rule. These tests measure the files with the four rules at their
+ * thresholds, and `refusals` refuses a ceiling above the measure, a count of offenders other than the measure, a ceiling `RECORD` does
+ * not know, an entry with no ceiling, and an entry for a file with no offender left. Oxlint accepts a rule name it does not know
+ * without a word, so plants over each threshold prove every rule runs. No directive in the code may turn a limit off, by naming it or
+ * by naming no rule.
  *
  * A file moved whole renames its entry and its ceiling block in the same commit, its numbers unchanged. A file cut into parts gives an
  * entry only to the parts still over a limit, each no higher than the original's ceiling per rule, their counts summing to no more than
  * the original's. No number is ever raised: a change that meets a limit cuts the function.
  *
- * The test reads files outside this package. `turbo.json` makes `.oxlintrc.json` and the apps' sources inputs of this package's tests, and
- * the runtime reaches them as a dependency; after a change anywhere else, `npx turbo run test --force`.
+ * The test reads files outside this package: `turbo.json` makes `.oxlintrc.json`, `lint/` and every package's code inputs of this
+ * package's tests; after a change anywhere else, `npx turbo run test --force`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -25,7 +28,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import ts from 'typescript';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 const OXLINT = path.join(ROOT, 'node_modules', '.bin', 'oxlint');
@@ -35,7 +38,7 @@ type Rule = (typeof RULES)[number];
 
 /** Each limit at the design's threshold, set as the top level of `.oxlintrc.json` must set it. */
 const THRESHOLDS: Record<Rule, unknown> = {
-  'max-lines': ['error', { max: 500, skipBlankLines: true, skipComments: true }],
+  'max-lines': ['error', { max: 800, skipBlankLines: true, skipComments: true }],
   'max-lines-per-function': ['error', { max: 80, skipBlankLines: true, skipComments: true }],
   complexity: ['error', { max: 20 }],
   'sonarjs/cognitive-complexity': ['error', 15],
@@ -45,8 +48,8 @@ const THRESHOLDS: Record<Rule, unknown> = {
 const EXEMPT = ['**/test/**', '**/*.test.ts', 'apps/web/src/components/ui/**', 'apps/web/src/routeTree.gen.ts'];
 
 /**
- * Each file over a limit, with its count of offenders per rule: the functions over it, or 1 for `max-lines`. It only shrinks, and each
- * entry has a ceiling block in `.oxlintrc.json`.
+ * Each file over a function limit, with its count of offenders per rule: the functions over it. It only shrinks, and each entry has a
+ * ceiling block in `.oxlintrc.json`. `max-lines` has none: no file is over it.
  */
 const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'apps/api/src/capabilities/reach.ts': { 'max-lines-per-function': 1, complexity: 1, 'sonarjs/cognitive-complexity': 1 },
@@ -98,7 +101,6 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'packages/agent-orchestrator/src/ending/ending.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/status/status.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 2 },
   'packages/agent-orchestrator/src/wait/wait.ts': { 'sonarjs/cognitive-complexity': 2 },
-  'packages/agent-orchestrator/src/record/record.store.ts': { 'max-lines': 1 },
   'packages/agent-orchestrator/src/timeline/timeline.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/workflow/validate.ts': { 'sonarjs/cognitive-complexity': 2 },
   'packages/agent-orchestrator/src/workspace/worktree.store.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
@@ -164,7 +166,12 @@ const resolvedPlugins = (config: Config): Config['jsPlugins'] =>
  */
 function measure(cwd: string, configPath: string, config: object, files: string[]): Measures {
   fs.writeFileSync(configPath, JSON.stringify(config));
-  const ran = spawnSync(OXLINT, ['-c', configPath, '-f', 'json', ...files], { cwd, encoding: 'utf8', timeout: 120_000 });
+  const ran = spawnSync(OXLINT, ['-c', configPath, '-f', 'json', ...files], {
+    cwd,
+    encoding: 'utf8',
+    timeout: 120_000,
+    maxBuffer: 64 << 20,
+  });
   assert.equal(ran.signal, null, `oxlint was stopped by ${ran.signal}: ${ran.stderr}`);
   assert.ok(ran.status === 0 || ran.status === 1, `oxlint exited ${ran.status}: ${ran.stderr}${ran.stdout}`);
   const report = JSON.parse(ran.stdout) as { diagnostics: { code: string; message: string; filename: string }[] };
@@ -207,7 +214,8 @@ const withMax = (setting: unknown, max: number): unknown => {
 
 /**
  * What the limits' config and `record` say that the measures do not hold, each a sentence naming the fix: a threshold moved, a limit off
- * outside `EXEMPT`, a ceiling block for more than one file or set otherwise than its rule, a ceiling above the measure, a ceiling
+ * outside `EXEMPT`, a ceiling block for more than one file or set otherwise than its rule, a ceiling on `max-lines`, a ceiling above
+ * the measure, a ceiling
  * `record` does not know, an entry with no ceiling, a file gone or with no offender left, and a count of offenders other than the
  * measured one.
  */
@@ -242,6 +250,8 @@ function refusals(
     }
     const [file] = block.files;
     ceilings.add(file);
+    if (limits.some(([rule]) => rule === 'max-lines'))
+      out.push(`${file} has a max-lines ceiling: max-lines is a stop for every file, with no ceiling — cut the file along its concepts`);
     if (!(file in record)) out.push(`${file} has a ceiling RECORD does not know: a file over a limit is cut, never added to the baseline`);
     if (Object.keys(measures[file] ?? {}).length === 0) continue;
     for (const [rule, setting] of limits as [Rule, unknown][]) {
@@ -290,7 +300,7 @@ test('the files over a limit are held to their ceilings and their counts, and no
   );
 });
 
-/** A config with the limits at their thresholds, the exemptions, and one ceiling block: `a.ts`, at 30 cyclomatic and 700 code lines. */
+/** A config with the limits at their thresholds, the exemptions, and one ceiling block: `a.ts`, at 30 cyclomatic and a 90-line function. */
 const clean = (): { config: Config; measures: Measures; record: Record<string, Partial<Record<Rule, number>>> } => ({
   config: {
     jsPlugins: [],
@@ -299,12 +309,15 @@ const clean = (): { config: Config; measures: Measures; record: Record<string, P
       { files: ['**/test/**', '**/*.test.ts'], rules: Object.fromEntries(RULES.map((rule) => [rule, 'off'])) },
       {
         files: ['a.ts'],
-        rules: { 'max-lines': withMax(THRESHOLDS['max-lines'], 700), complexity: withMax(THRESHOLDS.complexity, 30) },
+        rules: {
+          'max-lines-per-function': withMax(THRESHOLDS['max-lines-per-function'], 90),
+          complexity: withMax(THRESHOLDS.complexity, 30),
+        },
       },
     ],
   },
-  measures: { 'a.ts': { 'max-lines': { worst: 700, count: 1 }, complexity: { worst: 30, count: 2 } } },
-  record: { 'a.ts': { 'max-lines': 1, complexity: 2 } },
+  measures: { 'a.ts': { 'max-lines-per-function': { worst: 90, count: 1 }, complexity: { worst: 30, count: 2 } } },
+  record: { 'a.ts': { 'max-lines-per-function': 1, complexity: 2 } },
 });
 
 const exists = (file: string): boolean => file !== 'gone.ts';
@@ -380,9 +393,17 @@ test('REFUSED: an entry for a file that is gone', () => {
 test('REFUSED: a ceiling block for two files, or set otherwise than its threshold', () => {
   refusedOnce((f) => (ceilingBlock(f).files = ['a.ts', 'c.ts']), /^a ceiling block names a\.ts, c\.ts: give each file a block of its own/);
   refusedOnce(
-    (f) => (ceilingBlock(f).rules['max-lines'] = ['error', { max: 700, skipBlankLines: false, skipComments: true }]),
-    /^a\.ts's max-lines ceiling is set otherwise than its threshold/,
+    (f) => (ceilingBlock(f).rules['max-lines-per-function'] = ['error', { max: 90, skipBlankLines: false, skipComments: true }]),
+    /^a\.ts's max-lines-per-function ceiling is set otherwise than its threshold/,
   );
+});
+
+test('REFUSED: a ceiling block that sets max-lines for one file, whatever its measure', () => {
+  refusedOnce((f) => {
+    ceilingBlock(f).rules['max-lines'] = withMax(THRESHOLDS['max-lines'], 900);
+    f.measures['a.ts']['max-lines'] = { worst: 900, count: 1 };
+    f.record['a.ts']['max-lines'] = 1;
+  }, /^a\.ts has a max-lines ceiling/);
 });
 
 test('REFUSED: a threshold moved, or a limit turned off outside the exempt files', () => {
@@ -396,9 +417,12 @@ test('REFUSED: a threshold moved, or a limit turned off outside the exempt files
   );
 });
 
+/** A file of `n` code lines. */
+const lines = (n: number): string => Array.from({ length: n }, (_, i) => `export const a${i} = ${i};`).join('\n');
+
 /** A plant over each threshold, with the measure its rule must report. */
 const PLANTS: Record<Rule, { file: string; text: string; measure: number }> = {
-  'max-lines': { file: 'long.ts', text: Array.from({ length: 501 }, (_, i) => `export const a${i} = ${i};`).join('\n'), measure: 501 },
+  'max-lines': { file: 'long.ts', text: lines(801), measure: 801 },
   'max-lines-per-function': {
     file: 'function.ts',
     text: [
@@ -434,7 +458,7 @@ const PLANTS: Record<Rule, { file: string; text: string; measure: number }> = {
   },
 };
 
-test('each limit the config names runs at its threshold, is off only in the exempt files, and holds a ceiling at the measure', () => {
+test('each limit the config names runs at its threshold, is off only in the exempt files, and holds a ceiling at the measure; 800 code lines are let through, 801 refused', () => {
   const config = readConfig();
   const dir = scratch('limits-');
   const exempt = ['test/all.ts', 'all.test.ts', 'apps/web/src/components/ui/all.tsx', 'apps/web/src/routeTree.gen.ts'];
@@ -444,12 +468,15 @@ test('each limit the config names runs at its threshold, is off only in the exem
     fs.writeFileSync(path.join(dir, file), all);
   }
   const ceilings: Block[] = [];
+  for (const side of ['on', 'under', 'at']) fs.mkdirSync(path.join(dir, side), { recursive: true });
   for (const rule of RULES) {
     const { file, text, measure: at } = PLANTS[rule];
-    for (const side of ['on', 'under', 'at']) {
-      fs.mkdirSync(path.join(dir, side), { recursive: true });
-      fs.writeFileSync(path.join(dir, side, file), text);
+    fs.writeFileSync(path.join(dir, 'on', file), text);
+    if (rule === 'max-lines') {
+      fs.writeFileSync(path.join(dir, 'at', file), lines(at - 1));
+      continue;
     }
+    for (const side of ['under', 'at']) fs.writeFileSync(path.join(dir, side, file), text);
     ceilings.push({ files: [`under/${file}`], rules: { [rule]: withMax(config.rules[rule], at - 1) } });
     ceilings.push({ files: [`at/${file}`], rules: { [rule]: withMax(config.rules[rule], at) } });
   }
@@ -460,8 +487,8 @@ test('each limit the config names runs at its threshold, is off only in the exem
   const used = { ...rest, jsPlugins: resolvedPlugins(config), overrides: [...exemptions, ...ceilings] };
   const measures = measure(dir, path.join(dir, '.oxlintrc.json'), used, ['on', 'under', 'at', ...exempt]);
 
-  const expected = (side: string): Measures =>
-    Object.fromEntries(RULES.map((rule) => [`${side}/${PLANTS[rule].file}`, { [rule]: { worst: PLANTS[rule].measure, count: 1 } }]));
+  const expected = (side: string, rules: readonly Rule[] = RULES): Measures =>
+    Object.fromEntries(rules.map((rule) => [`${side}/${PLANTS[rule].file}`, { [rule]: { worst: PLANTS[rule].measure, count: 1 } }]));
   assert.deepEqual(
     Object.fromEntries(Object.entries(measures).filter(([file]) => file.startsWith('on/'))),
     expected('on'),
@@ -469,13 +496,16 @@ test('each limit the config names runs at its threshold, is off only in the exem
   );
   assert.deepEqual(
     Object.fromEntries(Object.entries(measures).filter(([file]) => file.startsWith('under/'))),
-    expected('under'),
+    expected(
+      'under',
+      RULES.filter((rule) => rule !== 'max-lines'),
+    ),
     'a ceiling one below the measure refused nothing: oxlint did not read the block',
   );
   assert.deepEqual(
     Object.keys(measures).filter((file) => !file.startsWith('on/') && !file.startsWith('under/')),
     [],
-    'a limit refused a plant at its ceiling, or in a file it is off in',
+    'a limit refused a plant at its ceiling, a file of 800 code lines, or a file it is off in',
   );
 });
 

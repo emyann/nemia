@@ -61,7 +61,7 @@ import { attachedSessions } from '../src/harness/claude/attached.ts';
 import { filesOf, readRun } from '../src/harness/claude/attached-file.ts';
 import { claudeStreamOutput } from '../src/harness/detached/output.ts';
 import { until as waitUntil } from '../src/waits/index.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { TaskId } from '../src/core/model.ts';
 
 const live = process.env.AE_LIVE === '1';

@@ -29,7 +29,7 @@ import { Engine } from '../src/index.ts';
 import { refusalWords } from '../src/service/refusal.ts';
 import { claudeCodeRefuses } from '../src/harness/claude/vocabulary.ts';
 import { claudeJob } from '../src/harness/claude/code.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
 import { TaskId } from '../src/core/model.ts';

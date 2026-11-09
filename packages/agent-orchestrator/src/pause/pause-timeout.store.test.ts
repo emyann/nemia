@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { names } from '../../test/assessed.ts';
 import { timeoutAt, timeoutFile, putTimeout } from './pause-timeout.store.ts';
 import { DEFAULT_TIMEOUT_MS } from './pause.ts';

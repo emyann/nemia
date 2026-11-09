@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const ROOT = scratch('wf-pause-lapse-');
 process.env.WF_ROOT = ROOT;

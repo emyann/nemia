@@ -11,7 +11,7 @@ import { file } from '../core/engine/filing.ts';
 import { Runner } from './seam.ts';
 import { codex } from './codex/codex.ts';
 import { commandHarness } from './command/command.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { builtEngine } from '../../test/engine.ts';
 import { asyncStore, type AsyncJournal } from '../../test/promise-runner.ts';
 

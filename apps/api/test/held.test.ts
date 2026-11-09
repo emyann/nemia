@@ -12,7 +12,7 @@
  */
 import { root } from './harness.ts';
 import { test } from 'node:test';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';

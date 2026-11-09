@@ -22,7 +22,7 @@ import type { Said } from 'agent-orchestrator';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import { listedOf, objectOf, type ObjectStep } from '../../test/run-reads.ts';
 import { list, runStore, sayRun } from 'agent-orchestrator';
-import { story } from '../../test/checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);

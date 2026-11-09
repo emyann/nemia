@@ -58,7 +58,6 @@ const DEADLINES: Readonly<Record<string, Allowance>> = {
   'test/git-skill.boundary.test.ts': { count: 1, not: 'a commit date a minute ahead' },
   'test/held.test.ts': { count: 1, not: 'a mocked clock set ten minutes ahead' },
   'test/tick-program.test.ts': { count: 1, not: 'a series read at a moment two minutes ahead' },
-  'test/scratch.ts': { count: 1, not: "the reaper's bound on a test run's leftover processes, after its end" },
   'src/daemon/daemon.store.test.ts': { count: 1, not: 'a mocked clock set twenty minutes ahead' },
   'src/meter/tally.store.test.ts': { count: 1, not: 'a spin that spends its time on the thread the meter measures' },
 };
@@ -106,7 +105,7 @@ const measured = () =>
 
 test("the package's tests hold no hand-written deadline but those `DEADLINES` allows, each no wait, and none allowed that is gone", () => {
   assert.ok(testFiles().includes('src/feed/feed.test.ts'), 'the tests beside the code are read');
-  assert.ok(testFiles().includes('test/scratch.ts'), "and the tests' helpers");
+  assert.ok(testFiles().includes('test/ambient.ts'), "and the tests' helpers");
   assert.deepEqual(deadlineBreaks(measured(), DEADLINES), []);
 });
 

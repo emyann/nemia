@@ -618,10 +618,8 @@ the git place where it is handed none, and each command gives its program that o
 `src/cli` that names the git place.
 
 A file in src or bin that no kind names fails the suite. `packages/agent-orchestrator/test/layout.test.ts` holds the
-folders: at most six source files in one, no folder named `utils`, `helpers`, `common`, `shared` or `misc`, no two
-source files that need each other's values, no source file that imports a test, and a folder's pure code imported from
-outside through its face — its `index.ts`, or its one pure file; a store, a verb or a model is imported by its own path. A folder
-holding a context's `glossary.json` leaves its one `<folder>.model.ts` out of its six.
+folders by the rule every package keeps, *Folders, in every package* below: here a part's faced code is its pure code, imported
+from outside its concept through the part's face; a store, a verb or a model is imported by its own path, and `src/cli/` has no face.
 
 **3. The runtime is reached through one client.** Of the orchestrator's files, `src/runtime-client.ts` alone imports
 agent-runtime, a type included (`CLIENT` in test/boundary.test.ts). It creates the runtime (`engine()`, `HARNESSES`): the
@@ -651,11 +649,10 @@ shrinks. Its `src/` is a folder per page or verb a
 person uses — `runs/`, `objects/` (the handlers of `objects`' `Api`, the run object and the cards, built into one web handler mounted on Hono's routes for the paths it serves), `openapi/`, `steps/`, `decide/`, `asks/`, `inbox/`, `factory/`, `capabilities/`, `workflows/`,
 `agents/`. The root holds `main.ts`, `app.ts`, `port.ts`, `guard.ts`, `store.ts`, `layer.ts` (the services a handler reads, and
 `served`, which runs it on the app's `ManagedRuntime`) and `body.ts` (the request-body reader every folder uses) and nothing else.
-A folder holds at most six source files; one of two or more has a face, `index.ts`, which holds only re-exports by name, and one of
-one file has none. `app.ts` mounts each folder through its face. An
-import between two folders names the file it needs wherever the face would close a cycle — `steps/` reads a run's try — since a cycle of values passes the typecheck and fails only as the modules load. No two api
-files need each other's values, and no file or folder is named `utils`, `helpers`, `common`, `shared` or `misc`. Test:
-`apps/api/test/layout.test.ts`.
+Its folders keep the rule every package keeps, *Folders, in every package* below; a folder of two files or more has a face,
+`index.ts`, which holds only re-exports by name, and one of one file has none. `app.ts` mounts each folder through its face. An
+import between two folders names the file it needs wherever the face would close a cycle — `steps/` reads a run's try — since a cycle
+of values passes the typecheck and fails only as the modules load. Test: `apps/api/test/layout.test.ts`.
 
 **4. Each layer says its own words**, held by `packages/agent-orchestrator/test/words.test.ts`. A harness's words — Claude Code's,
 Codex's and Anthropic's names, and the runtime's own permission modes and sandboxes but the plain English ones — stay in
@@ -674,3 +671,27 @@ read every file git lists outside their package; `turbo.json` makes the apps' `s
 `.ts` files and the orchestrator's source and tests, and for the orchestrator `packages/templates/sdlc/`, inputs of their package's test (`tools/guards/test/turbo-inputs.test.ts`),
 so a breach there cannot replay a pass from turbo's cache. A change to any other file outside a package is not in its
 cache key: run `npx turbo run test --force` after one.
+
+## Folders, in every package
+
+Pieces that change together live together. The rule is written here once, judged once by `tools/test-kit/layout.ts` (`test-kit/layout`),
+and held in each package by its own layout test over its source: `packages/agent-orchestrator/test/layout.test.ts`,
+`packages/agent-runtime/test/layout.test.ts`, `apps/api/test/layout.test.ts`, `apps/cli/test/layout.test.ts` and
+`packages/objects/test/layout.test.ts`. Each passes its root and keeps what is its own besides: the orchestrator's kinds, the runtime's
+reach by path, the api's root and its faces.
+
+- **A folder is a concept**: a context of a glossary, or a part of one. A file sits at most at `src/<concept>/<part>/<file>`; a file at
+  `src/a/b/c/d.ts` is refused (`depthBreaks`). There is no count of a folder's files: a concept holds what changes with it.
+- **No folder or file is named for no concept**: `utils`, `helpers`, `common`, `shared` and `misc` are refused, as a whole name or before
+  the name's first dot (`namelessBreaks`). What two concepts share lives in a file named for what it does, beside the code that uses it.
+- **A face per folder**, where the package has the face rule: a part's faced code is read from outside through the part's `index.ts`,
+  or its one faced file when it has no `index.ts` (`faceBreaks`). Outside means outside the **concept**: a file anywhere in
+  `src/factory/**` imports any file of `src/factory/**` by path, and a file outside imports a part's faced code through that part's face.
+  The face is per folder rather than per concept because one face over a whole concept closes value cycles its parts do not have.
+- **No two files need each other's values** (`cycles` over `valueGraph`), directly or around a loop: a type-only import is erased, so it
+  may cycle. No source file imports a test (`testImports`), and a face re-exports by name (`starExports`).
+- **A file stops at 800 code lines**: `max-lines` is an error at 800, blank lines and comments left out, with no ceiling for any file
+  (`tools/guards/test/limits.test.ts`). A file that reaches it is cut along its concepts; no file under it is split for its size. Test
+  files are unlimited, and the function limits (80 lines, cyclomatic 20, cognitive 15) are unchanged.
+
+A folder the rule does not fit today reshapes when it is next touched.

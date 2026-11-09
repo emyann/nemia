@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseAgent, WorkflowError, type StepDraft, type Workflow } from '../src/workflow.ts';
 import { agentDeniesOf } from '../src/workflow/index.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { TEAM, TEAM_DEV } from './team.ts';
 
 const ROOT = scratch('wf-write-');

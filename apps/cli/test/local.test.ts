@@ -5,17 +5,16 @@
  * the in-process path with its words intact, seen by what it writes into the store; and `--local` never reaches the in-process parser.
  * Each `nemia` is this checkout's bin, run as a child on a scratch store, waited on for its exit.
  */
-import { after, test } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { scratch } from 'test-kit/scratch';
 import { ambient } from './ambient.ts';
 
 const BIN = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
-const SCRATCH = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-local-'));
-after(() => fs.rmSync(SCRATCH, { recursive: true, force: true }));
+const SCRATCH = scratch('nemia-local-');
 
 /** A store of its own, its home beside it, so no `nemia` here reads the person's store, service or engine. */
 function aStore(name: string): { root: string; env: NodeJS.ProcessEnv } {

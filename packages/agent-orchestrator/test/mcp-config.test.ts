@@ -33,7 +33,7 @@ import { Engine as EngineService } from 'agent-runtime';
 import { type Engine } from '../src/runtime-client.ts';
 import { parseAgent, parseWorkflow } from '../src/workflow.ts';
 import { filedConfig, STEP_FILES } from '../src/filed/filed.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { plainEngine } from './promised.ts';
 import { until, WAITED } from 'agent-runtime/testing';
 import { sdkArgValue } from './sdk-argv.ts';

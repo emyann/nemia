@@ -9,13 +9,13 @@
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
-import { story } from '../../test/checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { addFactory, BUILTIN_SERVERS, builtinServers } from 'agent-orchestrator';
 import { HEADER_MASK } from 'objects';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { app } from '../app.ts';
 
 type McpServer = import('objects').McpServer;

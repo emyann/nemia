@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { bell, until, WAITED } from './waits.ts';
 
 const APP = path.join(import.meta.dirname, '..');

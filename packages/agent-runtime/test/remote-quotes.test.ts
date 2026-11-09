@@ -11,7 +11,7 @@ import type { EngineShape, EngineOptions, TaskSpec, TaskView } from '../src/inde
 import { Engine as EngineService } from '../src/index.ts';
 import { remoteOps } from '../src/a2a/remote.ts';
 import { apiKey, bearer, remoteServer, type RemoteServer, type ServerOptions } from './remote-server.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { builtEngine } from './engine.ts';
 
 /** A test agent for the row `t`, closed once the row ends. */

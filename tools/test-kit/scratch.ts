@@ -5,10 +5,10 @@
  * the suite: the folders pile up by the thousand, and the workers live on for hours, re-parented to init, holding the page
  * cache and slab that can freeze a machine. So a test makes its root here, `scratch(prefix)`, and never by calling
  * `os.tmpdir`; a test that asserts where the code under test runs a process names the directory with `machineTempDir()`,
- * which makes no root. Each package's `scratch.test.ts` refuses any other call of `os.tmpdir` under `test/`.
+ * which makes no root. `tools/guards/test/test-kit.test.ts` refuses any other call of `os.tmpdir` in a workspace's tests.
  *
- * Each package has this file, the same byte for byte (its `scratch.test.ts` holds the copy to the runtime's): a package
- * reaches another only through its exports, and a test helper is none. Importing it registers two hooks for the file:
+ * Every workspace's tests take it from here, `test-kit/scratch`, its own entry: importing it registers two hooks for the file, so
+ * a test that wants only another of the kit's entries never takes them:
  *
  * - after each test, what is still running in a root that test made is reaped: a worker is sent SIGTERM, the stop the
  *   runner sends, and waited out; then anything left naming the root — a harness, an orphan it left, a fake — is killed,
@@ -39,7 +39,7 @@ export const scratch = (prefix: string): string => {
 
 /**
  * The machine's temp directory itself, for a test that asserts where the code under test runs a process. Never a place to
- * make a root in: `scratch` makes one, and `scratch.test.ts` refuses a line that passes this to a `mkdtempSync`.
+ * make a root in: `scratch` makes one, and `tools/guards/test/test-kit.test.ts` refuses a line that passes this to a `mkdtempSync`.
  */
 export const machineTempDir = (): string => os.tmpdir();
 
@@ -57,7 +57,7 @@ const processes = (): Proc[] => {
       .split('\n')
       .flatMap((line) => {
         const m = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line);
-        return m ? [{ pid: Number(m[1]), pgid: Number(m[2]), state: m[3], args: m[4] }] : [];
+        return m ? [{ pid: Number(m[1]), pgid: Number(m[2]), state: m[3] ?? '', args: m[4] ?? '' }] : [];
       });
   }
   const found: Proc[] = [];
@@ -75,7 +75,7 @@ const processes = (): Proc[] => {
       try {
         env = fs.readFileSync(`/proc/${entry}/environ`, 'utf8').split('\0').join(' ');
       } catch {}
-      found.push({ pid: Number(entry), pgid: Number(fields[2]), state: fields[0], args, cwd, env });
+      found.push({ pid: Number(entry), pgid: Number(fields[2]), state: fields[0] ?? '', args, cwd, env });
     } catch {}
   }
   return found;

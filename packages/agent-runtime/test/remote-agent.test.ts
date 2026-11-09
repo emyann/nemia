@@ -34,10 +34,10 @@ import {
   type Step,
   type Turn,
 } from './remote-server.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { stepClock } from './clock.ts';
 import { builtEngine } from './engine.ts';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import { until as untilEvent, WAITED } from '../src/waits/index.ts';
 
 /** A test agent, closed once the test or row `t` ends. */

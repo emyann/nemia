@@ -12,7 +12,7 @@ import ts from 'typescript';
 import { testPlace } from '../place/memory/index.ts';
 import { PLACE_VERBS, type PlaceAnswers, type PlaceVerb } from '../src/place/place.ts';
 import { placeOver, type OwnVerbs } from './place-over.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { failing, unwalked, walksOn, WALKS, type Side } from './place-walks.ts';
 
 for (const [name, walk] of walksOn(testPlace)) test(name, walk);

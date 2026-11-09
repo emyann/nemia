@@ -9,9 +9,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { debtBreaks as heldTo, seamUses as usesOf, sourcesUnder } from 'test-kit/debt';
 import { Effect } from 'effect';
 import { names } from '../../test/assessed.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { act, done, doorFrom, walksOn } from '../../test/door-walks.ts';
 import { aSubscription, SUBSCRIPTION_WALKS } from '../../test/subscription-walks.ts';
 import { upgraded } from '../feed/index.ts';
@@ -185,50 +186,21 @@ const SEAM = [
 const OWN = ['src/subscription/subscription.store.ts', 'src/subscription/memory.store.ts'];
 
 /** Every file of `src` but the tests and the door's, by its path from the package. */
-function sourcesOfSrc(): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const entry of fs.readdirSync(path.join(PKG, 'src'), { recursive: true, withFileTypes: true })) {
-    if (!entry.isFile() || !entry.name.endsWith('.ts') || entry.name.endsWith('.test.ts')) continue;
-    const file = path.relative(PKG, path.join(entry.parentPath, entry.name)).split(path.sep).join('/');
-    if (!OWN.includes(file)) out[file] = fs.readFileSync(path.join(PKG, file), 'utf8');
-  }
-  return out;
-}
+const sourcesOfSrc = (): Record<string, string> => sourcesUnder(PKG, 'src', OWN);
 
 /** The seam's calls in each file, comment lines left out: what `SUBSCRIPTION_DOOR_DEBT` counts. */
-function seamUses(sources: Record<string, string>): Map<string, number> {
-  const call = new RegExp(`(?<![\\w$.])(?:${SEAM.join('|')})\\s*\\(`, 'g');
-  const uses = new Map<string, number>();
-  for (const [file, text] of Object.entries(sources)) {
-    const code = text
-      .split('\n')
-      .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))
-      .join('\n');
-    const n = [...code.matchAll(call)].length;
-    if (n) uses.set(file, n);
-  }
-  return uses;
-}
+const seamUses = (sources: Record<string, string>): Map<string, number> =>
+  usesOf(sources, new RegExp(`(?<![\\w$.])(?:${SEAM.join('|')})\\s*\\(`, 'g'));
 
 /** Why the uses of `sources` break the baseline `debt`: a file it does not name, a count grown, a count fallen. */
 function debtBreaks(sources: Record<string, string>, debt: Readonly<Record<string, number>>): string[] {
-  const uses = seamUses(sources);
-  const out: string[] = [];
-  for (const [file, n] of uses) {
-    const owed = debt[file] ?? 0;
-    if (n > owed)
-      out.push(
-        `${file} calls the subscriptions' module spellings ${n} time(s) where test/subscription-door.baseline.ts names ${owed}: yield SubscriptionDoor (src/subscription/subscription.store.ts) instead`,
-      );
-    if (n < owed)
-      out.push(
-        `${file} calls the subscriptions' module spellings ${n} time(s): lower its count in test/subscription-door.baseline.ts to ${n}, which only shrinks`,
-      );
-  }
-  for (const file of Object.keys(debt))
-    if (!uses.has(file))
-      out.push(`${file} calls the subscriptions' module spellings no more: take its line out of test/subscription-door.baseline.ts`);
-  return out;
+  return heldTo(seamUses(sources), debt).map(({ file, uses: n, owed, kind }) =>
+    kind === 'grown'
+      ? `${file} calls the subscriptions' module spellings ${n} time(s) where test/subscription-door.baseline.ts names ${owed}: yield SubscriptionDoor (src/subscription/subscription.store.ts) instead`
+      : kind === 'fallen'
+        ? `${file} calls the subscriptions' module spellings ${n} time(s): lower its count in test/subscription-door.baseline.ts to ${n}, which only shrinks`
+        : `${file} calls the subscriptions' module spellings no more: take its line out of test/subscription-door.baseline.ts`,
+  );
 }
 
 test("no file of src calls the subscriptions' module spellings but as test/subscription-door.baseline.ts counts it, and the count only shrinks", async () => {

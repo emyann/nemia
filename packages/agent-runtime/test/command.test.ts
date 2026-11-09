@@ -22,9 +22,9 @@ import { commandHarness } from '../src/harness/command/command.ts';
 import { detachedOps } from '../src/harness/detached/detached.ts';
 import { codex } from '../src/harness/codex/codex.ts';
 import { TERMINATION_MESSAGE_BYTES } from '../src/harness/detached/run-file.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { builtEngine } from './engine.ts';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import { until, WAITED } from '../src/waits/index.ts';
 
 /**

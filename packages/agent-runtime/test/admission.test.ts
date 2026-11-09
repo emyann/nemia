@@ -12,8 +12,8 @@ import { nameFor } from '../src/core/domain.ts';
 import { holdsSlot, ownPool, toAdmit, type AdmissionView } from '../src/core/admission.ts';
 import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
-import { scratch } from './scratch.ts';
-import { story } from './checkpoints.ts';
+import { scratch } from 'test-kit/scratch';
+import { story } from 'test-kit/checkpoints';
 
 const memoryJournal = (): AsyncJournal => {
   const tasks = new Map<string, Event[]>();

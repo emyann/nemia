@@ -57,10 +57,10 @@ import { composite } from '../src/harness/seam.ts';
 import { RunnerError, testOps, type Observation } from '../src/harness/seam.ts';
 import type { SessionState } from '../src/core/session.ts';
 import type { Sighting } from '../src/core/domain.ts';
-import { runningIn, scratch } from './scratch.ts';
+import { runningIn, scratch } from 'test-kit/scratch';
 import { warned } from './warned.ts';
 import { stepClock } from './clock.ts';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import {
   CLAUDE_CODE_VERSIONS,
   FILES_STREAM,

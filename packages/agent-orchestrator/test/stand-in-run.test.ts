@@ -17,7 +17,7 @@ import { testPlace } from '../place/memory/index.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { eachTest, runGiven, runOver } from './placed.ts';
 import { plantedGit } from './planted-git.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { TEAM, TEAM_DEV } from './team.ts';
 
 const ROOT = scratch('wf-stand-in-run-');

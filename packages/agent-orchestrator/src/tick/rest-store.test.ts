@@ -23,7 +23,7 @@ import { Engine, Journal, type Event, type Sighting } from 'agent-runtime';
 import { asyncOps, plainEngine, type AsyncRunner } from '../../test/promised.ts';
 import type { RepositoryRun, Run } from '../run.ts';
 import type { PassCost } from '../meter/meter.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { runGiven, runOver } from '../../test/placed.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { placeOver, unreadBy } from '../../test/place-over.ts';

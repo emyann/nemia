@@ -20,11 +20,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { EngineIo, HarnessSpec, Sighting } from '../src/index.ts';
 import { Engine } from '../src/index.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 import { asyncOps, asyncStore, type AsyncJournal, type AsyncRunner, type AsyncSighting } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 
 /**
  * A harness shaped as the orchestrator's `check`: a command and nothing else — no `find`, no `start` — run by the engine's

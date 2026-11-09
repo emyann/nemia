@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Fiber, Logger, References } from 'effect';
 import { until, WAITED } from 'agent-runtime/testing';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { steeredClock } from './steered.ts';
 import type { PlaceRequests, PlaceVerb } from '../src/place/place.ts';

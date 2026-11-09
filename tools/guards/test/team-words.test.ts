@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { splitFrontmatter } from 'agent-orchestrator/workflow';
-import { REPO } from './workspaces.ts';
+import { REPO } from 'test-kit/repo';
 
 /** This repository's placement vocabulary, which no file of the mechanism may name. */
 const REPOSITORY_WORDS = /agent-runtime|agent-orchestrator|apps\/api|runtime-client|docs\/architecture\.md|pure,\s*store,\s*controller/;

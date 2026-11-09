@@ -21,7 +21,7 @@ import { Effect, Result, Schema } from 'effect';
 import { parseAgent, parseWorkflow, renderStep, splitFrontmatter, WorkflowError, type Agents, type Workflow } from '../src/workflow.ts';
 import { headedLayers } from '../src/workflow/index.ts';
 import { briefBody, enabledSkillsOf, pluginOf, unrendered } from '../src/agents/agents.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { TEAM, teamCopy } from './team.ts';
 import { names } from './assessed.ts';
 import { staged, story } from './story.ts';

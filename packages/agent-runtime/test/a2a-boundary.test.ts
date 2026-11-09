@@ -9,26 +9,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { withoutComments, specifiersIn } from 'test-kit/imports';
 
 const PKG = path.join(import.meta.dirname, '..');
 const SDK = '@a2a-js/sdk';
 const SDK_ENTRIES = [SDK, `${SDK}/client`, `${SDK}/server`, `${SDK}/errors`];
-
-/** A line of prose read as nothing, as `contract.test.ts` reads one, the line kept so numbers still count. */
-const withoutComments = (text: string): string =>
-  text
-    .split('\n')
-    .map((line) => (/^\s*(\/\/|\/\*|\*)/.test(line) ? '' : line))
-    .join('\n');
-
-/** Every module a piece of source names: imports and re-exports, type-only included, `import()` and `require()` (as `contract.test.ts`). */
-function specifiersIn(text: string): string[] {
-  const found = new Set<string>();
-  for (const m of text.matchAll(/^\s*(?:import|export)\b[^'"`;]*?\bfrom\s*['"]([^'"]+)['"]/gm)) found.add(m[1]);
-  for (const m of text.matchAll(/^\s*import\s*['"]([^'"]+)['"]/gm)) found.add(m[1]);
-  for (const m of text.matchAll(/\b(?:import|require|import\.meta\.resolve|require\.resolve)\s*\(\s*['"`]([^'"`]+)['"`]/g)) found.add(m[1]);
-  return [...found].sort();
-}
 
 /**
  * The seam's files that name no type or value of the SDK's: the registry's entry, the holder's token, a send's lease read off it,

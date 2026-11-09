@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const SCRIPT = path.join(import.meta.dirname, '..', 'sdlc', 'workflows', 'build', 'parts.ts');
 

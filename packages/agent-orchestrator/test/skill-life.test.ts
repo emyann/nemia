@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import { renderSkill, skillDraftOf, skillEntryOf, splitFrontmatter, type SkillDraft } from '../src/workflow.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { TEAM } from './team.ts';
 import { names } from './assessed.ts';
 import { staged, story } from './story.ts';

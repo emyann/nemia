@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Tracer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
 

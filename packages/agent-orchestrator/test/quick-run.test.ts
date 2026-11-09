@@ -15,7 +15,7 @@ import path from 'node:path';
 import { testPlace } from '../place/memory/index.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { eachTest, runGiven, runOver } from './placed.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { teamCopy } from './team.ts';
 
 const ROOT = scratch('wf-quick-run-');

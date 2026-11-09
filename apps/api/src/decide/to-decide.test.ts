@@ -11,12 +11,12 @@
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
-import { story } from '../../test/checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import type { RunDecision } from './decision.ts';
 import { listedOf as listed, objectOf, specOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';

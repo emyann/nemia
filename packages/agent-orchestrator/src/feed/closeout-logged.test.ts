@@ -15,7 +15,7 @@ import { Effect, Layer, Logger, References } from 'effect';
 import { StoreRoot } from '../config/root.store.ts';
 import { parseCloseout } from '../closeout/closeout.ts';
 import type { FeedCloseout, FeedWords } from './feed.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const ROOT = scratch('wf-closeout-logged-');
 process.env.WF_ROOT = ROOT;

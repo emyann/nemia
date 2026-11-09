@@ -11,8 +11,7 @@
  * the story never meant, so its failures would be noise. A checkpoint is declared by a call named `test`, which is how a citation of
  * its name resolves (`tools/guards/test/claude-md-cites.test.ts`).
  *
- * It imports nothing, so each workspace keeps a copy of it, byte for byte, held equal to the original in
- * `packages/agent-orchestrator/test/checkpoints.ts` by that package's `test/scratch.test.ts`: a change is made there and copied.
+ * Every workspace's tests take it from here, `test-kit/checkpoints`.
  */
 
 /** What a checkpoint's body is handed: the subtest's own context. */

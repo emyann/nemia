@@ -24,8 +24,8 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import ts from 'typescript';
 import plugin, { COMMENT_WIDTH } from '../../../lint/comments.ts';
-import { workspaces } from './workspaces.ts';
-import { scratch } from './scratch.ts';
+import { workspaces } from 'test-kit/repo';
+import { scratch } from 'test-kit/scratch';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 const OXLINT = path.join(ROOT, 'node_modules', '.bin', 'oxlint');

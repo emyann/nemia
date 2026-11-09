@@ -16,7 +16,7 @@ import { Effect, Fiber, Logger, Metric, Tracer } from 'effect';
 import { testEngine, until, WAITED } from 'agent-runtime/testing';
 import { eachTest } from '../../test/placed.ts';
 import { story } from '../../test/story.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { steeredClock } from '../../test/steered.ts';
 import type { Answered } from '../prune/prune.ts';
 import type { RecentPass } from '../meter/meter.ts';

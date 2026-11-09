@@ -15,8 +15,8 @@ import { Journal, type JournalError, type JournalOps } from './journal.ts';
 import { BODY_GRACE_MS, BODY_MIN_BYTES, BodyError, refOf, split, type BodyRefused } from './bodies.ts';
 import type { Event } from '../domain.ts';
 import { ioCounts } from './tally.ts';
-import { scratch } from '../../../test/scratch.ts';
-import { story } from '../../../test/checkpoints.ts';
+import { scratch } from 'test-kit/scratch';
+import { story } from 'test-kit/checkpoints';
 import { TaskId } from '../model.ts';
 
 const root = () => scratch('ae-bodies-');

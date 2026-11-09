@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from '../scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { PHASES, type PageTiming } from './timing.ts';
 
 type Ended = { code: number | null; stdout: string; stderr: string; shots: string[] };

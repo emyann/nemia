@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { Effect, type Layer } from 'effect';
 import { Journal } from '../src/core/engine/journal.ts';
 import { failing, JOURNAL_WALKS, LAYER_ONLY, unwalked, walksOn, type Side } from './journal-walks.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 /** The door a layer gives. */
 const sideOf = (layer: Layer.Layer<Journal>): Side => ({ journal: Effect.runSync(Effect.provide(Effect.service(Journal), layer)) });

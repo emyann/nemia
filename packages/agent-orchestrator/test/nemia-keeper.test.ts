@@ -20,7 +20,7 @@ import { Effect, Fiber } from 'effect';
 import type { TaskView } from 'agent-runtime';
 import { CONFIG_FOLDERS } from 'agent-runtime/vocabulary';
 import { until } from 'agent-runtime/testing';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
 

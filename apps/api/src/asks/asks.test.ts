@@ -24,7 +24,7 @@ import type { RunList } from 'objects';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
-import { story } from '../../test/checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import { listedOf, objectOf, stepOf, triesOf } from '../../test/run-reads.ts';
 
 const stand = eachTest(testPlace);

@@ -1,7 +1,7 @@
 /**
  * Run by `leaks.test.ts` alone, under a TMPDIR of its own: a test written without `scratch`, whose root is made under the
  * temp directory by hand and whose worker is never stopped. It passes, and leaves both behind: the case the guard must see.
- * The one file under `test/` but `scratch.ts` allowed to call `tmpdir()` (`scratch.test.ts`). Its listener exits on its own
+ * The one test file outside the kit allowed to call `tmpdir()` (`tools/guards/test/test-kit.test.ts`). Its listener exits on its own
  * after two minutes, should the guard's reaping ever fail, so the fixture never leaks for real.
  */
 import { test } from 'node:test';

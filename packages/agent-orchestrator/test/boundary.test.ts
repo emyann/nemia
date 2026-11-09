@@ -38,6 +38,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { builtinModules } from 'node:module';
 import path from 'node:path';
+import { specifiersIn, withoutComments } from 'test-kit/imports';
 
 const PKG = path.join(import.meta.dirname, '..');
 
@@ -260,21 +261,8 @@ const IMPURE_GLOBALS = ['global:process.env', 'global:fetch'];
 
 type Sources = Record<string, readonly string[]>;
 
-/** Every module a piece of source names: imports and re-exports, type-only included, and `import()`. */
-function importsIn(text: string): string[] {
-  const found = new Set<string>();
-  for (const m of text.matchAll(/^\s*(?:import|export)\b[^'"`;]*?\bfrom\s*['"]([^'"]+)['"]/gm)) found.add(m[1]);
-  for (const m of text.matchAll(/^\s*import\s*['"]([^'"]+)['"]/gm)) found.add(m[1]);
-  for (const m of text.matchAll(/\bimport\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/g)) found.add(m[1]);
-  return [...found].sort();
-}
-
-/** Source text with each comment line blanked: a line that opens with `//`, `/*` or `*`. */
-const withoutComments = (text: string): string =>
-  text
-    .split('\n')
-    .map((line) => (/^\s*(\/\/|\/\*|\*)/.test(line) ? '' : line))
-    .join('\n');
+/** Every module a piece of source names: imports and re-exports, type-only included, and a whole `import()`. */
+const importsIn = (text: string): string[] => specifiersIn(text, { calls: ['import'], closed: true });
 
 /** `process.env` however a file reaches it: read off `process`, by `['env']`, or destructured from it (`const { env } = process`). */
 const PROCESS_ENV = /\bprocess\s*(?:\.\s*env\b|\[\s*['"`]env['"`]\s*\])|\{[^}]*\benv\b[^}]*\}\s*=\s*(?:globalThis\s*\.\s*)?process\b/;

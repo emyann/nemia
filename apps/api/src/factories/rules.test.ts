@@ -10,8 +10,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { addFactory, factoryRules } from 'agent-orchestrator';
-import { scratch } from '../../test/scratch.ts';
-import { story } from '../../test/checkpoints.ts';
+import { scratch } from 'test-kit/scratch';
+import { story } from 'test-kit/checkpoints';
 import { app } from '../app.ts';
 
 type FactoryRules = import('agent-orchestrator').FactoryRules;

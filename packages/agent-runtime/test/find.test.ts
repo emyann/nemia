@@ -12,7 +12,7 @@ import type { Sighting, TranscriptEvent } from '../src/index.ts';
 import { Engine } from '../src/index.ts';
 import { asyncOps } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const tmp = (label: string) => scratch(`ae-find-${label}-`);
 

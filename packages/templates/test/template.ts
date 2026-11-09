@@ -11,7 +11,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 /** This workspace: the folder each template is a folder of. */
 export const TEMPLATES = path.join(import.meta.dirname, '..');

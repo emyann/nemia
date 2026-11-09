@@ -12,7 +12,7 @@ import { testPlace, type TestPlace } from '../place/memory/index.ts';
 import { PlaceService } from '../src/place/place.store.ts';
 import { PLACE_SAYS, unknownHoles } from '../src/place/place.ts';
 import { eachTest, runGiven } from './placed.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const stand = eachTest(testPlace);
 const runPlaced = runGiven(() => stand().layer);

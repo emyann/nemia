@@ -12,10 +12,10 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { codex, nameFor, type EngineOptions, type Event, type FeedEntry, type Sighting } from '../src/index.ts';
 import { Engine as EngineService } from '../src/index.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import { bell, until, WAITED, type Waiter } from '../src/waits/index.ts';
 
 /** A store in twelve lines of plain async — what an application with its own database writes. */

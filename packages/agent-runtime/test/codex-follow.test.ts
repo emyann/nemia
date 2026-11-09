@@ -13,9 +13,9 @@ import { codex } from '../src/harness/codex/codex.ts';
 import { codexRolloutEvents } from '../src/harness/codex/transcript.ts';
 import type { Followed } from '../src/harness/seam.ts';
 import type { RunnerError } from '../src/harness/error.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { bell, until, WAITED } from '../src/waits/index.ts';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 
 const THREAD = '01a09996-d343-7932-8971-b2f209ba315b';
 const line = (o: object) => `${JSON.stringify(o)}\n`;

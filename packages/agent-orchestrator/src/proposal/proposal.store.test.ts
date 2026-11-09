@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { act, done, doorFrom, walksOn } from '../../test/door-walks.ts';
 import { aProposal, PROPOSAL_WALKS } from '../../test/proposal-walks.ts';
 import { ProposalDoor, proposalDoorFiles } from './proposal.store.ts';

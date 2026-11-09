@@ -16,9 +16,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { debtBreaks as heldTo, seamUses as usesOf, sourcesUnder } from 'test-kit/debt';
 import type { Run } from '../src/run.ts';
 import type { PersonRequest } from '../src/record/record.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const ROOT = scratch('wf-run-store-');
 process.env.WF_ROOT = ROOT;
@@ -328,15 +329,7 @@ function refusals(sources: Record<string, string>): string[] {
 }
 
 /** Every file of `src` but the tests beside the code and the interface's own, by its path from the package. */
-function sourcesOfSrc(): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const entry of fs.readdirSync(path.join(PKG, 'src'), { recursive: true, withFileTypes: true })) {
-    if (!entry.isFile() || !entry.name.endsWith('.ts') || entry.name.endsWith('.test.ts')) continue;
-    const file = path.relative(PKG, path.join(entry.parentPath, entry.name)).split(path.sep).join('/');
-    if (!OWN.includes(file)) out[file] = fs.readFileSync(path.join(PKG, file), 'utf8');
-  }
-  return out;
-}
+const sourcesOfSrc = (): Record<string, string> => sourcesUnder(PKG, 'src', OWN);
 
 test("what `nemia rm` and `nemia prune --artifacts` read of the store: each run's id, read or not, and its files directory found and dropped", async (t) => {
   await t.test("every run id with a record file is listed, read or not, and none from a person's file alone", () => {
@@ -429,36 +422,21 @@ test("no file of src but the store's own imports a run's functions from record.s
 });
 
 /** The run store's run groups as `src`'s code uses them, comment lines left out, by file: what `RUN_DOOR_DEBT` counts. */
-function seamUses(sources: Record<string, string>): Map<string, number> {
-  const uses = new Map<string, number>();
-  for (const [file, text] of Object.entries(sources)) {
-    if (file === 'src/record/files.store.ts') continue;
-    const code = text
-      .split('\n')
-      .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))
-      .join('\n');
-    const n = [...code.matchAll(/\brunStore\s*\.\s*(?:runs|asks|holds|refresh|forgetting)\b/g)].length;
-    if (n) uses.set(file, n);
-  }
-  return uses;
-}
+const seamUses = (sources: Record<string, string>): Map<string, number> =>
+  usesOf(
+    Object.fromEntries(Object.entries(sources).filter(([file]) => file !== 'src/record/files.store.ts')),
+    /\brunStore\s*\.\s*(?:runs|asks|holds|refresh|forgetting)\b/g,
+  );
 
 /** Why the uses of `sources` break the baseline `debt`: a file it does not name, a count grown, a count fallen. */
 function debtBreaks(sources: Record<string, string>, debt: Readonly<Record<string, number>>): string[] {
-  const uses = seamUses(sources);
-  const out: string[] = [];
-  for (const [file, n] of uses) {
-    const owed = debt[file] ?? 0;
-    if (n > owed)
-      out.push(
-        `${file} uses the run store ${n} time(s) where test/run-door.baseline.ts names ${owed}: yield RunDoor (src/runs/runs.store.ts) instead`,
-      );
-    if (n < owed)
-      out.push(`${file} uses the run store ${n} time(s): lower its count in test/run-door.baseline.ts to ${n}, which only shrinks`);
-  }
-  for (const file of Object.keys(debt))
-    if (!uses.has(file)) out.push(`${file} uses the run store no more: take its line out of test/run-door.baseline.ts`);
-  return out;
+  return heldTo(seamUses(sources), debt).map(({ file, uses: n, owed, kind }) =>
+    kind === 'grown'
+      ? `${file} uses the run store ${n} time(s) where test/run-door.baseline.ts names ${owed}: yield RunDoor (src/runs/runs.store.ts) instead`
+      : kind === 'fallen'
+        ? `${file} uses the run store ${n} time(s): lower its count in test/run-door.baseline.ts to ${n}, which only shrinks`
+        : `${file} uses the run store no more: take its line out of test/run-door.baseline.ts`,
+  );
 }
 
 test('no file of src uses the run store but as test/run-door.baseline.ts counts it, and the count only shrinks', async () => {

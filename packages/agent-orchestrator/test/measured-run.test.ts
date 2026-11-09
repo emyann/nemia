@@ -23,7 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Metric, Option, References, Tracer } from 'effect';
 import type { Stats } from '../src/stats/stats.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { staged, story, type Board } from './story.ts';
 
 const ROOT = scratch('wf-measured-run-');

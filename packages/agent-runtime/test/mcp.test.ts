@@ -24,8 +24,8 @@ import { detachedOps, type HarnessIO, type HarnessSpec } from '../src/harness/de
 import { codex } from '../src/harness/codex/codex.ts';
 import { codexMcpServerNames, codexMcpServers, everyMcpServer, mcpRefuses, mcpServerOf } from '../src/harness/mcp.ts';
 import type { RemoteMcpServer } from '../src/harness/seam.ts';
-import { scratch } from './scratch.ts';
-import { story } from './checkpoints.ts';
+import { scratch } from 'test-kit/scratch';
+import { story } from 'test-kit/checkpoints';
 import { builtEngine } from './engine.ts';
 import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 

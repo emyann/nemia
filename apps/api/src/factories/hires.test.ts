@@ -12,8 +12,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Layer } from 'effect';
 import { addFactory, attachWorkflow, hireRefusalOf } from 'agent-orchestrator';
-import { scratch } from '../../test/scratch.ts';
-import { story } from '../../test/checkpoints.ts';
+import { scratch } from 'test-kit/scratch';
+import { story } from 'test-kit/checkpoints';
 import { app, appOf, liveOf } from '../app.ts';
 import { StoreRoot } from '../store.ts';
 

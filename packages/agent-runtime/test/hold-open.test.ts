@@ -31,10 +31,10 @@ import {
 } from '../src/index.ts';
 import { fold } from '../src/core/domain.ts';
 import { taskLine } from '../src/cli/lines.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import { TaskId } from '../src/core/model.ts';
 
 /** Sign the session `name` off: done, with a closeout given a moment after its attempt started (`began`, as journalled). */

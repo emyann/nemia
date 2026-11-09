@@ -4406,10 +4406,11 @@ re-exports; the tick (`tick/tick.verb.ts`, `tick/advance.verb.ts`) and the verbs
 the bins, `bin/nemia.ts` and its alias `bin/wf.ts` — a file of `src/cli/` reaches the package only through `runner.ts`, `workflow.ts` and
 its own folder, and each bin only through `cli/main.ts` and `cli/exit.ts`, which it imports first, so a refusal thrown as the package loads exits 2 too. **The client**, `runtime-client.ts`, alone imports agent-runtime, a type included: the runtime is reached
 through one client (`CLIENT` in the same test), which every controller beneath the CLI reaches, itself or through a
-controller it imports, and which imports no controller. `test/layout.test.ts` holds the folders: at most six source
-files in one, no folder named `utils` or the like, no two files that need each other's values, no source file that
-imports a test, and a folder's pure code imported from outside it through its face — its `index.ts`, or its one pure
-file. A test sits beside the file it tests (`src/<feature>/x.test.ts`), and `test/` keeps the tests of the top-level
+controller it imports, and which imports no controller. `test/layout.test.ts` holds the folders by the rule every
+package keeps (`docs/architecture.md`, *Folders, in every package*): a concept at most `src/<concept>/<part>/` deep with no
+count of its files, no folder named `utils` or the like, no two files that need each other's values, no source file that
+imports a test, and a part's pure code imported from outside its concept through the part's face — its `index.ts`, or its
+one pure file. A test sits beside the file it tests (`src/<feature>/x.test.ts`), and `test/` keeps the tests of the top-level
 files and those across folders. Outside the package, the apps reach it through `agent-orchestrator`,
 `agent-orchestrator/run` and `agent-orchestrator/workflow` alone (`test/contract.test.ts`), whose names
 `test/entries.test.ts` pins.

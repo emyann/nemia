@@ -13,7 +13,7 @@ import path from 'node:path';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runOver } from './placed.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const ROOT = scratch('wf-cli-place-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });

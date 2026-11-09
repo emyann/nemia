@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { parse, stringify } from 'yaml';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { plantStepOutput, STEP_OUTPUT_SCHEMA, teamCopy } from '../../test/team.ts';
 
 process.env.WF_ROOT = scratch('wf-render-');

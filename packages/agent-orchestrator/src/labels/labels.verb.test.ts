@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Exit, Layer } from 'effect';
 import { names } from '../../test/assessed.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 process.env.WF_ROOT = scratch('wf-labels-verb-');
 const { labelCard, labelRun } = await import('./labels.verb.ts');

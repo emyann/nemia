@@ -24,6 +24,7 @@
     "@types/express": "^5.0.6",
     "@types/node": "^24.19.2",
     "express": "^5.2.1",
+    "test-kit": "*",
     "tsx": "^4.23.13",
     "typescript": "^6.0.3"
   },

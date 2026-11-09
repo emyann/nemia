@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Workflow } from '../src/workflow.ts';
 import { headedLayers } from '../src/workflow/index.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { teamCopy } from './team.ts';
 import { names } from './assessed.ts';
 import { staged, story } from './story.ts';

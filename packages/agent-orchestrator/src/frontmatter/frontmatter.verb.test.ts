@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { inFormerForm, readFrontmatter, rewriteFormer } from './frontmatter.ts';
 import { readKeys } from '../former/former.ts';
 import { splitFrontmatter, WorkflowError } from '../step/step.ts';

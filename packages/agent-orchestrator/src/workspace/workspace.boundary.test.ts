@@ -19,7 +19,7 @@ import { depsPlan, lockfileParting, workspaceModules, type DepsListing } from '.
 import type { Run } from '../record/record.ts';
 import { composeBrief } from '../brief/index.ts';
 import type { Workflow } from '../step/step.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 const ROOT = scratch('wf-deps-');
 process.env.WF_ROOT = ROOT;

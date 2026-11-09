@@ -28,6 +28,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { builtinModules } from 'node:module';
 import path from 'node:path';
+import { specifiersIn, withoutComments } from 'test-kit/imports';
 import ts from 'typescript';
 import { KINDS } from 'objects';
 import { OFFERS, PAUSED, PERSON } from '../src/lib/words.ts';
@@ -80,22 +81,8 @@ const sourceTexts = (): Map<string, string> =>
       .map((f) => [f, fs.readFileSync(path.join(WEB, f), 'utf8')]),
   );
 
-/** Source text with each comment line blanked: a line that opens with `//`, `/*` or `*`. */
-const withoutComments = (text: string): string =>
-  text
-    .split('\n')
-    .map((line) => (/^\s*(\/\/|\/\*|\*)/.test(line) ? '' : line))
-    .join('\n');
-
-/** Every module a piece of source names: imports and re-exports, type-only included, `import()` and `require()`. */
-function importsIn(text: string): string[] {
-  const code = withoutComments(text);
-  const found = new Set<string>();
-  for (const m of code.matchAll(/^\s*(?:import|export)\b[^'"`;]*?\bfrom\s*['"]([^'"]+)['"]/gm)) found.add(m[1]);
-  for (const m of code.matchAll(/^\s*import\s*['"]([^'"]+)['"]/gm)) found.add(m[1]);
-  for (const m of code.matchAll(/\b(?:import|require)\s*\(\s*['"`]([^'"`]+)['"`]/g)) found.add(m[1]);
-  return [...found].sort();
-}
+/** Every module a piece of source names outside its comment lines: imports and re-exports, type-only included, `import()`, `require()`. */
+const importsIn = (text: string): string[] => specifiersIn(withoutComments(text), { calls: ['import', 'require'] });
 
 /** Whether a relative module named in `file` leaves `apps/web`. */
 const leavesWeb = (file: string, mod: string): boolean =>

@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Engine } from '../src/runtime-client.ts';
 import { testEngine } from 'agent-runtime/testing';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { Effect } from 'effect';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';

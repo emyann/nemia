@@ -48,7 +48,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { CLAUDE_PERMISSION_MODES, CODEX_SANDBOXES } from 'agent-runtime';
 import { workflowsIn } from '../src/folder/folder.store.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { FORMER_TEAM, TEAM_NAMES, TEAM_PATHS } from './team-names.baseline.ts';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
@@ -768,9 +768,9 @@ test('REFUSED: a count above or below the baseline, an entry gone or clean, one 
 test("the team's rules read every package's and app's source and tests, but this guard's own two files and the board's vendored ones", () => {
   const read = [...repository().team.keys()];
   for (const file of [
-    'packages/agent-orchestrator/test/scratch.ts',
+    'packages/agent-orchestrator/test/ambient.ts',
     'packages/agent-orchestrator/src/factory/factory.test.ts',
-    'packages/agent-runtime/test/scratch.ts',
+    'packages/agent-runtime/test/clock.ts',
     'apps/api/test/harness.ts',
     'apps/web/test/gate.test.ts',
     'apps/web/src/lib/gate.ts',

@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { story } from './checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 import type { AgentListing, KeyForm } from '../src/lib/api.ts';
 import {
   choicesOf,

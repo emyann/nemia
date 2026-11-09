@@ -19,10 +19,13 @@ code of a layer. A tool beside the layers, not a layer: no package or app import
   `packages/agent-orchestrator/test/`: `agent-fences`, `frozen-step`, `mcp-config`, `nemia-shipped`, `skills-rendered`,
   `skill-folders`, `verbs-skill`, `quick-run`, `tally-start`, `observe`, `profile`, `workflow`; so do `stand-ins` and the
   orchestrator's own test-seat tests, and `observe-render.boundary`, a test of `tools/observe`'s code rather than of the configuration.
-- **Helpers are copies, held byte for byte by `packages/agent-orchestrator/test/scratch.test.ts`**: `test/scratch.ts` (the runtime's),
-  `test/repo-files.ts` and `test/workspaces.ts` (the orchestrator's). Change the original and copy it over; nothing imports a test
-  helper across workspaces. A test makes its roots with `scratch(prefix)`, never under `os.tmpdir` by hand, and takes the root and
-  the workspaces from `workspaces.ts`, which spawns nothing.
+- **Its helpers are the test kit's** (`tools/test-kit`): a test makes its roots with `scratch(prefix)` of `test-kit/scratch`, never
+  under `os.tmpdir` by hand, and takes the root, the workspaces and git's file list from `test-kit/repo`, whose `REPO` and
+  `workspaces` spawn nothing. No test imports a helper of another workspace's `test/`; `test/test-kit.test.ts` holds both, and the
+  kit's own boundary, over every workspace.
+- **The repository-wide guards live here**: `names`, `others` and `local-paths` read every file git lists, `comments` and `limits`
+  run oxlint with `.oxlintrc.json` and `lint/` over every package's code. `turbo.json` lists what they read among `guards#test`'s
+  inputs.
 - **`test/test-rules.baseline.ts` only shrinks**: the pinned-words debt left is the runtime's, the api's and the web's; the
   orchestrator's is gone.
 - **`test/glossary.baseline.ts` only shrinks**: a change that removes a retired spelling from a file lowers its count there in the same

@@ -16,8 +16,8 @@ import { servedOf, type Served } from '../src/a2a/listener.ts';
 import { forgetToken, holderTokenOf, tokenFileOf, tokenFolderOf, tokenOf, writeToken } from '../src/a2a/holder-token.ts';
 import type { Followed, RunnerOps } from '../src/harness/seam.ts';
 import type { Sighting } from '../src/core/domain.ts';
-import { scratch } from './scratch.ts';
-import { story } from './checkpoints.ts';
+import { scratch } from 'test-kit/scratch';
+import { story } from 'test-kit/checkpoints';
 import { until, WAITED } from '../src/waits/index.ts';
 
 const NAME = 'ae/t1/1';

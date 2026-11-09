@@ -13,8 +13,8 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Card, CardList } from 'objects';
-import { scratch } from '../../test/scratch.ts';
-import { story } from '../../test/checkpoints.ts';
+import { scratch } from 'test-kit/scratch';
+import { story } from 'test-kit/checkpoints';
 import { app } from '../app.ts';
 import {
   addToInbox,

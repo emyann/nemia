@@ -16,8 +16,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Stream } from 'effect';
-import { scratch } from './scratch.ts';
-import { story } from './checkpoints.ts';
+import { scratch } from 'test-kit/scratch';
+import { story } from 'test-kit/checkpoints';
 import { until, WAITED } from '../src/waits/index.ts';
 
 /** Where Claude Code keeps its transcripts, for the stand-in and the runtime's reader alike: set before `src` is imported. */

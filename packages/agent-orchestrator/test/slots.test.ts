@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from './promised.ts';
 import { Engine } from 'agent-runtime';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { plainEngine } from './promised.ts';
 import { runOver } from './placed.ts';
 import { testPlace } from '../place/memory/index.ts';

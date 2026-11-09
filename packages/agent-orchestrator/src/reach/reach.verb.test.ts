@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { staged } from '../../test/story.ts';
 import { eachTest } from '../../test/placed.ts';
 import { TEAM } from '../../test/team.ts';

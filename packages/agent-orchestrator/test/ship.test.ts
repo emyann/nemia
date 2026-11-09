@@ -24,7 +24,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import type { Engine } from '../src/runtime-client.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { decideScreen } from './screens.ts';
 import { placeOver, unreadBy } from './place-over.ts';
 import type { RepositoryRun, Run, StepRecord } from '../src/run.ts';

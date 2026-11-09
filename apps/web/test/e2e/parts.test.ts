@@ -9,7 +9,7 @@ import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright';
-import { scratch } from '../scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { WAITED } from '../waits.ts';
 import { photograph } from './board.ts';
 import { buildParts, openParts, story } from './parts/gallery.ts';

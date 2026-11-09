@@ -12,12 +12,12 @@ import { Effect, Fiber } from 'effect';
 import type { DaemonStanding } from '../daemon/daemon.ts';
 import type { Finishing } from '../pause/pause.ts';
 import type { Args } from '../command/command.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { testEngine, until, WAITED, type Waiter } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 import { steeredClock, type Steered } from '../../test/steered.ts';
-import { story } from '../../test/checkpoints.ts';
+import { story } from 'test-kit/checkpoints';
 
 const ROOT = scratch('wf-service-');
 process.env.WF_ROOT = ROOT;

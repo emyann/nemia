@@ -17,8 +17,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { OPEN_STATE } from './closed-state.baseline.ts';
 import { openStates, repositoryHits } from './closed-state.ts';
-import { REPO } from './workspaces.ts';
-import { scratch } from './scratch.ts';
+import { REPO } from 'test-kit/repo';
+import { scratch } from 'test-kit/scratch';
 
 type Baseline = Readonly<Record<string, { readonly card: string }>>;
 

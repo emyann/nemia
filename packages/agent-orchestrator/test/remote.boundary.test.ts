@@ -24,7 +24,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Exit, Layer, Logger, ManagedRuntime, References, Stream } from 'effect';
 import { a2aServer, type Answer } from './a2a-server.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { story, staged } from './story.ts';
 import { bell, until, WAITED, type Waiter } from 'agent-runtime/testing';
 

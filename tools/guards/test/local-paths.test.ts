@@ -13,7 +13,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { files, ours, textOf } from './repo-files.ts';
+import { files, ours, textOf } from 'test-kit/repo';
 
 /** The names a fixture gives a home that belongs to no one. */
 const PLACEHOLDERS = ['me', 'you', 'u'];

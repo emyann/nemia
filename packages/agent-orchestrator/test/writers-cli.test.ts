@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { testEngine } from 'agent-runtime/testing';
 import { eachTest } from './placed.ts';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { TEAM } from './team.ts';
 import { names } from './assessed.ts';
 import { story } from './story.ts';

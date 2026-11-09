@@ -20,7 +20,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
-import { files, REPO } from './repo-files.ts';
+import { files, REPO } from 'test-kit/repo';
 
 /** The names of a field that says a state or a kind. */
 export const STATE_NAMES = new Set(['phase', 'status', 'state', 'kind', 'type', 'reason']);

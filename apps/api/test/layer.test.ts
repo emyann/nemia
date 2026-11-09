@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
-import { scratch } from './scratch.ts';
+import { scratch } from 'test-kit/scratch';
 import { listedIn } from './definitions.ts';
 import { app, appOf, liveOf, runtime } from '../src/app.ts';
 import { ReadMemo } from '../src/layer.ts';

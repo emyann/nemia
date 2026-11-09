@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
-import { files, REPO } from './repo-files.ts';
+import { files, REPO } from 'test-kit/repo';
 
 /** The string methods that take a state apart. */
 export const PARSING = new Set(['startsWith', 'endsWith', 'split', 'match', 'replace', 'includes']);

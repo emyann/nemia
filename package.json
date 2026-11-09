@@ -12,7 +12,8 @@
   "workspaces": [
     "packages/*",
     "apps/*",
-    "tools/guards"
+    "tools/guards",
+    "tools/test-kit"
   ],
   "engines": {
     "node": ">=24.16.0"

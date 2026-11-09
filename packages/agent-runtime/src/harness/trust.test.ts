@@ -5,7 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { folderTrust, trustFolder, trustedFolder } from './trust.ts';
 import { claudeTrust } from './claude/trust.ts';
-import { scratch } from '../../test/scratch.ts';
+import { scratch } from 'test-kit/scratch';
 
 /** A `.claude.json` in a scratch folder holding `projects`, and its path. */
 const configWith = (projects: unknown): string => {

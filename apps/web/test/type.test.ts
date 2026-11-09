@@ -13,11 +13,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
+import { ours } from './ours.ts';
 
 const WEB = path.resolve(import.meta.dirname, '..');
-
-/** The one folder of `src` the rule does not read, from the board's root. */
-const KIT = 'src/components/ui/ds';
 
 /** What to write instead, said by every refusal. */
 const TABLE =
@@ -81,7 +79,7 @@ function sources(root: string): string[] {
     .readdirSync(path.join(root, 'src'), { withFileTypes: true, recursive: true })
     .filter((e) => e.isFile() && /\.(ts|tsx|css)$/.test(e.name))
     .map((e) => path.relative(root, path.join(e.parentPath, e.name)).split(path.sep).join('/'))
-    .filter((file) => !file.startsWith(`${KIT}/`))
+    .filter(ours)
     .sort();
 }
 
@@ -212,7 +210,7 @@ function boardOf(files: Record<string, string>): string {
 
 test('REFUSED: a size in any file of src, a stylesheet included; the vendored kit alone stays out, and a size outside the roles in its file alone', () => {
   const root = boardOf({
-    [`${KIT}/x.tsx`]: '<a className="text-sm">\n',
+    'src/components/ui/ds/x.tsx': '<a className="text-sm">\n',
     'src/components/ui/y.tsx': '<a className="text-sm">\n',
     'src/routes/z.tsx': '<a className="text-[11px]">\n',
     'src/components/m.tsx': '<a className="text-[1.15em]">\n',

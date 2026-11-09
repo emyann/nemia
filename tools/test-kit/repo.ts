@@ -33,10 +33,13 @@ export const workspaces = (root = REPO): string[] => {
   });
 };
 
-/** Every file the repository holds, tracked or not yet added, ignored ones left out: git's list, as a path from the root. */
-export const files = (): string[] =>
+/**
+ * Every file the repository at `root` holds, tracked or not yet added, ignored ones left out: git's list, as a path from the root. A test
+ * that proves a guard on a planted repository names its root.
+ */
+export const files = (root = REPO): string[] =>
   execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
-    cwd: REPO,
+    cwd: root,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
     maxBuffer: 64 << 20,

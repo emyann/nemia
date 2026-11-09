@@ -9,11 +9,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
+import { ours } from './ours.ts';
 
 const WEB = path.resolve(import.meta.dirname, '..');
-
-/** The one folder of `src` the rule does not read, from the board's root. */
-const KIT = 'src/components/ui/ds';
 
 const FAMILIES = [
   'slate',
@@ -82,7 +80,7 @@ function sources(root: string): string[] {
     .readdirSync(path.join(root, 'src'), { withFileTypes: true, recursive: true })
     .filter((e) => e.isFile() && /\.(ts|tsx|css)$/.test(e.name))
     .map((e) => path.relative(root, path.join(e.parentPath, e.name)).split(path.sep).join('/'))
-    .filter((file) => !file.startsWith(`${KIT}/`))
+    .filter(ours)
     .sort();
 }
 
@@ -197,7 +195,7 @@ test('REFUSED: a palette colour is found, where it is, under any variant; a role
 
 test('REFUSED: a palette colour in any file of src, a stylesheet included; the vendored kit alone stays out', () => {
   const root = scratch('palette-');
-  for (const file of [`${KIT}/x.tsx`, 'src/components/ui/y.tsx', 'src/routes/z.css', 'src/lib/clean.ts']) {
+  for (const file of ['src/components/ui/ds/x.tsx', 'src/components/ui/y.tsx', 'src/routes/z.css', 'src/lib/clean.ts']) {
     fs.mkdirSync(path.join(root, path.dirname(file)), { recursive: true });
     fs.writeFileSync(path.join(root, file), file.endsWith('clean.ts') ? 'export const a = "bg-card";\n' : 'a { b: "bg-red-500" }\n');
   }
@@ -285,7 +283,7 @@ function boardOf(files: Record<string, string>): string {
 
 test('REFUSED: a raw colour in any file of src, a stylesheet and a story included; the kit and test/ stay out, a kept colour in its file alone', () => {
   const root = boardOf({
-    [`${KIT}/x.tsx`]: '<a className="bg-[#fff]">\n',
+    'src/components/ui/ds/x.tsx': '<a className="bg-[#fff]">\n',
     'src/components/ui/y.tsx': '<a className="bg-[#fff]">\n',
     'src/routes/z.css': 'a { color: rgb(0 0 0) }\n',
     'src/components/look/A.stories.tsx': "<a style={{ color: '#000' }}>\n",

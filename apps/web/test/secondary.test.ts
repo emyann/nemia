@@ -9,11 +9,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
+import { ours } from './ours.ts';
 
 const WEB = path.resolve(import.meta.dirname, '..');
-
-/** The one folder of `src` the name rule does not read, from the board's root. */
-const KIT = 'src/components/ui/ds';
 
 /** A declaration of a Tailwind colour of the secondary family (`--color-secondary`, `--color-on-secondary-container`). */
 const FAMILY = /(?<![\w-])--color-(?:on-)?secondary[\w-]*\s*:/g;
@@ -37,7 +35,7 @@ export function shadcnSecondaryIn(root: string): string[] {
     .readdirSync(path.join(root, 'src'), { withFileTypes: true, recursive: true })
     .filter((e) => e.isFile() && /\.(ts|tsx|css)$/.test(e.name))
     .map((e) => path.relative(root, path.join(e.parentPath, e.name)).split(path.sep).join('/'))
-    .filter((file) => !file.startsWith(`${KIT}/`))
+    .filter(ours)
     .sort()
     .flatMap((file) => placesOf(fs.readFileSync(path.join(root, file), 'utf8'), SHADCN).map((at) => `${file}:${at}`));
 }
@@ -62,7 +60,7 @@ test("REFUSED: shadcn's secondary tone named in any file of src, a stylesheet in
   const files: [string, string][] = [
     ['src/components/ui/x.tsx', 'const a = 1;\nconst b = "bg-secondary text-secondary-foreground";\n'],
     ['src/styles.css', ':root {\n  --secondary: grey;\n  --x: var(--secondary);\n}\n'],
-    [`${KIT}/y.tsx`, 'const c = "bg-secondary text-secondary-foreground var(--secondary)";\n'],
+    ['src/components/ui/ds/y.tsx', 'const c = "bg-secondary text-secondary-foreground var(--secondary)";\n'],
     ['src/components/z.tsx', 'const d = "bg-secondary text-on-secondary ring-secondary/40 var(--md-sys-color-secondary)";\n'],
   ];
   for (const [file, text] of files) {

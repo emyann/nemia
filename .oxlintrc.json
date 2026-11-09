@@ -3,10 +3,11 @@
   "options": {
     "typeAware": true
   },
-  // The design system kit is another repository's code (french-tech-homies/design-system): the shadcn CLI writes it into the board from
-  // the `@ds` registry, its skills beside it, and an update fetches it again and is read as a diff. Nothing here shapes it, so no rule
-  // reads it. tools/guards/test/comments.test.ts holds this list and refuses a folder that joins it.
-  "ignorePatterns": ["apps/web/src/components/ui/ds/**", "apps/web/.claude/**"],
+  // The code that is not ours, as .gitattributes marks it: the design system kit the shadcn CLI writes into the board from the `@ds`
+  // registry and its skills beside it (another project's, vendored unchanged), and the route tree TanStack Router's plugin writes.
+  // Nothing here shapes them, so no rule reads them. tools/guards/test/comments.test.ts holds this list to .gitattributes: a file of
+  // code marked there that no glob here skips is refused, and so is a glob that skips a file of ours.
+  "ignorePatterns": ["apps/web/src/components/ui/ds/**", "apps/web/.claude/**", "apps/web/src/routeTree.gen.ts"],
   "jsPlugins": [
     { "name": "comments", "specifier": "./lint/comments.ts" },
     { "name": "sonarjs", "specifier": "eslint-plugin-sonarjs" }

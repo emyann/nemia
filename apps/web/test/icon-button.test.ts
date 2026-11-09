@@ -8,11 +8,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
+import { ours } from './ours.ts';
 
 const WEB = path.resolve(import.meta.dirname, '..');
-
-/** The one folder of `src` the rule does not read, from the board's root. */
-const KIT = 'src/components/ui/ds';
 
 const OPENING = /<IconButton(?![\w$])/g;
 
@@ -54,7 +52,7 @@ export function unstyledIn(root: string): string[] {
     .readdirSync(path.join(root, 'src'), { withFileTypes: true, recursive: true })
     .filter((e) => e.isFile() && /\.(ts|tsx)$/.test(e.name))
     .map((e) => path.relative(root, path.join(e.parentPath, e.name)).split(path.sep).join('/'))
-    .filter((file) => !file.startsWith(`${KIT}/`))
+    .filter(ours)
     .sort()
     .flatMap((file) => {
       const at = unstyledAt(fs.readFileSync(path.join(root, file), 'utf8'));
@@ -80,7 +78,7 @@ test('REFUSED: an icon button with no colour style, over several lines or past a
 
 test('REFUSED: an icon button with no colour style in any file of src; the vendored kit alone stays out', () => {
   const root = scratch('icon-button-');
-  for (const file of [`${KIT}/x.tsx`, 'src/components/y.tsx', 'src/lib/z.ts', 'src/lib/clean.tsx']) {
+  for (const file of ['src/components/ui/ds/x.tsx', 'src/components/y.tsx', 'src/lib/z.ts', 'src/lib/clean.tsx']) {
     fs.mkdirSync(path.join(root, path.dirname(file)), { recursive: true });
     fs.writeFileSync(
       path.join(root, file),

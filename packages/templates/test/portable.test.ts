@@ -126,6 +126,7 @@ const STEP_HOLDS: Record<string, string> = {
 const HOLDS: Array<[RegExp, (file: string) => string]> = [
   [/^nemia\.yaml$/, () => 'kind: FactoryTemplate'],
   [/^RULES\.md$/, () => '${{ parameters.areas }}'],
+  [/^fences\/[\w-]+\.(?:allow|deny)\.yaml$/, () => '\n- '],
   [/^agents\/[\w-]+\/agent\.yaml$/, () => 'kind: Agent'],
   [/^agents\/[\w-]+\/instructions\.md$/, () => 'You are '],
   [/\.schema\.json$/, () => '"properties"'],

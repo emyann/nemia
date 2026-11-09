@@ -432,7 +432,7 @@ writes) and a memory stand-in (`workflowDoorMemory`, `src/workflows/memory.store
 (`test/workflow-walks.ts`). A write checks each step's name, then the draft through the model's `Workflow`, whose checks are its
 invariants (one step at least, no name twice, every `after:` naming a step of it, no steps waiting on each other), and then the version
 it was read at, judged by a pure function (`workflowVersionRefusal`, `src/folder/folder.ts`, which `contracts/workflow-version.contract.ts`
-proves). What still calls the folder's stores is counted per file in `test/workflow-door.baseline.ts`, which only shrinks; `write.store.ts`'s
+proves). What once called the folder's stores around the door is paid, and its store test refuses any use; `write.store.ts`'s
 functions each take the store's root first (`writeWorkflowAt`, `isWorkflowsHolderAt`, `knownReposAt`, `placesAroundAt`), its old
 spellings the same functions at the module's root. A read and a write parse the steps against the agents and skills the door finds
 through the Agent and Skill doors (`agents.found`, `skills.found`), at the places its layer says (`around`), and hand them to the layer:
@@ -472,8 +472,8 @@ the place's skills, then Nemia's builtin skills, found last. A write checks the 
 `Skill`, then the version it was read at, judged by `definitionVersionRefusal` (`src/agents/agents.ts`,
 `contracts/definition-version.contract.ts`) before either layer acts; the place, a link, a sidecar and a step still naming an agent stay
 the files' own refusals. What still calls the agent and skill stores — the folder's load for its synchronous readers and the version,
-the roster, a start, the tick, the revisions pinned, a template, the sources — is counted per file in `test/agent-door.baseline.ts`,
-which only shrinks. The api reads agents and skills through the two doors alone, each handler running its program over the request's
+the roster, a start, the tick, the revisions pinned, a template, the sources — once went around the door; that debt is paid, and its
+store test refuses any use. The api reads agents and skills through the two doors alone, each handler running its program over the request's
 own services (`inRequest`, `apps/api/src/layer.ts`), so the door is the app's rooted one or the stand-in a test merged into the app's
 layer; `src/agents/agent-door.store.test.ts` counts the api's calls of the stores, none allowed. The stand-ins reach the api's tests on
 the testing entry (`agent-orchestrator/testing`, `packages/agent-orchestrator/testing.ts`) beside the test place, never a program.
@@ -486,7 +486,7 @@ built the one way (`subscriptionDoorOver`), the files (`subscriptionFiles(home)`
 once, checked by `SubscriptionName.OnCreate` and the model's `Subscription` — a name taken is `Conflict` (the files' `wx`), one dropped
 that is not there `Missing` — and a delivery written is decoded through the model's `Delivery`. Its list answers the unreadable ones
 apart (`left`), and the deliverer says each once: the store writes no stderr. A delivery's cursor may fall below where its subscription
-began, since a cut feed sets it to 0. What still calls its module spellings is counted in `test/subscription-door.baseline.ts`.
+began, since a cut feed sets it to 0. What once called its module spellings is paid, and its store test refuses any use.
 
 **The Ledger door.** The revision ledger — the numbers each content of a workflow, an agent, a skill or a factory's rules was given —
 is read and appended to through `LedgerDoor` (`packages/agent-orchestrator/src/revisions/revisions.store.ts`), by `RevisionOf`, a kind

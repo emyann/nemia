@@ -83,5 +83,8 @@ test('REFUSED: what .gitattributes marks vendored or generated is left unread, m
     'CLAUDE.md',
   ])
     assert.equal(ours(read), true, read);
-  assert.ok(files().some((f) => f.startsWith('.claude/skills/shadcn/') && !ours(f)), 'the vendored skill holds a file left unread');
+  assert.ok(
+    files().some((f) => f.startsWith('.claude/skills/shadcn/') && !ours(f)),
+    'the vendored skill holds a file left unread',
+  );
 });

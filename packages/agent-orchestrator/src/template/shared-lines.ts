@@ -11,7 +11,11 @@ export const onceEach: OnceEach = (lines) => lines.filter((line, i) => !lines.sl
 
 /** The list `items` with each `{ path }` item replaced by the lines `linesOf` holds for its file, a line already written left out. */
 export const withSharedLines: WithSharedLines = (items, linesOf) =>
-  onceEach(items.flatMap((item) => ('path' in item ? (linesOf[item.path] ?? []) : [item.line])));
+  onceEach(items.flatMap((item) => ('path' in item ? linesFor(linesOf, item.path) : [item.line])));
+
+/** The lines `linesOf` holds for `file` among its own entries, none for a name it holds only through Object (`constructor`, say). */
+const linesFor = (linesOf: Readonly<Record<string, readonly string[]>>, file: string): readonly string[] =>
+  Object.entries(linesOf).find(([name]) => name === file)?.[1] ?? [];
 
 /** The items of a list field as `withSharedLines` takes them: a string as its own `{ line }`, a `{ path }` as it is; anything else none. */
 export const listItemsOf = (value: readonly unknown[]): ListItem[] =>

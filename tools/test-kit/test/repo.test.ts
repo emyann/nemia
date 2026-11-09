@@ -16,10 +16,7 @@ test('REFUSED: a path .gitattributes marks vendored or generated is not ours; an
   const root = scratch('not-ours-');
   execFileSync('git', ['init', '-q', root]);
   fs.writeFileSync(path.join(root, '.gitattributes'), 'vendor/** linguist-vendored\nout.gen.ts linguist-generated\n');
-  assert.deepEqual(
-    [...notOurs(['vendor/a/b.ts', 'out.gen.ts', 'src/a.ts', 'vendorish.ts'], root)].sort(),
-    ['out.gen.ts', 'vendor/a/b.ts'],
-  );
+  assert.deepEqual([...notOurs(['vendor/a/b.ts', 'out.gen.ts', 'src/a.ts', 'vendorish.ts'], root)].sort(), ['out.gen.ts', 'vendor/a/b.ts']);
   assert.deepEqual([...notOurs([], root)], []);
 });
 

@@ -56,3 +56,12 @@ test('REFUSED: a rename onto a directory planted at the target throws, the direc
   assert.equal(fs.readFileSync(path.join(target, 'kept'), 'utf8'), 'old');
   assert.deepEqual(fs.readdirSync(dir), ['d.json']);
 });
+
+test('writeWhole given a mode lands the file at it: set on the hidden file before the rename, a read-only file stays read-only', () => {
+  const { dir, file } = planted('e.md', 'old');
+  fs.chmodSync(file, 0o444);
+  writeWhole(file, 'new', { mode: 0o444 });
+  assert.equal(fs.readFileSync(file, 'utf8'), 'new');
+  assert.equal(fs.statSync(file).mode & 0o777, 0o444);
+  assert.deepEqual(fs.readdirSync(dir), ['e.md']);
+});

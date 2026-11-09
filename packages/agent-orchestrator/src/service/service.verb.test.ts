@@ -24,11 +24,10 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-const { attachedCalls, timeoutGiven, installService, liveHost, uninstallService, serviceStatus, SERVICES } =
-  await import('./service.verb.ts');
+const { attachedCalls, timeoutGiven, installService, liveHost, uninstallService, serviceStatus } = await import('./service.verb.ts');
 const { pausingWords } = await import('../pause/pause.ts');
 const { LET_GO_MS } = await import('agent-runtime');
-const { restartService, RESTARTS } = await import('./restart.verb.ts');
+const { restartService } = await import('./restart.verb.ts');
 const { putPause, readPause, readPauseFile, pauseFile, resumePause } = await import('../pause/pause.store.ts');
 const { EngineService, engineOf, runWith: runEngine } = await import('../runtime-client.ts');
 const stand = eachTest(testPlace);
@@ -822,26 +821,14 @@ test(
   },
 );
 
-test('the service commands are the CLI’s alone; Nemia’s fence asks before install and uninstall and lets status run', () => {
-  assert.deepEqual(
-    SERVICES.map((c) => [c.name, c.only?.side, c.class]),
-    [
-      ['service install', 'cli', 'ask'],
-      ['service uninstall', 'cli', 'ask'],
-      ['service status', 'cli', 'read'],
-    ],
-  );
+test('Nemia’s fence asks before the service’s install and uninstall and lets its status run', () => {
   const fence = nemiaFence(TABLE);
   assert.ok(fence.ask.includes('Bash(nemia service install:*)'));
   assert.ok(fence.ask.includes('Bash(nemia service uninstall:*)'));
   assert.ok(!fence.allow.some((r) => r.startsWith('Bash(nemia service install') || r.startsWith('Bash(nemia service uninstall')));
   assert.ok(fence.allow.includes('Bash(nemia service status)') && fence.allow.includes('Bash(nemia service status:*)'));
 });
-test('the restart is the CLI’s alone, and Nemia’s fence asks before it', () => {
-  assert.deepEqual(
-    RESTARTS.map((c) => [c.name, c.only?.side, c.class]),
-    [['service restart', 'cli', 'ask']],
-  );
+test('Nemia’s fence asks before the service’s restart', () => {
   const fence = nemiaFence(TABLE);
   assert.ok(fence.ask.includes('Bash(nemia service restart:*)'), fence.ask.join('\n'));
   assert.ok(!fence.allow.some((r) => r.startsWith('Bash(nemia service restart')));

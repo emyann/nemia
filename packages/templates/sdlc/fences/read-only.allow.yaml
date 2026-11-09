@@ -1,0 +1,46 @@
+# What a read-only agent (one that runs dontAsk and never writes the repository) allows itself to read it by: git's questions, and
+# the text tools. Every line is a read that writes none of the repository's history, its refs or its configuration; what a line
+# would still let git write or run by is denied beside it, in read-only.deny.yaml. An allow is matched by its prefix, so each verb is
+# named alone: `git` whole, `git worktree` whole or `git branch` whole would reach a write.
+- Bash(git diff:*)
+- Bash(git diff-tree:*)
+- Bash(git log:*)
+- Bash(git show:*)
+- Bash(git show-ref:*)
+# `status` refreshes the worktree's index when it can take its lock, and changes nothing a commit reads.
+- Bash(git status:*)
+- Bash(git blame:*)
+# Its pager option runs a program: denied in read-only.deny.yaml.
+- Bash(git grep:*)
+- Bash(git ls-files:*)
+- Bash(git ls-tree:*)
+- Bash(git cat-file:*)
+- Bash(git rev-parse:*)
+- Bash(git rev-list:*)
+- Bash(git merge-base:*)
+# Asks whether two branches merge: it writes a loose object to git's store, and no ref, index or file.
+- Bash(git merge-tree:*)
+- Bash(git shortlog:*)
+# Like `status`, refreshes the index under `--dirty`, and changes nothing a commit reads.
+- Bash(git describe:*)
+- Bash(git name-rev:*)
+- Bash(git for-each-ref:*)
+- Bash(git check-ignore:*)
+# The branches, by listing alone: `git branch <name>`, `-D` or `-m` would move a ref.
+- Bash(git branch)
+- Bash(git branch --list:*)
+- Bash(git branch --contains:*)
+# The worktrees, by listing alone: `add`, `remove` and `prune` write.
+- Bash(git worktree list:*)
+# The text tools, each reading a file or a folder: Claude Code's own check keeps their paths inside the working tree. `wc` reads a
+# list of paths from a file by `--files0-from`, which that check never reads: denied in read-only.deny.yaml. Left out on purpose,
+# each able to write a file or run a program: `sed`, `awk`, `find`, `sort`, `uniq` and `tee`.
+- Bash(wc:*)
+- Bash(cut:*)
+- Bash(head:*)
+- Bash(tail:*)
+- Bash(cat:*)
+- Bash(ls:*)
+# A change of the factory's definitions the work needs, proposed for a person to approve rather than named in a sign-off. An
+# assignment before it is denied in read-only.deny.yaml.
+- Bash(nemia propose *)

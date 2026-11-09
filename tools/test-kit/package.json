@@ -13,6 +13,7 @@
     "./layout": "./layout.ts",
     "./debt": "./debt.ts",
     "./words": "./words.ts",
+    "./fence": "./fence.ts",
     "./package.json": "./package.json"
   },
   "scripts": {

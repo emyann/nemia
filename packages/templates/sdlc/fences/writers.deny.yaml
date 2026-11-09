@@ -1,0 +1,41 @@
+# What no writer's run may do (an agent that runs auto and writes the workspace), each refused by its own deny since auto runs
+# what no deny reaches. The run pushes, opens the pull request and merges by its own scripts; a step does none of it.
+#
+# Messages, schedules and triggers that reach past the step's own session.
+- SendMessage
+- CronCreate
+- CronDelete
+- RemoteTrigger
+# A push, which the run's scripts make.
+- Bash(git push)
+- Bash(git push:*)
+# gh whole: every write of a pull request, an issue or a repository.
+- Bash(gh)
+- Bash(gh:*)
+# A forced branch delete, which loses work no merge holds.
+- Bash(git branch -D:*)
+- Bash(git branch --delete --force:*)
+# A kill by name, which reaches the daemon and every other run's processes, in each spelling a session types.
+- Bash(pkill:*)
+- Bash(killall:*)
+- Bash(*pkill *)
+- Bash(*killall *)
+- Bash(*kill *pgrep*)
+- Bash(*pgrep*kill *)
+- Bash(*xargs kill*)
+# A session started by hand, in the background or under remote control, which outlives the step and no fence reaches.
+- Bash(claude *--bg*)
+- Bash(claude *--background*)
+- Bash(claude *remote-control*)
+# A harness's settings, whose allows would widen this fence for every later session.
+- Edit(//**/.claude/settings.local.json)
+- Edit(~/.claude/settings.json)
+- Edit(~/.claude.json)
+# GitHub's writes of a repository's files, branches and runs, which the run's scripts alone make.
+- mcp__github__push_files
+- mcp__github__create_or_update_file
+- mcp__github__delete_file
+- mcp__github__create_branch
+- mcp__github__create_repository
+- mcp__github__fork_repository
+- mcp__github__actions_run_trigger

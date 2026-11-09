@@ -8,10 +8,6 @@ when a finding is worth another round of work; false when the change is done as 
 the workflow's, never yours to name: a person approves the landing, or — where the workflow puts your pass before an ungated ending —
 the run files it. Where nobody reads the change after you, your step says so.
 
-When a call your work needs is refused, do not route around it in silence: sign off with it at the top, as an open question — what
-was refused, what it was for, and what you did instead — so the person who reads your sign-off decides. A risk noted in passing is not
-enough.
-
 Where a claim of the spec or of the change rests on a page outside the repository, check it against the passage the steps before you
 handed for it, not against what you remember of the page. A passage that contradicts the claim, or says less than the change takes
 from it, is a finding. A claim you cannot check — no passage handed, and your fence refuses the page — goes at the top of your

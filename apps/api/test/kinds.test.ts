@@ -9,8 +9,8 @@
  * that reaches what its entry does not list, an entry listing what its file no longer reaches, an entry for an entry file or a file gone,
  * and an entry that names no card it can be held to. A change that moves a reach out of a file takes it off its entry in the same commit.
  *
- * The scanners of the globals are the orchestrator's (`globalsIn` in its `test/boundary.test.ts`), copied: the two packages share no test
- * code, and that test holds the copy here to its own text.
+ * The scanners of the globals are a copy of the orchestrator's (`globalsIn` in its `test/boundary.test.ts`): the two packages share no
+ * test code, and each holds its own by the forms it must see and the ones it must pass over.
  */
 import './harness.ts';
 import { test } from 'node:test';
@@ -174,7 +174,20 @@ test('the scan sees each module a reader imports and each global it reads, outsi
     ' * reads `process.env` in a JSDoc',
   ].join('\n');
   assert.deepEqual(reachesIn(text), ['@hono/node-server', 'fs', 'global:fetch', 'global:process.env', 'node:fs']);
-  assert.deepEqual(reachesIn("const { env } = process;\nconst h = c.req.header('sec-fetch-site');"), ['global:process.env']);
+  for (const read of ['const { env } = process;', "const root = process['env'];", 'const { argv, env: e } = globalThis.process;'])
+    assert.deepEqual(reachesIn(read), ['global:process.env'], `${read} reads the environment`);
+  for (const read of ['const f = globalThis.fetch;', 'const { fetch } = globalThis;', 'export const t: typeof fetch = f;'])
+    assert.deepEqual(reachesIn(read), ['global:fetch'], `${read} reads the global fetch`);
+  for (const none of [
+    'const r = await client.fetch(url);',
+    'prefetch(url);',
+    'const o = { fetch: x };',
+    "const name = 'fetch';",
+    "const h = c.req.header('sec-fetch-site');",
+    'const { envelope } = process;',
+    'const e = run.process.envelope;',
+  ])
+    assert.deepEqual(reachesIn(none), [], `${none} reads no global`);
   const texts = sourceTexts();
   assert.ok(
     [...ENTRY, ...Object.keys(MOVES)].every((f) => texts.has(f)),

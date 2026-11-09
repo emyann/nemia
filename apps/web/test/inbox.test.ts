@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { UnreadAnswer, WriteRefusal } from '../src/lib/api/read.ts';
 import { entriesOf, entryOf as cardEntryOf } from '../src/lib/api/inbox.ts';
 import { cardList, cardObject } from './factory-fixtures.ts';
-import { CARD_WORDS } from '../src/lib/words.ts';
+import { CARD_WORDS, ENDED } from '../src/lib/words.ts';
 import {
   CARD_STATES,
   cardQuery,
@@ -997,5 +997,10 @@ test("cardPlace, cardFiling, factoriesOffered, notStarted: a card's factory and 
     assert.equal(CARD_WORDS.waiting.hue, 'yours', 'a run waiting on a person is yours');
     assert.equal(CARD_WORDS.running.hue, 'alive');
     assert.equal(CARD_WORDS.failed.hue, 'failure');
+  });
+  await t.test("a card whose run ended wears its outcome's hue, as every page draws that outcome (`ENDED`)", () => {
+    for (const outcome of ['succeeded', 'failed', 'cancelled'] as const) {
+      assert.deepEqual([CARD_WORDS[outcome].word, CARD_WORDS[outcome].hue], [ENDED[outcome].word, ENDED[outcome].hue], outcome);
+    }
   });
 });

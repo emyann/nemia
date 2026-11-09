@@ -2,7 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { photograph, themeOf, runPath } from '../board.ts';
-import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
+import { spentOf, type LabelStats } from '../../../src/lib/api/labels.ts';
+import { withSelector } from '../../../src/lib/api/selector.ts';
+import { dollars } from '../../../src/lib/money.ts';
+import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { LANDED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -90,6 +93,16 @@ export default {
       await expectVisible(page.locator('[data-bucket="landed"]', { hasText: '1' }), 'and counts the landed run');
       await expectVisible(page.locator('[data-section="runs"] h2', { hasText: /^Run$/ }), 'one run is said in the singular');
       await expectVisible(page.locator('[data-label-spent]'), 'and says what its runs spent, landed or not');
+      const read = await page.request.get(new URL(withSelector('/api/stats', LABEL), page.url()).href);
+      if (read.status() !== 200) throw new Refused(`the api gives the label's stats — it answered ${read.status()}: ${await read.text()}`);
+      const stats = (await read.json()) as LabelStats;
+      const figure = (tile: string) => page.locator(`[data-${tile}] [data-sticker] > span:last-child`);
+      await expectTexts(figure('label-spent'), [dollars(spentOf(stats))], 'what they spent is said as every page says an amount');
+      await expectTexts(
+        figure('label-cost'),
+        [dollars(stats.all.total.costPerLanded)],
+        'and so is what a landed run cost, `—` where none landed with a cost',
+      );
       await settled(page);
       await photograph(page, path.join(OUT, `labels-page-${theme}.png`), { fullPage: true });
     } finally {

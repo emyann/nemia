@@ -6,6 +6,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { Effect } from 'effect';
 import {
   Engine,
@@ -134,7 +136,6 @@ const VERBS = [
   'quota',
   'removeBody',
   'say',
-  'start',
   'stop',
   'sweep',
   'tallied',
@@ -168,7 +169,7 @@ test('one store, two engines — one built once, one provided its layer for each
     );
   });
 
-  await s.test('watch and start run through either engine, and each stops', async () => {
+  await s.test('watch and up run through either engine, and each stops', async () => {
     type Handle = { stop: () => void };
     const firstOf = async <A>(begin: (got: (a: A) => void, failed: (e: unknown) => void) => Promise<Handle>): Promise<A> => {
       const got: A[] = [];
@@ -188,9 +189,9 @@ test('one store, two engines — one built once, one provided its layer for each
 
     const tickedByService = await firstOf<TickReport>((onTick, onError) => effect((e) => e.up({ intervalMs: 1, onTick, onError })));
     const tickedByPromise = await firstOf<TickReport>(async (onTick, onError) =>
-      Effect.runSync(built.start({ intervalMs: 1, onTick, onError })),
+      Effect.runSync(built.up({ intervalMs: 1, onTick, onError })),
     );
-    assert.deepEqual([tickedByService.tasks, tickedByPromise.tasks], [2, 2], '`up` through the service, and `start`, its old name');
+    assert.deepEqual([tickedByService.tasks, tickedByPromise.tasks], [2, 2], '`up` through the service, and through the engine built once');
     assert.equal(sessions.size, 0, 'queued, neither started');
   });
 
@@ -575,4 +576,60 @@ test("refusalWords and the failures beside the refusals: say's failure that is n
     const plain = refusalWords('ae')(refused) as Error & { exitCode?: number };
     assert.deepEqual([plain.message, plain.exitCode], [`ae: ${refused.message}`, 2]);
   });
+});
+
+/** Each tagged error of the runtime's source named `*Refused` or `*Unsent`: its name, and the module that exports it. */
+const taggedFailures = (): { name: string; file: string }[] => {
+  const src = path.join(import.meta.dirname, '..', 'src');
+  return fs
+    .readdirSync(src, { recursive: true, encoding: 'utf8' })
+    .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+    .flatMap((f) =>
+      [...fs.readFileSync(path.join(src, f), 'utf8').matchAll(/^export class (\w+(?:Refused|Unsent)) extends Schema\.TaggedError/gm)].map(
+        (m) => ({ name: m[1] ?? '', file: path.join(src, f) }),
+      ),
+    );
+};
+
+test('every refusal class of the source is worded as a refusal, exit code 2, and every unsent as a failure that may pass, with no exit code', async (t) => {
+  const found = taggedFailures();
+  assert.ok(found.some((c) => c.name === 'AnswerRefused') && found.some((c) => c.name === 'AnswerUnsent'), 'the scan finds them');
+  for (const { name, file } of found) {
+    await t.test(name, async () => {
+      const exported: unknown = (await import(file))[name];
+      assert.equal(typeof exported, 'function', `${name} is exported by ${file}`);
+      const make = exported as new (fields: { message: string; held: boolean }) => Error & { _tag: string };
+      const tagged = new make({ message: 'm', held: false });
+      assert.equal(tagged._tag, name);
+      const plain = refusalWords('verb')(tagged) as Error & { _tag?: string; exitCode?: number };
+      assert.ok(plain instanceof Error && !('_tag' in plain), `${name} is worded behind the verb`);
+      assert.equal(plain.message, 'verb: m');
+      assert.equal(plain.exitCode, name.endsWith('Refused') ? 2 : undefined, `${name}: add it to the refusals of src/service/refusal.ts`);
+    });
+  }
+});
+
+test('say, interrupt and answerAsk each refuse a task with no session running in their own words: answerAsk speaks of a call waiting on a person, never of a turn', async (t) => {
+  const reaching = { ...asyncOps(fakeHarness(new Map(), [])), interrupt: () => Effect.void, answer: () => Effect.void };
+  const built = builtEngine(Engine.layer({ root: scratch('ae-verbs-'), journal: asyncStore(memoryJournal()), harnesses: { reaching } }));
+  await Effect.runPromise(built.file({ brief: 'unstarted', cwd: '/r', id: 'unstarted', queued: true }));
+  await Effect.runPromise(built.file({ brief: 'settled', cwd: '/r', id: 'settled', queued: true }));
+  await Effect.runPromise(built.stop('settled'));
+  await Effect.runPromise(built.tick());
+  const given = { id: 'q1', answers: { 'Which way?': 'This one' } };
+  const verbs: Array<[string, (id: string) => Promise<unknown>, RegExp]> = [
+    ['say', (id) => Effect.runPromise(built.say(id, 'hi')), /to hear anything/],
+    ['interrupt', (id) => Effect.runPromise(built.interrupt(id)), /no turn/],
+    ['answerAsk', (id) => Effect.runPromise(built.answerAsk(id, given)), /waiting on a person/],
+  ];
+  for (const [verb, asked, own] of verbs) {
+    for (const id of ['unstarted', 'settled']) {
+      await t.test(`${verb}, ${id}`, async () => {
+        const refused = await failure(asked(id));
+        assert.match(refused._tag ?? '', /Refused$/);
+        assert.match(refused.message, own);
+        if (verb === 'answerAsk') assert.doesNotMatch(refused.message, /turn/, 'an ask is no turn');
+      });
+    }
+  }
 });

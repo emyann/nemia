@@ -89,10 +89,3 @@ export const readText = (file: string): string => {
   countRead(buf.length);
   return buf.toString('utf8');
 };
-
-/** `fs.promises.readFile(file, 'utf8')`, counted: rejects as it does. */
-export const readTextAsync = async (file: string): Promise<string> => {
-  const buf = await fs.promises.readFile(file);
-  countRead(buf.length);
-  return buf.toString('utf8');
-};

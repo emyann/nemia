@@ -654,7 +654,7 @@ export function gateLines(
     steps,
     run,
     retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, () => false, spendOf),
-    roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, roundAsks, spendOf),
+    roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, roundAsks, spendOf, verdictOf),
   );
   for (const step of steps) {
     if (!hasGate(step, run) || waitingAgain.has(step.name)) continue;

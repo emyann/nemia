@@ -12,6 +12,7 @@ import path from 'node:path';
 import { Effect, Fiber } from 'effect';
 import { steeredClock } from './steered.ts';
 import { until, WAITED } from 'agent-runtime/testing';
+import { specifiersIn, withoutComments } from 'test-kit/imports';
 
 const PKG = path.join(import.meta.dirname, '..');
 const FROM_ROOT = 'packages/agent-orchestrator';
@@ -70,9 +71,9 @@ test('REFUSED: a clock no program was given cannot be moved, and says so', async
 /** Whether `file`, a path from the repository's root, is a test's: named `*.test.ts`, or under a `test` folder. */
 const isTestFile = (file: string): boolean => /\.test\.[cm]?[jt]sx?$/.test(file) || file.split('/').includes('test');
 
-/** Whether `text`, its block comments left out, imports Effect's testing entry, by an `import`, an `export … from` or `import()`. */
+/** Whether `text`, outside its comment lines, imports Effect's testing entry, by an `import`, an `export … from` or `import()`. */
 const importsTesting = (text: string): boolean =>
-  /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)['"]effect\/testing(?:\/[^'"]*)?['"]/.test(text.replace(/\/\*[\s\S]*?\*\//g, ''));
+  specifiersIn(withoutComments(text), { calls: ['import'] }).some((spec) => /^effect\/testing(?:\/|$)/.test(spec));
 
 /** Where `file`, which is no test's, imports Effect's testing entry: a file that runs reads the clock it is given. */
 function steeredBreaches(file: string, text: string): string[] {

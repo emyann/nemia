@@ -2,15 +2,15 @@
 /**
  * The detached worker: one harness process, babysat, reported.
  *
- * This is what `claude --bg` does for Claude Code, done by us for a harness that has no such
- * thing. It is deliberately dependency-free and dull — it starts before the engine can help it
- * and outlives the engine that started it, so anything clever in here is a thing that breaks
- * while nobody is watching.
+ * Every harness the runtime runs on a process of its own is run through it. It is deliberately dependency-free and dull — it
+ * starts before the engine can help it and outlives the engine that started it, so anything clever in here is a thing that
+ * breaks while nobody is watching.
  *
  * Its whole contract is the run file: `{ state, pid, heartbeatAt, beat, nativeId, startRefused }`, rewritten as the
  * session moves and on a timer. The heartbeat is what makes "the worker was killed" observable —
  * a stopped session and a stalled one are indistinguishable on disk without it. That is the cost
- * of owning a registry, and owning a registry is the cost of being harness-agnostic.
+ * of owning a registry, and owning a registry is the cost of being harness-agnostic. `beat` is the heartbeat on the monotonic
+ * clock, read by the runtime's own `monoNow`, so the lease is measured whatever the wall clock is set to.
  *
  * A harness that reads its messages on its stdin (`HarnessSpec.input`) is given them here: the brief's line first, then
  * each line of the run's inbox as it is appended — the person's file, which this only reads — until a line of the
@@ -70,6 +70,7 @@ import { spawn } from 'node:child_process';
 import { WORKER_BEAT_MS, WORKER_STOP_GRACE_MS } from '../src/harness/detached/worker-bounds.ts';
 import { terminationMessageAt } from '../src/harness/detached/termination-message.ts';
 import { cgroupMemoryOf, type CgroupMemory } from '../src/harness/cgroup.ts';
+import { monoNow } from '../src/core/engine/now.ts';
 
 /** The run file the worker is started on, its one argument; a worker started without one says how to start it, and exits 2. */
 const runFile = ((given: string | undefined): string => {
@@ -95,27 +96,13 @@ const plan = JSON.parse(fs.readFileSync(runFile, 'utf8')) as {
   memoryLimit?: number;
 };
 
-/** The running boot's id, read once from where Linux keeps it; `undefined` where the machine does not say. */
-const boot = (() => {
-  try {
-    return fs.readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim() || undefined;
-  } catch {
-    return undefined;
-  }
-})();
-/**
- * The heartbeat on the monotonic clock, `{ boot, ms }` as the runtime's `instantNow` reads it, so that the lease is measured
- * across this process and the one that reads it whatever the wall clock is set to; `undefined` with no boot id.
- */
-const beatNow = () => (boot ? { boot, ms: Number(process.hrtime.bigint() / 1_000_000n) } : undefined);
-
 let status = {
   ...plan,
   state: 'working' as string,
   pid: process.pid,
   startedAt: new Date().toISOString(),
   heartbeatAt: new Date().toISOString(),
-  beat: beatNow(),
+  beat: monoNow(),
   nativeId: undefined as string | undefined,
   startRefused: undefined as { line: number; field: string; found: string } | undefined,
   exitCode: undefined as number | undefined,
@@ -146,7 +133,7 @@ let stoppedAt: number | undefined;
  */
 const write = (patch: Partial<typeof status> = {}) => {
   if (gone) return;
-  status = { ...status, ...patch, heartbeatAt: new Date().toISOString(), beat: beatNow() };
+  status = { ...status, ...patch, heartbeatAt: new Date().toISOString(), beat: monoNow() };
   if (!fs.existsSync(runFile)) return vanished();
   try {
     fs.writeFileSync(`${runFile}.tmp`, JSON.stringify(status));

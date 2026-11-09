@@ -48,7 +48,7 @@ export function FromBadge({ from }: { from: AgentListing['from'] }) {
 }
 
 /** A node that names an agent, linked to its step's page: `workflow › step`. */
-export function NodeLink({ user }: { user: AgentUser }) {
+function NodeLink({ user }: { user: AgentUser }) {
   return (
     <RouteLink
       to="/workflows/$from/$workflow/$step"
@@ -201,7 +201,7 @@ function FollowingFace({ name, size, plate, expression, className }: Omit<FacePr
  * The search a link to a definition's page carries: for a factory's own, which only its factory serves, the place it is read in, `place`,
  * else the one the page is in (`here`); none for any other, which `default` serves whatever factory the link is drawn in.
  */
-export const definitionSearch = (from: string, place: PagePlace | undefined, here: PagePlace = {}): PagePlace => {
+const definitionSearch = (from: string, place: PagePlace | undefined, here: PagePlace = {}): PagePlace => {
   if (from !== 'factory') return {};
   const { factory, repo } = place ?? here;
   return { ...(factory !== undefined && { factory }), ...(repo !== undefined && { repo }) };

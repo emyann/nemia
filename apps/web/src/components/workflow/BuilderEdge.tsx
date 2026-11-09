@@ -3,11 +3,11 @@ import { X } from 'lucide-react';
 import { edgeLine, edgeStroke, loopPath } from '../../lib/canvas';
 
 /** An edge the builder drew from a key: which key it is, in words, and what taking it away does to the draft. */
-export type BuilderEdgeData = { loop: boolean; said: string; remove: () => void };
+type BuilderEdgeData = { loop: boolean; said: string; remove: () => void };
 export type BuilderFlowEdge = Edge<BuilderEdgeData, 'builder'>;
 
 /** How far below its ends an `after` edge drawn backwards dips: under the blocks, whose middles its ends are level with. */
-export const BACKWARD_DEPTH = 80;
+const BACKWARD_DEPTH = 80;
 
 /**
  * An edge on the builder's canvas: drawn as a workflow's edges are before any run — dashed, and a loop's edge back beneath the row in

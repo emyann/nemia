@@ -36,7 +36,7 @@ import {
 import { turnWords } from '../src/lib/conversation.ts';
 import { CHAT_OUTBOX_KEY, editKept, forgetKept, keepUnsent, parseKept, readKept, sendingOnce } from '../src/lib/chatOutbox.ts';
 import { anyAbove, composerButton, composerWords } from '../src/lib/nemia.ts';
-import { faceOf, UP, type Presence } from '../src/lib/presence.ts';
+import { cuesOf, faceOf, UP, type Presence } from '../src/lib/presence.ts';
 import type { StreamLike } from '../src/lib/follow.ts';
 import type { AskQuestion, ChatEvent, ChatPresence, FactoryLevel, PermissionFacts } from '../src/lib/api.ts';
 
@@ -385,15 +385,18 @@ test('a permission of hers is an ask: waiting, drawn as the form, answered in wo
   });
 });
 
-test('her chat followed on one stream: what it does not read is dropped, where she is replaced, her events merged and her asks read whole, then a notice, and the end', async (t) => {
+test('her chat followed on one stream: what it does not read is said and the stream goes on, where she is replaced, her events merged and her asks read whole, then a notice, and the end', async (t) => {
   const s = story(t);
   const { stream, now, stop } = followed();
 
-  await s.test('REFUSED: data of a shape her chat does not send changes nothing', () => {
+  await s.test('REFUSED: data of a shape her chat does not send changes nothing, and is said, naming its key, as a notice', () => {
     stream.send('chat', { kind: 'message', id: 'm:1', at: at(1) });
     stream.send('presence', { up: 'yes' });
     assert.deepEqual(now().events, []);
     assert.deepEqual(now().presence, CHAT_DOWN);
+    assert.match(now().retrying ?? '', /\bup\b/, 'the last said, in the words of its decode, which name the key');
+    assert.deepEqual([now().error, now().live, stream.readyState], [null, true, 1], 'a notice, not an end: the stream goes on');
+    stream.fire('open');
   });
 
   await s.test(
@@ -454,17 +457,58 @@ test('her chat followed on one stream: what it does not read is dropped, where s
   });
 });
 
+test("presenceOf: the runs that wait on the person are the run list's count, whatever the api's presence adds up", async (t) => {
+  const stale: ChatPresence = { ...up, waitsOnYou: 4 };
+  await t.test('a run list of none waiting, beside a presence that still says four, says no run waits', () => {
+    const presence = presenceOf(stale, false, 0, []);
+    assert.equal(presence.runsWaiting, 0);
+    assert.deepEqual(cuesOf(presence), [], 'no cue claims what the Runs page does not');
+    assert.equal(faceOf(presence), 'idle');
+  });
+  await t.test('two waiting on the run list say two, whatever the presence says', () => {
+    for (const said of [0, 2, 4])
+      assert.equal(presenceOf({ ...up, waitsOnYou: said }, false, 2, []).runsWaiting, 2, `the presence said ${said}`);
+    assert.deepEqual(
+      cuesOf(presenceOf(stale, false, 2, [])).map((cue) => cue.words),
+      ['2 wait on you'],
+    );
+  });
+  await t.test('her asks unanswered are counted from her chat and said apart, never added into the runs', () => {
+    const open = asked('question', [EXPLAINED]);
+    const done = asked('proposal', [PLAIN], { [PLAIN.question]: 'Cut it on read' });
+    const presence = presenceOf(stale, false, 2, [open, done]);
+    assert.deepEqual([presence.runsWaiting, presence.asksWaiting], [2, 1]);
+    assert.deepEqual(
+      cuesOf(presence).map((cue) => cue.words),
+      ['2 wait on you', '1 ask of hers'],
+    );
+    const asksAlone = presenceOf(stale, false, 0, [open]);
+    assert.equal(faceOf(asksAlone), 'surprised', 'an ask of hers still waits on the person');
+    assert.deepEqual(
+      cuesOf(asksAlone).map((cue) => cue.words),
+      ['1 ask of hers'],
+    );
+  });
+});
+
 test('presenceOf, composerWords and composerButton: where she is, and what the composer offers for it', async (t) => {
   await t.test(
     "her presence is the api's and this browser's kept message — and she reads as down when her session is not up, only then",
     () => {
-      assert.deepEqual(presenceOf(up, false), { waitsOnYou: 0, notSent: false, down: false, answering: false, unread: 0 });
-      assert.equal(presenceOf({ ...up, up: false }, false).down, true);
-      assert.equal(faceOf(presenceOf({ ...up, up: false }, false)), 'sleepy');
-      assert.equal(presenceOf(up, true).notSent, true, 'a message this browser kept is hers to say');
-      assert.equal(faceOf(presenceOf(up, true)), 'unsure');
-      const every: Presence = presenceOf({ up: true, answering: true, waitsOnYou: 2, unread: 3 }, true);
-      assert.deepEqual(every, { waitsOnYou: 2, notSent: true, down: false, answering: true, unread: 3 });
+      assert.deepEqual(presenceOf(up, false, 0, []), {
+        runsWaiting: 0,
+        asksWaiting: 0,
+        notSent: false,
+        down: false,
+        answering: false,
+        unread: 0,
+      });
+      assert.equal(presenceOf({ ...up, up: false }, false, 0, []).down, true);
+      assert.equal(faceOf(presenceOf({ ...up, up: false }, false, 0, [])), 'sleepy');
+      assert.equal(presenceOf(up, true, 0, []).notSent, true, 'a message this browser kept is hers to say');
+      assert.equal(faceOf(presenceOf(up, true, 0, [])), 'unsure');
+      const every: Presence = presenceOf({ up: true, answering: true, waitsOnYou: 2, unread: 3 }, true, 2, []);
+      assert.deepEqual(every, { runsWaiting: 2, asksWaiting: 0, notSent: true, down: false, answering: true, unread: 3 });
       assert.equal(faceOf(every), 'surprised', 'what waits on a person comes first in the owner’s order');
     },
   );
@@ -480,8 +524,8 @@ test('presenceOf, composerWords and composerButton: where she is, and what the c
       };
       const kept = { level: 'manual' as const, factories: [raised] };
       assert.equal(anyAbove(kept), true, 'the raise keeps her above Manual, though the store reads Manual');
-      assert.equal(presenceOf(up, false).down, false, 'her session is up, so she is');
-      assert.equal(faceOf(presenceOf(up, false)), 'idle');
+      assert.equal(presenceOf(up, false, 0, []).down, false, 'her session is up, so she is');
+      assert.equal(faceOf(presenceOf(up, false, 0, [])), 'idle');
       assert.equal(anyAbove({ level: 'manual', factories: [{ ...raised, level: 'manual', raise: null }] }), false, 'Manual everywhere');
     },
   );
@@ -491,7 +535,7 @@ test('presenceOf, composerWords and composerButton: where she is, and what the c
     assert.equal(composerWords({ ...UP, down: true }), 'Write now; she reads it when she is up');
     assert.equal(composerWords({ ...UP, notSent: true }), 'Waiting for the daemon');
     assert.equal(composerWords({ ...UP, notSent: true, down: true, answering: true }), 'Waiting for the daemon', 'nowhere to send it');
-    assert.equal(composerWords({ ...UP, waitsOnYou: 1 }, true), 'Or answer in your own words', 'a question of hers waits on them');
+    assert.equal(composerWords({ ...UP, asksWaiting: 1 }, true), 'Or answer in your own words', 'a question of hers waits on them');
     assert.equal(composerWords({ ...UP, answering: true }, true), 'Or answer in your own words', 'her turn is held by the question');
     assert.equal(composerWords({ ...UP, down: true }, true), 'Write now; she reads it when she is up', 'no session holds the question');
   });

@@ -68,7 +68,7 @@ export type CardRefusal = { entry: InboxEntry; action: 'start' | 'remove' | 'que
 /**
  * A line of the inbox page: a card, with the refusal it was last given, or one the inbox no longer lists (`gone`), kept for its refusal.
  */
-export type CardLine = { entry: InboxEntry; refusal: CardRefusal | null; gone: boolean };
+type CardLine = { entry: InboxEntry; refusal: CardRefusal | null; gone: boolean };
 
 /**
  * The inbox page's lines, newest first (`newestCardsFirst`): each card listed, with its refusal; and each card refused that the inbox, read
@@ -147,7 +147,7 @@ export const factoryPreset = (shown: string | undefined, offered: readonly Pick<
  * What the box that files a card holds when File is pressed: the idea; the factory now picked, null for none; `repo`, what its list of
  * repositories was last set to, `''` for none; and the workflow picked among those listed now, null for none.
  */
-export type FilingChoice = {
+type FilingChoice = {
   idea: string;
   factory: Pick<Factory, 'name' | 'repos'> | null;
   repo: string;
@@ -155,7 +155,7 @@ export type FilingChoice = {
 };
 
 /** A card as `fileCard` sends it. */
-export type CardFiling = { body: string; factory?: string; workflow?: string; from?: WorkflowListing['from']; repo?: string };
+type CardFiling = { body: string; factory?: string; workflow?: string; from?: WorkflowListing['from']; repo?: string };
 
 /**
  * What the box sends for `choice`, by what is offered now and never by what a list held before. With no factory, the idea alone: its

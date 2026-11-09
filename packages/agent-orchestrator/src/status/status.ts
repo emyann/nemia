@@ -14,6 +14,7 @@ import { declaredOutput, isLoopTarget, type Closeout } from '../closeout/index.t
 import { filedOwed } from '../pinned/pinned.ts';
 import { closeoutRefusals } from '../question/index.ts';
 import { budgetOf } from '../budget/budget.ts';
+import { declarationOf } from '../harness/harness.ts';
 export { approvedCapsOf, budgetOf } from '../budget/budget.ts';
 import type { Retry, RetryHow } from '../retry/index.ts';
 import {
@@ -52,11 +53,11 @@ export const approvalOf = (run: Run, step: string): Approval | undefined =>
   run.approvals?.find((a) => a.step === step && a.try === tryOf(run, step));
 
 /**
- * Whether a step's sessions are filed held open (the runtime's `holdOpen`): a Claude Code job — `claude`, the one harness the runtime's
- * held task is proven on (agent-runtime's open issue 28). A codex step is filed to settle when it signs, and a person's word to it is a
- * try of its own. Never a check.
+ * Whether a step's sessions are filed held open (the runtime's `holdOpen`): its harness, `DEFAULT_HARNESS` where it names none, declares
+ * it keeps a session open (`keepsOpen`; agent-runtime's open issue 28). A step on any other is filed to settle when it signs, and a
+ * person's word to it is a try of its own. Never a check.
  */
-export const holdsOpenOn = (step: Pick<Workflow, 'harness'>): boolean => (step.harness ?? 'claude') === 'claude';
+export const holdsOpenOn = (step: Pick<Workflow, 'harness'>): boolean => declarationOf(step.harness)?.can.includes('keepsOpen') === true;
 
 /** A person's route for a condition's try, as `readRun` reads it from its file (`routeAsk`): the route named, and when. */
 export type PersonRoute = { step: string; try: number; route: string; at: string };
@@ -1001,3 +1002,10 @@ export function usedLines(u: Consumed | undefined): string[] {
     cost,
   ];
 }
+
+/**
+ * The try a refusal points a person to for a step that stopped, as `nemia retry` takes it: with `--budget <amount>` where the step reads
+ * `over budget`, since a try of it without one is refused (`retryRefusal`). Pure.
+ */
+export const tryCommand = (run: Run, step: string, status: StepStatus): string =>
+  `nemia retry ${run.id} ${step}${status === 'over budget' ? ' --budget <amount>' : ''}`;

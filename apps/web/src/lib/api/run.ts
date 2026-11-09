@@ -8,7 +8,7 @@ import { Schema } from 'effect';
 import { decodes } from './decodes.ts';
 import { pace } from '../feed.ts';
 import { get } from './read.ts';
-import { retryRun, runGone } from './gone.ts';
+import { retryUnlessGone, readGone } from './gone.ts';
 import { WorkflowPageAddressSchema, type WorkflowPageAddress } from './address.ts';
 import type { StepTold, StepTry } from 'objects';
 import { runs } from './objects.ts';
@@ -32,7 +32,7 @@ export type RunLines = {
 const StepCommandsSchema = decodes<StepCommands>()(Schema.Struct({ approve: Schema.String, retry: Schema.String, say: Schema.String }));
 
 /** Decodes a `RunLines`. */
-export const RunLinesSchema = decodes<RunLines>()(
+const RunLinesSchema = decodes<RunLines>()(
   Schema.Struct({
     decide: Schema.String,
     refresh: Schema.String,
@@ -42,21 +42,21 @@ export const RunLinesSchema = decodes<RunLines>()(
   }),
 );
 
-export { retryRun, runGone } from './gone.ts';
+export { retryUnlessGone, readGone } from './gone.ts';
 
 /** The run's path under the api. */
 const runPath = (id: string): string => `/api/runs/${encodeURIComponent(id)}`;
 
 /**
  * The run object, under the run's own key, which every event of the feed about the run reads again, exactly, and which the board polls
- * at `pace` while it does not follow the feed. A 404 is the run gone (`runGone`), not tried again.
+ * at `pace` while it does not follow the feed. A 404 is the run gone (`readGone`), not tried again.
  */
 export const runObjectQuery = (id: string) =>
   queryOptions({
     queryKey: ['runs', id],
     queryFn: () => runs.show(id),
     refetchInterval: () => pace(5_000),
-    retry: retryRun,
+    retry: retryUnlessGone,
   });
 
 /**
@@ -71,12 +71,12 @@ export const stepTriesQuery = (id: string, step: string, stamp: string) =>
       runs.tries(id, step).then(
         (read) => read.tries,
         (error: unknown) => {
-          if (runGone(error)) return [];
+          if (readGone(error)) return [];
           throw error;
         },
       ),
     staleTime: Infinity,
-    retry: retryRun,
+    retry: retryUnlessGone,
   });
 
 /** What a step was told, keyed as its tries are (`stepTriesQuery`); null for a step the api has no told of. */
@@ -87,12 +87,12 @@ export const stepToldQuery = (id: string, step: string, stamp: string) =>
       runs.told(id, step).then(
         (read) => read,
         (error: unknown) => {
-          if (runGone(error)) return null;
+          if (readGone(error)) return null;
           throw error;
         },
       ),
     staleTime: Infinity,
-    retry: retryRun,
+    retry: retryUnlessGone,
   });
 
 /** The run's lines (`RunLines`): read once a page, never polled, since nothing a run does changes them. */
@@ -101,5 +101,5 @@ export const runLinesQuery = (id: string) =>
     queryKey: ['runs', id, 'lines'],
     queryFn: () => get(`${runPath(id)}/lines`, RunLinesSchema),
     staleTime: Infinity,
-    retry: retryRun,
+    retry: retryUnlessGone,
   });

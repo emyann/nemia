@@ -7,7 +7,16 @@
 import path from 'node:path';
 import { memoryQuantityRefusal } from 'agent-runtime/vocabulary';
 import { CLOSEOUT_FIELDS, COUNTS, isObject, type OutputSchema, refuse, type StepOutput, type Workflow } from '../step/step.ts';
-import { DEFAULT_HARNESS, HARNESSES, isRemoteHarness, REMOTE_NAME, remoteNameOf } from '../harness/harness.ts';
+import {
+  declarationOf,
+  DEFAULT_HARNESS,
+  fenceKeyOf,
+  fenceListsOf,
+  HARNESSES,
+  isRemoteHarness,
+  REMOTE_NAME,
+  remoteNameOf,
+} from '../harness/harness.ts';
 import { looseAt } from '../closeout/index.ts';
 import { expandShapes, SHAPE_KEY } from '../question/index.ts';
 import type { HarnessPrompt } from '../agents/agents.ts';
@@ -54,7 +63,7 @@ export function wordOf(
   harness: string | undefined,
 ): string | undefined {
   const on = harness ?? DEFAULT_HARNESS;
-  if (key === 'sandbox' && word !== undefined && on !== 'codex') {
+  if (key === 'sandbox' && word !== undefined && fenceKeyOf(on) !== 'sandbox') {
     const where = harness ? '' : ` (there is no \`harness:\` line, so the step runs on ${on})`;
     refuse(
       `${step}: \`sandbox: ${word}\` is a codex step's sandbox, and this step runs on ${on}${where}, which is fenced by its permission mode, \`permissionMode:\`, with \`tools:\`, \`disallowedTools:\` and \`allowedTools:\`: the line would be filed as a mode. Write \`permissionMode:\` instead, or run the step on codex.`,
@@ -286,7 +295,7 @@ export function workspaceOf(
       `${step}: \`workspace: ${workspace}\` is not \`base\`. \`workspace: base\` runs the step in the repository's own checkout, where a person's own work is, rather than in a worktree of the run's: what the last step of a workflow does when it merges. A step that works in a folder the run makes, with no git repository, says \`place: folder\`. Without the line, the step works where the workflow's shape puts it.`,
     );
   }
-  if (check !== undefined && harness === 'codex') {
+  if (check !== undefined && fenceListsOf(harness)?.length === 0) {
     refuse(
       `${step}: \`workspace: base\` with \`check: ${check}\` has the run commit the merge the step stages once the check passes, and keeps the session from committing it first by denying it what its place denies a landing session (\`denyWhileLanding\`, which its place declares) — which codex cannot be denied: one shell, fenced by its sandbox, and a sandbox that lets it stage a merge lets it commit one. Run the ending on claude — delete \`harness: codex\` — or delete the \`check:\` line.`,
     );
@@ -318,7 +327,8 @@ export function denialsOf(step: string, denials: string | undefined, harness: st
       `${step}: \`denials: ${denials}\` is not \`fail\`. \`denials: fail\` stops the step when the harness denied its try a call — it reads \`denied\` and waits on a person — rather than passing it on; without the line, what was denied is said beside the step and decides nothing. Write \`denials: fail\`, or delete the line.`,
     );
   }
-  if ((harness ?? DEFAULT_HARNESS) === 'codex') {
+  const declared = declarationOf(harness);
+  if (declared !== undefined && declared.recordsDenials !== true) {
     refuse(
       `${step}: \`denials: fail\` stops the step on a call the harness denied, and \`codex exec\` records none: its fence is the sandbox, and a call it refuses is said nowhere the run reads — so the line would never stop anything. Run the step on claude — delete \`harness: codex\` — or delete \`denials: fail\`.`,
     );
@@ -438,6 +448,12 @@ export function outputOf(
   return { file, schema: schema as OutputSchema };
 }
 
+/** Whether harness `harness` is one the runtime declares, taking none of the flags that carry a plugin and a prompt (`claudeFlags`). */
+const takesNoFlags = (harness: string | undefined): boolean => {
+  const declared = declarationOf(harness);
+  return declared !== undefined && !declared.can.includes('claudeFlags');
+};
+
 /**
  * Why an agent's skills or harness prompt (`harnessPrompt:`) cannot reach the sessions of a step that runs as `step` does — its harness,
  * tools and deny list — or `undefined`. `named` says whose: the agent's file, or a step that names it. Asked of the agent as its file sets
@@ -462,7 +478,7 @@ export function composedRefusal(
       return `${named}: \`harnessPrompt: ${harnessPrompt}\` shapes Claude Code's own prompt, and \`harness: ${step.harness}\` is a remote A2A agent, which keeps its own: the agent's instructions are sent in the brief. Delete the line, or run the step on claude.`;
     return undefined;
   }
-  if (step.harness === 'codex') {
+  if (takesNoFlags(step.harness)) {
     if (listed)
       return `${named}: ${listed} gives Claude Code skills from a plugin directory of the step's own, and codex loads none: it is handed its instructions in the brief. Run it on claude, or delete the line.`;
     if (harnessPrompt !== undefined && harnessPrompt !== 'keep')

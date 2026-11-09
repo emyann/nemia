@@ -22,6 +22,8 @@ declare module '@tanstack/react-router' {
   interface StaticDataRouteOption {
     /** The page takes the whole space beside the menu, rather than the reading column. */
     fullBleed?: boolean;
+    /** The page is Nemia's chat itself, so her docked face is not drawn over it. */
+    ownsChat?: boolean;
   }
 }
 

@@ -32,6 +32,7 @@ import { story } from 'test-kit/checkpoints';
  */
 const check: HarnessSpec = {
   name: 'check',
+  can: [],
   command: () => ({
     cmd: 'sh',
     args: ['-c', 'n=0; while [ -e hold ] && [ $n -lt 400 ]; do sleep 0.05; n=$((n+1)); done; echo checked; exit 3'],

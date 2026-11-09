@@ -121,7 +121,7 @@ export const nextBar = (open: Bar | undefined, pressed: Bar): Bar | undefined =>
  * The page Open visits from the bar: a factory's floor, a run's page, a step's session, a workflow's step's page, or none for what is no
  * page, the start of a run, the gauges and the runs waiting on you.
  */
-export type BarPage =
+type BarPage =
   | { to: '/factories/$factory'; params: { factory: string } }
   | { to: '/runs/$runId'; params: { runId: string } }
   | { to: '/runs/$runId/steps/$step'; params: { runId: string; step: string } }
@@ -205,7 +205,7 @@ export function barWidth(width: number, viewport: number): number {
 export const barMost = (viewport: number): number => barWidth(Number.POSITIVE_INFINITY, viewport);
 
 /** An Escape pressed while the bar is open: whether a menu or a modal took it, whether it ends a composition, the text of its field. */
-export type EscapeKey = { defaultPrevented: boolean; isComposing: boolean; fieldText: string | null };
+type EscapeKey = { defaultPrevented: boolean; isComposing: boolean; fieldText: string | null };
 
 /**
  * What `key` does to the open bar: nothing when something else took it or it ends a composition; `leave` the field it was pressed in when

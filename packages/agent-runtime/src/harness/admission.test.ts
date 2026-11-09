@@ -6,7 +6,7 @@ import { Effect } from 'effect';
 import { Engine } from '../index.ts';
 import { codex } from './codex/codex.ts';
 import { commandHarness } from './command/command.ts';
-import { attachedOptions } from './claude/attached-options.ts';
+import { attachedOptions } from './claude/session-options.ts';
 import { claudeRefuses } from './claude/vocabulary.ts';
 import { admitCall, type AdmissionRun } from './claude/admission.ts';
 import type { SpawnRequest } from './seam.ts';

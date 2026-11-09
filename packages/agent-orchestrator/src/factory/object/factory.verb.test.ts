@@ -1,7 +1,7 @@
 /**
  * The factories as objects (factory.verb.ts), off a listing as `nemia factory` reads it and the controller's status file in a scratch
  * store: the default factory listed first and got, a stray file listed with its error, the generation and the status read, and the
- * commands built off the table. Their page and selection are `src/object/listed.verb.test.ts`'s.
+ * commands a person types for it. Their page and selection are `src/object/listed.verb.test.ts`'s.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,8 +10,6 @@ import path from 'node:path';
 import { Factory as FactorySchema } from 'objects';
 import { Schema } from 'effect';
 import { scratch } from 'test-kit/scratch';
-import { commandLine } from '../../command/command.ts';
-import { COMMANDS } from '../../command/commands.verb.ts';
 import type { FactoryListing } from '../factory.ts';
 import { factoryCommands, factoryObjectsOf, type FactoryListed } from './factory.verb.ts';
 
@@ -120,23 +118,18 @@ test("a Factory's resourceVersion moves with its rules and its instruction, read
   assert.equal(versionOf('default'), byName('default')?.metadata.resourceVersion, "the default factory's version does not move");
 });
 
-test("a factory's commands are the table's lines, with each schedule's unschedule and each volume's rm", () => {
+test("a factory's commands are the lines a person types for it, with each schedule's unschedule and each volume's rm", () => {
   const m = byName('acme');
   assert.ok(m);
-  const line = (name: string, args: Record<string, string>, flags: Record<string, string> = {}) => {
-    const command = COMMANDS.find((c) => c.name === name);
-    assert.ok(command, name);
-    return commandLine(command, args, flags);
-  };
   assert.deepEqual(factoryCommands(m, ['nightly']), {
-    attach: line('factory attach', { factory: 'acme' }),
-    rm: line('factory rm', { factory: 'acme' }),
-    add: line('factory add', { name: 'acme' }, { repos: '<path>' }),
-    schedule: line('factory schedule', { factory: 'acme' }, { cron: '<expr>', brief: '<text>' }),
-    trust: line('factory trust', { factory: 'acme' }),
-    volume: line('factory volume add', { factory: 'acme', volume: '<path>:ro|:rw' }),
-    unschedule: { nightly: line('factory unschedule', { factory: 'acme', workflow: 'nightly' }) },
-    volumeRm: { a: line('factory volume rm', { factory: 'acme', path: '/data/a' }) },
+    attach: 'nemia factory attach acme <workflow>',
+    rm: 'nemia factory rm acme',
+    add: 'nemia factory add acme --repo <path>',
+    schedule: 'nemia factory schedule acme <workflow> --cron <expr> --brief <text>',
+    trust: 'nemia factory trust acme',
+    volume: 'nemia factory volume add acme <path>:ro|:rw',
+    unschedule: { nightly: 'nemia factory unschedule acme nightly' },
+    volumeRm: { a: 'nemia factory volume rm acme /data/a' },
   });
   assert.match(factoryCommands(m, []).attach, /^nemia factory attach acme/);
 });

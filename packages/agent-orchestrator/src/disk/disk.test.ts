@@ -252,7 +252,6 @@ test('`largestOf` and `vanished`: the runs that hold the most, and the label set
     const sizes = many.map((_, k) => (k === 3 ? 0 : k + 1));
     const empty: DiskRoot = { part: 'runs', kind: 'runs-other', name: 'empty', path: '/s/runs/empty' };
     const named = largestOf([...many, empty], whole([...sizes, 0]), runsOf({}));
-    assert.equal(DISK_RUNS_NAMED, 10);
     assert.deepEqual(
       named.map((run) => run.run),
       ['r10', 'r9', 'r8', 'r7', 'r6', 'r5', 'r4', 'r2', 'r1', 'r0'],

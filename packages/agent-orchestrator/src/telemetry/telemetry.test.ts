@@ -14,7 +14,6 @@ import { Effect, Logger, Metric } from 'effect';
 import { OtlpExporter } from 'effect/observability';
 import { TestClock } from 'effect/testing';
 import {
-  DEFAULT_SERVICE_NAME,
   lineOf,
   logsUrl,
   metricsUrl,
@@ -305,10 +304,9 @@ const OTLP: Row[] = [
     check: () => {
       assert.deepEqual(otlpOf({ OTEL_EXPORTER_OTLP_ENDPOINT: 'http://localhost:4318/' }), {
         url: 'http://localhost:4318',
-        serviceName: DEFAULT_SERVICE_NAME,
+        serviceName: 'nemia',
         every: {},
       });
-      assert.equal(DEFAULT_SERVICE_NAME, 'nemia');
     },
   },
   {

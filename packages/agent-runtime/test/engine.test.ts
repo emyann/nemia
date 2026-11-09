@@ -13,9 +13,9 @@
  * - a `claude --bg` session that called StructuredOutput and ended its turn can be observed blocked and idle, and a statement
  *   read there as an answer already given would leave it needing a person for ever.
  *
- * The judgement is `decide` in `domain.ts` — what it reads (`lifecycleOf`, `observe`, `spawnRefused`) and `needsHuman`, last in
- * the file — and the lifecycle's edges: the test that it reads no carried field slices `domain.ts` from `decide` to the file's
- * end, so no name moved or deleted below it can cut the slice short.
+ * The judgement is `decide` in `domain.ts` and the lifecycle's edges: that it reads no field a task carries but does not judge is
+ * shown by what it answers, the same with each such field laid over a state as without it, on journals that reach each of its
+ * readings, never by reading its source.
  *
  * The file tells the engine's pass as stories — a job to its release, a stop, a deadline, the ways a start fails, a long-lived
  * session across restarts — and as tables whose rows each build their own board: what a pass carries and reports, the crash
@@ -23,14 +23,13 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import { Effect, Layer } from 'effect';
 import { Journal, type FeedEntry, type JournalOps } from '../src/core/engine/journal.ts';
 import { Runner, RunnerError, testOps, type ExpectedSession } from '../src/harness/seam.ts';
 import { admit, answer, file, requestStop } from '../src/core/engine/filing.ts';
 import { GRACE_MS, Lifecycle, LIVE, reconcile, settleTask, tick, view } from '../src/core/engine/engine.ts';
 import { withoutEdge } from '../src/core/lifecycle.ts';
-import { decide, fold, nameFor, RESTART_WORDS, type Event, type Sighting } from '../src/core/domain.ts';
+import { decide, fold, nameFor, RESTART_WORDS, type Event, type Sighting, type State } from '../src/core/domain.ts';
 import type { SessionState } from '../src/core/session.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
 import { tickMemoLayer } from '../src/core/engine/memo.ts';
@@ -41,6 +40,8 @@ import { stepClock } from './clock.ts';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 import { TaskId } from '../src/core/model.ts';
+import { Engine } from '../src/index.ts';
+import { builtEngine } from './engine.ts';
 
 /**
  * One board: a journal and a fake harness whose session states a test moves by hand — and the pass's memo of the settled
@@ -1242,29 +1243,117 @@ test("the pass's refusals: an argument a pass, a step or a settle was never buil
   });
 });
 
-test("decide never reads tools, effort, MCP servers, a budget, a context window, Remote Control, a priority an old journal carries, a filing time, labels, a trace context, usage, a cost, an exit code, what a person said, or an end time but for a long-lived task's backoff — carried on the record, never judged", () => {
-  const source = fs.readFileSync(new URL('../src/core/domain.ts', import.meta.url), 'utf8');
-  const from = source.indexOf('export const decide: ');
-  assert.ok(from >= 0, 'found decide');
-  const restart = fs.readFileSync(new URL('../src/core/restart.ts', import.meta.url), 'utf8');
-  const body = `${source.slice(from)}\n${restart}`;
-  for (const name of [
-    'export const lifecycleOf: ',
-    'export const observe: ',
-    'export function spawnRefused(',
-    'export function needsHuman(',
-    'export const idleOf =',
-    'export function backoffOf(',
-  ])
-    assert.ok(body.includes(name), `the slice holds ${name}`);
-  const endTime = /const endedWhen = \([^)]*\)[^=]*=>\s*[^;]*\.endedAt[^;]*;/;
-  assert.match(body, endTime, 'the one reading of an end time, `endedWhen`, the backoff reads');
-  const machine = fs.readFileSync(new URL('../src/core/lifecycle.ts', import.meta.url), 'utf8');
-  for (const read of [body.replace(endTime, ''), machine])
-    assert.doesNotMatch(
-      read,
-      /\.tools|\.disallowedTools|\.effort|\.mcp\b|\.usage|\.exitCode|\.endedAt|\.said|\.budgetUsd|\.contextTokens|\.costUsd|\.remoteControl|\.claude\b|\.priority|\.filedAt|\.labels|\.traceparent/,
-    );
+/** A time `ms` after the journals' epoch, as a journal writes it. */
+const atMs = (ms: number): string => new Date(ms).toISOString();
+
+/**
+ * Journals that reach each of `decide`'s readings: queued, starting, at work, ended each way, held open and asked, past a deadline,
+ * asked to stop, a spawn that failed, and a long-lived task between restarts, whose backoff alone reads an end time.
+ */
+const JUDGED: Record<string, Event[]> = (() => {
+  const filed = (fields: Record<string, unknown> = {}): Event => ({ kind: 'filed', at: atMs(0), brief: 'b', cwd: '/r', ...fields });
+  const started: Event[] = [
+    { kind: 'starting', at: atMs(1_000), attempt: 1 },
+    { kind: 'spawned', at: atMs(2_000), attempt: 1 },
+  ];
+  const ended = (observed: 'succeeded' | 'failed' | 'stopped', reason: 'harness' | 'deadline' | 'operator'): Event => ({
+    kind: 'ended',
+    at: atMs(3_000),
+    attempt: 1,
+    sessionId: 's',
+    observed,
+    reason,
+    nativeId: 's',
+  });
+  return {
+    filed: [filed()],
+    queued: [filed({ queued: true })],
+    starting: [filed(), { kind: 'starting', at: atMs(1_000), attempt: 1 }],
+    'at work': [filed(), ...started],
+    'spawn failed': [
+      filed(),
+      { kind: 'starting', at: atMs(1_000), attempt: 1 },
+      { kind: 'spawned', at: atMs(2_000), attempt: 1, error: 'e' },
+    ],
+    succeeded: [filed(), ...started, ended('succeeded', 'harness')],
+    failed: [filed(), ...started, ended('failed', 'harness')],
+    'past its deadline': [filed({ deadlineSeconds: 60 }), ...started],
+    'asked to stop': [filed(), ...started, { kind: 'stop-requested', at: atMs(2_500) }],
+    'held open, asked': [
+      filed({ holdOpen: true }),
+      ...started,
+      ended('succeeded', 'harness'),
+      { kind: 'input', at: atMs(4_000), text: 'go on' },
+    ],
+    'held open, closed': [filed({ holdOpen: true }), ...started, ended('succeeded', 'harness'), { kind: 'closed', at: atMs(4_000) }],
+    'long-lived, between restarts': [filed({ restartPolicy: 'Always' }), ...started, ended('failed', 'harness')],
+  };
+})();
+
+/** What a task carries on its record that `decide` never judges, laid over a state and the sighting of its attempt. */
+const CARRIED: Record<string, { state?: (s: State) => State; sighting?: (s: Sighting) => Sighting }> = {
+  'tools, effort, MCP servers, a budget, a context window, Remote Control': {
+    state: (s) => ({
+      ...s,
+      config: {
+        tools: ['Read'],
+        disallowedTools: ['Bash'],
+        effort: 'high',
+        mcp: { m: { command: 'm' } },
+        budgetUsd: 0.01,
+        contextTokens: 1_000,
+        claude: { remoteControl: true },
+      },
+    }),
+  },
+  'a priority': { state: (s) => ({ ...s, priority: 7 }) },
+  'a filing time': { state: (s) => ({ ...s, filedAt: atMs(-86_400_000) }) },
+  labels: { state: (s) => ({ ...s, labels: { team: 'x' } }) },
+  'a trace context': { state: (s) => ({ ...s, traceparent: '00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01' }) },
+  'what a person said': { state: (s) => ({ ...s, said: [{ at: atMs(2_500), attempt: 1, text: 'hello' }] }) },
+  'usage, a cost and an exit code, on the record': {
+    state: (s) => ({ ...s, attempts: s.attempts.map((a) => ({ ...a, usage: { outputTokens: 9, costUsd: 9 }, exitCode: 9 })) }),
+  },
+  'usage, a cost and an exit code, on the sighting': { sighting: (s) => ({ ...s, usage: { outputTokens: 9, costUsd: 9 }, exitCode: 9 }) },
+  'an end time, but for a long-lived task': {
+    state: (s) =>
+      s.restartPolicy === 'Always'
+        ? s
+        : { ...s, attempts: s.attempts.map((a) => (a.endedAt === null ? a : { ...a, endedAt: atMs(999_999_999) })) },
+  },
+};
+
+test("decide answers the same whatever a task carries that it never judges: tools, effort, MCP servers, a budget, a context window, Remote Control, a priority, a filing time, labels, a trace context, usage, a cost, an exit code, what a person said, or an end time but for a long-lived task's backoff", async (t) => {
+  const sightings: Array<Sighting | undefined> = [
+    undefined,
+    ...(['working', 'input-required', 'completed', 'failed', 'canceled'] as const).map((state) => ({ sessionId: 's', state })),
+  ];
+  const times = [0, 2_500, 30_000, GRACE_MS + 5_000, 3_600_000, 86_400_000].map((ms) => ({ at: new Date(ms), graceMs: GRACE_MS }));
+  for (const [what, carried] of Object.entries(CARRIED))
+    await t.test(what, () => {
+      for (const [journal, events] of Object.entries(JUDGED))
+        for (const sighting of sightings)
+          for (const now of times) {
+            const state = fold('t', events);
+            const observed = (s: Sighting | undefined) => new Map(s ? [[nameFor('t', 1), s]] : []);
+            const under = { state: carried.state?.(state) ?? state, sighting: sighting && (carried.sighting?.(sighting) ?? sighting) };
+            assert.deepEqual(
+              decide(under.state, observed(under.sighting), now),
+              decide(state, observed(sighting), now),
+              `${journal}, ${sighting?.state ?? 'unseen'}, ${now.at.toISOString()}`,
+            );
+          }
+    });
+});
+
+test("a long-lived task's backoff is counted from its last attempt's end: the one end time decide reads", () => {
+  const events = JUDGED['long-lived, between restarts'] ?? [];
+  const state = fold('t', events);
+  const now = { at: new Date(3_500), graceMs: GRACE_MS };
+  const backing = decide(state, new Map(), now);
+  assert.equal(backing.do, 'nothing', 'half a second after its end, it backs off');
+  const endedEarlier = { ...state, attempts: state.attempts.map((a) => ({ ...a, endedAt: atMs(-3_600_000) })) };
+  assert.notDeepEqual(decide(endedEarlier, new Map(), now), backing, 'an hour after its end, it is started again');
 });
 
 test('LIVE is exactly the states decide waits on — `busy` is not a state, so it is not one of them', () => {
@@ -1906,4 +1995,23 @@ test('a harness unread for a pass: neither there nor gone — nothing ended, spa
       assert.deepEqual((await run(tick())).unobserved, [], 'the next pass that reads says nothing: nothing is kept from the last');
     },
   );
+});
+
+test("a view whose harness could not be read says its task's session unread, with the look's words, as the pass keeps it unread", async () => {
+  const sessions = new Map<string, Sighting>();
+  let fails = false;
+  const ops = testOps({ sessions });
+  const failing = Effect.suspend(() =>
+    fails ? Effect.fail(new RunnerError({ verb: 'observe', message: 'registry: timed out' })) : ops.observe,
+  );
+  const engine = builtEngine(
+    Engine.layer({ root: scratch('ae-view-unread-'), harnesses: { flaky: { ...ops, observe: failing, find: undefined } } }),
+  );
+  const id = await Effect.runPromise(engine.file({ ...spec, id: 'v' }));
+  await Effect.runPromise(engine.tick());
+  assert.equal((await Effect.runPromise(engine.view(id))).unreadWhy, undefined, 'read: nothing unread');
+  fails = true;
+  const unread = await Effect.runPromise(engine.view(id));
+  assert.match(unread.unreadWhy ?? '', /registry: timed out/, 'the failed look kept as unread, in its words');
+  assert.equal(unread.state.settled, null, 'and nothing settled by it');
 });

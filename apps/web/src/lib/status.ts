@@ -95,7 +95,7 @@ const HELD_BY_A_HOLD: ReadonlySet<StepState> = new Set(['blocked', 'awaiting-app
  * is `blocked`, a closeout's; a session that ended on its own word (`Succeeded`) is at most `unverified`; one an operator or a cancel
  * stopped is drawn `cancelled`; a node its route passed by is `skipped`, and a workflow node that filed its card `sent`.
  */
-export const STATE_OF: Record<StepReason, StepState> = {
+const STATE_OF: Record<StepReason, StepState> = {
   Running: 'working',
   Checking: 'checking',
   Paused: 'paused',

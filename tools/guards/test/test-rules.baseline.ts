@@ -67,7 +67,7 @@ export const PINNED_WORDS: Readonly<Record<string, number>> = {
   'apps/web/test/e2e-pages.test.ts': 15,
   'apps/web/test/e2e-print.test.ts': 1,
   'apps/web/test/e2e-runs-times.test.ts': 1,
-  'apps/web/test/e2e-timing.test.ts': 3,
+  'apps/web/test/e2e-timing.test.ts': 1,
   'apps/web/test/e2e/checks.test.ts': 15,
   'apps/web/test/e2e/visit.test.ts': 4,
   'apps/web/test/factory.test.ts': 9,

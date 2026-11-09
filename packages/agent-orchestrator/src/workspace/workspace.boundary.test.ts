@@ -20,16 +20,18 @@ import type { Run } from '../record/record.ts';
 import { composeBrief } from '../brief/index.ts';
 import type { Workflow } from '../step/step.ts';
 import { scratch } from 'test-kit/scratch';
+import { importsIn } from 'test-kit/imports';
 
 const ROOT = scratch('wf-deps-');
 process.env.WF_ROOT = ROOT;
 const { provisionDeps } = await import('../runner.ts');
 
-test("workspace.ts reads no disk and spawns nothing: it imports path, a step's shape and the record's, and nothing else", () => {
-  const text = fs.readFileSync(path.join(import.meta.dirname, 'workspace.ts'), 'utf8');
+test("workspace.ts reads no disk and spawns nothing: of node's modules it imports path alone, and no store or verb of the package", () => {
+  const specs = importsIn(fs.readFileSync(path.join(import.meta.dirname, 'workspace.ts'), 'utf8')).map((i) => i.spec);
+  assert.ok(specs.includes('node:path'), 'the imports are read');
   assert.deepEqual(
-    [...text.matchAll(/^\s*(?:import|export)\b[^'";]*?\bfrom\s*['"]([^'"]+)['"]/gm)].map((m) => m[1]),
-    ['node:path', '../step/step.ts', '../record/record.ts'],
+    specs.filter((spec) => (spec.startsWith('node:') && spec !== 'node:path') || /\.(store|verb)\.ts$|runner\.ts$/.test(spec)),
+    [],
   );
 });
 

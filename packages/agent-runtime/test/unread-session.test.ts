@@ -124,7 +124,7 @@ test('a Codex run whose stream does not decode is unread alone while it works, w
 });
 
 /** A harness that runs each task's brief as an `sh` script, whose output is read as Codex's. */
-const scripted: HarnessSpec = { name: 'sh', command: (r) => ({ cmd: 'sh', args: ['-c', r.brief] }), readOutput: codexOutput };
+const scripted: HarnessSpec = { name: 'sh', can: [], command: (r) => ({ cmd: 'sh', args: ['-c', r.brief] }), readOutput: codexOutput };
 
 /** A script that prints each of `lines` as a line of JSON. */
 const printing = (lines: object[]) => lines.map((l) => `printf '%s\\n' '${JSON.stringify(l)}'`).join('; ');

@@ -1,6 +1,10 @@
 /**
- * The face of `core/engine/`: the engine's verbs, its journal, its memo and its tally, as the doors take them.
+ * The face of `core/engine/`: the engine's verbs, its journal, its memo and its tally, as the doors take them, and the core's own
+ * readers the engine's stand-in folds a journal by (`fold`, `turnOf`, `unknownTask`).
  */
+export { fold } from '../domain.ts';
+export { turnOf } from '../turn.ts';
+export { unknownTask } from '../text.ts';
 export {
   Admission,
   SessionsDrained,

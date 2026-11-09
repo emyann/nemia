@@ -145,6 +145,8 @@ export { heldHarnessesOf } from './service/options.ts';
  */
 export { remoteConfigRefusal } from './a2a/index.ts';
 export { codex } from './harness/codex/codex.ts';
+/** The harnesses an engine given none runs, by the name each is configured under: for a caller that hands the engine a map of its own. */
+export { DEFAULT_HARNESSES } from './service/default-harnesses.ts';
 /**
  * How long a holder's whole let-go takes at most, in milliseconds: for a caller that waits for such a process to stop — a service
  * unit's stop timeout, a restart's wait for the lease — which is set above it rather than repeating the number.
@@ -174,8 +176,25 @@ export { denialText, fold, nameFor } from './core/index.ts';
 export { RuntimeModel };
 export { CLAUDE_AUTO_DROPPED, CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './harness/claude/index.ts';
 export { fenceReach, unruledIn, type FenceReach } from './harness/reach.ts';
+export { CLAUDE_RULES, type ClaudeRules, type Dated } from './harness/claude/rules.ts';
 export { CODEX_EFFORTS, CODEX_SANDBOXES } from './harness/codex/vocabulary.ts';
 export { HARNESS_CHOICES, HARNESS_KNOBS } from './harness/choices.ts';
+export {
+  CAPABILITIES,
+  DEFAULT_HARNESS,
+  HARNESS_DECLARATIONS,
+  declares,
+  misplacedOf,
+  ownArgsOf,
+  takersOf,
+  verbHarnessOf,
+  type Capability,
+  type HarnessDeclaration,
+  type HarnessDeclared,
+  type OwnArgs,
+  type VerbHarness,
+} from './harness/declaration.ts';
+export { REMOTE_DECLARATION } from './a2a/vocabulary.ts';
 export { CONFIG_FOLDERS, configFolderIn } from './harness/config-folders.ts';
 /**
  * A harness's trust of a folder, off its own file: whether it is given (`trustedFolder`), what it is in a person's words

@@ -18,7 +18,9 @@ import { rowsSaid } from '../../../src/lib/finished.ts';
 import { workflowNameOf } from '../../../src/lib/api/workflows.ts';
 import { runClock, titleOf } from '../../../src/lib/factory.ts';
 import { tokensBreakdown } from '../../../src/lib/breakdown.ts';
-import { agoWords, endedWords, openWord, presentWait, sinceShort, waitSentence, waitTag } from '../../../src/lib/runWords.ts';
+import { durationWords } from '../../../src/lib/duration.ts';
+import { agoWords, openWord, presentWait, waitSentence, waitTag } from '../../../src/lib/runWords.ts';
+import { ENDED } from '../../../src/lib/words.ts';
 import {
   answered,
   fed,
@@ -179,7 +181,7 @@ async function waitSaid(page: Page, run: WaitingRun, asOf: string): Promise<void
   }, `the card of ${run.id} says how long it has waited this time, since ${run.waitingSince}`);
 }
 
-/** The whole minutes a figure says, of `2h 5m` or `25m`; none for `under 1m` and `none`. */
+/** The whole minutes a figure says, of `2h 05m` or `25m`; none for `under 1m` and `none`. */
 const minutesIn = (said: string): number => {
   const [, h, m] = /(?:(\d+)h)?\s*(?:(\d+)m)?$/.exec(said.replace(/^under 1m$/, '')) ?? [];
   return Number(h ?? 0) * 60 + Number(m ?? 0);
@@ -544,7 +546,7 @@ async function clocksSay(page: Page, open: OpenRuns, finished: FinishedPage): Pr
     const want = table.runs.map((run) => runClock(run, table.at, table.done, 'row').words);
     if (words.join('|') !== want.join('|'))
       throw new Refused(`the ${table.where} Clock column says the time at work — expected ${want.join(', ')}, found ${words.join(', ')}`);
-    wallsDiffered += table.runs.filter((run, i) => words[i] !== sinceShort(run.wallMs)).length;
+    wallsDiffered += table.runs.filter((run, i) => words[i] !== durationWords(run.wallMs, 'minute')).length;
     await photograph(section(page, table.where), path.join(OUT, `runs-table-${table.where}-${await themeOf(page)}.png`));
   }
   if (!wallsDiffered)
@@ -771,7 +773,7 @@ async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage, given
     );
   await expectTexts(
     section(page, 'finished').locator('tr[data-run] [data-ended]'),
-    finished.runs.map((run) => endedWords(run.outcome).word),
+    finished.runs.map((run) => ENDED[run.outcome].word),
     'each finished row says how it ended, newest finished first as the api pages them',
   );
   await expectTexts(

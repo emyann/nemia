@@ -14,6 +14,7 @@ import {
   VERSION,
 } from 'agent-orchestrator';
 import { Forbidden, isRefusal, type Refusal } from 'agent-orchestrator';
+import { DEFAULT_HARNESS } from 'agent-orchestrator/workflow';
 import { callerGate, Unauthorized } from './caller/caller.ts';
 import { agents } from './agents/index.ts';
 import { customInstructions } from './custom/custom.ts';
@@ -233,7 +234,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .get('/api/daemon', (c) => c.json(readDaemon()))
     .get('/api/quota', (c) =>
       served(c, async ({ e, env, quota }) => {
-        const harness = 'claude';
+        const harness = DEFAULT_HARNESS;
         return c.json(await quota({ env, harness, ask: () => engineRead('quota', e.quota(harness)) }));
       }),
     )

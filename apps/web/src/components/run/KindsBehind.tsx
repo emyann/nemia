@@ -10,7 +10,7 @@ import type { RunView } from '@/lib/runView';
  * comparing each digest with the run's pins, so a kind reverted to the content the run pins is behind on nothing, and one reverted to
  * an older content says the older number.
  */
-export const behindWords = (k: NonNullable<RunView['kinds']>[number]): string =>
+const behindWords = (k: NonNullable<RunView['kinds']>[number]): string =>
   `${k.kind} ${k.name}: ${k.step ? `${k.step} ran on rev ${k.pinned}` : `rev ${k.pinned}`}, files at rev ${k.now}`;
 
 /**

@@ -782,3 +782,29 @@ test('a `start()` that refuses part-way stops the plan: the runs already started
   );
   assert.equal(folderOfCard(stopped!.card), flow);
 });
+
+test('a parent whose script condition answered a route no pass has copied yet has not landed, its branch on its base: what waits on it still waits', async () => {
+  const b = board();
+  const dir = folderOf(
+    {
+      implement: [],
+      pick: ['routes: [web, docs]', 'route: { script: pick.ts }'],
+      web: ['after: pick', 'when: [web]'],
+      docs: ['after: pick', 'when: [docs]'],
+    },
+    { 'pick.ts': "console.log('never run on the test engine');\n" },
+  );
+  const repo = aRepo();
+  const { id } = await stage.runPlaced(startRun({ brief: 'route it', repo, workflowDir: dir }));
+  await tick(id);
+  const wt = readRun(id).steps.implement.workspace!;
+  fs.writeFileSync(path.join(wt, 'page.ts'), 'export const page = true;\n');
+  world().commit(wt, 'add a page');
+  b.settle(`${id}-implement`, 'succeeded', SIGNED);
+  await tick(id);
+  world().stage(repo, readRun(id).steps.implement.branch!);
+  world().commit(repo, 'merge');
+  b.end(`${id}-pick`, 'succeeded', { exitCode: 0, terminationMessage: '{"route":"web"}' });
+  assert.equal(readRun(id).steps.pick?.route, undefined, 'no pass has copied the route onto the record');
+  assert.equal((await parentNow(id)).landed, false);
+});

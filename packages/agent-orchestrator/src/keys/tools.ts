@@ -3,6 +3,7 @@
  * anything but `Edit`), and the rule offered for a call a fenced step was denied (`allowRuleOf`, `disallowedBy`).
  */
 import { refuse } from '../step/step.ts';
+import { fenceListsOf } from '../harness/harness.ts';
 
 export const TOOLS_EXAMPLE = '`tools: Read, Grep, Glob, Bash`';
 
@@ -18,7 +19,8 @@ export function toolsOf(step: string, tools: string | undefined, harness: string
   if (tools === undefined) return undefined;
   const named = `${step}: \`tools: ${tools}\``;
   const written = `A step's tools are the harness's names for them, bare and comma-separated: ${TOOLS_EXAMPLE}.`;
-  if (harness === 'codex') {
+  const lists = fenceListsOf(harness);
+  if (lists !== undefined && !lists.includes('tools')) {
     refuse(
       `${named} is a tool list, and codex has none: one shell, fenced by its sandbox. The sandbox is \`sandbox:\` — \`read-only\` reads and runs commands and writes nothing, \`workspace-write\` writes in the workspace. Delete the line, and name the sandbox: \`sandbox: read-only\` for a step that must not write.`,
     );

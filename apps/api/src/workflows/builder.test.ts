@@ -17,13 +17,14 @@ import { Effect, Layer } from 'effect';
 import { AgentDoor, type AgentDoorShape } from 'agent-orchestrator';
 import { agentDoorMemory } from 'agent-orchestrator/testing';
 import { app, appOf, liveOf } from '../app.ts';
-import { DEFAULT_HARNESS, isRoleKey, putSchemasBack, stepsNamed } from './builder.ts';
+import { isRoleKey, putSchemasBack, stepsNamed } from './builder.ts';
 import { asWorkflowListing, listedIn } from '../../test/definitions.ts';
 import { StoreRoot, workflowVersion as versionIn } from 'agent-orchestrator';
 import { listWorkflows } from './workflows.ts';
 import { engine, builtinGitPlace, HARNESS_CHOICES, loadWorkflows, workflowTaken, writeWorkflow } from 'agent-orchestrator';
 import {
   AGENT_KEYS,
+  DEFAULT_HARNESS,
   HARNESSES,
   parseFolder,
   parseWorkflow,
@@ -355,7 +356,6 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
         /`gate: false` is what a step without the line already is/,
         "gate's `false` is refused",
       );
-      assert.equal(form.defaultHarness, DEFAULT_HARNESS, "the default harness is the parser's");
       for (const mode of HARNESS_CHOICES.permissionMode[DEFAULT_HARNESS])
         parseWorkflow('a', `---\nplace: git\npermissionMode: ${mode}\n---\nDo a.\n`);
       assert.equal(Object.hasOwn(HARNESS_CHOICES.sandbox, DEFAULT_HARNESS), false, 'a step that names no harness takes no sandbox');

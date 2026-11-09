@@ -2,12 +2,24 @@
  * The engine as an Effect service: `Engine`, built by `Engine.layer(options)` over the harnesses, the store and the memo, whose verbs
  * are Effects with typed errors.
  */
-import { Context, Effect, Exit, Fiber, Layer, Schema, type Scope, type Stream } from 'effect';
-import { fold, nameFor, own, pathOf, type Input, type LifecycleTransition, type Said, type Sighting, type State } from '../core/index.ts';
+import { Cause, Context, Effect, Exit, Fiber, Layer, Schema, type Scope, type Stream } from 'effect';
+import {
+  fold,
+  nameFor,
+  own,
+  pathOf,
+  unknownTask,
+  type Input,
+  type LifecycleTransition,
+  type Said,
+  type Sighting,
+  type State,
+} from '../core/index.ts';
 import {
   argsRefusalOf,
   Runner,
   RunnerError,
+  cursorOf,
   isTranscriptCursor,
   noTranscript,
   composite,
@@ -70,13 +82,12 @@ import { sayVerbOf, type SayRefused, type SayUnsent } from './say.ts';
 import { interruptVerbOf, type Interrupted, type InterruptRefused, type InterruptUnsent } from './interrupt.ts';
 import { answerVerbOf, type Answering, type AnswerRefused, type AnswerUnsent, type AskAnswered } from './answer.ts';
 import {
+  declarationOf,
   handleOf,
-  isSpec,
-  isClaude,
+  isRemote,
   limitedBy,
   runnersOf,
   optionsRefusalOf,
-  heldHarnessesOf,
   type EngineIo,
   type EngineOptions,
   type HarnessConfig,
@@ -86,10 +97,14 @@ import {
 } from './options.ts';
 import { harnessRefusalOf } from './harness-refusal.ts';
 import { harnessedOf, noFallbackRefusal, remoteIn, type Harnessed } from './harnessed.ts';
+import { fallbackOf, verbHarnessIn } from './verb-harness.ts';
+import { wordsOf } from './written-verb.ts';
+import { takersOf, type HarnessDeclared, type VerbHarness } from '../harness/declaration.ts';
 import { McpStateRefused, mcpStateVerbOf } from './mcp-state.ts';
 import { McpSignInRefused, mcpSignInVerbsOf, type McpSignInStarted, type McpSignInState } from './mcp-sign-in.ts';
 import { traceparentOf } from '../harness/telemetry.ts';
-import { attachedSessions, liftSessionDrain, putDrain, putSessionDrain, liftDrain, type Attached } from '../harness/claude/index.ts';
+import { attachedSessions, putDrain, type Attached } from '../harness/claude/index.ts';
+import { liftHolderDrain, liftSessionDrain, putSessionDrain } from '../core/engine/drain.ts';
 import type { McpServersRead } from '../harness/mcp-state.ts';
 import type { RemoteMcpServer } from '../harness/seam.ts';
 import { answerOptionsRefusalOf } from './answer-options.ts';
@@ -130,7 +145,18 @@ export const attemptRefusal = (attempts: readonly { readonly n: number }[], atte
 
 /** The cursor a transcript read from the start is handed, and whether a cursor is one a read of the engine's readers could give. */
 export const TRANSCRIPT_START: TranscriptCursor = noTranscript().cursor;
-export { isTranscriptCursor };
+/** The real reader's cursor and its check, for the engine's stand-in, which reads no transcript of its own. */
+export { cursorOf, isTranscriptCursor };
+
+/**
+ * Whether the conversation of a harness configured `h` is read by the runtime's own transcript reader (`harness/transcript.ts`), whose
+ * cursors `isTranscriptCursor` knows: a harness with a declaration the runtime drives itself. A remote agent's cursor is the agent's
+ * own, and a runner of the consumer's declares nothing, so neither cursor is judged here.
+ */
+const readsOwnTranscript = (h: HarnessConfig): boolean => declarationOf(h) !== undefined && !isRemote(h);
+
+/** Why an Engine verb only some harnesses answer found none to go to (`verbHarnessOf`). */
+type VerbRefusal = Extract<VerbHarness, { kind: 'refused' }>['reason'];
 
 /** What a transcript read names of a task's attempts (`TranscriptRefused` naming those it has where it names none of them). */
 type Asked = { readonly attempt?: number };
@@ -521,8 +547,8 @@ export type EngineShape = {
    * task's spawn `unstartable`: a long-lived Claude Code session runs attached, and nowhere else.
    *
    * Answers what the hold serves (`Served`): a loopback port of its own, speaking A2A as a reading surface alone — the card,
-   * `GetTask` and `SubscribeToTask` — behind one bearer token, for the sessions of each harness configured as the literal
-   * `'claude'`, and no other: those are the ones this process holds attached, and the only ones another process cannot read live
+   * `GetTask` and `SubscribeToTask` — behind one bearer token, for the sessions of each harness that declares `hold`, and no
+   * other: those are the ones this process holds attached, and the only ones another process cannot read live
    * for itself. The address, the token and each harness's card are for whoever started the engine to pass on to a viewer
    * (`EngineOptions.holder`); the port and the token last exactly as long as the scope. `null` for an engine with no such
    * harness, which holds nothing and serves nothing.
@@ -556,8 +582,6 @@ export type EngineShape = {
     onTick?: (r: TickReport) => void;
     onError?: (e: unknown) => void;
   }) => Effect.Effect<{ stop: () => void }>;
-  /** @deprecated use up */
-  readonly start: EngineShape['up'];
 };
 
 /** The W3C trace context of the span this runs in (`traceparentOf`): the filing's, for its sessions to join; undefined where none is. */
@@ -628,15 +652,27 @@ const logsOf = <E, R>(view: Effect.Effect<TaskView, E, R>, harnessOf: (state: St
   });
 
 /**
- * `quota` over `runners`, the engine's harnesses as the seam offers them: the quota of the harness named, or of `fallback`, the
- * default harness, when none is, as its runner answers it (`RunnerOps.quota`). Refused with `QuotaRefused`, in this order: an argument
- * that is not one harness's name; a harness this engine does not have, naming the ones it has; and one whose runner reports no quota,
- * naming the ones that do. Each call is one ask, and nothing is journalled.
+ * Why `quota` refuses the harness `name` of those `declared`, by the reason `verbHarnessOf` gives: a name this engine does not have,
+ * naming the ones it has; or one that does not declare `quota`, or none that does, naming the ones that do.
+ */
+export const quotaRefusalOf = (reason: VerbRefusal, name: string, declared: readonly HarnessDeclared[]): string => {
+  if (reason === 'unknown')
+    return `\`${name}\` is not a harness this engine has. Its harnesses are: ${declared.map((h) => h.name).join(', ')}.`;
+  const some = takersOf('quota', declared);
+  return `the \`${name}\` harness reports no quota. ${some.length ? `Ask one that does: ${some.join(', ')}.` : 'None of the harnesses this engine has does.'}`;
+};
+
+/**
+ * `quota` over `runners`, the engine's harnesses as the seam offers them: the quota of the harness named, or with none named of
+ * `fallback`, the default harness, where it declares `quota`, else of the first that does (`verbHarnessIn`), as its runner answers it
+ * (`RunnerOps.quota`). Refused with `QuotaRefused`, in this order: an argument that is not one harness's name; a harness this engine
+ * does not have; and one that declares no quota, or none that does (`quotaRefusalOf`). Each call is one ask, and nothing is
+ * journalled.
  *
  * Traced only where it asks a harness, as `Engine.quota` with the `harness` asked: a refusal asks nothing and makes no span, so a
  * harness that reports no quota, asked as every harness is, is no error on a trace.
  */
-const quotaVerbOf = (runners: Record<string, SeamOps>, fallback: string): EngineShape['quota'] =>
+const quotaVerbOf = (runners: Record<string, SeamOps>, declared: readonly Harnessed[], fallback: string): EngineShape['quota'] =>
   Effect.fnUntraced(function* (harness?: string) {
     const refuse = (message: string) => Effect.fail(new QuotaRefused({ message }));
     const args = [...arguments];
@@ -645,20 +681,11 @@ const quotaVerbOf = (runners: Record<string, SeamOps>, fallback: string): Engine
         `takes one harness's name, or nothing for the default harness (\`${fallback}\`); it was handed ${args.map((a) => JSON.stringify(a)).join(', ')}.`,
       );
     }
-    const name = harness ?? fallback;
-    if (!Object.hasOwn(runners, name)) {
-      return yield* refuse(`\`${name}\` is not a harness this engine has. Its harnesses are: ${Object.keys(runners).join(', ')}.`);
-    }
-    const ask = own(runners, name)?.quota;
-    if (!ask) {
-      const some = Object.entries(runners)
-        .filter(([, r]) => r.quota)
-        .map(([h]) => h);
-      return yield* refuse(
-        `the \`${name}\` harness reports no quota. ${some.length ? `Ask one that does: ${some.join(', ')}.` : 'None of the harnesses this engine has does.'}`,
-      );
-    }
-    return yield* ask.pipe(Effect.withSpan('Engine.quota', { attributes: { harness: name } }));
+    const taken = verbHarnessIn('quota', harness, declared, fallback);
+    if (taken.kind === 'refused') return yield* refuse(quotaRefusalOf(taken.reason, harness ?? fallback, declared));
+    const ask = own(runners, taken.name)?.quota;
+    if (!ask) return yield* refuse(quotaRefusalOf('undeclared', taken.name, declared));
+    return yield* ask.pipe(Effect.withSpan('Engine.quota', { attributes: { harness: taken.name } }));
   });
 
 /**
@@ -736,15 +763,66 @@ const writtenVerbsOf = (...given: Parameters<typeof sayVerbOf>) => ({
  */
 const askedVerbsOf = (
   runners: Record<string, SeamOps>,
-  fallback: string,
   harnesses: Record<string, HarnessConfig>,
+  declared: readonly Harnessed[],
+  fallback: string,
   root: string,
   executable: string | undefined,
 ): Pick<EngineShape, 'quota' | 'mcpState' | 'mcpSignIn' | 'mcpSignInState' | 'mcpSignOut'> => ({
-  quota: quotaVerbOf(runners, fallback),
+  quota: quotaVerbOf(runners, declared, fallback),
   mcpState: mcpStateVerbOf(harnesses, root, executable),
   ...mcpSignInVerbsOf(harnesses, root, executable),
 });
+
+/**
+ * A look at the harness `harness` that failed with `cause`, as a view reads it: nothing seen, and the session `name` — the last
+ * attempt's, where there is one — unread, with the failure's words (`TaskView.unreadWhy`), as the pass keeps a name its look could
+ * not read, rather than as a session gone.
+ */
+const unreadLookOf =
+  (harness: string, name: string | undefined) =>
+  (cause: Cause.Cause<unknown>): Observation => ({
+    seen: new Map<string, Sighting>(),
+    unread: new Set(name === undefined ? [] : [name]),
+    ...(name === undefined
+      ? {}
+      : { unreadWhy: new Map([[name, `the \`${harness}\` harness could not be read: ${wordsOf(Cause.squash(cause))}`]]) }),
+  });
+
+/**
+ * `view` over the engine's harnesses: the task's journal folded, and its harness asked only where the record cannot say — a session
+ * in flight looked at, a session's id found where its end recorded none. A look or a find that failed keeps the session unread, with
+ * its words (`unreadLookOf`), never read as a session gone.
+ */
+const viewVerbOf = (harnessOf: (state: State) => Harnessed, runners: Record<string, SeamOps>, fallback: string) => (taskId: string) =>
+  Effect.gen(function* () {
+    const events = yield* Effect.flatMap(Journal, (j) => j.read(TaskId.read(taskId)));
+    const state = fold(taskId, events);
+    const last = state.attempts.at(-1);
+    const { name: harness, runner } = harnessOf(state);
+    const { find, observe, observeFor } = runner;
+    const unreadOf = unreadLookOf(harness, last ? nameFor(taskId, last.n) : undefined);
+    const look = observeFor
+      ? observeFor(state.attempts.map((a) => ({ name: nameFor(taskId, a.n), harness: state.harness })))
+      : observe.pipe(Effect.map((seen): Observation => ({ seen, unread: new Set() })));
+    const observed = look.pipe(
+      Effect.catchCause((cause) => Effect.succeed(unreadOf(cause))),
+      Effect.map((o) => viewOfState(state, o.seen, o.unreadWhy, runner.bridgeAsked)),
+    );
+    const recorded = Effect.sync(() => viewOfState(state, new Map(), undefined, runner.bridgeAsked));
+    if (!Object.hasOwn(runners, state.harness ?? fallback)) return yield* recorded;
+    if (!state.settled && (!find || last?.ended === null)) return yield* observed;
+    if (!last || (find && last.nativeId)) return yield* recorded;
+    const found = find
+      ? yield* find(nameFor(taskId, last.n)).pipe(Effect.catchCause((cause) => Effect.succeed(unreadOf(cause))))
+      : undefined;
+    if (found && 'unread' in found)
+      return state.settled ? yield* recorded : viewOfState(state, found.seen, found.unreadWhy, runner.bridgeAsked);
+    if (found) return { ...(yield* recorded), sessionId: found.sessionId };
+    if (!state.settled) return yield* observed;
+    const v = yield* recorded;
+    return { ...v, sessionId: handleOf(events, last.n) ?? v.sessionId };
+  });
 
 /** A task's events, read through the Task door `journal` gives. */
 const readOn = (journal: Layer.Layer<Journal>, taskId: string) =>
@@ -756,7 +834,7 @@ const make = (options: EngineOptions) =>
     if (refused) return yield* Effect.fail(new EngineRefused({ message: refused }));
     const root = options.root;
     const harnesses = options.harnesses ?? DEFAULT_HARNESSES;
-    const fallback = options.defaultHarness ?? Object.keys(harnesses)[0] ?? 'claude';
+    const fallback = fallbackOf(harnesses, options.defaultHarness);
 
     const journalOps = options.journal ?? Journal.filesOps(root);
     const journal = Journal.layer(journalOps);
@@ -766,9 +844,10 @@ const make = (options: EngineOptions) =>
     const observedNow = () => copyOf(observed);
     const { credentials, missingCredential, telemetry, claudeExecutable, cgroupParent } = options;
     const attached = attachedSessions(root, claudeExecutable, { cgroupParent });
-    const made = runnersOf(harnesses, root, credentials, missingCredential, telemetry, attached, claudeExecutable, cgroupParent);
+    const made = runnersOf(harnesses, { root, credentials, missingCredential, telemetry, attached, claudeExecutable, cgroupParent });
     const runners = Object.fromEntries(Object.entries(made).map(seamOf(harnesses, events, counted, options)));
     const byName = harnessedOf(harnesses, runners);
+    const declared = Object.values(byName);
     const fallen = own(byName, fallback);
     if (fallen === undefined) return yield* Effect.fail(new EngineRefused({ message: noFallbackRefusal(fallback, harnesses) }));
     const layer = Layer.mergeAll(journal, Runner.layer(composite(runners, fallback)), tickMemoLayer(), passReadsOf(options, harnesses));
@@ -777,29 +856,7 @@ const make = (options: EngineOptions) =>
 
     const harnessOf = (state: State): Harnessed => own(byName, state.harness ?? fallback) ?? fallen;
 
-    const viewOf = (taskId: string) =>
-      Effect.gen(function* () {
-        const events = yield* Effect.flatMap(Journal, (j) => j.read(TaskId.read(taskId)));
-        const state = fold(taskId, events);
-        const last = state.attempts.at(-1);
-        const { find, observe, observeFor } = harnessOf(state).runner;
-        const look = observeFor
-          ? observeFor(state.attempts.map((a) => ({ name: nameFor(taskId, a.n), harness: state.harness })))
-          : observe.pipe(Effect.map((seen): Observation => ({ seen, unread: new Set() })));
-        const observed = look.pipe(
-          Effect.catchCause(() => Effect.succeed<Observation>({ seen: new Map<string, Sighting>(), unread: new Set() })),
-          Effect.map((o) => viewOfState(state, o.seen, o.unreadWhy)),
-        );
-        const recorded = Effect.sync(() => viewOfState(state, new Map()));
-        if (!Object.hasOwn(runners, state.harness ?? fallback)) return yield* recorded;
-        if (!state.settled && (!find || last?.ended === null)) return yield* observed;
-        if (!last || (find && last.nativeId)) return yield* recorded;
-        const found = find ? yield* find(nameFor(taskId, last.n)).pipe(Effect.catchCause(() => Effect.succeed(undefined))) : undefined;
-        if (found) return { ...(yield* recorded), sessionId: found.sessionId };
-        if (!state.settled) return yield* observed;
-        const v = yield* recorded;
-        return { ...v, sessionId: handleOf(events, last.n) ?? v.sessionId };
-      });
+    const viewOf = viewVerbOf(harnessOf, runners, fallback);
 
     const fileVerb = Effect.fn('Engine.file')(function* (spec: TaskSpec) {
       const task = { ...spec, harness: spec.harness ?? fallback, traceparent: options.telemetry ? yield* filingSpan : undefined };
@@ -845,8 +902,7 @@ const make = (options: EngineOptions) =>
     const transcriptVerb = Effect.fn('Engine.transcript')(function* (taskId: string, after?: TranscriptCursor, asked: Asked = {}) {
       const refuse = (message: string) => Effect.fail(new TranscriptRefused({ message }));
       const events = yield* read(taskId);
-      if (!events.length)
-        return yield* refuse(`\`${taskId}\` is not a task in this store. \`ae ls\`, or \`list()\`, gives the ones it has.`);
+      if (!events.length) return yield* refuse(unknownTask(taskId));
       const state = fold(taskId, events);
       const { name: harness, runner, config: h } = harnessOf(state);
       const transcriptOf = runner.transcriptOf;
@@ -854,7 +910,7 @@ const make = (options: EngineOptions) =>
         return yield* refuse(
           `the \`${harness}\` harness keeps no conversation this engine can read. \`logs\` gives what its session printed.`,
         );
-      if (after !== undefined && (isClaude(h) || isSpec(h)) && !isTranscriptCursor(after)) {
+      if (after !== undefined && readsOwnTranscript(h) && !isTranscriptCursor(after)) {
         return yield* refuse(
           `\`${after}\` is not a cursor a transcript read gave. Pass the \`cursor\` the last read returned, or none to read from the start.`,
         );
@@ -895,7 +951,7 @@ const make = (options: EngineOptions) =>
       output: outputVerbOf(read, harnessOf),
       follow: followVerbOf(read, harnessOf),
       ...writtenVerbsOf(go, read, harnessOf),
-      ...askedVerbsOf(runners, fallback, harnesses, root, options.claudeExecutable),
+      ...askedVerbsOf(runners, harnesses, declared, fallback, root, options.claudeExecutable),
       answer: answerVerb,
       close: (taskId) => go(close(taskId)),
       feed: feedVerb,
@@ -903,16 +959,10 @@ const make = (options: EngineOptions) =>
       ...keepingVerbsOf(go, journalOps, runners, harnessOf, fallback),
       watch: watchOf(feedVerb, journalOps.subscribe),
       ...ioVerbsOf(observedNow),
-      ...upVerbsOf(tickVerb),
-      ...attachVerbsOf(attached, root, servingOf(harnesses, made, events)),
+      up: upOf(tickVerb),
+      ...attachVerbsOf(attached, root, servingOf(declared, made, events)),
     });
   });
-
-/** `up` over `tick`, and `start`, its old name, the same function. */
-const upVerbsOf = (tick: EngineShape['tick']): Pick<EngineShape, 'up' | 'start'> => {
-  const up = upOf(tick);
-  return { up, start: up };
-};
 
 /**
  * A harness's runner as the engine runs it: through its A2A agent unless it is a remote one already, its observes counted, and its
@@ -936,18 +986,20 @@ const seamOf =
   ];
 
 /**
- * What a holder serves while it holds: the ops of each harness configured as the literal `'claude'`, by name, and no other — those
- * are the sessions one process holds attached, and the only ones another process cannot read live for itself. An engine with no such
- * harness serves nothing, and its `hold()` answers `null`.
+ * What a holder serves while it holds: the ops of each harness that declares `hold`, by name, and no other — those are the sessions
+ * one process holds attached, and the only ones another process cannot read live for itself. An engine with no such harness serves
+ * nothing, and its `hold()` answers `null`.
  */
-const servingOf = (harnesses: Record<string, HarnessConfig>, made: Record<string, RunnerOps>, events: Parameters<typeof a2aOps>[2]) => {
-  const held = heldHarnessesOf(harnesses);
+const servingOf = (declared: readonly Harnessed[], made: Record<string, RunnerOps>, events: Parameters<typeof a2aOps>[2]) => {
+  const held = declared.filter((h) => h.can.includes('hold')).map((h) => h.name);
   return { ops: Object.fromEntries(Object.entries(made).filter(([name]) => held.includes(name))), events };
 };
 
 /**
  * The verbs of the sessions run attached: `hold`, with the port it serves while it holds (`servedOf`), and `drain`, which writes the
- * drain's file or removes it; and `drainSessions`, which does the same of the sessions' drain.
+ * drain's file or removes it; and `drainSessions`, which does the same of the sessions' drain. Neither asks which harness declares
+ * `drain`: each is a record of the store, read by every engine and job over it, and a harness is held by it only where it declares
+ * `drain`, which is judged where the record is read (`SessionsDrained`).
  */
 const attachVerbsOf = (
   attached: Attached,
@@ -960,7 +1012,7 @@ const attachVerbsOf = (
     ),
   drain: Effect.fn('Engine.drain')(function* (holder: number | null) {
     yield* drainChecked(holder);
-    yield* Effect.sync(() => (holder === null ? liftDrain(root) : putDrain(root, holder)));
+    yield* Effect.sync(() => (holder === null ? liftHolderDrain(root) : putDrain(root, holder)));
   }),
   drainSessions: Effect.fn('Engine.drainSessions')(function* (given: { graceMs: number } | null) {
     yield* drainSessionsChecked([...arguments]);

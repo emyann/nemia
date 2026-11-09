@@ -500,6 +500,32 @@ test('a loop past its budget waits for a person to raise it, then goes round and
   });
 });
 
+test("a loop's target over its budget whose check refused: the round reads it as `nemia ls` does, and points to a try it takes", async (t) => {
+  const s = story(t);
+  let id = '';
+  await s.test('implement cost $4.25 of its $3 and its check exited 1: `nemia ls` reads it over budget', async () => {
+    id = await startedLoop(looped('', 'budget: 3\n'));
+    const implement = taskOf(id, 'implement');
+    stage.board().settle(implement, 'succeeded', SIGNED);
+    assert.deepEqual((await tick(id)).checked, ['implement']);
+    stage.board().settle(`${implement}-check`, 'failed', undefined, 1);
+    stage.board().tasks.get(implement)!.attempt!.usage = { costUsd: 4.25 };
+    await tick(id);
+    const l = await over(list(stage.board().e, readRun(id)));
+    assert.match(l.steps[0].message, /^over budget /);
+  });
+  await s.test('REFUSED: `nemia retry --round` names it over budget, and a try of it with `--budget`', async () => {
+    await assert.rejects(
+      over(roundRun(id)),
+      refusedAs('Conflict', 'implement is over budget', `nemia retry ${id} implement --budget <amount>`),
+    );
+  });
+  await s.test('the try its advice names, with a `--budget` above what it cost, is taken', async () => {
+    await over(retryRun(id, 'implement', { mode: 'continue', budget: 10 }));
+    assert.deepEqual(asksOf(id, 'retry').length, 1);
+  });
+});
+
 test('REFUSED: `nemia retry --round` and `nemia approve`, and their former spellings `nemia round` and `nemia accept` typed on purpose, before anything is written', async (t) => {
   const refused = (argv: string[], tag: string, ...facts: string[]) =>
     t.test(`nemia ${argv.join(' ')}`, async () => {

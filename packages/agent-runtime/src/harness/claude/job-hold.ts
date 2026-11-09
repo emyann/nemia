@@ -3,21 +3,18 @@
  * never held, the calls in flight a session keeps, and the two files a Claude Code job holds by — the store's sessions' drain, which says
  * every session, job or attached, is to stop at its call's end, and the job's own hold file, which says what it is doing about it.
  *
- * The sessions' drain is apart from the holder's (`putDrain`, `attached-file.ts`): a restart drains and lifts its holder, and must neither
- * hold nor release the jobs (two facts, two files). It carries when it was put and its grace, so a job that reads it judges by itself,
- * on every poll, whether its call has outlived the grace or its hold the bound (`bin/ae-claude-job.ts`), and a holder, on every look,
- * whether an attached session's call has (`attached.ts`): nothing is carried between two reads but the file.
+ * The sessions' drain is the runtime's record (`core/engine/drain.ts`), apart from the holder's. It carries when it was put and its
+ * grace, so a job that reads it judges by itself, on every poll, whether its call has outlived the grace or its hold the bound
+ * (`bin/ae-claude-job.ts`), and a holder, on every look, whether an attached session's call has (`attached.ts`): nothing is carried
+ * between two reads but the file.
  *
- * The hold file is the job's word on what it was doing, written whole as it changes (a temp file renamed over it), and read by the
+ * The hold file is the job's word on what it was doing, written whole as it changes (`replaceFile`), and read by the
  * runner's look beside its run: a call in flight (`calling`), a drain read standing (`draining`), a call waiting at its hook
  * (`heldBack`), and its end under the drain (`parked`, with the call it cut). Both files are decoded by their schema, and one that does
  * not decode is read as absent.
  */
-import fs from 'node:fs';
-import path from 'node:path';
-import { Option, Schema } from 'effect';
-import { instantNow } from '../../core/engine/now.ts';
-import { attachedDir } from './attached-file.ts';
+import { Schema } from 'effect';
+import { decodedFile, writeWhole } from '../../core/engine/drain.ts';
 
 /** How long a call is held at its hook before Claude Code answers for it, in seconds: a day, longer than any drain. */
 export const HOOK_HOLD_S = 86_400;
@@ -54,16 +51,6 @@ export const callStarted = (calls: CallsInFlight, id: string | undefined, input:
 
 const CallSchema = Schema.Struct({ tool: Schema.String, since: Schema.String });
 
-const SessionDrainSchema = Schema.Struct({
-  /** When the drain was put (ISO), what its grace and a job's hold bound are counted from. */
-  at: Schema.String,
-  /** How long a call in flight is given to finish once the drain is put, in milliseconds, before the job cuts it. */
-  graceMs: Schema.Finite,
-});
-
-/** The sessions' drain, as its file holds it. */
-export type SessionDrain = typeof SessionDrainSchema.Type;
-
 const JobHoldSchema = Schema.Struct({
   calling: Schema.optional(CallSchema),
   draining: Schema.optional(Schema.Struct({ since: Schema.String })),
@@ -74,53 +61,10 @@ const JobHoldSchema = Schema.Struct({
 /** A job's hold file: its call in flight, the drain it read standing, a call waiting at its hook, and its end under the drain. */
 export type JobHold = typeof JobHoldSchema.Type;
 
-/** The sessions' drain file of the store at `root`, beside the attached sessions' files and apart from the holder's drain. */
-export const sessionDrainFile = (root: string): string => path.join(attachedDir(root), 'sessions-drain.json');
-
-/** Writes `value` whole on `file`, through a file beside it renamed over it, so a reader never reads half of it. */
-const writeWhole = (file: string, value: unknown): void => {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const temp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(temp, JSON.stringify(value));
-  fs.renameSync(temp, file);
-};
-
-/** What `file` holds as JSON, through `decode`; `null` where it is absent, no JSON, or does not decode. */
-const readDecoded = <A>(file: string, decode: (u: unknown) => Option.Option<A>): A | null => {
-  let text: string;
-  try {
-    text = fs.readFileSync(file, 'utf8');
-  } catch {
-    return null;
-  }
-  try {
-    return Option.getOrNull(decode(JSON.parse(text)));
-  } catch {
-    return null;
-  }
-};
-
-const decodeDrain = Schema.decodeUnknownOption(SessionDrainSchema);
 const decodeHold = Schema.decodeUnknownOption(JobHoldSchema);
 
-/**
- * The sessions' drain put on the store at `root`: every session's next call waits, and a call in flight has `graceMs`. A drain standing
- * with the same grace is kept as it is, so a pass that puts it again on every tick never moves the `at` its grace counts from; one with
- * another grace is stamped now, which is how a grace of 0 cuts a standing drain's calls at once.
- */
-export const putSessionDrain = (root: string, { graceMs }: { graceMs: number }): void => {
-  if (sessionDrainOf(sessionDrainFile(root))?.graceMs === graceMs) return;
-  writeWhole(sessionDrainFile(root), { at: new Date(instantNow().at).toISOString(), graceMs } satisfies SessionDrain);
-};
-
-/** The sessions' drain lifted: no job waits. */
-export const liftSessionDrain = (root: string): void => fs.rmSync(sessionDrainFile(root), { force: true });
-
-/** The sessions' drain `file` says stands; `null` where none does, or the file does not decode. */
-export const sessionDrainOf = (file: string): SessionDrain | null => readDecoded(file, decodeDrain);
-
 /** The job's hold file `file`; `null` where it is absent or does not decode. */
-export const readJobHold = (file: string): JobHold | null => readDecoded(file, decodeHold);
+export const readJobHold = (file: string): JobHold | null => decodedFile(file, decodeHold);
 
 /** Writes `hold` whole on the job's hold file `file`. */
 export const writeJobHold = (file: string, hold: JobHold): void => writeWhole(file, hold);

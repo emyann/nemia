@@ -28,7 +28,7 @@ import {
 } from '../domain.ts';
 import { atWorkState, LIVE_PHASE, type SessionState, type TaskPhase } from '../session.ts';
 import { Journal } from './journal.ts';
-import { bridgeOfTask, configForTurn } from '../../harness/args.ts';
+import { configForTurn } from '../../harness/args.ts';
 import { Runner, type ExpectedSession, type Observation, type RunnerOps, type SpawnRequest } from '../../harness/seam.ts';
 import { TASK_LABEL } from '../labels.ts';
 import { transition, type Move, type Refusal } from '../lifecycle.ts';
@@ -56,25 +56,36 @@ export const Lifecycle = Context.Reference<Move>('engine/Lifecycle', { defaultVa
  */
 export const Admission = Context.Reference<AdmissionRule>('engine/Admission', { defaultValue: () => ({ poolOf: ownPool }) });
 
+/** Whether the sessions' drain holds a task of the harness named (`undefined`: the default harness), as one pass read it. */
+export type DrainedOn = (harness: string | undefined) => boolean;
+
 /**
- * Whether the store's sessions' drain stands, read off its file once per pass (`Now.drained`): `Engine.layer` provides the read of its
- * store's file. By default none stands, so a pass run over layers of a test's own holds no parked job back.
+ * The store's sessions' drain, read off its file once per pass, then asked per task (`Now.drained`): it holds a task whose harness
+ * declares `drain` while it stands, and no other. `Engine.layer` provides the read of its store's file. By default none stands, so a
+ * pass run over layers of a test's own holds no parked job back.
  */
-export const SessionsDrained = Context.Reference<() => boolean>('engine/SessionsDrained', { defaultValue: () => () => false });
+export const SessionsDrained = Context.Reference<() => DrainedOn>('engine/SessionsDrained', { defaultValue: () => () => () => false });
 
 /** How long a spawned session may go unregistered by the harness before we call it gone. */
 export const GRACE_MS = 30_000;
 
 /** What a pass read of the world beside its look, the same for every task it decides: the names it could not read, and the drain. */
-type World = { readonly unread: ReadonlySet<string>; readonly drained: boolean };
+type World = { readonly unread: ReadonlySet<string>; readonly drained: DrainedOn };
 
 /**
- * The clock `decide` is handed for one task: now, on the wall clock and the monotonic one, with the grace, the unread names and
- * whether the sessions' drain stands.
+ * The clock `decide` is handed for the task `state`: now, on the wall clock and the monotonic one, with the grace, the unread names
+ * and whether the sessions' drain holds it — it stands, and the task's harness declares `drain`.
  */
-const nowFor = ({ unread, drained }: World): Now => {
+const nowFor = ({ unread, drained }: World, state: State): Now => {
   const now = instantNow();
-  return { at: new Date(now.at), ...(now.mono ? { mono: now.mono } : {}), graceMs: GRACE_MS, unread, ...(drained ? { drained } : {}) };
+  const held = drained(state.harness);
+  return {
+    at: new Date(now.at),
+    ...(now.mono ? { mono: now.mono } : {}),
+    graceMs: GRACE_MS,
+    unread,
+    ...(held ? { drained: held } : {}),
+  };
 };
 
 /**
@@ -138,7 +149,8 @@ export type TaskView = {
   admission?: 'queued' | 'admitted';
   /**
    * The link that opens the session in a browser or on a phone, for a task that asked its harness to bridge it there — Claude
-   * Code's `claude.remoteControl` — or no link and why: not up yet, refused, or ended (`bridgeOfTask`). Absent for a task that did
+   * Code's `claude.remoteControl`, as its runner says (`RunnerOps.bridgeAsked`) — or no link and why: not up yet, refused, or ended
+   * (`bridgeOfTask`). Absent for a task that did
    * not ask, and only then. Off the same observation as the phase, read afresh every pass: the status a Pod's spec asked for.
    */
   bridge?: Bridge;
@@ -164,13 +176,10 @@ export type TaskView = {
  *
  * 1. The statement was made after this attempt began. A RESUMED Claude Code session's transcript holds its parent's whole
  *    conversation under the child's own id, so the parent's statement arrives looking like the child's: the session id
- *    cannot tell them apart. The `--bg` runner tells them by the call's id, against the parent's last call it recorded at
- *    spawn, reports the parent's none and the session's own with no time. Where a runner could not tell — no record, a
- *    call with no id — the moment it was made can, and only the journal knows when this attempt began, which is why the
- *    check is here and not in a runner. One made before is carried over, not said: it is dropped from the sighting, so it
- *    is never recorded as this attempt's either. One with no time is the session's own: a `--bg` session's told by its
- *    call's id, a remote agent's Task, made by this attempt's message, or a detached run, whose spawn cleared the last
- *    one's statement before it launched the run.
+ *    cannot tell them apart. The moment it was made can, and only the journal knows when this attempt began, which is why
+ *    the check is here and not in a runner. One made before is carried over, not said: it is dropped from the sighting, so
+ *    it is never recorded as this attempt's either. One with no time is the session's own: a remote agent's Task, made by
+ *    this attempt's message, or a detached run, whose spawn cleared the last one's statement before it launched the run.
  * 2. The harness has not answered already (`LIVE`): an ended session's statement rides along to the record and nothing
  *    more. A session listed `blocked` is live, and to `decide` it is live for ever: a step can call StructuredOutput, end its
  *    turn and be seen `blocked`, idle, next, so a statement ends a blocked attempt exactly as it ends a working one, or that
@@ -215,7 +224,7 @@ const allRead = Effect.map(SessionsDrained, (drained): World => ({ unread: ALL_R
 /**
  * One task, one step. Returns the action taken, so a caller can loop until nothing moves.
  *
- * `observed` is passed in rather than read here: one `claude agents` call serves a whole pass, which is the difference
+ * `observed` is passed in rather than read here: one look at the harnesses serves a whole pass, which is the difference
  * between a store that scales and one that shells out per task. Typed to take two arguments, and counts them all the same:
  * a third, as an untyped caller may still pass the ceiling's slots, fails with `ReconcileRefused` (`reconcileRefusalOf`), nothing read.
  */
@@ -305,7 +314,7 @@ const reconcileOn = Effect.fn('reconcileOn')(function* (taskId: string, observed
   const move = yield* Lifecycle;
 
   const state = yield* notedFold(taskId, observed);
-  const action = decide(state, endedOnStatement(state, observed), nowFor(world), move);
+  const action = decide(state, endedOnStatement(state, observed), nowFor(world, state), move);
   const at = () => new Date().toISOString();
 
   switch (action.do) {
@@ -601,7 +610,7 @@ const forgetNamed = Effect.fn('forgetNamed')(function* (memo: TickMemoState) {
  */
 const verifyKept = Effect.fnUntraced(function* (kept: Releasable, observed: ReadonlyMap<string, Sighting>, world: World) {
   const fresh = fold(kept.taskId, yield* (yield* Journal).read(TaskId.read(kept.taskId)));
-  const decided = decide(fresh, endedOnStatement(fresh, observed), nowFor(world), yield* Lifecycle);
+  const decided = decide(fresh, endedOnStatement(fresh, observed), nowFor(world, fresh), yield* Lifecycle);
   const why = divergence(kept, fresh, decided);
   if (why) return yield* Effect.fail(new TickMemoDiverged({ taskId: kept.taskId, message: `the pass skipped \`${kept.taskId}\`: ${why}` }));
 });
@@ -727,7 +736,7 @@ export const tick = Effect.fn('tick')(function* () {
       else memo.listed.delete(id);
     }
     if (after.settled) continue;
-    views.push(viewOfState(after, observed, unreadWhy));
+    views.push(viewOfState(after, observed, unreadWhy, runner.bridgeAsked));
     if (atWork(after, observed)) running[after.harness ?? 'default'] = (running[after.harness ?? 'default'] ?? 0) + 1;
   }
 
@@ -752,7 +761,8 @@ export const tick = Effect.fn('tick')(function* () {
 /** What a person wants to see. Derived, never stored. Over a full listing (`observe`), which says no session's `unreadWhy`. */
 export const view = Effect.fn('view')(function* (taskId: string, observed: ReadonlyMap<string, Sighting>) {
   const journal = yield* Journal;
-  return viewOfState(fold(taskId, yield* journal.read(TaskId.read(taskId))), observed);
+  const runner = yield* Runner;
+  return viewOfState(fold(taskId, yield* journal.read(TaskId.read(taskId))), observed, undefined, runner.bridgeAsked);
 });
 
 /** A task a read left out because its journal does not read, and why, in the words the pass says it with (`TickReport.unreadable`). */
@@ -783,7 +793,7 @@ const readEach = Effect.fn('readEach')(function* (taskIds: Iterable<string>) {
 /**
  * The views of `taskIds`, over one look at the harnesses: each journal read once, and the harnesses told the last attempt of each task not
  * settled (`observeFor`), which is all a view reads of a sighting — so a look for Claude Code jobs alone lists their run files and asks no
- * `claude agents`, and a look for none is not made. Where a runner cannot be told, it observes everything once, as `list` does. What a
+ * registry, and a look for none is not made. Where a runner cannot be told, it observes everything once, as `list` does. What a
  * caller that shows some of the store reads in place of a `view` each (an observation each for tasks in flight) or of `list` (every
  * journal in the store). A registry that cannot be read this time is nothing observed, as `view` reads it. Why a session alone was
  * unread (`TaskView.unreadWhy`) is carried off the look that said it.
@@ -803,7 +813,7 @@ export const viewsOf = Effect.fn('viewsOf')(function* (taskIds: readonly string[
           : runner.observe.pipe(Effect.map((seen): Observation => ({ seen, unread: ALL_READ })))
       ).pipe(Effect.catchCause(() => Effect.succeed<Observation>({ seen: new Map(), unread: ALL_READ })))
     : { seen: new Map<string, Sighting>(), unreadWhy: undefined };
-  return { views: states.map((state) => viewOfState(state, seen, unreadWhy)), unreadable } satisfies TaskList;
+  return { views: states.map((state) => viewOfState(state, seen, unreadWhy, runner.bridgeAsked)), unreadable } satisfies TaskList;
 });
 
 /**
@@ -812,9 +822,11 @@ export const viewsOf = Effect.fn('viewsOf')(function* (taskIds: readonly string[
  * harness that cannot be observed, fails the read. A full listing says no session's `unreadWhy`.
  */
 export const everyView = Effect.fn('everyView')(function* () {
-  const observed = yield* (yield* Runner).observe;
+  const runner = yield* Runner;
+  const observed = yield* runner.observe;
   const { read, unreadable } = yield* readEach(yield* (yield* Journal).list);
-  return { views: read.map(({ taskId, events }) => viewOfState(fold(taskId, events), observed)), unreadable } satisfies TaskList;
+  const views = read.map(({ taskId, events }) => viewOfState(fold(taskId, events), observed, undefined, runner.bridgeAsked));
+  return { views, unreadable } satisfies TaskList;
 });
 
 /** The phase `viewOfState` gives a task, by its rules in order, off its record and the sighting of its last attempt. */
@@ -855,6 +867,23 @@ const carriedOf = (sighting: Sighting | undefined, phase: TaskView['phase']) => 
 };
 
 /**
+ * A task's bridge as its view says it, from whether the task asked its harness for one (`asked`, `RunnerOps.bridgeAsked`) and what its
+ * harness saw of the session (`seen`): `undefined` for a task that did not ask, whatever was seen; else the bridge seen, a link or why
+ * there is none; else no link, and why, by whether the task is `settled`. Never `undefined` for a task that asked: an absent link is
+ * not "not bridged".
+ */
+export const bridgeOfTask = (asked: boolean, settled: boolean, seen: Bridge | undefined): Bridge | undefined => {
+  if (!asked) return undefined;
+  if (seen) return seen;
+  return {
+    url: null,
+    why: settled
+      ? 'its session has ended, and its bridge with it.'
+      : 'no process of its session is seen yet to read its bridge from: it is starting, restarting, or between attempts.',
+  };
+};
+
+/**
  * A task's view from its folded record and one observation. Pure: `view` reads the record for it, and `tick` hands in the
  * fold it made.
  *
@@ -879,16 +908,22 @@ const carriedOf = (sighting: Sighting | undefined, phase: TaskView['phase']) => 
  *
  * Its `sessionId` is the sighting's, or else the id its last end was recorded with: a released session is in no
  * observation, and that id is what `logs` reads then. What the sighting carries through untouched is `carriedOf`'s, never
- * judged — `decide` never saw it. So is its `bridge`, which only a task that asked for one carries (`bridgeOfTask`), and why the
+ * judged — `decide` never saw it. So is its `bridge`, which only a task its runner says asked for one carries (`bridgeAsked`,
+ * `bridgeOfTask`), and why the
  * look left its session unread (`unreadWhy`, the look's words by the last attempt's name), only for a session not seen.
  */
-export function viewOfState(state: State, observed: ReadonlyMap<string, Sighting>, unreadWhy?: ReadonlyMap<string, string>): TaskView {
+export function viewOfState(
+  state: State,
+  observed: ReadonlyMap<string, Sighting>,
+  unreadWhy?: ReadonlyMap<string, string>,
+  bridgeAsked?: RunnerOps['bridgeAsked'],
+): TaskView {
   const taskId = state.taskId;
   const last = state.attempts.at(-1);
   const sighting = last ? observed.get(nameFor(taskId, last.n)) : undefined;
   const phase = phaseOfView(state, observed, sighting);
   const admission = admissionOf(state);
-  const bridge = bridgeOfTask(state.config, state.settled !== null, sighting?.bridge);
+  const bridge = bridgeOfTask(bridgeAsked?.(state) === true, state.settled !== null, sighting?.bridge);
   const unread = sighting ? undefined : unreadOfTask(state, unreadWhy);
   return {
     id: taskId,

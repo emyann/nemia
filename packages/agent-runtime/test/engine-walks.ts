@@ -809,7 +809,6 @@ export const UNKEPT = [
   'close',
   'watch',
   'tallied',
-  'start',
   'up',
   'sweep',
   'removeBody',

@@ -87,10 +87,11 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   `timeToTheSecond`; a component draws one with `Instant` (`components/time/Instant.tsx`). date-fns is imported only in the four files that
   write a moment (`lib/timeOfDay.ts`, `lib/instant.ts`, `lib/runWords.ts`, `lib/quota.ts`); a fifth that needs it joins the list with
   its reason.
-- A time on the runs page is `whenWords`, and how long ago something was, in a table's column, is `agoWords` (`3 minutes ago`,
-  `4 months ago`, `just now` under a minute; date-fns's `formatDistanceStrict`, which writes no `about`), the board's only writer of how long ago (the quota's age, the daemon's line and the queue's ghosts too), the whole instant staying on
-  hover (`instantWhole`); a date's parts are `dateParts`. A schedule's far fire is `instantWords` (`14 Oct 12:00 PM`,
-  `1 Jan 2027, 4:00 AM`); `whenWords` keeps dropping the time in another year.
+- A time on the runs page is `whenWords`, and how long ago something was, in a table's column, is `agoWords` (`3 minutes ago`, `4 months
+  ago`, `just now` under a minute; date-fns's `formatDistanceStrict`, which writes no `about`), the board's only writer of how long ago
+  (the quota's age, the daemon's line and the queue's ghosts too), the whole instant staying on hover (`instantWhole`); a date's parts
+  are `dateParts`. A schedule's far fire is `instantWords` (`14 Oct 12:00 PM`, `1 Jan 2027, 4:00 AM`); `whenWords` keeps dropping the
+  time in another year.
 - How long something took has one writer, `durationWords(ms, grain)` (`lib/duration.ts`): to the second (`45s`, `12m 04s`, `1h 05m`,
   `1d 2h`) for a try, a turn, a run's clock and Facts; to the minute (`under 1m`, `3m`, `1h 30m`) for a breakdown's rows, a wait, the
   strip, a step card, the quota's keep and the pause's `cut in`.
@@ -155,7 +156,7 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - A kind of `objects` (the Run, the Card, the Factory, the McpServer, the Schedule, the Hire, the Volume, the Workflow, the Agent, the
   Skill) is read through `lib/api/objects.ts`, never a schema of the board's: its client is made from `objects`' `Api`, and each call rejects as `get` and
   `send` do (`ReadRefusal`, `WriteRefusal`, `UnreadAnswer`). The inbox's entry is made of a `Card` in one place (`entryOf`,
-  `lib/api/inbox.ts`), and the pages' view of a factory of a `Factory`, its `FactoryCommands` and its schedules in one place
+- `lib/api/inbox.ts`), and the pages' view of a factory of a `Factory`, its `FactoryCommands` and its schedules in one place
   (`factoryViewOf`, `lib/api/factories.ts`), which `factoriesQuery` reads together. A hire is written to its `Hire`, named
   `<workflow>.<step>`; a server's header is served as the mask (`HEADER_MASK`), and a form sends it back unchanged to keep the value.
   A definition is seen as the board's view of its kind in one place each — `workflowViewOf` (`lib/api/workflows.ts`), `agentViewOf`

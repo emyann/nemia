@@ -14,7 +14,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { files, NOT_OURS, ours, textOf } from 'test-kit/repo';
+import { files, ours, textOf } from 'test-kit/repo';
 
 /** Each name, and the one tool-call prefix that names the kanban as well as its name does. */
 const NAMES = ['aGVybWVz', 'bm91c3Jlc2VhcmNo', 'Z29vZ2xlL2F4', 'c3Vic3RyYXRl', 'Y2xhdWRlLWEyYQ==', 'amN3YXRzb24=', 'a2FuYmFuXw=='].map(
@@ -70,7 +70,7 @@ test('a description, what we integrate and what is compared by name pass', () =>
     assert.deepEqual(othersNamed(line), [], line);
 });
 
-test('REFUSED: only the lockfile and the vendored skill are left unread, matched whole', () => {
+test('REFUSED: what .gitattributes marks vendored or generated is left unread, matched whole', () => {
   assert.equal(ours('package-lock.json'), false);
   assert.equal(ours('.claude/skills/shadcn/SKILL.md'), false);
   for (const read of [
@@ -83,10 +83,5 @@ test('REFUSED: only the lockfile and the vendored skill are left unread, matched
     'CLAUDE.md',
   ])
     assert.equal(ours(read), true, read);
-  const all = files();
-  for (const entry of NOT_OURS)
-    assert.ok(
-      all.some((f) => !ours(f) && (f === entry || f.startsWith(entry))),
-      `${entry} is left unread and holds no file`,
-    );
+  assert.ok(files().some((f) => f.startsWith('.claude/skills/shadcn/') && !ours(f)), 'the vendored skill holds a file left unread');
 });

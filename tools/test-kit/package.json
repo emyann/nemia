@@ -2,7 +2,7 @@
   "name": "test-kit",
   "version": "1.0.0",
   "private": true,
-  "description": "The mechanics every workspace's tests share: scratch roots, story checkpoints, the repository's files, the import scanners, the folder rule's judgement and the door-debt counter. Never shipped.",
+  "description": "The mechanics every workspace's tests share: scratch roots, story checkpoints, the repository's files, the import scanners, the folder rule's judgement, the door-debt counter and the names a piece of code has. Never shipped.",
   "license": "MIT",
   "type": "module",
   "exports": {
@@ -12,6 +12,7 @@
     "./imports": "./imports.ts",
     "./layout": "./layout.ts",
     "./debt": "./debt.ts",
+    "./words": "./words.ts",
     "./package.json": "./package.json"
   },
   "scripts": {

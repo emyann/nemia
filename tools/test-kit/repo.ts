@@ -55,8 +55,35 @@ export const textOf = (file: string): string | undefined => {
   return bytes.subarray(0, 8000).includes(0) ? undefined : bytes.toString('utf8');
 };
 
-/** What is not ours to rewrite, by path from the root: the lockfile, and the vendored skill (a folder, `/` at its end). */
-export const NOT_OURS = ['package-lock.json', '.claude/skills/shadcn/'];
+/**
+ * The paths of `paths`, each from `root`, that are not ours to read or rewrite: what `.gitattributes` marks `linguist-vendored` (another
+ * project's files, vendored unchanged) or `linguist-generated` (what a tool writes). Git says it, through `git check-attr`, so no guard
+ * keeps a list of its own: a new vendored folder is one line of `.gitattributes`.
+ */
+export const notOurs = (paths: readonly string[], root = REPO): Set<string> => {
+  if (paths.length === 0) return new Set();
+  const out = execFileSync('git', ['check-attr', '-z', '--stdin', 'linguist-vendored', 'linguist-generated'], {
+    cwd: root,
+    input: paths.join('\0') + '\0',
+    encoding: 'utf8',
+    stdio: ['pipe', 'pipe', 'ignore'],
+    maxBuffer: 256 << 20,
+  }).split('\0');
+  const marked = new Set<string>();
+  for (let at = 0; at + 2 < out.length; at += 3) if (out[at + 2] === 'set' || out[at + 2] === 'true') marked.add(out[at] ?? '');
+  return marked;
+};
 
-/** Whether `file`, a path from the root, is ours to read and rewrite: not the lockfile, nor under the vendored skill. */
-export const ours = (file: string): boolean => !NOT_OURS.some((entry) => (entry.endsWith('/') ? file.startsWith(entry) : file === entry));
+let known: { all: Set<string>; marked: Set<string> } | undefined;
+
+/**
+ * Whether `file`, a path from the root, is ours to read and rewrite: nothing `.gitattributes` marks vendored or generated. Git's list is
+ * asked once; a path it does not hold (one a test plants) is asked of git on its own.
+ */
+export const ours = (file: string): boolean => {
+  if (!known) {
+    const all = files();
+    known = { all: new Set(all), marked: notOurs(all) };
+  }
+  return known.all.has(file) ? !known.marked.has(file) : !notOurs([file]).has(file);
+};

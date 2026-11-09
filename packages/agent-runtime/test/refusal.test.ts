@@ -98,10 +98,13 @@ const REFUSALS: Array<[Record<string, unknown>, RegExp]> = [
   [{ cwd: '~/repo' }, /^`cwd: ~\/repo` is not an absolute path/],
   [
     { maxAttempts: 1 },
-    /^`maxAttempts` is retired: the runtime makes one attempt per start.*file it again.*`resumeFrom: <session id>`.*`retries:`.*`wf retry <run> <step>`/,
+    /^`maxAttempts` is retired: the runtime makes one attempt per start.*file it again.*`resumeFrom: <session id>`(?![^]*(?:\bwf |retries:|--continue|--fresh))/,
   ],
   [{ maxAttempts: 2 }, /^`maxAttempts` is retired:/],
-  [{ resume: 'interrupted' }, /^`resume` is retired: the runtime makes one attempt per start.*`retries:`.*`wf retry <run> <step>`/],
+  [
+    { resume: 'interrupted' },
+    /^`resume` is retired: the runtime makes one attempt per start.*`resumeFrom: <session id>`(?![^]*(?:\bwf |retries:))/,
+  ],
   [{ resume: 'always' }, /^`resume` is retired:/],
   [{ deadlineSeconds: Number.NaN }, /^`deadlineSeconds: NaN` is not a number of seconds\./],
   [{ deadlineSeconds: 0 }, /^`deadlineSeconds: 0` is not a number of seconds\./],

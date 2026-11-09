@@ -754,6 +754,25 @@ test('the next holder takes up a session left behind: what it tells the session,
     assert.deepEqual(saidIn(dir), [CARRY_ON]);
     assert.equal(alive(taker), true, 'the process that took the pid is not killed');
   });
+
+  await t.test('a session that cannot be taken up is said, with why, never dropped: a warning of the holder each look', async (rt) => {
+    const { root, request } = place({ output: { done: 1 } }, { claude: { appendSystemPromptFile: 'not-there.md' } });
+    writeRun(root, {
+      name: NAME,
+      state: 'parked',
+      owner: process.pid,
+      startedAt: new Date().toISOString(),
+      sessionId: 'not-taken-up',
+      request: { ...request, brief: undefined },
+    });
+    const h = await holder(root);
+    rt.after(h.close);
+    await sighted(h);
+    const warned = await until(rt, () => h.said.find((l) => /^WARN/i.test(l) && l.includes(NAME)), 'the failed take-up said', {
+      everyMs: 20,
+    });
+    assert.match(warned, /not-there\.md/, 'it says why');
+  });
 });
 
 test(

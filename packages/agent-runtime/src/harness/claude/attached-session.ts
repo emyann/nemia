@@ -27,7 +27,7 @@ import {
 } from './attached-file.ts';
 import { bridgeDue, bridgeStateOf, enableBridge } from './attached-bridge.ts';
 import { bridgeAsked } from './vocabulary.ts';
-import { firstCall, HOOK_HOLD_S, inside, type CallsInFlight } from './job-hold.ts';
+import { callStarted, firstCall, HOOK_HOLD_S, inside, type CallsInFlight } from './job-hold.ts';
 import { claudeStreamKept, initLineKept } from '../detached/output.ts';
 import type { InitRead } from '../../../contracts/capture.contract.ts';
 import { ASK_CUT, permissionAnswered, permissionAskOf } from './permission.ts';
@@ -128,22 +128,70 @@ export const interruptTurn = async (live: Live | undefined): Promise<boolean> =>
   return true;
 };
 
-/** Waits until `held` lets go of `live`, the call's signal aborts, or the session is let go. */
-const waitWhile = async (held: Held, signal: AbortSignal, live: Live): Promise<void> => {
-  while (held(live) && !signal.aborted && !live.letGo) await new Promise((r) => setTimeout(r, 250));
+/** How often a call held at its hook reads whether it is still held, in milliseconds, where its session is given no other. */
+export const HELD_POLL_MS = 250;
+
+/** How often a wait for a process to be gone reads whether it is, in milliseconds, where it is given no other. */
+export const GONE_POLL_MS = 50;
+
+/**
+ * A session's hold at its `PreToolUse` hook, as a held session and a held job both keep one: whether a new call is held now
+ * (`held`), whether the session is being ended (`over`, and `ends`, a signal that says so beside the call's own), what a call that
+ * begins and ends its wait is told (`waits`, `waited`, by when it began), what each read of a held call does (`polled`), how often it
+ * reads (`pollMs`), and the session's calls in flight (`calls`).
+ */
+export type HookHold = {
+  readonly held: () => boolean;
+  readonly over: () => boolean;
+  readonly ends?: AbortSignal;
+  readonly waits: (since: string) => void;
+  readonly waited: (since: string) => void;
+  readonly polled?: () => void;
+  readonly pollMs: number;
+  readonly calls: CallsInFlight;
 };
 
 /**
- * What a new call held at its hook as its session is let go is answered with: nothing, once the call's signal or the session's abort
- * says it is over. The let-go ends the session's Claude Code by an interrupt (`parked`, `attached.ts`), which cuts the turn with this
- * call unanswered, as Claude Code leaves it; let through, the call would run while the session is being ended.
+ * The call a `PreToolUse` hook was given (`input`, `id`, its `signal`) through `hold`: a call of the main thread waits while it is held,
+ * read every `pollMs`, until it is not, its signal aborts, or the session is being ended. A call that belongs to a call in flight — a
+ * sub-agent's, which the SDK marks with `agent_id` (`inside`) — is never held, or the call it belongs to could never end.
+ *
+ * Answers what the hook answers a main-thread call that comes, or waited, as its session is ended: nothing, once its signal or `ends`
+ * says it is over — the end interrupts the turn with this call unanswered, as Claude Code leaves it; let through, the call would run
+ * while the session is being ended. Otherwise the call is written in flight (`callStarted`) and `undefined` answered: the hook's own.
  */
-const cutWhileHeld = (signal: AbortSignal, live: Live): Promise<object> =>
+export const heldAtHook = async (
+  hold: HookHold,
+  input: unknown,
+  id: string | undefined,
+  signal: AbortSignal,
+): Promise<object | undefined> => {
+  if (!inside(input)) {
+    if (hold.held()) {
+      const since = new Date().toISOString();
+      hold.waits(since);
+      try {
+        while (hold.held() && !hold.over() && !signal.aborted) {
+          hold.polled?.();
+          await new Promise((r) => setTimeout(r, hold.pollMs));
+        }
+      } finally {
+        hold.waited(since);
+      }
+    }
+    if (hold.over()) return await cutWhileHeld(signal, hold.ends);
+  }
+  callStarted(hold.calls, id, input);
+  return undefined;
+};
+
+/** Nothing, once the call's `signal` or the session's end (`ends`) says it is over. */
+const cutWhileHeld = (signal: AbortSignal, ends: AbortSignal | undefined): Promise<object> =>
   new Promise((resolve) => {
     const over = () => resolve({});
-    if (signal.aborted || live.abort.signal.aborted) return over();
+    if (signal.aborted || ends?.aborted) return over();
     signal.addEventListener('abort', over, { once: true });
-    live.abort.signal.addEventListener('abort', over, { once: true });
+    ends?.addEventListener('abort', over, { once: true });
   });
 
 /** The tool a session calls to ask a person a question, as Claude Code names it. */
@@ -310,8 +358,30 @@ export const toldCut = (root: string, live: Live): void => {
   rewrite(root, live, { state: 'working' });
 };
 
-/** The hooks that keep the call in flight, a new one held while `held` says so. */
-const hooksOf = (root: string, live: Live, held: Held, mayAsk: boolean): Partial<Record<HookEvent, HookCallbackMatcher[]>> => {
+/** The hooks that keep the call in flight, a new one held while `held` says so, read every `pollMs` (`heldAtHook`). */
+const hooksOf = (
+  root: string,
+  live: Live,
+  held: Held,
+  mayAsk: boolean,
+  pollMs: number,
+): Partial<Record<HookEvent, HookCallbackMatcher[]>> => {
+  const hold: HookHold = {
+    held: () => held(live),
+    over: () => live.letGo,
+    ends: live.abort.signal,
+    waits: (since) => {
+      live.waiting++;
+      live.holding ??= since;
+      rewrite(root, live);
+    },
+    waited: () => {
+      live.waiting--;
+      if (live.waiting === 0) delete live.holding;
+    },
+    pollMs,
+    calls: live.calls,
+  };
   const ended = async (input: unknown, id: string | undefined) => {
     const call = id === undefined ? undefined : live.calls.get(id);
     if (call && !inside(input)) live.after = { tool: call.tool };
@@ -324,22 +394,10 @@ const hooksOf = (root: string, live: Live, held: Held, mayAsk: boolean): Partial
         timeout: HOOK_HOLD_S,
         hooks: [
           async (input, id, { signal }) => {
-            if (!inside(input)) {
-              live.waiting++;
-              if (held(live)) {
-                live.holding ??= new Date().toISOString();
-                rewrite(root, live);
-              }
-              await waitWhile(held, signal, live).finally(() => {
-                live.waiting--;
-                if (live.waiting === 0) delete live.holding;
-              });
-              if (live.letGo) return await cutWhileHeld(signal, live);
-            }
-            const tool = (input as { tool_name?: string }).tool_name ?? 'a tool';
-            if (id) live.calls.set(id, { tool, since: new Date().toISOString() });
+            const cut = await heldAtHook(hold, input, id, signal);
+            if (cut) return cut;
             rewrite(root, live);
-            if (tool !== ASK_TOOL || !mayAsk || id === undefined) return {};
+            if ((input as { tool_name?: unknown }).tool_name !== ASK_TOOL || !mayAsk || id === undefined) return {};
             return askHookOutput(await askedOf(root, live, id, (input as { tool_input?: unknown }).tool_input, signal));
           },
         ],
@@ -491,11 +549,11 @@ export const hear = (root: string, live: Live): void => {
   rewrite(root, live, { heard: end, ...(live.open ? { state: 'working' as const } : {}) });
 };
 
-/** Waits until the process `pid` is gone. */
-export const gone = async (pid: number | undefined): Promise<void> => {
+/** Waits until the process `pid` is gone, read every `everyMs`. */
+export const gone = async (pid: number | undefined, everyMs: number = GONE_POLL_MS): Promise<void> => {
   for (;;) {
     if (pid === undefined || !alive(pid)) return;
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, everyMs));
   }
 };
 
@@ -511,9 +569,9 @@ export const killGroup = (pid: number | undefined): void => {
 
 /**
  * Starts the session `run` and answers it at once: `r` its spawn, `first` the first words on its input, `resume` the Claude Code session
- * it continues. `executable` is the Claude Code it runs, the SDK's own when absent, and `pushed` is given every message it gives. It
- * ends `completed` or `failed` by its result, `canceled` when aborted, `failed` when its messages end with none; a session let go
- * (`letGo`) is left as its holder wrote it.
+ * it continues. `executable` is the Claude Code it runs, the SDK's own when absent, `pushed` is given every message it gives, and a call
+ * held at its hook reads `held` every `holdPollMs`, `HELD_POLL_MS` where none is given. It ends `completed` or `failed` by its result,
+ * `canceled` when aborted, `failed` when its messages end with none; a session let go (`letGo`) is left as its holder wrote it.
  *
  * The session's options are built before its run file is written: `attachedOptions` refuses a task whose prompt file cannot be read,
  * whose `config.claude` flag is given two values or whose checkout's `.mcp.json` is not JSON, and a spawn refused that way must leave
@@ -527,6 +585,7 @@ export const startSession = (
   first: string,
   options: {
     held: Held;
+    holdPollMs?: number;
     executable?: string;
     resume?: string;
     pushed?: (m: SDKMessage) => void;
@@ -562,7 +621,7 @@ export const startSession = (
       ...(options.resume ? { resume: options.resume } : {}),
       abortController: abort,
       canUseTool: decidedHere(root, live, mayAsk),
-      hooks: hooksOf(root, live, options.held, mayAsk),
+      hooks: hooksOf(root, live, options.held, mayAsk, options.holdPollMs ?? HELD_POLL_MS),
       ...(options.executable ? { pathToClaudeCodeExecutable: options.executable } : {}),
       spawnClaudeCodeProcess: (o) => {
         const [command, ...args] = [...(scope?.argv ?? []), o.command, ...o.args];

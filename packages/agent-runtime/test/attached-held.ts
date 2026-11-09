@@ -62,13 +62,19 @@ export const lines = (dir: string, file: string): unknown[] => {
     : [];
 };
 
+/** How often a test's holder polls a held call and a process it waits to be gone, in milliseconds. */
+const POLL_MS = 20;
+
 /**
  * A holder of the sessions under `root`, for a scope the test closes, its let-go bound `letGoMs` and the share of it the calls in flight
- * may take, `callsShare`, where each is given, and where a limited session's scope is made (`at`, `ScopeAt`). `said` keeps every
- * line its let-go logged, at its level, so what the holder says as it lets go is read rather than printed.
+ * may take, `callsShare`, where each is given, and where a limited session's scope is made (`at`, `ScopeAt`). A call held at its hook
+ * and a take-up's wait for a process to be gone read every `POLL_MS`, shortened from the holder's shipped polls. `said` keeps every
+ * line the holder logged as it holds and as it lets go, at its level, so what it says is read rather than printed.
  */
 export const holder = async (root: string, letGoMs?: number, callsShare?: number, at: ScopeAt = {}) => {
   const attached = attachedSessions(root, STAND_IN, {
+    holdPollMs: POLL_MS,
+    gonePollMs: POLL_MS,
     ...(letGoMs === undefined ? {} : { letGoMs }),
     ...(callsShare === undefined ? {} : { callsShare }),
     ...at,
@@ -78,7 +84,7 @@ export const holder = async (root: string, letGoMs?: number, callsShare?: number
   const keeper = Logger.make(
     ({ message, logLevel }) => void said.push(`${logLevel} ${(Array.isArray(message) ? message : [message]).join(' ')}`),
   );
-  await Effect.runPromise(Scope.provide(attached.hold, scope));
+  await Effect.runPromise(Scope.provide(attached.hold, scope).pipe(Effect.provide(Logger.layer([keeper]))));
   return {
     attached,
     said,

@@ -53,8 +53,8 @@ import { query, type HookCallbackMatcher, type HookEvent, type SDKMessage } from
 import { attachedOptions } from '../src/harness/claude/attached-options.ts';
 import { bridgeDue, bridgeStateOf, enableBridge, type AttachedBridge } from '../src/harness/claude/attached-bridge.ts';
 import { bridgeAsked } from '../src/harness/claude/vocabulary.ts';
+import { heldAtHook, type HookHold } from '../src/harness/claude/attached-session.ts';
 import {
-  callStarted,
   firstCall,
   HOOK_HOLD_S,
   inside,
@@ -67,6 +67,7 @@ import {
   type JobHold,
 } from '../src/harness/claude/job-hold.ts';
 import { elapsedMs } from '../src/core/clock.ts';
+import { replaceFile } from '../src/core/replace.ts';
 import { instantNow } from '../src/core/engine/now.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
 
@@ -169,9 +170,10 @@ const requestAt = (at: string | undefined): Requested => {
  * The job's hold: its calls in flight, kept by its hooks, and the sessions' drain, read off its file on every poll and at every new call.
  *
  * - A new call of the main thread waits at its `PreToolUse` hook while the drain stands and none of the session's calls is in flight
- *   (the attached sessions' rule, `attached.ts`), reading the drain again every `holdPollMs`; a call that belongs to a call in flight —
- *   a sub-agent's (`inside`) — is never held, or the call it belongs to could never end. Its hook's timeout is `HOOK_HOLD_S`, over the
- *   job's own bound, so Claude Code never answers for it first.
+ *   (the attached sessions' rule, `attached.ts`), reading the drain again every `holdPollMs`, through the one hold at a hook a held
+ *   session keeps too (`heldAtHook`); a call that belongs to a call in flight — a sub-agent's (`inside`) — is never held, or the call it
+ *   belongs to could never end, and a main-thread call that comes or waited as the job parks is answered nothing once its signal aborts.
+ *   Its hook's timeout is `HOOK_HOLD_S`, over the job's own bound, so Claude Code never answers for it first.
  * - Every `holdPollMs`, the drain read: past its `at` plus its `graceMs` with a call in flight, the call is cut; past its `at` plus
  *   `holdMs`, the job gives up its hold. Either way it parks (`park`): `parked` written on the hold file, with the call it cut as its
  *   `calling`, and `ended` told to end the session.
@@ -227,26 +229,23 @@ const holdOf = (io: HoldIO, ended: () => void) => {
     if (id && calls.delete(id) && !parked) write();
     return {};
   };
+  const hold: HookHold = {
+    held,
+    over: () => parked !== undefined,
+    waits: (since) => void waiting.push(since),
+    waited: (since) => void waiting.splice(waiting.indexOf(since), 1),
+    polled: write,
+    pollMs: io.holdPollMs,
+    calls,
+  };
   const hooks: Partial<Record<HookEvent, HookCallbackMatcher[]>> = {
     PreToolUse: [
       {
         timeout: HOOK_HOLD_S,
         hooks: [
           async (input, id, { signal }) => {
-            if (!inside(input) && held()) {
-              const since = new Date().toISOString();
-              waiting.push(since);
-              try {
-                while (held() && !signal.aborted) {
-                  write();
-                  await new Promise((r) => setTimeout(r, io.holdPollMs));
-                }
-              } finally {
-                waiting.splice(waiting.indexOf(since), 1);
-              }
-              if (parked) return await new Promise<object>((r) => (signal.aborted ? r({}) : signal.addEventListener('abort', () => r({}))));
-            }
-            callStarted(calls, id, input);
+            const cut = await heldAtHook(hold, input, id, signal);
+            if (cut) return cut;
             write();
             return {};
           },
@@ -259,12 +258,8 @@ const holdOf = (io: HoldIO, ended: () => void) => {
   return { hooks, look };
 };
 
-/** Writes `bridge` whole on `file`, through a file beside it renamed over it, so a look never reads half of it. */
-const writeBridge = (file: string, bridge: AttachedBridge): void => {
-  const temp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(temp, JSON.stringify(bridge));
-  fs.renameSync(temp, file);
-};
+/** Writes `bridge` whole on `file`, through a file beside it renamed over it (`replaceFile`), so a look never reads half of it. */
+const writeBridge = (file: string, bridge: AttachedBridge): void => void replaceFile(file, JSON.stringify(bridge));
 
 /**
  * The job's bridge, as the session's messages bring it: opened on the message `bridgeDue` names, once, and its state kept from each

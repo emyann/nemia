@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { replaceFile } from '../../core/replace.ts';
 
 /** Claude Code's own `.claude.json`: in `CLAUDE_CONFIG_DIR` when it is set, else beside `~/.claude`, read at call time. */
 export const claudeConfigFile = (): string =>
@@ -104,15 +105,13 @@ function created(file: string, key: string): boolean {
  * through `read`, and renamed over it where nothing changed. False, and nothing left beside it, where another writer got there first.
  */
 function replaced(file: string, was: Buffer, text: string, read: (file: string) => Buffer | null): boolean {
-  const beside = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.trust`);
-  fs.writeFileSync(beside, text, { mode: fs.statSync(file).mode });
-  const now = read(file);
-  if (now === null || !now.equals(was)) {
-    fs.rmSync(beside, { force: true });
-    return false;
-  }
-  fs.renameSync(beside, file);
-  return true;
+  return replaceFile(file, text, {
+    mode: fs.statSync(file).mode,
+    still: () => {
+      const now = read(file);
+      return now !== null && now.equals(was);
+    },
+  });
 }
 
 /**

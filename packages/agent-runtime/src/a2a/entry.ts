@@ -2,9 +2,9 @@
  * A remote agent's registry, `remote/` under the store: one entry a session, `<name>.json` with the name URI-encoded, moved to
  * `remote/done/` once let go of. What an entry holds, how an older one is read, and how a session's entry is forgotten.
  */
-import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs';
+import { replaceFile } from '../core/replace.ts';
 import { formerStateOf, isSessionState, type Sighting } from '../core/index.ts';
 import { forgetFiles, keptOf, type RunnerOps } from '../harness/index.ts';
 import type { Monotonic } from '../core/clock.ts';
@@ -124,9 +124,7 @@ export const registryOf = (harness: string, root: string) => {
   const fileOf = (name: string, under = dir) => entryFileOf(under, name);
   const write = (e: Entry, under = dir) => {
     fs.mkdirSync(under, { recursive: true });
-    const tmp = `${fileOf(e.name, under)}.${process.pid}.${randomUUID()}.tmp`;
-    fs.writeFileSync(tmp, `${JSON.stringify(e)}\n`);
-    fs.renameSync(tmp, fileOf(e.name, under));
+    replaceFile(fileOf(e.name, under), `${JSON.stringify(e)}\n`);
   };
   const entriesIn = (under: string): Entry[] =>
     entryNames(under).flatMap((f) => {

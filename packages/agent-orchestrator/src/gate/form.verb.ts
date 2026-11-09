@@ -26,7 +26,7 @@ export const approveForm = Effect.fnUntraced(function* (id: string, stepName: st
     step,
     run,
     phaseOf,
-    closeoutReader(views, run),
+    closeoutReader(views, run, steps),
     closeoutAsked(views),
     steps,
     harnessBlocked(views),

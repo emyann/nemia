@@ -29,6 +29,7 @@ import {
   loopOf,
   roundOf,
   roundWord,
+  tryCommand,
   type MergeLanding,
   type MergeOf,
   type Round,
@@ -253,7 +254,7 @@ function loopRefusal(steps: readonly Workflow[], run: Run, looping: Workflow, re
   const stopping =
     steps.find((s) => s.name === looping.loop && stopsFollowers(reads.standingOf(s).own)) ?? (stopsFollowers(status) ? looping : undefined);
   if (stopping)
-    return `${stopping.name} is ${reads.standingOf(stopping).status} in round ${now} of ${looping.name}'s loop, so the round cannot end. Try it again — nemia retry ${run.id} ${stopping.name} — or see why: nemia decide ${run.id}.`;
+    return `${stopping.name} is ${reads.standingOf(stopping).status} in round ${now} of ${looping.name}'s loop, so the round cannot end. Try it again — ${tryCommand(run, stopping.name, reads.standingOf(stopping).status)} — or see why: nemia decide ${run.id}.`;
   return `round ${now} of ${looping.name}'s loop is ${status}, so its work is not ready to merge. Wait for it: nemia ls ${run.id}.`;
 }
 

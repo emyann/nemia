@@ -68,7 +68,7 @@ const runFacts = Effect.fnUntraced(function* (e: Engine, run: Run, steps: Workfl
     timeline: timeline(run, everyTry, filed, steps),
     succeeded: (taskId) => phaseOfView(everyTry.get(taskId)) === 'succeeded',
     verdictOf: (taskId) => verdictOf(everyTry.get(taskId)),
-    closeoutOf: closeoutReader(views, run),
+    closeoutOf: closeoutReader(views, run, steps),
     deniedOf: (taskId) => deniedCallsOf(everyTry.get(taskId)).map(denialText),
     skillsOf: (taskId, given) => skillsLoadedOf(everyTry.get(taskId), given),
     filesOf: (taskId) => filesTouchedOf(everyTry.get(taskId)),

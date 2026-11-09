@@ -13,15 +13,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { ours } from './ours.ts';
 import { clockWord } from '../src/lib/quota.ts';
 import { agoWords, whenWords } from '../src/lib/runWords.ts';
 import { fireWord } from '../src/lib/schedules.ts';
 import { timeOfDay } from '../src/lib/timeOfDay.ts';
 
 const WEB = path.resolve(import.meta.dirname, '..');
-
-/** The one folder of `src` the rule does not read, from the board's root. */
-const KIT = 'src/components/ui/ds';
 
 /** The one file an hour is written in, from the board's root. */
 export const WRITER = 'src/lib/timeOfDay.ts';
@@ -143,7 +141,7 @@ function sources(root: string): Record<string, string> {
       .readdirSync(path.join(root, 'src'), { withFileTypes: true, recursive: true })
       .filter((e) => e.isFile() && /\.tsx?$/.test(e.name))
       .map((e) => path.relative(root, path.join(e.parentPath, e.name)).split(path.sep).join('/'))
-      .filter((file) => !file.startsWith(`${KIT}/`))
+      .filter(ours)
       .sort()
       .map((file) => [file, fs.readFileSync(path.join(root, file), 'utf8')]),
   );

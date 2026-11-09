@@ -17,4 +17,5 @@ export {
   writeExpressions,
 } from './layout.ts';
 export { checkTemplate } from './check.ts';
+export { listItemsOf, withSharedLines } from './shared-lines.ts';
 export { draftOf, type Draft, type DraftFile, type Source, type StepSource } from './draft.ts';

@@ -1,13 +1,11 @@
 /**
- * What a permission rule reaches, proven on rules this suite writes or reads: a matcher of Claude Code's rule shapes, the fence of the
- * tests' team, the read set's denies planted on it, and Nemia's own fence. sdlc's agents and their rules as written are
+ * What a permission rule reaches, proven on rules this suite writes or reads: the fence of the tests' team, sdlc's read set and its
+ * denies planted on it, and Nemia's own fence. sdlc's agents and their rules as written are
  * `packages/templates/test/fences.test.ts`'s; this file says what such a rule reaches.
  *
- * The matcher is Claude Code's rule shapes this suite relies on (`reaches`), and throws on a wildcard it does not model, so an allow it
- * cannot read fails the test rather than passing it. A command is matched part by part, as Claude Code matches it (`partsOf`): a deny of
- * any part refuses the whole, and a dontAsk step runs it only when an allow reaches every part. A deny is matched against a part as typed
- * too, its leading assignment kept (`deniedPartsOfCall`), as Claude Code was measured to match one; an allow against the unwrapped part
- * alone.
+ * The matcher of Claude Code's rule shapes is the test kit's (`test-kit/fence`, and its own tests there), and throws on a shape it does
+ * not model, so an allow it cannot read fails the test rather than passing it: a command is matched part by part, a deny of any part
+ * refusing the whole and a dontAsk step running it only when an allow reaches every part, a deny against a part as typed too.
  *
  * The tests' team (`team.ts`) is fenced as a team must be: each step is refused `git push`, a forced branch delete, a kill by name, every
  * `gh` write and Playwright's `browser_run_code_unsafe` (`FENCED`), by its own deny in `auto`, by no allow in `dontAsk`, by a read-only
@@ -21,8 +19,8 @@
  * on the tests' reviewer, a dontAsk agent, in a copy of the team (`planted`), and read as a run reads it. Each deny is proven to be the one
  * that refuses its own spellings, and each plain read still asked. Beside them, a reviewer's reads of its pull request (`GH_ALLOWS`), and
  * the denies of every other form of gh they reach (`GH_REFUSED`), each proven the one that refuses its own spellings, and proven needed
- * where a settings file allows those reads to a step that allows none itself, which the checkout's no longer does. The planted lists
- * may drift from sdlc's: what sdlc writes is held where it is written.
+ * where a settings file allows those reads to a step that allows none itself, which the checkout's no longer does. The planted lines
+ * are sdlc's own, read from its fence files (`SDLC_FENCES`), so a line dropped there is refused here by the test of what it refuses.
  *
  * A writer of one kind of file: the read set with the allows of a contract (`CONTRACT_WRITES`), each a path from the session's working
  * folder (`WORK`), is planted the same way and writes exactly the checkout's contracts, read from the disk, and no helper beside them
@@ -60,6 +58,8 @@ import { admissionOf, agentClassOf, nemiaFence, widened } from '../src/admission
 import { TABLE } from '../src/command/commands.verb.ts';
 import { rulesOfTry } from '../src/stats/discipline.ts';
 import { REPO, TEAM, TEAM_DEV, teamCopy } from './team.ts';
+import yaml from 'js-yaml';
+import { type Call, deniedPartsOfCall, granting, partsOf, partsOfCall, reaches, runsUnder, shown, WORK } from 'test-kit/fence';
 
 /** The repository's own folder of skills, which a step run in this checkout may load. */
 const REPO_SKILLS = path.join(REPO, '.claude', 'skills');
@@ -69,20 +69,6 @@ const SKILL_FOLDERS = [REPO_SKILLS, path.join(TEAM, 'skills')].filter((dir) => f
 
 type Settings = { permissions?: { allow?: string[]; deny?: string[] } };
 const SETTINGS = JSON.parse(fs.readFileSync(path.join(REPO, '.claude', 'settings.json'), 'utf8')) as Settings;
-
-/**
- * A call a session makes: a shell command, or a tool by its name, an edit or a write with the absolute path it writes when one is said, a
- * browser tool with the address it opens or the file it is told to write when one is given, a fetch with the host it reads.
- */
-type Call =
-  | { tool: 'Bash'; command: string; path?: undefined; url?: undefined; filename?: undefined; domain?: undefined }
-  | { tool: string; command?: undefined; path?: string; url?: string; filename?: string; domain?: string };
-
-/** The parameters of an MCP tool a rule may name here, each read off the call as it wrote it. */
-const MCP_PARAMS = ['url', 'filename'] as const;
-
-/** Every parameter a rule may name here: an MCP tool's, and the host `WebFetch` reads. */
-const PARAMS = [...MCP_PARAMS, 'domain'] as const;
 
 /** What no step of a team may run, in the spellings a session types. */
 const FENCED: Call[] = [
@@ -125,167 +111,6 @@ const PROBES: Call[] = [
   { tool: 'Bash', command: 'cd /tmp && claude --bg x' },
   { tool: 'Bash', command: 'timeout 60 claude --bg x' },
 ];
-
-/** The home folder `~` is in an edit rule, for the paths the calls below write. */
-const HOME = '/home/u';
-
-/** The folder a planted session works in, where an edit rule's path from the working folder starts. */
-const WORK = '/work/checkout';
-
-/** A call as a rule would name it, for a message. */
-const shown = (call: Call): string => {
-  if (call.command !== undefined) return `Bash(${call.command})`;
-  const param = PARAMS.find((name) => call[name] !== undefined);
-  return param === undefined ? call.tool : `${call.tool}(${param}:${call[param]})`;
-};
-
-/**
- * Whether a permission rule reaches a call: a bare tool name is that tool, `mcp__<server>` or `mcp__<server>__*` every tool of the
- * server, `Bash(x)` the command `x` exactly, and `Bash(x:*)` or `Bash(x *)` the command `x` or `x` followed by a space and more; a `*`
- * inside a Bash rule is any run of characters, none included (`globbed`). Any other `Tool(x)` reaches some call of that tool, so it is
- * read as reaching every one, unless the call says the path it writes: then `Edit(//<glob>)` and `Edit(~/<glob>)` reach it when the glob
- * covers it (`covers`). Claude Code matches a write against `Edit` rules, so an `Edit` rule reaches `Write` too. A rule on an MCP tool's
- * parameter, `mcp__<server>__<tool>(url:<glob>)` or `(filename:<glob>)`, reaches a call of that tool whose parameter the glob covers
- * whole, each `*` any run of characters, compared as the call wrote it, and no call that gives none: so Claude Code was measured to
- * read one in a deny list, and an allow list is read through `granting`, which refuses one. A rule on `WebFetch`'s host,
- * `WebFetch(domain:<host>)`, reaches a fetch of exactly that host and no other, and no fetch that says none; a bare `WebFetch` reaches
- * every one. Throws on a `*` in a tool's name and on any other parameter, which this matcher does not model.
- */
-function reaches(rule: string, call: Call): boolean {
-  const bash = /^Bash\((.*)\)$/s.exec(rule)?.[1];
-  if (bash === undefined) {
-    const tool = rule.includes('(') ? rule.slice(0, rule.indexOf('(')) : undefined;
-    if (tool?.startsWith('mcp__')) {
-      const said = rule.slice(tool.length + 1, -1);
-      const param = MCP_PARAMS.find((name) => said.startsWith(`${name}:`));
-      if (param === undefined || tool.includes('*'))
-        throw new Error(
-          `${rule}: a parameter rule on an MCP tool is modelled for \`url:\` and \`filename:\` alone; say how it reads, here`,
-        );
-      const given = call[param];
-      return tool === call.tool && given !== undefined && globbed(said.slice(param.length + 1), false).test(given);
-    }
-    if (tool === 'WebFetch') {
-      const said = rule.slice(tool.length + 1, -1);
-      if (!said.startsWith('domain:'))
-        throw new Error(`${rule}: a rule on WebFetch is modelled for \`domain:\` alone; say how it reads, here`);
-      return call.tool === 'WebFetch' && call.domain === said.slice('domain:'.length);
-    }
-    const pathed = call.path !== undefined && tool !== undefined;
-    if (pathed && (tool === call.tool || (call.tool === 'Write' && tool === 'Edit')))
-      return covers(rule.slice(tool.length + 1, -1), call.path!);
-    if (call.tool === 'Write' && (rule === 'Edit' || tool === 'Edit')) return true;
-    if (tool !== undefined) return tool === call.tool && call.command === undefined;
-    const server = rule.startsWith('mcp__') ? rule.replace(/__\*$/, '') : undefined;
-    if (server !== undefined && !server.includes('*') && server.split('__').length === 2)
-      return rule === call.tool || call.tool.startsWith(`${server}__`);
-    if (rule.includes('*')) throw new Error(`${rule}: a wildcard in a tool name is not modelled; say how it reads, here`);
-    return rule === call.tool;
-  }
-  if (call.command === undefined) return false;
-  const prefix = /^(.*?)(?::\*| \*)$/s.exec(bash)?.[1];
-  const exact = prefix ?? bash;
-  if (exact.includes('*')) return globbed(exact, prefix !== undefined).test(call.command);
-  return prefix === undefined ? call.command === bash : call.command === prefix || call.command.startsWith(`${prefix} `);
-}
-
-/**
- * The words of a Bash rule with a `*` inside them, as a pattern of the whole command: each `*` any run of characters, none included;
- * `open`, where the rule ends in `:*` or ` *`, the words alone or followed by a space and more.
- */
-const globbed = (words: string, open: boolean): RegExp =>
-  new RegExp(
-    `^${words
-      .split('*')
-      .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
-      .join('[\\s\\S]*')}${open ? '(?: [\\s\\S]*)?' : ''}$`,
-  );
-
-/**
- * Whether the path of a file rule covers the absolute path `file`: `//<glob>` from the root, `~/<glob>` from `HOME`; in the glob `**\/`
- * is any run of folders, none included, `**` any run of characters, and `*` any run within a folder's name. A path with no leading `/`,
- * `.` or `~` that holds a `/` before its last name is anchored at the session's working folder, `WORK`, as gitignore anchors a pattern
- * with a slash inside it. Throws on a path from the project (`/x`), on a bare name, which gitignore matches at any depth, and on
- * `<name>/**`, whose depth Claude Code reads differently by rule type: this matcher does not model them.
- */
-function covers(rulePath: string, file: string): boolean {
-  const fromWork = !/^[/.~]/.test(rulePath) && /\/[^/]+$/.test(rulePath) && !/^[^/]+\/\*\*$/.test(rulePath);
-  const from = rulePath.startsWith('//')
-    ? rulePath.slice(1)
-    : rulePath.startsWith('~/')
-      ? `${HOME}${rulePath.slice(1)}`
-      : fromWork
-        ? `${WORK}/${rulePath}`
-        : undefined;
-  if (from === undefined)
-    throw new Error(`${rulePath}: a path from the project or the working folder is not modelled; say how it reads, here`);
-  const pattern = from
-    .split(/(\*\*\/|\*\*|\*)/)
-    .map((part) =>
-      part === '**/' ? '(?:.*/)?' : part === '**' ? '.*' : part === '*' ? '[^/]*' : part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'),
-    )
-    .join('');
-  return new RegExp(`^${pattern}$`).test(file);
-}
-
-/**
- * The rules of an allow list as this matcher may read them: all of them. Throws on a rule on an MCP tool's parameter, which Claude Code
- * was measured to read in a deny list alone: what such a rule allows is not modelled, and a guess would make a fence pass for nothing.
- */
-function granting(rules: readonly string[]): readonly string[] {
-  const odd = rules.find((rule) => /^mcp__[^(]*\(/.test(rule));
-  if (odd !== undefined)
-    throw new Error(`${odd}: a parameter rule on an MCP tool in an allow list is not modelled; say how it reads, here`);
-  return rules;
-}
-
-/** A wrapper Claude Code strips before it matches a part: a leading assignment, `timeout` with its duration, `nohup`. */
-const WRAPPER = /^(?:[A-Za-z_]\w*=\S*|timeout \d+(?:\.\d+)?[smhd]?|nohup)\s+/;
-
-/** A part with every leading wrapper stripped (`WRAPPER`). */
-function unwrapped(part: string): string {
-  let rest = part.trim();
-  let wrapper = WRAPPER.exec(rest);
-  while (wrapper) {
-    rest = rest.slice(wrapper[0].length).trimStart();
-    wrapper = WRAPPER.exec(rest);
-  }
-  return rest;
-}
-
-/**
- * The parts of a shell command as typed: split on `&&`, `||`, `;`, `|&`, `|`, `&` and a newline outside quotes, each trimmed. Throws on
- * a substitution, a redirection, an escape, an unclosed quote or a separator inside quotes, which this matcher does not model.
- */
-function typedPartsOf(command: string): string[] {
-  if (/\$\(|[`<>\\]/.test(command))
-    throw new Error(`${command}: a substitution, redirection or escape is not modelled; say how it reads, here`);
-  const tokens = [...command.matchAll(/'[^']*'|"[^"]*"|&&|\|\||\|&|[;|&\n]|[^'"&|;\n]+/g)].map((token) => token[0]);
-  const quoted = tokens.filter((token) => /^['"]/.test(token));
-  if (tokens.join('') !== command || quoted.some((token) => /[;&|\n]/.test(token)))
-    throw new Error(`${command}: an unclosed quote or a separator inside quotes is not modelled; say how it reads, here`);
-  const parts = [''];
-  for (const token of tokens)
-    if (/^(?:&&|\|\||\|&|[;|&\n])$/.test(token)) parts.push('');
-    else parts[parts.length - 1] += token;
-  return parts.map((part) => part.trim()).filter(Boolean);
-}
-
-/** The parts of a shell command Claude Code matches an allow against: each part as typed (`typedPartsOf`), `unwrapped`. */
-const partsOf = (command: string): string[] => typedPartsOf(command).map(unwrapped).filter(Boolean);
-
-/** A call as the parts Claude Code matches an allow against: each part of a shell command (`partsOf`), or the tool call itself. */
-const partsOfCall = (call: Call): Call[] =>
-  call.command === undefined ? [call] : partsOf(call.command).map((command) => ({ tool: 'Bash', command }) as const);
-
-/**
- * A call as the parts Claude Code matches a deny against: each part of a shell command unwrapped, and as typed too, its leading
- * assignment and wrappers kept, so a deny of what an assignment says reaches it; or the tool call itself.
- */
-const deniedPartsOfCall = (call: Call): Call[] =>
-  call.command === undefined
-    ? [call]
-    : [...new Set([...partsOf(call.command), ...typedPartsOf(call.command)])].map((command) => ({ tool: 'Bash', command }) as const);
 
 /** A SKILL.md's `allowed-tools`, split on commas: what a session that loads the skill may run without asking. */
 function allowedToolsOf(file: string): string[] {
@@ -354,78 +179,6 @@ const folderOf = (steps: Record<string, string>): string => {
   return dir;
 };
 
-test('the matcher reads the rule shapes the fences use, and throws on a wildcard it does not model', () => {
-  const push = { tool: 'Bash', command: 'git push origin main' } as const;
-  assert.equal(reaches('Bash(git push:*)', push), true);
-  assert.equal(reaches('Bash(git push *)', push), true);
-  assert.equal(reaches('Bash(git push)', push), false, 'a rule with no wildcard is the command exactly');
-  assert.equal(reaches('Bash(git push)', { tool: 'Bash', command: 'git push' }), true);
-  assert.equal(reaches('Bash(git pu:*)', push), false, 'a prefix ends at a word');
-  assert.equal(reaches('Bash(git:*)', push), true);
-  assert.equal(reaches('Bash', push), true, 'a bare Bash is every command');
-  assert.equal(reaches('Bash(git branch --list:*)', { tool: 'Bash', command: 'git branch -D x' }), false);
-  const unsafe = { tool: 'mcp__playwright__browser_run_code_unsafe' };
-  assert.equal(reaches('mcp__playwright__browser_run_code_unsafe', unsafe), true);
-  assert.equal(reaches('mcp__playwright', unsafe), true, 'a server is every tool of it');
-  assert.equal(reaches('mcp__playwright__*', unsafe), true);
-  assert.equal(reaches('mcp__playwright__browser_navigate', unsafe), false);
-  assert.equal(reaches('Bash(git push:*)', unsafe), false);
-  assert.equal(reaches('Edit(**)', { tool: 'Edit' }), true, 'an edit rule on any path reaches an edit');
-  assert.equal(reaches('Edit(src/**)', { tool: 'Write' }), true, 'a write is matched against Edit rules');
-  assert.equal(reaches('Edit', { tool: 'Write' }), true);
-  assert.equal(reaches('Read(**)', { tool: 'Edit' }), false);
-  assert.equal(reaches('Edit(**)', push), false);
-  assert.equal(reaches('Bash(git * main)', push), true, 'a * inside a rule is any run of characters');
-  assert.equal(reaches('Bash(git * main)', { tool: 'Bash', command: 'git push origin main2' }), false, 'up to the end of the command');
-  const store = 'Bash(nemia factory instruction *--store*)';
-  assert.equal(reaches(store, { tool: 'Bash', command: 'nemia factory instruction f --store' }), true);
-  assert.equal(reaches(store, { tool: 'Bash', command: 'nemia factory instruction --store f' }), true, 'and none');
-  assert.equal(reaches(store, { tool: 'Bash', command: 'nemia factory instruction f' }), false);
-  assert.equal(reaches('Bash(git (x) *.md)', { tool: 'Bash', command: 'git (x) a.md' }), true, "a rule's other characters are its own");
-  assert.equal(reaches('Bash(git (x) *.md)', { tool: 'Bash', command: 'git (x) a_md' }), false);
-  const fetch = { tool: 'WebFetch', domain: 'code.claude.com' } as const;
-  assert.equal(reaches('WebFetch(domain:code.claude.com)', fetch), true);
-  assert.equal(reaches('WebFetch(domain:docs.claude.com)', fetch), false, 'a rule on a host is that host alone');
-  assert.equal(reaches('WebFetch(domain:claude.com)', fetch), false, 'a host is matched whole, never as a suffix');
-  assert.equal(reaches('WebFetch(domain:code.claude.com)', { tool: 'WebFetch' }), false, 'and reaches no fetch that says no host');
-  assert.equal(reaches('WebFetch', fetch), true, 'a bare WebFetch is every host');
-  assert.equal(reaches('WebFetch(domain:code.claude.com)', { tool: 'WebSearch' }), false);
-  assert.throws(
-    () => reaches('mcp__play*', unsafe),
-    (err: Error) => err.message.includes('not modelled'),
-  );
-  assert.throws(
-    () => reaches('WebFetch(url:https://code.claude.com/docs)', fetch),
-    (err: Error) => err.message.includes('a rule on WebFetch is modelled for `domain:` alone'),
-  );
-});
-
-test('the matcher reads a rule on a browser tool by the address it opens, as written, and throws on a parameter it does not model', () => {
-  const live = 'mcp__playwright__browser_navigate(url:*:8787*)';
-  const to = (url?: string): Call => ({ tool: 'mcp__playwright__browser_navigate', url });
-  for (const url of ['http://127.0.0.1:8787/', 'localhost:8787', 'http://[::1]:8787/runs', 'http://localhost:8787'])
-    assert.equal(reaches(live, to(url)), true, url);
-  assert.equal(reaches(live, to('http://127.0.0.1:41234/')), false, 'another port');
-  assert.equal(reaches(live, to('http://127.0.0.1:18787/')), false, "the colon is the port's");
-  assert.equal(reaches(live, to()), false, 'a call that gives no address is matched by no parameter rule');
-  assert.equal(reaches(live, { tool: 'mcp__playwright__browser_tabs', url: 'http://127.0.0.1:8787/' }), false, "a rule is one tool's");
-  assert.equal(reaches('mcp__playwright__browser_navigate', to('http://127.0.0.1:8787/')), true, 'a bare name is every call of it');
-  assert.equal(reaches('mcp__playwright', to('http://127.0.0.1:8787/')), true);
-  assert.equal(shown(to('http://127.0.0.1:8787/')), 'mcp__playwright__browser_navigate(url:http://127.0.0.1:8787/)');
-  for (const rule of ['mcp__playwright__browser_evaluate(function:*)', 'mcp__playwright__*(url:*)'])
-    assert.throws(
-      () => reaches(rule, to('http://127.0.0.1:8787/')),
-      (err: Error) => err.message.includes('modelled for `url:` and `filename:` alone'),
-      rule,
-    );
-  const named = 'mcp__playwright__browser_take_screenshot(filename:*)';
-  const shot = (filename?: string): Call => ({ tool: 'mcp__playwright__browser_take_screenshot', filename });
-  for (const filename of ['x.png', 'a/x.png', '/tmp/playwright-mcp/x.png']) assert.equal(reaches(named, shot(filename)), true, filename);
-  assert.equal(reaches(named, shot()), false, 'a picture given no name is matched by no rule on its name');
-  assert.equal(reaches(named, { tool: 'mcp__playwright__browser_snapshot', filename: 'x.yml' }), false);
-  assert.equal(shown(shot('x.png')), 'mcp__playwright__browser_take_screenshot(filename:x.png)');
-});
-
 test("REFUSED: a rule on an MCP tool's parameter in an allow list is not read as allowing anything: the matcher throws on it", () => {
   const reviewer = stepOf('reviewer');
   const call = [{ tool: 'mcp__playwright__browser_navigate', url: 'http://127.0.0.1:41234/' }];
@@ -447,42 +200,6 @@ test("REFUSED: a rule on an MCP tool's parameter in an allow list is not read as
     [],
     'a deny list reads one',
   );
-});
-
-test('the matcher splits a command into the parts Claude Code matches, strips the wrappers it strips, and throws on a form it does not model', () => {
-  assert.deepEqual(partsOf('cd packages/agent-orchestrator && pkill -f "turbo run test"'), [
-    'cd packages/agent-orchestrator',
-    'pkill -f "turbo run test"',
-  ]);
-  assert.deepEqual(partsOf('a || b; c | d |& e & f\ng'), ['a', 'b', 'c', 'd', 'e', 'f', 'g']);
-  assert.deepEqual(partsOf('timeout 5 pkill -f turbo'), ['pkill -f turbo']);
-  assert.deepEqual(partsOf('FOO=1 nohup timeout 2.5s killall node'), ['killall node']);
-  assert.deepEqual(partsOf('true &'), ['true'], 'a command sent to the background is its own part');
-  assert.deepEqual(partsOf("bash -c 'pkill -f x'"), ["bash -c 'pkill -f x'"], 'a shell started by a command is one part');
-  assert.deepEqual(partsOf('timeoutx pkill'), ['timeoutx pkill'], 'a wrapper is a whole word');
-  for (const command of ['kill $(pgrep -f turbo)', 'kill `pgrep -f turbo`', "bash -c 'a; pkill x'", 'npm test 2>&1', 'echo "a'])
-    assert.throws(
-      () => partsOf(command),
-      (err: Error) => err.message.includes('not modelled'),
-      command,
-    );
-  const compound = { tool: 'Bash', command: 'cd packages/agent-orchestrator && pkill -f "turbo run test"' } as const;
-  assert.equal(reaches('Bash(pkill:*)', compound), false, 'a rule matched against the whole command misses the part');
-  assert.ok(partsOfCall(compound).some((part) => reaches('Bash(pkill:*)', part)));
-  assert.deepEqual(partsOfCall({ tool: 'Edit' }), [{ tool: 'Edit' }]);
-  const assigned: Call = { tool: 'Bash', command: 'true && X=http://localhost:4318 timeout 5 true' };
-  assert.deepEqual(typedPartsOf(assigned.command), ['true', 'X=http://localhost:4318 timeout 5 true']);
-  assert.deepEqual(
-    deniedPartsOfCall(assigned).map((part) => part.command),
-    ['true', 'X=http://localhost:4318 timeout 5 true'],
-    'a deny is matched against a part as typed too',
-  );
-  assert.ok(
-    deniedPartsOfCall(assigned).some((part) => reaches('Bash(*:4318*)', part)),
-    'so a deny of an address reaches an assignment',
-  );
-  assert.ok(!partsOfCall(assigned).some((part) => reaches('Bash(*:4318*)', part)), 'and an allow of it reaches nothing an assignment says');
-  assert.deepEqual(deniedPartsOfCall({ tool: 'Edit' }), [{ tool: 'Edit' }]);
 });
 
 test("the tests' team is fenced as a shipped team must be: every step of its dev, auto and dontAsk", () => {
@@ -595,38 +312,6 @@ test('REFUSED: a dontAsk step an allow of pkill reaches is open on each kill by 
   assert.deepEqual(unfenced(reviewer), []);
 });
 
-test('the matcher reads an edit rule by the path it covers, from the root, the home or the working folder, and throws on one it does not model', () => {
-  const local = 'Edit(//**/.claude/settings.local.json)';
-  assert.equal(reaches(local, { tool: 'Edit', path: '/home/u/projects/.claude/settings.local.json' }), true);
-  assert.equal(reaches(local, { tool: 'Write', path: '/.claude/settings.local.json' }), true, 'a write too, and **/ is no folder as well');
-  assert.equal(reaches(local, { tool: 'Edit', path: '/home/u/projects/.claude/settings.json' }), false);
-  assert.equal(reaches(local, { tool: 'Edit', path: '/home/u/projects/x.claude/settings.local.json' }), false, 'a folder whole');
-  assert.equal(reaches('Edit(~/.claude.json)', { tool: 'Write', path: '/home/u/.claude.json' }), true);
-  assert.equal(reaches('Edit(~/.claude.json)', { tool: 'Write', path: '/home/u/x/.claude.json' }), false);
-  assert.equal(reaches('Edit(//a/*/c)', { tool: 'Edit', path: '/a/b/c' }), true);
-  assert.equal(reaches('Edit(//a/*/c)', { tool: 'Edit', path: '/a/b/d/c' }), false, 'a * stays within a folder');
-  assert.equal(reaches('Read(//**)', { tool: 'Edit', path: '/a' }), false);
-  assert.equal(reaches('Edit', { tool: 'Write', path: '/a' }), true);
-  const contract = 'Edit(packages/*/contracts/*.contract.ts)';
-  assert.equal(reaches(contract, { tool: 'Write', path: `${WORK}/packages/a/contracts/x.contract.ts` }), true, 'from the session');
-  assert.equal(reaches(contract, { tool: 'Edit', path: `${WORK}/packages/a/contracts/x.contract.ts` }), true);
-  assert.equal(reaches(contract, { tool: 'Write', path: `${WORK}/packages/a/contracts/laws.ts` }), false);
-  assert.equal(reaches(contract, { tool: 'Write', path: `${WORK}/packages/a/contracts/n/x.contract.ts` }), false, 'one folder deep');
-  assert.equal(reaches(contract, { tool: 'Write', path: `${WORK}/packages/a/b/contracts/x.contract.ts` }), false, 'a * is one name');
-  assert.equal(reaches(contract, { tool: 'Write', path: '/elsewhere/packages/a/contracts/x.contract.ts' }), false, 'anchored');
-  assert.equal(
-    reaches('Edit(*/contracts/*.contract.ts)', { tool: 'Write', path: `${WORK}/packages/a/contracts/x.contract.ts` }),
-    false,
-    'a leading * is one folder, not two',
-  );
-  for (const odd of ['Edit(src/**)', 'Edit(x.ts)'])
-    assert.throws(
-      () => reaches(odd, { tool: 'Edit', path: `${WORK}/src/b` }),
-      (err: Error) => err.message.includes('is not modelled') && err.message.includes('say how it reads'),
-      odd,
-    );
-});
-
 /** A list of a fence that a file's frontmatter writes on one line, as a comma string. */
 type FenceList = 'tools' | 'allowedTools' | 'disallowedTools';
 
@@ -736,26 +421,15 @@ function runs(
   inside = true,
 ): string[] {
   assert.ok(dontAskJob(step), `${step.name} is a dontAsk job, which runs only what an allow reaches`);
-  const allows = granting([...(step.allowedTools ?? []), ...(settings.permissions?.allow ?? []), ...grants]);
-  const denies = [...(step.disallowedTools ?? []), ...(settings.permissions?.deny ?? [])];
-  return calls
-    .filter(
-      (call) =>
-        partsOfCall(call).every((part) => allows.some((rule) => reaches(rule, part)) && !(inside && readsOutside(part))) &&
-        !deniedPartsOfCall(call).some((part) => denies.some((rule) => reaches(rule, part))),
-    )
-    .map(shown);
+  return runsUnder(
+    {
+      allow: [...(step.allowedTools ?? []), ...(settings.permissions?.allow ?? []), ...grants],
+      deny: [...(step.disallowedTools ?? []), ...(settings.permissions?.deny ?? [])],
+    },
+    calls,
+    { inside },
+  );
 }
-
-/**
- * The plain text tools each read-only agent allows beside git's questions, by its own allow. None of them writes a file or runs a
- * program: a `>` is a write Claude Code refuses a dontAsk job with no `Edit` allow, and each verb's own options name no output file and
- * no program. What each can read outside the working tree is held by Claude Code's own check (`CLAUDE_KEEPS_INSIDE`), but `wc
- * --files0-from=<file>`, which reads a list of paths from a file and counts each: that check reads no path inside the list, so its
- * deny (`WC_READS_A_LIST_DENY`) names it. Left out on purpose, each able to write a file or run a program: `sed` (`w`, `-i`), `awk`
- * (`system()`, `>`), `find` (`-exec`, `-delete`, `-fprint`), `sort` (`-o`), `uniq` (its output file) and `tee`.
- */
-const TEXT_ALLOWS = ['Bash(wc:*)', 'Bash(cut:*)', 'Bash(head:*)', 'Bash(tail:*)', 'Bash(cat:*)', 'Bash(ls:*)'];
 
 /** A read of each text tool inside the working tree, which every read-only agent runs by its own allow. */
 const TEXT_READS: Call[] = [
@@ -767,27 +441,6 @@ const TEXT_READS: Call[] = [
   'ls',
   'ls -la packages',
 ].map((command) => ({ tool: 'Bash', command }));
-
-/**
- * The verbs whose paths Claude Code keeps inside the session's working folders by its own check, before any rule: measured on 2.1.308
- * a dontAsk session allowed `Bash(cat:*)`, `Bash(head:*)`, `Bash(tail:*)`, `Bash(wc:*)`, `Bash(cut:*)` and `Bash(ls:*)`
- * ran each on a file of its folder and was refused each on `/etc/hostname`, `..`, `../<file>`, `~/<file>`, `$HOME/<file>`, after
- * `--`, behind `<`, and on a link in its folder to `/etc/hostname`; and refused `cat <file> > <file>`. It ran `wc --files0-from=<list>`,
- * whose list named `/etc/hostname`, and read it; with `Bash(wc *--f*)` denied, it refused that, `wc --f=<list>` and
- * `wc -l --files0=<list>`, and still ran `wc -l <file>`, `cat <file> | wc -l` and `head -1 <file> && ls`. It resolves a path: `ls
- * ./../<its folder>` ran.
- */
-const CLAUDE_KEEPS_INSIDE = ['cat', 'head', 'tail', 'wc', 'cut', 'ls'];
-
-/**
- * Whether Claude Code's own check refuses a part as reading outside the working tree (`CLAUDE_KEEPS_INSIDE`): a word after the verb
- * that opens `/`, `~` or `$`, or that climbs with `..`. A link is not modelled here, having no file system: measured, it is refused.
- * A `..` that climbs back inside is refused here and run by Claude Code, a read inside either way.
- */
-function readsOutside(part: Call): boolean {
-  const [verb, ...words] = (part.command ?? '').split(/\s+/);
-  return CLAUDE_KEEPS_INSIDE.includes(verb) && words.some((word) => /^[/~$]/.test(word) || /(?:^|\/)\.\.(?:\/|$)/.test(word));
-}
 
 /** The text tools' reads outside the working tree, each refused by Claude Code's own check, as measured (`CLAUDE_KEEPS_INSIDE`). */
 const TEXT_READS_OUTSIDE: Call[] = [
@@ -927,51 +580,49 @@ const GIT_READS_OUTSIDE: Call[] = [
 /** The denies that answer a read outside the repository, planted beside the read set. */
 const READS_OUTSIDE_DENIES = ['Bash(git *--no-ind*)', 'Bash(git blame *--con*)', 'Bash(git grep -f*)', 'Bash(git grep * -f*)'];
 
-/**
- * Every deny planted beside the read set, on the agent's own line: a step's own line adds to it, so each step is refused it. sdlc's own
- * list as written is `packages/templates/test/fences.test.ts`'s.
- */
-const READ_SET_DENIES = [...RUNS_A_PROGRAM_DENIES, WRITES_A_FILE_DENY, ...READS_OUTSIDE_DENIES, WC_READS_A_LIST_DENY];
+/** sdlc's fence files, whose lines its read-only agents name: the read set planted here is theirs, read where it is written. */
+const SDLC_FENCES = path.join(REPO, 'packages', 'templates', 'sdlc', 'fences');
+
+/** The lines of sdlc's fence file `file`, a YAML list of strings. */
+const fenceLines = (file: string): string[] => yaml.load(fs.readFileSync(path.join(SDLC_FENCES, file), 'utf8')) as string[];
+
+/** `rules` less `rule`, which it holds, so taking it off says something. */
+const less = (rules: readonly string[], ...rule: string[]): string[] => {
+  for (const one of rule) assert.ok(rules.includes(one), `${one} is planted, so taking it off says something`);
+  return rules.filter((kept) => !rule.includes(kept));
+};
+
+/** The proposal of a change to the factory's definitions, which each read-only agent allows itself beside the read set. */
+const PROPOSE_ALLOW = 'Bash(nemia propose *)';
 
 /**
- * Git's read-only questions as rules, one for each form of `GIT_READS`: the git half of the read set planted here. Planted, it may
- * drift from sdlc's; `packages/templates/test/fences.test.ts` holds sdlc's rules as written.
+ * The deny of any assignment before nemia. An allow is matched with a leading assignment stripped, so without it a session's
+ * `WF_SESSION_TOKEN= nemia …` drops its token and the api takes the call for the person's.
  */
-const GIT_ALLOWS = [
-  'Bash(git diff:*)',
-  'Bash(git diff-tree:*)',
-  'Bash(git log:*)',
-  'Bash(git show:*)',
-  'Bash(git show-ref:*)',
-  'Bash(git status:*)',
-  'Bash(git blame:*)',
-  'Bash(git grep:*)',
-  'Bash(git ls-files:*)',
-  'Bash(git ls-tree:*)',
-  'Bash(git cat-file:*)',
-  'Bash(git rev-parse:*)',
-  'Bash(git rev-list:*)',
-  'Bash(git merge-base:*)',
-  'Bash(git merge-tree:*)',
-  'Bash(git shortlog:*)',
-  'Bash(git describe:*)',
-  'Bash(git name-rev:*)',
-  'Bash(git for-each-ref:*)',
-  'Bash(git check-ignore:*)',
-  'Bash(git branch)',
-  'Bash(git branch --list:*)',
-  'Bash(git branch --contains:*)',
-  'Bash(git worktree list:*)',
-];
+const ASSIGNED_BEFORE_NEMIA_DENY = 'Bash(*=* nemia *)';
 
-/** The read set planted on a read-only agent's allow: git's questions and the text tools. */
-const READ_SET_ALLOWS = [...GIT_ALLOWS, ...TEXT_ALLOWS];
+/** The read set planted on a read-only agent's allow: git's questions and the text tools, sdlc's lines less the proposal. */
+const READ_SET_ALLOWS = less(fenceLines('read-only.allow.yaml'), PROPOSE_ALLOW);
+
+/** sdlc's read-only denies as written: the read set's, gh's and nemia's. */
+const READ_ONLY_DENIES = fenceLines('read-only.deny.yaml');
+
+/** Whether a rule is a deny of gh's, which a test of gh's reads plants on its own (`GH_DENIES`). */
+const ofGh = (rule: string): boolean => /^Bash\((?:\*=\* )?gh /.test(rule);
+
+/**
+ * Every deny planted beside the read set, on the agent's own line, a step's own line adding to it: sdlc's read-only denies less gh's
+ * and nemia's, which their own tests plant.
+ */
+const READ_SET_DENIES = less(
+  READ_ONLY_DENIES.filter((rule) => !ofGh(rule)),
+  ASSIGNED_BEFORE_NEMIA_DENY,
+);
 
 /**
  * The review step of the tests' team, read as a run reads it, from a copy of the team (`teamCopy`) whose reviewer — a dontAsk agent —
  * allows `allows` and denies `denies`, each on its own line of the agent's fence; and the step file's own `disallowedTools:` written as
- * `own`, where it is given, the agent then offering its fence to override. The lines are planted here, so they may drift from sdlc's:
- * `packages/templates/test/fences.test.ts` holds sdlc's rules as written.
+ * `own`, where it is given, the agent then offering its fence to override.
  */
 function planted({
   allows = READ_SET_ALLOWS,
@@ -996,12 +647,6 @@ function planted({
   assert.ok(dontAskJob(review), 'the review is a dontAsk job, which runs only what an allow reaches');
   return review;
 }
-
-/** `rules` less `rule`, which it holds, so taking it off says something. */
-const less = (rules: readonly string[], ...rule: string[]): string[] => {
-  for (const one of rule) assert.ok(rules.includes(one), `${one} is planted, so taking it off says something`);
-  return rules.filter((kept) => !rule.includes(kept));
-};
 
 /**
  * The read set's denies less the deny of any assignment before git, which reaches every spelling typed behind one: a test of another
@@ -1397,7 +1042,7 @@ test('a step that measures nothing denies each compiler whole, and REFUSED witho
   }
 });
 
-/** The pull request's reads the reviewer allows itself, planted beside the read set. sdlc's own is held as written there. */
+/** The pull request's reads the reviewer allows itself, planted beside the read set, as sdlc's reviewer allows them. */
 const GH_ALLOWS = ['Bash(gh pr view:*)', 'Bash(gh pr checks:*)'];
 
 /**
@@ -1459,8 +1104,12 @@ const GH_REFUSED: Record<string, string[]> = {
   ],
 };
 
-/** The denies beside gh's reads, each read-only agent's, by the rule each is written as. */
+/** The denies beside gh's reads, each read-only agent's, by the rule each is written as: sdlc's, each with the spellings it refuses. */
 const GH_DENIES = Object.keys(GH_REFUSED);
+
+test("the denies of gh's forms planted here are sdlc's own, each with its spellings", () => {
+  assert.deepEqual(GH_DENIES, READ_ONLY_DENIES.filter(ofGh));
+});
 
 /** Every spelling of gh's reads a read-only step must not run. */
 const GH_REFUSED_CALLS: Call[] = Object.values(GH_REFUSED)
@@ -1539,15 +1188,6 @@ test("REFUSED: a settings allow of gh's reads reaches every step, so a read-only
   assert.deepEqual(runs(fenced, GH_REFUSED_CALLS, settings, []), [], 'and its denies fence them');
   assert.deepEqual(runs(planted(), GH_REFUSED_CALLS, settings, []), GH_REFUSED_CALLS.map(shown), 'without them, the settings open each');
 });
-
-/** The proposal of a change to the factory's definitions, which each read-only agent allows itself. sdlc's own is held as written there. */
-const PROPOSE_ALLOW = 'Bash(nemia propose *)';
-
-/**
- * The deny of any assignment before nemia. An allow is matched with a leading assignment stripped, so without it a session's
- * `WF_SESSION_TOKEN= nemia …` drops its token and the api takes the call for the person's.
- */
-const ASSIGNED_BEFORE_NEMIA_DENY = 'Bash(*=* nemia *)';
 
 /**
  * A proposal as a step types it: from a file, and with its objects on the line as JSON (`--objects`), the way a step with no `Write`

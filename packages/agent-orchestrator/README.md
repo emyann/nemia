@@ -509,6 +509,13 @@ keys as before, so nothing past it changed. Refused at load, each naming the fil
 two blocks, a block for a harness the file does not run on (its own `harness:` line, its agent's, or `claude` without one), and the
 same key written both at the top level and in the block. `renderStep` and `renderAgent` write the block alone.
 
+**A template's tool list may take lines from a file of the template**: an item `{ path: <file> }` in an agent's or a step's fence list
+(`allowedTools`, `disallowedTools`, `tools`) names a YAML list of strings in the template, each line with a comment saying why it is
+there, so lines several agents share are written once. `nemia template lint` refuses an item whose file is missing, outside the
+template, or no list of strings; the render writes the full list into the factory's tree, each item in its place and each line once
+(`withSharedLines`, `src/template/shared-lines.ts`, whose laws `contracts/shared-lines.contract.ts` states), so a factory's agent file
+and Claude Code read the whole fence, never a reference.
+
 A fence key written at the top level is its former spelling, used until 2026-10-31, and it is still read, as the key in the block of the
 file's harness (`FORMER_FENCE_KEYS`); `nemia start` prints a line naming each file that writes one. `nemia frontmatter rewrite
 <folder>` moves each into its block, every value byte for byte (`fenceMoved`; a codex file's former `permissionMode:` lands as
@@ -612,40 +619,30 @@ applied, and its lint refuses there a word not in the list.
 
 #### Five layers: what shapes an agent, apart from its task
 
-What an agent is told comes in five layers, each written by whoever owns it:
+What an agent is told comes in five layers, each written by whoever owns it: the agent's instructions, the person's custom
+instructions, the folder's files, the factory's rules and the step's policy. Their list, numbered by precedence, is said once, in the
+`create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-agent/SKILL.md`, *The five layers*), which every agent that writes
+an agent is given; what follows is where each lives in this package.
 
-1. **Instructions** — the agent's own body, written once in its file: who it is and how it works, whatever node it is attached to.
-2. **Custom instructions** — what a person adds to an agent they use without rewriting it, any agent, the repository's or their own. They
-   are kept in the person's store, one file per agent name, `$WF_ROOT/custom-instructions/<agent>.md`
-   (`~/.agent-workflows/custom-instructions/<agent>.md` by default), never in the agent's folder, which may be the repository's; the
-   same words reach whichever agent of that name a run finds. `wf agents custom <name> --file <path>` writes them (`--file -` reads
-   stdin), `wf agents custom <name>` prints them, and `--clear` removes them; the board's page of an agent reads, writes and clears them
-   through the same functions (`writeCustomInstructions`, `clearCustomInstructions`). Both refuse a name no place has, blank words, and a
-   frontmatter block, in the same words. They only add words: they set no key, so they never widen the agent's fence, give it a tool, or change its model,
-   mode or skills — a frontmatter block written by hand, or a link, stops a start of every step naming the agent, naming the file.
-   `wf start` reads them once and freezes them with the step (`StepAgent.customInstructions`): a run started before an edit or a
-   `--clear` keeps the words it froze, and only runs started after it get the new ones.
-3. **The folder's files** — the files the harness reads from the folder the agent works in (today `CLAUDE.md`, `AGENTS.md`): what holds
-   there for every agent at work in it. Nemia composes nothing of them; the harness reads them as it would for a person. They rank
-   above the agent's own instructions and below the factory's rules and the step's policy: a place's facts beat a role's generic
-   defaults, and the factory knows its work and the step knows its process better than a folder knows either. This holds although a
-   harness presents a folder's files as overriding everything it is told — that framing is the harness's, not Nemia's.
-4. **The factory's rules** — the rules and policies of one factory, told to every agent hired into it, whichever agent and whichever
-   step: one file a factory, `$WF_ROOT/factories/<name>/RULES.md`, kept in the store and never in a repository (a factory made from a
-   template keeps it in its tree, `$WF_ROOT/factories/<name>/tree/RULES.md`, where a template carries it and an upgrade merges it as
-   text). `nemia factory rules <name> --file <path>` writes them (`--file -` reads stdin), `nemia factory rules <name>` prints them,
-   and `--clear` removes them; the factory's Settings on the board reads, writes and clears them through the same command. They only
-   add words, as custom instructions do: blank words and a frontmatter block are refused, and a frontmatter block written by hand, a
-   link or a folder in the file's place stops a start in the factory, naming the file. `nemia start` reads them once and freezes them
-   with every step of the run (`StepAgent.factoryRules`): a run started before an edit or a `--clear` keeps the words it froze. A
-   factory with none tells nothing, the default factory keeps none, and a step on a remote agent is told none: it runs as its operator
-   configured it. `NEMIA.md` is another file, Nemia's: no step is told it (*A factory's instruction*, below).
-5. **The step's policy** — the step's own words and keys: what this node of this process asks of whoever does its work — a role's
-   policies, *in this team, also check …*, or a `ship` step telling its shipper why a build and an e2e matter on a merged tree. It is a
-   normal layer, the place a process says what it expects of a role. A step's `skills:` adds skills to its agent's, and takes none away
-   (below).
+- **The instructions** are the agent's own body, written once in its file.
+- **The custom instructions** are kept in the person's store, one file per agent name, `$WF_ROOT/custom-instructions/<agent>.md`
+  (`~/.agent-workflows/custom-instructions/<agent>.md` by default), never in the agent's folder, which may be the repository's; the
+  same words reach whichever agent of that name a run finds. `wf agents custom <name> --file <path>` writes them (`--file -` reads
+  stdin), `wf agents custom <name>` prints them, and `--clear` removes them; the board's page of an agent reads, writes and clears them
+  through the same functions (`writeCustomInstructions`, `clearCustomInstructions`). Both refuse a name no place has, blank words, and a
+  frontmatter block, in the same words; a frontmatter block written by hand, or a link, stops a start of every step naming the agent,
+  naming the file. `wf start` reads them once and freezes them with the step (`StepAgent.customInstructions`).
+- **The folder's files** (today `CLAUDE.md`, `AGENTS.md`) Nemia composes nothing of: the harness reads them as it would for a person.
+- **The factory's rules** are one file a factory, `$WF_ROOT/factories/<name>/RULES.md`, kept in the store and never in a repository (a
+  factory made from a template keeps it in its tree, `$WF_ROOT/factories/<name>/tree/RULES.md`, where a template carries it and an
+  upgrade merges it as text). `nemia factory rules <name> --file <path>` writes them (`--file -` reads stdin), `nemia factory rules
+  <name>` prints them, and `--clear` removes them; the factory's Settings on the board reads, writes and clears them through the same
+  command. A frontmatter block written by hand, a link or a folder in the file's place stops a start in the factory, naming the file.
+  `nemia start` freezes them with every step of the run (`StepAgent.factoryRules`). `NEMIA.md` is another file, Nemia's: no step is
+  told it (*A factory's instruction*, below).
+- **The step's policy** is the step's own words and keys; a step's `skills:` adds skills to its agent's, and takes none away (below).
 
-The number is precedence, not arrival: where two layers say different things, the higher number wins — the folder's facts over the
+A layer's number is precedence, not arrival: where two layers say different things, the higher number wins — the folder's facts over the
 role's generic words, the factory over the folder, the step's process over the factory — and the task is above them all. The order the
 words arrive in is Nemia's own and unchanged: the instructions, then the custom instructions, then the factory's rules, then the step's
 policy, then the task, with the folder's files read by the harness itself wherever the agent works.
@@ -1598,6 +1595,12 @@ nothing that waits on the step ever runs. A step with no `check:` has nothing ru
   in the folder is refused there, before anything is written) and again wherever the run's pins move — its first
   filing, `nemia refresh`, a factory that follows revisions (`renderAgain`) — so a check line and the scripts it runs
   are always the one revision: a refresh cannot hand a run a check whose scripts are not where its line reads them.
+- **The command reads the files its workflows share as the run took them**, in `WF_CARRIED_FILES`: a folder `carried/` beside the
+  workflows (a template's own `carried/`, rendered byte for byte into a factory's `workflows/carried/`, any file at any depth), copied by
+  the run beside its workflow's copy, never into it, so the workflow's digest stays its own folder's (`runs/<id>/carried/<hex>/`,
+  `Run.carriedFiles`). It is taken and told wherever the workflow's copy is: at `nemia start` and wherever the pins move, set for
+  every check, in every session's environment, mounted read-only and named on the brief. A run whose workflows have no `carried/` is
+  told none. So a script two workflows run is one file (`node "$WF_CARRIED_FILES/<script>.ts"`), and no workflow is named `carried`.
   The record names the copy as `workflowFiles`; a run started before it has none, and its checks are not told the
   variable. A script edited alone is still no new revision of the workflow, which digests its `.md` and `.json` files.
 - The run commits what a step left **before** filing its check and never after, so what a suite leaves

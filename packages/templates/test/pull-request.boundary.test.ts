@@ -1,13 +1,14 @@
 /**
- * sdlc's pull-request door (`sdlc/workflows/build/pull-request.ts`, which `quick/` carries byte for byte): the one act that pushes a
+ * sdlc's pull-request door (`sdlc/carried/pull-request.ts`, which `build` and `quick` both run): the one act that pushes a
  * run's branch and opens the pull request CI judges. Driven as its three owners drive it — `open` by the engineer's session, `push` and
  * `wait --check <name>` by the round's check — in a scratch repository whose `origin` is a bare repository, so a push is a real push
  * and a diverged tip a real rejection, with a stub `gh` first on the PATH that records each call and answers from a fixture
  * (`test/origin.ts`), each a bounded subprocess. The CI context the wait reads is the one `--check` names, since that name is the
  * repository's a factory is applied to, never the script's.
  *
- * The wait's two bounds are told apart by `WF_CI_START_SECONDS` and `WF_CI_WAIT_SECONDS`, each read on its own, and the shipped numbers
- * are held against the words of `sdlc/workflows/build/README.md` and against a round check's own deadline. Build's implement check is
+ * The wait's two bounds are told apart by `WF_CI_START_SECONDS` and `WF_CI_WAIT_SECONDS`, each read on its own, and the shipped
+ * numbers, kept once in `sdlc/carried/exec.ts` and named by the READMEs rather than restated, are held against a round check's own
+ * deadline. Build's implement check is
  * read off sdlc as a factory gets it, rendered by `nemia factory apply` and the controller on a scratch store, on GitHub with its round
  * check and its CI context set as parameters, and each clause that runs the script is run as the run runs a check (`checkArgv`); at
  * sdlc's default, in the checkout, it is run whole, and pushes nothing.
@@ -28,9 +29,10 @@ import { CI_URL, GREEN, type Called, type Gh, type Rule, bareOrigin, ghStub, git
 /** The template these scripts ship in. */
 const SDLC = path.join(import.meta.dirname, '..', 'sdlc');
 
-const BUILD = path.join(SDLC, 'workflows', 'build');
+/** The carried folder, where the script and the helpers it shares with the landing are kept once. */
+const CARRIED = path.join(SDLC, 'carried');
 
-const SCRIPT = path.join(BUILD, 'pull-request.ts');
+const SCRIPT = path.join(CARRIED, 'pull-request.ts');
 
 /** The wait's flag, naming the CI context `origin.ts`'s rollups report. */
 const CI = ['--check', 'ci'];
@@ -1095,8 +1097,8 @@ test("build's implement check, rendered on GitHub, pushes through the script bef
   const check = stepsOf(at, 'build').find((step) => step.name === 'implement')?.check;
   assert.equal(typeof check, 'string', "sdlc's build has an implement step with a check");
   const frozen = check as string;
-  const clauses = [...frozen.matchAll(/node\s+"\$WF_WORKFLOW_FILES\/([\w-]+\.ts)"\s+(check|push|wait)?/g)].map(([, script, verb]) =>
-    verb ? `${script} ${verb}` : script,
+  const clauses = [...frozen.matchAll(/node\s+"\$\{WF_CARRIED_FILES:\?[^}]*\}\/([\w-]+\.ts)"\s+(check|push|wait)?/g)].map(
+    ([, script, verb]) => (verb ? `${script} ${verb}` : script),
   );
   assert.deepEqual(clauses, ['probe.ts check', 'parts.ts check', 'pull-request.ts push', 'pull-request.ts wait']);
   const round = frozen.indexOf('{ round-check --all; }');
@@ -1108,17 +1110,10 @@ test("build's implement check, rendered on GitHub, pushes through the script bef
   assert.ok(round < frozen.indexOf('pull-request.ts" wait'), `and CI is waited on last:\n${frozen}`);
   assert.doesNotMatch(frozen, /npm test/, "the suite is CI's now, on the pushed commit");
   assert.doesNotMatch(frozen, /npm run e2e/, 'and so is the whole e2e');
-  assert.ok(clauseOf(frozen, 'wait').includes('pull-request.ts" wait --check "gate";'), 'the wait reads the CI context the factory set');
-  assert.ok(
-    clauseOf(frozen, 'push').includes(`pull-request.ts" push --labels "${RULES}";`),
-    'the push labels by the rules the factory set',
-  );
+  assert.ok(clauseOf(frozen, 'wait').endsWith('pull-request.ts" wait --check "gate"'), 'the wait reads the CI context the factory set');
+  assert.ok(clauseOf(frozen, 'push').endsWith(`pull-request.ts" push --labels "${RULES}"`), 'the push labels by the rules the factory set');
   for (const verb of ['push', 'wait']) {
     const clause = clauseOf(frozen, verb);
-    assert.ok(
-      clause.startsWith(`{ if [ -n "\${WF_WORKFLOW_FILES:-}" ]; then node "$WF_WORKFLOW_FILES/pull-request.ts" ${verb}`),
-      `${verb} runs the script from the run's frozen workflow files first, in its own clause:\n${clause}`,
-    );
     const at2 = placed();
     at2.gh.answers([
       REPO_LABELS,
@@ -1129,7 +1124,7 @@ test("build's implement check, rendered on GitHub, pushes through the script bef
       },
     ]);
     const run = (more: Record<string, string>) => {
-      const [cmd, ...argv] = checkArgv(`${clause}fi; }`);
+      const [cmd, ...argv] = checkArgv(clause);
       const ran = spawnSync(cmd, argv, {
         cwd: at2.repo,
         env: {
@@ -1148,12 +1143,12 @@ test("build's implement check, rendered on GitHub, pushes through the script bef
       return { code: ran.status, out: ran.stdout, err: ran.stderr };
     };
     const unset = run({});
-    assert.notEqual(unset.code, 0, `${verb}, where the frozen workflow files are not named, refuses rather than read the script elsewhere`);
-    assert.match(unset.err, /WF_WORKFLOW_FILES/, 'naming the variable');
+    assert.notEqual(unset.code, 0, `${verb}, where the frozen carried files are not named, refuses rather than read the script elsewhere`);
+    assert.match(unset.err, /WF_CARRIED_FILES/, 'naming the variable');
     assert.deepEqual(at2.gh.calls(), [], 'and runs no script');
     assert.equal(tip(at2.bare!, at2.branch), null, 'nothing is pushed');
-    const ran = run({ WF_WORKFLOW_FILES: path.join(at.tree, 'workflows', 'build'), WF_LABELS: JSON.stringify({ work: 'cleanup' }) });
-    assert.equal(ran.code, 0, `${verb}, from the frozen workflow files, on a red \`ci\` beside a green \`gate\`:\n${ran.err}`);
+    const ran = run({ WF_CARRIED_FILES: path.join(at.tree, 'workflows', 'carried'), WF_LABELS: JSON.stringify({ work: 'cleanup' }) });
+    assert.equal(ran.code, 0, `${verb}, from the frozen carried files, on a red \`ci\` beside a green \`gate\`:\n${ran.err}`);
     assert.match(ran.out, verb === 'push' ? /nemia pr: #7 is at [0-9a-f]{12}/ : /nemia ci: `gate` passed on/);
     assert.deepEqual(
       labelCalls(at2.gh.calls()).map((call) => call.argv.at(-1)),
@@ -1181,7 +1176,7 @@ test("build's and quick's implement notes, rendered on GitHub, open the pull req
         HOME: place.repo,
         GIT_CONFIG_GLOBAL: '/dev/null',
         GIT_CONFIG_NOSYSTEM: '1',
-        WF_WORKFLOW_FILES: path.join(at.tree, 'workflows', workflow),
+        WF_CARRIED_FILES: path.join(at.tree, 'workflows', 'carried'),
         WF_LABELS: JSON.stringify({ work: 'cleanup' }),
         ...place.gh.env(),
       },
@@ -1216,7 +1211,7 @@ test("REFUSED at shipped defaults, in the checkout: build's implement check runs
         GIT_CONFIG_GLOBAL: '/dev/null',
         GIT_CONFIG_NOSYSTEM: '1',
         WF_RUN: 'r-1',
-        WF_WORKFLOW_FILES: path.join(at.tree, 'workflows', 'build'),
+        WF_CARRIED_FILES: path.join(at.tree, 'workflows', 'carried'),
         ...place.gh.env(),
       },
       encoding: 'utf8',
@@ -1237,17 +1232,17 @@ test("REFUSED at shipped defaults, in the checkout: build's implement check runs
 });
 
 /**
- * The clause of the frozen check `frozen` that runs the pull-request script's `verb`: from the `{` that opens it to the `fi; }` that
- * closes it, so what the clause holds is read against that verb alone and not against another's.
+ * The clause of the frozen check `frozen` that runs the pull-request script's `verb`: from the `node` that opens it to the ` && ` or the
+ * `; else` after it, so what the clause holds is read against that verb alone and not against another's.
  */
 function clauseOf(frozen: string, verb: string): string {
   const named = frozen.indexOf(`/pull-request.ts" ${verb}`);
   assert.ok(named > 0, `the check runs the script's ${verb}:\n${frozen}`);
-  const opens = frozen.lastIndexOf('{ if [ -n "${WF_WORKFLOW_FILES:-}" ]', named);
-  assert.ok(opens >= 0, `the ${verb} clause opens on the frozen workflow files:\n${frozen}`);
-  const closes = frozen.indexOf('fi; }', named);
-  assert.ok(closes > named, `the ${verb} clause closes:\n${frozen}`);
-  return frozen.slice(opens, closes);
+  const opens = frozen.lastIndexOf('node "', named);
+  assert.ok(opens >= 0, `the ${verb} clause opens on node:\n${frozen}`);
+  const ends = [frozen.indexOf(' && ', named), frozen.indexOf('; else', named)].filter((at) => at > named);
+  assert.ok(ends.length > 0, `the ${verb} clause closes:\n${frozen}`);
+  return frozen.slice(opens, Math.min(...ends));
 }
 
 test('the wait tells its two bounds apart: the start is its own, and what is left of the check deadline bounds the whole', () => {
@@ -1279,20 +1274,18 @@ test('the wait tells its two bounds apart: the start is its own, and what is lef
   assert.match(unfinished.err, /was still in_progress after 0 s/, 'a started `ci` is bounded by the whole');
 });
 
-/** The number the script's constant `name` holds, read from its shipped text; it must be there. */
+/** The number the shared constant `name` holds, read from `exec.ts`'s shipped text, where the script takes it; it must be there. */
 function shippedSeconds(name: 'START_SECONDS' | 'WHOLE_SECONDS'): number {
-  const found = new RegExp(`const\\s+${name}\\s*=\\s*(\\d+);`).exec(fs.readFileSync(SCRIPT, 'utf8'));
-  assert.ok(found, `pull-request.ts declares ${name}`);
+  assert.match(fs.readFileSync(SCRIPT, 'utf8'), new RegExp(`\\b${name}\\b[^;]*from '\\./exec\\.ts'`), `pull-request.ts takes ${name}`);
+  const found = new RegExp(`export const\\s+${name}\\s*=\\s*(\\d+);`).exec(fs.readFileSync(path.join(CARRIED, 'exec.ts'), 'utf8'));
+  assert.ok(found, `exec.ts declares ${name}`);
   return Number(found[1]);
 }
 
-test("the wait's two bounds are the numbers the README states, and both fit under a round check's own deadline", () => {
+test("the wait's two bounds: the start within the whole, and both under a round check's own deadline", () => {
   const start = shippedSeconds('START_SECONDS');
   const whole = shippedSeconds('WHOLE_SECONDS');
   assert.ok(start < whole, `the start bound ${start} is within the whole ${whole}: the wait has two stages`);
-  const readme = fs.readFileSync(path.join(BUILD, 'README.md'), 'utf8');
-  assert.match(readme, new RegExp(`${start}\\s*s\\s+for\\s+it\\s+to\\s+start`), "build's README states the start bound");
-  assert.match(readme, new RegExp(`${whole}\\s*s\\s+whole`), "build's README states the whole bound");
   assert.ok(
     CHECK_DEADLINE_SECONDS - whole >= 900,
     `the round check's deadline is ${CHECK_DEADLINE_SECONDS} s and the wait takes up to ${whole} s of it: the clauses before it — the ` +

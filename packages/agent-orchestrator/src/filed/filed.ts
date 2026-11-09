@@ -23,11 +23,11 @@ import { splitServers, type FactoryServer, type FactoryServers } from '../factor
  * files directory, read-only, for a step that writes outside its directory only by rule (`ownMounts`), the
  * artifacts folder of each step it comes after, read-only, then the store's folders its `reads:` names, read-only, the inbox at `t.inbox`,
  * then the run's inputs folder at `t.inputs`, read-only, given only for a run given inputs, then the run's copy of its workflow folder
- * at `t.workflowFiles`, read-only (`workflowMounts`); the key left out with none, the MCP servers
- * its sessions load, its factory's record first and the checkout's `.mcp.json` for the rest (`serversOf`), the step's files directory and
- * the run's copy of its workflow folder, the run's labels and the try's session token in its session's environment (`stepFilesEnv`),
- * and the harness's own arguments (`own`) last, a step's settings given its factory's harness settings beneath its own (`ownWith`). The
- * runtime judges no budget:
+ * at `t.workflowFiles` and of its carried files at `t.carriedFiles`, each read-only (`workflowMounts`); the key left out with none, the
+ * MCP servers its sessions load, its factory's record first and the checkout's `.mcp.json` for the rest (`serversOf`), the step's files
+ * directory and the run's copies of its workflow folder and its carried files, the run's labels and the try's session token in its
+ * session's environment (`stepFilesEnv`), and the harness's own arguments (`own`) last, a step's settings given its factory's harness
+ * settings beneath its own (`ownWith`). The runtime judges no budget:
  * `budgetUsd` is the harness's own cap, and whether the step went over is this package's (`ownStatus`). Pure.
  */
 export const filedConfig = <Own extends object>(
@@ -42,6 +42,8 @@ export const filedConfig = <Own extends object>(
     inputs?: string;
     /** The run's copy of its workflow folder (`workflowFilesDir`), absolute: absent where the record names none. */
     workflowFiles?: string;
+    /** The run's copy of its carried files (`carriedFilesDir`), absolute: absent where the record names none. */
+    carriedFiles?: string;
     /** The artifacts folders of the run that routed on to this one, for a root (`callerMounts`): absent for every other step. */
     caller?: readonly Mount[];
     own: Own;
@@ -70,7 +72,7 @@ export const filedConfig = <Own extends object>(
   budgetUsd: t.budgetUsd,
   ...mountsOf([...(stepMounts(step, run.mounts) ?? []), ...volumeMounts(step, run.volumes), ...folders(filedFolders(step, steps, t))]),
   ...serversOf(step, t.servers),
-  ...stepFilesEnv(step, t.runArtifacts, t.workflowFiles, run.labels, t.sessionToken),
+  ...stepFilesEnv(step, t.runArtifacts, { workflowFiles: t.workflowFiles, carriedFiles: t.carriedFiles }, run.labels, t.sessionToken),
   ...ownWith(step, run.harnessSettings, t.own),
 });
 
@@ -103,6 +105,13 @@ export const STEP_FILES = 'WF_STEP_FILES';
 export const WORKFLOW_FILES = 'WF_WORKFLOW_FILES';
 
 /**
+ * The variable a step's session, and its check, find the run's copy of its carried files in (`carriedFilesDir`): the `carried/` folder
+ * beside its workflow's, the files the workflows of a template share, frozen with the workflow's copy, so a script one of them names is
+ * the one its run took.
+ */
+export const CARRIED_FILES = 'WF_CARRIED_FILES';
+
+/**
  * The variable a step's session, as its check (`checkEnvOf`), is told its run's labels in: a JSON object of strings, `{}` where the run
  * has none, as Kubernetes' Downward API gives a container its own Pod's labels. Read when the session is filed: a label put on the run
  * after that reaches its next session and its check, not this one.
@@ -119,19 +128,20 @@ export const SESSION_TOKEN = 'WF_SESSION_TOKEN';
 
 /**
  * A step's session's own environment: its files directory under `runArtifacts` as `STEP_FILES`, the run's copy of its workflow folder
- * as `WORKFLOW_FILES` where the record names one (`workflowFiles`), the run's labels as `RUN_LABELS`, and its session token as
- * `SESSION_TOKEN` where one was minted (`sessionToken`).
+ * as `WORKFLOW_FILES` and of its carried files as `CARRIED_FILES`, each where the record names one (`copies`), the run's labels as
+ * `RUN_LABELS`, and its session token as `SESSION_TOKEN` where one was minted (`sessionToken`).
  */
 const stepFilesEnv = (
   step: Pick<Workflow, 'name'>,
   runArtifacts: string,
-  workflowFiles: string | undefined,
+  copies: { workflowFiles: string | undefined; carriedFiles: string | undefined },
   labels: Run['labels'],
   sessionToken: string | undefined,
 ): { env: Record<string, string> } => ({
   env: {
     [STEP_FILES]: stepFilesOf(step, runArtifacts),
-    ...(workflowFiles === undefined ? {} : { [WORKFLOW_FILES]: workflowFiles }),
+    ...(copies.workflowFiles === undefined ? {} : { [WORKFLOW_FILES]: copies.workflowFiles }),
+    ...(copies.carriedFiles === undefined ? {} : { [CARRIED_FILES]: copies.carriedFiles }),
     [RUN_LABELS]: JSON.stringify(labels ?? {}),
     ...(sessionToken === undefined ? {} : { [SESSION_TOKEN]: sessionToken }),
   },
@@ -172,6 +182,8 @@ export type FiledFolders = {
   inputs: Mount[];
   /** The run's copy of its workflow folder, read-only (`workflowMounts`): absent or empty where it is not mounted. */
   workflow?: Mount[];
+  /** The run's copy of its carried files, read-only (`workflowMounts`): absent or empty where it is not mounted. */
+  carried?: Mount[];
   /** The result steps' artifacts folders of the run that routed on to this one, read-only, on a local root (`callerMounts`). */
   caller?: Mount[];
   named?: Readonly<Record<string, HandedFiles>>;
@@ -188,19 +200,20 @@ export type FiledFolders = {
 export const filedFolders = (
   step: Workflow,
   steps: readonly Workflow[],
-  t: { runArtifacts: string; inbox: string; inputs?: string; workflowFiles?: string; caller?: readonly Mount[] },
+  t: { runArtifacts: string; inbox: string; inputs?: string; workflowFiles?: string; carriedFiles?: string; caller?: readonly Mount[] },
 ): FiledFolders => ({
   own: ownMounts(step, t.runArtifacts),
   handed: handedMounts(step, steps, t.runArtifacts),
   store: readsMounts(step, t.inbox),
   inputs: inputsMounts(step, steps, t.inputs),
   workflow: workflowMounts(step, t.workflowFiles),
+  carried: workflowMounts(step, t.carriedFiles),
   caller: local(step.harness) ? [...(t.caller ?? [])] : [],
 });
 
 /**
  * A step's folders beyond its factory's, in the order they are filed: its own, the handed ones, the caller's, the store's, the run's
- * inputs, then the run's copy of its workflow folder.
+ * inputs, then the run's copies of its workflow folder and of its carried files.
  */
 const folders = (f: FiledFolders): Mount[] => [
   ...(f.own ?? []),
@@ -209,6 +222,7 @@ const folders = (f: FiledFolders): Mount[] => [
   ...f.store,
   ...f.inputs,
   ...(f.workflow ?? []),
+  ...(f.carried ?? []),
 ];
 
 /** Whether a step's harness reads the disk only through what it is filed: neither a remote agent nor one fenced by a sandbox. */

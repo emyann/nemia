@@ -46,7 +46,7 @@ that part.
 into the run's worktree yourself, as one commit per part with a plain message, and remove the part's worktree once taken. Once a part's commit is in the run's branch, leave the part's branch where it is:
 the landing counts it as taken by its patches, every commit of it having an equivalent on the run's branch (`git cherry`), and
 never delete it with `-D` or `--delete --force`, which your fence refuses. A part whose work your branch replaced rather than took (an
-earlier cut, its work moved elsewhere) you declare replaced through the run's script, `node "$WF_WORKFLOW_FILES/parts.ts" replaced
+earlier cut, its work moved elsewhere) you declare replaced through the run's script, `node "$WF_CARRIED_FILES/parts.ts" replaced
 <part>`, and name in your summary: your check refuses a part branch that is neither taken nor declared. Once
 the parts of a phase are in, run the tests across their seams, and a package's whole tests where a file many tests read has changed.
 Your summary names each part, who built it, and what you changed in it when you took it.

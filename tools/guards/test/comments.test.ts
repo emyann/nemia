@@ -11,8 +11,11 @@
  * No line that holds a comment is wider than oxfmt's print width, which wraps code but rewraps no comment: the plugin's rule refuses
  * one, in every folder a guard block covers.
  *
- * The design system kit the shadcn CLI writes into the board, and its skills beside it, are another repository's code, fetched again
- * at each update: the linter skips them (`"ignorePatterns"`) and so do the scans here, and no other folder may join them.
+ * What is not ours — another project's files vendored unchanged, as the design system kit and its skills, and what a tool writes, as
+ * the route tree — is said once, by `.gitattributes`, and read through git (`notOurs` and `ours` of `test-kit/repo`). The scans here
+ * leave it unread, and both configs' `"ignorePatterns"` are held to it: each file it marks is skipped by the formatter, and each file of
+ * code it marks by the linter, which skips no file of ours. The formatter skips more, by kind (prose, data, fixtures), which this does
+ * not hold.
  *
  * The test reads files outside this package: after a change elsewhere, `npx turbo run test --force`.
  */
@@ -24,8 +27,9 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import ts from 'typescript';
 import plugin, { COMMENT_WIDTH } from '../../../lint/comments.ts';
-import { workspaces } from 'test-kit/repo';
+import { files, notOurs, ours, REPO, workspaces } from 'test-kit/repo';
 import { scratch } from 'test-kit/scratch';
+import { namesOf } from 'test-kit/words';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 const OXLINT = path.join(ROOT, 'node_modules', '.bin', 'oxlint');
@@ -37,18 +41,41 @@ const SELF = path
 type Block = { files: string[]; excludeFiles?: string[]; rules: Record<string, unknown> };
 type Config = { jsPlugins: { name: string; specifier: string }[]; overrides: Block[]; ignorePatterns?: string[]; [key: string]: unknown };
 
-/** The folders that hold another repository's code as it ships it: the design system kit in the board, and its skills beside it. */
-const VENDORED = ['apps/web/src/components/ui/ds/**', 'apps/web/.claude/**'];
+/**
+ * Whether the config's ignore pattern `glob` skips `file`, a path from the root: as a glob from the root, a folder and all under it, and
+ * a pattern with no `/` at any depth, as both tools read a `.gitignore`'s.
+ */
+const skips = (file: string, glob: string): boolean =>
+  path.matchesGlob(file, glob) || path.matchesGlob(file, `${glob}/**`) || (!glob.includes('/') && path.matchesGlob(file, `**/${glob}`));
 
-/** Whether `file`, from the root, is under a vendored folder. */
-const vendored = (file: string): boolean => VENDORED.some((glob) => path.matchesGlob(file, glob));
+/** The files the linter reads: code, in each spelling of JavaScript and TypeScript. The formatter reads every kind not skipped. */
+const LINTED = /\.[cm]?[jt]sx?$/;
 
-/** The globs the linter is told to skip that are not a vendored folder's, in the order the config lists them: each hides code of ours. */
-const strayIgnores = (config: Config): string[] => (config.ignorePatterns ?? []).filter((glob) => !VENDORED.includes(glob));
+/**
+ * Each of `listed` that `.gitattributes` at `root` marks not ours and no ignore pattern of `config` skips, among the files `reads`
+ * accepts: a file the config must skip.
+ */
+const unskipped = (
+  listed: readonly string[],
+  config: Pick<Config, 'ignorePatterns'>,
+  reads: (file: string) => boolean = () => true,
+  root = REPO,
+): string[] => {
+  const read = listed.filter(reads);
+  const marked = notOurs(read, root);
+  return read.filter((file) => marked.has(file) && !(config.ignorePatterns ?? []).some((glob) => skips(file, glob)));
+};
 
-/** `.oxlintrc.json`, read as oxlint reads it: JSON with comments. */
-function readConfig(text = fs.readFileSync(path.join(ROOT, '.oxlintrc.json'), 'utf8')): Config {
-  const parsed = ts.parseConfigFileTextToJson('.oxlintrc.json', text);
+/** The ignore patterns of `config` that skip a file of `listed` that is ours at `root`, in the order the config lists them. */
+const strayIgnores = (listed: readonly string[], config: Pick<Config, 'ignorePatterns'>, root = REPO): string[] => {
+  const marked = notOurs(listed, root);
+  const own = listed.filter((file) => !marked.has(file));
+  return (config.ignorePatterns ?? []).filter((glob) => own.some((file) => skips(file, glob)));
+};
+
+/** `.oxlintrc.json`, or the config `name` names, read as both tools read it: JSON with comments. */
+function readConfig(text = fs.readFileSync(path.join(ROOT, '.oxlintrc.json'), 'utf8'), name = '.oxlintrc.json'): Config {
+  const parsed = ts.parseConfigFileTextToJson(name, text);
   if (parsed.error) throw new Error(ts.flattenDiagnosticMessageText(parsed.error.messageText, '\n'));
   return parsed.config as Config;
 }
@@ -416,42 +443,67 @@ test('REFUSED: a guard block with an excludeFiles is found', () => {
   assert.deepEqual(excludedBlocks(readConfig(text.replace(line, `${line} "excludeFiles": ["apps/api/**"],`))), ['apps/api']);
 });
 
-test('the linter skips the vendored folders, each one, and no folder of ours', () => {
-  const config = readConfig();
-  assert.deepEqual(strayIgnores(config), [], 'the linter is told to skip these: every guard runs on every file of ours');
-  assert.deepEqual(config.ignorePatterns, VENDORED, 'the vendored folders the linter skips');
+/** `.oxfmtrc.json`, read as oxfmt reads it. */
+const formatConfig = (): Config => readConfig(fs.readFileSync(path.join(ROOT, '.oxfmtrc.json'), 'utf8'), '.oxfmtrc.json');
+
+test('the linter and the formatter skip each file .gitattributes marks not ours, and the linter no file of ours', () => {
+  const listed = files();
+  assert.ok(notOurs(listed).size > 0, 'git marks the vendored kit not ours');
+  assert.deepEqual(
+    unskipped(listed, readConfig(), (file) => LINTED.test(file)),
+    [],
+    'add a glob to .oxlintrc.json\'s "ignorePatterns" for these files',
+  );
+  assert.deepEqual(unskipped(listed, formatConfig()), [], 'add a glob to .oxfmtrc.json\'s "ignorePatterns" for these files');
+  assert.deepEqual(strayIgnores(listed, readConfig()), [], 'the linter is told to skip files of ours: every guard runs on every one');
+});
+
+test('REFUSED: a file .gitattributes marks vendored that a config does not skip, and a glob of the linter that skips a file of ours', () => {
+  const root = scratch('not-ours-skipped-');
+  execFileSync('git', ['init', '-q', root]);
+  fs.writeFileSync(path.join(root, '.gitattributes'), 'vendor/** linguist-vendored\n');
+  const listed = ['vendor/kit/a.ts', 'vendor/kit/README.md', 'src/b.ts'];
+  assert.deepEqual(unskipped(listed, { ignorePatterns: ['**/*.md'] }, undefined, root), ['vendor/kit/a.ts']);
+  assert.deepEqual(
+    unskipped(listed, { ignorePatterns: [] }, (file) => LINTED.test(file), root),
+    ['vendor/kit/a.ts'],
+  );
+  assert.deepEqual(unskipped(listed, { ignorePatterns: ['vendor/**'] }, undefined, root), []);
+  assert.deepEqual(strayIgnores(listed, { ignorePatterns: ['vendor/**', 'src'] }, root), ['src']);
 });
 
 test('REFUSED: a folder of ours the linter is told to skip is found', () => {
   const text = fs.readFileSync(path.join(ROOT, '.oxlintrc.json'), 'utf8');
   const key = '"ignorePatterns": [';
   assert.equal(text.split(key).length, 2, `no one ${key} in .oxlintrc.json`);
-  assert.deepEqual(strayIgnores(readConfig(text.replace(key, `${key}"apps/api/**", `))), ['apps/api/**']);
+  assert.deepEqual(strayIgnores(files(), readConfig(text.replace(key, `${key}"apps/api/**", `))), ['apps/api/**']);
 });
 
-test('REFUSED: a file of ours beside the vendored folders is no vendored file', () => {
+test('a file of ours beside the vendored folders is ours, and a file in them is not', () => {
   assert.deepEqual(
-    ['apps/web/src/components/ui/ds/components/Button.tsx', 'apps/web/.claude/skills/ds-spec/md3.mjs'].filter((file) => !vendored(file)),
+    ['apps/web/src/components/ui/ds/components/Button.tsx', 'apps/web/.claude/skills/ds-spec/md3.mjs'].filter(ours),
     [],
+    'git marks these vendored: see .gitattributes',
   );
   assert.deepEqual(
-    ['apps/web/src/components/ui/button.tsx', 'apps/web/src/components/ds.tsx', '.claude/skills/look/SKILL.md'].filter(vendored),
+    ['apps/web/src/components/ui/button.tsx', 'apps/web/src/components/ds.tsx', '.claude/skills/look/SKILL.md'].filter(
+      (file) => !ours(file),
+    ),
     [],
+    'these are ours: no line of .gitattributes may mark them',
   );
 });
 
 /**
  * Every source file of ours git lists under each workspace, lint/ and tools/, tracked or not yet added, that is on disk, from the root:
- * no generated route tree, and no file under a vendored folder.
+ * nothing `.gitattributes` marks vendored or generated.
  */
-const sourceFiles = (): string[] =>
-  execFileSync('git', ['ls-files', '-co', '--exclude-standard', ...workspaces(), 'lint', 'tools'], {
-    cwd: ROOT,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
-    .split('\n')
-    .filter((file) => /\.tsx?$/.test(file) && !file.endsWith('.gen.ts') && !vendored(file) && fs.existsSync(path.join(ROOT, file)));
+const sourceFiles = (): string[] => {
+  const dirs = [...workspaces(), 'lint', 'tools'];
+  return files().filter(
+    (file) => /\.tsx?$/.test(file) && dirs.some((dir) => file.startsWith(`${dir}/`)) && ours(file) && fs.existsSync(path.join(ROOT, file)),
+  );
+};
 
 /** `text` parsed as TypeScript, or as TSX where the file name says so. */
 const parse = (file: string, text: string): ts.SourceFile =>
@@ -493,18 +545,6 @@ function quotedNames(comment: string): string[][] {
     .map((match) => match[1])
     .filter((quoted) => NAME.test(quoted) && !FILE_EXTENSIONS.test(quoted))
     .map((quoted) => quoted.replace(/\(\)$/, '').split('.'));
-}
-
-/** Every name a piece of code has: its identifiers, private and JSX names included, and the words of its strings and templates. */
-function namesOf(source: ts.SourceFile, into: Set<string>): Set<string> {
-  const visit = (node: ts.Node) => {
-    if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node)) into.add(node.text.replace(/^#/, ''));
-    else if (ts.isStringLiteralLike(node) || ts.isTemplateLiteralToken(node) || ts.isJsxText(node))
-      for (const word of node.text.match(/[A-Za-z_$][\w$]*/g) ?? []) into.add(word);
-    ts.forEachChild(node, visit);
-  };
-  visit(source);
-  return into;
 }
 
 type Scanned = { names: ReadonlySet<string>; comments: ReadonlyMap<string, readonly Found[]> };

@@ -8,10 +8,12 @@ A change its card settles, which needs no design, goes through [`quick`](../quic
 design → implement ⇄ review → land
 ```
 
-Each script a step runs is read from the run's frozen workflow files (`$WF_WORKFLOW_FILES`), the copy of this folder the run took
-when it began, never from the tree it judges: a step's check runs `node "$WF_WORKFLOW_FILES/<script>.ts"`. Where `WF_WORKFLOW_FILES`
-is not set, the check says so on stderr and fails: a factory's scripts are not in the repository it works on, so there is nowhere else
-to read them from.
+Each script a step runs is read from the run's frozen carried files (`$WF_CARRIED_FILES`), the copy of the template's `carried/`
+folder the run took when it began, never from the tree it judges: a step's check runs `node "$WF_CARRIED_FILES/<script>.ts"`. The
+scripts live there once, since `quick` runs them too, with the helpers `landing.ts` and `pull-request.ts` share (`exec.ts`) and the
+rules of a CI log (`ci-log.ts`). Where `WF_CARRIED_FILES` is not set, the check names it on stderr and fails: a factory's scripts are
+not in the repository it works on, so there is nowhere else to read them from. This sdlc needs the Nemia it ships with: one that
+renders and freezes a template's carried folder and reads a `{ path }` item of a list.
 
 ## Two ways to judge and land: in this checkout, or on GitHub
 
@@ -38,12 +40,12 @@ pushes this run's own branch, never another and never the base and never forced,
 branch, never a draft, printing the address that goes on Grace's closeout as an artifact value. Her check pushes again through the same
 script and refuses unless the pull request's head is the commit it judges — GitHub moves that head a moment after the push, so it is
 read again for up to 30 s before the refusal — then runs the round check, then, unless GitHub says the pull request conflicts with its
-base (refused at once, naming the merge of the base, since GitHub runs no CI on a conflicting head), waits on the CI context (1800 s
-for it to start, 2400 s whole), reading only the latest run of each check on the head, so a failure a later run of the same check
+base (refused at once, naming the merge of the base, since GitHub runs no CI on a conflicting head), waits on the CI context (`START_SECONDS`
+for it to start, `WHOLE_SECONDS` whole, both in `exec.ts`), reading only the latest run of each check on the head, so a failure a later run of the same check
 superseded is neither judged nor listed: CI runs the repository's suite on that commit, and a red, cancelled or missing context is the check's
 refusal, with the Actions URL, the failing jobs and a bounded tail of their log — no writer of this team may type `gh`, so the script
 reads it for them. A red the context judged is first re-run, once: the failed jobs of its workflow run, with the jobs that need them
-(`gh run rerun <id> --failed`), waited on within the same 2400 s, and only a run on its first attempt is re-run, as GitHub says, so a
+(`gh run rerun <id> --failed`), waited on within the same whole bound, and only a run on its first attempt is re-run, as GitHub says, so a
 head is never re-run twice; a job red again is the change's, and the pass or the refusal names each job re-run and how it ended the
 second time. A re-run still running at the bound is a refusal the next try answers by changing nothing, its check reading the re-run's
 verdict. An attempt that cannot be read, a re-run `gh` refuses, or a red that is no Actions job is not re-run, said in a line. Where the context is red on the base branch too, at the commit of it the head holds, the refusal says so and names
@@ -87,8 +89,8 @@ progress, every commit of every branch of the run with an equivalent patch on HE
 own counts as taken) — which is what the run needs to record `landed` on the commit that landed. It runs no suite: CI judged the head
 the review read, and the merge commit's first parent is the base. Last, where the factory's `landingWaitsOnCi` is true (the default),
 the receipt waits on the CI context at the merge commit on the base branch (`receipt --run <id> --check <name> --wait-on-ci <true|false>`;
-up to 1800 s for it to be reported there, or 2400 s while another check there still runs, and 2400 s in all, inside the landing
-check's own deadline). Green passes. Red fails the step
+up to `START_SECONDS` for it to be reported there, or `WHOLE_SECONDS` while another check there still runs, and `WHOLE_SECONDS` in all,
+the bounds the implement step's wait keeps in `exec.ts`, inside the landing check's own deadline). Green passes. Red fails the step
 though the merge stands — nothing is taken back — naming the jobs that did not pass: a person re-runs them where CI failed on its own
 account, or lands a fix, then types `nemia retry <run> land`; where the base's tip holds the merge and the context is green there, the
 receipt passes and says so. A merge whose own run was cancelled — a CI that replaces a pending run of the base with a newer push's
@@ -98,7 +100,7 @@ read and why; red there fails the step naming that commit; anything else waits o
 receipt then waits on nothing.
 
 The implement step's check runs `probe.ts`, read from the frozen files as well: a session a step starts to measure something, a probe, is named
-`<run>-probe-<label>` (`node "$WF_WORKFLOW_FILES/probe.ts" start <label> -- <prompt>`), runs in the machinery's trusted folder
+`<run>-probe-<label>` (`node "$WF_CARRIED_FILES/probe.ts" start <label> -- <prompt>`), runs in the machinery's trusted folder
 `$WF_ROOT/probes`, and says in its first message whether the person must act; it reaches the person's phone through Remote Control
 only with `--answer`, and the step then stops `blocked` on the `needs` line it prints. The check refuses while a probe named for the
 run is live, naming `probe.ts stop`. Grace's and Otto's fences refuse a bare `claude --bg` or Remote Control, and an edit of a
@@ -107,12 +109,12 @@ harness's trust or local settings anywhere.
 The implement step's check runs `parts.ts check` after it, read from the frozen files too: every other branch of the run
 (`wf/<run>/<part>`, a part Grace built beside her branch) has each of its commits' patches on her branch (`git cherry`, as the
 landing reads it), or the check refuses, naming each part left out and the two ways to settle it. A part whose work her branch
-replaced she declares replaced, `node "$WF_WORKFLOW_FILES/parts.ts" replaced <part>…`, which removes its branch and keeps its tip as
+replaced she declares replaced, `node "$WF_CARRIED_FILES/parts.ts" replaced <part>…`, which removes its branch and keeps its tip as
 `refs/backup/wf/<run>/<part>` — a step may not delete a branch — and names in her closeout; so the landing never finds a superseded
 part it would refuse.
 
 The implement step's check then runs the factory's own check, its `implementCheck` parameter, either way: a command of the factory's
-own (a script it keeps in this folder is read as `node "$WF_WORKFLOW_FILES/<script>.ts"`), run from the workspace's root after `parts.ts
+own (a script it keeps once in its carried folder is read as `node "$WF_CARRIED_FILES/<script>.ts"`), run from the workspace's root after `parts.ts
 check` and before anything is pushed or the local check runs, so a non-zero exit refuses the round with nothing pushed. Its default,
 `true`, checks nothing. A factory that adds a check of its own sets the parameter rather than editing the check line or the sentences
 that list its scripts, and an upgrade that changes either merges with no conflict on them.

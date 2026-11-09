@@ -173,7 +173,7 @@ test("REFUSED: a file of src or bin that takes the engine's stand-in, by its ent
     [],
     'a test beside the code',
   );
-  assert.deepEqual(standInBreaches('src/service/engine.ts', ' * A test takes `testEngine` of `agent-runtime/testing`.'), [], 'prose');
+  assert.deepEqual(standInBreaches('src/service/engine.ts', '/** A test takes `testEngine` of `agent-runtime/testing`. */'), [], 'prose');
 });
 
 test("no file of src or bin takes the engine's stand-in but its own three", () => {

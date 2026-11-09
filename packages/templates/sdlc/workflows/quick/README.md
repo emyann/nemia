@@ -38,11 +38,12 @@ hold a part for each.
 
 On GitHub, the check is the cheap set, and CI: it runs `change.ts size`, `probe.ts`, `parts.ts`, the factory's own check, its
 `implementCheck` parameter, `pull-request.ts push` and `pull-request.ts wait --check <name>`, in that order, and nothing else.
-Each script is read from the run's frozen workflow files (`node "$WF_WORKFLOW_FILES/<script>.ts"`, the copy of this folder the run
-took when it began), never from the tree it judges; where `WF_WORKFLOW_FILES` is not set, the check says so on stderr and fails. The
-run copies this folder alone, so it carries `build`'s `probe.ts`, `parts.ts`, `pull-request.ts`, `ci-log.ts` (which `pull-request.ts` imports) and `landing.ts`
-as copies of its own, equal to
-`build`'s byte for byte: an edit to one is made to both.
+Each script is read from what the run froze when it began, never from the tree it judges: `change.ts`, quick's own, from its frozen
+workflow files (`node "$WF_WORKFLOW_FILES/change.ts"`, the copy of this folder), and the scripts it runs as `build` does — `probe.ts`,
+`parts.ts`, `pull-request.ts` and `landing.ts`, with `ci-log.ts` and `exec.ts`, which they import — from its frozen carried files
+(`node "$WF_CARRIED_FILES/<script>.ts"`, the copy of the template's `carried/` folder), kept there once for both workflows. Where
+either variable is not set, the check names it on stderr and fails, running no clause after it. This sdlc needs the Nemia it ships
+with: one that renders and freezes a template's carried folder and reads a `{ path }` item of a list.
 
 1. `change.ts size`, first: the net change from the base the branch holds to `HEAD` (`git diff --numstat -M`, so a line added then
    removed counts for nothing and a rename is one file). It says the files and the lines, a generated file (`package-lock.json`,
@@ -50,15 +51,15 @@ as copies of its own, equal to
    nothing by them. Its `nemia size:` line is the review's measure of the change; the `touched` list is the place's report, and may
    count a rename as two. Its only refusals are of the run's environment or the check line, never of the work, so each ends with
    `nemia change: not the work:` (below).
-2. `build`'s `probe.ts`, quick's copy of it: no probe is left live.
-3. `build`'s `parts.ts`, quick's copy of it: every other branch of the run (`wf/<run>/<part>`) is held by the branch, by patch,
+2. `probe.ts`, the carried one `build` runs too: no probe is left live.
+3. `parts.ts`, the carried one `build` runs too: every other branch of the run (`wf/<run>/<part>`) is held by the branch, by patch,
    or was declared replaced (`parts.ts replaced <part>`, which removes it and keeps its tip under `refs/backup/`), so the landing
    finds no result branch left out.
 4. The factory's own check, its `implementCheck` parameter, either way: a command of the factory's own (a script it keeps in
-   both workflows' folders is read as `node "$WF_WORKFLOW_FILES/<script>.ts"`), so a factory adds a check by setting it rather than
+   its carried folder once is read as `node "$WF_CARRIED_FILES/<script>.ts"`), so a factory adds a check by setting it rather than
    by editing the check line or these sentences. A non-zero exit refuses the round before anything is pushed or the local check runs;
    `true`, the default, checks nothing.
-5. `build`'s `pull-request.ts`, quick's copy of it: `push` pushes the branch and refuses unless the one open, non-draft
+5. `pull-request.ts`, the carried one `build` runs too: `push` pushes the branch and refuses unless the one open, non-draft
    pull request of it is at the commit the check judges, and labels that pull request from the run's labels by the factory's
    `pullRequestLabels` rules (`<key>=<value>:<label>`; empty, the default, labels nothing), as `build`'s README says, and as
    the implement step's `open` already did when it created the pull request; `wait` polls the CI context the factory names (its `ciCheck`
@@ -75,8 +76,9 @@ sign-off spend no try and wait on a person at once, and so does a refusal after 
 On GitHub, no typecheck, no lint and no test on this machine: nothing here runs Grace's tests for her before the review. Her session runs the
 tests of what she changed, the types and the lint, as the repository's instructions say of a session's checks; CI runs the
 repository's suite on the commit the check pushed, and the check waits on it. Land then merges that same pull request through
-`build`'s `landing.ts` (quick's copy) and fast-forwards the checkout, and its check is the receipt that the merge happened —
-`build`'s land step to the letter but its `after:` and its gate (note, check, fence and budget). Main has one guard, whatever the
+the carried `landing.ts`, as `build`'s does, and fast-forwards the checkout, and its check is the receipt that the merge happened —
+`build`'s land step to the letter but its `after:` and its gate (check, fence and budget, and its note, which is `build`'s own
+`land.md`, which the step's `instruction:` names as a `{ path }`). Main has one guard, whatever the
 workflow: the required CI context on the head the review read, and a merge that refuses anything but this run's own green pull
 request. Where the factory's `landingWaitsOnCi` is true (the default), the receipt then waits on the CI context at the merge commit on
 the base branch, as `build`'s README says: a merge that turned the base red fails the land step though the merge stands, unless the

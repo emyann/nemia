@@ -1,23 +1,27 @@
 /**
- * sdlc's agents carry their fences with them, as a factory's tree gets them rendered: what the root `CLAUDE.md`, *Agents in this
- * repository*, says of the team it was taken from holds of the template.
+ * sdlc's agents carry their fences with them, as a factory's tree gets them rendered: the lines several agents share are written once,
+ * in `sdlc/fences/` (each with its reason beside it), and each agent names the files its role takes, as a `{ path }` item of its list.
  *
- * - The four read-only agents (Seldon, Agora, Iris, Argus) run `dontAsk`, name the place's `git` skill, allow one and the same read-only
- *   set of git's questions and text tools (`READ_SET`), and deny beside it what that set would let git write a file, run a program or
- *   read outside the repository by (`READ_SET_DENIES`), an assignment before git among them.
- * - Agora, the reviewer, alone allows `gh pr view` and `gh pr checks` (`GH_READS`), on either way sdlc lands, and the four deny beside
- *   them every form of gh that opens a browser, never returns, reads beyond the answer or another repository, bundles a short option to
- *   reach one, or is typed after an assignment (`GH_DENIES`): a repository's own allow of gh reaches every step, so each is fenced.
- * - The four propose a change of the factory's definitions they need (`PROPOSES`), one and the same allow on each, and deny any
- *   assignment before nemia (`NEMIA_DENIES`), which would drop the session's token and act as the person.
+ * - The four read-only agents (Seldon, Agora, Iris, Argus) run `dontAsk`, name the place's `git` skill, and take the read set and its
+ *   denies (`read-only.allow.yaml`, `read-only.deny.yaml`): git's questions and the text tools, a proposal of a change, and the denies of
+ *   what those would let git write a file, run a program or read outside the repository by, and of every form of gh and of an
+ *   assignment before nemia.
+ * - Agora, the reviewer, alone allows `gh pr view` and `gh pr checks` (`GH_READS`), on either way sdlc lands.
+ * - An agent that allows the browser's tools denies those that write a file (`browser.deny.yaml`), and every agent that may reach the
+ *   browser, the writers among them, denies the one that runs a script in the page (`run-code.deny.yaml`).
  * - Every agent is refused an edit and a write of the store's factories, workflows and inbox, under the store the factory names
  *   (`storeRoot`), and none of its runs: a step writes its own run's folder.
- * - The two writers, Grace and Otto, each deny `git push`, a forced branch delete, a kill by name, every `gh`, a session started by
- *   hand and an edit of a harness's settings, one and the same list (`WRITER_DENIES`), as today's do.
+ * - The two writers, Grace and Otto, take one list (`writers.deny.yaml`): a push, a forced branch delete, a kill by name, every `gh`, a
+ *   session started by hand, an edit of a harness's settings and GitHub's writes of a repository.
  *
- * Each rule is first refused on a copy of sdlc with one line of an agent cut, rendered beside sdlc itself on one store, and the refusal
- * names the agent and the rule; then sdlc as it ships is read. The deny lists are held by the rule as written: what a rule reaches is
- * `packages/agent-orchestrator/test/agent-fences.test.ts`'s to say.
+ * What each rule asks of an agent is read from the files themselves, so a line dropped from one is refused on every agent that names it.
+ * Each rule is first refused on a copy of sdlc with lines cut, rendered beside sdlc itself on one store; then sdlc as it ships is read,
+ * and what its rendered fences run is proven through the test kit's matcher of Claude Code's rules (`test-kit/fence`): each read open,
+ * each write, program and read outside refused. What each deny refuses spelling by spelling is the orchestrator's
+ * `agent-fences.test.ts`'s, on these same lines.
+ *
+ * Every step's prompt holds sdlc's `RULES.md`, so a rule every agent keeps is written there once: the paragraph on a refused call is in
+ * it and in no agent's instructions.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -25,6 +29,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import { splitFrontmatter } from 'agent-orchestrator/workflow';
+import { bash, runsUnder, type Call } from 'test-kit/fence';
 import { copyOf, rendered, SDLC } from './template.ts';
 
 /**
@@ -39,88 +44,11 @@ const READ_ONLY = ['agora', 'argus', 'iris', 'seldon'];
 /** The writers, whose fences refuse what no run of theirs may do. */
 const WRITERS = ['grace', 'otto'];
 
-/** Git's read-only questions and the text tools each read-only agent allows itself, the same on each. */
-const READ_SET = [
-  'Bash(git diff:*)',
-  'Bash(git diff-tree:*)',
-  'Bash(git log:*)',
-  'Bash(git show:*)',
-  'Bash(git show-ref:*)',
-  'Bash(git status:*)',
-  'Bash(git blame:*)',
-  'Bash(git grep:*)',
-  'Bash(git ls-files:*)',
-  'Bash(git ls-tree:*)',
-  'Bash(git cat-file:*)',
-  'Bash(git rev-parse:*)',
-  'Bash(git rev-list:*)',
-  'Bash(git merge-base:*)',
-  'Bash(git merge-tree:*)',
-  'Bash(git shortlog:*)',
-  'Bash(git describe:*)',
-  'Bash(git name-rev:*)',
-  'Bash(git for-each-ref:*)',
-  'Bash(git check-ignore:*)',
-  'Bash(git branch)',
-  'Bash(git branch --list:*)',
-  'Bash(git branch --contains:*)',
-  'Bash(git worktree list:*)',
-  'Bash(wc:*)',
-  'Bash(cut:*)',
-  'Bash(head:*)',
-  'Bash(tail:*)',
-  'Bash(cat:*)',
-  'Bash(ls:*)',
-];
-
-/**
- * What the read set would let git write a file, run a program or read outside the repository by, and `wc` read a list of paths by:
- * `git grep`'s pager option, git's environment, any assignment before git (`HOME`, `XDG_CONFIG_HOME`), `--output`, `--no-index`,
- * `blame --contents`, `grep -f`, `wc --files0-from`.
- */
-const READ_SET_DENIES = [
-  'Bash(git grep *O*)',
-  'Bash(git grep *--op*)',
-  'Bash(*GIT_*)',
-  'Bash(*=* git *)',
-  'Bash(git *--output*)',
-  'Bash(git *--no-ind*)',
-  'Bash(git blame *--con*)',
-  'Bash(git grep -f*)',
-  'Bash(git grep * -f*)',
-  'Bash(wc *--f*)',
-];
+/** The lines of sdlc's fence file `file`, as shipped. */
+const linesOf = (file: string): string[] => yaml.load(fs.readFileSync(path.join(SDLC, 'fences', file), 'utf8')) as string[];
 
 /** The pull request's reads, which Agora alone allows itself. */
 const GH_READS = ['Bash(gh pr view:*)', 'Bash(gh pr checks:*)'];
-
-/**
- * What gh's reads would open, run or read beyond the answer by, each read-only agent's deny: the browser, `--watch`, a jq query or a
- * template, another repository by option or by address, a short option bundled after `-c`, and any assignment before gh.
- */
-const GH_DENIES = [
-  'Bash(gh *--web*)',
-  'Bash(gh * -w*)',
-  'Bash(gh *--watch*)',
-  'Bash(gh *--jq*)',
-  'Bash(gh * -q*)',
-  'Bash(gh *--template*)',
-  'Bash(gh * -t*)',
-  'Bash(gh *--repo*)',
-  'Bash(gh * -R*)',
-  'Bash(gh *//*)',
-  'Bash(gh * -c*)',
-  'Bash(*=* gh *)',
-];
-
-/** The proposal of a change to the factory's definitions, which each read-only agent allows itself, the same on each. */
-const PROPOSES = 'Bash(nemia propose *)';
-
-/**
- * Each read-only agent's deny of any assignment before nemia: an allow is matched with a leading assignment stripped, so
- * `WF_SESSION_TOKEN= nemia propose …` would pass `PROPOSES` with the session's token dropped, as the person.
- */
-const NEMIA_DENIES = ['Bash(*=* nemia *)'];
 
 /** The reviewer, the one read-only agent whose steps read the pull request. */
 const READS_THE_PULL_REQUEST = 'agora';
@@ -130,34 +58,6 @@ const READS_THE_PULL_REQUEST = 'agora';
  * Claude Code matches every file-editing tool, `Write` with it, against `Edit` rules, and the agent reader refuses a `Write(…)` rule.
  */
 const storeDenies = (root: string): string[] => ['factories', 'workflows', 'inbox'].map((folder) => `Edit(${root}/${folder}/**)`);
-
-/** What each writer denies, Grace's and Otto's alike. */
-const WRITER_DENIES = [
-  'SendMessage',
-  'CronCreate',
-  'CronDelete',
-  'RemoteTrigger',
-  'Bash(git push)',
-  'Bash(git push:*)',
-  'Bash(gh)',
-  'Bash(gh:*)',
-  'Bash(git branch -D:*)',
-  'Bash(git branch --delete --force:*)',
-  'Bash(pkill:*)',
-  'Bash(killall:*)',
-  'Bash(*pkill *)',
-  'Bash(*killall *)',
-  'Bash(*kill *pgrep*)',
-  'Bash(*pgrep*kill *)',
-  'Bash(*xargs kill*)',
-  'mcp__playwright__browser_run_code_unsafe',
-  'Bash(claude *--bg*)',
-  'Bash(claude *--background*)',
-  'Bash(claude *remote-control*)',
-  'Edit(//**/.claude/settings.local.json)',
-  'Edit(~/.claude/settings.json)',
-  'Edit(~/.claude.json)',
-];
 
 /** An agent's fence as its rendered file says it. */
 type Fence = { mode: unknown; skills: string[]; allowed: string[]; denied: string[] };
@@ -198,6 +98,9 @@ function fencesIn(tree: string): Record<string, Fence> {
   );
 }
 
+/** Whether an agent allows a tool of the browser's, and so must deny those that write a file. */
+const allowsTheBrowser = (fence: Fence): boolean => fence.allowed.some((rule) => rule.startsWith('mcp__playwright__'));
+
 /** What the fences `fences` fall short of, a line each, `<agent>: <what>`, the store being `root`. */
 function shortOf(fences: Record<string, Fence>, root: string): string[] {
   const fence = (agent: string): Fence => fences[agent] ?? { mode: undefined, skills: [], allowed: [], denied: [] };
@@ -209,11 +112,8 @@ function shortOf(fences: Record<string, Fence>, root: string): string[] {
       return [
         ...(mode === 'dontAsk' ? [] : [`${agent}: runs ${String(mode)}`]),
         ...(skills.includes('git') ? [] : [`${agent}: names no git skill`]),
-        ...lacks(agent, READ_SET, allowed, 'allows no'),
-        ...lacks(agent, READ_SET_DENIES, denied, 'denies no'),
-        ...lacks(agent, GH_DENIES, denied, 'denies no'),
-        ...lacks(agent, [PROPOSES], allowed, 'allows no'),
-        ...lacks(agent, NEMIA_DENIES, denied, 'denies no'),
+        ...lacks(agent, linesOf('read-only.allow.yaml'), allowed, 'allows no'),
+        ...lacks(agent, linesOf('read-only.deny.yaml'), denied, 'denies no'),
         ...(agent === READS_THE_PULL_REQUEST
           ? lacks(agent, GH_READS, allowed, 'allows no')
           : allowed.filter((rule) => rule.startsWith('Bash(gh')).map((rule) => `${agent}: allows gh, ${rule}`)),
@@ -222,18 +122,29 @@ function shortOf(fences: Record<string, Fence>, root: string): string[] {
     ...Object.keys(fences)
       .sort()
       .flatMap((agent) => [
+        ...(allowsTheBrowser(fence(agent))
+          ? lacks(agent, [...linesOf('run-code.deny.yaml'), ...linesOf('browser.deny.yaml')], fence(agent).denied, 'denies no')
+          : []),
         ...lacks(agent, storeDenies(root), fence(agent).denied, 'denies no'),
         ...fence(agent)
           .denied.filter((rule) => rule.includes(`${root}/runs`))
           .map((rule) => `${agent}: denies its runs, ${rule}`),
       ]),
-    ...WRITERS.flatMap((agent) => lacks(agent, WRITER_DENIES, fence(agent).denied, 'denies no')),
+    ...WRITERS.flatMap((agent) =>
+      lacks(agent, [...linesOf('writers.deny.yaml'), ...linesOf('run-code.deny.yaml')], fence(agent).denied, 'denies no'),
+    ),
   ];
 }
 
+/** `text` less the line `- <rule>` of a fence file or an agent's list, for each of `rules`. */
+const cut =
+  (...rules: string[]) =>
+  (text: string): string =>
+    rules.reduce((left, rule) => left.replace(new RegExp(`^ *- ${rule.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\n`, 'm'), ''), text);
+
 /**
- * sdlc as it ships, on either way it lands, and a copy with one line cut from six agents' fences, rendered on one store with the store
- * `STORE`.
+ * sdlc as it ships, on either way it lands, and a copy with lines cut from four fence files and from two agents' own lists, rendered on
+ * one store with the store `STORE`.
  */
 const TREES = await rendered([
   { name: 'shipped', template: copyOf(SDLC), sets: [`storeRoot=${STORE}`] },
@@ -241,14 +152,12 @@ const TREES = await rendered([
   {
     name: 'cut',
     template: copyOf(SDLC, {
-      'agents/otto/agent.yaml': (text) => text.replace('        - Edit(${{ parameters.storeRoot }}/inbox/**)\n', ''),
-      'agents/agora/agent.yaml': (text) =>
-        text.replace('        - Bash(git *--output*)\n', '').replace('        - Bash(gh pr checks:*)\n', ''),
-      'agents/iris/agent.yaml': (text) =>
-        text.replace('        - Bash(git merge-base:*)\n', '').replace('        - Bash(nemia propose *)\n', ''),
-      'agents/argus/agent.yaml': (text) => text.replace('        - Bash(*=* nemia *)\n', ''),
-      'agents/seldon/agent.yaml': (text) => text.replace('        - Bash(gh *--jq*)\n', '').replace('        - Bash(*=* git *)\n', ''),
-      'agents/grace/agent.yaml': (text) => text.replace('        - Bash(git push:*)\n', ''),
+      'fences/read-only.allow.yaml': cut('Bash(git merge-base:*)'),
+      'fences/read-only.deny.yaml': cut('Bash(git *--output*)', 'Bash(*=* nemia *)'),
+      'fences/writers.deny.yaml': cut('Bash(git push:*)'),
+      'fences/browser.deny.yaml': cut('mcp__playwright__browser_snapshot(filename:*)'),
+      'agents/otto/agent.yaml': cut('Edit(${{ parameters.storeRoot }}/inbox/**)'),
+      'agents/agora/agent.yaml': cut('Bash(gh pr checks:*)'),
     }),
     sets: [`storeRoot=${STORE}`],
   },
@@ -261,18 +170,23 @@ const fencesOf = (name: string): Record<string, Fence> => {
   return fencesIn(tree);
 };
 
-test('REFUSED: an agent with a line of its fence cut is named, with the rule it lost', () => {
-  assert.deepEqual(shortOf(fencesOf('cut'), STORE).sort(), [
-    `agora: allows no Bash(gh pr checks:*)`,
-    `agora: denies no Bash(git *--output*)`,
-    `argus: denies no Bash(*=* nemia *)`,
-    `grace: denies no Bash(git push:*)`,
-    `iris: allows no Bash(git merge-base:*)`,
-    `iris: allows no Bash(nemia propose *)`,
-    `otto: denies no Edit(${STORE}/inbox/**)`,
-    `seldon: denies no Bash(*=* git *)`,
-    `seldon: denies no Bash(gh *--jq*)`,
-  ]);
+test('REFUSED: a line cut from a fence file is named on every agent that takes the file, and a line cut from an agent on it', () => {
+  assert.deepEqual(
+    shortOf(fencesOf('cut'), STORE).sort(),
+    [
+      'agora: allows no Bash(gh pr checks:*)',
+      ...READ_ONLY.flatMap((agent) => [
+        `${agent}: allows no Bash(git merge-base:*)`,
+        `${agent}: denies no Bash(*=* nemia *)`,
+        `${agent}: denies no Bash(git *--output*)`,
+      ]),
+      'agora: denies no mcp__playwright__browser_snapshot(filename:*)',
+      'grace: denies no Bash(git push:*)',
+      'otto: denies no Bash(git push:*)',
+      `otto: denies no Edit(${STORE}/inbox/**)`,
+      'seldon: denies no mcp__playwright__browser_snapshot(filename:*)',
+    ].sort(),
+  );
 });
 
 test('REFUSED: a deny over the runs, and a read-only agent in another mode or with no git skill, are named', () => {
@@ -292,12 +206,24 @@ test('REFUSED: a deny over the runs, and a read-only agent in another mode or wi
   ]);
 });
 
-test("sdlc's six agents carry their fences: the read set and its denies, the store's denies, and the writers' refusals", () => {
+test("sdlc's six agents carry their fences: the read set and its denies, the browser's, the store's, and the writers' refusals", () => {
   for (const way of ['shipped', 'github']) {
     const fences = fencesOf(way);
     assert.deepEqual(Object.keys(fences).sort(), ['agora', 'argus', 'grace', 'iris', 'otto', 'seldon'], way);
     assert.deepEqual(shortOf(fences, STORE), [], way);
+    for (const [agent, { allowed, denied }] of Object.entries(fences))
+      for (const [list, rules] of Object.entries({ allowed, denied }))
+        assert.deepEqual(
+          rules.filter((rule, i) => rules.indexOf(rule) !== i),
+          [],
+          `${way}: ${agent}'s ${list} list holds each rule once`,
+        );
   }
+  assert.deepEqual(
+    ['agora', 'seldon'].map((agent) => allowsTheBrowser(fencesOf('shipped')[agent])),
+    [true, true],
+    'the browser rules are read on the two that allow it',
+  );
 });
 
 test("Agora allows gh's two reads and nothing else of gh, on either way sdlc lands", () => {
@@ -309,30 +235,105 @@ test("Agora allows gh's two reads and nothing else of gh, on either way sdlc lan
     );
 });
 
-test('the four read-only agents allow one and the same read set, and nothing else of git', () => {
-  const fences = fencesOf('shipped');
+/** Reads a read-only agent makes, in the spellings a session types: each runs by its own allow. */
+const READS: Call[] = [
+  'git diff main...HEAD',
+  'git log --oneline -5',
+  'git grep -n foo HEAD',
+  'git merge-base --is-ancestor a HEAD',
+  'git branch --list',
+  'git worktree list',
+  'cat README.md',
+  'wc -l README.md',
+  'nemia propose -f x.yaml -n f',
+].map(bash);
+
+/** What a read-only agent must never run: a write of git's, a program or a file by an option, a read outside, a move, a dropped token. */
+const NEVER_READ_ONLY: Call[] = [
+  'git commit -m x',
+  'git push',
+  'git branch -D x',
+  'git worktree add ../x',
+  'git diff --output=x HEAD',
+  'git grep -nOsh foo',
+  'GIT_EXTERNAL_DIFF=sh git diff HEAD',
+  'HOME=planted git log -p',
+  'git diff --no-index /etc/hostname x',
+  'wc --files0-from=list0',
+  'cat /etc/hostname',
+  'cd .. && git log',
+  'sed -i s/a/b/ x',
+  'gh pr view 1 --web',
+  'gh pr merge 1',
+  'WF_SESSION_TOKEN= nemia propose -f x.yaml -n f',
+].map(bash);
+
+/** What a writer, which runs auto, must never run: each refused by its own deny. */
+const NEVER_WRITERS: Call[] = [
+  ...['git push origin x', 'git branch -D x', 'gh pr merge 1', 'pkill -f node', 'claude --bg x'].map(bash),
+  { tool: 'Edit', path: '/home/u/.claude.json' },
+  { tool: 'mcp__playwright__browser_run_code_unsafe' },
+  { tool: 'mcp__github__push_files' },
+];
+
+test("the read-only agents' rendered fences run every read, and no write, program, read outside or dropped token", () => {
+  for (const way of ['shipped', 'github'])
+    for (const agent of READ_ONLY) {
+      const { allowed, denied } = fencesOf(way)[agent];
+      const fence = { allow: allowed, deny: denied };
+      assert.deepEqual(
+        runsUnder(fence, READS),
+        READS.map((call) => `Bash(${call.command})`),
+        `${way}: ${agent} reads`,
+      );
+      assert.deepEqual(runsUnder(fence, NEVER_READ_ONLY), [], `${way}: ${agent} writes nothing`);
+    }
+});
+
+test("the writers' rendered fences refuse a push, a forced delete, gh, a kill, a session by hand, a harness's settings and a script in the page", () => {
+  for (const agent of WRITERS) {
+    const { denied } = fencesOf('shipped')[agent];
+    assert.deepEqual(runsUnder({ allow: [], deny: denied }, NEVER_WRITERS, { dontAsk: false }), [], agent);
+    assert.deepEqual(runsUnder({ allow: [], deny: denied }, [bash('git commit -m x')], { dontAsk: false }), ['Bash(git commit -m x)']);
+  }
+});
+
+test('REFUSED: on the fences with lines cut, a read-only agent writes a file by --output and proposes as the person, and a writer pushes', () => {
+  const fences = fencesOf('cut');
   for (const agent of READ_ONLY)
     assert.deepEqual(
-      fences[agent].allowed.filter((rule) => /^Bash\((?:git|wc|cut|head|tail|cat|ls)\b/.test(rule)),
-      READ_SET,
+      runsUnder({ allow: fences[agent].allowed, deny: fences[agent].denied }, NEVER_READ_ONLY),
+      ['Bash(git diff --output=x HEAD)', 'Bash(WF_SESSION_TOKEN= nemia propose -f x.yaml -n f)'],
+      agent,
+    );
+  for (const agent of WRITERS)
+    assert.deepEqual(
+      runsUnder({ allow: [], deny: fences[agent].denied }, NEVER_WRITERS, { dontAsk: false }),
+      ['Bash(git push origin x)'],
       agent,
     );
 });
 
-test('the four read-only agents allow one and the same proposal of a change, and deny any assignment before nemia', () => {
-  for (const way of ['shipped', 'github']) {
-    const fences = fencesOf(way);
-    for (const agent of READ_ONLY) {
-      assert.deepEqual(
-        fences[agent].allowed.filter((rule) => rule.startsWith('Bash(nemia propose')),
-        [PROPOSES],
-        `${way}: ${agent}`,
-      );
-      assert.deepEqual(
-        fences[agent].denied.filter((rule) => /^Bash\(.*\bnemia\b/.test(rule)),
-        NEMIA_DENIES,
-        `${way}: ${agent}`,
-      );
-    }
-  }
+/** The paragraph every step keeps when a call it needs is refused, by its opening words. */
+const REFUSED_CALL = 'When a call your work needs is refused, do not route around it in silence';
+
+/** Which of `files` (a file's path in sdlc, its text) hold the refused-call paragraph: RULES.md alone should. */
+const refusedCallCopies = (files: Map<string, string>): string[] =>
+  [...files].filter(([, text]) => text.replace(/[\s*]+/g, ' ').includes(REFUSED_CALL)).map(([file]) => file);
+
+/** RULES.md and each agent's instructions, by their path in `template`. */
+const promptsOf = (template: string): Map<string, string> =>
+  new Map(
+    ['RULES.md', ...fs.readdirSync(path.join(template, 'agents')).map((agent) => `agents/${agent}/instructions.md`)]
+      .filter((file) => fs.existsSync(path.join(template, file)))
+      .map((file) => [file, fs.readFileSync(path.join(template, file), 'utf8')]),
+  );
+
+test('the refused-call paragraph is in RULES.md, which every step holds, and in no agent; REFUSED: a copy in an agent is named', () => {
+  const prompts = promptsOf(SDLC);
+  assert.equal(prompts.size, 7, 'RULES.md and every agent are read');
+  assert.deepEqual(refusedCallCopies(prompts), ['RULES.md']);
+  prompts.set('agents/argus/instructions.md', `${prompts.get('agents/argus/instructions.md')}\n${prompts.get('RULES.md')}`);
+  prompts.set('RULES.md', '');
+  assert.deepEqual(refusedCallCopies(prompts), ['agents/argus/instructions.md']);
 });

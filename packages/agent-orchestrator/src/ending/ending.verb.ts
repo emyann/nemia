@@ -135,7 +135,7 @@ const mainClaim = Effect.fnUntraced(function* (
   if (taskId && inFlightPhase(phase)) return { id: run.id, repo, step: ending.name, holds: true };
   if (taskId && landsOnCheck(ending, run) && !run.steps[ending.name]?.landed) {
     const { views, phaseOf } = yield* taskPhasesRead(run).pipe(over(e));
-    const own = ownStatus(ending, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), steps, spendReader(views));
+    const own = ownStatus(ending, run, phaseOf, closeoutReader(views, run, steps), closeoutAsked(views), steps, spendReader(views));
     const merging = () => {
       if (stagedHere(run) === false) return 'none';
       const read = checkoutStatus(run, steps, memo);
@@ -152,7 +152,7 @@ const mainClaim = Effect.fnUntraced(function* (
     steps,
     run,
     phaseOf,
-    closeoutReader(views, run),
+    closeoutReader(views, run, steps),
     closeoutAsked(views),
     exitVerdicts(views, run),
     asks,

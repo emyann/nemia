@@ -764,7 +764,7 @@ test(
         await d.quiet(3);
         const handed = () => Effect.runSync(Metric.value(FEED_FOLLOW_LINES)).count;
         const before = handed();
-        appended(w, line('r-gone', 'awaiting approval'), line('r-pipao', 'awaiting approval'));
+        appended(w, line('r-gone', 'awaiting approval'), line('r-hkb', 'awaiting approval'));
         for (const reads of [1, 2, 3]) {
           await d.clock.adjust('1 second');
           await held(t, () => handed() >= before + 2 * reads, `the two lines read ${reads} times`);
@@ -775,7 +775,7 @@ test(
         writeLevel({ level: 'manual', since: '2026-10-06T08:00:00.000Z' });
         await d.clock.adjust('1 second');
         await held(t, () => toldTo(manual).length === 1, 'the line said once the level reads');
-        assert.deepEqual(fieldsOf(toldTo(manual)[0]), ['r-pipao build awaiting approval'], 'the line of a run gone still passed over');
+        assert.deepEqual(fieldsOf(toldTo(manual)[0]), ['r-hkb build awaiting approval'], 'the line of a run gone still passed over');
         await held(t, () => readDelivery(w, 'manual')?.cursor === feedSize(w), 'the cursor kept past both lines');
       },
     );

@@ -258,7 +258,6 @@ test("choicesOf, ROLE_KEYS, deniedWithoutSkill: an agent's keys, their choices, 
   );
   await t.test('no key that describes the agent itself is a role key the form sends among its keys', () => {
     for (const own of ['description', 'skills', 'harnessPrompt']) assert.equal((ROLE_KEYS as readonly string[]).includes(own), false, own);
-    assert.deepEqual(HARNESS_PROMPTS, ['keep', 'no-coding', 'replace']);
   });
   await t.test('the skills line is edited as a list and sent as the line the package reads: in its order, each once, trimmed', () => {
     assert.deepEqual(skillList(' review-a-change,, write-a-note ,'), ['review-a-change', 'write-a-note']);

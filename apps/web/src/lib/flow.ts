@@ -39,7 +39,7 @@ export type Pill = {
  * are, and to come otherwise. `round`: on a loop edge past its first round, the round it is on (`loopLabel`) and where its words
  * go, under the middle of the curve; null otherwise.
  */
-export type Arrow = {
+type Arrow = {
   id: string;
   from: string;
   to: string;
@@ -54,9 +54,9 @@ export type Arrow = {
 export type Flow = { pills: Pill[]; arrows: Arrow[]; width: number; height: number; error: string | null };
 
 /** The most columns the rail shows, fold pills counted: four boxes and their arrows across a card. */
-export const RAIL_SLOTS = 4;
+const RAIL_SLOTS = 4;
 /** The most pills a column of the rail shows, the one counting the rest included. */
-export const RAIL_LANES = 3;
+const RAIL_LANES = 3;
 /** How wide the rail may be: the card's inside (`CARD_WIDTH`, `w-88`, less its padding). */
 export const RAIL_WIDTH = 328;
 
@@ -79,7 +79,7 @@ export const flowSteps = (run: Pick<RunSummary, 'steps' | 'cancelledAt'> & { hol
  * an api older than the board listed with no graph: the list is read tolerantly (`onYouOf`), so each card says what to do rather than the
  * floor refusing every run.
  */
-export function columnsOf(names: readonly string[], graph: RunGraph): { columns: string[][]; error: string | null } {
+function columnsOf(names: readonly string[], graph: RunGraph): { columns: string[][]; error: string | null } {
   if (!Array.isArray((graph as Partial<RunGraph> | undefined)?.edges)) return { columns: names.map((name) => [name]), error: UNGRAPHED };
   try {
     return { columns: layers(stepsOf(names, graph.edges)), error: null };
@@ -92,11 +92,11 @@ export function columnsOf(names: readonly string[], graph: RunGraph): { columns:
 export const UNGRAPHED = "Listed without its steps' graph by an api older than this board: restart the api, then reload the page.";
 
 /** Where the run is now: at work, or waiting on a person. Nothing is, on a run somebody called off. */
-export const isLiveStep = (state: StepState, cancelled: boolean): boolean =>
+const isLiveStep = (state: StepState, cancelled: boolean): boolean =>
   !cancelled && (movingInto(state) || state === 'asks-in-session' || waitsAtGate(state, false));
 
 /** The column the rail is centred on: the first with a step live, else the first with a step not done, else the last. */
-export function liveColumn(columns: readonly string[][], stateOf: (name: string) => StepState, cancelled: boolean): number {
+function liveColumn(columns: readonly string[][], stateOf: (name: string) => StepState, cancelled: boolean): number {
   const live = columns.findIndex((column) => column.some((name) => isLiveStep(stateOf(name), cancelled)));
   if (live >= 0) return live;
   const todo = columns.findIndex((column) => column.some((name) => !settledState(stateOf(name))));

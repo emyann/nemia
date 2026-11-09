@@ -1,10 +1,11 @@
 /**
  * A message to Nemia the api would not take, kept in this browser until it does. It is no fact of the store — the store's outbox holds
- * what the api took — so it is this browser's alone, under one key, in the shape `lib/canvas.ts` keeps an arrangement in: a storage that
+ * what the api took — so it is this browser's alone, under one key, through `lib/stored.ts`: a storage that
  * is refused or full keeps nothing, and the message lasts as long as the page does.
  *
  * Pure, apart from the storage calls, so a node test proves each rule.
  */
+import { forgetStored, readStored, store } from './stored.ts';
 
 /** The key this browser keeps a message that did not go under. */
 export const CHAT_OUTBOX_KEY = 'nemia:chat-outbox';
@@ -28,18 +29,12 @@ export function parseKept(raw: string | null): ChatKept | null {
 
 /** The message this browser keeps, null where it keeps none or storage is refused. */
 export function readKept(): ChatKept | null {
-  try {
-    return parseKept(localStorage.getItem(CHAT_OUTBOX_KEY));
-  } catch {
-    return null;
-  }
+  return readStored(CHAT_OUTBOX_KEY, parseKept, null);
 }
 
 /** Keeps `text`, written at `at`, as the message that did not go: where storage is refused or full, nothing is kept. */
 export function keepUnsent(text: string, at: string): void {
-  try {
-    localStorage.setItem(CHAT_OUTBOX_KEY, JSON.stringify({ text, at }));
-  } catch {}
+  store(CHAT_OUTBOX_KEY, JSON.stringify({ text, at }));
 }
 
 /** The kept message's words changed to `text`, its moment kept: nothing where none is kept. */
@@ -50,9 +45,7 @@ export function editKept(text: string): void {
 
 /** Forgets the kept message: where storage is refused, nothing was kept to forget. */
 export function forgetKept(): void {
-  try {
-    localStorage.removeItem(CHAT_OUTBOX_KEY);
-  } catch {}
+  forgetStored(CHAT_OUTBOX_KEY);
 }
 
 /** The send in flight, so a second try while the first is still going is the first. */

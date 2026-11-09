@@ -374,6 +374,35 @@ test('a card that reads runs as context says how many in a chip, each run on hov
   assert.doesNotMatch(await cardMarkup(atGate(), false), /data-context/);
 });
 
+test("a ghost's card writes the api's word for what it waits on, then an arrow to each run it waits on, the word naming each run once", async () => {
+  const base = atGate({}, { waitingOnYou: [], waitingOnYouWords: [] });
+  const ghost: RunView = {
+    ...base,
+    toDecide: null,
+    waiting: {
+      runs: [
+        { run: 'a-1x2y', missing: false, cancelledAt: null, gone: [] },
+        { run: 'b-3z', missing: false, cancelledAt: null, gone: [] },
+      ],
+      word: 'after a-1x2y and b-3z land',
+      advice: 'it starts once both land',
+      waitingOnYou: false,
+    },
+  };
+  const html = await cardMarkup(ghost, false);
+  assert.match(html, /data-ghost-run="true"/, 'the card is a ghost');
+  const line = /<p[^>]*data-waiting="on-runs"[^>]*>([\s\S]*?)<\/p>/.exec(html)![1];
+  assert.equal(line.replace(/<[^>]+>/g, ''), 'after a-1x2y and b-3z land', "the line reads the api's word as it is, each run named once");
+  assert.deepEqual(
+    [...line.matchAll(/<a [^>]*>/g)].map((m) => [/href="\/runs\/([^"]+)"/.exec(m[0])?.[1], /aria-label="([^"]+)"/.exec(m[0])?.[1]]),
+    [
+      ['a-1x2y', 'Open a-1x2y'],
+      ['b-3z', 'Open b-3z'],
+    ],
+    'each run it waits on is a link to its page',
+  );
+});
+
 test("the run bar: the run's title and id, what it asks of a person, its steps each a button with its status, and its brief", async () => {
   const { RunBar } = await import('../src/components/run/RunBar.tsx');
   const { titleOf: runTitle } = await import('../src/lib/factory.ts');
@@ -385,7 +414,7 @@ test("the run bar: the run's title and id, what it asks of a person, its steps e
   const run = { ...base, steps: [base.steps[0], theme] };
   const html = await pagedWith(createElement(RunBar, { run: run.id }), readsOf(run));
   assert.ok(html.includes(`>${runTitle(run)}</h2>`), html);
-  assert.ok(html.includes(`<span class="font-mono text-body-small">${run.id}</span>`), html);
+  assert.ok(textsOf(html).includes(run.id), `the bar says the run's id\n${html}`);
   assert.match(html, /<section aria-label="Waiting on you"/);
   assert.match(html, /<button type="button" data-approve="review"/, "a step the banner names opens that step's bar");
   const steps = /<section aria-label="Steps"[\s\S]*?<\/section>/.exec(html)![0];
@@ -474,7 +503,7 @@ test("a breakdown's rows are terms with their amounts, each named by what it cou
     assert.match(html, new RegExp(`data-breakdown-row="${what}"`), what);
   assert.doesNotMatch(html, /Everything else/, 'the last line is absent where the four parts cover the wall');
   assert.match(html, /<dd[^>]*>10m<\/dd>/, "the sessions' ten minutes");
-  assert.match(html, /data-breakdown-foot[^>]*>Wall time 1h, from 11 Oct 1:11 PM\.</);
+  assert.match(html, /data-breakdown-foot[^>]*>Wall time 1h 00m, from 11 Oct 1:11 PM\.</);
 });
 
 /** The Cost cell of a row with `cost` and `tokens`. */

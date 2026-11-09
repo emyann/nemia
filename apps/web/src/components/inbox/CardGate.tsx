@@ -1,22 +1,19 @@
 import { useId, useState, type ReactNode } from 'react';
 import { Button as AriaButton, Dialog, DialogTrigger, Heading, Popover } from 'react-aria-components';
 import { barValue } from '../../lib/bar';
-import { backName, gateCardLine, readLink, takenLine, type GateAsk } from '../../lib/gate';
+import { backName, endingWarning, gateCardLine, readLink, takenLine, type GateAsk } from '../../lib/gate';
 import { cn } from '../../lib/utils';
 import { RouteLink } from '../agent/AgentParts';
-import { BUTTON, Refusal, TEXTAREA, useAsk } from '../gate/Ask';
-import { SECONDARY, useApprove } from '../gate/Gate';
+import { Refusal, useAsk } from '../gate/Ask';
+import { useApprove } from '../../lib/useApprove';
 import type { RunAt } from '@/lib/runNamespace';
+import { BUTTON, BUTTON_SECONDARY, BUTTON_SMALL, TEXTAREA, POPOVER } from '../../lib/classes';
 
 /**
  * What a card says once a person's word is taken there, the run's state it was taken in, and the state the answer moved it to once the
  * card reads it (`next`): said through both.
  */
 export type Taken = { said: string; stamp: string; next?: string };
-
-export const SMALL = 'h-6 rounded px-2 text-body-small font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/50';
-export const POPOVER =
-  'z-50 w-72 rounded-lg border border-outline-variant bg-card p-3 text-body-medium text-foreground shadow-lg outline-none';
 
 /**
  * A gate on the Factory's card: what approving does and where a send-back goes, in one row whatever the names (`gateCardLine`), since a
@@ -43,7 +40,7 @@ export function CardGate({
   stamp: string;
   onTaken: (taken: Taken) => void;
 }) {
-  const approval = useApprove(run.id, gate.step, () => undefined, run.namespace);
+  const approval = useApprove(run.id, gate.step, { namespace: run.namespace });
   const [to, setTo] = useState(gate.back[0] ?? gate.step);
   const sendBack = useAsk(run.id, gate.step, () => undefined, run.namespace);
   const line = gateCardLine(gate);
@@ -139,7 +136,7 @@ function Answer({
       <AriaButton
         data-answer={label}
         className={cn(
-          SMALL,
+          BUTTON_SMALL,
           primary
             ? 'bg-primary text-primary-foreground hover:bg-primary/90'
             : 'bg-card text-foreground ring-1 ring-outline ring-inset hover:bg-accent',
@@ -185,9 +182,7 @@ function ApproveForm({
     >
       <Heading slot="title" className="font-semibold">{`Approve ${gate.step}?`}</Heading>
       <p className="text-body-small text-muted-foreground">
-        {gate.ends
-          ? `This runs ${gate.step} in the repository's own checkout${gate.onto ? ` on ${gate.onto}` : ''}, and it cannot be taken back.`
-          : `What waits on ${gate.step} is filed next, handed what it handed on.`}
+        {gate.ends ? endingWarning(gate.step, gate.onto) : `What waits on ${gate.step} is filed next, handed what it handed on.`}
       </p>
       <label htmlFor={field} className="sr-only">{`Words to approve ${gate.step} with, if any`}</label>
       <textarea
@@ -202,7 +197,7 @@ function ApproveForm({
         <button type="submit" disabled={pending} className={cn(BUTTON, 'px-2.5 py-1 text-body-small')}>
           {pending ? 'Approving…' : gate.ends ? `Run ${gate.step} now` : 'Approve'}
         </button>
-        <button type="button" onClick={onCancel} className={cn(BUTTON, SECONDARY, 'px-2.5 py-1 text-body-small')}>
+        <button type="button" onClick={onCancel} className={cn(BUTTON, BUTTON_SECONDARY, 'px-2.5 py-1 text-body-small')}>
           Not yet
         </button>
       </div>
@@ -268,7 +263,7 @@ function SendBackForm({
         <button type="submit" disabled={pending || !message.trim()} className={cn(BUTTON, 'px-2.5 py-1 text-body-small')}>
           {pending ? 'Sending back…' : 'Send back'}
         </button>
-        <button type="button" onClick={onCancel} className={cn(BUTTON, SECONDARY, 'px-2.5 py-1 text-body-small')}>
+        <button type="button" onClick={onCancel} className={cn(BUTTON, BUTTON_SECONDARY, 'px-2.5 py-1 text-body-small')}>
           Not yet
         </button>
       </div>

@@ -1,7 +1,7 @@
 import { useId, useState, type ReactNode } from 'react';
 import { Switch } from '@/components/ui/switch';
 import type { CheckResult, CheckVerdict, StepAttempts, StepCloseout, StepTry } from '../../lib/api';
-import { duration } from '../../lib/canvas';
+import { durationWords } from '../../lib/duration';
 import { foldsAtGate, imagePaths, type Outcome, outcomeOf, outcomeWord } from '../../lib/outcome';
 import { bodyLeadsWith, summaryShown } from '../../lib/transcript';
 import { cn } from '../../lib/utils';
@@ -24,9 +24,13 @@ export function tryLabel(t: Frozen<StepTry>, tries: readonly Frozen<StepTry>[]):
 }
 
 /** A try's sessions as its row says them: how many, and how long the latest took, or that it runs. */
-export function attemptsWord({ count, latest }: StepAttempts): string {
+function attemptsWord({ count, latest }: StepAttempts): string {
   if (!latest) return 'no session';
-  const took = latest.endedAt ? duration(Date.parse(latest.endedAt) - Date.parse(latest.startedAt)) : latest.ended ? null : 'running';
+  const took = latest.endedAt
+    ? durationWords(Date.parse(latest.endedAt) - Date.parse(latest.startedAt), 'second')
+    : latest.ended
+      ? null
+      : 'running';
   return took ? `#${count} · ${took}` : `#${count}`;
 }
 
@@ -192,7 +196,7 @@ function TryOutcome({ t, none }: { t: Frozen<StepTry>; none: string }) {
  * replies, what it did not give, and its files. The Raw switch shows the statement as the engine recorded it instead, whole; its word is a
  * label of its own beside it, naming the switch's input, since React Aria's switch is a label round its input.
  */
-export function CloseoutView({ closeout, outcome }: { closeout: Frozen<StepCloseout>; outcome: Outcome }) {
+function CloseoutView({ closeout, outcome }: { closeout: Frozen<StepCloseout>; outcome: Outcome }) {
   const [raw, setRaw] = useState(false);
   const switchId = useId();
   const toggle = (

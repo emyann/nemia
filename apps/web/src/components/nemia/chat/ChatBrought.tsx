@@ -6,7 +6,7 @@
  * Her words above it are hers; nothing here is a copy of what the step asks.
  */
 import type { ReactNode } from 'react';
-import { runGone } from '@/lib/api';
+import { readGone } from '@/lib/api';
 import { offersOf, askedOf, type Answer } from '@/lib/asks';
 import { broughtFacts, broughtPart, type BroughtPart } from '@/lib/brought';
 import { titleOf } from '@/lib/factory';
@@ -22,7 +22,7 @@ import { Unread } from '@/components/step/StepBar';
 /** The step `step` of the run `run`, read live, drawn as the run's page answers it. */
 export function ChatBrought({ run: id, step: name }: { run: string; step: string }) {
   const { view: run, error } = useRunRead(id);
-  if (run && runGone(error)) return <RunGone run={run} />;
+  if (run && readGone(error)) return <RunGone run={run} />;
   if (!run) {
     return (
       <Frame part="reading" run={id} step={name}>

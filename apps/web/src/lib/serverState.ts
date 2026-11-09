@@ -11,7 +11,7 @@ import type { McpState } from 'objects';
 import type { Hue } from './meaning.ts';
 
 /** The word shown for a state, and the word for none read. */
-export const UNREAD_STATE = 'unread';
+const UNREAD_STATE = 'unread';
 
 /** A state's hue, and what its title says of it. */
 type Drawn = { readonly hue: Hue; readonly title: string };
@@ -44,6 +44,3 @@ export const stateDrawn = (state: string | null): { word: string } & Drawn => {
         : `The harness says "${state}", which this board does not know: it is shown as read and nothing is concluded from it`,
   };
 };
-
-/** Whether `state` is the one state a person acts on: a server that waits on a sign-in, which holds back the steps that name it. */
-export const waitsOnSignIn = (state: string | null): boolean => state === 'needs-auth';

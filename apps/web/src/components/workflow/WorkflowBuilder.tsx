@@ -28,6 +28,8 @@ import { BuilderEdge, type BuilderFlowEdge } from './BuilderEdge';
 import { StepForm, type DraftUpdate } from '../step/StepForm';
 import { SpecNode, type SpecFlowNode } from '../step/StepNode';
 import { ringed } from '../../lib/meaning';
+import { FLOOR_BOX } from '../../lib/classes';
+import { cn } from '../../lib/utils';
 
 /** The builder's node types for React Flow, one object for the module's life. */
 const nodeTypes = { spec: SpecNode };
@@ -215,7 +217,7 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div
           aria-label={`The steps of ${base.name}, to draw`}
-          className="self-start overflow-hidden rounded border border-outline-variant lg:sticky lg:top-4"
+          className={cn(FLOOR_BOX, 'self-start lg:sticky lg:top-4')}
           style={{ height }}
         >
           <ReactFlow

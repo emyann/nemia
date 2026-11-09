@@ -13,13 +13,13 @@ export type Box = { x: number; y: number; width: number; height: number };
 export type Transform = readonly [x: number, y: number, zoom: number];
 
 /** A view to move to, as React Flow's `setViewport` takes it. */
-export type View = { x: number; y: number; zoom: number };
+type View = { x: number; y: number; zoom: number };
 
 /** How big `el` is laid out, in its own pixels: 0 × 0 while it is hidden or off the page. */
 export const sizeOf = (el: { clientWidth: number; clientHeight: number }): Size => ({ width: el.clientWidth, height: el.clientHeight });
 
 /** What a card is to React Flow's store, in so far as it says where the card is drawn on the floor and how big it measured. */
-export type Measured = { internals: { positionAbsolute: { x: number; y: number } }; measured: { width?: number; height?: number } };
+type Measured = { internals: { positionAbsolute: { x: number; y: number } }; measured: { width?: number; height?: number } };
 
 /** The boxes of `nodes` on the floor, as React Flow's store keeps them (`nodeLookup`); a card not measured yet takes no room. */
 export function boxesOf(nodes: Iterable<Measured>): Box[] {

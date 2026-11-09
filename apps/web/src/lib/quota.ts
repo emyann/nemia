@@ -4,6 +4,8 @@
  */
 import { format, isSameDay } from 'date-fns';
 import type { Quota, QuotaWindow } from './api';
+import { durationWords } from './duration.ts';
+import { agoWords } from './runWords.ts';
 import { timeOfDay, unreadable, UNREADABLE, zoneOf } from './timeOfDay.ts';
 
 /**
@@ -15,16 +17,6 @@ export function clockWord(at: Date, now: Date, timeZone?: string): string {
   const zone = zoneOf(timeZone);
   const time = timeOfDay(at, timeZone);
   return isSameDay(at, now, zone) ? time : `${format(at, 'EEE', zone)} ${time}`;
-}
-
-/** How long ago a reading was made: `just now`, `4 min ago`, `2 h 5 min ago`, `3 d ago`. */
-export function agoWord(ms: number): string {
-  const min = Math.floor(Math.max(0, ms) / 60_000);
-  if (min < 1) return 'just now';
-  if (min < 60) return `${min} min ago`;
-  const h = Math.floor(min / 60);
-  if (h >= 48) return `${Math.floor(h / 24)} d ago`;
-  return min % 60 ? `${h} h ${min % 60} min ago` : `${h} h ago`;
 }
 
 /** One window as the header says it: its label, the percentage used, and when it resets — or that it has, since the reading. */
@@ -41,13 +33,11 @@ export function windowWords(w: QuotaWindow, now: Date, timeZone?: string): Windo
   };
 }
 
-/** `3 min`, `90 s`: a keep, as the hover says how often the api asks. */
-function keepWord(ms: number): string {
-  return ms % 60_000 === 0 ? `${ms / 60_000} min` : `${Math.round(ms / 1000)} s`;
-}
+/** `3m`, `1m 30s`: a keep, as the hover says how often the api asks, to the minute where it is whole and to the second where not. */
+const keepWord = (ms: number): string => durationWords(ms, ms % 60_000 === 0 ? 'minute' : 'second');
 
 /**
- * The last good reading beside a state with no windows of its own: its windows, and `as of 11:20 AM, 25 min ago`. Null when there is
+ * The last good reading beside a state with no windows of its own: its windows, and `as of 11:20 AM, 25 minutes ago`. Null when there is
  * none.
  */
 export function lastWords(q: Quota, now: Date, timeZone?: string): { windows: WindowWords[]; asOf: string } | null {
@@ -55,7 +45,7 @@ export function lastWords(q: Quota, now: Date, timeZone?: string): { windows: Wi
   const at = new Date(q.last.askedAt);
   return {
     windows: q.last.windows.map((w) => windowWords(w, now, timeZone)),
-    asOf: `as of ${clockWord(at, now, timeZone)}, ${agoWord(now.getTime() - at.getTime())}`,
+    asOf: `as of ${clockWord(at, now, timeZone)}, ${agoWords(at, now)}`,
   };
 }
 

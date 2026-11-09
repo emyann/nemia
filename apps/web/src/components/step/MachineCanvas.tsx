@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef } from 'react';
 import { Background, BackgroundVariant, MarkerType, ReactFlow } from '@xyflow/react';
 import type { MachineGraph } from '../../lib/api';
+import { FLOOR_BOX } from '../../lib/classes';
 import { drawMachine, type Drawing } from '../../lib/machine';
+import { useFrameSize } from '../../lib/useFrameSize';
 import { MachineEdge, type MachineFlowEdge } from './MachineEdge';
 import { MachineNode, type MachineFlowNode } from './MachineNode';
 
@@ -83,22 +85,18 @@ export function MachineCanvas({
   taken?: readonly string[];
   maxHeight?: number;
 }) {
-  const [frameWidth, setFrameWidth] = useState(0);
+  const frame = useRef<HTMLDivElement>(null);
+  const frameWidth = useFrameSize(frame, true).width;
   const drawing = useMemo(() => drawMachine(machine), [machine]);
   const drawn = useMemo(() => flowOf(drawing, lit, taken), [drawing, lit, taken]);
   const zoom = frameWidth ? Math.min(1, frameWidth / drawn.width, maxHeight / drawn.height) : 1;
 
   return (
     <div
-      ref={(el) => {
-        if (!el) return;
-        const observer = new ResizeObserver(() => setFrameWidth(el.clientWidth));
-        observer.observe(el);
-        return () => observer.disconnect();
-      }}
+      ref={frame}
       aria-label={`${title} as a graph`}
       data-machine={name}
-      className="overflow-hidden rounded border border-outline-variant"
+      className={FLOOR_BOX}
       style={{ height: Math.ceil(drawn.height * zoom) + 2 }}
     >
       {frameWidth > 0 && (

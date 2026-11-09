@@ -385,15 +385,18 @@ test('a permission of hers is an ask: waiting, drawn as the form, answered in wo
   });
 });
 
-test('her chat followed on one stream: what it does not read is dropped, where she is replaced, her events merged and her asks read whole, then a notice, and the end', async (t) => {
+test('her chat followed on one stream: what it does not read is said and the stream goes on, where she is replaced, her events merged and her asks read whole, then a notice, and the end', async (t) => {
   const s = story(t);
   const { stream, now, stop } = followed();
 
-  await s.test('REFUSED: data of a shape her chat does not send changes nothing', () => {
+  await s.test('REFUSED: data of a shape her chat does not send changes nothing, and is said, naming its key, as a notice', () => {
     stream.send('chat', { kind: 'message', id: 'm:1', at: at(1) });
     stream.send('presence', { up: 'yes' });
     assert.deepEqual(now().events, []);
     assert.deepEqual(now().presence, CHAT_DOWN);
+    assert.match(now().retrying ?? '', /\bup\b/, 'the last said, in the words of its decode, which name the key');
+    assert.deepEqual([now().error, now().live, stream.readyState], [null, true, 1], 'a notice, not an end: the stream goes on');
+    stream.fire('open');
   });
 
   await s.test(

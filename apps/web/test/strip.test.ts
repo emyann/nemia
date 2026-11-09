@@ -10,7 +10,8 @@ import path from 'node:path';
 import type { Factory, QuotaWindow, RunSummary } from '../src/lib/api.ts';
 import { coded, summary } from './run-fixtures.ts';
 import { ceilings } from './factory-fixtures.ts';
-import { dayStartOf, dollars, quotaLineOf, readoutOf, runsOutAt, stripOf } from '../src/lib/strip.ts';
+import { dollars } from '../src/lib/money.ts';
+import { dayStartOf, quotaLineOf, readoutOf, runsOutAt, stripOf } from '../src/lib/strip.ts';
 
 const WEB = path.join(import.meta.dirname, '..');
 const MIN = 60_000;
@@ -241,9 +242,9 @@ test('stripOf: what counts today, landed, failed, waiting and spent', async (t) 
     const quiet = stripOf({ runs: [idleSinceYesterday], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
     assert.deepEqual([quiet.waitsOnYou, quiet.spentUsd], [1, 0], 'an open run not worked since midnight spends nothing today');
     assert.equal(dollars(null), '—');
-    assert.equal(dollars(7.851), '$7.85', 'to the cent below $10');
-    assert.equal(dollars(12.684), '$13', 'whole from $10, so a sticker stays as narrow');
-    assert.equal(dollars(230.4), '$230');
+    assert.equal(dollars(7.851), '$7.85', 'to the cent');
+    assert.equal(dollars(12.684), '$12.68', 'to the cent above $10 too, as every page says an amount');
+    assert.equal(dollars(230.4), '$230.40');
   });
   await t.test("REFUSED: Spent's tokens of a run Spent does not count: they are those of exactly the runs worked today", () => {
     const today = { ...landedToday, tokens: tokensOf(800, 1) };

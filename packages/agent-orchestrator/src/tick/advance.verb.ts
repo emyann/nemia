@@ -52,7 +52,7 @@ import { onceFacts, roundsGranted, settledOnce, timelineFacts, type StepFact } f
 import { checkoutHold, landEnding } from '../ending/ending.verb.ts';
 import { statusMemo } from '../place/landing.store.ts';
 import type { PassRead } from '../cap/cap.verb.ts';
-import { fileChecks, fileReady, fileRounds, fileTries, type Closer, type Filing, type Heads } from './file.verb.ts';
+import { fileChecks, fileReady, fileRounds, fileTries, tryFiled, type Closer, type Filing, type Heads } from './file.verb.ts';
 import { readPass, recordNamed, type PassReads } from './told.verb.ts';
 import { closeHeld, stopAsked } from './held.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
@@ -101,6 +101,9 @@ export const adoptChecks = Effect.fn('adoptChecks')(function* (
  * A continue a pass gave as an answer to the step's task held open, and died before writing down, shows as a task with more answers
  * than the record has turns (`answersIn`, `turnsOf`): the answered task reads running, so the ask reads as one to stop it first. It is
  * adopted as the turn it is, and nothing is stopped and nothing filed.
+ *
+ * Either way the try is recorded as filing it records it (`tryFiled`): on what the run's pins and frozen steps are now, never on what the
+ * try behind it was filed on.
  */
 export const adoptTries = Effect.fn('adoptTries')(function* (
   e: Engine,
@@ -115,11 +118,13 @@ export const adoptTries = Effect.fn('adoptTries')(function* (
   spendOf: SpendOf,
 ) {
   const adopted: string[] = [];
+  const pins = { run, reads: { steps } };
   for (const r of retriesDue(steps, run, phaseOf, closeoutOf, asked, verdictOf, asks, () => false, spendOf)) {
     const held = run.steps[r.step];
     const current = held?.taskId;
+    const step = steps.find((s) => s.name === r.step);
     if (held && r.by === 'ask' && r.mode === 'continue' && current && answersIn(views.get(current)) > turnsOf(held)) {
-      run.steps[r.step] = nextTry(held, r, current);
+      run.steps[r.step] = tryFiled(pins, step, held, r, current);
       adopted.push(r.step);
       continue;
     }
@@ -128,7 +133,7 @@ export const adoptTries = Effect.fn('adoptTries')(function* (
     if (!view.state.brief) continue;
     views.set(taskId, view);
     const record = recordNamed(run, r.step);
-    run.steps[r.step] = r.mode === 'recheck' ? { ...nextTry(record, r), check: { taskId } } : nextTry(record, r, taskId);
+    run.steps[r.step] = r.mode === 'recheck' ? { ...nextTry(record, r), check: { taskId } } : tryFiled(pins, step, record, r, taskId);
     for (const b of r.back ?? []) run.steps[b] = sentBack(recordNamed(run, b));
     adopted.push(r.step);
   }

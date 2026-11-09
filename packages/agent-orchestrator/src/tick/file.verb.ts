@@ -151,6 +151,24 @@ const heldAnswered = (f: Filing, r: Retry, step: Workflow, record: StepRecord): 
 };
 
 /**
+ * A step's record once a try that is a session of its own is filed on `taskId` (a new task, or the task held open it answers): the try
+ * moved behind it (`nextTry`), and what this filing is pinned on (`filedOn`) in place of what the try behind it was. The one writer of a
+ * filed try's record, for the pass that files it and the pass that adopts one a pass filed and died before writing down (`adoptTries`),
+ * so the two cannot drift: a try adopted with the record of the try before it would be judged by that try's fields, resume by its
+ * schema and read as run on its revisions. A recheck is the same try, and keeps what it was filed on: `nextTry` alone. Pure.
+ */
+export const tryFiled = (
+  f: Parameters<typeof filedOn>[0],
+  step: Workflow | undefined,
+  record: StepRecord,
+  retry: Retry,
+  taskId: string,
+): StepRecord => ({
+  ...nextTry(record, retry, taskId),
+  ...filedOn(f, step),
+});
+
+/**
  * File one try due, or stop its session first, and put it on the record with its note: nothing once the pass may file no more, and
  * nothing but the note where the engine refuses the close or the answer it needs.
  */
@@ -185,7 +203,7 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
   }
   out.tried.push(r.step);
   notes.push(said);
-  run.steps[r.step] = { ...nextTry(record, r, taskId), ...filedOn(f, step) };
+  run.steps[r.step] = tryFiled(f, step, record, r, taskId);
   for (const b of r.back ?? []) run.steps[b] = sentBack(recordNamed(run, b));
 });
 

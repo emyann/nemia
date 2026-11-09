@@ -13,17 +13,16 @@ export const PAUSE_PARKS =
   'nothing new starts, and each working session stops when its current tool call ends, cut once the timeout passes';
 
 /** What a pause at once does (its timeout 0, the board's Stop now), the package's words: each working session is cut at once and parks. */
-export const PAUSE_CUTS = 'nothing new starts, and each working session is cut at once and parks';
+const PAUSE_CUTS = 'nothing new starts, and each working session is cut at once and parks';
 
 /** What a pause with no timeout does (a restart's take-over), the package's words: each working session runs on. */
-export const PAUSE_RUNS_ON = 'nothing new starts, and each working session runs on to its end';
+const PAUSE_RUNS_ON = 'nothing new starts, and each working session runs on to its end';
 
 /**
  * What `pause` does, as the package says it: `PAUSE_CUTS` under a timeout of 0, `PAUSE_PARKS` under another,
  * `PAUSE_RUNS_ON` under none.
  */
-export const pauseDoes = ({ timeoutMs }: Pause): string =>
-  timeoutMs === 0 ? PAUSE_CUTS : timeoutMs !== undefined ? PAUSE_PARKS : PAUSE_RUNS_ON;
+const pauseDoes = ({ timeoutMs }: Pause): string => (timeoutMs === 0 ? PAUSE_CUTS : timeoutMs !== undefined ? PAUSE_PARKS : PAUSE_RUNS_ON);
 
 /** The same words opening a sentence. */
 const opening = (words: string): string => `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
@@ -48,7 +47,7 @@ export type PauseWords = {
 };
 
 /** Since when, by whom and why: `since 4:40 PM by ann: merging by hand`, and what the file no longer says, said so. */
-export function pauseSince(pause: Pause, now: Date): string {
+function pauseSince(pause: Pause, now: Date): string {
   const at = Number.isNaN(Date.parse(pause.at)) ? 'a time its file no longer says' : clockWord(new Date(pause.at), now);
   return `since ${at} by ${pause.by || 'someone its file no longer names'}${pause.why ? `: ${pause.why}` : ''}`;
 }
@@ -77,7 +76,7 @@ export const parkedSentence = ({ run, step, after, cut }: Parked): string =>
  * finishing a tool call, cut in 1h 30m", `leftMs` to the minute as every duration is said (`durationWords`); "…, cut now" once none is
  * left.
  */
-export const pausingLine = (sessions: number, leftMs: number): string =>
+const pausingLine = (sessions: number, leftMs: number): string =>
   `Pausing: ${sessions} session${sessions === 1 ? '' : 's'} finishing a tool call, cut ${leftMs > 0 ? `in ${durationWords(leftMs, 'minute')}` : 'now'}`;
 
 /**
@@ -95,11 +94,11 @@ const pausingHead = ({ pause, finishing }: Paused & { pause: Pause }, now: Date)
 export const interruptSentence = ({ run, step, kind }: Interrupt): string => `${run}: ${step}'s ${kind}`;
 
 /** A landing the pause holds with its merge staged, in a sentence: whose, where, and that its check waits on the resume. */
-export const stagedSentence = ({ run, step, repo }: PauseStaged): string =>
+const stagedSentence = ({ run, step, repo }: PauseStaged): string =>
   `${run}'s ${step} has its merge staged in ${repo} (MERGE_HEAD), and its check waits on the resume`;
 
 /** A check the pause holds whose merge is not staged, in a sentence: whose, and that its check waits on the resume. */
-export const heldSentence = ({ run, step }: PauseHeld): string => `${run}'s ${step} has signed off, and its check waits on the resume`;
+const heldSentence = ({ run, step }: PauseHeld): string => `${run}'s ${step} has signed off, and its check waits on the resume`;
 
 /** How many checks the pause holds back, staged landings among them: `, 2 checks held`, or nothing for none. */
 const heldCount = ({ staged, held }: Paused): string => {

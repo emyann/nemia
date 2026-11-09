@@ -32,7 +32,7 @@ export type RunLines = {
 const StepCommandsSchema = decodes<StepCommands>()(Schema.Struct({ approve: Schema.String, retry: Schema.String, say: Schema.String }));
 
 /** Decodes a `RunLines`. */
-export const RunLinesSchema = decodes<RunLines>()(
+const RunLinesSchema = decodes<RunLines>()(
   Schema.Struct({
     decide: Schema.String,
     refresh: Schema.String,

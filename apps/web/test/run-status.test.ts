@@ -11,12 +11,13 @@ import { decidableRun, decisionStamp } from '../src/lib/decide.ts';
 import { inFlight } from '../src/lib/factory.ts';
 import { holdable, holdCandidates } from '../src/lib/hold.ts';
 import { prunable } from '../src/lib/prune.ts';
-import { RunStatusSchema, type RunStatus } from '../src/lib/api/judged.ts';
+import { RUN_STATUSES } from 'objects';
+import type { RunStatus } from '../src/lib/api/judged.ts';
 
 const SRC = path.join(import.meta.dirname, '..', 'src');
 
 /** Every word a run's status takes, as the board decodes it. */
-const WORDS: readonly RunStatus[] = RunStatusSchema.literals;
+const WORDS: readonly RunStatus[] = RUN_STATUSES;
 
 /** The files of `src` that compare a run's status to one of its words, each with what it asks of it. */
 const READERS: Readonly<Record<string, string>> = {

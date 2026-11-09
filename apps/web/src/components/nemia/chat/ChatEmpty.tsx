@@ -12,7 +12,7 @@ import type { Presence } from '@/lib/presence';
 import { NemiaFace } from '../NemiaFace';
 
 /** What a person may start with: the three questions and the one instruction the canvas draws. */
-export const CHAT_STARTERS = ['What is waiting on me?', 'What is at work?', 'What did today cost?', 'Start a run'] as const;
+const CHAT_STARTERS = ['What is waiting on me?', 'What is at work?', 'What did today cost?', 'Start a run'] as const;
 
 /** One of the tags over her greeting: quiet, or in the alive container for what is at work. */
 const Tag = ({ at, children }: { at?: 'work'; children: string }) => (

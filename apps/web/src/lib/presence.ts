@@ -22,10 +22,10 @@ export type FaceExpression = 'surprised' | 'unsure' | 'sleepy' | 'thinking' | 'h
 export const UP: Presence = { waitsOnYou: 0, notSent: false, down: false, answering: false, unread: 0 };
 
 /** A hue a cue is drawn in: what waits on a person, a session at work, what failed, or none, at rest. */
-export type CueHue = 'yours' | 'alive' | 'failure' | 'none';
+type CueHue = 'yours' | 'alive' | 'failure' | 'none';
 
 /** A cue: its hue and its words. */
-export type Cue = { hue: CueHue; words: string };
+type Cue = { hue: CueHue; words: string };
 
 /** A presence that may hold: whether it holds, the face it gives, its cue, and the sentence her docked face says it in. */
 type Fact = {
@@ -39,7 +39,7 @@ type Fact = {
  * The presences in the owner's order, the first that holds wins the face: waits on you, then a message not sent, then down, then
  * answering, then unread.
  */
-export const FACE_ORDER: readonly Fact[] = [
+const FACE_ORDER: readonly Fact[] = [
   {
     holds: (p) => p.waitsOnYou > 0,
     face: 'surprised',

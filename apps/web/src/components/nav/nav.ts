@@ -35,13 +35,13 @@ const ownDefinitionAt = (path: string): { kind: 'agent' | 'skill'; name: string 
 };
 
 /** The tabs of Settings, in their order: what is set for the whole store, and what the repository offers a step. */
-export const SETTINGS_TABS = [
+const SETTINGS_TABS = [
   { to: '/settings', label: 'Settings' },
   { to: '/capabilities', label: 'Capabilities' },
 ] as const;
 
 /** A tab of Settings (`SETTINGS_TABS`): its page and its name. */
-export type SettingsTab = (typeof SETTINGS_TABS)[number];
+type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 /** The tabs of the place whose tab's page `path` is, itself and not a page under it; none on any other page. */
 export const tabsOf = (path: string): readonly SettingsTab[] | undefined =>
@@ -110,7 +110,7 @@ const withoutRepo = ({ repo: _repo, ...kept }: Record<string, unknown>): Record<
 /**
  * Where a pick goes: a section's page with its search, a workflow's page or a step's in the picked factory, a factory's floor, or Overview.
  */
-export type PickTarget =
+type PickTarget =
   | { to: Listing; search: Record<string, unknown> }
   | { to: '/workflows/$from/$workflow'; params: { from: string; workflow: string }; search: Record<string, unknown> }
   | { to: '/workflows/$from/$workflow/$step'; params: { from: string; workflow: string; step: string }; search: Record<string, unknown> }

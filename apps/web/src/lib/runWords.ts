@@ -53,13 +53,13 @@ export const waitKindOf: Record<StepState, WaitKind | null> = {
 type CodedStep = Pick<RunSummary['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via' | 'verdict'>;
 
 /** What the words read of a row of the light answer: of each step its name and its codes, and of the run who it waits on. */
-export type WaitingRow = Pick<RunSummary, 'cancelledAt' | 'holding' | 'waiting' | 'waitingOnYou'> & { steps: ReadonlyArray<CodedStep> };
+type WaitingRow = Pick<RunSummary, 'cancelledAt' | 'holding' | 'waiting' | 'waitingOnYou'> & { steps: ReadonlyArray<CodedStep> };
 
 /** A row whose button is worded: a `WaitingRow` that says of each step the task of its work too, none for a step not filed yet. */
-export type OpenedRow = WaitingRow & { steps: ReadonlyArray<CodedStep & Pick<RunSummary['steps'][number], 'taskId'>> };
+type OpenedRow = WaitingRow & { steps: ReadonlyArray<CodedStep & Pick<RunSummary['steps'][number], 'taskId'>> };
 
 /** A wait: its kind, the step that waits, none for a wait of the run's own, and how many of the run's steps are done. */
-export type Wait = Waited & { kind: WaitKind };
+type Wait = Waited & { kind: WaitKind };
 
 /**
  * The kind of wait a step is on its row: its state's (`waitKindOf`), but `unfinished` where its check did not finish (its verdict's
@@ -143,7 +143,7 @@ export function openWord(row: OpenedRow): string {
 }
 
 /** What a row in flight says it does now: the word of the step it is on, and a note of which step, its place, and how long. */
-export type Now = { word: string; note: string };
+type Now = { word: string; note: string };
 
 /**
  * What a run in flight does now: its first step not done, by the rail's word for its state, and its name and its place among the run's

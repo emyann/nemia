@@ -9,7 +9,7 @@ import { durationWords } from './duration.ts';
 import { dollars } from './money.ts';
 
 /** One line of a breakdown: what it counts, how much in the tile's own unit, how the page says it, and whether it says there is none. */
-export type BreakdownRow = { what: string; amount: number; said: string; none: boolean };
+type BreakdownRow = { what: string; amount: number; said: string; none: boolean };
 
 /** A tile's breakdown: its headline, its rows, which add up to what the foot says, and a closing note, empty for none. */
 export type Breakdown = { head: string; rows: BreakdownRow[]; foot: string };

@@ -43,7 +43,7 @@ export type ConversationLine = {
 };
 
 /** A link under what was said: the words it was written on, and the page of this board it leads to. */
-export type ConversationLink = { words: string; href: string };
+type ConversationLink = { words: string; href: string };
 
 /**
  * One block of a conversation, as the family's list draws it. `said` is a bubble — `who` and `at` over it, `yours` for the person's
@@ -89,7 +89,7 @@ export const drawnCount = (items: readonly ConversationItem<unknown>[]): number 
  * What a turn's lines are, which its folded line counts them as: `call` where every line is a tool call (her chat), `step` where a line
  * may be a call, a thought or the harness's own (a step's session).
  */
-export type Counted = 'call' | 'step';
+type Counted = 'call' | 'step';
 
 /** The one line a folded turn says: `Worked for 2m 14s · 9 calls`, over `ms` and how many `lines` it holds, counted as `counts`. */
 export const turnWords = (ms: number, lines: number, counts: Counted): string =>

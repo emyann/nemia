@@ -206,7 +206,7 @@ function offerSaid(offer: Extract<Answer, { case: 'answer' | 'try-again' | 'deni
  * it; something to tell a try is optional, and none is sent when nothing was written or with a recheck, whatever the closed box still
  * holds.
  */
-export function OfferRow({ runId, offer }: { runId: string; offer: Extract<Answer, { case: 'answer' | 'try-again' | 'denied' }> }) {
+function OfferRow({ runId, offer }: { runId: string; offer: Extract<Answer, { case: 'answer' | 'try-again' | 'denied' }> }) {
   const [message, setMessage] = useState('');
   const [mode, setMode] = useState<RetryMode>(
     offer.case === 'try-again' && offer.unfinished ? 'recheck' : offer.case === 'denied' ? 'fresh' : 'continue',
@@ -551,7 +551,7 @@ export function LessonChip({ lesson }: { lesson: Lesson }) {
  * Land it, drop it, once more: each command on a line of its own with a button that copies it. The board runs none of them: what it
  * presses is an answer's, in the Answer section (`Offers`).
  */
-export function Commands({ commands }: { commands: readonly DecideCommand[] }) {
+function Commands({ commands }: { commands: readonly DecideCommand[] }) {
   return (
     <section aria-label="Commands" className="space-y-2">
       <h3 className={HEADING}>Commands — copy one to run it</h3>

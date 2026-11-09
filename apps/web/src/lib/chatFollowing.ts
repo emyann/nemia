@@ -40,7 +40,7 @@ export type ChatAsk = Extract<ChatEvent, { kind: 'question' | 'proposal' | 'perm
 const isAsk = (event: ChatEvent): event is ChatAsk => event.kind === 'question' || event.kind === 'proposal' || event.kind === 'permission';
 
 /** How an ask is drawn: as the action buttons of a proposal, as the radio form of one question, or as the flow of several. */
-export type AskDrawn = 'actions' | 'form' | 'many';
+type AskDrawn = 'actions' | 'form' | 'many';
 
 /**
  * How the ask `questions` is drawn, the canvas's three boards: `many` for several questions (board 7b, a tab for each and a recap);
@@ -129,7 +129,7 @@ export function mergeChatEvents(known: readonly ChatEvent[], incoming: readonly 
 }
 
 /** What one frame of her chat's stream does to what the panel holds: events, where she is, or a read that failed. */
-export type ChatChange =
+type ChatChange =
   | { kind: 'events'; events: ChatEvent[] }
   | { kind: 'presence'; presence: ChatPresence }
   | { kind: 'cursor'; cursor: string };
@@ -211,7 +211,7 @@ export type ChatItem = { kind: 'event'; event: ChatEvent } | ChatTurn;
  * Her calls between two of anything else, as one turn: its `id` the first call's, its calls in the order they came, `running` while
  * one of them is at work or waits on the person, and `ms` from the first call to the last.
  */
-export type ChatTurn = { kind: 'turn'; id: string; calls: ChatCall[]; running: boolean; ms: number };
+type ChatTurn = { kind: 'turn'; id: string; calls: ChatCall[]; running: boolean; ms: number };
 
 /** The milliseconds from the first of `calls` to the last, 0 where either moment does not parse. */
 const spanOf = (calls: readonly ChatCall[]): number => {
@@ -275,7 +275,7 @@ export function newFrom(events: readonly ChatEvent[], unread: number): string | 
 export const readableFrom = (events: readonly ChatEvent[]): string | null => events.filter(hers).at(-1)?.id ?? null;
 
 /** A link read out of her words: the words it was written on, and where it goes. */
-export type ChatLink = { words: string; href: string };
+type ChatLink = { words: string; href: string };
 
 /** A markdown link in her words: its words, then its address. */
 const LINK = /\[([^\]\n]+)\]\(([^()\s]+)\)/g;
@@ -303,10 +303,10 @@ export function linksOf(text: string): { text: string; links: ChatLink[] } {
 }
 
 /** A step of a run her words link to, which her talk draws under them as the run's page's own part for it (`ChatBrought`). */
-export type ChatBrought = { kind: 'brought'; run: string; step: string };
+type ChatBrought = { kind: 'brought'; run: string; step: string };
 
 /** A proposal her words link to, which her talk draws under them as the proposal page's own part (`ChatProposal`). */
-export type ChatBroughtProposal = { kind: 'brought-proposal'; factory: string; name: string };
+type ChatBroughtProposal = { kind: 'brought-proposal'; factory: string; name: string };
 
 /** What her talk draws itself, through the family's one escape hatch: an ask of hers, or a step or a proposal her words bring. */
 export type ChatOwn = ChatAsk | ChatBrought | ChatBroughtProposal;

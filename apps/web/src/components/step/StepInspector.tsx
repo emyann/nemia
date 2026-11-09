@@ -34,7 +34,7 @@ type Tab = (typeof TABS)[number];
  * at its gate, blocked or done — since what it handed on is what there is to read, and at a gate what a person approves; Details before
  * that.
  */
-export const openingTab = (step: Pick<Step, 'closeout'>): Tab => (step.closeout ? 'Output' : 'Details');
+const openingTab = (step: Pick<Step, 'closeout'>): Tab => (step.closeout ? 'Output' : 'Details');
 
 /**
  * What is going on in one step, in three tabs. It opens on the step's `openingTab`, and a tab a person picks is kept while it stays

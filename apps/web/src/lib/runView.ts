@@ -21,7 +21,7 @@ import { stepStamp } from './lifecyclePath.ts';
 import type { Frozen } from './frozen.ts';
 
 /** An edge of the run's graph as its pages draw it: what a step waits on, and a loop; never what it is handed (`input`). */
-export type RunViewEdge = Exclude<RunStatus['graph']['edges'][number], { kind: 'input' }>;
+type RunViewEdge = Exclude<RunStatus['graph']['edges'][number], { kind: 'input' }>;
 
 /** A step as the run froze it. Null where the run froze none of it. */
 export type StepSpecView = Omit<RunSpecStep, 'name' | 'input'>;

@@ -3,7 +3,7 @@
  * would be told): the type a step's view reads them as, and the schema `workflows.ts` decodes with.
  */
 import { Schema } from 'effect';
-import { HANDED_HOW, TOLD_VIA, type HandedHow, type ToldVia } from 'objects';
+import { TOLD_VIA, type HandedHow, type ToldVia } from 'objects';
 import { decodes } from './decodes.ts';
 
 /**
@@ -51,17 +51,3 @@ export const StepLayersSchema = decodes<StepLayers>()(
  * landed (`--after`), or read as context (`--from`); absent where the record names it as neither.
  */
 export type TaskPart = { kind: 'from'; run: string; asked: string; body: string; how?: HandedHow } | { kind: 'text'; text: string };
-
-/** Decodes a `TaskPart`: the `from` member first, the wider one, so a part is never read as the narrower. */
-export const TaskPartSchema = decodes<TaskPart>()(
-  Schema.Union([
-    Schema.Struct({
-      kind: Schema.Literal('from'),
-      run: Schema.String,
-      asked: Schema.String,
-      body: Schema.String,
-      how: Schema.optionalKey(Schema.Literals(HANDED_HOW)),
-    }),
-    Schema.Struct({ kind: Schema.Literal('text'), text: Schema.String }),
-  ]),
-);

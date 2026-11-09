@@ -26,7 +26,7 @@ export type Usage = {
 const Count = Schema.optionalKey(Schema.Number);
 
 /** Decodes a `Usage`. */
-export const UsageSchema = decodes<Usage>()(
+const UsageSchema = decodes<Usage>()(
   Schema.Struct({
     responses: Count,
     toolCalls: Count,
@@ -53,7 +53,7 @@ export const UsageSchema = decodes<Usage>()(
 export type PeakMark = PeakMarkWord | null;
 
 /** Decodes a `PeakMark`. */
-export const PeakMarkSchema = decodes<PeakMark>()(Schema.NullOr(Schema.Literals(PEAK_MARKS)));
+const PeakMarkSchema = decodes<PeakMark>()(Schema.NullOr(Schema.Literals(PEAK_MARKS)));
 
 /**
  * Mirrors `StepUsed` in apps/api/src/runs/runs.ts: the usage, and the CLI `decide`'s words for it — `used` and `cost`, `not measured`
@@ -93,12 +93,3 @@ export const StepUsedSchema = decodes<StepUsed>()(
  * rebuilt their cache.
  */
 export type RunRead = { said: string; peak: PeakMark; rebuilt: number };
-
-/** Decodes a `RunRead`. */
-export const RunReadSchema = decodes<RunRead>()(
-  Schema.Struct({
-    said: Schema.String,
-    peak: PeakMarkSchema,
-    rebuilt: Schema.Number,
-  }),
-);

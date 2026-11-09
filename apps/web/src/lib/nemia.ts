@@ -14,7 +14,7 @@ import { clockWord } from './quota.ts';
  * the keeper stops; waiting on the person to trust her folder, not filed until they do; not filed yet; filed and starting, not yet
  * reachable; up, reached; and stopped from outside, not filed again.
  */
-export type SessionKind = 'off' | 'leaving' | 'untrusted' | 'not-filed' | 'starting' | 'up' | 'stopped';
+type SessionKind = 'off' | 'leaving' | 'untrusted' | 'not-filed' | 'starting' | 'up' | 'stopped';
 
 /** What each state is said as, a sentence each. */
 const SESSION_WORDS: Record<SessionKind, string> = {
@@ -115,7 +115,7 @@ export function composerWords(presence: Presence, asking = false): string {
 }
 
 /** What the composer's one button does: send what is written, or end the turn she is answering. */
-export type ComposerButton = 'send' | 'stop';
+type ComposerButton = 'send' | 'stop';
 
 /**
  * What the composer's button is, by where she is: the stop while she answers, since a turn of hers can be ended without ending her

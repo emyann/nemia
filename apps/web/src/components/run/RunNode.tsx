@@ -28,7 +28,7 @@ import { StepRail, StepTiles, type TilesRead } from '../step/StepRail';
  * `onToggle` opens or closes the card, and `onStep` shows a step of it in the bar. `reads` is a line per run it reads as context, its id
  * and title (`readsLines`).
  */
-export type RunNodeData = {
+type RunNodeData = {
   run: RunSummary;
   reads: string[];
   finished: boolean;

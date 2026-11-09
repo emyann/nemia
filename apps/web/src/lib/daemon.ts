@@ -9,7 +9,7 @@ import { agoWords } from './runWords.ts';
  * The line in three parts, `before` + `command` + `after`, so the page can set the command — the api's `start` — as code and a test can
  * read the sentence whole.
  */
-export type DaemonWords = { before: string; command: string; after: string };
+type DaemonWords = { before: string; command: string; after: string };
 
 /** How long ago the daemon did something, as every page says an age (`agoWords`): `20 minutes ago`, `just now`. */
 const heard = (at: string | null, now: Date): string => (at ? agoWords(new Date(at), now) : 'at a time its file does not say');

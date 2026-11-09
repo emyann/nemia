@@ -96,7 +96,7 @@ const approverOf = (proposal: Proposal): string | null => {
 };
 
 /** A proposal as it reads, with the buttons its phase offers; a refusal of the last click in the api's words. */
-export function ProposalView({
+function ProposalView({
   proposal,
   pending,
   refused,

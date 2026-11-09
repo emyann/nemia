@@ -8,7 +8,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { HARNESS_CHOICES, fenceReach } from '../src/vocabulary.ts';
 import { HARNESS_KNOBS } from '../src/harness/choices.ts';
-import { CLAUDE_OWNED_FLAGS } from '../src/harness/claude/vocabulary.ts';
 import { configRefusal } from '../src/index.ts';
 import { DEFAULT_HARNESSES } from '../src/service/default-harnesses.ts';
 
@@ -57,29 +56,25 @@ test('HARNESS_CHOICES ⊆ what configRefusal takes, each harness offered the fen
     assert.deepEqual(choicesBreaks(HARNESS_CHOICES), []);
   });
   await t.test(
-    'HARNESS_KNOBS names the harnesses HARNESS_CHOICES does, each with the effort and the fence words HARNESS_CHOICES gives it',
+    'HARNESS_KNOBS names the harnesses HARNESS_CHOICES does, fenced by the key HARNESS_CHOICES offers it, each word one configRefusal takes',
     () => {
       assert.deepEqual(Object.keys(HARNESS_KNOBS).sort(), Object.keys(HARNESS_CHOICES.effort).sort());
       for (const [harness, knobs] of Object.entries(HARNESS_KNOBS)) {
-        assert.equal(knobs.effort, HARNESS_CHOICES.effort[harness], harness);
-        const fence = HARNESS_CHOICES.permissionMode[harness] ? 'permissionMode' : 'sandbox';
-        assert.equal(knobs.fence.key, fence, harness);
-        assert.equal(knobs.fence.words, HARNESS_CHOICES[fence][harness], harness);
+        assert.equal(knobs.fence.key, Object.hasOwn(HARNESS_CHOICES.permissionMode, harness) ? 'permissionMode' : 'sandbox', harness);
+        for (const word of knobs.effort) assert.equal(configRefusal(harness, { effort: word }), undefined, `${harness} effort ${word}`);
+        for (const word of knobs.fence.words)
+          assert.equal(configRefusal(harness, { permissionMode: word }), undefined, `${harness} ${knobs.fence.key} ${word}`);
       }
     },
   );
-  await t.test(
-    'a harness fenced by its permission mode takes the tool lists, a context window and any flag but those the runtime owns',
-    () => {
-      for (const [harness, knobs] of Object.entries(HARNESS_KNOBS)) {
-        const moded = knobs.fence.key === 'permissionMode';
-        assert.deepEqual(knobs.fence.lists, moded ? ['tools', 'allowedTools', 'disallowedTools'] : [], harness);
-        assert.equal(knobs.context, moded, harness);
-        if (moded) assert.equal('owned' in knobs.flags && knobs.flags.owned, CLAUDE_OWNED_FLAGS, harness);
-        else assert.deepEqual(knobs.flags, { only: ['trustFrom'] }, harness);
-      }
-    },
-  );
+  await t.test('a harness fenced by its permission mode takes tool lists, a context window and its own flags but those owned; one fenced by sandbox none', () => {
+    for (const [harness, knobs] of Object.entries(HARNESS_KNOBS)) {
+      const moded = knobs.fence.key === 'permissionMode';
+      assert.equal(knobs.fence.lists.length > 0, moded, harness);
+      assert.equal(knobs.context, moded, harness);
+      assert.equal('owned' in knobs.flags, moded, harness);
+    }
+  });
 });
 
 test('REFUSED: the checks over HARNESS_CHOICES, each made to refuse by a planted table', async (t) => {

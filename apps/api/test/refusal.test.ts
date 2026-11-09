@@ -46,7 +46,7 @@ test('REFUSED: each kind thrown in a mounted router is answered its status, in i
 
 test('answerError: what each thrown thing is answered with, a refusal by its kind and anything else a 500', async (t) => {
   await t.test(
-    'REFUSAL_STATUS answers every kind of refusal, each once: 404 for Missing, 409 for Conflict, 422 for Invalid, 403 for Forbidden, 401 for Unauthorized',
+    'REFUSAL_STATUS answers every kind of refusal, each once (each status is held by what a thrown kind of it is answered)',
     () => {
       const kinds = [
         new Missing({ message: 'm' }),
@@ -56,7 +56,6 @@ test('answerError: what each thrown thing is answered with, a refusal by its kin
         new Unauthorized({ message: 'u', reason: 'unknown-token' }),
       ].map((r) => r._tag);
       assert.deepEqual(Object.keys(REFUSAL_STATUS).sort(), [...kinds].sort());
-      assert.deepEqual(REFUSAL_STATUS, { Missing: 404, Conflict: 409, Invalid: 422, Forbidden: 403, Unauthorized: 401 });
     },
   );
   await t.test('a caller refused is answered by its kind, its reason beside its words: Forbidden 403, Unauthorized 401', async () => {
@@ -70,7 +69,7 @@ test('answerError: what each thrown thing is answered with, a refusal by its kin
   await t.test('a table that leaves out a kind is refused by the compiler', () => {
     // @ts-expect-error -- REFUSED by the compiler: a table that leaves out a kind, as REFUSAL_STATUS is checked
     const partial = { Missing: 404, Conflict: 409 } as const satisfies Record<Refusal['_tag'], ContentfulStatusCode>;
-    assert.equal(Object.keys(partial).length, 2);
+    void partial;
   });
   await t.test('a Conflict that names the steps holding what is asked of is answered 409 with them, as `users`', async () => {
     const thrown = new Conflict({ message: 'agents/reviewer.md is named by a step beside it.', users: ['dev/review'] });

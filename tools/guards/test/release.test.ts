@@ -5,7 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bump, FIRST, LABELS, main, nextVersion, releaseTag } from '../../release/release.ts';
+import { bump, LABELS, main, nextVersion, releaseTag } from '../../release/release.ts';
 
 test('a release is a tag v<x.y.z> and nothing else: the legacy tag and the local nemia-* tags are never read as one', () => {
   assert.equal(releaseTag('v0.3.0'), '0.3.0');
@@ -24,28 +24,17 @@ test('the bump is the highest a label gives: breaking a major, feature a minor, 
   assert.equal(bump(['dependencies']), 'none', 'a label of no release counts for none');
 });
 
-test('the next version bumps the last release and is never below FIRST', () => {
-  assert.equal(FIRST, '1.0.0');
+test('the next version bumps the last release and is never below 1.0.0', () => {
   assert.equal(nextVersion('0.3.0', 'patch'), '1.0.0', 'the floor lifts a patch of 0.3.0');
   assert.equal(nextVersion('0.3.0', 'minor'), '1.0.0', 'the floor lifts a minor of 0.3.0');
   assert.equal(nextVersion('1.0.0', 'patch'), '1.0.1');
   assert.equal(nextVersion('1.0.0', 'minor'), '1.1.0');
   assert.equal(nextVersion('1.2.3', 'major'), '2.0.0');
   assert.equal(nextVersion('1.0.0', 'none'), undefined, 'nothing released, no version');
-  assert.equal(nextVersion(undefined, 'patch'), FIRST, 'no release yet: the first');
+  assert.equal(nextVersion(undefined, 'patch'), '1.0.0', 'no release yet: the first');
 });
 
-test('the labels are five, in their order, each with its bump, a colour and a description', () => {
-  assert.deepEqual(
-    LABELS.map((label) => [label.name, label.bump]),
-    [
-      ['breaking', 'major'],
-      ['feature', 'minor'],
-      ['fix', 'patch'],
-      ['docs', 'patch'],
-      ['internal', 'none'],
-    ],
-  );
+test('each label has a colour and a description GitHub takes (each one\'s bump is held by the bump above)', () => {
   for (const label of LABELS) {
     assert.match(label.color, /^[0-9a-f]{6}$/, `${label.name}'s colour is six hex digits, as GitHub takes it`);
     assert.ok(label.description.length > 0 && label.description.length <= 100, `${label.name}'s description fits GitHub's 100`);

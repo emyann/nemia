@@ -28,4 +28,4 @@ export type {
   TranscriptOriginKind,
   TranscriptMark,
 } from './seam.ts';
-export { isTranscriptCursor, noTranscript } from './transcript.ts';
+export { cursorOf, isTranscriptCursor, noTranscript } from './transcript.ts';

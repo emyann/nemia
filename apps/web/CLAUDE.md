@@ -88,9 +88,28 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   write a moment (`lib/timeOfDay.ts`, `lib/instant.ts`, `lib/runWords.ts`, `lib/quota.ts`); a fifth that needs it joins the list with
   its reason.
 - A time on the runs page is `whenWords`, and how long ago something was, in a table's column, is `agoWords` (`3 minutes ago`,
-  `4 months ago`, `just now` under a minute; date-fns's `formatDistanceStrict`, which writes no `about`), the whole instant staying on
+  `4 months ago`, `just now` under a minute; date-fns's `formatDistanceStrict`, which writes no `about`), the board's only writer of how long ago (the quota's age, the daemon's line and the queue's ghosts too), the whole instant staying on
   hover (`instantWhole`); a date's parts are `dateParts`. A schedule's far fire is `instantWords` (`14 Oct 12:00 PM`,
   `1 Jan 2027, 4:00 AM`); `whenWords` keeps dropping the time in another year.
+- How long something took has one writer, `durationWords(ms, grain)` (`lib/duration.ts`): to the second (`45s`, `12m 04s`, `1h 05m`,
+  `1d 2h`) for a try, a turn, a run's clock and Facts; to the minute (`under 1m`, `3m`, `1h 30m`) for a breakdown's rows, a wait, the
+  strip, a step card, the quota's keep and the pause's `cut in`.
+- An amount of money has one writer, `dollars` (`lib/money.ts`), by the package's rule: `$0.004` under a cent, `$12.50`, `-$0.13`, `—`
+  for none; a budget as its author writes it is `budgetWord` (`$16`, `$2.50`). How a run ended, its word, sentence and hue, is `ENDED`.
+- What this browser keeps (a layout, the open runs, the bar's width, the chat's unsent message) goes through `lib/stored.ts`
+  (`readStored`, `store`, `forgetStored`), never `localStorage` by hand. A copy control's copied or failed moment, 1500 ms, is `useCopy`
+  (`lib/useCopy.ts`); a media query is `useMedia` (`lib/useMedia.ts`), which `useIsMobile`, `useSheetPreview` and `useReducedMotion`
+  read; a frame's size is `useFrameSize`, never a ResizeObserver by hand.
+- An approval is `useApprove` (`lib/useApprove.ts`) wherever a person approves; an ending's warning is `endingWarning` (`lib/gate.ts`),
+  the card's and the gate's confirm alike. A run's wait on runs, or its hold, is drawn by `components/run/RunWait.tsx`, a proposal's
+  phase tag and Widens mark by `components/gate/ProposalTags.tsx`, and a graph's edges from `StepGraphFacts` (`stepEdges`).
+- A class string two features share (a button, a field, a popover, the floor's frame) is `lib/classes.ts`'s, never a feature
+  component's export.
+- A followed stream's event is decoded by `streamDataOf` (`lib/api/stream.ts`); one that does not decode is an `UnreadAnswer`, which
+  `follow` says as its could-not-be-read line while the stream goes on.
+- No export of `src` is dead: `test/dead-exports.test.ts` refuses a name no other file of `src`, `test`, `.storybook` or `contracts`
+  imports. Unexport a name used only in its own file, delete one used nowhere; the vendored folders, stories, `main.tsx`,
+  `routeTree.gen.ts`, a route's `Route` and the look's door are exempt.
 - A colour says one thing: `yours` (waits on a person), `alive`, `money` (an amount), `rest` (grey, and sage for done) and `failure`.
   `src/styles.css` reads each from a theme role once (`--meaning-*`, `bg-yours`); `lib/meaning.ts` holds the drawn forms, each class a
   whole literal.
@@ -156,7 +175,7 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - A link to a route is `routeLink` (`components/nav/routeLink.tsx`), under the root's `RouterProvider`: Enter on a React Aria link is two
   clicks, and each would navigate.
 - A suspense query keeps what it showed when a read fails: a page that must say a thing is gone reads the query's `error`, and a query
-  whose 404 is an answer does not retry it (`runGone`, `retryRun` in `lib/api/gone.ts`).
+  whose 404 is an answer does not retry it (`readGone`, `retryUnlessGone` in `lib/api/gone.ts`, for a run's, a fact's and a proposal's read alike).
 - A query keyed by the state it answers for is not invalidated by a write: a write invalidates the run's record alone (`exact: true`).
   A run's step sub-resources (its tries and told, `lib/api/run.ts`) are keyed by `stepStamp` (`lib/lifecyclePath.ts`) and never named by
   a step's event on the feed; a run's event, a removal and a write (`runsMoved` given the run) read every stamp of them by prefix.

@@ -32,7 +32,7 @@ const { readRun } = await import('../src/record/record.store.ts');
 const { tickRun, freshRestMemo } = await import('../src/tick/tick.verb.ts');
 const { PlaceService } = await import('../src/place/place.store.ts');
 const { builtinGitPlace } = await import('../src/place/builtin.store.ts');
-const { freeOnce, freshFreeMemory } = await import('../src/prune/free.verb.ts');
+const { freeOnce, freshFreeMemory } = await import('../src/forget/prune/free.verb.ts');
 
 type Pass = Awaited<ReturnType<typeof tick>>;
 type Memory = ReturnType<typeof freshFreeMemory>;

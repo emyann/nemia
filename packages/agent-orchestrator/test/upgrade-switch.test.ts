@@ -6,11 +6,10 @@
  * upgrade` is held to its `--plan`; the controller waits with the status alone; each conflict is resolved, and the merge keeps each
  * choice. After it, `other` at 1.1.0 read from another folder of the same name merges three ways again.
  *
- * Beside the story: a base whose status names no template yet is refused a switch until a pass names it, or, where its template
- * cannot be read, until it is put back; an upgrade already under way
- * keeps its three-way merge, and a factory whose template changed under its version (`ContentChanged`) is named and switched. The merge
- * with no base itself is `src/upgrade/merge.test.ts`; the naming of a base, `src/applied/applied.verb.test.ts`. `WF_ROOT` is set before
- * `src` is imported, which reads it as it loads.
+ * Beside the story: a base whose status names no template yet is refused a switch until a pass names it, or, where its template cannot be
+ * read, until it is put back; an upgrade already under way keeps its three-way merge, and a factory whose template changed under its
+ * version (`ContentChanged`) is named and switched. The merge with no base itself is `src/factory/upgrade/merge.test.ts`; the naming of a
+ * base, `src/factory/applied/applied.verb.test.ts`. `WF_ROOT` is set before `src` is imported, which reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -29,7 +28,7 @@ const { templated: programsAt } = await import('./templated.ts');
 const { exportTemplate, reconciled } = programsAt(ROOT);
 const { readFactory } = await import('../src/runner.ts');
 const { appliedDir, digestOf, entriesIn, readStatus, resolutionsFile, statusFile, treeDir } =
-  await import('../src/applied/applied.store.ts');
+  await import('../src/factory/applied/applied.store.ts');
 const { main } = await import('../src/cli/main.ts');
 const { engineOf, runWith } = await import('../src/runtime-client.ts');
 const stage = staged({ runWith, main, engineOf });

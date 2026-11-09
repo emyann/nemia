@@ -7,7 +7,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { ScheduleListed } from '../schedule/schedule.ts';
+import type { ScheduleListed } from './schedule/schedule.ts';
 import { names } from '../../test/assessed.ts';
 import {
   ambiguousFactoryRefusal,

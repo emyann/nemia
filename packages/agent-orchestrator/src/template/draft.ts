@@ -11,7 +11,7 @@ import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
 import type { Agent } from '../agents/agents.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { budgetOf, countOf, gateOf, readsNamesOf, rulesOf, serverNamesOf, skillNamesOf, toolsOf } from '../keys/index.ts';
-import { FACTORY_RULES_FILE } from '../rules/rules.ts';
+import { FACTORY_RULES_FILE } from '../factory/rules/rules.ts';
 import { baseSpelled } from '../former/former.ts';
 import type { RevisionsPolicy } from '../factory/factory.ts';
 import { API_VERSION, HARNESS_FENCE_KEYS, type Profile, type Step, type TemplateRoute } from './layout.ts';

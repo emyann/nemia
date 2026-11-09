@@ -55,6 +55,7 @@ import {
 import { mergeSpent } from '../merge/merge.ts';
 import { keptRecords, type RecordMemo } from '../rest/index.ts';
 import { verifiesRest } from '../config/config.store.ts';
+import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /** Each ask, by which it is: the file it is written at, by run, step and number, and its reader, as the tick reads it. */
 const ASKS: Record<
@@ -266,9 +267,7 @@ export function writeLabels(id: string, labels: Labels): void {
     return;
   }
   fs.mkdirSync(runsDir(), { recursive: true });
-  const tmp = path.join(runsDir(), `.${id}.labels.${process.pid}.tmp`);
-  fs.writeFileSync(tmp, JSON.stringify(labels, null, 2));
-  fs.renameSync(tmp, labelsFile(id));
+  writeWhole(labelsFile(id), JSON.stringify(labels, null, 2));
 }
 
 /** The run as its record reads (`readRun`), with its labels composed onto it, and whatever the record carried under `labels` dropped. */
@@ -359,9 +358,7 @@ const isForgetting = Schema.is(Schema.Struct({ run: Schema.String, taskIds: Sche
 /** The marker of the run `id` written whole, through a hidden file renamed over it, the folder made first. */
 function writeForgetting(id: string, taskIds: readonly string[]): void {
   fs.mkdirSync(forgettingDir(), { recursive: true });
-  const hidden = path.join(forgettingDir(), `.${id}.json.${process.pid}`);
-  fs.writeFileSync(hidden, JSON.stringify({ run: id, taskIds: [...taskIds] }, null, 2));
-  fs.renameSync(hidden, forgettingFile(id));
+  writeWhole(forgettingFile(id), JSON.stringify({ run: id, taskIds: [...taskIds] }, null, 2));
 }
 
 /** The task ids the marker of the run `id` lists, or undefined: none there, or one that does not read as a marker. */

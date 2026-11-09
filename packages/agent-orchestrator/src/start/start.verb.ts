@@ -57,7 +57,7 @@ import {
   type Factory,
 } from '../factory/factory.ts';
 import { readFactory } from '../factory/factory.store.ts';
-import { factoryFills } from '../rules/rules.store.ts';
+import { factoryFills } from '../factory/rules/rules.store.ts';
 import { Context, Effect } from 'effect';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';

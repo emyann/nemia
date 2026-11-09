@@ -22,6 +22,7 @@ import {
   ruleWords,
   type PolicyRule,
 } from './auto.ts';
+import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /** A rule at a gate as the files keep it. */
 const GateRuleSchema = Schema.Struct({
@@ -134,11 +135,9 @@ function unread(file: string, raw: unknown, error: Schema.SchemaError, fix: stri
 }
 
 /** Writes `value` to `file` whole, through a hidden file renamed over it. */
-function writeWhole(file: string, value: unknown): void {
+function jsonWritten(file: string, value: unknown): void {
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  const hidden = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}`);
-  fs.writeFileSync(hidden, `${JSON.stringify(value)}\n`);
-  fs.renameSync(hidden, file);
+  writeWhole(file, `${JSON.stringify(value)}\n`);
 }
 
 /**
@@ -169,7 +168,7 @@ export function readProposed(home: string, agent: string): Proposed | undefined 
 
 /** Writes what `agent` proposes in the store `home`, whole, over what it proposed before: `nemia policy propose`'s, alone. */
 export function writeProposed(home: string, agent: string, proposed: Proposed): void {
-  writeWhole(proposedFile(home, agent), proposed);
+  jsonWritten(proposedFile(home, agent), proposed);
 }
 
 /**
@@ -194,7 +193,7 @@ export function confirmRule(home: string, agent: string, id: string, words: stri
       message: `the rule ${id} is in force already for ${agent}: drop it first with nemia policy rm ${agent} ${id}.`,
     });
   const confirmed = { since: now.toISOString(), rules: [...rules, id === DEFAULT_ID ? rule : { ...rule, from: 'proposed' as const }] };
-  writeWhole(confirmedFile(home, agent), confirmed);
+  jsonWritten(confirmedFile(home, agent), confirmed);
   return confirmed;
 }
 
@@ -209,6 +208,6 @@ export function dropRule(home: string, agent: string, id: string, now: Date): Co
       message: `no rule ${id} is in force for ${agent}: the rules in force are ${rules.map((r) => r.id).join(', ') || 'none'} (nemia policy ${agent}).`,
     });
   const confirmed = { since: now.toISOString(), rules: rules.filter((r) => r.id !== id) };
-  writeWhole(confirmedFile(home, agent), confirmed);
+  jsonWritten(confirmedFile(home, agent), confirmed);
   return confirmed;
 }

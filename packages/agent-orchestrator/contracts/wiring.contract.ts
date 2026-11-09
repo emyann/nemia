@@ -1,5 +1,5 @@
 /**
- * A factory's wiring, judged (agent-orchestrator, src/wiring/wiring.ts): why a person's change of what a factory offers, hires and
+ * A factory's wiring, judged (agent-orchestrator, src/factory/wiring/wiring.ts): why a person's change of what a factory offers, hires and
  * schedules is refused (`wiringRefusal`), and the factory after one it accepts (`rewired`). The refusal's laws are the Factory door's
  * invariant — a factory hires and schedules only into a workflow it offers — so a change that would break it is refused; the
  * rewire's say what each change does, and the door's model decode refuses a factory written that breaks the invariant. The names a
@@ -19,7 +19,15 @@ import {
   workflowNameRefusal,
   type Factory,
 } from '../src/factory/factory.ts';
-import { hiresInto, withEntry, withHire, withName, withoutEntry, type WiringChange, type WiringRefused } from '../src/wiring/wiring.ts';
+import {
+  hiresInto,
+  withEntry,
+  withHire,
+  withName,
+  withoutEntry,
+  type WiringChange,
+  type WiringRefused,
+} from '../src/factory/wiring/wiring.ts';
 import { accepted } from './laws.ts';
 
 export const hireNamed = assume(hireRefusal, { pure: false });

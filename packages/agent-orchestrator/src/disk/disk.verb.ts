@@ -9,9 +9,9 @@ import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { rootSpan } from '../meter/meter.verb.ts';
 import { runTasks } from '../record/record.ts';
 import { EngineService, HARNESSES, tried, type KeptReport } from '../runtime-client.ts';
-import { walk } from '../prune/freed.store.ts';
+import { walk } from '../forget/prune/freed.store.ts';
 import { firstPiece } from '../piece/piece.ts';
-import type { Answered } from '../prune/prune.ts';
+import type { Answered } from '../forget/prune/prune.ts';
 import { storeFree, storeRoots } from './disk.store.ts';
 import {
   entryKey,

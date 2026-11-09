@@ -20,7 +20,7 @@ import type { AgentDraft } from './agents.ts';
 import type { AgentSidecar, AgentWritten } from './agents.store.ts';
 import { AgentDoor, type AgentRemoved } from './agent-door.store.ts';
 import { AgentName } from './agents.model.ts';
-import { rooted } from '../wiring/wire.verb.ts';
+import { rooted } from '../factory/wiring/wire.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { AGENTS_COPY } from '../sources/copy.verb.ts';
 

@@ -24,7 +24,7 @@ delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 const { advanceRun, prune, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
-const { freeingMany, judgingMany } = await import('../src/prune/prune.verb.ts');
+const { freeingMany, judgingMany } = await import('../src/forget/prune/prune.verb.ts');
 const { PlaceService } = await import('../src/place/place.store.ts');
 const { builtinGitPlace } = await import('../src/place/builtin.store.ts');
 const { engineOf } = await import('../src/runtime-client.ts');

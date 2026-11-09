@@ -7,8 +7,8 @@
  * archive said as drift and previewed by `nemia factory diff`.
  *
  * What export, pack, unpack and lint write and refuse beyond the trip is `src/template/template.store.test.ts`; what apply refuses
- * and what the controller says of a template moved, `src/applied/applied.verb.test.ts`; what a render writes and refuses,
- * `src/applied/render.test.ts`; the system's own tar, `template-tar.boundary.test.ts`. `WF_ROOT` and `CLAUDE_CONFIG_DIR` are set
+ * and what the controller says of a template moved, `src/factory/applied/applied.verb.test.ts`; what a render writes and refuses,
+ * `src/factory/applied/render.test.ts`; the system's own tar, `template-tar.boundary.test.ts`. `WF_ROOT` and `CLAUDE_CONFIG_DIR` are set
  * before `src` is imported, which reads them as it loads.
  */
 import { test } from 'node:test';
@@ -33,13 +33,13 @@ const { exportTemplate, reconciled, reconciledAt } = programsAt(ROOT);
 const AT = '2026-11-01T09:00:00.000Z';
 const { checkedTree, packageSkillNames } = await import('../src/template/template.store.ts');
 const { readFactories, readFactory } = await import('../src/runner.ts');
-const { appliedDir, readStatus, statusFile, treeDir } = await import('../src/applied/applied.store.ts');
-const { reconcileOnce } = await import('../src/applied/applied.verb.ts');
+const { appliedDir, readStatus, statusFile, treeDir } = await import('../src/factory/applied/applied.store.ts');
+const { reconcileOnce } = await import('../src/factory/applied/applied.verb.ts');
 const { readRun } = await import('../src/record/record.store.ts');
-const { startDue } = await import('../src/schedule/schedule.verb.ts');
+const { startDue } = await import('../src/factory/schedule/schedule.verb.ts');
 const { StoreRoot } = await import('../src/config/root.store.ts');
-const { TemplateDoor } = await import('../src/templates/templates.store.ts');
-const { TemplateSource } = await import('../src/templates/templates.model.ts');
+const { TemplateDoor } = await import('../src/template/door/templates.store.ts');
+const { TemplateSource } = await import('../src/template/door/templates.model.ts');
 const { main } = await import('../src/cli/main.ts');
 const { engineOf, runWith } = await import('../src/runtime-client.ts');
 const stage = staged({ runWith, main, engineOf });

@@ -5,7 +5,7 @@
  *
  * The rest of the area: the argument refusals of `nemia factory` as tables, and two adds racing, in `src/factory/factory.store.test.ts`;
  * names, holders and what `nemia factory ls` says, pure, in `src/factory/factory.test.ts`; the rules and the instruction in
- * `factory-rules.test.ts`, `src/rules/` and `src/factory/instruction.store.test.ts`; schedules over time in `schedule.test.ts`.
+ * `factory-rules.test.ts`, `src/factory/rules/` and `src/factory/instruction.store.test.ts`; schedules over time in `schedule.test.ts`.
  *
  * `WF_ROOT` is set before the runner is imported, since it is read as the module loads. Every run here is filed in a factory as shipped,
  * or in the default one where `WF_DEFAULT_FACTORY_STARTS` (which `test/ambient.ts` sets) lets it: `asShipped` deletes the switch for a
@@ -48,7 +48,7 @@ const { main: cli } = await import('../src/cli/main.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { nemiaDefinition } = await import('../src/nemia/level.store.ts');
 const { FACTORY_HELP } = await import('../src/factory/factory.verb.ts');
-const { writeRules } = await import('../src/rules/rules.store.ts');
+const { writeRules } = await import('../src/factory/rules/rules.store.ts');
 const { writeInstructionText } = await import('../src/factory/instruction.store.ts');
 const stage = staged({ runWith: runEngine, main: cli, engineOf });
 /** The test place of this test, as the focused test below reads it. */

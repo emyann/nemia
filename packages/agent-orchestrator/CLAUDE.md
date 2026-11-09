@@ -24,7 +24,7 @@ too, which holds parity with this one until the in-process reads retire.
   required `home: string` with no default. `test/root-given.test.ts` refuses by name a new module-level root, a parameter defaulted to
   one, and a new line of a body that reads one — the shape most of the debt is in, since such a function takes no root at all;
   `test/global-roots.baseline.ts` counts the lines that still do, per file, and only shrinks.
-- **`src/servers/` is the store that already takes its root by parameter**: `servers.store.ts`'s functions take a required
+- **`src/factory/servers/` is the store that already takes its root by parameter**: `servers.store.ts`'s functions take a required
   `home: string` first, threaded from `servers.verb.ts`'s handlers (`Command.handler`'s third argument, through `rootGiven`), from
   `filedAt` and from the pass's `PassReads.home`, which `advanceRun` asks of `StoreRoot`. Copy it, not `level.store.ts`, for a new
   per-factory file: it is in no line of `test/global-roots.baseline.ts`, and the baseline only shrinks.
@@ -55,7 +55,7 @@ too, which holds parity with this one until the in-process reads retire.
 - **A key added to `STEP_KEYS` has four sites outside the package**: `KINDS` in `apps/api/src/workflows/words.ts`, `WorkflowStepSpec` and
   `specOf` in `apps/api/src/workflows/workflows.ts`, the web's mirror with `UNSET` (`apps/web/src/lib/builder.ts`), and its schemas with
   `StepKeySchema` (`apps/web/src/lib/api/library.ts`), which refuses a key it does not list. A template places it too, or its export
-  refuses it by name: `PLACED` and `stepOf` (`template/draft.ts`), `OVERRIDES` (`template/layout.ts`), `stepFile` (`applied/render.ts`).
+  refuses it by name: `PLACED` and `stepOf` (`template/draft.ts`), `OVERRIDES` (`template/layout.ts`), `stepFile` (`factory/applied/render.ts`).
 - **A key renamed in `STEP_KEYS` is still read under its old name**: `FORMER_KEYS` (`former/former.ts`), `formerStepFields` and the agent's
   `keys` in `FrozenStepSchema` (`folder/folder.store.ts`), `asNamed` in `readRun`, `keysWritten` in `src/roster/roster.ts`,
   `formerKeyWritten` in the renders, `formerKeyLines` at `wf start`.
@@ -117,12 +117,12 @@ too, which holds parity with this one until the in-process reads retire.
   stands: the files hold it by an exclusive claim, `<root>/started/<card>.json`, removed with the run that it names (`runs.forget`),
   and taken over where its run has no record. A test that removes a run's files by hand removes its claim too, as the e2e's
   `takeBackRuns` does.
-- **A factory is read and written through the Factory door (`FactoryDoor`, `src/factories/factories.store.ts`), whose default is rooted**:
+- **A factory is read and written through the Factory door (`FactoryDoor`, `src/factory/door/factories.store.ts`), whose default is rooted**:
   it reads the files at the `StoreRoot` a program is given, and is refused `Invalid` where none was, so a handler that yields it is run
-  through `rooted(home, verb, program)` (`src/wiring/wire.verb.ts`). A test that only needs a factory to exist gives its program one
-  `factoryDoorMemory()` (`src/factories/memory.store.ts`) and plants the factory through it (`aFactory`, `test/factory-walks.ts`); code
+  through `rooted(home, verb, program)` (`src/factory/wiring/wire.verb.ts`). A test that only needs a factory to exist gives its program one
+  `factoryDoorMemory()` (`src/factory/door/memory.store.ts`) and plants the factory through it (`aFactory`, `test/factory-walks.ts`); code
   still on `factory.store.ts`'s spellings without a root (`test/factory-door.baseline.ts`) reads the module's root whatever door was
-  given. A change of a factory's wiring is judged by `wiringRefusal` (`src/wiring/wiring.ts`), whose contract a new rule of the wiring
+  given. A change of a factory's wiring is judged by `wiringRefusal` (`src/factory/wiring/wiring.ts`), whose contract a new rule of the wiring
   is a law of, not a row of a test.
 - **A card is read and written through the Card door (`CardDoor`, `src/cards/cards.store.ts`), rooted as the Factory door is**: the
   inbox's verbs are programs that yield it, so a test runs one with its root given (`Effect.provideService(program, StoreRoot, root)`;
@@ -151,10 +151,10 @@ too, which holds parity with this one until the in-process reads retire.
   `test/agent-walks.ts`; `aSkill`, `test/skill-walks.ts`). Code still on their stores (`test/agent-door.baseline.ts`) reads the disk
   whatever door was given. A new rule of which root wins is a law of `contracts/lookup.contract.ts`, and of a definition's version a
   law of `contracts/definition-version.contract.ts`, not a row of a test.
-- **A template is read and written through the Template door (`TemplateDoor`, `src/templates/templates.store.ts`), whose default is
+- **A template is read and written through the Template door (`TemplateDoor`, `src/template/door/templates.store.ts`), whose default is
   rooted** as the Factory door's: a program that yields it — the template verbs, `nemia factory apply`, diff, upgrade and resolve, the
   factory controller (`reconcileFactory`) — is given `StoreRoot`, a handler through `rooted`, and a test runs it with one
-  (`test/templated.ts`) or gives `templateDoorMemory()` (`src/templates/memory.store.ts`). The door checks a tree's name and paths
+  (`test/templated.ts`) or gives `templateDoorMemory()` (`src/template/door/memory.store.ts`). The door checks a tree's name and paths
   (`TemplateTreeWrite`), never the template's lint: a verb that must refuse a template that does not pass checks it first (`checkedTree`).
   A `--template <name>` and a factory's recorded name are resolved by `templatePlace` at `BuiltinTemplates`, before the door: a test
   gives a scratch folder of its own (`withBuiltins`, `test/templated.ts`), never `packages/templates`.
@@ -198,7 +198,7 @@ too, which holds parity with this one until the in-process reads retire.
   object's parts no stamp watches — `onDisk`, a folder run's step files, the workflow folder's `warning` — are read on every request
   (`diskPartsOf`, `src/object/run.verb.ts`). A new input of a run's object goes into what the informer checks, or into those parts.
 - **A test that starts a daemon and reads a finished run's worktree afterwards sets `WF_KEEP_WORKTREES=1`**: the daemon frees a finished
-  run's worktrees on a sweep beside its passes (`freeOnce`, `src/prune/free.verb.ts`).
+  run's worktrees on a sweep beside its passes (`freeOnce`, `src/forget/prune/free.verb.ts`).
 - **The daemon measures the store's disk on a sweep beside its passes** (`diskOnce`, `src/disk/disk.verb.ts`): a test daemon walks its
   scratch store once, a pass is handed the reading and never the walk, and a test of the sweep plants sizes on the stand-in
   (`engine().keeps`).

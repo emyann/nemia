@@ -1,5 +1,5 @@
 /**
- * A volume's name (agent-orchestrator, src/volume/volume.ts): the name a factory's volume is served and linked under, the
+ * A volume's name (agent-orchestrator, src/factory/volume/volume.ts): the name a factory's volume is served and linked under, the
  * `Volume` object's `metadata.name`. It is `base`, the slug of its path's basename (`volumeBase`, a test's), unless another volume of the
  * factory holds that name already (`taken`: the names its file stores, then those named before it in path order), and then `base` with a
  * suffix, `<base>-<n>`. A name once stored on the file is kept, so a link to it stays: this function names only a volume with none.
@@ -24,5 +24,5 @@ const volumeNameAmongSpec = spec<(base: string, taken: readonly string[]) => str
   },
 });
 
-/** `volumeNameAmong`'s type, which `src/volume/volume.ts` takes. */
+/** `volumeNameAmong`'s type, which `src/factory/volume/volume.ts` takes. */
 export type VolumeNameAmong = Implementation<typeof volumeNameAmongSpec>;

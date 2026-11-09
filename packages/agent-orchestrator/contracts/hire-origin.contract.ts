@@ -1,5 +1,5 @@
 /**
- * Where a hire's settings came from (agent-orchestrator, src/hire/hire.ts): the `Hire` object's status says, for the step
+ * Where a hire's settings came from (agent-orchestrator, src/factory/hire/hire.ts): the `Hire` object's status says, for the step
  * `<workflow>.<step>` of a factory, who fills it and, for each setting a session gets there (model, effort, context, harness, fence,
  * skills, mcp), which layer set it. Two decisions, each from what the resolved step already carries (`StepAgent.keys`, the keys its
  * own file sets; `StepAgent.given`, what its agent gives): who fills the step (`fillOrigin`), and where one setting came from
@@ -42,8 +42,8 @@ const settingOriginSpec = spec<(stepSets: boolean, agentGives: boolean) => Setti
   },
 });
 
-/** `fillOrigin`'s type, which `src/hire/hire.ts` takes. */
+/** `fillOrigin`'s type, which `src/factory/hire/hire.ts` takes. */
 export type FillOriginOf = Implementation<typeof fillOriginSpec>;
 
-/** `settingOrigin`'s type, which `src/hire/hire.ts` takes. */
+/** `settingOrigin`'s type, which `src/factory/hire/hire.ts` takes. */
 export type SettingOriginOf = Implementation<typeof settingOriginSpec>;

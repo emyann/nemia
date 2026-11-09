@@ -6,7 +6,7 @@
  * factory's and the agent's names, and the grants as objects' `DelegationSpec` decodes them. The walks of `test/delegation-walks.ts` hold
  * both layers to one table.
  *
- * Every function here takes the store's root as a required `home: string`, as `src/servers/` does.
+ * Every function here takes the store's root as a required `home: string`, as `src/factory/servers/` does.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,6 +17,7 @@ import { factoryNameRefusal } from '../factory/factory.ts';
 import { agentNameRefusal } from '../agents/agents.ts';
 import { firstRefusal } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
+import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /** One agent's delegation in one factory, as the store keeps it: its grants, and when it was last written. */
 export type DelegationRecord = {
@@ -124,9 +125,7 @@ export function delegationFiles(home: string): DelegationLayer {
       write: (record) => {
         const file = delegationFile(home, record.factory, record.agent);
         fs.mkdirSync(path.dirname(file), { recursive: true });
-        const hidden = path.join(path.dirname(file), `.${record.agent}.json.${process.pid}`);
-        fs.writeFileSync(hidden, `${JSON.stringify({ since: record.since, spec: record.spec }, null, 2)}\n`);
-        fs.renameSync(hidden, file);
+        writeWhole(file, `${JSON.stringify({ since: record.since, spec: record.spec }, null, 2)}\n`);
         return record;
       },
       remove: (factory, agent) => {

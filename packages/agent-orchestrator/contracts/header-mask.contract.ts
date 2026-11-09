@@ -1,5 +1,5 @@
 /**
- * An MCP server's header as a write keeps it (agent-orchestrator, src/servers/servers.ts). A server's headers are served
+ * An MCP server's header as a write keeps it (agent-orchestrator, src/factory/servers/servers.ts). A server's headers are served
  * masked, each value as `HEADER_MASK`, so a client that reads a server and sends it back sends the mask: the mask sent for a header the
  * server holds keeps the stored value, and any other value is the new one. A mask sent for a header the server does not hold says no
  * value, and is refused (`Invalid`, naming the header and asking for its value). `stored` is the value the record holds, null for none.
@@ -28,5 +28,5 @@ const headerWrittenSpec = spec<(sent: string, stored: string | null) => HeaderWr
   },
 });
 
-/** `headerWritten`'s type, which `src/servers/servers.ts` takes. */
+/** `headerWritten`'s type, which `src/factory/servers/servers.ts` takes. */
 export type HeaderWrittenOf = Implementation<typeof headerWrittenSpec>;

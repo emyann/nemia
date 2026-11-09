@@ -21,7 +21,7 @@
  * way (`OBJECTS`): never by a subpath, a relative path or a path built into their src. Their own files are not read for it.
  *
  * No file of this package's `src`, `bin` or `place` imports the templates workspace (`packages/templates`), by its name or by a path:
- * the builtin templates are found by path (`BuiltinTemplates`, `src/templates/templates.store.ts`), as its skills and servers are.
+ * the builtin templates are found by path (`BuiltinTemplates`, `src/template/door/templates.store.ts`), as its skills and servers are.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -331,7 +331,7 @@ const TEMPLATES = { name: 'templates', dir: 'packages/templates' } as const;
 
 /** Where `file`, of this package, imports the templates workspace, by its name or by a relative path into its folder. */
 function templateBreaches(file: string, text: string): string[] {
-  const instead = `find a builtin template by path, through BuiltinTemplates (src/templates/templates.store.ts)`;
+  const instead = `find a builtin template by path, through BuiltinTemplates (src/template/door/templates.store.ts)`;
   return specifiersIn(withoutComments(text)).flatMap((spec) => {
     const named = spec === TEMPLATES.name || spec.startsWith(`${TEMPLATES.name}/`);
     const into =
@@ -341,16 +341,16 @@ function templateBreaches(file: string, text: string): string[] {
 }
 
 test('REFUSED: a file of this package that imports the templates workspace, by its name or by a path; its own templates folder is not it', () => {
-  const file = 'packages/agent-orchestrator/src/applied/x.ts';
+  const file = 'packages/agent-orchestrator/src/factory/applied/x.ts';
   assert.equal(templateBreaches(file, "import x from 'templates/sdlc/nemia.ts';").length, 1, 'by its name');
-  assert.equal(templateBreaches(file, "import y from '../../../templates/sdlc/nemia.ts';").length, 1, 'by a path into its folder');
-  assert.deepEqual(templateBreaches(file, "import { templatePlace } from '../templates/templates.store.ts';"), [], 'its own folder');
+  assert.equal(templateBreaches(file, "import y from '../../../../templates/sdlc/nemia.ts';").length, 1, 'by a path into its folder');
+  assert.deepEqual(templateBreaches(file, "import { templatePlace } from '../../template/door/templates.store.ts';"), [], 'its own folder');
 });
 
-test("no file of this package's src, bin or place imports the templates workspace, and the scan reads src/templates", () => {
+test("no file of this package's src, bin or place imports the templates workspace, and the scan reads src/template/door", () => {
   const listed = execFileSync('git', ['ls-files', '-co', '--exclude-standard', 'src', 'bin', 'place'], { cwd: PKG, encoding: 'utf8' });
   const files = listed.split('\n').filter((f) => SOURCE.test(f) && fs.existsSync(path.join(PKG, f)));
-  assert.ok(files.includes('src/templates/templates.store.ts'), 'the scan reads the store that finds the templates by path');
+  assert.ok(files.includes('src/template/door/templates.store.ts'), 'the scan reads the store that finds the templates by path');
   assert.deepEqual(
     files.flatMap((f) => templateBreaches(`${GUARDED.dir}/${f}`, fs.readFileSync(path.join(PKG, f), 'utf8'))),
     [],

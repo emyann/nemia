@@ -7,11 +7,11 @@
 import path from 'node:path';
 import { Cause, Clock, Effect, Exit } from 'effect';
 import { StoreRoot } from '../src/config/root.store.ts';
-import { BuiltinTemplates, TemplateDoor } from '../src/templates/templates.store.ts';
-import { TemplateSource } from '../src/templates/templates.model.ts';
+import { BuiltinTemplates, TemplateDoor } from '../src/template/door/templates.store.ts';
+import { TemplateSource } from '../src/template/door/templates.model.ts';
 import { openedTree, packageSkillNames } from '../src/template/template.store.ts';
 import { exportedTemplate } from '../src/template/template.verb.ts';
-import { reconcileFactory } from '../src/applied/applied.verb.ts';
+import { reconcileFactory } from '../src/factory/applied/applied.verb.ts';
 
 /** A clock that says the time is `ms` (epoch milliseconds) whenever it is asked, and sleeps no one: a controller's pass, seeded. */
 export const seededClock = (ms: number): Clock.Clock => ({

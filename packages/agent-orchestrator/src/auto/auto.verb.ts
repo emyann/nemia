@@ -12,7 +12,7 @@ import { AgentDoor } from '../agents/agent-door.store.ts';
 import { AgentName } from '../agents/agents.model.ts';
 import { HOME } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { rooted } from '../wiring/wire.verb.ts';
+import { rooted } from '../factory/wiring/wire.verb.ts';
 import {
   DEFAULT_POLICY,
   gateRules,

@@ -1,7 +1,7 @@
 /**
- * The Template door's contract (`TemplateDoor`, `src/templates/templates.store.ts`), as walks (`door-walks.ts`): every method's rows, run
- * on the files by `src/templates/templates.store.test.ts` and on the memory stand-in by `src/templates/memory.store.test.ts`. A tree
- * written as a folder is read back with its name, paths, modes and bytes, and one packed as an archive with the digest pack answered;
+ * The Template door's contract (`TemplateDoor`, `src/template/door/templates.store.ts`), as walks (`door-walks.ts`): every method's rows,
+ * run on the files by `src/template/door/templates.store.test.ts` and on the memory stand-in by `src/template/door/memory.store.test.ts`. A
+ * tree written as a folder is read back with its name, paths, modes and bytes, and one packed as an archive with the digest pack answered;
  * and the write check: a place taken, a name that is no template's, a folder named other than its tree, a path that climbs out of the
  * folder and a place that is no whole path are refused, and nothing is written.
  *
@@ -10,8 +10,8 @@
 import path from 'node:path';
 import type { DoorWalk } from './door-walks.ts';
 import { act, done } from './door-walks.ts';
-import type { TemplateDoorShape, TemplateTree } from '../src/templates/templates.store.ts';
-import { TemplateSource } from '../src/templates/templates.model.ts';
+import type { TemplateDoorShape, TemplateTree } from '../src/template/door/templates.store.ts';
+import { TemplateSource } from '../src/template/door/templates.model.ts';
 import type { TreeFile } from '../src/archive/archive.ts';
 
 type Walk = DoorWalk<TemplateDoorShape>;

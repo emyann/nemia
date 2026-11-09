@@ -1,7 +1,7 @@
 /**
  * Where the tick acts on proposals: a reference the tick's pass yields once its runs are judged (`ProposalsAct`), given the runs it listed
  * and each judged run's status. Its default acts on none; the daemon's loop (`up`) gives it `proposalsActed` (`pass.verb.ts`). A
- * reference rather than an import, since the pass reads the served objects (`factory-object/`), whose verbs reach the tick through the
+ * reference rather than an import, since the pass reads the served objects (`factory/object/`), whose verbs reach the tick through the
  * command table.
  */
 import { Context, Effect } from 'effect';

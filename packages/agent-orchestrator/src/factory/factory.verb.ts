@@ -18,23 +18,23 @@ import {
   type RevisionsPolicy,
 } from './factory.ts';
 import { factoriesDir, factoryRepos, readFactories, refuseName } from './factory.store.ts';
-import { ownAgentRefusal } from '../wiring/own-agent.store.ts';
+import { ownAgentRefusal } from './wiring/own-agent.store.ts';
 import { FactoryName } from './factory.model.ts';
-import { FactoryDoor } from '../factories/factories.store.ts';
+import { FactoryDoor } from './door/factories.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import { rooted, wire } from '../wiring/wire.verb.ts';
+import { rooted, wire } from './wiring/wire.verb.ts';
 import { removeInstructionFolder } from './instruction.store.ts';
 import { FACTORY_INSTRUCT, FACTORY_INSTRUCTION } from './instruction.verb.ts';
-import { FACTORY_RULES } from '../rules/rules.verb.ts';
+import { FACTORY_RULES } from './rules/rules.verb.ts';
 import { TEMPLATED_FACTORY_VERBS } from '../adopt/templated.verb.ts';
-import { FACTORY_SCHEDULES } from '../schedule/schedule.verb.ts';
-import { scheduleRun, schedulesListed, type ScheduleRuns } from '../schedule/listed.store.ts';
-import type { ScheduleListed } from '../schedule/schedule.ts';
+import { FACTORY_SCHEDULES } from './schedule/schedule.verb.ts';
+import { scheduleRun, schedulesListed, type ScheduleRuns } from './schedule/listed.store.ts';
+import type { ScheduleListed } from './schedule/schedule.ts';
 import { keptRuns } from '../record/files.store.ts';
 import { trustedLines, type PlaceTrust, type Untrusted } from '../trust/trust.ts';
 import { FACTORY_TRUST, NO_TRUST, trustPlaces, untrustedPlaces } from '../trust/trust.verb.ts';
-import { FACTORY_SERVER_VERBS } from '../servers/servers.verb.ts';
-import { FACTORY_VOLUMES, VOLUME_FORMS } from '../volume/volume.verb.ts';
+import { FACTORY_SERVER_VERBS } from './servers/servers.verb.ts';
+import { FACTORY_VOLUMES, VOLUME_FORMS } from './volume/volume.verb.ts';
 import { FACTORY_SETTINGS, SETTING_FORMS } from '../harness-settings/harness-settings.verb.ts';
 
 export const FACTORY_HELP = `nemia factory [ls]

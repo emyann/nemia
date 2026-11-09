@@ -15,15 +15,15 @@ import { instructionAt, type Factory } from '../factory/factory.ts';
 import { instructionFile, readInstructionAt } from '../factory/instruction.store.ts';
 import { factoriesDirAt } from '../factory/factory.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
-import { FactoryDoor } from '../factories/factories.store.ts';
-import { TemplateDoor } from '../templates/templates.store.ts';
+import { FactoryDoor } from '../factory/door/factories.store.ts';
+import { TemplateDoor } from './door/templates.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import { rooted } from '../wiring/wire.verb.ts';
+import { rooted } from '../factory/wiring/wire.verb.ts';
 import { AgentDoor } from '../agents/agent-door.store.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
 import type { AgentName } from '../agents/agents.model.ts';
 import type { Agent } from '../agents/agents.ts';
-import { TemplateSource } from '../templates/templates.model.ts';
+import { TemplateSource } from './door/templates.model.ts';
 import {
   archiveAsked,
   checkedTree,

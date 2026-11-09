@@ -6,7 +6,7 @@
 import { Effect } from 'effect';
 import { type Args, NAMED_ACTION, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { rooted } from '../wiring/wire.verb.ts';
+import { rooted } from '../factory/wiring/wire.verb.ts';
 import type { Labelled } from './labels.model.ts';
 import { labelCard, labelRun } from './labels.verb.ts';
 

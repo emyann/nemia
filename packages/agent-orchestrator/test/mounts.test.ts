@@ -26,7 +26,7 @@ import { CARD, filedOf, handedBy, INBOX, INPUT_FILE, INPUTS, mountHolds, readsAt
 import { factoryMounts, stepMounts } from '../src/factory/factory.ts';
 import { mountsLine } from '../src/start/index.ts';
 import { inputsMounts, readsMounts } from '../src/filed/filed.ts';
-import { volumeMounts } from '../src/volume/volume.ts';
+import { volumeMounts } from '../src/factory/volume/volume.ts';
 import { handedMounts } from '../src/artifacts/artifacts.ts';
 import { writesOutsideByRule } from '../src/workflow/index.ts';
 import { parseWorkflow, agentsDir } from '../src/workflow.ts';

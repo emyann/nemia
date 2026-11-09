@@ -5,7 +5,7 @@
  * refused for that fire; and the end of daylight saving, neither skipped nor doubled. The level is a focused test; a due fire held by the
  * store's pause is a checkpoint of the pause's story, in `pause.test.ts`.
  *
- * When a schedule is due, and what its lines say, is pure, in `src/schedule/schedule.test.ts`; its refusals as it is written, in
+ * When a schedule is due, and what its lines say, is pure, in `src/factory/schedule/schedule.test.ts`; its refusals as it is written, in
  * `src/factory/factory.store.test.ts`.
  *
  * A schedule's `now` is the wall's (`Date.now()`, in `startDue`): a wall decision, which `stage.clock()` — Effect's clock — does not move,
@@ -241,9 +241,9 @@ test("at Manual, with no Nemia, a due schedule starts all the same: the schedule
   t.mock.timers.setTime(Date.parse(MONDAY) + 30_000);
   await runWith(e, tickRun());
   assert.deepEqual(scheduledDues(), [MONDAY]);
-  const source = fs.readFileSync(path.join(import.meta.dirname, '..', 'src', 'schedule', 'schedule.verb.ts'), 'utf8');
+  const source = fs.readFileSync(path.join(import.meta.dirname, '..', 'src', 'factory', 'schedule', 'schedule.verb.ts'), 'utf8');
   const imports = [...source.matchAll(/^import[\s\S]*?from\s*'([^']+)';/gm)].map((m) => m[1]);
-  assert.ok(imports.includes('../start/start.verb.ts'), 'the imports are read');
+  assert.ok(imports.includes('../../start/start.verb.ts'), 'the imports are read');
   assert.deepEqual(
     imports.filter((from) => /\/level\/|\/nemia\/|keep/.test(from ?? '')),
     [],

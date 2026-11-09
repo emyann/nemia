@@ -11,7 +11,7 @@ import path from 'node:path';
 import { Cause, Effect, type Duration } from 'effect';
 import { StoreRoot } from '../config/root.store.ts';
 import type { LeaseRelease } from '../daemon/daemon.ts';
-import { alive } from '../daemon/daemon.store.ts';
+import { alive } from '../process/alive.store.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { asked, EngineService } from '../runtime-client.ts';
 import { sessionRelease, type Running } from '../release/release.ts';

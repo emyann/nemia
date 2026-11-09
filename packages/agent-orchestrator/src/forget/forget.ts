@@ -26,7 +26,7 @@ import { spentRoundAsks } from '../round/round.ts';
 import { inside } from '../workspace/workspace.ts';
 import path from 'node:path';
 import type { Held, MergeState } from '../place/place.ts';
-import { engineWords, type EngineForgetting } from '../forgetting/forgetting.ts';
+import { engineWords, type EngineForgetting } from './forgetting/forgetting.ts';
 
 /**
  * How `nemia rm` treats a run's branches. Kept by default, since a branch is where the work is: `deleteBranches` deletes each one merged

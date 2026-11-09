@@ -15,7 +15,7 @@ import { WorkflowDir } from '../folder/folder.model.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { isRefusal, Missing } from '../refusal/refusal.ts';
-import { factoryFills } from '../rules/rules.store.ts';
+import { factoryFills } from '../factory/rules/rules.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { type Run, runTasks, unjudgedWords, unloadedWords } from '../record/record.ts';
 import { unloadedOf } from '../steps/steps.verb.ts';

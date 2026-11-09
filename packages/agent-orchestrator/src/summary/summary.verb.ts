@@ -16,7 +16,7 @@ import { runStore } from '../record/files.store.ts';
 import type { Labels } from '../labels/labels.ts';
 import type { Selectors } from '../watch/selector.ts';
 import { runLabelMap, selectedRuns } from '../runlist/runlist.ts';
-import { prunedKept } from '../prune/prune.ts';
+import { prunedKept } from '../forget/prune/prune.ts';
 import { standingReader, standingSnapshot } from '../standing/standing.verb.ts';
 import { informedJudgements, type InformerMemo, informerRead } from '../rest/informer.verb.ts';
 import { type Judgement, type Judgements, judgementsOf, sameJudgement } from './judgement.verb.ts';

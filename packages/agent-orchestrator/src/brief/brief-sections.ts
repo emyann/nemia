@@ -29,7 +29,7 @@ import { refusalSection, type CheckRefusal, type LandingSaid, type Verdict } fro
 import type { Said } from '../say/say.ts';
 import { loopSpan, upstreamOf } from '../workflow/index.ts';
 import { heldLater, roundsDue } from '../round/round.ts';
-import { neverApproved } from '../prune/prune.ts';
+import { neverApproved } from '../forget/prune/prune.ts';
 import { answersOr } from '../question/index.ts';
 
 /**

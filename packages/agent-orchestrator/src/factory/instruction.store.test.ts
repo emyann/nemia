@@ -34,7 +34,7 @@ const {
 const stand = eachTest(testPlace);
 const runWith = runOver(runEngine, () => stand().layer);
 const { readInstructionAt, writeInstructionText } = await import('./instruction.store.ts');
-const { clearRules, readRules, writeRules } = await import('../rules/rules.store.ts');
+const { clearRules, readRules, writeRules } = await import('./rules/rules.store.ts');
 const { main: cli } = await import('../cli/main.ts');
 /** `nemia`, as a person types it, its commands given this test's place. */
 const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place);

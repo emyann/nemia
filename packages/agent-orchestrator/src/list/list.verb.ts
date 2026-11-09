@@ -24,7 +24,7 @@ import { stepsAmong, stepsOf } from '../steps/steps.verb.ts';
 import { resultBranches, standingsOf, type BranchReader } from '../branches/branches.store.ts';
 import { headsOver, standingReader, standingSnapshot, type PassStanding } from '../standing/standing.verb.ts';
 import { daemonStanding } from '../daemon/daemon.store.ts';
-import { schedulesListed } from '../schedule/listed.store.ts';
+import { schedulesListed } from '../factory/schedule/listed.store.ts';
 import {
   closeoutAsked,
   closeoutOf,

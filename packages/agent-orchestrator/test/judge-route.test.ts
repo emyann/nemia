@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { assess } from '../src/tick/assess.ts';
-import { runWords } from '../src/routed/routed-words.ts';
+import { runWords } from '../src/route/routed/routed-words.ts';
 import { closeoutSchemaOf, type Closeout } from '../src/closeout/closeout.ts';
 import { composeBrief } from '../src/brief/brief.ts';
 import { stepSetRefusal, validate } from '../src/workflow/validate.ts';

@@ -10,6 +10,7 @@ import path from 'node:path';
 import { Schema } from 'effect';
 import { Invalid } from '../refusal/refusal.ts';
 import { DEFAULT_TIMEOUT_MS, timeoutOf, timeoutRefusal } from './pause.ts';
+import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /** The store's timeout file. */
 export const timeoutFile = (home: string): string => path.join(home, 'pause-timeout.json');
@@ -51,8 +52,6 @@ export function putTimeout(home: string, text: string, now: Date = new Date()): 
   if (ms === undefined) throw new Invalid({ message: `${timeoutRefusal(text)}: type nemia pause-timeout <d>, as nemia pause-timeout 10m` });
   const file = timeoutFile(home);
   fs.mkdirSync(home, { recursive: true });
-  const hidden = path.join(home, `.pause-timeout.json.${process.pid}`);
-  fs.writeFileSync(hidden, `${JSON.stringify({ timeout: text.trim(), at: now.toISOString() })}\n`);
-  fs.renameSync(hidden, file);
+  writeWhole(file, `${JSON.stringify({ timeout: text.trim(), at: now.toISOString() })}\n`);
   return { ms, set: true, at: now.toISOString() };
 }

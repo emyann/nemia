@@ -29,13 +29,13 @@ import { workflowDirAt } from '../folder/folder.store.ts';
 import type { StepDraft } from '../workflow/index.ts';
 import { definitionRevision } from '../revisions/revisions.store.ts';
 import type { RevisionKind } from '../revisions/revisions.ts';
-import { FactoryDoor } from '../factories/factories.store.ts';
+import { FactoryDoor } from '../factory/door/factories.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
 import { readFactoryAt } from '../factory/factory.store.ts';
 import { FACTORY_INSTRUCT } from '../factory/instruction.verb.ts';
-import { ownAgentRefusal } from '../wiring/own-agent.store.ts';
-import { wire } from '../wiring/wire.verb.ts';
-import { withoutEntry } from '../wiring/wiring.ts';
+import { ownAgentRefusal } from '../factory/wiring/own-agent.store.ts';
+import { wire } from '../factory/wiring/wire.verb.ts';
+import { withoutEntry } from '../factory/wiring/wiring.ts';
 import { treeDir, type ProposalNeeds, type ProposalPlace } from '../propose/current.verb.ts';
 import { verbOf } from '../propose/propose.verb.ts';
 

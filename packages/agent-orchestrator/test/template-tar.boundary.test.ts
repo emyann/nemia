@@ -16,8 +16,8 @@ import type { StoreRoot as Root } from '../src/config/root.store.ts';
 const ROOT = scratch('wf-template-tar-');
 process.env.WF_ROOT = ROOT;
 const { checkedTree, packageSkillNames } = await import('../src/template/template.store.ts');
-const { TemplateDoor } = await import('../src/templates/templates.store.ts');
-const { TemplateSource } = await import('../src/templates/templates.model.ts');
+const { TemplateDoor } = await import('../src/template/door/templates.store.ts');
+const { TemplateSource } = await import('../src/template/door/templates.model.ts');
 const { StoreRoot } = await import('../src/config/root.store.ts');
 const { exportedTemplate, packedTemplate } = await import('../src/template/template.verb.ts');
 

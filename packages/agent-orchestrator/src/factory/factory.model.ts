@@ -8,7 +8,7 @@ import { brandedId, type Id } from '../model/brand.model.ts';
 import type { ErModel } from '../model/er.model.ts';
 import { StepName, WorkflowName } from '../record/record.model.ts';
 import { AgentName } from '../agents/agents.model.ts';
-import { TemplateSource } from '../templates/templates.model.ts';
+import { TemplateSource } from '../template/door/templates.model.ts';
 import { factoryNameRefusal, REVISIONS_POLICIES } from './factory.ts';
 import { HarnessSettings } from '../harness-settings/harness-settings.model.ts';
 

@@ -28,7 +28,7 @@ import {
 import type { CheckoutHold } from '../cap/cap.ts';
 import { assess } from '../tick/assess.ts';
 import { resultSteps } from '../branches/index.ts';
-import { runWords } from '../routed/index.ts';
+import { runWords } from '../route/routed/index.ts';
 import { merges } from '../ending/ending.ts';
 import type { RunStatusWord } from 'objects';
 

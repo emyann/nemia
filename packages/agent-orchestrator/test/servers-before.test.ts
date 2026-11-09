@@ -21,8 +21,8 @@ import { eachTest } from './placed.ts';
 const ROOT = scratch('wf-servers-before-');
 process.env.WF_ROOT = ROOT;
 const { engineOf, runWith } = await import('../src/runtime-client.ts');
-const { serversBefore } = await import('../src/servers/servers.verb.ts');
-const { writeFactoryServers } = await import('../src/servers/servers.store.ts');
+const { serversBefore } = await import('../src/factory/servers/servers.verb.ts');
+const { writeFactoryServers } = await import('../src/factory/servers/servers.store.ts');
 
 const engine = eachTest(testEngine);
 

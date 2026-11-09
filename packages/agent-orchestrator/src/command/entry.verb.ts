@@ -8,7 +8,7 @@ import type { EngineService } from '../runtime-client.ts';
 import type { Conflict, Missing, Refusal } from '../refusal/refusal.ts';
 import type { StatsMemo } from '../stats/stats.verb.ts';
 import type { InformerMemo } from '../rest/informer.verb.ts';
-import type { ScheduleRuns } from '../schedule/listed.store.ts';
+import type { ScheduleRuns } from '../factory/schedule/listed.store.ts';
 import type { PauseRuns } from '../pause/pause.ts';
 import type { SeriesMemo } from '../series/series.ts';
 import type { Filings } from '../summary/reads.verb.ts';

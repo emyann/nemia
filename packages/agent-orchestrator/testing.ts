@@ -9,4 +9,4 @@
 export { testPlace, type TestPlace, type Tree, type World } from './place/memory/index.ts';
 export { agentDoorMemory, MEMORY_AGENTS } from './src/agents/agent-memory.store.ts';
 export { skillDoorMemory } from './src/skills/skill-memory.store.ts';
-export { BuiltinTemplates } from './src/templates/templates.store.ts';
+export { BuiltinTemplates } from './src/template/door/templates.store.ts';

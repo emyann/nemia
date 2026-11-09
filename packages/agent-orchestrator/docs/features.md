@@ -6032,7 +6032,7 @@ Two things changed behind the rename. A step may not be named `run` — its cut 
 ## Shipped: a factory's MCP servers, recorded beside it and named by its agents (2026-10-22)
 
 The card `a-factory-s-mcp-servers-reco`, card 1 of the intent `mcp-servers-configured-from-izq1`. A factory keeps its own MCP servers in
-`factories/<name>/servers.json`, one entry per server, read and written by `src/servers/` and by `nemia factory servers`,
+`factories/<name>/servers.json`, one entry per server, read and written by `src/factory/servers/` and by `nemia factory servers`,
 `nemia factory server add` and `nemia factory server rm`. An agent's `mcp:` name resolves against that record before the checkout's
 `.mcp.json` (`serversOf`, `src/filed/filed.ts`), and a step's session is handed the servers inline, byte-identical to the config any
 sign-in was made against: `mcpServerOf` (`agent-runtime/src/harness/mcp.ts`) is the one producer of those bytes, since the harness files
@@ -6057,7 +6057,7 @@ and the pre-start refusal is Claude Code's only.
 
 Card 2 of the intent `mcp-servers-configured-from-izq1`. `workflows/servers/github.json` ships GitHub's hosted server with its toolsets
 header (`context,repos,issues,pull_requests,users,actions`) and the client id of Nemia's own GitHub App, Nemia Factory; the App's client
-secret ships in `src/servers/clients.ts`, as gh ships its own, and GitHub's push protection let it through. A row of the settings page
+secret ships in `src/factory/servers/clients.ts`, as gh ships its own, and GitHub's push protection let it through. A row of the settings page
 that reads `needs-auth` offers **Sign in**: the api's `POST …/servers/:server/sign-in` asks the engine's `mcpSignIn`, which stores the
 secret with `claude mcp add --scope local` under the engine's root (never `--scope user`, so the owner's own sessions gain nothing) and
 holds a session asked `mcpAuthenticate` for 5 minutes; the board shows the address, polls the state every 2 s, and reads the servers again

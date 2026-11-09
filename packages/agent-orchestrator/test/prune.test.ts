@@ -48,7 +48,7 @@ const {
 } = await import('../src/runner.ts');
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
 const { runStore } = await import('../src/record/files.store.ts');
-const { freeing, freeingMany, judging, judgingMany, PRUNE_A_TURN, sized } = await import('../src/prune/prune.verb.ts');
+const { freeing, freeingMany, judging, judgingMany, PRUNE_A_TURN, sized } = await import('../src/forget/prune/prune.verb.ts');
 const { PlaceService } = await import('../src/place/place.store.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');

@@ -9,7 +9,7 @@
 import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';
 import { tried } from '../runtime-client.ts';
-import { rooted } from '../wiring/wire.verb.ts';
+import { rooted } from '../factory/wiring/wire.verb.ts';
 import { WorkflowDoor, type CarriedFile } from './workflows.store.ts';
 import type { WorkflowDir } from '../folder/folder.model.ts';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
@@ -17,7 +17,7 @@ import type { Command } from '../command/entry.verb.ts';
 import { cliPath, factoryFlag, FROM, versionFlag, writerSpec, yoursOrRefused } from '../yours/yours.ts';
 import { workflowNameRefusal } from '../factory/factory.ts';
 import { readFactories, readFactory, readFactoryAt, templatedTree, templatedTreeAt } from '../factory/factory.store.ts';
-import { factoryFills } from '../rules/rules.store.ts';
+import { factoryFills } from '../factory/rules/rules.store.ts';
 import type { Factory } from '../factory/factory.ts';
 import { readInbox } from '../inbox/inbox.store.ts';
 import { inboxDir, runStore } from '../record/files.store.ts';

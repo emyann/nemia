@@ -19,6 +19,7 @@ import { oneLine } from '../record/record.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import type { Identity } from '../daemon/daemon.ts';
 import { pauseLapsed, RESUME_LINE, type Pause, type PauseHolder } from './pause.ts';
+import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /** The store whose pause this is, read once as the package loads, as `record.store.ts` reads its `HOME`. */
 const ROOT = wfRoot();
@@ -136,9 +137,7 @@ export function cutPause(): Pause {
   if (stands === null) throw new Missing({ message: 'the store is not paused: there is nothing to cut (nemia pause --now puts one).' });
   const pause: Pause = { ...stands.pause, timeoutMs: 0 };
   const file = pauseFile();
-  const hidden = path.join(path.dirname(file), `.${PAUSE_FILE}.${process.pid}`);
-  fs.writeFileSync(hidden, `${JSON.stringify(stands.heldBy ? { ...pause, heldBy: stands.heldBy } : pause)}\n`);
-  fs.renameSync(hidden, file);
+  writeWhole(file, `${JSON.stringify(stands.heldBy ? { ...pause, heldBy: stands.heldBy } : pause)}\n`);
   return pause;
 }
 

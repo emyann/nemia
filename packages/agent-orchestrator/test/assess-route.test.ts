@@ -8,8 +8,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { assess } from '../src/tick/assess.ts';
-import { runWords } from '../src/routed/routed-words.ts';
-import { listedWords, routedRows } from '../src/routed/routed-lines.ts';
+import { runWords } from '../src/route/routed/routed-words.ts';
+import { listedWords, routedRows } from '../src/route/routed/routed-lines.ts';
 import { retryable } from '../src/retry/retry.ts';
 import { ranShape } from '../src/workspace/worktree.store.ts';
 import { workspacePlan } from '../src/workspace/workspace.ts';

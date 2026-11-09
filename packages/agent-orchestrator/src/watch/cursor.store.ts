@@ -10,12 +10,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Invalid } from '../refusal/refusal.ts';
+import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /** What the cursor file holds: one decimal number of bytes, and a newline. */
 const cursorText = (cursor: number): string => `${cursor}\n`;
 
 /** The temp name a write goes to before it is renamed over the file: beside it, so the rename stays on one filesystem. */
-const tempOf = (file: string): string => `${file}.${process.pid}.tmp`;
 
 /**
  * The cursor `file` holds — or undefined where there is no such file, which is a watch's first: it starts where it was told to, and
@@ -42,9 +42,7 @@ export function keepCursor(file: string, cursor: number): void {
   const dir = path.dirname(file);
   if (fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory() !== true)
     throw new Invalid({ message: `${dir} is no directory, so ${file} cannot be written: make it, or name a cursor file in one that is` });
-  const temp = tempOf(file);
-  fs.writeFileSync(temp, cursorText(cursor));
-  fs.renameSync(temp, file);
+  writeWhole(file, cursorText(cursor));
 }
 
 /** Rewrites `file` to 0: what a watch keeps when the feed was cut under it, and it reads on from the start of the feed there is now. */

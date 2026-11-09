@@ -24,7 +24,7 @@ import type { Verdict } from '../check/check.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
 import { roundsDue } from '../round/round.ts';
 import { conditionOf, nodeFate, nodeKind } from '../route/index.ts';
-import { answeredRoute, routedWords } from '../routed/index.ts';
+import { answeredRoute, routedWords } from '../route/routed/index.ts';
 import type { RunStatusWord } from 'objects';
 
 export type Assessment = {

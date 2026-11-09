@@ -12,7 +12,7 @@ import { RunId } from '../record/record.model.ts';
 import type { Labels } from '../labels/labels.ts';
 import { CardName } from '../inbox/inbox.model.ts';
 import { firstPiece } from '../piece/piece.ts';
-import { answeredRoute } from '../routed/index.ts';
+import { answeredRoute } from '../route/routed/index.ts';
 import { conditionOf } from '../route/index.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { found } from '../tick/told.verb.ts';

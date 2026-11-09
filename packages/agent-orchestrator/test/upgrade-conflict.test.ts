@@ -8,8 +8,8 @@
  * the merge read it.
  *
  * What upgrade and resolve refuse beyond this, a clean upgrade, the rules carried and a status lost are
- * `src/upgrade/upgrade.verb.test.ts`; the three-way merge itself, `src/upgrade/merge.test.ts`. `WF_ROOT` is set before `src` is
- * imported, which reads it as it loads.
+ * `src/factory/upgrade/upgrade.verb.test.ts`; the three-way merge itself, `src/factory/upgrade/merge.test.ts`. `WF_ROOT` is set before
+ * `src` is imported, which reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,7 +28,7 @@ const { templated: programsAt } = await import('./templated.ts');
 const { exportTemplate, reconciled, reconciledAt } = programsAt(ROOT);
 const { readFactory } = await import('../src/runner.ts');
 const { appliedDir, digestOf, entriesIn, readStatus, replaceBase, resolutionsFile, statusFile, swapTree, treeDir } =
-  await import('../src/applied/applied.store.ts');
+  await import('../src/factory/applied/applied.store.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
 const { engineOf, runWith } = await import('../src/runtime-client.ts');

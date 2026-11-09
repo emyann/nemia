@@ -14,8 +14,8 @@ import { RunDoor } from '../runs/runs.store.ts';
 import { parseInboxCard } from '../inbox/index.ts';
 import { factoriesDirAt } from '../factory/factory.store.ts';
 import type { Factory, FactoryTemplate } from '../factory/factory.ts';
-import { readRules, rulesAtHome } from '../rules/rules.store.ts';
-import { appliedDirAt, digestOf, entriesIn, stageFolder, treeDirAt, treeWiringOf, type Entry } from '../applied/applied.store.ts';
+import { readRules, rulesAtHome } from '../factory/rules/rules.store.ts';
+import { appliedDirAt, digestOf, entriesIn, stageFolder, treeDirAt, treeWiringOf, type Entry } from '../factory/applied/applied.store.ts';
 import type { Adoption, AdoptedCard } from './adopt.ts';
 
 /** A template rendered with a factory's parameters, as `renderedAt` answers it: its version, its parameters, and its files. */

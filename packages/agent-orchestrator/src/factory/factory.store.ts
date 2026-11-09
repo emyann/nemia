@@ -42,13 +42,14 @@ import {
   type Schedule,
   volumeEntry,
 } from './factory.ts';
-import { firesOf } from '../schedule/schedule.store.ts';
+import { firesOf } from './schedule/schedule.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { firstRefusal, HOME, isDirectory } from '../record/record.store.ts';
-import { readStatusAt, readTreeWiringAt, treeDirAt, writeTreeWiringAt } from '../applied/applied.store.ts';
-import { rewired, wiringRefusal, type WiringChange } from '../wiring/wiring.ts';
-import { ownAgentRefusal } from '../wiring/own-agent.store.ts';
-import { generationWritten } from '../factories/generation.ts';
+import { readStatusAt, readTreeWiringAt, treeDirAt, writeTreeWiringAt } from './applied/applied.store.ts';
+import { rewired, wiringRefusal, type WiringChange } from './wiring/wiring.ts';
+import { ownAgentRefusal } from './wiring/own-agent.store.ts';
+import { generationWritten } from './door/generation.ts';
+import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /** Where the factories of the store `home` are: `<home>/factories`, beside `runs/` and `inbox/`. The default factory has no file there. */
 export const factoriesDirAt = (home: string): string => path.join(home, 'factories');
@@ -448,17 +449,6 @@ const DONE = {
 /** A verb that writes a factory back. */
 type Rewrite = keyof typeof DONE;
 
-/** `content` written whole onto `file`: to a hidden file beside it first, then renamed onto it, so no reader sees half a file. */
-function writeWhole(file: string, content: unknown): void {
-  const hidden = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${randomBytes(4).toString('hex')}`);
-  try {
-    fs.writeFileSync(hidden, `${JSON.stringify(content, null, 2)}\n`);
-    fs.renameSync(hidden, file);
-  } finally {
-    fs.rmSync(hidden, { force: true });
-  }
-}
-
 /** The wiring a factory's tree holds, as its workflows, hires and revisions policy, for telling whether a rewrite changes it. */
 const wiringKey = (wiring: Pick<Factory, 'workflows' | 'hires' | 'revisions'>): string =>
   JSON.stringify([[...wiring.workflows].sort(), wiring.hires, wiring.revisions ?? null]);
@@ -503,7 +493,7 @@ export function rewriteFactoryAt(home: string, factory: Factory, notDone = 'Noth
     }
   }
   const after = fileContentOf(content, written);
-  if (JSON.stringify(after) !== JSON.stringify(content)) writeWhole(read.file, after);
+  if (JSON.stringify(after) !== JSON.stringify(content)) writeWhole(read.file, `${JSON.stringify(after, null, 2)}\n`);
   return changed;
 }
 

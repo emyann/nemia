@@ -13,7 +13,7 @@ import { CHECK_DEADLINE_SECONDS, CHECK_NICENESS, checkEnvOf, type Verdict } from
 import { stepTaskId, tryOf, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import { MOMENTUM, stepStatus, type SpendOf } from '../status/status.ts';
-import { answeredRoute, routeSettled } from '../routed/index.ts';
+import { answeredRoute, routeSettled } from '../route/routed/index.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { artifactsDir } from '../record/record.store.ts';
 import { workflowFilesDir } from '../frozen/frozen.store.ts';

@@ -7,10 +7,10 @@
  * as their own layer and frozen at `nemia start`, edited and cleared, reaching only later runs; the instruction kept in the folder, then
  * in the store, written from a file and cleared. And a table: rules that cannot be told stop a start in their factory.
  *
- * The rest of the area: the refusals of a write of the rules and of `nemia factory rules` as tables in `src/rules/`, and the guards a
- * rules or instruction file is read through, shared, in `src/factory/instruction.store.test.ts`; a factory's removal, which takes both,
- * in `factory-start.test.ts`. The story lives here, beside the layers it proves on a run, since a start is what freezes them. `WF_ROOT`
- * is set before the import, since the store reads it as it loads.
+ * The rest of the area: the refusals of a write of the rules and of `nemia factory rules` as tables in `src/factory/rules/`, and the guards
+ * a rules or instruction file is read through, shared, in `src/factory/instruction.store.test.ts`; a factory's removal, which takes both,
+ * in `factory-start.test.ts`. The story lives here, beside the layers it proves on a run, since a start is what freezes them. `WF_ROOT` is
+ * set before the import, since the store reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -43,7 +43,7 @@ const { main } = await import('../src/cli/main.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 const { WORKFLOWS_STEP } = await import('../src/workflows/workflows.verb.ts');
-const { clearRules, readRules, rulesAt, writeRules } = await import('../src/rules/rules.store.ts');
+const { clearRules, readRules, rulesAt, writeRules } = await import('../src/factory/rules/rules.store.ts');
 const stage = staged({ runWith: runEngine, main, engineOf });
 const { runPlaced } = stage;
 

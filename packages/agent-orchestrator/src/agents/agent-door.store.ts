@@ -215,7 +215,7 @@ export function agentFiles(home: string): AgentLayer {
 /**
  * The Agent door, as the service a program yields: a reference whose default is rooted (`rootedDoor`) — the door over the files at the
  * store's root the program is given, refused `Invalid` where it was given none — so a handler that yields it is run through
- * `rooted(home, verb, program)` (`src/wiring/wire.verb.ts`), and a test gives `agentDoorMemory()` with no root at all.
+ * `rooted(home, verb, program)` (`src/factory/wiring/wire.verb.ts`), and a test gives `agentDoorMemory()` with no root at all.
  */
 export const AgentDoor = Context.Reference<AgentDoorShape>('agent-orchestrator/AgentDoor', {
   defaultValue: () => rootedDoor((root) => agentDoorOver(agentFiles(root)), 'Agent door'),

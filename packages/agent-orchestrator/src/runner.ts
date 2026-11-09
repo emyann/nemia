@@ -279,8 +279,8 @@ export {
 export { parentRecord, stepsOf } from './steps/steps.verb.ts';
 export { inboxDir, keptRuns, runStore } from './record/files.store.ts';
 export { type RunStore, lackedOf } from './record/record.ts';
+export { alive } from './process/alive.store.ts';
 export {
-  alive,
   beat,
   ceilings,
   daemonFile,
@@ -463,25 +463,26 @@ export { continueToken, continuedAfter, listPage, pageOf, type PageAsked, type P
 export { watchChanges, type Versioned } from './list-watch/list-watch.ts';
 export { measuredToNow, runWatchVersion } from './runlist/runlist.ts';
 export { resourcesOf, routeOf, type ApiRoute } from './discovery/discovery.ts';
-export { factoryCommandsOf, factoryList, factoryObject, type ObjectQuery } from './factory-object/factory.verb.ts';
-export { builtinServerList, mcpServerList, mcpServerObject } from './factory-object/mcp-server.verb.ts';
-export { scheduleList, scheduleObject } from './factory-object/schedule.verb.ts';
-export { hireList, hireObject } from './factory-object/hire.verb.ts';
-export { volumeList, volumeObject } from './factory-object/volume.verb.ts';
+export { factoryCommandsOf, factoryList, factoryObject } from './factory/object/factory.verb.ts';
+export type { ObjectQuery } from './object/listed.verb.ts';
+export { builtinServerList, mcpServerList, mcpServerObject } from './factory/object/mcp-server.verb.ts';
+export { scheduleList, scheduleObject } from './factory/object/schedule.verb.ts';
+export { hireList, hireObject } from './factory/object/hire.verb.ts';
+export { volumeList, volumeObject } from './factory/object/volume.verb.ts';
 export { eventKept, eventList, eventObject, type EventQuery } from './event-object/event.verb.ts';
 export { subscriptionList, subscriptionObject } from './subscription-object/subscription.verb.ts';
-export { templateList, templateObject, templateTree, TemplateRenders, type TemplateTreeRendered } from './template-object/template.verb.ts';
+export { templateList, templateObject, templateTree, TemplateRenders, type TemplateTreeRendered } from './template/object/template.verb.ts';
 export { folderRefusal, START } from './start/commands.verb.ts';
 export { INBOX, INBOX_ADD, INBOX_QUEUE } from './inbox/commands.verb.ts';
 export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction, type FactoryInstruction } from './factory/instruction.verb.ts';
-export { FACTORY_RULES, factoryRules, type FactoryRules } from './rules/rules.verb.ts';
+export { FACTORY_RULES, factoryRules, type FactoryRules } from './factory/rules/rules.verb.ts';
 /** A factory's own MCP servers: the entry that lists its record with each server's state, and the name rule the board shares. */
-export { FACTORY_SERVERS } from './servers/servers.verb.ts';
-export { serverNameRefusal, type BuiltinServer } from './servers/index.ts';
-export { BUILTIN_SERVERS, builtinServers } from './servers/servers.store.ts';
+export { FACTORY_SERVERS } from './factory/servers/servers.verb.ts';
+export { serverNameRefusal, type BuiltinServer } from './factory/servers/index.ts';
+export { BUILTIN_SERVERS, builtinServers } from './factory/servers/servers.store.ts';
 /** A factory's server signed in to and out of from the board, through the engine; the builtin secret stays inside the package. */
-export { serverSignIn, serverSignInState, serverSignOut } from './servers/sign-in.verb.ts';
-export type { ServerSignInStarted, ServerSignInState } from './servers/sign-in.verb.ts';
+export { serverSignIn, serverSignInState, serverSignOut } from './factory/servers/sign-in.verb.ts';
+export type { ServerSignInStarted, ServerSignInState } from './factory/servers/sign-in.verb.ts';
 export { AGENTS_CUSTOM } from './custom/custom.verb.ts';
 export { POLICY_PROPOSE } from './auto/auto.verb.ts';
 export type { Command, Ran } from './command/entry.verb.ts';
@@ -489,7 +490,7 @@ export { CLI, CLI_VERBS, commandBreaks, commandLine, generated, helpOf, leftOut,
 export { renamedIn, renamedValues } from './command/command.ts';
 export type { Args, CommandSpec, Flag, Positional, Route, Spec } from './command/command.ts';
 export { forgetRun, runsForgetting } from './forget/forget.verb.ts';
-export { freeingMany, judgingMany, prune, type Listed, type Turned } from './prune/prune.verb.ts';
+export { freeingMany, judgingMany, prune, type Listed, type Turned } from './forget/prune/prune.verb.ts';
 export { decideRun, type Answered, type Decided } from './decide/decide.verb.ts';
 export { freshStatsMemo, statsRun, type StatsMemo, type StatsOptions } from './stats/stats.verb.ts';
 export { seriesMemo, type Health, type SeriesMemo, type SeriesPoint, type SeriesRead } from './series/series.ts';
@@ -518,7 +519,7 @@ export type { GitAsked, JudgeHow, RunHolding, RunStatus, RunToDecide, RunWaiting
 export { dropInformed, Informer, informerLayer, informerMemo, informerRead } from './rest/informer.verb.ts';
 export type { InformerMemo, InformerRead } from './rest/informer.verb.ts';
 export type { Judgement } from './summary/judgement.verb.ts';
-export type { ScheduleRuns } from './schedule/listed.store.ts';
+export type { ScheduleRuns } from './factory/schedule/listed.store.ts';
 export type { PauseRuns } from './pause/pause.ts';
 export { judgedNow, runsSummarized, type RunSummary, type SummaryHow } from './summary/summary.verb.ts';
 /**

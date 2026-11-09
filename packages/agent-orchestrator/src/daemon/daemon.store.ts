@@ -39,6 +39,8 @@ import {
 import { Conflict } from '../refusal/refusal.ts';
 import type { PauseHolder } from '../pause/pause.ts';
 import { ALL_KINDS, DISK_PARTS } from '../disk/disk.ts';
+import { writeWhole } from '../whole-file/whole-file.store.ts';
+import { alive } from '../process/alive.store.ts';
 
 /** The text as JSON, or undefined where it is not: a file half written, or another program's. */
 const jsonOr = (text: string): unknown => {
@@ -106,11 +108,9 @@ export function lastCeilings(): { sessions: number; runs: number } | undefined {
 export function recordCeilings(c: { sessions: number; runs: number }): void {
   const last = lastCeilings();
   if (last && last.sessions === c.sessions && last.runs === c.runs) return;
-  const hidden = path.join(HOME, `.tick.json.${process.pid}`);
   try {
     fs.mkdirSync(HOME, { recursive: true });
-    fs.writeFileSync(hidden, JSON.stringify({ sessions: c.sessions, runs: c.runs }, null, 2));
-    fs.renameSync(hidden, tickFile());
+    writeWhole(tickFile(), JSON.stringify({ sessions: c.sessions, runs: c.runs }, null, 2));
   } catch {}
 }
 
@@ -176,11 +176,9 @@ export function lastPassCost(): PassCostRead | undefined {
  */
 export function recordPassCost(cost: PassCost): number {
   const t0 = performance.now();
-  const hidden = path.join(HOME, `.tick-stats.json.${process.pid}`);
   try {
     fs.mkdirSync(HOME, { recursive: true });
-    fs.writeFileSync(hidden, JSON.stringify(cost, null, 2));
-    fs.renameSync(hidden, statsFile());
+    writeWhole(statsFile(), JSON.stringify(cost, null, 2));
   } catch {}
   return performance.now() - t0;
 }
@@ -260,16 +258,6 @@ function readDaemonText(): string | undefined {
 function readDaemon(): DaemonRead | undefined {
   const text = readDaemonText();
   return text === undefined ? undefined : { text, file: parseDaemonFile(text) };
-}
-
-/** Whether `pid` is a live process on this host: a signal 0 delivered, or refused for want of permission, which still means it is there. */
-export function alive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    return (err as NodeJS.ErrnoException).code === 'EPERM';
-  }
 }
 
 /**
@@ -352,9 +340,7 @@ export const daemonStanding = (now: Instant = instantNow()): DaemonStanding => s
 
 /** The file written whole, through a hidden file renamed over it, so a reader never reads half of it. */
 function writeDaemon(file: DaemonFile): void {
-  const hidden = path.join(HOME, `.${DAEMON_FILE}.${process.pid}`);
-  fs.writeFileSync(hidden, daemonText(file));
-  fs.renameSync(hidden, daemonFile());
+  writeWhole(daemonFile(), daemonText(file));
 }
 
 /** What `takeStore` took: the file this daemon now holds the store by, and where the store stood before it. */
@@ -601,11 +587,9 @@ export function recordRecentPass(cost: PassCost, keep = RECENT_KEPT, also: AlsoK
   const t0 = performance.now();
   const text = recentText();
   const kept = [...(text === undefined ? [] : parseRecentPasses(text).passes), recentOf(cost, also)].slice(-keep);
-  const hidden = path.join(HOME, `.tick-recent.json.${process.pid}`);
   try {
     fs.mkdirSync(HOME, { recursive: true });
-    fs.writeFileSync(hidden, JSON.stringify(kept));
-    fs.renameSync(hidden, recentFile());
+    writeWhole(recentFile(), JSON.stringify(kept));
   } catch {}
   return { ms: performance.now() - t0, kept };
 }

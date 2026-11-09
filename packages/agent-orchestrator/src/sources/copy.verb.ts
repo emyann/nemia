@@ -9,7 +9,7 @@ import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import { rooted } from '../wiring/wire.verb.ts';
+import { rooted } from '../factory/wiring/wire.verb.ts';
 import { Conflict, Invalid } from '../refusal/refusal.ts';
 import { writerSpec, writerText, yourSkillsDir, yoursOf } from '../yours/yours.ts';
 import { AgentDoor } from '../agents/agent-door.store.ts';

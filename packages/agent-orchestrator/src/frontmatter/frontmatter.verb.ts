@@ -14,7 +14,6 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { randomBytes } from 'node:crypto';
 import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import type { Args, Spec } from '../command/command.ts';
@@ -25,6 +24,7 @@ import { AGENTS_FOLDER, SKILLS_FOLDER, splitFrontmatter, WorkflowError } from '.
 import { fenceMoved, frontmatterKey } from '../former/former.ts';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
 import { commentTails, rewriteFormer } from './frontmatter.ts';
+import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /** The folders a walk does not go into: a repository's history and a package's dependencies. */
 const SKIPPED = new Set(['.git', 'node_modules']);
@@ -43,7 +43,7 @@ export type Rewritten = {
 
 /**
  * The folders a rewrite covers given none, under the store `home`: its workflows and inbox, and each factory's tree and applied base, as
- * `applied/applied.store.ts` lays them out (`treeDir`, `appliedDir`). Only those there.
+ * `factory/applied/applied.store.ts` lays them out (`treeDir`, `appliedDir`). Only those there.
  */
 export function storeFolders(home: string): string[] {
   const factories = path.join(home, 'factories');
@@ -73,17 +73,11 @@ export function markdownIn(dir: string): string[] {
     });
 }
 
-/** `text` written over `file` through a file beside it renamed onto it, the file's mode kept: no reader sees half of it. */
+/** `text` written whole over `file` (`writeWhole`), the file's mode put back on the file that replaced it. */
 function replaceFile(file: string, text: string): void {
   const mode = fs.statSync(file).mode & 0o777;
-  const beside = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${randomBytes(4).toString('hex')}`);
-  try {
-    fs.writeFileSync(beside, text);
-    fs.chmodSync(beside, mode);
-    fs.renameSync(beside, file);
-  } finally {
-    fs.rmSync(beside, { force: true });
-  }
+  writeWhole(file, text);
+  fs.chmodSync(file, mode);
 }
 
 /** The lines of `text`'s frontmatter, already YAML, that YAML ends at ` #`, as `file:line`; none for a frontmatter that does not read. */

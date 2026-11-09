@@ -9,7 +9,7 @@ import { Run as RunObject } from 'objects';
 import { EngineService, asked, tried } from '../runtime-client.ts';
 import type { PlaceService } from '../place/place.store.ts';
 import type { Refusal } from '../refusal/refusal.ts';
-import { rooted } from '../wiring/wire.verb.ts';
+import { rooted } from '../factory/wiring/wire.verb.ts';
 import type { StepCloseout, StepTry } from '../resource/tries.verb.ts';
 import { runObject, stepCloseout, stepTold, stepTries, stepTry, type TryCloseout } from '../object/run.verb.ts';
 import { runStore } from '../record/files.store.ts';

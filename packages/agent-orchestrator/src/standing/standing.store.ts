@@ -12,6 +12,7 @@ import { firstRefusal, HOME } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { StandingSchema } from '../place/place.store.ts';
 import type { Standing } from '../place/place.ts';
+import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /**
  * One repository, place and base branch as a pass read where its branches stand: the place's answer, or why there is none — the place
@@ -78,8 +79,6 @@ export function readStanding(): StandingFile | undefined {
  */
 export function writeStanding(at: string, places: readonly StoodRead[]): void {
   const file: StandingFile = { v: 1, at, places };
-  const hidden = path.join(HOME, `.standing.json.${process.pid}`);
   fs.mkdirSync(HOME, { recursive: true });
-  fs.writeFileSync(hidden, JSON.stringify(file));
-  fs.renameSync(hidden, standingFile());
+  writeWhole(standingFile(), JSON.stringify(file));
 }

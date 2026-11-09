@@ -67,14 +67,17 @@ test('HARNESS_CHOICES ⊆ what configRefusal takes, each harness offered the fen
       }
     },
   );
-  await t.test('a harness fenced by its permission mode takes tool lists, a context window and its own flags but those owned; one fenced by sandbox none', () => {
-    for (const [harness, knobs] of Object.entries(HARNESS_KNOBS)) {
-      const moded = knobs.fence.key === 'permissionMode';
-      assert.equal(knobs.fence.lists.length > 0, moded, harness);
-      assert.equal(knobs.context, moded, harness);
-      assert.equal('owned' in knobs.flags, moded, harness);
-    }
-  });
+  await t.test(
+    'a harness fenced by its permission mode takes tool lists, a context window and its own flags but those owned; one fenced by sandbox none',
+    () => {
+      for (const [harness, knobs] of Object.entries(HARNESS_KNOBS)) {
+        const moded = knobs.fence.key === 'permissionMode';
+        assert.equal(knobs.fence.lists.length > 0, moded, harness);
+        assert.equal(knobs.context, moded, harness);
+        assert.equal('owned' in knobs.flags, moded, harness);
+      }
+    },
+  );
 });
 
 test('REFUSED: the checks over HARNESS_CHOICES, each made to refuse by a planted table', async (t) => {

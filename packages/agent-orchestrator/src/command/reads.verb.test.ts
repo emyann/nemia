@@ -22,7 +22,10 @@ test('nemia stats prints JSON with --json, one line with --line, and its tiles a
   for (const fact of ['14 days', 'runs finished', 'landed']) assert.ok(line[0]?.includes(fact), `the recap says ${fact}`);
   const words = STATS.print?.(s, {}) ?? [];
   assert.ok(words.length > 1, words.join('\n'));
-  assert.ok(words.some((l) => l.includes('no try has ended')), 'an empty store says nothing has ended');
+  assert.ok(
+    words.some((l) => l.includes('no try has ended')),
+    'an empty store says nothing has ended',
+  );
   assert.ok(!words.some((l) => l.includes('runs finished')), 'and not the recap line');
 });
 

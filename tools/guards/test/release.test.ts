@@ -34,7 +34,7 @@ test('the next version bumps the last release and is never below 1.0.0', () => {
   assert.equal(nextVersion(undefined, 'patch'), '1.0.0', 'no release yet: the first');
 });
 
-test('each label has a colour and a description GitHub takes (each one\'s bump is held by the bump above)', () => {
+test("each label has a colour and a description GitHub takes (each one's bump is held by the bump above)", () => {
   for (const label of LABELS) {
     assert.match(label.color, /^[0-9a-f]{6}$/, `${label.name}'s colour is six hex digits, as GitHub takes it`);
     assert.ok(label.description.length > 0 && label.description.length <= 100, `${label.name}'s description fits GitHub's 100`);

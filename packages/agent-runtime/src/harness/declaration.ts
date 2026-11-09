@@ -190,5 +190,5 @@ export const ownArgsOf = (
   const trust = declaration?.asks?.trustRepository;
   const repo = trust === undefined ? undefined : asked.trustRepository?.();
   const bridge = asked.remoteControl === true ? declaration?.asks?.remoteControl : undefined;
-  return { ...(bridge ?? {}), ...(trust === undefined || repo === undefined ? {} : trust(repo)) };
+  return { ...bridge, ...(trust === undefined || repo === undefined ? {} : trust(repo)) };
 };

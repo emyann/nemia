@@ -5,9 +5,10 @@
  * other. A factory's parts read it through `factoryFiled`: its spec and its listing, off one read of the store's factories, no status, and
  * no run. A factory's `metadata.generation` is its file's count of changes to its spec (`generationOf`); its status the controller's
  * `status.json` (its conditions, each with the time it last moved, the generation that pass observed, the version applied and an upgrade
- * waiting) and its places a harness does not trust, read live; its `resourceVersion` a digest of its encoded spec and status, so a live
- * read that changes moves it with no file written. And `factoryCommands`, the lines a person types for one factory, built off the
- * command table as the board read them before.
+ * waiting) and its places a harness does not trust, read live; its `resourceVersion` a digest of its encoded spec and status, and of its
+ * rules and its instruction, the sub-resources read beside it (`partsOf`), so a live read that changes moves it with no file written, and
+ * an edit of its rules or its instruction moves it as a write of its spec does — a proposal read before either goes stale. And
+ * `factoryCommands`, the lines a person types for one factory, built off the command table as the board read them before.
  *
  * Every kind of a factory's parts is listed the one way (`objectsListed`): selected by its labels first — no kind here stores a label,
  * so only a negative selector (`key!=value`, `key notin (…)`) keeps any — sorted by name, then cut into a page (`pageOf`), so
@@ -28,7 +29,9 @@ import { readStatusAt } from '../applied/applied.store.ts';
 import { commandLine } from '../command/command.ts';
 import { COMMANDS } from '../command/commands.verb.ts';
 import { generationOf } from '../factories/generation.ts';
-import { DEFAULT_FACTORY, type FactoryListing } from '../factory/factory.ts';
+import { DEFAULT_FACTORY, instructionAt, type FactoryListing } from '../factory/factory.ts';
+import { instructionFileAt, readInstructionAt, type InstructionRead } from '../factory/instruction.store.ts';
+import { readRules, rulesAtHome, type RulesRead } from '../rules/rules.store.ts';
 import { readFactoriesAt } from '../factory/factory.store.ts';
 import { tried } from '../runtime-client.ts';
 import { untrustedPlaces } from '../trust/trust.verb.ts';
@@ -57,9 +60,15 @@ const byText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 /** Objects in the order a list answers them and a token reads them: by name, as `<` compares. */
 const byName = (a: Named, b: Named): number => (a.metadata.name < b.metadata.name ? -1 : a.metadata.name > b.metadata.name ? 1 : 0);
 
-/** The `resourceVersion` of an object: a digest of its spec and status as they encode. */
-export const versionOf = (spec: unknown, status: unknown): string =>
-  createHash('sha256').update(JSON.stringify({ spec, status })).digest('hex').slice(0, 16);
+/**
+ * The `resourceVersion` of an object: a digest of its spec and status as they encode, and of the sub-resources read beside them, `parts`,
+ * where it has any (a Factory's rules and instruction). Without `parts` the digest is the spec's and the status's alone.
+ */
+export const versionOf = (spec: unknown, status: unknown, parts?: unknown): string =>
+  createHash('sha256')
+    .update(JSON.stringify(parts === undefined ? { spec, status } : { spec, status, parts }))
+    .digest('hex')
+    .slice(0, 16);
 
 /** When a file was made, or the epoch where it cannot be read: a part's `creationTimestamp`. */
 export const bornAt = (file: string): string => {
@@ -129,11 +138,38 @@ const harnessSettingsOf = (settings: Readonly<Record<string, unknown>> | undefin
   return held.length ? { harnessSettings: Object.fromEntries(held.map(([k, v]) => [k, { ...v }])) } : {};
 };
 
-/** A factory's object, of its spec and status and when it was filed: its `resourceVersion` their digest. */
-const objectOf = (meta: Omit<ObjectMeta, 'resourceVersion'>, spec: FactoryObject['spec'], status: FactoryStatus): FactoryObject => ({
+/** A factory's sub-resources as they read, each its words and why it does not read: its rules and its instruction. */
+type FactoryParts = { readonly rules: RulesRead; readonly instruction: InstructionRead };
+
+/** A read that found nothing: no words, and nothing that does not read. */
+const isBlank = (read: { words: string | null; error: string | null }): boolean => read.words === null && read.error === null;
+
+/**
+ * The rules and the instruction of the factory of `listing`, read at the store `home`, as its version digests them: none where it keeps
+ * neither, so a factory with no sub-resource keeps the version of its spec and status alone. Where the instruction's place cannot be said,
+ * its error is read.
+ */
+const partsOf = (listing: Exclude<FactoryListing, { error: string }>, home: string): FactoryParts | undefined => {
+  const rules = readRules(rulesAtHome(home, listing));
+  let instruction: InstructionRead;
+  try {
+    instruction = readInstructionAt(instructionAt(listing, instructionFileAt(home, listing.name)));
+  } catch (err) {
+    instruction = { words: null, error: err instanceof Error ? err.message : String(err) };
+  }
+  return isBlank(rules) && isBlank(instruction) ? undefined : { rules, instruction };
+};
+
+/** A factory's object, of its spec and status and when it was filed: its `resourceVersion` their digest, and its `parts`' where given. */
+const objectOf = (
+  meta: Omit<ObjectMeta, 'resourceVersion'>,
+  spec: FactoryObject['spec'],
+  status: FactoryStatus,
+  parts?: FactoryParts,
+): FactoryObject => ({
   apiVersion: API_VERSION,
   kind: 'Factory',
-  metadata: { ...meta, resourceVersion: versionOf(spec, status) },
+  metadata: { ...meta, resourceVersion: versionOf(spec, status, parts) },
   spec,
   status,
 });
@@ -153,7 +189,8 @@ const ownLevel = (home: string, name: string): { level: Level } | { error: strin
 
 /**
  * The object of one factory `listing` of the store, read at the store `home`: a file that reads as its spec, its status the controller's
- * file and its places not trusted among `listed`'s; one that does not read with no spec but its name's, its error saying why.
+ * file and its places not trusted among `listed`'s, its version moved by its rules and its instruction too (`partsOf`); one that does not
+ * read with no spec but its name's, its error saying why.
  */
 export const factoryObjectOf = (listing: FactoryListing, listed: FactoryListed, home: string): FactoryObject => {
   const { metadata, spec } = filedOf(listing, home);
@@ -170,7 +207,7 @@ export const factoryObjectOf = (listing: FactoryListing, listed: FactoryListed, 
     untrusted: untrustedOf(listed.untrusted, listing.name),
     ...('error' in level ? { error: level.error } : {}),
   };
-  return objectOf(metadata, spec, status);
+  return objectOf(metadata, spec, status, partsOf(listing, home));
 };
 
 /**

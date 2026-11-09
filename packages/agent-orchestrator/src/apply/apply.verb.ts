@@ -6,7 +6,7 @@
  * what was written, and no pass applies it again. Carries nothing between calls.
  */
 import { Effect } from 'effect';
-import type { Proposal, ProposedObject } from 'objects';
+import { RESOURCE_PLURALS, type Proposal, type ProposedObject } from 'objects';
 import type { ApplyAction } from '../../contracts/proposal-apply.contract.ts';
 import type { Refusal } from '../refusal/refusal.ts';
 import { proposalApproval } from '../approval/index.ts';
@@ -45,13 +45,29 @@ const withStatus = (proposal: Proposal, status: Partial<Proposal['status']>): Pr
   status: { ...proposal.status, ...status },
 });
 
-/** What the action other than an apply makes of `proposal`: its phase, and a sentence saying why. */
-const moved = (proposal: Proposal, action: Exclude<ApplyAction, 'apply' | 'wait'>): Proposal => {
-  if (action === 'stale')
+/** The line that reads `object` of `factory` again: `nemia get <resource> <name>`, in the factory unless it is the Factory itself. */
+const readAgain = (factory: string, object: ProposedObject): string =>
+  object.kind === 'Factory'
+    ? `nemia get ${RESOURCE_PLURALS.Factory} ${object.metadata.name}`
+    : `nemia get ${RESOURCE_PLURALS[object.kind]} ${object.metadata.name} -n ${factory}`;
+
+/**
+ * What the action other than an apply makes of `proposal` of `factory`: its phase, and a sentence saying why — for a stale one, each
+ * object of `changed` that moved since it was read, and the line that reads it again.
+ */
+const moved = (
+  proposal: Proposal,
+  factory: string,
+  changed: readonly ProposedObject[],
+  action: Exclude<ApplyAction, 'apply' | 'wait'>,
+): Proposal => {
+  if (action === 'stale') {
+    const named = changed.map((o) => `${o.kind} ${o.metadata.name} (${readAgain(factory, o)})`).join(', ');
     return withStatus(proposal, {
       phase: 'stale',
-      message: 'an object it carries changed since it was read: read the objects again and propose anew.',
+      message: `${named || 'an object it carries'} changed since it was read: read it again and propose from what it holds now.`,
     });
+  }
   if (action === 'drop')
     return withStatus(proposal, { phase: 'dropped', message: 'its run was called off before it ended well, so it is not applied.' });
   const { approvedBy: _lapsed, ...status } = proposal.status;
@@ -88,7 +104,15 @@ export const applyProgram = Effect.fn('applyProgram')(function* (
     stillApproved: yield* stillApproved(place, factory, proposal),
   });
   if (action === 'wait') return proposal;
-  if (action !== 'apply') return yield* door.write(moved(proposal, action));
+  if (action !== 'apply')
+    return yield* door.write(
+      moved(
+        proposal,
+        factory,
+        objects.filter((o) => !o.current).map((o) => o.object),
+        action,
+      ),
+    );
   const before: ProposedObject[] = objects.flatMap(({ object, now }) =>
     now.version === null
       ? []

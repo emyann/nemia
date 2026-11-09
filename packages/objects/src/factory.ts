@@ -6,7 +6,9 @@
  * harness does not trust now, and why its file does not read. Its `metadata.generation` counts the changes to its spec.
  *
  * Beside it, its sub-resources: its rules (`FactoryRules`), its instruction (`FactoryInstruction`) and the lines a person types for it
- * (`FactoryCommands`), with the bodies their writes are sent. Plain Schemas of JSON, as every object of this package is.
+ * (`FactoryCommands`), with the bodies their writes are sent. The rules and the instruction share the Factory's `resourceVersion`, as a
+ * Kubernetes subresource shares its object's: a write of either moves it, as a change of its spec or its status does. Plain Schemas of
+ * JSON, as every object of this package is.
  */
 import { Schema } from 'effect';
 import { API_VERSION, ObjectMeta, listOf } from './meta.ts';

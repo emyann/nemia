@@ -13,7 +13,7 @@ import { DEFAULT_HARNESS, remoteNameOf } from '../harness/harness.ts';
 import { asked, EngineService, tried, type TaskView } from '../runtime-client.ts';
 import { rootGiven } from '../config/root.store.ts';
 import { daemonEntry } from '../service/service.store.ts';
-import { VERSION as PACKAGE_VERSION } from '../version/version.ts';
+import { VERSION as PACKAGE_VERSION } from '../version/version.store.ts';
 import { sessionCounts, sessionRanOn, versionLines, type Current, type Running, type SessionCount } from './release.ts';
 import { currentRelease, realReleasesDir, runningAt } from './release.store.ts';
 

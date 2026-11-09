@@ -11,7 +11,7 @@
  * one before a run can start, so only a folder or record edited by hand could bring one here.
  */
 
-export type StepEdges = { name: string; after: readonly string[] };
+type StepEdges = { name: string; after: readonly string[] };
 export type Point = { x: number; y: number };
 
 /**
@@ -30,8 +30,6 @@ export function stepsOf(names: readonly string[], edges: ReadonlyArray<{ from: s
 export const COLUMN_WIDTH = 300;
 /** Room for one node and the gap below it, within a column. */
 export const ROW_HEIGHT = 150;
-/** How wide a step's node is drawn (`w-56`): the rest of its column is the arrow to the next. */
-export const NODE_WIDTH = 224;
 
 /**
  * The columns, left first, each top to bottom. An `after` naming anything but one of the run's own steps draws nothing. Each step is

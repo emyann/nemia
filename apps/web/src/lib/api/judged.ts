@@ -4,7 +4,7 @@
  * (`runRowOf`). A type a read of the board's own decodes has its schema beside it, which `get` decodes the api's answer with.
  */
 import { Schema } from 'effect';
-import { RUN_STATUSES, type RunStatusWord } from 'objects';
+import type { RunStatusWord } from 'objects';
 import { decodes } from './decodes.ts';
 
 /** A list of strings, as a decoded answer holds it: mutable, as the plain types say. */
@@ -21,9 +21,6 @@ export type { PlaceKind } from 'objects';
  * alone stops is `awaiting approval`, at its gates, or `waiting`, on anything else.
  */
 export type RunStatus = RunStatusWord;
-
-/** Decodes a `RunStatus`. */
-export const RunStatusSchema = decodes<RunStatus>()(Schema.Literals(RUN_STATUSES));
 
 /**
  * Mirrors `RunToDecide` in agent-orchestrator: what a person has to decide about a run's result, the fifth reason a run waits on

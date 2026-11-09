@@ -97,7 +97,7 @@ export const blockOf = (factory: Factory, runs: readonly FactoryRun[]): FactoryB
 };
 
 /** What a factory's block reads of its light answer: the three counts. */
-export type OpenBlock = Pick<OpenRuns, 'counts'>;
+type OpenBlock = Pick<OpenRuns, 'counts'>;
 
 /**
  * `factory` as its bar shows it, from `open`, the light answer asked for that factory alone: the runs it holds are the three counts
@@ -263,7 +263,7 @@ export const hirePlaceOf = (search: Record<string, unknown>): Partial<HirePlace>
 };
 
 /** What follows an agent written from a step's New agent: hired, and back to the step; or the hire's refusal, to say on the creator. */
-export type HiredOnCreate = { hired: true } | { hired: false; why: string };
+type HiredOnCreate = { hired: true } | { hired: false; why: string };
 
 /**
  * Hires `agent`, just written, into `place` with `hire`, the board's hire: `hired` once the api takes it, else `why` not, in its words —

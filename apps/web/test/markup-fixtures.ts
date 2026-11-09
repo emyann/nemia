@@ -168,6 +168,16 @@ export function runOf(
 export const unescaped = (text: string) =>
   text.replaceAll('&amp;', '&').replaceAll('&quot;', '"').replaceAll('&#x27;', "'").replaceAll('&lt;', '<').replaceAll('&gt;', '>');
 
+/**
+ * The class tokens of the first tag in `html` that carries `mark` (a data mark as the markup writes it, `data-unread="dev"`), and none
+ * where no tag does: a test reads one class that carries a meaning as a token, never the whole string of classes beside it.
+ */
+export const classesAt = (html: string, mark: string): string[] =>
+  new RegExp(`<[^>]*${mark}[^>]*>`)
+    .exec(html)?.[0]
+    .match(/\bclass="([^"]*)"/)?.[1]
+    .split(/\s+/) ?? [];
+
 /** A markup's text, tags taken for separators: each run of text between two tags, trimmed, and none of the empty ones. */
 export const textsOf = (html: string): string[] =>
   html

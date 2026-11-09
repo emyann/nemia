@@ -491,7 +491,7 @@
     {
       "files": ["apps/web/src/components/factory/FactoryCanvas.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 249, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 248, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

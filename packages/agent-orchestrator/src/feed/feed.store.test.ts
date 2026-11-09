@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { debtBreaks as heldTo, seamUses as usesOf, sourcesUnder } from 'test-kit/debt';
+import { debtBreaks, seamUses, sourcesUnder, type DebtBreak } from 'test-kit/debt';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { act, done, doorFrom, walksOn } from '../../test/door-walks.ts';
@@ -77,34 +77,27 @@ const SEAM = ['watchFeed', 'recordFeed', 'recordDaemonLine', 'readFeed', 'readFe
 /** The door's own files: where the seam is defined, not a debt. */
 const OWN = ['src/feed/feed.store.ts', 'src/feed/memory.store.ts'];
 
-/** Every file of `src` but the tests and the door's own, by its path from the package. */
-const sourcesOfSrc = (): Record<string, string> => sourcesUnder(PKG, 'src', OWN);
-
 /** The seam's calls in each file, comment lines left out: what `FEED_DOOR_DEBT` counts. */
-const seamUses = (sources: Record<string, string>): Map<string, number> =>
-  usesOf(sources, new RegExp(`(?<![\\w$.])(?:${SEAM.join('|')})\\s*\\(`, 'g'));
+const SEAM_CALL = new RegExp(`(?<![\\w$.])(?:${SEAM.join('|')})\\s*\\(`, 'g');
 
-/** Why the uses of `sources` break the baseline `debt`: a file it does not name, a count grown, a count fallen. */
-function debtBreaks(sources: Record<string, string>, debt: Readonly<Record<string, number>>): string[] {
-  return heldTo(seamUses(sources), debt).map(({ file, uses: n, owed, kind }) =>
-    kind === 'grown'
-      ? `${file} calls the feed's module spellings ${n} time(s) where test/feed-door.baseline.ts names ${owed}: yield FeedDoor (src/feed/feed.store.ts) instead`
-      : kind === 'fallen'
-        ? `${file} calls the feed's module spellings ${n} time(s): lower its count in test/feed-door.baseline.ts to ${n}, which only shrinks`
-        : `${file} calls the feed's module spellings no more: take its line out of test/feed-door.baseline.ts`,
-  );
-}
+/** What a break of the baseline says: a file it does not name or a count grown, a count fallen, a file with none left. */
+const inWords = ({ file, uses: n, owed, kind }: DebtBreak): string =>
+  kind === 'grown'
+    ? `${file} calls the feed's module spellings ${n} time(s) where test/feed-door.baseline.ts names ${owed}: yield FeedDoor (src/feed/feed.store.ts) instead`
+    : kind === 'fallen'
+      ? `${file} calls the feed's module spellings ${n} time(s): lower its count in test/feed-door.baseline.ts to ${n}, which only shrinks`
+      : `${file} calls the feed's module spellings no more: take its line out of test/feed-door.baseline.ts`;
 
 test("no file of src calls the feed's module spellings but as test/feed-door.baseline.ts counts it, and the count only shrinks", async () => {
   const { FEED_DOOR_DEBT } = await import('../../test/feed-door.baseline.ts');
-  assert.deepEqual(debtBreaks(sourcesOfSrc(), FEED_DOOR_DEBT), []);
+  assert.deepEqual(debtBreaks(seamUses(sourcesUnder(PKG, 'src', OWN), SEAM_CALL), FEED_DOOR_DEBT).map(inWords), []);
 });
 
 test('REFUSED: a converted file that calls a spelling again, and a count the baseline holds above what is left', async () => {
   const { FEED_DOOR_DEBT } = await import('../../test/feed-door.baseline.ts');
-  const sources = sourcesOfSrc();
+  const sources = sourcesUnder(PKG, 'src', OWN);
   const again = { ...sources, 'src/feed/feed.verb.ts': `${sources['src/feed/feed.verb.ts']}\nconst x = feedSize();\n` };
-  assert.equal(debtBreaks(again, FEED_DOOR_DEBT).length, 1);
+  assert.equal(debtBreaks(seamUses(again, SEAM_CALL), FEED_DOOR_DEBT).length, 1);
   const [first] = Object.keys(FEED_DOOR_DEBT);
-  assert.equal(debtBreaks(sources, { ...FEED_DOOR_DEBT, [first]: (FEED_DOOR_DEBT[first] ?? 0) + 1 }).length, 1);
+  assert.equal(debtBreaks(seamUses(sources, SEAM_CALL), { ...FEED_DOOR_DEBT, [first]: (FEED_DOOR_DEBT[first] ?? 0) + 1 }).length, 1);
 });

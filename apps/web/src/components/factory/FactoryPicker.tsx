@@ -14,7 +14,7 @@ import { pickTo } from '../nav/nav';
 const ALL = 0;
 
 /** A factory the picker offers: its name, and what the api says of it, none for a name the api lists no factory by. */
-export type PickerFactory = { name: string; factory?: Factory };
+type PickerFactory = { name: string; factory?: Factory };
 
 /**
  * The factories the picker offers after All factories, from what the api answered: those Home lists (`factoriesShown`), in its order, the

@@ -4,7 +4,8 @@ import { FINISHED_SIZE, runLinesQuery, workflowNameOf, type FinishedPage } from 
 import { factoryOf } from '@/lib/factories';
 import { titleOf } from '@/lib/factory';
 import { ink } from '@/lib/meaning';
-import { agoWords, endedWords } from '@/lib/runWords';
+import { agoWords } from '@/lib/runWords';
+import { ENDED } from '@/lib/words';
 import { instantWhole } from '@/lib/instant';
 import { cn } from '@/components/ui/ds/utils';
 import { LabelTags } from '../field/Labels';
@@ -34,7 +35,7 @@ const Ago = ({ at, asOf }: { at: string; asOf: Date }) => (
  * (`runLinesQuery`), which the route's loader read.
  */
 function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: Date }) {
-  const ended = endedWords(run.outcome);
+  const ended = ENDED[run.outcome];
   const workflowPage = useQuery(runLinesQuery(run.id)).data?.workflowPage ?? null;
   return (
     <Row id={run.id} data-run={run.id} data-outcome={run.outcome} className={FRAMED_ROW}>

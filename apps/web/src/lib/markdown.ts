@@ -41,7 +41,7 @@ export function languageOf(className: unknown): CodeLanguage {
 }
 
 /** A node of the markdown's tree (hast), as far as a code block goes: its text, and an element's name and class. */
-export type TextNode = {
+type TextNode = {
   type: string;
   value?: string;
   tagName?: string;
@@ -50,7 +50,7 @@ export type TextNode = {
 };
 
 /** Every piece of text under `node`, in order: a code block's code. */
-export const textOf = (node: TextNode | undefined): string =>
+const textOf = (node: TextNode | undefined): string =>
   !node ? '' : node.type === 'text' ? (node.value ?? '') : (node.children ?? []).map(textOf).join('');
 
 /**

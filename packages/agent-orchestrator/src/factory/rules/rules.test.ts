@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { names } from '../../../test/assessed.ts';
-import { FACTORY_RULES_FILE, factoryRulesRefusal, rulesFile } from './rules.ts';
+import { factoryRulesRefusal, rulesFile } from './rules.ts';
 
 const BOM = String.fromCharCode(0xfeff);
 
@@ -30,7 +30,6 @@ test('factoryRulesRefusal and rulesFile: rules are RULES.md beside the factory, 
   for (const text of ['Be kind.\n', 'Be kind.\n\n---\n\nmodel: opus\n', '--- a dash to open\n', '', `${BOM}Be kind.\n`])
     await t.test(`taken: ${JSON.stringify(text)}`, () => assert.equal(factoryRulesRefusal('/f/RULES.md', text), undefined));
   await t.test("the file is RULES.md in the store's folder for the factory", () => {
-    assert.equal(FACTORY_RULES_FILE, 'RULES.md');
     assert.equal(rulesFile({}, '/store/factories/pipao'), path.join('/store/factories/pipao', 'RULES.md'));
   });
   await t.test('and in its tree, for a factory made from a template', () =>

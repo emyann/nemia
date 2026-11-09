@@ -5,7 +5,7 @@
  */
 import { Option, Result, Schema, SchemaIssue } from 'effect';
 
-/** A read the api answered with an error: its words, and its status, which is how a run gone from the store is told apart (`runGone`). */
+/** A read the api answered with an error: its words, and its status, which is how a run gone from the store is told apart (`readGone`). */
 export class ReadRefusal extends Error {
   readonly status: number;
   constructor(message: string, status: number) {
@@ -28,7 +28,7 @@ export class UnreadAnswer extends Error {
 
 /**
  * A write the api answered with an error: its words, and its status. Apart from `ReadRefusal`, so a write's 404 is never taken for a run
- * gone from the store (`runGone`).
+ * gone from the store (`readGone`).
  */
 export class WriteRefusal extends Error {
   readonly status: number;

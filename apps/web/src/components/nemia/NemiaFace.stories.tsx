@@ -14,7 +14,7 @@ const AROUND = { display: 'inline-flex', padding: 24, background: 'var(--backgro
 const SHEET: [string, Presence][] = [
   ['Up', UP],
   ['Answering', { ...UP, answering: true }],
-  ['Waits on you', { ...UP, waitsOnYou: 2 }],
+  ['Waits on you', { ...UP, runsWaiting: 2 }],
   ['Unread', { ...UP, unread: 1 }],
   ['Down', { ...UP, down: true }],
   ['Not sent', { ...UP, notSent: true }],
@@ -36,7 +36,7 @@ export const Idle = docked(UP);
 export const Thinking = docked({ ...UP, answering: true });
 
 /** Something waits on the person: surprised. */
-export const Surprised = docked({ ...UP, waitsOnYou: 2 });
+export const Surprised = docked({ ...UP, runsWaiting: 2 });
 
 /** An answer unread: happy. */
 export const Happy = docked({ ...UP, unread: 1 });
@@ -48,7 +48,7 @@ export const Sleepy = docked({ ...UP, down: true });
 export const Unsure = docked({ ...UP, notSent: true });
 
 /** Every presence at once: the first in the owner's order wins, surprised. */
-export const SeveralAtOnce = docked({ waitsOnYou: 2, notSent: true, down: true, answering: true, unread: 1 });
+export const SeveralAtOnce = docked({ runsWaiting: 2, asksWaiting: 1, notSent: true, down: true, answering: true, unread: 1 });
 
 /** At a panel header's size, 34 pixels. */
 export const InTheHeader: StoryObj = {

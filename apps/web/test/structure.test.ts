@@ -415,7 +415,7 @@ const waitedBreaks = (text: string): string[] => {
 test('REFUSED: a waiting card whose figure reads the sum of the run’s waits on a person', () => {
   const card = sourceTexts().get('src/components/run/WaitingCard.tsx')!;
   assert.deepEqual(waitedBreaks(card), []);
-  const summed = card.replace(/\{\s*waited\s*\}/, '{sinceShort(run.clock.personMs)}');
+  const summed = card.replace(/\{\s*waited\s*\}/, "{durationWords(run.clock.personMs, 'minute')}");
   assert.notEqual(summed, card, 'the figure is planted over');
   assert.equal(waitedBreaks(summed).length, 2);
   assert.equal(waitedBreaks(card.replace(/presentWait\(run, asOf\)/, 'null')).length, 1);

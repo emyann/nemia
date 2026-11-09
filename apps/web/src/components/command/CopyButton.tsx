@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
 import { Check as Done, Copy } from 'lucide-react';
+import { useCopy } from '@/lib/useCopy';
 
 /**
  * Copies a line to the clipboard, and says so for a moment — or that it could not, so a person selects the line instead. `what` names
@@ -7,19 +7,7 @@ import { Check as Done, Copy } from 'lucide-react';
  * where the page has no clipboard, it says it could not copy rather than throwing.
  */
 export function CopyButton({ text, what = 'the command' }: { text: string; what?: string }) {
-  const [said, setSaid] = useState<'copy' | 'copied' | 'failed'>('copy');
-  useEffect(() => {
-    if (said === 'copy') return;
-    const timer = setTimeout(() => setSaid('copy'), 1_500);
-    return () => clearTimeout(timer);
-  }, [said]);
-  const copy = () => {
-    const written = navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject(new Error('no clipboard'));
-    written.then(
-      () => setSaid('copied'),
-      () => setSaid('failed'),
-    );
-  };
+  const { said, copy } = useCopy(text);
   return (
     <button
       type="button"

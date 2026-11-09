@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
-import { ChevronRight } from 'lucide-react';
+import { ArrowUpRight, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { decisionQuery, type RunSummary, type RunWaiting } from '@/lib/api';
@@ -28,7 +28,7 @@ import { StepRail, StepTiles, type TilesRead } from '../step/StepRail';
  * `onToggle` opens or closes the card, and `onStep` shows a step of it in the bar. `reads` is a line per run it reads as context, its id
  * and title (`readsLines`).
  */
-export type RunNodeData = {
+type RunNodeData = {
   run: RunSummary;
   reads: string[];
   finished: boolean;
@@ -255,7 +255,8 @@ function lookOf(run: RunSummary, finished: boolean, inspected: boolean): Look {
 
 /**
  * What a run started `--after` runs waits on, in the CLI `ls`'s word (`waiting.word`), with what the CLI's `decide` says on hover. Yours
- * when only a person moves it; on a ghost's card (`ghost`), each run it waits on a link to that run's page.
+ * when only a person moves it; on a ghost's card (`ghost`), after the word an arrow to each run it waits on, named by its label, so the
+ * word names each run once.
  */
 function WaitingLine({ waiting, ghost }: { waiting: RunWaiting; ghost: boolean }) {
   return (
@@ -264,26 +265,20 @@ function WaitingLine({ waiting, ghost }: { waiting: RunWaiting; ghost: boolean }
       title={waiting.advice}
       className={`mt-1 line-clamp-2 font-mono text-body-small break-words ${waiting.waitingOnYou ? 'text-yours' : 'text-muted-foreground'}`}
     >
-      {ghost ? (
-        <>
-          waiting on{' '}
-          {waiting.runs.map(({ run }, i) => (
-            <span key={run}>
-              {i > 0 && ', '}
-              <RouteLink
-                to="/runs/$runId"
-                params={{ runId: run }}
-                data-waits-on={run}
-                className="nodrag text-foreground/80 hover:underline"
-              >
-                {run}
-              </RouteLink>
-            </span>
-          ))}
-        </>
-      ) : (
-        waiting.word
-      )}
+      {waiting.word}
+      {ghost &&
+        waiting.runs.map(({ run }) => (
+          <RouteLink
+            key={run}
+            to="/runs/$runId"
+            params={{ runId: run }}
+            data-waits-on={run}
+            aria-label={`Open ${run}`}
+            className="nodrag ml-1 inline-flex align-middle text-foreground/80 hover:text-foreground"
+          >
+            <ArrowUpRight aria-hidden className="size-3.5" />
+          </RouteLink>
+        ))}
     </p>
   );
 }

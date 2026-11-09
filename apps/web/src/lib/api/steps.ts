@@ -3,10 +3,11 @@
  * (`/api/runs/:id/steps/:step/path`), both in apps/api/src/steps/steps.ts, each type with the schema `get` decodes it with.
  */
 import { keepPreviousData, queryOptions } from '@tanstack/react-query';
-import { Option, Schema } from 'effect';
+import { Schema } from 'effect';
 import { SAID_AFTER, type SaidAfter } from 'objects';
 import { decodes } from './decodes.ts';
 import { get } from './read.ts';
+import { UnreadableSchema, type StreamUnreadable } from './stream.ts';
 
 /**
  * Mirrors `TranscriptEvent` in agent-runtime, as the api passes it on: one thing said in a session's conversation, its `kind` one of
@@ -83,30 +84,17 @@ export type StreamData = {
   partial: StreamPartial;
   moved: { taskId: string };
   following: { streamed: boolean };
-  unreadable: { error: string; retrying: boolean };
+  unreadable: StreamUnreadable;
 };
 
-/** Decodes the data of each event of `StreamData`, by its name. */
-const STREAM_SCHEMAS: { readonly [K in keyof StreamData]: Schema.Decoder<StreamData[K]> } = {
+/** Decodes the data of each event of `StreamData`, by its name, for `streamDataOf` (`stream.ts`). */
+export const STEP_STREAM_SCHEMAS: { readonly [K in keyof StreamData]: Schema.Decoder<StreamData[K]> } = {
   transcript: TranscriptEventSchema,
   partial: decodes<StreamPartial>()(Schema.Struct({ key: Schema.String, delta: Schema.String, last: Schema.Boolean })),
   moved: decodes<StreamData['moved']>()(Schema.Struct({ taskId: Schema.String })),
   following: decodes<StreamData['following']>()(Schema.Struct({ streamed: Schema.Boolean })),
-  unreadable: decodes<StreamData['unreadable']>()(Schema.Struct({ error: Schema.String, retrying: Schema.Boolean })),
+  unreadable: UnreadableSchema,
 };
-
-/**
- * The data `data` of a stream event named `event`, decoded by its schema: undefined for data that is no JSON or not of the event's shape.
- */
-export function streamDataOf<K extends keyof StreamData>(event: K, data: string): StreamData[K] | undefined {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(data);
-  } catch {
-    return undefined;
-  }
-  return Option.getOrUndefined(Schema.decodeUnknownOption(STREAM_SCHEMAS[event])(parsed));
-}
 
 /** Where a step's conversation is read, and — with `/stream` after it — followed as server-sent events. */
 export const transcriptPath = (runId: string, step: string) =>

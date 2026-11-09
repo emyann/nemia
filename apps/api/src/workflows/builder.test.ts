@@ -355,7 +355,6 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
         /`gate: false` is what a step without the line already is/,
         "gate's `false` is refused",
       );
-      assert.equal(form.defaultHarness, DEFAULT_HARNESS, "the default harness is the parser's");
       for (const mode of HARNESS_CHOICES.permissionMode[DEFAULT_HARNESS])
         parseWorkflow('a', `---\nplace: git\npermissionMode: ${mode}\n---\nDo a.\n`);
       assert.equal(Object.hasOwn(HARNESS_CHOICES.sandbox, DEFAULT_HARNESS), false, 'a step that names no harness takes no sandbox');

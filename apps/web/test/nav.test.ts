@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { destinationHref, destinationOf, DESTINATIONS, pickedOf, pickTo, SETTINGS_TABS, tabsOf } from '../src/components/nav/nav.ts';
+import { destinationHref, destinationOf, DESTINATIONS, pickedOf, pickTo, tabsOf } from '../src/components/nav/nav.ts';
 
 /** The name of the destination the page at `path` lights, none for none. */
 const lit = (path: string) => destinationOf(path)?.label;
@@ -46,21 +46,20 @@ test("DESTINATIONS, destinationOf, SETTINGS_TABS and tabsOf: the rail's destinat
         assert.equal(lit(path), undefined, `refused: ${path} is no destination's page`);
     },
   );
-  await t.test("Settings has two tabs, Settings then Capabilities, each its own page's address", () => {
-    assert.deepEqual(SETTINGS_TABS, [
-      { to: '/settings', label: 'Settings' },
-      { to: '/capabilities', label: 'Capabilities' },
-    ]);
-  });
   await t.test(
-    "a tab's page has the tabs of Settings, in their order, and any other page has none, a path that only begins with a tab's name included",
+    "a tab's page has the tabs of Settings, in their order, each its own page's address, and any other page has none, a path that only begins with a tab's name included",
     () => {
-      for (const path of ['/settings', '/capabilities'])
+      for (const path of ['/settings', '/capabilities']) {
         assert.deepEqual(
           tabsOf(path)?.map((tab) => tab.label),
           ['Settings', 'Capabilities'],
           path,
         );
+        assert.ok(
+          tabsOf(path)?.some((tab) => tab.to === path),
+          `${path} is a tab's own address`,
+        );
+      }
       for (const path of [
         '/machines',
         '/machinesx',

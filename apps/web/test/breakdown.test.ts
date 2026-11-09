@@ -17,7 +17,8 @@ import {
   tokensSaid,
   type Breakdown,
 } from '../src/lib/breakdown.ts';
-import { presentWait, sinceWords } from '../src/lib/runWords.ts';
+import { durationWords } from '../src/lib/duration.ts';
+import { presentWait } from '../src/lib/runWords.ts';
 import { detail, runList, runObject, step, summary, waitingRun } from './run-fixtures.ts';
 
 const [S, M] = [1_000, 60_000];
@@ -158,7 +159,7 @@ test('clockBreakdown, costBreakdown, tokensBreakdown: each breakdown adds up to 
     async () => {
       const run = await decoded();
       const clock = clockBreakdown(run.clock!, '17m', '13:11');
-      assert.equal(sinceWords(run.clock!.wallMs), '27m', 'the tile');
+      assert.equal(durationWords(run.clock!.wallMs, 'minute'), '27m', 'the tile');
       assert.deepEqual(
         clock.rows.map((row) => row.said),
         ['17m', '7m', '2m', '1m', 'under 1m'],
@@ -199,6 +200,16 @@ test('clockBreakdown, costBreakdown, tokensBreakdown: each breakdown adds up to 
     );
     assert.equal(clock.head, '5m', 'the head is verbatim the words the tile or the cell shows, never a figure of its own');
     assert.equal(clock.foot, 'Wall time 6m, from Tue 13:32.', 'the rows add up to the foot, which the head is a part of');
+    const long = clockBreakdown(
+      { wallMs: 90 * M, sessionsMs: 65 * M, checksMs: 0, personMs: 25 * M, slotMs: 0, restMs: 0 },
+      '1h 05m',
+      'Tue 13:32',
+    );
+    assert.deepEqual(
+      [long.rows[0].said, long.foot],
+      ['1h 05m', 'Wall time 1h 30m, from Tue 13:32.'],
+      'past an hour, a row and the foot say their minutes as every duration is said',
+    );
     const cost = costBreakdown(run.cost!, run.stepCosts!);
     assert.equal(cost.head, '$5.63 so far, by step');
     assert.deepEqual(cost.rows[2], { what: 'land', amount: 0, said: 'none measured', none: true });

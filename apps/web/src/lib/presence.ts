@@ -4,11 +4,13 @@
  */
 
 /**
- * What holds of her now: how many things wait on the person, whether a message of theirs was not sent, whether her session is down,
- * whether she is answering, and how many of her answers are unread. None holding is up, at rest.
+ * What holds of her now: how many runs wait on the person (`runsWaiting`, the run list's own count, never added to), how many asks of
+ * her own they have not answered (`asksWaiting`), whether a message of theirs was not sent, whether her session is down, whether she is
+ * answering, and how many of her answers are unread. None holding is up, at rest.
  */
 export type Presence = {
-  waitsOnYou: number;
+  runsWaiting: number;
+  asksWaiting: number;
   notSent: boolean;
   down: boolean;
   answering: boolean;
@@ -19,13 +21,13 @@ export type Presence = {
 export type FaceExpression = 'surprised' | 'unsure' | 'sleepy' | 'thinking' | 'happy' | 'idle';
 
 /** Up, at rest: nothing waits, nothing failed to go, she is neither down, answering, nor holding an unread answer. */
-export const UP: Presence = { waitsOnYou: 0, notSent: false, down: false, answering: false, unread: 0 };
+export const UP: Presence = { runsWaiting: 0, asksWaiting: 0, notSent: false, down: false, answering: false, unread: 0 };
 
 /** A hue a cue is drawn in: what waits on a person, a session at work, what failed, or none, at rest. */
-export type CueHue = 'yours' | 'alive' | 'failure' | 'none';
+type CueHue = 'yours' | 'alive' | 'failure' | 'none';
 
 /** A cue: its hue and its words. */
-export type Cue = { hue: CueHue; words: string };
+type Cue = { hue: CueHue; words: string };
 
 /** A presence that may hold: whether it holds, the face it gives, its cue, and the sentence her docked face says it in. */
 type Fact = {
@@ -36,15 +38,22 @@ type Fact = {
 };
 
 /**
- * The presences in the owner's order, the first that holds wins the face: waits on you, then a message not sent, then down, then
- * answering, then unread.
+ * The presences in the owner's order, the first that holds wins the face: runs that wait on you, then her own asks unanswered — both
+ * what waits on the person, each said apart so no number mixes the two — then a message not sent, then down, then answering, then
+ * unread.
  */
-export const FACE_ORDER: readonly Fact[] = [
+const FACE_ORDER: readonly Fact[] = [
   {
-    holds: (p) => p.waitsOnYou > 0,
+    holds: (p) => p.runsWaiting > 0,
     face: 'surprised',
-    cue: (p) => ({ hue: 'yours', words: p.waitsOnYou === 1 ? '1 waits on you' : `${p.waitsOnYou} wait on you` }),
-    says: (p) => (p.waitsOnYou === 1 ? '1 waits on you.' : `${p.waitsOnYou} wait on you.`),
+    cue: (p) => ({ hue: 'yours', words: p.runsWaiting === 1 ? '1 waits on you' : `${p.runsWaiting} wait on you` }),
+    says: (p) => (p.runsWaiting === 1 ? '1 waits on you.' : `${p.runsWaiting} wait on you.`),
+  },
+  {
+    holds: (p) => p.asksWaiting > 0,
+    face: 'surprised',
+    cue: (p) => ({ hue: 'yours', words: p.asksWaiting === 1 ? '1 ask of hers' : `${p.asksWaiting} asks of hers` }),
+    says: (p) => (p.asksWaiting === 1 ? '1 ask of hers waits on you.' : `${p.asksWaiting} asks of hers wait on you.`),
   },
   {
     holds: (p) => p.notSent,

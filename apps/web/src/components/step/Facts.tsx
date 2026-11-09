@@ -5,6 +5,7 @@ import { stepAnchor } from '../../lib/asks';
 import { contextText } from '../../lib/builder';
 import { costText, pastBudget } from '../../lib/cost';
 import { collisionFacts, type GateFact } from '../../lib/gate';
+import { durationWords } from '../../lib/duration';
 import { cn } from '../../lib/utils';
 import { RouteLink } from '../agent/AgentParts';
 import { CopyButton } from '../command/CopyButton';
@@ -123,7 +124,7 @@ export const specRows = (spec: StepSpecView, filed: StepFiledView | null = null)
         ['resume', code(spec.resume)],
         [fenceLabel(spec), modeRow(spec.sandbox ?? spec.fence, filed)],
         ['tools', ranWith(toolsWord(spec.tools), filed, (f) => toolsWord(f.tools))],
-        ['deadline', ranWith(secondsWord(spec.deadlineSeconds), filed, (f) => secondsWord(f.deadlineSeconds), 'no limit')],
+        ['deadline', ranWith(deadlineWord(spec.deadlineSeconds), filed, (f) => deadlineWord(f.deadlineSeconds), 'no limit')],
         ...(filed?.bridge
           ? ([['reach', <BridgeWords key="reach" bridge={filed.bridge} data-step-bridge />]] satisfies Array<[string, ReactNode]>)
           : []),
@@ -163,7 +164,7 @@ function remoteRows(spec: StepSpecView, filed: StepFiledView | null): Array<[str
     ['after', spec.after.length ? code(spec.after.join(', ')) : null],
     ...(spec.workspace ? ([['workspace', code(spec.workspace)]] satisfies Array<[string, ReactNode]>) : []),
     ...placeRows(spec),
-    ['deadline', ranWith(secondsWord(spec.deadlineSeconds), filed, (f) => secondsWord(f.deadlineSeconds), 'no limit')],
+    ['deadline', ranWith(deadlineWord(spec.deadlineSeconds), filed, (f) => deadlineWord(f.deadlineSeconds), 'no limit')],
   ];
 }
 
@@ -173,7 +174,8 @@ export const fenceLabel = (spec: Pick<StepSpecView, 'harness' | 'sandbox'>): str
 
 const tokensWord = (tokens: number | null | undefined) => (tokens === null || tokens === undefined ? null : contextText(tokens));
 const toolsWord = (tools: readonly string[] | null) => (tools === null ? null : tools.join(', ') || 'none');
-const secondsWord = (seconds: number | null) => (seconds === null ? null : `${seconds} s`);
+/** A deadline in seconds as every duration is said, to the second (`durationWords`): `45s`, `1h 05m`. */
+const deadlineWord = (seconds: number | null) => (seconds === null ? null : durationWords(seconds * 1000, 'second'));
 
 /**
  * One field of what a step runs with: the workflow's word, the engine's where the workflow has none — `unset` where the engine was

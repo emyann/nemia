@@ -8,8 +8,8 @@ export { ReadRefusal, UnreadAnswer, WriteRefusal } from './api/read.ts';
 export type * from './api/judged.ts';
 export * from './api/runs.ts';
 export {
-  retryRun,
-  runGone,
+  retryUnlessGone,
+  readGone,
   runLinesQuery,
   runObjectQuery,
   stepToldQuery,

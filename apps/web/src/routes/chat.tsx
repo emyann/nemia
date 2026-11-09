@@ -7,21 +7,22 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ChatPanel } from '@/components/nemia/chat/ChatPanel';
 import { ScanLines } from '@/components/look';
-import { levelQuery, openRunsQuery } from '@/lib/api';
+import { frameRunsQuery } from '@/components/nav/nav';
+import { levelQuery } from '@/lib/api';
 import { presenceOf } from '@/lib/chatFollowing';
 import { atWork } from '@/lib/footer';
 import { useNemiaChat } from '@/lib/useNemiaChat';
 import { useNow } from '@/lib/useNow';
 
-export const Route = createFileRoute('/chat')({ component: ChatPage, staticData: { fullBleed: true } });
+export const Route = createFileRoute('/chat')({ component: ChatPage, staticData: { fullBleed: true, ownsChat: true } });
 
 /** The chat, the whole page: her panel over the look's scan lines, as the board's other full-bleed pages stand. */
 function ChatPage() {
   const chat = useNemiaChat();
   const nemia = useQuery(levelQuery).data;
-  const open = useQuery(openRunsQuery()).data;
+  const open = useQuery(frameRunsQuery(Route.fullPath, {})).data;
   const now = new Date(useNow(30_000));
-  const presence = presenceOf(chat.state.presence, chat.kept !== null);
+  const presence = presenceOf(chat.state.presence, chat.kept !== null, open?.counts.waiting ?? 0, chat.state.events);
 
   return (
     <ScanLines className="flex min-h-0 flex-1 flex-col">

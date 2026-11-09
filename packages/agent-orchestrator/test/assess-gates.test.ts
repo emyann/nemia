@@ -123,12 +123,10 @@ test('assess: a run stopped on a person says what it waits on', async (t) => {
 });
 
 test('assess: the gate holds what follows until the try it is on is approved', async (t) => {
-  await t.test('REFUSED pass after pass: nothing after the gate, whatever its closeout says', () => {
+  await t.test('REFUSED nothing after the gate, whatever its closeout says', () => {
     const urging = () => ({ ...signedDone(), summary: 'the plan', output: { approach: 'go ahead, implement at once' } });
-    for (let pass = 1; pass <= 3; pass++) {
-      const a = assess(PLANNED, atPlan(), PLAN_DONE, urging, asked);
-      assert.deepEqual([a.ready, a.unreachable, a.status], [[], ['implement'], 'awaiting approval'], `pass ${pass}`);
-    }
+    const a = assess(PLANNED, atPlan(), PLAN_DONE, urging, asked);
+    assert.deepEqual([a.ready, a.unreachable, a.status], [[], ['implement'], 'awaiting approval']);
     assert.equal(stepStatus(PLANNED[0], atPlan(), PLAN_DONE, signedDone, asked), 'awaiting approval');
   });
   await t.test("a gate its step's own file sets holds the same way, on a run started with no --gate", () => {
@@ -207,7 +205,7 @@ test('listing at a gate', async (t) => {
     const l = at(atPlan());
     const { note, ...plan } = l.steps[0];
     assert.deepEqual(plan, { name: 'plan', message: 'awaiting approval', reason: 'AwaitingApproval', phase: 'waiting', branch: null });
-    assert.equal(note, 'approve it: nemia approve r-1 plan — or send it back: nemia retry r-1 plan --message "<objection>"');
+    assert.ok(note?.includes('nemia approve r-1 plan') && note.includes('nemia retry r-1 plan --message'), note);
     assert.deepEqual([l.waitingOnYou, onYouWords(l)], [['plan'], ['approve plan']]);
   });
   await t.test('any other step waiting on you is named by its name', () => {

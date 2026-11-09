@@ -20,6 +20,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
+import { importsIn } from 'test-kit/imports';
 import { TEAM } from './team.ts';
 import { staged, story } from './story.ts';
 import { promised } from './promised.ts';
@@ -242,10 +243,10 @@ test("at Manual, with no Nemia, a due schedule starts all the same: the schedule
   await runWith(e, tickRun());
   assert.deepEqual(scheduledDues(), [MONDAY]);
   const source = fs.readFileSync(path.join(import.meta.dirname, '..', 'src', 'factory', 'schedule', 'schedule.verb.ts'), 'utf8');
-  const imports = [...source.matchAll(/^import[\s\S]*?from\s*'([^']+)';/gm)].map((m) => m[1]);
+  const imports = importsIn(source).map((i) => i.spec);
   assert.ok(imports.includes('../../start/start.verb.ts'), 'the imports are read');
   assert.deepEqual(
-    imports.filter((from) => /\/level\/|\/nemia\/|keep/.test(from ?? '')),
+    imports.filter((from) => /\/level\/|\/nemia\/|keep/.test(from)),
     [],
   );
 });

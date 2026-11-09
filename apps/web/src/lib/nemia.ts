@@ -5,6 +5,7 @@
  */
 import type { Level } from 'objects';
 import type { FactoryLevel, NemiaLevel, Spend } from './api/nemia.ts';
+import { dollars } from './money.ts';
 import type { Presence } from './presence.ts';
 import { clockWord } from './quota.ts';
 
@@ -13,7 +14,7 @@ import { clockWord } from './quota.ts';
  * the keeper stops; waiting on the person to trust her folder, not filed until they do; not filed yet; filed and starting, not yet
  * reachable; up, reached; and stopped from outside, not filed again.
  */
-export type SessionKind = 'off' | 'leaving' | 'untrusted' | 'not-filed' | 'starting' | 'up' | 'stopped';
+type SessionKind = 'off' | 'leaving' | 'untrusted' | 'not-filed' | 'starting' | 'up' | 'stopped';
 
 /** What each state is said as, a sentence each. */
 const SESSION_WORDS: Record<SessionKind, string> = {
@@ -75,9 +76,6 @@ export const freshLevel = (level: Level): Level => (level === 'manual' ? 'semi-a
 export const raisesOver = (level: Level): readonly Level[] =>
   level === 'manual' ? ['semi-auto', 'auto'] : level === 'semi-auto' ? ['auto'] : [];
 
-/** A cost in dollars, as the package's `dollars` says it: three figures under a cent, cents above. */
-const dollars = (usd: number): string => `$${usd > 0 && usd < 0.01 ? Number(usd.toPrecision(3)) : usd.toFixed(2)}`;
-
 /** What her sessions cost, as her level's own line says it: each counted as it ends, her open one not yet. */
 export const spendWords = ({ usd, measured, unmeasured }: Spend): string =>
   `Spent ${dollars(usd)} over ${measured} session${measured === 1 ? '' : 's'} ended${unmeasured ? `, ${unmeasured} not measured` : ''}; her open one counts once it ends.`;
@@ -117,7 +115,7 @@ export function composerWords(presence: Presence, asking = false): string {
 }
 
 /** What the composer's one button does: send what is written, or end the turn she is answering. */
-export type ComposerButton = 'send' | 'stop';
+type ComposerButton = 'send' | 'stop';
 
 /**
  * What the composer's button is, by where she is: the stop while she answers, since a turn of hers can be ended without ending her

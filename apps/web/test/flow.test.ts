@@ -260,7 +260,7 @@ test("railOf and windowOf: a run's rail of pills and arrows, folded around the l
       assert.deepEqual(read(flow), [['design'], ['implement'], ['review'], ['land']]);
       for (const pill of flow.pills)
         assert.ok(pill.width - PILL_EDGES >= 'implement'.length * CHAR_WIDTH, `${pill.label}: ${pill.width} wide holds no nine letters`);
-      const rail = fs.readFileSync(path.join(import.meta.dirname, '..', 'src', 'components', 'StepRail.tsx'), 'utf8');
+      const rail = fs.readFileSync(path.join(import.meta.dirname, '..', 'src', 'components', 'step', 'StepRail.tsx'), 'utf8');
       assert.match(
         rail,
         /rounded-full\s+px-1\s+font-mono\s+text-body-small/,

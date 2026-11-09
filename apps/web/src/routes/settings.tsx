@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { NemiaSettings } from '@/components/NemiaSettings';
+import { NemiaSettings } from '@/components/nemia/NemiaSettings';
 import { policyQuery, levelQuery, nemiaMemoryQuery } from '@/lib/api';
 
 /**

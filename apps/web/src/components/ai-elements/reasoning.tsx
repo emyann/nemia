@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { BrainIcon, ChevronDownIcon } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
 import { createContext, memo, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Markdown } from '@/components/Markdown';
+import { Markdown } from '@/components/markdown/Markdown';
 import { Shimmer } from './shimmer';
 
 type ReasoningContextValue = {

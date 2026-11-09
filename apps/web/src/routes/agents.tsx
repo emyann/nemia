@@ -2,9 +2,9 @@ import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { Plus } from 'lucide-react';
 import { LinkButton } from '@/components/ui/button';
-import { AgentCard } from '../components/AgentCard';
-import { SkillLink } from '../components/AgentParts';
-import { routeLink } from '../components/routeLink';
+import { AgentCard } from '../components/agent/AgentCard';
+import { SkillLink } from '../components/agent/AgentParts';
+import { routeLink } from '../components/nav/routeLink';
 import { agentsQuery, skillsQuery, storeQuery, type LibraryAgent, type SkillPlace } from '../lib/api';
 import { PLACE_LABELS } from '../lib/skills';
 

@@ -2,7 +2,7 @@ import { Button as AriaButton, Link as AriaLink, type ButtonProps, type LinkProp
 import { filled } from '@/lib/meaning';
 import { cn } from '@/components/ui/ds/utils';
 import { cutRing, cutShape } from './cut';
-import { routeLink } from '../routeLink';
+import { routeLink } from '../nav/routeLink';
 
 /** How long the button's cut is along each side, in pixels. */
 const CUT = 12;

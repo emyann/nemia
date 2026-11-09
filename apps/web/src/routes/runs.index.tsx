@@ -1,10 +1,10 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
-import { FinishedTable } from '../components/FinishedTable';
-import { FlightTable } from '../components/FlightTable';
-import { WaitingCard } from '../components/WaitingCard';
-import { SelectorField } from '../components/SelectorField';
+import { FinishedTable } from '../components/run/FinishedTable';
+import { FlightTable } from '../components/run/FlightTable';
+import { WaitingCard } from '../components/run/WaitingCard';
+import { SelectorField } from '../components/field/SelectorField';
 import { finishedRunsQuery, labelSearch, openRunsQuery, runLinesQuery } from '../lib/api';
 import { ReadRefusal } from '../lib/api/read';
 import { finishedSearch, trailOf, trailSearch } from '../lib/finished';

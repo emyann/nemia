@@ -15,7 +15,7 @@ import { Marker, MarkerContent } from '@/components/ui/marker';
 import { CutButton, cutShape } from '@/components/look';
 import { mark, type ConversationItem } from '@/lib/conversation';
 import { timeOfDay } from '@/lib/timeOfDay';
-import { Markdown } from '../Markdown';
+import { Markdown } from '../markdown/Markdown';
 
 /** What was said, as the family's `said` item holds it. */
 type Spoken = Extract<ConversationItem, { kind: 'said' }>;

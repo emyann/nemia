@@ -1,10 +1,10 @@
 /**
- * The rail and the picked factory (src/components/nav.ts), two tables: the destinations and the tabs of Settings each page lights, and
+ * The rail and the picked factory (src/components/nav/nav.ts), two tables: the destinations and the tabs of Settings each page lights, and
  * the factory picked, read from the address and carried by a link or a pick.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { destinationHref, destinationOf, DESTINATIONS, pickedOf, pickTo, SETTINGS_TABS, tabsOf } from '../src/components/nav.ts';
+import { destinationHref, destinationOf, DESTINATIONS, pickedOf, pickTo, SETTINGS_TABS, tabsOf } from '../src/components/nav/nav.ts';
 
 /** The name of the destination the page at `path` lights, none for none. */
 const lit = (path: string) => destinationOf(path)?.label;

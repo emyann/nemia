@@ -1,7 +1,7 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { FactoriesCanvas } from '@/components/FactoriesCanvas';
-import { OverviewStrip } from '@/components/OverviewStrip';
+import { FactoriesCanvas } from '@/components/factory/FactoriesCanvas';
+import { OverviewStrip } from '@/components/frame/OverviewStrip';
 import { ceilingsQuery, daemonQuery, factoriesQuery, quotaQuery, runsQuery } from '@/lib/api';
 import { factoryBlocks, factorySearch } from '@/lib/factories';
 

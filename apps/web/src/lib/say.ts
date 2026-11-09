@@ -4,7 +4,7 @@
  *
  * The facts are the api's — the step's word, its task, the run's cancellation, and `said`, off the engine's journal — which are the
  * package's and the engine's. What is said where there is nobody to say anything to is the board's: the composer is not drawn at all,
- * and the stopped band carries these words, which point at where a person can act instead (`components/session/SessionBand.tsx`).
+ * and the stopped band carries these words, which point at where a person can act instead (`components/step/session/SessionBand.tsx`).
  */
 import type { Said } from './api';
 import type { RunView, StepView } from './runView.ts';

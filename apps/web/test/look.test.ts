@@ -64,16 +64,16 @@ test("the look's door: every part with its stories, no import past the door, and
     assert.deepEqual(storyless(shipped), [], 'every shipped part has its stories');
   });
   await t.test('REFUSED: an import past the door of the look', () => {
-    assert.deepEqual(pastDoor('components/WaitingCard.tsx', "import { CutFrame } from './look/CutFrame';"), ['./look/CutFrame']);
+    assert.deepEqual(pastDoor('components/run/WaitingCard.tsx', "import { CutFrame } from '../look/CutFrame';"), ['../look/CutFrame']);
     assert.deepEqual(pastDoor('routes/runs.index.tsx', "import { Plate } from '@/components/look/Plate';"), ['@/components/look/Plate']);
     assert.deepEqual(pastDoor('routes/x.tsx', "const cut = await import('../components/look/cut.ts');"), ['../components/look/cut.ts']);
     assert.deepEqual(pastDoor('routes/x.tsx', "import { Plate } from '../components/look';\nimport { cn } from '@/lib/look/cut';"), []);
     assert.deepEqual(pastDoor('components/x.tsx', "import { Plate } from './look/index';"), []);
     assert.deepEqual(pastDoor('components/look/CutButton.tsx', "import { cutRing } from './cut';"), [], 'a part reaches its siblings');
     const files = filesUnder(SRC).filter((file) => /\.tsx?$/.test(file) && !file.startsWith('components/ui/ds/'));
-    assert.ok(files.includes('components/WaitingCard.tsx'), 'the source is read');
+    assert.ok(files.includes('components/run/WaitingCard.tsx'), 'the source is read');
     const through = files.filter((file) =>
-      /from '(?:\.\/look|\.\.\/components\/look|@\/components\/look)'/.test(fs.readFileSync(path.join(SRC, file), 'utf8')),
+      /from '(?:\.\.?\/look|\.\.\/components\/look|@\/components\/look)'/.test(fs.readFileSync(path.join(SRC, file), 'utf8')),
     );
     assert.ok(through.length >= 4, `the pages take the look through its door: ${through.join(', ')}`);
     for (const file of files)
@@ -182,8 +182,8 @@ test("the cut and the grain in the board's source: no ring a clip breaks, the co
         .map((file) => [file, fs.readFileSync(path.join(SRC, file), 'utf8')]),
     );
     assert.ok('styles.css' in sources && 'components/look/Sticker.tsx' in sources, 'the source is read');
-    assert.deepEqual(tilesOutside({ ...sources, 'components/WaitingCard.tsx': "url('data:image/svg+xml,<feTurbulence/>')" }), [
-      'components/WaitingCard.tsx',
+    assert.deepEqual(tilesOutside({ ...sources, 'components/run/WaitingCard.tsx': "url('data:image/svg+xml,<feTurbulence/>')" }), [
+      'components/run/WaitingCard.tsx',
     ]);
     assert.deepEqual(tilesOutside(sources), [], 'no page and no part writes a tile of its own');
     const grain = sources[GRAIN] ?? '';

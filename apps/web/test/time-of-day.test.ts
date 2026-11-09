@@ -272,22 +272,34 @@ test("REFUSED, refusals: a second writer of an hour, a formatter, date-fns or a 
     assert.equal(wrong.length, 0, wrong.join('\n'));
     const back = refusals({
       ...files,
-      'src/components/Facts.tsx': `${files['src/components/Facts.tsx']}\nnew Date(iso).toLocaleString();\n`,
+      'src/components/step/Facts.tsx': `${files['src/components/step/Facts.tsx']}\nnew Date(iso).toLocaleString();\n`,
     });
     assert.equal(back.length, 1, back.join('\n'));
-    assert.match(back[0] ?? '', /^src\/components\/Facts\.tsx writes 1 times in a locale/, 'a toLocaleString() written back is refused');
+    assert.match(
+      back[0] ?? '',
+      /^src\/components\/step\/Facts\.tsx writes 1 times in a locale/,
+      'a toLocaleString() written back is refused',
+    );
     const built = refusals({
       ...files,
-      'src/components/Facts.tsx': `${files['src/components/Facts.tsx']}\nIntl.DateTimeFormat('en-US').format(d);\n`,
+      'src/components/step/Facts.tsx': `${files['src/components/step/Facts.tsx']}\nIntl.DateTimeFormat('en-US').format(d);\n`,
     });
     assert.equal(built.length, 1, built.join('\n'));
-    assert.match(built[0] ?? '', /^src\/components\/Facts\.tsx:\d+:1 \(Intl\.DateTimeFormat\) writes a date/, 'a formatter written back');
+    assert.match(
+      built[0] ?? '',
+      /^src\/components\/step\/Facts\.tsx:\d+:1 \(Intl\.DateTimeFormat\) writes a date/,
+      'a formatter written back',
+    );
     const took = refusals({
       ...files,
-      'src/components/Facts.tsx': `import { format } from 'date-fns';\n${files['src/components/Facts.tsx']}`,
+      'src/components/step/Facts.tsx': `import { format } from 'date-fns';\n${files['src/components/step/Facts.tsx']}`,
     });
     assert.equal(took.length, 1, took.join('\n'));
-    assert.match(took[0] ?? '', /^src\/components\/Facts\.tsx:1:24 \('date-fns'\) writes a moment of its own/, 'the library taken up');
+    assert.match(
+      took[0] ?? '',
+      /^src\/components\/step\/Facts\.tsx:1:24 \('date-fns'\) writes a moment of its own/,
+      'the library taken up',
+    );
     assert.ok(
       WRITERS.every((file) => files[file]?.length),
       `every file of WRITERS is read: ${WRITERS.join(', ')}`,

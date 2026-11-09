@@ -12,17 +12,17 @@ const SRC = path.join(import.meta.dirname, '..', 'src');
 /** The files that draw the Runs page: its route and each part of the board it mounts. */
 const FILES = [
   'routes/runs.index.tsx',
-  'components/WaitingCard.tsx',
+  'components/run/WaitingCard.tsx',
   'components/look/StatTile.tsx',
   'components/look/CopyId.tsx',
   'components/look/CutButton.tsx',
   'components/look/CutCue.tsx',
   'components/look/CutField.tsx',
-  'components/FlightTable.tsx',
-  'components/FinishedTable.tsx',
-  'components/WorkflowLink.tsx',
-  'components/RunClockCell.tsx',
-  'components/RunCostCell.tsx',
+  'components/run/FlightTable.tsx',
+  'components/run/FinishedTable.tsx',
+  'components/workflow/WorkflowLink.tsx',
+  'components/run/RunClockCell.tsx',
+  'components/run/RunCostCell.tsx',
   'components/look/Breakdown.tsx',
   'components/look/Plate.tsx',
   'components/look/Sticker.tsx',
@@ -32,10 +32,10 @@ const FILES = [
   'components/look/CutFrame.tsx',
   'components/look/CutTag.tsx',
   'components/look/ScanLines.tsx',
-  'components/StepPreview.tsx',
-  'components/StepCard.tsx',
-  'components/Labels.tsx',
-  'components/SelectorField.tsx',
+  'components/step/StepPreview.tsx',
+  'components/step/StepCard.tsx',
+  'components/field/Labels.tsx',
+  'components/field/SelectorField.tsx',
 ];
 
 /** The files a folder's door exports from, when `at` is a folder with a door (`index.ts`): each sibling it names, as a component's file. */
@@ -61,7 +61,7 @@ test('every file that draws the Runs page is on the list: each part the route an
       }
     }
   }
-  reached.delete('components/routeLink.tsx');
+  reached.delete('components/nav/routeLink.tsx');
   assert.deepEqual([...reached].sort(), [...FILES].sort());
 });
 

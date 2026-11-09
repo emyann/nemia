@@ -69,7 +69,7 @@ const waitRead = Effect.fnUntraced(function* (runId: string, stepName: string) {
       step,
       run,
       phaseOf,
-      closeoutReader(views, run),
+      closeoutReader(views, run, steps),
       closeoutAsked(views),
       steps,
       harnessBlocked(views),

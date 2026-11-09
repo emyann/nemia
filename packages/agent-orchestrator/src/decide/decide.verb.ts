@@ -302,7 +302,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
   const ended = Boolean(run.cancelledAt || run.pruned || run.hold);
   const offers = [
     ...roundOffers(steps, run, d, spendOf),
-    ...mergeOffers(place, steps, run, d, rounds, phaseOf, reader, asked, spendOf),
+    ...mergeOffers(place, steps, run, d, rounds, phaseOf, reader, asked, spendOf, verdictOf),
     ...retryOffers(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf, () => landingDenies(run, place)),
   ];
   const parent = yield* parentsRead(run, yield* live.when(waitedOn(run).length > 0)).pipe(over(e));
@@ -313,7 +313,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
     closeouts,
     checks,
     retrying: ended ? [] : retriesDue(steps, run, phaseOf, reader, asked, verdictOf, asks, blocked, spendOf),
-    rounding: ended ? [] : roundsDue(steps, run, phaseOf, reader, asked, rounds, spendOf),
+    rounding: ended ? [] : roundsDue(steps, run, phaseOf, reader, asked, rounds, spendOf, verdictOf),
     offers: offers.map((o) => o.said),
     commands: choicesOf(steps, run, d, offers),
     overBudgetLine: overBudgetLine(steps, run, d, spendOf),

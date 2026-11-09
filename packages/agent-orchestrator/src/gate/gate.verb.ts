@@ -68,7 +68,7 @@ export const approveRun = Effect.fn('approve')(function* (
       stepName,
       message,
       phaseOf,
-      closeoutReader(views, now),
+      closeoutReader(views, now, steps),
       closeoutAsked(views),
       exitVerdicts(views, now),
       runStore.asks.read(id).asks,
@@ -79,7 +79,7 @@ export const approveRun = Effect.fn('approve')(function* (
   if (refused) return yield* Effect.fail(new Conflict({ message: refused }));
   const proposed = proposedBudgets(
     steps.find((s) => s.name === stepName),
-    closeoutReader(views, run)(stepName),
+    closeoutReader(views, run, steps)(stepName),
   ).map((p) => ({ step: p.step, usd: p.usd }));
   const set = approvedCaps(proposed, given, laterSteps(steps, stepName));
   if ('refused' in set) {

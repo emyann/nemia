@@ -658,7 +658,7 @@ export const parentRead = Effect.fn('parentOf')(function* (id: string, git: Bran
     record,
     phaseOf,
     landedOf(record, git),
-    closeoutReader(views, record),
+    closeoutReader(views, record, steps),
     closeoutAsked(views),
     exitVerdicts(views, record),
     asks,

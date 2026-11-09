@@ -121,10 +121,13 @@ export const runReadingOf = (steps: StepsReading, filed: ReadonlyMap<string, str
   filed,
 });
 
-/** What a step's raise and status word are read from, off the views already read (`RaiseReads`), as `nemia decide` reads them. */
-export const raiseReads = (run: Run, views: Views): RaiseReads => ({
+/**
+ * What a step's raise and status word are read from, off the views already read (`RaiseReads`), as `nemia decide` reads them: the
+ * closeouts with the run's `steps`, so a script condition's answer is read as its closeout.
+ */
+export const raiseReads = (run: Run, views: Views, steps: readonly Workflow[]): RaiseReads => ({
   phaseOf: (taskId) => phaseOfView(views.get(taskId)),
-  closeoutOf: closeoutReader(views, run),
+  closeoutOf: closeoutReader(views, run, steps),
   askedCloseout: closeoutAsked(views),
   verdictOf: exitVerdicts(views, run),
 });

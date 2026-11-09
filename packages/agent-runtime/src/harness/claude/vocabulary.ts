@@ -3,6 +3,7 @@
  * asked for, as sentences. Harness vocabulary, so it lives beside the runners
  * that speak it and never in `domain.ts`.
  */
+import type { FenceReach, HarnessDeclaration } from '../declaration.ts';
 import type { SpawnRequest } from '../seam.ts';
 
 /**
@@ -287,3 +288,62 @@ export const worktreeName = (r: SpawnRequest): string =>
  * in the session (its `CLAUDE.md` is not read). Taken whole, since what it does with the folder's other subfolders is unmeasured.
  */
 export const CLAUDE_CONFIG_FOLDERS: readonly [string, ...string[]] = ['.claude'];
+
+/** Whether Claude Code drops `auto` on `model`: one of `CLAUDE_AUTO_DROPPED`, as named or with a `-` suffix. */
+const dropsAuto = (model: string | undefined): boolean =>
+  model !== undefined && CLAUDE_AUTO_DROPPED.some((m) => model === m || model.startsWith(`${m}-`));
+
+/** Claude Code's fence on `model`, run as a job or a background session alike. */
+const claudeReach = (model: string | undefined): FenceReach => ({
+  by: 'mode',
+  rank: CLAUDE_MODE_RANK,
+  given: CLAUDE_DEFAULT_MODE,
+  writes: CLAUDE_MODE_RANK.acceptEdits,
+  held: CLAUDE_HELD_MODE,
+  unasking: CLAUDE_UNASKING_MODES,
+  dropped: dropsAuto(model) ? ['auto'] : [],
+  refusing: CLAUDE_REFUSING_MODES,
+  unfenced: CLAUDE_UNFENCED,
+  granted: CLAUDE_GRANTED,
+});
+
+/**
+ * What Claude Code declares, as the engine runs it (`'claude'`), a job and a long-lived session alike: every key of a task's config
+ * but Codex's and a command's, a session kept open and a call held for a person (attached, in the holder), and every Engine verb that is
+ * not a task's. Its job's `HarnessSpec` declares the same `can` (`claudeJobSpec`, held equal by `test/declaration.test.ts`).
+ */
+export const CLAUDE_DECLARATION: HarnessDeclaration = {
+  can: [
+    'contextTokens',
+    'claudeFlags',
+    'env',
+    'readOnlyMount',
+    'writableMount',
+    'callAdmission',
+    'projectMcp',
+    'enabledSkills',
+    'memoryLimit',
+    'bridge',
+    'keepsOpen',
+    'holdsCalls',
+    'interrupt',
+    'answerAsk',
+    'quota',
+    'mcp',
+    'hold',
+    'drain',
+  ],
+  ownKey: 'claude',
+  knobs: {
+    effort: CLAUDE_EFFORTS,
+    fence: { key: 'permissionMode', words: CLAUDE_PERMISSION_MODES, lists: ['tools', 'allowedTools', 'disallowedTools'] },
+    context: true,
+    flags: { owned: CLAUDE_OWNED_FLAGS },
+  },
+  contextTokens: CLAUDE_CONTEXT_TOKENS,
+  reach: claudeReach,
+  unruled: CLAUDE_UNRULED,
+  asks: { remoteControl: { claude: { remoteControl: true } } },
+  runsBrief: true,
+  recordsDenials: true,
+};

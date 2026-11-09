@@ -176,6 +176,22 @@ export { CLAUDE_AUTO_DROPPED, CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERM
 export { fenceReach, unruledIn, type FenceReach } from './harness/reach.ts';
 export { CODEX_EFFORTS, CODEX_SANDBOXES } from './harness/codex/vocabulary.ts';
 export { HARNESS_CHOICES, HARNESS_KNOBS } from './harness/choices.ts';
+export {
+  CAPABILITIES,
+  DEFAULT_HARNESS,
+  HARNESS_DECLARATIONS,
+  declares,
+  misplacedOf,
+  ownArgsOf,
+  takersOf,
+  verbHarnessOf,
+  type Capability,
+  type HarnessDeclaration,
+  type HarnessDeclared,
+  type OwnArgs,
+  type VerbHarness,
+} from './harness/declaration.ts';
+export { REMOTE_DECLARATION } from './a2a/vocabulary.ts';
 export { CONFIG_FOLDERS, configFolderIn } from './harness/config-folders.ts';
 /**
  * A harness's trust of a folder, off its own file: whether it is given (`trustedFolder`), what it is in a person's words

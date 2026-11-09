@@ -12,7 +12,7 @@ import { AgentRefused } from '../agent/AgentParts';
  * a change reaches them, marked `frozen` or `told`; `saved` and `cleared`, said after a write; `clearAsks`, the question Clear asks;
  * `placeholder`, the empty draft's hint; `unread`, what words that do not read stop.
  */
-export type Reach = {
+type Reach = {
   told: (name: ReactNode) => ReactNode;
   takes: { mark: 'frozen' | 'told'; words: string };
   saved: string;
@@ -23,7 +23,7 @@ export type Reach = {
 };
 
 /** The words for an agent hired by steps: told to each step it fills, frozen on a run as it starts. */
-export const HIRED: Reach = {
+const HIRED: Reach = {
   told: (name) => (
     <>Your words for every agent named {name}, wherever it is hired: told after its instructions, and before a step's policy.</>
   ),

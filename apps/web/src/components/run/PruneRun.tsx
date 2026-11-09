@@ -9,9 +9,9 @@ import { decidableRun, decisionStamp } from '../../lib/decide';
 import { awaitingOf, firstChoice, prunable, pruneOffer, pruneQuestion, type PruneChoice, type PruneOffer } from '../../lib/prune.ts';
 import { cn } from '../../lib/utils';
 import { DOT, RADIO } from '../agent/AgentForm';
-import { POPOVER } from '../inbox/CardGate';
 import { Refusal } from '../gate/Ask';
 import { runsMoved } from '@/lib/runWrites';
+import { POPOVER } from '../../lib/classes';
 
 /**
  * Prune, on a finished repository run's page: the button opens a popover with a choice of what to give back — its worktrees; its files

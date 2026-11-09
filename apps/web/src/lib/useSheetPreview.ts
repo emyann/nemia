@@ -1,22 +1,14 @@
 import { useSyncExternalStore } from 'react';
+import { useMedia } from './useMedia.ts';
 
 /** Where a step's preview opens as a sheet: no pointer that hovers, or a window narrower than Material's compact class ends (600). */
-export const SHEET_QUERY = '(hover: none), (max-width: 599px)';
+const SHEET_QUERY = '(hover: none), (max-width: 599px)';
 
-/** Whether a preview opens as a sheet now; false where there is no browser to ask, as when a server renders. */
-function sheetNow(): boolean {
-  return typeof matchMedia === 'function' ? matchMedia(SHEET_QUERY).matches : false;
-}
-
-function subscribe(changed: () => void): () => void {
-  if (typeof matchMedia !== 'function') return () => {};
-  const query = matchMedia(SHEET_QUERY);
-  query.addEventListener('change', changed);
-  return () => query.removeEventListener('change', changed);
-}
-
-/** `sheetNow`, read again when the window or the pointer changes, with the page open. */
-export const useSheetPreview = (): boolean => useSyncExternalStore(subscribe, sheetNow, () => false);
+/**
+ * Whether a step's preview opens as a sheet now, read again when the window or the pointer changes; false where there is no browser to
+ * ask.
+ */
+export const useSheetPreview = (): boolean => useMedia(SHEET_QUERY, false);
 
 /** The room a step's card takes across: its frame's 416 pixels, the 12 its box keeps on each side, and the window's 12 at its edge. */
 export const CARD_REACH = 452;

@@ -102,7 +102,7 @@ export function pruneOffer(run: Prunable, awaiting: Awaiting | null): PruneOffer
  * What `--unmerged` gives up, said plainly: no branch is deleted, and the run's result branches become the only copy of its work — or, for
  * a run that worked on its base branch itself, what it would be decided on is gone.
  */
-export function unmergedWarning(awaiting: Awaiting): string {
+function unmergedWarning(awaiting: Awaiting): string {
   const after = 'No branch is ever deleted, and none of its steps can be tried again, sent round or approved.';
   if (awaiting.direct)
     return `It worked on ${awaiting.branches[0] ?? 'its base branch'} itself and nobody has decided it: once pruned, the files you would read to decide it are gone. ${after}`;

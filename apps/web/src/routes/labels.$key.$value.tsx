@@ -6,6 +6,7 @@ import { PageName, Plate, ScanLines, StatTile, Sticker, TextLink } from '../comp
 import { inboxSelectedQuery, labelStatsQuery, runsSelectedQuery, spentOf, type RunSummary } from '../lib/api';
 import { startedCard } from '../lib/inbox';
 import type { Hue } from '../lib/meaning';
+import { dollars } from '../lib/money';
 
 /** A bucket a run of the label page is counted in, by its phase and whether it waits on a person. */
 type Bucket = 'waiting' | 'running' | 'needs a person' | 'landed' | 'failed' | 'stopped';
@@ -20,7 +21,7 @@ const BUCKETS: ReadonlyArray<{ bucket: Bucket; hue: Hue }> = [
 ];
 
 /** The bucket of `run`: a person's first, then its phase. */
-export const bucketOf = (run: Pick<RunSummary, 'phase' | 'waitingOnYou'>): Bucket => {
+const bucketOf = (run: Pick<RunSummary, 'phase' | 'waitingOnYou'>): Bucket => {
   if (run.waitingOnYou.length > 0) return 'needs a person';
   switch (run.phase) {
     case 'running':
@@ -116,10 +117,10 @@ function LabelPage() {
               </span>
             ))}
             <span data-label-spent>
-              <StatTile hue="money" label="Spent" value={spent === null ? '—' : `$${spent.toFixed(2)}`} breakdown={null} />
+              <StatTile hue="money" label="Spent" value={dollars(spent)} breakdown={null} />
             </span>
             <span data-label-cost>
-              <StatTile hue="money" label="Cost per landed run" value={cost === null ? '—' : `$${cost.toFixed(2)}`} breakdown={null} />
+              <StatTile hue="money" label="Cost per landed run" value={dollars(cost)} breakdown={null} />
             </span>
           </div>
           <TextLink to="/runs" search={{ l: selector }} className="w-fit text-body-medium underline">

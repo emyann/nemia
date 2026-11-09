@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { runGone, runsQuery, tryAgent, type AgentListing } from '../../lib/api';
+import { readGone, runsQuery, tryAgent, type AgentListing } from '../../lib/api';
 import { useRunRead } from '../../lib/runView';
 import { latestTryOf, TRY_FENCE, TRY_TERMS, tryHeld } from '../../lib/agents';
 import { costText } from '../../lib/cost';
@@ -108,7 +108,7 @@ export function TryRun({ id }: { id: string }) {
       {id}
     </RouteLink>
   );
-  if (runGone(error)) {
+  if (readGone(error)) {
     return (
       <p data-try-gone className="text-body-small text-muted-foreground">
         The try {code(id)} was removed.

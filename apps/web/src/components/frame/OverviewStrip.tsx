@@ -6,7 +6,8 @@ import { ceilingsQuery, daemonQuery, factoriesQuery, type Quota, type QuotaWindo
 import { tokensBreakdown } from '@/lib/breakdown';
 import { type DaemonDot, type DaemonTone, daemonDot } from '@/lib/footer';
 import { lastWords } from '@/lib/quota';
-import { dayStartOf, dollars, quotaLineOf, readoutOf, type Strip, stripOf } from '@/lib/strip';
+import { dollars } from '@/lib/money';
+import { dayStartOf, quotaLineOf, readoutOf, type Strip, stripOf } from '@/lib/strip';
 import { useNow } from '@/lib/useNow';
 import { cn } from '@/lib/utils';
 

@@ -7,14 +7,15 @@ import type { Ceilings, Factory, QuotaWindow, RunSummary } from './api';
 import type { TokenCounts } from './breakdown.ts';
 import { keptBy } from './factories.ts';
 import { inFlight, titleOf, waitsOnYou } from './factory.ts';
+import { durationWords } from './duration.ts';
 import { clockWord } from './quota.ts';
 import { stepState } from './status.ts';
 
 /** The rows of agents at work the strip shows before it says how many more there are. */
-export const ROWS_SHOWN = 3;
+const ROWS_SHOWN = 3;
 
 /** One step at work by an agent: who, which step of which run, and since when, in whole minutes and in words. */
-export type AgentRow = { agent: string; step: string; run: string; title: string; minutes: number; atWork: string };
+type AgentRow = { agent: string; step: string; run: string; title: string; minutes: number; atWork: string };
 
 /**
  * The strip's numbers. `waitsOnYou` and `inFlight` are the open runs, a run that waits on a person counted with the waiting alone;
@@ -41,7 +42,7 @@ export type Strip = {
 };
 
 /** What the strip reads: the whole list, the factories, the caps, now and the day's start in epoch ms, and the factory in view if any. */
-export type StripIn = {
+type StripIn = {
   runs: readonly RunSummary[];
   factories: readonly Factory[];
   ceilings: Ceilings | undefined;
@@ -58,21 +59,17 @@ export const dayStartOf = (now: number): number => {
 };
 
 /** When a finished run's work stopped: the later of its last task's end and its cancellation, else its creation (the api's own rule). */
-export const finishedAtOf = (run: Pick<RunSummary, 'atWork' | 'cancelledAt' | 'createdAt'>): string => {
+const finishedAtOf = (run: Pick<RunSummary, 'atWork' | 'cancelledAt' | 'createdAt'>): string => {
   const ends = [run.atWork?.endedAt ?? null, run.cancelledAt].filter((at): at is string => at !== null);
   return ends.sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? run.createdAt;
 };
 
 /** How a finished run ended (the api's own rule): called off, its result undecided, landed, or failed. */
-export const outcomeOf = (run: Pick<RunSummary, 'cancelledAt' | 'toDecide' | 'status'>): RunOutcome => {
+const outcomeOf = (run: Pick<RunSummary, 'cancelledAt' | 'toDecide' | 'status'>): RunOutcome => {
   if (run.cancelledAt) return 'cancelled';
   if (run.toDecide?.kind === 'result') return 'undecided';
   return run.status === 'succeeded' ? 'succeeded' : 'failed';
 };
-
-/** Minutes at work in words: `17m`, `2h 5m`. */
-export const minutesWord = (minutes: number): string =>
-  minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h${minutes % 60 ? ` ${minutes % 60}m` : ''}`;
 
 /** A cap as the readout says it: none where it is zero or unknown. */
 const capOf = (cap: number | null | undefined): number | null => (cap ? cap : null);
@@ -134,7 +131,16 @@ const rowsOf = (open: readonly RunSummary[], now: number): AgentRow[] =>
       run.steps.flatMap((step) => {
         if (step.agent === null || step.since === null || !working(run, step)) return [];
         const minutes = Math.max(0, Math.floor((now - Date.parse(step.since)) / 60_000));
-        return [{ agent: step.agent, step: step.name, run: run.id, title: titleOf(run), minutes, atWork: minutesWord(minutes) }];
+        return [
+          {
+            agent: step.agent,
+            step: step.name,
+            run: run.id,
+            title: titleOf(run),
+            minutes,
+            atWork: durationWords(minutes * 60_000, 'minute'),
+          },
+        ];
       }),
     )
     .sort((a, b) => b.minutes - a.minutes || a.run.localeCompare(b.run) || a.step.localeCompare(b.step));
@@ -172,12 +178,6 @@ export function stripOf(given: StripIn): Strip {
     more: Math.max(0, rows.length - ROWS_SHOWN),
   };
 }
-
-/**
- * An amount in dollars as a sticker says it, never more than four figures wide below $10,000, so the six stickers keep one line: whole from
- * $10, to the cent below; `—` for none.
- */
-export const dollars = (usd: number | null): string => (usd === null ? '—' : usd >= 10 ? `$${Math.round(usd)}` : `$${usd.toFixed(2)}`);
 
 /** The readout of what is at work: `5 OF 7 RUNS · 2 OF 50 SESSIONS`, a part with no cap said without its `OF`. */
 export const readoutOf = ({ runs, sessions }: Pick<Strip, 'runs' | 'sessions'>): string => {

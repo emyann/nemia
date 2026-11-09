@@ -14,9 +14,6 @@ import { useFeed } from '@/lib/useFeed';
 import { NemiaChatProvider } from '@/lib/useNemiaChat';
 import { useScrollMark } from '@/lib/useScrollMark';
 
-/** The route Nemia's chat is a page of its own at: the page is the panel, so her docked face is not drawn over it. */
-const CHAT = '/chat';
-
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   validateSearch: barSearch,
   component: Root,
@@ -30,13 +27,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
  * address's `?bar=` names, the same on every page, and a link to another page, which carries no `bar`, closes it. It follows the workflow
  * feed once for the whole page: what moves on it is read again at once, the polls slow while it is open, and the gauges say which. Her
  * chat is held over the whole frame too (`NemiaChatProvider`), one stream of hers for the visit, which her docked face and the chat page
- * both read, so a navigation neither closes it nor opens another. React
+ * both read, so a navigation neither closes it nor opens another; her docked face is drawn on every page but one whose route's
+ * `staticData` says it `ownsChat`, the chat page, which is the panel itself. React
  * Aria's `RouterProvider` sends every React Aria link, pressed with Enter or clicked, through the router, so no link loads the whole page
  * again.
  */
 function Root() {
   const path = useRouterState({ select: (state) => state.location.pathname });
   const fullBleed = useMatches({ select: (matches) => matches.some((match) => match.staticData?.fullBleed) });
+  const ownsChat = useMatches({ select: (matches) => matches.some((match) => match.staticData?.ownsChat) });
   const search: Record<string, unknown> = useRouterState({ select: (state) => state.location.search });
   const router = useRouter();
   const feed = useFeed();
@@ -63,7 +62,7 @@ function Root() {
           </div>
         </SidebarProvider>
         <OpenBar feed={feed} />
-        {path !== CHAT && <NemiaDock />}
+        {!ownsChat && <NemiaDock />}
       </NemiaChatProvider>
       <ReactQueryDevtools buttonPosition="bottom-left" />
       <TanStackRouterDevtools position="bottom-right" />

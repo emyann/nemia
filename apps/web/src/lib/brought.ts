@@ -8,7 +8,7 @@ import { askedOf, offersOf } from './asks.ts';
 import { gateOfStep } from './gate.ts';
 import type { RunView } from './runView';
 
-export type { BroughtFacts, BroughtPart } from '../../contracts/brought.contract.ts';
+export type { BroughtPart } from '../../contracts/brought.contract.ts';
 
 /**
  * The part the chat draws for a step with the facts `facts`, the one the run's page draws for that state: missing where the run has no

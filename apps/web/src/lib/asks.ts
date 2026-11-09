@@ -18,7 +18,7 @@ type NeedsStep = Pick<RunSummary['steps'][number], 'name' | 'needs' | 'reason' |
 };
 
 /** Whether a step's harness stopped its session to ask, and no closeout signed off blocked: codes `AwaitingAnswer` via `session`. */
-export const atHarness = (step: Pick<NeedsStep, 'reason' | 'via'>): boolean => step.reason === 'AwaitingAnswer' && step.via === 'session';
+const atHarness = (step: Pick<NeedsStep, 'reason' | 'via'>): boolean => step.reason === 'AwaitingAnswer' && step.via === 'session';
 
 /**
  * What one step needs from a person: the question it signed off blocked with; that the harness blocked its session — with what that harness
@@ -32,7 +32,7 @@ export type Need =
   | { step: string; kind: 'approve'; said: string };
 
 /** The harness's own half of such a need, in the order a person reads it: what it waits for, then what the session said last. */
-export const harnessSaid = (need: Extract<Need, { kind: 'harness' }>): string =>
+const harnessSaid = (need: Extract<Need, { kind: 'harness' }>): string =>
   [need.waitingFor?.words, need.lastLine].filter(Boolean).join(' · ');
 
 /**

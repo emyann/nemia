@@ -8,10 +8,9 @@ import { useQuery } from '@tanstack/react-query';
 import { RouteLink } from '@/components/agent/AgentParts';
 import { TEXT_LINK } from '@/components/look';
 import { proposalsQuery } from '@/lib/api';
-import { filled, ringed } from '@/lib/meaning';
-import { proposalsInOrder, widensHue } from '@/lib/proposals';
+import { proposalsInOrder } from '@/lib/proposals';
 import { cn } from '@/lib/utils';
-import { PROPOSAL_WORDS } from '@/lib/words';
+import { ProposalTags } from '@/components/gate/ProposalTags';
 
 /** The proposals of the factory `factory`, listed above its floor; nothing while it has none or they do not read. */
 export function FactoryProposals({ factory }: { factory: string }) {
@@ -26,7 +25,6 @@ export function FactoryProposals({ factory }: { factory: string }) {
       <ul className="mt-1 flex max-h-32 flex-col gap-1 overflow-y-auto">
         {proposalsInOrder(data).map((proposal) => {
           const { name } = proposal.metadata;
-          const words = PROPOSAL_WORDS[proposal.status.phase];
           return (
             <li
               key={name}
@@ -41,14 +39,7 @@ export function FactoryProposals({ factory }: { factory: string }) {
               >
                 {name}
               </RouteLink>
-              <span title={words.title} className={cn('rounded px-2 py-0.5 text-label-small', filled[words.hue])}>
-                {words.word}
-              </span>
-              {proposal.status.widens && (
-                <span data-proposal-widens className={cn('rounded px-2 py-0.5 text-label-small', ringed[widensHue(proposal.status.phase)])}>
-                  Widens access
-                </span>
-              )}
+              <ProposalTags phase={proposal.status.phase} widens={proposal.status.widens} size="small" />
               {proposal.spec.why && <span className="truncate text-body-small text-muted-foreground">{proposal.spec.why}</span>}
             </li>
           );

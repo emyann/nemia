@@ -8,7 +8,8 @@ import { LEVELS, type Level } from 'objects';
 import { decodes } from './decodes.ts';
 import { pace } from '../feed.ts';
 import { BridgeSchema, type Bridge } from './bridge.ts';
-import { get, ReadRefusal, send } from './read.ts';
+import { retryUnlessGone } from './gone.ts';
+import { get, send } from './read.ts';
 
 /** `objects`' `Level`: Manual, her session stopped; Semi-auto, her session kept, what waits on a person asked of them. */
 export type { Level } from 'objects';
@@ -105,15 +106,12 @@ export const nemiaMemoryQuery = queryOptions({
   refetchInterval: () => pace(30_000),
 });
 
-/** Every failure tried again three times, as react-query does by default, but a fact she no longer keeps: said at once. */
-const retryFact = (failures: number, error: unknown): boolean => !(error instanceof ReadRefusal && error.status === 404) && failures < 3;
-
-/** One fact's words, read when a person opens it, never polled. */
+/** One fact's words, read when a person opens it, never polled: a fact she no longer keeps is said at once (`retryUnlessGone`). */
 export const nemiaFactQuery = (name: string) =>
   queryOptions({
     queryKey: ['nemia', 'memory', name],
     queryFn: () => get(`/api/nemia/memory/${encodeURIComponent(name)}`, NemiaMemorySchema),
-    retry: retryFact,
+    retry: retryUnlessGone,
   });
 
 /**

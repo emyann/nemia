@@ -6,7 +6,7 @@
  * `src/styles.css` reads each meaning from a role of the theme once (`--meaning-yours`), and names it for Tailwind (`bg-yours`). Every
  * class here is written whole: Tailwind finds a class by its text in a source file, never one built from a meaning's name.
  */
-export type Meaning = 'yours' | 'alive' | 'money' | 'rest' | 'failure';
+type Meaning = 'yours' | 'alive' | 'money' | 'rest' | 'failure';
 
 /** A colour a meaning is drawn in: the meaning itself, or one of rest's two tints. */
 export type Hue = 'yours' | 'alive' | 'money' | 'failure' | 'grey' | 'sage';

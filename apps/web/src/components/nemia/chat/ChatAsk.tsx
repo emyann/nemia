@@ -44,7 +44,7 @@ export const askTag = (ask: Ask): { words: string; hue: 'yours' | 'money' | 'gre
  * asked (`description`), why it prompts (`decisionReason`), the path it reaches outside her folder (`blockedPath`), and a Bash call's
  * command as typed, in mono with its spaces kept. A fact the SDK did not hand over is not drawn.
  */
-export function PermissionFactsOf({ facts }: { facts: PermissionFacts }) {
+function PermissionFactsOf({ facts }: { facts: PermissionFacts }) {
   const lines = [
     { mark: 'description', words: facts.description },
     { mark: 'reason', words: facts.decisionReason },
@@ -115,7 +115,7 @@ export function AskWords({ text }: { text: string }) {
 }
 
 /** Each link her words carry, as a plain link beside the ask's own controls. */
-export function AskLinks({ text }: { text: string }) {
+function AskLinks({ text }: { text: string }) {
   const { links } = linksOf(text);
   return links.map((link) => (
     <a key={`${link.href} ${link.words}`} href={link.href} className={`text-label-large ${TEXT_LINK}`}>

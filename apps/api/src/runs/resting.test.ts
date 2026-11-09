@@ -20,7 +20,7 @@ import { createRequire, syncBuiltinESMExports } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app, runtime } from '../app.ts';
-import type { MetricRead } from '../factory/ceilings.ts';
+import type { MetricRead } from '../gauges/ceilings.ts';
 import { Engine, findRun } from '../store.ts';
 import {
   approveRun,

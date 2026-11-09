@@ -9,10 +9,10 @@
  * JSON, before its body is read.
  */
 import { factoryNameRefusal, Invalid as Refused, type ObjectQuery } from 'agent-orchestrator';
-import { repoOf } from '../capabilities/capabilities.ts';
+import { repoOf } from '../../capabilities/capabilities.ts';
 import type { Context as RequestContext, Hono } from 'hono';
-import type { Guarded } from '../guard.ts';
-import type { ApiEnv, Served } from '../layer.ts';
+import type { Guarded } from '../../guard.ts';
+import type { ApiEnv, Served } from '../../layer.ts';
 
 /** The repository the default factory is on: the api's own. */
 export const defaultRepo = (s: Served): string => repoOf(s.env, s.running);

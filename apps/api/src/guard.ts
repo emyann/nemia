@@ -2,9 +2,9 @@
  * The guard on the board's writes: a request refused before its body is read, whatever it asks for.
  *
  * These writes pass it: a factory signed in to a server (`POST /api/namespaces/:namespace/mcpservers/:name/sign-in`,
- * factory-parts/parts.ts) or signed out of one (`DELETE` on the same path), each of which writes the harness's own store, which every
+ * factory/parts/parts.ts) or signed out of one (`DELETE` on the same path), each of which writes the harness's own store, which every
  * session of the factory reads; a factory's server recorded or taken off, a schedule written or taken back, an agent hired into a step or
- * fired, its rules written or cleared and its instruction placed, written or cleared (factory-parts/parts.ts), each what every run started
+ * fired, its rules written or cleared and its instruction placed, written or cleared (factory/parts/parts.ts), each what every run started
  * in the factory after acts on; the run's named actions (objects/serve.ts), each guarded in its command's words before the objects' handler
  * reads its body: a start (`POST /api/namespaces/:namespace/runs`, `runStart` in workflows.ts), which writes a run's record; an ask for
  * another try or another round (`POST /api/namespaces/:namespace/runs/:runId/steps/:step/retry`, with `"round": true` for `nemia retry

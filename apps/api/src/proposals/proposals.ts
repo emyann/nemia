@@ -21,7 +21,7 @@ import {
 } from 'agent-orchestrator';
 import { Api, type Conflict, Failed, Forbidden, type Invalid, type Missing } from 'objects';
 import type { Served } from '../layer.ts';
-import { queryOf } from '../factory-parts/index.ts';
+import { queryOf } from '../factory/parts/index.ts';
 import { refusedAs, ServedNow } from '../objects/refused.ts';
 import { listed } from '../definitions/served.ts';
 import { runPlaced } from '../store.ts';

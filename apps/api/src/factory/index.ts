@@ -1,10 +1,9 @@
 /**
- * The floor's gauges, as app.ts answers them: the cap on runs in flight, what the recent passes cost, the process's metrics, the store's
- * pause, the daemon, the feed and the quota.
+ * A factory as the api serves it: the factories as objects and their rules, instruction and command lines (`factories.ts`), its parts in
+ * the factory's namespace — MCP servers, schedules, hires and volumes, behind their own face (`parts/`) — and where a request is answered,
+ * its factory and repository (`place.ts`), as objects/serve.ts provides and mounts them. layer.ts, which every handler reads its services
+ * off, takes `placeFor` from `place.ts` alone, so resolving a request's place loads no handler.
  */
-export { ceilingsOf, metricsOf, passesOf, seriesOf } from './ceilings.ts';
-export type { MetricRead } from './ceilings.ts';
-export { pauseNowOf, pauseOf } from './pause.ts';
-export { readDaemon } from './daemon.ts';
-export { feed } from './feed.ts';
-export { QuotaAsker } from './quota.ts';
+export { factoriesHandlers } from './factories.ts';
+export { builtinHandlers, hiresHandlers, mcpServersHandlers, partsRoutes, schedulesHandlers, volumesHandlers } from './parts/index.ts';
+export { placeFor } from './place.ts';

@@ -24,6 +24,7 @@ import { randomUUID } from 'node:crypto';
 import { elapsedMs } from '../clock.ts';
 import { instantNow } from './now.ts';
 import { countLock, countRead, countWrite } from './tally.ts';
+import { alive } from '../../process/alive.ts';
 
 /** How long an append or a rotation waits for the feed's lock held by a live process before it fails, naming the holder. */
 export const FEED_LOCK_WAIT_MS = 2_000;
@@ -235,16 +236,6 @@ const holderIn = (file: string): Holder | undefined => {
   return typeof holder === 'object' && holder !== null && Number.isSafeInteger(holder.pid) && typeof holder.token === 'string'
     ? (holder as Holder)
     : undefined;
-};
-
-/** Whether process `pid` lives: `kill(pid, 0)` answers anything but ESRCH. */
-const alive = (pid: number): boolean => {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (e) {
-    return (e as NodeJS.ErrnoException).code !== 'ESRCH';
-  }
 };
 
 /** Wait `ms` without leaving the call: the store's writes are synchronous. */

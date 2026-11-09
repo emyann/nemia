@@ -96,7 +96,7 @@ const measured = () =>
   new Map(testFiles().flatMap((file) => [[file, deadlinesIn(fs.readFileSync(path.join(PACKAGE, file), 'utf8'))] as const]));
 
 test("the package's tests hold no hand-written deadline but those `DEADLINES` allows, each no wait, and none allowed that is gone", () => {
-  assert.ok(testFiles().includes('src/factory/feed.test.ts'), 'the tests beside the code are read');
+  assert.ok(testFiles().includes('src/gauges/feed.test.ts'), 'the tests beside the code are read');
   assert.ok(testFiles().includes('test/harness.ts'), "and the tests' helpers");
   assert.deepEqual(deadlineBreaks(measured(), DEADLINES), []);
 });
@@ -108,11 +108,11 @@ test('REFUSED: a deadline written into a test is over its allowance, and an allo
   assert.equal(deadlinesIn(compared), 1, 'a start held under a bound is a deadline too');
   const counts = measured();
   for (const deadline of [planted, compared]) {
-    counts.set('src/factory/feed.test.ts', (counts.get('src/factory/feed.test.ts') ?? 0) + deadlinesIn(deadline));
+    counts.set('src/gauges/feed.test.ts', (counts.get('src/gauges/feed.test.ts') ?? 0) + deadlinesIn(deadline));
     assert.deepEqual(deadlineBreaks(counts, DEADLINES), [
-      'src/factory/feed.test.ts has 1 hand-written deadlines, 0 allowed: wait with `until` (agent-runtime/testing) instead',
+      'src/gauges/feed.test.ts has 1 hand-written deadlines, 0 allowed: wait with `until` (agent-runtime/testing) instead',
     ]);
-    counts.set('src/factory/feed.test.ts', 0);
+    counts.set('src/gauges/feed.test.ts', 0);
   }
   counts.set('test/nemia.test.ts', 0);
   assert.deepEqual(deadlineBreaks(counts, DEADLINES), ['test/nemia.test.ts is allowed 1 but has 0: lower its count in DEADLINES']);

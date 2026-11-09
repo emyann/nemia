@@ -15,7 +15,7 @@
  *
  * A step's page reads one step of one folder through its own router (step/step.ts), which reads the step's file with `stepSourceOf`.
  *
- * Each is answered in the factory the request names (`served`, factories/place.ts): a factory offers only the workflows attached to it,
+ * Each is answered in the factory the request names (`served`, factory/place.ts): a factory offers only the workflows attached to it,
  * each step its hires fill read with the agent hired, and a run is started in it. The default factory offers every workflow, as it is.
  */
 import fs from 'node:fs';

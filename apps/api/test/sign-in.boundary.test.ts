@@ -1,5 +1,5 @@
 /**
- * A factory's server signed in to and out of from the board (src/factory-parts/mcp-servers.ts), over the runtime's stand-in for the three
+ * A factory's server signed in to and out of from the board (src/factory/parts/mcp-servers.ts), over the runtime's stand-in for the three
  * sign-in verbs: the real ones spawn Claude Code and wait on a browser, which no api test does.
  *
  * The rule the card rests on is that no answer carries the builtin secret: every body of the three routes, and the servers' read with

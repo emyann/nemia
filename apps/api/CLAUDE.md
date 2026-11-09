@@ -45,9 +45,9 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
 - **The list's `toDecide` is not the package's decision**: `decision` answers `awaiting` where `toDecide` says nothing.
 - **A remote step's wait is answered with `wf say`** (`answerIn` in the package's `needsOf`), never in Claude Code.
 - **A new key in `STEP_KEYS` or `AGENT_KEYS` has sites here**: see `packages/agent-orchestrator/CLAUDE.md`.
-- **The objects are served by HttpApi handlers in `src/objects/`** (`runs.ts`, `cards.ts`, `factories.ts`; a factory's parts in
-  `src/factory-parts/`: `mcp-servers.ts`, `schedules.ts`, `hires.ts`, `volumes.ts`, and in `parts.ts` what they share, their paths and
-  the guard words of their writes; the Workflows, Agents and Skills in `src/definitions/`: `workflows.ts`, `agents.ts`, `skills.ts`,
+- **The objects are served by HttpApi handlers in `src/objects/`** (`runs.ts`, `cards.ts`; the factories in `src/factory/`:
+  `factories.ts`, where a request is answered in `place.ts`, and its parts in `src/factory/parts/`: `mcp-servers.ts`, `schedules.ts`,
+  `hires.ts`, `volumes.ts`, and in `parts.ts` what they share, their paths and the guard words of their writes; the Workflows, Agents and Skills in `src/definitions/`: `workflows.ts`, `agents.ts`, `skills.ts`,
   in `served.ts` what they share and in `routes.ts` their paths and guard words, each request placed in its namespace's factory by
   `placeFor`, a write of yours taken in `default` alone; the cluster's builtin templates, the feed's subscriptions and its lines as
   events in `src/template-objects/templates.ts` and `src/feed-objects/` (`subscriptions.ts`, `events.ts`), a template's documents read from its render by the definitions' own
@@ -93,8 +93,8 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
 - **In a test, what a statement means goes into the test's name, an assertion's message, or a JSDoc on a property.**
 - **What a route holds is taken with `acquireRelease` and let go as its scope closes** (`followFeed` under `feedEvents`, `serverAsk`): a release
   that ends a process waits for it, so a test reads its pid gone as the Effect returns. An ask requests share (`makeQuota` in
-  `factory/quota.ts`, `makeMcpAsker` in `capabilities/capabilities.ts`) is never interrupted by one request's going.
-- **A handle count is waited for, never read once after a close** (`followers` in `src/factory/feed.test.ts`, waited for with the `until`
+  `gauges/quota.ts`, `makeMcpAsker` in `capabilities/capabilities.ts`) is never interrupted by one request's going.
+- **A handle count is waited for, never read once after a close** (`followers` in `src/gauges/feed.test.ts`, waited for with the `until`
   of `test/waits.ts`): a stream's reader is counted a few microtasks after its response, so a test waits for it before it breaks the feed.
 - **A package program that asks the place is run with `runPlaced(placeService, e, program)`** (`src/store.ts`), the place the app's layer
   holds (`PlaceService` in `Services`, `gitPlaceLayer` in `liveOf`, `Served.placeService`); a test replaces it with
@@ -104,7 +104,7 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   api's calls, none allowed): `inRequest` runs a program over the request's own services, so the door reads the app's `StoreRoot`, or
   the door a test merged into the app's layer. A test merges `agentDoorMemory()` or `skillDoorMemory()` (`agent-orchestrator/testing`)
   only where the route makes no `runPlaced` read of agents or skills, which runs outside the app's runtime and reads the files.
-- **A request's factory and repository are resolved in `served`** (`placeFor`, `factories/place.ts`): a handler reads `repo` and `factory`
+- **A request's factory and repository are resolved in `served`** (`placeFor`, `factory/place.ts`): a handler reads `repo` and `factory`
   off `Served`, never `?repo=` itself.
 - **An agent fills a step by the file a start would run it with** (`stepsFilled`, the package's `roster/fills.store.ts`), never by its
   name alone: the same name in the repository and in yours are two agents. `usedBy` is the package's by-name, same-place list the delete refusal reads.

@@ -57,7 +57,7 @@ const MOVES: Readonly<Record<string, Entry>> = {
     move: "reading a harness's settings and servers off the machine",
     to: 'packages/agent-runtime, answered per harness through the orchestrator',
   },
-  'src/factory/quota.ts': {
+  'src/gauges/quota.ts': {
     reaches: ['global:process.env'],
     move: "the quota asker's default environment, read off the process",
     to: 'the environment `served` gives each handler (src/layer.ts), passed to the asker by its route',

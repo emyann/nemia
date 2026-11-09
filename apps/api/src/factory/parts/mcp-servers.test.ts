@@ -7,7 +7,7 @@
  * The states are not read here: a read of one spawns a harness session, which no api test does. What the api answers of a record it
  * could not read states of is the thing to hold, and it is held: no `state` on each server, its `status.error` saying why.
  */
-import { root } from '../../test/harness.ts';
+import { root } from '../../../test/harness.ts';
 import { test } from 'node:test';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -16,7 +16,7 @@ import path from 'node:path';
 import { addFactory, BUILTIN_SERVERS, builtinServers } from 'agent-orchestrator';
 import { HEADER_MASK } from 'objects';
 import { scratch } from 'test-kit/scratch';
-import { app } from '../app.ts';
+import { app } from '../../app.ts';
 
 type McpServer = import('objects').McpServer;
 type McpServerList = import('objects').McpServerList;
@@ -165,7 +165,7 @@ test("A person keeps a factory's MCP servers: none recorded, one recorded and re
 });
 
 test("Nemia's builtin servers are the orchestrator package's own folder, never a folder of the checkout's team", () => {
-  const pkg = path.resolve(import.meta.dirname, '..', '..', '..', '..', 'packages', 'agent-orchestrator');
+  const pkg = path.resolve(import.meta.dirname, '..', '..', '..', '..', '..', 'packages', 'agent-orchestrator');
   assert.equal(path.relative(pkg, path.resolve(BUILTIN_SERVERS)), 'servers', 'the folder is packages/agent-orchestrator/servers');
   assert.ok(
     builtinServers(BUILTIN_SERVERS).some((s) => s.name === 'github'),

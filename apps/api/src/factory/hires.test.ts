@@ -1,5 +1,5 @@
 /**
- * A factory's Hires on the board (`/api/namespaces/<factory>/hires/<workflow>.<step>`, factory-parts/hires.ts, over `nemia factory
+ * A factory's Hires on the board (`/api/namespaces/<factory>/hires/<workflow>.<step>`, factory/parts/hires.ts, over `nemia factory
  * hire` and `fire`): a story of an agent hired into a step, replaced and fired, each answered as the Hire read again; and one table of
  * what a hire refuses — in a scratch store whose factory is filed with the package's own verbs. Every write is read back from the
  * factory's file, and every refusal leaves it as it was.

@@ -10,7 +10,7 @@ import type { ApiEnv } from '../layer.ts';
 import { agentGuard, tryGuard } from '../agents/agents.ts';
 import { skillGuard } from '../agents/skills.ts';
 import { buildGuard } from '../workflows/builder.ts';
-import type { Handing } from '../factory-parts/parts.ts';
+import type { Handing } from '../factory/parts/parts.ts';
 
 const WORKFLOW_SHAPE =
   '`{ "metadata": { "name" | "resourceVersion" }, "spec": { "steps": [{ "name", "keys", "body" }], "readme"? }, "schemas"?: [{ "file", "text" }] }`';

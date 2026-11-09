@@ -1532,7 +1532,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     'high · default',
     'auto · default',
     'Read, Grep · default',
-    '3600 s · default',
+    '1h 00m · default',
   ]);
 
   assert.equal(
@@ -1611,7 +1611,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     remote: null,
     bridge: null,
   };
-  assert.deepEqual(ranWith(rowsOf(set, asSet)), ['opus', 'high', 'dontAsk', 'none', '600 s'], "the workflow's words");
+  assert.deepEqual(ranWith(rowsOf(set, asSet)), ['opus', 'high', 'dontAsk', 'none', '10m 00s'], "the workflow's words");
   assert.equal(
     ['max attempts', 'attempts'].some((row) => row in rowsOf(set, asSet) || row in rowsOf(unset, bare) || row in rowsOf(unset, null)),
     false,
@@ -1641,7 +1641,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
   assert.equal(rowsOf(unset, null).context, '—');
 
   assert.deepEqual(ranWith(rowsOf(unset, null)), ['—', '—', '—', '—', '—'], 'not filed: a dash where the workflow sets nothing');
-  assert.deepEqual(ranWith(rowsOf(set, null)), ['opus', 'high', 'dontAsk', 'none', '600 s'], "and the workflow's words where it does");
+  assert.deepEqual(ranWith(rowsOf(set, null)), ['opus', 'high', 'dontAsk', 'none', '10m 00s'], "and the workflow's words where it does");
 });
 
 test('a step on a remote A2A agent says the agent and its address, and no model, effort, context, fence or tools the run never chose', () => {

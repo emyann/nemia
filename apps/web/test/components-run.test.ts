@@ -474,7 +474,7 @@ test("a breakdown's rows are terms with their amounts, each named by what it cou
     assert.match(html, new RegExp(`data-breakdown-row="${what}"`), what);
   assert.doesNotMatch(html, /Everything else/, 'the last line is absent where the four parts cover the wall');
   assert.match(html, /<dd[^>]*>10m<\/dd>/, "the sessions' ten minutes");
-  assert.match(html, /data-breakdown-foot[^>]*>Wall time 1h, from 11 Oct 1:11 PM\.</);
+  assert.match(html, /data-breakdown-foot[^>]*>Wall time 1h 00m, from 11 Oct 1:11 PM\.</);
 });
 
 /** The Cost cell of a row with `cost` and `tokens`. */

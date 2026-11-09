@@ -2,7 +2,8 @@ import { lazy, Suspense, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import type { StepTry } from '../../lib/api';
 import type { RunView, StepView } from '../../lib/runView';
-import { duration, isLive } from '../../lib/canvas';
+import { isLive } from '../../lib/canvas';
+import { durationWords } from '../../lib/duration';
 import { waitsAtGate, stepState, type StepState } from '../../lib/status';
 import { gateOfStep } from '../../lib/gate';
 import { foldTranscript, sessionToRead } from '../../lib/transcript';
@@ -157,7 +158,7 @@ function Details({ run, step, state, runCancelled, current, selected, onSelect }
                   'still running'
                 ) : null),
             ],
-            ['latest took', latest?.endedAt ? duration(Date.parse(latest.endedAt) - Date.parse(latest.startedAt)) : null],
+            ['latest took', latest?.endedAt ? durationWords(Date.parse(latest.endedAt) - Date.parse(latest.startedAt), 'second') : null],
             ['ran on', ranOnWords(latest)],
             ['used', step.used?.used],
             ['cost', step.used?.cost],

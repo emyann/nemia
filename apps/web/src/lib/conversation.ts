@@ -9,7 +9,7 @@
  * It knows nothing of either conversation's events: each maps its own onto this shape through an adapter of its own — hers is
  * `chatItems` in `lib/chatFollowing.ts` — so the family in `components/conversation/` draws one thing and names neither.
  */
-import { duration } from './canvas.ts';
+import { durationWords } from './duration.ts';
 import type { TraceStatus } from '@/components/ui/trace';
 
 /** What a line of a turn is doing: done draws plain, the other four each in their own state. */
@@ -93,7 +93,7 @@ export type Counted = 'call' | 'step';
 
 /** The one line a folded turn says: `Worked for 2m 14s · 9 calls`, over `ms` and how many `lines` it holds, counted as `counts`. */
 export const turnWords = (ms: number, lines: number, counts: Counted): string =>
-  `Worked for ${duration(ms)} · ${lines === 1 ? `1 ${counts}` : `${lines} ${counts}s`}`;
+  `Worked for ${durationWords(ms, 'second')} · ${lines === 1 ? `1 ${counts}` : `${lines} ${counts}s`}`;
 
 /** The words the line between what was read and what is new says: `2 new`. */
 export const newWords = (unread: number): string => (unread === 1 ? '1 new' : `${unread} new`);

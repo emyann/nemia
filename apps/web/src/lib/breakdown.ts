@@ -5,7 +5,8 @@
  */
 import type { RunTokens, Spent } from './api/judged.ts';
 import type { RunClock, StepCost } from './api/runs.ts';
-import { sinceWords } from './runWords.ts';
+import { durationWords } from './duration.ts';
+import { dollars } from './money.ts';
 
 /** One line of a breakdown: what it counts, how much in the tile's own unit, how the page says it, and whether it says there is none. */
 export type BreakdownRow = { what: string; amount: number; said: string; none: boolean };
@@ -26,8 +27,8 @@ export function shared(parts: readonly number[], unit: number, total: number): n
   return floors;
 }
 
-/** What a part of the clock says for `minutes` whole minutes of `ms`: `none`, `under 1m`, or the minutes as the tile says them. */
-const minutesSaid = (ms: number, minutes: number): string => (ms <= 0 ? 'none' : minutes < 1 ? 'under 1m' : sinceWords(minutes * 60_000));
+/** What a part of the clock says for `minutes` whole minutes of `ms`: `none`, or its minutes as the tile says them (`1h 05m`). */
+const minutesSaid = (ms: number, minutes: number): string => (ms <= 0 ? 'none' : durationWords(minutes * 60_000, 'minute'));
 
 /** The clock's last line: the time none of its four parts covers. */
 export const CLOCK_REST = 'Everything else';
@@ -56,12 +57,9 @@ export function clockBreakdown(clock: RunClock, head: string, from: string): Bre
   return {
     head,
     rows: parts.map(([what, ms], i) => ({ what, amount: ms, said: minutesSaid(ms, minutes[i]), none: ms <= 0 })),
-    foot: `Wall time ${sinceWords(clock.wallMs)}, from ${from}.`,
+    foot: `Wall time ${durationWords(clock.wallMs, 'minute')}, from ${from}.`,
   };
 }
-
-/** Dollars from whole cents: `$5.63`. */
-const dollars = (cents: number): string => `${cents < 0 ? '-' : ''}$${(Math.abs(cents) / 100).toFixed(2)}`;
 
 /** The cost's last line: what the run cost beyond its steps' own costs. */
 export const COST_REST = 'Outside its steps';
@@ -83,7 +81,7 @@ export function costBreakdown(cost: Spent, steps: readonly StepCost[]): Breakdow
     rows: parts.map((part, i) => ({
       what: part.what,
       amount: part.usd,
-      said: part.run ? dollars(cents[i]) : 'none measured',
+      said: part.run ? dollars(cents[i] / 100) : 'none measured',
       none: !part.run,
     })),
     foot: cost.unmeasured > 0 ? 'A session that ended with no cost on it is counted in none of these.' : '',

@@ -7,6 +7,7 @@ import type { Ceilings, Factory, QuotaWindow, RunSummary } from './api';
 import type { TokenCounts } from './breakdown.ts';
 import { keptBy } from './factories.ts';
 import { inFlight, titleOf, waitsOnYou } from './factory.ts';
+import { durationWords } from './duration.ts';
 import { clockWord } from './quota.ts';
 import { stepState } from './status.ts';
 
@@ -70,10 +71,6 @@ export const outcomeOf = (run: Pick<RunSummary, 'cancelledAt' | 'toDecide' | 'st
   return run.status === 'succeeded' ? 'succeeded' : 'failed';
 };
 
-/** Minutes at work in words: `17m`, `2h 5m`. */
-export const minutesWord = (minutes: number): string =>
-  minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h${minutes % 60 ? ` ${minutes % 60}m` : ''}`;
-
 /** A cap as the readout says it: none where it is zero or unknown. */
 const capOf = (cap: number | null | undefined): number | null => (cap ? cap : null);
 
@@ -134,7 +131,16 @@ const rowsOf = (open: readonly RunSummary[], now: number): AgentRow[] =>
       run.steps.flatMap((step) => {
         if (step.agent === null || step.since === null || !working(run, step)) return [];
         const minutes = Math.max(0, Math.floor((now - Date.parse(step.since)) / 60_000));
-        return [{ agent: step.agent, step: step.name, run: run.id, title: titleOf(run), minutes, atWork: minutesWord(minutes) }];
+        return [
+          {
+            agent: step.agent,
+            step: step.name,
+            run: run.id,
+            title: titleOf(run),
+            minutes,
+            atWork: durationWords(minutes * 60_000, 'minute'),
+          },
+        ];
       }),
     )
     .sort((a, b) => b.minutes - a.minutes || a.run.localeCompare(b.run) || a.step.localeCompare(b.step));
@@ -172,12 +178,6 @@ export function stripOf(given: StripIn): Strip {
     more: Math.max(0, rows.length - ROWS_SHOWN),
   };
 }
-
-/**
- * An amount in dollars as a sticker says it, never more than four figures wide below $10,000, so the six stickers keep one line: whole from
- * $10, to the cent below; `—` for none.
- */
-export const dollars = (usd: number | null): string => (usd === null ? '—' : usd >= 10 ? `$${Math.round(usd)}` : `$${usd.toFixed(2)}`);
 
 /** The readout of what is at work: `5 OF 7 RUNS · 2 OF 50 SESSIONS`, a part with no cap said without its `OF`. */
 export const readoutOf = ({ runs, sessions }: Pick<Strip, 'runs' | 'sessions'>): string => {

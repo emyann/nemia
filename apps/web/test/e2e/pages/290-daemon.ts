@@ -77,7 +77,7 @@ export default {
       await reload(page);
       const stalled = page.locator('[data-daemon="stalled"]', {
         hasText: new RegExp(
-          `^Nothing ticks this store, so no run moves: the nemia up of pid ${process.pid} is alive but silent, last heard from 20 min ago\\. ${START} — it takes the store over\\.$`,
+          `^Nothing ticks this store, so no run moves: the nemia up of pid ${process.pid} is alive but silent, last heard from 20 minutes ago\\. ${START} — it takes the store over\\.$`,
         ),
       });
       await expectVisible(

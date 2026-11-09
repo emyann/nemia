@@ -5,6 +5,7 @@
  */
 import type { StepView } from '../../lib/runView';
 import type { Frozen } from '../../lib/frozen';
+import { budgetWord } from '../../lib/money';
 
 /** The budgets a gated step proposed for the steps after it, or the caps its approval set, as the api says each. */
 export type GateBudgets = NonNullable<NonNullable<StepView['gate']>['budgets']>;
@@ -12,9 +13,6 @@ export type GateBudgets = NonNullable<NonNullable<StepView['gate']>['budgets']>;
 export type GivenBudget = { step: string; usd: number };
 /** What a person typed in each budget's amount field, by step: a step not there is left as proposed. */
 export type Amounts = Readonly<Record<string, string>>;
-
-/** An amount in dollars, as the package says one (`$40.00`). */
-const money = (usd: number): string => `$${usd.toFixed(2)}`;
 
 /** The amount a field holds, or null where it holds no number above zero. */
 const amountOf = (text: string): number | null => {
@@ -151,11 +149,11 @@ function BudgetRow({
           </span>
         )}{' '}
         <span data-own className="text-body-small text-muted-foreground">
-          {row.workflow === null ? 'no budget of its own' : `its own budget ${money(row.workflow)}`}
+          {row.workflow === null ? 'no budget of its own' : `its own budget ${budgetWord(row.workflow)}`}
         </span>{' '}
         {above && row.workflow !== null && (
           <span data-above-words className="text-body-small font-medium text-yours">
-            {`above the workflow's ${money(row.workflow)}`}
+            {`above the workflow's ${budgetWord(row.workflow)}`}
           </span>
         )}
       </div>

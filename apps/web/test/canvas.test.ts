@@ -13,7 +13,6 @@ import {
   besideBar,
   besideOpen,
   drawnWhole,
-  duration,
   edgeLine,
   edgesOf,
   edgeState,
@@ -47,22 +46,7 @@ const loop = (from: string, to: string, rounds = 3): GraphEdge => ({ from, to, k
 const graphOf = (...edges: GraphEdge[]): RunGraph => ({ roots: [], edges });
 const step = (name: string, state: StepState, note: string | null = null, roundDue = false): EdgeStep => ({ name, state, note, roundDue });
 
-test("duration and attemptLine: an attempt's time", async (t) => {
-  await t.test(
-    "a duration reads in its two largest units, and one below zero — the engine's clock ahead of this one — as nothing elapsed yet",
-    () => {
-      const s = 1000;
-      const cases: Array<[number, string]> = [
-        [0, '0s'],
-        [42 * s, '42s'],
-        [12 * 60 * s + 4 * s, '12m 04s'],
-        [3 * 3600 * s + 12 * 60 * s + 59 * s, '3h 12m'],
-        [2 * 86400 * s + 4 * 3600 * s, '2d 4h'],
-        [-5 * s, '0s'],
-      ];
-      for (const [ms, said] of cases) assert.equal(duration(ms), said, String(ms));
-    },
-  );
+test("attemptLine: an attempt's time", async (t) => {
   await t.test('an attempt that runs counts its time; one that is over says when it started', () => {
     const now = Date.parse('2026-09-13T01:00:00.000Z');
     const startedAt = '2026-09-13T00:47:56.000Z';

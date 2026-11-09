@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
-import { runGone, runObjectQuery, stepTriesQuery } from '../src/lib/api/run.ts';
+import { readGone, runObjectQuery, stepTriesQuery } from '../src/lib/api/run.ts';
 import type { Run, StepTry } from 'objects';
 import { decisionQuery, type RunDecision } from '../src/lib/api/decision.ts';
 import { readTranscript, stepPathQuery, type StepPath } from '../src/lib/api/steps.ts';
@@ -69,7 +69,7 @@ test("get, the run page's reads: each decodes what the api gives, keeps out what
     );
     assert.ok(err instanceof ReadRefusal && !(err instanceof UnreadAnswer), String(err));
     assert.equal(err.status, 404);
-    assert.equal(runGone(err), true);
+    assert.equal(readGone(err), true);
   });
   await t.test('a word the board does not know in a closed field of a try is refused at decode, never shown', async (t) => {
     const attempts = { count: 1, latest: { startedAt: '2026-09-30T05:00:00.000Z', ended: 'failed', endedAt: null, reason: 'mystery' } };

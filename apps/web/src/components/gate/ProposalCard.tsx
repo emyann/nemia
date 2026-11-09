@@ -11,7 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Instant } from '@/components/time/Instant';
-import { approveProposal, declineProposal, proposalKey, proposalQuery, proposalsKey, ReadRefusal } from '@/lib/api';
+import { approveProposal, declineProposal, proposalKey, proposalQuery, proposalsKey, readGone } from '@/lib/api';
 import { filled, ink, ringed } from '@/lib/meaning';
 import { proposalOffers, widensHue, type ProposalOffers } from '@/lib/proposals';
 import { cn } from '@/lib/utils';
@@ -42,7 +42,7 @@ export function ProposalCard({ factory, name }: { factory: string; name: string 
     },
   });
   if (!proposal) {
-    if (error instanceof ReadRefusal && error.status === 404)
+    if (readGone(error))
       return (
         <p data-no-proposal={name} className="text-body-medium text-muted-foreground">
           {factory} has no proposal named {name}: it was never made, or its factory is gone.

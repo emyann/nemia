@@ -7,7 +7,7 @@
 import { queryOptions } from '@tanstack/react-query';
 import type { Delegation, DelegationWrite, Proposal } from 'objects';
 import { pace } from '../feed.ts';
-import { ReadRefusal } from './read.ts';
+import { retryUnlessGone } from './gone.ts';
 import { agents, delegations, proposals } from './objects.ts';
 
 /** The key of the factory `factory`'s proposals, which a judgement invalidates exactly. */
@@ -24,13 +24,16 @@ export const proposalsQuery = (factory: string) =>
     refetchInterval: () => pace(15_000),
   });
 
-/** The proposal `name` of `factory`: polled, and not asked again where the api answers it is not there. */
+/**
+ * The proposal `name` of `factory`: polled, and not asked again where the api answers it is not there (`retryUnlessGone`), whose retry is
+ * typed by an `Error` here so the query's error stays one.
+ */
 export const proposalQuery = (factory: string, name: string) =>
   queryOptions({
     queryKey: proposalKey(factory, name),
     queryFn: () => proposals.get(factory, name),
     refetchInterval: () => pace(15_000),
-    retry: (count: number, error: Error) => !(error instanceof ReadRefusal && error.status === 404) && count < 3,
+    retry: (failures: number, error: Error) => retryUnlessGone(failures, error),
   });
 
 /** Approve the proposal `name` of `factory`, the person's: the proposal as it then reads. Rejects with a `WriteRefusal`. */

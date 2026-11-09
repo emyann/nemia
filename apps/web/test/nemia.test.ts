@@ -5,6 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { retryUnlessGone } from '../src/lib/api/gone.ts';
 import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
 import {
   levelQuery,
@@ -213,5 +214,6 @@ test('levelQuery, nemiaMemoryQuery, nemiaFactQuery: what the api answers of her,
     assert.equal(retry(0, new ReadRefusal('no such fact', 404)), false);
     assert.equal(retry(0, new ReadRefusal('down', 500)), true);
     assert.equal(retry(3, new ReadRefusal('down', 500)), false, 'three tries, as by default');
+    assert.equal(retry, retryUnlessGone, 'the one rule of a read gone, never a copy');
   });
 });

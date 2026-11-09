@@ -8,7 +8,9 @@
  *
  * Beside the effect in `lib/useStepTranscript.ts`.
  */
-import { streamDataOf, type StreamPartial, type TranscriptEvent } from './api/steps.ts';
+import { UnreadAnswer } from './api/read.ts';
+import { STEP_STREAM_SCHEMAS, type StreamData, type StreamPartial, type TranscriptEvent } from './api/steps.ts';
+import { streamDataOf } from './api/stream.ts';
 import { follow, type Followed, type Follower, type Frames, type StreamLike } from './follow.ts';
 import { mergeEvents } from './transcript.ts';
 
@@ -82,19 +84,25 @@ export const followedFrom = (first: { live: boolean; cursor: string | null; open
   first.live || (waiting && first.open) ? first.cursor : null;
 
 /**
- * What a step's stream means, for `follow`: its events decoded by their schemas (`streamDataOf`), each change taken as `changed` says
+ * What a step's stream means, for `follow`: its events decoded by their schemas (`streamDataOf`), one that does not decode handed to
+ * `follow` to say as it is (an `UnreadAnswer`), each change taken as `changed` says
  * with the blocks this following has seen written whole, consecutive whole events joined as they queue, `settled` the end, and a
  * following that ends dropping the message being written. A following of its own, since the blocks it closes are its own.
  */
 const stepFollower = (): Follower<Following, Change> => {
   const closed = new Set<string>();
-  const one = <T>(got: T | null | undefined, of: (said: T) => Change): Change[] => (got ? [of(got)] : []);
+  const one =
+    <K extends keyof StreamData>(event: K, of: (said: StreamData[K]) => Change) =>
+    (m: MessageEvent): (Change | UnreadAnswer)[] => {
+      const got = streamDataOf(STEP_STREAM_SCHEMAS, event, m.data);
+      return [got instanceof UnreadAnswer ? got : of(got)];
+    };
   return {
     reads: {
-      transcript: (m) => one(streamDataOf('transcript', m.data), (event) => ({ kind: 'events', events: [event] })),
-      partial: (m) => one(streamDataOf('partial', m.data), (piece) => ({ kind: 'partial', ...piece })),
-      moved: (m) => one(streamDataOf('moved', m.data), () => ({ kind: 'moved' })),
-      following: (m) => one(streamDataOf('following', m.data), (said) => ({ kind: 'streamed', streamed: said.streamed })),
+      transcript: one('transcript', (event) => ({ kind: 'events', events: [event] })),
+      partial: one('partial', (piece) => ({ kind: 'partial', ...piece })),
+      moved: one('moved', () => ({ kind: 'moved' })),
+      following: one('following', (said) => ({ kind: 'streamed', streamed: said.streamed })),
     },
     over: ['settled'],
     fold: (s, c) => changed(s, c, closed),
@@ -105,7 +113,10 @@ const stepFollower = (): Follower<Following, Change> => {
     },
     ending: (s) => ({ ...s, partial: null }),
     opened: (s) => s,
-    unreadable: (m) => streamDataOf('unreadable', m.data) ?? null,
+    unreadable: (m) => {
+      const said = streamDataOf(STEP_STREAM_SCHEMAS, 'unreadable', m.data);
+      return said instanceof UnreadAnswer ? null : said;
+    },
     words: {
       unread: 'The conversation could not be read.',
       refused: 'The api refused to follow this conversation any further. Reload the page to read it again.',

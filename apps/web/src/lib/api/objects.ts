@@ -8,7 +8,7 @@
  * take one.
  *
  * What a call rejects with is what the board's own reads and writes reject with (`read.ts`): a refusal in the api's words (its `error`)
- * and its status — a `ReadRefusal` for a read, so a run gone is still `runGone`, a `WriteRefusal` for a write — and an `UnreadAnswer`
+ * and its status — a `ReadRefusal` for a read, so a run gone is still `readGone`, a `WriteRefusal` for a write — and an `UnreadAnswer`
  * where an answer does not decode, naming the first key that is wrong. So each call runs on a `fetch` of its own that keeps the status and
  * the body of what it was answered, which the client's own errors do not carry whole.
  *

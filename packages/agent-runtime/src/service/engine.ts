@@ -766,7 +766,7 @@ const make = (options: EngineOptions) =>
     const observedNow = () => copyOf(observed);
     const { credentials, missingCredential, telemetry, claudeExecutable, cgroupParent } = options;
     const attached = attachedSessions(root, claudeExecutable, { cgroupParent });
-    const made = runnersOf(harnesses, root, credentials, missingCredential, telemetry, attached, claudeExecutable, cgroupParent);
+    const made = runnersOf(harnesses, { root, credentials, missingCredential, telemetry, attached, claudeExecutable, cgroupParent });
     const runners = Object.fromEntries(Object.entries(made).map(seamOf(harnesses, events, counted, options)));
     const byName = harnessedOf(harnesses, runners);
     const fallen = own(byName, fallback);

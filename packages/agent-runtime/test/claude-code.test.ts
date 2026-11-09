@@ -599,7 +599,7 @@ test("REFUSED at the door: Claude Code's flags on the wrong harness, a flag the 
       const { codex } = await import('../src/index.ts');
       const { Engine } = await import('../src/index.ts');
       const { builtEngine } = await import('./engine.ts');
-      const other = { name: 'other', command: () => ({ cmd: 'true', args: [] }) };
+      const other = { name: 'other', can: [], command: () => ({ cmd: 'true', args: [] }) };
       const e = builtEngine(Engine.layer({ root: tmp('root'), harnesses: { claude: 'claude', codex, other } }));
       const claude = { appendSystemPromptFile: '/a/prompt.md' };
       for (const harness of ['codex', 'other']) {

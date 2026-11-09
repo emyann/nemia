@@ -17,7 +17,7 @@ test('a worker started in a root made by hand, and never stopped', WAITED, async
   const script = path.join(dir, 'listener.cjs');
   fs.writeFileSync(script, "require('node:fs').writeFileSync('started', ''); process.stdin.resume(); setTimeout(() => process.exit(0), 120_000).unref();\n");
   const spec: HarnessSpec = {
-    name: 'in', command: () => ({ cmd: process.execPath, args: [script] }),
+    name: 'in', can: [], command: () => ({ cmd: process.execPath, args: [script] }),
     input: { line: (text) => JSON.stringify({ said: text }), closesOn: { key: 'kind', value: 'end' } },
   };
   await Effect.runPromise(detachedOps(spec, dir).spawn({ name: 'ae/leak/3', brief: 'b', cwd: dir }));

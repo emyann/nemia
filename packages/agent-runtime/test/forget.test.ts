@@ -389,7 +389,7 @@ test('a forget cut short by a harness that could not remove its files keeps the 
   assert.ok(!fs.existsSync(journalOf(root, ids[0])));
 });
 
-const check: HarnessSpec = { name: 'check', command: () => ({ cmd: 'sh', args: ['-c', 'echo checked'] }) };
+const check: HarnessSpec = { name: 'check', can: [], command: () => ({ cmd: 'sh', args: ['-c', 'echo checked'] }) };
 
 test("forget removes the run files a detached harness keeps of a settled session, and no other session's", WAITED, async (t) => {
   const root = scratch('ae-forget-root-');

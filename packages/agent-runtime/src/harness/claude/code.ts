@@ -43,7 +43,7 @@ import {
 } from '../detached/detached.ts';
 import { sessionDrainFile, sessionDrainOf, readJobHold, type JobHold } from './job-hold.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile, claudeTranscriptRecords } from './transcript.ts';
-import { CLAUDE_CONTEXT_TOKENS, bridgeAsked, claudeCodeRefuses, claudeRefuses } from './vocabulary.ts';
+import { CLAUDE_CONTEXT_TOKENS, CLAUDE_DECLARATION, bridgeAsked, claudeCodeRefuses, claudeRefuses } from './vocabulary.ts';
 import { claudePartials, claudeStreamKept, claudeStreamOutput } from '../detached/output.ts';
 import { projectMcpConfig } from '../mcp.ts';
 import { RunnerError } from '../error.ts';
@@ -179,13 +179,8 @@ export const claudeJobSpec = (executable?: string, hold?: JobHoldOptions): Harne
   partials: claudePartials,
   prepare: (r, beside) => claudePrepare(r, beside, hold),
   refuses: claudeRefuses,
+  can: CLAUDE_DECLARATION.can,
   contextTokens: CLAUDE_CONTEXT_TOKENS,
-  projectMcp: true,
-  enabledSkills: true,
-  env: true,
-  claudeFlags: true,
-  mounts: { readOnly: true, writable: true },
-  callAdmission: true,
   resumeCostCarried: true,
 });
 

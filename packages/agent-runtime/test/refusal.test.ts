@@ -283,7 +283,7 @@ const fakeHarness = (sessions: Map<string, Sighting>): AsyncRunner => ({
 });
 
 /** A command a test harness runs: nothing. */
-const check: HarnessSpec = { name: 'check', command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) };
+const check: HarnessSpec = { name: 'check', can: [], command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) };
 
 /**
  * The engines the harness rows file through, each over a store in memory a row can read, built once per test: the doors a
@@ -305,12 +305,13 @@ const harnessDoors = () => {
   };
   const picky: HarnessSpec = {
     name: 'picky',
+    can: [],
     command: () => ({ cmd: 'true', args: [] }),
     refuses: (task) => (task.config?.model === 'huge' ? 'picky runs no huge models' : undefined),
   };
   const own = { ...asyncOps(fakeHarness(new Map())), refuses: (task: TaskSpec) => (task.brief === 'no' ? 'own runs no "no"' : undefined) };
-  const bare: HarnessSpec = { name: 'bare', command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) };
-  const windowed: HarnessSpec = { ...bare, name: 'windowed', contextTokens: { least: 8_000, most: 32_000 } };
+  const bare: HarnessSpec = { name: 'bare', can: [], command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) };
+  const windowed: HarnessSpec = { ...bare, name: 'windowed', can: ['contextTokens'], contextTokens: { least: 8_000, most: 32_000 } };
   const runner: AsyncRunner = { spawn: async () => {}, observe: async () => new Map(), stop: async () => {}, logs: async () => '' };
   return {
     shipped: over(),
@@ -838,7 +839,7 @@ test('REFUSED: `mayAsk: true` on a session this runtime does not hold attached, 
 });
 
 test("REFUSED: a list in `enabledSkills` on a road that cannot close a session's skills, and taken on Claude Code's SDK roads", async () => {
-  const bare: HarnessSpec = { name: 'bare', command: () => ({ cmd: 'true', args: [] }) };
+  const bare: HarnessSpec = { name: 'bare', can: [], command: () => ({ cmd: 'true', args: [] }) };
   const options = {
     root: scratch('ae-enabled-skills-'),
     journal: asyncStore(memoryStore()),

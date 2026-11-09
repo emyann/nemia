@@ -15,6 +15,7 @@ export const THREAD = '01a09996-d343-7932-8971-b2f209ba315b';
 /** A harness that runs `script` under `sh`, whose start event is `start`. */
 export const sh = (script: string, start: StartEvent, more: Partial<HarnessSpec> = {}): HarnessSpec => ({
   name: 'sh',
+  can: [],
   command: () => ({ cmd: 'sh', args: ['-c', script] }),
   start,
   ...more,

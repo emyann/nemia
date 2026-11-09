@@ -407,6 +407,7 @@ test("a spec's config file: the task's servers written owner-only outside the wo
   let given: HarnessIO | undefined;
   const spy: HarnessSpec = {
     name: 'sh',
+    can: [],
     command: (_r, io) => {
       given = io;
       return { cmd: 'sh', args: ['-c', 'exit 0'] };

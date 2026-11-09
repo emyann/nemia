@@ -15,8 +15,6 @@ import { writeWhole } from '../whole-file/whole-file.store.ts';
 /** What the cursor file holds: one decimal number of bytes, and a newline. */
 const cursorText = (cursor: number): string => `${cursor}\n`;
 
-/** The temp name a write goes to before it is renamed over the file: beside it, so the rename stays on one filesystem. */
-
 /**
  * The cursor `file` holds — or undefined where there is no such file, which is a watch's first: it starts where it was told to, and
  * writes the file as it reads. A file that holds anything but a whole number of bytes is refused by name (exit 2), never read as 0: a

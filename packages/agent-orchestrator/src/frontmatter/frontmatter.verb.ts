@@ -73,11 +73,9 @@ export function markdownIn(dir: string): string[] {
     });
 }
 
-/** `text` written whole over `file` (`writeWhole`), the file's mode put back on the file that replaced it. */
+/** `text` written whole over `file` (`writeWhole`) at the file's own mode, so a read-only file is never writable in between. */
 function replaceFile(file: string, text: string): void {
-  const mode = fs.statSync(file).mode & 0o777;
-  writeWhole(file, text);
-  fs.chmodSync(file, mode);
+  writeWhole(file, text, { mode: fs.statSync(file).mode & 0o777 });
 }
 
 /** The lines of `text`'s frontmatter, already YAML, that YAML ends at ` #`, as `file:line`; none for a frontmatter that does not read. */

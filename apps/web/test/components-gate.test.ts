@@ -973,6 +973,16 @@ test('the gate of an ending step says approving is what files it, and its send-b
   assert.doesNotMatch(held, /name="[^"]*-to"/, "and its send-back is the step's own");
 });
 
+test("the second press at an ending's gate reads the ending's warning, on its base branch, then the press that approves it", () => {
+  const onMain = textsOf(renderToStaticMarkup(createElement(Gates.EndingConfirm, { step: 'ship', onto: 'main' }))).join(' ');
+  assert.match(
+    onMain,
+    /runs ship in the repository's own checkout on main, and it cannot be taken back\. Press Run ship now to approve it\.$/,
+  );
+  const unknown = textsOf(renderToStaticMarkup(createElement(Gates.EndingConfirm, { step: 'ship', onto: null }))).join(' ');
+  assert.match(unknown, /own checkout, and it cannot be taken back\. Press Run ship now/, 'no branch is named where the run knows none');
+});
+
 test("the gate's own words at an ending: the approval's box says the step is handed them, and the word taken names the step it was about", () => {
   const html = withClient(
     createElement(Gates.Gate, { runId: 'r-1', step: 'ship', approveLine: 'nemia approve r-1 ship', back: ['review'], acts: true }),

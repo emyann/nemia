@@ -34,8 +34,8 @@ export type StepFiledView = NonNullable<RunStepStatus['filed']>;
  * try's closeout, or why it could not be read.
  *
  * Its closeout, its tries and its current try's short (`current`, absent from the page) are typed as the decision's mirror has them
- * (`api/tries.ts`), read only, which the objects' ones are too. `current` is optional for a view built with no try read, as a
- * workflow's unstarted run is (`unstartedRun`).
+ * (`api/tries.ts`), read only, which the objects' ones are too. `current` is optional for a view built with no try read, as the
+ * board's test fixtures build one.
  */
 export type StepView = Omit<RunStepStatus, 'status' | 'filed' | 'current'> & {
   readonly current?: RunStepStatus['current'];

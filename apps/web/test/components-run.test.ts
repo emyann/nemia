@@ -374,6 +374,35 @@ test('a card that reads runs as context says how many in a chip, each run on hov
   assert.doesNotMatch(await cardMarkup(atGate(), false), /data-context/);
 });
 
+test("a ghost's card writes the api's word for what it waits on, each run id in it a link to that run's page", async () => {
+  const base = atGate({}, { waitingOnYou: [], waitingOnYouWords: [] });
+  const ghost: RunView = {
+    ...base,
+    toDecide: null,
+    waiting: {
+      runs: [
+        { run: 'a-1x2y', missing: false, cancelledAt: null, gone: [] },
+        { run: 'b-3z', missing: false, cancelledAt: null, gone: [] },
+      ],
+      word: 'after a-1x2y and b-3z land',
+      advice: 'it starts once both land',
+      waitingOnYou: false,
+    },
+  };
+  const html = await cardMarkup(ghost, false);
+  assert.match(html, /data-ghost-run="true"/, 'the card is a ghost');
+  const line = /<p[^>]*data-waiting="on-runs"[^>]*>([\s\S]*?)<\/p>/.exec(html)![1];
+  assert.equal(line.replace(/<[^>]+>/g, ''), 'after a-1x2y and b-3z land', "the line reads the api's word as it is");
+  assert.deepEqual(
+    [...line.matchAll(/<a [^>]*href="\/runs\/([^"]+)"[^>]*>([^<]+)<\/a>/g)].map((m) => [m[1], m[2]]),
+    [
+      ['a-1x2y', 'a-1x2y'],
+      ['b-3z', 'b-3z'],
+    ],
+    'each run id the word names is a link to its page',
+  );
+});
+
 test("the run bar: the run's title and id, what it asks of a person, its steps each a button with its status, and its brief", async () => {
   const { RunBar } = await import('../src/components/run/RunBar.tsx');
   const { titleOf: runTitle } = await import('../src/lib/factory.ts');

@@ -49,6 +49,24 @@ const { StatusChip, StepNote } = await import('../src/components/step/StatusChip
 const { StepTabs } = await import('../src/components/step/StepInspector.tsx');
 const { StepNode } = await import('../src/components/step/StepNode.tsx');
 const { afterEdges, readEdges, stepData, stepEdges } = await import('../src/components/step/stepGraph.ts');
+type StepGraphFacts = import('../src/components/step/stepGraph.ts').StepGraphFacts;
+
+/** Of a run, exactly what its graph's edges are drawn from (`StepGraphFacts`): a test of `stepEdges` gives it no more. */
+const factsOf = (run: RunView): StepGraphFacts => ({
+  cancelledAt: run.cancelledAt,
+  holding: run.holding,
+  graph: run.graph,
+  steps: run.steps.map(({ name, phase, reason, on, via, note, roundDue, message }) => ({
+    name,
+    phase,
+    reason,
+    on,
+    via,
+    note,
+    roundDue,
+    message,
+  })),
+});
 const { StepRail, StepTiles } = await import('../src/components/step/StepRail.tsx');
 const { flowSteps, railOf, tilesOf } = await import('../src/lib/flow.ts');
 const { StateEdge } = await import('../src/components/step/StateEdge.tsx');
@@ -273,7 +291,7 @@ test("the loop's edge goes back to its target, whatever the steps' specs lack", 
     review: 'round 3 of 3, and it asked again — once more: nemia retry r-1 review --round',
   });
 
-  const edges = stepEdges(run, 'r-1/');
+  const edges = stepEdges(factsOf(run));
   const shape = ({ id, source, target, type, sourceHandle, targetHandle, label, data }: StateFlowEdge) => ({
     id,
     source,
@@ -288,9 +306,9 @@ test("the loop's edge goes back to its target, whatever the steps' specs lack", 
     edges.map(shape),
     [
       {
-        id: 'r-1/implement->review',
-        source: 'r-1/implement',
-        target: 'r-1/review',
+        id: 'implement->review',
+        source: 'implement',
+        target: 'review',
         type: 'state',
         sourceHandle: undefined,
         targetHandle: undefined,
@@ -298,9 +316,9 @@ test("the loop's edge goes back to its target, whatever the steps' specs lack", 
         data: { state: 'done', loop: false },
       },
       {
-        id: 'r-1/loop:review->implement',
-        source: 'r-1/review',
-        target: 'r-1/implement',
+        id: 'loop:review->implement',
+        source: 'review',
+        target: 'implement',
         type: 'state',
         sourceHandle: LOOP_SOURCE,
         targetHandle: LOOP_TARGET,
@@ -312,14 +330,14 @@ test("the loop's edge goes back to its target, whatever the steps' specs lack", 
   );
 
   const due = stepEdges(
-    loopRun({ implement: null, review: 'round 2 of 3 due — review asked again, and the next tick files implement' }, true),
+    factsOf(loopRun({ implement: null, review: 'round 2 of 3 due — review asked again, and the next tick files implement' }, true)),
   );
   assert.deepEqual([due[1].label, due[1].data], ['round 2 of 3', { state: 'running', loop: true }]);
-  const first = stepEdges(loopRun({ implement: null, review: null }));
+  const first = stepEdges(factsOf(loopRun({ implement: null, review: null })));
   assert.deepEqual([first[1].label, first[1].data], [undefined, { state: 'to-come', loop: true }]);
 
   const chain = { ...run, graph: { roots: ['implement', 'review'], edges: [] } };
-  assert.deepEqual(stepEdges(chain), [], 'a run with no loop draws no edge back');
+  assert.deepEqual(stepEdges(factsOf(chain)), [], 'a run with no loop draws no edge back');
 });
 
 /**
@@ -366,7 +384,7 @@ const legendMarkup = (): string => renderToStaticMarkup(createElement(ReactFlowP
 
 test("a loop's edge is drawn from under its looping step, dashed, into its target with the arrow and the round beside it", () => {
   const [, back] = stepEdges(
-    loopRun({ implement: 'round 3 of 3', review: 'round 3 of 3, and it asked again — once more: nemia retry r-1 review --round' }),
+    factsOf(loopRun({ implement: 'round 3 of 3', review: 'round 3 of 3, and it asked again — once more: nemia retry r-1 review --round' })),
   );
   const html = withMotion(false, () => edgeMarkup(back));
   const d = pathOf(html);
@@ -419,7 +437,7 @@ test('a running edge carries a dot travelling its own path; an edge done, to com
     ['ask', 'needs-human', 'tokens'],
     ['draft', 'running (working)'],
   ]);
-  const drawn = stepEdges(run);
+  const drawn = stepEdges(factsOf(run));
   const html = new Map(drawn.map((edge) => [edge.id, withMotion(false, () => edgeMarkup(edge))]));
   const moving = ['implement->review', 'tokens->theme'];
   assert.deepEqual(
@@ -614,7 +632,9 @@ test("an opened card's tiles each name the step, its chip and what it waits on a
 
 test("a loop's edge back moves as a running edge does while its round is due, along its curve and keeping its round", () => {
   const [, due] = stepEdges(
-    loopRun({ implement: 'round 2 of 3', review: 'round 2 of 3 due — review asked again, and the next tick files implement' }, true),
+    factsOf(
+      loopRun({ implement: 'round 2 of 3', review: 'round 2 of 3 due — review asked again, and the next tick files implement' }, true),
+    ),
   );
   const html = withMotion(false, () => edgeMarkup(due));
   const d = pathOf(html);
@@ -628,13 +648,17 @@ test("a loop's edge back moves as a running edge does while its round is due, al
 
 test('where the person asked for reduced motion nothing travels — on a running edge, a loop whose round is due, or the legend — and colour and arrow still say it', () => {
   const [running] = stepEdges(
-    runOfSteps([
-      ['implement', 'verified ✓'],
-      ['review', 'running (working)', 'implement'],
-    ]),
+    factsOf(
+      runOfSteps([
+        ['implement', 'verified ✓'],
+        ['review', 'running (working)', 'implement'],
+      ]),
+    ),
   );
   const [, due] = stepEdges(
-    loopRun({ implement: 'round 2 of 3', review: 'round 2 of 3 due — review asked again, and the next tick files implement' }, true),
+    factsOf(
+      loopRun({ implement: 'round 2 of 3', review: 'round 2 of 3 due — review asked again, and the next tick files implement' }, true),
+    ),
   );
   assert.equal((running.markerEnd as EdgeMarker).color, 'var(--edge-running)');
 

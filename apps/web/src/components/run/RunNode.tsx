@@ -253,9 +253,24 @@ function lookOf(run: RunSummary, finished: boolean, inspected: boolean): Look {
   return { ghost, className: finished ? 'bg-background shadow-none' : '', marks };
 }
 
+/** A piece of a word: a run's id in it, or the text between two. */
+type WordPiece = { run: string; text?: undefined } | { run?: undefined; text: string };
+
+/** `word` cut at each of `runs` it names, the longest first where one id holds another, so a card links each id where the word says it. */
+function wordPieces(word: string, runs: readonly string[]): WordPiece[] {
+  const ids = [...new Set(runs)].filter(Boolean).sort((a, b) => b.length - a.length);
+  if (!ids.length) return [{ text: word }];
+  const escaped = ids.map((id) => id.replace(/[.*+?^$|()[\]{}\\]/g, '\\$&'));
+  const named = new RegExp(`(${escaped.join('|')})`);
+  return word
+    .split(named)
+    .map((part, i): WordPiece => (i % 2 === 1 ? { run: part } : { text: part }))
+    .filter((piece) => piece.run !== undefined || piece.text !== '');
+}
+
 /**
  * What a run started `--after` runs waits on, in the CLI `ls`'s word (`waiting.word`), with what the CLI's `decide` says on hover. Yours
- * when only a person moves it; on a ghost's card (`ghost`), each run it waits on a link to that run's page.
+ * when only a person moves it; on a ghost's card (`ghost`), each run it waits on a link to that run's page, where the word names it.
  */
 function WaitingLine({ waiting, ghost }: { waiting: RunWaiting; ghost: boolean }) {
   return (
@@ -264,26 +279,26 @@ function WaitingLine({ waiting, ghost }: { waiting: RunWaiting; ghost: boolean }
       title={waiting.advice}
       className={`mt-1 line-clamp-2 font-mono text-body-small break-words ${waiting.waitingOnYou ? 'text-yours' : 'text-muted-foreground'}`}
     >
-      {ghost ? (
-        <>
-          waiting on{' '}
-          {waiting.runs.map(({ run }, i) => (
-            <span key={run}>
-              {i > 0 && ', '}
+      {ghost
+        ? wordPieces(
+            waiting.word,
+            waiting.runs.map(({ run }) => run),
+          ).map((piece, i) =>
+            piece.run ? (
               <RouteLink
+                key={i}
                 to="/runs/$runId"
-                params={{ runId: run }}
-                data-waits-on={run}
+                params={{ runId: piece.run }}
+                data-waits-on={piece.run}
                 className="nodrag text-foreground/80 hover:underline"
               >
-                {run}
+                {piece.run}
               </RouteLink>
-            </span>
-          ))}
-        </>
-      ) : (
-        waiting.word
-      )}
+            ) : (
+              piece.text
+            ),
+          )
+        : waiting.word}
     </p>
   );
 }

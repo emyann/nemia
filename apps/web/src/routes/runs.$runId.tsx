@@ -17,6 +17,7 @@ import { Timeline } from '../components/run/Timeline';
 import { StartedFrom } from '../components/run/TryTag';
 import { RemoveRun } from '../components/run/RemoveRun';
 import { LiftHold } from '../components/run/LiftHold';
+import { RunWait } from '../components/run/RunWait';
 import { HoldRun } from '../components/run/HoldRun';
 import { PruneRun } from '../components/run/PruneRun';
 import { KindsBehind } from '../components/run/KindsBehind';
@@ -32,7 +33,7 @@ import { spentTitle } from '../lib/cost';
 import { duration } from '../lib/canvas';
 import { clockCounts, inFlight, runClock, waitedMs } from '../lib/factory';
 import { useNow } from '../lib/useNow';
-import { container, ink } from '../lib/meaning';
+import { ink } from '../lib/meaning';
 import { ENDED } from '../lib/words';
 
 /**
@@ -126,9 +127,7 @@ function Run({ run }: { run: RunView }) {
 
       <NeedsBanner run={run} />
 
-      <WaitingOnRuns run={run} />
-
-      <HeldUntil run={run} />
+      <RunWaits run={run} />
 
       {run.warning && <p className="rounded border border-outline px-3 py-2 text-body-medium text-muted-foreground">{run.warning}</p>}
 
@@ -394,7 +393,7 @@ function AtGate({ run, step, acts }: { run: RunView; step: StepView; acts: boole
       {acts ? (
         <div className="grid items-start gap-4 lg:grid-cols-2">
           <ActsOn run={run} step={step} />
-          <Gate runId={run.id} step={step.name} approveLine={step.commands.approve} back={back} acts={acts} />
+          <Gate runId={run.id} step={step.name} approveLine={step.commands.approve} back={back} acts={acts} onto={run.branch} />
         </div>
       ) : (
         <Gate
@@ -445,72 +444,19 @@ function startedRow(run: RunView): ReactNode {
 }
 
 /**
- * What a run started `--after` runs still waits on, as the CLI's `decide` says it for such a run and offers nothing else: the CLI `ls`'s
- * word, what it leaves a person to do, and each run it names, linked to its page where the store has it. In the yours container when one
- * never lands without a person, at rest otherwise.
+ * What the run waits on other runs for: a start `--after` runs, and a person's hold, which carries its Lift. While a hold stands no step
+ * offers an answer — the package refuses each — so it is the one thing on the page asked of anyone.
  */
-function WaitingOnRuns({ run }: { run: RunView }) {
-  const { waiting } = run;
-  if (!waiting) return null;
+function RunWaits({ run }: { run: RunView }) {
   return (
-    <section
-      aria-label="Waiting on runs"
-      data-on-you={waiting.waitingOnYou}
-      className={`space-y-1 rounded px-3 py-2 text-body-medium ${waiting.waitingOnYou ? container.yours : 'bg-muted text-foreground'}`}
-    >
-      <p className="font-mono">{waiting.word}</p>
-      <p data-advice>{waiting.advice}</p>
-      <ul className="flex flex-wrap gap-x-3 text-body-small">
-        {waiting.runs.map((w) => (
-          <li key={w.run}>
-            {w.missing ? (
-              <span className="font-mono">{w.run}</span>
-            ) : (
-              <Link to="/runs/$runId" params={{ runId: w.run }} className="font-mono underline underline-offset-2">
-                {w.run}
-              </Link>
-            )}
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-/**
- * A person's hold on the run (the CLI's `hold`), as the CLI's `decide` says it: until which runs land, what that means and how to lift it,
- * and each run it is held until, linked where it is there. At rest, in the grey container, and in the yours container
- * once only a person lifts it. While it stands no step offers an answer — the package refuses each — so this is the one thing on the page
- * asked of anyone.
- */
-function HeldUntil({ run }: { run: RunView }) {
-  const { holding } = run;
-  if (!holding) return null;
-  return (
-    <section
-      aria-label="Held"
-      data-on-you={holding.waitingOnYou}
-      className={`space-y-1 rounded px-3 py-2 text-body-medium ${holding.waitingOnYou ? container.yours : container.grey}`}
-    >
-      <p className="font-mono">{holding.word}</p>
-      <p data-advice>{holding.advice}</p>
-      {holding.runs.length > 0 && (
-        <ul className="flex flex-wrap gap-x-3 text-body-small">
-          {holding.runs.map((h) => (
-            <li key={h.run}>
-              {h.missing ? (
-                <span className="font-mono">{h.run}</span>
-              ) : (
-                <Link to="/runs/$runId" params={{ runId: h.run }} className="font-mono underline underline-offset-2">
-                  {h.run}
-                </Link>
-              )}
-            </li>
-          ))}
-        </ul>
+    <>
+      {run.waiting && <RunWait label="Waiting on runs" wait={run.waiting} />}
+      {run.holding && (
+        <RunWait label="Held" wait={run.holding}>
+          <LiftHold id={run.id} />
+        </RunWait>
       )}
-      <LiftHold id={run.id} />
-    </section>
+    </>
   );
 }
 

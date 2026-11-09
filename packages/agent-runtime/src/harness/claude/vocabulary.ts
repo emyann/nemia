@@ -5,6 +5,7 @@
  */
 import type { FenceReach, HarnessDeclaration } from '../declaration.ts';
 import type { SpawnRequest } from '../seam.ts';
+import { CLAUDE_RULES } from './rules.ts';
 
 /**
  * The permission modes Claude Code takes. Harness vocabulary, so it lives beside the runner that
@@ -346,4 +347,5 @@ export const CLAUDE_DECLARATION: HarnessDeclaration = {
   asks: { remoteControl: { claude: { remoteControl: true } } },
   runsBrief: true,
   recordsDenials: true,
+  rules: CLAUDE_RULES,
 };

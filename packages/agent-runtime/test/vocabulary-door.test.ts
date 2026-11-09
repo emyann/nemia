@@ -23,6 +23,7 @@ const DOOR_FILES = [
   'src/harness/reach.ts',
   'src/harness/config-folders.ts',
   'src/harness/claude/vocabulary.ts',
+  'src/harness/claude/rules.ts',
   'src/harness/codex/vocabulary.ts',
 ];
 

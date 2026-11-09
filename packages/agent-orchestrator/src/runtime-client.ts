@@ -18,12 +18,13 @@ import path from 'node:path';
 import { Cause, Context, Effect, Exit, Layer, References, Scope } from 'effect';
 import {
   BEARER,
-  codex,
   commandHarness,
+  DEFAULT_HARNESSES,
   heldHarnessesOf,
   holderTokenOf,
   remoteConfigRefusal,
   type Credentials,
+  type HarnessConfig,
   type MissingCredential,
   type RemoteAgent,
   type EndReason,
@@ -40,7 +41,7 @@ import { HOME } from './record/record.store.ts';
 import { cgroupParent, maxConcurrent, memoryLimit } from './config/config.store.ts';
 import { pauseFile } from './pause/pause.store.ts';
 import { servesOnStore } from './daemon/daemon.store.ts';
-import { REMOTE_PREFIX, remoteNameOf } from './harness/harness.ts';
+import { declarationOf, HARNESSES as STEP_HARNESSES, REMOTE_PREFIX, remoteNameOf } from './harness/harness.ts';
 import { Invalid, isRefusal, type Refusal } from './refusal/refusal.ts';
 import { exportIntervalRefusalOf, sessionTelemetryOf, toolDetailsRefusalOf } from './telemetry/telemetry.ts';
 import type { AttemptMemory, EnginePhase } from './views/views-words.ts';
@@ -159,26 +160,31 @@ export const unreadableJournal = (err: unknown): string | undefined => {
 };
 
 /**
- * The engine's harnesses, the run's `check` among them: the runtime's command harness, under the name checks have always run under, so
- * the runtime keeps their streams in `runs/check/` and a check filed before it reads the same. It runs a step's `check:` command as the
+ * The engine's harnesses: each a step runs on (`STEP_HARNESSES`, the runtime's that run a brief), as the runtime configures it by default
+ * (`DEFAULT_HARNESSES`), then the run's `check`: the runtime's command harness, under the name checks have always run under, so the
+ * runtime keeps their streams in `runs/check/` and a check filed before it reads the same. It runs a step's `check:` command as the
  * task's `config` gives it (`checkArgv`, `src/check/check.ts`). Passing `harnesses` REPLACES the engine's
- * default map rather than adding to it, so the defaults are named again here — leaving them out would
+ * default map rather than adding to it, so the step harnesses are named again here — leaving them out would
  * quietly send every step to whichever harness came first.
  *
  * A step runs on the engine's harness of its name as a job, which ends on its own, asks nobody in any mode, and keeps a spend cap. Each
  * harness, `check` among them, is a pool of its own.
  */
-export const HARNESSES = {
-  claude: 'claude',
-  codex,
+export const HARNESSES: Readonly<Record<string, HarnessConfig>> & { readonly check: typeof commandHarness & { readonly name: string } } = {
+  ...Object.fromEntries(
+    STEP_HARNESSES.flatMap((name) => {
+      const config = Object.hasOwn(DEFAULT_HARNESSES, name) ? DEFAULT_HARNESSES[name] : undefined;
+      return config === undefined ? [] : [[name, config]];
+    }),
+  ),
   check: { ...commandHarness, name: 'check' },
-} as const;
+};
 
 /**
- * The harnesses the daemon asks for their quota (`up`): each of the engine's, every one a subscription of its own. One that reports no
- * quota refuses the ask, and is asked again all the same: the refusal costs no process, and no span.
+ * The harnesses the daemon asks for their quota (`up`): each of the engine's that declares it reports one (`quota`), every one a
+ * subscription of its own.
  */
-export const quotaHarnesses = (): string[] => Object.keys(HARNESSES);
+export const quotaHarnesses = (): string[] => Object.keys(HARNESSES).filter((name) => declarationOf(name)?.can.includes('quota') === true);
 
 /**
  * The engine the controllers use. Every filing goes out `queued`, and the runtime admits it per pool under the ceiling handed to it here,

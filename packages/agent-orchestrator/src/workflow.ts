@@ -65,6 +65,8 @@ export {
 } from './frontmatter/frontmatter.ts';
 export type { Frontmatter, FrontmatterEntry, FrontmatterPair, FrontmatterValue } from './frontmatter/frontmatter.ts';
 export {
+  CLAUDE_RULES,
+  DEFAULT_HARNESS,
   HARNESSES,
   isRemoteHarness,
   REMOTE_NAME,
@@ -72,7 +74,9 @@ export {
   REMOTE_REFUSED_KEYS,
   remoteNameOf,
   remoteRetryRefusal,
+  rulesOf,
 } from './harness/harness.ts';
+export type { ClaudeRules, Dated } from './harness/harness.ts';
 export {
   allowRuleOf,
   contextText,

@@ -8,6 +8,7 @@
  * Pure: it imports the harnesses' vocabulary files alone, so `agent-runtime/vocabulary` carries it (`test/vocabulary-door.test.ts`).
  */
 import type { MisplacedOf, TakersOf, VerbHarnessOf } from '../../contracts/capability.contract.ts';
+import type { ClaudeRules } from './claude/rules.ts';
 import { CLAUDE_DECLARATION } from './claude/vocabulary.ts';
 import { CODEX_DECLARATION } from './codex/vocabulary.ts';
 import { COMMAND_DECLARATION } from './command/vocabulary.ts';
@@ -129,7 +130,8 @@ export type OwnArgs = { readonly claude?: { readonly remoteControl: true }; read
  * - `asks`: what each neutral ask becomes in its own config — a function of the repository for `trustRepository`, the config itself for
  *   `remoteControl` — an ask it has none for being dropped;
  * - `runsBrief`: it runs a step's brief as an agent (what a workflow's step may name), as a command or a remote agent does not;
- * - `recordsDenials`: a job of it records the calls its fence denied.
+ * - `recordsDenials`: a job of it records the calls its fence denied;
+ * - `rules`: how its permission rules are matched and the tool sets measured on it (`ClaudeRules`), for a caller that shows a reach.
  */
 export type HarnessDeclaration = {
   readonly can: readonly Capability[];
@@ -141,6 +143,7 @@ export type HarnessDeclaration = {
   readonly asks?: { readonly trustRepository?: (repo: string) => OwnArgs; readonly remoteControl?: OwnArgs };
   readonly runsBrief?: true;
   readonly recordsDenials?: true;
+  readonly rules?: ClaudeRules;
 };
 
 /**

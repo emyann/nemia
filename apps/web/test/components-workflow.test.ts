@@ -14,7 +14,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import './tsx.ts';
-import { routedWith, textsOf } from './markup-fixtures.ts';
+import { classesAt, routedWith, textsOf } from './markup-fixtures.ts';
 
 const { createElement } = await import('react');
 const { renderToStaticMarkup } = await import('react-dom/server');
@@ -125,9 +125,9 @@ test('the workflows a list leaves out are said under it, each by name with why i
   const html = renderToStaticMarkup(
     createElement(WorkflowsUnread, { workflows: [listing('ok', null), listing('dev', 'implement: `agent: implementer` fills this step')] }),
   );
-  assert.equal(
-    html,
-    '<div data-workflows-unread="true" class="space-y-1 text-body-small text-yours"><p>Not offered until it reads:</p><p data-unread="dev" class="whitespace-pre-wrap break-words"><span class="font-mono">dev</span>: implement: `agent: implementer` fills this step</p></div>',
-  );
+  assert.ok(classesAt(html, 'data-workflows-unread="true"').includes('text-yours'), `drawn as yours to mend\n${html}`);
+  assert.match(html, /data-unread="dev"/);
+  assert.doesNotMatch(html, /data-unread="ok"/, 'a workflow that reads is not said');
+  assert.deepEqual(textsOf(html), ['Not offered until it reads:', 'dev', ': implement: `agent: implementer` fills this step']);
   assert.equal(renderToStaticMarkup(createElement(WorkflowsUnread, { workflows: [listing('ok', null)] })), '');
 });

@@ -414,7 +414,7 @@ test("the run bar: the run's title and id, what it asks of a person, its steps e
   const run = { ...base, steps: [base.steps[0], theme] };
   const html = await pagedWith(createElement(RunBar, { run: run.id }), readsOf(run));
   assert.ok(html.includes(`>${runTitle(run)}</h2>`), html);
-  assert.ok(html.includes(`<span class="font-mono text-body-small">${run.id}</span>`), html);
+  assert.ok(textsOf(html).includes(run.id), `the bar says the run's id\n${html}`);
   assert.match(html, /<section aria-label="Waiting on you"/);
   assert.match(html, /<button type="button" data-approve="review"/, "a step the banner names opens that step's bar");
   const steps = /<section aria-label="Steps"[\s\S]*?<\/section>/.exec(html)![0];

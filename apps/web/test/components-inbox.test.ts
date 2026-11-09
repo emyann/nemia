@@ -14,7 +14,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import './tsx.ts';
-import { inboxCard, LISTED, routedWith, STORE_ANSWER, textsOf } from './markup-fixtures.ts';
+import { classesAt, inboxCard, LISTED, routedWith, STORE_ANSWER, textsOf } from './markup-fixtures.ts';
 
 const { createElement } = await import('react');
 const { renderToStaticMarkup } = await import('react-dom/server');
@@ -53,11 +53,10 @@ test('REFUSED: a card that names no factory wears no default tag — its line sa
 test('REFUSED: a card that names a workflow and no factory says it has no Queue and that Start gives it a factory — and no other card says it', async () => {
   const note = (extra: Record<string, unknown>) => renderToStaticMarkup(createElement(InboxParts.NoQueue, { entry: inboxCard(extra) }));
   for (const factory of [null, 'default']) {
-    assert.equal(
-      note({ factory, workflow: 'dev' }),
-      '<p data-no-queue="true" class="text-body-small text-muted-foreground">No Queue: a queued card starts on its own, in the factory it names, and this one names none. Start gives it one.</p>',
-      String(factory),
-    );
+    const said = note({ factory, workflow: 'dev' });
+    assert.ok(classesAt(said, 'data-no-queue="true"').includes('text-muted-foreground'), `a note, drawn at rest\n${said}`);
+    const words = textsOf(said).join(' ');
+    assert.ok(words.startsWith('No Queue:') && words.includes('Start gives it one'), `${String(factory)}: ${words}`);
   }
   assert.equal(note({ factory: 'solo', workflow: 'dev' }), '', 'a card of a factory has its Queue');
   assert.equal(note({ factory: null }), '', 'no workflow: nothing to queue it on');

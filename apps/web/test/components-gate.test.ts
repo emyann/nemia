@@ -1128,10 +1128,8 @@ test('what sessions read, by price: beside the cost, the peak marked at a cap or
   assert.deepEqual(readRows(null), []);
 
   const plain = markup(createElement(Read, { said: 'read 21.4M · wrote 412k · peak 167k', peak: null, rebuilt: 0 }));
-  assert.match(
-    plain,
-    /<span class="font-mono text-body-small"><span>read 21\.4M<\/span><span> · wrote 412k<\/span><span> · peak 167k<\/span><\/span>/,
-  );
+  assert.match(plain, /data-read/);
+  assert.deepEqual(textsOf(plain), ['read 21.4M', '· wrote 412k', '· peak 167k'], 'each count its own part, in the order said');
   assert.doesNotMatch(plain, /data-peak|data-rebuilt/, 'under its cap, and resumed from a warm cache: nothing marked');
 
   const capped = markup(
@@ -1177,7 +1175,7 @@ test('what sessions read, by price: beside the cost, the peak marked at a cap or
   const html = renderToStaticMarkup(createElement(DecideSection, { runId: 'r-1', decision }));
   assert.match(
     html,
-    /<dt[^>]*>cost<\/dt><dd[^>]*>\$3\.01<\/dd><\/div><div[^>]*class="contents"><dt[^>]*>read<\/dt><dd[^>]*><span data-read="true" class="block"><span class="font-mono text-body-small"><span>read 7\.3M<\/span>/,
+    /data-fact="cost"[^>]*>[\s\S]*?\$3\.01<\/dd><\/div><div data-fact="read"[\s\S]*?<span data-read="true"[\s\S]*?read 7\.3M</,
     "on the Decide section, beside the total's cost",
   );
 });

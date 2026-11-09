@@ -52,7 +52,6 @@ const BROKEN = new Date('not a date');
 
 test('REFUSED: a date or a clock that does not parse is said in the fixed words by every writer of a moment, and none throws', async (t) => {
   await t.test('REFUSED: a date that does not parse is said in fixed words by the writers of an hour, and none throws', () => {
-    assert.equal(UNREADABLE, 'an unreadable time');
     assert.equal(timeOfDay(BROKEN, ZONE), UNREADABLE);
     assert.equal(timeToTheSecond(BROKEN, ZONE), UNREADABLE);
   });

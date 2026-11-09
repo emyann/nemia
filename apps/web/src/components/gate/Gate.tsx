@@ -636,7 +636,6 @@ export function useApprove(runId: string, step: string, onApproved: () => void, 
       namespaceNow().then((ns) => approveStep(ns, runId, step, how)),
     onSuccess: () => {
       onApproved();
-      void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
       void runsMoved(queryClient, runId);
     },
   });

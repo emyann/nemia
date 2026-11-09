@@ -75,7 +75,7 @@ function HoldForm({ id, runs, onClose }: { id: string; runs: RunSummary[]; onClo
     mutationFn: () => namespaceNow().then((ns) => putHold(ns, id, until, why)),
     onSuccess: async () => {
       onClose();
-      await Promise.all([queryClient.invalidateQueries({ queryKey: ['runs', id], exact: true }), runsMoved(queryClient, id)]);
+      await runsMoved(queryClient, id);
     },
   });
   return (

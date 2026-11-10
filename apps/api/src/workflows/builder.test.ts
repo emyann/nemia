@@ -1140,7 +1140,11 @@ test("the builder's routes: a body not in its shape, a source not yours, a folde
           { file: 'a.json', text: again },
         ],
       });
-      assert.equal(twice.status, 422, 'a schema given twice: the api judges the schemas before it reads the folder');
+      assert.equal(
+        twice.status,
+        400,
+        'a schema given twice is refused as the request it is (400), the schemas judged before the folder is read',
+      );
       const twiceSaid = String(((await twice.json()) as { error?: string }).error);
       assert.match(
         twiceSaid,
@@ -1165,7 +1169,11 @@ test("the builder's routes: a body not in its shape, a source not yours, a folde
         ['tab\t.json', /control character/],
       ] as const) {
         const res = await put('shaped', { steps: [plan], schemas: [{ file, text: again }] });
-        assert.equal(res.status, 422, `${file}: not a file directly in the folder, the api's \`Invalid\` (${String(said)})`);
+        assert.equal(
+          res.status,
+          400,
+          `${file}: not a file directly in the folder, refused as the request it is (400, \`schemaNameRefusal\`) (${String(said)})`,
+        );
       }
       assert.deepEqual(snapshot(dir), before);
       assert.equal(fs.existsSync(path.join(STORE, 'x.json')), false);

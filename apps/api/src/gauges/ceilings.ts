@@ -16,7 +16,8 @@ export type { Ceilings, MetricRead };
  * The cap on runs in flight, and the runs it counts and holds (objects' `Ceilings`), as the package judges them between passes
  * (`CEILINGS`, the table's entry whose handler is `slotsRead`) — every run read as a pass reads it, off one look at the harnesses — with
  * what the last pass ran with (`last`, `lastCeilings`: null before any pass wrote them) and cost (`pass`, `lastPassCost`). Read through
- * the request's engine; the cap, before any pass wrote one, is `WF_MAX_RUNS` of `s.env`, the app's environment. Over the app's informer
+ * the request's engine; the cap, before any pass wrote one, is the store's settings' `maxRuns` (`StoreConfig`, which `inRequest` gives from
+ * the app's layer, `storeConfigLayer(env)`: `WF_MAX_RUNS`). Over the app's informer
  * (`Informer`, in the request's services), a run it serves as ended at rest is left out unjudged (`slotsRead`); every run is judged where
  * the app keeps none, or under `WF_VERIFY_REST=1`. `inFlight` names the runs that count against the cap, oldest first, null with no cap;
  * `held` the runs it holds, each with `nemia ls`'s words on its roots (`slotWord`).

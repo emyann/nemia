@@ -3,7 +3,7 @@
  * through the Workflow door the program is given, at the store's root it is given, its agents found through the Agent door — never the
  * disk at the module's root — and refused `UnloadedFolder` where it does not load, a defect of the read included; refused `Invalid`, and
  * not as a folder that does not load, where no root was given. `stepsOrNone` and `unloadedOf` read the refusal alone, and `stepsOrWhy`
- * keeps its reason.
+ * keeps its reason, as `parentRecord` does for a run waited on.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -25,7 +25,10 @@ import { WorkflowDir } from '../folder/folder.model.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { UnloadedFolder, unloadedFolder } from './steps.ts';
-import { stepsOf, stepsOrNone, stepsOrWhy, unloadedOf } from './steps.verb.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { runDoorMemory } from '../runs/memory.store.ts';
+import { NOTHING_READ, standingReader } from '../standing/standing.verb.ts';
+import { parentRecord, stepsOf, stepsOrNone, stepsOrWhy, unloadedOf } from './steps.verb.ts';
 
 /** `run`'s record with no frozen workflow, its folder `dir`: what a record written before `nemia start` froze one holds. */
 const unfrozen = (dir: string): Run => {
@@ -124,4 +127,19 @@ test('stepsOrWhy: an unfrozen folder that does not load is answered with its rea
   const steps = Effect.runSync(stepsOrWhy(frozen));
   assert.ok('steps' in steps);
   assert.equal(failureOf(stepsOrWhy(unfrozen(path.join(root, 'workflows', 'dev')))) instanceof Invalid, true, 'no root is no reason');
+});
+
+test('parentRecord: a run waited on whose unfrozen folder does not load says why (unread), never a run with no branches', () => {
+  const root = scratch('wf-steps-parent-');
+  const run = unfrozen(path.join(root, 'workflows', 'gone'));
+  const program = Effect.gen(function* () {
+    yield* (yield* RunDoor).runs.create(run);
+    return yield* parentRecord(run.id, standingReader(NOTHING_READ));
+  });
+  const known = Effect.runSync(Effect.provide(Effect.provideService(program, StoreRoot, root), runDoorMemory()));
+  assert.equal(known.record?.id, run.id, 'the record is read');
+  const refusal = failureOf(Effect.provideService(stepsOf(run), StoreRoot, root));
+  assert.ok(refusal instanceof UnloadedFolder);
+  assert.equal(known.unread, refusal.why, "the reason is the refusal's own, as stepsOrWhy keeps it");
+  assert.equal(known.gone, undefined, 'no branch is called gone');
 });

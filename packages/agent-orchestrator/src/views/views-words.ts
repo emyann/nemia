@@ -74,6 +74,12 @@ export type WordView = TaskClock & {
  *
  * Exported, log-free, so a consumer narrows a view as the tick does. No view at all is `unknown` too.
  */
+/**
+ * Whether the engine's word for a task says its harness blocked the session — `needs-human` — waiting on a person with nothing signed: the
+ * one place outside `views/` the word is compared (`harnessBlocked` reads it off a view); a word elsewhere is said, never compared.
+ */
+export const blockedWord = (word: string | null | undefined): boolean => word === 'needs-human';
+
 export const phaseOfView = (v: WordView | undefined): TaskPhase => {
   if (!v) return 'unknown';
   if (v.state.settled) return v.state.settled;

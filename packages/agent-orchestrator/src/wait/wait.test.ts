@@ -28,7 +28,7 @@ import { listing } from '../list/list.ts';
 import { assess } from '../tick/assess.ts';
 import { heldLater } from '../round/round.ts';
 import type { RepositoryRun, Run, TaskPhase } from '../record/record.ts';
-import { namesFor, phases, run, step, STEPS } from '../../test/assessed.ts';
+import { aRead, listingInput, namesFor, phases, run, step, STEPS } from '../../test/assessed.ts';
 
 /** A `landed` that answers yes for these runs, and keeps every run it was asked about. */
 const landedOnly = (...ids: string[]) => {
@@ -53,7 +53,11 @@ test('readiness under `after`: a run is ready once every parent landed, and a ru
     assert.equal(runReady(legacy, landed), true);
     assert.equal(runReady(run({ implement: null, review: null }, { after: [] }), landed), true);
     assert.deepEqual(asked, []);
-    assert.deepEqual(assess(STEPS, legacy, phases({})).ready, ['implement'], 'and its first step is ready exactly as before');
+    assert.deepEqual(
+      assess(aRead(STEPS, legacy, { phaseOf: phases({}) })).ready,
+      ['implement'],
+      'and its first step is ready exactly as before',
+    );
   });
   await t.test(
     'REFUSED: a parent not landed is not ready, pass after pass — every parent must land, each not landed named in order',
@@ -131,13 +135,15 @@ test('`listing` puts `waiting on <run>` on each root of a waiting run, where `wa
   const child = run({ a: null, b: null, c: null }, { after: ['p-1'] });
   const waits: Wait[] = [{ run: 'p-1', cancelledAt: '2026-09-14T10:00:00Z' }];
   const listed = (r: Run, phase: TaskPhase, given: Wait[] | undefined) =>
-    listing({
-      steps: fan,
-      run: r,
-      phaseOf: () => phase,
-      closeoutOf: () => undefined,
-      ...(given ? { asks: [], roundAsks: [], answers: [], waits: given } : {}),
-    });
+    listing(
+      listingInput({
+        steps: fan,
+        run: r,
+        phaseOf: () => phase,
+        closeoutOf: () => undefined,
+        ...(given ? { asks: [], roundAsks: [], answers: [], waits: given } : {}),
+      }),
+    );
   const rows: Array<[string, Run, TaskPhase, Wait[] | undefined, string[], Wait[] | undefined]> = [
     [
       'a root says the wait, what waits on a root still says `waiting`',

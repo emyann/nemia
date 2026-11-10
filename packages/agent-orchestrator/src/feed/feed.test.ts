@@ -35,7 +35,7 @@ import {
   type StoreLine,
 } from './feed.ts';
 import { scratch } from 'test-kit/scratch';
-import { listing as coded } from '../../test/assessed.ts';
+import { listing as coded, listingInput, type ListedInput } from '../../test/assessed.ts';
 import { reasonOf } from './reason.ts';
 import { factoryLevelOf, type FactoryLevel, type FactoryLevelFile } from '../level/level.ts';
 import { codedStep, runCodes, type CodedStep } from '../phase/phase.ts';
@@ -867,34 +867,38 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
       branch: 'wf/r-1',
       base: 'main',
     } as unknown as Run;
-    const held = listing({
-      steps,
-      run,
-      phaseOf: () => 'unknown',
-      closeoutOf: () => undefined,
-      asks: [],
-      roundAsks: [],
-      answers: [],
-      waits: [],
-      slot: { inFlight: 2, cap: 2 },
-    });
+    const held = listing(
+      listingInput({
+        steps,
+        run,
+        phaseOf: () => 'unknown',
+        closeoutOf: () => undefined,
+        asks: [],
+        roundAsks: [],
+        answers: [],
+        waits: [],
+        slot: { inFlight: 2, cap: 2 },
+      }),
+    );
     const a = feedWords(held, run, { status: 'running' });
     assert.deepEqual(a.run, { word: 'running', reason: 'Running' });
     assert.deepEqual(
       a.steps.map((s) => [s.word, s.reason, s.on]),
       [['waiting for a run slot', 'Waiting', 'limit']],
     );
-    const other = listing({
-      steps,
-      run,
-      phaseOf: () => 'unknown',
-      closeoutOf: () => undefined,
-      asks: [],
-      roundAsks: [],
-      answers: [],
-      waits: [],
-      slot: { inFlight: 3, cap: 3 },
-    });
+    const other = listing(
+      listingInput({
+        steps,
+        run,
+        phaseOf: () => 'unknown',
+        closeoutOf: () => undefined,
+        asks: [],
+        roundAsks: [],
+        answers: [],
+        waits: [],
+        slot: { inFlight: 3, cap: 3 },
+      }),
+    );
     assert.deepEqual(feedWords(other, run, { status: 'running' }), a, 'the count in flight moving is not a change');
     assert.deepEqual(feedWords(held, { pruned: { at: '', worktrees: [] } }, { status: 'succeeded' }).run, {
       word: 'succeeded (pruned)',
@@ -918,12 +922,12 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
   });
   await t.test("each step's reason and the run's are the ones the feed's word names, read off the same word", async (t) => {
     const at = { id: 'r-1', brief: 'b', createdAt: '2026-09-22T10:00:00.000Z', repo: '/r', branch: 'wf/r-1', base: 'main' };
-    const plan = [{ name: 'plan', after: [], brief: 'plan it' }] as unknown as Parameters<typeof listing>[0]['steps'];
-    const ship = [{ name: 'ship', after: [], brief: 'land it', workspace: 'base' }] as unknown as Parameters<typeof listing>[0]['steps'];
+    const plan = [{ name: 'plan', after: [], brief: 'plan it' }] as unknown as ListedInput['steps'];
+    const ship = [{ name: 'ship', after: [], brief: 'land it', workspace: 'base' }] as unknown as ListedInput['steps'];
     const filed = { ...at, steps: { plan: { taskId: 't1' } } } as unknown as Run;
     const unfiled = { ...at, steps: {} } as unknown as Run;
-    const done = { outcome: 'done' } as unknown as NonNullable<ReturnType<Parameters<typeof listing>[0]['closeoutOf']>>;
-    const rows: Array<[string, Parameters<typeof listing>[0], string]> = [
+    const done = { outcome: 'done' } as unknown as NonNullable<ReturnType<ListedInput['closeoutOf']>>;
+    const rows: Array<[string, ListedInput, string]> = [
       [
         'a root the cap holds',
         { steps: plan, run: unfiled, phaseOf: () => 'unknown', closeoutOf: () => undefined, slot: { inFlight: 2, cap: 2 } },
@@ -961,7 +965,7 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
       [
         'a step waiting on the steps before it',
         {
-          steps: [...plan, { name: 'build', after: ['plan'], brief: 'build it' }] as unknown as Parameters<typeof listing>[0]['steps'],
+          steps: [...plan, { name: 'build', after: ['plan'], brief: 'build it' }] as unknown as ListedInput['steps'],
           run: unfiled,
           phaseOf: () => 'unknown',
           closeoutOf: () => undefined,
@@ -1000,7 +1004,7 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
         ),
       );
     await t.test("the run's reason is the one its word and note name, a held run's `Waiting` on run", () => {
-      const l = listing({ steps: plan, run: filed, phaseOf: () => 'running', closeoutOf: () => undefined });
+      const l = listing(listingInput({ steps: plan, run: filed, phaseOf: () => 'running', closeoutOf: () => undefined }));
       const hold = { at: '2026-09-22T10:00:00.000Z', until: ['r-0'] };
       const cases: Array<[Pick<Run, 'pruned' | 'hold'>, Parameters<typeof feedWords>[2]['status'], string]> = [
         [{}, 'running', 'Running'],
@@ -1050,17 +1054,19 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
       base: 'main',
     } as unknown as Run;
     const blockedWith = (waitingOf: (id: string) => string | undefined) =>
-      listing({
-        steps,
-        run,
-        phaseOf: (id) => (id === 't1' ? 'needs-human' : 'unknown'),
-        closeoutOf: () => undefined,
-        asks: [],
-        roundAsks: [],
-        answers: [],
-        waits: [],
-        waitingOf,
-      });
+      listing(
+        listingInput({
+          steps,
+          run,
+          phaseOf: (id) => (id === 't1' ? 'needs-human' : 'unknown'),
+          closeoutOf: () => undefined,
+          asks: [],
+          roundAsks: [],
+          answers: [],
+          waits: [],
+          waitingOf,
+        }),
+      );
     const waiting = blockedWith((id) => (id === 't1' ? 'permission prompt' : undefined));
     assert.equal(waiting.steps[0].message, 'needs-human', "the listing's word is the bare one");
     assert.equal(waiting.steps[0].waits, 'waiting for a permission prompt', 'and the wait is beside it');

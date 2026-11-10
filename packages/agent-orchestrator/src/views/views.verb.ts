@@ -36,7 +36,7 @@ import { stepsOf } from '../steps/steps.verb.ts';
 import { landedOf, type BranchReader } from '../branches/branches.store.ts';
 import { parentRecord } from '../steps/steps.verb.ts';
 import { continuesFrom } from '../retry/index.ts';
-import { currentTurn, killedMemoryOf, phaseOfView, unsignedEnd, wordOfView, type EnginePhase } from './views-words.ts';
+import { blockedWord, currentTurn, killedMemoryOf, phaseOfView, unsignedEnd, wordOfView, type EnginePhase } from './views-words.ts';
 import { outOfMemory } from '../out-of-memory/out-of-memory.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
@@ -288,7 +288,7 @@ export const closeoutAsked =
 export const harnessBlocked =
   (views: ReadonlyMap<string, TaskView>) =>
   (taskId: string): boolean =>
-    views.get(taskId)?.phase === 'needs-human';
+    blockedWord(views.get(taskId)?.phase);
 
 /**
  * What the harness says a task's blocked session waits for, in its own words (`TaskView.waitingFor`), off views already read — as a remote
@@ -653,19 +653,21 @@ export const parentRead = Effect.fn('parentOf')(function* (id: string, git: Bran
   if (!onBase) return { ...known, landed: false } satisfies ParentRun;
   const { views, phaseOf } = yield* taskPhasesRead(record);
   const { asks, rounds } = yield* (yield* RunDoor).asks.read(RunId.read(id));
-  const said = decision(
+  const read = {
     steps,
-    record,
+    run: record,
     phaseOf,
-    landedOf(record, git),
-    closeoutReader(views, record, steps),
-    closeoutAsked(views),
-    exitVerdicts(views, record),
+    signedOff: closeoutReader(views, record, steps),
+    asked: closeoutAsked(views),
+    verdictOf: exitVerdicts(views, record),
+    sessionBlocked: harnessBlocked(views),
+    spendOf: spendReader(views),
     asks,
-    rounds,
-    () => false,
-    spendReader(views),
-  );
+    roundAsks: rounds,
+    standings: [],
+    checkout: undefined,
+  };
+  const said = decision(read, landedOf(record, git));
   return { ...known, landed: said.kind === 'landed' } satisfies ParentRun;
 });
 

@@ -39,7 +39,7 @@ import { stepsOf } from '../steps/steps.verb.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { Conflict } from '../refusal/refusal.ts';
 import type { SkillsFound } from '../agents/agents.ts';
-import type { Run } from '../record/record.ts';
+import { endedForGood, type Run } from '../record/record.ts';
 import { repoAllows, type Allows } from '../trust/allows.verb.ts';
 import { appendRevision, ledgerOf } from './revisions.store.ts';
 import { kindsDrift, revisionNow, stepsDrift, type Drift, type KindName, type Pin, type Revision, type RevisionKind } from './revisions.ts';
@@ -357,10 +357,11 @@ export type Behind = Drift & { hash: string };
  * revisions until a refresh: what the feed says as `revisions behind` (`behindOf`). Each carries the digest of what the files hold, since
  * two edits nobody has resolved read as the one next number. `[]` for a run that follows revisions, whose next filing takes the files
  * whatever they hold, and for a run that will file nothing again — one that succeeded (`succeeded`, the pass's own judgement), one called
- * off, one pruned. A run that failed or waits at a gate keeps it: a retry or an approval files again. Read every pass, never written.
+ * off, one pruned. A run that failed or waits at a gate keeps it: a retry or an approval files again, and so does a held one, which files
+ * again once the hold lifts (`endedForGood`). Read every pass, never written.
  */
 export const behindNow = Effect.fn('behindNow')(function* (run: Run, succeeded: boolean, given?: PassRevisions) {
-  if (succeeded || run.cancelledAt || run.pruned || !hasStarted(run)) return [];
+  if (succeeded || endedForGood(run) || !hasStarted(run)) return [];
   const read = yield* readOr(given);
   if (yield* follows(run, read)) return [];
   const now = yield* pinsNow(run, read);
@@ -416,13 +417,14 @@ const NOTHING: PinnedPass = { wrote: false, notes: [], lift: false };
  *
  * One run's world stops that run alone: a resolve that throws leaves it the revisions, the step set and the prompts it had and says why
  * (`unread`), and so does a folder whose steps are a set no run may take (`stepSetRefusal`), which `nemia start` refuses too — the pass
- * judges every other run either way.
+ * judges every other run either way. A run called off or pruned is never resolved (`endedForGood`); a held one is, since it files again
+ * once the hold lifts, on the pins this keeps.
  *
  * @param read What this pass reads once for every run it resolves (`PassRevisions`), so ten runs on one workflow folder read and digest
  *   it once between them. A one-off verb that hands none — `advanceRun`, `nemia refresh`, `nemia start` — reads the world for itself.
  */
 export const pinPass = Effect.fn('pinPass')(function* (run: Run, at: string, given?: PassRevisions) {
-  if (run.cancelledAt || run.pruned) return NOTHING;
+  if (endedForGood(run)) return NOTHING;
   const filed = hasStarted(run);
   const read = yield* readOr(given);
   return yield* (filed ? refreshDue(run, at, read) : firstResolve(run, at, read)).pipe(
@@ -505,10 +507,11 @@ const refreshDue = Effect.fnUntraced(function* (run: Run, at: string, read: Pass
  * given, whatever reaches it a full pass (a restarted daemon, a stamp moved), and a run at rest acts on no pass a memo would have
  * skipped. Level-triggered: it reads the factory, the files and the run's pins on the pass, and writes only where the pins moved, so a
  * due filing with no edit is filed on that pass. A folder that does not load, and a factory that no longer reads (`follows`), leave the
- * run what it had, unsaid, since it would be said on every pass.
+ * run what it had, unsaid, since it would be said on every pass. A held run has no filing due, so it is left alone by `filing` alone,
+ * its pins kept for the lift; one called off or pruned is left alone whatever it is handed (`endedForGood`).
  */
 export const followPass = Effect.fn('followPass')(function* (run: Run, at: string, filing: boolean, given?: PassRevisions) {
-  if (!filing || run.cancelledAt || run.pruned || !hasStarted(run)) return NOTHING;
+  if (!filing || endedForGood(run) || !hasStarted(run)) return NOTHING;
   const read = yield* readOr(given);
   if (!(yield* follows(run, read))) return NOTHING;
   return yield* Effect.gen(function* () {

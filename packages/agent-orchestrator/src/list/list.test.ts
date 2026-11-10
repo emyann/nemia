@@ -88,3 +88,36 @@ test('a step killed at its memory limit says so in its note, and one with no kil
     );
   });
 });
+
+test('a held run waits on no one and lists no try due, though a step signed off blocked and a person asked to try it', async (t) => {
+  const HOLD = { hold: { at: '2026-11-09T00:00:00.000Z', until: ['r-0'] } };
+  const listed = (marks: object) =>
+    listing({
+      steps: STEPS,
+      run: run({ implement: 't1', review: null }, marks),
+      phaseOf: phases({ t1: 'failed' }),
+      closeoutOf: () => undefined,
+      asks: [{ step: 'implement', try: 2, mode: 'fresh', at: '2026-11-09T00:00:00.000Z' }],
+    });
+  const blocked = (marks: object) =>
+    listing({
+      steps: STEPS,
+      run: run({ implement: 't1', review: null }, marks),
+      phaseOf: phases({ t1: 'succeeded' }),
+      closeoutOf: (name) =>
+        name === 'implement'
+          ? { outcome: 'blocked', summary: 's', artifacts: [], needs: 'which flag', questions: ['which flag?'] }
+          : undefined,
+    });
+  const note = (l: ReturnType<typeof listing>) => l.steps.find((s) => s.name === 'implement')?.note ?? '';
+  await t.test('unmarked: the try is due, and the blocked step waits on you', () => {
+    assert.match(note(listed({})), /try 2/);
+    assert.deepEqual(blocked({}).waitingOnYou, ['implement']);
+  });
+  await t.test('held: no try due, nobody waited on, no question counted on the row', () => {
+    assert.doesNotMatch(note(listed(HOLD)), /try 2/);
+    const held = blocked(HOLD);
+    assert.deepEqual(held.waitingOnYou, []);
+    assert.equal(held.steps.find((s) => s.name === 'implement')?.asks, undefined);
+  });
+});

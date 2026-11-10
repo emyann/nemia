@@ -16,10 +16,9 @@ import { workspacePlan } from '../src/workspace/workspace.ts';
 import type { Closeout } from '../src/closeout/closeout.ts';
 import type { Run, StepRecord, TaskPhase } from '../src/record/record.ts';
 import type { Workflow } from '../src/step/step.ts';
-import { listing, phases, run, step, STEPS } from './assessed.ts';
+import { aRead, listing, listingInput, phases, run, step, STEPS, type ListedInput } from './assessed.ts';
 import { decision, onYouWords } from '../src/run.ts';
 import { listing as listed } from '../src/list/list.ts';
-import { standing } from '../src/status/status.ts';
 
 const PLAN_SCHEMA = {
   type: 'object' as const,
@@ -60,7 +59,7 @@ const passOf = ({ filed = {}, surface = 'web', steps = TRIAGE, records = {} }: P
   const asked = () => true;
   return {
     run: r,
-    a: assess(steps, r, phaseOf, said, asked),
+    a: assess(aRead(steps, r, { phaseOf, signedOff: said, asked })),
     words: Object.fromEntries(runWords(steps, r, phaseOf, said, asked)),
     retryOf: (name: string) => {
       const s = steps.find((x) => x.name === name);
@@ -156,7 +155,7 @@ test("a gated condition's row says the route it proposes beside its gate", () =>
   const said = (name: string): Closeout | undefined =>
     name === 'plan' ? { outcome: 'done', summary: 'did plan', artifacts: [], output: { surface: 'web' } } : undefined;
   const input = { steps: gated, run: held.run, phaseOf: phases({ 't-plan': 'succeeded' }), closeoutOf: said, askedCloseout: () => true };
-  const rows = routedRows(input, listedWords(input));
+  const rows = routedRows(input, listedWords(listingInput(input).read));
   assert.deepEqual(rows.get('triage'), { besides: 'proposes web' });
 });
 
@@ -174,14 +173,7 @@ test('nemia ls and nemia decide read a gated condition whose table answered as a
   assert.deepEqual(onYouWords(l), ['approve triage']);
   assert.ok(triage?.note?.includes(`nemia approve ${held.run.id} triage`), triage?.note);
   assert.ok(triage?.note?.includes(`nemia retry ${held.run.id} plan`), triage?.note);
-  const d = decision(
-    gated,
-    held.run,
-    phaseOf,
-    () => false,
-    said,
-    () => true,
-  );
+  const d = decision(aRead(gated, held.run, { phaseOf, signedOff: said, asked: () => true }), () => false);
   assert.equal(d.kind, 'awaiting');
   assert.ok(d.kind === 'awaiting' && d.awaitingApproval.includes('triage'));
 });
@@ -200,8 +192,11 @@ test('a gated condition holds its answered route for a person, and files on the 
   assert.deepEqual(held.a.ready, []);
   assert.equal(held.a.status, 'awaiting approval');
   held.run.approvals = [{ step: 'triage', try: 1, at: '2026-01-01T00:00:00Z' }];
-  const approved = assess(gated, held.run, phases({ 't-plan': 'succeeded' }), (n) =>
-    n === 'plan' ? { outcome: 'done', summary: 's', artifacts: [], output: { surface: 'web' } } : undefined,
+  const approved = assess(
+    aRead(gated, held.run, {
+      phaseOf: phases({ 't-plan': 'succeeded' }),
+      signedOff: (n) => (n === 'plan' ? { outcome: 'done', summary: 's', artifacts: [], output: { surface: 'web' } } : undefined),
+    }),
   );
   assert.deepEqual(approved.ready, ['build-web', 'log']);
 });
@@ -234,7 +229,8 @@ test('a condition is tried only while none of its followers is filed; a skipped 
 
 test('a workflow without the routing keys assesses exactly as before', () => {
   const r = run({ implement: 't-i', review: null });
-  const a = assess(STEPS, r, phases({ 't-i': 'succeeded' }));
+  const { stepWords, due, unheld, ...a } = assess(aRead(STEPS, r, { phaseOf: phases({ 't-i': 'succeeded' }) }));
+  assert.deepEqual([[...stepWords.keys()], due, unheld], [['implement', 'review'], { retry: [], round: [] }, []]);
   assert.deepEqual(a, {
     ready: ['review'],
     send: [],
@@ -245,37 +241,39 @@ test('a workflow without the routing keys assesses exactly as before', () => {
     waitingOnCheckout: [],
     status: 'running',
   });
-  const done = assess(STEPS, run({ implement: 't-i', review: 't-r' }), phases({ 't-i': 'succeeded', 't-r': 'succeeded' }));
+  const done = assess(
+    aRead(STEPS, run({ implement: 't-i', review: 't-r' }), { phaseOf: phases({ 't-i': 'succeeded', 't-r': 'succeeded' }) }),
+  );
   assert.equal(done.status, 'succeeded');
-  const broke = assess(STEPS, run({ implement: 't-i', review: null }), phases({ 't-i': 'failed' }));
+  const broke = assess(aRead(STEPS, run({ implement: 't-i', review: null }), { phaseOf: phases({ 't-i': 'failed' }) }));
   assert.deepEqual([broke.unreachable, broke.status], [['review'], 'failed']);
 });
 
-test("a run's listing judges each step's standing once, with the routing keys or without them", async (t) => {
-  const counted = (input: Parameters<typeof listed>[0]) => {
-    let calls = 0;
-    const l = listed(input, (...args) => {
-      calls += 1;
-      return standing(...args);
-    });
-    assert.deepEqual(l, listed(input), 'the count changes nothing the listing prints');
-    return { l, calls };
+test("a run's listing stands no step itself: each step's standing is its assessment's, with the routing keys or without them", async (t) => {
+  const planted = (input: ListedInput, step: string) => {
+    const given = listingInput(input);
+    const assessed = assess(given.read);
+    const l = listed({ ...given, assessed });
+    assert.deepEqual(l, listed(given), 'the assessment handed in changes nothing the listing prints');
+    const stepWords = new Map(assessed.stepWords).set(step, { status: 'exhausted', own: 'exhausted' });
+    return { l, moved: listed({ ...given, assessed: { ...assessed, stepWords } }) };
   };
-  await t.test('a workflow with none of the routing keys: one per step', () => {
+  await t.test('a workflow with none of the routing keys: the words are the standings', () => {
     const r = run({ implement: 't-implement', review: null });
     const said = (): Closeout => ({ outcome: 'done', summary: 'did implement', artifacts: [] });
-    const { calls } = counted({ steps: STEPS, run: r, phaseOf: phases({ 't-implement': 'succeeded' }), closeoutOf: said });
-    assert.equal(calls, STEPS.length);
+    const { l, moved } = planted({ steps: STEPS, run: r, phaseOf: phases({ 't-implement': 'succeeded' }), closeoutOf: said }, 'implement');
+    assert.notEqual(l.steps.find((s) => s.name === 'implement')?.message, 'rounds exhausted');
+    assert.equal(moved.steps.find((s) => s.name === 'implement')?.message, 'rounds exhausted', 'the planted standing is what it says');
   });
-  await t.test('a routed workflow: one per step, its rows still routed', () => {
+  await t.test('a routed workflow: its rows still routed over the standings', () => {
     const gated = TRIAGE.map((s) => (s.name === 'triage' ? { ...s, gate: true as const } : s));
     const held = passOf({ filed: { plan: 'succeeded' }, steps: gated });
     const said = (name: string): Closeout | undefined =>
       name === 'plan' ? { outcome: 'done', summary: 'did plan', artifacts: [], output: { surface: 'web' } } : undefined;
     const input = { steps: gated, run: held.run, phaseOf: phases({ 't-plan': 'succeeded' }), closeoutOf: said, askedCloseout: () => true };
-    const { l, calls } = counted(input);
-    assert.equal(calls, gated.length);
+    const { l, moved } = planted(input, 'plan');
     assert.equal(l.steps.find((s) => s.name === 'triage')?.message, 'awaiting approval · proposes web');
     assert.equal(l.steps.find((s) => s.name === 'build-backend')?.message, 'skipped (triage: web)');
+    assert.equal(moved.steps.find((s) => s.name === 'plan')?.message, 'rounds exhausted', 'the planted standing is what it says');
   });
 });

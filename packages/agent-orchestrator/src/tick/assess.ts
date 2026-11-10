@@ -17,7 +17,15 @@ import {
 import { toDecide, type ToDecide } from '../ending/ending.ts';
 import type { Workflow } from '../step/step.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
-import { satisfiesAfter, stopsFollowers, type CloseoutAsked, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
+import {
+  honoursAsks,
+  satisfiesAfter,
+  stopsFollowers,
+  type CloseoutAsked,
+  type Run,
+  type StepStatus,
+  type TaskPhase,
+} from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { closeoutRefusals } from '../question/index.ts';
 import type { Verdict } from '../check/check.ts';
@@ -73,6 +81,49 @@ export type Assessment = {
    * on the pause.
    */
   waitingOnPause?: { steps: string[]; checks: string[] };
+  /**
+   * Where each step stands on this pass, before any try, round or routing moves it (`standing`): its word, and its own work's under it.
+   * What the listing words each row from, and `decision` reads, so neither stands a step again.
+   */
+  stepWords: ReadonlyMap<string, { status: StepStatus; own: StepStatus }>;
+  /**
+   * The tries and rounds due on this pass before the checkout or the store's pause hold them back: what a person's ask, a check's
+   * `retries:` or a loop's `again` makes due. `retry` and `round` are what of them the pass files now. None on a run cancelled or held,
+   * and none of a person's ask on a pruned one (`honoursAsks`).
+   */
+  due: { retry: Retry[]; round: Round[] };
+  /** The steps the work due on this pass sends back (`unheld`): an ending at its gate that waits for that work again. */
+  unheld: string[];
+};
+
+/**
+ * What `assess` reads of a run, as one value: the run, its frozen steps, the readers made once of the engine's views (`readersOf` in
+ * told.verb.ts), a person's asks, where the result branches stand and who holds the checkout. `RunRead` (told.verb.ts) is this and what a
+ * filing reads besides; a pure caller is handed one.
+ */
+export type AssessRead = {
+  readonly steps: readonly Workflow[];
+  readonly run: Run;
+  /** Each task's phase, as the engine's view of it says (`phaseOfView`). */
+  readonly phaseOf: (taskId: string) => TaskPhase;
+  /** How each step signed off, when it left a closeout (`closeoutReader`): a clean session can still say `outcome: "blocked"`. */
+  readonly signedOff: (step: string) => Closeout | undefined;
+  /** Whether a task was asked for a closeout (`closeoutAsked`). */
+  readonly asked: (taskId: string) => CloseoutAsked;
+  /** What each step's current check exited with (`exitVerdicts`), read only for a check that did not pass. */
+  readonly verdictOf: (step: string) => Verdict | undefined;
+  /** Whether a task's session is blocked by its harness (`harnessBlocked`): what makes a person's try of it due, to stop it first. */
+  readonly sessionBlocked: (taskId: string) => boolean;
+  /** What each task's sessions cost (`spendReader`): what holds a step over its `budget:`. */
+  readonly spendOf: SpendOf;
+  /** What people asked for with `nemia retry`, and the run has not consumed yet. */
+  readonly asks: readonly RetryAsk[];
+  /** What people asked for with `nemia retry --round`, and the run has not consumed yet. */
+  readonly roundAsks: readonly RoundAsk[];
+  /** Where each result branch stands against the base branch: what says a run with no gated ending is one nobody has decided. */
+  readonly standings: readonly BranchStanding[];
+  /** The run whose `workspace: base` step is in the repository's own checkout (`checkoutHold`), if one is. */
+  readonly checkout: CheckoutHold | undefined;
 };
 
 /**
@@ -94,50 +145,47 @@ export type Assessment = {
  *   would be goes to `waitingOnPause`; a person's asks are honoured as for any run, so a step asked for again is `running`, and its ask
  *   waits on its file for the lift. What a person decides (`toDecide`) is still asked: a word given is kept for the next pass.
  *
- * @param closeoutOf How each step signed off, when it left a closeout: a session that ends cleanly can still say `outcome: "blocked"`,
- *   which the engine cannot tell from finished work.
- * @param askedCloseout Whether a task was asked for a closeout: the schema on the engine's record of its filing.
- * @param verdictOf What each step's current check exited with, read only for a check that did not pass (`refusedCheck`). Left out, no
- *   check has refused, so no try of `retries:` is due.
- * @param asks What people asked for with `nemia retry`, and the run has not consumed yet.
- * @param roundAsks What people asked for with `nemia retry --round`, and the run has not consumed yet.
- * @param harnessBlocked Whether a task's session is blocked by its harness (`retryable`): what makes a person's try of such a step due, to
- *   stop it first.
- * @param spendOf What each task's sessions cost (`taskSpend`): what holds a step over its `budget:`. Left out, no step is over.
- * @param standings Where each result branch stands against the base branch on this pass (`branchStandings` in branches.store.ts): what says
- *   a run whose folder has no gated ending is one nobody has decided (`toDecide`). Left out, no branch is ahead, and only a gate says so.
- * @param checkout The run whose `workspace: base` step is in the repository's own checkout (`checkoutHold` in ending.verb.ts), if one is.
- *   Left out, nothing holds the checkout.
+ * The read is the pass's (`readRun`), and every reader of a run is handed it, so the tick, the verbs and the screens say one thing of it.
  */
-export function assess(
-  steps: readonly Workflow[],
-  run: Run,
-  phaseOf: (taskId: string) => TaskPhase,
-  closeoutOf: (step: string) => Closeout | undefined = () => undefined,
-  askedCloseout: (taskId: string) => CloseoutAsked = () => false,
-  verdictOf: (step: string) => Verdict | undefined = () => undefined,
-  asks: readonly RetryAsk[] = [],
-  roundAsks: readonly RoundAsk[] = [],
-  harnessBlocked: (taskId: string) => boolean = () => false,
-  spendOf: SpendOf = () => undefined,
-  standings: readonly BranchStanding[] = [],
-  checkout?: CheckoutHold,
-): Assessment {
-  if (run.cancelledAt)
-    return { ready: [], send: [], check: [], retry: [], round: [], unreachable: [], waitingOnCheckout: [], status: 'cancelled' };
-  if (run.pruned) [asks, roundAsks] = [[], []];
-  if (run.hold) [asks, roundAsks] = [[], []];
-
+export function assess(read: AssessRead): Assessment {
+  const {
+    steps,
+    run,
+    phaseOf,
+    signedOff: closeoutOf,
+    asked: askedCloseout,
+    verdictOf,
+    sessionBlocked,
+    spendOf,
+    standings,
+    checkout,
+  } = read;
+  const [asks, roundAsks] = honoursAsks(run) ? [read.asks, read.roundAsks] : [[], []];
   const stood = new Map(steps.map((s) => [s.name, standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
+  const stepWords = new Map([...stood].map(([name, st]) => [name, { status: st.status, own: st.own }]));
+  const nothing = {
+    ready: [],
+    send: [],
+    check: [],
+    retry: [],
+    round: [],
+    waitingOnCheckout: [],
+    stepWords,
+    due: { retry: [], round: [] },
+    unheld: [],
+  };
+  if (run.cancelledAt) return { ...nothing, unreachable: [], status: 'cancelled' };
+
   const status = routedWords(steps, run, new Map([...stood].map(([name, st]) => [name, st.status])), closeoutOf);
-  const due = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, harnessBlocked, spendOf);
+  const due = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, sessionBlocked, spendOf);
   const retry = due.filter((r) => !waitsOnCheckout(steps, r.step, checkout));
   const waitingOnCheckout: string[] = due.filter((r) => waitsOnCheckout(steps, r.step, checkout)).map((r) => r.step);
   for (const r of due) status.set(r.step, 'running');
   const round = roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, roundAsks, spendOf, verdictOf);
   unspent(status, stood, roundSpans(steps, round));
   for (const r of round) status.set(r.step, 'running');
-  for (const name of unheld(steps, run, retry, round)) status.set(name, 'pending');
+  const sentBack = [...unheld(steps, run, retry, round)];
+  for (const name of sentBack) status.set(name, 'pending');
   const { ready, send, check, unreachable } = dueSteps(steps, run, status, closeoutOf, checkout, waitingOnCheckout);
 
   const all = [...status.values()];
@@ -147,18 +195,7 @@ export function assess(
       ? stoppedOnWord(steps.flatMap((s) => wordsOf(status.get(s.name), stood.get(s.name))))
       : 'running';
 
-  if (run.hold)
-    return {
-      ready: [],
-      send: [],
-      check: [],
-      retry: [],
-      round: [],
-      unreachable,
-      waitingOnCheckout: [],
-      status: 'running',
-      holdUntil: run.hold.until,
-    };
+  if (run.hold) return { ...nothing, unreachable, status: 'running', holdUntil: run.hold.until };
   const decide = toDecide(steps, run, overall, (name) => status.get(name) ?? 'pending', standings);
   const assessed: Assessment = {
     ready,
@@ -170,6 +207,9 @@ export function assess(
     waitingOnCheckout,
     status: overall,
     ...(decide ? { toDecide: decide } : {}),
+    stepWords,
+    due: { retry: due, round },
+    unheld: sentBack,
   };
   return underPause(run, assessed);
 }

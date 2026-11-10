@@ -9,6 +9,7 @@ import {
   oneLine,
   prunedWords,
   refusedCheck,
+  honoursAsks,
   satisfiesAfter,
   SETTLED,
   tryOf,
@@ -269,7 +270,7 @@ export function raiseGrounds(
   const round = roundOver(steps, step, run, spendOf);
   const own = tried.raise ? ownStatus(step, run, reads.phaseOf, reads.closeoutOf, reads.askedCloseout, steps, spendOf) : null;
   const verdict = raiseVerdict({
-    called: Boolean(run.cancelledAt || run.pruned || run.hold),
+    called: !honoursAsks(run),
     tryRaise: tried.raise ?? null,
     modes: tried.modes,
     status: tried.status,
@@ -621,7 +622,7 @@ export function retryOffers(
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
   landingDenied: () => readonly string[] = () => [],
 ): Offer[] {
-  if (d.kind !== 'awaiting' || run.pruned || run.hold) return [];
+  if (d.kind !== 'awaiting' || !honoursAsks(run)) return [];
   const lines: Offer[] = [];
   for (const step of steps) {
     const offer = (bare: string, before: string, after = '') =>
@@ -772,7 +773,7 @@ export function answerLines(
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   spendOf: SpendOf = () => undefined,
 ): Record<string, string> {
-  if (d.kind !== 'awaiting' || run.pruned || run.hold) return {};
+  if (d.kind !== 'awaiting' || !honoursAsks(run)) return {};
   const lines: Record<string, string> = {};
   for (const step of steps) {
     const tried = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, () => false, spendOf);

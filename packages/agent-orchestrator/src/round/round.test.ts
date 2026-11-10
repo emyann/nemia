@@ -25,7 +25,9 @@ import { closeoutHashOf } from '../closeout/index.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import type { EarlierTry } from '../retry/retry-ask.ts';
 import type { OutputSchema, Workflow } from '../workflow.ts';
-import { names, namesFor, phases, run, step, STEPS } from '../../test/assessed.ts';
+import { aRead, names, namesFor, phases, run, step, STEPS } from '../../test/assessed.ts';
+import { decision } from '../decide/decide.ts';
+import { roundOffers } from './round.ts';
 
 const asked = () => true;
 const signedDone = () => ({ outcome: 'done' as const, summary: 's', artifacts: [], needs: undefined });
@@ -148,6 +150,12 @@ test('acceptAsk: what `nemia approve` takes', async (t) => {
   await t.test('REFUSED: no step named, no loop out of rounds, and a step at its gate: the approval of that step is named', () => {
     const gated = run({ implement: 't1', review: 't2' }, { gates: ['review'] });
     names(refusalOf(acceptAsk(STEPS, gated, undefined, undefined, ALL_SUCCEEDED, signedDone, asked)), 'nemia approve r-1 review');
+  });
+  await t.test('REFUSED: a held run at its gate is refused for its hold, never pointed at an approval it would not honour', () => {
+    const held = run({ implement: 't1', review: 't2' }, { gates: ['review'], hold: { at: '2026-09-17T01:00:00.000Z', until: ['r-0'] } });
+    const refusal = refusalOf(acceptAsk(STEPS, held, undefined, ENOUGH, ALL_SUCCEEDED, signedDone, asked));
+    names(refusal, 'nemia hold r-1 --off');
+    assert.equal(refusal.includes('nemia approve r-1 review'), false, refusal);
   });
   await t.test('REFUSED: a try already accepted, and a round already asked for', () => {
     const again = refusalOf(accept(inRound(3, acceptedTry(3)), 'review', ENOUGH));
@@ -371,4 +379,17 @@ test('roundFiled: a round moves every step of the loop behind it', async (t) => 
     );
     assert.equal(budgetOf(BUDGETED_LOOP[0], { ...inRound(1), steps: filed }), 10);
   });
+});
+
+test('roundOffers: a loop out of rounds is offered its round, and never on a run called off, pruned or held', () => {
+  const r = inRound(3);
+  const said = saidIn(3, true);
+  const d = decision(aRead(LOOP, r, { phaseOf: ALL_SUCCEEDED, signedOff: said, asked }), () => false);
+  assert.equal(d.kind, 'awaiting');
+  assert.ok(roundOffers(LOOP, r, d).length > 0, 'the unmarked run is offered its round');
+  for (const marks of [
+    { pruned: { at: '2026-09-17T01:00:00.000Z', worktrees: [] } },
+    { hold: { at: '2026-09-17T01:00:00.000Z', until: ['r-0'] } },
+  ] as Array<Partial<RepositoryRun>>)
+    assert.deepEqual(roundOffers(LOOP, inRound(3, marks), d), [], JSON.stringify(marks));
 });

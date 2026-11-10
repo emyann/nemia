@@ -3,21 +3,19 @@
  * (`waitingWords`, `harnessWaitLine`), a denial's (`deniedWords`), a person's (`onYouWords`). Pure.
  */
 import { gated, hasStarted, holdAdvice, holdNeedsYou, holdWord, waitAdvice, waitWord, type Wait } from '../wait/wait.ts';
-import { slotWord, type CheckoutHold, type RunSlot } from '../cap/cap.ts';
-import { checkoutWord, LANDED_CAP, landedWords, onBaseNote, toDecideWords, type ToDecide } from '../ending/ending.ts';
+import { slotWord, type RunSlot } from '../cap/cap.ts';
+import { checkoutWord, LANDED_CAP, landedWords, onBaseNote, toDecideWords, unrunEnding, type ToDecide } from '../ending/ending.ts';
 import type { Workflow } from '../step/step.ts';
 import type { AttemptMemory, EnginePhase } from '../views/views-words.ts';
 import { outOfMemory, outOfMemoryWords } from '../out-of-memory/out-of-memory.ts';
-import { DENIED_CAP, DENIED_SHOWN, oneLine, satisfiesAfter, type CloseoutAsked, type Run, type StepStatus } from '../record/record.ts';
+import { DENIED_CAP, DENIED_SHOWN, honoursAsks, oneLine, satisfiesAfter, type Run, type StepStatus } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { checkVerdictOf, verdictWord, type CheckVerdict, type Verdict } from '../check/check.ts';
-import { routedRows, routedWords, settledOf as settledWord } from '../route/routed/index.ts';
-import type { WhereAStepStands } from '../../contracts/standing.contract.ts';
+import { routedRows, routedWords } from '../route/routed/index.ts';
 import { codedStep, ENGINE_REASON, holdsTheRun, REASON_OF, type CodedStep, type QualifiedStep } from '../phase/phase.ts';
-import { answerOf, dueNote, modeWord, retriesDue, tryNote, type RetryAsk } from '../retry/index.ts';
+import { answerOf, dueNote, modeWord, tryNote, type RetryAsk } from '../retry/index.ts';
 import {
   acceptanceOf,
-  approvedFirst,
   budgetOf,
   waitsOnCheckout,
   loopOver,
@@ -29,17 +27,13 @@ import {
   spentWord,
   standing,
   stepSpend,
-  unheld,
-  type BranchStanding,
-  type RoundAsk,
-  type SpendOf,
   budgetWord,
   durationWord,
 } from '../status/status.ts';
-import { acceptedNote, exhaustedNote, heldLater, heldNote, roundDueNote, roundsDue } from '../round/round.ts';
+import { acceptedNote, exhaustedNote, heldLater, heldNote, roundDueNote } from '../round/round.ts';
 import { saidWord } from '../say/say.ts';
 import { askedQuestions } from '../question/index.ts';
-import { assess } from '../tick/assess.ts';
+import { assess, type Assessment, type AssessRead } from '../tick/assess.ts';
 import { neverApproved } from '../forget/prune/prune.ts';
 import { daemonLine, staleAfterMs, type DaemonStanding } from '../daemon/daemon.ts';
 import type { Paused } from '../pause/pause.ts';
@@ -146,24 +140,21 @@ export function standingLine(standing: ListedStanding, daemon: DaemonStanding, n
  */
 export type ListedPhase = EnginePhase | 'unknown' | 'running';
 
-/** What `listing` reads a run's steps off: the run, the engine's words for its tasks, and what people and git said of it. */
+/**
+ * What `listing` reads a run's steps off: the run's one read (`read`, `readRun`'s) and its assessment, which judge every step; and, for the
+ * words alone, the engine's own words for its tasks and what people said of it.
+ */
 export interface ListingInput {
-  /** The run's steps, as the frozen folder names them, in its order. */
+  /** The run's steps as they are shown, as the frozen folder names them, in its order. */
   readonly steps: readonly Workflow[];
-  /** The run whose steps are listed. */
-  readonly run: Run;
+  /** The run's one read (`AssessRead`): what judges each step, its tries and rounds due, its result and its checkout. */
+  readonly read: AssessRead;
+  /** `assess` on `read`, where the caller judged it already: each step's standing and what is due. Left out, the listing assesses it. */
+  readonly assessed?: Assessment;
   /** The engine's own word for a task's phase — `working`, `needs-human` — shown as-is. */
   readonly phaseOf: (taskId: string) => ListedPhase;
   /** Each step's closeout, or the error that kept it from being read. */
   readonly closeoutOf: (step: string) => Closeout | { error: string } | undefined;
-  /** Whether a task was asked its closeout, and what it was asked. */
-  readonly askedCloseout?: (taskId: string) => CloseoutAsked;
-  /** What a refused check exited with, as its log tells it. */
-  readonly verdictOf?: (step: string) => Verdict | undefined;
-  /** What people asked for with `nemia retry`, and the run has not consumed yet. */
-  readonly asks?: readonly RetryAsk[];
-  /** What people asked for with `nemia retry --round`, and the run has not consumed yet. */
-  readonly roundAsks?: readonly RoundAsk[];
   /** Every ask that carried a message, waiting or consumed (`readAnswers`): what says a step's try was answered (`answerOf`). */
   readonly answers?: readonly RetryAsk[];
   /** The runs this run waits on that have not landed (`waitsOf`): what its roots say where `waiting` would be. */
@@ -173,25 +164,14 @@ export interface ListingInput {
    * task.
    */
   readonly saidTo?: (step: string) => number;
-  /** What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, with the amounts. */
-  readonly spendOf?: SpendOf;
   /** The cap on runs in flight holding this run (`heldRuns`), if it does: what its roots say where `waiting` would be. */
   readonly slot?: RunSlot;
   /**
-   * Where each result branch stands against the base branch, as git says it on this pass (`branchStandings` in
-   * branches.store.ts): what says a finished run is one nobody has decided.
-   */
-  readonly standings?: readonly BranchStanding[];
-  /**
-   * The run whose `workspace: base` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in
-   * ending.verb.ts): what this run's ending says where `waiting` would be.
-   */
-  readonly checkout?: CheckoutHold;
-  /**
    * What the harness says a blocked session waits for, in its own words (`TaskView.waitingFor`): the row's `waits` beside
-   * the engine's `needs-human`. **Beside the word, never in it.** `phaseOf` is compared for `needs-human` exactly, here and in
-   * `harnessBlocked` (views.verb.ts), and a row says it as its reason (`AwaitingAnswer`, `via: 'session'`), which the api and the board
-   * compare; the status stays the engine's bare word, and only what `nemia ls` prints gains the harness's (`shownStatus`).
+   * the engine's `needs-human`. **Beside the word, never in it.** Read for a task the run's one read says its harness blocked
+   * (`sessionBlocked`, `harnessBlocked` in views.verb.ts), and a row says it as its reason (`AwaitingAnswer`, `via: 'session'`), which
+   * the api and the board compare; the status stays the engine's bare word, and only what `nemia ls` prints gains the harness's
+   * (`shownStatus`).
    */
   readonly waitingOf?: (taskId: string) => string | undefined;
   /**
@@ -226,15 +206,7 @@ export interface ListingInput {
 }
 
 /** Where a step stands on a pass: its word, and its own work's (`standing`). */
-type Stood = ReturnType<WhereAStepStands>;
-
-/** A listing's closeouts as a step's standing reads them: one nobody can read is none. */
-const readableOf =
-  (closeoutOf: ListingInput['closeoutOf']) =>
-  (name: string): Closeout | undefined => {
-    const c = closeoutOf(name);
-    return c && !('error' in c) ? c : undefined;
-  };
+type Stood = { status: StepStatus; own: StepStatus };
 
 /** Whether a step carries a routing key a step's word reads: a condition's `routes:`, or a workflow node's `workflow:`. */
 const routes = (step: Workflow): boolean => step.routes !== undefined || step.workflow !== undefined;
@@ -243,20 +215,21 @@ const routes = (step: Workflow): boolean => step.routes !== undefined || step.wo
  * `listedSteps`, with the routing's rows laid over the steps it words (`routedRows`): a node `skipped (<condition>: <route>)`, a workflow
  * node `sent → <card>`, a condition never filed its route and the line that routes it by hand.
  *
- * Each step's standing is judged once (`stand`, `standing` but where a test counts its calls), and the routing laid over it only where a
- * step has a routing key a word reads (`routes:`, `workflow:`): with none, the words are the standings (`routedWords`).
+ * Each step's standing is the assessment's (`stepWords`, `assess` on the run's one read), so the listing stands no step itself and says
+ * what the pass says; the routing is laid over it only where a step has a routing key a word reads (`routes:`, `workflow:`): with none,
+ * the words are the standings (`routedWords`).
  */
-export function listing(input: ListingInput, stand: WhereAStepStands = standing): Listing {
-  const { steps, run, askedCloseout = () => false, spendOf = () => undefined, verdictOf = () => undefined } = input;
-  const readable = readableOf(input.closeoutOf);
-  const settledOf = settledWord(input.phaseOf);
-  const stood = new Map(steps.map((s) => [s.name, stand(s, run, settledOf, readable, askedCloseout, steps, spendOf, verdictOf)]));
-  const statuses = new Map([...stood].map(([name, { status }]) => [name, status]));
-  const words = steps.some(routes) ? routedWords(steps, run, statuses, readable) : statuses;
+export function listing(input: ListingInput): Listing {
+  const { steps, read } = input;
+  const { run } = read;
+  const assessed = input.assessed ?? assess(read);
   const stoodOf = (step: Workflow): Stood =>
-    stood.get(step.name) ?? stand(step, run, settledOf, readable, askedCloseout, steps, spendOf, verdictOf);
-  const listed = memoryNoted(input, listedSteps(input, stoodOf, words));
-  const routed = routedRows(input, words);
+    assessed.stepWords.get(step.name) ??
+    standing(step, run, read.phaseOf, read.signedOff, read.asked, read.steps, read.spendOf, read.verdictOf);
+  const statuses = new Map(steps.map((s) => [s.name, stoodOf(s).status]));
+  const words = steps.some(routes) ? routedWords(steps, run, statuses, read.signedOff) : statuses;
+  const listed = memoryNoted(input, listedSteps(input, assessed, stoodOf, words));
+  const routed = routedRows({ steps, run, closeoutOf: input.closeoutOf }, words);
   if (!routed.size) return listed;
   const rows = listed.steps.map((s) => {
     const row = routed.get(s.name);
@@ -271,8 +244,9 @@ export function listing(input: ListingInput, stand: WhereAStepStands = standing)
  * own words: read off the attempts on every pass, so a step whose tasks carry no such record reads as it did. The session's words name the
  * step's own `memory:` where it names one; a check runs under the daemon's default alone.
  */
-const memoryNoted = ({ steps, run, memoryOf }: ListingInput, listed: Listing): Listing => {
+const memoryNoted = ({ steps, read, memoryOf }: ListingInput, listed: Listing): Listing => {
   if (!memoryOf) return listed;
+  const { run } = read;
   const said = (taskId: string | null | undefined, own: string | undefined, of: 'session' | 'check'): string => {
     const killed = taskId ? outOfMemory(memoryOf(taskId), own) : undefined;
     return killed ? outOfMemoryWords(killed, own, of) : '';
@@ -300,7 +274,7 @@ const memoryNoted = ({ steps, run, memoryOf }: ListingInput, listed: Listing): L
  * for one nobody can read. A step that stopped itself `blocked` ended its session as cleanly as one that
  * finished the work, so the engine's phase reads `succeeded` for both; `BLOCKED` is shouted beside it, in
  * the word `nemia decide` uses. A step still running shows the engine's own word for it, and a session whose
- * word is exactly `needs-human` what the harness says it waits for (`waitingWords`). Nothing is inferred
+ * harness blocked it (`sessionBlocked`) what the harness says it waits for (`waitingWords`). Nothing is inferred
  * for a step with no closeout — a missing closeout is not a claim that the work was done, and a run with
  * none still lists. A cap reached says what was spent and the cap in force; a looping step held on another
  * step's budget shows that step's.
@@ -328,63 +302,38 @@ const memoryNoted = ({ steps, run, memoryOf }: ListingInput, listed: Listing): L
  * ending's merge (`landed`), unless it found nothing staged; how many times it was spoken to; and what it
  * was denied. Its cost goes beside its word once measured, unless the word already shows it.
  *
- * @param stoodOf Where a step stands on this pass (`standing`), judged once by `listing`.
+ * @param assessed `assess` on the run's one read: the tries, rounds and send-backs due, read here and never judged again.
+ * @param stoodOf Where a step stands on this pass (`stepWords`).
  * @param routed Every step's word on this pass, routing and all (`routedWords` over `stood`).
  */
 function listedSteps(
   {
     steps,
-    run,
+    read,
     phaseOf,
     closeoutOf,
-    askedCloseout = () => false,
-    verdictOf = () => undefined,
-    asks = [],
-    roundAsks = [],
     answers = [],
     waits = [],
     saidTo = () => 0,
-    spendOf = () => undefined,
     slot,
-    standings = [],
-    checkout,
     waitingOf = () => undefined,
     deniedOf = () => [],
     ranOnOf = () => undefined,
     parkedOf = () => undefined,
     holds,
   }: ListingInput,
+  assessed: Assessment,
   stoodOf: (step: Workflow) => Stood,
   routed: ReadonlyMap<string, StepStatus>,
 ): Listing {
+  const { run, verdictOf, spendOf, standings, checkout, sessionBlocked } = read;
   const waiting = gated(run) ? [...waits] : [];
   const held = slot && !waiting.length && !hasStarted(run) && !run.cancelledAt ? slot : undefined;
-  const settledOf = settledWord(phaseOf);
-  const readable = readableOf(closeoutOf);
-  const due =
-    run.cancelledAt || run.pruned || run.hold
-      ? []
-      : retriesDue(steps, run, settledOf, readable, askedCloseout, verdictOf, asks, (taskId) => phaseOf(taskId) === 'needs-human', spendOf);
-  const rounds =
-    run.cancelledAt || run.pruned || run.hold ? [] : roundsDue(steps, run, settledOf, readable, askedCloseout, roundAsks, spendOf);
+  const due = assessed.due.retry;
+  const rounds = assessed.due.round;
   const refiled = roundSpans(steps, rounds);
-  const waitingAgain = unheld(steps, run, due, rounds);
-  const assessed = assess(
-    steps,
-    run,
-    settledOf,
-    readable,
-    askedCloseout,
-    verdictOf,
-    asks,
-    roundAsks,
-    (taskId) => phaseOf(taskId) === 'needs-human',
-    spendOf,
-    standings,
-    checkout,
-  );
-  const takenByHand = (name: string): boolean =>
-    resultOnBase(standings) && !run.steps[name]?.taskId && steps.some((s) => s.name === name && approvedFirst(s, run));
+  const waitingAgain = new Set(assessed.unheld);
+  const takenByHand = (name: string): boolean => resultOnBase(standings) && unrunEnding(steps, run, name);
 
   const waitingOnYou: string[] = [];
   const exhausted = new Set<string>();
@@ -460,7 +409,7 @@ function listedSteps(
     const judged = judgedRow(status, () => verdictOf(name), assessed.waitingOnPause?.checks.includes(name) === true);
     if (judged) return { name, ...judged, branch };
 
-    return { name, ...taskWord(status, taskId, closeoutOf(name), { phaseOf, parkedOf, waitingOf }), branch };
+    return { name, ...taskWord(status, taskId, closeoutOf(name), { phaseOf, parkedOf, waitingOf, sessionBlocked }), branch };
   }
 
   function budgetStatus(step: Workflow, status: StepStatus): string {
@@ -479,7 +428,7 @@ function listedSteps(
   const decide = assessed.toDecide;
   return {
     steps: asking(rows, steps, run, waitingOnYou, closeoutOf),
-    waitingOnYou: run.cancelledAt || run.pruned || run.hold ? [] : waitingOnYou,
+    waitingOnYou: honoursAsks(run) ? waitingOnYou : [],
     waiting,
     ...(run.hold && !run.cancelledAt ? { holding: holds ? [...holds] : run.hold.until.map((id) => ({ run: id })) } : {}),
     ...(held ? { slot: held } : {}),
@@ -506,20 +455,20 @@ const coded = codedStep;
 /**
  * The word of a step the run has no verdict of its own on, its closeout `c` beside it: the status it is shown by where it has no task or
  * the record says `unsigned` or `unverified`; else `paused` where its session is parked (`pausedWord`, reason `Paused`), or the engine's
- * word for its task, with what a session at `needs-human` waits for (`waitingWords`).
+ * word for its task, with what a session its harness blocked waits for (`sessionBlocked`, `waitingWords`).
  */
 function taskWord(
   status: StepStatus,
   taskId: string | null | undefined,
   c: Closeout | { error: string } | undefined,
-  read: Required<Pick<ListingInput, 'phaseOf' | 'parkedOf' | 'waitingOf'>>,
+  read: Required<Pick<ListingInput, 'phaseOf' | 'parkedOf' | 'waitingOf'>> & Pick<AssessRead, 'sessionBlocked'>,
 ): CodedStep & { message: string; waits?: string } {
   const said = !c ? '' : 'error' in c ? ' · closeout unreadable' : ` · ${c.outcome === 'blocked' ? 'BLOCKED' : 'done'}`;
   const engine = typeof taskId === 'string' && taskId !== '' && status !== 'unsigned' && status !== 'unverified';
   const parked = engine ? read.parkedOf(taskId) : undefined;
   if (parked) return { message: `${pausedWord(parked)}${said}`, ...coded({ reason: 'Paused' }) };
   const word = engine ? read.phaseOf(taskId) : status;
-  const waitsFor = engine && word === 'needs-human' ? read.waitingOf(taskId) : undefined;
+  const waitsFor = engine && read.sessionBlocked(taskId) ? read.waitingOf(taskId) : undefined;
   return { message: `${word}${said}`, ...coded(saidReason(word, c)), ...(waitsFor ? { waits: waitingWords(waitsFor) } : {}) };
 }
 
@@ -693,7 +642,7 @@ function asking(
   waitingOnYou: readonly string[],
   closeoutOf: (step: string) => Closeout | { error: string } | undefined,
 ): Listing['steps'] {
-  const waits = !run.cancelledAt && !run.pruned && !run.hold;
+  const waits = honoursAsks(run);
   return rows.map((row) => {
     const step = waits && waitingOnYou.includes(row.name) ? steps.find((s) => s.name === row.name) : undefined;
     const asks = step ? askedQuestions(step, closeoutOf(row.name)).flatMap((a) => a.questions).length : 0;

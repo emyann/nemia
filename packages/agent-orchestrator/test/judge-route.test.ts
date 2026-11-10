@@ -13,7 +13,7 @@ import { composeBrief } from '../src/brief/brief.ts';
 import { stepSetRefusal, validate } from '../src/workflow/validate.ts';
 import type { TaskPhase } from '../src/record/record.ts';
 import type { Workflow } from '../src/step/step.ts';
-import { phases, run, step } from './assessed.ts';
+import { aRead, phases, run, step } from './assessed.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
@@ -47,7 +47,10 @@ const passOf = (filed: Record<string, TaskPhase>, output?: Record<string, unknow
       ? { outcome: 'done', summary: `did ${name}`, artifacts: [], ...(name === 'triage' && output ? { output } : {}) }
       : undefined;
   const asked = () => true;
-  return { a: assess(JUDGED, r, phaseOf, said, asked), words: Object.fromEntries(runWords(JUDGED, r, phaseOf, said, asked)) };
+  return {
+    a: assess(aRead(JUDGED, r, { phaseOf, signedOff: said, asked })),
+    words: Object.fromEntries(runWords(JUDGED, r, phaseOf, said, asked)),
+  };
 };
 
 test('a judge is filed as a step, and its signed route routes the nodes after it', async (t) => {

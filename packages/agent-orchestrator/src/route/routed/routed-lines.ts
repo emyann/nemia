@@ -4,9 +4,8 @@
  */
 import type { Workflow } from '../../step/step.ts';
 import type { Closeout } from '../../closeout/index.ts';
-import type { CloseoutAsked, Run, StepStatus, TaskPhase } from '../../record/record.ts';
-import type { Verdict } from '../../check/check.ts';
-import type { SpendOf } from '../../status/status.ts';
+import type { Run, StepStatus } from '../../record/record.ts';
+import type { AssessRead } from '../../tick/assess.ts';
 import { codedStep, REASON_OF, type CodedStep } from '../../phase/phase.ts';
 import { answeredRoute, personRouted, runWords } from './routed-words.ts';
 
@@ -22,25 +21,12 @@ export const routeLine = (run: Pick<Run, 'id'>, condition: Workflow): string =>
 const conditionBefore = (step: Workflow, steps: readonly Workflow[]): Workflow | undefined =>
   steps.find((s) => step.after.includes(s.name) && s.routes !== undefined);
 
-/** What `routedRows` reads of a listing (`ListingInput`): the engine's word for a task's phase, as the list is given it. */
+/** What `routedRows` reads of a listing (`ListingInput`): the run, its steps, and each step's closeout as the list is given it. */
 export type RoutedInput = {
   readonly steps: readonly Workflow[];
   readonly run: Run;
-  readonly phaseOf: (taskId: string) => string;
   readonly closeoutOf: (step: string) => Closeout | { error: string } | undefined;
-  readonly askedCloseout?: (taskId: string) => CloseoutAsked;
-  readonly spendOf?: SpendOf;
-  readonly verdictOf?: (step: string) => Verdict | undefined;
 };
-
-/** The engine's word as a step's standing reads it: a session that stopped to ask is still at work, and what is not settled runs. */
-export const settledOf =
-  (phaseOf: (taskId: string) => string) =>
-  (taskId: string): TaskPhase => {
-    const word = phaseOf(taskId);
-    if (word === 'input-required') return 'succeeded';
-    return word === 'succeeded' || word === 'failed' || word === 'stopped' || word === 'unknown' ? word : 'running';
-  };
 
 /** A listing's closeouts as the routing reads them: one nobody can read is none. */
 const readableOf =
@@ -50,9 +36,10 @@ const readableOf =
     return c && !('error' in c) ? c : undefined;
   };
 
-/** Every step's word on this pass (`runWords`), off a listing's input: the engine's words as a step's standing reads them. */
-export const listedWords = (input: RoutedInput): Map<string, StepStatus> =>
-  runWords(input.steps, input.run, settledOf(input.phaseOf), readableOf(input), input.askedCloseout, input.spendOf, input.verdictOf);
+/** Every step's word on this pass (`runWords`), off the run's one read: its readers as the pass made them (`readersOf`). */
+export const listedWords = (
+  read: Pick<AssessRead, 'steps' | 'run' | 'phaseOf' | 'signedOff' | 'asked' | 'spendOf' | 'verdictOf'>,
+): Map<string, StepStatus> => runWords(read.steps, read.run, read.phaseOf, read.signedOff, read.asked, read.spendOf, read.verdictOf);
 
 /**
  * The rows the routing words for a run's steps never filed, by name: every other step reads as its own work says. A skipped node says the
@@ -60,7 +47,7 @@ export const listedWords = (input: RoutedInput): Map<string, StepStatus> =>
  * that its table answers none, with the line that routes it by hand while no node after it is filed; a filed condition that stopped on no
  * route of its own (`blocked`, `unsigned`) that line too, and one a person routed its route.
  *
- * @param words Every step's word on this pass (`runWords`), judged once by the caller (`listing`, or `listedWords` off the same input).
+ * @param words Every step's word on this pass (`runWords`), judged once by the caller (`listing`, or `listedWords` off the run's read).
  */
 export function routedRows(input: RoutedInput, words: ReadonlyMap<string, StepStatus>): Map<string, RoutedRow> {
   const { steps, run } = input;

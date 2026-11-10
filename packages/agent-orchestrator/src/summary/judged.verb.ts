@@ -1,13 +1,13 @@
 /**
  * What a run established, over one read of its tasks (`judge`): each step's word and note in `nemia ls`'s words, who is waited on and why,
  * where the run stands, whether it still moves, what it has cost, and what a person has to decide about its result. The board's reading
- * of a run, as the list and a run's page give it. A controller: it reads the run through `runReading` and its branches through
+ * of a run, as the list and a run's page give it. A controller: it reads the run through `listReading` and its branches through
  * `branchStandings`.
  */
 import { Effect } from 'effect';
 import { type Engine, nameFor } from '../runtime-client.ts';
 import { answerIn, onYouWords } from '../list/list.ts';
-import { runReading } from '../list/list.verb.ts';
+import { listReading } from '../list/list.verb.ts';
 import { type BranchReader, branchStandings } from '../branches/branches.store.ts';
 import { resultSteps } from '../branches/index.ts';
 import { type BranchStanding, sendBackTo, type Spend, type SpendOf, spentWord } from '../status/status.ts';
@@ -431,11 +431,13 @@ export type JudgeHow = {
   git: BranchReader;
   standings?: (status: RunStatus, steps: readonly Workflow[]) => readonly BranchStanding[];
   parent?: (id: string) => ParentRun;
+  /** The environment the checkout's claim reads the cap on runs in flight over (`ListReadingHow`'s `env`); left out, the process's. */
+  env?: NodeJS.ProcessEnv;
 };
 
 /**
  * What `nemia ls` says about each step, what `assess` says about the run, and whether the run still moves: the package's one reading of the
- * run (`runReading`), which `nemia ls` answers from too, over the views the request already has.
+ * run (`listReading`), which `nemia ls` answers from too, over the views the request already has.
  *
  * The words are `listing`'s — `verified ✓`, `checking`, `unverified · done`, `failed ✗ check (exit 1)`, `unsigned`, `succeeded · BLOCKED`,
  * `rounds exhausted`, the engine's bare word while a step runs (`needs-human`), and
@@ -449,8 +451,8 @@ export type JudgeHow = {
  * waiting on runs says `waiting on <run>`, and the run moves while each may still land — the tick files the roots when they do — and not
  * once one never will without a person. A held run moves as it would unheld while the hold may still lift on its own — the tick lifts it
  * once every run it names has landed, and files then what is due — and not once it lifts only by a person's hand: a run it names never
- * lands, or it names none. No slot is said and no
- * checkout read: the board says the run slots over its Factory.
+ * lands, or it names none. No slot is said — the board says the run slots over its Factory — and the run holding the repository's
+ * checkout is read as the pass reads it (`listReading`): a try a person asked stands in `asked` while the checkout or the pause holds it.
  *
  * Where the run's result branches stand is asked once the run's status is known (`standings`): left out, no branch is read, only a gate
  * says a run is one nobody has decided, and a finished run whose branch nobody merged says there is nothing to decide.
@@ -462,11 +464,11 @@ export const judge = Effect.fn('judge')(function* (
   names: readonly string[],
   folder: readonly Workflow[] | null,
   views: Views,
-  { reader, git, standings = () => [], parent }: JudgeHow,
+  { reader, git, standings = () => [], parent, env }: JudgeHow,
 ) {
   const steps = judgedSteps(run, folder);
   const shown = [...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map(bare)];
-  const read = yield* runReading(reader, run, { views, steps, shown, standings, git, ...(parent ? { parent } : {}) });
+  const read = yield* listReading(reader, run, { views, steps, shown, standings, git, env, ...(parent ? { parent } : {}) });
   const { status, ready, check, retry, round } = read.assessed;
   const waiting = runWaitingOf(run, read.waiting);
   const holding = holdingOf(run, read.holding ?? []);
@@ -492,7 +494,7 @@ export const judge = Effect.fn('judge')(function* (
         ((due.ready.length > 0 && !waiting?.waitingOnYou) || due.check.length > 0 || due.retry.length > 0 || due.round.length > 0)),
     waiting,
     holding,
-    asked: new Map(retry.filter((r) => r.by === 'ask').map((r) => [r.step, r])),
+    asked: new Map(read.assessed.due.retry.filter((r) => r.by === 'ask').map((r) => [r.step, r])),
     answers: read.answers,
     spendOf: read.spendOf,
     cost: spentOf(read.spend),

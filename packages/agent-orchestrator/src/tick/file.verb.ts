@@ -63,7 +63,7 @@ import { localFields } from './assess.ts';
 import { stepToken } from '../token/token.store.ts';
 import { sendCards, type Due } from '../send/send.verb.ts';
 import { answerTables, fileScripts } from '../script/script.verb.ts';
-import { filedAt, foldersTold, placeTold, toldOf, type PassReads, type PlaceTold, type StepTold, type Told } from './told.verb.ts';
+import { filedAt, foldersTold, placeTold, toldOf, type RunRead, type PlaceTold, type StepTold, type Told } from './told.verb.ts';
 import { found, recordNamed, stepNamed, taskToStop, tryTold } from './told.verb.ts';
 
 /** A task as the engine is asked to file it (`e.file`). */
@@ -89,11 +89,21 @@ export type Closer = {
 
 /**
  * One pass's filing: the engine, which files each brief with its parts beside it (`inParts`, given by `advancePass`), the run, what
- * the pass read (`PassReads`), its closer (`Closer`), whether it may file still (`mayFile`, made by `mayFileOf` once a pass), the
+ * the pass read (`RunRead`), its closer (`Closer`), whether it may file still (`mayFile`, made by `mayFileOf` once a pass), the
  * pass's notes, which each filing adds to in the order it runs, and `heads`, every branch of the run's repository and its commit as the
  * pass read them, undefined where it did not.
  */
-export type Filing = { e: Engine; run: Run; reads: PassReads; closer: Closer; mayFile: () => boolean; notes: string[]; heads?: Heads };
+export type Filing = {
+  e: Engine;
+  run: Run;
+  reads: RunRead;
+  closer: Closer;
+  mayFile: () => boolean;
+  notes: string[];
+  heads?: Heads;
+  /** The store's root, as the pass was given it (`StoreRoot`): where a filing reads the run's factory's MCP server record. */
+  home: string;
+};
 
 /** Every branch of a run's repository and its commit, read when first asked, as a pass read them; undefined where it did not. */
 export type Heads = () => Readonly<Record<string, string>> | undefined;
@@ -301,8 +311,8 @@ const trySpec = (
     config: filedConfig(step, f.reads.steps, f.run, {
       model: tryModel(step, record, r),
       budgetUsd: t.budgetUsd,
-      ...filedAt(f.run, f.reads.home),
-      ...stepToken(f.reads.home, f.run, step, t.taskId, r.try),
+      ...filedAt(f.run, f.home),
+      ...stepToken(f.home, f.run, step, t.taskId, r.try),
       own: t.told.own,
       landingDenied: () => t.told.words?.denied ?? [],
     }),
@@ -420,8 +430,8 @@ function roundSpec(
     ...localFields(target, () => ({
       config: filedConfig(target, reads.steps, run, {
         model: sessionModel(target, record),
-        ...filedAt(run, f.reads.home),
-        ...stepToken(f.reads.home, run, target, taskId, tryOf(run, r.target) + 1),
+        ...filedAt(run, f.home),
+        ...stepToken(f.home, run, target, taskId, tryOf(run, r.target) + 1),
         budgetUsd: budgetUsdFor(
           r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, run),
           stepSpend(run, r.target, reads.spendOf),
@@ -514,7 +524,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, 
   const scripts: string[] = yield* fileScripts(f, ready);
   const filed: string[] = [...(yield* sendCards(f, due.send)), ...scripts];
   const placed = yield* PlaceService;
-  const servers = yield* serversFiling(run.factory ?? DEFAULT_FACTORY, f.reads.home, ready, f.notes);
+  const servers = yield* serversFiling(run.factory ?? DEFAULT_FACTORY, f.home, ready, f.notes);
   for (const name of ready.filter((n) => !scripts.includes(n))) {
     if (!f.mayFile()) break;
     const step = stepNamed(f, name);
@@ -607,8 +617,8 @@ function readySpec(
     ...localFields(step, () => ({
       config: filedConfig(step, reads.steps, run, {
         model: step.model,
-        ...filedAt(run, f.reads.home),
-        ...stepToken(f.reads.home, run, step, stepTaskId(run, step.name, tryOf(run, step.name)), tryOf(run, step.name)),
+        ...filedAt(run, f.home),
+        ...stepToken(f.home, run, step, stepTaskId(run, step.name, tryOf(run, step.name)), tryOf(run, step.name)),
         caller: callerMounts(step, parents),
         budgetUsd: budgetUsdFor(budgetOf(step, run), stepSpend(run, step.name, reads.spendOf)),
         own: told.own,

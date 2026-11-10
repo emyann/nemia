@@ -15,19 +15,10 @@ import { unloadedFolder } from '../steps/steps.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { lastCeilings } from '../daemon/daemon.store.ts';
 import { maxRuns } from '../config/config.store.ts';
-import {
-  closeoutAsked,
-  closeoutReader,
-  exitVerdicts,
-  harnessBlocked,
-  parentsRead,
-  passParents,
-  spendReader,
-  type Parents,
-} from '../views/views.verb.ts';
+import { parentsRead, passParents, type Parents } from '../views/views.verb.ts';
 import { standingReader, type PassStanding } from '../standing/standing.verb.ts';
 import type { PassRevisions } from '../revisions/pin.verb.ts';
-import { phaseOfView } from '../views/views-words.ts';
+import { readRun } from '../tick/told.verb.ts';
 
 /** A run a task of which does not read (`unreadableJournal`), as a pass counts it: in flight, and asking the cap for nothing more. */
 const UNJUDGED = { inFlight: true, wants: false } as const;
@@ -58,20 +49,9 @@ const needOf = Effect.fnUntraced(function* (
   steps: Workflow[],
   parents: Parents,
 ) {
-  const phaseOf = (taskId: string) => phaseOfView(listed.get(taskId));
-  const { asks, rounds } = runStore.asks.read(run.id);
-  const a = assess(
-    steps,
-    run,
-    phaseOf,
-    closeoutReader(listed, run, steps),
-    closeoutAsked(listed),
-    exitVerdicts(listed, run),
-    asks,
-    rounds,
-    harnessBlocked(listed),
-    spendReader(listed),
-  );
+  const { read } = yield* readRun(seen, run, { steps, views: new Map(listed) });
+  const { phaseOf } = read;
+  const a = assess(read);
   const parent = yield* parentsRead(run, parents.git, parents.read).pipe(over(seen));
   return slotNeed(run, phaseOf, a, (id) => parent(id).landed, steps);
 });

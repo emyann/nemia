@@ -26,8 +26,8 @@ import { sayFilled, unansweredWords, type Held, type PlaceOutcome } from '../../
 import { landedOf, standingsOf } from '../../branches/branches.store.ts';
 import { askCheckoutStatus, checkoutStatus, stagedHere, statusMemo, type StatusMemo } from '../../place/landing.store.ts';
 import { headsOver, standingLive } from '../../standing/standing.verb.ts';
-import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhasesRead } from '../../views/views.verb.ts';
-import { adoptChecks, adoptRounds, adoptTries, handOffOwed, unrecordedSteps } from '../../tick/advance.verb.ts';
+import { handOffOwed } from '../../tick/advance.verb.ts';
+import { readAndAdopt } from '../../adopt/run-adopt.verb.ts';
 import { Conflict, Invalid } from '../../refusal/refusal.ts';
 
 /**
@@ -239,24 +239,14 @@ const judgedOf = Effect.fn('prune.judged')(function* (
   if (!steps) return judged;
   const git = yield* standingLive([run]);
   const placed = yield* PlaceService;
-  const { views, phaseOf } = yield* taskPhasesRead(run);
-  const { asks, rounds } = runStore.asks.read(run.id);
-  const reader = closeoutReader(views, run, steps);
-  const asked = closeoutAsked(views);
-  const verdictOf = exitVerdicts(views, run);
-  const spendOf = spendReader(views);
-  yield* adoptRounds(e, run, steps, views, phaseOf, reader, asked, rounds, spendOf);
-  yield* adoptTries(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, spendOf);
-  yield* adoptChecks(e, run, steps, views, phaseOf, reader, asked, spendOf);
-  for (const { name, taskId } of yield* unrecordedSteps(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, rounds, spendOf)) {
-    run.steps[name] = { ...run.steps[name], taskId };
-  }
+  const { read } = yield* readAndAdopt(e, run, { steps, unrecorded: true });
+  const { phaseOf, signedOff: reader, asked, verdictOf, asks, roundAsks: rounds, spendOf } = read;
   const askAt = (a: AskName) => runStore.asks.where(run.id, a);
   const standings = steps.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run, steps, git) : [];
   const checkout = statusMemo(headsOver(git), placed);
   if (readsCheckout(run, steps)) yield* askCheckoutStatus(run, steps, checkout);
   return {
-    decided: decision(steps, run, phaseOf, landedOf(run, git), reader, asked, verdictOf, asks, rounds, harnessBlocked(views), spendOf).kind,
+    decided: decision(read, landedOf(run, git)).kind,
     held: forgetRefusal(
       steps,
       run,

@@ -192,7 +192,20 @@ function factsOf(f: Forgetting, others: readonly Run[]): Facts {
   const judged =
     !run.cancelledAt && steps
       ? {
-          a: assess(steps, free, f.phaseOf, f.closeoutOf, f.askedCloseout, f.verdictOf, f.asks, f.roundAsks, () => false, f.spendOf),
+          a: assess({
+            steps,
+            run: free,
+            phaseOf: f.phaseOf,
+            signedOff: f.closeoutOf,
+            asked: f.askedCloseout,
+            verdictOf: f.verdictOf,
+            sessionBlocked: () => false,
+            spendOf: f.spendOf,
+            asks: f.asks,
+            roundAsks: f.roundAsks,
+            standings: [],
+            checkout: undefined,
+          }),
           steps,
         }
       : undefined;

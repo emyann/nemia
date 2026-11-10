@@ -45,7 +45,7 @@ const { stepTaskId } = await import('../src/record/record.ts');
 const { stepsNow: stepsOf } = await import('./steps-now.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 const { ledgerOf } = await import('../src/revisions/revisions.store.ts');
-const { followPass, passRevisions, pinPass, resolvedNow } = await import('../src/revisions/pin.verb.ts');
+const { behindNow, followPass, passRevisions, pinPass, resolvedNow } = await import('../src/revisions/pin.verb.ts');
 const { refreshRun } = await import('../src/revisions/pin.verb.ts');
 const { metered } = await import('../src/meter/tally.store.ts');
 const { writeRules } = await import('../src/factory/rules/rules.store.ts');
@@ -1224,4 +1224,38 @@ test('a read that fails is kept for the pass: asked again it fails again with no
   const note = took.notes[0] ?? '';
   assert.ok(note.includes('the skills beside the folder did not read'), 'the note names the failure');
   assert.equal(note.includes('a second line'), false, 'by its first line alone');
+});
+
+test('a held run is read and pinned as one that files again once the hold lifts; a run called off or pruned is left as it is', async () => {
+  const HOLD = { at: '2026-11-09T00:00:00.000Z', until: [] };
+  const CALLED_OFF = { cancelledAt: '2026-11-09T00:00:00.000Z' };
+  const PRUNED = { pruned: { at: '2026-11-09T00:00:00.000Z', worktrees: [] } };
+  const t = team();
+  const repo = aRepo();
+  const factory = `held-${t.name}`;
+  addFactory({ name: factory, repos: [repo] });
+  attachWorkflow({ factory, workflow: t.name });
+  setRevisions({ factory, revisions: 'follow' });
+  const run = await started(t.dir, repo, { factory });
+  const b = board();
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  b.settle(`${run.id}-build`, 'failed');
+  fs.writeFileSync(t.agentFile, `---\nskills: ${t.skill}\n---\nYou build, held.\n`);
+  const now = new Date().toISOString();
+  const follow = (marks: object) => rooted(followPass({ ...readRun(run.id), ...marks }, now, true)).wrote;
+  assert.equal(follow(CALLED_OFF), false, 'a run called off takes no edit');
+  assert.equal(follow(PRUNED), false, 'nor does a pruned one');
+  assert.equal(follow({ hold: HOLD }), true, 'a held run with a filing due takes the edit, for the filing after the lift');
+
+  const still = team();
+  const pinned = await started(still.dir, aRepo());
+  await runWith(b.e, advanceRun(readRun(pinned.id)));
+  b.settle(`${pinned.id}-build`, 'failed');
+  fs.writeFileSync(still.agentFile, `---\nskills: ${still.skill}\n---\nYou build, edited since.\n`);
+  const behind = (marks: object) => rooted(behindNow({ ...readRun(pinned.id), ...marks }, false)).length;
+  assert.equal(behind(CALLED_OFF), 0, 'a run called off is behind nothing: it files nothing again');
+  assert.equal(behind(PRUNED), 0, 'nor is a pruned one');
+  assert.ok(behind({ hold: HOLD }) > 0, 'a held run is behind the edited agent: it files again once the hold lifts');
+  const pin = (marks: object) => rooted(pinPass({ ...readRun(pinned.id), ...marks }, now));
+  assert.deepEqual(pin(CALLED_OFF), { wrote: false, notes: [], lift: false }, 'a run called off is never resolved');
 });

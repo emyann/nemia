@@ -22,17 +22,9 @@ import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { checkoutStatus, landThrough, stagedHere, type StatusMemo } from '../place/landing.store.ts';
 import { dropLandedPictures, LANDED_PICTURES } from '../artifacts/artifacts.store.ts';
-import {
-  closeoutAsked,
-  closeoutReader,
-  exitVerdicts,
-  harnessBlocked,
-  parentsRead,
-  spendReader,
-  taskPhasesRead,
-  type Parents,
-} from '../views/views.verb.ts';
+import { closeoutAsked, closeoutReader, parentsRead, spendReader, taskPhasesRead, type Parents } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
+import { readRun } from '../tick/told.verb.ts';
 import { passRead, type PassRead } from '../cap/cap.verb.ts';
 import { passRevisions } from '../revisions/pin.verb.ts';
 import type { PassStanding } from '../standing/standing.verb.ts';
@@ -144,22 +136,11 @@ const mainClaim = Effect.fnUntraced(function* (
     if (landingOpen(ending, run, own, phaseOf, merging)) return { id: run.id, repo, step: ending.name, holds: true };
   }
   if (run.cancelledAt) return undefined;
-  const { asks, rounds } = runStore.asks.read(run.id);
+  const { asks } = runStore.asks.read(run.id);
   const at = endingClaimedAt(run, ending, asks);
   if (at === undefined) return undefined;
-  const { views, phaseOf } = yield* taskPhasesRead(run).pipe(over(e));
-  const a = assess(
-    steps,
-    run,
-    phaseOf,
-    closeoutReader(views, run, steps),
-    closeoutAsked(views),
-    exitVerdicts(views, run),
-    asks,
-    rounds,
-    harnessBlocked(views),
-    spendReader(views),
-  );
+  const { read } = yield* readRun(e, run, { steps: [...steps] });
+  const a = assess(read);
   const claim = { id: run.id, repo, step: ending.name, holds: false, at };
   if (a.retry.some((r) => r.step === ending.name)) return claim;
   if (!a.ready.includes(ending.name)) return undefined;

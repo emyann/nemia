@@ -443,7 +443,7 @@ const PINNED: Record<string, string[]> = {
     'runMain',
     'builtin',
     'builtinGitPlace',
-    'runReading',
+    'listReading',
     'runSlots',
     'runsForgetting',
     'runStore',

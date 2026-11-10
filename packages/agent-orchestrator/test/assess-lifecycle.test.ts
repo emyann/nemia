@@ -34,7 +34,7 @@ import { admissionOf } from '../src/admission/index.ts';
 import { TABLE } from '../src/command/commands.verb.ts';
 import { waitsOnPerson } from '../src/retry/index.ts';
 import type { Workflow } from '../src/workflow.ts';
-import { listing, phases, run, signedOffOnce, step, STEPS } from './assessed.ts';
+import { aRead, listing, phases, run, signedOffOnce, step, STEPS } from './assessed.ts';
 
 const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
 /** The engine's own phase words — `working`, `needs-human` — or the feed's `running`. */
@@ -96,74 +96,76 @@ const placed = (s: Workflow, r: Run, steps: readonly Workflow[]): string =>
 
 test('assess of the DAG: what a pass files, what it blocks, and how the run stands', async (t) => {
   await t.test('a fresh run files only the step with nothing in front of it', () => {
-    const a = assess(STEPS, run({ implement: null, review: null }), phases({}));
+    const a = assess(aRead(STEPS, run({ implement: null, review: null }), { phaseOf: phases({}) }));
     assert.deepEqual(a.ready, ['implement']);
     assert.equal(a.status, 'running');
   });
 
   await t.test('the next step waits while the first one runs', () => {
-    const a = assess(STEPS, run({ implement: 't1', review: null }), phases({ t1: 'running' }));
+    const a = assess(aRead(STEPS, run({ implement: 't1', review: null }), { phaseOf: phases({ t1: 'running' }) }));
     assert.deepEqual(a.ready, []);
     assert.equal(a.status, 'running');
   });
 
   await t.test('the next step is filed when the first SUCCEEDS — not merely when it ends', () => {
-    const a = assess(STEPS, run({ implement: 't1', review: null }), phases({ t1: 'succeeded' }));
+    const a = assess(aRead(STEPS, run({ implement: 't1', review: null }), { phaseOf: phases({ t1: 'succeeded' }) }));
     assert.deepEqual(a.ready, ['review']);
   });
 
   await t.test('a failed step blocks what waits on it, and says so rather than hanging', () => {
-    const a = assess(STEPS, run({ implement: 't1', review: null }), phases({ t1: 'failed' }));
+    const a = assess(aRead(STEPS, run({ implement: 't1', review: null }), { phaseOf: phases({ t1: 'failed' }) }));
     assert.deepEqual(a.ready, []);
     assert.deepEqual(a.unreachable, ['review']);
     assert.equal(a.status, 'failed');
   });
 
   await t.test('a stopped step blocks too — an operator stop is final, not a pause', () => {
-    const a = assess(STEPS, run({ implement: 't1', review: null }), phases({ t1: 'stopped' }));
+    const a = assess(aRead(STEPS, run({ implement: 't1', review: null }), { phaseOf: phases({ t1: 'stopped' }) }));
     assert.deepEqual(a.unreachable, ['review']);
     assert.equal(a.status, 'failed');
   });
 
   await t.test('a run is finished when every step has succeeded', () => {
-    const a = assess(STEPS, run({ implement: 't1', review: 't2' }), phases({ t1: 'succeeded', t2: 'succeeded' }));
+    const a = assess(aRead(STEPS, run({ implement: 't1', review: 't2' }), { phaseOf: phases({ t1: 'succeeded', t2: 'succeeded' }) }));
     assert.deepEqual(a.ready, []);
     assert.equal(a.status, 'succeeded');
   });
 
   await t.test('independent steps are filed together — this is a DAG, not a queue', () => {
     const fan = [step('a'), step('b'), step('merge', ['a', 'b'])];
-    const first = assess(fan, run({ a: null, b: null, merge: null }), phases({}));
+    const first = assess(aRead(fan, run({ a: null, b: null, merge: null }), { phaseOf: phases({}) }));
     assert.deepEqual(first.ready.sort(), ['a', 'b']);
 
-    const half = assess(fan, run({ a: 't1', b: 't2', merge: null }), phases({ t1: 'succeeded', t2: 'running' }));
+    const half = assess(aRead(fan, run({ a: 't1', b: 't2', merge: null }), { phaseOf: phases({ t1: 'succeeded', t2: 'running' }) }));
     assert.deepEqual(half.ready, [], 'merge waits for BOTH');
 
-    const done = assess(fan, run({ a: 't1', b: 't2', merge: null }), phases({ t1: 'succeeded', t2: 'succeeded' }));
+    const done = assess(aRead(fan, run({ a: 't1', b: 't2', merge: null }), { phaseOf: phases({ t1: 'succeeded', t2: 'succeeded' }) }));
     assert.deepEqual(done.ready, ['merge']);
   });
 
   await t.test('assessing twice in a row says the same thing — it is level-triggered', () => {
     const r = run({ implement: 't1', review: null });
     const p = phases({ t1: 'succeeded' });
-    assert.deepEqual(assess(STEPS, r, p), assess(STEPS, r, p));
+    assert.deepEqual(assess(aRead(STEPS, r, { phaseOf: p })), assess(aRead(STEPS, r, { phaseOf: p })));
   });
 
   await t.test('a cancelled run files nothing, however ready the next step looked', () => {
     const live = run({ implement: 't1', review: null });
     assert.deepEqual(
-      assess(STEPS, live, phases({ t1: 'succeeded' })).ready,
+      assess(aRead(STEPS, live, { phaseOf: phases({ t1: 'succeeded' }) })).ready,
       ['review'],
       'without the cancel mark this assessment files review, and the next tick would start a step of a run somebody just stopped',
     );
 
-    const a = assess(STEPS, run({ implement: 't1', review: null }, CANCELLED), phases({ t1: 'succeeded' }));
+    const a = assess(aRead(STEPS, run({ implement: 't1', review: null }, CANCELLED), { phaseOf: phases({ t1: 'succeeded' }) }));
     assert.deepEqual(a.ready, []);
     assert.equal(a.status, 'cancelled');
   });
 
   await t.test('cancelled is a fact about the run, not a verdict on its steps', () => {
-    const a = assess(STEPS, run({ implement: 't1', review: 't2' }, CANCELLED), phases({ t1: 'succeeded', t2: 'succeeded' }));
+    const a = assess(
+      aRead(STEPS, run({ implement: 't1', review: 't2' }, CANCELLED), { phaseOf: phases({ t1: 'succeeded', t2: 'succeeded' }) }),
+    );
     assert.deepEqual(a.unreachable, [], 'nothing is blocked: no step failed, the run was called off');
     assert.equal(a.status, 'cancelled', 'a run whose steps all succeeded before the cancel is still cancelled, not succeeded');
   });
@@ -171,20 +173,22 @@ test('assess of the DAG: what a pass files, what it blocks, and how the run stan
 
 test('cancelPlan and inFlight: what `nemia cancel` stops, and whether a run is finished', async (t) => {
   await t.test('cancelling stops what is in flight — both a running step and one still queued', () => {
-    const queued = cancelPlan(STEPS, run({ implement: 't1', review: null }), phases({ t1: 'pending' }));
+    const queued = cancelPlan(aRead(STEPS, run({ implement: 't1', review: null }), { phaseOf: phases({ t1: 'pending' }) }));
     assert.deepEqual(
       queued,
       { kind: 'cancel', stop: [{ name: 'implement', taskId: 't1' }] },
       'a filed task would be STARTED by the next tick, so it counts as in flight',
     );
 
-    const working = cancelPlan(STEPS, run({ implement: 't1', review: 't2' }), phases({ t1: 'succeeded', t2: 'running' }));
+    const working = cancelPlan(
+      aRead(STEPS, run({ implement: 't1', review: 't2' }), { phaseOf: phases({ t1: 'succeeded', t2: 'running' }) }),
+    );
     assert.deepEqual(working, { kind: 'cancel', stop: [{ name: 'review', taskId: 't2' }] }, 'the step that has ended is not asked to stop');
   });
 
   await t.test('a fan-out with two live siblings stops both', () => {
     const fan = [step('a'), step('b'), step('merge', ['a', 'b'])];
-    const plan = cancelPlan(fan, run({ a: 't1', b: 't2', merge: null }), phases({ t1: 'running', t2: 'pending' }));
+    const plan = cancelPlan(aRead(fan, run({ a: 't1', b: 't2', merge: null }), { phaseOf: phases({ t1: 'running', t2: 'pending' }) }));
     assert.deepEqual(plan, {
       kind: 'cancel',
       stop: [
@@ -198,16 +202,16 @@ test('cancelPlan and inFlight: what `nemia cancel` stops, and whether a run is f
     const fan = [step('a'), step('b'), step('merge', ['a', 'b'])];
     const r = run({ a: 't1', b: 't2', merge: null });
     const p = phases({ t1: 'failed', t2: 'running' });
-    assert.equal(assess(fan, r, p).status, 'failed');
+    assert.equal(assess(aRead(fan, r, { phaseOf: p })).status, 'failed');
     assert.deepEqual(
-      cancelPlan(fan, r, p),
+      cancelPlan(aRead(fan, r, { phaseOf: p })),
       { kind: 'cancel', stop: [{ name: 'b', taskId: 't2' }] },
       'the run failed the moment a failed, but b is a session still burning, and stopping it is what the person cancelling came for',
     );
   });
 
   await t.test('cancelling a run with nothing in flight is normal, and still cancels it', () => {
-    const plan = cancelPlan(STEPS, run({ implement: null, review: null }), phases({}));
+    const plan = cancelPlan(aRead(STEPS, run({ implement: null, review: null }), { phaseOf: phases({}) }));
     assert.deepEqual(
       plan,
       { kind: 'cancel', stop: [] },
@@ -216,14 +220,16 @@ test('cancelPlan and inFlight: what `nemia cancel` stops, and whether a run is f
   });
 
   await t.test('cancelling a finished run is not an error, and does not relabel it', () => {
-    const done = cancelPlan(STEPS, run({ implement: 't1', review: 't2' }), phases({ t1: 'succeeded', t2: 'succeeded' }));
+    const done = cancelPlan(
+      aRead(STEPS, run({ implement: 't1', review: 't2' }), { phaseOf: phases({ t1: 'succeeded', t2: 'succeeded' }) }),
+    );
     assert.deepEqual(
       done,
       { kind: 'finished', status: 'succeeded' },
       'stamping a succeeded run cancelled would make nemia ls lie about work that landed: it is already succeeded, and nothing is written',
     );
 
-    const gone = cancelPlan(STEPS, run({ implement: 't1', review: null }), phases({ t1: 'failed' }));
+    const gone = cancelPlan(aRead(STEPS, run({ implement: 't1', review: null }), { phaseOf: phases({ t1: 'failed' }) }));
     assert.deepEqual(gone, { kind: 'finished', status: 'failed' });
   });
 
@@ -232,25 +238,29 @@ test('cancelPlan and inFlight: what `nemia cancel` stops, and whether a run is f
     const r = run({ a: 't1', b: 't2', c: null });
     const p = phases({ t1: 'failed', t2: 'succeeded' });
 
-    const a = assess(fan, r, p);
+    const a = assess(aRead(fan, r, { phaseOf: p }));
     assert.equal(a.status, 'failed');
     assert.deepEqual(a.ready, ['c'], 'the run is failed AND has work it would file');
 
     assert.deepEqual(
-      cancelPlan(fan, r, p),
+      cancelPlan(aRead(fan, r, { phaseOf: p })),
       { kind: 'cancel', stop: [] },
       'failed is not stopped moving: c waits only on b, which succeeded; called finished, no mark is written and the next tick files c',
     );
-    assert.deepEqual(assess(fan, { ...r, cancelledAt: '2026-01-02T00:00:00Z' }, p).ready, [], 'and once marked, that step is never filed');
+    assert.deepEqual(
+      assess(aRead(fan, { ...r, cancelledAt: '2026-01-02T00:00:00Z' }, { phaseOf: p })).ready,
+      [],
+      'and once marked, that step is never filed',
+    );
   });
 
   await t.test('cancelling a cancelled run says who got there first, rather than re-stamping it', () => {
-    const plan = cancelPlan(STEPS, run({ implement: 't1', review: null }, CANCELLED), phases({ t1: 'stopped' }));
+    const plan = cancelPlan(aRead(STEPS, run({ implement: 't1', review: null }, CANCELLED), { phaseOf: phases({ t1: 'stopped' }) }));
     assert.deepEqual(plan, { kind: 'already-cancelled', at: CANCELLED.cancelledAt, stop: [] });
   });
 
   await t.test('cancelling twice still stops what is still in flight — it is level-triggered', () => {
-    const plan = cancelPlan(STEPS, run({ implement: 't1', review: null }, CANCELLED), phases({ t1: 'running' }));
+    const plan = cancelPlan(aRead(STEPS, run({ implement: 't1', review: null }, CANCELLED), { phaseOf: phases({ t1: 'running' }) }));
     assert.deepEqual(
       plan,
       { kind: 'already-cancelled', at: CANCELLED.cancelledAt, stop: [{ name: 'implement', taskId: 't1' }] },
@@ -269,14 +279,14 @@ test('cancelPlan and inFlight: what `nemia cancel` stops, and whether a run is f
   await t.test('REFUSED to be finished: a run whose step signed off blocked waits on a person, so `nemia cancel` calls it off', () => {
     const p = phases({ t1: 'succeeded' });
     const blocked = (name: string) => (name === 'implement' ? said('blocked') : undefined);
-    assert.equal(assess(STEPS, blockedRun(), p, blocked, asked).status, 'waiting');
+    assert.equal(assess(aRead(STEPS, blockedRun(), { phaseOf: p, signedOff: blocked, asked })).status, 'waiting');
     assert.deepEqual(
       listing({ steps: STEPS, run: blockedRun(), phaseOf: shown({ t1: 'succeeded' }), closeoutOf: BLOCKED_SAID, askedCloseout: asked })
         .waitingOnYou,
       ['implement'],
     );
     assert.deepEqual(
-      cancelPlan(STEPS, blockedRun(), p, blocked, asked),
+      cancelPlan(aRead(STEPS, blockedRun(), { phaseOf: p, signedOff: blocked, asked })),
       { kind: 'cancel', stop: [] },
       'nothing is in flight, but the blocked step is asked of a person: calling the run off is how they set it aside and keep its record',
     );
@@ -313,7 +323,9 @@ test('cancelPlan and inFlight: what `nemia cancel` stops, and whether a run is f
           why,
         );
         assert.deepEqual(
-          cancelPlan(steps, r, p, readable, asked, () => undefined, [], [], spendOf),
+          cancelPlan(
+            aRead(steps, r, { phaseOf: p, signedOff: readable, asked, verdictOf: () => undefined, asks: [], roundAsks: [], spendOf }),
+          ),
           { kind: 'cancel', stop: [] },
           `${why}: cancelPlan reads the closeout as the run's reader hands it, only a well-formed one`,
         );
@@ -345,7 +357,11 @@ test('cancelPlan and inFlight: what `nemia cancel` stops, and whether a run is f
         const admitted = (command: string) => admissionOf({ tool: 'Bash', input: { command }, cwd: '/' }, TABLE, waitOf);
         assert.equal(admitted('nemia retry r implement'), undefined, `${status}: a try of a stopped step is Nemia's to give`);
         assert.ok(admitted('nemia retry r implement --budget 5'), `${status}: a budget is the person's`);
-        assert.deepEqual(cancelPlan(steps, r, p, closeoutOf, asked), { kind: 'cancel', stop: [] }, `${status}: the run is not finished`);
+        assert.deepEqual(
+          cancelPlan(aRead(steps, r, { phaseOf: p, signedOff: closeoutOf, asked })),
+          { kind: 'cancel', stop: [] },
+          `${status}: the run is not finished`,
+        );
         const closeouts = (name: string) => (name === 'implement' ? closeoutOf(name) : undefined);
         assert.deepEqual(
           listing({ steps, run: r, phaseOf: shown(ended), closeoutOf: closeouts, askedCloseout: asked }).waitingOnYou,
@@ -368,24 +384,17 @@ test('what a run called off says: `nemia ls`, `nemia decide` and the feed', asyn
       const l = listed(called);
       assert.deepEqual(l.waitingOnYou, []);
       assert.deepEqual(l.steps, listed(blockedRun()).steps, "the steps' words stand as they were");
-      assert.deepEqual(
-        decision(STEPS, called, p, nothingShipped, () => said('blocked'), asked),
-        {
-          kind: 'cancelled',
-          at: CANCELLED.cancelledAt,
-        },
-      );
-      const words = feedWords(
-        l,
-        called,
-        assess(STEPS, called, p, () => said('blocked'), asked),
-      );
+      assert.deepEqual(decision(aRead(STEPS, called, { phaseOf: p, signedOff: () => said('blocked'), asked }), nothingShipped), {
+        kind: 'cancelled',
+        at: CANCELLED.cancelledAt,
+      });
+      const words = feedWords(l, called, assess(aRead(STEPS, called, { phaseOf: p, signedOff: () => said('blocked'), asked })));
       assert.deepEqual([words.run.word, words.run.note], ['cancelled', undefined], 'no `waiting on you:` note');
       assert.ok(
         feedWords(
           listed(blockedRun()),
           blockedRun(),
-          assess(STEPS, blockedRun(), p, () => said('blocked'), asked),
+          assess(aRead(STEPS, blockedRun(), { phaseOf: p, signedOff: () => said('blocked'), asked })),
         ).run.note,
       );
     },

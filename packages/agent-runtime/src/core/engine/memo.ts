@@ -21,7 +21,7 @@ import type { Cursor } from './journal.ts';
  * when a long-lived one's attempts began (`expectedOf`), and nothing else — a brief is not kept.
  */
 export type Releasable = Pick<State, 'taskId' | 'settled' | 'config' | 'harness' | 'restartPolicy'> & {
-  attempts: Array<Pick<Attempt, 'n' | 'startedAt' | 'ended' | 'nativeId' | 'usage'>>;
+  attempts: Array<Pick<Attempt, 'n' | 'startedAt' | 'ended' | 'nativeId' | 'usage' | 'exitCode'>>;
 };
 
 export const releasableOf = (state: State): Releasable => ({
@@ -30,7 +30,14 @@ export const releasableOf = (state: State): Releasable => ({
   config: state.config,
   harness: state.harness,
   ...(state.restartPolicy ? { restartPolicy: state.restartPolicy } : {}),
-  attempts: state.attempts.map(({ n, startedAt, ended, nativeId, usage }) => ({ n, startedAt, ended, nativeId, usage })),
+  attempts: state.attempts.map(({ n, startedAt, ended, nativeId, usage, exitCode }) => ({
+    n,
+    startedAt,
+    ended,
+    nativeId,
+    usage,
+    exitCode,
+  })),
 });
 
 /**

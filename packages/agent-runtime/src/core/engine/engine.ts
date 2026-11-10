@@ -470,8 +470,11 @@ const releases = (runner: RunnerOps): runner is Releasing => runner.release !== 
  * more when one of its keys has a value the record lacks — by value, never by key: `{ costUsd: undefined }` measured
  * nothing, and a journal that writes JSON drops the key, so a key asked alone would be new on every pass.
  *
- * It reads a task's settling, its config and each attempt's end, session and usage, and no more (`Releasable`): a settled
- * task a pass skips is released off what the pass's memo kept of it. Says whether it wrote a `measured`, and whether a
+ * How its process exited is written down the same way, once (`exited`): an attempt ended on its statement while its process still
+ * ran has no exit on its end, and the first sighting that has one, the process gone, is where the record learns it.
+ *
+ * It reads a task's settling, its config and each attempt's end, session, usage and exit, and no more (`Releasable`): a settled
+ * task a pass skips is released off what the pass's memo kept of it. Says whether it wrote a `measured` or an `exited`, and whether a
  * finished session of the task can still move — the memo keeps looking for one that can (`TickMemoState.listed`): one whose
  * release the harness refused, so it is asked again; one its harness lists at work, whose process runs on and may yet say
  * what it consumed; and one whose harness could not be read this pass (`unread`), released nothing: it may still be there,
@@ -504,8 +507,9 @@ const releaseFinished = Effect.fnUntraced(function* (
 
 /**
  * Each of a task's finished sessions the harness still lists, `finished` in attempt order, let go by `runner`, and what each
- * consumed written down where it says more than the record (`releaseFinished`): traced, annotated with the task, since it asks
- * the harness. Says whether it wrote a `measured`, and whether a session can still move: its release refused, or listed at work.
+ * consumed and how its process exited written down where it says more than the record (`releaseFinished`): traced, annotated
+ * with the task, since it asks the harness. Says whether it wrote a `measured` or an `exited`, and whether a session can still
+ * move: its release refused, or listed at work.
  */
 const letGo = Effect.fn('releaseFinished')(function* (
   state: Releasable,
@@ -529,6 +533,15 @@ const letGo = Effect.fn('releaseFinished')(function* (
         at: new Date().toISOString(),
         attempt: attempt.n,
         usage: measured,
+      });
+      wrote = true;
+    }
+    if (attempt.exitCode === null && session.exitCode !== undefined) {
+      yield* journal.append(TaskId.read(state.taskId), {
+        kind: 'exited',
+        at: new Date().toISOString(),
+        attempt: attempt.n,
+        exitCode: session.exitCode,
       });
       wrote = true;
     }

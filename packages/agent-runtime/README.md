@@ -1314,7 +1314,9 @@ that never gives one ends by quiet — `closedOut: false`, where one was asked f
 
 Every attempt records `usage` — `{ responses?, toolCalls?, inputTokens?, uncachedTokens?, cacheWriteTokens?, cacheReadTokens?,
 peakContextTokens?, firstContextTokens?, firstCacheWriteTokens?, compactions?, outputTokens?, costUsd?, apiMs?, toolMs?, unpricedModel? }` — and `exitCode`, copied from the sighting that ended it, or, for what a harness writes only as its
-session exits, read once the session was let go (`measured`, below). **Each is `null` when nothing measured it,
+session exits, read once the session was let go (`measured`, below). An attempt ended on its closing statement while its
+process still runs has no exit on its end: the pass keeps looking for its session, and writes the exit once it has one
+(`exited`), so a job's attempt can be settled a pass before its `exitCode` is. **Each is `null` when nothing measured it,
 never `0`**: a zero that means "nobody counted" reads as "cost nothing". A count its runner could not
 see is absent from `usage` in the same way, and `ae show` names it not measured. `decide` reads neither. A journal
 written before the model's responses took their name counts them as `turns`, on an `ended`, a `measured` or a `counted`

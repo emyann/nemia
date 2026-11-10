@@ -14,7 +14,7 @@ import { runsAtOnce } from '../runs/runs.store.ts';
 import { unloadedFolder } from '../steps/steps.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { lastCeilings } from '../daemon/daemon.store.ts';
-import { maxRuns } from '../config/config.store.ts';
+import type { Settings } from '../config/config.store.ts';
 import { parentsRead, passParents, type Parents } from '../views/views.verb.ts';
 import { standingReader, type PassStanding } from '../standing/standing.verb.ts';
 import type { PassRevisions } from '../revisions/pin.verb.ts';
@@ -75,8 +75,8 @@ const leftOutRightly = (id: string, need: { inFlight: boolean; wants: boolean })
  * any other reason is left out, as nothing of it could be filed.
  *
  * The cap is the one the last pass ran with (`lastCeilings`), not the caller's environment, which is a shell's and not the daemon's; before
- * any pass has written it, `WF_MAX_RUNS` of `env` (`maxRuns`, refused by name when it is not a count). The runs the runs wait on are read
- * through `parents` (`passParents`): a pass's, or the caller's, over the reader it read where the branches stand through.
+ * any pass has written it, `WF_MAX_RUNS` of `config` (`StoreConfig`, refused by name when it is not a count). The runs the runs wait on are
+ * read through `parents` (`passParents`): a pass's, or the caller's, over the reader it read where the branches stand through.
  *
  * `settled` names the runs a caller would have left out of `runs` as neither in flight nor held (`slotSettled`), handed to check that
  * claim on a verified read (`WF_VERIFY_REST=1`): a run of them judged in flight or wanting a slot dies, naming it.
@@ -84,11 +84,11 @@ const leftOutRightly = (id: string, need: { inFlight: boolean; wants: boolean })
 export const slotsOf = Effect.fn('slotsOf')(function* (
   e: Engine,
   runs: readonly Run[] = storeRunsGiven(),
-  env: NodeJS.ProcessEnv = process.env,
+  config: Settings,
   parents: Parents,
   settled: ReadonlySet<string> = new Set(),
 ) {
-  const cap = lastCeilings()?.runs ?? maxRuns(env);
+  const cap = lastCeilings()?.runs ?? config.maxRuns;
   if (cap <= 0) return { cap: 0, inFlight: null, held: new Map() } satisfies Slots;
   const read = yield* asked('list', e.list(runs.flatMap(runTasks)));
   const listed = new Map(read.views.map((view) => [view.id, view]));
@@ -118,14 +118,14 @@ export const slotsOf = Effect.fn('slotsOf')(function* (
 export const storeRunsGiven = (given?: (id: string) => Run | undefined): Run[] => runsAtOnce.runs.list(undefined, given);
 
 /**
- * The runs the cap on runs in flight holds now, each with the count it is held at (`slotsOf`'s `held`). None, and nothing read, with no
- * cap or no run that has nothing filed. The cap before any pass has written one is `env`'s `WF_MAX_RUNS`, as `slotsOf` reads it; the runs
+ * The runs the cap on runs in flight holds now, each with the count it is held at (`slotsOf`'s `held`). None, and nothing read, with no cap
+ * or no run that has nothing filed. The cap before any pass has written one is `config`'s `WF_MAX_RUNS`, as `slotsOf` reads it; the runs
  * the runs wait on are read through `parents`, as `slotsOf` reads them.
  */
-export const runSlots = Effect.fn('runSlots')(function* (e: Engine, runs: readonly Run[], env: NodeJS.ProcessEnv, parents: Parents) {
-  const cap = lastCeilings()?.runs ?? maxRuns(env);
+export const runSlots = Effect.fn('runSlots')(function* (e: Engine, runs: readonly Run[], config: Settings, parents: Parents) {
+  const cap = lastCeilings()?.runs ?? config.maxRuns;
   if (cap <= 0 || !runs.some((r) => !hasStarted(r) && !r.cancelledAt)) return new Map<string, RunSlot>();
-  return (yield* slotsOf(e, runs, env, parents)).held;
+  return (yield* slotsOf(e, runs, config, parents)).held;
 });
 
 /**
@@ -145,16 +145,10 @@ export type PassRead = {
 };
 
 /**
- * What one pass reads once (`PassRead`), over `e` and the pass's listing `runs`, the cap read from `env` as `runSlots` reads it, and the
+ * What one pass reads once (`PassRead`), over `e` and the pass's listing `runs`, the cap read from `config` as `runSlots` reads it, and the
  * runs others wait on read off `standing`, and what resolving each run's kinds reads, which the caller made for the pass (`passRevisions`).
  */
-export const passRead = (
-  e: Engine,
-  runs: readonly Run[],
-  env: NodeJS.ProcessEnv,
-  standing: PassStanding,
-  revisions: PassRevisions,
-): PassRead => {
+export const passRead = (e: Engine, runs: readonly Run[], config: Settings, standing: PassStanding, revisions: PassRevisions): PassRead => {
   const parents = passParents(standingReader(standing));
   type Held = Deferred.Deferred<Map<string, RunSlot>, Refusal>;
   let held: Held | undefined;
@@ -162,7 +156,7 @@ export const passRead = (
     if (held) return Deferred.await(held);
     const pending: Held = Deferred.makeUnsafe();
     held = pending;
-    return runSlots(e, runs, env, parents).pipe(
+    return runSlots(e, runs, config, parents).pipe(
       Effect.onExit((exit) => {
         if (Exit.isFailure(exit) && held === pending) held = undefined;
         return Deferred.done(pending, exit);

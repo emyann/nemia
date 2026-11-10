@@ -20,6 +20,7 @@
  * instant written as a literal. `WF_ROOT` is set before the import, since the module reads it as it loads, and the run cap high, so the
  * schedule's fire is held by the pause alone.
  */
+import { rootNow } from './config-given.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -39,7 +40,8 @@ process.env.WF_VERIFY_REST = '1';
 process.env.WF_MAX_RUNS = '100';
 process.env.WF_DEFAULT_FACTORY_STARTS = '1';
 delete process.env.WF_MAX_CONCURRENT;
-const { addFactory, approveRun, attachWorkflow, setSchedule, startRun, tickRun, runWith } = await import('../src/runner.ts');
+const { approveRun, startRun, tickRun, runWith } = await import('../src/runner.ts');
+const { addFactory, attachWorkflow, setSchedule } = await import('../testing.ts');
 const { askFile, asksDir, listRuns, markCancelled, runRecord } = await import('../src/record/record.store.ts');
 const { pauseFile, readPause } = await import('../src/pause/pause.store.ts');
 const { nowRead } = await import('../src/pause/pause.verb.ts');
@@ -160,11 +162,14 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
   await s.test(
     'a store with nothing at work: `nemia pause --now --yes` puts the pause, stopping nothing; a folder run started under it is filed nothing, and the pause reads Paused, nothing finishing',
     async (sub) => {
-      assert.deepEqual([readPause(), listRuns().flatMap(currentTasks)], [null, []], 'no run of the store has a task yet');
+      assert.deepEqual([readPause(rootNow()), listRuns().flatMap(currentTasks)], [null, []], 'no run of the store has a task yet');
       const said = await printedBy(sub, () => stage.main(['pause', '--now', '--yes', '--why', 'quiet', '--by', 'ann'], stopping));
       names(said[0], 'paused at once', 'by ann: quiet', 'nemia resume');
       names(said[1], 'nothing was stopped');
-      assert.deepEqual([readPause()?.why, readPause()?.by, readPause()?.timeoutMs, stops], ['quiet', 'ann', 0, []]);
+      assert.deepEqual(
+        [readPause(rootNow())?.why, readPause(rootNow())?.by, readPause(rootNow())?.timeoutMs, stops],
+        ['quiet', 'ann', 0, []],
+      );
       assert.deepEqual(b.sessionDrains.at(-1), { graceMs: 0 }, "the sessions' drain put at no timeout: every call in flight is cut");
       const team = fs.mkdtempSync(path.join(ROOT, 'wf-'));
       fs.writeFileSync(path.join(team, 'work.md'), '---\nplace: folder\n---\nwork it\n');
@@ -180,7 +185,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       assert.equal(feed[0], pausedWords(standing), feed.join('\n'));
       markCancelled(loose.id);
       assert.deepEqual(await printedBy(sub, () => stage.main(['resume'])), [RESUMED]);
-      assert.equal(readPause(), null);
+      assert.equal(readPause(rootNow()), null);
       assert.equal(b.sessionDrains.at(-1), null, "the sessions' drain lifted");
     },
   );
@@ -209,7 +214,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       JSON.stringify({ step: 'work', try: 2, mode: 'fresh', at: '2026-10-04T12:00:00Z' }),
     );
     markCancelled(runs.called.id);
-    assert.equal(readPause(), null);
+    assert.equal(readPause(rootNow()), null);
   });
   await s.test(
     '`nemia pause --now` alone says what it would stop, at what cost, and the line that acts — and writes and stops nothing',
@@ -230,7 +235,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       assert.ok(preview.includes(`   ${runs.session.id}'s work: its session, its call cut, going on as the same try`), preview.join('\n'));
       assert.ok(preview.includes(`   ${runs.checking.id}'s work: its check, run again`), preview.join('\n'));
       assert.equal(preview.at(-1), 'nemia pause --now --yes does it.');
-      assert.equal(fs.existsSync(pauseFile()), false);
+      assert.equal(fs.existsSync(pauseFile(rootNow())), false);
       assert.deepEqual([asksOf(runs.session.id), asksOf(runs.checking.id), stops], [[], [], []]);
     },
   );
@@ -238,7 +243,10 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
     "`nemia pause --yes` pauses as a plain pause does, stopping nothing and parking every session within the store's timeout; a plain pause again is refused, naming --now",
     async (sub) => {
       await printedBy(sub, () => stage.main(['pause', '--yes', '--why', 'lunch', '--by', 'ann'], stopping));
-      assert.deepEqual([readPause()?.why, readPause()?.by, readPause()?.timeoutMs, stops], ['lunch', 'ann', 600_000, []]);
+      assert.deepEqual(
+        [readPause(rootNow())?.why, readPause(rootNow())?.by, readPause(rootNow())?.timeoutMs, stops],
+        ['lunch', 'ann', 600_000, []],
+      );
       assert.deepEqual(b.sessionDrains.at(-1), { graceMs: 600_000 }, "the sessions' drain put at the store's timeout, 10m by default");
       await assert.rejects(stage.main(['pause', '--why', 'other'], stopping), (err: Error & { exitCode?: number; _tag?: string }) => {
         assert.deepEqual([err._tag, err.exitCode], ['Conflict', 2], err.message);
@@ -255,7 +263,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       filings = [...b.filings];
       const paused = await pass();
       assert.deepEqual([paused.scheduled, scheduledDues(), b.filings], [undefined, [], filings]);
-      assert.deepEqual(paused.pause?.pause, readPause(), 'the pass says the pause it read');
+      assert.deepEqual(paused.pause?.pause, readPause(rootNow()), 'the pass says the pause it read');
       const standing = await stage.runWith(b.e, pausedRead());
       assert.match(
         pausedWords(standing) ?? '',
@@ -284,10 +292,10 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
   await s.test(
     "`nemia pause --now --yes` keeps the pause as it was put, its timeout cut to 0, and asks each check at work to stop, its ask on disk first; a session is asked no try and no stop, the sessions' drain cutting its call",
     async (sub) => {
-      const pause = readPause();
+      const pause = readPause(rootNow());
       const said = await printedBy(sub, () => stage.main(['pause', '--now', '--yes', '--why', 'other'], stopping));
       names(said[0], "the store's pause stands as it was put", 'by ann: lunch', 'now what runs is cut');
-      assert.deepEqual(readPause(), { ...pause, timeoutMs: 0 }, 'the pause stands as it was, its timeout cut');
+      assert.deepEqual(readPause(rootNow()), { ...pause, timeoutMs: 0 }, 'the pause stands as it was, its timeout cut');
       assert.deepEqual(b.sessionDrains.at(-1), { graceMs: 0 }, "the sessions' drain put at no timeout");
       assert.ok(said.includes(`   ${runs.session.id}'s work: its session, its call cut, going on as the same try`), said.join('\n'));
       assert.deepEqual(

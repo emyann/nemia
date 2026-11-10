@@ -55,8 +55,7 @@ heldUnasked(engine);
 const noEngine = () => engineOf(engine().layer);
 
 /** Every card as `nemia inbox --all` lists it, with its state, read through `memo` where one is given, as the api keeps one. */
-const judgedInbox = async (memo = informerMemo()) =>
-  (await runWith(noEngine(), INBOX_LIST.handler({ all: true }, undefined, ROOT, { runs: memo }))).cards;
+const judgedInbox = async (memo = informerMemo()) => (await runWith(noEngine(), INBOX_LIST.handler({ all: true }, { runs: memo }))).cards;
 
 /**
  * Refused by kind and exit 2, its message naming each of `named` — the command, flag or field its fix names, and the card or path it is

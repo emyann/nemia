@@ -3,7 +3,8 @@
  * name; given one, its words. Her session alone writes them, in her folder's `memory/`; the api serves both reads as the nemia group's
  * `memory` and `fact` (`objects`' Api), calling the handler by type (`MemoryInput`).
  */
-import { Schema } from 'effect';
+import { Effect, Schema } from 'effect';
+import { StoreRoot } from '../config/root.store.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { tried } from '../runtime-client.ts';
 import { listFacts, memoryDir, readFact } from './level.store.ts';
@@ -40,13 +41,15 @@ export const MEMORY: Command<NemiaMemory, MemoryInput> = {
   only: { side: 'cli', why: "the api serves it as the nemia group's `memory` and `fact` of `objects`' Api, calling this handler" },
   input: MemoryInput,
   handler: ({ fact }) =>
-    tried(
-      () =>
-        ({
-          dir: memoryDir(),
-          facts: listFacts(),
-          fact: fact === undefined ? null : { name: fact, text: readFact(fact) },
-        }) satisfies NemiaMemory,
+    Effect.flatMap(StoreRoot, (home) =>
+      tried(
+        () =>
+          ({
+            dir: memoryDir(home),
+            facts: listFacts(home),
+            fact: fact === undefined ? null : { name: fact, text: readFact(home, fact) },
+          }) satisfies NemiaMemory,
+      ),
     ),
   print: memoryLines,
 };

@@ -1,7 +1,6 @@
 /** `nemia agents` and `nemia agents card`, entries of the command table: the agents of both places, and one agent's card. */
 import { Effect } from 'effect';
 import { StoreRoot } from '../config/root.store.ts';
-import { rooted } from '../factory/wiring/wire.verb.ts';
 import { agentCardRead, agentsRead } from './roster.store.ts';
 import { agentsLines, cardNote, type AgentsRead, type CardRead } from './roster.ts';
 import type { Args, CommandSpec, Flag } from '../command/command.ts';
@@ -64,12 +63,7 @@ export const AGENTS: Command<AgentsRead, AgentsInput> = {
     why: "the api serves it as the Agent's `list` verb of `objects`' Api (`/api/namespaces/:namespace/agents`), which calls this entry's handler: no route of its own",
   },
   input: AgentsInput,
-  handler: ({ repo = '.' }, _env, home) =>
-    rooted(
-      home,
-      'agents',
-      Effect.flatMap(StoreRoot, (root) => agentsRead({ repo, home: root })),
-    ),
+  handler: ({ repo = '.' }) => Effect.flatMap(StoreRoot, (root) => agentsRead({ repo, home: root })),
   print: agentsLines,
 };
 
@@ -92,12 +86,8 @@ export const AGENT_CARD: Command<CardRead, AgentCardInput> = {
     why: "the api serves it as the Agent's `card` verb of `objects`' Api (`/api/namespaces/:namespace/agents`), which calls this entry's handler: no route of its own",
   },
   input: AgentCardInput,
-  handler: ({ name, repo = '.', from }, _env, home) =>
-    rooted(
-      home,
-      'agents card',
-      Effect.flatMap(StoreRoot, (root) => agentCardRead(name, { repo, home: root, ...(from !== undefined && { from }) })),
-    ),
+  handler: ({ name, repo = '.', from }) =>
+    Effect.flatMap(StoreRoot, (root) => agentCardRead(name, { repo, home: root, ...(from !== undefined && { from }) })),
   print: ({ card }) => [JSON.stringify(card, null, 2)],
   note: (data, { name }) => cardNote(data, name),
 };

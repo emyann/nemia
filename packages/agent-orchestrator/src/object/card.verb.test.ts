@@ -4,6 +4,9 @@
  * a card that names none, and a card read under another is `Missing`; a label selector keeps the cards it takes before the page is cut;
  * and a bad limit, token or selector is `Invalid`. Kinds are asserted, never sentences.
  */
+import type { StoreRoot } from '../config/root.store.ts';
+import type { StoreConfig } from '../config/config.store.ts';
+import { configGiven, rootNow } from '../../test/config-given.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Exit } from 'effect';
@@ -32,13 +35,18 @@ const stand = eachTest(testPlace);
  * Runs `program` against a fresh memory door on which `cards` are filed first, by name to their text, given the test place and a memory
  * Factory door holding no factory.
  */
-const over = <A, E>(cards: Readonly<Record<string, string>>, program: Effect.Effect<A, E, PlaceService>) =>
+const over = <A, E>(cards: Readonly<Record<string, string>>, program: Effect.Effect<A, E, PlaceService | StoreRoot | StoreConfig>) =>
   Effect.runSyncExit(
     Effect.gen(function* () {
       const door = yield* CardDoor;
       for (const [name, text] of Object.entries(cards)) yield* door.cards.add(CardName.read(name), text);
       return yield* program;
-    }).pipe(Effect.provide(cardDoorMemory()), Effect.provide(factoryDoorMemory()), Effect.provide(stand().layer)),
+    }).pipe(
+      Effect.provide(cardDoorMemory()),
+      Effect.provide(factoryDoorMemory()),
+      Effect.provide(stand().layer),
+      Effect.provide(configGiven(rootNow())),
+    ),
   );
 
 /** The inbox as the listing reads it now, through the door: no run started from any card. */
@@ -174,7 +182,7 @@ test('a label selector keeps the cards it takes, over their labels, workflow and
 
 test("cardList and cardObject read the inbox as nemia inbox reads it now, through the engine's informer", () => {
   const e = engineOf(engine().layer);
-  const how = howOf(undefined, process.env.WF_ROOT);
+  const how = Effect.runSync(howOf().pipe(Effect.provide(configGiven(rootNow()))));
   const page = valueOf(over(five, cardList(e, how, { namespace: 'default', limit: 2 })));
   assert.deepEqual(
     page.items.map((c) => [c.metadata.name, c.status.state]),

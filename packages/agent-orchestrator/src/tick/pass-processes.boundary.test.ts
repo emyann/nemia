@@ -35,7 +35,7 @@ const { gitPlaceLayer, builtinGitPlace } = await import('../place/builtin.store.
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
 const { PlaceService } = await import('../place/place.store.ts');
-const { addFactory, attachWorkflow, hireAgent } = await import('../factory/factory.store.ts');
+const { addFactory, attachWorkflow, hireAgent } = await import('../../testing.ts');
 type Place = import('../place/place.store.ts').Place;
 
 const git = (repo: string, ...args: string[]) =>

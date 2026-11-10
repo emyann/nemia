@@ -5,6 +5,7 @@
  * `readAndAdopt` (adopt/run-adopt.verb.ts), as `nemia cancel`, `nemia rm` and `nemia prune` do. Beside it, the steps owed a hand-off
  * (`handOffOwed`), which `prune` reads. A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
+import { StoreConfig } from '../config/config.store.ts';
 import fs from 'node:fs';
 import { endsOnBase } from '../step/step.ts';
 import { Effect } from 'effect';
@@ -199,7 +200,7 @@ export const advancePass = Effect.fn('advancePass')(
     const from = pass
       ? { read: pass, slot }
       : { standing: standingNow(runsAtOnce.runs.list()).pipe(Effect.provideService(PlaceService, place)) };
-    const checkout = yield* checkoutHold(e, run, steps, from, process.env, memo, phaseOf);
+    const checkout = yield* checkoutHold(e, run, steps, from, yield* StoreConfig, memo, phaseOf);
     const lift = yield* liftHold(e, run, parents);
     const assessed = assess(withStandings({ ...reads, checkout }, yield* standingOf(pass)));
     const { ran, settled, marked, timed } = yield* marksOf(e, run, reads, assessed.status);

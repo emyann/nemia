@@ -2,6 +2,7 @@
  * The store's pause, entries of the command table: `nemia pause` and `nemia resume`, and the api's reads of the pause that stands and of
  * what a pause at once would stop.
  */
+import { StoreRoot } from '../config/root.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { BY_CAP, WHY_CAP } from '../record/record.ts';
 import { readPause, resumePause } from './pause.store.ts';
@@ -62,7 +63,7 @@ const pauseRefusal = (args: Args): string | null =>
  * `nemia pause`'s handler, by its input: a plain pause, which parks every session at its call's end within `timeout` or the store's
  * timeout (`timeoutAt`), refused while one stands; `now`, which pauses at once. Its input refused first, as `Invalid`, whoever calls it.
  */
-const pauseBy = Effect.fnUntraced(function* (input: PauseWrite, home?: string) {
+const pauseBy = Effect.fnUntraced(function* (input: PauseWrite, home: string) {
   const wrong = pauseRefusal(input);
   if (wrong !== null) return yield* Effect.fail(new Invalid({ message: wrong }));
   const said = { why: saidOf(input, 'why'), by: saidOf(input, 'by') };
@@ -75,7 +76,8 @@ const pauseBy = Effect.fnUntraced(function* (input: PauseWrite, home?: string) {
  * question before it acts (`--yes` acts); the board asks its own, reading `GET /api/pause/now`.
  */
 export const pauseNowPreview = Effect.fnUntraced(function* () {
-  return { pause: readPause(), interrupts: yield* nowRead() } satisfies PauseNowRead;
+  const home = yield* StoreRoot;
+  return { pause: readPause(home), interrupts: yield* nowRead() } satisfies PauseNowRead;
 });
 
 /** The lines `nemia pause --now` prints of what it would cut (`pauseNowPreview`). */
@@ -128,7 +130,7 @@ export const PAUSE: Command<PauseAnswer, PauseWrite> = {
   writes: true,
   class: 'act',
   input: PauseWrite,
-  handler: (input, _env, home) => pauseBy(input, home),
+  handler: (input) => Effect.flatMap(StoreRoot, (home) => pauseBy(input, home)),
   print: (answer) => ('kept' in answer ? pausedNowLines(answer) : [pauseWords(answer.pause)]),
 };
 
@@ -153,7 +155,8 @@ export const RESUME: Command<{ pause: Pause }, ResumeInput> = {
   ticks: true,
   class: 'act',
   input: ResumeInput,
-  handler: () => tried(() => ({ pause: resumePause() })).pipe(Effect.tap(() => sessionsDrained(null))),
+  handler: () =>
+    Effect.flatMap(StoreRoot, (home) => tried(() => ({ pause: resumePause(home) }))).pipe(Effect.tap(() => sessionsDrained(null))),
   print: () => [RESUMED],
 };
 
@@ -182,7 +185,7 @@ export const PAUSE_NOW: Command<{ interrupts: Interrupt[]; cost: string }> = {
   writes: false,
   class: 'read',
   only: { side: 'api', why: 'the board confirms a pause at once with it; at the command line, nemia pause --now says it' },
-  handler: Effect.fnUntraced(function* (_args, _env, _home, kept) {
+  handler: Effect.fnUntraced(function* (_args, kept) {
     return { interrupts: yield* nowRead(kept?.records?.pause), cost: NOW_COST };
   }),
   print: () => [],

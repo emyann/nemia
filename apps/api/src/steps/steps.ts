@@ -362,7 +362,7 @@ const logOf = (runId: string, step: string) =>
   answered(async (s): Promise<StepLog> => {
     const { taskId } = stepOf(s, runId, step);
     try {
-      const { output } = await s.inRequest(LOGS.handler({ runId, step }, s.env, s.home));
+      const { output } = await s.inRequest(LOGS.handler({ runId, step }));
       return output === undefined ? { lines: [], truncated: false } : tailOf(output, LOG_LINES);
     } catch (err) {
       const why = err instanceof Error ? err.message : String(err);
@@ -502,10 +502,10 @@ const followedFrom = (runId: string, step: string, after: string | undefined) =>
  */
 export const stepsHandlers = HttpApiBuilder.group(Api, 'steps', (handlers) =>
   handlers
-    .handle('tries', ({ params: { runId, step } }) => answered((s) => s.inRequest(TRIES.handler({ runId, step }, s.env, s.home))))
-    .handle('try', ({ params }) => answered((s) => s.inRequest(TRY.handler(params, s.env, s.home))))
-    .handle('closeout', ({ params }) => answered((s) => s.inRequest(CLOSEOUT.handler(params, s.env, s.home))))
-    .handle('told', ({ params: { runId, step } }) => answered((s) => s.inRequest(TOLD.handler({ runId, step }, s.env, s.home))))
+    .handle('tries', ({ params: { runId, step } }) => answered((s) => s.inRequest(TRIES.handler({ runId, step }))))
+    .handle('try', ({ params }) => answered((s) => s.inRequest(TRY.handler(params))))
+    .handle('closeout', ({ params }) => answered((s) => s.inRequest(CLOSEOUT.handler(params))))
+    .handle('told', ({ params: { runId, step } }) => answered((s) => s.inRequest(TOLD.handler({ runId, step }))))
     .handle('log', ({ params: { runId, step } }) => logOf(runId, step))
     .handle('artifact', ({ params: { runId, step, file } }) => artifactOf(runId, step, file))
     .handle('file', ({ params: { runId, step, file } }) => fileOf(runId, step, file))

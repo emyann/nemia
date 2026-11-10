@@ -16,21 +16,21 @@ import { answered } from '../objects/refused.ts';
 const rules = (method: string, name: string, args: { words?: string; clear?: boolean }) =>
   answered(async (s: Served) => {
     factoryNamed(`${method} /api/factories/${name}/rules`, name);
-    return s.inRequest(FACTORY_RULES.handler({ factory: name, ...args }, undefined, s.home));
+    return s.inRequest(FACTORY_RULES.handler({ factory: name, ...args }));
   });
 
 /** The instruction of the factory `name`, read or placed (`path`, `store`, `clear`), as `nemia factory instruction` does it. */
 const instruction = (method: string, name: string, args: { path?: string; store?: boolean; clear?: boolean }) =>
   answered(async (s: Served) => {
     factoryNamed(`${method} /api/factories/${name}/instruction`, name);
-    return s.inRequest(FACTORY_INSTRUCTION.handler({ factory: name, ...args }, undefined, s.home));
+    return s.inRequest(FACTORY_INSTRUCTION.handler({ factory: name, ...args }));
   });
 
 /** The words the store keeps as the factory `name`'s instruction, written or cleared, as `nemia factory instruct` does it. */
 const instruct = (method: string, name: string, args: { words?: string; clear?: boolean }) =>
   answered(async (s: Served) => {
     factoryNamed(`${method} /api/factories/${name}/instruction/words`, name);
-    return s.inRequest(FACTORY_INSTRUCT.handler({ factory: name, ...args }, undefined, s.home));
+    return s.inRequest(FACTORY_INSTRUCT.handler({ factory: name, ...args }));
   });
 
 export const factoriesHandlers = HttpApiBuilder.group(Api, 'factories', (handlers) =>

@@ -3,8 +3,8 @@
  * before it is cut. Bare, the timeout in force, as `nemia level` says the level; given a duration, the timeout written (`putTimeout`). A
  * command of the CLI alone: the board pauses with the store's timeout and sets none.
  */
+import { StoreRoot } from '../config/root.store.ts';
 import { Effect } from 'effect';
-import { rootGiven } from '../config/root.store.ts';
 import { tried } from '../runtime-client.ts';
 import type { Args } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
@@ -52,14 +52,16 @@ export const TIMEOUT: Command<TimeoutAnswer> = {
   writes: true,
   class: 'ask',
   only: { side: 'cli', why: "the board pauses with the store's timeout and sets none: nemia pause-timeout <d> sets it" },
-  handler: (args: Args, _env, home) =>
-    tried(() => {
-      const root = rootGiven(home, 'pause-timeout');
-      const text = textOf(args);
-      return text === undefined
-        ? ({ timeout: timeoutAt(root), wrote: false } satisfies TimeoutAnswer)
-        : ({ timeout: putTimeout(root, text), wrote: true } satisfies TimeoutAnswer);
-    }).pipe(Effect.withSpan('pause-timeout')),
+  handler: (args: Args) =>
+    Effect.flatMap(StoreRoot, (home) =>
+      tried(() => {
+        const root = home;
+        const text = textOf(args);
+        return text === undefined
+          ? ({ timeout: timeoutAt(root), wrote: false } satisfies TimeoutAnswer)
+          : ({ timeout: putTimeout(root, text), wrote: true } satisfies TimeoutAnswer);
+      }).pipe(Effect.withSpan('pause-timeout')),
+    ),
   print: ({ timeout, wrote }) =>
     wrote
       ? [

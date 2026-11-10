@@ -5,13 +5,12 @@
  * `from:` (`nemia inbox from`) is the command line's alone: the api writes it as part of the Card's whole write (`update`, `replaceCard`),
  * and reads one card with its file as written (`get`).
  */
+import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
 import { Effect, Schema } from 'effect';
-import { rooted } from '../factory/wiring/wire.verb.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { defaultStartsAllowed } from '../factory/factory.store.ts';
-import { inboxDir } from '../record/files.store.ts';
+import { setting } from '../config/config.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { parseSelectors, SELECTOR_FORM, selectorsRefusal, selectsLabels } from '../watch/selector.ts';
 import { labelsText, type LeftOut } from '../labels/labels.ts';
@@ -105,7 +104,7 @@ const leftOutLines = (name: string, leftOut: readonly LeftOut[]): string[] =>
  * that the inbox is empty. A started card's state is its run's phase, judged through the informer the caller keeps (`kept.runs`). `ended`
  * counts the cards the selector takes that are left out for their run having ended: none with `--all`.
  */
-export const INBOX: Command<{ cards: InboxListing[]; ended: number }> = {
+export const INBOX: Command<{ cards: InboxListing[]; ended: number; defaultStarts: boolean; dir: string }> = {
   name: 'inbox',
   usage: '',
   help: [
@@ -133,26 +132,27 @@ export const INBOX: Command<{ cards: InboxListing[]; ended: number }> = {
     why: "the command line's listing: the api's list of the Card (`GET /api/cards`, `objects`' Api) is the package's `cardList`, never this handler, and prints its rows as a Table (`cardTable`)",
   },
   manual: INBOX_HELP,
-  handler: (args, env, home, kept) =>
+  handler: (args, kept) =>
     Effect.gen(function* () {
       const selector = listOf(args, 'selector');
       const refused = selectorsRefusal(selector);
       if (refused) return yield* Effect.fail(new Invalid({ message: `nemia inbox -l: ${refused}` }));
       const selectors = parseSelectors(selector);
       const e = yield* EngineService;
-      const cards = yield* rooted(home, 'inbox', inboxJudged(e, howOf(env, home, kept)));
+      const cards = yield* inboxJudged(e, yield* howOf(kept));
       const selected = cards.filter((card) => selectsLabels(selectors, cardLabels(card)));
       const shown = args.all === true ? selected : selected.filter(cardInPlay);
-      return { cards: shown, ended: selected.length - shown.length };
+      const defaultStarts = yield* setting('defaultFactoryStarts');
+      return { cards: shown, ended: selected.length - shown.length, defaultStarts, dir: path.join(yield* StoreRoot, 'inbox') };
     }),
-  print: ({ cards, ended }, args) =>
+  print: ({ cards, ended, defaultStarts, dir }, args) =>
     cards.length
       ? [
-          ...inboxLines(cards, defaultStartsAllowed(), {
+          ...inboxLines(cards, defaultStarts, {
             showLabels: args.showLabels === true,
             columns: listOf(args, 'labelColumns'),
           }),
-          `\nstart one: nemia start ${path.join(inboxDir(), '<name>.md')} [--workflows <w>] [--repo <r>] [--factory <f>] — queue one: nemia inbox queue <name> — drop one: nemia inbox rm <name>`,
+          `\nstart one: nemia start ${path.join(dir, '<name>.md')} [--workflows <w>] [--repo <r>] [--factory <f>] — queue one: nemia inbox queue <name> — drop one: nemia inbox rm <name>`,
         ]
       : ended
         ? [`no card in play${inboxSelected(args)}, and ${ended} whose run ended — list them with nemia inbox --all`]
@@ -235,12 +235,7 @@ export const INBOX_ADD: Command<{ card: InboxCard; file: string; labelsLeftOut?:
     why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Card's `create`, whose handler calls this one by its `input`",
   },
   input: InboxAddInput,
-  handler: ({ idea, label, ...keys }, _env, home) =>
-    rooted(
-      home,
-      'inbox add',
-      Effect.suspend(() => addToInbox({ text: idea, ...keys, labels: [...(label ?? [])] })),
-    ),
+  handler: ({ idea, label, ...keys }) => Effect.suspend(() => addToInbox({ text: idea, ...keys, labels: [...(label ?? [])] })),
   print: ({ card, file, labelsLeftOut }) => [
     `${card.name}  ${firstPiece(card.body, '\n').slice(0, 56)}${card.workflow ? `  workflow: ${card.workflow}` : ''}${card.repo ? `  repo: ${card.repo}` : ''}${card.factory ? `  factory: ${card.factory}` : ''}${card.labels ? `  labels: ${labelsText(card.labels)}` : ''}`,
     ...leftOutLines(card.name, labelsLeftOut ?? []),
@@ -320,24 +315,20 @@ export const INBOX_QUEUE: Command<Queued, InboxQueueInput> = {
     why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Card's `queue` and `unqueue`, whose handlers call this one by its `input`",
   },
   input: InboxQueueInput,
-  handler: ({ name, workflow, off }, _env, home) =>
-    rooted(
-      home,
-      'inbox queue',
-      Effect.gen(function* () {
-        const done = yield* queueInInbox(name, { off: off === true, ...(workflow !== undefined ? { workflow } : {}) });
-        return {
-          name: done.card.name,
-          file: done.file,
-          was: done.was,
-          queued: done.card.queued ?? null,
-          place: done.place ?? null,
-          of: done.of ?? null,
-          card: done.card,
-          factoryRepo: done.factoryRepo,
-        };
-      }),
-    ),
+  handler: ({ name, workflow, off }) =>
+    Effect.gen(function* () {
+      const done = yield* queueInInbox(name, { off: off === true, ...(workflow !== undefined ? { workflow } : {}) });
+      return {
+        name: done.card.name,
+        file: done.file,
+        was: done.was,
+        queued: done.card.queued ?? null,
+        place: done.place ?? null,
+        of: done.of ?? null,
+        card: done.card,
+        factoryRepo: done.factoryRepo,
+      };
+    }),
   print({ name, file, was, place, of, card, factoryRepo }) {
     if (was === 'not queued') return [`${name}  not queued — nothing to take back`];
     if (was === 'taken back') return [`${name}  taken back: it no longer starts on its own — start it with nemia start ${file}`];
@@ -384,16 +375,12 @@ export const INBOX_FROM: Command<InboxFrom & { name: string; from: string[] }> =
     side: 'cli',
     why: "the command line's alone: the api writes a card's `from:` with the rest of it, the Card's `update` of `objects`' Api (`replaceCard`), never through this handler",
   },
-  handler: (args, _env, home) =>
-    rooted(
-      home,
-      'inbox from',
-      Effect.map(setFrom(textOf(args, 'name') ?? '', args.off === true ? [] : runsOf(args)), (done) => ({
-        ...done,
-        name: done.card.name,
-        from: done.card.from ?? [],
-      })),
-    ),
+  handler: (args) =>
+    Effect.map(setFrom(textOf(args, 'name') ?? '', args.off === true ? [] : runsOf(args)), (done) => ({
+      ...done,
+      name: done.card.name,
+      from: done.card.from ?? [],
+    })),
   print: ({ card, file, was }) =>
     card.from?.length
       ? [`${card.name}  from: ${card.from.join(', ')} — its run is handed what each concluded, as context, and waits on none (${file})`]
@@ -425,7 +412,7 @@ export const INBOX_RM: Command<InboxDropped, InboxRmInput> = {
     why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Card's `delete`, whose handler calls this one by its `input`",
   },
   input: InboxRmInput,
-  handler: ({ name }, _env, home) => rooted(home, 'inbox rm', dropFromInbox(name)),
+  handler: ({ name }) => dropFromInbox(name),
   print: (dropped, { name }) => [
     dropped.removed
       ? `${name}  dropped, and nothing started — ${dropped.file} removed`

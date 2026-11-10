@@ -33,7 +33,6 @@ import {
   type DaemonStanding,
   type Liveness,
   type Watched,
-  HOME,
   lastPassCost,
   queueLine,
   refusalLines,
@@ -45,7 +44,8 @@ import {
   runWith,
   builtinGitPlace,
   PlaceService,
-  storeRootLayer,
+  settingsOf,
+  storeConfigLayer,
   wfRoot,
   type Place,
   telemetryLayer,
@@ -240,12 +240,7 @@ async function tickVerb(args: Args, e: Engine, place: Place): Promise<void> {
   const stats = args.stats === true;
   const held = storeRefusal('tick');
   if (held) throw new Conflict({ message: stats ? `${held} What its last pass cost is read without a pass: nemia up --stats.` : held });
-  const { cost } = tickLines(
-    await runWith(
-      e,
-      placedIn(place, withProposalsPass(tickRun({ repo: path.resolve('.') })).pipe(Effect.provide(storeRootLayer(process.env)))),
-    ),
-  );
+  const { cost } = tickLines(await runWith(e, placedIn(place, withProposalsPass(tickRun({ repo: path.resolve('.') })))));
   if (stats) for (const line of cost ? breakdownLines(cost) : ['this pass was not measured']) console.log(line);
   return;
 }
@@ -256,7 +251,7 @@ function upStats(): void {
   const daemon = storeRefusal('tick') !== undefined;
   if (!cost)
     return console.log(
-      `no pass has written what it cost to ${path.join(HOME, 'tick-stats.json')} yet — ${daemon ? 'the daemon that holds this store writes it after its next pass' : 'no daemon holds this store: run nemia tick --stats, or start one (npm start in apps/api, or nemia up; any nemia command that files work starts one too)'}`,
+      `no pass has written what it cost to ${path.join(wfRoot(process.env), 'tick-stats.json')} yet — ${daemon ? 'the daemon that holds this store writes it after its next pass' : 'no daemon holds this store: run nemia tick --stats, or start one (npm start in apps/api, or nemia up; any nemia command that files work starts one too)'}`,
     );
   for (const line of breakdownLines(cost)) console.log(line);
   return console.log(
@@ -276,8 +271,8 @@ function upVerb(args: Args, e: Engine, place: Place): void | Promise<void> {
   if (args.stats === true) return upStats();
   const asked = everyOf(typeof args.every === 'string' ? args.every : undefined);
   const every = 'refusal' in asked ? usage(asked.refusal) : asked.every;
-  const ceiling = ceilings();
-  const store = HOME;
+  const ceiling = ceilings(settingsOf(process.env));
+  const store = wfRoot(process.env);
   const onTaken = ({ held, replaced }: TakenStore) =>
     Effect.sync(() => {
       console.log(`up — every ${every}ms, ^C to stop`);
@@ -294,7 +289,7 @@ function upVerb(args: Args, e: Engine, place: Place): void | Promise<void> {
   return runMain(
     daemon.pipe(
       Effect.scoped,
-      Effect.provide(Layer.mergeAll(telemetryLayer(process.env), feedHubLayer(), PlaceService.layer(place), storeRootLayer(process.env))),
+      Effect.provide(Layer.mergeAll(telemetryLayer(process.env), feedHubLayer(), PlaceService.layer(place), storeConfigLayer(process.env))),
     ),
   );
 }
@@ -382,7 +377,7 @@ async function pauseRun(args: Args, e: Engine, place: Place): Promise<void> {
     return;
   }
   const given = inputOf(PAUSE, args);
-  const data = await runWith(e, placedIn(place, PAUSE.handler(given, process.env, wfRoot(process.env))));
+  const data = await runWith(e, placedIn(place, PAUSE.handler(given)));
   for (const line of PAUSE.print(data, given)) console.log(line);
 }
 
@@ -427,19 +422,25 @@ export const RUNS: ReadonlyMap<string, Runner> = new Map<string, Runner>([
  * started where none ticks the store (`ensureDaemon`, over `demand`); then handed to its runner (`RUNS`) where it has one, else to its
  * handler, and the lines it prints of the answer printed.
  */
-async function commanded(command: Command | Ran, rest: string[], e: Engine, demand: () => DemandHost, place: Place): Promise<void> {
+async function commanded(
+  command: Command | Ran,
+  rest: string[],
+  e: Engine,
+  demand: (root: string) => DemandHost,
+  place: Place,
+): Promise<void> {
   if (command.manual !== undefined && rest.includes('--help')) return console.log(command.manual);
   const args = parseArgv(command.spec, rest);
   if (args === undefined) return console.log(HELP);
   const wrong = command.check?.(args);
   if (wrong) usage(wrong);
-  if (command.ticks === true) await Effect.runPromise(ensureDaemon(demand()));
+  if (command.ticks === true) await Effect.runPromise(ensureDaemon(demand(wfRoot(process.env))));
   const runner = RUNS.get(command.name);
   if (runner) return runner(args, e, place, wfRoot(process.env));
   if (command.handler === undefined)
     throw new Error(`${command.name} has neither a runner nor a handler: give it one in RUNS or its entry`);
   const given = inputOf(command, args);
-  const data = await runWith(e, placedIn(place, command.handler(given, process.env, wfRoot(process.env))));
+  const data = await runWith(e, placedIn(place, command.handler(given)));
   for (const line of command.print(data, given)) console.log(line);
   for (const line of command.note?.(data, given) ?? []) console.error(line);
 }
@@ -480,7 +481,7 @@ function namedIn(argv: readonly string[]): { name: string; rest: string[] } | un
 export async function main(
   argv: string[],
   given?: Engine,
-  demand: () => DemandHost = liveDemandHost,
+  demand: (root: string) => DemandHost = liveDemandHost,
   place: Place = builtinGitPlace,
 ): Promise<void> {
   const renamed = renamedIn(argv);
@@ -488,9 +489,9 @@ export async function main(
   const named = namedIn(renamed.words);
   if (named === undefined) return console.log(HELP);
   const exempt = named.name === 'version' || named.rest.includes('--help');
-  const trial = exempt ? null : trialRefusal(runningRelease(), currentRelease(), HOME, process.env);
+  const trial = exempt ? null : trialRefusal(runningRelease(), currentRelease(wfRoot(process.env)), wfRoot(process.env), process.env);
   if (trial !== null) throw new Conflict({ message: trial });
-  const e = given ?? engine();
+  const e = given ?? engine(process.env);
   const command = TABLE.find((c) => c.name === named.name && c.only?.side !== 'api');
   if (command) return commanded(command, named.rest, e, demand, place);
   const verb = VERBS.get(named.name);

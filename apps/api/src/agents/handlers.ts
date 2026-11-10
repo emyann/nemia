@@ -31,7 +31,7 @@ import {
   definitionRevision,
   factoriesFilling,
   inFactory,
-  readFactories,
+  listedAtOnce,
   stepsFilled,
   untriedOf,
   type AgentReading,
@@ -79,7 +79,7 @@ const treeAgents = (s: Served) =>
   });
 
 /** What the namespace's agents are told apart by: the steps each file fills (`stepsFilled`) and the factories that fill one with it. */
-const fillsIn = (s: Served) => ({ filled: stepsFilled(s.repo, s.home, s.factory), byFile: factoriesFilling(readFactories(), s.home) });
+const fillsIn = (s: Served) => ({ filled: stepsFilled(s.repo, s.home, s.factory), byFile: factoriesFilling(listedAtOnce(s.home), s.home) });
 
 /**
  * The agents of the factory's tree (`<tree>/workflows/agents`), each held at `origin` — `factory` in a namespace, `builtin` for a
@@ -97,7 +97,7 @@ export async function treeAgentsHeld(s: Served, origin: Origin, fills = fillsIn(
  * other only where it fills a step there (`inFactory`).
  */
 async function heldIn(s: Served): Promise<Held<LibraryAgent>[]> {
-  const { agents } = await s.inRequest(AGENTS.handler({ repo: s.repo }, s.env, s.home));
+  const { agents } = await s.inRequest(AGENTS.handler({ repo: s.repo }));
   const fills = fillsIn(s);
   const own = await treeAgentsHeld(s, 'factory', fills);
   const trees = new Set(own.map(({ item }) => item.file));
@@ -233,7 +233,7 @@ const clearedOf = (answer: AgentInstructions | AgentInstructionsCleared): AgentI
  */
 async function instructionsRead(s: Served, name: string): Promise<AgentInstructions> {
   try {
-    return wordsOf(await s.inRequest(AGENTS_CUSTOM.handler({ name, repo: s.repo }, undefined, s.home)));
+    return wordsOf(await s.inRequest(AGENTS_CUSTOM.handler({ name, repo: s.repo })));
   } catch (err) {
     if (!(err instanceof WorkflowError)) throw err;
     return { name, file: customInstructionsFile(s.home, name), words: null, error: err.message };
@@ -256,7 +256,7 @@ async function triedIn(s: Served, namespace: string, name: string, brief: string
       error: `${route}: ${untried?.why ?? 'only an agent of yours is tried.'}${untried?.copy ? ` \`${untried.copy}\`` : ''}`,
     });
   }
-  const { id } = await s.inRequest(AGENTS_TRY.handler({ from: 'yours', name, brief, repo: s.repo }, undefined, s.home));
+  const { id } = await s.inRequest(AGENTS_TRY.handler({ from: 'yours', name, brief, repo: s.repo }));
   return { id };
 }
 
@@ -269,7 +269,7 @@ async function cardIn(s: Served, namespace: string, name: string, origin: string
       error: `${name} is the factory's own agent, whose card is not drawn here: its skills are \`status.card\` of GET /api/namespaces/${namespace}/agents/${name}?origin=factory.`,
     });
   const from = served.origin === 'yours' ? 'yours' : 'repo';
-  const { card } = await s.inRequest(AGENT_CARD.handler({ name, repo: s.repo, from }, s.env, s.home));
+  const { card } = await s.inRequest(AGENT_CARD.handler({ name, repo: s.repo, from }));
   return { card, servedOverA2A: false as const, why: A2A_WHY(name) };
 }
 
@@ -310,7 +310,7 @@ export const agentsHandlers = HttpApiBuilder.group(Api, 'agents', (handlers) =>
         writeGoes(namespace, 'remove', thereOf(await heldIn(s), name));
         const version = versioned(route, query.resourceVersion);
         const before = await agentAt(s, namespace, name, 'yours');
-        await s.inRequest(AGENTS_REMOVE.handler({ from: 'yours', name, version, repo: s.repo }, undefined, s.home));
+        await s.inRequest(AGENTS_REMOVE.handler({ from: 'yours', name, version, repo: s.repo }));
         return before;
       }),
     )
@@ -318,11 +318,11 @@ export const agentsHandlers = HttpApiBuilder.group(Api, 'agents', (handlers) =>
       answeredWriteIn(namespace, (s) => triedIn(s, namespace, name, payload.brief)),
     )
     .handle('card', ({ params: { namespace, name }, query }) => answeredWriteIn(namespace, (s) => cardIn(s, namespace, name, query.origin)))
-    .handle('sources', ({ query }) => answered((s) => s.inRequest(AGENTS_SOURCES.handler(query, undefined, s.home))))
+    .handle('sources', ({ query }) => answered((s) => s.inRequest(AGENTS_SOURCES.handler(query))))
     .handle('copy', ({ params: { namespace }, payload }) =>
       answeredWriteIn(namespace, (s) => {
         writeGoes(namespace, 'act', 'yours');
-        return s.inRequest(AGENTS_COPY.handler(payload, undefined, s.home));
+        return s.inRequest(AGENTS_COPY.handler(payload));
       }),
     )
     .handle('instructions', ({ params: { namespace, name } }) =>
@@ -332,14 +332,14 @@ export const agentsHandlers = HttpApiBuilder.group(Api, 'agents', (handlers) =>
       answeredWriteIn(namespace, async (s) => {
         writeGoes(namespace, 'act', 'yours');
         const agent = agentNamed(`PUT ${instructionsPath(namespace, name)}`, name);
-        return wordsOf(await s.inRequest(AGENTS_CUSTOM.handler({ name: agent, repo: s.repo, words }, undefined, s.home)));
+        return wordsOf(await s.inRequest(AGENTS_CUSTOM.handler({ name: agent, repo: s.repo, words })));
       }),
     )
     .handle('deleteInstructions', ({ params: { namespace, name } }) =>
       answeredWriteIn(namespace, async (s) => {
         writeGoes(namespace, 'act', 'yours');
         const agent = agentNamed(`DELETE ${instructionsPath(namespace, name)}`, name);
-        return clearedOf(await s.inRequest(AGENTS_CUSTOM.handler({ name: agent, repo: s.repo, clear: true }, undefined, s.home)));
+        return clearedOf(await s.inRequest(AGENTS_CUSTOM.handler({ name: agent, repo: s.repo, clear: true })));
       }),
     ),
 );

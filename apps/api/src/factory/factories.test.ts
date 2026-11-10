@@ -21,21 +21,8 @@ import { story } from 'test-kit/checkpoints';
 import { linesOf, listedOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
 import { workflowsListed } from '../../test/definitions.ts';
-import {
-  addFactory,
-  addToInbox,
-  attachWorkflow,
-  clearSchedule,
-  hireAgent,
-  loadWorkflows,
-  readInbox,
-  removeFactory,
-  runStore,
-  setSchedule,
-  hireRefusalOf,
-  unfilledRefusal,
-  StoreRoot,
-} from 'agent-orchestrator';
+import { addToInbox, loadWorkflows, readInbox, runStore, hireRefusalOf, unfilledRefusal, StoreRoot } from 'agent-orchestrator';
+import { addFactory, attachWorkflow, clearSchedule, hireAgent, removeFactory, setSchedule } from 'agent-orchestrator/testing';
 import { Effect } from 'effect';
 
 /** `program`, one of the package's inbox verbs, run on the harness's store (`root`): its refusal thrown as itself. */

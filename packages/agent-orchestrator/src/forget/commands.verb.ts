@@ -2,6 +2,7 @@
  * `nemia rm` and `nemia prune`, entries of the command table: one run forgotten (`forgetRun`), or what it left on disk pruned (`prune`);
  * the CLI's runners walk the many runs each takes.
  */
+import { StoreRoot } from '../config/root.store.ts';
 import { forgetLine, type Forgot } from './forget.ts';
 import { forgetRun } from './forget.verb.ts';
 import type { EngineForgetting } from './forgetting/forgetting.ts';
@@ -13,7 +14,6 @@ import { RunPrune } from 'objects';
 import { tryOf } from '../summary/reads.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
-import { rootGiven } from '../config/root.store.ts';
 import type { Args } from '../command/command.ts';
 import { checked, type Command } from '../command/entry.verb.ts';
 
@@ -50,10 +50,10 @@ export type RmInput = typeof RmInput.Type;
  * Refused of a removal of a try alone (`onlyTry`) for any other run: a repository run's worktrees and branches are a person's to read
  * before they go, and `nemia rm` says what it hands off and what it leaves.
  */
-const tryAlone = Effect.fnUntraced(function* (runId: string, home: string | undefined) {
+const tryAlone = Effect.fnUntraced(function* (runId: string, home: string) {
   const run = yield* (yield* RunDoor).runs.find(RunId.read(runId), () => {});
   if (run === undefined) return;
-  if (tryOf(run, rootGiven(home, 'rm'))) return;
+  if (tryOf(run, home)) return;
   return yield* Effect.fail(
     new Conflict({
       message: `${run.id} is a run of ${run.workflowDir}, and only a try — a run started from an agent's page — is removed here. Remove it with \`nemia rm ${run.id}\`, which says what it hands off and what it leaves.`,
@@ -101,7 +101,8 @@ export const RM: Command<{ id: string; removed: boolean; engine: EngineForgettin
   class: 'ask',
   only: { side: 'cli', why: "the api serves it as the Run's `delete` of `objects`' Api, calling this handler, a try alone" },
   input: RmInput,
-  handler: Effect.fnUntraced(function* (input: RmInput, _env, home) {
+  handler: Effect.fnUntraced(function* (input: RmInput) {
+    const home = yield* StoreRoot;
     yield* checked(rmRefusal(input));
     const { runId } = input;
     if (input.onlyTry === true) yield* tryAlone(runId, home);

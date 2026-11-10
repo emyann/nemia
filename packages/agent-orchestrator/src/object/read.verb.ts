@@ -7,14 +7,14 @@ import { Effect } from 'effect';
 import { timeline, type Timeline } from '../timeline/index.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
-import { type Engine, EngineService, tried } from '../runtime-client.ts';
+import { type Engine, EngineService } from '../runtime-client.ts';
 import { realReleasesDir } from '../release/release.store.ts';
 import type { RaiseReads } from '../retry/index.ts';
 import { bare, filedTimes, type Filings, type Views, workflowsOf } from '../summary/reads.verb.ts';
 import { stepSaid } from '../summary/judged.verb.ts';
 import { type JudgedOrWhy, type Judgement, judgementsOf, sameJudgement } from '../summary/judgement.verb.ts';
 import { informedJudgements, Informer, informerRead } from '../rest/informer.verb.ts';
-import { verifiesRest } from '../config/config.store.ts';
+import { setting } from '../config/config.store.ts';
 import { standingReader, standingSnapshot } from '../standing/standing.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import type { Run } from '../record/record.ts';
@@ -31,7 +31,7 @@ import { attemptsIn, closeoutIn, type StepTry, triesOf, unreadableIn } from '../
 const judgedOn = Effect.fnUntraced(function* (e: Engine, home: string, run: Run) {
   const git = standingReader(yield* standingSnapshot());
   const informer = yield* Informer;
-  const read = informer ? yield* informerRead(e, informer, yield* tried(() => verifiesRest()), git, sameJudgement) : undefined;
+  const read = informer ? yield* informerRead(e, informer, yield* setting('verifyRest'), git, sameJudgement) : undefined;
   const judged = read ? yield* informedJudgements(e, home, [run], read, git) : yield* judgementsOf(e, home, [run], git);
   const one = judged.runs.get(run.id);
   return one ?? (yield* Effect.die(new Error(`Run ${run.id} was handed to its judgement and not judged.`)));

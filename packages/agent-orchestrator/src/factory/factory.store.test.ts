@@ -24,7 +24,7 @@ const ROOT = scratch('wf-factory-');
 const FACTORIES = path.join(ROOT, 'factories');
 
 process.env.WF_ROOT = ROOT;
-const { addFactory, attachWorkflow, fireAgent, hireAgent, readFactories, readFactory, setSchedule } = await import('../runner.ts');
+const { addFactory, attachWorkflow, fireAgent, hireAgent, readFactories, readFactory, setSchedule } = await import('../../testing.ts');
 const { detached } = await import('../../test/factory-planted.ts');
 const { main } = await import('../cli/main.ts');
 

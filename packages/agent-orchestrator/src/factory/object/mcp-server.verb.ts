@@ -48,7 +48,7 @@ export const mcpServerOf = (s: ServerListed, namespace: string, filedAt: string,
 const serversOf = Effect.fn('serversOf')(function* (home: string, repo: string, namespace: string) {
   const { factory, listing: filed } = yield* factoryFiled(home, repo, namespace);
   if (filed === undefined) return [];
-  const listing: ServersListing = yield* FACTORY_SERVERS.handler({ factory: namespace }, undefined, home);
+  const listing: ServersListing = yield* FACTORY_SERVERS.handler({ factory: namespace });
   return listing.servers.map((s) => mcpServerOf(s, namespace, factory.metadata.creationTimestamp, listing.unread));
 });
 

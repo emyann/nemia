@@ -5,8 +5,8 @@
  * every machine, saying which variable to set. A test file that reads a ceiling sets or deletes it itself (`ambient.test.ts`).
  *
  * And `WF_DEFAULT_FACTORY_STARTS=1`: most tests start runs in scratch repositories no factory holds, often of cards that name no factory,
- * and the switch lets those starts go to the default factory (`defaultStartsAllowed`). A test of the refusal they meet as shipped deletes
- * it first.
+ * and the switch lets those starts go to the default factory (`StoreConfig`'s `defaultFactoryStarts`). A test of the refusal they meet as
+ * shipped deletes it first.
  *
  * And `NEMIA_DAEMON_START=off` (`DEMAND_OFF`): a command that ticks, typed in a test on a store no daemon holds, would start the daemon of
  * this checkout (`ensureDaemon`), and so would a `nemia` child a test spawns with this environment. A test of the start hands `main` a

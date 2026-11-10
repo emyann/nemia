@@ -4,6 +4,7 @@
  * of a run, as the list and a run's page give it. A controller: it reads the run through `listReading` and its branches through
  * `branchStandings`.
  */
+import type { Settings } from '../config/config.store.ts';
 import { Effect } from 'effect';
 import { type Engine, nameFor } from '../runtime-client.ts';
 import { answerIn, onYouWords } from '../list/list.ts';
@@ -431,8 +432,8 @@ export type JudgeHow = {
   git: BranchReader;
   standings?: (status: RunStatus, steps: readonly Workflow[]) => readonly BranchStanding[];
   parent?: (id: string) => ParentRun;
-  /** The environment the checkout's claim reads the cap on runs in flight over (`ListReadingHow`'s `env`); left out, the process's. */
-  env?: NodeJS.ProcessEnv;
+  /** The settings the checkout's claim reads the cap on runs in flight from (`ListReadingHow`'s `config`); left out, the program's. */
+  config?: Settings;
 };
 
 /**
@@ -464,11 +465,19 @@ export const judge = Effect.fn('judge')(function* (
   names: readonly string[],
   folder: readonly Workflow[] | null,
   views: Views,
-  { reader, git, standings = () => [], parent, env }: JudgeHow,
+  { reader, git, standings = () => [], parent, config }: JudgeHow,
 ) {
   const steps = judgedSteps(run, folder);
   const shown = [...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map(bare)];
-  const read = yield* listReading(reader, run, { views, steps, shown, standings, git, env, ...(parent ? { parent } : {}) });
+  const read = yield* listReading(reader, run, {
+    views,
+    steps,
+    shown,
+    standings,
+    git,
+    ...(config ? { config } : {}),
+    ...(parent ? { parent } : {}),
+  });
   const { status, ready, check, retry, round } = read.assessed;
   const waiting = runWaitingOf(run, read.waiting);
   const holding = holdingOf(run, read.holding ?? []);

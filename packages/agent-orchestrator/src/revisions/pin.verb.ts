@@ -12,6 +12,7 @@
  *
  * A controller: it gathers digests from four stores, which only a controller may do (`CONTROLLER` in `test/boundary.test.ts`).
  */
+import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { Cache, Cause, Effect } from 'effect';
@@ -177,7 +178,10 @@ export type PassRevisions = {
 type Numbering = (kind: RevisionKind, name: string, hash: string, at: string) => Revision;
 
 /** The number `hash` stands at for `kind` and `name`, read off the ledger and never appended: the next number for a content it lacks. */
-const lookedUp: Numbering = (kind, name, hash, at) => revisionNow(ledgerOf(kind, name), hash, at);
+const lookedUp =
+  (home: string): Numbering =>
+  (kind, name, hash, at) =>
+    revisionNow(ledgerOf(home, kind, name), hash, at);
 
 /** As many keys as one pass's `Cache` holds: more than a pass can name, so nothing a pass read is let go before the pass is. */
 const PASS_KEYS = Number.MAX_SAFE_INTEGER;
@@ -193,6 +197,7 @@ const runOfKey = (key: string): FolderRun => {
  * `Cache` of that pass, keyed by what it reads and holding the `Exit`, so a concurrent miss waits on the one lookup and a failure is kept.
  */
 export const passRevisions = Effect.fn('passRevisions')(function* () {
+  const home = yield* StoreRoot;
   const where = (run: FolderRun): Array<string | null> => [
     path.resolve(run.workflowDir),
     run.repo === undefined ? null : path.resolve(run.repo),
@@ -237,13 +242,17 @@ export const passRevisions = Effect.fn('passRevisions')(function* () {
     },
   });
   const digest = (of: KindName, run: FolderRun) => Cache.get(digestCache, JSON.stringify([of.kind, of.name, ...where(run)]));
-  const revision = once(appendRevision, (kind, name, hash) => JSON.stringify([kind, name, hash]));
-  const looked = once(lookedUp, (kind, name, hash) => JSON.stringify([kind, name, hash]));
+  const revision = once<Parameters<Numbering>, Revision>(
+    (kind, name, hash, at) => appendRevision(home, kind, name, hash, at),
+    (kind, name, hash) => JSON.stringify([kind, name, hash]),
+  );
+  const looked = once(lookedUp(home), (kind, name, hash) => JSON.stringify([kind, name, hash]));
   return { factory, skills, steps, allows, digest, revision, looked } satisfies PassRevisions;
 });
 
 /** The pass's reader `read` where one was handed, else one made for this call alone. */
-const readOr = (read: PassRevisions | undefined): Effect.Effect<PassRevisions> => (read ? Effect.succeed(read) : passRevisions());
+const readOr = (read: PassRevisions | undefined): Effect.Effect<PassRevisions, never, StoreRoot> =>
+  read ? Effect.succeed(read) : passRevisions();
 
 /**
  * The pins of `steps` as the world holds them now, each given its number in the ledger by `number`: appended where the digest has moved
@@ -341,7 +350,7 @@ export const driftNow = Effect.fn('driftNow')(function* (run: Run, given?: PassR
 });
 
 /** The pins the run's next filing would take, numbered without a write (`driftNow`'s): none where nothing would be filed or read. */
-const pinsNow = (run: Run, read: PassRevisions): Effect.Effect<Pin[]> =>
+const pinsNow = (run: Run, read: PassRevisions): Effect.Effect<Pin[], never, StoreRoot> =>
   !hasStarted(run) || !run.pinned?.length
     ? Effect.succeed([])
     : Effect.gen(function* () {

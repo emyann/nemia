@@ -116,7 +116,7 @@ export function toldOf(
  * What the engine filed a step's current try with (`StepFiled`), off its record; null for no task, or one the engine has no record of. The
  * harness's arguments are the adapter's, under `config` (agent-runtime's `HarnessArgs`), which the engine carries unread.
  */
-export function filedOf(record: StepRecord | undefined, views: Views): StepFiled | null {
+export function filedOf(record: StepRecord | undefined, views: Views, home: string): StepFiled | null {
   const view = record?.taskId ? views.get(record.taskId) : undefined;
   if (!view || phaseOfView(view) === 'unknown') return null;
   const { deadlineSeconds } = view.state;
@@ -128,7 +128,7 @@ export function filedOf(record: StepRecord | undefined, views: Views): StepFiled
     contextTokens: contextTokens ?? null,
     permissionMode: permissionMode ?? null,
     runsIn: runsInOf(view.state),
-    remote: remoteOf(view.state.harness),
+    remote: remoteOf(view.state.harness, home),
     bridge: bridgeOf(views)(view.id),
     tools: tools ?? null,
     deadlineSeconds: deadlineSeconds ?? null,
@@ -151,12 +151,12 @@ function askedModelOf(record: StepRecord | undefined): string | null {
  * refused, or that is refused as it stands, gives no address — the run's page is still drawn, and `nemia up` says what is wrong with the
  * file.
  */
-function remoteOf(harness: string | undefined): StepFiled['remote'] {
+function remoteOf(harness: string | undefined, home: string): StepFiled['remote'] {
   const name = remoteNameOf(harness);
   if (name === undefined) return null;
   let agent: Record<string, unknown> | undefined;
   try {
-    agent = remoteAgents().get(name);
+    agent = remoteAgents(home).get(name);
   } catch {
     return { name, address: null };
   }

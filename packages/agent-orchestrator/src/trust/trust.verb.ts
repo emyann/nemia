@@ -4,12 +4,13 @@
  * back; `untrustedPlaces` reads which places are not trusted now, for a listing; and `nemia factory trust <name>`, the verb that asks
  * again (`FACTORY_TRUST`). The repository a folder is in is the place's answer (`root`), and the trust is the runtime's.
  */
+import { StoreRoot } from '../config/root.store.ts';
+import { listedAtOnce } from '../factory/door/factories.store.ts';
 import { Effect } from 'effect';
 import { folderTrust, tried, trustFolder } from '../runtime-client.ts';
 import type { Args, Flag } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { noFactoryLine, type FactoryListing } from '../factory/factory.ts';
-import { readFactories } from '../factory/factory.store.ts';
 import { HARNESSES } from '../harness/harness.ts';
 import { PlaceService, type Place } from '../place/place.store.ts';
 import { unansweredWords } from '../place/place.ts';
@@ -97,8 +98,8 @@ export const NO_TRUST: Flag = { flag: '--no-trust', kind: 'switch', key: 'noTrus
 const nameOf = (args: Args): string => (typeof args.factory === 'string' ? args.factory : '');
 
 /** The places of the factory `name`; refuses, as `Missing`, a name the store has no factory under, and one whose file does not read. */
-function placesOf(name: string): readonly string[] {
-  const all = readFactories();
+function placesOf(home: string, name: string): readonly string[] {
+  const all = listedAtOnce(home);
   const found = all.find((f) => f.name === name);
   if (!found)
     throw new Missing({
@@ -132,7 +133,8 @@ export const FACTORY_TRUST: Command<{ name: string; trusts: readonly PlaceTrust[
   handler: (args) =>
     Effect.gen(function* () {
       const name = nameOf(args);
-      const repos = yield* tried(() => placesOf(name));
+      const home = yield* StoreRoot;
+      const repos = yield* tried(() => placesOf(home, name));
       return { name, trusts: yield* trustPlaces(repos) };
     }),
   print: ({ name, trusts }) => {

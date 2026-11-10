@@ -5,6 +5,7 @@
  *
  * `WF_KEEP_WORKTREES` is deleted at its head, so the rule is read at its shipped default.
  */
+import { configGiven, rootNow } from './config-given.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -16,7 +17,7 @@ import { asyncOps, asyncStore, plainEngine, type AsyncJournal, type AsyncRunner 
 import { scratch } from 'test-kit/scratch';
 import { runGiven } from './placed.ts';
 import type { PlaceRequests, PlaceVerb } from '../src/place/place.ts';
-import { storeRootLayer } from '../src/config/root.store.ts';
+import { storeConfigLayer } from '../src/config/root.store.ts';
 
 const ROOT = scratch('wf-free-held-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -132,7 +133,7 @@ const tick = (memo?: ReturnType<typeof freshRestMemo>) =>
     e,
     withProposalsPass(tickRun({ repo: ROOT, ...(memo ? { memo } : {}) })).pipe(
       Effect.provide(gitPlaceLayer),
-      Effect.provide(storeRootLayer(process.env)),
+      Effect.provide(storeConfigLayer(process.env)),
     ),
   );
 
@@ -159,6 +160,7 @@ async function sweep(pass: Pass, ids: readonly string[], memory: Memory) {
   const done = await runEngine(
     e,
     freeOnce(answers, memory).pipe(
+      Effect.provide(configGiven(rootNow(), process.env)),
       Effect.provide(counting(asked)),
       Effect.provide(Logger.layer([keeper])),
       Effect.provideService(References.MinimumLogLevel, 'Info'),

@@ -202,6 +202,7 @@ const draftsOf = (steps: readonly WorkflowStep[], route: string) =>
 const writing = (s: Served, name: string, changes: boolean) => ({
   e: s.e,
   placeService: s.placeService,
+  config: s.config,
   trace: s.trace,
   name,
   dir: path.join(s.home, 'workflows', name),
@@ -271,7 +272,7 @@ export const workflowsHandlers = HttpApiBuilder.group(Api, 'workflows', (handler
             error: `${route} takes the \`?resourceVersion=\` the Workflow was read at, so a folder changed since is not removed unseen.`,
           });
         const before = await workflowAt(s, namespace, name, 'yours');
-        await s.inRequest(WORKFLOWS_REMOVE.handler({ from: 'yours', name, version, repo: s.repo }, undefined, s.home));
+        await s.inRequest(WORKFLOWS_REMOVE.handler({ from: 'yours', name, version, repo: s.repo }));
         return before;
       }),
     )
@@ -283,5 +284,5 @@ export const workflowsHandlers = HttpApiBuilder.group(Api, 'workflows', (handler
         return stepPage(s, { name, ...item }, step);
       }),
     )
-    .handle('keys', () => answered(async (s) => keyForm(await s.inRequest(yourAgentsRead(s.home))))),
+    .handle('keys', () => answered(async (s) => keyForm(await s.inRequest(yourAgentsRead(s.home)), s.home))),
 );

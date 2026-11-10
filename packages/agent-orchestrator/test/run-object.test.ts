@@ -29,9 +29,9 @@ const { EngineService: RunsEngine } = await import('../src/runtime-client.ts');
 const { Effect: RunsEffect } = await import('effect');
 /** Every run's summary, as the whole list judges it (`runsSummarized`), read through the informer and filings `kept` hands. */
 const RUNS = {
-  handler: (_args: object, env?: NodeJS.ProcessEnv, home?: string, kept?: Parameters<typeof howOf>[2]) =>
+  handler: (_args: object, kept?: Parameters<typeof howOf>[0]) =>
     RunsEffect.gen(function* () {
-      return yield* runsSummarized(yield* RunsEngine, howOf(env, home, kept));
+      return yield* runsSummarized(yield* RunsEngine, yield* howOf(kept));
     }),
 };
 const { SHOW, TRIES, TRY, CLOSEOUT, TOLD } = await import('../src/object/commands.verb.ts');
@@ -116,7 +116,7 @@ const refusal = async (p: Promise<unknown>): Promise<{ exitCode?: number }> => {
 
 test('runObject: the run as one object, its status the list’s judged fields, its current tries the TRY entry’s', async () => {
   const ids = await threeRuns();
-  const rows = (await runWith(e(), RUNS.handler({}, process.env, ROOT) as never)) as RunSummary[];
+  const rows = (await runWith(e(), RUNS.handler({}) as never)) as RunSummary[];
   const phases = new Set<string>();
   let compared = 0;
   for (const id of ids) {

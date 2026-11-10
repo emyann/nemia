@@ -32,7 +32,7 @@ export const hiresHandlers = HttpApiBuilder.group(Api, 'hires', (handlers) =>
         factoryNamed(`PUT /api/namespaces/${namespace}/hires/${name}`, namespace);
         const { spec } = await hireIn(s, namespace, name);
         const step = `${spec.workflow}/${spec.step}`;
-        await s.inRequest(FACTORY_HIRE.handler({ factory: namespace, agent: payload.agent, step }, s.env, s.home));
+        await s.inRequest(FACTORY_HIRE.handler({ factory: namespace, agent: payload.agent, step }));
         return hireIn(s, namespace, name);
       }),
     )
@@ -40,7 +40,7 @@ export const hiresHandlers = HttpApiBuilder.group(Api, 'hires', (handlers) =>
       answered(async (s) => {
         factoryNamed(`DELETE /api/namespaces/${namespace}/hires/${name}`, namespace);
         const { spec } = await hireIn(s, namespace, name);
-        await s.inRequest(FACTORY_FIRE.handler({ factory: namespace, step: `${spec.workflow}/${spec.step}` }, s.env, s.home));
+        await s.inRequest(FACTORY_FIRE.handler({ factory: namespace, step: `${spec.workflow}/${spec.step}` }));
         return hireIn(s, namespace, name);
       }),
     ),

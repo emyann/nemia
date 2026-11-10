@@ -24,14 +24,15 @@ import {
 import type { Run } from 'agent-orchestrator/run';
 
 /**
- * The engine the api reads through — `list`, `view` and `logs` — one for an app, built with its runtime (`live`: the package's `engine()`).
- * The api's process, started without `--no-tick`, is the store's daemon, and ticks on this engine (main.ts), so a board served by it keeps
- * the store ticking; its routes still file and advance nothing but through `nemia`'s own verbs, and an api under `--no-tick` ticks nothing.
- * The one write through it from a route is a try's removal (`DELETE /api/namespaces/:namespace/runs/:runId`), `nemia rm`'s own code, which
- * closes a task that waits for a word nobody will give once the record is gone.
+ * The engine the api reads through — `list`, `view` and `logs` — one for an app, built with its runtime (`live`: the package's
+ * `engine(env)`). The api's process, started without `--no-tick`, is the store's daemon, and ticks on this engine (main.ts), so a board
+ * served by it keeps the store ticking; its routes still file and advance nothing but through `nemia`'s own verbs, and an api under
+ * `--no-tick` ticks nothing. The one write through it from a route is a try's removal (`DELETE /api/namespaces/:namespace/runs/:runId`),
+ * `nemia rm`'s own code, which closes a task that waits for a word nobody will give once the record is gone.
  */
 export class Engine extends Context.Service<Engine, ReturnType<typeof engine>>()('api/Engine') {
-  static readonly live: Layer.Layer<Engine> = Layer.sync(Engine)(engine);
+  /** The package's engine over the store and the settings `env` names (`engine(env)`). */
+  static readonly live = (env: Parameters<typeof engine>[0]): Layer.Layer<Engine> => Layer.sync(Engine)(() => engine(env));
 
   /**
    * The api's engine over the runtime's layer `runtime`, wrapped as `live` wraps its own (`engineOf`, which files every task queued):
@@ -45,15 +46,15 @@ export class Engine extends Context.Service<Engine, ReturnType<typeof engine>>()
 /**
  * The store's root, as the api's own reads and writes take it — your workflows, agents and skills, and a try's folder, looked for and
  * written under it — and as the package takes it too: one service (`orchestrator/StoreRoot`), given by the app's layer from `WF_ROOT`
- * (`storeRootLayer`, `app.ts`), with no default, so an app given none does not compile. A test that gives another root moves where the
- * api looks for yours.
+ * (`storeConfigLayer`, `app.ts`, which gives the store's settings too, `StoreConfig`), with no default, so an app given none does not
+ * compile. A test that gives another root moves where the api looks for yours.
  *
  * What the package still reads off a root of its own, as its modules load — the runs (`runsAtOnce`, `findRun`), the inbox and the queue,
  * the daemon's file — is named in `packages/agent-orchestrator/test/global-roots.baseline.ts`, and is owed its own threading; a test that
  * means to move those sets `WF_ROOT` before it imports the package, as `test/harness.ts` does.
  */
-export { StoreRoot } from 'agent-orchestrator';
-import { StoreRoot } from 'agent-orchestrator';
+export { StoreConfig, StoreRoot } from 'agent-orchestrator';
+import { StoreConfig, StoreRoot } from 'agent-orchestrator';
 
 type Reader = Engine['Service'];
 
@@ -111,18 +112,26 @@ export function taskOfStep(id: string, step: string, home: string): { run: Run; 
 }
 
 /**
- * A package program run for a request: over the engine `e` (`runWith`), the place the app's layer gave and the store's root (`at`), its
+ * A package program run for a request: over the engine `e` (`runWith`), the place the app's layer gave, the store's root and its
+ * settings (`at`), its
  * spans children of the request's own on the app's tracer where `at.trace` names them (`RequestTrace`). Rejects with what the program
  * failed with or died of, as `runWith` does.
  */
 export const runPlaced = <A, E>(
   at: Placed,
   e: Engine['Service'],
-  program: Effect.Effect<A, E, EngineService | PlaceService | StoreRoot>,
+  program: Effect.Effect<A, E, EngineService | PlaceService | StoreRoot | StoreConfig>,
 ): Promise<A> =>
   runWith(
     e,
-    tracedIn(at.trace, program.pipe(Effect.provideService(PlaceService, at.placeService), Effect.provideService(StoreRoot, at.home))),
+    tracedIn(
+      at.trace,
+      program.pipe(
+        Effect.provideService(PlaceService, at.placeService),
+        Effect.provideService(StoreRoot, at.home),
+        Effect.provideService(StoreConfig, at.config),
+      ),
+    ),
   );
 
 /**
@@ -141,7 +150,12 @@ const tracedIn = <A, E, R>(trace: RequestTrace | undefined, program: Effect.Effe
  * (`Served.placeService`, `Served.home`, `Served.trace`). `trace` is required, so that a site that has a request's names it, and one that
  * has none says so with `undefined`.
  */
-export type Placed = { readonly placeService: PlaceService['Service']; readonly home: string; readonly trace: RequestTrace | undefined };
+export type Placed = {
+  readonly placeService: PlaceService['Service'];
+  readonly home: string;
+  readonly config: StoreConfig['Service'];
+  readonly trace: RequestTrace | undefined;
+};
 
 /** The place a helper's package programs run on and the trace they join, without the root it takes apart: a request's `Served` is one. */
-export type RunsOn = Pick<Placed, 'placeService' | 'trace'>;
+export type RunsOn = Pick<Placed, 'placeService' | 'config' | 'trace'>;

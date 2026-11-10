@@ -9,7 +9,6 @@ import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import { rooted } from '../factory/wiring/wire.verb.ts';
 import { Conflict, Invalid } from '../refusal/refusal.ts';
 import { AgentCopy } from 'objects';
 import { writerSpec, yourSkillsDir, yoursOf } from '../yours/yours.ts';
@@ -181,13 +180,9 @@ export const AGENTS_COPY: Command<AgentCopied, AgentCopy> = {
     why: "the api serves it as the Agent's `copy` verb of `objects`' Api (`/api/namespaces/:namespace/agents/copy`), which calls this entry's handler: no route of its own",
   },
   input: AgentCopy,
-  handler: ({ file, as, keep = [] }, _env, home) =>
-    rooted(
-      home,
-      'nemia agents copy',
-      Effect.gen(function* () {
-        return yield* copyAgent({ file, ...(as !== undefined && { as }), keep: [...keep], home: yield* StoreRoot });
-      }),
-    ),
+  handler: ({ file, as, keep = [] }) =>
+    Effect.gen(function* () {
+      return yield* copyAgent({ file, ...(as !== undefined && { as }), keep: [...keep], home: yield* StoreRoot });
+    }),
   print: copiedLines,
 };

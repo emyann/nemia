@@ -3,13 +3,18 @@
  * `WF_MAX_RUNS`), whether a pass judges its runs at rest in full (`WF_VERIFY_REST`), whether a finished run keeps its worktrees
  * (`WF_KEEP_WORKTREES`), how long the series are kept (`WF_METRICS_MINUTE_DAYS`, `WF_METRICS_HOUR_DAYS`), and the memory limit each
  * session runs under by default and the slice its scope is made in (`WF_MEMORY_LIMIT`, `WF_CGROUP_PARENT`). Each is an Effect `Config`
- * with its default, and each has a plain reader that takes the environment, `process.env` unless given, and answers the value or throws
- * `Invalid`, exit 2, in the variable's own words. A value that is set and not one the variable takes is refused, never read as its
- * default. Reads no disk.
+ * with its default, and each has a plain reader that takes the environment it is given — never `process.env` by default — and answers the
+ * value or throws `Invalid`, exit 2, in the variable's own words. A value that is set and not one the variable takes is refused, never
+ * read as its default. Reads no disk.
+ *
+ * A program reads them as services with no default, given where it is composed: `StoreConfig`, every setting, and `StoreRoot`, the store's
+ * directory, both given by `storeConfigLayer(env)` (`root.store.ts`, which imports this file) — `src/cli/main.ts` and the daemon from
+ * `process.env`, the api from its own, a test from a record it means. A program given none does not compile, so none silently reads the
+ * process's environment, as Effect's default `ConfigProvider` would.
  */
 import os from 'node:os';
 import path from 'node:path';
-import { Config, ConfigProvider, Effect, Result, Schema } from 'effect';
+import { Config, ConfigProvider, Context, Effect, Layer, Result, Schema } from 'effect';
 import { memoryQuantityRefusal } from 'agent-runtime/vocabulary';
 import { Invalid } from '../refusal/refusal.ts';
 
@@ -102,7 +107,7 @@ function read<T>(config: Config.Config<T>, name: string, env: Env, refusal: (val
  * `WF_ROOT`, the store's directory: an absolute path, or `~/.agent-workflows` when unset. Refused when relative, since each process would
  * read a store of its own under its working directory, and when empty, which would read the working directory itself.
  */
-export const wfRoot = (env: Env = process.env): string =>
+export const wfRoot = (env: Env): string =>
   read(
     root,
     'WF_ROOT',
@@ -113,7 +118,7 @@ export const wfRoot = (env: Env = process.env): string =>
   );
 
 /** `WF_MAX_CONCURRENT`, sessions at work per pool at once: a whole number from 1, or 2 when unset, empty or blank. */
-export const maxConcurrent = (env: Env = process.env): number =>
+export const maxConcurrent = (env: Env): number =>
   read(
     concurrent,
     'WF_MAX_CONCURRENT',
@@ -126,7 +131,7 @@ export const maxConcurrent = (env: Env = process.env): number =>
  * `WF_MAX_RUNS`, the cap on runs in flight: a whole number, or 0 — unset, empty or blank too — for none. Refused when it is anything else:
  * read as no cap, a mistyped value would lift the cap it was set to hold.
  */
-export const maxRuns = (env: Env = process.env): number =>
+export const maxRuns = (env: Env): number =>
   read(
     runs,
     'WF_MAX_RUNS',
@@ -140,7 +145,7 @@ export const maxRuns = (env: Env = process.env): number =>
  * unset or empty and a finished run is freed. Refused when it is anything else: read as off, a mistyped value would free what it was
  * set to keep.
  */
-export const keepsWorktrees = (env: Env = process.env): boolean =>
+export const keepsWorktrees = (env: Env): boolean =>
   read(
     keepWorktrees,
     'WF_KEEP_WORKTREES',
@@ -150,7 +155,7 @@ export const keepsWorktrees = (env: Env = process.env): boolean =>
   );
 
 /** `WF_VERIFY_REST`, whether a pass judges in full each run it answers from its memo of runs at rest: `1` on; `0`, unset or empty off. */
-export const verifiesRest = (env: Env = process.env): boolean =>
+export const verifiesRest = (env: Env): boolean =>
   read(
     verifyRest,
     'WF_VERIFY_REST',
@@ -160,7 +165,7 @@ export const verifiesRest = (env: Env = process.env): boolean =>
   );
 
 /** `WF_METRICS_MINUTE_DAYS`, the days of minute lines the series keep: a whole number from 2, or 30 when unset or empty. */
-export const metricsMinuteDays = (env: Env = process.env): number =>
+export const metricsMinuteDays = (env: Env): number =>
   read(
     minuteDays,
     'WF_METRICS_MINUTE_DAYS',
@@ -170,7 +175,7 @@ export const metricsMinuteDays = (env: Env = process.env): number =>
   );
 
 /** `WF_METRICS_HOUR_DAYS`, the days of hour lines the series keep: a whole number from 1, or undefined — kept until pruned — when unset. */
-export const metricsHourDays = (env: Env = process.env): number | undefined =>
+export const metricsHourDays = (env: Env): number | undefined =>
   read(
     hourDays,
     'WF_METRICS_HOUR_DAYS',
@@ -184,7 +189,7 @@ export const metricsHourDays = (env: Env = process.env): number | undefined =>
  * `defaultLimits`): a Kubernetes quantity, `8Gi`, `512Mi`, `4G`, as written, or undefined — no limit — when unset, empty or blank. Refused
  * in the runtime's words when it is anything else: read as no limit, a mistyped value would lift the bound it was set to hold.
  */
-export const memoryLimit = (env: Env = process.env): string | undefined =>
+export const memoryLimit = (env: Env): string | undefined =>
   read(
     memory,
     'WF_MEMORY_LIMIT',
@@ -197,11 +202,86 @@ export const memoryLimit = (env: Env = process.env): string | undefined =>
  * `WF_CGROUP_PARENT`, the systemd slice every limited session's scope is made in, as Docker's `--cgroup-parent`: a unit name ending
  * `.slice`, which an operator caps to bound the sessions together, or undefined — the user manager's root slice — when unset or empty.
  */
-export const cgroupParent = (env: Env = process.env): string | undefined =>
+export const cgroupParent = (env: Env): string | undefined =>
   read(
     slice,
     'WF_CGROUP_PARENT',
     env,
     (value) =>
       `WF_CGROUP_PARENT=${value} is not a slice's name. It is the systemd slice each limited session's scope is made in, a unit name of letters, digits and dashes ending .slice: WF_CGROUP_PARENT=sessions.slice — or unset, for the user manager's own.`,
+  );
+
+/**
+ * `WF_DEFAULT_FACTORY_STARTS`, whether a start may go to the default factory when it names none and no factory holds its folder, or when
+ * it starts a card that names none: only with `1`, which the package's and the api's tests set for the starts they make in scratch
+ * folders. Unset, by default, every such start is refused.
+ */
+export const defaultFactoryStarts = (env: Env): boolean => env.WF_DEFAULT_FACTORY_STARTS === '1';
+
+/**
+ * The daemon's per-session variables: what it sets on each session it starts, and so what no process but a session's starts with — the
+ * session's token, and the memory limit and slice a limited session runs under. A test seat drops them, so a test reads what CI reads.
+ */
+export const SESSION_VARIABLES = ['WF_SESSION_TOKEN', 'WF_MEMORY_LIMIT', 'WF_CGROUP_PARENT'] as const;
+
+/** Every `WF_` setting a program reads besides the root, each as its reader answers it. */
+export type Settings = {
+  readonly maxConcurrent: number;
+  readonly maxRuns: number;
+  readonly verifyRest: boolean;
+  readonly keepWorktrees: boolean;
+  readonly metricsMinuteDays: number;
+  readonly metricsHourDays: number | undefined;
+  readonly memoryLimit: string | undefined;
+  readonly cgroupParent: string | undefined;
+  readonly defaultFactoryStarts: boolean;
+};
+
+/**
+ * `env`'s settings, each read by its reader when it is read, so a value set wrong is refused (`Invalid`, exit 2) by the program that
+ * reads it and by no other: a command that never reads `WF_MAX_RUNS` runs whatever it holds, as it did when each read its own.
+ */
+export const settingsOf = (env: Env): Settings => ({
+  get maxConcurrent() {
+    return maxConcurrent(env);
+  },
+  get maxRuns() {
+    return maxRuns(env);
+  },
+  get verifyRest() {
+    return verifiesRest(env);
+  },
+  get keepWorktrees() {
+    return keepsWorktrees(env);
+  },
+  get metricsMinuteDays() {
+    return metricsMinuteDays(env);
+  },
+  get metricsHourDays() {
+    return metricsHourDays(env);
+  },
+  get memoryLimit() {
+    return memoryLimit(env);
+  },
+  get cgroupParent() {
+    return cgroupParent(env);
+  },
+  get defaultFactoryStarts() {
+    return defaultFactoryStarts(env);
+  },
+});
+
+/**
+ * The store's configuration a program asks for, given by whoever composes it, as `StoreRoot` is. It has no default: a program that asks
+ * it and is given none does not compile.
+ */
+export class StoreConfig extends Context.Service<StoreConfig, Settings>()('orchestrator/StoreConfig') {
+  /** `settings` as the layer that gives them to a program. */
+  static readonly layer = (settings: Settings): Layer.Layer<StoreConfig> => Layer.succeed(StoreConfig)(StoreConfig.of(settings));
+}
+
+/** The setting `key` of the configuration the program was given, or the `Invalid` its reader refuses a value set wrong with. */
+export const setting = <K extends keyof Settings>(key: K): Effect.Effect<Settings[K], Invalid, StoreConfig> =>
+  Effect.flatMap(StoreConfig, (config) =>
+    Effect.try({ try: () => config[key], catch: (error) => (error instanceof Invalid ? error : new Invalid({ message: String(error) })) }),
   );

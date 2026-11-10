@@ -10,7 +10,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { Result, Schema } from 'effect';
-import { wfRoot } from '../config/config.store.ts';
 import { CURRENT, RELEASE_FILE, type Current, type ReleaseFile, type Running } from './release.ts';
 import type { BuildLog, Installed, PidEntry } from '../retention/index.ts';
 
@@ -23,7 +22,7 @@ const ReleaseFileSchema = Schema.Struct({
 });
 
 /** The store's releases folder. */
-export const releasesDir = (root: string = wfRoot()): string => path.join(root, 'releases');
+export const releasesDir = (root: string): string => path.join(root, 'releases');
 
 /**
  * The store's releases folder as a real path, which an image a session recorded is compared with (`sessionRelease`): through
@@ -39,7 +38,7 @@ export function realReleasesDir(home: string): string {
 }
 
 /** The folder `tag` is built into. */
-export const releaseDir = (tag: string, root: string = wfRoot()): string => path.join(releasesDir(root), tag);
+export const releaseDir = (tag: string, root: string): string => path.join(releasesDir(root), tag);
 
 /** What the `release.json` at the root of `dir` says, or undefined where there is none or it does not read as one. */
 export function releaseFileOf(dir: string): ReleaseFile | undefined {
@@ -64,7 +63,7 @@ export function runningAt(root: string): Running {
 }
 
 /** The release the store's pointer names, with its real folder, or null where there is no pointer or it names no built release. */
-export function currentRelease(root: string = wfRoot()): Current | null {
+export function currentRelease(root: string): Current | null {
   let dir: string;
   try {
     dir = fs.realpathSync(path.join(releasesDir(root), CURRENT));
@@ -89,7 +88,7 @@ export function scriptsOf(dir: string): Readonly<Record<string, unknown>> {
 export type Building = { readonly dir: string; readonly tree: string; readonly trial: string; readonly log: string };
 
 /** A new build of `tag`: `releases/.building-<tag>-<pid>/`, its `trial/` made, and its log under `releases/.logs/`, named by `stamp`. */
-export function buildingOf(tag: string, stamp: string, root: string = wfRoot()): Building {
+export function buildingOf(tag: string, stamp: string, root: string): Building {
   const releases = releasesDir(root);
   const dir = path.join(releases, `.building-${tag}-${process.pid}`);
   fs.rmSync(dir, { recursive: true, force: true });
@@ -127,7 +126,7 @@ export const writeReleaseFile = (tree: string, file: ReleaseFile): void =>
   fs.writeFileSync(path.join(tree, RELEASE_FILE), `${JSON.stringify(file, null, 2)}\n`);
 
 /** Moves the built tree into `releases/<tag>`; answers false, moving nothing, where a release of that tag is there already. */
-export function placeRelease(tree: string, tag: string, root: string = wfRoot()): boolean {
+export function placeRelease(tree: string, tag: string, root: string): boolean {
   const at = releaseDir(tag, root);
   if (fs.existsSync(at)) return false;
   fs.renameSync(tree, at);
@@ -138,7 +137,7 @@ export function placeRelease(tree: string, tag: string, root: string = wfRoot())
 export const removeBuilding = (building: Building): void => fs.rmSync(building.dir, { recursive: true, force: true });
 
 /** Points `releases/current` at `releases/<tag>`: a relative link made beside it, then renamed over it, so the pointer is never absent. */
-export function switchCurrent(tag: string, root: string = wfRoot()): void {
+export function switchCurrent(tag: string, root: string): void {
   const releases = releasesDir(root);
   const hidden = path.join(releases, `${CURRENT_LINK}${process.pid}`);
   fs.rmSync(hidden, { force: true });

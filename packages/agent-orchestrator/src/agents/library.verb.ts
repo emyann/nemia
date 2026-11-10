@@ -11,7 +11,6 @@ import type { Args, Flag, Positional, Spec } from '../command/command.ts';
 import { cliPath, factoryFlag, FROM, versionFlag, writerSpec, yoursOrRefused } from '../yours/yours.ts';
 import { templatedTreeOf } from '../factory/door/factories.store.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { HOME } from '../record/record.store.ts';
 import type { AgentPlace, AgentReading } from '../roster/roster.ts';
 import { agentRead } from '../roster/roster.store.ts';
 import { TRY_BUDGET } from '../try/try.ts';
@@ -20,7 +19,6 @@ import type { AgentDraft } from './agents.ts';
 import type { AgentSidecar, AgentWritten } from './agents.store.ts';
 import { AgentDoor, type AgentRemoved } from './agent-door.store.ts';
 import { AgentName } from './agents.model.ts';
-import { rooted } from '../factory/wiring/wire.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { AGENTS_COPY } from '../sources/copy.verb.ts';
 
@@ -107,7 +105,7 @@ const writtenLines = ({ dir, agent, version, written, removed }: AgentWritten): 
 ];
 
 /**
- * An agent of yours written through the Agent door (`AgentDoor`, run `rooted` at the store's root its handler is given): `draft`, the
+ * An agent of yours written through the Agent door (`AgentDoor`, run at the store's root (`StoreRoot`) its handler is given): `draft`, the
  * agent as JSON text, which the command line reads off `--file`; `schema`, the result schema its `output:` names as JSON text, read
  * beside that file; `version`, what the agent was read at, none for a new one; and the agent's name on the path (`name`), the one it is
  * renamed from — none given for the agent of the draft's own name with no version, a new one. Written to the tree of the factory
@@ -143,26 +141,22 @@ export const AGENTS_WRITE: Command<AgentWritten, AgentWriteInput> = {
     why: "the api serves it as the Agent's `create` and `replace` verb of `objects`' Api (`/api/namespaces/:namespace/agents`), which calls this entry's handler: no route of its own",
   },
   input: AgentWriteInput,
-  handler: ({ from, name, factory, version, draft, schema, ...given }, _env, home) =>
-    rooted(
-      home,
-      'nemia agents write',
-      Effect.gen(function* () {
-        const root = yield* StoreRoot;
-        const tree = (named: string) => templatedTreeOf(root, named, 'nemia agents write');
-        const repo = yield* tried(() => (from === 'factory' && factory !== undefined ? tree(factory) : given.repo));
-        const dir = yield* tried(() =>
-          yoursOrRefused('nemia agents write', 'agents', from, name ?? null, repo ?? '', root, { factory, treeOf: tree }),
-        );
-        const sidecar: AgentSidecar | null | undefined = schema;
-        const door = yield* AgentDoor;
-        return yield* door.agents.write(AgentName.read(name ?? draft.name), draft, version, {
-          dir,
-          ...(sidecar !== undefined && { schema: sidecar }),
-          ...(repo !== undefined && { repo }),
-        });
-      }),
-    ),
+  handler: ({ from, name, factory, version, draft, schema, ...given }) =>
+    Effect.gen(function* () {
+      const root = yield* StoreRoot;
+      const tree = (named: string) => templatedTreeOf(root, named, 'nemia agents write');
+      const repo = yield* tried(() => (from === 'factory' && factory !== undefined ? tree(factory) : given.repo));
+      const dir = yield* tried(() =>
+        yoursOrRefused('nemia agents write', 'agents', from, name ?? null, repo ?? '', root, { factory, treeOf: tree }),
+      );
+      const sidecar: AgentSidecar | null | undefined = schema;
+      const door = yield* AgentDoor;
+      return yield* door.agents.write(AgentName.read(name ?? draft.name), draft, version, {
+        dir,
+        ...(sidecar !== undefined && { schema: sidecar }),
+        ...(repo !== undefined && { repo }),
+      });
+    }),
   print: writtenLines,
 };
 
@@ -179,17 +173,13 @@ export const AGENTS_REMOVE: Command<AgentRemoved, AgentRemoveInput> = {
     why: "the api serves it as the Agent's `delete` verb of `objects`' Api (`/api/namespaces/:namespace/agents`), which calls this entry's handler: no route of its own",
   },
   input: AgentRemoveInput,
-  handler: ({ from, name, version, repo }, _env, home) =>
-    rooted(
-      home,
-      'nemia agents rm',
-      Effect.gen(function* () {
-        const root = yield* StoreRoot;
-        const dir = yield* tried(() => yoursOrRefused('nemia agents rm', 'agents', from, name, repo ?? '', root));
-        const door = yield* AgentDoor;
-        return yield* door.agents.remove(AgentName.read(name), version, { dir, ...(repo !== undefined && { repo }) });
-      }),
-    ),
+  handler: ({ from, name, version, repo }) =>
+    Effect.gen(function* () {
+      const root = yield* StoreRoot;
+      const dir = yield* tried(() => yoursOrRefused('nemia agents rm', 'agents', from, name, repo ?? '', root));
+      const door = yield* AgentDoor;
+      return yield* door.agents.remove(AgentName.read(name), version, { dir, ...(repo !== undefined && { repo }) });
+    }),
   print: ({ dir, removed }) => [`removed from ${dir}: ${removed.join(', ')}`],
 };
 
@@ -218,8 +208,8 @@ export const AGENTS_TRY: Command<{ id: string }, AgentTryInput> = {
   },
   ticks: true,
   input: AgentTryInput,
-  handler: ({ from, name, brief = '', repo = '' }, _env, home = HOME) =>
-    tryAgent({ who: 'nemia agents run', from, name, brief, repo, home }),
+  handler: ({ from, name, brief = '', repo = '' }) =>
+    Effect.flatMap(StoreRoot, (home) => tryAgent({ who: 'nemia agents run', from, name, brief, repo, home })),
   print: ({ id }, { name }) => [`${id}  a try of ${name} started: nemia ls shows how it goes, and its page on the board`],
 };
 
@@ -238,19 +228,15 @@ export const AGENTS_READ: Command<{ agent: AgentReading | null }> = {
     side: 'api',
     why: "the board's agent page reads one agent with its versions and users; at the command line, nemia agents lists them",
   },
-  handler: (args, _env, home) =>
-    rooted(
-      home,
-      'agents read',
-      Effect.gen(function* () {
-        const root = yield* StoreRoot;
-        const agent = yield* agentRead(textOf(args, 'from') as AgentPlace, textOf(args, 'dir') ?? '', textOf(args, 'name') ?? '', {
-          repo: textOf(args, 'repo') ?? '',
-          home: root,
-        });
-        return { agent };
-      }),
-    ),
+  handler: (args) =>
+    Effect.gen(function* () {
+      const root = yield* StoreRoot;
+      const agent = yield* agentRead(textOf(args, 'from') as AgentPlace, textOf(args, 'dir') ?? '', textOf(args, 'name') ?? '', {
+        repo: textOf(args, 'repo') ?? '',
+        home: root,
+      });
+      return { agent };
+    }),
   print: () => [],
 };
 

@@ -58,9 +58,9 @@ const { EngineService: RunsEngine } = await import('../src/runtime-client.ts');
 const { Effect: RunsEffect } = await import('effect');
 /** Every run's summary, as the whole list judges it (`runsSummarized`), read through the informer and filings `kept` hands. */
 const RUNS = {
-  handler: (_args: object, env?: NodeJS.ProcessEnv, home?: string, kept?: Parameters<typeof howOf>[2]) =>
+  handler: (_args: object, kept?: Parameters<typeof howOf>[0]) =>
     RunsEffect.gen(function* () {
-      return yield* runsSummarized(yield* RunsEngine, howOf(env, home, kept));
+      return yield* runsSummarized(yield* RunsEngine, yield* howOf(kept));
     }),
 };
 const { passStanding } = await import('../src/standing/standing.verb.ts');
@@ -552,7 +552,7 @@ test('a run held until a person lifts it: no run named, nothing asked nor filed 
   const why = 'folded into the microVM intake (hotz)';
   const words = `held until a person lifts it (why: ${why}; by ${user})`;
   const summaryOf = async (id: string) => {
-    const all = await stage.runWith(b.e, RUNS.handler({}, process.env));
+    const all = await stage.runWith(b.e, RUNS.handler({}));
     const found = all.find((r) => r.id === id);
     assert.ok(found, `${id} is listed`);
     return found;

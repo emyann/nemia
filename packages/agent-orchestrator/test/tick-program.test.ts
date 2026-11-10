@@ -9,6 +9,7 @@
  * `WF_ROOT` is set before the runner is imported, which reads it as the module loads. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, sessions enough are admitted for the one run, and no cap is set on runs.
  */
+import { settingsOf } from '../src/config/config.store.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -28,6 +29,7 @@ import { runGiven, runOver } from './placed.ts';
 import { testPlace } from '../place/memory/index.ts';
 import type { PlaceService } from '../src/place/place.store.ts';
 import type { StoreRoot } from '../src/config/root.store.ts';
+import type { StoreConfig } from '../src/config/config.store.ts';
 import type { ProposalsAct } from '../src/apply/act.verb.ts';
 
 const place = testPlace();
@@ -109,11 +111,11 @@ const signAll = () => {
  * failure.
  */
 function _tickProgramTypes(e: Engine) {
-  void (tickRun() satisfies EffectOf<Pass, Refusal, Service | PlaceService | StoreRoot | ProposalsAct>);
+  void (tickRun() satisfies EffectOf<Pass, Refusal, Service | PlaceService | StoreRoot | StoreConfig | ProposalsAct>);
   // @ts-expect-error -- every tick acts on proposals: a pass composed without the proposals pass (`ProposalsAct`) does not compile
   void (tickRun() satisfies EffectOf<Pass, Refusal, Service | PlaceService | StoreRoot>);
   // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
-  void (tickRun() satisfies EffectOf<Pass, never, Service | PlaceService | StoreRoot | ProposalsAct>);
+  void (tickRun() satisfies EffectOf<Pass, never, Service | PlaceService | StoreRoot | StoreConfig | ProposalsAct>);
   // @ts-expect-error -- tickRun requires EngineService, and runPromise takes no requirement
   void Effect.runPromise(tickRun());
   // @ts-expect-error -- a program that asks the place is given none: the engine alone does not give it
@@ -208,7 +210,7 @@ test('a check filed by a pass is kept with its labels among the recent passes, a
     'the pass that filed it carries its labels',
   );
   const later = Date.now() + 120_000;
-  keepSeries(recentPasses(), later);
+  keepSeries(recentPasses(), settingsOf(process.env), later);
   assert.deepEqual(
     seriesRead('24h', undefined, later)
       .series.filter((x) => x.s === 'check.load')

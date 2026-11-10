@@ -115,5 +115,5 @@ export async function saved(
     ...(version !== undefined && { version }),
     ...(name !== undefined && { name }),
   };
-  await s.inRequest(AGENTS_WRITE.handler(input, undefined, s.home));
+  await s.inRequest(AGENTS_WRITE.handler(input));
 }

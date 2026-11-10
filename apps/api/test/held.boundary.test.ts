@@ -96,12 +96,12 @@ const summary = async (id: string) => (await listedOf(app, id)).status;
 
 test("a held step closed and not yet settled reads as it signed, never the engine's `between-attempts` for a session still going — as `nemia ls` says", async () => {
   assert.equal(
-    (await Effect.runPromise(engine().view('h-closed-plan'))).phase,
+    (await Effect.runPromise(engine(process.env).view('h-closed-plan'))).phase,
     'between-attempts',
     'the seed: closed, and the engine has not settled it',
   );
-  await runWith(engine(), approveRun('h-closed', 'plan'));
-  const listed = await runWith(engine(), list(engine(), runStore.runs.read('h-closed')));
+  await runWith(engine(process.env), approveRun('h-closed', 'plan'));
+  const listed = await runWith(engine(process.env), list(engine(process.env), runStore.runs.read('h-closed')));
   for (const run of [await detail('h-closed'), await summary('h-closed')]) {
     assert.deepEqual(
       run.steps.map((s) => s.message),

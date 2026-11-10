@@ -23,6 +23,6 @@ const globsOf = (sensitive: string | undefined): { sensitive?: string[] } => {
  */
 export const decisionHandler = (runId: string, sensitive?: string) =>
   Effect.flatMap(
-    answered((s) => s.inRequest(runDecision(runId, s.env, globsOf(sensitive)))),
+    answered((s) => s.inRequest(runDecision(runId, globsOf(sensitive)))),
     (read) => ('unjudged' in read ? Effect.fail(new Unjudged({ error: read.unjudged })) : Effect.succeed(read.decision)),
   );

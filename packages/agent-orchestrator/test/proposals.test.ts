@@ -135,7 +135,7 @@ const delegated = (factoryName: string, agent: string, resources: string[], verb
 async function ruleConfirmed(agent: string, rule: Omit<Rule, 'answer' | 'id'>): Promise<void> {
   const full: Rule = { id: `take-${rule.factory}`, answer: 'approve-proposal', ...rule };
   writeProposed(ROOT, agent, { at: new Date().toISOString(), rules: [full], guidance: [], digest: null });
-  await run(POLICY_CONFIRM.handler({ name: agent, id: full.id, words: ruleWords(full) }, {}, ROOT));
+  await run(POLICY_CONFIRM.handler({ name: agent, id: full.id, words: ruleWords(full) }));
 }
 
 test('the proposal story: an agent proposes, the person approves, it is applied as a new revision, and undone by proposing it back', async (t) => {
@@ -206,7 +206,7 @@ async function factoryChanged(name: string, spec: { rules?: string; instruction?
 const personRules = (name: string, words: string) => run(Effect.flatMap(FactoryDoor, (d) => d.rules.write(FactoryName.read(name), words)));
 
 /** The person's instruction of the factory `name` written, as `nemia factory instruct` writes it. */
-const personInstruction = (name: string, words: string) => run(FACTORY_INSTRUCT.handler({ factory: name, words }, {}, ROOT));
+const personInstruction = (name: string, words: string) => run(FACTORY_INSTRUCT.handler({ factory: name, words }));
 
 /** What the factory `name` keeps of its rules and its instruction, each read off its tree. */
 const factoryParts = (tree: string) => ({
@@ -430,12 +430,12 @@ test("REFUSED at confirm: a proposal rule past the agent's delegation (Invalid),
     proposedBy: [],
   };
   writeProposed(ROOT, 'shipper', { at: new Date().toISOString(), rules: [past], guidance: [], digest: null });
-  const refused = await refusalOf(POLICY_CONFIRM.handler({ name: 'shipper', id: 'too-far', words: ruleWords(past) }, {}, ROOT));
+  const refused = await refusalOf(POLICY_CONFIRM.handler({ name: 'shipper', id: 'too-far', words: ruleWords(past) }));
   assert.deepEqual([refused._tag, refused.exitCode], ['Invalid', 2]);
   assert.equal(fs.existsSync(confirmedFile(ROOT, 'shipper')), false, 'nothing is confirmed');
   const within = { ...past, id: 'workflows-only', resources: ['workflows'] };
   writeProposed(ROOT, 'shipper', { at: new Date().toISOString(), rules: [within], guidance: [], digest: null });
-  await run(POLICY_CONFIRM.handler({ name: 'shipper', id: 'workflows-only', words: ruleWords(within) }, {}, ROOT));
+  await run(POLICY_CONFIRM.handler({ name: 'shipper', id: 'workflows-only', words: ruleWords(within) }));
   assert.equal(fs.existsSync(confirmedFile(ROOT, 'shipper')), true);
   const list = policyListOf(ROOT, 'shipper', undefined);
   assert.deepEqual(

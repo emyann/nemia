@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { Schema } from 'effect';
-import { pauseFile, readPause } from '../pause/pause.store.ts';
+import { pauseAtModuleRoot, pauseFileAtModuleRoot } from '../pause/pause.store.ts';
 import type { Pause } from '../pause/pause.ts';
 import type { AskKey, AskOf, AsksRead, AskWritten, PersonRequest, Pruned, Run, RunStore } from './record.ts';
 import type { Labels } from '../labels/labels.ts';
@@ -54,7 +54,6 @@ import {
 } from './record.store.ts';
 import { mergeSpent } from '../merge/merge.ts';
 import { keptRecords, type RecordMemo } from '../rest/index.ts';
-import { verifiesRest } from '../config/config.store.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /** Each ask, by which it is: the file it is written at, by run, step and number, and its reader, as the tick reads it. */
@@ -397,7 +396,7 @@ function forgettingRuns(): string[] {
  * the pause as it stands, or with none while none does, is the very run given, which the memo knows by identity (`keptOf`). Never
  * written into the record.
  */
-function paused(run: Run, pause: Pause | null = readPause()): Run {
+function paused(run: Run, pause: Pause | null = pauseAtModuleRoot()): Run {
   if (isDeepStrictEqual(run.pause ?? null, pause)) return run;
   const { pause: _, ...bare } = run;
   return pause ? { ...bare, pause } : bare;
@@ -425,7 +424,7 @@ function runListed(id: string, said: (line: string) => void, pause: Pause | null
  * undefined for an id the store does not list, or that does not read (`runListed`).
  */
 function findRun(id: string, said: (line: string) => void = sayOnce): Run | undefined {
-  return runIds().includes(id) ? runListed(id, said, readPause()) : undefined;
+  return runIds().includes(id) ? runListed(id, said, pauseAtModuleRoot()) : undefined;
 }
 
 /** Where the claims of the cards started are, `<card>.json` each: beside `runs/`, so that no listing of runs reads one. */
@@ -493,7 +492,7 @@ export const filesStore: RunStore = {
     read: (id) => paused(labelled(runRecord(id))),
     find: findRun,
     list: (said, kept) => {
-      const pause = readPause();
+      const pause = pauseAtModuleRoot();
       const given = new Set<Run>();
       const keeps = kept && ((id: string) => givenOf(given, kept(id)));
       return listRuns(said, keeps).map((run) => paused(given.has(run) ? run : labelled(run), pause));
@@ -503,7 +502,7 @@ export const filesStore: RunStore = {
     stamps: restStamps,
     exists: (id) => fs.existsSync(runFile(id)),
     taken: runIdTaken,
-    calledOff: (id) => [cancelFile, pruneFile, holdFile].some((file) => fs.existsSync(file(id))) || fs.existsSync(pauseFile()),
+    calledOff: (id) => [cancelFile, pruneFile, holdFile].some((file) => fs.existsSync(file(id))) || fs.existsSync(pauseFileAtModuleRoot()),
     cancel: markCancelled,
     forget: removeRunFiles,
     ids: runIds,
@@ -528,15 +527,15 @@ export const filesStore: RunStore = {
 /**
  * Every run of the store as `project` reads it, off `memo` where one is handed in (`keptRecords`): the store stamped before any record
  * is read, each run whose stamp stands answered from memory, and each other read by id. With no memo — the command line's reads, and a
- * test's cold read — every record is read, and nothing is kept. `env` says whether each kept projection is judged afresh too
- * (`WF_VERIFY_REST`).
+ * test's cold read — every record is read, and nothing is kept. `verify` says whether each kept projection is judged afresh too
+ * (`WF_VERIFY_REST`, the program's `StoreConfig`).
  *
  * The store is listed once and its pause read once for the whole read, as `runs.list` lists and reads them once: `runs.find` does both
  * for its one run, and a read that went through it per run would list the store once per run.
  */
-export const keptRuns = <P>(memo: RecordMemo<P> | undefined, project: (run: Run) => P, env: NodeJS.ProcessEnv = process.env): P[] => {
+export const keptRuns = <P>(memo: RecordMemo<P> | undefined, project: (run: Run) => P, verify: boolean): P[] => {
   const listed = new Set(runIds());
-  const pause = readPause();
+  const pause = pauseAtModuleRoot();
   const find = (id: string) => (listed.has(id) ? runListed(id, sayOnce, pause) : undefined);
-  return keptRecords(memo, { stamps: filesStore.runs.stamps(), find, verify: verifiesRest(env) }, project);
+  return keptRecords(memo, { stamps: filesStore.runs.stamps(), find, verify }, project);
 };

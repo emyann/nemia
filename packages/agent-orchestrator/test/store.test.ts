@@ -1062,9 +1062,9 @@ const verbPrograms = async () => {
   const { approveRun } = await import('../src/gate/gate.verb.ts');
   const { sayRun } = await import('../src/say/say.verb.ts');
   const { cancelRun } = await import('../src/cancel/cancel.verb.ts');
-  const { storeRootLayer } = await import('../src/config/root.store.ts');
+  const { storeConfigLayer } = await import('../src/config/root.store.ts');
   const over = <A, E>(e: Engine, program: EffectOf<A, E, EngineService | PlaceService | StoreRoot>): Promise<A> =>
-    Effect.runPromise(placed(program).pipe(Effect.provide(EngineService.layer(e)), Effect.provide(storeRootLayer(process.env))));
+    Effect.runPromise(placed(program).pipe(Effect.provide(EngineService.layer(e)), Effect.provide(storeConfigLayer(process.env))));
   return { Effect, EngineService, over, acceptRun, approveRun, cancelRun, retryRun, roundRun, sayRun };
 };
 
@@ -1186,7 +1186,7 @@ const startProgram = async () => {
 async function _startProgramTypes() {
   const s = await startProgram();
   const opts = { brief: 'x', repo: ROOT, workflowDir: WORKFLOW };
-  void (s.startRun(opts) satisfies EffectOf<Run, Refusal, PlaceService>);
+  void (s.startRun(opts) satisfies EffectOf<Run, Refusal, PlaceService | StoreRoot>);
   // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
   void (s.startRun(opts) satisfies EffectOf<Run, never, PlaceService>);
   // @ts-expect-error -- a program that asks the place is given none, and runSync takes no requirement

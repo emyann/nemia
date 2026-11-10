@@ -14,15 +14,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Schema } from 'effect';
-import { wfRoot } from '../config/config.store.ts';
 import { oneLine } from '../record/record.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import type { Identity } from '../daemon/daemon.ts';
 import { pauseLapsed, RESUME_LINE, type Pause, type PauseHolder } from './pause.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
-
-/** The store whose pause this is, read once as the package loads, as `record.store.ts` reads its `HOME`. */
-const ROOT = wfRoot();
+import { wfRoot } from '../config/config.store.ts';
 
 /**
  * The name of the pause's file in the store. The store keeps the name it had before the verbs became `nemia pause` and `nemia resume`,
@@ -31,7 +28,7 @@ const ROOT = wfRoot();
 const PAUSE_FILE = 'cordon';
 
 /** The pause's file: one for the whole store. */
-export const pauseFile = (): string => path.join(ROOT, PAUSE_FILE);
+export const pauseFile = (home: string): string => path.join(home, PAUSE_FILE);
 
 /** A field of the file as it was written: one line of words, or absent. */
 const Said = Schema.optional(Schema.String);
@@ -64,10 +61,10 @@ export type PauseFileRead = { pause: Pause; heldBy?: PauseHolder; text: string }
  * The store's pause and its holder in one read, or null when none stands. A file that is there pauses the store whatever it holds: one
  * that does not read as the pause gives its fields empty, so a person's hand edit never lets new work start.
  */
-export function readPauseFile(): PauseFileRead | null {
+export function readPauseFile(home: string): PauseFileRead | null {
   let text: string;
   try {
-    text = fs.readFileSync(pauseFile(), 'utf8');
+    text = fs.readFileSync(pauseFile(home), 'utf8');
   } catch {
     return null;
   }
@@ -89,7 +86,18 @@ export function readPauseFile(): PauseFileRead | null {
 }
 
 /** The store's pause, or null when none stands (`readPauseFile`, its holder left in the file). */
-export const readPause = (): Pause | null => readPauseFile()?.pause ?? null;
+export const readPause = (home: string): Pause | null => readPauseFile(home)?.pause ?? null;
+
+/** The store's root as this module loaded, as `record.store.ts` reads its `HOME`: what `files.store.ts`'s run store still reads by. */
+const MODULE_ROOT = wfRoot(process.env);
+
+/**
+ * The pause of the store at the module's root, and its file: for the run store of `files.store.ts` alone, which still reads that root as
+ * it loads (`test/global-roots.baseline.ts`). Every other caller names its root.
+ */
+export const pauseAtModuleRoot = (): Pause | null => readPause(MODULE_ROOT);
+/** The pause's file at the module's root (`pauseAtModuleRoot`). */
+export const pauseFileAtModuleRoot = (): string => pauseFile(MODULE_ROOT);
 
 /** Who the machine says runs this process, or undefined where it cannot say. */
 function osUser(): string | undefined {
@@ -106,7 +114,13 @@ function osUser(): string | undefined {
  * A take-over names itself as the pause's holder (`heldBy`), written to the file and not answered, so the pass lifts the pause once that
  * process is gone. Refuses (`Conflict`) a store already paused, naming who paused it, `nemia resume`, and `nemia pause --now`.
  */
-export function putPause(said: { why?: string; by?: string }, now: Date = new Date(), timeoutMs?: number, heldBy?: PauseHolder): Pause {
+export function putPause(
+  home: string,
+  said: { why?: string; by?: string },
+  now: Date = new Date(),
+  timeoutMs?: number,
+  heldBy?: PauseHolder,
+): Pause {
   const by = said.by ?? osUser() ?? 'someone';
   const pause: Pause = {
     at: now.toISOString(),
@@ -114,12 +128,12 @@ export function putPause(said: { why?: string; by?: string }, now: Date = new Da
     ...(said.why ? { why: said.why } : {}),
     ...(timeoutMs === undefined ? {} : { timeoutMs }),
   };
-  fs.mkdirSync(ROOT, { recursive: true });
+  fs.mkdirSync(home, { recursive: true });
   try {
-    fs.writeFileSync(pauseFile(), `${JSON.stringify(heldBy ? { ...pause, heldBy } : pause)}\n`, { flag: 'wx' });
+    fs.writeFileSync(pauseFile(home), `${JSON.stringify(heldBy ? { ...pause, heldBy } : pause)}\n`, { flag: 'wx' });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
-    const stands = readPause();
+    const stands = readPause(home);
     throw new Conflict({
       message: `the store is already paused${stands?.by ? ` by ${stands.by}` : ''}${stands?.at ? ` since ${stands.at}` : ''}: ${RESUME_LINE} lifts it first, and nemia pause --now stops what still finishes under it.`,
     });
@@ -132,20 +146,20 @@ export function putPause(said: { why?: string; by?: string }, now: Date = new Da
  * were put, the file written whole through a hidden file renamed over it. Answers the pause as written. Refuses (`Missing`) a store no
  * pause stands on.
  */
-export function cutPause(): Pause {
-  const stands = readPauseFile();
+export function cutPause(home: string): Pause {
+  const stands = readPauseFile(home);
   if (stands === null) throw new Missing({ message: 'the store is not paused: there is nothing to cut (nemia pause --now puts one).' });
   const pause: Pause = { ...stands.pause, timeoutMs: 0 };
-  const file = pauseFile();
+  const file = pauseFile(home);
   writeWhole(file, `${JSON.stringify(stands.heldBy ? { ...pause, heldBy: stands.heldBy } : pause)}\n`);
   return pause;
 }
 
 /** Lifts the store's pause and answers the pause lifted. Refuses (`Missing`) a store no pause stands on. */
-export function resumePause(): Pause {
-  const pause = readPause();
+export function resumePause(home: string): Pause {
+  const pause = readPause(home);
   try {
-    fs.unlinkSync(pauseFile());
+    fs.unlinkSync(pauseFile(home));
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
     throw new Missing({ message: 'the store is not paused: there is nothing to resume (nemia pause puts one).' });
@@ -159,11 +173,11 @@ export function resumePause(): Pause {
  * from the file and the process table, never remembered. The file is unlinked only while it holds the text judged, so a pause put again
  * between the read and the lift — a person's `nemia resume` then `nemia pause` — stands.
  */
-export function liftLapsedPause(identify: (holder: PauseHolder) => Identity): { pause: Pause; heldBy: PauseHolder } | null {
-  const read = readPauseFile();
+export function liftLapsedPause(home: string, identify: (holder: PauseHolder) => Identity): { pause: Pause; heldBy: PauseHolder } | null {
+  const read = readPauseFile(home);
   if (read === null || read.heldBy === undefined) return null;
   if (!pauseLapsed(identify(read.heldBy))) return null;
-  const file = pauseFile();
+  const file = pauseFile(home);
   try {
     if (fs.readFileSync(file, 'utf8') !== read.text) return null;
     fs.unlinkSync(file);

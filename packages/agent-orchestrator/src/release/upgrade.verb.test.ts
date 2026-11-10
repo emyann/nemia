@@ -5,6 +5,7 @@
  * unit, signal and start are the test's, as `service.verb.test.ts`'s are, so no test starts a service or signals a process. `WF_ROOT` is
  * set before the import, since the pause's store reads it as it loads; the repository is the test place's.
  */
+import { rootNow } from '../../test/config-given.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -202,18 +203,18 @@ async function refusalOf(args: Args, host: ServiceHost, env?: NodeJS.ProcessEnv)
 }
 
 /** What is left under `releases/` beside the releases: no build folder, no hidden link. */
-const leftovers = (): string[] => fs.readdirSync(releasesDir()).filter((f) => f.startsWith('.') && f !== '.logs');
+const leftovers = (): string[] => fs.readdirSync(releasesDir(rootNow())).filter((f) => f.startsWith('.') && f !== '.logs');
 
 const V1 = tagged('v1', 'one');
 const V2 = tagged('v2', 'two');
 
 test('two tags: v1 built on its trial store, v2 switched in with the service on the pointer restarted, back to v1 beside a hand daemon', async (t) => {
   const s = story(t);
-  const pointer = path.join(releasesDir(), 'current');
+  const pointer = path.join(releasesDir(rootNow()), 'current');
   let first: { built: boolean; release: { builtAt: string } } | undefined;
 
   await s.test('v1 is exported, built and checked on a trial store, then pointed at by a relative link', async () => {
-    assert.equal(currentRelease(), null, 'no pointer yet');
+    assert.equal(currentRelease(rootNow()), null, 'no pointer yet');
     const home = '/home/me';
     const { WF_ROOT: _wf, ...person } = ENV;
     fs.rmSync(SEEN, { force: true });
@@ -227,19 +228,19 @@ test('two tags: v1 built on its trial store, v2 switched in with the service on 
     assert.equal(done.built, true);
     assert.match(done.lines.at(-1) ?? '', /no daemon ticks the store/);
     const seen = JSON.parse(fs.readFileSync(SEEN, 'utf8')) as Record<string, string | null>;
-    const building = `^${releasesDir().replaceAll('.', '\\.')}/\\.building-v1-\\d+/trial/`;
+    const building = `^${releasesDir(rootNow()).replaceAll('.', '\\.')}/\\.building-v1-\\d+/trial/`;
     assert.match(seen.WF_ROOT ?? '', new RegExp(`${building}workflows$`), 'WF_ROOT given though the person has none');
     assert.match(seen.AE_ROOT ?? '', new RegExp(`${building}engine$`), "the person's AE_ROOT replaced");
     assert.equal(seen.HKB_REPO, null, 'HKB_REPO taken out');
     assert.equal(fs.readlinkSync(pointer), 'v1', 'a relative link');
-    assert.equal(currentRelease()?.commit, V1);
-    assert.equal(currentRelease()?.dir, fs.realpathSync(releaseDir('v1')));
-    assert.equal(fs.readFileSync(path.join(releaseDir('v1'), 'marker.txt'), 'utf8'), 'one\n', "the tag's tree");
-    assert.equal(fs.readFileSync(path.join(releaseDir('v1'), 'built.txt'), 'utf8'), 'built', 'its build ran there');
-    assert.equal(fs.existsSync(path.join(releaseDir('v1'), '.git')), false, 'the export holds no repository');
-    assert.deepEqual(runningAt(releaseDir('v1')), {
+    assert.equal(currentRelease(rootNow())?.commit, V1);
+    assert.equal(currentRelease(rootNow())?.dir, fs.realpathSync(releaseDir('v1', rootNow())));
+    assert.equal(fs.readFileSync(path.join(releaseDir('v1', rootNow()), 'marker.txt'), 'utf8'), 'one\n', "the tag's tree");
+    assert.equal(fs.readFileSync(path.join(releaseDir('v1', rootNow()), 'built.txt'), 'utf8'), 'built', 'its build ran there');
+    assert.equal(fs.existsSync(path.join(releaseDir('v1', rootNow()), '.git')), false, 'the export holds no repository');
+    assert.deepEqual(runningAt(releaseDir('v1', rootNow())), {
       kind: 'install',
-      root: releaseDir('v1'),
+      root: releaseDir('v1', rootNow()),
       tag: 'v1',
       commit: V1,
       source: REPO,
@@ -264,21 +265,21 @@ test('two tags: v1 built on its trial store, v2 switched in with the service on 
       assert.equal(done.pid, NEW);
       assert.match(done.lines.at(-1) ?? '', new RegExp(`onto v2: the service ticks the store as pid ${NEW}`));
       assert.equal(fs.readlinkSync(pointer), 'v2');
-      assert.equal(currentRelease()?.commit, V2);
-      const names = fs.readdirSync(releasesDir()).filter((f) => !f.startsWith('.'));
+      assert.equal(currentRelease(rootNow())?.commit, V2);
+      const names = fs.readdirSync(releasesDir(rootNow())).filter((f) => !f.startsWith('.'));
       assert.deepEqual(names.sort(), ['current', 'v1', 'v2'], 'no link of its own left beside the pointer');
       fs.rmSync(UNIT, { force: true });
     },
   );
 
   await s.test('back to v1 without a rebuild, and a daemon started by hand named and never signalled', async () => {
-    const inode = fs.statSync(path.join(releaseDir('v1'), 'release.json')).ino;
+    const inode = fs.statSync(path.join(releaseDir('v1', rootNow()), 'release.json')).ino;
     const { host, events } = hostOf({ lease: lease(OLD), unitPid: null });
     const back = await run({ tag: 'v1', repo: REPO }, host);
     assert.equal(back.built, false);
     assert.match(back.lines[0], /without a rebuild/);
-    assert.equal(currentRelease()?.tag, 'v1');
-    assert.equal(fs.statSync(path.join(releaseDir('v1'), 'release.json')).ino, inode, 'not rebuilt');
+    assert.equal(currentRelease(rootNow())?.tag, 'v1');
+    assert.equal(fs.statSync(path.join(releaseDir('v1', rootNow()), 'release.json')).ino, inode, 'not rebuilt');
     assert.equal(back.release.builtAt, first?.release.builtAt);
     assert.deepEqual(events, [], 'nothing paused nor signalled');
     assert.equal(back.restart, 'hand');
@@ -296,7 +297,7 @@ test('two tags: v1 built on its trial store, v2 switched in with the service on 
     assert.equal(tag, 'Conflict');
     assert.ok(message.includes(`releases/v2 was built at ${V2.slice(0, 7)}`), message);
     assert.ok(message.includes(moved.slice(0, 7)), message);
-    assert.equal(currentRelease()?.commit, V1);
+    assert.equal(currentRelease(rootNow())?.commit, V1);
     stand().world.tag(REPO, 'v2', V2);
   });
 });
@@ -309,10 +310,10 @@ test('REFUSED: an upgrade that cannot build, check or restart changes what it sa
     assert.equal(tag, 'Invalid');
     assert.match(message, /npm run release:check exited 1/);
     const log = /read (\S+)\.$/.exec(message)?.[1] ?? '';
-    assert.ok(log.startsWith(path.join(releasesDir(), '.logs', 'v3-')) && fs.existsSync(log), log);
+    assert.ok(log.startsWith(path.join(releasesDir(rootNow()), '.logs', 'v3-')) && fs.existsSync(log), log);
     assert.match(fs.readFileSync(log, 'utf8'), /\$ npm ci[\s\S]*\$ npm run build[\s\S]*\$ npm run release:check/);
-    assert.equal(currentRelease()?.tag, 'v1');
-    assert.equal(fs.existsSync(releaseDir('v3')), false);
+    assert.equal(currentRelease(rootNow())?.tag, 'v1');
+    assert.equal(fs.existsSync(releaseDir('v3', rootNow())), false);
     assert.deepEqual(leftovers(), []);
   });
 
@@ -326,9 +327,9 @@ test('REFUSED: an upgrade that cannot build, check or restart changes what it sa
     assert.match(message, /npm run build exited 3/);
     assert.equal(fs.existsSync(SEEN), false, 'the check did not run');
     assert.deepEqual(events, []);
-    assert.equal(readPause(), null, 'no pause put');
-    assert.equal(currentRelease()?.tag, 'v1');
-    assert.equal(fs.existsSync(releaseDir('v4')), false);
+    assert.equal(readPause(rootNow()), null, 'no pause put');
+    assert.equal(currentRelease(rootNow())?.tag, 'v1');
+    assert.equal(fs.existsSync(releaseDir('v4', rootNow())), false);
     assert.deepEqual(leftovers(), []);
     fs.rmSync(UNIT, { force: true });
   });
@@ -338,7 +339,7 @@ test('REFUSED: an upgrade that cannot build, check or restart changes what it sa
     const { tag, message } = await refusalOf({ tag: 'v5', repo: REPO }, idle().host);
     assert.equal(tag, 'Invalid');
     assert.match(message, /has no release:check script/);
-    assert.equal(fs.existsSync(releaseDir('v5')), false);
+    assert.equal(fs.existsSync(releaseDir('v5', rootNow())), false);
   });
 
   await t.test('a tag the repository lacks is Missing, naming it', async () => {
@@ -401,7 +402,7 @@ test('an upgrade removes the releases no one needs: not the two newest, not one 
   const runOn = (args: Args) => runWith(e(), upgrade(args, idle().host, ENV));
   const installed = () =>
     fs
-      .readdirSync(releasesDir())
+      .readdirSync(releasesDir(rootNow()))
       .filter((f) => !f.startsWith('.') && f !== 'current')
       .sort();
   await run({ tag: 'v1', repo: REPO }, idle().host);
@@ -413,7 +414,7 @@ test('an upgrade removes the releases no one needs: not the two newest, not one 
   await s.test('v6 built after v1 and v2 removes v1, which is neither of the two newest nor run on', async () => {
     const done = await runOn({ tag: 'v6', repo: REPO });
     assert.deepEqual(done.removed, ['v1']);
-    assert.equal(fs.existsSync(releaseDir('v1')), false);
+    assert.equal(fs.existsSync(releaseDir('v1', rootNow())), false);
     assert.ok(
       done.lines.some((l) => /\bv1\b/.test(l) && l !== done.lines[0]),
       done.lines.join('\n'),
@@ -424,14 +425,14 @@ test('an upgrade removes the releases no one needs: not the two newest, not one 
   await s.test('a session at work on v2 keeps it when v7 makes it the oldest', async () => {
     const engineNow = e();
     await Effect.runPromise(engineNow.file({ id: 'on-v2', brief: 'b', cwd: '/r', harness: 'claude' }));
-    engine().settle('on-v2', 'working', { image: path.join(fs.realpathSync(releasesDir()), 'v2', 'packages', 'agent-runtime') });
+    engine().settle('on-v2', 'working', { image: path.join(fs.realpathSync(releasesDir(rootNow())), 'v2', 'packages', 'agent-runtime') });
     const done = await runWith(engineNow, upgrade({ tag: 'v7', repo: REPO }, idle().host, ENV));
     assert.deepEqual(done.removed, []);
     assert.deepEqual(installed(), ['v2', 'v6', 'v7']);
   });
 
   await s.test('a build under way in another upgrade holds every removal', async () => {
-    const building = path.join(releasesDir(), `.building-vx-${process.pid}`);
+    const building = path.join(releasesDir(rootNow()), `.building-vx-${process.pid}`);
     fs.mkdirSync(building);
     try {
       const done = await runOn({ tag: 'v8', repo: REPO });
@@ -454,9 +455,9 @@ test('an upgrade removes the releases no one needs: not the two newest, not one 
   await s.test(
     "a crashed upgrade's build folder is removed by the next upgrade, which says so, and only a log over 30 days old goes",
     async () => {
-      const crashed = path.join(releasesDir(), `.building-v9-${DEAD}`);
+      const crashed = path.join(releasesDir(rootNow()), `.building-v9-${DEAD}`);
       fs.mkdirSync(path.join(crashed, 'trial', 'engine'), { recursive: true });
-      const logs = path.join(releasesDir(), '.logs');
+      const logs = path.join(releasesDir(rootNow()), '.logs');
       const old = path.join(logs, 'v9-old.log');
       fs.writeFileSync(old, 'npm ci\n');
       const longAgo = (Date.now() - 31 * 24 * 60 * 60 * 1000) / 1000;

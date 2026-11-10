@@ -10,7 +10,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Result, Schema } from 'effect';
 import { CONFIG_FOLDERS } from 'agent-runtime/vocabulary';
-import { wfRoot } from '../config/config.store.ts';
 import { parseAgent } from '../agents/agents.ts';
 import { stepFrom } from '../workflow/index.ts';
 import type { Workflow } from '../step/step.ts';
@@ -20,23 +19,20 @@ import { Invalid, Missing } from '../refusal/refusal.ts';
 import { LEVELS, nemiaPrompt, type LevelFile, type ToldCustom } from './nemia.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
 
-/** The store she is kept in, read once as the package loads, as `subscription.store.ts` reads its `ROOT`. */
-const ROOT = wfRoot();
-
 /** Her folder in the store: her session's working folder. */
-export const nemiaDir = (): string => path.join(ROOT, 'nemia');
+export const nemiaDir = (home: string): string => path.join(home, 'nemia');
 
 /** Her memory: the facts she alone writes, one file each. */
-export const memoryDir = (): string => path.join(nemiaDir(), 'memory');
+export const memoryDir = (home: string): string => path.join(nemiaDir(home), 'memory');
 
 /** The person's level, written by `nemia level`. */
-export const levelFile = (): string => path.join(nemiaDir(), 'level.json');
+export const levelFile = (home: string): string => path.join(nemiaDir(home), 'level.json');
 
 /** The instruction her session is filed with: what is built in, then the person's custom words. */
-export const promptFile = (): string => path.join(nemiaDir(), 'prompt.md');
+export const promptFile = (home: string): string => path.join(nemiaDir(home), 'prompt.md');
 
 /** The keeper's record of the person's custom words her session was last filed or told with (`ToldCustom`). */
-export const toldFile = (): string => path.join(nemiaDir(), 'told.json');
+export const toldFile = (home: string): string => path.join(nemiaDir(home), 'told.json');
 
 /** What is built in with her: her definition, `nemia.md`, and her skills, `skills/`, a plugin folder. */
 export const SHIPPED_NEMIA = path.join(import.meta.dirname, '..', '..', 'nemia');
@@ -55,10 +51,10 @@ const LevelSchema = Schema.Struct({
  * The person's level, or undefined where they never set one. Refused (`Invalid`), naming the file and its first wrong field, where it
  * does not read as one.
  */
-export function readLevel(): LevelFile | undefined {
+export function readLevel(home: string): LevelFile | undefined {
   let text: string;
   try {
-    text = fs.readFileSync(levelFile(), 'utf8');
+    text = fs.readFileSync(levelFile(home), 'utf8');
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw err;
@@ -67,20 +63,20 @@ export function readLevel(): LevelFile | undefined {
   try {
     raw = JSON.parse(text);
   } catch {
-    throw new Invalid({ message: `${levelFile()} is not JSON: set the level again with nemia level manual.` });
+    throw new Invalid({ message: `${levelFile(home)} is not JSON: set the level again with nemia level manual.` });
   }
   const read = Schema.decodeUnknownResult(LevelSchema)(raw);
   if (Result.isSuccess(read)) return { ...read.success };
   const { path: at, words } = firstRefusal(raw, read.failure);
   throw new Invalid({
-    message: `${levelFile()}: ${at.length ? `its ${at.join('.')} ` : ''}${words}: set the level again with nemia level manual.`,
+    message: `${levelFile(home)}: ${at.length ? `its ${at.join('.')} ` : ''}${words}: set the level again with nemia level manual.`,
   });
 }
 
 /** Writes the person's level whole, through a hidden file renamed over it, so the keeper never reads half of it. */
-export function writeLevel(level: LevelFile): void {
-  fs.mkdirSync(nemiaDir(), { recursive: true });
-  writeWhole(levelFile(), `${JSON.stringify(level)}\n`);
+export function writeLevel(home: string, level: LevelFile): void {
+  fs.mkdirSync(nemiaDir(home), { recursive: true });
+  writeWhole(levelFile(home), `${JSON.stringify(level)}\n`);
 }
 
 /**
@@ -159,42 +155,45 @@ export function ownBin(root: string = PACKAGE): string | undefined {
  * of the custom words she was told (`toldFile`), the three files of her folder she does not own. Read at each filing, so a folder the
  * store gains is denied at the next.
  */
-export function storeDenies(root: string = ROOT): string[] {
+export function storeDenies(home: string): string[] {
   let names: string[];
   try {
-    names = fs.readdirSync(root).sort();
+    names = fs.readdirSync(home).sort();
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
     names = [];
   }
-  const own = path.basename(nemiaDir());
+  const own = path.basename(nemiaDir(home));
   return [
     ...names
       .filter((name) => name !== own && name !== POLICY_FOLDER)
-      .map((name) => path.join(root, name))
+      .map((name) => path.join(home, name))
       .map((at) => (fs.statSync(at, { throwIfNoEntry: false })?.isDirectory() ? `Edit(/${at}/**)` : `Edit(/${at})`)),
-    `Edit(/${path.join(root, POLICY_FOLDER)}/**)`,
-    `Edit(/${levelFile()})`,
-    `Edit(/${promptFile()})`,
-    `Edit(/${toldFile()})`,
-    `Edit(/${path.join(nemiaDir(), 'chat')}/**)`,
+    `Edit(/${path.join(home, POLICY_FOLDER)}/**)`,
+    `Edit(/${levelFile(home)})`,
+    `Edit(/${promptFile(home)})`,
+    `Edit(/${toldFile(home)})`,
+    `Edit(/${path.join(nemiaDir(home), 'chat')}/**)`,
   ];
 }
 
 /** Her chat as the chat's verbs and its delivery are given it: the task her session is filed under, if any, and her folder. */
-export const nemiaChatPlace = (): { task: string | undefined; dir: string } => ({ task: readLevel()?.task, dir: nemiaDir() });
+export const nemiaChatPlace = (home: string): { task: string | undefined; dir: string } => ({
+  task: readLevel(home)?.task,
+  dir: nemiaDir(home),
+});
 
 /** Writes `text` as the instruction her session is filed with (`promptFile`), and answers the file. */
-export function writePrompt(text: string): string {
-  fs.mkdirSync(nemiaDir(), { recursive: true });
-  fs.writeFileSync(promptFile(), text);
-  return promptFile();
+export function writePrompt(home: string, text: string): string {
+  fs.mkdirSync(nemiaDir(home), { recursive: true });
+  fs.writeFileSync(promptFile(home), text);
+  return promptFile(home);
 }
 
 /** Records `custom` as the words her session was last filed or told with (`toldFile`): none where undefined. */
-export function writeTold(custom: string | undefined): void {
-  fs.mkdirSync(nemiaDir(), { recursive: true });
-  fs.writeFileSync(toldFile(), `${JSON.stringify(custom === undefined ? {} : { words: custom })}\n`);
+export function writeTold(home: string, custom: string | undefined): void {
+  fs.mkdirSync(nemiaDir(home), { recursive: true });
+  fs.writeFileSync(toldFile(home), `${JSON.stringify(custom === undefined ? {} : { words: custom })}\n`);
 }
 
 /** The decoded record of the words she was last filed or told with: an object, with words, if any, as a string. */
@@ -204,10 +203,10 @@ const ToldSchema = Schema.Struct({ words: Schema.optionalKey(Schema.String) });
  * The custom words her session was last filed or told with (`toldFile`), or undefined where the keeper kept no record, or one that does
  * not read as one: a session filed before the keeper kept them, read off her instruction instead (`customChanged`).
  */
-export function readTold(): ToldCustom | undefined {
+export function readTold(home: string): ToldCustom | undefined {
   let text: string;
   try {
-    text = fs.readFileSync(toldFile(), 'utf8');
+    text = fs.readFileSync(toldFile(home), 'utf8');
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw err;
@@ -224,16 +223,16 @@ export function readTold(): ToldCustom | undefined {
  * Writes the instruction her session is filed with (`promptFile`): her builtin instruction, then the person's custom words for her,
  * `custom`, where there are any (read through the Agent door, `keep.verb.ts`), and records those words (`writeTold`). Answers the file.
  */
-export function composePrompt(body: string, custom: string | undefined): string {
-  const file = writePrompt(nemiaPrompt(body, custom));
-  writeTold(custom);
+export function composePrompt(home: string, body: string, custom: string | undefined): string {
+  const file = writePrompt(home, nemiaPrompt(body, custom));
+  writeTold(home, custom);
   return file;
 }
 
 /** The instruction her task was last filed or told with (`promptFile`), or undefined where none was ever written. */
-export function filedPrompt(): string | undefined {
+export function filedPrompt(home: string): string | undefined {
   try {
-    return fs.readFileSync(promptFile(), 'utf8');
+    return fs.readFileSync(promptFile(home), 'utf8');
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw err;
@@ -244,10 +243,10 @@ export function filedPrompt(): string | undefined {
 const FACT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 /** Her facts, by file name, in name order; none where she has written none. */
-export function listFacts(): string[] {
+export function listFacts(home: string): string[] {
   try {
     return fs
-      .readdirSync(memoryDir(), { withFileTypes: true })
+      .readdirSync(memoryDir(home), { withFileTypes: true })
       .filter((entry) => entry.isFile() && FACT.test(entry.name))
       .map((entry) => entry.name)
       .sort();
@@ -258,26 +257,26 @@ export function listFacts(): string[] {
 }
 
 /** One fact's words. Refused (`Missing`) where she keeps no fact by that name, naming the ones she keeps. */
-export function readFact(name: string): string {
-  if (!listFacts().includes(name)) {
-    const kept = listFacts();
+export function readFact(home: string, name: string): string {
+  if (!listFacts(home).includes(name)) {
+    const kept = listFacts(home);
     throw new Missing({
       message: `Nemia keeps no fact named ${name}: ${kept.length ? `she keeps ${kept.join(', ')}` : 'she keeps none yet'} (nemia memory lists them).`,
     });
   }
-  return fs.readFileSync(path.join(memoryDir(), name), 'utf8');
+  return fs.readFileSync(path.join(memoryDir(home), name), 'utf8');
 }
 
 /**
  * The allow rules a person gave her session at a prompt ("don't ask again"), written in her folder's local settings: what widens her
  * level beyond what is built in. None where the file is not there or holds none.
  */
-export function promptAllows(): string[] {
+export function promptAllows(home: string): string[] {
   let raw: unknown;
   try {
     const [folder] = CONFIG_FOLDERS;
     if (folder === undefined) return [];
-    raw = JSON.parse(fs.readFileSync(path.join(nemiaDir(), folder, 'settings.local.json'), 'utf8'));
+    raw = JSON.parse(fs.readFileSync(path.join(nemiaDir(home), folder, 'settings.local.json'), 'utf8'));
   } catch {
     return [];
   }

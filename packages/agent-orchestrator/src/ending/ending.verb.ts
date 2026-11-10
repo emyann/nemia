@@ -3,6 +3,7 @@
  * and the merge an ending staged there, committed or aborted on its check (`landEnding`). A controller, reaching the runtime through the
  * client (`runtime-client.ts`).
  */
+import type { Settings } from '../config/config.store.ts';
 import path from 'node:path';
 import { endsOnBase } from '../step/step.ts';
 import { Effect } from 'effect';
@@ -53,7 +54,7 @@ const inFlightPhase = (phase: TaskPhase): boolean => phase === 'pending' || phas
  *   once for the pass, and only where another run's claim waits on a slot, since this run's own claim reads the slot the pass gave it; and
  *   each run another waits on is read once for the pass. Else where the branches stand, as the caller reads it (`PassStanding`): the store
  *   is listed, and that read, only past the run's own asks, and the cap read only where a claim waits on a slot.
- * @param env Where the cap on runs in flight is read before any pass has written one (`runSlots`): the process's, or the api's own.
+ * @param config Where the cap on runs in flight is read before any pass has written one (`runSlots`): the program's `StoreConfig`.
  * @param memo The reading of the places (`StatusMemo`), shared with the pass's `landEnding`, so a checkout is read once a run.
  * @param phaseOf The phase of this run's tasks as the caller read them on this pass (`advancePass`'s): an ending in flight there is in the
  *   checkout already, so nothing holds it and no task is viewed again — a long-lived `workspace: base` step, filed and never landed, claims
@@ -64,7 +65,7 @@ export const checkoutHold = (
   run: Run,
   steps: readonly Workflow[],
   from: { read: PassRead; slot: RunSlot | undefined } | { standing: Effect.Effect<PassStanding, Refusal> },
-  env: NodeJS.ProcessEnv,
+  config: Settings,
   memo: StatusMemo,
   phaseOf?: (taskId: string) => TaskPhase,
 ) => {
@@ -73,7 +74,7 @@ export const checkoutHold = (
     return Effect.succeed(undefined);
   const taskId = run.steps[ending.name]?.taskId;
   if (taskId && phaseOf && inFlightPhase(phaseOf(taskId))) return Effect.succeed(undefined);
-  return claimsRead(e, run, from, env, memo);
+  return claimsRead(e, run, from, config, memo);
 };
 
 /** The claims on the run's repository's checkout, read once the run's ending claims it (`checkoutHold`). */
@@ -81,11 +82,11 @@ const claimsRead = Effect.fn('checkoutHold')(function* (
   e: Engine,
   run: Run,
   from: { read: PassRead; slot: RunSlot | undefined } | { standing: Effect.Effect<PassStanding, Refusal> },
-  env: NodeJS.ProcessEnv,
+  config: Settings,
   memo: StatusMemo,
 ) {
   const read =
-    'read' in from ? from.read : passRead(e, yield* (yield* RunDoor).runs.list(), env, yield* from.standing, yield* passRevisions());
+    'read' in from ? from.read : passRead(e, yield* (yield* RunDoor).runs.list(), config, yield* from.standing, yield* passRevisions());
   const slotOf = (id: string) => read.slots.pipe(Effect.map((slots) => slots.get(id)));
   const mine = yield* mainClaim(e, run, 'read' in from ? Effect.succeed(from.slot) : slotOf(run.id), read.parents, memo);
   if (!mine || mine.holds) return undefined;

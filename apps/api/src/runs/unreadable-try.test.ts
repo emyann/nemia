@@ -118,7 +118,7 @@ writeRun('r-try', {
 });
 
 writeRun('r-child', {}, { after: ['r-check'] });
-await runWith(engine(), passStanding(runStore.runs.list()));
+await runWith(engine(process.env), passStanding(runStore.runs.list()));
 
 /** Why the RunList leaves each run unjudged (its `unjudged` entry's `error`), by name, and the names of the runs it judges. */
 const listed = async () => {

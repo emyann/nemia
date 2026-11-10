@@ -8,6 +8,8 @@
  *
  * `WF_ROOT` is set before the package is imported; `WF_MAX_RUNS` is set by each test, and no pass has written a cap.
  */
+import { configGiven, rootNow } from './config-given.ts';
+import { settingsOf } from '../src/config/config.store.ts';
 import { test } from 'node:test';
 import { Effect } from 'effect';
 import assert from 'node:assert/strict';
@@ -129,7 +131,7 @@ test('`slotsOf` and `runSlots`: what the cap counts and holds between passes, of
     async () => {
       process.env.WF_MAX_RUNS = '2';
       calls.list = calls.view = 0;
-      const slots = await runWith(e, slotsOf(e, RUNS(), process.env, noParents()));
+      const slots = await runWith(e, slotsOf(e, RUNS(), settingsOf(process.env), noParents()));
       assert.deepEqual(
         { ...slots, held: [...slots.held] },
         {
@@ -143,7 +145,7 @@ test('`slotsOf` and `runSlots`: what the cap counts and holds between passes, of
       );
       assert.deepEqual(calls, { list: 1, view: 0 }, 'one look at the harnesses for the whole store, and no task viewed again');
       assert.deepEqual(
-        [...(await runWith(e, runSlots(e, RUNS(), process.env, noParents())))],
+        [...(await runWith(e, runSlots(e, RUNS(), settingsOf(process.env), noParents())))],
         [...slots.held],
         'runSlots answers slotsOf’s held runs',
       );
@@ -153,7 +155,11 @@ test('`slotsOf` and `runSlots`: what the cap counts and holds between passes, of
   await t.test('with no cap slotsOf reads nothing, and runSlots reads nothing on a store with no run waiting to start', async () => {
     process.env.WF_MAX_RUNS = '0';
     calls.list = calls.view = 0;
-    assert.deepEqual(await runWith(e, slotsOf(e, RUNS(), process.env, noParents())), { cap: 0, inFlight: null, held: new Map() });
+    assert.deepEqual(await runWith(e, slotsOf(e, RUNS(), settingsOf(process.env), noParents())), {
+      cap: 0,
+      inFlight: null,
+      held: new Map(),
+    });
     process.env.WF_MAX_RUNS = '2';
     assert.deepEqual(
       [
@@ -162,7 +168,7 @@ test('`slotsOf` and `runSlots`: what the cap counts and holds between passes, of
           runSlots(
             e,
             RUNS().filter((r) => Object.keys(r.steps).length),
-            process.env,
+            settingsOf(process.env),
             noParents(),
           ),
         )),
@@ -200,9 +206,14 @@ test('`slotsRead` through an informer: a run it serves ended at rest is left out
     process.env.WF_VERIFY_REST = '0';
     const memo = await filledInformer();
     assert.equal(memo.runs.get('r-done')?.value.judged.status, 'succeeded', 'the informer serves r-done as ended');
-    const plain = await runWith(e, slotsRead(process.env));
+    const plain = await runWith(e, slotsRead().pipe(Effect.provide(configGiven(rootNow(), process.env))));
     listedTasks.length = 0;
-    const informed = await runWith(e, slotsRead(process.env).pipe(Effect.provideService(Informer, memo)));
+    const informed = await runWith(
+      e,
+      slotsRead()
+        .pipe(Effect.provide(configGiven(rootNow(), process.env)))
+        .pipe(Effect.provideService(Informer, memo)),
+    );
     assert.deepEqual(listedTasks.length, 1, 'one look at the harnesses');
     assert.ok(listedTasks[0]?.includes('r-a-implement'), 'a run still open is listed');
     assert.ok(!listedTasks[0]?.some((id) => id.startsWith('r-done-')), 'no task of the ended run is listed');
@@ -217,11 +228,19 @@ test('`slotsRead` through an informer: a run it serves ended at rest is left out
       assert.ok(entry, 'the informer keeps r-a');
       entry.value = { ...entry.value, judged: { ...entry.value.judged, status: 'succeeded', moving: false } };
       entry.atRest = true;
-      await assert.rejects(runWith(e, slotsRead(process.env).pipe(Effect.provideService(Informer, memo))), (err: unknown) => {
-        assert.ok(err instanceof Error);
-        assert.match(err.message, /\br-a\b/);
-        return true;
-      });
+      await assert.rejects(
+        runWith(
+          e,
+          slotsRead()
+            .pipe(Effect.provide(configGiven(rootNow(), process.env)))
+            .pipe(Effect.provideService(Informer, memo)),
+        ),
+        (err: unknown) => {
+          assert.ok(err instanceof Error);
+          assert.match(err.message, /\br-a\b/);
+          return true;
+        },
+      );
     } finally {
       delete process.env.WF_VERIFY_REST;
     }

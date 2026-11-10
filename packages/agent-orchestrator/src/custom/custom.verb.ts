@@ -1,7 +1,7 @@
 /**
  * `nemia agents custom`, an entry of the command table: a person's custom instructions for one agent, read, written and cleared. The api
  * calls its handler by type (`CustomInput`) for an agent's `…/agents/<name>/instructions` and Nemia's own; each through the Agent door's
- * `custom` (`AgentDoor`, run `rooted` at the store's root its handler is given).
+ * `custom` (`AgentDoor`, run at the store's root (`StoreRoot`) its handler is given).
  */
 import { Effect, Schema } from 'effect';
 import { leftOut, type Flag, type Spec } from '../command/command.ts';
@@ -10,7 +10,6 @@ import { customInstructionsFile } from '../agents/read.store.ts';
 import { isStoreAgent } from './custom.store.ts';
 import { AgentDoor } from '../agents/agent-door.store.ts';
 import { AgentName } from '../agents/agents.model.ts';
-import { rooted } from '../factory/wiring/wire.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 
 /** The refusal of a value flag of `nemia agents custom` given twice. */
@@ -97,20 +96,16 @@ export const AGENTS_CUSTOM: Command<Read | Cleared, CustomInput> = {
     why: "the api serves it as the Agent's `instructions`, `putInstructions` and `deleteInstructions` verbs of `objects`' Api (`/api/namespaces/:namespace/agents/:name/instructions`) and Nemia's at `/api/nemia/instructions`, each calling this entry's handler: no route of its own",
   },
   input: CustomInput,
-  handler: ({ name, repo = '.', clear, words }, _env, home) =>
-    rooted(
-      home,
-      'nemia agents custom',
-      Effect.gen(function* () {
-        const root = yield* StoreRoot;
-        const file = customInstructionsFile(root, name);
-        const door = (yield* AgentDoor).custom;
-        const agent = AgentName.read(name);
-        if (clear === true) return { name, file, removed: yield* door.clear(agent, repo) };
-        if (words !== undefined) yield* door.write(agent, words, repo);
-        return { name, file, words: (yield* door.read(agent, repo)) ?? null, error: null };
-      }),
-    ),
+  handler: ({ name, repo = '.', clear, words }) =>
+    Effect.gen(function* () {
+      const root = yield* StoreRoot;
+      const file = customInstructionsFile(root, name);
+      const door = (yield* AgentDoor).custom;
+      const agent = AgentName.read(name);
+      if (clear === true) return { name, file, removed: yield* door.clear(agent, repo) };
+      if (words !== undefined) yield* door.write(agent, words, repo);
+      return { name, file, words: (yield* door.read(agent, repo)) ?? null, error: null };
+    }),
   print(data, args) {
     const name = data.name;
     const hers = isStoreAgent(name);

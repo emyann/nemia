@@ -18,10 +18,13 @@ import { scratch } from 'test-kit/scratch';
 import { TEAM } from './team.ts';
 import { names } from './assessed.ts';
 import { staged, story } from './story.ts';
+import { Effect } from 'effect';
+import { settingsOf, StoreConfig } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-skill-life-');
 process.env.WF_ROOT = ROOT;
-const { addFactory, isRefusal, runWith: runEngine } = await import('../src/runner.ts');
+const { isRefusal, runWith: runEngine } = await import('../src/runner.ts');
+const { addFactory } = await import('../testing.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');
 const { SKILLS_LIST, SKILLS_READ, SKILLS_WRITE } = await import('../src/skills/skills.verb.ts');
@@ -100,7 +103,7 @@ test("a library skill's life: written as Nemia ships one, given, switched, mende
   await s.test(
     "a skill written from the board's form is written as Nemia ships its own, and read back by the card reader and YAML",
     async () => {
-      const made = await stage.runWith(e, SKILLS_WRITE.handler({ from: 'yours', change: DRAFT }, undefined, ROOT));
+      const made = await stage.runWith(e, SKILLS_WRITE.handler({ from: 'yours', change: DRAFT }));
       assert.ok('version' in made, JSON.stringify(made));
       version = made.version;
       const text = read('tidy-notes');
@@ -132,14 +135,19 @@ test("a library skill's life: written as Nemia ships one, given, switched, mende
   await s.test(
     'it reads back for its page and in the list, at the version its write answered; a read given no root is refused',
     async () => {
-      const page = await stage.runWith(e, SKILLS_READ.handler({ name: 'tidy-notes', dir }, undefined, ROOT));
+      const page = await stage.runWith(e, SKILLS_READ.handler({ name: 'tidy-notes', dir }));
       assert.equal(page.version, version);
       assert.match(page.text, /one fact a line\./);
       assert.equal(page.entry?.id, 'tidy-notes');
-      const listed = await stage.runWith(e, SKILLS_LIST.handler({ skills: [dir] }, undefined, ROOT));
+      const listed = await stage.runWith(e, SKILLS_LIST.handler({ skills: [dir] }));
       assert.deepEqual(Object.keys(listed), [dir]);
       assert.equal(listed[dir]?.entry?.id, 'tidy-notes');
-      await assert.rejects(stage.runWith(e, SKILLS_LIST.handler({ skills: [dir] })), (err: { _tag?: string }) => err._tag === 'Invalid');
+      const unrooted = SKILLS_LIST.handler({ skills: [dir] }).pipe(
+        Effect.provide(stage.place().layer),
+        Effect.provide(StoreConfig.layer(settingsOf(process.env))),
+      );
+      // @ts-expect-error -- a read that asks the store root is given none
+      await assert.rejects(runEngine(e, unrooted), (err: { _tag?: string }) => err._tag === 'Invalid');
     },
   );
 
@@ -193,7 +201,7 @@ test("a library skill's life: written as Nemia ships one, given, switched, mende
   await s.test(
     "a skill of another place is copied whole into the library, byte for byte, and the store's agents are given it",
     async () => {
-      const made = await stage.runWith(e, SKILLS_WRITE.handler({ from: 'yours', copy: copied, builtin: SHIPPED }, undefined, ROOT));
+      const made = await stage.runWith(e, SKILLS_WRITE.handler({ from: 'yours', copy: copied, builtin: SHIPPED }));
       assert.deepEqual(made, { dir: path.join(LIBRARY, copied), name: copied, written: ['SKILL.md'] });
       assert.deepEqual(snapshot(path.join(LIBRARY, copied)), snapshot(path.join(SHIPPED, copied)), 'byte for byte');
       assert.equal(skillsFor(path.join(ROOT, 'workflows', '_'), { home: ROOT }).at.get(copied), path.join(LIBRARY, copied));
@@ -208,14 +216,11 @@ test("a library skill's life: written as Nemia ships one, given, switched, mende
 
   await s.test('REFUSED: a copy over a skill the library has, naming the folder, and nothing written', async () => {
     const before = snapshot(LIBRARY);
-    await assert.rejects(
-      stage.runWith(e, SKILLS_WRITE.handler({ from: 'yours', copy: copied, builtin: SHIPPED }, undefined, ROOT)),
-      (err: unknown) => {
-        assert.ok(isRefusal(err), String(err));
-        names(err.message, `skills/${copied}`, LIBRARY);
-        return true;
-      },
-    );
+    await assert.rejects(stage.runWith(e, SKILLS_WRITE.handler({ from: 'yours', copy: copied, builtin: SHIPPED })), (err: unknown) => {
+      assert.ok(isRefusal(err), String(err));
+      names(err.message, `skills/${copied}`, LIBRARY);
+      return true;
+    });
     assert.deepEqual(snapshot(LIBRARY), before);
   });
 

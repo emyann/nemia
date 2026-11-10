@@ -11,6 +11,7 @@
  * The place is the stand-in (`testPlace`): the subject is the ledger and the pin, not git, and the steps work in the checkout itself. Each
  * team is given a folder, an agent and a skill named for itself, so no test's edit of a kind moves another's number.
  */
+import { rootNow } from './config-given.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -26,16 +27,8 @@ const ROOT = scratch('wf-revisions-');
 process.env.WF_ROOT = ROOT;
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const {
-  addFactory,
-  advanceRun,
-  approveRun,
-  attachWorkflow,
-  driftNow,
-  startRun,
-  retryRun,
-  runWith: runEngine,
-} = await import('../src/runner.ts');
+const { advanceRun, approveRun, driftNow, startRun, retryRun, runWith: runEngine } = await import('../src/runner.ts');
+const { addFactory, attachWorkflow } = await import('../testing.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');
 const stage = staged({ runWith: runEngine, main, engineOf });
@@ -204,7 +197,7 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
         1,
         "the run records the revision of its factory's rules, beside the rest",
       );
-      assert.equal(ledgerOf('rules', factory).length, 1, 'and the ledger of the kind holds the one content it was given');
+      assert.equal(ledgerOf(rootNow(), 'rules', factory).length, 1, 'and the ledger of the kind holds the one content it was given');
 
       writeRules({ name: factory }, 'Never push on a Friday, nor on a Monday.');
       const b = board();
@@ -216,7 +209,7 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
         'the rules edited while the run waits are pinned at their new revision',
       );
       assert.deepEqual(
-        ledgerOf('rules', factory).map((r) => r.n),
+        ledgerOf(rootNow(), 'rules', factory).map((r) => r.n),
         [1, 2],
         'which the ledger numbered as it numbers any other kind',
       );
@@ -239,7 +232,7 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
       assert.deepEqual(runRecord(run.id).pinned, pinned, 'the pins are the ones it filed on');
       assert.doesNotMatch(promptOf(run.id, 'build'), /Something else/, 'and the prompt is the one it was rendered with');
       assert.deepEqual(
-        ledgerOf('agent', t.agent).map((r) => r.n),
+        ledgerOf(rootNow(), 'agent', t.agent).map((r) => r.n),
         [1],
         'and nothing of the edit is numbered on its account: a filed run nobody asked appends nothing to the ledger',
       );
@@ -280,13 +273,13 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
       const b = board();
       await runWith(b.e, advanceRun(runRecord(run.id)));
       b.settle(`${run.id}-build`, 'failed');
-      const ledger = ledgerOf('agent', t.agent).length;
+      const ledger = ledgerOf(rootNow(), 'agent', t.agent).length;
       assert.equal(
         rooted(followPass(runRecord(run.id), new Date().toISOString(), true)).wrote,
         false,
         'a filing due with no edit re-pins nothing',
       );
-      assert.equal(ledgerOf('agent', t.agent).length, ledger, 'and numbers nothing new');
+      assert.equal(ledgerOf(rootNow(), 'agent', t.agent).length, ledger, 'and numbers nothing new');
 
       fs.writeFileSync(t.agentFile, `---\nskills: ${t.skill}\n---\nYou follow the files.\n`);
       fs.writeFileSync(path.join(t.dir, 'extra.md'), `---\nplace: git\nagent: ${t.agent}\n---\nA step added since.\n`);
@@ -340,17 +333,17 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
     const b = board();
     await runWith(b.e, advanceRun(runRecord(run.id)));
     assert.deepEqual(
-      ledgerOf('agent', t.agent).map((r) => r.n),
+      ledgerOf(rootNow(), 'agent', t.agent).map((r) => r.n),
       [1],
       'resolved at the start and again on the pass, with no edit, the ledger holds one entry',
     );
-    assert.match(ledgerOf('agent', t.agent)[0].at, /^\d{4}-\d{2}-\d{2}T/, 'and says when it was first seen');
+    assert.match(ledgerOf(rootNow(), 'agent', t.agent)[0].at, /^\d{4}-\d{2}-\d{2}T/, 'and says when it was first seen');
 
     const first = fs.readFileSync(t.agentFile, 'utf8');
     fs.writeFileSync(t.agentFile, `---\nskills: ${t.skill}\n---\nYou build it differently.\n`);
     await runPlaced(refreshRun(run.id));
     assert.deepEqual(
-      ledgerOf('agent', t.agent).map((r) => r.n),
+      ledgerOf(rootNow(), 'agent', t.agent).map((r) => r.n),
       [1, 2],
       'the edit takes the next number',
     );
@@ -358,7 +351,7 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
     fs.writeFileSync(t.agentFile, first);
     const again = await started(t.dir, aRepo());
     assert.deepEqual(
-      ledgerOf('agent', t.agent).map((r) => r.n),
+      ledgerOf(rootNow(), 'agent', t.agent).map((r) => r.n),
       [1, 2],
       'and the content back as it was takes no third number',
     );
@@ -562,7 +555,7 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
         fs.writeFileSync(on.agentFile, `---\nskills: ${on.skill}\n---\nAn edit someone took back.\n`);
         await started(on.dir, aRepo());
         assert.deepEqual(
-          ledgerOf('agent', on.agent).map((r) => r.n),
+          ledgerOf(rootNow(), 'agent', on.agent).map((r) => r.n),
           [1, 2],
           'another start numbered the edit',
         );
@@ -585,9 +578,13 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
         const on = team();
         const run = await filed(on);
         fs.writeFileSync(on.agentFile, `---\nskills: ${on.skill}\n---\nNever resolved.\n`);
-        const before = [ledgerOf('agent', on.agent), ledgerOf('workflow', on.name)];
+        const before = [ledgerOf(rootNow(), 'agent', on.agent), ledgerOf(rootNow(), 'workflow', on.name)];
         assert.deepEqual(agentDrift(run, on.agent), [{ kind: 'agent', name: on.agent, pinned: 1, now: 2 }]);
-        assert.deepEqual([ledgerOf('agent', on.agent), ledgerOf('workflow', on.name)], before, 'nothing was appended');
+        assert.deepEqual(
+          [ledgerOf(rootNow(), 'agent', on.agent), ledgerOf(rootNow(), 'workflow', on.name)],
+          before,
+          'nothing was appended',
+        );
       });
     },
   );

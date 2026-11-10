@@ -22,7 +22,7 @@ const ROOT = scratch('wf-trust-');
 process.env.WF_ROOT = ROOT;
 const { main: cli } = await import('../cli/main.ts');
 const { engineOf } = await import('../runtime-client.ts');
-const { readFactories } = await import('../factory/factory.store.ts');
+const { readFactories } = await import('../../testing.ts');
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
 heldUnasked(engine);

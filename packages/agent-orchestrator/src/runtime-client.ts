@@ -37,8 +37,7 @@ import {
   type EngineShape,
 } from 'agent-runtime';
 import { envNameOf, readRemoteAgents, remoteAgentsFile } from './harness/a2a.store.ts';
-import { HOME } from './record/record.store.ts';
-import { cgroupParent, maxConcurrent, memoryLimit } from './config/config.store.ts';
+import { type Env, type Settings, settingsOf, wfRoot } from './config/config.store.ts';
 import { pauseFile } from './pause/pause.store.ts';
 import { servesOnStore } from './daemon/daemon.store.ts';
 import { declarationOf, HARNESSES as STEP_HARNESSES, REMOTE_PREFIX, remoteNameOf } from './harness/harness.ts';
@@ -208,29 +207,31 @@ export const quotaHarnesses = (): string[] => Object.keys(HARNESSES).filter((nam
  * `1` (`sessionTelemetryOf`). Any other value is said on stderr and leaves them off (`toolDetailsRefusalOf`), as an export interval that
  * is no number is (`exportIntervalRefusalOf`).
  */
-export const engine = (): Engine => {
-  const read = readRemote();
+export const engine = (env: Env): Engine => {
+  const root = wfRoot(env);
+  const config = settingsOf(env);
+  const read = readRemote(root);
   const remote = Object.fromEntries([...read.agents].map(([name, agent]) => [`${REMOTE_PREFIX}${name}`, agent]));
   for (const why of refusalsOf(read)) console.error(`nemia: ${why} ${LEFT_OUT}`);
   const harnesses = { ...HARNESSES, ...remote };
-  for (const why of [toolDetailsRefusalOf(process.env), exportIntervalRefusalOf(process.env)]) if (why) console.error(`nemia: ${why}`);
-  const telemetry = sessionTelemetryOf(process.env);
+  for (const why of [toolDetailsRefusalOf(env), exportIntervalRefusalOf(env)]) if (why) console.error(`nemia: ${why}`);
+  const telemetry = sessionTelemetryOf(env);
   return engineOf(
     RuntimeEngine.layer({
-      root: engineRoot(),
+      root: engineRoot(root),
       harnesses,
       holder: holderOption(),
-      credentials,
+      credentials: credentialsAt(root),
       missingCredential,
-      ...storeAdmission(),
-      ...storeLimits(),
+      ...storeAdmission(root, config),
+      ...storeLimits(config),
       ...(telemetry ? { telemetry } : {}),
     }),
   );
 };
 
 /** Where the runtime keeps its own store, under this store's `WF_ROOT`: the one root every process on this store shares. */
-const engineRoot = (): string => path.join(HOME, 'engine');
+const engineRoot = (root: string): string => path.join(root, 'engine');
 
 /**
  * The engines holding the sessions this one only reads, as the runtime takes them: one entry per harness a holder can hold
@@ -325,15 +326,15 @@ export const awaited = <A>(read: () => Promise<A>): Effect.Effect<A, Refusal> =>
  * the runtime's pass before it admits, true while the store's pause's file is there (`pauseFile`), whatever it holds, as `readPause`
  * reads a file that is there as a pause.
  */
-export const storeAdmission = (): { maxConcurrent?: number; unschedulable: () => boolean } => ({
-  unschedulable: () => fs.existsSync(pauseFile()),
-  ...ceilingOf(),
+export const storeAdmission = (root: string, config: Settings): { maxConcurrent?: number; unschedulable: () => boolean } => ({
+  unschedulable: () => fs.existsSync(pauseFile(root)),
+  ...ceilingOf(config),
 });
 
 /** The engine's ceiling, `WF_MAX_CONCURRENT`'s sessions per pool, or none when the variable is refused (`maxConcurrent`). */
-const ceilingOf = (): { maxConcurrent?: number } => {
+const ceilingOf = (config: Settings): { maxConcurrent?: number } => {
   try {
-    return { maxConcurrent: maxConcurrent() };
+    return { maxConcurrent: config.maxConcurrent };
   } catch (err) {
     if (isRefusal(err)) return {};
     throw err;
@@ -345,10 +346,10 @@ const ceilingOf = (): { maxConcurrent?: number } => {
  * (`defaultLimits`), and `WF_CGROUP_PARENT` as the slice each limited task's scope is made in (`cgroupParent`); neither when unset, and
  * neither when either is refused, as `ceilingOf` gives no ceiling.
  */
-export const storeLimits = (): { defaultLimits?: { memory: string }; cgroupParent?: string } => {
+export const storeLimits = (config: Settings): { defaultLimits?: { memory: string }; cgroupParent?: string } => {
   try {
-    const memory = memoryLimit();
-    const parent = cgroupParent();
+    const memory = config.memoryLimit;
+    const parent = config.cgroupParent;
     return { ...(memory === undefined ? {} : { defaultLimits: { memory } }), ...(parent === undefined ? {} : { cgroupParent: parent }) };
   } catch (err) {
     if (isRefusal(err)) return {};
@@ -368,8 +369,8 @@ const LEFT_OUT =
  */
 export type RemoteRead = { agents: ReadonlyMap<string, RemoteAgent>; refused: ReadonlyMap<string, string>; unread?: string };
 
-export function readRemote(): RemoteRead {
-  const file = remoteAgentsFile(HOME);
+export function readRemote(root: string): RemoteRead {
+  const file = remoteAgentsFile(root);
   let entries: ReturnType<typeof readRemoteAgents>;
   try {
     entries = readRemoteAgents(file);
@@ -394,8 +395,8 @@ export const refusalsOf = (read: RemoteRead): string[] => (read.unread ? [read.u
  * and reads a run's address off. An entry the runtime refuses is not among them; a file refused as it stands is refused, exit code 2, in
  * its words.
  */
-export function remoteAgents(): ReadonlyMap<string, RemoteAgent> {
-  const read = readRemote();
+export function remoteAgents(root: string): ReadonlyMap<string, RemoteAgent> {
+  const read = readRemote(root);
   if (read.unread) throw new Invalid({ message: read.unread });
   return read.agents;
 }
@@ -413,11 +414,13 @@ export function remoteAgents(): ReadonlyMap<string, RemoteAgent> {
  * to whatever agent the engine was configured with for that harness — which is the card off the lease, written by the process that
  * holds it. A later slice that lets a card come from elsewhere makes this branch read the url.
  */
-export const credentials: Credentials = (scheme, _agentUrl, harness) => {
-  if (scheme === BEARER && servesOnStore()?.[harness] !== undefined) return holderTokenOf(engineRoot());
-  const name = remoteNameOf(harness);
-  return name === undefined ? undefined : process.env[envNameOf(name, scheme)] || undefined;
-};
+export const credentialsAt =
+  (root: string): Credentials =>
+  (scheme, _agentUrl, harness) => {
+    if (scheme === BEARER && servesOnStore()?.[harness] !== undefined) return holderTokenOf(engineRoot(root));
+    const name = remoteNameOf(harness);
+    return name === undefined ? undefined : process.env[envNameOf(name, scheme)] || undefined;
+  };
 
 /** What a spawn refused for a secret not given says to do: set the variable, where the run's processes read it. */
 export const missingCredential: MissingCredential = (scheme, _agentUrl, harness) => {

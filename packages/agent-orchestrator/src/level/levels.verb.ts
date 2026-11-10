@@ -6,6 +6,7 @@
  * A controller beneath the CLI: it joins the factory's level store with the store's (`nemia/level.store.ts`), which no store file imports.
  */
 import { Effect } from 'effect';
+import { StoreRoot } from '../config/root.store.ts';
 import { tried } from '../runtime-client.ts';
 import type { Refusal } from '../refusal/refusal.ts';
 import { FactoryDoor, type FactoryDoorShape } from '../factory/door/factories.store.ts';
@@ -36,19 +37,20 @@ const fileOrManual = (door: FactoryDoorShape, name: string): Effect.Effect<Facto
   );
 
 /** The store's own level: what `nemia level <level>` set, `manual` where it never was. */
-const storeLevel = (): Level => readLevel()?.level ?? 'manual';
+const storeLevel = (home: string): Level => readLevel(home)?.level ?? 'manual';
 
 /** The levels of the factories `names` at `at` (ms), each its own file over the store's level, read through the door. */
-const rowsOf = (door: FactoryDoorShape, names: readonly string[], at: number): Effect.Effect<FactoryLevel[], Refusal> =>
+const rowsOf = (door: FactoryDoorShape, names: readonly string[], at: number): Effect.Effect<FactoryLevel[], Refusal, StoreRoot> =>
   Effect.gen(function* () {
-    const store = yield* tried(storeLevel);
+    const home = yield* StoreRoot;
+    const store = yield* tried(() => storeLevel(home));
     const rows: FactoryLevel[] = [];
     for (const name of names) rows.push(factoryLevelOf(name, yield* fileOrManual(door, name), store, at));
     return rows;
   });
 
 /** Every factory's level at `at`, the default factory first, then each factory of the store that reads, by name. */
-export const levelsNow = (at: number = Date.now()): Effect.Effect<FactoryLevel[], Refusal> =>
+export const levelsNow = (at: number = Date.now()): Effect.Effect<FactoryLevel[], Refusal, StoreRoot> =>
   Effect.gen(function* () {
     const door = yield* FactoryDoor;
     const unread = new Set((yield* door.factories.listed()).flatMap((l) => ('error' in l ? [l.name] : [])));
@@ -60,10 +62,10 @@ export const levelsNow = (at: number = Date.now()): Effect.Effect<FactoryLevel[]
   });
 
 /** The level at `at` of the factory `name`, the default factory where none is named. */
-export const levelOfFactory = (name: string | undefined, at: number = Date.now()): Effect.Effect<Level, Refusal> =>
+export const levelOfFactory = (name: string | undefined, at: number = Date.now()): Effect.Effect<Level, Refusal, StoreRoot> =>
   Effect.gen(function* () {
     const [row] = yield* rowsOf(yield* FactoryDoor, [runNamespace(name)], at);
-    return row?.level ?? storeLevel();
+    return row?.level ?? storeLevel(yield* StoreRoot);
   });
 
 /** The factory the run `runId` was started in, frozen on its record: the default factory where it names none. Refused: no such run. */

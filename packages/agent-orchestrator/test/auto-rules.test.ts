@@ -12,6 +12,7 @@
  * `src/auto/auto.test.ts`; the facts it reads, `src/auto/facts.test.ts`. `WF_ROOT` is set before `src` is imported, which reads it as
  * it loads.
  */
+import { rootNow, storeGiven } from './config-given.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -28,7 +29,7 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 const { ADMIT, admitted } = await import('../src/admission/admit.verb.ts');
 const { TABLE } = await import('../src/command/commands.verb.ts');
-const { addFactory } = await import('../src/factory/factory.store.ts');
+const { addFactory } = await import('../testing.ts');
 const { writeFactoryLevel } = await import('../src/level/level.store.ts');
 const { writeLevel } = await import('../src/nemia/level.store.ts');
 const { customInstructionsFile } = await import('../src/agents/read.store.ts');
@@ -73,7 +74,7 @@ function proposed(): string {
  * door — the files at `home`, or the door `agents` where one is given.
  */
 const shown = (home = ROOT, agents?: Layer.Layer<never>) => {
-  const program = POLICY.handler({ name: 'nemia' }, undefined, home);
+  const program = storeGiven(home, process.env)(POLICY.handler({ name: 'nemia' }));
   return stage.runWith(stage.board().e, agents === undefined ? program : Effect.provide(program, agents));
 };
 
@@ -165,7 +166,7 @@ test('Her floor: a call on a run or a factory left at manual is denied, one rais
     },
   );
   await s.test("the store's level raised raises the default factory, and every factory without its own", async () => {
-    writeLevel({ level: 'semi-auto', since: '2026-10-06T08:00:00.000Z' });
+    writeLevel(rootNow(), { level: 'semi-auto', since: '2026-10-06T08:00:00.000Z' });
     assert.equal(await decided('nemia show r-default'), undefined, "the store's level raises the default factory");
     assert.equal(await decided('nemia show r-pipao'), undefined, 'and every factory without its own');
   });
@@ -308,7 +309,7 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
     );
     assert.equal(fs.existsSync(customInstructionsFile(home, 'nemia')), false, 'her words are on no disk');
     assert.equal((await shown(home, agents)).instruction, WORDS);
-    const propose = POLICY_PROPOSE.handler({ name: 'nemia', words: PROPOSAL }, undefined, home);
+    const propose = storeGiven(home, process.env)(POLICY_PROPOSE.handler({ name: 'nemia', words: PROPOSAL }));
     const list = await stage.runWith(stage.board().e, Effect.provide(propose, agents));
     assert.equal(readProposed(home, 'nemia')?.digest, digestOf(WORDS), 'the digest is of the words the door holds');
     assert.equal(list.proposed?.stale, false);

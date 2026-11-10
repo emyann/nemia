@@ -54,7 +54,7 @@ export const mcpServersHandlers = HttpApiBuilder.group(Api, 'mcpservers', (handl
     .handle('put', ({ params: { namespace, name }, payload }) =>
       answered(async (s) => {
         named(routeOf('PUT', namespace, name), namespace, name);
-        await s.inRequest(FACTORY_SERVER_ADD.handler({ factory: namespace, server: name, ...payload }, s.env, s.home));
+        await s.inRequest(FACTORY_SERVER_ADD.handler({ factory: namespace, server: name, ...payload }));
         return serverIn(s, namespace, name);
       }),
     )
@@ -62,7 +62,7 @@ export const mcpServersHandlers = HttpApiBuilder.group(Api, 'mcpservers', (handl
       answered(async (s) => {
         named(routeOf('DELETE', namespace, name), namespace, name);
         const server = await serverIn(s, namespace, name);
-        await s.inRequest(FACTORY_SERVER_RM.handler({ factory: namespace, server: name }, s.env, s.home));
+        await s.inRequest(FACTORY_SERVER_RM.handler({ factory: namespace, server: name }));
         return server;
       }),
     )

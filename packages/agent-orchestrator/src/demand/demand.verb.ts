@@ -34,8 +34,8 @@ export type DemandHost = ServiceHost & {
 };
 
 /** The machine as it is, the lease read every `DEMAND_POLL_MS` for at most `DEMAND_WAIT_MS`. */
-export const liveDemandHost = (): DemandHost => ({
-  ...liveHost(),
+export const liveDemandHost = (root: string): DemandHost => ({
+  ...liveHost(root),
   pollMs: DEMAND_POLL_MS,
   waitMs: DEMAND_WAIT_MS,
   spawn: spawnDetached,
@@ -127,7 +127,7 @@ const spawnDaemon = Effect.fn('spawnDaemon')(function* (host: DemandHost) {
  * `NEMIA_DAEMON_START=off` nothing starts, and that is said. A daemon that does not come up is said, never thrown: the command goes on, and
  * what it files waits for a daemon. Answers the plan it followed.
  */
-export const ensureDaemon = Effect.fn('ensureDaemon')(function* (host: DemandHost = liveDemandHost()) {
+export const ensureDaemon = Effect.fn('ensureDaemon')(function* (host: DemandHost) {
   const { plan, root, found } = yield* tried(() => {
     const found: { service?: ServiceNamed & { start: () => void } } = {};
     const serviced = () => (found.service = storeService(host) ?? undefined) !== undefined;

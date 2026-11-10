@@ -32,6 +32,6 @@ export const SERIES: Command<SeriesRead, SeriesInput> = {
   writes: false,
   class: 'read',
   input: SeriesInput,
-  handler: (input, _env, _home, kept?: Kept) => tried(() => seriesRead(input.range, kept?.series)),
+  handler: (input, kept?: Kept) => tried(() => seriesRead(input.range, kept?.series)),
   print: (read, args) => (args.json === true ? [JSON.stringify(read, null, 2)] : seriesLines(read)),
 };

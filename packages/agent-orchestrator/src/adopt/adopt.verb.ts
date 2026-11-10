@@ -14,9 +14,7 @@ import { runInFactory, kindOf } from '../run-state/run-state.ts';
 import { leftOut, type Args, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { Conflict, Invalid } from '../refusal/refusal.ts';
-import { refuseName } from '../factory/factory.store.ts';
-import { FactoryDoor, filedFactory } from '../factory/door/factories.store.ts';
-import { rooted } from '../factory/wiring/wire.verb.ts';
+import { FactoryDoor, filedFactory, refuseName } from '../factory/door/factories.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import type { Factory, FactoryTemplate } from '../factory/factory.ts';
 import { renderedAt } from '../factory/applied/applied.verb.ts';
@@ -97,7 +95,7 @@ export type AdoptPreview = { kind: 'adopt'; plan: AdoptPlan; digest: string; lin
  * `nemia factory diff <name> --template <name|folder|archive> [--set …] [--to <x.y.z>]` on a factory made from no template: what taking it
  * over would change (`adoptPlan`) — its runs those the run list counts waiting or in flight (`kindOf`) — its digest, and the adopt
  * line; nothing written. Run with the store's root given
- * (`rooted`). Refused as `takeoverAsked` refuses, and a `--to`
+ * (`StoreRoot`). Refused as `takeoverAsked` refuses, and a `--to`
  * other than the template's version (`Conflict`).
  */
 export const adoptPreview = Effect.fn('adoptPreview')(function* (args: Args) {
@@ -230,7 +228,7 @@ export const FACTORY_ADOPT: Command<Adopted> = {
   class: 'ask',
   asksAlways: true,
   only: HERE,
-  handler: (args, _env, home) => rooted(home, 'factory adopt', adoptedNow(args)),
+  handler: (args) => adoptedNow(args),
   print: ({ name, file, template, tree }) => [
     `${name}: taken over by ${template.source} at ${template.version}`,
     `filed: ${file}`,

@@ -1,6 +1,5 @@
 /** `nemia ls`, an entry of the command table: every run, or the one named, and its steps (`runsListed`). */
 import { Effect, Schema } from 'effect';
-import { rootGiven } from '../config/root.store.ts';
 import { runsListed } from './list.verb.ts';
 import { lsLines, type RunsListed } from './list.ts';
 import { labelFlags, runsShown, selectorCheck, selectorsIn, type Command } from '../command/entry.verb.ts';
@@ -44,6 +43,6 @@ export const LS: Command<RunsListed, typeof LsInput.Type> = {
   writes: false,
   class: 'read',
   input: LsInput,
-  handler: (args, _env, home) => Effect.flatMap(selectorsIn(args), (s) => runsListed(args.runId, s, rootGiven(home, 'ls'))),
+  handler: (args) => Effect.flatMap(selectorsIn(args), (s) => runsListed(args.runId, s)),
   print: (listed, args) => [...(listed.paused ? pausedLines(listed.paused) : []), ...lsLines(listed, Date.now(), runsShown(args))],
 };

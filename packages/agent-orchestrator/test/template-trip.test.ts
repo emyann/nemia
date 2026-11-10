@@ -32,7 +32,7 @@ const { exportTemplate, reconciled, reconciledAt } = programsAt(ROOT);
 /** The time the controller's passes here are seeded at: the time each condition of the factory last moved. */
 const AT = '2026-11-01T09:00:00.000Z';
 const { checkedTree, packageSkillNames } = await import('../src/template/template.store.ts');
-const { readFactories, readFactory } = await import('../src/runner.ts');
+const { readFactories, readFactory } = await import('../testing.ts');
 const { appliedDir, readStatus, statusFile, treeDir } = await import('../src/factory/applied/applied.store.ts');
 const { reconcileOnce } = await import('../src/factory/applied/applied.verb.ts');
 const { runRecord } = await import('../src/record/record.store.ts');

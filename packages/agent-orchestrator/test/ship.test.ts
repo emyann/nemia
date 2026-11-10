@@ -18,6 +18,8 @@
  * so it is called once the environment is set; the team's agents and skills are copied beside every folder made under `root`, since the
  * team's `ship.md` names `agent: shipper`.
  */
+import { settingsOf } from '../src/config/config.store.ts';
+import { rootNow } from './config-given.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -613,7 +615,7 @@ test('a landing a pass reads again — after a restart, under a pause, or with a
         [1, 'failed'],
       ] as const) {
         const { repo, id, base, checkId } = await at.stagedAndSigned();
-        putPause({ why: 'merging by hand', by: 'ann' });
+        putPause(rootNow(), { why: 'merging by hand', by: 'ann' });
         try {
           settle(checkId, phase, undefined, exit);
           const paused = runStore.runs.read(id);
@@ -629,7 +631,7 @@ test('a landing a pass reads again — after a restart, under a pause, or with a
             assert.equal(world().head(repo), base, 'aborted, the base branch where it was');
           }
         } finally {
-          resumePause();
+          resumePause(rootNow());
         }
       }
     },
@@ -748,7 +750,7 @@ async function landedThrough(e: Engine, id: string, place: Place) {
 const holdOf = (e: Engine, id: string, memo: ReturnType<typeof statusMemo>) => {
   const r = runRecord(id);
   const standing = standingNow(runStore.runs.list()).pipe(Effect.provide(stage.place().layer));
-  return stage.runWith(e, checkoutHold(e, r, stepsOf(r), { standing }, process.env, memo));
+  return stage.runWith(e, checkoutHold(e, r, stepsOf(r), { standing }, settingsOf(process.env), memo));
 };
 
 /** Two runs of one repository, one whose ending is filed and has staged its merge, the other approved behind it. */

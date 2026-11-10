@@ -52,7 +52,8 @@ import { composeBrief } from '../brief/index.ts';
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
 import { carriedFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
 import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
-import { factoryServers } from '../factory/servers/servers.store.ts';
+import { doorAtOnce } from '../factory/door/factories.store.ts';
+import { FactoryName } from '../factory/factory.model.ts';
 import type { FactoryServers } from '../factory/servers/index.ts';
 import { inboxDir } from '../record/files.store.ts';
 
@@ -236,7 +237,7 @@ export const filedAt = (
  */
 const recordedServers = (factory: string | undefined, home: string): FactoryServers => {
   try {
-    const record = factoryServers(home, factory ?? DEFAULT_NAMESPACE);
+    const record = doorAtOnce(home, (door) => door.servers.read(FactoryName.read(factory ?? DEFAULT_NAMESPACE)));
     return Object.fromEntries(Object.entries(record).map(([name, server]) => [name, mcpServerOf(server)]));
   } catch {
     return {};

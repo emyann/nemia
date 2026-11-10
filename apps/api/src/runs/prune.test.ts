@@ -197,7 +197,8 @@ const stateOf = (id: string) => ({
 const hasBranch = (branch: string) => git('branch', '--list', branch).trim() !== '';
 
 /** What `nemia prune` says, without `--yes`, of the same run with the same switches: the words a refusal on the board must be. */
-const packageSays = async (id: string, how: { artifacts?: boolean; unmerged?: boolean } = {}) => runWith(engine(), prune(id, how));
+const packageSays = async (id: string, how: { artifacts?: boolean; unmerged?: boolean } = {}) =>
+  runWith(engine(process.env), prune(id, how));
 
 test('a finished run pruned on the board as `nemia prune` prunes it: what it refuses without `--unmerged`, a merged run pruned with its files, refused a second time, an unmerged one refused and then pruned keeping its branch', async (t) => {
   const s = story(t);

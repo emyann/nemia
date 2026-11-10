@@ -10,7 +10,8 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { addFactory, attachWorkflow, runStore } from 'agent-orchestrator';
+import { runStore } from 'agent-orchestrator';
+import { addFactory, attachWorkflow } from 'agent-orchestrator/testing';
 import { scratch } from 'test-kit/scratch';
 import { app } from '../app.ts';
 

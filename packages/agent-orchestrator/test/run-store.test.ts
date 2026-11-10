@@ -12,6 +12,7 @@
  * functions from `record.store.ts`, or through `runner.ts`, is refused. `WF_ROOT` is set before the store is imported, since it is read as
  * the module loads.
  */
+import { rootNow } from './config-given.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -137,17 +138,17 @@ test('a record in the store, read and written back through the door: what it hol
 test('whether a person called a run off: a pause, a hold and a record gone, as the store and the tick each read it', async (t) => {
   await t.test('every run is called off while the store is paused, and none once the pause is lifted', () => {
     const run = made('r-paused');
-    putPause({ by: 'ann' });
+    putPause(rootNow(), { by: 'ann' });
     try {
       assert.equal(filesStore.runs.calledOff(run.id), true);
     } finally {
-      resumePause();
+      resumePause(rootNow());
     }
     assert.equal(filesStore.runs.calledOff(run.id), false);
   });
   await t.test("the store's pause is composed onto every run read and listed, and written back into none", () => {
     const run = made('r-pause-read');
-    const pause = putPause({ why: 'merging by hand', by: 'ann' });
+    const pause = putPause(rootNow(), { why: 'merging by hand', by: 'ann' });
     try {
       const read = filesStore.runs.read(run.id);
       assert.deepEqual(read.pause, pause);
@@ -160,7 +161,7 @@ test('whether a person called a run off: a pause, a hold and a record gone, as t
       assert.equal(filesStore.runs.rewrite(read), true);
       assert.equal('pause' in JSON.parse(fs.readFileSync(runFile(run.id), 'utf8')), false, 'the pause is written into the record');
     } finally {
-      resumePause();
+      resumePause(rootNow());
     }
     assert.equal('pause' in filesStore.runs.read(run.id), false, 'lifted, no run reads it');
   });

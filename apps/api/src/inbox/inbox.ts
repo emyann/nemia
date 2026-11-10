@@ -9,7 +9,7 @@
  * `DELETE /api/inbox/:name/from` answer 404, as the others before them.
  */
 import path from 'node:path';
-import { Invalid, readFactory, type Factory } from 'agent-orchestrator';
+import { Invalid, readFactoryAtOnce, type Factory } from 'agent-orchestrator';
 import type { CardFile } from 'objects';
 import type { Refusal } from '../guard.ts';
 import { folderOf, type WorkflowSource } from '../workflows/workflows.ts';
@@ -102,7 +102,7 @@ export function filingOf(body: CardFile, repo: string, home: string): Filing | R
       error: "`from` says where the card's workflow is read from, and this request names no `workflow`. Name one, or leave both out.",
     };
   }
-  if (body.factory !== undefined) return filingIn(readFactory(body.factory, 'Nothing was filed.'), body, home);
+  if (body.factory !== undefined) return filingIn(readFactoryAtOnce(home, body.factory, 'Nothing was filed.'), body, home);
   const filing: Filing = {
     text,
     ...(body.label !== undefined ? { label: [...body.label] } : {}),

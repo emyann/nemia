@@ -4,17 +4,13 @@
  * by its `input`. Both through the Factory door (`FactoryDoor`); `factoryRules` reads the module's root,
  * for the package's callers not yet on it.
  */
+import { doorAtOnce, FactoryDoor } from '../door/factories.store.ts';
 import { leftOut, type Flag, type Spec } from '../../command/command.ts';
 import type { Command } from '../../command/entry.verb.ts';
-import { defaultFactoryRefusal } from '../factory.ts';
-import { readFactory } from '../factory.store.ts';
 import { Effect, Schema } from 'effect';
-import { DEFAULT_NAMESPACE, FactoryRulesWrite } from 'objects';
-import { Conflict, type Refusal } from '../../refusal/refusal.ts';
+import { FactoryRulesWrite } from 'objects';
+import type { Refusal } from '../../refusal/refusal.ts';
 import { FactoryName } from '../factory.model.ts';
-import { FactoryDoor } from '../door/factories.store.ts';
-import { rooted } from '../wiring/wire.verb.ts';
-import { readRules, rulesAt } from './rules.store.ts';
 
 /**
  * A factory's rules as they read: its factory's `name`; `file`, the file they are kept in; `words`, null where there are none; and `error`,
@@ -23,18 +19,12 @@ import { readRules, rulesAt } from './rules.store.ts';
 export type FactoryRules = { name: string; file: string; words: string | null; error: string | null; removed?: boolean };
 
 /**
- * The factory `name`, for its rules to be read or written. Refused: the default factory, which keeps none (`Conflict`), and the factory
- * as `readFactory` refuses it — a name that is no slug or whose file does not read (`Invalid`), a name with no file (`Missing`).
+ * The rules of the factory `name` in the store `home`, read afresh where they are kept, through the Factory door at once. Refused as the
+ * door refuses the read: the default factory, which keeps none (`Conflict`), a name that is no slug or whose file does not read
+ * (`Invalid`), a name with no file (`Missing`).
  */
-function factoryOf(name: string, notDone: string) {
-  if (name === DEFAULT_NAMESPACE) throw new Conflict({ message: defaultFactoryRefusal('rules') });
-  return readFactory(name, notDone);
-}
-
-/** The rules of the factory `name`, read afresh where they are kept (`rulesAt`). Refused: as `factoryOf` refuses the factory. */
-export function factoryRules(name: string): FactoryRules {
-  const file = rulesAt(factoryOf(name, 'There are no rules to read.'));
-  return { name, file, ...readRules(file) };
+export function factoryRules(home: string, name: string): FactoryRules {
+  return { name, ...doorAtOnce(home, (door) => door.rules.read(FactoryName.read(name))) };
 }
 
 /** `--file <path>`, or `-` for stdin: the words to write, read by the command line's runner. */
@@ -74,21 +64,17 @@ export type RulesInput = typeof RulesInput.Type;
  * The rules of the factory `name`, after they are written from `words` or removed with `clear`, where they ask either. Refused, writing
  * nothing: as `FACTORY_RULES` says.
  */
-function ruled({ factory: name, words, clear }: RulesInput, home: string | undefined): Effect.Effect<FactoryRules, Refusal> {
-  return rooted(
-    home,
-    'factory rules',
-    Effect.gen(function* () {
-      const door = yield* FactoryDoor;
-      const factory = FactoryName.read(name);
-      if (clear === true) {
-        const removed = yield* door.rules.clear(factory);
-        return { name, ...(yield* door.rules.read(factory)), removed };
-      }
-      if (words !== undefined) yield* door.rules.write(factory, words);
-      return { name, ...(yield* door.rules.read(factory)) };
-    }),
-  );
+function ruled({ factory: name, words, clear }: RulesInput): Effect.Effect<FactoryRules, Refusal> {
+  return Effect.gen(function* () {
+    const door = yield* FactoryDoor;
+    const factory = FactoryName.read(name);
+    if (clear === true) {
+      const removed = yield* door.rules.clear(factory);
+      return { name, ...(yield* door.rules.read(factory)), removed };
+    }
+    if (words !== undefined) yield* door.rules.write(factory, words);
+    return { name, ...(yield* door.rules.read(factory)) };
+  });
 }
 
 /** What a write or a clear says of a run already started. */
@@ -121,7 +107,7 @@ export const FACTORY_RULES: Command<FactoryRules, RulesInput> = {
     why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Factory's `rules`, `putRules` and `deleteRules`, whose handlers call this one by its `input`",
   },
   input: RulesInput,
-  handler: (args, _env, home) => ruled(args, home),
+  handler: (args) => ruled(args),
   print(data, args) {
     const { name } = data;
     if (data.removed !== undefined)

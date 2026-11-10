@@ -2,6 +2,7 @@
  * `nemia daemon`: the store's daemon as its lease stands — its pid, its url and its state — printed in words or as JSON; and, on a store
  * no daemon ticks, the start asked of the host `main` is handed (`ensureDaemon`), once, before it answers, as every command that ticks.
  */
+import { rootNow } from '../../test/config-given.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -30,7 +31,7 @@ heldUnasked(engine);
 function hostOf(): { host: () => DemandHost; spawns: string[] } {
   const spawns: string[] = [];
   const host: DemandHost = {
-    ...liveDemandHost(),
+    ...liveDemandHost(rootNow()),
     machine: () => ({ platform: 'linux', wsl: false, systemd: false }),
     call: (argv) => assert.fail(`ran ${argv.join(' ')}`),
     daemon: () => ({ checkout: NOWHERE, entry: path.join(NOWHERE, 'main.ts'), cwd: NOWHERE }),

@@ -1,13 +1,14 @@
 /**
  * The Factory door's files layer: the door's walks (`test/factory-walks.ts`) on a fresh scratch store each, what only the files can be
  * asked — a key the model does not name kept by a write, a templated factory's wiring written into its tree, the default door's root —
- * and the seam's debt, the code of `src` still on the stores the door is over (`test/factory-door.baseline.ts`), which only shrinks.
+ * and the seam: no file of `src` but the door's imports the factories' store or calls a store the door is over, with no baseline.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { debtBreaks, seamUses, sourcesUnder, type DebtBreak } from 'test-kit/debt';
+import { seamUses, sourcesUnder } from 'test-kit/debt';
+import { importsIn, resolved } from 'test-kit/imports';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { act, done, doorFrom, walksOn } from '../../../test/door-walks.ts';
@@ -146,37 +147,46 @@ const OWN = [
   'src/factory/door/factories.store.ts',
 ];
 
-/** The seam's calls in each file, comment lines left out: what `FACTORY_DOOR_DEBT` counts. */
+/** The seam's calls in a file, comment lines left out. */
 const SEAM_CALL = new RegExp(`(?<![\\w$.])(?:${SEAM.join('|')})\\s*\\(`, 'g');
 
-/** What a break of the baseline says: a file it does not name or a count grown, a count fallen, a file with none left. */
-const inWords = ({ file, uses: n, owed, kind }: DebtBreak): string =>
-  kind === 'grown'
-    ? `${file} calls the factories' stores ${n} time(s) where test/factory-door.baseline.ts names ${owed}: yield FactoryDoor (src/factory/door/factories.store.ts) instead`
-    : kind === 'fallen'
-      ? `${file} calls the factories' stores ${n} time(s): lower its count in test/factory-door.baseline.ts to ${n}, which only shrinks`
-      : `${file} calls the factories' stores no more: take its line out of test/factory-door.baseline.ts`;
+/** The factories' store, by its path from the package: what no file of `src` but the door's imports. */
+const STORE = 'src/factory/factory.store.ts';
 
-test("no file of src calls the factories' stores but as test/factory-door.baseline.ts counts it, and the count only shrinks", async () => {
-  const { FACTORY_DOOR_DEBT } = await import('../../../test/factory-door.baseline.ts');
-  assert.deepEqual(debtBreaks(seamUses(sourcesUnder(PKG, 'src', OWN), SEAM_CALL), FACTORY_DOOR_DEBT).map(inWords), []);
+/**
+ * Each file of `sources` that imports the factories' store or calls a store the door is over, in the words a break says: the door is
+ * the only way to the factories, so a file that reaches past it is refused with no baseline to hold it.
+ */
+const seamBreaks = (sources: Readonly<Record<string, string>>): string[] => [
+  ...Object.entries(sources)
+    .filter(([file, text]) => importsIn(text).some(({ spec }) => resolved(file, spec) === STORE))
+    .map(([file]) => `${file} imports ${STORE}: import from src/factory/door/factories.store.ts, the Factory door, instead`),
+  ...[...seamUses(sources, SEAM_CALL, { bindings: true })].map(
+    ([file, n]) => `${file} calls the factories' stores ${n} time(s): yield FactoryDoor, or doorAtOnce(home, …) where no Effect runs`,
+  ),
+];
+
+test("no file of src but the door's imports the factories' store or calls a store the door is over", () => {
+  assert.deepEqual(seamBreaks(sourcesUnder(PKG, 'src', OWN)), []);
 });
 
-test('REFUSED: a converted file that calls a store again, by either spelling, and a count the baseline holds above what is left', async () => {
-  const { FACTORY_DOOR_DEBT } = await import('../../../test/factory-door.baseline.ts');
+test("REFUSED: a planted import of the factories' store, a module spelling and a rooted spelling, each by its file", () => {
   const sources = sourcesUnder(PKG, 'src', OWN);
+  const imported = {
+    ...sources,
+    'src/factory/wiring/wire.verb.ts': `import { factoriesDirAt } from '../factory.store.ts';\n${sources['src/factory/wiring/wire.verb.ts']}`,
+  };
+  assert.equal(seamBreaks(imported).length, 1, 'an import of the store, however little it takes, is refused');
   const again = {
     ...sources,
     'src/factory/wiring/wire.verb.ts': `${sources['src/factory/wiring/wire.verb.ts']}\nconst x = readFactory('a');\n`,
   };
-  assert.equal(debtBreaks(seamUses(again, SEAM_CALL), FACTORY_DOOR_DEBT).length, 1);
+  assert.equal(seamBreaks(again).length, 1);
   const rootedAgain = {
     ...sources,
     'src/workflows/workflows.verb.ts': `${sources['src/workflows/workflows.verb.ts']}\nconst y = readFactoryAt(home, 'a');\n`,
   };
-  assert.equal(debtBreaks(seamUses(rootedAgain, SEAM_CALL), FACTORY_DOOR_DEBT).length, 1, 'a rooted spelling is a bypass too');
-  const [first] = Object.keys(FACTORY_DOOR_DEBT);
-  assert.equal(debtBreaks(seamUses(sources, SEAM_CALL), { ...FACTORY_DOOR_DEBT, [first]: (FACTORY_DOOR_DEBT[first] ?? 0) + 1 }).length, 1);
+  assert.equal(seamBreaks(rootedAgain).length, 1, 'a rooted spelling is a bypass too');
 });
 
 /** How many changes `write` counts on the file of `acme`, a factory filed with a level file at manual. */

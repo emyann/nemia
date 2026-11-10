@@ -12,6 +12,7 @@
  * lease it steps, a signal and a start it logs — and whose pause, resume and calls are the live host's, over the stage's engine. A line
  * the take-over says of waiting on the landing throws, so a take-over that waits on it fails at once rather than hanging the story.
  */
+import { rootNow } from './config-given.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -63,7 +64,7 @@ const storeLines = (reason: string): FeedLine[] => readFeed(0).lines.filter((l) 
  */
 const takeOverProcess = async (t: TestContext) => {
   const child = nodeChild(
-    `const m = await import(${JSON.stringify(SERVICE_VERB)}); m.liveHost().pause({ by: ${JSON.stringify(BY)}, why: 'restarting the daemon at pid ${OLD}' }); process.stdout.write('paused\\n'); setInterval(() => {}, 60_000);`,
+    `const m = await import(${JSON.stringify(SERVICE_VERB)}); m.liveHost(${JSON.stringify(ROOT)}).pause({ by: ${JSON.stringify(BY)}, why: 'restarting the daemon at pid ${OLD}' }); process.stdout.write('paused\\n'); setInterval(() => {}, 60_000);`,
     { ...process.env, WF_ROOT: ROOT },
   );
   t.after(() => void child.child.kill('SIGKILL'));
@@ -79,9 +80,9 @@ test("a restart killed while it waits leaves the store paused no longer than the
 
   await s.test('the take-over pauses the store naming its own process, and a pass while it runs leaves the pause standing', async () => {
     child = await takeOverProcess(t);
-    assert.equal(readPauseFile()?.heldBy?.pid, child.child.pid, 'the pause names the process that put it');
+    assert.equal(readPauseFile(rootNow())?.heldBy?.pid, child.child.pid, 'the pause names the process that put it');
     await pass();
-    assert.equal(readPause()?.by, BY, 'a pause whose process runs stands');
+    assert.equal(readPause(rootNow())?.by, BY, 'a pause whose process runs stands');
     assert.equal(storeLines('StorePaused').length, 1, 'the feed says the store paused');
   });
 
@@ -89,9 +90,9 @@ test("a restart killed while it waits leaves the store paused no longer than the
     assert.ok(child);
     child.child.kill('SIGKILL');
     assert.equal((await child.closed).signal, 'SIGKILL');
-    assert.ok(readPause() !== null, 'the pause outlives the killed command until a pass reads it');
+    assert.ok(readPause(rootNow()) !== null, 'the pause outlives the killed command until a pass reads it');
     await pass();
-    assert.equal(readPause(), null, 'the pass lifted the pause of a process gone');
+    assert.equal(readPause(rootNow()), null, 'the pass lifted the pause of a process gone');
     assert.equal(storeLines('StoreResumed').length, 1, 'the feed says the store resumed');
   });
 });
@@ -131,7 +132,7 @@ test("a restart with only a landing's check running restarts at once, and the ch
     let lease: DaemonStanding = leaseOf(OLD);
     const later: DaemonStanding[] = [];
     let unitPid: number | null = OLD;
-    const live = liveHost();
+    const live = liveHost(rootNow());
     const host = {
       ...live,
       lease: () => {
@@ -170,7 +171,7 @@ test("a restart with only a landing's check running restarts at once, and the ch
       ['pause', `signal ${OLD}`, 'start', 'resume'],
       'nothing is waited for between the pause and the signal',
     );
-    assert.equal(readPause(), null);
+    assert.equal(readPause(rootNow()), null);
   });
 
   await s.test("the check ends on its worker, and the new daemon's pass records the landing", async () => {

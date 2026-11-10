@@ -4,8 +4,8 @@
  * command line's alone: its runner starts a run per card (`nemia start <folder>`), and `folderRefusal` says what such a start does not
  * take.
  */
+import { StoreRoot } from '../config/root.store.ts';
 import { Effect, Schema } from 'effect';
-import { rooted } from '../factory/wiring/wire.verb.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { endingSteps } from '../ending/ending.ts';
@@ -160,6 +160,9 @@ type Started = {
   paused?: Paused;
   landed?: readonly string[];
   hints?: readonly string[];
+  /** The factory's repositories and volumes left out of the run's mounts, each no directory now (`leftOutMounts`, `leftOutVolumes`). */
+  notMounted?: readonly string[];
+  notVolumes?: readonly string[];
 };
 
 /** The steps of a run just started: the workflow `nemia start` froze on its record, which every run it writes has (`frozenStepsOf`). */
@@ -168,8 +171,7 @@ const startedSteps = (run: Run): Workflow[] => frozenStepsOf(run) ?? [];
 /**
  * The folders of its factory a run mounts, read-only, and those left out because they were no directory; none in the default factory.
  */
-function mountLines(run: Run): string[] {
-  const missing = leftOutMounts(run);
+function mountLines({ run, notMounted: missing = [], notVolumes = [] }: Started): string[] {
   const written = writersOf(startedSteps(run), run.mounts);
   return [
     ...(run.mounts?.length
@@ -181,7 +183,7 @@ function mountLines(run: Run): string[] {
     ...(missing.length
       ? [`not mounted: ${missing.join(', ')} — of the factory's repositories, and no directory now; start again once it is there`]
       : []),
-    ...volumeLines(run),
+    ...volumeLines(run, notVolumes),
     ...settingsLine(run),
   ];
 }
@@ -196,8 +198,7 @@ function settingsLine(run: Run): string[] {
  * The factory's volumes a run mounts: those read-only, then each writable one with the steps whose fence writes it (`volumeMounts`), and
  * that it is not the run's workspace; then those left out because they were no directory.
  */
-function volumeLines(run: Run): string[] {
-  const missing = leftOutVolumes(run);
+function volumeLines(run: Run, missing: readonly string[]): string[] {
   const volumes = run.volumes ?? [];
   const local = startedSteps(run).filter((s) => !isRemoteHarness(s.harness));
   const reads = volumes.filter((v) => v.readOnly);
@@ -275,7 +276,7 @@ function startedLines(started: Started): string[] {
     `${run.id}  ${steps.length} step(s): ${steps.map((s) => (s.agent ? `${s.name} (${s.agent.name})` : s.name)).join(' → ')}`,
     ...fromLines(started),
     ...(run.factory ? [`factory: ${run.factory}${isRepositoryRun(run) ? `, on ${run.repo}` : ''}`] : []),
-    ...mountLines(run),
+    ...mountLines(started),
     `workspace: ${run.workspace}${isRepositoryRun(run) ? '' : ' — a folder per step, made as each is filed, with no git repository'}`,
     ...(run.inputs?.length ? [`inputs: ${run.inputs.join(', ')} — copied into ${inputsDir(run)}`] : []),
     ...(run.workflowFiles === undefined ? [] : [`workflow files: copied into ${workflowFilesDir(run, run.workflowFiles)}`]),
@@ -422,19 +423,24 @@ export const START: Command<Started, StartInput> = {
   class: 'act',
   only: { side: 'cli', why: "the api serves it as the Run's `create` of `objects`' Api, calling this handler with the folder it found" },
   input: StartInput,
-  handler: Effect.fnUntraced(function* (given: StartInput, _env?: NodeJS.ProcessEnv, home?: string) {
-    const started = yield* startOf(given, home);
+  handler: Effect.fnUntraced(function* (given: StartInput) {
+    const home = yield* StoreRoot;
+    const started = yield* startOf(given);
     const paused = yield* pausedRead();
     const landed: string[] = [];
     const context = started.run.context ?? [];
     const git = context.length ? yield* standingLive([started.run]) : undefined;
     for (const id of context) if (git && (yield* parentRead(id, git)).landed) landed.push(id);
-    const hints = yield* rooted(home, 'start', hintsOf(started.run));
+    const hints = yield* hintsOf(started.run);
+    const notMounted = leftOutMounts(home, started.run);
+    const notVolumes = leftOutVolumes(home, started.run);
     return {
       ...started,
       ...(paused.pause ? { paused } : {}),
       ...(started.run.context?.length ? { landed } : {}),
       ...(hints.length ? { hints } : {}),
+      ...(notMounted.length ? { notMounted } : {}),
+      ...(notVolumes.length ? { notVolumes } : {}),
     };
   }),
   print: startedLines,
@@ -481,26 +487,22 @@ export const CONCLUDED: Command<Concluded, typeof ConcludedInput.Type> = {
 };
 
 /** A run of a brief, or of an inbox card under `card`, started off what the handler was handed (`START`). */
-const startOf = Effect.fnUntraced(function* (given: StartInput, home: string | undefined) {
+const startOf = Effect.fnUntraced(function* (given: StartInput) {
   const { card, factory } = given;
-  if (card !== undefined) return yield* rooted(home, 'start', cardStart(card, given));
-  const run = yield* rooted(
-    home,
-    'start',
-    startRun({
-      brief: given.brief ?? '',
-      repo: given.repo ?? '.',
-      repoNamed: given.repoNamed === true,
-      workflowDir: given.workflows ?? '',
-      isolate: given.noWorktree !== true,
-      after: [...(given.after ?? [])],
-      context: [...(given.context ?? [])],
-      inputs: [...(given.inputs ?? [])],
-      gates: [...(given.gates ?? [])],
-      labels: { edits: [...(given.label ?? [])] },
-      ...(factory !== undefined ? { factory } : {}),
-    }),
-  );
+  if (card !== undefined) return yield* cardStart(card, given);
+  const run = yield* startRun({
+    brief: given.brief ?? '',
+    repo: given.repo ?? '.',
+    repoNamed: given.repoNamed === true,
+    workflowDir: given.workflows ?? '',
+    isolate: given.noWorktree !== true,
+    after: [...(given.after ?? [])],
+    context: [...(given.context ?? [])],
+    inputs: [...(given.inputs ?? [])],
+    gates: [...(given.gates ?? [])],
+    labels: { edits: [...(given.label ?? [])] },
+    ...(factory !== undefined ? { factory } : {}),
+  });
   return { id: run.id, run } satisfies Started;
 });
 

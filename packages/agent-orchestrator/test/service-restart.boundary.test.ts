@@ -9,6 +9,7 @@
  * The stub runs as a real process, so the file is a boundary test. The scratch-unit repro on a real systemd user manager is a by-hand
  * measure, written in the change's closeout and never in the suite.
  */
+import { rootNow } from './config-given.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -124,7 +125,7 @@ function hostOf(start: string, linger: number) {
   let signalled = false;
   let newReads = 0;
   return {
-    ...liveHost(),
+    ...liveHost(rootNow()),
     machine: () => ({ platform: 'linux', wsl: false, systemd: true }),
     dirs: () => ({ home: HOME, configHome: path.join(HOME, '.config') }),
     roots: () => ({ root: ROOT, defaultRoot: ROOT }),
@@ -166,7 +167,7 @@ test('nemia service restart on a stub systemctl: the unit started once it has en
       const log = stubLog();
       assert.ok(!log.includes('start no-op'), log.join('\n'));
       assert.ok(log.indexOf('start') > log.lastIndexOf(`show active ${OLD}`), log.join('\n'));
-      assert.equal(readPause(), null, "the first pass lifted the restart's pause");
+      assert.equal(readPause(rootNow()), null, "the first pass lifted the restart's pause");
     },
   );
 
@@ -176,8 +177,8 @@ test('nemia service restart on a stub systemctl: the unit started once it has en
       conflict((m) => /systemctl --user start nemia\.service/.test(m) && !/was started/.test(m)),
     );
     assert.ok(stubLog().includes('start nothing'));
-    assert.match(readPause()?.by ?? '', /nemia service restart/, "the restart's pause stands");
-    resumePause();
+    assert.match(readPause(rootNow())?.by ?? '', /nemia service restart/, "the restart's pause stands");
+    resumePause(rootNow());
   });
 
   await t.test("a start systemd refuses: Conflict carrying systemd's line and the start command", async () => {
@@ -185,6 +186,6 @@ test('nemia service restart on a stub systemctl: the unit started once it has en
       restart(hostOf('fail', 0)),
       conflict((m) => /Job for nemia\.service failed\./.test(m) && /systemctl --user start nemia\.service/.test(m)),
     );
-    resumePause();
+    resumePause(rootNow());
   });
 });

@@ -13,7 +13,8 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 import { app } from '../app.ts';
-import { addFactory, addToInbox, fromNote, inboxDir, startFromInbox, runStore, engine, StoreRoot } from 'agent-orchestrator';
+import { addToInbox, fromNote, inboxDir, startFromInbox, runStore, engine, StoreRoot } from 'agent-orchestrator';
+import { addFactory } from 'agent-orchestrator/testing';
 import { runWith } from '../../test/builtin-place.ts';
 import { objectOf, linesOf } from '../../test/run-reads.ts';
 import { names } from '../../test/named.ts';
@@ -158,7 +159,7 @@ test('a person starts a card: the run carries where it came from, and the card s
       const { card } = onStore(addToInbox({ text: 'Show what a step cost\n\nOn the run page.', workflow: 'mine', repo }));
       const other = onStore(addToInbox({ text: 'Another idea' }));
       const parent = await runWith(
-        engine(),
+        engine(process.env),
         startFromInbox({ name: other.card.name, callerRepo: repo, workflow: dev, brief: 'A run to wait on' }),
       );
 
@@ -258,7 +259,7 @@ test('POST /api/runs with `card` of a card already started is refused, 409, nami
 /** What `startFromInbox` refuses `name` with, asked as the route asks it. */
 const startRefusal = async (name: string, extra: { brief?: string; after?: string[] } = {}): Promise<string> => {
   try {
-    await runWith(engine(), startFromInbox({ name, callerRepo: repo, workflow: dev, ...extra }));
+    await runWith(engine(process.env), startFromInbox({ name, callerRepo: repo, workflow: dev, ...extra }));
   } catch (err) {
     assert.equal((err as { exitCode?: unknown }).exitCode, 2);
     return (err as Error).message;
@@ -383,7 +384,7 @@ test("a card whose start fails without a refusal — its repository's `.worktree
   const { card } = onStore(addToInbox({ text: 'Its include file is a link to itself', repo: odd }));
   let failure: (Error & { exitCode?: unknown }) | undefined;
   try {
-    await runWith(engine(), startFromInbox({ name: card.name, callerRepo: repo, workflow: dev }));
+    await runWith(engine(process.env), startFromInbox({ name: card.name, callerRepo: repo, workflow: dev }));
   } catch (err) {
     failure = err as Error & { exitCode?: unknown };
   }

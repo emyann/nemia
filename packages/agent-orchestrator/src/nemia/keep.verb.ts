@@ -12,6 +12,8 @@
  * her subscription through the Subscription door (`SubscriptionDoor`) and the person's custom words for her through the Agent door
  * (`AgentDoor`), each at the store root `up` is given.
  */
+import { listedAtOnce } from '../factory/door/factories.store.ts';
+import { StoreRoot } from '../config/root.store.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Effect, Metric, type Duration } from 'effect';
@@ -19,7 +21,6 @@ import { DEFAULT_HARNESS } from '../harness/harness.ts';
 import { ownOf } from '../tick/told.verb.ts';
 import { factoryMounts } from '../factory/factory.ts';
 import type { Mount } from '../record/record.ts';
-import { readFactories } from '../factory/factory.store.ts';
 import { FeedDoor } from '../feed/feed.store.ts';
 import { SubscriptionDoor } from '../subscription/subscription.store.ts';
 import { SubscriptionName } from '../feed/feed.model.ts';
@@ -106,8 +107,8 @@ const nemiaBrief = (quota: string | undefined): string =>
   ].join(' ');
 
 /** Each factory's folders, read-only: what she reads of the work and never writes. A factory that does not read is left out. */
-const factoryFolders = (): Mount[] => {
-  const repos = readFactories().flatMap((f) => ('repos' in f ? f.repos : []));
+const factoryFolders = (home: string): Mount[] => {
+  const repos = listedAtOnce(home).flatMap((f) => ('repos' in f ? f.repos : []));
   return factoryMounts({ repos }, undefined);
 };
 
@@ -119,18 +120,18 @@ const factoryFolders = (): Mount[] => {
  * prompt allowed while she runs is widened the next time she is filed. Her instruction is composed with the person's custom words for
  * her, `custom` (`herCustom`), and her session token, minted as she is filed (`herToken`), is in her environment as `SESSION_TOKEN`.
  */
-export function nemiaSpec(id: string, custom: string | undefined, token: string): Parameters<Engine['file']>[0] {
+export function nemiaSpec(id: string, custom: string | undefined, token: string, home: string): Parameters<Engine['file']>[0] {
   const step = readNemia();
-  const prompt = composePrompt(step.body, custom);
-  const memory = `Edit(/${memoryDir()}/**)`;
+  const prompt = composePrompt(home, step.body, custom);
+  const memory = `Edit(/${memoryDir(home)}/**)`;
   const quota = quotaUrl();
-  const fence = widened(nemiaFence(TABLE), promptAllows());
+  const fence = widened(nemiaFence(TABLE), promptAllows(home));
   const bin = ownBin();
-  const settings = nemiaSettings({ ask: fence.ask, deny: [...fence.deny, ...storeDenies()] }, bin, process.env.PATH ?? '');
+  const settings = nemiaSettings({ ask: fence.ask, deny: [...fence.deny, ...storeDenies(home)] }, bin, process.env.PATH ?? '');
   return {
     id,
     brief: nemiaBrief(quota),
-    cwd: nemiaDir(),
+    cwd: nemiaDir(home),
     harness: step.harness ?? DEFAULT_HARNESS,
     restartPolicy: 'Always',
     priority: NEMIA_PRIORITY,
@@ -144,7 +145,7 @@ export function nemiaSpec(id: string, custom: string | undefined, token: string)
         command: [bin === undefined ? 'nemia' : path.join(bin, 'nemia'), 'admit', '--at-least', NEMIA_FLOOR, '--auto', 'nemia'],
         tools: ['Bash'],
       },
-      mounts: factoryFolders(),
+      mounts: factoryFolders(home),
       env: { [SESSION_TOKEN]: token },
       ...ownOf(
         { harness: step.harness, remote: true },
@@ -179,7 +180,7 @@ const fileHer = (e: Engine, id: string) =>
     if (ownBin() === undefined)
       yield* Effect.logWarning(`Nemia is filed with no nemia of the daemon's first on her path: none links ${SHIPPED_NEMIA}/../bin.`);
     const custom = yield* herCustom();
-    yield* asked('file', e.file(nemiaSpec(id, custom, yield* herToken(id))));
+    yield* asked('file', e.file(nemiaSpec(id, custom, yield* herToken(id), yield* StoreRoot)));
   });
 
 /**
@@ -189,14 +190,15 @@ const fileHer = (e: Engine, id: string) =>
  */
 const sayCustom = (e: Engine, id: string) =>
   Effect.gen(function* () {
+    const home = yield* StoreRoot;
     const custom = yield* herCustom();
     yield* asked('say', e.say(id, toldCustom(custom)));
-    writePrompt(nemiaPrompt(readNemia().body, custom));
-    writeTold(custom);
+    writePrompt(home, nemiaPrompt(readNemia().body, custom));
+    writeTold(home, custom);
   });
 
 /** Each act the keeper owes on her task `id`: a stop or a drop already done by another is no failure. */
-const ACTS: Record<NemiaAct, (e: Engine, id: string) => Effect.Effect<void, Refusal>> = {
+const ACTS: Record<NemiaAct, (e: Engine, id: string) => Effect.Effect<void, Refusal, StoreRoot>> = {
   file: fileHer,
   stop: (e, id) => asked('stop', e.stop(id).pipe(Effect.catchTag('StopRefused', () => Effect.void))),
   subscribe: (_e, id) =>
@@ -215,9 +217,9 @@ const ACTS: Record<NemiaAct, (e: Engine, id: string) => Effect.Effect<void, Refu
       if ((yield* door.subscriptions.list()).listed.some((s) => s.name === NEMIA_SUBSCRIPTION)) yield* door.subscriptions.drop(HERS);
     }),
   sayCustom,
-  sayOutbox: (e, id) => sayOutbox(id, nemiaDir()).pipe(over(e), Effect.asVoid),
-  record: (e, id) => recordAsks(id, nemiaDir()).pipe(over(e), Effect.asVoid),
-  answer: (e, id) => answersDue(id, nemiaDir()).pipe(over(e), Effect.asVoid),
+  sayOutbox: (e, id) => Effect.flatMap(StoreRoot, (home) => sayOutbox(id, nemiaDir(home))).pipe(over(e), Effect.asVoid),
+  record: (e, id) => Effect.flatMap(StoreRoot, (home) => recordAsks(id, nemiaDir(home))).pipe(over(e), Effect.asVoid),
+  answer: (e, id) => Effect.flatMap(StoreRoot, (home) => answersDue(id, nemiaDir(home))).pipe(over(e), Effect.asVoid),
 };
 
 /** One act owed on her task `id`, counted once done. */
@@ -230,6 +232,7 @@ const act = (e: Engine, id: string, owed: NemiaAct) => ACTS[owed](e, id).pipe(Ef
  */
 const herTask = (e: Engine, id: string | undefined) =>
   Effect.gen(function* () {
+    const home = yield* StoreRoot;
     if (id === undefined) return { task: undefined, up: false, asking: false, closing: false };
     const { state, phase, asks } = yield* asked('view', e.view(id));
     if (!state.filedAt) return { task: undefined, up: false, asking: false, closing: false };
@@ -237,7 +240,7 @@ const herTask = (e: Engine, id: string | undefined) =>
       task: { settled: Boolean(state.settled), stopRequested: state.stopRequested } satisfies HerTask,
       up: upOf(phase),
       asking: (asks ?? []).length > 0,
-      closing: closesOwed(nemiaDir(), asks),
+      closing: closesOwed(nemiaDir(home), asks),
     };
   });
 
@@ -266,17 +269,18 @@ const herSubscription = Effect.fn('herSubscription')(function* () {
  * filed or told with (`customChanged`); each act owed done in order. Answers the acts done.
  */
 export const keepOnce = Effect.fn('keepOnce')(function* () {
+  const home = yield* StoreRoot;
   const e = yield* EngineService;
-  const id = readLevel()?.task;
+  const id = readLevel(home)?.task;
   const above = (yield* levelsNow()).some((row) => row.level !== 'manual');
   const { task, up, asking, closing } = yield* herTask(e, id);
-  const trusted = trustedFolder(DEFAULT_HARNESS, nemiaDir());
+  const trusted = trustedFolder(DEFAULT_HARNESS, nemiaDir(home));
   const keeping = { above, ...(id === undefined ? {} : { task: id }), ...(trusted === undefined ? {} : { trusted }) };
   const subscribed = yield* herSubscription();
   const kept = nemiaState(keeping, task, subscribed) === 'kept';
-  const stale = kept && customChanged(readTold(), yield* herCustom(), filedPrompt());
+  const stale = kept && customChanged(readTold(home), yield* herCustom(), filedPrompt(home));
   const owed = nemiaDue(
-    { ...keeping, stale, up, asking, closing, owed: kept && outboxOwed(nemiaDir()), answered: kept && answersOwed(nemiaDir()) },
+    { ...keeping, stale, up, asking, closing, owed: kept && outboxOwed(nemiaDir(home)), answered: kept && answersOwed(nemiaDir(home)) },
     task,
     subscribed,
   );
@@ -285,7 +289,7 @@ export const keepOnce = Effect.fn('keepOnce')(function* () {
 });
 
 /** The keeper, for as long as it runs: a beat each `every`; a beat that fails is a warning, and the next is tried a beat later. */
-export const keep = (options: Partial<KeepOptions> = {}): Effect.Effect<never, never, EngineService> => {
+export const keep = (options: Partial<KeepOptions> = {}): Effect.Effect<never, never, EngineService | StoreRoot> => {
   const o = { ...KEEP_DEFAULTS, ...options };
   const beat = Effect.suspend(() => keepOnce()).pipe(
     Effect.catchCause((cause) => Effect.logWarning(`Nemia could not be kept this beat: ${Cause.pretty(cause)}`)),

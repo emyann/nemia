@@ -1532,7 +1532,13 @@ test('a prompt the person allowed by its own rule runs unasked once she is filed
 test('REFUSED: an edit of the store outside her folder, of her level, her instruction or what she was told is denied her; her memory is hers', () => {
   const root = herStore();
   const rules = herRules(root);
-  const files = [path.join(root, 'runs', 'r-1', 'run.json'), path.join(root, 'daemon.json'), levelFile(), promptFile(), toldFile()];
+  const files = [
+    path.join(root, 'runs', 'r-1', 'run.json'),
+    path.join(root, 'daemon.json'),
+    levelFile(root),
+    promptFile(root),
+    toldFile(root),
+  ];
   for (const file of files) assert.equal(editVerdictOf(rules, file), 'deny', file);
   assert.equal(editVerdictOf(rules, path.join(root, 'nemia', 'memory', 'fact.md')), 'allow');
   const open = { ...rules, deny: rules.deny.filter((rule) => !rule.includes(path.join(root, 'runs'))) };

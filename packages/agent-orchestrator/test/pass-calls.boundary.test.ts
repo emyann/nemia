@@ -8,6 +8,7 @@
  * `WF_ROOT` is set before the runner is imported: the module reads it as it loads. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo of runs at rest.
  */
+import { settingsOf } from '../src/config/config.store.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -331,7 +332,7 @@ test("each question a pass asks its place is one call of its place phase, and ea
     const e = meteredEngine(b.e);
     const program = Effect.gen(function* () {
       const runs = [runRecord(run.id)];
-      const read = passRead(e, runs, process.env, yield* passStanding(runs), yield* passRevisions());
+      const read = passRead(e, runs, settingsOf(process.env), yield* passStanding(runs), yield* passRevisions());
       return (yield* advancePass(e, runs[0], undefined, read)).advanced;
     });
     const before = gitRan();

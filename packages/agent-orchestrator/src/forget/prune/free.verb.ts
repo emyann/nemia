@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Effect, Exit, type Duration } from 'effect';
-import { keepsWorktrees } from '../../config/config.store.ts';
+import { setting } from '../../config/config.store.ts';
 import { HOME } from '../../record/record.store.ts';
 import { firstPiece } from '../../piece/piece.ts';
 import { dropEmpty, freedByRepo, judging, resolved, sized, type Judged, type Sized } from './prune.verb.ts';
@@ -118,7 +118,7 @@ const saidOnce = Effect.fnUntraced(function* (left: ReadonlyArray<{ id: string; 
  * the store and the place say then.
  */
 export const freeOnce = Effect.fn('freeOnce')(function* (answers: readonly Answered[], memory: FreeMemory) {
-  if (keepsWorktrees()) return { freed: [], said: [] } satisfies Freed;
+  if (yield* setting('keepWorktrees')) return { freed: [], said: [] } satisfies Freed;
   const candidates = freeable(answers).filter((id) => fs.existsSync(path.join(HOME, 'worktrees', id)));
   forgotten(memory, candidates);
   const turn = freeTurn(candidates, memory.judged, FREE_A_SWEEP, memory.turn++);

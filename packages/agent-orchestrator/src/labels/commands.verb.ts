@@ -6,7 +6,6 @@
 import { Effect, Schema } from 'effect';
 import { type Args, type Spec } from '../command/command.ts';
 import { checked, type Command } from '../command/entry.verb.ts';
-import { rooted } from '../factory/wiring/wire.verb.ts';
 import { LabelEdit, type Labelled } from 'objects';
 import { labelCard, labelRun } from './labels.verb.ts';
 
@@ -74,13 +73,9 @@ export const LABEL_RUN: Command<Labelled, LabelRunInput> = {
   class: 'act',
   only: { side: 'cli', why: "the api serves it as the Run's `labels` of `objects`' Api, calling this handler" },
   input: LabelRunInput,
-  handler: (input, _env, home) =>
-    rooted(
-      home,
-      'label run',
-      Effect.andThen(checked(noEdits('nemia label run', 'run')(input)), () =>
-        labelRun(input.runId, [...input.labels], input.overwrite === true),
-      ),
+  handler: (input) =>
+    Effect.andThen(checked(noEdits('nemia label run', 'run')(input)), () =>
+      labelRun(input.runId, [...input.labels], input.overwrite === true),
     ),
   print: labelledLines,
 };
@@ -107,12 +102,7 @@ export const LABEL_CARD: Command<Labelled, LabelCardInput> = {
     why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Card's `labels`, whose handler calls this one by its `input`",
   },
   input: LabelCardInput,
-  handler: ({ name, labels, overwrite }, _env, home) =>
-    rooted(
-      home,
-      'label inbox',
-      Effect.suspend(() => labelCard(name, [...labels], overwrite === true)),
-    ),
+  handler: ({ name, labels, overwrite }) => Effect.suspend(() => labelCard(name, [...labels], overwrite === true)),
   print: labelledLines,
 };
 

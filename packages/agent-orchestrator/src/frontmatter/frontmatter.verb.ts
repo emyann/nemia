@@ -12,12 +12,12 @@
  * `--check` writes nothing, and exits 1 where a rewrite is due, as a formatter's `--check` does; a file refused exits 2, the refusal's
  * code, with or without it. Either way the lines are the error's words, on stderr.
  */
+import { StoreRoot } from '../config/root.store.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import type { Args, Spec } from '../command/command.ts';
-import { rootGiven } from '../config/root.store.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { isRefusal, Missing } from '../refusal/refusal.ts';
 import { AGENTS_FOLDER, SKILLS_FOLDER, splitFrontmatter, WorkflowError } from '../step/step.ts';
@@ -206,7 +206,9 @@ export const FRONTMATTER_REWRITE: Command<Rewritten> = {
   class: 'ask',
   asksAlways: true,
   only: { side: 'cli', why: 'it rewrites files on the machine nemia runs on, folders a person names among them' },
-  handler: (args, _env, home) =>
-    tried(() => rewriteFolders(foldersOf(args, rootGiven(home, 'frontmatter rewrite')), args.check === true)).pipe(Effect.flatMap(ended)),
+  handler: (args) =>
+    Effect.flatMap(StoreRoot, (home) =>
+      tried(() => rewriteFolders(foldersOf(args, home), args.check === true)).pipe(Effect.flatMap(ended)),
+    ),
   print: (found) => rewrittenLines(found),
 };

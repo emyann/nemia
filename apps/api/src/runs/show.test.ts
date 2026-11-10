@@ -60,7 +60,7 @@ test("the run's route answers the run object, nemia/v1's Run, as nemia show prin
   assert.equal(body.metadata.name, R);
   const handler = SHOW?.handler?.bind(SHOW);
   assert.ok(handler, 'show has a handler');
-  const shown = await runWith(engine(), handler({ runId: R }, process.env, root));
+  const shown = await runWith(engine(), handler({ runId: R }));
   assert.deepEqual(body, JSON.parse(JSON.stringify(shown)), 'one judgement serves both sides: the api answers what nemia show prints');
 });
 
@@ -82,7 +82,7 @@ test("GET /api/runs/:name/record answers the run's record as nemia show --raw pr
   assert.equal(res.status, 200);
   const handler = SHOW?.handler?.bind(SHOW);
   assert.ok(handler, 'show has a handler');
-  const printed = await runWith(engine(), handler({ runId: R, raw: true }, process.env, root));
+  const printed = await runWith(engine(), handler({ runId: R, raw: true }));
   assert.deepEqual(await res.json(), JSON.parse(JSON.stringify(printed)), 'the record nemia show --raw prints');
   assert.equal((await app().request('/api/runs/r-nowhere/record')).status, 404, 'no such run');
 });
@@ -101,7 +101,7 @@ test("GET /api/listing answers nemia ls's whole answer, every run or the one nam
   );
   const one = await app().request(`/api/listing/${R}`);
   assert.equal(one.status, 200);
-  const listed = await runWith(engine(), handler({ runId: R }, process.env, root));
+  const listed = await runWith(engine(), handler({ runId: R }));
   assert.deepEqual(await one.json(), JSON.parse(JSON.stringify(listed)), 'what nemia ls lists of it');
   assert.equal((await app().request('/api/listing/r-nowhere')).status, 404, 'no such run');
 });

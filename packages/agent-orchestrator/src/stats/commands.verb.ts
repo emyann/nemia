@@ -1,7 +1,7 @@
 /** `nemia stats`, an entry of the command table: what the store's runs add up to (`statsRun`). */
 import { Effect, Schema } from 'effect';
 import { tried } from '../runtime-client.ts';
-import { verifiesRest } from '../config/config.store.ts';
+import { setting } from '../config/config.store.ts';
 import { BY_KEYS, statsLine, statsLines, statsQueryOf, type QueryKey, type Stats } from './index.ts';
 import { statsRun } from './stats.verb.ts';
 import type { Args } from '../command/command.ts';
@@ -128,12 +128,12 @@ export const STATS: Command<Stats, StatsInput> = {
   writes: false,
   class: 'read',
   input: StatsInput,
-  handler: Effect.fnUntraced(function* (args: StatsInput, env?: NodeJS.ProcessEnv, _home?: string, kept?: Kept) {
+  handler: Effect.fnUntraced(function* (args: StatsInput, kept?: Kept) {
     const selectors = yield* selectorsIn(args);
     const query = yield* tried(() => statsQueryOf(givenOf(args), (key) => `--${key}`));
     return yield* statsRun(selectors.length ? { ...query, selectors } : query, new Date(), {
       memo: kept?.stats,
-      verify: env ? verifiesRest(env) : undefined,
+      verify: yield* setting('verifyRest'),
       series: kept?.series,
     });
   }),

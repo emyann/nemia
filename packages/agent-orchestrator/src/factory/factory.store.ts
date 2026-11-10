@@ -6,9 +6,6 @@
  * (`factories.store.ts`) is over them. A person's verbs are their one writer; the judgement is `factory.ts`'s words and `wiring.ts`'s
  * decision.
  *
- * The old spellings, which take no root (`readFactory`, `hireAgent`, …), are each the function `At` the module's root (`atHome`), for the
- * callers not yet on the Factory door (`test/factory-door.baseline.ts`).
- *
  * Beneath the controllers, beside `record.store.ts`, the one store file it imports; `runner.ts` re-exports what the package exports of it.
  */
 import { DEFAULT_NAMESPACE } from 'objects';
@@ -42,7 +39,7 @@ import {
 } from './factory.ts';
 import { firesOf } from './schedule/schedule.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
-import { firstRefusal, HOME, isDirectory } from '../record/record.store.ts';
+import { firstRefusal, isDirectory } from '../record/record.store.ts';
 import { readStatusAt, readTreeWiringAt, treeDirAt, writeTreeWiringAt } from './applied/applied.store.ts';
 import { rewired, wiringRefusal, type WiringChange } from './wiring/wiring.ts';
 import { ownAgentRefusal } from './wiring/own-agent.store.ts';
@@ -372,13 +369,6 @@ export function treeChecked<F extends { tree?: string }>(name: string, factory: 
   return { ...factory, tree };
 }
 
-/**
- * Whether a start may go to the default factory when it names none and no factory holds its folder, or when it starts a card that names
- * none: only with `WF_DEFAULT_FACTORY_STARTS=1`, which the package's and the api's tests set for the starts they make in scratch folders.
- * Unset, by default, every such start is refused.
- */
-export const defaultStartsAllowed = (env: NodeJS.ProcessEnv = process.env): boolean => env.WF_DEFAULT_FACTORY_STARTS === '1';
-
 /** The store's factories that read, and the names of those whose file does not. */
 function readable(home: string): { factories: Factory[]; unread: string[] } {
   const listing = readFactoriesAt(home);
@@ -392,16 +382,22 @@ function readable(home: string): { factories: Factory[]; unread: string[] } {
 export const factoryNamesAt = (home: string): string[] => readable(home).factories.map((f) => f.name);
 
 /**
- * The factory a start of a workflow is made in, and, when it was found from the folder, the repository there (`repo`): the factory
- * `named`, read as a run reads it (`readFactory`), else the one factory of the store a repository of which holds the folder `at`
- * (`factoriesHolding`), with that repository; none, the default factory, only when none holds it and `defaultStartsAllowed`. `fix` is the
- * start's words for naming one, `<name>` in them: `--factory <name>`, or `?factory=<name>`.
+ * The factory a start of a workflow is made in, and, when it was found from the folder, the repository there (`repo`): the factory `named`,
+ * read as a run reads it (`readFactory`), else the one factory of the store a repository of which holds the folder `at`
+ * (`factoriesHolding`), with that repository; none, the default factory, only when none holds it and `defaultStarts` (`StoreConfig`'s
+ * `defaultFactoryStarts`). `fix` is the start's words for naming one, `<name>` in them: `--factory <name>`, or `?factory=<name>`.
  *
  * Refused, `Invalid`, before anything is written: the default factory named, whatever the environment (`defaultStartRefusal`); two or more
  * factories holding the folder (`ambiguousFactoryRefusal`); and none holding it (`noFactoryRefusal`). A factory whose file does not read is
  * not looked at, and the refusal of none names it.
  */
-export function startFactoryAt(home: string, named: string | undefined, at: string, fix: string): { factory?: Factory; repo?: string } {
+export function startFactoryAt(
+  home: string,
+  named: string | undefined,
+  at: string,
+  fix: string,
+  defaultStarts: boolean,
+): { factory?: Factory; repo?: string } {
   if (named === DEFAULT_NAMESPACE) throw new Invalid({ message: defaultStartRefusal(fix, factoryNamesAt(home)) });
   if (named !== undefined) return { factory: readFactoryAt(home, named) };
   const { factories, unread } = readable(home);
@@ -409,7 +405,7 @@ export function startFactoryAt(home: string, named: string | undefined, at: stri
   const [only] = holding;
   if (holding.length === 1 && only !== undefined) return only;
   if (holding.length > 1) throw new Invalid({ message: ambiguousFactoryRefusal(at, holding, fix) });
-  if (defaultStartsAllowed()) return {};
+  if (defaultStarts) return {};
   throw new Invalid({
     message: noFactoryRefusal(
       at,
@@ -672,40 +668,3 @@ export function clearScheduleAt(home: string, opts: { factory: string; workflow:
   if (cleared === undefined) throw new Missing({ message: unscheduledRefusal(opts.factory, opts.workflow, Object.keys(was.schedules)) });
   return { file, cleared };
 }
-
-/**
- * A function of this file taking the store's root first, as the old spelling that takes none: `at` the module's root, `HOME`. The one
- * line of this file that reads a root of its own (`test/global-roots.baseline.ts`); each spelling below is called by code not yet on the
- * Factory door (`test/factory-door.baseline.ts`).
- */
-const atHome =
-  <A extends unknown[], R>(at: (home: string, ...args: A) => R) =>
-  (...args: A): R =>
-    at(HOME, ...args);
-
-/** `factoriesDirAt` the module's root. */
-export const factoriesDir = atHome(factoriesDirAt);
-/** `readFactoriesAt` the module's root. */
-export const readFactories = atHome(readFactoriesAt);
-/** `addFactoryAt` the module's root. */
-export const addFactory = atHome(addFactoryAt);
-/** `removeFactoryAt` the module's root. */
-export const removeFactory = atHome(removeFactoryAt);
-/** `readFactoryAt` the module's root. */
-export const readFactory = atHome(readFactoryAt);
-/** `factoryNamesAt` the module's root. */
-export const factoryNames = atHome(factoryNamesAt);
-/** `startFactoryAt` the module's root. */
-export const startFactory = atHome(startFactoryAt);
-/** `hireAgentAt` the module's root. */
-export const hireAgent = atHome(hireAgentAt);
-/** `fireAgentAt` the module's root. */
-export const fireAgent = atHome(fireAgentAt);
-/** `attachWorkflowAt` the module's root. */
-export const attachWorkflow = atHome(attachWorkflowAt);
-/** `setInstructionAt` the module's root. */
-export const setInstruction = atHome(setInstructionAt);
-/** `setScheduleAt` the module's root. */
-export const setSchedule = atHome(setScheduleAt);
-/** `clearScheduleAt` the module's root. */
-export const clearSchedule = atHome(clearScheduleAt);

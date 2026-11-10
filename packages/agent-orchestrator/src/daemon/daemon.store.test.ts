@@ -10,6 +10,7 @@
  * import; `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo of runs at rest, and a difference throws (`verifyRest`
  * in tick.verb.ts).
  */
+import { rootNow } from '../../test/config-given.ts';
 import { after, test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -1343,7 +1344,7 @@ test('the daemon delivers the subscriptions: a wake line written to the feed is 
   const { Effect } = await import('effect');
   const { dropSubscription, putSubscription } = await import('../subscription/subscription.store.ts');
   const { feedFile, feedSize } = await import('../feed/feed.store.ts');
-  putSubscription('daemon', { task: 'nemia', selectors: ['reason=AwaitingApproval'], digestEvery: 60, from: feedSize() });
+  putSubscription(rootNow(), 'daemon', { task: 'nemia', selectors: ['reason=AwaitingApproval'], digestEvery: 60, from: feedSize() });
   fs.appendFileSync(feedFile(), `${JSON.stringify({ at: at(0), run: 'r-1', step: 'plan', word: 'awaiting approval' })}\n`);
   const told: string[] = [];
   const e = engineOf((n) => {
@@ -1357,7 +1358,7 @@ test('the daemon delivers the subscriptions: a wake line written to the feed is 
     /^nemia: The feed needs your judgement:\n {2}\S+ {2}r-1 {2}plan {2}awaiting approval(\n\nSince your last news:\n(1 routine line|2 routine lines) of the feed:(\n {2}\S+ {2}pid \d+ {2}daemon started {2}· first daemon on this store)?(\n {2}\S+ {2}r-1 {2}— {2}removed)?)?$/,
     "the wake alone, or with the routine lines the same read found riding it: the daemon's started line, and the tick's own line of r-1, which no run of the store names",
   );
-  dropSubscription('daemon');
+  dropSubscription(rootNow(), 'daemon');
   clear();
 });
 

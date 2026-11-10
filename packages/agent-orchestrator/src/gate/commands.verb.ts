@@ -3,6 +3,7 @@
  * questions the step asks (`--answer`, `typedAnswers`), or a loop out of rounds ended as it stands, with the person's words (what `nemia
  * accept` was, decision 7: `approveForm`), and what the next tick files because of it.
  */
+import { StoreRoot } from '../config/root.store.ts';
 import { Effect, Schema } from 'effect';
 import { RunApprove } from 'objects';
 import { commandLine, type Args } from '../command/command.ts';
@@ -152,7 +153,8 @@ export const APPROVE: Command<
   class: 'answer',
   only: { side: 'cli', why: "the api serves it as the Run's `approve` of `objects`' Api, calling this handler" },
   input: ApproveInput,
-  handler: Effect.fnUntraced(function* (input: ApproveInput, _env, home) {
+  handler: Effect.fnUntraced(function* (input: ApproveInput) {
+    const home = yield* StoreRoot;
     const { answers: _answers, budgets: _budgets, ...flags } = input;
     yield* checked(approveRefusal(flags));
     const { runId, step } = input;

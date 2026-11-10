@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
+import { storeGiven } from '../../../test/config-given.ts';
 
 const ROOT = scratch('wf-servers-');
 process.env.WF_ROOT = ROOT;
@@ -182,10 +183,11 @@ test("a server's headers are served masked, and a mask sent back keeps the value
   const root = scratch('wf-servers-mask-');
   const add = async (server: string, ...headers: string[]) => {
     const sent = Object.fromEntries(headers.map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
-    const program = FACTORY_SERVER_ADD.handler(
-      { factory: DEFAULT_NAMESPACE, server, url: 'https://docs.example/mcp', headers: sent },
-      process.env,
+    const program = storeGiven(
       root,
+      process.env,
+    )(
+      FACTORY_SERVER_ADD.handler({ factory: DEFAULT_NAMESPACE, server, url: 'https://docs.example/mcp', headers: sent }),
     ) as unknown as import('effect').Effect.Effect<{ server: { headers?: Record<string, string> } }, { _tag?: string }>;
     return Effect.runPromise(program).then(
       (answer) => answer,

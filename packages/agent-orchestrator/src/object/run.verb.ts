@@ -4,6 +4,7 @@
  * (`judgedFields`), so the object and the list say a run alike. The board reads the object, and a step's tries and told layers at their
  * sub-resources, each its own read.
  */
+import { StoreRoot } from '../config/root.store.ts';
 import type { InputsWatchedBy } from '../rest/index.ts';
 import { valueVersion } from '../digest/digest.ts';
 import fs from 'node:fs';
@@ -248,7 +249,7 @@ const stepStatusOf = Effect.fnUntraced(function* (name: string, at: StepAt) {
     status: stepWord(at, name),
     timeline: (clock.steps[name] ?? []).map((t) => ({ ...t, used: t.session ? usedOf(t.used, judgedContext) : null })),
     current: latest ? tryShort(latest) : null,
-    filed: filedIn(filedOf(run.steps[name], views)),
+    filed: filedIn(filedOf(run.steps[name], views, yield* StoreRoot)),
     taskId,
     workspace: run.steps[name]?.workspace ?? null,
     files: [],

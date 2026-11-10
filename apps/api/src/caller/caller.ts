@@ -14,7 +14,7 @@ import type { MiddlewareHandler } from 'hono';
 import { PERSON, PlaceService, sessionCaller, type ProposalCaller } from 'agent-orchestrator';
 import type { TokenRefusal } from 'objects';
 import { type ApiEnv, traceOf } from '../layer.ts';
-import { Engine, runPlaced, StoreRoot } from '../store.ts';
+import { Engine, runPlaced, StoreConfig, StoreRoot } from '../store.ts';
 
 /** A request whose token the api refuses, with the reason where it presented one: the api's 401 (`objects`' `Unauthorized`). */
 export class Unauthorized extends TaggedError('Unauthorized')<{ readonly message: string; readonly reason?: TokenRefusal }> {
@@ -39,7 +39,8 @@ export async function callerBy(c: Parameters<MiddlewareHandler<ApiEnv>>[0], toke
   if (token === undefined) return PERSON;
   const { e, placed } = await c.var.runtime.runPromise(
     Effect.gen(function* () {
-      return { e: yield* Engine, placed: { placeService: yield* PlaceService, home: yield* StoreRoot, trace: yield* traceOf(c) } };
+      const placed = { placeService: yield* PlaceService, home: yield* StoreRoot, config: yield* StoreConfig, trace: yield* traceOf(c) };
+      return { e: yield* Engine, placed };
     }),
   );
   const caller = await runPlaced(placed, e, sessionCaller(token));

@@ -27,9 +27,9 @@ const { EngineService: RunsEngine } = await import('../runtime-client.ts');
 const { Effect: RunsEffect } = await import('effect');
 /** Every run's summary, as the whole list judges it (`runsSummarized`), read through the informer and filings `kept` hands. */
 const RUNS = {
-  handler: (_args: object, env?: NodeJS.ProcessEnv, home?: string, kept?: Parameters<typeof howOf>[2]) =>
+  handler: (_args: object, kept?: Parameters<typeof howOf>[0]) =>
     RunsEffect.gen(function* () {
-      return yield* runsSummarized(yield* RunsEngine, howOf(env, home, kept));
+      return yield* runsSummarized(yield* RunsEngine, yield* howOf(kept));
     }),
 };
 const { advanceRun, startRun, runWith: runEngine } = await import('../runner.ts');
@@ -75,7 +75,7 @@ const started = async (card?: string): Promise<string> => {
 
 /** The step `name` of the run `id`, as the whole list answers it. */
 const stepOf = async (id: string, name: string): Promise<RunSummary['steps'][number]> => {
-  const list: RunSummary[] = await runWith(e(), RUNS.handler({}, process.env));
+  const list: RunSummary[] = await runWith(e(), RUNS.handler({}));
   const step = list.find((run) => run.id === id)?.steps.find((s) => s.name === name);
   assert.ok(step, `the run ${id} has a step ${name}`);
   return step;
@@ -118,7 +118,7 @@ test("a run's judged fields: the judgement's run-level words, its time at work a
   assert.deepEqual(Object.keys(unjudgedFields()).sort(), Object.keys(fields).sort(), 'a run left unjudged carries the same fields');
 
   engine().settle(`${id}-build`, 'working', { startedAt: AT, spawnedAt: AT });
-  const list: RunSummary[] = await runWith(e(), RUNS.handler({}, process.env));
+  const list: RunSummary[] = await runWith(e(), RUNS.handler({}));
   const row = list.find((r) => r.id === id);
   assert.ok(row, `the run ${id} is listed`);
   assert.equal(row.atWork?.since, AT, "the list's row carries the judged time at work");
@@ -132,7 +132,7 @@ test('`cardRuns`: each run started from a card with its phase as the list judges
   const memo = informerMemo();
   const how = { home: ROOT, memo, filings: { filed: new Map(), cursor: 0 }, verify: false };
   passStarted(memo);
-  await runWith(e(), RUNS.handler({}, { ...process.env, WF_VERIFY_REST: '0' }, ROOT, { runs: memo }));
+  await runWith(e(), RUNS.handler({}, { runs: memo }));
   assert.ok(memo.runs.has(loose), 'the list, within a pass, kept the run from no card');
 
   assert.deepEqual(await runWith(e(), cardRuns(e(), how)), [{ id: fromCard, from: { inbox: 'cache-the-views-k2q9' }, phase: 'running' }]);

@@ -50,7 +50,7 @@ const exportingTo = (t: TestContext, endpoint: string) => withEnv(t, { OTEL_EXPO
 
 /** A task the client's engine files on the shipped `check` harness, never started, and the trace context it was journalled with. */
 const filedTrace = async () => {
-  const e = clientEngine();
+  const e = clientEngine(process.env);
   const id = await Effect.runPromise(
     e.file({ brief: 'b', cwd: ROOT, harness: 'check', config: { command: ['true'] } }).pipe(Effect.withSpan('the pass')),
   );
@@ -96,7 +96,7 @@ require('node:fs').writeFileSync(${JSON.stringify(seen)}, JSON.stringify(env));
     NEMIA_TOOL_DETAILS: details,
     WF_MAX_CONCURRENT: '1',
   });
-  const e = clientEngine();
+  const e = clientEngine(process.env);
   const id = await Effect.runPromise(e.file({ brief: 'b', cwd: scratch('wf-step-labels-cwd-'), harness: 'claude' }));
   stoppedAfter(t, e, id);
   await until(
@@ -144,7 +144,7 @@ const HANDED: Row[] = [
     check: async (t) => {
       withEnv(t, { OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9', NEMIA_TOOL_DETAILS: 'true' });
       const said = t.mock.method(console, 'error', () => {});
-      clientEngine();
+      clientEngine(process.env);
       const lines = said.mock.calls.map((c) => String(c.arguments[0])).filter((line) => line.includes('NEMIA_TOOL_DETAILS'));
       assert.equal(lines.length, 1, lines.join('\n'));
       assert.ok(lines[0].startsWith('nemia: ') && lines[0].includes('"true"'), lines[0]);

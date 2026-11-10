@@ -5,10 +5,10 @@
  * journals, files what it did not or files in another order, fails here, whatever else it still gets right. With them, the processes a
  * pass over a repository run starts for its place's verbs, each counted once, in the `place` phase (`passStanding`, `advancePass`).
  *
- * `WF_ROOT` is set before the runner is imported: the module reads it as it loads. `WF_VERIFY_REST=1` judges in full every run a pass
+ * The store is the file's own, at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo of runs at rest.
  */
-import { settingsOf } from '../src/config/config.store.ts';
+import { settingsOf, type Env } from '../src/config/config.store.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -19,25 +19,21 @@ import { scratch } from 'test-kit/scratch';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
 import { runGiven, runOver } from './placed.ts';
-import { rootNow } from './config-given.ts';
+import { advanceRun, approveRun, cancelRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import { metered } from '../src/meter/tally.store.ts';
+import { meteredEngine } from '../src/meter/meter.verb.ts';
+import { passStanding } from '../src/standing/standing.verb.ts';
+import { passRead } from '../src/cap/cap.verb.ts';
+import { passRevisions } from '../src/revisions/pin.verb.ts';
+import { advancePass } from '../src/tick/advance.verb.ts';
 
 const ROOT = scratch('wf-pass-calls-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { advanceRun, approveRun, cancelRun, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
-const { runRecord } = await import('../src/record/record.store.ts');
-const { metered } = await import('../src/meter/tally.store.ts');
-const { meteredEngine } = await import('../src/meter/meter.verb.ts');
-const { passStanding } = await import('../src/standing/standing.verb.ts');
-const { passRead } = await import('../src/cap/cap.verb.ts');
-const { passRevisions } = await import('../src/revisions/pin.verb.ts');
-const { advancePass } = await import('../src/tick/advance.verb.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
+const runWith = runOver(runEngine, gitPlaceLayer, ENV);
+const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 const LOOPING = {
@@ -133,7 +129,7 @@ const board = () => {
  */
 const pass = async (b: ReturnType<typeof board>, id: string) => {
   b.calls.length = 0;
-  const { value, tallies } = await metered(() => runWith(meteredEngine(b.e), advanceRun(runRecord(rootNow(), id))));
+  const { value, tallies } = await metered(() => runWith(meteredEngine(b.e), advanceRun(runRecord(ROOT, id))));
   assert.ok(tallies, 'the pass was metered');
   return {
     advanced: value,
@@ -293,7 +289,7 @@ row(FILED, 'an approved ending is filed in the checkout, once the pass has read 
   const run = await started(folder({ implement: '', ship: 'after: implement\nworkspace: base\ngate: true' }), true);
   const b = board();
   await pass(b, run.id);
-  fs.writeFileSync(path.join(runRecord(rootNow(), run.id).steps.implement.workspace!, 'flag.ts'), 'export const flag = true;\n');
+  fs.writeFileSync(path.join(runRecord(ROOT, run.id).steps.implement.workspace!, 'flag.ts'), 'export const flag = true;\n');
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
   const gated = await pass(b, run.id);
   assert.deepEqual(gated.advanced.filed, [], 'the gate holds it');
@@ -332,8 +328,8 @@ test("each question a pass asks its place is one call of its place phase, and ea
   const placed = async () => {
     const e = meteredEngine(b.e);
     const program = Effect.gen(function* () {
-      const runs = [runRecord(rootNow(), run.id)];
-      const read = passRead(rootNow(), e, runs, settingsOf(process.env), yield* passStanding(runs), yield* passRevisions());
+      const runs = [runRecord(ROOT, run.id)];
+      const read = passRead(ROOT, e, runs, settingsOf(ENV), yield* passStanding(runs), yield* passRevisions());
       return (yield* advancePass(e, runs[0], undefined, read)).advanced;
     });
     const before = gitRan();
@@ -352,10 +348,10 @@ test("each question a pass asks its place is one call of its place phase, and ea
     'every git process is counted once, in the place phase, and nothing else is',
   );
 
-  fs.writeFileSync(path.join(runRecord(rootNow(), run.id).steps.implement.workspace!, 'flag.ts'), 'export const flag = true;\n');
+  fs.writeFileSync(path.join(runRecord(ROOT, run.id).steps.implement.workspace!, 'flag.ts'), 'export const flag = true;\n');
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
   const handed = await placed();
-  assert.equal(runRecord(rootNow(), run.id).steps.implement.handedOff, `${run.id}-implement`, 'implement was handed off on this pass');
+  assert.equal(runRecord(ROOT, run.id).steps.implement.handedOff, `${run.id}-implement`, 'implement was handed off on this pass');
   assert.equal(
     handed.calls,
     3,

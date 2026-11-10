@@ -1,5 +1,5 @@
 /**
- * A workflow step on a remote A2A agent, on the real engine `nemia up` makes (`engine(process.env)`) and the SDK's own server over HTTP
+ * A workflow step on a remote A2A agent, on the real engine `nemia up` makes (`engine(env)`) and the SDK's own server over HTTP
  * (`a2a-server.ts`): the A2A talk is the runtime's, so no stand-in tells it. Two tests.
  *
  * The remote step end to end, a story: `nemia start` on a folder team whose step says `harness: a2a:<name>`, the store's
@@ -15,8 +15,8 @@
  * once the file is fixed; a queued one is refused its start; neither is handed to Claude Code, the engine's first harness. A fake
  * `claude` and `codex` first on PATH write down every call, so nothing real is asked and any call is seen.
  *
- * `WF_ROOT` is set before the import, since the module reads it as it loads. Each row leaves a step held at work on its agent, so the
- * file sets `WF_MAX_CONCURRENT` itself, since a check the run executes inherits the daemon's ceiling.
+ * The store is the file's own, at `ROOT`, given as `ENV`. Each row leaves a step held at work on its agent, so the
+ * file sets `WF_MAX_CONCURRENT` on it itself, since a check the run executes inherits the daemon's ceiling.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,24 +27,21 @@ import { a2aServer, type Answer } from './a2a-server.ts';
 import { scratch } from 'test-kit/scratch';
 import { story, staged } from './story.ts';
 import { bell, until, WAITED, type Waiter } from 'agent-runtime/testing';
-import { rootNow } from './config-given.ts';
+import { EngineService, engine, feedHubLayer, followStep, retryRun, tickRun, runWith, withProposalsPass } from '../src/runner.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import { storeConfigLayer } from '../src/config/root.store.ts';
+import { main as cli } from '../src/cli/main.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-remote-');
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_RUNS;
-process.env.WF_MAX_CONCURRENT = '10';
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_RUNS: undefined, WF_MAX_CONCURRENT: '10' };
 const BIN = scratch('wf-remote-bin-');
 const CALLS = path.join(BIN, 'calls.log');
 for (const name of ['claude', 'codex'])
   fs.writeFileSync(path.join(BIN, name), `#!/bin/sh\necho "${name} $*" >> '${CALLS}'\nexit 1\n`, { mode: 0o755 });
 process.env.PATH = `${BIN}${path.delimiter}${process.env.PATH}`;
-const { EngineService, engine, feedHubLayer, followStep, retryRun, tickRun, runWith, withProposalsPass } = await import('../src/runner.ts');
-const { engineOf } = await import('../src/runtime-client.ts');
-const { runRecord } = await import('../src/record/record.store.ts');
-const { storeConfigLayer } = await import('../src/config/root.store.ts');
-const { main: cli } = await import('../src/cli/main.ts');
-const stage = staged({ runWith, main: cli, engineOf });
+const stage = staged({ runWith, main: cli, engineOf, env: ENV });
 
 type Engine = ReturnType<typeof engine>;
 type Moment = Stream.Success<ReturnType<typeof followStep>>;
@@ -140,7 +137,7 @@ async function remoteRun(t: Waiter, name: string, answer: Answer, secret: string
   try {
     declare({ [name]: { url: server.url } });
     const id = await started(team(`${name}-team`, `a2a:${name}`));
-    const e = engine(process.env);
+    const e = engine(ENV);
     await settle(t, e, id);
     return { server, id, e, decided: await printed(['decide', id], e), listed: await printed(['ls'], e) };
   } finally {
@@ -171,7 +168,7 @@ const shown = (got: Moment[]): string[] =>
 async function following(t: TestContext, agent: string, url: string) {
   declare({ [agent]: { url } });
   const id = await started(team(`${agent}-team`, `a2a:${agent}`, 'ask', 'Read the note.'), false);
-  const e = engine(process.env);
+  const e = engine(ENV);
   const rt = ManagedRuntime.make(
     Layer.mergeAll(
       feedHubLayer(),
@@ -179,11 +176,11 @@ async function following(t: TestContext, agent: string, url: string) {
       EngineService.layer(e),
       stage.place().layer,
       Layer.succeed(References.MinimumLogLevel, 'Warn'),
-      storeConfigLayer(process.env),
+      storeConfigLayer(ENV),
     ),
   );
   t.after(() => rt.dispose());
-  const ticked = () => rt.runPromise(withProposalsPass(tickRun({ repo: ROOT })).pipe(Effect.provide(storeConfigLayer(process.env))));
+  const ticked = () => rt.runPromise(withProposalsPass(tickRun({ repo: ROOT })).pipe(Effect.provide(storeConfigLayer(ENV))));
   await until(
     t,
     async () => {
@@ -249,7 +246,7 @@ test(
 
         const view = await Effect.runPromise(e.view(`${id}-ask`));
         assert.equal(view.phase, 'succeeded');
-        assert.ok(runRecord(rootNow(), id).steps.ask?.taskId, 'filed');
+        assert.ok(runRecord(ROOT, id).steps.ask?.taskId, 'filed');
         assert.ok(decided.join('\n').includes('ask'), decided.join('\n'));
         assert.match(listed.join('\n'), /^\s+ask\s+unverified\s*$/m, listed.join('\n'));
         const everything = (dir: string): string[] =>
@@ -322,7 +319,7 @@ test(
         try {
           declare({ asker: { url: server.url } });
           const id = await started(team('asker-team', 'a2a:asker'));
-          const e = engine(process.env);
+          const e = engine(ENV);
           let seen = 'not read yet';
           await until(
             c,
@@ -446,7 +443,7 @@ test(
 );
 
 /** `nemia argv` with the engine `main` makes itself, as a restarted `nemia up` would, and what it printed. */
-const own = (argv: string[]) => said(() => cli(argv));
+const own = (argv: string[]) => said(() => cli(argv, undefined, undefined, undefined, ENV));
 
 const LOCAL = team('local', 'claude', 'work', 'Write a note on tides.');
 const REMOTE = team('remote', 'a2a:reviewer', 'work');
@@ -470,7 +467,7 @@ test(
         async (row) => {
           const server = await a2aServer({ answer: () => ({ asks: 'Which note?' }) });
           const good = JSON.stringify({ reviewer: { url: server.url } });
-          const start = (dir: string) => startedBy((argv) => cli(argv), dir, false);
+          const start = (dir: string) => startedBy((argv) => cli(argv, undefined, undefined, undefined, ENV), dir, false);
           try {
             fs.writeFileSync(FILE, good);
             const away = await start(REMOTE);
@@ -535,10 +532,7 @@ test(
             }
             const ticked = await own(['tick']);
             if (why !== undefined) assert.match(ticked.err, why);
-            assert.ok(
-              runRecord(rootNow(), local).steps.work,
-              `the local step was filed: ${JSON.stringify(runRecord(rootNow(), local).steps)}`,
-            );
+            assert.ok(runRecord(ROOT, local).steps.work, `the local step was filed: ${JSON.stringify(runRecord(ROOT, local).steps)}`);
             const runs = fs.readdirSync(path.join(ROOT, 'runs')).length;
             await assert.rejects(
               start(REMOTE),

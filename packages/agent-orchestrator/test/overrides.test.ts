@@ -11,12 +11,11 @@ import path from 'node:path';
 import { parseAgent, parseWorkflow, WorkflowError, type Agent } from '../src/workflow.ts';
 import { formerKeyLines } from '../src/folder/folder.store.ts';
 import { formerFenceLine, overridableLine } from '../src/former/former.ts';
+import { writeAgent } from '../src/agents/agents.store.ts';
+import { agentVersion } from '../src/agents/read.store.ts';
 import { scratch } from 'test-kit/scratch';
 
 const ROOT = scratch('wf-overrides-');
-process.env.WF_ROOT = ROOT;
-const { writeAgent } = await import('../src/agents/agents.store.ts');
-const { agentVersion } = await import('../src/agents/read.store.ts');
 
 /** The agents a step may name, each parsed from its file's text. */
 const agentsOf = (files: Record<string, string>): Map<string, Agent | WorkflowError> =>

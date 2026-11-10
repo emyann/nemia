@@ -12,13 +12,13 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
+import { Conflict, Invalid, Missing, isRefusal } from '../src/refusal/refusal.ts';
+import { maxRuns } from '../src/config/config.store.ts';
+import { unhold } from '../src/wait/wait.verb.ts';
+import { storeGiven } from './config-given.ts';
+import { WorkflowError } from '../src/workflow.ts';
 
-process.env.WF_ROOT = scratch('wf-refusal-store-');
-const { Conflict, Invalid, Missing, isRefusal } = await import('../src/refusal/refusal.ts');
-const { maxRuns } = await import('../src/config/config.store.ts');
-const { unhold } = await import('../src/wait/wait.verb.ts');
-const { rootNow, storeGiven } = await import('./config-given.ts');
-const { WorkflowError } = await import('../src/workflow.ts');
+const ROOT = scratch('wf-refusal-store-');
 
 const PKG = path.join(import.meta.dirname, '..');
 
@@ -72,7 +72,7 @@ test('each refusal is an Error of its kind with its words and exit code 2, an Ef
     ['unhold of no run id', () => Effect.runPromise(unhold('Not An Id')), Invalid, ['"Not An Id"', "a run's id"]],
     [
       'unhold of a run the store has not',
-      () => Effect.runPromise(storeGiven(rootNow())(unhold('r-nope'))),
+      () => Effect.runPromise(storeGiven(ROOT)(unhold('r-nope'))),
       Missing,
       ['r-nope', 'nemia hold <runId> --off'],
     ],

@@ -1,6 +1,6 @@
 /**
  * `nemia start` of a folder whose step declares a field its agent's `output:` declares too: refused with exit 2, naming the field and
- * both declarers, and no run is written. `WF_ROOT` is set before the import, since the module reads it as it loads, and a start
+ * both declarers, and no run is written. The test's store is its own, at `ROOT`, handed to `main` as `ENV`, and a start
  * outside a factory is allowed, with no daemon started, whether or not the test setup's preload ran.
  */
 import { test } from 'node:test';
@@ -8,17 +8,21 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
+import { main } from '../src/cli/main.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-owners-start-');
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_RUNS;
-process.env.WF_DEFAULT_FACTORY_STARTS = '1';
 process.env.NEMIA_DAEMON_START = 'off';
 const BIN = scratch('wf-owners-start-bin-');
 for (const name of ['claude', 'codex']) fs.writeFileSync(path.join(BIN, name), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
 process.env.PATH = `${BIN}${path.delimiter}${process.env.PATH}`;
-const { main } = await import('../src/cli/main.ts');
+const ENV: Env = {
+  ...process.env,
+  WF_ROOT: ROOT,
+  WF_VERIFY_REST: '1',
+  WF_MAX_RUNS: undefined,
+  WF_DEFAULT_FACTORY_STARTS: '1',
+};
 
 /** A JSON Schema of an object whose `names` are each a required string. */
 const fields = (...names: string[]): string =>
@@ -52,17 +56,20 @@ test('REFUSED: nemia start of a step declaring a field its agent declares exits 
   console.error = () => undefined;
   process.chdir(ROOT);
   try {
-    await assert.rejects(main(['start', 'judge it', '--workflows', dir]), (err: Error & { exitCode?: number; _tag?: string }) => {
-      assert.deepEqual([err._tag, err.exitCode], ['Invalid', 2]);
-      for (const fact of [
-        'judge: `findings` is declared by agent judger',
-        '(agents/judger.md, `output: judger.schema.json`)',
-        'step judge (judge.md, `output: judge.schema.json`)',
-        'Delete it from one of the two.',
-      ])
-        assert.ok(err.message.includes(fact), `${fact} — in: ${err.message}`);
-      return true;
-    });
+    await assert.rejects(
+      main(['start', 'judge it', '--workflows', dir], undefined, undefined, undefined, ENV),
+      (err: Error & { exitCode?: number; _tag?: string }) => {
+        assert.deepEqual([err._tag, err.exitCode], ['Invalid', 2]);
+        for (const fact of [
+          'judge: `findings` is declared by agent judger',
+          '(agents/judger.md, `output: judger.schema.json`)',
+          'step judge (judge.md, `output: judge.schema.json`)',
+          'Delete it from one of the two.',
+        ])
+          assert.ok(err.message.includes(fact), `${fact} — in: ${err.message}`);
+        return true;
+      },
+    );
   } finally {
     process.chdir(cwd);
     console.error = error;

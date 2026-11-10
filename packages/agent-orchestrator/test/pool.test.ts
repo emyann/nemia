@@ -1,7 +1,7 @@
 /**
- * Pools by subscription, at shipped defaults, through the client's `engine(process.env)`, which files every task `queued` and hands the
+ * Pools by subscription, at shipped defaults, through the client's `engine(ENV)`, which files every task `queued` and hands the
  * runtime its ceiling and pools, and `tick()`, whose engine pass admits. `WF_MAX_CONCURRENT` is unset, so the ceiling is 2 on every pass.
- * `WF_ROOT` is read as the module loads, so it is set before the import; `WF_VERIFY_REST=1` judges in full every run a pass answers from
+ * The store is the test's own, at `ROOT`, given as `ENV`; `WF_VERIFY_REST=1` judges in full every run a pass answers from
  * its memo of runs at rest, and a difference throws (`verifyRest` in tick.verb.ts).
  *
  * A fake `claude` (`gatedJob`, the job's Claude Code) and `codex` first on PATH run until the test opens their gate — a file named for
@@ -10,7 +10,7 @@
  * Claude Code session is a job, which it reads off its run file (`agents-calls.boundary.test.ts` has a run's steps and a restart).
  *
  * Told as one story on `story(t)`, its checkpoints the four things a pool does, each leaving the board drained for the next. Not on
- * `staged`: the stand-in engine admits into no pool, so this keeps the client's real `engine(process.env)` and the fakes. An admitted task
+ * `staged`: the stand-in engine admits into no pool, so this keeps the client's real `engine(ENV)` and the fakes. An admitted task
  * starts on the runtime's next pass, so a freed slot is taken one pass after it is admitted into: each checkpoint ticks once to admit and
  * once to start.
  */
@@ -27,14 +27,11 @@ import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runOver } from './placed.ts';
 import { story } from './story.ts';
 
+import { engine, tickRun, runWith as runEngine } from '../src/runner.ts';
+import type { Env } from '../src/config/config.store.ts';
+
 const ROOT = scratch('wf-pool-');
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { engine, tickRun, runWith: runEngine } = await import('../src/runner.ts');
 const stand = eachTest(testPlace);
-const runWith = runOver(runEngine, () => stand().layer);
 
 /** The fakes, their gates, and the count of `claude agents` calls. */
 const fakes = () => {
@@ -77,7 +74,10 @@ ${runUntilGate('args.at(-1)')}
 };
 
 const fake = fakes();
-const e = engine(process.env);
+/** The store is the test's own, its environment taken once the fakes are first on PATH. */
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
+const runWith = runOver(runEngine, () => stand().layer, ENV);
+const e = engine(ENV);
 const cwd = scratch('wf-pool-cwd-');
 
 /**
@@ -276,13 +276,17 @@ test(
     );
 
     await s.test(
-      'REFUSED: `WF_MAX_CONCURRENT=abc` refuses the pass, and the engine `engine(process.env)` builds under it has no ceiling, so it admits nothing',
+      'REFUSED: `WF_MAX_CONCURRENT=abc` refuses the pass, and the engine `engine(ENV)` builds under it has no ceiling, so it admits nothing',
       async (t) => {
-        process.env.WF_MAX_CONCURRENT = 'abc';
+        const abc: Env = { ...ENV, WF_MAX_CONCURRENT: 'abc' };
         try {
-          const refused = engine(process.env);
+          const refused = engine(abc);
           await Effect.runPromise(refused.file({ id: 'r1', cwd, harness: 'claude', brief: 'r1' }));
-          const err = await runWith(refused, tickRun()).then(
+          const err = await runOver(
+            runEngine,
+            () => stand().layer,
+            abc,
+          )(refused, tickRun()).then(
             () => assert.fail('a pass under a ceiling that does not read resolved'),
             (x: unknown) => x as Error,
           );
@@ -295,7 +299,6 @@ test(
           );
           assert.equal((await Effect.runPromise(refused.view('r1'))).state.attempts.length, 0);
         } finally {
-          delete process.env.WF_MAX_CONCURRENT;
           await drain(t);
         }
       },

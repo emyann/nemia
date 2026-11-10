@@ -3,7 +3,7 @@
  * its failed step left uncommitted committed on its branch first, what git ignores not, and nothing a link in it leads to touched. One of
  * the three walks kept on real git.
  *
- * `WF_ROOT` is set before the runner is imported: the module reads it as it loads.
+ * The store is the test's own, at `ROOT`, given as `ENV`.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,7 +16,11 @@ import type { Run, TaskPhase } from '../src/run.ts';
 import { scratch } from 'test-kit/scratch';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
-import { rootNow } from './config-given.ts';
+import { advanceRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import { LINE_NAME } from '../src/run.ts';
+import { main } from '../src/cli/main.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-store-');
 const WORKFLOW = path.join(ROOT, 'workflow');
@@ -25,15 +29,9 @@ fs.mkdirSync(WORKFLOW, { recursive: true });
 fs.writeFileSync(path.join(WORKFLOW, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
 fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
 
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { advanceRun, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
-const { runRecord } = await import('../src/record/record.store.ts');
-const { LINE_NAME } = await import('../src/run.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
+const runWith = runOver(runEngine, gitPlaceLayer, ENV);
+const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 /** A run record over `/repo`, without worktrees: a test of the record, not of git. */
 const aRun = (id: string, steps: Run['steps']): Run => ({
@@ -227,9 +225,8 @@ const rmTyped = async (t: TestContext, e: Engine, ...args: string[]) => {
   const log = t.mock.method(console, 'log', (...a: unknown[]) => {
     printed.push(a.join(' '));
   });
-  const { main } = await import('../src/cli/main.ts');
   try {
-    await main(['rm', ...args], e);
+    await main(['rm', ...args], e, undefined, undefined, ENV);
     return { printed, error: undefined };
   } catch (err) {
     return { printed, error: err as Error & { exitCode?: number } };
@@ -242,11 +239,11 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
   const repo = anIgnoringRepo();
   const b = board();
   const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: folder() }));
-  await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
-  const wt = runRecord(rootNow(), run.id).steps.implement.workspace!;
+  await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+  const wt = runRecord(ROOT, run.id).steps.implement.workspace!;
   assert.equal(wt, path.join(ROOT, 'worktrees', run.id, LINE_NAME));
   b.settle(`${run.id}-implement`, 'failed');
-  await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
+  await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
 
   fs.writeFileSync(path.join(wt, 'fix.ts'), 'export const fixed = true;\n');
   const outside = fs.mkdtempSync(path.join(ROOT, 'outside-'));
@@ -296,7 +293,7 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
     "the engine is asked to forget the run's task, once, and stops or files nothing",
   );
   assert.throws(
-    () => runRecord(rootNow(), run.id),
+    () => runRecord(ROOT, run.id),
     (err: Error) => err.message.startsWith('no such run: '),
   );
 

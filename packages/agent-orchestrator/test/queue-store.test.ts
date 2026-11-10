@@ -7,8 +7,8 @@
  *
  * What the cap decides is pure, and lives in `src/cap/cap.test.ts`; what a card and the queue's order are, in `src/inbox/inbox.test.ts`;
  * a queued card whose start fails in git's words, in `queue-store.boundary.test.ts`. A file of its own, since `tick` reads every run
- * under `WF_ROOT`: each story starts on an empty store and leaves none in flight. `WF_ROOT` is read as the module loads, so it is set
- * before the import; `WF_MAX_RUNS` is read on every pass. `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo of
+ * under `WF_ROOT`: each story starts on an empty store and leaves none in flight. The store is the file's own, at `ROOT`, given
+ * as `ENV`; `WF_MAX_RUNS` is read off it on every pass. `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo of
  * runs at rest, and a difference throws (`verifyRest` in tick.verb.ts). The stage's engine keeps no pass of its own: `ticking` hands it
  * one that reports nothing, so a pass reads each task off the stand-in as a person settled it.
  */
@@ -26,18 +26,8 @@ import { scratch } from 'test-kit/scratch';
 import { TEAM } from './team.ts';
 import { decideScreen } from './screens.ts';
 import { names } from './assessed.ts';
-import { rootNow } from './config-given.ts';
 import type { StoreRoot as StoreRootNeeded } from '../src/config/root.store.ts';
-
-const ROOT = scratch('wf-queue-');
-const RUNS = path.join(ROOT, 'runs');
-const INBOX = path.join(ROOT, 'inbox');
-
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_RUNS;
-delete process.env.WF_MAX_CONCURRENT;
-const {
+import {
   advanceRun,
   cancelRun,
   decideRun,
@@ -46,26 +36,59 @@ const {
   startRun,
   startFromInbox,
   tickRun,
-  runWith: runEngine,
+  runWith as runEngine,
   StoreRoot,
   checkoutPromiseLine,
   runningRelease,
-  ...verbs
-} = await import('../src/runner.ts');
-const { addFactory, attachWorkflow } = await import('../testing.ts');
+  addToInbox as addToInboxVerb,
+  readInbox as readInboxVerb,
+} from '../src/runner.ts';
+import { addFactoryAt, attachWorkflowAt } from '../src/factory/factory.store.ts';
+import { listRuns, runRecord } from '../src/record/record.store.ts';
+import { main as cli } from '../src/cli/main.ts';
+import { cardFiles } from '../src/cards/cards.store.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import { passParents } from '../src/views/views.verb.ts';
+import { NOTHING_READ, standingReader } from '../src/standing/standing.verb.ts';
+import { story, staged } from './story.ts';
+
+const ROOT = scratch('wf-queue-');
+const RUNS = path.join(ROOT, 'runs');
+const INBOX = path.join(ROOT, 'inbox');
+
+/** The file's store and settings; a story sets the cap and the ceilings on it, as a person's shell would. */
+const ENV: Record<string, string | undefined> = {
+  ...process.env,
+  WF_ROOT: ROOT,
+  WF_VERIFY_REST: '1',
+  WF_MAX_RUNS: undefined,
+  WF_MAX_CONCURRENT: undefined,
+};
 /** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
 const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRootNeeded>): A => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
-const addToInbox = (opts: Parameters<typeof verbs.addToInbox>[0]) => atRoot(verbs.addToInbox(opts));
-const readInbox = () => atRoot(verbs.readInbox());
-const { listRuns, runRecord } = await import('../src/record/record.store.ts');
-const { main: cli } = await import('../src/cli/main.ts');
-const { cardFiles } = await import('../src/cards/cards.store.ts');
-const { engineOf } = await import('../src/runtime-client.ts');
-const { passParents } = await import('../src/views/views.verb.ts');
-const { NOTHING_READ, standingReader } = await import('../src/standing/standing.verb.ts');
-const { story, staged } = await import('./story.ts');
-const stage = staged({ runWith: runEngine, main: cli, engineOf });
+const addToInbox = (opts: Parameters<typeof addToInboxVerb>[0]) => atRoot(addToInboxVerb(opts));
+const readInbox = () => atRoot(readInboxVerb());
+const stage = staged({ runWith: runEngine, main: cli, engineOf, env: ENV });
 const { runWith, runPlaced } = stage;
+
+/**
+ * `decideScreen` on this file's store: `screens.ts` runs `main` on the process's environment, so the store's `WF_` settings are put on
+ * it for the call alone, and put back.
+ */
+const screenOn = async (...args: Parameters<typeof decideScreen>): Promise<string[]> => {
+  const keys = Object.keys(ENV).filter((key) => key.startsWith('WF_'));
+  const was = keys.map((key) => [key, process.env[key]] as const);
+  const put = (key: string, value: string | undefined) => {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  };
+  for (const key of keys) put(key, ENV[key]);
+  try {
+    return await decideScreen(...args);
+  } finally {
+    for (const [key, value] of was) put(key, value);
+  }
+};
 /** The runs waited on as a read with no standing reads them: none of their branches asked. */
 const noParents = () => passParents(standingReader(NOTHING_READ));
 
@@ -104,8 +127,7 @@ const refusedAs =
 const emptyStore = (cap: string | undefined) => {
   for (const dir of [RUNS, INBOX, path.join(ROOT, 'queue'), path.join(ROOT, 'tick.json')]) fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(RUNS, { recursive: true });
-  if (cap === undefined) delete process.env.WF_MAX_RUNS;
-  else process.env.WF_MAX_RUNS = cap;
+  ENV.WF_MAX_RUNS = cap;
 };
 
 /** A repository with one commit, so a start has a base to record. */
@@ -150,7 +172,7 @@ const started = async (
   );
   const file = path.join(RUNS, `${run.id}.json`);
   fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), createdAt }, null, 2));
-  return runRecord(rootNow(), run.id);
+  return runRecord(ROOT, run.id);
 };
 const at = (minute: number) => `2026-09-16T09:${String(minute).padStart(2, '0')}:00.000Z`;
 const runsWritten = () => fs.readdirSync(RUNS).filter((f) => f.endsWith('.json')).length;
@@ -192,7 +214,7 @@ const aCard = (name: string, keys: Record<string, string>, body: string): string
   return file;
 };
 
-const fromCard = (card: string) => listRuns(rootNow()).filter((r) => r.from?.inbox === card);
+const fromCard = (card: string) => listRuns(ROOT).filter((r) => r.from?.inbox === card);
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
 /**
@@ -203,17 +225,17 @@ const aSoloFactory = (attached: readonly string[]): string => {
   fs.rmSync(path.join(ROOT, 'factories'), { recursive: true, force: true });
   const repo = aRepo();
   fs.cpSync(TEAM, path.join(repo, 'workflows'), { recursive: true });
-  addFactory({ name: 'solo', repos: [repo] });
-  for (const workflow of attached) attachWorkflow({ factory: 'solo', workflow });
+  addFactoryAt(ROOT, { name: 'solo', repos: [repo] });
+  for (const workflow of attached) attachWorkflowAt(ROOT, { factory: 'solo', workflow });
   return repo;
 };
 
 /** Unfactored starts as shipped, for one test: the switch the tests' ambient sets is taken off, and put back after. */
 const asShipped = (t: { after: (f: () => void) => void }): void => {
-  const was = process.env.WF_DEFAULT_FACTORY_STARTS;
-  delete process.env.WF_DEFAULT_FACTORY_STARTS;
+  const was = ENV.WF_DEFAULT_FACTORY_STARTS;
+  ENV.WF_DEFAULT_FACTORY_STARTS = undefined;
   t.after(() => {
-    if (was !== undefined) process.env.WF_DEFAULT_FACTORY_STARTS = was;
+    if (was !== undefined) ENV.WF_DEFAULT_FACTORY_STARTS = was;
   });
 };
 
@@ -248,8 +270,8 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
       assert.deepEqual(b.filings, [task(one), task(two)]);
       for (const held of [younger, older]) assert.ok(ticked.includes(`${held.id}  running  ${HELD}`), ticked.join('\n'));
       assert.ok(ticked.includes(`   implement: ${HELD} — filed once a run in flight settles`), ticked.join('\n'));
-      assert.ok(runRecord(rootNow(), older.id).slotHeldAt, 'the pass that held it wrote when');
-      assert.deepEqual(runRecord(rootNow(), one.id).slotHeldAt, undefined, 'a run the cap never held has no time written');
+      assert.ok(runRecord(ROOT, older.id).slotHeldAt, 'the pass that held it wrote when');
+      assert.deepEqual(runRecord(ROOT, one.id).slotHeldAt, undefined, 'a run the cap never held has no time written');
 
       const listed = await printedBy(c, ['ls']);
       assert.ok(
@@ -269,9 +291,9 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
   await s.test(
     'the next pass holds them again, files nothing, and writes nothing: the time stands, and the note is said once',
     async () => {
-      const heldAt = runRecord(rootNow(), older.id).slotHeldAt;
+      const heldAt = runRecord(ROOT, older.id).slotHeldAt;
       const { runs: again } = await runWith(b.e, tickRun());
-      assert.deepEqual([b.filings.length, runRecord(rootNow(), older.id).slotHeldAt], [2, heldAt]);
+      assert.deepEqual([b.filings.length, runRecord(ROOT, older.id).slotHeldAt], [2, heldAt]);
       assert.deepEqual(again.find((a) => a.run.id === older.id)!.notes, []);
       assert.deepEqual(
         [
@@ -296,18 +318,17 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
       const held = { listed: [`implement      ${HELD}`, `implement      ${HELD}`], decided: heldDecided(older) };
       try {
         for (const shell of [undefined, '5', '1', 'two']) {
-          if (shell === undefined) delete process.env.WF_MAX_RUNS;
-          else process.env.WF_MAX_RUNS = shell;
+          ENV.WF_MAX_RUNS = shell;
           assert.deepEqual(await seen(), held, `a shell with WF_MAX_RUNS=${shell} says what the daemon holds`);
         }
       } finally {
-        process.env.WF_MAX_RUNS = '2';
+        ENV.WF_MAX_RUNS = '2';
       }
     },
   );
 
   await s.test('the whole screen of a run the cap holds', async (c) => {
-    assert.deepEqual(await decideScreen(c, b.e, [older.id], { '<id>': older.id, '<root>': ROOT }, stage.place().place), [
+    assert.deepEqual(await screenOn(c, b.e, [older.id], { '<id>': older.id, '<root>': ROOT }, stage.place().place), [
       '<id>  c the older',
       '',
       '  waiting for a run slot (2 of 2 in flight)',
@@ -331,7 +352,7 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
         'the work beside it waits as before, listed by id: the watcher took no slot',
       );
       const held = async () =>
-        [...(await runWith(b.e, runSlots(b.e, listRuns(rootNow()), settingsOf(process.env), noParents())))]
+        [...(await runWith(b.e, runSlots(b.e, listRuns(ROOT), settingsOf(ENV), noParents())))]
           .map(([id]) => id)
           .sort((x, y) => x.localeCompare(y));
       assert.deepEqual(await held(), [younger.id, older.id], 'between passes too');
@@ -435,9 +456,9 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
       const recorded = () => JSON.parse(fs.readFileSync(path.join(ROOT, 'tick.json'), 'utf8')) as { sessions: number; runs: number };
       const listedHeld = async () => (await printedBy(c, ['ls'])).filter((l) => l.includes('waiting for a run slot'));
       fs.rmSync(path.join(ROOT, 'tick.json'));
-      delete process.env.WF_MAX_RUNS;
+      ENV.WF_MAX_RUNS = undefined;
       assert.deepEqual(await listedHeld(), [], "before any pass has written its ceilings, the shell's own: with none, nothing is held");
-      process.env.WF_MAX_RUNS = 'two';
+      ENV.WF_MAX_RUNS = 'two';
       await assert.rejects(
         stage.main(['ls']),
         refusedAs('Invalid', 'WF_MAX_RUNS=two', 'WF_MAX_RUNS=2'),
@@ -445,8 +466,7 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
       );
 
       for (const cap of [undefined, '0']) {
-        if (cap === undefined) delete process.env.WF_MAX_RUNS;
-        else process.env.WF_MAX_RUNS = cap;
+        ENV.WF_MAX_RUNS = cap;
         const runs = [await started('fresh one', at(8)), await started('fresh two', at(9))];
         const { runs: pass } = await runWith(b.e, tickRun());
         assert.equal(recorded().runs, 0, `${cap}: the pass writes down that it runs with no cap`);
@@ -455,14 +475,14 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
           pass.filter((a) => a.held),
           [],
         );
-        assert.ok(runs.every((r) => runRecord(rootNow(), r.id).slotHeldAt === undefined));
+        assert.ok(runs.every((r) => runRecord(ROOT, r.id).slotHeldAt === undefined));
       }
       await started('fourth', at(10));
-      process.env.WF_MAX_RUNS = '1';
+      ENV.WF_MAX_RUNS = '1';
       try {
         assert.deepEqual(await listedHeld(), [], 'not held by a cap the daemon does not run with');
       } finally {
-        delete process.env.WF_MAX_RUNS;
+        ENV.WF_MAX_RUNS = undefined;
       }
     },
   );
@@ -499,7 +519,7 @@ test('a run keeps its momentum: its first steps are filed with none, and everyth
         .filter((task) => task.startsWith(`${id}-`))
         .map((task) => [task.slice(id.length + 1), b.tasks.get(task)!.spec.priority ?? 'none']),
     );
-  const advanced = async (id: string) => runWith(b.e, advanceRun(runRecord(rootNow(), id)));
+  const advanced = async (id: string) => runWith(b.e, advanceRun(runRecord(ROOT, id)));
 
   await s.test('every step that waits on nothing has no momentum, and the step that joins them has 1', async () => {
     const dir = folderOf({ left: '', right: '', join: 'after: left, right' });
@@ -582,8 +602,8 @@ test("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read the
   emptyStore(undefined);
   t.after(() => {
     emptyStore(undefined);
-    process.env.WF_VERIFY_REST = '1';
-    delete process.env.WF_MAX_CONCURRENT;
+    ENV.WF_VERIFY_REST = '1';
+    ENV.WF_MAX_CONCURRENT = undefined;
   });
   const stop = Object.assign(new Error('the engine was asked to tick'), { exitCode: 9 });
   const daemon = path.join(ROOT, 'daemon.json');
@@ -591,19 +611,19 @@ test("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read the
 
   await t.test('`nemia up` says both ceilings in words before its first pass, and the store it takes, once per start', async (c) => {
     const { e } = stoppedBy(stop);
-    process.env.WF_MAX_CONCURRENT = '4';
+    ENV.WF_MAX_CONCURRENT = '4';
     const printed: string[] = [];
     const log = c.mock.method(console, 'log', (...args: unknown[]) => {
       printed.push(args.join(' '));
     });
     try {
       await assert.rejects(stage.main(['up'], e), (err) => err === stop);
-      process.env.WF_MAX_RUNS = '2';
+      ENV.WF_MAX_RUNS = '2';
       await assert.rejects(stage.main(['up', '1000'], e), (err) => err === stop);
     } finally {
       log.mock.restore();
-      delete process.env.WF_MAX_CONCURRENT;
-      delete process.env.WF_MAX_RUNS;
+      ENV.WF_MAX_CONCURRENT = undefined;
+      ENV.WF_MAX_RUNS = undefined;
     }
     const holds = `   holds ${ROOT} as pid ${process.pid} — a second daemon, the api or a nemia up, or a nemia tick, on this store is refused while it ticks (daemon.json)`;
     const promise = checkoutPromiseLine(runningRelease());
@@ -648,7 +668,7 @@ test("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read the
       const held = daemonFile();
       const { e, own } = stoppedBy(stop);
       if (engineAskedFirst) Object.assign(e, { tick: () => Effect.succeed(QUIET) });
-      Object.assign(process.env, env);
+      Object.assign(ENV, env);
       c.mock.method(console, 'log', () => {});
       try {
         await assert.rejects(argv === 'pass' ? runWith(e, tickRun()) : stage.main(argv, e), (err: Error & { exitCode?: number }) => {
@@ -657,8 +677,8 @@ test("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read the
           return true;
         });
       } finally {
-        for (const key of Object.keys(env)) delete process.env[key];
-        process.env.WF_VERIFY_REST = '1';
+        for (const key of Object.keys(env)) delete ENV[key];
+        ENV.WF_VERIFY_REST = '1';
         c.mock.restoreAll();
       }
       assert.deepEqual(
@@ -803,12 +823,12 @@ test('a card becomes a run: filed with its factory and its gate, queued, it wait
         `${bare.card.name}  taken back: it no longer starts on its own — start it with nemia start ${bare.file}`,
       ]);
       assert.equal(fs.readFileSync(bare.file, 'utf8'), `---\nworkflow: dev\nrepo: ${repo}\n---\nNo workflow yet\n`);
-      const runs = listRuns(rootNow()).length;
-      assert.deepEqual([(await runWith(b.e, tickRun())).queue, listRuns(rootNow()).length], [undefined, runs], 'taken back: not started');
+      const runs = listRuns(ROOT).length;
+      assert.deepEqual([(await runWith(b.e, tickRun())).queue, listRuns(ROOT).length], [undefined, runs], 'taken back: not started');
       await printedBy(c, ['inbox', 'queue', bare.card.name]);
       await printedBy(c, ['inbox', 'rm', bare.card.name]);
       assert.deepEqual(
-        [(await runWith(b.e, tickRun())).queue, listRuns(rootNow()).length],
+        [(await runWith(b.e, tickRun())).queue, listRuns(ROOT).length],
         [undefined, runs],
         'queued, then dropped: nothing to start',
       );
@@ -887,7 +907,7 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
         `no workflow folder at ${path.join(INBOX, 'nope')}`,
         `nemia inbox queue gone-a1b2 --off, then nemia inbox queue gone-a1b2`,
       );
-      assert.deepEqual([fs.readFileSync(gone, 'utf8'), listRuns(rootNow())], [text, []], 'the card as it was, and no run');
+      assert.deepEqual([fs.readFileSync(gone, 'utf8'), listRuns(ROOT)], [text, []], 'the card as it was, and no run');
       const listed = (await printedBy(c, ['inbox'])).find((l) => l.startsWith('gone-a1b2'))!;
       names(listed, 'workflow: nope', 'queued 1 of 2 — not started at ', 'gone-a1b2.md: `workflow: nope`');
 
@@ -925,7 +945,7 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
       const ticked = await printedBy(c, ['tick']);
       assert.equal(ticked.length, 1, ticked.join('\n'));
       names(ticked[0], `gone-a1b2 not started: gone-a1b2.md: \`repo: ${doomed}\` names no directory`, 'nemia inbox queue gone-a1b2 --off');
-      assert.deepEqual([fs.readFileSync(gone, 'utf8'), listRuns(rootNow())], [text, []]);
+      assert.deepEqual([fs.readFileSync(gone, 'utf8'), listRuns(ROOT)], [text, []]);
       const listed = (await printedBy(c, ['inbox'])).find((l) => l.startsWith('gone-a1b2'))!;
       names(listed, `gone-a1b2.md: \`repo: ${doomed}\` names no directory`, 'queued 1 of 2 — not started at ');
 
@@ -963,7 +983,7 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
       assert.ok(line.startsWith(`${card.name} not started on ${none}: ${card.name}.md: `), line);
       names(line, '`workflow: dev`', 'no workflow folder at ', 'run nemia up in the repository it is about');
       assert.deepEqual(
-        [(await runWith(b.e, tickRun({ repo: none }))).queue, listRuns(rootNow())],
+        [(await runWith(b.e, tickRun({ repo: none }))).queue, listRuns(ROOT)],
         [undefined, []],
         'passed over on the same repository',
       );
@@ -990,7 +1010,7 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
       names(refused.queue.refused, 'nemia factory attach solo dev');
       assert.equal(cardFiles(ROOT).tries.list().get('unattached-card')?.repo, solo);
       assert.deepEqual(
-        [(await runWith(b.e, tickRun({ repo: daemons }))).queue, listRuns(rootNow())],
+        [(await runWith(b.e, tickRun({ repo: daemons }))).queue, listRuns(ROOT)],
         [undefined, []],
         'passed over on the same repository',
       );
@@ -1019,7 +1039,7 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
       );
       assert.doesNotMatch(refused.queue.refused, /--factory <name>;|at start/, 'a daemon has no flag to give');
       assert.doesNotMatch(queueLine(refused.queue), / not started on |run nemia up in the repository/);
-      assert.deepEqual([(await runWith(b.e, tickRun({ repo: solo }))).queue, listRuns(rootNow())], [undefined, []], 'the refusal lasts');
+      assert.deepEqual([(await runWith(b.e, tickRun({ repo: solo }))).queue, listRuns(ROOT)], [undefined, []], 'the refusal lasts');
       const [line] = await printedBy(c, ['inbox']);
       assert.match(line, /^loose-card .* — not started at \S+: \S+\/inbox\/loose-card\.md: this card names no factory, /);
       assert.doesNotMatch(line, /run nemia up in the repository/);
@@ -1052,11 +1072,11 @@ test('REFUSED by name at shipped defaults: `nemia inbox queue` of a name with no
   const x = await started('x', at(1));
   fs.writeFileSync(
     path.join(RUNS, 'started-already-zz99.json'),
-    JSON.stringify({ ...runRecord(rootNow(), x.id), id: 'started-already-zz99', from: { inbox: 'kept-a1b2' } }),
+    JSON.stringify({ ...runRecord(ROOT, x.id), id: 'started-already-zz99', from: { inbox: 'kept-a1b2' } }),
   );
   const cards = () => Object.fromEntries(fs.readdirSync(INBOX).map((f) => [f, fs.readFileSync(path.join(INBOX, f), 'utf8')]));
   const before = cards();
-  const runs = listRuns(rootNow()).length;
+  const runs = listRuns(ROOT).length;
   const queue = (...argv: string[]) => stage.main(['inbox', 'queue', ...argv]);
   const rows: Array<[string, () => Promise<unknown>, 'Missing' | 'Conflict' | 'Invalid', string[], shipped?: boolean]> = [
     [
@@ -1136,7 +1156,7 @@ test('REFUSED by name at shipped defaults: `nemia inbox queue` of a name with no
       if (shipped) asShipped(c);
       await assert.rejects(refused, refusedAs(tag, ...facts));
       assert.deepEqual(cards(), before, 'nothing written');
-      assert.equal(listRuns(rootNow()).length, runs, 'nothing started');
+      assert.equal(listRuns(ROOT).length, runs, 'nothing started');
     });
 
   await t.test(

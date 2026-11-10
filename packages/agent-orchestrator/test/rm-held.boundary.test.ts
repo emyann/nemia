@@ -3,7 +3,7 @@
  * git's index, and a worktree on no branch. The test place models no lock, no hook, no index and no checkout on no branch, so these
  * keep the git place; the rest of `nemia rm` is walked in store.test.ts.
  *
- * `WF_ROOT` is set before the runner is imported, since it is read as the module loads.
+ * The store is the test's own, at `ROOT`, given as `ENV`.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,7 +17,10 @@ import { scratch } from 'test-kit/scratch';
 import { isRepositoryRun } from '../src/run.ts';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
-import { rootNow } from './config-given.ts';
+import { advanceRun, forgetRun, forgetLine as forgetLineOf, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
+import { markCancelled, runRecord } from '../src/record/record.store.ts';
+import { main } from '../src/cli/main.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-rm-held-');
 const WORKFLOW = path.join(ROOT, 'workflow');
@@ -26,14 +29,9 @@ fs.mkdirSync(WORKFLOW, { recursive: true });
 fs.writeFileSync(path.join(WORKFLOW, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
 fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
 
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { advanceRun, forgetRun, forgetLine: forgetLineOf, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
-const { markCancelled, runRecord } = await import('../src/record/record.store.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
+const runWith = runOver(runEngine, gitPlaceLayer, ENV);
+const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
@@ -209,15 +207,15 @@ const aParent = async (
   }: { work?: string; signed?: boolean; workflowDir?: string; brief?: string } = {},
 ) => {
   const run = repositoryRunOf(await runPlaced(startRun({ brief, repo, workflowDir: workflowDir ?? oneStep() })));
-  await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
-  const wt = runRecord(rootNow(), run.id).steps.implement.workspace!;
+  await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+  const wt = runRecord(ROOT, run.id).steps.implement.workspace!;
   if (work) {
     fs.writeFileSync(path.join(wt, work), `${work}\n`);
     gitIn(wt, 'add', '-A');
     gitIn(wt, 'commit', '-q', '-m', `add ${work}`);
   }
   if (signed) b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  return { run, wt, branch: runRecord(rootNow(), run.id).steps.implement.branch! };
+  return { run, wt, branch: runRecord(ROOT, run.id).steps.implement.branch! };
 };
 
 const worktreesOf = (repo: string) =>
@@ -233,9 +231,8 @@ const rmTyped = async (t: TestContext, e: Engine, ...args: string[]) => {
   const log = t.mock.method(console, 'log', (...a: unknown[]) => {
     printed.push(a.join(' '));
   });
-  const { main } = await import('../src/cli/main.ts');
   try {
-    await main(['rm', ...args], e);
+    await main(['rm', ...args], e, undefined, undefined, ENV);
     return { printed, error: undefined };
   } catch (err) {
     return { printed, error: err as Error & { exitCode?: number } };
@@ -249,7 +246,7 @@ test("REFUSED at shipped defaults: a locked worktree — git will not remove it,
   const b = board();
   const locked = await aParent(repo, b, { work: 'locked.txt' });
   gitIn(repo, 'worktree', 'lock', '--reason', 'a person holds it', locked.wt);
-  markCancelled(rootNow(), locked.run.id);
+  markCancelled(ROOT, locked.run.id);
 
   const held = await rmTyped(t, b.e, locked.run.id);
   assert.deepEqual(
@@ -260,7 +257,7 @@ test("REFUSED at shipped defaults: a locked worktree — git will not remove it,
     `${locked.run.id}  not forgotten: ${locked.wt} is held (a person holds it), and the place will not remove it — let it go if nothing needs it: git -C ${repo} worktree unlock ${locked.wt}. Its record, files and branches are kept until every worktree is gone: nemia rm ${locked.run.id} again then.`,
   ]);
   assert.ok(fs.existsSync(path.join(locked.wt, 'locked.txt')) && worktreesOf(repo).includes(locked.wt));
-  assert.ok(runRecord(rootNow(), locked.run.id).cancelledAt, 'the record is read with its cancellation, still');
+  assert.ok(runRecord(ROOT, locked.run.id).cancelledAt, 'the record is read with its cancellation, still');
 
   gitIn(repo, 'worktree', 'unlock', locked.wt);
   assert.equal((await runWith(b.e, forgetRun(locked.run.id))).kind, 'forgotten');

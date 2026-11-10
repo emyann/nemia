@@ -1,18 +1,15 @@
 /**
  * The client's way of reading the runtime: a verb of the engine read through `asked` dies, as an `Error`, of the runtime's refusal in the
  * runtime's words, and an engine `engineOf` cannot build is refused in them, one table; a program it runs (`runWith`) says its warnings
- * and errors, and no Info line. `WF_ROOT` is set before the client loads, a scratch root.
+ * and errors, and no Info line.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Layer } from 'effect';
 import { Engine, EngineRefused, StopRefused } from 'agent-runtime';
 import { testEngine } from 'agent-runtime/testing';
-import { scratch } from 'test-kit/scratch';
-
-process.env.WF_ROOT = scratch('wf-runtime-client-');
-const { asked, engineOf, HARNESSES, quotaHarnesses, runWith } = await import('../src/runtime-client.ts');
-const { HARNESSES: STEP_HARNESSES } = await import('../src/harness/harness.ts');
+import { asked, engineOf, HARNESSES, quotaHarnesses, runWith } from '../src/runtime-client.ts';
+import { HARNESSES as STEP_HARNESSES } from '../src/harness/harness.ts';
 
 /** What `run` was rejected or thrown with: the error, and the exit code it carries. */
 const failure = async (run: () => unknown): Promise<Error & { exitCode?: number }> => {

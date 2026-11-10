@@ -172,6 +172,20 @@
     {
       "term": "Label page",
       "meaning": "the page of one label value, `/labels/<key>/<value>` (`apps/web/src/routes/labels.$key.$value.tsx`): the cards that carry it no run started, the runs that carry it counted by where each stands (waiting, running, needs a person, landed, failed, stopped), and what a landed one cost, each linking to its list filtered by it."
+    },
+    {
+      "term": "Default factory",
+      "meaning": "the factory a run or a card that names none is in, `default` (objects' `DEFAULT_NAMESPACE`), and the board's two converters of it, written once in `apps/web/src/lib/api/namespace.ts` and re-exported by `apps/web/src/lib/factories.ts`: `namespaceOf`, from a factory as the api answers it (null for the default) to its namespace, and `factoryIn`, the way back.",
+      "retired": [
+        {
+          "spelling": "DEFAULT_NAME",
+          "card": "run-core, one read of a run (D): the board's default factory is objects' `DEFAULT_NAMESPACE`, through two converters"
+        },
+        {
+          "spelling": "factoryOf",
+          "card": "run-core, one read of a run (D): the board's default factory is objects' `DEFAULT_NAMESPACE`, through two converters"
+        }
+      ]
     }
   ]
 }

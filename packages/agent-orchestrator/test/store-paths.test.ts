@@ -75,7 +75,7 @@ const EXCEPTIONS: Readonly<Record<string, Exception>> = {
   'packages/agent-orchestrator/src/tick/told.verb.ts': {
     through: ['handedFolderAt'],
     why:
-      "the folders of a run another is handed, runs/<id>/artifacts and runs/<id>/inputs, are looked for at each filing, to be mounted " +
+      'the folders of a run another is handed, runs/<id>/artifacts and runs/<id>/inputs, are looked for at each filing, to be mounted ' +
       "read-only where each is a directory now: neither its record, a person's file nor the inbox",
   },
 };

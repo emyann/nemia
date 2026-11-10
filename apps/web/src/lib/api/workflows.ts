@@ -6,6 +6,7 @@
 import { queryOptions } from '@tanstack/react-query';
 import { Option, Schema } from 'effect';
 import {
+  DEFAULT_NAMESPACE,
   DEFINITION_ORIGINS,
   RepositoryAnswer,
   type DefinitionOrigin,
@@ -15,11 +16,9 @@ import {
 } from 'objects';
 import type { GraphEdge, RunGraph } from './graph.ts';
 import type { StepLayers } from './layers.ts';
-import { call, namespaceOf, read, runs, workflows as served, type Refuse } from './objects.ts';
+import { call, read, runs, workflows as served, type Refuse } from './objects.ts';
+import { namespaceOf } from './namespace.ts';
 import { sourceOf, type SchemaFile, StepKeySchema, WorkflowStepSpecSchema, type StepKey, type WorkflowStepSpec } from './library.ts';
-
-/** The namespace of the api's repository and your library, where the board writes yours. */
-const DEFAULT = 'default';
 
 /**
  * A step as the board reads it, off a Workflow's `status.steps`: `spec` and `body` are the step resolved; `own` is what a step with an
@@ -153,7 +152,7 @@ export const writtenStepOf = (step: StepWritten): WorkflowStep => {
 /** Every workflow the default namespace serves: the api's repository's and yours. Not polled: it changes when a person edits a folder. */
 export const workflowsQuery = queryOptions({
   queryKey: ['workflows'],
-  queryFn: async () => (await served.list(DEFAULT)).map(workflowViewOf),
+  queryFn: async () => (await served.list(DEFAULT_NAMESPACE)).map(workflowViewOf),
 });
 
 /**
@@ -164,7 +163,9 @@ export type Place = { factory: string; repo: string };
 
 /** The query naming `place`: none for no place and for the default factory, whose answer is the same as naming none. */
 export const placeQuery = (place?: Place | null): string =>
-  !place || place.factory === 'default' ? '' : `?factory=${encodeURIComponent(place.factory)}&repo=${encodeURIComponent(place.repo)}`;
+  !place || place.factory === DEFAULT_NAMESPACE
+    ? ''
+    : `?factory=${encodeURIComponent(place.factory)}&repo=${encodeURIComponent(place.repo)}`;
 
 /**
  * The workflows a factory offers on one of its repositories, its namespace read on `?repo=`, with its hires: each says what they leave
@@ -256,7 +257,7 @@ export const startRun = (
     namespaceOf(place?.factory),
     { ...start, from: sourceOf(start.from) },
     'The run may have started: look on the Runs page before starting it again.',
-    !place || place.factory === 'default' ? undefined : place.repo,
+    !place || place.factory === DEFAULT_NAMESPACE ? undefined : place.repo,
   );
 
 /**
@@ -298,7 +299,7 @@ export const saveWorkflow = async (
 ): Promise<WorkflowListing> =>
   workflowViewOf(
     await served.replace(
-      DEFAULT,
+      DEFAULT_NAMESPACE,
       name,
       {
         metadata: { resourceVersion: save.version },
@@ -314,7 +315,7 @@ export const saveWorkflow = async (
  * name taken, or a step the package refuses.
  */
 export const createWorkflow = async (name: string, step: StepWritten): Promise<WorkflowListing> =>
-  workflowViewOf(await served.create(DEFAULT, { metadata: { name }, spec: { steps: [writtenStepOf(step)] } }, refused));
+  workflowViewOf(await served.create(DEFAULT_NAMESPACE, { metadata: { name }, spec: { steps: [writtenStepOf(step)] } }, refused));
 
 /**
  * Remove a folder of yours whole, against the version it was read at (`DELETE /api/namespaces/default/workflows/<name>`): answers the
@@ -323,4 +324,4 @@ export const createWorkflow = async (name: string, step: StepWritten): Promise<W
  * read, saying the folder may be gone.
  */
 export const removeWorkflow = async (name: string, version: string): Promise<WorkflowListing> =>
-  workflowViewOf(await served.delete(DEFAULT, name, version));
+  workflowViewOf(await served.delete(DEFAULT_NAMESPACE, name, version));

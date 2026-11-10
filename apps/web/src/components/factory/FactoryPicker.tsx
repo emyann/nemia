@@ -8,7 +8,8 @@ import type { Key } from 'react';
 import { Select, SelectItem } from '@/components/ui/ds/components/Select';
 import { factoriesQuery, type Factory } from '@/lib/api/factories';
 import { openRunsQuery, type OpenRuns } from '@/lib/api/runs';
-import { DEFAULT_NAME, factoriesShown } from '@/lib/factories';
+import { DEFAULT_NAMESPACE } from 'objects';
+import { factoriesShown, namespaceOf } from '@/lib/factories';
 import { pickTo } from '../nav/nav';
 
 /** The choice of every factory: a number, where every factory's name is a string. */
@@ -55,7 +56,7 @@ export function inFlightWords(count: number, runs: boolean): string {
 }
 
 /** How many runs of the light answer `open` are in flight in the factory `name`, a run of the default factory naming none. */
-const inFlightIn = (open: OpenRuns, name: string): number => open.inFlight.filter((row) => (row.factory ?? DEFAULT_NAME) === name).length;
+const inFlightIn = (open: OpenRuns, name: string): number => open.inFlight.filter((row) => namespaceOf(row.factory) === name).length;
 
 /** What the trigger's title says of the factory picked: its repositories whole, one a line, and why its file does not read. */
 const aboutOf = (factory: Factory | undefined): string | undefined =>
@@ -83,7 +84,7 @@ export function FactoryPicker({ path, search, picked }: { path: string; search: 
   const factories = useQuery(factoriesQuery);
   const open = useQuery(openRunsQuery());
   const unnamed = factories.data !== undefined && factories.data.every((f) => f.default);
-  const held = useQuery({ ...openRunsQuery(DEFAULT_NAME), refetchInterval: false, enabled: unnamed });
+  const held = useQuery({ ...openRunsQuery(DEFAULT_NAMESPACE), refetchInterval: false, enabled: unnamed });
   const items = pickerOffer(factories.data, held.data, picked);
   const shown = items.find((item) => item.name === picked);
   const choose = (key: Key | null) => {

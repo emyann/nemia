@@ -2,7 +2,8 @@ import type { CardState, InboxEntry } from './api/inbox.ts';
 import type { Ceilings } from './api/ceilings.ts';
 import type { Factory } from './api/factories.ts';
 import type { WorkflowListing } from './api/workflows.ts';
-import { DEFAULT_NAME, shownIn, startRepo } from './factories.ts';
+import { DEFAULT_NAMESPACE } from 'objects';
+import { shownIn, startRepo } from './factories.ts';
 
 /**
  * The inbox as the page lists it: the newest card first, by when its file was written (`filedAt`) — a card carries no time of its own —
@@ -133,7 +134,7 @@ export function presetOf(
 }
 
 /** Whether a card names no factory: it has no `factory:` line, or writes `default`, which is no factory to start in. */
-export const unassigned = (entry: Pick<InboxEntry, 'factory'>): boolean => entry.factory === null || entry.factory === DEFAULT_NAME;
+export const unassigned = (entry: Pick<InboxEntry, 'factory'>): boolean => entry.factory === null || entry.factory === DEFAULT_NAMESPACE;
 
 /** The factories a card can be filed or started in, in the api's order: each named one whose file reads, never the default factory. */
 export const factoriesOffered = <T extends Pick<Factory, 'default' | 'error'>>(factories: readonly T[]): T[] =>

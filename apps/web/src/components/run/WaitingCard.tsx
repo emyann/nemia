@@ -2,7 +2,7 @@ import { Card, Tag } from '@/components/ui/ds';
 import type { WaitingRun } from '@/lib/api/runs';
 import { judged, type UnjudgedRun } from '@/lib/api/judged';
 import { clockBreakdown, costBreakdown, tokensBreakdown, tokensSaid } from '@/lib/breakdown';
-import { factoryOf } from '@/lib/factories';
+import { namespaceOf } from '@/lib/factories';
 import { titleOf } from '@/lib/factory';
 import { runClock } from '@/lib/factory';
 import { openWord, presentWait, waitSentence, waitTag, whenWords } from '@/lib/runWords';
@@ -74,8 +74,8 @@ function UnjudgedCard({ run }: { run: UnjudgedRun }) {
               {ANY_WAIT.tag({ step: null, done: 0 })}
             </Tag>
           </CutTag>
-          <Tag data-factory={factoryOf(run)} variant="outlined" className="uppercase">
-            {factoryOf(run)}
+          <Tag data-factory={namespaceOf(run.factory)} variant="outlined" className="uppercase">
+            {namespaceOf(run.factory)}
           </Tag>
         </div>
         <div className="flex flex-col items-start gap-1">
@@ -119,8 +119,8 @@ function JudgedCard({ run, asOf }: { run: WaitingRun; asOf: Date }) {
               {waitTag(run)}
             </Tag>
           </CutTag>
-          <Tag data-factory={factoryOf(run)} variant="outlined" className="uppercase">
-            {factoryOf(run)}
+          <Tag data-factory={namespaceOf(run.factory)} variant="outlined" className="uppercase">
+            {namespaceOf(run.factory)}
           </Tag>
           {waited !== null && (
             <span data-waited className="ml-auto font-mono text-body-small text-on-surface-variant uppercase">

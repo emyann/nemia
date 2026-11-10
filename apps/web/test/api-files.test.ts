@@ -3,9 +3,9 @@
  * file reaches a sibling only one level deep: it may import values from a sibling that imports values from no sibling (the objects'
  * client, objects.ts, which every read goes through), so no runtime import cycle can form among them. A type crosses by `import type`,
  * which is erased; the other values they import are react-query's, effect's, the objects' (`objects`, by its entry, whose words and
- * schemas the board reads rather than copies), the feed's pace, the refusals and the decode (read.ts) and `decodes` (decodes.ts); read.ts
- * imports effect alone and decodes.ts no value at all. The objects' client alone imports effect's HTTP client and HttpApi modules
- * besides, which make it.
+ * schemas the board reads rather than copies), the feed's pace, the refusals and the decode (read.ts), `decodes` (decodes.ts) and the
+ * default factory's two converters (namespace.ts); read.ts imports effect alone, decodes.ts no value at all and namespace.ts the objects'
+ * entry alone. The objects' client alone imports effect's HTTP client and HttpApi modules besides, which make it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,7 +21,7 @@ const DIR = path.resolve(import.meta.dirname, '../src/lib/api');
 const SRC = path.resolve(import.meta.dirname, '../src');
 
 /** What the files under src/lib/api/ may import values from. */
-const ALLOWED = new Set(['@tanstack/react-query', 'effect', 'objects', '../feed.ts', './read.ts', './decodes.ts']);
+const ALLOWED = new Set(['@tanstack/react-query', 'effect', 'objects', '../feed.ts', './read.ts', './decodes.ts', './namespace.ts']);
 
 /** What one file alone may import besides: the objects' client, effect's modules that make it. */
 const OWN: ReadonlyMap<string, ReadonlySet<string>> = new Map([['objects.ts', new Set(['effect/http', 'effect/http-api'])]]);
@@ -29,10 +29,14 @@ const OWN: ReadonlyMap<string, ReadonlySet<string>> = new Map([['objects.ts', ne
 /** What read.ts, the reads every file imports, may import values from. */
 const READ_ALLOWED = new Set(['effect']);
 
-/** What each file every other file imports may import values from: read.ts effect alone, and decodes.ts nothing. */
+/**
+ * What each file every other file imports may import values from: read.ts effect alone, decodes.ts nothing, and namespace.ts, the default
+ * factory's two converters, the objects' entry alone, for `DEFAULT_NAMESPACE`.
+ */
 const SHARED: ReadonlyMap<string, ReadonlySet<string>> = new Map([
   ['read.ts', READ_ALLOWED],
   ['decodes.ts', new Set<string>()],
+  ['namespace.ts', new Set(['objects'])],
 ]);
 
 /** A specifier naming a sibling under src/lib/api/, other than the shared files (`SHARED`). */
@@ -86,6 +90,7 @@ test('REFUSED: a value import of a sibling that imports a sibling, of anything b
     ['judged.ts', "import { runsQuery } from './runs.ts';"],
     ['read.ts', "import { Schema } from 'effect';\nimport { pace } from '../feed.ts';"],
     ['decodes.ts', "import { Schema } from 'effect';"],
+    ['namespace.ts', "import { DEFAULT_NAMESPACE } from 'objects';\nimport { pace } from '../feed.ts';"],
     ['quota.ts', "import { decodes } from './decodes.ts';\nimport { get } from './read.ts';"],
     [
       'objects.ts',
@@ -98,6 +103,7 @@ test('REFUSED: a value import of a sibling that imports a sibling, of anything b
     'judged.ts imports ./runs.ts',
     'read.ts imports ../feed.ts',
     'decodes.ts imports effect',
+    'namespace.ts imports ../feed.ts',
     'objects.ts imports objects/src/run.ts',
     'cards.ts imports effect/http',
   ]);

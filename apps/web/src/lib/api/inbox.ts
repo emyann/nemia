@@ -16,7 +16,8 @@ import {
   DEFAULT_NAMESPACE,
 } from 'objects';
 import { selectorKey } from './selector.ts';
-import { cards, namespaceOf } from './objects.ts';
+import { cards } from './objects.ts';
+import { factoryIn, namespaceOf } from './namespace.ts';
 import { sourceOf, type KeyRow } from './library.ts';
 import type { Place, Started, WorkflowListing } from './workflows.ts';
 
@@ -87,7 +88,7 @@ export const entryOf = (card: Card): InboxEntry => {
     title: status.title ?? null,
     workflow: spec.workflow ?? null,
     repo: spec.repo ?? null,
-    factory: metadata.namespace === undefined || metadata.namespace === DEFAULT_NAMESPACE ? null : metadata.namespace,
+    factory: factoryIn(metadata.namespace),
     from: [...(spec.from ?? [])],
     ...(spec.gate !== undefined ? { gate: spec.gate } : {}),
     startedAs: [...status.runs],
@@ -254,7 +255,7 @@ export const startCard = (
       namespaceOf(card.factory),
       card.name,
       { ...start, from: sourceOf(start.from) },
-      place && place.factory !== 'default' ? place : undefined,
+      place && place.factory !== DEFAULT_NAMESPACE ? place : undefined,
     )
     .then(({ id, card: started }) => ({ id, card: started }));
 

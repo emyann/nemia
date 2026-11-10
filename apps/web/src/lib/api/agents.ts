@@ -15,11 +15,9 @@ import {
   type DefinitionOrigin,
 } from 'objects';
 import { agents as served, call, read, write, type Refuse } from './objects.ts';
+import { namespaceOf } from './namespace.ts';
 import { cardEntryOf, originWord, type AgentSkill, type GivenSkill, type SchemaFile } from './library.ts';
 import type { PagePlace } from './workflows.ts';
-
-/** The namespace of the api's repository and your library, where the board writes yours. */
-const DEFAULT = 'default';
 
 /**
  * The keys an agent sets on the steps that name it: every agent key but what describes the agent itself — its description, the skills its
@@ -140,7 +138,7 @@ const LISTED: readonly DefinitionOrigin[] = ['repo', 'yours'];
 export const agentsQuery = queryOptions({
   queryKey: ['agents'],
   queryFn: async (): Promise<LibraryAgent[]> =>
-    (await Promise.all(LISTED.map((origin) => served.list(DEFAULT, { origin })))).flat().map(agentViewOf),
+    (await Promise.all(LISTED.map((origin) => served.list(DEFAULT_NAMESPACE, { origin })))).flat().map(agentViewOf),
 });
 
 /**
@@ -148,7 +146,9 @@ export const agentsQuery = queryOptions({
  * `agentQuery`'s read, for a page that must read it past the cache.
  */
 export const readAgent = async (from: string, name: string, place: PagePlace = {}): Promise<AgentListing> =>
-  agentViewOf(await served.get(place.factory ?? DEFAULT, name, { origin: originWord(from), ...(place.repo ? { repo: place.repo } : {}) }));
+  agentViewOf(
+    await served.get(namespaceOf(place.factory), name, { origin: originWord(from), ...(place.repo ? { repo: place.repo } : {}) }),
+  );
 
 /** One agent, for its page, read in `place` (a factory's own agent is read in its factory alone). */
 export const agentQuery = (from: string, name: string, place: PagePlace = {}) =>
@@ -216,19 +216,24 @@ const refused: Refuse = (words, status, answer) =>
 
 /** Make an agent of yours. Rejects with an `AgentRefusal`: a name taken, or a key or value the package refuses. */
 export const createAgent = async (draft: AgentDraft): Promise<AgentSaved> => ({
-  agent: agentViewOf(await served.create(DEFAULT, { metadata: { name: draft.name }, spec: specOfDraft(draft) }, refused)),
+  agent: agentViewOf(await served.create(DEFAULT_NAMESPACE, { metadata: { name: draft.name }, spec: specOfDraft(draft) }, refused)),
 });
 
 /** Put an agent of yours back — renamed, when the draft names it otherwise — against the version it was read at. */
 export const saveAgent = async (name: string, version: string, draft: AgentDraft): Promise<AgentSaved> => ({
   agent: agentViewOf(
-    await served.replace(DEFAULT, name, { metadata: { name: draft.name, resourceVersion: version }, spec: specOfDraft(draft) }, refused),
+    await served.replace(
+      DEFAULT_NAMESPACE,
+      name,
+      { metadata: { name: draft.name, resourceVersion: version }, spec: specOfDraft(draft) },
+      refused,
+    ),
   ),
 });
 
 /** Remove an agent of yours, against the version it was read at: refused while a node still names it, saying which. */
 export const removeAgent = async (name: string, version: string): Promise<AgentListing> =>
-  agentViewOf(await served.delete(DEFAULT, name, version, refused));
+  agentViewOf(await served.delete(DEFAULT_NAMESPACE, name, version, refused));
 
 /** The run a try started, which its page follows. */
 type AgentTried = { id: string };
@@ -238,7 +243,7 @@ type AgentTried = { id: string };
  * `AgentRefusal`: an empty brief, a try of it still running, an agent that does not read or gives a skill only the repository has.
  */
 export const tryAgent = async (name: string, brief: string): Promise<AgentTried> => ({
-  id: (await served.try(DEFAULT, name, brief, refused)).id,
+  id: (await served.try(DEFAULT_NAMESPACE, name, brief, refused)).id,
 });
 
 /** A person's custom instructions for an agent: the file they are kept in, their words (null for none), and why they do not read. */

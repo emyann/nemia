@@ -5,6 +5,8 @@
  * with no factory is in, and where the address's place reads a list of
  * workflows. A run or a card belongs to the factory it names, and one naming none to the default factory. Pure.
  */
+import { DEFAULT_NAMESPACE } from 'objects';
+import { namespaceOf } from './api/namespace.ts';
 import type { Factory, FactoryCondition, FactoryUntrusted } from './api/factories.ts';
 import type { InboxEntry } from './api/inbox.ts';
 import { type OpenRuns } from './api/runs.ts';
@@ -172,17 +174,17 @@ export const floorPlace = (factory: Factory): { factory: string; repos: string[]
 export const whyNotStarted = (workflow: Pick<WorkflowListing, 'error' | 'unfilled'>): string | null =>
   workflow.error ?? workflow.unfilled ?? null;
 
-/** The name the default factory goes by: in a filter, on a tag, and on a card that writes `factory: default`. */
-export const DEFAULT_NAME = 'default';
+/**
+ * The default factory's two converters, written once in a leaf of `lib/api` so the api's files reach them too: `namespaceOf`, from a
+ * factory as the api answers it (null for the default) to its name, and `factoryIn`, from a name back to that form.
+ */
+export { factoryIn, namespaceOf } from './api/namespace.ts';
 
-/** The factory a run or a card is tagged with: the one it names, or `default` for one naming none. */
-export const factoryOf = (item: { factory: string | null }): string => item.factory ?? DEFAULT_NAME;
-
-/** Whether a run or a card is kept by the filter on the factory `filter` names (`factoryOf`): every one is when it names none. */
+/** Whether a run or a card is kept by the filter on the factory `filter` names (`namespaceOf`): every one is when it names none. */
 export const keptBy =
   (filter: string | undefined) =>
   (item: { factory: string | null }): boolean =>
-    filter === undefined || factoryOf(item) === filter;
+    filter === undefined || namespaceOf(item.factory) === filter;
 
 /** The runs or cards of the factory `filter` names (`keptBy`), in their order; every one when `filter` names none. */
 export const shownIn = <T extends { factory: string | null }>(items: readonly T[], filter: string | undefined): T[] =>
@@ -222,7 +224,7 @@ export type ListPlace =
  */
 export const listPlace = (address: PagePlace, factories: readonly Factory[]): ListPlace => {
   const { factory: name, repo } = address;
-  if (name === undefined || name === DEFAULT_NAME) return { kind: 'every' };
+  if (name === undefined || name === DEFAULT_NAMESPACE) return { kind: 'every' };
   const factory = factories.find((f) => f.name === name && !f.default);
   const floor = factory ? floorPlace(factory) : null;
   if (!floor) return { kind: 'refused', factory: name, why: `No factory is named ${name}.` };
@@ -241,7 +243,7 @@ export const listPlace = (address: PagePlace, factories: readonly Factory[]): Li
 export const fromWord = (from: WorkflowListing['from'], factory?: string): string => {
   if (from === 'yours') return 'yours';
   if (from === 'factory') return "the factory's";
-  return factory === undefined || factory === DEFAULT_NAME ? 'this repository' : "the factory's";
+  return factory === undefined || factory === DEFAULT_NAMESPACE ? 'this repository' : "the factory's";
 };
 
 /**

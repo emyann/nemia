@@ -27,7 +27,7 @@ import { factoriesQuery } from '../lib/api/factories.ts';
 import { labelRun } from '../lib/api/labels.ts';
 import { readGone } from '../lib/api/gone.ts';
 import { loadRun, useRunView, type RunDetail, type StepView } from '../lib/runView';
-import { namespaceOf } from '../lib/runNamespace';
+import { namespaceOf } from '../lib/factories';
 import { untrustedFor, type UntrustedPlace } from '../lib/factories';
 import { askedIn, decideDrawn, gateOffered, stepAnchor } from '../lib/asks';
 import { barValue } from '../lib/bar';

@@ -6,10 +6,7 @@
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { Run } from 'objects';
 import { runObjectQuery } from './api/run.ts';
-import { namespaceOf } from './api/objects.ts';
-
-/** The namespace of a run of `factory`, as a row says it (null for the default factory). */
-export { namespaceOf };
+import { namespaceOf } from './factories.ts';
 
 /** A run by its name and the namespace its actions are sent in. */
 export type RunAt = { id: string; namespace: string };

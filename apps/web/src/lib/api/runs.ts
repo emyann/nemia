@@ -9,7 +9,8 @@ import { Concluded as ConcludedAnswer, type RunClock, type RunOutcome, type Step
 import { pace } from '../feed.ts';
 import { selectorKey } from './selector.ts';
 import { call, read, runs, type RunListQuery } from './objects.ts';
-import { factoryIn, runViewOf, type RunRow, type RunView, type UnjudgedRun } from './judged.ts';
+import { factoryIn } from './namespace.ts';
+import { runViewOf, type RunRow, type RunView, type UnjudgedRun } from './judged.ts';
 
 export type { RunClock, RunOutcome, StepCost } from 'objects';
 

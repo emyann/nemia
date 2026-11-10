@@ -17,7 +17,7 @@ import { clockCounts, repoName, runClock, titleOf, toDecideOf, waitsOnRuns, wait
 import { flowSteps, railOf, tilesOf } from '@/lib/flow';
 import { decideLine, gateOfSummary } from '@/lib/gate';
 import { useNow } from '@/lib/useNow';
-import { namespaceOf } from '@/lib/runNamespace';
+import { namespaceOf } from '@/lib/factories';
 import { ENDED } from '@/lib/words';
 import { RouteLink } from '../agent/AgentParts';
 import { CardGate, type Taken } from '../inbox/CardGate';

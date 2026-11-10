@@ -3,13 +3,11 @@
  * page as a `SkillDetail` — a builtin skill copied into your library, and one of yours written on the board, through the Skill object.
  */
 import { queryOptions } from '@tanstack/react-query';
-import type { DefinitionOrigin, Skill } from 'objects';
+import { DEFAULT_NAMESPACE, type DefinitionOrigin, type Skill } from 'objects';
 import { skills as served, type Refuse } from './objects.ts';
+import { namespaceOf } from './namespace.ts';
 import { cardEntryOf, originWord, type AgentSkill, type SkillCost, type SkillSource } from './library.ts';
 import type { PagePlace } from './workflows.ts';
-
-/** The namespace of the api's repository and your library, where the board writes yours. */
-const DEFAULT = 'default';
 
 /** One skill as the picker lists it, off its Skill object: its card entry or why no agent can be given it. */
 export type SkillRow = {
@@ -53,7 +51,7 @@ const skillRowOf = (skill: Skill): SkillRow => ({
  * in a factory, its own tree first.
  */
 const skillOrigins = (namespace: string): DefinitionOrigin[] =>
-  namespace === DEFAULT ? ['yours', 'repo', 'builtin'] : ['factory', 'yours', 'repo', 'builtin'];
+  namespace === DEFAULT_NAMESPACE ? ['yours', 'repo', 'builtin'] : ['factory', 'yours', 'repo', 'builtin'];
 
 /**
  * Every skill of `namespace`'s places, a list each read by its origin (`?origin=`), shadowed or not, read from disk on each request; keyed
@@ -61,7 +59,7 @@ const skillOrigins = (namespace: string): DefinitionOrigin[] =>
  */
 const skillsInQuery = (namespace: string) =>
   queryOptions({
-    queryKey: namespace === DEFAULT ? ['skills'] : ['skills', namespace],
+    queryKey: namespace === DEFAULT_NAMESPACE ? ['skills'] : ['skills', namespace],
     queryFn: (): Promise<SkillPlace[]> =>
       Promise.all(
         skillOrigins(namespace).map(async (from) => {
@@ -72,7 +70,7 @@ const skillsInQuery = (namespace: string) =>
   });
 
 /** Every skill the picker lists, by place, in the default namespace. */
-export const skillsQuery = skillsInQuery(DEFAULT);
+export const skillsQuery = skillsInQuery(DEFAULT_NAMESPACE);
 
 /** A copy the api refused: its words, and its status — 404 for a skill Nemia does not ship, 409 for a name your library has already. */
 export class SkillRefusal extends Error {
@@ -88,7 +86,7 @@ const refused: Refuse = (words, status) => new SkillRefusal(words, status);
 
 /** Copy the builtin skill `name` into your library, a write of its own: an agent of yours can then be given it. */
 export const copySkill = async (name: string): Promise<SkillAdded> => ({
-  skill: skillRowOf(await served.copy(DEFAULT, name, refused)),
+  skill: skillRowOf(await served.copy(DEFAULT_NAMESPACE, name, refused)),
 });
 
 /**
@@ -161,7 +159,7 @@ export const skillQuery = (from: string, name: string, place: PagePlace = {}) =>
     queryKey: place.factory ? ['skills', from, name, place.factory, place.repo ?? null] : ['skills', from, name],
     queryFn: async () =>
       skillDetailOf(
-        await served.get(place.factory ?? DEFAULT, name, { origin: originWord(from), ...(place.repo ? { repo: place.repo } : {}) }),
+        await served.get(namespaceOf(place.factory), name, { origin: originWord(from), ...(place.repo ? { repo: place.repo } : {}) }),
       ),
   });
 
@@ -173,12 +171,14 @@ const specOfDraft = ({ name: _, ...spec }: SkillDraft) => spec;
  * refuses.
  */
 export const createSkill = async (draft: SkillDraft): Promise<SkillSaved> =>
-  skillDetailOf(await served.create(DEFAULT, { metadata: { name: draft.name }, spec: specOfDraft(draft) }, refused));
+  skillDetailOf(await served.create(DEFAULT_NAMESPACE, { metadata: { name: draft.name }, spec: specOfDraft(draft) }, refused));
 
 /** A skill of yours written again, whole, at the version it was read at: refused 409 when it has changed since. */
 export const saveSkill = async (name: string, version: string, draft: SkillDraft): Promise<SkillSaved> =>
-  skillDetailOf(await served.replace(DEFAULT, name, { metadata: { resourceVersion: version }, spec: specOfDraft(draft) }, refused));
+  skillDetailOf(
+    await served.replace(DEFAULT_NAMESPACE, name, { metadata: { resourceVersion: version }, spec: specOfDraft(draft) }, refused),
+  );
 
 /** A skill of yours loaded every turn, or named for a session to load: its `preload:` line alone, at the version it was read at. */
 export const switchPreload = async (name: string, version: string, preload: boolean): Promise<SkillSaved> =>
-  skillDetailOf(await served.replace(DEFAULT, name, { metadata: { resourceVersion: version }, preload }, refused));
+  skillDetailOf(await served.replace(DEFAULT_NAMESPACE, name, { metadata: { resourceVersion: version }, preload }, refused));

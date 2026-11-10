@@ -4,12 +4,12 @@
  */
 import { judged, type RunRow, type RunView } from './api/judged.ts';
 import { stepAnchor } from './asks.ts';
-import { factoryOf } from './factories.ts';
+import { namespaceOf } from './factories.ts';
 import { byAge, titleOf } from './factory.ts';
 
 /**
- * A run the waiting bar lists: its id, its title (`titleOf`), the factory it is in (`factoryOf`), what it waits for in the package's words,
- * and the step waiting at its gate, null for a run that waits on a person for anything else.
+ * A run the waiting bar lists: its id, its title (`titleOf`), the factory it is in (`namespaceOf`), what it waits for in the package's
+ * words, and the step waiting at its gate, null for a run that waits on a person for anything else.
  */
 export type BellRow = { run: string; title: string; factory: string; waitsFor: string[]; gate: string | null };
 
@@ -31,11 +31,11 @@ export const bellRows = (waiting: readonly RunRow[]): BellRow[] => [
   ...waiting
     .filter((run) => !judged(run))
     .sort((a, b) => a.id.localeCompare(b.id))
-    .map((run) => ({ run: run.id, title: run.id, factory: factoryOf(run), waitsFor: [], gate: null })),
+    .map((run) => ({ run: run.id, title: run.id, factory: namespaceOf(run.factory), waitsFor: [], gate: null })),
   ...byAge(waiting.filter(judged)).map((run) => ({
     run: run.id,
     title: titleOf(run),
-    factory: factoryOf(run),
+    factory: namespaceOf(run.factory),
     waitsFor: waitsForOf(run),
     gate: run.steps.find((step) => step.approve)?.name ?? null,
   })),

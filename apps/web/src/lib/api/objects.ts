@@ -25,7 +25,6 @@ import {
   type AgentWrite,
   Api,
   Card,
-  DEFAULT_NAMESPACE,
   Delegation,
   DelegationList,
   type DelegationWrite,
@@ -255,9 +254,6 @@ export const steps = {
   /** What a step was told. */
   told: (runId: string, step: string): Promise<StepTold> => call((c) => c.steps.told({ params: { runId, step } }), read(StepTold)),
 };
-
-/** The namespace of a card of `factory`: the factory itself, or `default` for a card that names none. */
-export const namespaceOf = (factory: string | null | undefined): string => factory ?? DEFAULT_NAMESPACE;
 
 /** What a card's start answers: its new run, and the card's name. */
 const Started = Schema.Struct({ id: Schema.String, card: Schema.String });

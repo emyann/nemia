@@ -209,8 +209,8 @@ export type HarnessOutput = {
    */
   harnessVersion?: string;
   /**
-   * The permission mode the session ran in, as its own start line said it — Claude Code's `init` line's `permissionMode`, the last
-   * one. Absent when it does not say.
+   * The permission mode the session ran in, as its own start line said it (the mode Claude Code's last `init` line names), or as the
+   * runtime's spawn gave it (`HarnessSpec.command`'s `ranIn`). Absent when neither says.
    */
   ranIn?: string;
 };

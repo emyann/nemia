@@ -7,7 +7,16 @@
  */
 import path from 'node:path';
 import { firstPiece, type Denial, type Usage } from '../../core/index.ts';
-import { partialMarksOf, printedKindOf, printedLinesOf, type PrintedKind, type PrintedLine, type Printed } from '../claude/stream.ts';
+import {
+  initLineText,
+  initRanIn,
+  partialMarksOf,
+  printedKindOf,
+  printedLinesOf,
+  type PrintedKind,
+  type PrintedLine,
+  type Printed,
+} from '../claude/stream.ts';
 import type { InitKept, InitRead } from '../../../contracts/capture.contract.ts';
 import type { HarnessOutput } from './detached.ts';
 import type { PartialMark } from './follow.ts';
@@ -206,7 +215,7 @@ type StreamFacts = {
    */
   harnessVersion?: string;
   /** The mode its last `init` line names: one per turn, so a turn in another mode than the first is the mode it runs in now. */
-  permissionMode?: string;
+  ranIn?: string;
   skills: Map<string, unknown>;
   files: Map<string, [string, unknown]>;
   denied: Set<string>;
@@ -235,7 +244,7 @@ const gather = (facts: StreamFacts, printed: PrintedLine): void => {
     facts.cwd ??= printed.line.cwd;
     facts.model ??= printed.line.model;
     if (printed.line.claude_code_version) facts.harnessVersion = printed.line.claude_code_version;
-    if (printed.line.permissionMode) facts.permissionMode = printed.line.permissionMode;
+    facts.ranIn = initRanIn(printed.line) ?? facts.ranIn;
   } else if (printed.kind === 'assistant') gatherCalls(facts, printed.line);
 };
 
@@ -254,7 +263,7 @@ const gather = (facts: StreamFacts, printed: PrintedLine): void => {
  * whose `init` line names a model, which is the alias — `opus` — already resolved to the model id the harness chose for it; what it
  * answers it `ranOn`, so no field of a recorded fact is spelt as the harness argument that asked for it. The version of Claude
  * Code it runs, `harnessVersion`, is the last `init` line's `claude_code_version`, said only by a stream with one that names it; the
- * mode it ran in, `ranIn`, the last `init` line's `permissionMode`, likewise. What it was denied is said, `[]` for nothing, by a stream
+ * mode it ran in, `ranIn`, the mode the last `init` line names, likewise. What it was denied is said, `[]` for nothing, by a stream
  * with its `init` line or its result, which measured it; one with neither cannot say.
  *
  * Throws an `Error` naming the line, its field and the fix when a line of a kind it reads does not decode (`printedLinesOf`).
@@ -271,7 +280,7 @@ export const claudeStreamOutput = (output: string): HarnessOutput => {
     ...(files ? { files } : {}),
     ...(facts.model ? { ranOn: facts.model } : {}),
     ...(facts.harnessVersion ? { harnessVersion: facts.harnessVersion } : {}),
-    ...(facts.permissionMode ? { ranIn: facts.permissionMode } : {}),
+    ...(facts.ranIn ? { ranIn: facts.ranIn } : {}),
   };
 };
 
@@ -364,7 +373,7 @@ const readAfter = (read: InitRead | undefined, line: InitRead): InitRead => ({
   cwd: read?.cwd ?? line.cwd,
   model: read?.model ?? line.model,
   claude_code_version: line.claude_code_version ?? read?.claude_code_version,
-  permissionMode: line.permissionMode ?? read?.permissionMode,
+  ranIn: line.ranIn ?? read?.ranIn,
 });
 
 /**
@@ -376,11 +385,11 @@ export const initLineKept = (text: string, read: InitRead | undefined): { kept?:
   if (printedKindOf(text) !== 'system init') return undefined;
   const [printed] = decoded(text, ['system init']);
   if (printed?.kind !== 'system init') return undefined;
-  const { cwd, model, claude_code_version, permissionMode } = printed.line;
-  const line: InitRead = { cwd, model, claude_code_version, permissionMode };
+  const { cwd, model, claude_code_version } = printed.line;
+  const line: InitRead = { cwd, model, claude_code_version, ranIn: initRanIn(printed.line) };
   const kept = initKept(line, read);
   return {
-    ...(kept ? { kept: JSON.stringify({ type: 'system', subtype: 'init', ...kept }) } : {}),
+    ...(kept ? { kept: initLineText(kept) } : {}),
     read: readAfter(read, line),
   };
 };
@@ -412,12 +421,12 @@ export const claudePartials = (output: string, before: number): { marks: Partial
  * version of Claude Code or a mode other than the last; else nothing. Proved by its contract (`contracts/capture.contract.ts`).
  */
 export const initKept: InitKept = (line, read) => {
-  const { cwd, model, claude_code_version: version, permissionMode: mode } = line;
+  const { cwd, model, claude_code_version: version, ranIn: mode } = line;
   const changes =
     read === undefined ||
     (read.cwd === undefined && cwd !== undefined) ||
     (read.model === undefined && model !== undefined) ||
     (version !== undefined && version !== read.claude_code_version) ||
-    (mode !== undefined && mode !== read.permissionMode);
-  return changes ? { cwd, model, claude_code_version: version, permissionMode: mode } : undefined;
+    (mode !== undefined && mode !== read.ranIn);
+  return changes ? { cwd, model, claude_code_version: version, ranIn: mode } : undefined;
 };

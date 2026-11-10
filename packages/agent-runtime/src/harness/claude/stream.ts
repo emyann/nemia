@@ -14,6 +14,7 @@
 import { Result, Schema } from 'effect';
 import { firstRefusal } from '../../core/index.ts';
 import type { PartialMark } from '../detached/follow.ts';
+import type { InitRead } from '../../../contracts/capture.contract.ts';
 
 const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 
@@ -199,6 +200,13 @@ export const printedLinesOf = (output: string, kinds: readonly PrintedKind[]): {
 
 /** A line of `kind`, as its schema in `PRINTED` decodes it. */
 export type Printed<K extends PrintedKind> = (typeof PRINTED)[K]['Type'];
+
+/** The mode an `init` line names, in the runtime's word (`ranIn`): Claude Code's `permissionMode`. */
+export const initRanIn = (line: Printed<'system init'>): string | undefined => line.permissionMode;
+
+/** An `init` line as a capture keeps it, off what a reader reads of it: the mode under Claude Code's own key. */
+export const initLineText = ({ ranIn, ...read }: InitRead): string =>
+  JSON.stringify({ type: 'system', subtype: 'init', ...read, permissionMode: ranIn });
 
 /**
  * What one `stream_event`'s event says of the text being written, as a follow reads it (`PartialMark`): a message begun, a piece of

@@ -7,12 +7,12 @@
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
-/** The fields of an `init` line a reader of the capture reads, as the SDK names them. */
+/** The fields of an `init` line a reader of the capture reads, as the SDK names them, but the mode, in the runtime's word (`ranIn`). */
 export type InitRead = {
   readonly cwd?: string;
   readonly model?: string;
   readonly claude_code_version?: string;
-  readonly permissionMode?: string;
+  readonly ranIn?: string;
 };
 
 /**
@@ -23,12 +23,12 @@ const readOf = (read: InitRead | undefined, line: InitRead): InitRead => ({
   cwd: read?.cwd ?? line.cwd,
   model: read?.model ?? line.model,
   claude_code_version: line.claude_code_version ?? read?.claude_code_version,
-  permissionMode: line.permissionMode ?? read?.permissionMode,
+  ranIn: line.ranIn ?? read?.ranIn,
 });
 
 /** Whether two readings say the same. */
 const same = (a: InitRead, b: InitRead): boolean =>
-  a.cwd === b.cwd && a.model === b.model && a.claude_code_version === b.claude_code_version && a.permissionMode === b.permissionMode;
+  a.cwd === b.cwd && a.model === b.model && a.claude_code_version === b.claude_code_version && a.ranIn === b.ranIn;
 
 const initKeptSpec = spec<(line: InitRead, read: InitRead | undefined) => InitRead | undefined>({
   ensures: {
@@ -55,7 +55,7 @@ const initKeptSpec = spec<(line: InitRead, read: InitRead | undefined) => InitRe
         (output.cwd === line.cwd &&
           output.model === line.model &&
           output.claude_code_version === line.claude_code_version &&
-          output.permissionMode === line.permissionMode),
+          output.ranIn === line.ranIn),
     },
   },
 });

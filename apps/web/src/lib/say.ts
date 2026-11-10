@@ -7,7 +7,7 @@
  * and the stopped band carries these words, which point at where a person can act instead (`components/step/session/SessionBand.tsx`).
  */
 import type { Said } from './api/asks.ts';
-import type { RunView, StepView } from './runView.ts';
+import type { RunDetail, StepView } from './runView.ts';
 import { stepState } from './status.ts';
 
 /** Whether the composer may send to a step's session — or why not, and where to go instead. */
@@ -22,7 +22,7 @@ export type Sayable = { open: true } | { open: false; why: string };
  * package's words or the engine's, and the composer shows that refusal as it is.
  */
 export function sayable(
-  run: Pick<RunView, 'cancelledAt'>,
+  run: Pick<RunDetail, 'cancelledAt'>,
   step: Pick<StepView, 'name' | 'taskId' | 'phase' | 'reason' | 'on' | 'via'>,
 ): Sayable {
   if (run.cancelledAt !== null) {

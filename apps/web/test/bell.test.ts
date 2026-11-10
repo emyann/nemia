@@ -5,65 +5,24 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { RunSummary } from '../src/lib/api/runs.ts';
-import { coded } from './run-fixtures.ts';
+import type { RunView } from '../src/lib/api/judged.ts';
+import { listedStep, summary } from './run-fixtures.ts';
 import { bellHash, bellRows } from '../src/lib/bell.ts';
 import { waitsOnYou } from '../src/lib/factory.ts';
 
 /** A run of the default factory with a step per name in `steps`, nobody waited on, and `extra` over it. */
-const run = (id: string, extra: Partial<RunSummary> = {}, steps: readonly string[] = ['plan', 'build', 'ship']): RunSummary => ({
-  labels: {},
-  id,
-  repo: '/code/app',
-  factory: null,
-  place: 'git',
-  work: null,
-  brief: `# ${id}'s brief\n\nMore.`,
-  workflowDir: '/code/app/workflows/dev',
-  try: null,
-  createdAt: '2026-10-01T00:00:00.000Z',
-  startedAt: '2026-10-01T00:00:00.000Z',
-  cancelledAt: null,
-  pruned: null,
-  status: 'running',
-  phase: 'running',
-  reason: 'Running',
-  on: null,
-  via: null,
-  moving: true,
-  cost: null,
-  atWork: null,
-  tokens: null,
-  steps: steps.map((name) => ({
-    name,
-    taskId: `t-${name}`,
-    branch: null,
-    ...coded('waiting'),
-    note: null,
-    roundDue: false,
-    agent: null,
-    since: null,
-    needs: null,
-    waitingFor: null,
-    approve: null,
-    denied: null,
-    sessionUnread: null,
-  })),
-  graph: { roots: [], edges: [] },
-  waitingOnYou: [],
-  waitingOnYouWords: [],
-  after: [],
-  waiting: null,
-  context: [],
-  holdUntil: [],
-  holding: null,
-  toDecide: null,
-  unreadable: null,
-  ...extra,
-});
+const run = (id: string, extra: Partial<RunView> = {}, steps: readonly string[] = ['plan', 'build', 'ship']): RunView =>
+  summary([], {
+    id,
+    brief: `# ${id}'s brief\n\nMore.`,
+    createdAt: '2026-10-01T00:00:00.000Z',
+    startedAt: '2026-10-01T00:00:00.000Z',
+    steps: steps.map((name, i) => listedStep(name, 'waiting', i, { taskId: `t-${name}` })),
+    ...extra,
+  });
 
 /** A run whose second step waits at its gate. */
-const atGate = (id: string, extra: Partial<RunSummary> = {}): RunSummary => {
+const atGate = (id: string, extra: Partial<RunView> = {}): RunView => {
   const base = run(id, {
     status: 'awaiting approval',
     moving: false,
@@ -74,10 +33,10 @@ const atGate = (id: string, extra: Partial<RunSummary> = {}): RunSummary => {
 };
 
 /** The bell's rows of those of `runs` the board's own rule says wait on a person. */
-const bellRuns = (runs: readonly RunSummary[]) => bellRows(runs.filter(waitsOnYou));
+const bellRuns = (runs: readonly RunView[]) => bellRows(runs.filter(waitsOnYou));
 
 /** A hold on a run until `p` lands: one a person lifts alone when `onYou`. */
-const holdOn = (onYou: boolean): RunSummary['holding'] => ({
+const holdOn = (onYou: boolean): RunView['holding'] => ({
   at: '2026-10-01T00:00:00.000Z',
   runs: [{ run: 'p', missing: onYou, cancelledAt: null, gone: [], landed: false }],
   word: onYou ? 'held until p lands (no such run)' : 'held until p lands',
@@ -86,7 +45,7 @@ const holdOn = (onYou: boolean): RunSummary['holding'] => ({
 });
 
 /** What a run started after `p` waits on: a run that never lands without a person when `onYou`. */
-const waitOn = (onYou: boolean): RunSummary['waiting'] => ({
+const waitOn = (onYou: boolean): RunView['waiting'] => ({
   runs: [{ run: 'p', missing: false, cancelledAt: onYou ? '2026-10-01T00:00:00.000Z' : null, gone: [] }],
   word: onYou ? 'waiting on p (cancelled)' : 'waiting on p',
   advice: 'nothing to decide yet',

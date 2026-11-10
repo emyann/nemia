@@ -1,7 +1,7 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import type { StepTry } from '../../lib/api/tries.ts';
-import type { RunView, StepView } from '../../lib/runView';
+import type { RunDetail, StepView } from '../../lib/runView';
 import { isLive } from '../../lib/canvas';
 import { durationWords } from '../../lib/duration';
 import { waitsAtGate, stepState, type StepState } from '../../lib/status';
@@ -43,7 +43,7 @@ const openingTab = (step: Pick<Step, 'closeout'>): Tab => (step.closeout ? 'Outp
  * Opened on Output at a gate, it says first that the answer is on Details, so the plan read is not a dead end. The Activity tab is keyed by
  * run and step, so a conversation never stands in for another step's while that one is read. `className` places it in what holds it.
  */
-export function StepTabs({ run, step, className }: { run: RunView; step: Step; className?: string }) {
+export function StepTabs({ run, step, className }: { run: RunDetail; step: Step; className?: string }) {
   const [picked, setTab] = useState<Tab | null>(null);
   const tab = picked ?? openingTab(step);
   const [chosen, setChosen] = useState<{ step: string; try: number } | null>(null);
@@ -108,7 +108,7 @@ export function StepTabs({ run, step, className }: { run: RunView; step: Step; c
 }
 
 type DetailsProps = {
-  run: RunView;
+  run: RunDetail;
   step: Step;
   state: StepState;
   runCancelled: boolean;
@@ -221,7 +221,7 @@ export const ACTIVITY_TURNS = 30;
  * until the step waits on a person's word, its session over, and never stops for `held`: a hold on the run (the CLI's `hold`) answers
  * nothing, and the session runs or rests as it did.
  */
-function Activity({ run, step }: { run: RunView; step: Step }) {
+function Activity({ run, step }: { run: RunDetail; step: Step }) {
   const cancelled = run.cancelledAt !== null;
   const following = useStepTranscript(run.id, step.name, sessionToRead(step), waitsAtGate(stepState(step, cancelled, false), cancelled));
   return <ActivityTail run={run} step={step} following={following} />;
@@ -231,7 +231,7 @@ function Activity({ run, step }: { run: RunView; step: Step }) {
  * What the Activity tab draws of the conversation `following` holds: its last `ACTIVITY_TURNS` turns, compact, and the way to the
  * whole of it.
  */
-export function ActivityTail({ run, step, following }: { run: RunView; step: Step; following: Following }) {
+export function ActivityTail({ run, step, following }: { run: RunDetail; step: Step; following: Following }) {
   const turns = useMemo(() => foldTranscript(following.events), [following.events]);
   const tail = turns.slice(-ACTIVITY_TURNS);
 

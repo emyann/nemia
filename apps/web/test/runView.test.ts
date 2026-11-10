@@ -1,15 +1,15 @@
 /**
- * The board's view of a run (`src/lib/runView.ts`), composed from the run object, each step's tries and what it was told, and the run's
- * lines: a step's closeout is its current try's, its spec the frozen step of its name, its lines the api's, and the graph has no `input`
- * edge. And the stamp a step's tries and told are keyed by (`stepStamp`, `src/lib/lifecyclePath.ts`), which moves when the step moves
- * and with nothing else.
+ * A run's detail (`src/lib/runView.ts`), the run's one view (`runViewOf`, `src/lib/api/judged.ts`) with each step's tries and what it was
+ * told, and the run's lines: a step's closeout is its current try's, its spec the frozen step of its name, its lines the api's, and the
+ * graph has no `input` edge. And the stamp a step's tries and told are keyed by (`stepStamp`, `src/lib/lifecyclePath.ts`), which moves
+ * when the step moves and with nothing else.
  */
 import type * as RunObject from 'objects';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { RunLines } from '../src/lib/api/run.ts';
-import { runViewOf } from '../src/lib/runView.ts';
+import { runDetailOf } from '../src/lib/runView.ts';
 import { stepStamp } from '../src/lib/lifecyclePath.ts';
 
 /** The time of no task yet, as a run's timeline totals it. */
@@ -215,16 +215,16 @@ const lines = (): RunLines => ({
 
 const told: RunObject.StepTold = { body: 'Implement it.', told: 'the whole brief', layers: null, taskParts: null };
 
-/** The view of the sample run: the first step's two tries, the current one last, and what it was told; the second step's none. */
+/** The detail of the sample run: the first step's two tries, the current one last, and what it was told; the second step's none. */
 const view = () =>
-  runViewOf(
+  runDetailOf(
     object(),
     lines(),
     { implement: [tried(1, false, 'the first try'), tried(2, true, 'the current try')], review: [] },
     { implement: told, review: null },
   );
 
-test('runViewOf: the run object, its sub-resources and its lines, as the run page reads them', async (t) => {
+test('runDetailOf: the run object, its sub-resources and its lines, as the run page reads them', async (t) => {
   await t.test("a step's closeout is the closeout of its current try, not of the first", () => {
     const [implement] = view().steps;
     assert.equal(implement?.closeout?.summary, 'the current try');
@@ -237,7 +237,7 @@ test('runViewOf: the run object, its sub-resources and its lines, as the run pag
     assert.equal(implement?.spec?.fence, 'acceptEdits');
     assert.equal(implement?.filed?.fence, 'bypassPermissions', 'and so is the fence it was filed with');
     const unfrozen = object();
-    const ran = runViewOf(
+    const ran = runDetailOf(
       { ...unfrozen, spec: { ...unfrozen.spec, steps: [frozen('implement', [])] } },
       lines(),
       { implement: [], review: [] },
@@ -269,7 +269,7 @@ test('runViewOf: the run object, its sub-resources and its lines, as the run pag
     assert.equal(v.createdAt, '2026-11-02T10:00:00.000Z');
     assert.equal('fromNote' in v, false);
     const card = object();
-    const from = runViewOf(
+    const from = runDetailOf(
       { ...card, spec: { ...card.spec, from: { inbox: 'c-1' } } },
       { ...lines(), fromNote: 'from inbox card c-1' },
       {},

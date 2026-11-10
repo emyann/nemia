@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { RunSummary } from '../src/lib/api/runs.ts';
+import type { RunView } from '../src/lib/api/judged.ts';
 import type { StepState } from '../src/lib/status.ts';
 import { ENDED, PAUSED, PERSON } from '../src/lib/words.ts';
 import {
@@ -36,7 +36,7 @@ const DONE = [
 ] as const;
 
 /** A row of three done steps and `land` saying `word` with its codes, which waits on a person. */
-const landing = (word: Word, extra: Partial<RunSummary> = {}): RunSummary =>
+const landing = (word: Word, extra: Partial<RunView> = {}): RunView =>
   summary([...DONE, ['land', word]], { status: 'failed', moving: false, waitingOnYou: ['land'], waitingOnYouWords: [COMMAND], ...extra });
 
 const holding = { at: '2026-09-30T05:00:00.000Z', runs: [], word: `held: ${COMMAND}`, advice: COMMAND, waitingOnYou: true };
@@ -48,7 +48,7 @@ const waiting = {
 };
 
 /** One row of the light answer per kind of wait, the sentence it says, and the words of its card's button. */
-const ROWS: Record<WaitKind, { row: RunSummary; says: string; opens: string }> = {
+const ROWS: Record<WaitKind, { row: RunView; says: string; opens: string }> = {
   approve: { row: landing('awaiting approval'), says: 'Three steps are done. Land waits for your approval.', opens: 'Read the land' },
   answer: { row: landing('succeeded · BLOCKED'), says: 'Land stopped and needs your word to go on.', opens: 'Read the question' },
   check: {
@@ -82,7 +82,7 @@ const ROWS: Record<WaitKind, { row: RunSummary; says: string; opens: string }> =
 };
 
 /** `row` with the task of its step `name` set to `taskId`. */
-const tasked = (row: RunSummary, name: string, taskId: string | null): RunSummary => ({
+const tasked = (row: RunView, name: string, taskId: string | null): RunView => ({
   ...row,
   steps: row.steps.map((step) => (step.name === name ? { ...step, taskId } : step)),
 });
@@ -160,7 +160,7 @@ test("waitOf, waitSentence, openWord, waitTag: the one sentence and the button's
     assert.equal(waitOf(landing('failed ✗ check (exit 137)'))?.kind, 'check');
   });
   await t.test('a check that did not finish is read off its verdict, never off the words beside it', () => {
-    const said = (row: RunSummary, message: string, verdict: RunSummary['steps'][number]['verdict']): RunSummary => ({
+    const said = (row: RunView, message: string, verdict: RunView['steps'][number]['verdict']): RunView => ({
       ...row,
       steps: row.steps.map((step) => (step.name === 'land' ? { ...step, message, verdict } : step)),
     });

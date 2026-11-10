@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { QueryClient } from '@tanstack/react-query';
 import { openRunsQuery, type WaitingRun } from '../src/lib/api/runs.ts';
+import { judged } from '../src/lib/api/judged.ts';
 import {
   CLOCK_REST,
   clockBreakdown,
@@ -78,7 +79,7 @@ const AS_OF = '2026-10-12T12:00:00.000Z';
 async function decoded(run: WaitingRun = answered()): Promise<WaitingRun> {
   const before = globalThis.fetch;
   const { wallMs, clock, stepCosts, waitingSince, cost, tokens, waitingOnYou, waitingOnYouWords } = run;
-  const steps = run.steps.map(({ agent: _a, since: _s, ...own }) => step({ ...own, timeline: [] }));
+  const steps = run.steps.map((own) => step({ ...own, timeline: [] }));
   const object = runObject(detail({ id: run.id, steps }), {
     state: 'waiting',
     wallMs,
@@ -96,7 +97,9 @@ async function decoded(run: WaitingRun = answered()): Promise<WaitingRun> {
   globalThis.fetch = async () => new Response(JSON.stringify(list), { status: 200, headers: { 'content-type': 'application/json' } });
   const client = new QueryClient();
   try {
-    return (await client.fetchQuery(openRunsQuery())).waiting[0];
+    const [waiting] = (await client.fetchQuery(openRunsQuery())).waiting;
+    assert.ok(waiting && judged(waiting), 'the run is judged');
+    return waiting;
   } finally {
     client.clear();
     globalThis.fetch = before;

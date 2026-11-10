@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Sheet, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { stepPathQuery, type LifecycleTransition, type MachineGraph, type StepPath } from '@/lib/api/steps';
-import type { RunView, StepView } from '@/lib/runView';
+import type { RunDetail, StepView } from '@/lib/runView';
 import { byPerson, centredScroll, litAt, pathPoll, stepStamp, takenRoutes } from '@/lib/lifecyclePath';
 import { clockWord } from '@/lib/quota';
 import { useNow } from '@/lib/useNow';
@@ -27,7 +27,7 @@ const PATH_TITLE = "The task's path through the runtime's lifecycle";
  * moved through the runtime's lifecycle, drawn over the lifecycle's graph, with a timeline to scrub back through, and a button that opens
  * the same lit graph full width, at a size its names can be read. Nothing of it is read or drawn while it is closed.
  */
-export function DebugPanel({ run, step }: { run: RunView; step: Step }) {
+export function DebugPanel({ run, step }: { run: RunDetail; step: Step }) {
   return (
     <section aria-label="Debug" className="shrink-0 border-b">
       <Collapsible>
@@ -50,7 +50,7 @@ export function DebugPanel({ run, step }: { run: RunView; step: Step }) {
  * moves it, and again once they move it back to the end; picking another try follows that try's newest. The graph opened full width is
  * drawn from the same read and the same entry shown.
  */
-function PathOf({ run, step }: { run: RunView; step: Step }) {
+function PathOf({ run, step }: { run: RunDetail; step: Step }) {
   const [tryNumber, setTryNumber] = useState<number | null>(null);
   const [pinned, setPinned] = useState<number | null>(null);
   const poll = (r: StepPath | undefined) => pathPoll(r, r?.lifecycle.final ?? [], tryNumber === null);

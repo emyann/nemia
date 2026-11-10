@@ -26,7 +26,7 @@ import { Switch } from '@/components/ui/switch';
 import { ceilingsQuery } from '@/lib/api/ceilings';
 import { inboxQuery } from '@/lib/api/inbox';
 import { runObjectQuery } from '@/lib/api/run';
-import { type RunSummary } from '@/lib/api/runs';
+import { judged, type RunRow } from '@/lib/api/judged';
 import {
   forgetFactoryLayout,
   forgetFactoryOpen,
@@ -138,10 +138,11 @@ const HANDFUL = 5;
 /**
  * A card's colour on the minimap, in the look's meanings: yours when to decide or waiting on you, else sage once finished, else
  * alive. A run whose
- * result nobody has decided, and one stopped at a step that needs a person, are both over, and both still want finding.
+ * result nobody has decided, and one stopped at a step that needs a person, are both over, and both still want finding. A run the list
+ * could not judge is in flight, as the tick counts it.
  */
-const minimapFill = (node: RunFlowNode) =>
-  toDecideOf(node.data.run) ? paint.yours : waitsOnYou(node.data.run) ? paint.yours : node.data.finished ? paint.sage : paint.alive;
+const minimapFill = ({ data: { run, finished } }: RunFlowNode) =>
+  !judged(run) ? paint.alive : toDecideOf(run) ? paint.yours : waitsOnYou(run) ? paint.yours : finished ? paint.sage : paint.alive;
 
 /**
  * Every run in flight of `factory`, given as `runs`, a card each, on a floor a person can arrange, each with its steps as a small
@@ -166,7 +167,7 @@ const minimapFill = (node: RunFlowNode) =>
  *
  * What the page puts `above` the floor, its template among them, takes its height from the floor's, which fills the rest of the frame.
  */
-export function FactoryCanvas({ runs, factory, above }: { runs: readonly RunSummary[]; factory: FactoryPlace; above?: ReactNode }) {
+export function FactoryCanvas({ runs, factory, above }: { runs: readonly RunRow[]; factory: FactoryPlace; above?: ReactNode }) {
   return (
     <div className="flex h-[calc(100svh-var(--frame-top))] min-h-96 flex-col">
       {above}
@@ -194,10 +195,10 @@ const readsOf = (results: UseQueryResult<RunObject.Run>[]): Read[] =>
   }));
 
 /** The floor's header counts: the runs in flight (`flying` of `runs`), finished, to decide and waiting on you. */
-function FloorCounts({ runs, flying }: { runs: readonly RunSummary[]; flying: number }) {
+function FloorCounts({ runs, flying }: { runs: readonly RunRow[]; flying: number }) {
   const finished = runs.length - flying;
-  const waiting = runs.filter(waitsOnYou).length;
-  const toDecide = runs.filter((run) => toDecideOf(run) !== null).length;
+  const waiting = runs.filter((run) => judged(run) && waitsOnYou(run)).length;
+  const toDecide = runs.filter((run) => judged(run) && toDecideOf(run) !== null).length;
   return (
     <p className="text-body-medium text-muted-foreground">
       <span className="font-medium text-foreground">{flying}</span> in flight
@@ -207,6 +208,16 @@ function FloorCounts({ runs, flying }: { runs: readonly RunSummary[]; flying: nu
     </p>
   );
 }
+
+/**
+ * The runs on the floor: those judged it shows (`floorRuns`), after each the list could not judge, which has no age to be ordered by and
+ * is in flight, as the tick counts it; and every run judged, which a card's context lines read.
+ */
+const onTheFloor = (runs: readonly RunRow[], showFinished: boolean) => {
+  const judgedRuns = runs.filter(judged);
+  const shownJudged = floorRuns(judgedRuns, showFinished);
+  return { judgedRuns, shownJudged, shown: [...runs.filter((run) => !judged(run)), ...shownJudged] };
+};
 
 /**
  * A drag moving a card, or React Flow measuring one: the only changes the floor takes, since it adds, removes and selects no card itself.
@@ -246,29 +257,29 @@ const placing = (change: NodeChange<RunFlowNode>): change is NodePositionChange 
  * - A click on a card, or Enter on the card itself, shows the run in the bar or closes it; a click or Enter on a link or a button in it
  *   does only what that does (`useFloorPress`).
  */
-function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: FactoryPlace }) {
+function Floor({ runs, factory }: { runs: readonly RunRow[]; factory: FactoryPlace }) {
   const { fitView, setViewport } = useReactFlow<RunFlowNode>();
   const store = useStoreApi<RunFlowNode>();
   const [showFinished, setShowFinished] = useState(false);
 
-  const flying = useMemo(() => new Set(runs.filter(inFlight).map((run) => run.id)), [runs]);
-  const shown = useMemo(() => floorRuns(runs, showFinished), [runs, showFinished]);
+  const flying = useMemo(() => new Set(runs.filter((run) => !judged(run) || inFlight(run)).map((run) => run.id)), [runs]);
+  const { judgedRuns, shownJudged, shown } = useMemo(() => onTheFloor(runs, showFinished), [runs, showFinished]);
   const known = useMemo(() => new Set(runs.map((run) => run.id)), [runs]);
   const ids = useContent(shown.map((run) => run.id));
-  const afterEntries = useContent(shown.map((run): [string, string[]] => [run.id, run.after]));
+  const afterEntries = useContent(shownJudged.map((run): [string, string[]] => [run.id, run.after]));
   const after = useMemo(() => new Map(afterEntries), [afterEntries]);
 
   const [open, setOpen] = useState<string[]>(readFactoryOpen);
   const openSet = useMemo(() => new Set(open), [open]);
   const { inspecting, inspected, step: barStep, onStep, machine, ...press } = useFloorPress();
 
-  const opened = useMemo(() => open.filter((id) => ids.includes(id)), [open, ids]);
+  const opened = useMemo(() => open.filter((id) => shownJudged.some((run) => run.id === id)), [open, shownJudged]);
   const reads = useQueries({ queries: opened.map((id) => runObjectQuery(id)), combine: readsOf });
   const details = useMemo(() => new Map(opened.map((id, i) => [id, reads[i] ?? NOT_READ])), [opened, reads]);
 
   const spanEntries = useContent(
     [...opened].reverse().map((id): [string, Span] => {
-      const run = shown.find((one) => one.id === id)!;
+      const run = shownJudged.find((one) => one.id === id)!;
       return [
         id,
         openSpan(
@@ -356,11 +367,11 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
       return [
         {
           ...card,
-          ariaLabel: `Inspect run: ${titleOf(run)}`,
+          ariaLabel: `Inspect run: ${judged(run) ? titleOf(run) : run.id}`,
           data: {
             run,
             finished: !flying.has(run.id),
-            reads: readsLines(run, runs),
+            reads: judged(run) ? readsLines(run, judgedRuns) : [],
             open: isOpen,
             detail: read?.detail ?? null,
             trouble: read?.trouble ?? null,
@@ -372,11 +383,11 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
         },
       ];
     });
-  }, [placed, shown, runs, flying, openSet, details, inspected, barStep, toggle, onStep]);
+  }, [placed, shown, judgedRuns, flying, openSet, details, inspected, barStep, toggle, onStep]);
 
   const [hovered, setHovered] = useState<string | null>(null);
   const focus = hovered ?? inspected;
-  const edges = useMemo((): Edge[] => [...afterEdges(shown), ...readEdges(shown, focus)], [shown, focus]);
+  const edges = useMemo((): Edge[] => [...afterEdges(shownJudged), ...readEdges(shownJudged, focus)], [shownJudged, focus]);
   const onNodeMouseEnter = useCallback((_: unknown, node: RunFlowNode) => setHovered(node.id), []);
   const onNodeMouseLeave = useCallback(() => setHovered(null), []);
 

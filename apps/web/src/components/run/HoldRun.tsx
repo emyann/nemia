@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { putHold, runsQuery, type RunSummary } from '../../lib/api/runs.ts';
+import { putHold, runsQuery } from '../../lib/api/runs.ts';
+import { judged, type RunView } from '../../lib/api/judged.ts';
 import { useRunNamespace } from '@/lib/runNamespace';
-import type { RunView } from '../../lib/runView';
+import type { RunDetail } from '../../lib/runView';
 import { titleOf } from '../../lib/factory';
 import { holdable, holdCandidates } from '../../lib/hold.ts';
 import { cn } from '../../lib/utils';
@@ -22,7 +23,7 @@ import { POPOVER } from '../../lib/classes';
  * package's, of a run it will not hold or one it will not wait on — is shown in the form, and nothing is written. Nothing is offered where
  * the run says it cannot be held (`holdable`).
  */
-export function HoldRun({ run }: { run: RunView }) {
+export function HoldRun({ run }: { run: RunDetail }) {
   if (!holdable(run)) return null;
   return (
     <DialogTrigger>
@@ -39,7 +40,7 @@ export function HoldRun({ run }: { run: RunView }) {
 }
 
 /** The runs a hold may wait on, read off the list the Runs page reads (`holdCandidates`), before the form is drawn. */
-function HoldRead({ run, onClose }: { run: RunView; onClose: () => void }) {
+function HoldRead({ run, onClose }: { run: RunDetail; onClose: () => void }) {
   const { data, error } = useQuery(runsQuery);
   if (error) {
     return (
@@ -59,14 +60,14 @@ function HoldRead({ run, onClose }: { run: RunView; onClose: () => void }) {
         Reading the runs to wait on…
       </p>
     );
-  return <HoldForm id={run.id} runs={holdCandidates(run, data)} onClose={onClose} />;
+  return <HoldForm id={run.id} runs={holdCandidates(run, data.filter(judged))} onClose={onClose} />;
 }
 
 /**
  * The runs to wait on, ticked, the why, and Hold. The run is read again once held, its record and the list each alone (`exact`), as a lift
  * reads them, and the popover closes; a refusal stays in the form until something is changed.
  */
-function HoldForm({ id, runs, onClose }: { id: string; runs: RunSummary[]; onClose: () => void }) {
+function HoldForm({ id, runs, onClose }: { id: string; runs: RunView[]; onClose: () => void }) {
   const [until, setUntil] = useState<string[]>([]);
   const [why, setWhy] = useState('');
   const queryClient = useQueryClient();
@@ -138,7 +139,7 @@ function WaitFor({
   isDisabled,
   onChange,
 }: {
-  runs: RunSummary[];
+  runs: RunView[];
   until: string[];
   isDisabled: boolean;
   onChange: (until: string[]) => void;

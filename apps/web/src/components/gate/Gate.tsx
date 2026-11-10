@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { decisionQuery } from '../../lib/api/decision.ts';
 import { type Question, type StepCloseout } from '../../lib/api/tries.ts';
 import { type QuestionAnswer, type RetryMode } from '../../lib/api/asks.ts';
-import type { RunView, StepView } from '../../lib/runView';
+import type { RunDetail, StepView } from '../../lib/runView';
 import { askedSaid } from '../../lib/asks';
 import { decidableRun, decisionStamp, isDecidable } from '../../lib/decide';
 import { cn } from '../../lib/utils';
@@ -512,7 +512,7 @@ export const endsTheRun = (step: Pick<StepView, 'spec'>): boolean => step.spec?.
  * or the sentence saying what the run changed is not known — as the CLI's `decide` prints them beside the branch; the steps waited on are
  * read in the run's order off the graph the api gives, whatever the ending's spec reads.
  */
-export function ActsOn({ run, step }: { run: RunView; step: StepView }) {
+export function ActsOn({ run, step }: { run: RunDetail; step: StepView }) {
   const { data, error } = useQuery({ ...decisionQuery(run.id, decisionStamp(run)), enabled: decidableRun(run) });
   const standings = isDecidable(data) ? data.standings : [];
   const waitsOn = new Set(

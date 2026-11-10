@@ -1,6 +1,6 @@
 import type * as RunObject from 'objects';
 import { Button as AriaButton } from 'react-aria-components';
-import type { RunSummary } from '../../lib/api/runs.ts';
+import type { RunView } from '../../lib/api/judged.ts';
 import { needNodeText, needOf, needText, type Need } from '../../lib/asks';
 import { attemptLine, edgeLine, edgeStroke, isLive } from '../../lib/canvas';
 import { costText, pastBudget } from '../../lib/cost';
@@ -12,7 +12,7 @@ import { useNow } from '../../lib/useNow';
 import { StatusChip } from './StatusChip';
 import { Travelling } from './StateEdge';
 
-type SummaryStep = RunSummary['steps'][number];
+type SummaryStep = RunView['steps'][number];
 
 /**
  * The arrows of a flow, in one SVG under its boxes: each as the canvases draw an edge — dashed and still to come, solid done, in the
@@ -62,7 +62,7 @@ const at = (pill: Pill) => ({ left: pill.x, top: pill.y, width: pill.width, heig
  * Past four columns, the columns before and after the ones around the run are one pill that counts them; past three lanes, one that counts
  * the rest.
  */
-export function StepRail({ run, flow }: { run: RunSummary; flow: Flow }) {
+export function StepRail({ run, flow }: { run: RunView; flow: Flow }) {
   const cancelled = run.cancelledAt !== null;
   const held = run.holding != null;
   const byName = new Map(run.steps.map((step) => [step.name, step]));
@@ -115,7 +115,7 @@ function stepTitle(step: SummaryStep | undefined, name: string, cancelled: boole
 
 /**
  * What the tiles read of an open run, once read: each step's attempts, filing and cost, as its object's status holds them
- * (`runObjectQuery`) — a run's view (`RunView`) holds them too.
+ * (`runObjectQuery`) — a run's detail (`RunDetail`) holds them too.
  */
 export type TilesRead = {
   readonly steps: readonly Pick<RunObject.RunStepStatus, 'name' | 'attempts' | 'taskId' | 'spent' | 'budget'>[];
@@ -134,7 +134,7 @@ export function StepTiles({
   selected,
   onStep,
 }: {
-  run: RunSummary;
+  run: RunView;
   detail: TilesRead | null;
   flow: Flow;
   selected: string | null;

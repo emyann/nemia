@@ -17,7 +17,7 @@ import {
   type NodeDimensionChange,
   type NodePositionChange,
 } from '@xyflow/react';
-import type { RunView } from '../../lib/runView';
+import type { RunDetail } from '../../lib/runView';
 import { besideOpen, drawnWhole, forgetLayout, LEAST_ZOOM, place, readLayout, saveLayout } from '../../lib/canvas';
 import { layout, stepsOf, type Point } from '../../lib/layout';
 import { useContent } from '../../lib/useContent';
@@ -32,7 +32,7 @@ import { StateEdge } from '../step/StateEdge';
 import { stepData, stepEdges, stepMinimapFill } from '../step/stepGraph';
 import { StepNode, type StepFlowNode } from '../step/StepNode';
 
-type Props = { run: RunView };
+type Props = { run: RunDetail };
 
 /** The canvas's node types for React Flow, one object for the module's life. */
 const nodeTypes = { step: StepNode };
@@ -164,7 +164,7 @@ const placing = (change: NodeChange<StepFlowNode>): change is NodePositionChange
  * What a press on the canvas of `run` does (`useCanvasPress`): a node shows its step in the frame's bar, or closes it, and a double click
  * opens the step's session. With the step the bar shows (`selected`), none when it shows anything else.
  */
-function usePress(run: RunView) {
+function usePress(run: RunDetail) {
   const navigate = useNavigate();
   const { shown, ...press } = useCanvasPress(
     (step) => ({ kind: 'step', run: run.id, step }),

@@ -9,15 +9,8 @@ import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { decodes } from '../src/lib/api/decodes.ts';
 import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
-import {
-  openRunsQuery,
-  runRowOf,
-  runsQuery,
-  runsSelectedQuery,
-  unjudgedRowOf,
-  type OpenRuns,
-  type RunSummary,
-} from '../src/lib/api/runs.ts';
+import { openRunsQuery, rowsOf, runsQuery, runsSelectedQuery, type OpenRuns } from '../src/lib/api/runs.ts';
+import { agentOf, judged, runViewOf, sinceOf, type RunRow } from '../src/lib/api/judged.ts';
 import type { StepView } from '../src/lib/runView.ts';
 import { detail, runList, runObject, step } from './run-fixtures.ts';
 
@@ -49,7 +42,7 @@ const tried = (n: number, spawnedAt: string, endedAt: string | null, check?: [st
   return { try: n, round: 1, session: span(spawnedAt, endedAt), sessionOf: null, check: check ? span(...check) : null, used: null };
 };
 
-/** The run `runRowOf` is shown: two steps, the first given an agent, its tries `timeline`, in `namespace`. */
+/** The run `runViewOf` is shown: two steps, the first given an agent, its tries `timeline`, in `namespace`. */
 const object = (timeline: TimelineTry[], namespace?: string) => {
   const view = detail({ id: 'r-1', steps: [step({ name: 'plan', timeline }), step({ name: 'land', timeline: [] })] });
   const graph = {
@@ -73,50 +66,51 @@ const object = (timeline: TimelineTry[], namespace?: string) => {
   };
 };
 
-const readRuns = runsQuery.queryFn as unknown as () => Promise<RunSummary[]>;
+const readRuns = runsQuery.queryFn as unknown as () => Promise<RunRow[]>;
 
 /** The frame read for `factory`, or for every factory, with no context of a query's. */
 const readOpen = (factory?: string) => (openRunsQuery(factory).queryFn as unknown as () => Promise<OpenRuns>)();
 
-test("runRowOf: a run's row off its object — its factory from its namespace, each step's agent from its spec, and since", async (t) => {
+test("runViewOf: the one view of a run off its object — its factory from its namespace, each step's agent (agentOf) and since (sinceOf)", async (t) => {
   await t.test("a step's since is the earliest spawnedAt of a session or check of it that has not ended", () => {
     const run = object([
       tried(1, '2026-10-12T10:00:00.000Z', '2026-10-12T10:05:00.000Z'),
       tried(2, '2026-10-12T10:20:00.000Z', null, ['2026-10-12T10:10:00.000Z', null]),
       tried(3, '2026-10-12T10:15:00.000Z', null),
     ]);
-    const row = runRowOf(run);
-    assert.equal(row.steps[0].since, '2026-10-12T10:10:00.000Z');
-    assert.equal(row.steps[1].since, null, 'a step never tried has none');
+    const [plan, land] = runViewOf(run).steps;
+    assert.equal(sinceOf(plan), '2026-10-12T10:10:00.000Z');
+    assert.equal(sinceOf(land), null, 'a step never tried has none');
   });
   await t.test('REFUSED: a step all of whose spans have ended has no since', () => {
     const run = object([
       tried(1, '2026-10-12T10:00:00.000Z', '2026-10-12T10:05:00.000Z', ['2026-10-12T10:06:00.000Z', '2026-10-12T10:07:00.000Z']),
     ]);
-    assert.equal(runRowOf(run).steps[0].since, null);
+    assert.equal(sinceOf(runViewOf(run).steps[0]), null);
   });
   await t.test("the factory is the run's namespace, none for the default factory's", () => {
-    assert.equal(runRowOf(object([], 'harbour')).factory, 'harbour');
-    assert.equal(runRowOf(object([], 'default')).factory, null);
-    assert.equal(runRowOf(object([])).factory, null);
+    assert.equal(runViewOf(object([], 'harbour')).factory, 'harbour');
+    assert.equal(runViewOf(object([], 'default')).factory, null);
+    assert.equal(runViewOf(object([])).factory, null);
   });
   await t.test("each step's agent is the one its spec froze, none for a step given none; the graph keeps no input edge", () => {
-    const row = runRowOf(object([]));
+    const row = runViewOf(object([]));
     assert.deepEqual(
-      row.steps.map((s) => [s.name, s.agent]),
+      row.steps.map((s) => [s.name, agentOf(s)]),
       [
         ['plan', 'planner'],
         ['land', null],
       ],
     );
     assert.deepEqual(row.graph.edges, [{ from: 'plan', to: 'land', kind: 'after' }]);
-    assert.deepEqual([row.id, row.createdAt, row.unreadable], ['r-1', object([]).metadata.creationTimestamp, null]);
+    assert.deepEqual([row.id, row.createdAt], ['r-1', '2026-09-30T05:00:00.000Z']);
   });
-  await t.test('a run the list could not judge is an unreadable row: its name, its factory and why, bare', () => {
-    const row = unjudgedRowOf({ name: 'r-9', namespace: 'harbour', error: 'journal t-9 does not read', state: 'inFlight' });
-    assert.deepEqual([row.id, row.factory, row.unreadable, row.steps.length], ['r-9', 'harbour', 'journal t-9 does not read', 0]);
-    assert.deepEqual([row.status, row.moving], ['running', true]);
-    assert.equal(unjudgedRowOf({ name: 'r-9', namespace: 'default', error: 'x' }).factory, null);
+  await t.test('a run the list could not judge is said unjudged: its name, its factory and why, and nothing judged of it', () => {
+    const unjudged = { name: 'r-9', namespace: 'harbour', error: 'journal t-9 does not read', state: 'inFlight' as const };
+    assert.deepEqual(rowsOf(runList([], {}, [unjudged, { name: 'r-8', namespace: 'default', error: 'x' }])), [
+      { id: 'r-8', factory: null, unjudged: 'x' },
+      { id: 'r-9', factory: 'harbour', unjudged: 'journal t-9 does not read' },
+    ]);
   });
 });
 
@@ -133,13 +127,13 @@ test('every run is the plain RunList whole, a label selector going with it, each
   });
   const rows = await readRuns();
   assert.deepEqual(
-    rows.map((row) => [row.id, row.unreadable]),
+    rows.map((row) => [row.id, judged(row) ? null : row.unjudged]),
     [
       ['r-1', 'unread'],
       ['r-2', null],
     ],
   );
-  await (runsSelectedQuery('team=blue').queryFn as unknown as () => Promise<RunSummary[]>)();
+  await (runsSelectedQuery('team=blue').queryFn as unknown as () => Promise<RunRow[]>)();
   assert.deepEqual(asked.map(decodeURIComponent), ['/api/runs', '/api/runs?labelSelector=team=blue'], 'no state, no page: the list whole');
 });
 
@@ -171,13 +165,13 @@ test("the frame is the RunList of the runs not finished, split by each run's sta
   assert.equal(open.asOf, '2026-10-12T12:00:00.000Z');
   assert.deepEqual(open.counts, { waiting: 1, inFlight: 2, finished: 7 });
   assert.deepEqual(
-    open.waiting.map((run) => [run.id, run.wallMs, run.clock, run.stepCosts, run.waitingSince]),
+    open.waiting.map((run) => (judged(run) ? [run.id, run.wallMs, run.clock, run.stepCosts, run.waitingSince] : [run.id])),
     [['r-1', 5, clock, stepCosts, '2026-10-12T11:57:00.000Z']],
   );
   assert.deepEqual(
-    open.inFlight.map((run) => [run.id, run.unreadable, run.wallMs]),
+    open.inFlight.map((run) => (judged(run) ? [run.id, null, run.wallMs] : [run.id, run.unjudged])),
     [
-      ['r-2', 'unread', 0],
+      ['r-2', 'unread'],
       ['r-3', null, 5],
     ],
   );

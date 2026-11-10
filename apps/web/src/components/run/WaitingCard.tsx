@@ -1,10 +1,12 @@
 import { Card, Tag } from '@/components/ui/ds';
 import type { WaitingRun } from '@/lib/api/runs';
+import { judged, type UnjudgedRun } from '@/lib/api/judged';
 import { clockBreakdown, costBreakdown, tokensBreakdown, tokensSaid } from '@/lib/breakdown';
 import { factoryOf } from '@/lib/factories';
 import { titleOf } from '@/lib/factory';
 import { runClock } from '@/lib/factory';
 import { openWord, presentWait, waitSentence, waitTag, whenWords } from '@/lib/runWords';
+import { ANY_WAIT, OPENS } from '@/lib/words';
 import { previewBar } from '../step/StepPreview';
 import { CopyId, CutButton, CutFrame, CutTag, RunSteps, StatTile, TextLink } from '../look';
 
@@ -43,9 +45,62 @@ function Tiles({ run, asOf }: { run: WaitingRun; asOf: Date }) {
  * rail, each bar a button that opens its step's card, three tiles, and one button at the card's right, beside the tiles where the
  * card holds both and under them where it does not, which says what there is to read (`openWord`) and opens the run's page. The title
  * stands over the copy control's target, so a press on the title opens the run. It decides nothing and shows no command: the run's
- * page does.
+ * page does. A run the list could not judge is a card of its own (`UnjudgedCard`).
  */
-export function WaitingCard({ run, asOf }: { run: WaitingRun; asOf: Date }) {
+export function WaitingCard({ run, asOf }: { run: WaitingRun | UnjudgedRun; asOf: Date }) {
+  return judged(run) ? <JudgedCard run={run} asOf={asOf} /> : <UnjudgedCard run={run} />;
+}
+
+/**
+ * A waiting run the list could not judge, a task it reads having a journal that does not read: a wait on a person in no particular
+ * words, its factory, its id for its title, a link, with a copy control, the list's sentence of why, and the button that opens its page;
+ * no steps and no tiles, since nothing of it is judged.
+ */
+function UnjudgedCard({ run }: { run: UnjudgedRun }) {
+  return (
+    <CutFrame hue="yours" className="h-full">
+      <Card
+        component="article"
+        variant="elevated"
+        aria-label={run.id}
+        data-run={run.id}
+        data-unreadable=""
+        className="overflow-visible rounded-none bg-transparent shadow-none"
+        classNames={{ content: 'gap-3 p-6' }}
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <CutTag>
+            <Tag data-wait-tag variant="filled" color="primary" className="uppercase">
+              {ANY_WAIT.tag({ step: null, done: 0 })}
+            </Tag>
+          </CutTag>
+          <Tag data-factory={factoryOf(run)} variant="outlined" className="uppercase">
+            {factoryOf(run)}
+          </Tag>
+        </div>
+        <div className="flex flex-col items-start gap-1">
+          <h3 className="relative z-10 m-0 text-title-medium">
+            <TextLink to="/runs/$runId" params={{ runId: run.id }}>
+              {run.id}
+            </TextLink>
+          </h3>
+          <CopyId id={run.id} />
+        </div>
+        <p data-sentence className="m-0 text-body-medium text-on-surface-variant">
+          {run.unjudged}
+        </p>
+        <div data-foot className="mt-2 flex flex-wrap items-end justify-between gap-4">
+          <CutButton to="/runs/$runId" params={{ runId: run.id }} className="ml-auto">
+            {OPENS}
+          </CutButton>
+        </div>
+      </Card>
+    </CutFrame>
+  );
+}
+
+/** A waiting run judged: every part `WaitingCard` says. */
+function JudgedCard({ run, asOf }: { run: WaitingRun; asOf: Date }) {
   const title = titleOf(run);
   const waited = presentWait(run, asOf);
   return (
@@ -55,7 +110,6 @@ export function WaitingCard({ run, asOf }: { run: WaitingRun; asOf: Date }) {
         variant="elevated"
         aria-label={title}
         data-run={run.id}
-        data-unreadable={run.unreadable ? '' : undefined}
         className="overflow-visible rounded-none bg-transparent shadow-none"
         classNames={{ content: 'gap-3 p-6' }}
       >
@@ -83,7 +137,7 @@ export function WaitingCard({ run, asOf }: { run: WaitingRun; asOf: Date }) {
           <CopyId id={run.id} />
         </div>
         <p data-sentence className="m-0 text-body-medium text-on-surface-variant">
-          {run.unreadable ?? waitSentence(run)}
+          {waitSentence(run)}
         </p>
         <RunSteps steps={run.steps} cancelled={run.cancelledAt !== null} held={run.holding != null} names wrap={previewBar(run, asOf)} />
         <div data-foot className="mt-2 flex flex-wrap items-end justify-between gap-4">

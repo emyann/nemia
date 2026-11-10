@@ -2,7 +2,8 @@ import { useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { repositoryQuery, startRun, type Place, type Started, type WorkflowListing } from '../../lib/api/workflows.ts';
-import { runsQuery, type RunSummary } from '../../lib/api/runs.ts';
+import { runsQuery } from '../../lib/api/runs.ts';
+import { judged, type RunView } from '../../lib/api/judged.ts';
 import { startCard } from '../../lib/api/inbox.ts';
 import { standingOf, titleOf } from '../../lib/factory';
 import { afterFor, ignoredRepoNote } from '../../lib/inbox';
@@ -190,7 +191,7 @@ function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]
   const legend = useId();
   const error = repository.error ?? runs.error;
   const where = repo ?? repository.data?.repo;
-  const onRepo = where && runs.data ? newestFirst(runs.data.filter((run) => run.repo === where)) : null;
+  const onRepo = where && runs.data ? newestFirst(runs.data.filter(judged).filter((run) => run.repo === where)) : null;
 
   return (
     <fieldset aria-labelledby={legend} className="min-w-0 space-y-1.5">
@@ -234,5 +235,5 @@ function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]
   );
 }
 
-const newestFirst = (runs: readonly RunSummary[]): RunSummary[] =>
+const newestFirst = (runs: readonly RunView[]): RunView[] =>
   [...runs].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));

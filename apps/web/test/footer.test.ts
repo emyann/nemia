@@ -7,8 +7,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { QuotaWindow } from '../src/lib/api/quota.ts';
-import type { RunSummary } from '../src/lib/api/runs.ts';
-import { coded, listed, waitingRun, type Word } from './run-fixtures.ts';
+import type { RunView } from '../src/lib/api/judged.ts';
+import { listed, listedStep, summary, waitingRun, type Word } from './run-fixtures.ts';
 import { atWork, atWorkWords, daemonDot, feedWords, quotaShort, staleFrameHeights, versionWords } from '../src/lib/footer.ts';
 import { daemon, quota } from './factory-fixtures.ts';
 
@@ -26,59 +26,11 @@ const win = (extra: Partial<QuotaWindow> = {}): QuotaWindow => ({
 });
 
 /** A run in flight with one step per status, in `factory`, and `extra` over it. */
-const run = (statuses: readonly Word[], extra: Partial<RunSummary> = {}): RunSummary => ({
-  labels: {},
-  id: 'r-1',
-  repo: '/code/app',
-  factory: null,
-  place: 'git',
-  work: null,
-  brief: 'Do the thing',
-  workflowDir: '/code/app/workflows/dev',
-  try: null,
-  createdAt: '2026-09-13T00:00:00.000Z',
-  startedAt: null,
-  cancelledAt: null,
-  pruned: null,
-  status: 'running',
-  phase: 'running',
-  reason: 'Running',
-  on: null,
-  via: null,
-  moving: true,
-  cost: null,
-  atWork: null,
-  tokens: null,
-  steps: statuses.map((status, i) => ({
-    name: `step-${i}`,
-    taskId: `t-${i}`,
-    branch: null,
-    ...coded(status),
-    note: null,
-    roundDue: false,
-    agent: null,
-    since: null,
-    needs: null,
-    waitingFor: null,
-    approve: null,
-    denied: null,
-    sessionUnread: null,
-  })),
-  graph: { roots: [], edges: [] },
-  waitingOnYou: [],
-  waitingOnYouWords: [],
-  after: [],
-  waiting: null,
-  context: [],
-  holdUntil: [],
-  holding: null,
-  toDecide: null,
-  unreadable: null,
-  ...extra,
-});
+const run = (statuses: readonly Word[], extra: Partial<RunView> = {}): RunView =>
+  summary([], { steps: statuses.map((status, i) => listedStep(`step-${i}`, status, i)), ...extra });
 
 /** A light answer holding `waiting` and `inFlight`, its counts their lengths. */
-const light = (waiting: RunSummary[], inFlight: RunSummary[]) => ({
+const light = (waiting: RunView[], inFlight: RunView[]) => ({
   counts: { waiting: waiting.length, inFlight: inFlight.length, finished: 0 },
   waiting: waiting.map((row) => waitingRun(row)),
   inFlight: inFlight.map((row) => listed(row)),

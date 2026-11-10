@@ -1,12 +1,12 @@
 /**
- * What a step's card says, read from the run's own answer (`RunView`), the run's row on the list and the agents: the card's kind and
+ * What a step's card says, read from the run's own answer (`RunDetail`), the run's row on the list and the agents: the card's kind and
  * the hue of its frame, its tag, its agent, its tries and rounds, its time, its session's five facts, its spend, a note and its one
  * action, `Read and approve` at an approval's gate. Pure, so that each state is proven without a browser; `StepCard` draws it.
  */
 import type { AgentListing } from './api/agents.ts';
 import type { StepPhase } from 'objects';
-import type { RunView, StepView } from './runView.ts';
-import type { RunSummary } from './api/runs.ts';
+import type { RunDetail, StepView } from './runView.ts';
+import { agentOf, type RunView } from './api/judged.ts';
 import { meaningOf } from './meaning.ts';
 import { durationWords } from './duration.ts';
 import { whenWords } from './runWords.ts';
@@ -53,9 +53,9 @@ type DetailStep = StepView;
 
 /** What the card reads: the run's row, the step's name, the run's own answer once read, the agents once read, and the instant now. */
 export type StepCardInput = {
-  run: Pick<RunSummary, 'id' | 'cancelledAt' | 'holding' | 'steps'>;
+  run: Pick<RunView, 'id' | 'cancelledAt' | 'holding' | 'steps'>;
   step: string;
-  detail?: Pick<RunView, 'steps'> | undefined;
+  detail?: Pick<RunDetail, 'steps'> | undefined;
   agents?: ReadonlyArray<Pick<AgentListing, 'name' | 'role'>> | undefined;
   now: Date;
 };
@@ -205,8 +205,8 @@ function noteOf(step: DetailStep, now: Date): CardNote | null {
   return gate ? { text: gate, icon: 'info' } : null;
 }
 
-/** The agent of a step, by the run's row, with its role from the agents' listing; null for a step that names none. */
-function agentOf(name: string | null, agents: StepCardInput['agents']): StepCardFacts['agent'] {
+/** The agent of a step, as the run froze it (`agentOf`), with its role from the agents' listing; null for a step that names none. */
+function agentFacts(name: string | null, agents: StepCardInput['agents']): StepCardFacts['agent'] {
   if (!name) return null;
   const role = agents?.find((agent) => agent.name === name)?.role ?? '';
   return { name, initial: name.charAt(0).toUpperCase(), role };
@@ -230,7 +230,7 @@ export function stepCardOf({ run, step, detail, agents, now }: StepCardInput): S
     kind,
     hue: hueOf(state),
     tag: { word: stateWordsOf(state, codes.on, run.holding != null).rail, ...TAGS[kind] },
-    agent: agentOf(row?.agent ?? null, agents),
+    agent: agentFacts(row ? agentOf(row) : null, agents),
     step,
     place: own && detail ? placeOf(own, detail.steps, kind) : null,
     time: own ? timeOf(own, kind, now) : null,

@@ -1,21 +1,22 @@
 /**
- * A run's page's reads as the api answers them, every key the board reads and each union in its shapes: a run's view (`detail`, its
- * steps from `step`), the reads it is composed from (`readsOf`), a run's row in a list (`summary`), its decision (`decidable`), a step's
- * conversation (`transcript`) and its try's path (`stepPath`). Each takes keys to put over its own.
+ * A run's page's reads as the api answers them, every key the board reads and each union in its shapes: a run's detail (`detail`, its
+ * steps from `step`), the reads it is composed from (`readsOf`), a run as a list has it (`summary`, its steps from `listedStep`), its
+ * decision (`decidable`), a step's conversation (`transcript`) and its try's path (`stepPath`). Each takes keys to put over its own.
  */
 import type * as RunObject from 'objects';
 import type { Decidable } from '../src/lib/api/decision.ts';
-import type { ListedRun, RunSummary, WaitingRun } from '../src/lib/api/runs.ts';
+import type { ListedRun, WaitingRun } from '../src/lib/api/runs.ts';
+import type { RunStep, RunView } from '../src/lib/api/judged.ts';
 import type { MachineGraph, StepPath, StepTranscript } from '../src/lib/api/steps.ts';
 import type { StepTry } from '../src/lib/api/tries.ts';
 import type { StepUsed } from '../src/lib/api/usage.ts';
 
 import type { RunLines } from '../src/lib/api/run.ts';
-import type { RunView, StepView } from '../src/lib/runView.ts';
+import type { RunDetail, StepView } from '../src/lib/runView.ts';
 import { stepStamp } from '../src/lib/lifecyclePath.ts';
 
 type Step = StepView;
-type TimelineTotal = RunView['timeline']['run'];
+type TimelineTotal = RunDetail['timeline']['run'];
 
 /** A step's codes as the api carries them beside its word. */
 type Codes = Pick<Step, 'phase' | 'reason' | 'on' | 'via' | 'verdict'>;
@@ -288,9 +289,10 @@ export const step = (extra: Partial<Step> = {}): Step => ({
 });
 
 /** A run's detail, as `GET /api/runs/r-1` answers it: from an inbox card, pruned, waiting and held, its steps `step`'s. */
-export const detail = (extra: Partial<RunView> = {}): RunView => ({
+export const detail = (extra: Partial<RunDetail> = {}): RunDetail => ({
   labels: {},
   id: 'r-1',
+  factory: null,
   brief: 'Decode the reads',
   decide: 'nemia decide r-1',
   repo: '/work/repo',
@@ -462,8 +464,69 @@ export const stepPath = (extra: Partial<StepPath> = {}): StepPath => ({
   ...extra,
 });
 
-/** A run's row as a list answers it, in flight, with one step per `[name, word]` carrying that word's codes, and `extra` over it. */
-export const summary = (steps: ReadonlyArray<readonly [string, Word]>, extra: Partial<RunSummary> = {}): RunSummary => ({
+/** A step as a list's run carries it, with `word`'s codes, its task `t-<i>`, nothing frozen of it and nothing asked of a person. */
+export const listedStep = (name: string, word: Word, i: number, extra: Partial<RunStep> = {}): RunStep => ({
+  name,
+  ...coded(word),
+  raise: null,
+  timeline: [],
+  filed: null,
+  spec: null,
+  taskId: `t-${i}`,
+  workspace: null,
+  branch: null,
+  files: [],
+  filesError: null,
+  note: null,
+  roundDue: false,
+  needs: null,
+  waitingFor: null,
+  approve: null,
+  denied: null,
+  sessionUnread: null,
+  lastLine: null,
+  gate: null,
+  said: [],
+  asked: null,
+  check: null,
+  attempts: { count: 0, latest: null },
+  used: null,
+  spent: null,
+  budget: null,
+  ...extra,
+});
+
+/** A step as the run froze it, given the agent `agent`: what `agentOf` reads. */
+export const givenAgent = (agent: string): NonNullable<RunStep['spec']> => ({ ...step().spec!, agent });
+
+/** The tries on the clock of a step whose session started at `at` and still runs: what `sinceOf` reads. */
+export const atWorkSince = (at: string): RunStep['timeline'] => [
+  {
+    try: 1,
+    round: 1,
+    session: {
+      taskId: 't-0',
+      at: 'running',
+      filedAt: at,
+      spawnedAt: at,
+      endedAt: null,
+      attempts: 1,
+      queuedMs: 0,
+      ranMs: 0,
+      queued: '0s',
+      ran: '0s',
+    },
+    sessionOf: null,
+    check: null,
+    used: null,
+  },
+];
+
+/**
+ * A run as a list answers it, in flight, with one step per `[name, word]` carrying that word's codes (`listedStep`), and `extra` over
+ * it.
+ */
+export const summary = (steps: ReadonlyArray<readonly [string, Word]>, extra: Partial<RunView> = {}): RunView => ({
   labels: {},
   id: 'r-1',
   repo: '/code/app',
@@ -473,10 +536,14 @@ export const summary = (steps: ReadonlyArray<readonly [string, Word]>, extra: Pa
   brief: 'Do the thing',
   workflowDir: '/code/app/workflows/dev',
   try: null,
+  baseRef: null,
+  branch: null,
+  isolate: null,
   createdAt: '2026-09-13T00:00:00.000Z',
   startedAt: null,
   cancelledAt: null,
   pruned: null,
+  onDisk: { worktrees: true, files: true },
   status: 'running',
   phase: 'running',
   reason: 'Running',
@@ -486,36 +553,26 @@ export const summary = (steps: ReadonlyArray<readonly [string, Word]>, extra: Pa
   cost: null,
   atWork: null,
   tokens: null,
-  steps: steps.map(([name, word], i) => ({
-    name,
-    taskId: `t-${i}`,
-    branch: null,
-    ...coded(word),
-    note: null,
-    roundDue: false,
-    agent: null,
-    since: null,
-    needs: null,
-    waitingFor: null,
-    approve: null,
-    denied: null,
-    sessionUnread: null,
-  })),
+  read: null,
+  steps: steps.map(([name, word], i) => listedStep(name, word, i)),
   graph: { roots: [], edges: [] },
   waitingOnYou: [],
   waitingOnYouWords: [],
+  gates: [],
+  warning: null,
+  kinds: [],
   after: [],
   waiting: null,
   context: [],
   holdUntil: [],
   holding: null,
   toDecide: null,
-  unreadable: null,
+  timeline: { rounds: [], run: total({ tasks: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: '0s', ran: '0s', wall: '0s', cost: null }) },
   ...extra,
 });
 
 /** `run` as the light answer lists one in flight: its wall time, no end, and no clock but the one `clock` gives. */
-export const listed = (run: RunSummary, wallMs = 0, clock: ListedRun['clock'] = null): ListedRun => ({
+export const listed = (run: RunView, wallMs = 0, clock: ListedRun['clock'] = null): ListedRun => ({
   ...run,
   wallMs,
   finishedAt: null,
@@ -527,7 +584,7 @@ export const listed = (run: RunSummary, wallMs = 0, clock: ListedRun['clock'] = 
  * gives, none by default.
  */
 export const waitingRun = (
-  run: RunSummary,
+  run: RunView,
   extra: Partial<Pick<WaitingRun, 'wallMs' | 'clock' | 'stepCosts' | 'waitingSince'>> = {},
 ): WaitingRun => ({
   ...listed(run),
@@ -537,7 +594,7 @@ export const waitingRun = (
 });
 
 /** A run behind on an agent, and on a skill a step already ran on the older one of: what the run page draws the drift from. */
-export const behind = (): RunView =>
+export const behind = (): RunDetail =>
   detail({
     kinds: [
       { kind: 'agent', name: 'coder', pinned: 5, now: 6 },
@@ -546,15 +603,15 @@ export const behind = (): RunView =>
   });
 
 /** A run behind no revision: no `kinds`, and nothing drawn. */
-export const unpinned = (): RunView => ({ ...detail(), kinds: [] });
+export const unpinned = (): RunDetail => ({ ...detail(), kinds: [] });
 
 /**
- * The reads a run's view is composed from (`runViewOf`), each under the key its query reads it by: the object, the lines, and each step's
- * tries and told at its stamp — what a reader with no loader (`useRunRead`) finds in the cache for `view`. A step's closeout is its
- * current try's, so a view whose closeout no try carries reads back without one.
+ * The reads a run's detail is composed from (`runDetailOf`), each under the key its query reads it by: the object, the lines, and each
+ * step's tries and told at its stamp — what a reader with no loader (`useRunRead`) finds in the cache for `view`. A step's closeout is
+ * its current try's, so a view whose closeout no try carries reads back without one.
  */
-export function readsOf(view: RunView): Array<[readonly unknown[], unknown]> {
-  const { id, createdAt, decide, refresh, workflowPage, from, fromNote, graph, steps, timeline, ...rest } = view;
+export function readsOf(view: RunDetail): Array<[readonly unknown[], unknown]> {
+  const { id, factory, createdAt, decide, refresh, workflowPage, from, fromNote, graph, steps, timeline, ...rest } = view;
   const { brief, repo, place, work, workflowDir, try: tried, baseRef, branch, isolate, after, context, ...judged } = rest;
   const statusOf = (s: StepView): RunObject.RunStepStatus => {
     const {
@@ -575,7 +632,7 @@ export function readsOf(view: RunView): Array<[readonly unknown[], unknown]> {
   const object = {
     apiVersion: 'nemia/v1',
     kind: 'Run',
-    metadata: { name: id, creationTimestamp: createdAt, labels: { workflow: '' } },
+    metadata: { name: id, ...(factory === null ? {} : { namespace: factory }), creationTimestamp: createdAt, labels: { workflow: '' } },
     spec: {
       steps: steps.flatMap((s) => (s.spec ? [{ ...s.spec, name: s.name, input: [] }] : [])),
       brief,
@@ -617,7 +674,7 @@ export function readsOf(view: RunView): Array<[readonly unknown[], unknown]> {
  * A run's object as a list answers it, off `view`'s reads (`readsOf`), in `namespace` where one is given, with `status` over its own:
  * the frame's parts a list asked by state carries.
  */
-export function runObject(view: RunView = detail(), status: Partial<RunObject.Run['status']> = {}, namespace?: string): RunObject.Run {
+export function runObject(view: RunDetail = detail(), status: Partial<RunObject.Run['status']> = {}, namespace?: string): RunObject.Run {
   const object = readsOf(view)[0][1] as RunObject.Run;
   return {
     ...object,

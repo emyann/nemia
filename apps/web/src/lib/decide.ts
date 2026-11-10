@@ -3,7 +3,7 @@
  * bar, and what a line of a diff is. Pure. The words themselves are the api's, which are the CLI `decide`'s.
  */
 import type { Decidable, Group, RunDecision, Touched } from './api/decision.ts';
-import type { RunSummary } from './api/runs.ts';
+import type { RunView } from './api/judged.ts';
 import { stepState } from './status.ts';
 import type { Frozen } from './frozen.ts';
 
@@ -11,7 +11,7 @@ import type { Frozen } from './frozen.ts';
  * Whether a run has something to decide, as its page and the list read it: `assess` says it finished, or a step waits
  * on a person — and nobody called it off. The api has the last word (`isDecidable`); this only says when to ask.
  */
-export const decidableRun = (run: Frozen<Pick<RunSummary, 'status' | 'cancelledAt' | 'waitingOnYou'>>): boolean =>
+export const decidableRun = (run: Frozen<Pick<RunView, 'status' | 'cancelledAt' | 'waitingOnYou'>>): boolean =>
   run.cancelledAt === null && run.status !== 'cancelled' && (run.status !== 'running' || run.waitingOnYou.length > 0);
 
 /** Whether the api's answer is a decision to show, rather than `running` or `nothing`. */
@@ -30,8 +30,8 @@ export const isDecidable = (decision: RunDecision | undefined): decision is Deci
  */
 export const decisionStamp = (
   run: Frozen<
-    Pick<RunSummary, 'status' | 'cancelledAt' | 'waitingOnYou'> & { holding?: RunSummary['holding'] } & {
-      steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'taskId' | 'phase' | 'reason' | 'on' | 'via' | 'message'>>;
+    Pick<RunView, 'status' | 'cancelledAt' | 'waitingOnYou'> & { holding?: RunView['holding'] } & {
+      steps: ReadonlyArray<Pick<RunView['steps'][number], 'name' | 'taskId' | 'phase' | 'reason' | 'on' | 'via' | 'message'>>;
     }
   >,
 ): string =>

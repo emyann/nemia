@@ -7,13 +7,20 @@
  */
 import type { Factory, FactoryCondition, FactoryUntrusted } from './api/factories.ts';
 import type { InboxEntry } from './api/inbox.ts';
-import type { OpenRuns, RunSummary } from './api/runs.ts';
+import { type OpenRuns } from './api/runs.ts';
+import { judged, type UnjudgedRun } from './api/judged.ts';
+import type { RunView } from './api/judged.ts';
 import type { PagePlace, Place, WorkflowListing } from './api/workflows.ts';
 import type { WorkflowPageAddress } from './api/address.ts';
 import { inFlight, repoName, waitsOnYou } from './factory.ts';
 
-/** What the blocks read of a run: the factory it names, and what `inFlight` and `waitsOnYou` read. */
-export type FactoryRun = Pick<RunSummary, 'factory' | 'status' | 'moving' | 'waitingOnYou' | 'cancelledAt' | 'waiting' | 'holding'>;
+/**
+ * What the blocks read of a run: the factory it names, and what `inFlight` and `waitsOnYou` read; or a run the list could not judge, in
+ * flight as the tick counts it, and waiting on nobody.
+ */
+export type FactoryRun =
+  | Pick<RunView, 'factory' | 'status' | 'moving' | 'waitingOnYou' | 'cancelledAt' | 'waiting' | 'holding'>
+  | UnjudgedRun;
 
 /** A factory as a block reads it: its name, and whether it is the default factory, which holds whatever names none. */
 export type FactoryPlace = Pick<Factory, 'name' | 'default'>;
@@ -81,8 +88,8 @@ export const blockOf = (factory: Factory, runs: readonly FactoryRun[]): FactoryB
     default: factory.default,
     repos: factory.repos.map(repoName),
     runs: mine.length,
-    inFlight: mine.filter(inFlight).length,
-    waitsOnYou: mine.filter(waitsOnYou).length,
+    inFlight: mine.filter((run) => !judged(run) || inFlight(run)).length,
+    waitsOnYou: mine.filter((run) => judged(run) && waitsOnYou(run)).length,
     workflows: factory.workflows === null ? null : factory.workflows.length,
     hires: Object.keys(factory.hires).length,
     error: factory.error,

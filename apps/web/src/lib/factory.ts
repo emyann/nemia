@@ -3,7 +3,7 @@
  * says, where a card goes, and how many cells an open card takes. Pure.
  */
 import type { AtWork, RunToDecide } from './api/judged.ts';
-import type { RunSummary } from './api/runs.ts';
+import type { RunView } from './api/judged.ts';
 import type { EdgeState } from './canvas.ts';
 import { durationWords } from './duration.ts';
 import type { Flow } from './flow.ts';
@@ -31,7 +31,7 @@ import type { Frozen } from './frozen.ts';
  * steps say, and the tick lifts the hold when those runs land, though nothing of it is filed before then. Not once only a person lifts it
  * (`holding.waitingOnYou`): then it waits on them (`waitsOnYou`). A listing without `holding` is read as holding nothing.
  */
-export const inFlight = (run: Frozen<Pick<RunSummary, 'status' | 'moving'> & Held>): boolean =>
+export const inFlight = (run: Frozen<Pick<RunView, 'status' | 'moving'> & Held>): boolean =>
   run.moving || (run.status === 'running' && !run.waiting?.waitingOnYou && !run.holding?.waitingOnYou);
 
 /**
@@ -41,7 +41,7 @@ export const inFlight = (run: Frozen<Pick<RunSummary, 'status' | 'moving'> & Hel
 export const openRows = <T>(open: { waiting: readonly T[]; inFlight: readonly T[] }): T[] => [...open.waiting, ...open.inFlight];
 
 /** What `inFlight` and `waitsOnYou` read beside their own fields, each read as absent where a listing lacks it. */
-type Held = { waiting?: RunSummary['waiting']; holding?: RunSummary['holding']; cancelledAt?: string | null };
+type Held = { waiting?: RunView['waiting']; holding?: RunView['holding']; cancelledAt?: string | null };
 
 /**
  * What a person has to decide about the run's result, off the api's `toDecide`: its ending step's gate, or a branch nobody merged. Null
@@ -56,7 +56,7 @@ export const toDecideOf = (run: { toDecide?: Frozen<RunToDecide> | null }): Froz
  * (`holding.waitingOnYou`: a run it is held until is cancelled, gone, or not there). Not once it is cancelled: a cancelled run waits on
  * nobody, whatever its steps last said.
  */
-export const waitsOnYou = (run: Frozen<Pick<RunSummary, 'waitingOnYou' | 'cancelledAt'> & Held>): boolean =>
+export const waitsOnYou = (run: Frozen<Pick<RunView, 'waitingOnYou' | 'cancelledAt'> & Held>): boolean =>
   !run.cancelledAt && (run.waitingOnYou.length > 0 || Boolean(run.waiting?.waitingOnYou) || Boolean(run.holding?.waitingOnYou));
 
 /**
@@ -64,7 +64,7 @@ export const waitsOnYou = (run: Frozen<Pick<RunSummary, 'waitingOnYou' | 'cancel
  * filed yet (the api's `waiting`, null once a step is filed), and nobody to act (`waitsOnYou`). The floor draws such a run as a ghost, as
  * the queue lane draws a card not started, until it starts. Not a cancelled run, which waits on nobody.
  */
-export const waitsOnRuns = (run: Pick<RunSummary, 'waitingOnYou' | 'cancelledAt'> & Held): boolean =>
+export const waitsOnRuns = (run: Pick<RunView, 'waitingOnYou' | 'cancelledAt'> & Held): boolean =>
   !run.cancelledAt && Boolean(run.waiting) && !waitsOnYou(run);
 
 /**
@@ -76,7 +76,7 @@ export const waitsOnRuns = (run: Pick<RunSummary, 'waitingOnYou' | 'cancelledAt'
  * whole of what is asked is the decision — so a caller that says `waiting on you:` asks whether there is anything to say first.
  */
 export const onYouOf = (
-  run: Frozen<Pick<RunSummary, 'waitingOnYou'> & { waitingOnYouWords?: readonly string[]; toDecide?: RunToDecide | null }>,
+  run: Frozen<Pick<RunView, 'waitingOnYou'> & { waitingOnYouWords?: readonly string[]; toDecide?: RunToDecide | null }>,
 ): readonly string[] => {
   const said = run.waitingOnYouWords ?? run.waitingOnYou;
   const decide = toDecideOf(run);
@@ -87,15 +87,15 @@ export const onYouOf = (
  * Where a run stands, in a word, as the start form offers it to wait on: called off; waiting on you (`waitsOnYou`) — a run that waits on
  * a run that never lands is one, though it has filed nothing and is not in flight; in flight; or finished.
  */
-export const standingOf = (run: Pick<RunSummary, 'cancelledAt' | 'status' | 'moving' | 'waitingOnYou' | 'waiting'>): string =>
+export const standingOf = (run: Pick<RunView, 'cancelledAt' | 'status' | 'moving' | 'waitingOnYou' | 'waiting'>): string =>
   run.cancelledAt ? ENDED.cancelled.word : waitsOnYou(run) ? 'waiting on you' : inFlight(run) ? 'in flight' : 'finished';
 
 type Clocked = Frozen<
-  Pick<RunSummary, 'createdAt' | 'startedAt' | 'cancelledAt'> & Held & { waitingOnYou?: RunSummary['waitingOnYou']; atWork?: AtWork | null }
+  Pick<RunView, 'createdAt' | 'startedAt' | 'cancelledAt'> & Held & { waitingOnYou?: RunView['waitingOnYou']; atWork?: AtWork | null }
 >;
 
 /** How long a run waited before it started — created to its first filing — or null while nothing of it is filed. */
-export const waitedMs = (run: Pick<RunSummary, 'createdAt' | 'startedAt'>): number | null =>
+export const waitedMs = (run: Pick<RunView, 'createdAt' | 'startedAt'>): number | null =>
   run.startedAt === null ? null : Math.max(0, Date.parse(run.startedAt) - Date.parse(run.createdAt));
 
 /**
@@ -123,7 +123,7 @@ const isOver = (run: Clocked & { atWork: AtWork }, finished: boolean): boolean =
 const whole = (iso: string): string => instantWhole(new Date(iso));
 
 /** The sentence a clock's title ends on for a run that waited a second or more before its first filing (`waitedMs`); else nothing. */
-const waitedSentence = (run: Pick<RunSummary, 'createdAt' | 'startedAt'>): string => {
+const waitedSentence = (run: Pick<RunView, 'createdAt' | 'startedAt'>): string => {
   const waited = waitedMs(run) ?? 0;
   return waited >= 1000
     ? ` Created ${whole(run.createdAt)}, and waited ${durationWords(waited, 'second')} before its first step was filed.`
@@ -200,10 +200,10 @@ export function runClock(
   return { words: said(finished ? `started ${since} ago` : `${since} since it started`), at: startedAt, title };
 }
 
-type FloorRun = Pick<RunSummary, 'id' | 'createdAt' | 'status' | 'moving' | 'waiting' | 'after' | 'waitingOnYou' | 'cancelledAt'> & {
+type FloorRun = Pick<RunView, 'id' | 'createdAt' | 'status' | 'moving' | 'waiting' | 'after' | 'waitingOnYou' | 'cancelledAt'> & {
   toDecide?: RunToDecide | null;
   holdUntil?: readonly string[];
-  holding?: RunSummary['holding'];
+  holding?: RunView['holding'];
 };
 
 /**
@@ -232,7 +232,7 @@ export function floorRuns<T extends FloorRun>(runs: readonly T[], showFinished: 
 }
 
 /** What a card's live waits are read off: the runs its roots still wait on, and a person's hold. */
-type Waits = Pick<RunSummary, 'id' | 'waiting'> & { holding?: RunSummary['holding'] };
+type Waits = Pick<RunView, 'id' | 'waiting'> & { holding?: RunView['holding'] };
 
 /**
  * The runs a card still waits on, each once: those its roots wait on before anything is filed (`waiting`, the CLI's `--after`), then each
@@ -291,7 +291,7 @@ type ContextEdge = { id: string; source: string; target: string };
  * The lines of what the focused card reads: one from each run in its `context` that is on the floor, to it. None without a focus — the
  * card hovered, else the one selected — so the floor draws only its waits until a person looks at a card.
  */
-export function contextEdges(runs: ReadonlyArray<Pick<RunSummary, 'id' | 'context'>>, focus: string | null): ContextEdge[] {
+export function contextEdges(runs: ReadonlyArray<Pick<RunView, 'id' | 'context'>>, focus: string | null): ContextEdge[] {
   const card = runs.find((run) => run.id === focus);
   if (!card) return [];
   const floor = new Set(runs.map((run) => run.id));
@@ -301,7 +301,7 @@ export function contextEdges(runs: ReadonlyArray<Pick<RunSummary, 'id' | 'contex
 }
 
 /** A card's title: the brief's first line with words on it, without a heading's hashes; else the run id. */
-export const titleOf = (run: Pick<RunSummary, 'id' | 'brief'>): string =>
+export const titleOf = (run: Pick<RunView, 'id' | 'brief'>): string =>
   run.brief
     .split('\n')
     .map((line) => line.replace(/^\s*#+\s*/, '').trim())
@@ -311,7 +311,7 @@ export const titleOf = (run: Pick<RunSummary, 'id' | 'brief'>): string =>
  * What a card's chip of the runs it reads says on hover: a line per run in its `context`, its id and its title where `runs` has it, its
  * id alone where it does not.
  */
-export const readsLines = (run: Frozen<Pick<RunSummary, 'context'>>, runs: ReadonlyArray<Pick<RunSummary, 'id' | 'brief'>>): string[] => {
+export const readsLines = (run: Frozen<Pick<RunView, 'context'>>, runs: ReadonlyArray<Pick<RunView, 'id' | 'brief'>>): string[] => {
   const byId = new Map(runs.map((source) => [source.id, source]));
   return run.context.map((id) => {
     const source = byId.get(id);
@@ -327,7 +327,7 @@ export const repoName = (repo: string): string =>
     .at(-1) ?? repo;
 
 /** Oldest first, so a run that starts takes the next free cell and moves no card already down. */
-export const byAge = <T extends Pick<RunSummary, 'id' | 'createdAt'>>(runs: readonly T[]): T[] =>
+export const byAge = <T extends Pick<RunView, 'id' | 'createdAt'>>(runs: readonly T[]): T[] =>
   [...runs].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
 
 /** A cell on the Factory's grid: room for one card and the gap beside and below it. Cards are drawn to fit. */

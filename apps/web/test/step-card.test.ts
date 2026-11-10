@@ -5,15 +5,15 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { RunView } from '../src/lib/runView.ts';
+import type { RunDetail } from '../src/lib/runView.ts';
 import { kindOf, stepCardOf, type StepCardFacts, type StepKind } from '../src/lib/stepCard.ts';
 import type { StepPhase } from 'objects';
 import type { StepState } from '../src/lib/status.ts';
 import { PERSON } from '../src/lib/words.ts';
 import { aCardOpen, CARD_REACH, cardOpened, previewSide } from '../src/lib/useSheetPreview.ts';
-import { coded, detail, step, summary, triedAs, type Word } from './run-fixtures.ts';
+import { coded, detail, givenAgent, step, summary, triedAs, type Word } from './run-fixtures.ts';
 
-type Step = RunView['steps'][number];
+type Step = RunDetail['steps'][number];
 
 const NOW = new Date('2026-09-30T05:20:00.000Z');
 
@@ -50,8 +50,8 @@ const aTry = (n: number, round = 1): Step['tries'][number] => ({
 
 /** The card of `name` on a run of design, implement, review whose steps say `words`, its answer's steps `steps`. */
 function cardOf(name: string, words: Record<string, Word>, steps: Step[], agent: string | null = 'Ada'): StepCardFacts {
-  const row = summary(Object.entries(words));
-  row.steps = row.steps.map((s) => ({ ...s, agent: s.name === name ? agent : null }));
+  const listed = summary(Object.entries(words));
+  const row = { ...listed, steps: listed.steps.map((s) => ({ ...s, spec: s.name === name && agent ? givenAgent(agent) : null })) };
   return stepCardOf({
     run: row,
     step: name,

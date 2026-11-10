@@ -1,4 +1,4 @@
-import type { RunSummary } from '@/lib/api/runs';
+import type { RunView } from '@/lib/api/judged';
 import type { WaitOn } from 'objects';
 import { Fragment, type CSSProperties, type ReactNode } from 'react';
 import { filled, ink, paint } from '@/lib/meaning';
@@ -61,7 +61,7 @@ export function RunSteps({
   names = false,
   wrap,
 }: {
-  steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via'>>;
+  steps: ReadonlyArray<Pick<RunView['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via'>>;
   cancelled: boolean;
   held: boolean;
   names?: boolean;

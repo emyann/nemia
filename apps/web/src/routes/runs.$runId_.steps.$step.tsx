@@ -8,7 +8,7 @@ import { RunGone } from '@/components/run/RunGone';
 import { StatusChip, StepNote } from '@/components/step/StatusChip';
 import { readGone } from '@/lib/api/gone';
 import { type Said } from '@/lib/api/asks';
-import { loadRun, useRunView, type RunView, type StepView } from '@/lib/runView';
+import { loadRun, useRunView, type RunDetail, type StepView } from '@/lib/runView';
 import { titleOf } from '@/lib/factory';
 import { mergeSaid, sayable } from '@/lib/say';
 import { waitsAtGate, stepState } from '@/lib/status';
@@ -96,7 +96,7 @@ function SessionRead({ runId, name }: { runId: string; name: string }) {
  * kept with the task it was said to, so a later try starts afresh. Words the transcript shows reaching the session are drawn once, as what
  * was said, where they reached it (`heardIn`).
  */
-function Session({ run, step }: { run: RunView; step: Step }) {
+function Session({ run, step }: { run: RunDetail; step: Step }) {
   const cancelled = run.cancelledAt !== null;
   const following = useStepTranscript(run.id, step.name, sessionToRead(step), waitsAtGate(stepState(step, cancelled, false), cancelled));
   const [sent, setSent] = useState<{ taskId: string | null; said: Said[] }>({ taskId: step.taskId, said: [] });
@@ -175,7 +175,7 @@ function SessionBody({ step, following, turns }: { step: Step; following: Follow
   );
 }
 
-function BackToRun({ run }: { run: RunView }) {
+function BackToRun({ run }: { run: RunDetail }) {
   return (
     <Link
       to="/runs/$runId"

@@ -28,15 +28,38 @@ const unstamped = (line: string): string => line.replace(BOM, '').replace(/^\d{4
 const bare = (line: string): string => line.replace(/^\S+:\S+: /, '');
 
 /**
+ * A runner's own line for a subject that failed, `<tool>: FAILED — <subject>: <why>`, also said by one of its workers as `<tool>: worker
+ * <n> FAILED — …` and relayed with the worker's tag before it (`[w<n>] `): its subject, which names the page or the case, and the rest.
+ * The runner prints one such failure several times — by the worker, by the runner, again in a headline — so the subject, never the whole
+ * line, is what says it once.
+ */
+const SUBJECT_FAILED = /^\s*(?:\[[^\]\s]+\] )?[\w.-]+: (?:worker \d+ )?FAILED — (.+)$/;
+
+/** The subject of a runner's failed line (`SUBJECT_FAILED`): what it says before its first `: `, or all of it where it says no reason. */
+const subjectOf = (line: string): string | undefined => {
+  const said = SUBJECT_FAILED.exec(bare(line))?.[1];
+  return said === undefined ? undefined : said.split(': ')[0].trim();
+};
+
+/**
  * Whether `line` fails a job: a test node's reporters name, `✖` (spec) or `not ok ` (TAP) after its indent — never the heading
  * `✖ failing tests:` the spec reporter lists them again under, the rule of Nemia's own check, copied, since this script imports
- * nothing — a TypeScript error (`<path>(<line>,<col>): error TS<n>: …`) or oxlint's ` x <rule>: …` (`×` where it draws).
+ * nothing — a runner's failed subject (`SUBJECT_FAILED`), a TypeScript error (`<path>(<line>,<col>): error TS<n>: …`) or oxlint's
+ * ` x <rule>: …` (`×` where it draws).
  */
 const failing = (line: string): boolean => {
   const said = bare(line);
   const test = /^\s*((?:✖|not ok ).*)$/.exec(said);
   if (test !== null) return !test[1].startsWith('✖ failing tests:');
-  return /^\s*\S.*?(?:\(\d+,\d+\)|:\d+:\d+)(?::| -) error TS\d+: /.test(said) || /^\s*[x×] \S+: /.test(said);
+  return (
+    subjectOf(line) !== undefined || /^\s*\S.*?(?:\(\d+,\d+\)|:\d+:\d+)(?::| -) error TS\d+: /.test(said) || /^\s*[x×] \S+: /.test(said)
+  );
+};
+
+/** What says a failing line once: a runner's failure by its subject, any other by the line itself. */
+const keyOf = (line: string): string => {
+  const subject = subjectOf(line);
+  return subject === undefined ? bare(line).trim() : `FAILED — ${subject}`;
 };
 
 /** Whether `line` ends the lines that tell one failing test: the next test, a pass, a summary, the spec reporter's location line. */
@@ -52,6 +75,12 @@ const detail = (line: string): boolean => {
 };
 
 /**
+ * Whether `line` tells why a runner's subject failed: what it looked like as the runner pictured it (`what it looked like: <file>`) and,
+ * where it says one, what it then failed on — its indented `what …: ` lines, and none of the call log or server lines around them.
+ */
+const told = (line: string): boolean => /^\s*(?:\[[^\]\s]+\] )?\s*what [^:]*: \S/.test(bare(line));
+
+/**
  * Whether `line` is GitHub's own after the job's steps ran: the post-job cleanup, the git commands it runs there, the orphans it ends.
  * A tail drops them, and everything from `Post job cleanup.` on: none of it says why the job failed.
  */
@@ -60,24 +89,25 @@ const postJob = (line: string): boolean =>
 
 /**
  * What a failing job's log says of why it failed: each line that fails it (`failing`) once, in order, with the lines after it that tell
- * why (`detail`) — the occurrence that tells most, since the spec reporter prints the test bare where it ran and with its error under
- * `✖ failing tests:` — bounded by `JOB_LINES`. A log with no such line gives its
+ * why (`detail`, or `told` of a runner's failed subject) — the occurrence that tells most, since the spec reporter prints the test bare
+ * where it ran and with its error under `✖ failing tests:`, and a runner its failure where it failed, again from the worker that ran
+ * it and again in a headline — bounded by `JOB_LINES`. A log with no such line gives its
  * last `TAIL_LINES` before GitHub's post-job lines (`postJob`) instead.
  */
 export function failures(log: string): { lines: string[]; tests: boolean } {
   const all = log.split('\n').map(unstamped);
-  const told = new Map<string, string[]>();
+  const seen = new Map<string, string[]>();
   all.forEach((line, i) => {
     if (!failing(line)) return;
-    const after: string[] = [];
+    const [after, why] = [[] as string[], subjectOf(line) === undefined ? detail : told];
     for (const next of all.slice(i + 1, i + 1 + AFTER_LINES)) {
       if (ends(next)) break;
-      if (detail(next) && after.length < DETAIL_LINES) after.push(next);
+      if (why(next) && after.length < DETAIL_LINES) after.push(next);
     }
-    const key = bare(line).trim();
-    if ((told.get(key)?.length ?? -1) <= after.length) told.set(key, [line, ...after]);
+    const key = keyOf(line);
+    if ((seen.get(key)?.length ?? -1) <= after.length) seen.set(key, [line, ...after]);
   });
-  if (told.size) return { lines: [...told.values()].flat().slice(0, JOB_LINES), tests: true };
+  if (seen.size) return { lines: [...seen.values()].flat().slice(0, JOB_LINES), tests: true };
   const cleanup = all.findIndex((line) => /^Post job cleanup\.?$/.test(line.trim()));
   const ran = cleanup === -1 ? all : all.slice(0, cleanup);
   return { lines: ran.filter((line) => line.trim() && !postJob(line)).slice(-TAIL_LINES), tests: false };

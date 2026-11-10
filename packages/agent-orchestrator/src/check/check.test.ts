@@ -589,6 +589,21 @@ test("failingLines: the lines naming a failing test, node's `✖` and TAP's `not
       cut: 0,
     });
   });
+  await t.test("a runner's failed subject, once however many times its workers and the runner say it, in order", () => {
+    const page = 'the run page (/runs/r) in the dark theme';
+    const log = [
+      `[w1] e2e: FAILED — ${page}: not visible after 10000 ms`,
+      '[w1]   what it looked like: /tmp/run-dark.png',
+      `e2e: worker 1 FAILED — ${page}: not visible after 10000 ms`,
+      `web:e2e: e2e: FAILED — ${page}: not visible after 10000 ms`,
+      `e2e: FAILED — ${page.replace('dark', 'light')}: not visible`,
+      'npm error Lifecycle script `e2e` failed with error:',
+    ].join('\n');
+    assert.deepEqual(failingLines(log).lines, [
+      `[w1] e2e: FAILED — ${page}: not visible after 10000 ms`,
+      `e2e: FAILED — ${page.replace('dark', 'light')}: not visible`,
+    ]);
+  });
   await t.test('past FAILING_LINES the first that many are kept, and how many more there were is said', () => {
     const log = Array.from({ length: FAILING_LINES + 2 }, (_, i) => `✖ test ${i + 1}`).join('\n');
     const { lines, cut } = failingLines(log);

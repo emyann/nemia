@@ -1,14 +1,13 @@
 /**
  * The Workflow door's files layer: the door's walks (`test/workflow-walks.ts`) on a fresh scratch store each, what only the files can be
  * asked — a folder written byte for byte as today's writer writes it, a former spelling its files still hold read with its hint, the
- * default door's root — and the seam's debt, the code of `src` still on the stores the door is over (`test/workflow-door.baseline.ts`),
- * which only shrinks.
+ * default door's root — and the seam, refused: no code of `src` calls the stores the door is over.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { debtBreaks as heldTo, seamUses as usesOf, sourcesUnder } from 'test-kit/debt';
+import { seamUses as usesOf, sourcesUnder } from 'test-kit/debt';
 import { Effect, Layer } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { act, done, doorFrom, walksOn } from '../../test/door-walks.ts';
@@ -174,41 +173,35 @@ const OWN = [
 /** Every file of `src` but the tests and the stores, by its path from the package. */
 const sourcesOfSrc = (): Record<string, string> => sourcesUnder(PKG, 'src', OWN);
 
-/** The seam's calls in each file, comment lines left out: what `WORKFLOW_DOOR_DEBT` counts. */
+/** The seam's calls in each file, comment lines left out: what `seamRefusals` refuses. */
 const seamUses = (sources: Record<string, string>): Map<string, number> =>
   usesOf(sources, new RegExp(`(?<![\\w$]|[^.]\\.)(?:${SEAM.join('|')})\\s*\\(`, 'g'));
 
-/** Why the uses of `sources` break the baseline `debt`: a file it does not name, a count grown, a count fallen. */
-function debtBreaks(sources: Record<string, string>, debt: Readonly<Record<string, number>>): string[] {
-  return heldTo(seamUses(sources), debt).map(({ file, uses: n, owed, kind }) =>
-    kind === 'grown'
-      ? `${file} calls the workflow folder's stores ${n} time(s) where test/workflow-door.baseline.ts names ${owed}: yield WorkflowDoor (src/workflows/workflows.store.ts) instead`
-      : kind === 'fallen'
-        ? `${file} calls the workflow folder's stores ${n} time(s): lower its count in test/workflow-door.baseline.ts to ${n}, which only shrinks`
-        : `${file} calls the workflow folder's stores no more: take its line out of test/workflow-door.baseline.ts`,
+/**
+ * Each file of `sources` that calls the workflow folder's stores rather than yielding the door, with how many times: a refusal, since
+ * every caller is converted and none may come back.
+ */
+const seamRefusals = (sources: Record<string, string>): string[] =>
+  [...seamUses(sources)].map(
+    ([file, n]) => `${file} calls the workflow folder's stores ${n} time(s): yield WorkflowDoor (src/workflows/workflows.store.ts) instead`,
   );
-}
 
-test("no file of src calls the workflow folder's stores but as test/workflow-door.baseline.ts counts it, and the count only shrinks", async () => {
-  const { WORKFLOW_DOOR_DEBT } = await import('../../test/workflow-door.baseline.ts');
-  assert.deepEqual(debtBreaks(sourcesOfSrc(), WORKFLOW_DOOR_DEBT), []);
+test("no file of src calls the workflow folder's stores: every caller yields WorkflowDoor", () => {
+  assert.deepEqual(seamRefusals(sourcesOfSrc()), []);
 });
 
-test('REFUSED: a converted file that calls a store again, and a count the baseline holds above what is left', async () => {
-  const { WORKFLOW_DOOR_DEBT } = await import('../../test/workflow-door.baseline.ts');
+test('REFUSED: a file that calls a store again, a call spread into a list among them', () => {
   const sources = sourcesOfSrc();
   const again = {
     ...sources,
     'src/workflows/workflows.verb.ts': `${sources['src/workflows/workflows.verb.ts']}\nconst x = loadWorkflows('a');\n`,
   };
-  assert.equal(debtBreaks(again, WORKFLOW_DOOR_DEBT).length, 1);
+  assert.equal(seamRefusals(again).length, 1);
   const spread = {
     ...sources,
     'src/workflows/workflows.verb.ts': `${sources['src/workflows/workflows.verb.ts']}\nconst y = [...formerKeyLines('a')];\n`,
   };
-  assert.equal(debtBreaks(spread, WORKFLOW_DOOR_DEBT).length, 1, 'a call spread into a list is a call');
-  const [first = 'src/workflows/workflows.verb.ts'] = Object.keys(WORKFLOW_DOOR_DEBT);
-  assert.equal(debtBreaks(sources, { ...WORKFLOW_DOOR_DEBT, [first]: (WORKFLOW_DOOR_DEBT[first] ?? 0) + 1 }).length, 1);
+  assert.equal(seamRefusals(spread).length, 1, 'a call spread into a list is a call');
 });
 
 test("the door's version moves with an agent the folder names, and a write answers the version of the folder as written", () => {

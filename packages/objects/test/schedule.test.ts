@@ -1,11 +1,12 @@
 /**
- * The Schedule (`src/schedule.ts`): a schedule, named by its workflow, and a page of them decoded from JSON and encoded back equal, one
- * missing every optional key read; and the write body decoded as the old route was sent it.
+ * The Schedule (`src/schedule.ts`): a schedule, named by its workflow, and a page of them as the Api's endpoints answer them, every key
+ * kept, one missing every optional key read; and the write body the Api takes as the old route was sent it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import { API_VERSION, Schedule, ScheduleList, ScheduleWrite } from 'objects';
+import { API_VERSION, Schedule, ScheduleWrite } from 'objects';
+import { answered, taken } from './served.ts';
 
 const nightly = {
   apiVersion: API_VERSION,
@@ -28,20 +29,20 @@ const bare = {
   status: { since: '2026-11-01T00:00:00.000Z' },
 } as const;
 
-const roundTrip = <S extends Schema.Codec<unknown, unknown>>(schema: S, value: unknown): unknown =>
-  JSON.parse(JSON.stringify(Schema.encodeSync(schema)(Schema.decodeUnknownSync(schema)(JSON.parse(JSON.stringify(value))))));
-
-test('a schedule and a page of them decode from JSON and encode back the same, absent keys left absent', () => {
-  assert.deepEqual(roundTrip(Schedule, nightly), nightly);
-  assert.deepEqual(roundTrip(Schedule, bare), bare);
+test("the Api's get answers a schedule and its list a page of them, every key kept, absent keys left absent; another kind refused", () => {
+  assert.deepEqual(answered('schedules', 'get', nightly), nightly);
+  assert.deepEqual(answered('schedules', 'get', bare), bare);
   const page = { apiVersion: API_VERSION, kind: 'ScheduleList', metadata: {}, items: [nightly, bare] };
-  assert.deepEqual(roundTrip(ScheduleList, page), page);
+  assert.deepEqual(answered('schedules', 'list', page), page);
+  assert.equal(answered('schedules', 'get', { ...bare, kind: 'Card' }), undefined);
+  assert.equal(answered('schedules', 'list', { ...page, kind: 'CardList' }), undefined);
 });
 
-test('the write decodes as the old route was sent it', () => {
+test("the Api's put takes the write as the old route was sent it, and refuses one with no brief", () => {
   const full = { cron: '0 3 * * *', brief: 'tidy up', repo: '/repo', tz: 'UTC' };
-  assert.deepEqual(roundTrip(ScheduleWrite, full), full);
-  assert.deepEqual(roundTrip(ScheduleWrite, { cron: '0 3 * * *', brief: 'b' }), { cron: '0 3 * * *', brief: 'b' });
+  assert.deepEqual(taken('schedules', 'put', full), full);
+  assert.deepEqual(taken('schedules', 'put', { cron: '0 3 * * *', brief: 'b' }), { cron: '0 3 * * *', brief: 'b' });
+  assert.equal(taken('schedules', 'put', { cron: '0 3 * * *' }), undefined);
 });
 
 test('REFUSED: a schedule with no cron, a write with no brief, a last fire with no run, and another kind', () => {

@@ -1,6 +1,7 @@
 import { TriangleAlert } from 'lucide-react';
-import type { Quota } from '@/lib/api';
-import { agoWord, lastWords, quotaTitle, type WindowWords, windowWords } from '@/lib/quota';
+import type { Quota } from '@/lib/api/quota';
+import { lastWords, quotaTitle, type WindowWords, windowWords } from '@/lib/quota';
+import { agoWords } from '@/lib/runWords';
 import { useNow } from '@/lib/useNow';
 
 /**
@@ -43,7 +44,7 @@ export function QuotaLine({ quota, error }: { quota: Quota | undefined; error: E
       </div>
     );
   }
-  const age = quota.askedAt ? agoWord(now.getTime() - Date.parse(quota.askedAt)) : null;
+  const age = quota.askedAt ? agoWords(new Date(quota.askedAt), now) : null;
   return (
     <p
       data-quota="fresh"

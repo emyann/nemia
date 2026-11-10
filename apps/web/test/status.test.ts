@@ -14,14 +14,14 @@ import {
   stateClass,
   stateDrawn,
   statePaint,
-  STATE_OF,
   stepState,
   type Drawn,
   type StepState,
   waitsAtGate,
   waitsOnPerson,
 } from '../src/lib/status.ts';
-import { STEP_REASONS, type StepCodes, type StepPhase, type StepReason } from '../src/lib/api/reasons.ts';
+import type { StepPhase, StepReason } from 'objects';
+import type { StepCodes } from '../src/lib/status.ts';
 import { container, meaningOf } from '../src/lib/meaning.ts';
 import { HELD_TO_COME, PAUSED, PERSON, stateWordsOf } from '../src/lib/words.ts';
 import { isLive, movingInto } from '../src/lib/canvas.ts';
@@ -90,10 +90,6 @@ test('stepState: each reason the api carries, read as the state a person acts on
       ['Waiting on hold', 'waiting'],
     ];
     for (const [named, state] of cases) assert.equal(stateAt(named), state, named);
-  });
-  await t.test('every reason has its state (`STATE_OF`), and every state it names is drawn', () => {
-    assert.deepEqual(Object.keys(STATE_OF).sort(), [...STEP_REASONS].sort());
-    for (const reason of STEP_REASONS) assert.ok(stateDrawn[STATE_OF[reason]], reason);
   });
   await t.test('a step whose record the api could not judge is unreadable, apart from a task the engine has no record of', () => {
     assert.equal(stepState(plain('failed', 'Unknown'), false, false), 'unreadable');
@@ -332,16 +328,6 @@ const STATE_DRAWERS = [
   'look/RunSteps.tsx',
 ];
 
-/** The text of `source` from the declaration `from` up to the declaration `to`, both of which must be there. */
-function sliceOf(source: string, from: string, to: string): string {
-  const [start, end] = [source.indexOf(from), source.indexOf(to)];
-  assert.ok(start >= 0 && end > start, `${from} then ${to}`);
-  return source.slice(start, end);
-}
-
-/** Whether a banner's source draws what waits on a person from the yours container: `waitingOnYou`, then the form, across line breaks. */
-const onYouReadsYours = (banner: string): boolean => /\.waitingOnYou\s*\?\s*container\.yours\s*:/.test(banner);
-
 test("the meanings of a state's colour: one thing each, read from the look's roles, never a hand-picked hue", async (t) => {
   await t.test(
     'a colour says one thing: a state that waits on a person is yours, a failure is failure and nothing else is, and no state is money',
@@ -407,20 +393,57 @@ test("the meanings of a state's colour: one thing each, read from the look's rol
     }
   });
   await t.test(
-    "REFUSED: the run page's banners of a wait on a person — waiting on runs, held — drawn from another meaning than yours",
-    () => {
-      const page = fs.readFileSync(path.join(web, 'src', 'routes', 'runs.$runId.tsx'), 'utf8');
-      for (const [from, to] of [
-        ['function WaitingOnRuns(', 'function HeldUntil('],
-        ['function HeldUntil(', 'function RunHeading('],
-      ]) {
-        const banner = sliceOf(page, from, to);
-        assert.equal(onYouReadsYours(banner), true, `${from} draws a wait on a person from container.yours`);
-        assert.doesNotMatch(banner, /container\.(?:money|failure|alive)/, `${from} draws no other meaning`);
+    "REFUSED: the run page's banner of a wait on other runs — waiting on runs, held — drawn from another meaning than yours or rest",
+    async () => {
+      await import('./tsx.ts');
+      const { createElement } = await import('react');
+      const { routedWith } = await import('./markup-fixtures.ts');
+      const { RunWait } = await import('../src/components/run/RunWait.tsx');
+      const { LiftHold } = await import('../src/components/run/LiftHold.tsx');
+      const tokensOf = (html: string): Set<string> => new Set(/<section[^>]*class="([^"]*)"/.exec(html)![1].split(/\s+/));
+      const wears = (tokens: Set<string>, drawn: string) => drawn.split(' ').every((token) => tokens.has(token));
+      const runs = [
+        { run: 'a-1', missing: false },
+        { run: 'a-2', missing: true },
+      ];
+
+      const onYou = await routedWith(
+        createElement(RunWait, {
+          label: 'Waiting on runs',
+          wait: { runs, word: 'waiting on a-1, a-2 (missing)', advice: 'start it again', waitingOnYou: true },
+        }),
+      );
+      assert.match(onYou, /data-on-you="true"/);
+      assert.equal(wears(tokensOf(onYou), container.yours), true, 'a wait only a person ends reads yours');
+      assert.match(onYou, /<a [^>]*href="\/runs\/a-1"[^>]*>a-1<\/a>/, 'a run the store has is linked to its page');
+      assert.doesNotMatch(onYou, /href="\/runs\/a-2"/, 'a missing run is named, not linked');
+      assert.match(onYou, /<span[^>]*>a-2<\/span>/, 'and still named');
+
+      const resting = await routedWith(
+        createElement(RunWait, {
+          label: 'Waiting on runs',
+          wait: { runs: runs.slice(0, 1), word: 'waiting on a-1', advice: 'it starts once a-1 lands', waitingOnYou: false },
+        }),
+      );
+      const tokens = tokensOf(resting);
+      assert.equal(wears(tokens, container.grey), true, 'a wait that ends by itself is at rest, grey');
+      for (const hue of ['money', 'failure', 'alive', 'yours'] as const) {
+        assert.equal(wears(tokens, container[hue]), false, `a resting wait draws no ${hue}`);
       }
-      assert.equal(onYouReadsYours('waiting.waitingOnYou\n  ? container.yours\n  : filled.grey'), true, 'across a line break');
-      assert.equal(onYouReadsYours('waiting.waitingOnYou ? container.money : filled.grey'), false, "an amount's amber is refused");
-      assert.equal(container.yours, 'bg-yours-container text-on-yours-container');
+
+      const held = await routedWith(
+        createElement(
+          RunWait,
+          {
+            label: 'Held',
+            wait: { runs: runs.slice(0, 1), word: 'held until a-1 lands', advice: 'lift it with hold --off', waitingOnYou: false },
+          },
+          createElement(LiftHold, { id: 'r-1' }),
+        ),
+      );
+      assert.match(held, /<section aria-label="Held"/);
+      assert.match(held, /<section[^>]*>[\s\S]*data-lift[\s\S]*<\/section>/, 'a hold carries its Lift inside the banner');
+      assert.doesNotMatch(resting, /data-lift/, 'a wait carries no Lift');
     },
   );
 });

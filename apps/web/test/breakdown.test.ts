@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { QueryClient } from '@tanstack/react-query';
 import { openRunsQuery, type WaitingRun } from '../src/lib/api/runs.ts';
+import { judged } from '../src/lib/api/judged.ts';
 import {
   CLOCK_REST,
   clockBreakdown,
@@ -17,7 +18,8 @@ import {
   tokensSaid,
   type Breakdown,
 } from '../src/lib/breakdown.ts';
-import { presentWait, sinceWords } from '../src/lib/runWords.ts';
+import { durationWords } from '../src/lib/duration.ts';
+import { presentWait } from '../src/lib/runWords.ts';
 import { detail, runList, runObject, step, summary, waitingRun } from './run-fixtures.ts';
 
 const [S, M] = [1_000, 60_000];
@@ -77,7 +79,7 @@ const AS_OF = '2026-10-12T12:00:00.000Z';
 async function decoded(run: WaitingRun = answered()): Promise<WaitingRun> {
   const before = globalThis.fetch;
   const { wallMs, clock, stepCosts, waitingSince, cost, tokens, waitingOnYou, waitingOnYouWords } = run;
-  const steps = run.steps.map(({ agent: _a, since: _s, ...own }) => step({ ...own, timeline: [] }));
+  const steps = run.steps.map((own) => step({ ...own, timeline: [] }));
   const object = runObject(detail({ id: run.id, steps }), {
     state: 'waiting',
     wallMs,
@@ -95,7 +97,9 @@ async function decoded(run: WaitingRun = answered()): Promise<WaitingRun> {
   globalThis.fetch = async () => new Response(JSON.stringify(list), { status: 200, headers: { 'content-type': 'application/json' } });
   const client = new QueryClient();
   try {
-    return (await client.fetchQuery(openRunsQuery())).waiting[0];
+    const [waiting] = (await client.fetchQuery(openRunsQuery())).waiting;
+    assert.ok(waiting && judged(waiting), 'the run is judged');
+    return waiting;
   } finally {
     client.clear();
     globalThis.fetch = before;
@@ -158,7 +162,7 @@ test('clockBreakdown, costBreakdown, tokensBreakdown: each breakdown adds up to 
     async () => {
       const run = await decoded();
       const clock = clockBreakdown(run.clock!, '17m', '13:11');
-      assert.equal(sinceWords(run.clock!.wallMs), '27m', 'the tile');
+      assert.equal(durationWords(run.clock!.wallMs, 'minute'), '27m', 'the tile');
       assert.deepEqual(
         clock.rows.map((row) => row.said),
         ['17m', '7m', '2m', '1m', 'under 1m'],
@@ -199,6 +203,16 @@ test('clockBreakdown, costBreakdown, tokensBreakdown: each breakdown adds up to 
     );
     assert.equal(clock.head, '5m', 'the head is verbatim the words the tile or the cell shows, never a figure of its own');
     assert.equal(clock.foot, 'Wall time 6m, from Tue 13:32.', 'the rows add up to the foot, which the head is a part of');
+    const long = clockBreakdown(
+      { wallMs: 90 * M, sessionsMs: 65 * M, checksMs: 0, personMs: 25 * M, slotMs: 0, restMs: 0 },
+      '1h 05m',
+      'Tue 13:32',
+    );
+    assert.deepEqual(
+      [long.rows[0].said, long.foot],
+      ['1h 05m', 'Wall time 1h 30m, from Tue 13:32.'],
+      'past an hour, a row and the foot say their minutes as every duration is said',
+    );
     const cost = costBreakdown(run.cost!, run.stepCosts!);
     assert.equal(cost.head, '$5.63 so far, by step');
     assert.deepEqual(cost.rows[2], { what: 'land', amount: 0, said: 'none measured', none: true });

@@ -370,7 +370,7 @@ test('the harnesses a holder serves: the literal `claude` and no other, by defau
         claude: 'claude',
         second: 'claude',
         reviewer: { url: 'https://a.example' },
-        made: { name: 'made', command: () => ({ cmd: 'echo', args: [] }) },
+        made: { name: 'made', can: [], command: () => ({ cmd: 'echo', args: [] }) },
         stand: handOps(),
       }),
       ['claude', 'second'],

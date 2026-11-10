@@ -41,7 +41,7 @@ import type { Observe } from '../../contracts/observe.contract.ts';
  * peak where the kernel keeps one, and how many processes the kernel's OOM killer ended in it. Read by the runner off the cgroup's
  * files (`cgroupMemoryOf`, `harness/cgroup.ts`); carried, never read by `decide`.
  */
-export type MemoryUse = { limitBytes: number; peakBytes?: number; oomKills: number };
+type MemoryUse = { limitBytes: number; peakBytes?: number; oomKills: number };
 
 /** What a task asks of its host's resources, as a container's `resources`: a memory limit, a Kubernetes quantity. */
 export type TaskResources = { limits?: { memory?: string } };
@@ -86,9 +86,7 @@ export type Sighting = {
    * The time is not decoration. A resumed session can carry a statement its parent made, and the
    * engine keeps one only if it was made after this attempt began. A runner whose session cannot carry
    * another attempt's statement gives no time, and the engine keeps the statement whatever the clock says:
-   * a remote agent's, and a detached run's, whose spawn cleared the last one's before it launched it. So
-   * does a runner that told the statement is its session's own: Claude Code's `--bg`, by the call's id,
-   * against the parent's last call it recorded at spawn.
+   * a remote agent's, and a detached run's, whose spawn cleared the last one's before it launched it.
    */
   closeout?: { payload: unknown; at?: number };
   /**
@@ -131,7 +129,7 @@ export type Sighting = {
   /**
    * Every tool call the harness denied the session, as the harness recorded it, in the order it first did: a session
    * with no approval surface carries on past a denial, and this is the only trace of it. Absent when the harness denied
-   * nothing, or cannot say (`claude --bg` records no denial anywhere the runner reads). **Carried, never judged**:
+   * nothing, or cannot say. **Carried, never judged**:
    * `decide` does not read it; a person, and the upper layer, do.
    */
   denials?: Denial[];
@@ -813,12 +811,15 @@ export function waitsForInput(state: State): boolean {
 }
 
 /** A task a person may ask to stop (`requestStop`): not settled, and not asked to stop already. */
-export const stoppable = (state: State): boolean => !state.settled && !state.stopRequested;
+const stoppable = (state: State): boolean => !state.settled && !state.stopRequested;
 
 /** A task a person may answer or close: waiting on their word (`waitsForInput`), and not asked to stop, which outranks it. */
-export const awaitsWord = (state: State): boolean => waitsForInput(state) && !state.stopRequested;
+const awaitsWord = (state: State): boolean => waitsForInput(state) && !state.stopRequested;
 
-/** Each guard a verb of `VERBS` names, by that name: the predicate its refusal asks of the task's state. */
+/**
+ * Each guard a verb of `VERBS` names, by that name: the predicate its refusal asks of the task's state.
+ * Exported only for the tests that import it.
+ */
 export const VERB_GUARDS: Record<VerbGuard, (state: State) => boolean> = { stoppable, awaitsWord };
 
 /** Whether a person's verb is taken in this state: the guard `VERBS` names for it, asked of the state. */
@@ -910,6 +911,7 @@ export type Now = {
 /**
  * How long a long-lived task's session may be listed with no process before the runtime ends its attempt `lost`: Claude Code
  * respawns a process it lost within some ten seconds, and one listed so for two minutes is not coming back.
+ * Exported only for the tests that import it.
  */
 export const RESPAWN_GAP_MS = 120_000;
 
@@ -1024,6 +1026,7 @@ export const lifecycleOf: LifecycleOf = (state) => {
  * 9. `PREVIOUS_LIVE`, when the session the turn continues — for the first turn, what the task was filed against; for a
  *    later one, the session that ended the turn before it — is still held by its harness: it is stopped first.
  * 10. `READY` otherwise: in a later turn, told the person's answer; else the brief.
+ * Exported only for the tests that import it.
  */
 export const observe: Observe = (state, observed, now) => {
   if (state.settled) return { type: 'SETTLED', outcome: state.settled };

@@ -1,7 +1,7 @@
 /**
  * `decodes<T>()(schema)`: the schema itself at run time, refused by the compiler where what it decodes is not `T` both ways — narrower (a
- * word left out, a `null` refused, a `?` key required), wider, or `any`. `Same` is the equality it holds, which `test/wire.test.ts` holds
- * between each mirror and the api's type. A sibling that imports none, never handed out by the barrel.
+ * word left out, a `null` refused, a `?` key required), wider, or `any`. `Same` is the equality it holds. A sibling that imports
+ * none.
  */
 import type { Schema } from 'effect';
 
@@ -25,7 +25,7 @@ type IsAny<T> = 0 extends 1 & T ? true : false;
  * True when neither side is `any` and each is assignable to the other, key by key, with an optional key apart from a required one; else
  * the words of which side is not the other's.
  */
-export type Same<A, B> =
+type Same<A, B> =
   IsAny<A> extends true
     ? 'the first is any'
     : IsAny<B> extends true
@@ -35,9 +35,6 @@ export type Same<A, B> =
           ? true
           : 'the second does not fit the first'
         : 'the first does not fit the second';
-
-/** Only `true`: a `Same` that is not fails to compile where it is held. */
-export type Holds<T extends true> = T;
 
 /** What the compiler says at a schema that does not decode `T`. */
 type Refused<T> = { readonly 'decodes: the schema does not decode its type both ways; make it match': T };

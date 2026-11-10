@@ -4,7 +4,10 @@
  */
 import type { TaskPhase } from './session.ts';
 
-/** The part of a task's view admission reads. */
+/**
+ * The part of a task's view admission reads.
+ * Exported only for the tests that import it.
+ */
 export type AdmissionView = {
   id: string;
   phase: TaskPhase;
@@ -47,6 +50,7 @@ const HOLDS_SLOT: Record<TaskPhase, boolean> = {
 
 /**
  * Whether a task holds a slot of its pool: by its phase (`HOLDS_SLOT`), or admitted and not yet started, which the next pass starts.
+ * Exported only for the tests that import it.
  */
 export const holdsSlot = (view: Pick<AdmissionView, 'phase' | 'admission'>): boolean =>
   view.admission === 'admitted' || HOLDS_SLOT[view.phase];

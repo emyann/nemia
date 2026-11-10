@@ -271,7 +271,7 @@ test('REFUSED: a CLI entry resolved outside apps/cli/src/local.ts, and one impor
     'the two in one resolve',
   );
   assert.deepEqual(
-    binBreaches('apps/cli/src/main.ts', " * spawns `agent-orchestrator/bin` from local.ts, 'agent-orchestrator/bin'"),
+    binBreaches('apps/cli/src/main.ts', "/** spawns `agent-orchestrator/bin` from local.ts, 'agent-orchestrator/bin' */"),
     [],
     'prose',
   );

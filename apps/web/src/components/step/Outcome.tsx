@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
-import type { StepArtifact } from '../../lib/api';
+import type { StepArtifact } from '../../lib/api/tries.ts';
 import { descriptionOf, type Outcome, outcomeWord, type OutputKind, outputKind } from '../../lib/outcome';
 import { cn } from '../../lib/utils';
 import { ArtifactView } from '../run/Artifacts';

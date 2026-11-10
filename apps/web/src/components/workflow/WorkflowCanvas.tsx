@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Background, BackgroundVariant, type Edge, Position, ReactFlow, ReactFlowProvider, useReactFlow } from '@xyflow/react';
-import type { PagePlace, WorkflowListing } from '../../lib/api';
+import type { PagePlace, WorkflowListing } from '../../lib/api/workflows.ts';
 import { specStep, stepPage } from '../../lib/bar';
 import { extentOf, layout, stepsOf } from '../../lib/layout';
 import { useBarOver } from '../../lib/useBarOver';
 import { useCanvasPress } from '../../lib/useCanvasPress';
-import type { RunView, StepView } from '../../lib/runView';
+import { useFrameSize } from '../../lib/useFrameSize';
+import { FLOOR_BOX } from '../../lib/classes';
 import { StateEdge } from '../step/StateEdge';
-import { stepEdges } from '../step/stepGraph';
+import { stepEdges, type StepGraphFacts } from '../step/stepGraph';
 import { nodeKinds, routesOf } from '../../lib/routing';
 import { SpecNode, type SpecFlowNode } from '../step/StepNode';
 
@@ -24,137 +25,25 @@ const FIT = { padding: 0.15, maxZoom: 1 };
 const LOOP_ROOM = 70;
 
 /**
- * The run a workflow would start, the moment the CLI's `start` has written it: every step waiting, nothing filed, nobody waited
- * on. What a workflow's graph is drawn as, so its edges are the run canvas's own (`stepEdges`), drawn as they are on a run's
- * page before anything has happened: dashed, since all of it is still to come.
+ * What a workflow's graph is drawn from, as the run it would start the moment the CLI's `start` has written it: every step pending,
+ * nothing filed, nobody called it off or holds it. So its edges are the run canvas's own (`stepEdges`), drawn as they are on a run's page
+ * before anything has happened: dashed, since all of it is still to come.
  */
-export function unstartedRun(workflow: WorkflowListing): RunView {
-  return {
-    id: `${workflow.from}:${workflow.name}`,
-    labels: {},
-    kinds: [],
-    refresh: '',
-    brief: '',
-    decide: '',
-    repo: '',
-    place: workflow.folderTeam ? 'folder' : 'git',
-    work: null,
-    workflowDir: workflow.dir,
-    workflowPage: null,
-    try: null,
-    baseRef: '',
-    branch: '',
-    isolate: true,
-    createdAt: '',
-    startedAt: null,
-    cancelledAt: null,
-    pruned: null,
-    onDisk: { worktrees: false, files: false },
-    after: [],
-    waiting: null,
-    context: [],
-    holdUntil: [],
-    holding: null,
-    status: 'running',
-    phase: 'running',
-    reason: 'Running',
-    on: null,
-    via: null,
-    moving: false,
-    cost: null,
-    atWork: null,
-    tokens: null,
-    read: null,
-    waitingOnYou: [],
-    waitingOnYouWords: [],
-    toDecide: null,
-    gates: [],
-    warning: null,
-    graph: workflow.graph,
-    steps: workflow.steps.map(({ name }) => unstartedStep(name)),
-    timeline: {
-      rounds: [],
-      run: {
-        loop: null,
-        round: null,
-        tasks: 0,
-        inFlight: 0,
-        queuedMs: 0,
-        ranMs: 0,
-        wallMs: null,
-        queued: '—',
-        ran: '—',
-        wall: 'not known',
-        cost: null,
-      },
-    },
-  };
-}
-
-/** The step `name` of an unstarted run: waiting, on its first try, nothing filed, told nothing yet. */
-function unstartedStep(name: string): StepView {
-  return {
+const unstartedFacts = (workflow: WorkflowListing): StepGraphFacts => ({
+  cancelledAt: null,
+  holding: null,
+  graph: workflow.graph,
+  steps: workflow.steps.map(({ name }) => ({
     name,
-    spec: null,
-    filed: null,
-    body: null,
-    told: null,
-    layers: null,
-    taskParts: null,
-    taskId: null,
-    workspace: null,
-    files: [],
-    filesError: null,
-    branch: null,
     phase: 'pending',
     reason: 'Pending',
     on: null,
     via: null,
-    message: 'pending',
-    verdict: null,
     note: null,
     roundDue: false,
-    commands: { approve: '', retry: '', say: '' },
-    needs: null,
-    waitingFor: null,
-    approve: null,
-    denied: null,
-    sessionUnread: null,
-    gate: null,
-    lastLine: null,
-    said: [],
-    asked: null,
-    closeout: null,
-    unreadable: null,
-    check: null,
-    attempts: { count: 0, latest: null },
-    used: null,
-    spent: null,
-    budget: null,
-    raise: null,
-    tries: [
-      {
-        try: 1,
-        round: 1,
-        cause: null,
-        current: true,
-        taskId: null,
-        note: null,
-        phase: 'pending',
-        reason: 'Pending',
-        on: null,
-        via: null,
-        message: 'pending',
-        attempts: { count: 0, latest: null },
-        check: null,
-        closeout: null,
-        unreadable: null,
-        answer: null,
-      },
-    ],
-    timeline: [],
-  };
-}
+    message: 'pending',
+  })),
+});
 
 /** A workflow's graph as the canvas draws it: its nodes, its edges, and how tall its rows and the room under them are. */
 type Drawn = { nodes: SpecFlowNode[]; edges: Edge[]; height: number };
@@ -191,7 +80,7 @@ function drawnOf(workflow: WorkflowListing): Drawn | Error {
     style: { pointerEvents: 'all' },
   }));
   const loops = graph.edges.some((e) => e.kind === 'loop');
-  return { nodes, edges: stepEdges(unstartedRun(workflow)), height: extentOf(at).height + (loops ? LOOP_ROOM : 0) };
+  return { nodes, edges: stepEdges(unstartedFacts(workflow)), height: extentOf(at).height + (loops ? LOOP_ROOM : 0) };
 }
 
 /**
@@ -243,7 +132,7 @@ function Graph({ workflow, drawn, place }: { workflow: WorkflowListing; drawn: D
     <div
       ref={whole}
       aria-label={`The steps of ${name} as a graph`}
-      className="overflow-hidden rounded border border-outline-variant"
+      className={FLOOR_BOX}
       style={{ height: Math.min(Math.max(drawn.height + 40, 180), 420) }}
     >
       <div ref={frame} className="h-full min-w-0" style={{ marginRight: over }}>
@@ -279,16 +168,11 @@ function Graph({ workflow, drawn, place }: { workflow: WorkflowListing; drawn: D
 /** Fits every step of the canvas in `frame` again (`FIT`) each time the frame changes width, as the bar opens or closes beside it. */
 function useRefit(frame: RefObject<HTMLDivElement | null>) {
   const { fitView } = useReactFlow();
+  const { width } = useFrameSize(frame, true);
+  const fitted = useRef<number | null>(null);
   useEffect(() => {
-    const el = frame.current;
-    if (!el) return;
-    let width = el.clientWidth;
-    const observer = new ResizeObserver(() => {
-      if (el.clientWidth === width) return;
-      width = el.clientWidth;
-      void fitView({ ...FIT, duration: 200 });
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [frame, fitView]);
+    if (width === 0) return;
+    if (fitted.current !== null && fitted.current !== width) void fitView({ ...FIT, duration: 200 });
+    fitted.current = width;
+  }, [width, fitView]);
 }

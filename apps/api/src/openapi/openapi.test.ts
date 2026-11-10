@@ -64,7 +64,7 @@ test('the OpenAPI document is 3.1.0, defines `Run`, and imports back into a Sche
   assert.ok(doc.components.schemas.Run, 'the document defines Run');
   assert.ok(doc.paths['/api/runs/{runId}/steps/{step}/tries/{try}/closeout'], "it names the closeout's route");
   assert.deepEqual(
-    (doc.paths['/api/runs/{runId}'] as { get?: { responses: Record<string, { content: unknown }> } } | undefined)?.get?.responses['200']
+    (doc.paths['/api/runs/{name}'] as { get?: { responses: Record<string, { content: unknown }> } } | undefined)?.get?.responses['200']
       ?.content,
     { 'application/json': { schema: { $ref: '#/components/schemas/Run' } } },
     "the run's own path answers the run object",
@@ -92,7 +92,7 @@ test('the document is the one Effect writes of the Api, and holds, for each of K
   };
   assert.deepEqual(doc, JSON.parse(JSON.stringify(OpenApi.fromApi(Api))), 'the document is OpenApi.fromApi(Api), as JSON');
   const GET_PATHS = {
-    Run: '/api/runs/{runId}',
+    Run: '/api/runs/{name}',
     Card: '/api/namespaces/{namespace}/cards/{name}',
     Factory: '/api/factories/{name}',
     McpServer: '/api/namespaces/{namespace}/mcpservers/{name}',
@@ -186,14 +186,15 @@ test("the document holds the RunList, a run in its namespace, and each of the ru
     components: { schemas: Record<string, unknown> };
   };
   assert.ok(doc.components.schemas['RunList'], 'RunList is a component');
-  for (const path of ['/api/runs', '/api/namespaces/{namespace}/runs'])
-    assert.deepEqual(
-      doc.paths[path]?.get?.responses['200']?.content?.['application/json'].schema,
-      { $ref: '#/components/schemas/RunList' },
-      `${path} answers a RunList`,
-    );
+  for (const path of ['/api/runs', '/api/namespaces/{namespace}/runs']) {
+    const listed = doc.paths[path]?.get?.responses['200']?.content?.['application/json'].schema as
+      | { anyOf?: { $ref?: string; properties?: { kind?: { enum?: unknown } } }[] }
+      | undefined;
+    assert.deepEqual(listed?.anyOf?.[0], { $ref: '#/components/schemas/RunList' }, `${path} answers a RunList`);
+    assert.deepEqual(listed?.anyOf?.[1]?.properties?.kind?.enum, ['Table'], `${path} answers a Table where one is asked`);
+  }
   const inNamespace = doc.paths['/api/namespaces/{namespace}/runs/{name}']?.get?.responses['200']?.content?.['application/json'].schema;
-  assert.deepEqual(inNamespace, { $ref: '#/components/schemas/Run' }, 'the same component as /api/runs/{runId} answers');
+  assert.deepEqual(inNamespace, { $ref: '#/components/schemas/Run' }, 'the same component as /api/runs/{name} answers');
   for (const [method, path, status, body] of RUN_ACTIONS) {
     const op = doc.paths[path]?.[method];
     assert.ok(op, `${method.toUpperCase()} ${path} is in the document`);
@@ -208,18 +209,25 @@ test("the document holds the RunList, a run in its namespace, and each of the ru
   }
 });
 
-/** The component each read of the runs group answers with, by its endpoint's name. */
-const ANSWERS = { show: 'Run', tries: 'StepTries', try: 'StepTry', closeout: 'TryCloseout', told: 'StepTold' } as const;
+/** The component each read of a run and of its steps answers with, by its endpoint's group and name. */
+const ANSWERS = {
+  'runs.show': 'Run',
+  'steps.tries': 'StepTries',
+  'steps.try': 'StepTry',
+  'steps.closeout': 'TryCloseout',
+  'steps.told': 'StepTold',
+  'steps.transcript': 'StepTranscript',
+} as const;
 
 test("each read of a run's path names its answer's component, which imports back and decodes what the route answers", async () => {
   const doc = (await (await app().request('/openapi/v3/nemia/v1')).json()) as {
     paths: Record<string, { get?: { operationId: string; responses: Record<string, { content?: unknown }> } }>;
     components: { schemas: Record<string, JsonSchema.JsonSchema> };
   };
-  const asked = { runId: R, step: 'design', try: '1' };
+  const asked = { name: R, runId: R, step: 'design', try: '1' };
   for (const [operation, name] of Object.entries(ANSWERS)) {
-    const found = Object.entries(doc.paths).find(([, { get }]) => get?.operationId === `runs.${operation}`);
-    assert.ok(found, `the document has the runs group's ${operation}`);
+    const found = Object.entries(doc.paths).find(([, { get }]) => get?.operationId === operation);
+    assert.ok(found, `the document has ${operation}`);
     const [path, { get }] = found;
     assert.deepEqual(
       get?.responses['200']?.content,

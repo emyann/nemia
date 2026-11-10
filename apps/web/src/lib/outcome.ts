@@ -1,5 +1,5 @@
 import type { Outcome as SignedOff } from 'objects';
-import type { StepArtifact, StepTry } from './api';
+import type { StepArtifact, StepTry } from './api/tries.ts';
 import type { AttemptEnd } from './api/tries.ts';
 import type { Frozen } from './frozen.ts';
 
@@ -147,7 +147,7 @@ export const outcomeWord = (o: Outcome): string =>
   o.by === 'agent' ? o.outcome : o.by === 'machine' ? o.reason : o.by === 'unreadable' ? 'unreadable' : 'no closeout';
 
 /** How many entries a list holds before the gate folds it: a plan's three risks are read at a glance, its dozen files are not. */
-export const FOLD_AT = 4;
+const FOLD_AT = 4;
 
 /**
  * Whether a closeout's field is folded where a person reads it beside a gate (`HandedOn`): a list or a table of `FOLD_AT` entries or

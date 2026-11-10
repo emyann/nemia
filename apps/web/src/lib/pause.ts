@@ -3,8 +3,13 @@
  * its current tool call's end, or are Paused once nothing does, as the package says it (`pausedWords`), read off `GET /api/pause` on each
  * poll and never kept. Pure: the time is handed in. The board neither shows nor sets a pause's timeout: it pauses with the store's, and
  * says only when what finishes is cut.
+ *
+ * The sentences copy the package's (`pausedWords`, `pausingWords`, its pause's three effects in agent-orchestrator's `pause/pause.ts`): a
+ * copy that stays, since `GET /api/pause` answers the pause's facts (`objects`' `Paused`) and none of its sentences, and the board says
+ * them with its own clock (`clockWord`) and the time handed in. Served sentences would be an addition to `Paused` first.
  */
-import type { Finishing, Interrupt, Parked, Pause, Paused, PauseHeld, PauseStaged } from './api';
+import type { Finishing, Interrupt, Parked, Pause, Paused, PauseHeld, PauseStaged } from './api/pause.ts';
+import { durationWords } from './duration.ts';
 import { clockWord } from './quota.ts';
 
 /** What a timed pause does, the package's words: each working session stops at its call's end, cut once the timeout passes. */
@@ -12,17 +17,16 @@ export const PAUSE_PARKS =
   'nothing new starts, and each working session stops when its current tool call ends, cut once the timeout passes';
 
 /** What a pause at once does (its timeout 0, the board's Stop now), the package's words: each working session is cut at once and parks. */
-export const PAUSE_CUTS = 'nothing new starts, and each working session is cut at once and parks';
+const PAUSE_CUTS = 'nothing new starts, and each working session is cut at once and parks';
 
 /** What a pause with no timeout does (a restart's take-over), the package's words: each working session runs on. */
-export const PAUSE_RUNS_ON = 'nothing new starts, and each working session runs on to its end';
+const PAUSE_RUNS_ON = 'nothing new starts, and each working session runs on to its end';
 
 /**
  * What `pause` does, as the package says it: `PAUSE_CUTS` under a timeout of 0, `PAUSE_PARKS` under another,
  * `PAUSE_RUNS_ON` under none.
  */
-export const pauseDoes = ({ timeoutMs }: Pause): string =>
-  timeoutMs === 0 ? PAUSE_CUTS : timeoutMs !== undefined ? PAUSE_PARKS : PAUSE_RUNS_ON;
+const pauseDoes = ({ timeoutMs }: Pause): string => (timeoutMs === 0 ? PAUSE_CUTS : timeoutMs !== undefined ? PAUSE_PARKS : PAUSE_RUNS_ON);
 
 /** The same words opening a sentence. */
 const opening = (words: string): string => `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
@@ -47,7 +51,7 @@ export type PauseWords = {
 };
 
 /** Since when, by whom and why: `since 4:40 PM by ann: merging by hand`, and what the file no longer says, said so. */
-export function pauseSince(pause: Pause, now: Date): string {
+function pauseSince(pause: Pause, now: Date): string {
   const at = Number.isNaN(Date.parse(pause.at)) ? 'a time its file no longer says' : clockWord(new Date(pause.at), now);
   return `since ${at} by ${pause.by || 'someone its file no longer names'}${pause.why ? `: ${pause.why}` : ''}`;
 }
@@ -72,11 +76,12 @@ export const parkedSentence = ({ run, step, after, cut }: Parked): string =>
   `${run}'s ${step} is paused${after ? ` after its call to ${after}` : cut ? `, its call to ${cut} cut` : ''}`;
 
 /**
- * How many sessions still finish a tool call and when what is left is cut, as the package's `pausingWords` says it: "Pausing: 2 sessions
- * finishing a tool call, cut in 9 min", `leftMs` rounded up to whole minutes; "…, cut now" once none is left.
+ * How many sessions still finish a tool call and when what is left is cut, after the package's `pausingWords`: "Pausing: 2 sessions
+ * finishing a tool call, cut in 1h 30m", `leftMs` to the minute as every duration is said (`durationWords`); "…, cut now" once none is
+ * left.
  */
-export const pausingLine = (sessions: number, leftMs: number): string =>
-  `Pausing: ${sessions} session${sessions === 1 ? '' : 's'} finishing a tool call, cut ${leftMs > 0 ? `in ${Math.ceil(leftMs / 60_000)} min` : 'now'}`;
+const pausingLine = (sessions: number, leftMs: number): string =>
+  `Pausing: ${sessions} session${sessions === 1 ? '' : 's'} finishing a tool call, cut ${leftMs > 0 ? `in ${durationWords(leftMs, 'minute')}` : 'now'}`;
 
 /**
  * The head of the Pausing line: under a pause with a timeout while sessions finish, how many and when they are cut (`pausingLine`);
@@ -93,11 +98,11 @@ const pausingHead = ({ pause, finishing }: Paused & { pause: Pause }, now: Date)
 export const interruptSentence = ({ run, step, kind }: Interrupt): string => `${run}: ${step}'s ${kind}`;
 
 /** A landing the pause holds with its merge staged, in a sentence: whose, where, and that its check waits on the resume. */
-export const stagedSentence = ({ run, step, repo }: PauseStaged): string =>
+const stagedSentence = ({ run, step, repo }: PauseStaged): string =>
   `${run}'s ${step} has its merge staged in ${repo} (MERGE_HEAD), and its check waits on the resume`;
 
 /** A check the pause holds whose merge is not staged, in a sentence: whose, and that its check waits on the resume. */
-export const heldSentence = ({ run, step }: PauseHeld): string => `${run}'s ${step} has signed off, and its check waits on the resume`;
+const heldSentence = ({ run, step }: PauseHeld): string => `${run}'s ${step} has signed off, and its check waits on the resume`;
 
 /** How many checks the pause holds back, staged landings among them: `, 2 checks held`, or nothing for none. */
 const heldCount = ({ staged, held }: Paused): string => {

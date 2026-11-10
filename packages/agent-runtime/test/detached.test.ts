@@ -78,7 +78,7 @@ import { builtEngine } from './engine.ts';
 import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 
 const root = () => scratch('ae-detached-');
-const sh = (script: string): HarnessSpec => ({ name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', script] }) });
+const sh = (script: string): HarnessSpec => ({ name: 'sh', can: [], command: () => ({ cmd: 'sh', args: ['-c', script] }) });
 const req = (name: string, cwd: string) => ({ name, brief: 'x', cwd });
 /** The file a run `name` of the spec `spec` keeps under `dir`. */
 const runFileOf = (dir: string, spec: string, name: string) => path.join(dir, 'runs', spec, `${name.replace(/[^a-zA-Z0-9]+/g, '_')}.json`);
@@ -642,6 +642,7 @@ process.stdin.on('end', () => { fs.appendFileSync('heard', 'EOF\\n'); setTimeout
   );
   return {
     name: 'in',
+    can: [],
     command: () => ({ cmd: process.execPath, args: [script] }),
     input: { line: (text) => JSON.stringify({ said: text }), closesOn: { key: 'kind', value: 'end' } },
   };
@@ -1614,12 +1615,17 @@ test(
     const dir = root();
     const workspace = scratch('ae-ws-');
     const answers = detachedOps(
-      { name: 'answers', command: (_r, io) => ({ cmd: 'sh', args: ['-c', `printf '%s' '{"outcome":"done"}' > '${io?.closeoutFile}'`] }) },
+      {
+        name: 'answers',
+        can: [],
+        command: (_r, io) => ({ cmd: 'sh', args: ['-c', `printf '%s' '{"outcome":"done"}' > '${io?.closeoutFile}'`] }),
+      },
       dir,
     );
     const prints = detachedOps(
       {
         name: 'prints',
+        can: [],
         readOutput: claudeResultOutput,
         command: () => ({
           cmd: 'sh',
@@ -1630,12 +1636,12 @@ test(
     );
     const denials = [{ tool: 'Bash', what: 'pytest' }, { tool: 'WebFetch' }];
     const says = (name: string, read: HarnessOutput) =>
-      detachedOps({ name, readOutput: () => read, command: () => ({ cmd: 'sh', args: ['-c', 'echo out'] }) }, dir);
+      detachedOps({ name, can: [], readOutput: () => read, command: () => ({ cmd: 'sh', args: ['-c', 'echo out'] }) }, dir);
     const denied = says('denied', { denials });
     const none = says('nodenial', { denials: [] });
-    const quiet = detachedOps({ name: 'quiet', command: () => ({ cmd: 'sh', args: ['-c', 'sleep 2'] }) }, dir);
+    const quiet = detachedOps({ name: 'quiet', can: [], command: () => ({ cmd: 'sh', args: ['-c', 'sleep 2'] }) }, dir);
     const quietPrints = detachedOps(
-      { name: 'quietp', readOutput: claudeResultOutput, command: () => ({ cmd: 'sh', args: ['-c', 'sleep 2'] }) },
+      { name: 'quietp', can: [], readOutput: claudeResultOutput, command: () => ({ cmd: 'sh', args: ['-c', 'sleep 2'] }) },
       dir,
     );
 
@@ -1704,6 +1710,7 @@ test(
     const dir = root();
     const late: HarnessSpec = {
       name: 'sh',
+      can: [],
       readOutput: claudeResultOutput,
       command: () => ({
         cmd: 'sh',
@@ -1751,6 +1758,7 @@ test(
       stepClock(sub, AHEAD_MS);
       const prints: HarnessSpec = {
         name: 'sh',
+        can: [],
         readOutput: claudeResultOutput,
         command: () => ({ cmd: 'sh', args: ['-c', `printf '%s\\n' '${resultLine({ structured_output: { outcome: 'done' } })}'`] }),
       };
@@ -1766,6 +1774,7 @@ test(
         stepClock(sub, AHEAD_MS);
         const answers: HarnessSpec = {
           name: 'sh',
+          can: [],
           command: (_r, io) => ({ cmd: 'sh', args: ['-c', `printf '%s' '{"outcome":"done"}' > '${io?.closeoutFile}'`] }),
         };
         const state = await settledOn(sub, answers);
@@ -1781,6 +1790,7 @@ test(
         const line = (o: object) => `printf '%s\\n' '${resultLine(o)}'`;
         const spec: HarnessSpec = {
           name: 'sh',
+          can: [],
           readOutput: claudeResultOutput,
           command: (r, io) => ({
             cmd: 'sh',
@@ -1870,6 +1880,7 @@ test(
       let given: HarnessIO | undefined;
       const spy: HarnessSpec = {
         name: 'sh',
+        can: [],
         prepare: () => ({ trustedDirs: ['/somewhere'] }),
         command: (_r, io) => {
           given = io;
@@ -1885,6 +1896,7 @@ test(
       const given: (HarnessIO | undefined)[] = [];
       const spy = (needsRequest?: true): HarnessSpec => ({
         name: 'sh',
+        can: [],
         ...(needsRequest ? { needsRequest } : {}),
         prepare: () => ({ trustedDirs: ['/somewhere'] }),
         command: (_r, io) => {
@@ -1917,6 +1929,7 @@ test(
         const given: (HarnessIO | undefined)[] = [];
         const spec = (needsRequest?: true): HarnessSpec => ({
           name: 'sh',
+          can: [],
           ...(needsRequest ? { needsRequest } : {}),
           command: (_r, io) => {
             given.push(io);
@@ -1936,7 +1949,7 @@ test(
       },
     );
 
-    const again: HarnessSpec = { name: 'req', needsRequest: true, command: () => ({ cmd: 'sh', args: ['-c', 'exit 0'] }) };
+    const again: HarnessSpec = { name: 'req', can: [], needsRequest: true, command: () => ({ cmd: 'sh', args: ['-c', 'exit 0'] }) };
     const ops = detachedOps(again, dir);
     const at = path.join(dir, 'runs', 'req', 'ae_t_again_1.request.json');
 
@@ -1968,6 +1981,7 @@ test('spawn: refused before the worker launches, saying nothing started, where t
   await t.test('a detached spawn that throws says nothing started — the worker is never launched', async () => {
     const broken: HarnessSpec = {
       name: 'sh',
+      can: [],
       command: () => {
         throw new Error('no command for this');
       },
@@ -2005,6 +2019,7 @@ test('a relative cwd is resolved where the worker is launched — the harness ru
   let given: string | undefined;
   const where: HarnessSpec = {
     name: 'sh',
+    can: [],
     command: (r) => {
       given = r.cwd;
       return { cmd: 'sh', args: ['-c', 'pwd > where.txt'] };

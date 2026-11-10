@@ -5,7 +5,10 @@
  */
 import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { daemonQuery, openRunsQuery, quotaQuery, versionQuery } from '@/lib/api';
+import { daemonQuery } from '@/lib/api/daemon';
+import { openRunsQuery } from '@/lib/api/runs';
+import { quotaQuery } from '@/lib/api/quota';
+import { versionQuery } from '@/lib/api/version';
 import type { FeedStatus } from '@/lib/feed';
 import { atWork, atWorkWords, feedWords, versionWords } from '@/lib/footer';
 import { DaemonLine } from './DaemonLine';

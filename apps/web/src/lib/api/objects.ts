@@ -8,7 +8,7 @@
  * take one.
  *
  * What a call rejects with is what the board's own reads and writes reject with (`read.ts`): a refusal in the api's words (its `error`)
- * and its status — a `ReadRefusal` for a read, so a run gone is still `runGone`, a `WriteRefusal` for a write — and an `UnreadAnswer`
+ * and its status — a `ReadRefusal` for a read, so a run gone is still `readGone`, a `WriteRefusal` for a write — and an `UnreadAnswer`
  * where an answer does not decode, naming the first key that is wrong. So each call runs on a `fetch` of its own that keeps the status and
  * the body of what it was answered, which the client's own errors do not carry whole.
  *
@@ -68,9 +68,8 @@ import {
   SignedOut,
   SignInStarted,
   SignInState,
-  Volume,
-  VolumeList,
   StepTold,
+  type Table,
   StepTries,
   Skill,
   SkillFiles,
@@ -80,6 +79,8 @@ import {
   type WorkflowCreate,
   WorkflowList,
   type WorkflowWrite,
+  WorkflowStepPage,
+  KeyForm,
   type DefinitionOrigin,
 } from 'objects';
 import { decoded, ReadRefusal, WriteRefusal } from './read.ts';
@@ -124,14 +125,14 @@ const pathOf = (input: RequestInfo | URL, query: Record<string, string> | undefi
   return `${url.pathname}${url.search}`;
 };
 
-/** What a refusal of the api's says: its `error`. */
+/** What a refusal of the api's says: its `error`. The board's one reading of a refusal's words: every answer is read through `call`. */
 const Said = Schema.Struct({ error: Schema.String });
 
 /**
  * Runs `use` of the client: resolves with its answer, decoded; rejects with `how.refuse` of the api's words and status where it refused,
- * with an `UnreadAnswer` where its answer does not decode, and with `fetch`'s own failure where nothing answered.
+ * with an `UnreadAnswer` where its answer does not decode, and with `fetch`'s own failure where nothing answered. `signal` aborts it.
  */
-async function call<A>(use: (client: Client) => Effect.Effect<A, unknown>, how: How<A>): Promise<A> {
+export async function call<A>(use: (client: Client) => Effect.Effect<A, unknown>, how: How<A>, signal?: AbortSignal): Promise<A> {
   let seen: Seen | undefined;
   const fetchSeen: typeof fetch = async (input, init) => {
     const path = pathOf(input, how.query);
@@ -147,7 +148,10 @@ async function call<A>(use: (client: Client) => Effect.Effect<A, unknown>, how: 
     };
     return res;
   };
-  const exit = await Effect.runPromiseExit(use(client).pipe(Effect.provideService(FetchHttpClient.Fetch, fetchSeen)));
+  const exit = await Effect.runPromiseExit(
+    use(client).pipe(Effect.provideService(FetchHttpClient.Fetch, fetchSeen)),
+    signal ? { signal } : undefined,
+  );
   if (Exit.isSuccess(exit)) return exit.value;
   if (seen === undefined) throw Cause.squash(exit.cause);
   const body = await seen.body;
@@ -157,7 +161,7 @@ async function call<A>(use: (client: Client) => Effect.Effect<A, unknown>, how: 
 }
 
 /** How a read is refused: a `ReadRefusal`, whose 404 on a run is the run gone. */
-const read = <A>(schema: Schema.Decoder<A>, query?: Record<string, string>): How<A> => ({
+export const read = <A>(schema: Schema.Decoder<A>, query?: Record<string, string>): How<A> => ({
   schema,
   refuse: (words, status) => new ReadRefusal(words, status),
   ...(query ? { query } : {}),
@@ -167,12 +171,22 @@ const read = <A>(schema: Schema.Decoder<A>, query?: Record<string, string>): How
 export type Refuse = (words: string, status: number, answer: unknown) => Error;
 
 /** How a write is refused: a `WriteRefusal`; `may` says what it may have done, which an answer the board does not read says. */
-const write = <A>(schema: Schema.Decoder<A>, may: string, query?: Record<string, string>, refuse?: Refuse): How<A> => ({
+export const write = <A>(schema: Schema.Decoder<A>, may: string, query?: Record<string, string>, refuse?: Refuse): How<A> => ({
   schema,
   refuse: refuse ?? ((words, status) => new WriteRefusal(words, status)),
   may,
   ...(query ? { query } : {}),
 });
+
+/** Whether a list's answer is the `Table` it answers when asked for one (`TABLE_ACCEPT`), which the board never asks for. */
+const isTable = (answer: unknown): answer is Table =>
+  typeof answer === 'object' && answer !== null && Reflect.get(answer, 'kind') === 'Table';
+
+/** A list endpoint's answer, its list: a `Table`, never asked for, is a defect of the api's. */
+const listed = <L>(answer: L | Table): Effect.Effect<L> =>
+  isTable(answer)
+    ? Effect.die(new Error('The api answered a Table the board did not ask for: restart the api (npm run dev).'))
+    : Effect.succeed(answer);
 
 /** What a list of runs is asked by: its labels, its state (`status.state=<state>`, `==`, `!=`), and a page of it. */
 export type RunListQuery = { labelSelector?: string; fieldSelector?: string; limit?: number; continue?: string };
@@ -195,12 +209,13 @@ export const runs = {
    * labels (`labelSelector`), by its state (`fieldSelector`, which brings the frame's parts and the counts), a page of `limit` runs from
    * `continue`; with no `limit` the api answers them all.
    */
-  listAll: (query: RunListQuery = {}): Promise<RunList> => call((c) => c.runs.listAll({ query: runListQueryOf(query) }), read(RunList)),
+  listAll: (query: RunListQuery = {}): Promise<RunList> =>
+    call((c) => c.runs.listAll({ query: runListQueryOf(query) }).pipe(Effect.flatMap(listed)), read(RunList)),
   /** The runs of `namespace` the query keeps (`GET /api/namespaces/:namespace/runs`), as `listAll` asks them. */
   list: (namespace: string, query: RunListQuery = {}): Promise<RunList> =>
-    call((c) => c.runs.list({ params: { namespace }, query: runListQueryOf(query) }), read(RunList)),
-  /** The run object (`GET /api/runs/:runId`). */
-  show: (runId: string): Promise<Run> => call((c) => c.runs.show({ params: { runId } }), read(Run)),
+    call((c) => c.runs.list({ params: { namespace }, query: runListQueryOf(query) }).pipe(Effect.flatMap(listed)), read(RunList)),
+  /** The run object (`GET /api/runs/:name`). */
+  show: (name: string): Promise<Run> => call((c) => c.runs.show({ params: { name } }), read(Run)),
   /** A run started in `namespace`, on its repository `repo` where the factory has several (`?repo=`): its name. */
   create: (namespace: string, start: RunStart, may: string, repo?: string): Promise<RunStarted> =>
     call(
@@ -231,10 +246,14 @@ export const runs = {
   /** Words said to a step's running session. */
   say: (namespace: string, name: string, step: string, text: string, may: string): Promise<RunSaid> =>
     call((c) => c.runs.say({ params: { namespace, name, step }, payload: { text } }), write(RunSaid, may)),
+};
+
+/** A run's step's reads (`/api/runs/:runId/steps/:step/…`). */
+export const steps = {
   /** Every try of a step, earliest first. */
-  tries: (runId: string, step: string): Promise<StepTries> => call((c) => c.runs.tries({ params: { runId, step } }), read(StepTries)),
+  tries: (runId: string, step: string): Promise<StepTries> => call((c) => c.steps.tries({ params: { runId, step } }), read(StepTries)),
   /** What a step was told. */
-  told: (runId: string, step: string): Promise<StepTold> => call((c) => c.runs.told({ params: { runId, step } }), read(StepTold)),
+  told: (runId: string, step: string): Promise<StepTold> => call((c) => c.steps.told({ params: { runId, step } }), read(StepTold)),
 };
 
 /** The namespace of a card of `factory`: the factory itself, or `default` for a card that names none. */
@@ -247,7 +266,10 @@ const Started = Schema.Struct({ id: Schema.String, card: Schema.String });
 export const cards = {
   /** Every card, of every namespace, that `labelSelector` keeps by its labels, or every card for none (`GET /api/cards`). */
   listAll: (labelSelector?: string): Promise<CardList> =>
-    call((c) => c.cards.listAll({ query: labelSelector === undefined ? {} : { labelSelector } }), read(CardList)),
+    call(
+      (c) => c.cards.listAll({ query: labelSelector === undefined ? {} : { labelSelector } }).pipe(Effect.flatMap(listed)),
+      read(CardList),
+    ),
   /** A card, by its namespace and its name, with its file as written (`status.source`). */
   get: (namespace: string, name: string): Promise<Card> => call((c) => c.cards.get({ params: { namespace, name } }), read(Card)),
   /** A card by its name alone, whichever namespace holds it, with its file as written (`GET /api/cards/:name`): a card's page's read. */
@@ -448,17 +470,11 @@ export const delegations = {
     call((c) => c.delegations.delete({ params: { namespace, name } }), write(Delegation, DELEGATION_WRITTEN)),
 };
 
-/** A factory's volumes, read-only: each folder its runs reach beside its repositories. */
-export const volumes = {
-  list: (namespace: string): Promise<VolumeList> => call((c) => c.volumes.list({ params: { namespace }, query: {} }), read(VolumeList)),
-  get: (namespace: string, name: string): Promise<Volume> => call((c) => c.volumes.get({ params: { namespace, name } }), read(Volume)),
-};
-
 /**
  * Which definition a read is of, beside its namespace: `origin`, the place it is read from, shadowed or not (none: the one the namespace
  * serves at each name); and `repo`, the factory's repository it is read on, sent as `?repo=` as every read of a factory's says it.
  */
-export type DefinitionRead = { origin?: DefinitionOrigin; repo?: string };
+type DefinitionRead = { origin?: DefinitionOrigin; repo?: string };
 
 /** The `?origin=` of `at`, none for none. */
 const originOf = (at: DefinitionRead | undefined): { origin?: string } => (at?.origin ? { origin: at.origin } : {});
@@ -506,6 +522,11 @@ export const workflows = {
       (c) => c.workflows.delete({ params: { namespace, name }, query: { resourceVersion } }),
       write(Workflow, 'The folder may be removed: reload the Workflows page before removing it again.', undefined, refuse),
     ),
+  /** A step of the workflow `name`, for its page: its keys, its layers, its hires and its recent runs, read where `at` says. */
+  step: (namespace: string, name: string, step: string, at?: DefinitionRead): Promise<WorkflowStepPage> =>
+    call((c) => c.workflows.step({ params: { namespace, name, step }, query: originOf(at) }), read(WorkflowStepPage, repoOf(at))),
+  /** Every key a step's form sets, how, and what it means (`GET /api/workflows/keys`). */
+  keys: (): Promise<KeyForm> => call((c) => c.workflows.keys(), read(KeyForm)),
 };
 
 /** What an agent's write may have done, and what to look at before writing it again. */

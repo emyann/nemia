@@ -114,7 +114,7 @@ const taskKept = (task: JournalKept, asked: Asked | string | undefined, seen: Se
  * not asked, and one whose ask fails, or that this engine does not have, is said on each of its tasks' `unread`. Yields between
  * tasks.
  */
-export const keptVerbOf = (store: StoreOps, runners: Record<string, SeamOps>, harnessNamed: (harness?: string) => string | undefined) => {
+const keptVerbOf = (store: StoreOps, runners: Record<string, SeamOps>, harnessNamed: (harness?: string) => string | undefined) => {
   const ask = (harness: string, sessions: readonly { name: string; nativeId?: string }[]) => {
     const kept = own(runners, harness)?.kept;
     if (!kept || !sessions.length) return Effect.succeed<Asked>({ kept: {} });

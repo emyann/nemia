@@ -1,14 +1,14 @@
 /**
  * The inbox page's arithmetic (src/lib/inbox.ts) — the cards in order, the workflow a card's start is preset to, and the queue as the page
- * and the Factory say it — and what the board sends the api for it (src/lib/api.ts): a card filed, dropped, started, queued and taken off
- * the queue. `npm run e2e` looks at the page itself.
+ * and the Factory say it — and what the board sends the api for it (src/lib/api/inbox.ts): a card filed, dropped, started, queued and
+ * taken off the queue. `npm run e2e` looks at the page itself.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { UnreadAnswer, WriteRefusal } from '../src/lib/api/read.ts';
 import { entriesOf, entryOf as cardEntryOf } from '../src/lib/api/inbox.ts';
 import { cardList, cardObject } from './factory-fixtures.ts';
-import { CARD_WORDS } from '../src/lib/words.ts';
+import { CARD_WORDS, ENDED } from '../src/lib/words.ts';
 import {
   CARD_STATES,
   cardQuery,
@@ -18,12 +18,11 @@ import {
   inboxQuery,
   queueCard,
   startCard,
-  startRun,
   type CardState,
-  type Factory,
   type InboxEntry,
-  type WorkflowListing,
-} from '../src/lib/api.ts';
+} from '../src/lib/api/inbox.ts';
+import { startRun, type WorkflowListing } from '../src/lib/api/workflows.ts';
+import { type Factory } from '../src/lib/api/factories.ts';
 import {
   afterFor,
   capLine,
@@ -997,5 +996,10 @@ test("cardPlace, cardFiling, factoriesOffered, notStarted: a card's factory and 
     assert.equal(CARD_WORDS.waiting.hue, 'yours', 'a run waiting on a person is yours');
     assert.equal(CARD_WORDS.running.hue, 'alive');
     assert.equal(CARD_WORDS.failed.hue, 'failure');
+  });
+  await t.test("a card whose run ended wears its outcome's hue, as every page draws that outcome (`ENDED`)", () => {
+    for (const outcome of ['succeeded', 'failed', 'cancelled'] as const) {
+      assert.deepEqual([CARD_WORDS[outcome].word, CARD_WORDS[outcome].hue], [ENDED[outcome].word, ENDED[outcome].hue], outcome);
+    }
   });
 });

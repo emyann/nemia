@@ -56,7 +56,7 @@ claude:
   `[Read, Grep]`; the board writes the first.
 - Say `effort:` and `context:` (`200k`): a job reads no user settings, and a session left unbounded reads up to a million tokens on every
   call.
-- `auto` is refused at load on the models measured to drop it (haiku, `claude-sonnet-4-5`); name `dontAsk` with rules there.
+- `auto` is refused at load on the models measured to drop it (`claude-haiku-4-5`, `claude-sonnet-4-5`: the runtime's `CLAUDE_AUTO_DROPPED`, measured on Claude Code 2.1.316, where the `haiku` alias keeps `auto`); name `dontAsk` with rules there.
 
 ## Its instructions
 

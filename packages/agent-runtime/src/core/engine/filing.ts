@@ -11,6 +11,7 @@ import { Journal, type JournalError } from './journal.ts';
 import { argsRefusalOf, configForTurn, turnArgsRefusalOf, type HarnessArgs } from '../../harness/args.ts';
 import { Runner } from '../../harness/seam.ts';
 import { labelsRefusalOf } from '../labels.ts';
+import { unknownTask } from '../text.ts';
 import type { RequestStop } from '../../../contracts/stop.contract.ts';
 import { TaskId } from '../model.ts';
 
@@ -52,14 +53,14 @@ export class FileRefused extends Schema.TaggedError<FileRefused>()('FileRefused'
  * since a key taken and then dropped is a promise nobody keeps. The words say where trying again goes. `ae`'s brief
  * refuses the same keys in the same words (`RETIRED_BRIEF_KEYS` and `retiredKeyRefusal`, in `cli/main.ts`).
  */
-export const RETIRED_KEYS: Record<'maxAttempts' | 'resume', string> = {
+const RETIRED_KEYS: Record<'maxAttempts' | 'resume', string> = {
   maxAttempts: "the runtime makes one attempt per start, and trying again is the caller's",
   resume: 'the runtime makes one attempt per start, so there is no later attempt for a policy to continue or not',
 };
 
-/** What to do instead of a retired key: file the task again, or, in a workflow, let the orchestrator try again. */
-export const RETIRED_INSTEAD =
-  "To run the task again, file it again — with `resumeFrom: <session id>` to continue its session. In a workflow, give the step `retries:`, or ask for an attempt with `wf retry <run> <step>` (`--continue` continues the last attempt's session, `--fresh` starts clean).";
+/** What to do instead of a retired key: file the task again, a new task that continues its session or one that starts clean. */
+const RETIRED_INSTEAD =
+  'To run the task again, file it again: with `resumeFrom: <session id>` to continue its session, or without it to start clean.';
 
 /** Why a key a task no longer takes is refused, and what to do instead. */
 export const retiredKeyRefusal = (key: keyof typeof RETIRED_KEYS) => `\`${key}\` is retired: ${RETIRED_KEYS[key]}. ${RETIRED_INSTEAD}`;
@@ -86,7 +87,7 @@ const priorityRefusalOf = (priority: unknown): string | undefined =>
  * of `memory` alone, and a `memory` that is no quantity `memoryBytesOf` reads (`memoryQuantityRefusal`'s words). A container's
  * `requests` and its other limits (`cpu`) are refused rather than dropped: a limit taken and never held is a promise nobody keeps.
  */
-export const resourcesRefusalOf = (resources: unknown): string | undefined => {
+const resourcesRefusalOf = (resources: unknown): string | undefined => {
   if (resources === undefined) return undefined;
   const shown = (v: unknown) => (typeof v === 'number' ? String(v) : JSON.stringify(v));
   const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -246,8 +247,8 @@ export class AdmitRefused extends Schema.TaggedError<AdmitRefused>()('AdmitRefus
 }) {}
 
 /** Why `admit` would not take this task, or `undefined`: one it has no record of, or one that has settled. Off the record alone. */
-export const admitRefusalOf = (taskId: string, state: State | undefined): string | undefined => {
-  if (!state) return `\`${taskId}\` is not a task in this store. \`ae ls\`, or \`list()\`, gives the ones it has.`;
+const admitRefusalOf = (taskId: string, state: State | undefined): string | undefined => {
+  if (!state) return unknownTask(taskId);
   if (state.settled)
     return `\`${taskId}\` has settled (${state.settled}): there is nothing left to start. File a task that continues its session (\`resumeFrom\`) to go on.`;
   return undefined;
@@ -290,7 +291,7 @@ export class StopRefused extends Schema.TaggedError<StopRefused>()('StopRefused'
  * Off the record alone, so it costs no registry call.
  */
 export const stopRefusalOf = (taskId: string, state: State | undefined): string | undefined => {
-  if (!state) return `\`${taskId}\` is not a task in this store. \`ae ls\`, or \`list()\`, gives the ones it has.`;
+  if (!state) return unknownTask(taskId);
   if (verbTakes('requestStop', state)) return undefined;
   if (state.settled)
     return `\`${taskId}\` has settled (${state.settled}): there is nothing left to stop. File a task that continues its session (\`resumeFrom\`) to go on.`;
@@ -321,7 +322,7 @@ export class InputRefused extends Schema.TaggedError<InputRefused>()('InputRefus
  * off the record alone, so it costs no registry call.
  */
 const waitRefusalOf = (verb: 'answer' | 'close', taskId: string, state: State | undefined): string | undefined => {
-  if (!state) return `\`${taskId}\` is not a task in this store. \`ae ls\`, or \`list()\`, gives the ones it has.`;
+  if (!state) return unknownTask(taskId);
   const last = state.attempts.at(-1);
   if (verbTakes(verb, state)) {
     return verb === 'answer' && last !== undefined && !last.nativeId
@@ -350,7 +351,10 @@ export const answerRefusalOf = (taskId: string, state: State | undefined, text: 
   return turnArgsRefusalOf(config) ?? waitRefusalOf('answer', taskId, state);
 };
 
-/** Why `close` would not journal a close, or `undefined`. */
+/**
+ * Why `close` would not journal a close, or `undefined`.
+ * Exported only for the tests that import it.
+ */
 export const closeRefusalOf = (taskId: string, state: State | undefined): string | undefined => waitRefusalOf('close', taskId, state);
 
 /**

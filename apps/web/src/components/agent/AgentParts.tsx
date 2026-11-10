@@ -4,15 +4,9 @@ import type { Expression } from 'blobatar';
 import type { ReactNode } from 'react';
 import { useRouterState } from '@tanstack/react-router';
 import { Link as AriaLink } from 'react-aria-components';
-import {
-  sourceOf,
-  type AgentListing,
-  type AgentSkill,
-  type AgentUser,
-  type GivenSkill,
-  type PagePlace,
-  type SkillSource,
-} from '../../lib/api';
+import { sourceOf, type AgentSkill, type GivenSkill, type SkillSource } from '../../lib/api/library.ts';
+import { type AgentListing, type AgentUser } from '../../lib/api/agents.ts';
+import { type PagePlace } from '../../lib/api/workflows.ts';
 import { costWords, SOURCE_BADGES } from '../../lib/skills';
 import { cn } from '../../lib/utils';
 import { routeLink } from '../nav/routeLink';
@@ -48,7 +42,7 @@ export function FromBadge({ from }: { from: AgentListing['from'] }) {
 }
 
 /** A node that names an agent, linked to its step's page: `workflow › step`. */
-export function NodeLink({ user }: { user: AgentUser }) {
+function NodeLink({ user }: { user: AgentUser }) {
   return (
     <RouteLink
       to="/workflows/$from/$workflow/$step"
@@ -201,7 +195,7 @@ function FollowingFace({ name, size, plate, expression, className }: Omit<FacePr
  * The search a link to a definition's page carries: for a factory's own, which only its factory serves, the place it is read in, `place`,
  * else the one the page is in (`here`); none for any other, which `default` serves whatever factory the link is drawn in.
  */
-export const definitionSearch = (from: string, place: PagePlace | undefined, here: PagePlace = {}): PagePlace => {
+const definitionSearch = (from: string, place: PagePlace | undefined, here: PagePlace = {}): PagePlace => {
   if (from !== 'factory') return {};
   const { factory, repo } = place ?? here;
   return { ...(factory !== undefined && { factory }), ...(repo !== undefined && { repo }) };

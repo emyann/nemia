@@ -92,6 +92,20 @@ test("checkEnvOf: every check is told the run's copy of its workflow folder, whe
   });
 });
 
+test("checkEnvOf: a check is told the run's copy of its carried files where the record names one, and nothing where it does not", () => {
+  const told = {
+    workspace: '/wt',
+    files: '/wf/runs/r-1/artifacts/implement',
+    closeout: undefined,
+    workflowFiles: '/wf/runs/r-1/workflow/ab',
+  };
+  assert.equal(
+    checkEnvOf(run({}), { name: 'implement' }, { ...told, carriedFiles: '/wf/runs/r-1/carried/cd' }).WF_CARRIED_FILES,
+    '/wf/runs/r-1/carried/cd',
+  );
+  assert.equal('WF_CARRIED_FILES' in checkEnvOf(run({}), { name: 'implement' }, told), false);
+});
+
 test("checkEnvOf: every check is told its run's labels, as JSON, an object even where the run has none", async (t) => {
   const told = { workspace: '/wt', files: '/wf/runs/r-1/artifacts/implement', closeout: undefined };
   const rows: Array<[string, Run, string]> = [

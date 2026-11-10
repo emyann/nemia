@@ -250,7 +250,7 @@ test('no factory and Nemia off: Turn Nemia on, beside the line that does it from
 });
 
 /** A factory's template as the api answers it: applied at `applied`, with `conditions`. */
-const template = (applied: string | null, conditions: import('../src/lib/api.ts').FactoryCondition[] = []) => ({
+const template = (applied: string | null, conditions: import('../src/lib/api/factories.ts').FactoryCondition[] = []) => ({
   source: '/drafts/team',
   version: 'v2',
   params: { repo: '/work/repo', retries: 2 },
@@ -289,7 +289,7 @@ test('REFUSED: a schedule whose latest fire was refused draws why, whole, under 
   const { FactorySchedules } = await import('../src/components/factory/FactorySchedules.tsx');
   const why =
     'dev: the factory nemia does not offer this workflow — it offers none yet. Attach it: nemia factory attach nemia dev. Nothing was started.';
-  const scheduled = (workflow: string, extra: Partial<import('../src/lib/api.ts').FactorySchedule>) => ({
+  const scheduled = (workflow: string, extra: Partial<import('../src/lib/api/factories.ts').FactorySchedule>) => ({
     workflow,
     cron: '0 9 * * 1',
     tz: 'America/Montreal',

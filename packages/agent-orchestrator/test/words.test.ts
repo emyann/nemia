@@ -48,6 +48,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { CLAUDE_PERMISSION_MODES, CODEX_SANDBOXES } from 'agent-runtime';
 import { workflowsIn } from '../src/folder/folder.store.ts';
+import { ours } from 'test-kit/repo';
 import { scratch } from 'test-kit/scratch';
 import { FORMER_TEAM, TEAM_NAMES, TEAM_PATHS } from './team-names.baseline.ts';
 
@@ -192,9 +193,8 @@ export type Baseline = Readonly<Record<string, Entry>>;
  */
 const FENCE_WORDS: Baseline = {
   'apps/api/src/capabilities/reach.ts': { count: 17, ...MOVES.fenceForm },
-  'apps/api/src/workflows/builder.ts': { count: 2, ...MOVES.fenceForm },
-  'apps/api/src/workflows/words.ts': { count: 5, ...MOVES.fenceForm },
-  'apps/api/src/workflows/workflows.ts': { count: 13, ...MOVES.fenceForm },
+  'apps/api/src/workflows/builder.ts': { count: 1, ...MOVES.fenceForm },
+  'apps/api/src/workflows/workflows.ts': { count: 6, ...MOVES.fenceForm },
   'apps/web/src/components/agent/AgentForm.tsx': { count: 5, ...MOVES.fenceForm },
   'apps/web/src/components/step/Facts.tsx': { count: 1, ...MOVES.fenceForm },
   'apps/web/src/components/step/StepForm.tsx': { count: 1, ...MOVES.fenceForm },
@@ -202,7 +202,6 @@ const FENCE_WORDS: Baseline = {
   'apps/web/src/lib/agents.ts': { count: 11, ...MOVES.fenceForm },
   'apps/web/src/lib/api/agents.ts': { count: 6, ...MOVES.fenceForm },
   'apps/web/src/lib/api/capabilities.ts': { count: 7, ...MOVES.fenceForm },
-  'apps/web/src/lib/api/library.ts': { count: 13, ...MOVES.fenceForm },
   'apps/web/src/lib/asks.ts': { count: 1, ...MOVES.fenceForm },
   'apps/web/src/lib/builder.ts': { count: 12, ...MOVES.fenceForm },
   'apps/web/src/lib/words.ts': { count: 2, ...MOVES.fenceForm },
@@ -242,7 +241,8 @@ const FENCE_WORDS: Baseline = {
   'packages/agent-runtime/src/cli/main.ts': { count: 4, ...MOVES.fenceArgs },
   'packages/agent-runtime/src/core/event-schema.ts': { count: 3, ...MOVES.fenceArgs },
   'packages/agent-runtime/src/harness/args.ts': { count: 19, ...MOVES.fenceArgs },
-  'packages/agent-runtime/src/harness/choices.ts': { count: 12, ...MOVES.fenceArgs },
+  'packages/agent-runtime/src/harness/choices.ts': { count: 5, ...MOVES.fenceArgs },
+  'packages/agent-runtime/src/harness/declaration.ts': { count: 1, ...MOVES.fenceArgs },
   'packages/agent-runtime/src/harness/codex/codex.ts': { count: 21, ...MOVES.fenceArgs },
   'packages/agent-runtime/src/harness/codex/vocabulary.ts': { count: 1, ...MOVES.fenceArgs },
   'packages/agent-runtime/src/harness/sdk.ts': { count: 4, ...MOVES.fenceArgs },
@@ -251,14 +251,13 @@ const FENCE_WORDS: Baseline = {
 
 /** Each file outside the runtime that says a harness's word today, with its count and what removes them. */
 const HARNESS_WORDS: Baseline = {
-  'apps/api/src/agents/skills.ts': { count: 4, ...MOVES.checkout },
-  'apps/api/src/app.ts': { count: 3, ...MOVES.quota },
-  'apps/api/src/capabilities/capabilities.ts': { count: 27, ...MOVES.reach },
-  'apps/api/src/capabilities/reach.ts': { count: 44, ...MOVES.reach },
+  'apps/api/src/capabilities/capabilities.ts': { count: 15, ...MOVES.reach },
+  'apps/api/src/capabilities/reach.ts': { count: 31, ...MOVES.reach },
   'apps/api/src/gauges/quota.ts': { count: 36, ...MOVES.quota },
+  'apps/api/src/skills/skills.ts': { count: 3, ...MOVES.checkout },
   'apps/api/src/stats/stats.ts': { count: 1, card: 'u42s' },
-  'apps/api/src/workflows/builder.ts': { count: 2, ...MOVES.defaults },
-  'apps/api/src/workflows/workflows.ts': { count: 8, ...MOVES.api },
+  'apps/api/src/workflows/builder.ts': { count: 1, ...MOVES.defaults },
+  'apps/api/src/workflows/workflows.ts': { count: 1, ...MOVES.api },
   'apps/web/src/components/agent/AgentCard.tsx': { count: 1, ...MOVES.prompt },
   'apps/web/src/components/agent/AgentForm.tsx': { count: 7, ...MOVES.web },
   'apps/web/src/components/gate/Decide.tsx': { count: 1, ...MOVES.checkout },
@@ -271,16 +270,14 @@ const HARNESS_WORDS: Baseline = {
   'apps/web/src/lib/agents.ts': { count: 7, ...MOVES.web },
   'apps/web/src/lib/api/agents.ts': { count: 2, ...MOVES.web },
   'apps/web/src/lib/api/capabilities.ts': { count: 13, ...MOVES.reach },
-  'apps/web/src/lib/api/library.ts': { count: 6, ...MOVES.web },
-  'apps/web/src/lib/api/quota.ts': { count: 8, ...MOVES.quota },
-  'apps/web/src/lib/api/steps.ts': { count: 1, ...MOVES.web },
+  'apps/web/src/lib/api/quota.ts': { count: 1, ...MOVES.quota },
   'apps/web/src/lib/builder.ts': { count: 2, ...MOVES.web },
   'apps/web/src/lib/quota.ts': { count: 2, ...MOVES.quota },
   'apps/web/src/lib/skills.ts': { count: 2, ...MOVES.prompt },
   'apps/web/src/lib/transcript.ts': { count: 8, ...MOVES.web },
   'apps/web/src/routes/capabilities.tsx': { count: 19, ...MOVES.reach },
   'packages/agent-orchestrator/src/agents/agents.store.ts': { count: 7, ...MOVES.render },
-  'packages/agent-orchestrator/src/agents/agents.ts': { count: 34, ...MOVES.render },
+  'packages/agent-orchestrator/src/agents/agents.ts': { count: 32, ...MOVES.render },
   'packages/agent-orchestrator/src/agents/read.store.ts': { count: 1, ...MOVES.checkout },
   'packages/agent-orchestrator/src/artifacts/artifacts.store.ts': { count: 2, card: 'slice-2' },
   'packages/agent-orchestrator/src/artifacts/artifacts.ts': { count: 2, card: 'slice-2' },
@@ -291,34 +288,34 @@ const HARNESS_WORDS: Baseline = {
   'packages/agent-orchestrator/src/daemon/daemon.store.ts': { count: 1, card: 'slice-3' },
   'packages/agent-orchestrator/src/decide/decide.verb.ts': { count: 4, ...MOVES.wait },
   'packages/agent-orchestrator/src/ending/ending.ts': { count: 1, ...MOVES.knobs },
-  'packages/agent-orchestrator/src/folder/folder.store.ts': { count: 2, ...MOVES.knobs },
-  'packages/agent-orchestrator/src/folder/write.store.ts': { count: 4, ...MOVES.knobs },
-  'packages/agent-orchestrator/src/former/former.ts': { count: 32, ...MOVES.knobs },
-  'packages/agent-orchestrator/src/harness/harness.ts': { count: 6, ...MOVES.defaults },
+  'packages/agent-orchestrator/src/folder/folder.store.ts': { count: 1, ...MOVES.knobs },
+  'packages/agent-orchestrator/src/folder/write.store.ts': { count: 3, ...MOVES.knobs },
+  'packages/agent-orchestrator/src/former/former.ts': { count: 31, ...MOVES.knobs },
+  'packages/agent-orchestrator/src/harness/harness.ts': { count: 4, ...MOVES.defaults },
   'packages/agent-orchestrator/src/keys/filed-as.ts': { count: 1, ...MOVES.knobs },
-  'packages/agent-orchestrator/src/keys/keys.ts': { count: 35, ...MOVES.knobs },
-  'packages/agent-orchestrator/src/keys/tools.ts': { count: 15, ...MOVES.knobs },
+  'packages/agent-orchestrator/src/keys/keys.ts': { count: 31, ...MOVES.knobs },
+  'packages/agent-orchestrator/src/keys/tools.ts': { count: 14, ...MOVES.knobs },
   'packages/agent-orchestrator/src/list/list.ts': { count: 9, ...MOVES.wait },
   'packages/agent-orchestrator/src/record/places.store.ts': { count: 1, card: 'slice-2' },
   'packages/agent-orchestrator/src/record/record.store.ts': { count: 2, ...MOVES.wait },
   'packages/agent-orchestrator/src/record/record.ts': { count: 1, card: 'u42s' },
-  'packages/agent-orchestrator/src/resource/told.verb.ts': { count: 12, card: 'u42s' },
+  'packages/agent-orchestrator/src/resource/told.verb.ts': { count: 11, card: 'u42s' },
   'packages/agent-orchestrator/src/retry/retry-refusal.ts': { count: 3, ...MOVES.knobs },
-  'packages/agent-orchestrator/src/try/try.ts': { count: 13, ...MOVES.reach },
+  'packages/agent-orchestrator/src/try/try.ts': { count: 10, ...MOVES.reach },
   'packages/agent-orchestrator/src/try/try.verb.ts': { count: 1, ...MOVES.checkout },
   'packages/agent-orchestrator/src/yours/yours.ts': { count: 1, ...MOVES.checkout },
   'packages/agent-orchestrator/src/runner.ts': { count: 1, ...MOVES.wait },
-  'packages/agent-orchestrator/src/runtime-client.ts': { count: 5, ...MOVES.defaults },
+  'packages/agent-orchestrator/src/runtime-client.ts': { count: 1, ...MOVES.defaults },
   'packages/agent-orchestrator/src/skills/read.store.ts': { count: 8, ...MOVES.checkout },
   'packages/agent-orchestrator/src/skills/skills.ts': { count: 11, ...MOVES.render },
-  'packages/agent-orchestrator/src/stats/discipline.ts': { count: 6, card: 'u42s' },
-  'packages/agent-orchestrator/src/status/status.ts': { count: 8, card: 'u42s' },
+  'packages/agent-orchestrator/src/stats/discipline.ts': { count: 5, card: 'u42s' },
+  'packages/agent-orchestrator/src/status/status.ts': { count: 3, card: 'u42s' },
   'packages/agent-orchestrator/src/step/step.ts': { count: 59, ...MOVES.knobs },
   'packages/agent-orchestrator/src/tick/told.verb.ts': { count: 15, ...MOVES.render },
   'packages/agent-orchestrator/src/views/views.verb.ts': { count: 1, ...MOVES.wait },
   'packages/agent-orchestrator/src/workflow.ts': { count: 1, ...MOVES.knobs },
   'packages/agent-orchestrator/src/workflow/fence.ts': { count: 1, ...MOVES.knobs },
-  'packages/agent-orchestrator/src/workflow/step-file.ts': { count: 13, ...MOVES.knobs },
+  'packages/agent-orchestrator/src/workflow/step-file.ts': { count: 12, ...MOVES.knobs },
   'packages/agent-orchestrator/src/workflow/validate.ts': { count: 3, ...MOVES.knobs },
   'packages/agent-orchestrator/src/workspace/workspace.ts': { count: 2, card: 'slice-2' },
 };
@@ -329,7 +326,6 @@ const WORKFLOW_WORDS: Baseline = {
   'packages/agent-runtime/src/a2a/remote.ts': { count: 1, ...MOVES.reword },
   'packages/agent-runtime/src/core/domain.ts': { count: 14, ...MOVES.closeout },
   'packages/agent-runtime/src/core/engine/engine.ts': { count: 14, ...MOVES.reword },
-  'packages/agent-runtime/src/core/engine/filing.ts': { count: 6, ...MOVES.reword },
   'packages/agent-runtime/src/core/engine/journal.ts': { count: 1, ...MOVES.reword },
   'packages/agent-runtime/src/core/event-schema.ts': { count: 1, ...MOVES.closeout },
   'packages/agent-runtime/src/core/lifecycle.ts': { count: 7, ...MOVES.closeout },
@@ -337,14 +333,14 @@ const WORKFLOW_WORDS: Baseline = {
   'packages/agent-runtime/src/service/options.ts': { count: 4, ...MOVES.reword },
   'packages/agent-runtime/src/harness/args.ts': { count: 3, ...MOVES.reword },
   'packages/agent-runtime/src/harness/claude/transcript.ts': { count: 1, ...MOVES.closeout },
+  'packages/agent-runtime/src/harness/claude/rules.ts': { count: 1, ...MOVES.reword },
   'packages/agent-runtime/src/harness/claude/vocabulary.ts': { count: 1, ...MOVES.reword },
-  'packages/agent-runtime/src/harness/codex/codex.ts': { count: 3, ...MOVES.reword },
+  'packages/agent-runtime/src/harness/codex/codex.ts': { count: 2, ...MOVES.reword },
   'packages/agent-runtime/src/harness/detached/detached.ts': { count: 18, ...MOVES.closeout },
   'packages/agent-runtime/src/harness/detached/output.ts': { count: 2, ...MOVES.closeout },
   'packages/agent-runtime/src/harness/detached/said.ts': { count: 1, ...MOVES.closeout },
   'packages/agent-runtime/src/harness/sdk.ts': { count: 2, ...MOVES.reword },
   'packages/agent-runtime/src/index.ts': { count: 2, ...MOVES.reword },
-  'packages/agent-runtime/src/service/say.ts': { count: 1, ...MOVES.reword },
 };
 
 /** Each runtime file that says the layer above's word for an end, the store or an attempt today, its count and what removes them. */
@@ -414,14 +410,16 @@ const TEAM_GUARD_FILES: ReadonlySet<string> = new Set([
   'packages/agent-orchestrator/test/team-names.baseline.ts',
 ]);
 
-/** The board's vendored and generated files, which no rule reads. */
-const vendored = (file: string): boolean =>
-  file.startsWith('apps/web/src/components/ui/') || file === 'apps/web/src/routeTree.gen.ts' || file.split('/').includes('node_modules');
+/**
+ * The files no rule reads: what `.gitattributes` marks vendored or generated (`ours`, from git), and an installed package's. Not ours to
+ * rewrite, so no rule of ours can hold them.
+ */
+const vendored = (file: string): boolean => file.split('/').includes('node_modules') || !ours(file);
 
-/** The files a layer's rule leaves out: tests, and the board's vendored and generated files. */
+/** The files a layer's rule leaves out: tests, and the vendored and generated files. */
 const skipped = (file: string): boolean => file.endsWith('.test.ts') || file.split('/').includes('test') || vendored(file);
 
-/** The files the team's rules leave out: the board's vendored and generated files, and this guard's own two. Tests are read. */
+/** The files the team's rules leave out: the vendored and generated files, and this guard's own two. Tests are read. */
 const teamSkipped = (file: string): boolean => vendored(file) || TEAM_GUARD_FILES.has(file);
 
 /** A source file, which every rule reads. */

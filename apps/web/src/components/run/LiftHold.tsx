@@ -2,13 +2,12 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button as AriaButton, Dialog, DialogTrigger, Heading, Popover } from 'react-aria-components';
 import { Button } from '@/components/ui/button';
-import { liftHold } from '../../lib/api';
+import { liftHold } from '../../lib/api/runs.ts';
 import { cn } from '../../lib/utils';
-import { POPOVER, SMALL } from '../inbox/CardGate';
-import { BUTTON, Refusal } from '../gate/Ask';
-import { SECONDARY } from '../gate/Gate';
+import { Refusal } from '../gate/Ask';
 import { runsMoved } from '@/lib/runWrites';
 import { useRunNamespace } from '@/lib/runNamespace';
+import { BUTTON, BUTTON_SECONDARY, BUTTON_SMALL, POPOVER } from '../../lib/classes';
 
 /** What a lift does, said before the second press: the package's `unhold`, as the CLI's `hold <run> --off` runs it. */
 const LIFTS = 'It goes on at the next tick, and what its steps asked while it was held is asked again.';
@@ -85,7 +84,7 @@ export function CardLift({ id, namespace }: { id: string; namespace: string }) {
       onDoubleClick={(event) => event.stopPropagation()}
     >
       <DialogTrigger>
-        <AriaButton data-lift={id} className={cn(SMALL, 'bg-card text-foreground ring-1 ring-outline ring-inset hover:bg-accent')}>
+        <AriaButton data-lift={id} className={cn(BUTTON_SMALL, 'bg-card text-foreground ring-1 ring-outline ring-inset hover:bg-accent')}>
           Lift…
         </AriaButton>
         <Popover placement="bottom end" offset={6} className={POPOVER}>
@@ -109,7 +108,12 @@ function LiftForm({ id, namespace, onClose }: { id: string; namespace: string; o
         <button type="button" onClick={() => lift.mutate()} disabled={lift.isPending} className={cn(BUTTON, 'px-2.5 py-1 text-body-small')}>
           {lift.isPending ? 'Lifting…' : 'Lift'}
         </button>
-        <button type="button" onClick={onClose} disabled={lift.isPending} className={cn(BUTTON, SECONDARY, 'px-2.5 py-1 text-body-small')}>
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={lift.isPending}
+          className={cn(BUTTON, BUTTON_SECONDARY, 'px-2.5 py-1 text-body-small')}
+        >
           Keep it
         </button>
       </div>

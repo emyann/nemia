@@ -6,7 +6,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import type { Key } from 'react';
 import { Select, SelectItem } from '@/components/ui/ds/components/Select';
-import { factoriesQuery, openRunsQuery, type Factory, type OpenRuns } from '@/lib/api';
+import { factoriesQuery, type Factory } from '@/lib/api/factories';
+import { openRunsQuery, type OpenRuns } from '@/lib/api/runs';
 import { DEFAULT_NAME, factoriesShown } from '@/lib/factories';
 import { pickTo } from '../nav/nav';
 
@@ -14,7 +15,7 @@ import { pickTo } from '../nav/nav';
 const ALL = 0;
 
 /** A factory the picker offers: its name, and what the api says of it, none for a name the api lists no factory by. */
-export type PickerFactory = { name: string; factory?: Factory };
+type PickerFactory = { name: string; factory?: Factory };
 
 /**
  * The factories the picker offers after All factories, from what the api answered: those Home lists (`factoriesShown`), in its order, the

@@ -69,7 +69,6 @@ test('hireRefusal: a hire names an agent into <workflow>/<step>', async (t) => {
 });
 
 test('defaultFactoryRefusal: the default factory is read, never written, so no verb that writes a factory takes it', async (t) => {
-  await t.test('its name is default', () => assert.equal(DEFAULT_FACTORY, 'default'));
   for (const verb of ['add', 'rm', 'hire', 'fire', 'attach', 'detach', 'instruction', 'instruct'] as const)
     await t.test(`REFUSED: nemia factory ${verb}`, () => names(defaultFactoryRefusal(verb), '`default`', `nemia factory ${verb}`));
 });

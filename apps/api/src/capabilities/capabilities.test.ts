@@ -11,19 +11,11 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { app, appOf, liveOf } from '../app.ts';
 import { ApiConfig } from '../layer.ts';
-import {
-  HOME_REPO,
-  MEASURED_TOOLS,
-  READ_ONLY_COMMANDS,
-  capabilitiesOf,
-  dated,
-  denyingRule,
-  describedAt,
-  readOnlyCommands,
-  repoOf,
-  serverAsk,
-} from './capabilities.ts';
-import { DISALLOW, askDenierOf, bashCovers } from './reach.ts';
+import { CLAUDE_RULES } from 'agent-orchestrator/workflow';
+import { HOME_REPO, capabilitiesOf, describedAt, repoOf, serverAsk } from './capabilities.ts';
+import { DISALLOW, askDenierOf } from './reach.ts';
+
+const { measuredTools: MEASURED_TOOLS, readOnlyCommands: READ_ONLY_COMMANDS } = CLAUDE_RULES;
 
 type CapabilitiesWithSteps = import('./reach.ts').CapabilitiesWithSteps;
 type StepReach = import('./reach.ts').StepReach;
@@ -262,6 +254,18 @@ test('a server that exits before it answers is an error with what it printed on 
     body.mcp[0].error ?? '',
     /did not list its tools: .+\. Run it yourself to see why, or fix its entry in \.mcp\.json\.\nWhat it printed on stderr:\nfixture: no licence key in FIXTURE_KEY$/,
   );
+});
+
+test('a server whose refusal reaches the api before its stderr does is an error quoting what it printed, once its stderr has ended', async () => {
+  const repo = repoWith({
+    '.mcp.json': { mcpServers: { refuse: fixture({ HKB_TEST_MODE: 'refuse' }) } },
+    '.claude/settings.json': { enabledMcpjsonServers: ['refuse'] },
+  });
+  const { status, body } = await served(repo);
+  assert.equal(status, 200);
+  assert.equal(body.mcp[0].tools, null);
+  assert.match(body.mcp[0].error ?? '', /tools: .*refused/);
+  assert.match(body.mcp[0].error ?? '', /stderr:\nfixture: .*FIXTURE_KEY$/);
 });
 
 /** A deadline for asking a server that the test can wait for; the api's own is `ASK_MS`. */
@@ -517,24 +521,6 @@ test('a .mcp.json or a settings file that does not read is a warning naming it a
   ]);
 });
 
-test("a deny rule refuses a server's tool by the tool's name, the server's, or every tool of the server — and by nothing else", () => {
-  const tool = ['playwright', 'browser_click'] as const;
-  assert.equal(denyingRule(['Read', 'mcp__playwright__browser_click'], ...tool), 'mcp__playwright__browser_click');
-  assert.equal(denyingRule(['mcp__playwright'], ...tool), 'mcp__playwright');
-  assert.equal(denyingRule(['mcp__playwright__*'], ...tool), 'mcp__playwright__*');
-  for (const rule of [
-    'mcp__play',
-    'mcp__playwrightx',
-    'mcp__playwright__browser',
-    'mcp__playwright__browser_click_',
-    'mcp__other__browser_click',
-    'Bash(git push)',
-    '*',
-  ]) {
-    assert.equal(denyingRule([rule], ...tool), null, rule);
-  }
-});
-
 /** Whether `dir` is the checkout: the folder whose `package.json` declares the workspaces. */
 const isCheckout = (dir: string): boolean => {
   const file = path.join(dir, 'package.json');
@@ -770,32 +756,6 @@ test("a step without `tools:` gets the harness's own set — what was measured, 
   });
 });
 
-/** The `names` the ledger's `bullet` does not write as a tool of its own, in backticks of their own. */
-const unnamedIn = (bullet: string, names: readonly string[]): string[] => names.filter((name) => !bullet.includes(`\`${name}\``));
-
-test("REFUSED: the measured set holds only what the ledger's measurement names, as a tool of its own — a tool it does not name is inferred, with why, or not there", () => {
-  const plan = fs.readFileSync(path.join(HOME_REPO, 'docs', 'plan-hold-the-bar.md'), 'utf8');
-  const at = plan.indexOf('- **what a worker gets, measured');
-  assert.ok(at >= 0, 'the ledger has the bullet MEASURED_TOOLS cites');
-  const next = plan.indexOf('\n- **', at + 1);
-  const bullet = plan.slice(at, next < 0 ? undefined : next);
-  assert.ok(bullet.includes(MEASURED_TOOLS.measuredAt), 'measured on the day the bullet says');
-  const unnamed = (names: readonly string[]) => unnamedIn(bullet, names);
-  assert.deepEqual(unnamed(MEASURED_TOOLS.tools), []);
-  assert.deepEqual(unnamed(MEASURED_TOOLS.lacks), []);
-  assert.deepEqual(
-    unnamed([...MEASURED_TOOLS.tools, 'Edit', 'Bash']),
-    ['Edit', 'Bash'],
-    "refused: Edit, which the bullet never names, and Bash, which it names only in the fenced reviewer's list — each would read as measured",
-  );
-  const inferred = MEASURED_TOOLS.inferred.map((t: { name: string }) => t.name);
-  assert.deepEqual(
-    inferred.filter((name: string) => (MEASURED_TOOLS.tools as readonly string[]).includes(name)),
-    [],
-    'no tool is both measured and inferred',
-  );
-});
-
 test("REFUSED: `disallow` takes away — a tool, one of a family, a server's tool — and a command it denies is not allowed, though the settings allow it", async () => {
   const { 'dev/implement': implement, 'dev/review': review } = await claudeStepsOf(stepsRepo());
   assert.ok(!implement.tools.names.includes('SendMessage'), 'SendMessage is not among its tools');
@@ -860,33 +820,6 @@ test("a `dontAsk` step under the settings shows what Bash commands are allowed �
     { name: 'wipe', denied: { rule: 'mcp__fixture__wipe', source: SETTINGS }, asks: null, allowed: false },
   ]);
   assert.equal(implement.allowed.dontAsk, false, 'a step in no mode is not dontAsk');
-});
-
-test("a Bash rule covers another as Claude Code matches them: `*` any text, spaces included; `:*` a trailing ` *`, which matches the bare command too; no `*`, one command — the permissions docs' own examples, a colon anywhere but the end a colon, and a rule against a rule covering every command of the inner one", () => {
-  const cases: Array<[outer: string, inner: string, covers: boolean]> = [
-    ['ls *', 'ls -la', true],
-    ['ls *', 'ls', true],
-    ['ls *', 'lsof', false],
-    ['ls*', 'lsof', true],
-    ['ls:*', 'ls -la', true],
-    ['git log *', 'git log', true],
-    ['* --help *', 'npm --help x', true],
-    ['* --help *', 'npm --help', false],
-    ['git:* push', 'git push', false],
-    ['git:* push', 'git:x push', true],
-    ['git:*', 'git diff:*', true],
-    ['git diff:*', 'git:*', false],
-    ['npm run:*', 'npm run build', true],
-    ['npm run build', 'npm run:*', false],
-    ['npm test *', 'npm test', true],
-    ['npm test', 'npm test *', false],
-    ['npm run build', 'npm run build', true],
-    ['npx turbo run test:*', 'npx turbo run test build', true],
-    ['npx turbo run test build', 'npx turbo run test:*', false],
-    ['git *', 'git log *', true],
-    ['git log *', 'git *', false],
-  ];
-  for (const [outer, inner, covers] of cases) assert.equal(bashCovers(outer, inner), covers, `${outer} covers ${inner}: ${covers}`);
 });
 
 test('REFUSED: a deny takes back every allow whose commands it matches, however narrow the allow — a prefix, a bare command, the tool whole — and a narrower deny is an exception to the allow it falls in', async () => {
@@ -1299,16 +1232,7 @@ test("REFUSED: an ask rule over a server's tool makes it ask — not allowed, th
   );
 });
 
-test("the read-only commands are data of the day they were measured: the list's shape and its date pinned, and settings that allow some of them change nothing of it", async () => {
-  assert.deepEqual(Object.keys(READ_ONLY_COMMANDS), ['harness', 'version', 'measuredAt', 'source', 'measured', 'documented', 'docs']);
-  assert.deepEqual(
-    { harness: READ_ONLY_COMMANDS.harness, version: READ_ONLY_COMMANDS.version, measuredAt: READ_ONLY_COMMANDS.measuredAt },
-    { harness: 'Claude Code', version: '2.1.272', measuredAt: '2026-09-15' },
-  );
-  assert.deepEqual(READ_ONLY_COMMANDS.measured, ['cat', 'grep', 'head', 'ls', 'tail']);
-  assert.equal(readOnlyCommands('READ_ONLY_COMMANDS', READ_ONLY_COMMANDS), READ_ONLY_COMMANDS, 'the shipped list passes its own guard');
-  assert.equal(dated('MEASURED_TOOLS', MEASURED_TOOLS), MEASURED_TOOLS);
-
+test('the read-only commands are served as they were measured: settings that allow some of them change nothing of it', async () => {
   const repo = askingRepo({ allow: ['Bash(ls:*)', 'Bash(cat:*)'] });
   const { body } = await served(repo);
   assert.deepEqual(
@@ -1320,54 +1244,4 @@ test("the read-only commands are data of the day they were measured: the list's 
   assert.ok(review, JSON.stringify(body.steps.map((s) => s.step)));
   assert.deepEqual(review.readOnly, readOnlyAll(), 'each command still measured');
   assert.deepEqual(review.allowed.bash, [bashRule('Bash(ls:*)'), bashRule('Bash(cat:*)')], 'and the allows listed as allows');
-});
-
-/**
- * The shipped list `of`, with `key` set to `value` — or left out, for undefined — returned `as never`: not a measurement, on purpose,
- * so the readers are handed what their type refuses, to prove they refuse it at run time too.
- */
-const edited = (of: object, key: string, value?: unknown): never => {
-  const copy: Record<string, unknown> = { ...of };
-  if (value === undefined) delete copy[key];
-  else copy[key] = value;
-  return copy as never;
-};
-
-test('REFUSED: a measurement without a date, or a version, is refused by name with the fix — and a day not on the calendar, a list naming a command twice, or docs with no day read', () => {
-  const refuses = (run: () => unknown, pattern: RegExp) =>
-    assert.throws(
-      run,
-      (err: Error & { exitCode?: number }) =>
-        pattern.test(err.message) && err.exitCode === 2 && /give it the day it was taken|Fix the list/.test(err.message),
-    );
-  const R = READ_ONLY_COMMANDS;
-  refuses(
-    () => readOnlyCommands('READ_ONLY_COMMANDS', edited(R, 'measuredAt')),
-    /^READ_ONLY_COMMANDS has no `measuredAt` day written as 2026-09-15 \(null\)\./,
-  );
-  refuses(
-    () => readOnlyCommands('READ_ONLY_COMMANDS', edited(R, 'version')),
-    /^READ_ONLY_COMMANDS has no `version` numbered as 2\.1\.272 \(null\)\./,
-  );
-  refuses(
-    () => readOnlyCommands('READ_ONLY_COMMANDS', edited(edited(R, 'version', ''), 'measuredAt')),
-    /^READ_ONLY_COMMANDS has no `version` .*, no `measuredAt` day/,
-  );
-  refuses(() => readOnlyCommands('READ_ONLY_COMMANDS', edited(R, 'version', 'latest')), /no `version` numbered as 2\.1\.272 \("latest"\)/);
-  for (const day of ['2026-02-30', '2026-13-01', 'September 15', '2026-9-15', 'today']) {
-    refuses(() => readOnlyCommands('READ_ONLY_COMMANDS', edited(R, 'measuredAt', day)), /no `measuredAt` day written as 2026-09-15/);
-  }
-  refuses(() => dated('MEASURED_TOOLS', edited(MEASURED_TOOLS, 'measuredAt')), /^MEASURED_TOOLS has no `measuredAt` day/);
-  refuses(() => dated('MEASURED_TOOLS', edited(MEASURED_TOOLS, 'version')), /^MEASURED_TOOLS has no `version`/);
-  refuses(() => dated('MEASURED_TOOLS', edited(MEASURED_TOOLS, 'source', ' ')), /^MEASURED_TOOLS has no `source`/);
-  refuses(
-    () => readOnlyCommands('READ_ONLY_COMMANDS', edited(R, 'documented', [...R.documented, 'cat'])),
-    /^READ_ONLY_COMMANDS has cat listed twice\./,
-  );
-  refuses(() => readOnlyCommands('READ_ONLY_COMMANDS', edited(R, 'measured', [])), /no `measured` list of commands/);
-  refuses(() => readOnlyCommands('READ_ONLY_COMMANDS', edited(R, 'measured', ['cat -n'])), /no `measured` list of commands/);
-  refuses(
-    () => readOnlyCommands('READ_ONLY_COMMANDS', edited(R, 'docs', 'code.claude.com/docs/en/permissions')),
-    /no `docs` ending in the day they were read/,
-  );
 });

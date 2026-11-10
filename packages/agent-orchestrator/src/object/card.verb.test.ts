@@ -21,7 +21,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { eachTest } from '../../test/placed.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { engineOf } from '../runtime-client.ts';
-import { howOf } from '../command/pages.verb.ts';
+import { howOf } from '../summary/how.verb.ts';
 import { cardList, cardListOf, cardObject, cardObjectOf, type CardQuery } from './card.verb.ts';
 
 const engine = eachTest(testEngine);
@@ -276,4 +276,17 @@ test('a stray entry is listed, never hidden: under its file, with why it is no c
   const idea = walked[0];
   assert.equal(idea?.metadata.creationTimestamp, fs.statSync(path.join(inbox, 'idea.txt')).mtime.toISOString(), 'dated by its file');
   assert.equal(walked[3]?.metadata.creationTimestamp, fs.statSync(path.join(inbox, 'sub')).mtime.toISOString(), 'a folder by its own');
+});
+
+test('a card the listing read and that no longer parses when its text is read is listed all the same, its status saying why', () => {
+  const home = scratch('card-unparsed-');
+  const inbox = path.join(home, 'inbox');
+  fs.mkdirSync(inbox, { recursive: true });
+  fs.writeFileSync(path.join(inbox, 'alpha.md'), '---\nnot-a-key: 1\n---\nAlpha\n');
+  const read = inboxListing([{ file: 'alpha.md', text: aCard('Alpha') }], [], () => true);
+  const page = valueOf(Effect.runSyncExit(cardListOf(read, {}).pipe(Effect.provide(cardDoorFiles(home)), Effect.provide(stand().layer))));
+  const [alpha] = page.items;
+  assert.equal(alpha?.metadata.name, 'alpha');
+  assert.equal(alpha?.spec.body, undefined, 'no body of a text that does not parse');
+  assert.match(alpha?.status.error ?? '', /not-a-key/, 'why it does not parse, naming the key');
 });

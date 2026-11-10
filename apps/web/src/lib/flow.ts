@@ -9,7 +9,9 @@
  *
  * Opened, the card grows to the right and holds every step as a tile (`tilesOf`), on the same layering with nothing folded.
  */
-import type { RunGraph, RunSummary } from './api';
+import type { RunGraph } from './api/graph.ts';
+import type { Frozen } from './frozen.ts';
+import type { RunView } from './api/judged.ts';
 import { edgesOf, loopPath, movingInto, type EdgeState, type EdgeStep } from './canvas.ts';
 import { layers, stepsOf, type Point } from './layout.ts';
 import { waitsAtGate, settledState, stepState, type StepState } from './status.ts';
@@ -39,7 +41,7 @@ export type Pill = {
  * are, and to come otherwise. `round`: on a loop edge past its first round, the round it is on (`loopLabel`) and where its words
  * go, under the middle of the curve; null otherwise.
  */
-export type Arrow = {
+type Arrow = {
   id: string;
   from: string;
   to: string;
@@ -54,9 +56,9 @@ export type Arrow = {
 export type Flow = { pills: Pill[]; arrows: Arrow[]; width: number; height: number; error: string | null };
 
 /** The most columns the rail shows, fold pills counted: four boxes and their arrows across a card. */
-export const RAIL_SLOTS = 4;
+const RAIL_SLOTS = 4;
 /** The most pills a column of the rail shows, the one counting the rest included. */
-export const RAIL_LANES = 3;
+const RAIL_LANES = 3;
 /** How wide the rail may be: the card's inside (`CARD_WIDTH`, `w-88`, less its padding). */
 export const RAIL_WIDTH = 328;
 
@@ -66,7 +68,7 @@ const RAIL = { box: 110, height: 20, gap: 16, lane: 6, over: 12, under: 14 };
 export const TILE = { width: 176, height: 88, gap: 32, lane: 12, over: 18, under: 22 };
 
 /** A run's steps as its flow reads them, off the list's record of it: each one's name, its state, its note and whether its round is due. */
-export const flowSteps = (run: Pick<RunSummary, 'steps' | 'cancelledAt'> & { holding?: RunSummary['holding'] }): EdgeStep[] =>
+export const flowSteps = (run: Pick<RunView, 'steps' | 'cancelledAt'> & { holding?: RunView['holding'] }): EdgeStep[] =>
   run.steps.map((step) => ({
     name: step.name,
     state: stepState(step, run.cancelledAt !== null, run.holding != null),
@@ -79,8 +81,9 @@ export const flowSteps = (run: Pick<RunSummary, 'steps' | 'cancelledAt'> & { hol
  * an api older than the board listed with no graph: the list is read tolerantly (`onYouOf`), so each card says what to do rather than the
  * floor refusing every run.
  */
-export function columnsOf(names: readonly string[], graph: RunGraph): { columns: string[][]; error: string | null } {
-  if (!Array.isArray((graph as Partial<RunGraph> | undefined)?.edges)) return { columns: names.map((name) => [name]), error: UNGRAPHED };
+function columnsOf(names: readonly string[], graph: Frozen<RunGraph>): { columns: string[][]; error: string | null } {
+  if (!Array.isArray((graph as Partial<Frozen<RunGraph>> | undefined)?.edges))
+    return { columns: names.map((name) => [name]), error: UNGRAPHED };
   try {
     return { columns: layers(stepsOf(names, graph.edges)), error: null };
   } catch (err) {
@@ -92,11 +95,11 @@ export function columnsOf(names: readonly string[], graph: RunGraph): { columns:
 export const UNGRAPHED = "Listed without its steps' graph by an api older than this board: restart the api, then reload the page.";
 
 /** Where the run is now: at work, or waiting on a person. Nothing is, on a run somebody called off. */
-export const isLiveStep = (state: StepState, cancelled: boolean): boolean =>
+const isLiveStep = (state: StepState, cancelled: boolean): boolean =>
   !cancelled && (movingInto(state) || state === 'asks-in-session' || waitsAtGate(state, false));
 
 /** The column the rail is centred on: the first with a step live, else the first with a step not done, else the last. */
-export function liveColumn(columns: readonly string[][], stateOf: (name: string) => StepState, cancelled: boolean): number {
+function liveColumn(columns: readonly string[][], stateOf: (name: string) => StepState, cancelled: boolean): number {
   const live = columns.findIndex((column) => column.some((name) => isLiveStep(stateOf(name), cancelled)));
   if (live >= 0) return live;
   const todo = columns.findIndex((column) => column.some((name) => !settledState(stateOf(name))));
@@ -122,7 +125,7 @@ type Box = Omit<Pill, 'x' | 'y' | 'width' | 'height'>;
 type Sizes = { width: number; height: number; gap: number; lane: number; over: number; under: number };
 
 /** The rail a card holds at rest: the columns around where the run is, each of at most `RAIL_LANES` pills. */
-export function railOf(names: readonly string[], graph: RunGraph, steps: readonly EdgeStep[], cancelled: boolean): Flow {
+export function railOf(names: readonly string[], graph: Frozen<RunGraph>, steps: readonly EdgeStep[], cancelled: boolean): Flow {
   const { columns, error } = columnsOf(names, graph);
   const stateOf = stateReader(steps);
   const { start, end } = windowOf(columns.length, liveColumn(columns, stateOf, cancelled));
@@ -136,7 +139,7 @@ export function railOf(names: readonly string[], graph: RunGraph, steps: readonl
 }
 
 /** The tiles an open card holds: every step, on the layering, nothing folded. */
-export function tilesOf(names: readonly string[], graph: RunGraph, steps: readonly EdgeStep[], cancelled: boolean): Flow {
+export function tilesOf(names: readonly string[], graph: Frozen<RunGraph>, steps: readonly EdgeStep[], cancelled: boolean): Flow {
   const { columns, error } = columnsOf(names, graph);
   const boxOf = boxer(stateReader(steps), cancelled);
   return arrange(
@@ -201,7 +204,7 @@ function capped(
  * two steps' own boxes: back into a fold it would say nothing a person could follow. Room over the row only when an arrow arcs
  * over it, and under it only when a loop does.
  */
-function arrange(slots: readonly Box[][], size: Sizes, graph: RunGraph, steps: readonly EdgeStep[], error: string | null): Flow {
+function arrange(slots: readonly Box[][], size: Sizes, graph: Frozen<RunGraph>, steps: readonly EdgeStep[], error: string | null): Flow {
   const boxOf = new Map(slots.flatMap((slot, s) => slot.flatMap((box) => box.names.map((name) => [name, { box, slot: s }] as const))));
   const joined = new Map<string, { from: Box; to: Box; loop: boolean; states: EdgeState[]; skip: boolean; label: string | null }>();
   if (error === null) {

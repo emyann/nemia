@@ -1,10 +1,10 @@
 /**
  * The words the builder writes by. The names, judged before a byte is written: a workflow's, one folder directly in the store's
- * `workflows/`, and a schema's, a `.json` file directly in that folder, each refusal a sentence naming the fix (400). And what a step's
- * form is drawn from, by key: how each is set (`KeyKind`, `KINDS`) and the words a key of a fixed list may be set to (`WORDS`).
+ * `workflows/`, and a schema's, a `.json` file directly in that folder, each refusal a sentence naming the fix (400). And the words a
+ * key of a fixed list may be set to (`WORDS`); how each key is set is objects' (`STEP_KEY_FORM`).
  */
 import { AGENTS_FOLDER, DENIALS, SLOTS, WORKSPACES, type StepKey } from 'agent-orchestrator/workflow';
-import { PLACE_KINDS } from 'objects';
+import { PLACE_KINDS, type StepKeyForm } from 'objects';
 
 /**
  * Why `name` cannot be a folder of yours (400), or undefined: a name the listing would show, one folder directly in the store's
@@ -40,61 +40,8 @@ export function schemaNameRefusal(file: string): string | undefined {
   return undefined;
 }
 
-/**
- * How a key is set on a step's form, which is what its value is in JSON: `steps`, a list of the workflow's steps (`after`, `input`);
- * `step`, one of them (`resume`, `loop`); `choice`, one of `choices` (`harness`); `harness-word`, one of the words the step's harness takes
- * (`byHarness`: `effort`, `permissionMode`, `sandbox` — a harness absent from `byHarness` takes no such key); `text`, one line (`model`,
- * `check`); `list`, names (`tools`, `disallowedTools`); `count`, a whole number; `dollars`, an amount; `tokens`, a number of tokens, which
- * the form writes as a person does (`context`, `200k`); `flag`, `true` or `false` as `choices` has them (`remote`, `gate`);
- * `schema`, a file beside the step (`output`). `place` is a `choice` of its words, `git` and `folder`; `workspace` of one, `base`, `slot`
- * of one, `none`, and `denials` of one, `fail`, since a step either says it or says nothing. `agent` is a `choice` of the agents in yours'
- * `agents/`, the only folder the builder writes the steps of.
- */
-export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'list' | 'count' | 'dollars' | 'tokens' | 'flag' | 'schema';
-
-/**
- * Each key's kind, in `STEP_KEYS`' order: a key added to the package without one does not typecheck. `count` is the package's `COUNTS`,
- * which it does not export: `builder.test.ts` holds this copy to the parser, which refuses exactly those keys as "not a count".
- */
-export const KINDS: Readonly<Record<StepKey, KeyKind>> = {
-  after: 'steps',
-  resume: 'step',
-  input: 'steps',
-  place: 'choice',
-  workspace: 'choice',
-  writable: 'list',
-  reads: 'list',
-  slot: 'choice',
-  agent: 'choice',
-  skills: 'list',
-  mcp: 'list',
-  harness: 'choice',
-  model: 'text',
-  effort: 'harness-word',
-  context: 'tokens',
-  permissionMode: 'harness-word',
-  sandbox: 'harness-word',
-  tools: 'list',
-  disallowedTools: 'list',
-  allowedTools: 'list',
-  denials: 'choice',
-  remote: 'flag',
-  deadlineSeconds: 'count',
-  memory: 'text',
-  budget: 'dollars',
-  check: 'text',
-  retries: 'count',
-  gate: 'flag',
-  output: 'schema',
-  tally: 'list',
-  loop: 'step',
-  rounds: 'count',
-  routes: 'list',
-  route: 'text',
-  when: 'list',
-  ends: 'list',
-  workflow: 'text',
-};
+/** How a key is set on a step's form: objects' word (`StepKeyForm`, each key's in `STEP_KEY_FORM`), under the name the board reads. */
+export type KeyKind = StepKeyForm;
 
 /** A flag that says either word. */
 const EITHER = ['true', 'false'] as const;

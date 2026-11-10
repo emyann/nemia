@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { DaemonDot } from '@/lib/footer';
-import type { Quota, QuotaWindow } from '@/lib/api';
+import type { Quota, QuotaWindow } from '@/lib/api/quota';
 import type { Strip } from '@/lib/strip';
 import { StripView } from './OverviewStrip';
 

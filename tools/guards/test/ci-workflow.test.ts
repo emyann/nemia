@@ -47,6 +47,8 @@ import {
   allowlistStep,
   SCAN,
   SCAN_CONFIG,
+  SCAN_STEP,
+  scanStep,
   shardRunStep,
   stallDrift,
   staleStep,
@@ -60,6 +62,42 @@ import {
 } from './ci-workflow.ts';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
+
+/**
+ * What an Actions expression reads: the contexts it names (`github.ref`, `matrix.workspace`, `needs`), the functions it calls, the
+ * string literals it compares with and its comparison operators. The guard holds an expression to what it reads, never to its spelling,
+ * so a space or a quote style moved is no drift.
+ */
+type Reads = { contexts: string[]; calls: string[]; literals: string[]; operators: string[] };
+
+/** What the one expression `${{ … }}` that is all of `text` reads, or `undefined` where `text` is not one expression. */
+export function readsOf(text: unknown): Reads | undefined {
+  const whole = /^\$\{\{([^}]*)\}\}$/.exec(String(text).trim());
+  if (!whole) return undefined;
+  const body = whole[1];
+  const literals = [...body.matchAll(/'((?:[^']|'')*)'/g)].map(([, value]) => value.replaceAll("''", "'"));
+  const bare = body.replace(/'(?:[^']|'')*'/g, ' ');
+  const words = [...bare.matchAll(/([A-Za-z_][\w-]*(?:\.[\w*-]+)*)\s*(\()?/g)];
+  return {
+    contexts: words
+      .filter(([, , call]) => !call)
+      .map(([, word]) => word)
+      .filter((word) => !['true', 'false', 'null'].includes(word)),
+    calls: words.filter(([, , call]) => call).map(([, word]) => word),
+    literals,
+    operators: [...bare.matchAll(/[!=<>]=|&&|\|\||[<>!]/g)].map(([operator]) => operator),
+  };
+}
+
+/** The expression after `flag` in `run` (`--filter=${{ … }}`, `--shard ${{ … }}`), as what it reads. */
+const flagReads = (run: string, flag: string): Reads | undefined => {
+  const found = new RegExp(`${flag}[ =](\\$\\{\\{[^}]*\\}\\})`).exec(run);
+  return found ? readsOf(found[1]) : undefined;
+};
+
+/** Whether `reads` reads `context` and nothing else, through no function. */
+const readsOnly = (reads: Reads | undefined, context: string): boolean =>
+  reads !== undefined && reads.contexts.length === 1 && reads.contexts[0] === context && reads.calls.length === 0;
 
 /** What `cancel-in-progress` must read, as the sentence that refuses another value spells it out. */
 const SPARED = "${{ github.ref != 'refs/heads/main' }}";
@@ -487,7 +525,7 @@ function nameDrift(workflow: Workflow): string[] {
  */
 function filterDrift(workflow: Workflow): string[] {
   return (workflow.jobs[LEGS]?.steps ?? [])
-    .filter((step) => step.run?.includes('turbo run test') === true && !step.run.includes(FILTERED))
+    .filter((step) => step.run?.includes('turbo run test') === true && !readsOnly(flagReads(step.run, '--filter'), 'matrix.workspace'))
     .map(
       (step) =>
         `the ${LEGS} job's suite run under TZ=${String(step.env?.TZ)} in ${FILE} does not pass ${FILTERED}: every leg would run the same package's suite, and the legs report a workspace they never tested`,
@@ -506,7 +544,11 @@ function verdictDrift(workflow: Workflow): string[] {
     ];
   const [step] = steps as [Step];
   const sentences: string[] = [];
-  if (!Object.values(step.env ?? {}).includes(RESULTS))
+  const givesResults = (value: string): boolean => {
+    const reads = readsOf(value);
+    return reads !== undefined && reads.calls.join() === 'toJSON' && reads.contexts.join() === 'needs';
+  };
+  if (!Object.values(step.env ?? {}).some(givesResults))
     sentences.push(
       `the ${GATE} job's step in ${FILE} is not given ${RESULTS} in its env: without it the step reads no result, and the ${GATE} context says nothing about the jobs it needs`,
     );
@@ -517,13 +559,22 @@ function verdictDrift(workflow: Workflow): string[] {
   return sentences;
 }
 
-/** The one expression that cancels a branch's superseded run and spares every run of main, as the owner chose at the gate. */
-const SPARES_MAIN = /^\$\{\{\s*github\.ref\s*!=\s*'refs\/heads\/main'\s*\}\}$/;
+/** Whether `value` is the one expression that cancels a branch's superseded run and spares every run of main, as the owner chose. */
+const sparesMain = (value: unknown): boolean => {
+  const reads = readsOf(value);
+  return (
+    reads !== undefined &&
+    reads.contexts.join() === 'github.ref' &&
+    reads.literals.join() === 'refs/heads/main' &&
+    reads.operators.join() === '!=' &&
+    reads.calls.length === 0
+  );
+};
 
 /** A `cancel-in-progress` that does not spare main: `true` cancels a landing's run, and anything else cancels nothing or is unreadable. */
 function cancelDrift(workflow: Workflow): string[] {
   const value = workflow.concurrency?.['cancel-in-progress'];
-  return SPARES_MAIN.test(String(value))
+  return sparesMain(value)
     ? []
     : [
         `concurrency.cancel-in-progress in ${FILE} reads ${String(value)}: write it ${SPARED} so a branch's superseded run is cancelled and every push to main keeps its own run, since the ${GATE} gate reads a cancelled job as a failure and a landing that was never tested would report red`,
@@ -574,8 +625,11 @@ function shardDrift(workflow: Workflow, pages: readonly string[]): string[] {
       `the ${E2E} job in ${FILE} has no step that runs \`${E2E_COMMAND}\`: give it one passing ${SHARD_FLAG} ${OF_FLAG}, or the job reports green having visited no page`,
     );
   else
-    for (const flag of [SHARD_FLAG, OF_FLAG])
-      if (!run.includes(flag))
+    for (const [flag, name, context] of [
+      [SHARD_FLAG, '--shard', 'matrix.shard'],
+      [OF_FLAG, '--of', 'strategy.job-total'],
+    ] as const)
+      if (!readsOnly(flagReads(run, name), context))
         sentences.push(
           `the ${E2E} job's run of \`${E2E_COMMAND}\` in ${FILE} does not pass ${flag}: write it \`${E2E_COMMAND} -- ${SHARD_FLAG} ${OF_FLAG}\`, or the shards visit the wrong pages — every leg the same one, or a count adrift from the legs, and the pages of a shard nobody runs are never visited`,
         );
@@ -677,7 +731,7 @@ function buildDrift(workflow: Workflow, generated: readonly string[] = GENERATED
       `${FILE} has no ${BUILD} job: add the job that runs ${BUILT.map((built) => `\`${built.command}\``).join(' and ')} and then refuses a diff of ${generated.join(' and ')}, or a generated file committed stale passes CI and fails a person's typecheck`,
     ];
   const runs = runSteps(workflow, BUILD)
-    .filter((step) => step.name !== STALE_STEP)
+    .filter((step) => step.id !== STALE_STEP)
     .map((step) => step.run ?? '')
     .join('\n');
   sentences.push(
@@ -689,7 +743,7 @@ function buildDrift(workflow: Workflow, generated: readonly string[] = GENERATED
   const stale = staleStep(workflow)?.run;
   if (stale === undefined)
     sentences.push(
-      `the ${BUILD} job in ${FILE} has no step named ${STALE_STEP}: give it the step that refuses a diff of ${generated.join(' and ')} by name, which ci-build.boundary.test.ts runs as GitHub runs it`,
+      `the ${BUILD} job in ${FILE} has no step with id: ${STALE_STEP}: give it the step that refuses a diff of ${generated.join(' and ')} by name, with that id, which ci-build.boundary.test.ts runs as GitHub runs it`,
     );
   else
     sentences.push(
@@ -848,9 +902,13 @@ function scanDrift(workflow: Workflow, config: string): string[] {
     sentences.push(
       `the ${SCAN} job in ${FILE} does not check the download against a sha256: give the step env SHA256 with the 64-digit hash from that release's gitleaks_<version>_checksums.txt and pipe it to \`sha256sum --check --strict -\`, or a third party's bytes run here unverified`,
     );
+  if (scanStep(workflow) === undefined)
+    sentences.push(
+      `the ${SCAN} job in ${FILE} has no step with id: ${SCAN_STEP}: give that id to the step that scans the push's new commits, which ci-scan.boundary.test.ts runs as GitHub runs it`,
+    );
   if (allowlistStep(workflow) === undefined)
     sentences.push(
-      `the ${SCAN} job in ${FILE} has no step named "${ALLOWLIST_STEP}": add back the step that scans a fixture with the pinned binary, with ${SCAN_CONFIG} and without it, and refuses unless the stub shapes are allowed at their one path and nothing else is. It is the only thing that proves what ${SCAN_CONFIG} allows, since a configuration's meaning is not in its text`,
+      `the ${SCAN} job in ${FILE} has no step with id: ${ALLOWLIST_STEP}: add back, with that id, the step that scans a fixture with the pinned binary, with ${SCAN_CONFIG} and without it, and refuses unless the stub shapes are allowed at their one path and nothing else is. It is the only thing that proves what ${SCAN_CONFIG} allows, since a configuration's meaning is not in its text`,
     );
   sentences.push(
     ...SCAN_FLAGS.filter((flag) => !runs.includes(flag)).map(
@@ -1506,7 +1564,7 @@ test('REFUSED: no build job, a generator not run, a staleness step that names on
       steps.some((step) => step.run?.includes(command) === true),
       `the build job runs \`${command}\` today`,
     );
-    ungenerated.jobs[BUILD].steps = steps.filter((step) => step.name === STALE_STEP || step.run?.includes(command) !== true);
+    ungenerated.jobs[BUILD].steps = steps.filter((step) => step.id === STALE_STEP || step.run?.includes(command) !== true);
     assert.deepEqual(buildDrift(ungenerated), [
       `the build job in .github/workflows/ci.yml does not run \`${command}\`: it is what writes ${writes}, so without it the staleness ` +
         'step reads the committed bytes against themselves and refuses nothing',
@@ -1517,24 +1575,39 @@ test('REFUSED: no build job, a generator not run, a staleness step that names on
   const stale = staleStep(half);
   assert.ok(stale?.run !== undefined, `the build job has its ${STALE_STEP} step today`);
   stale.run = stale.run.replaceAll('apps/web/theme/', '');
-  assert.deepEqual(buildDrift(half), [
-    "the build job's Refuse a stale generated file step in .github/workflows/ci.yml does not name apps/web/theme/: a generator " +
-      'rewrites it, so add it to the paths the step diffs, or a stale apps/web/theme/ reports green',
-  ]);
+  const halved = buildDrift(half);
+  assert.equal(halved.length, 1, halved.join('\n'));
+  assert.match(halved[0], /^the build job's stale step in \.github\/workflows\/ci\.yml does not name apps\/web\/theme\//);
 
-  assert.deepEqual(buildDrift(shipped, ['apps/web/src/routeTree.gen.ts', 'apps/web/no-such-generated-file.ts']), [
-    'GENERATED in ci-workflow.ts names apps/web/no-such-generated-file.ts, which this repository does not have: a step that diffs a ' +
-      'path that is not there refuses nothing, so write the path the generator writes, or take it off the list',
-    "the build job's Refuse a stale generated file step in .github/workflows/ci.yml does not name apps/web/no-such-generated-file.ts: " +
-      'a generator rewrites it, so add it to the paths the step diffs, or a stale apps/web/no-such-generated-file.ts reports green',
-  ]);
+  const unlisted = buildDrift(shipped, ['apps/web/src/routeTree.gen.ts', 'apps/web/no-such-generated-file.ts']);
+  assert.equal(unlisted.length, 2, unlisted.join('\n'));
+  assert.match(
+    unlisted[0],
+    /^GENERATED in ci-workflow\.ts names apps\/web\/no-such-generated-file\.ts, which this repository does not have/,
+  );
+  assert.match(unlisted[1], /^the build job's stale step in .* does not name apps\/web\/no-such-generated-file\.ts/);
 
   const unnamed = structuredClone(shipped);
-  unnamed.jobs[BUILD].steps = (unnamed.jobs[BUILD].steps ?? []).filter((step) => step.name !== STALE_STEP);
-  assert.deepEqual(buildDrift(unnamed), [
-    'the build job in .github/workflows/ci.yml has no step named Refuse a stale generated file: give it the step that refuses a diff of ' +
-      'apps/web/src/routeTree.gen.ts and apps/web/theme/ by name, which ci-build.boundary.test.ts runs as GitHub runs it',
-  ]);
+  unnamed.jobs[BUILD].steps = (unnamed.jobs[BUILD].steps ?? []).filter((step) => step.id !== STALE_STEP);
+  const dropped = buildDrift(unnamed);
+  assert.equal(dropped.length, 1, dropped.join('\n'));
+  assert.match(dropped[0], /^the build job in \.github\/workflows\/ci\.yml has no step with id: stale/);
+});
+
+test('REFUSED: a ci.yml whose step a guard reads by its id has that id renamed, the step and its name left as they were', () => {
+  const text = workflowText();
+  for (const [id, drift] of [
+    [STALE_STEP, (workflow: Workflow) => buildDrift(workflow)],
+    [ALLOWLIST_STEP, (workflow: Workflow) => scanDrift(workflow, readConfig())],
+    [SCAN_STEP, (workflow: Workflow) => scanDrift(workflow, readConfig())],
+  ] as const) {
+    assert.deepEqual(drift(readWorkflow(text)), [], `the step with id: ${id} is found today`);
+    const renamed = text.replace(new RegExp(`^(\\s+)id: ${id}$`, 'm'), `$1id: ${id}-renamed`);
+    assert.notEqual(renamed, text, `ci.yml has a step with id: ${id}`);
+    const refused = drift(readWorkflow(renamed));
+    assert.equal(refused.length, 1, refused.join('\n'));
+    assert.match(refused[0], new RegExp(`has no step with id: ${id}\\b`));
+  }
 });
 
 test('REFUSED: no scan job, a download unpinned or unchecked, a scan without its flags, a shallow checkout, a self-check dropped, and an allowlist global, unnested or adrift', () => {
@@ -1620,12 +1693,10 @@ test('REFUSED: no scan job, a download unpinned or unchecked, a scan without its
 
   const unproven = structuredClone(shipped);
   assert.ok(allowlistStep(unproven) !== undefined, 'the scan job proves its own allowlist today');
-  unproven.jobs[SCAN].steps = (unproven.jobs[SCAN].steps ?? []).filter((step) => step.name !== ALLOWLIST_STEP);
-  assert.deepEqual(scanDrift(unproven, config), [
-    `the gitleaks job in .github/workflows/ci.yml has no step named "${ALLOWLIST_STEP}": add back the step that scans a fixture with ` +
-      `the pinned binary, with ${SCAN_CONFIG} and without it, and refuses unless the stub shapes are allowed at their one path and ` +
-      `nothing else is. It is the only thing that proves what ${SCAN_CONFIG} allows, since a configuration's meaning is not in its text`,
-  ]);
+  unproven.jobs[SCAN].steps = (unproven.jobs[SCAN].steps ?? []).filter((step) => step.id !== ALLOWLIST_STEP);
+  const unprovenDrift = scanDrift(unproven, config);
+  assert.equal(unprovenDrift.length, 1, unprovenDrift.join('\n'));
+  assert.match(unprovenDrift[0], /^the gitleaks job in \.github\/workflows\/ci\.yml has no step with id: allowlist:/);
 
   const global = [
     '[extend]',

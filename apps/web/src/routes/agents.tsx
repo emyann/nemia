@@ -5,7 +5,9 @@ import { LinkButton } from '@/components/ui/button';
 import { AgentCard } from '../components/agent/AgentCard';
 import { SkillLink } from '../components/agent/AgentParts';
 import { routeLink } from '../components/nav/routeLink';
-import { agentsQuery, skillsQuery, storeQuery, type LibraryAgent, type SkillPlace } from '../lib/api';
+import { agentsQuery, type LibraryAgent } from '../lib/api/agents.ts';
+import { skillsQuery, type SkillPlace } from '../lib/api/skills.ts';
+import { storeQuery } from '../lib/api/store.ts';
 import { PLACE_LABELS } from '../lib/skills';
 
 export const Route = createFileRoute('/agents')({

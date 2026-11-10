@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { replaceFile } from '../../core/replace.ts';
 
 /** Claude Code's own `.claude.json`: in `CLAUDE_CONFIG_DIR` when it is set, else beside `~/.claude`, read at call time. */
 export const claudeConfigFile = (): string =>
@@ -42,13 +43,14 @@ export const claudeTrusts = (dir: string, file: string = claudeConfigFile()): bo
 };
 
 /** What `claudeTrustText` answers: the key is already set, the text that sets it, or why the text given cannot be rewritten. */
-export type TrustText = { readonly trusted: true } | { readonly text: string } | { readonly unread: string };
+type TrustText = { readonly trusted: true } | { readonly text: string } | { readonly unread: string };
 
 /**
  * The text of a `.claude.json` with `projects[key].hasTrustDialogAccepted` set to true and nothing else changed in what it holds:
  * `projects` and the entry made where absent, the entry's other keys kept, written with two spaces and the last line break the text
  * had. Answers `trusted` where the key is already true, and `unread` for a text that is no JSON object, or whose `projects` or entry
  * for `key` is no object. Pure.
+ * Exported only for the tests that import it.
  */
 export function claudeTrustText(text: string, key: string): TrustText {
   let parsed: unknown;
@@ -69,7 +71,7 @@ export function claudeTrustText(text: string, key: string): TrustText {
 }
 
 /** What `claudeTrust` answers: whether it wrote the key, and why it could not where it neither wrote it nor found it set. */
-export type TrustWritten = { readonly wrote: boolean; readonly refused: string | null };
+type TrustWritten = { readonly wrote: boolean; readonly refused: string | null };
 
 /** The bytes of `file`, or null where there is none. */
 const bytesOf = (file: string): Buffer | null => {
@@ -104,15 +106,13 @@ function created(file: string, key: string): boolean {
  * through `read`, and renamed over it where nothing changed. False, and nothing left beside it, where another writer got there first.
  */
 function replaced(file: string, was: Buffer, text: string, read: (file: string) => Buffer | null): boolean {
-  const beside = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.trust`);
-  fs.writeFileSync(beside, text, { mode: fs.statSync(file).mode });
-  const now = read(file);
-  if (now === null || !now.equals(was)) {
-    fs.rmSync(beside, { force: true });
-    return false;
-  }
-  fs.renameSync(beside, file);
-  return true;
+  return replaceFile(file, text, {
+    mode: fs.statSync(file).mode,
+    still: () => {
+      const now = read(file);
+      return now !== null && now.equals(was);
+    },
+  });
 }
 
 /**

@@ -125,10 +125,15 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
  * `agent-orchestrator/run` is one more for `out-of-memory/out-of-memory.ts`, the judgement and the words of a session or a check killed
  * at its memory limit, which `list/list.ts` appends to a step's note: pure, importing nothing but its contract's types, and a leaf of its
  * own so that the listing does not load `views/views-words.ts` and the timeline behind it.
+ *
+ * Each is five more since a harness declares what it can do, once, in the runtime: the vocabulary door now reads every harness's
+ * declaration, so `harness/declaration.ts`, `harness/claude/rules.ts`, `harness/command/vocabulary.ts`, `a2a/vocabulary.ts` and
+ * `core/own.ts`, which `harness/reach.ts` reads a fence word's reach by, load with it: all five pure, importing nothing but each other's
+ * declarations and their contracts' types, and none touching a disk.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 192, effect: 15 },
-  'agent-orchestrator/workflow': { all: 141, effect: 15 },
+  'agent-orchestrator/run': { all: 197, effect: 15 },
+  'agent-orchestrator/workflow': { all: 146, effect: 15 },
 };
 
 const isEffectModule = (url: string): boolean => url.includes('/node_modules/effect/');

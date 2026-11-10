@@ -36,7 +36,7 @@ holds what every change needs.
   (`agent-orchestrator`, `agent-runtime`, `objects`, `api`, `web`, `cli`, `guards`, `templates`). Typecheck and lint run whole: they are cheap. Implement's round check runs the
   declarations, the typecheck and the lint, and pushes the round's commit and waits on GitHub's `ci` context, which runs the whole
   suite on it (`packages/templates/sdlc/workflows/build/implement.md`); the landing's check runs no suite at all — it is the receipt that
-  the pull request `ci` judged was merged (`packages/templates/sdlc/workflows/build/landing.ts`), then a wait on main's own `ci` at the
+  the pull request `ci` judged was merged (`packages/templates/sdlc/carried/landing.ts`), then a wait on main's own `ci` at the
   merge commit, so a landing that turns main red fails its land step — so no step's suite reads the merged tree, and main's own `ci`
   is the last word on it; a session runs the whole suite only to measure it, as the e2e's rule says.
   A failing test it did not run is the check's refusal, answered in the next try. Outside a run no check
@@ -88,13 +88,14 @@ holds what every change needs.
   holds it, the spellings it retired, each with its card), which the docs' Glossary page draws one section per context
   (`apps/docs/src/glossary.ts`). Read the table of the context you change before you name something there. A renamed word keeps its
   old spelling as `retired` on its row, and `tools/guards/test/glossary.test.ts` counts that spelling in each file under the table's
-  paths, a count that only shrinks (`tools/guards/test/glossary.baseline.ts`). A row cites each path from the repository's root
+  paths except those its row lists as `kept`, each with why; a rename still in flight holds its counts in
+  `tools/guards/test/glossary.baseline.ts`, which only shrinks. A row cites each path from the repository's root
   (`packages/agent-orchestrator/src/folder/folder.model.ts`, never `src/folder/folder.model.ts`), and a change to a table runs the
   docs' tests, `node --test test/*.test.ts` in `apps/docs`: they read every table by a glob, so grepping the tests for its path does
   not find them.
 - **A field that says a state or a kind at a door is a closed union of its words, never `string`**: a `phase`, `status`, `state`,
   `kind`, `type` or `reason` an entry of a package's `exports` or a type of the api reaches. A sentence a person reads is a `message`.
-  Held by `tools/guards/test/closed-state.test.ts`, through the TypeScript checker, whose baseline only shrinks.
+  Held by `tools/guards/test/closed-state.test.ts`, through the TypeScript checker, with no exception.
 - **Level-triggered.** A tick reads the world, decides, acts, and carries nothing between passes. A guard that only fires on a
   transition is wrong after a restart.
 - **Prose is not a constraint.** If the packages need an agent to do something, the machinery refuses the alternative.
@@ -117,10 +118,10 @@ holds what every change needs.
   refuses the push and the delete (a `dontAsk` agent's: no allow reaches them; `packages/templates/test/fences.test.ts`).
   `.claude/settings.json` denies none of it: pushing and opening a pull request are the person's, or done by their session when they ask.
   What a step may not type, the run does in its place, as two frozen scripts read from the run's frozen workflow files
-  (`$WF_WORKFLOW_FILES`, the copy of its workflow folder the run took when it began; out of git while that is unset) and run with
-  `node`, never as a tool a fence could not tell apart: `packages/templates/sdlc/workflows/build/pull-request.ts` pushes a run's own
-  branch and opens or updates its pull request, and `packages/templates/sdlc/workflows/build/landing.ts` merges that pull request
-  and fast-forwards the checkout (`quick` carries copies of both, held equal by `packages/templates/test/scripts-equal.test.ts`). The
+  (`$WF_CARRIED_FILES`, the copy of the template's `carried/` folder the run took when it began, beside its workflow's; out of git while that is unset) and run with
+  `node`, never as a tool a fence could not tell apart: `packages/templates/sdlc/carried/pull-request.ts` pushes a run's own
+  branch and opens or updates its pull request, and `packages/templates/sdlc/carried/landing.ts` merges that pull request
+  and fast-forwards the checkout (`build` and `quick` both run them, kept once there; `packages/templates/test/check-scripts.test.ts` holds every check to the folder its variable names). The
   one exception to the rule is a run's ending step (a workflow's last step, `workspace: base`), filed once a person approves it — or,
   where its workflow puts before it a step that can send the work back (`loop:`), once that step passes, which is how `quick` lands with no gate at all; an ending with a `check:` and
   neither of the two is refused at load (`validateBaseWorkspace`, `src/workflow/validate.ts`). It runs `landing.ts merge`, which refuses
@@ -137,62 +138,25 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   precedence, and the routing rule that says which layer owns a new instruction (*Where a new instruction goes*).
 - An agent's questions are an output field `{ "x-shape": "questions" }`, expanded by `packages/agent-orchestrator/src/question/question.ts`.
 - Its checks are *Check your work*; a new agent of sdlc is named in *Where things are*.
-- **Every agent of sdlc's team reads the repository through git.** The four read-only ones (Seldon, Agora, Iris, Argus, each `dontAsk`,
-  which no allow from a step reaches) carry the same read-only git set on their own `allowedTools:` in
-  `packages/templates/sdlc/agents/`, a list of their `claude:` block's fence (`claude: { fence: … }`) as is each `disallowedTools:` below,
-  and each holds the place's `git` skill on its
-  `skills:`; the two writers (Grace, Otto) run `auto` and need no allow. Nothing in the set writes
-  the repository's history, its refs or its configuration — `git merge-tree` writes a loose object and no ref, and `git status` and
-  `git describe --dirty` refresh the worktree's index and rewrite it when they can take its lock — and `git push` stays refused by the
-  writers' `disallowedTools:`, Grace's held equal to Otto's. The set holds `cat`, `head`, `tail`, `wc`, `cut` and `ls` too, each kept
-  inside the working tree by Claude Code's own check of a path and `wc --files0-from` by `Bash(wc *--f*)`; `sed`, `awk`, `find`, `sort`,
-  `uniq` and `tee` stay out, each able to write a file or run a program. **What the set would let git write a file or run a program by is denied
-  beside it**, on each of the four, and so on every step of theirs, whose `disallowedTools:` adds to its agent's, since no allow rule
-  can exclude an option and an allow is matched with a leading assignment stripped: `Bash(git grep *O*)` and `Bash(git grep *--op*)`
-  for the pager option, which runs a
-  command on the files that matched (every short spelling carries a capital `O`, git bundling it after other short options; every long
-  one carries `--op`, since git takes any unambiguous abbreviation and `--o` alone it refuses), and `Bash(*GIT_*)` for every assignment
-  of git's environment — `GIT_EXTERNAL_DIFF`, and `diff.external` through `GIT_CONFIG_COUNT` — which is the fence under the "never
-  `VAR=`" these roles' skills already say. `Bash(*=* git *)` beside it refuses any assignment before git, an `=` anywhere before ` git` in the part as typed: `HOME`
-  and `XDG_CONFIG_HOME` name no variable of git's, yet move the configuration git reads to a folder the change under review can carry,
-  whose `diff.external` or `core.pager` git runs; a search for a word holding `=` stays open, its `=` after `git`. The leading `*` is the point of that last one, as it is for the collector's `Bash(*:4318*)`:
-  a deny is matched against the part as typed, and without it the rule reaches only a part that *opens* `GIT_`, so a first assignment
-  naming something else, or a `nohup` or `timeout` before it, would carry the whole of git's environment through. `Bash(git
-  *--output*)` refuses `--output=<file>`, which `diff`, `diff-tree`, `log`, `show`, `rev-list`, `blame` and `shortlog` take and which
-  creates or truncates the file it names, written anywhere after `git`: a deny that names it right after the verb misses it later in
-  the line. **What the set would let git read outside the repository by is denied too**, by name: `Bash(git *--no-ind*)` for
-  `--no-index` on `diff` and `grep` (`grep` takes it down to `--no-ind`), `Bash(git blame *--con*)` for `blame --contents <file>` (taken
-  down to `--con`), and `Bash(git grep -f*)` and `Bash(git grep * -f*)` for `grep -f <file>`, a word that opens `-f` (2.43's `grep` has
-  no `--file`). A path outside the working tree no deny can tell apart: `git diff ../outside f` or `git diff /etc/hostname f` compares
-  the two files with no option typed, and a bundled `git grep -nf <file>` is a word no glob tells from a pattern. These denies hold
-  the forms as typed and no other: a Bash rule matches the text, so a spelling the shell rejoins — quoted (`--out''put`), escaped
-  (`--out\put`), brace-split or put together from a `$` — passes each of them, and what the set writes or runs by such a spelling is open until something reads the line as the shell does. Adding a verb to the set means asking
-  what file it can be made to write and what program it can be made to run. **Agora alone allows `gh pr view` and `gh pr checks`**, the
-  pull request its review reads on GitHub, rendered on either way sdlc lands, and the four deny beside the set every other form they
-  reach: `Bash(gh *--web*)` and `Bash(gh * -w*)` for a browser, `Bash(gh *--watch*)`, which never returns, `Bash(gh *--jq*)` and
-  `Bash(gh * -q*)`, whose jq reads the process's environment, `Bash(gh *--template*)` and `Bash(gh * -t*)`, `Bash(gh *--repo*)`,
-  `Bash(gh * -R*)` and `Bash(gh *//*)` for another repository, `Bash(gh * -c*)`, after which a short option bundles, and `Bash(*=* gh
-  *)` for any assignment before gh (`GH_PAGER`, `PAGER`, `BROWSER`, `GH_CONFIG_DIR`, `HOME`). They are on all four because a settings
-  allow of gh reaches every step, and
-  a spelling the shell rejoins passes these as it passes git's. **The four allow `Bash(nemia propose *)`**, a definition change their
-  work needs proposed rather than named in a closeout, and deny `Bash(*=* nemia *)`, any assignment before nemia, so a session cannot
-  drop its `WF_SESSION_TOKEN` and act as the person (`docs/architecture.md`, *The caller is the session token's to say*), both held by
-  the two tests named below, the deny shown refusing a dropped token on planted lines. The set is on the agents rather than in
-  `.claude/settings.json` so
-  that the team travels to a factory that is not this checkout; `packages/templates/test/fences.test.ts` holds sdlc's rules as written
-  and the four lines equal, and `packages/agent-orchestrator/test/agent-fences.test.ts`, on planted lines, every read open, every write
-  refused and every spelling of `--output` and of a read outside it can read refused. The nemia factory's overlays, in its own tree
-  out of git (sdlc names no command of this repository), deny too on each step of the four what the settings and shadcn's skill allow
-  that writes the workspace or runs the suite: shadcn's CLI in each spelling an allow reaches (`npx shadcn@latest`, `pnpm dlx`, `bunx --bun`), its one read being the
-  board's pinned `npx shadcn view` the settings allow, and `npm test`; intake and the janitor, which run no test, `node --test` and `npx
-  turbo run test` besides, while design and review keep the checks their notes name and are refused a build on that line
-  (`npx turbo run test *build*`) and a file of the e2e's (`node --test *e2e/*`, the folder: the board's `test/e2e-*.test.ts` stay open). Design and review measure by the compiler and the linter, which the settings allow
-  (`npx tsrs --noEmit`, the compiler `ci` judges with, `npx tsc --noEmit` where tsc 6 is still wanted, `npx oxlint`), and deny on that
-  line what would write or watch, each compiler's options by their first letters in each case, since it reads an option's name in any
-  case and after one dash or two, and tsrs's fast mode, whose verdict may differ from the pinned TypeScript's, by `--fast` and by
-  `TSRS_FAST` (`Bash(*=* npx tsrs *)`, any assignment before tsrs, as for git and gh); intake and the janitor deny all three whole.
-  Each of the
-  four is told, in one paragraph they hold equal, to put a refused call its work needs at the top of its sign-off, never only in a risk.
+- **Every agent of sdlc's team reads the repository through git**, and the rules that fence it are sdlc's own: the lines several agents
+  share are in `packages/templates/sdlc/fences/`, each with its reason beside it — the read-only four's read set and what it would let
+  git or gh write, run or read outside by (`read-only.allow.yaml`, `read-only.deny.yaml`), the writers' refusals (`writers.deny.yaml`,
+  Grace's and Otto's one list), the browser's — and each agent names the files its role takes. Read a file's reasons before you add a
+  verb or a deny: a verb is added by asking what file it can be made to write and what program it can be made to run. The denies hold
+  the spellings as typed: one the shell rejoins (quoted, escaped, brace-split, built from a `$`) passes them. Agora alone allows `gh pr
+  view` and `gh pr checks`. A refused call goes at the top of a sign-off (sdlc's `RULES.md`). `packages/templates/test/fences.test.ts`
+  holds the agents to the files and proves on their rendered fences, through the test kit's matcher (`test-kit/fence`), each read open
+  and each write refused; `packages/agent-orchestrator/test/agent-fences.test.ts` proves, on the same lines, what each deny refuses
+  spelling by spelling. The set is on the agents, not in `.claude/settings.json`, so the team travels to a factory that is not this
+  checkout. The nemia factory's overlays, in its own tree out of git (sdlc names no command of this repository), deny too on each step
+  of the four what the settings and shadcn's skill allow that writes the workspace or runs the suite: shadcn's CLI in each spelling an
+  allow reaches (`npx shadcn@latest`, `pnpm dlx`, `bunx --bun`), its one read being the board's pinned `npx shadcn view` the settings
+  allow, and `npm test`; intake and the janitor, which run no test, `node --test` and `npx turbo run test` besides, while design and
+  review keep the checks their notes name and are refused a build on that line (`npx turbo run test *build*`) and a file of the e2e's
+  (`node --test *e2e/*`, the folder: the board's `test/e2e-*.test.ts` stay open). Design and review measure by the compiler and the
+  linter, which the settings allow (`npx tsrs --noEmit`, the compiler `ci` judges with, `npx tsc --noEmit` where tsc 6 is still
+  wanted, `npx oxlint`), and deny on that line what would write or watch, each compiler's options by their first letters in each case,
+  and tsrs's fast mode by `--fast` and by `TSRS_FAST` (`Bash(*=* npx tsrs *)`); intake and the janitor deny all three whole.
 - **In the nemia factory, build's design writes the contracts its spec adds** (`change-a-contract`): the factory's own copy of Seldon,
   in its tree out of git, adds `Write, Edit` to its tools and allows `Edit(packages/*/contracts/*.contract.ts)` and
   `Edit(apps/*/contracts/*.contract.ts)`, a contract directly under a package's or an app's `contracts/` and no other file, each path

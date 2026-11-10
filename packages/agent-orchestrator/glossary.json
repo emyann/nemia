@@ -13,7 +13,61 @@
       "retired": [
         {
           "spelling": "accept",
-          "card": "decision 7: two verbs answer a waiting step, approve and retry"
+          "card": "decision 7: two verbs answer a waiting step, approve and retry",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/command/command.ts",
+              "why": "`nemia accept` is a row of `RENAMED`, taken with a hint naming `approve`"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/admission/admission.ts",
+              "why": "names the former verb in its doc of what `RENAMED` takes"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/record/record.store.ts",
+              "why": "the file a loop's end writes keeps its name, `accept-<step>-<n>`, so a record on disk still reads"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/record/record.ts",
+              "why": "the record's names for what a loop's end writes, as the files on disk are named"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/round/round.ts",
+              "why": "the file a loop's end writes, and the word's own sense: a person accepts the work as it stands"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/round/round.verb.ts",
+              "why": "`acceptAsk`, the record's name for what a loop's end writes"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/gate/commands.verb.ts",
+              "why": "`acceptRun`, the record's name for what a loop's end writes, and the former verb named in its doc"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/gate/form.verb.ts",
+              "why": "the former verb named in its doc"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/gate/gate.ts",
+              "why": "the word's own sense: what the step's work would accept"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/brief/brief-sections.ts",
+              "why": "the word's own sense: a person accepts the closeout of a try"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/status/status.ts",
+              "why": "the word's own sense, in a doc"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/nemia/level.verb.ts",
+              "why": "the word's own sense: a session accepts a prompt"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/trust/trust.ts",
+              "why": "the word's own sense: a person accepts a prompt of trust"
+            }
+          ]
         }
       ],
       "see": {
@@ -99,7 +153,13 @@
       "retired": [
         {
           "spelling": "factory plan",
-          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+          "card": "decision 8: one spelling to list, to read one thing, and to remove",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/command/command.ts",
+              "why": "a row of `RENAMED`, which still runs a line that says the former spelling, with a hint naming the new one"
+            }
+          ]
         }
       ]
     },
@@ -114,7 +174,33 @@
       "retired": [
         {
           "spelling": "workspace: main",
-          "card": "decision 9: the step format says workspace: base, main read as its former spelling"
+          "card": "decision 9: the step format says workspace: base, main read as its former spelling",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/factory/applied/render.ts",
+              "why": "the former spelling read on purpose (`baseSpelled`, `baseLine`, `baseWritten`), so a step file written before the rename still loads"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/folder/folder.store.ts",
+              "why": "the former spelling read on purpose (`baseSpelled`, `baseLine`, `baseWritten`), so a step file written before the rename still loads"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/former/former.ts",
+              "why": "the former spelling read on purpose (`baseSpelled`, `baseLine`, `baseWritten`), so a step file written before the rename still loads"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/step/step.ts",
+              "why": "the former spelling read on purpose (`baseSpelled`, `baseLine`, `baseWritten`), so a step file written before the rename still loads"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/template/draft.ts",
+              "why": "the former spelling read on purpose (`baseSpelled`, `baseLine`, `baseWritten`), so a step file written before the rename still loads"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/workflow/step-file.ts",
+              "why": "the former spelling read on purpose (`baseSpelled`, `baseLine`, `baseWritten`), so a step file written before the rename still loads"
+            }
+          ]
         }
       ]
     },
@@ -213,7 +299,13 @@
       "retired": [
         {
           "spelling": "template check",
-          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+          "card": "decision 8: one spelling to list, to read one thing, and to remove",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/command/command.ts",
+              "why": "a row of `RENAMED`, which still runs a line that says the former spelling, with a hint naming the new one"
+            }
+          ]
         }
       ]
     },
@@ -264,7 +356,17 @@
       "retired": [
         {
           "spelling": "cordon",
-          "card": "resource objects, P9: the leftover words — cordon is the pause, auto's rules are policy, one LABEL_KEYS, no needs-human above the runtime"
+          "card": "resource objects, P9: the leftover words — cordon is the pause, auto's rules are policy, one LABEL_KEYS, no needs-human above the runtime",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/pause/pause.store.ts",
+              "why": "the store's pause file keeps its name, `PAUSE_FILE`, so a pause put before the rename still stands and is lifted"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/record/record.store.ts",
+              "why": "`readRun` drops the key a record of that time may hold"
+            }
+          ]
         }
       ]
     },
@@ -386,15 +488,33 @@
       "retired": [
         {
           "spelling": "agents remove",
-          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+          "card": "decision 8: one spelling to list, to read one thing, and to remove",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/command/command.ts",
+              "why": "a row of `RENAMED`, which still runs a line that says the former spelling, with a hint naming the new one"
+            }
+          ]
         },
         {
           "spelling": "workflows remove",
-          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+          "card": "decision 8: one spelling to list, to read one thing, and to remove",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/command/command.ts",
+              "why": "a row of `RENAMED`, which still runs a line that says the former spelling, with a hint naming the new one"
+            }
+          ]
         },
         {
           "spelling": "policy drop",
-          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+          "card": "decision 8: one spelling to list, to read one thing, and to remove",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/command/command.ts",
+              "why": "a row of `RENAMED`, which still runs a line that says the former spelling, with a hint naming the new one"
+            }
+          ]
         }
       ]
     },
@@ -422,7 +542,13 @@
       "retired": [
         {
           "spelling": "agents try",
-          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+          "card": "decision 8: one spelling to list, to read one thing, and to remove",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/command/command.ts",
+              "why": "a row of `RENAMED`, which still runs a line that says the former spelling, with a hint naming the new one"
+            }
+          ]
         }
       ]
     },
@@ -555,7 +681,17 @@
       "retired": [
         {
           "spelling": "nudge",
-          "card": "decision 7, slice C: nudge becomes continue in the store and on the wire"
+          "card": "decision 7, slice C: nudge becomes continue in the store and on the wire",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/command/command.ts",
+              "why": "`RENAMED_FLAGS` and `RENAMED_VALUES` take `nemia retry --nudge` and an api body's former mode with a hint"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/retry/retry-ask.ts",
+              "why": "`FORMER_MODES`, through which a record and an ask file written before the rename still read"
+            }
+          ]
         }
       ],
       "see": {

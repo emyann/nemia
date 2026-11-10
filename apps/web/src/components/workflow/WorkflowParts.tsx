@@ -4,7 +4,8 @@
  */
 import type { ReactNode } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { storeQuery, type WorkflowListing } from '../../lib/api';
+import { storeQuery } from '../../lib/api/store.ts';
+import { type WorkflowListing } from '../../lib/api/workflows.ts';
 import { FACTORY_WAY, fromWord, type ListPlace } from '../../lib/factories';
 import { repoName } from '../../lib/factory';
 import { container } from '../../lib/meaning';

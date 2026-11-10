@@ -12,6 +12,9 @@ import { claudeCodeOps, type Attached } from '../harness/claude/index.ts';
 import { DEFAULT_HARNESSES } from './default-harnesses.ts';
 import { memoryQuantityRefusal } from '../core/memory.ts';
 import { detachedOps, type HarnessSpec } from '../harness/detached/detached.ts';
+import { CAPABILITIES, type HarnessDeclaration } from '../harness/declaration.ts';
+import { CLAUDE_DECLARATION } from '../harness/claude/vocabulary.ts';
+import { REMOTE_DECLARATION } from '../a2a/vocabulary.ts';
 import { telemetered, telemetryRefusalOf, type Telemetry } from '../harness/telemetry.ts';
 import {
   holderRefusal,
@@ -257,8 +260,6 @@ export const handleOf = (events: readonly Event[], attempt: number): string | un
 export const isSpec = (h: HarnessConfig): h is HarnessSpec => typeof h === 'object' && 'command' in h;
 /** A remote A2A agent: an object that is neither a spec (`command`) nor a runner (`spawn`). */
 export const isRemote = (h: HarnessConfig): h is RemoteAgent => typeof h === 'object' && h !== null && !('command' in h) && !('spawn' in h);
-/** Claude Code as the engine runs it itself. */
-export const isClaude = (h: HarnessConfig): h is 'claude' => h === 'claude';
 
 /**
  * `task` with the engine's default limits written on where it was filed with no `resources` of its own, as a LimitRange's default is
@@ -276,56 +277,94 @@ export const limitedBy = <T extends TaskSpec & { harness: string }>(
 };
 
 /**
+ * What the harness `h` declares it can do: Claude Code's declaration for the literal `'claude'`, a spec's own `can` (with its range of
+ * windows), a remote agent's (`REMOTE_DECLARATION`, which takes no task's config of ours) — and `undefined` for a `RunnerOps` brought as
+ * its own, the consumer's, which is asked nothing. Every check of what a harness takes reads this, never the harness's kind or name.
+ */
+export const declarationOf = (h: HarnessConfig): HarnessDeclaration | undefined =>
+  h === 'claude'
+    ? CLAUDE_DECLARATION
+    : isSpec(h)
+      ? { can: h.can, ...(h.contextTokens === undefined ? {} : { contextTokens: h.contextTokens }) }
+      : isRemote(h)
+        ? REMOTE_DECLARATION
+        : undefined;
+
+/** What `runnersOf` builds each harness with, beside the harnesses themselves: each read by the harnesses that need it. */
+type RunnersGiven = {
+  /** The store's root, under which each harness keeps its registry. */
+  root: string;
+  /** A remote agent's secrets, and the words for one not given (`EngineOptions`). */
+  credentials?: Credentials;
+  missingCredential?: MissingCredential;
+  /** Where each spawn exports its telemetry (`telemetered`). */
+  telemetry?: Telemetry;
+  /** The sessions Claude Code holds attached, in this process. */
+  attached?: Attached;
+  /** The Claude Code a session runs, where it is not the Agent SDK's own. */
+  claudeExecutable?: string;
+  /** The slice each limited session's scope is made in. */
+  cgroupParent?: string;
+};
+
+/**
  * Each configured harness as the seam's value, by name: composed into one `Runner`, and asked directly for a task's logs. With
  * `telemetry`, each spawn is told where to export (`telemetered`).
  */
-export const runnersOf = (
-  harnesses: Record<string, HarnessConfig>,
-  root: string,
-  credentials?: Credentials,
-  missingCredential?: MissingCredential,
-  telemetry?: Telemetry,
-  attached?: Attached,
-  claudeExecutable?: string,
-  cgroupParent?: string,
-): Record<string, RunnerOps> =>
+export const runnersOf = (harnesses: Record<string, HarnessConfig>, given: RunnersGiven): Record<string, RunnerOps> =>
   Object.fromEntries(
     Object.entries(harnesses).map(([name, h]): [string, RunnerOps] => {
-      const ops = runnerOf(name, h, root, credentials, missingCredential, attached, claudeExecutable, cgroupParent);
-      return [name, telemetry ? telemetered(ops, telemetry) : ops];
+      const ops = runnerOf(name, h, given);
+      return [name, given.telemetry ? telemetered(ops, given.telemetry) : ops];
     }),
   );
 
 /** The harness `h`, configured under `name`, as the seam's value. */
-const runnerOf = (
-  name: string,
-  h: HarnessConfig,
-  root: string,
-  credentials?: Credentials,
-  missingCredential?: MissingCredential,
-  attached?: Attached,
-  claudeExecutable?: string,
-  cgroupParent?: string,
-): RunnerOps =>
-  h === 'claude'
+const runnerOf = (name: string, h: HarnessConfig, given: RunnersGiven): RunnerOps => {
+  const { root, credentials, missingCredential, attached, claudeExecutable, cgroupParent } = given;
+  return h === 'claude'
     ? claudeCodeOps({ root, ...(claudeExecutable ? { claudeExecutable } : {}), ...(cgroupParent ? { cgroupParent } : {}) }, attached)
     : isSpec(h)
       ? detachedOps(h, root, cgroupParent ? { cgroupParent } : {})
       : isRemote(h)
         ? remoteOps(name, h, root, credentials, undefined, { missingCredential })
         : h;
+};
 
 /**
- * Which of `harnesses` a holder can hold: the names configured as the literal `'claude'`, and no other. Those are the sessions one
- * process holds attached, and the only ones another process cannot read live off the files both engines share — a remote agent's are
- * the other party's, a detached one's and a command's are on the store. One rule, read by what a holder serves (`servingOf` in
- * `engine.ts`), by what `holder` may name (`holdersRefusalOf`), and by a layer above that configures a viewer off the runtime's door:
- * a copy of the literal elsewhere drifts the day the rule changes.
+ * Which of `harnesses` a holder can hold: those whose declaration declares `hold` — Claude Code configured as the literal `'claude'`, and
+ * no other the runtime ships. Those are the sessions one process holds attached, and the only ones another process cannot read live off
+ * the files both engines share — a remote agent's are the other party's, a detached one's and a command's are on the store. One rule,
+ * read by what a holder serves (`servingOf` in `engine.ts`), by what `holder` may name (`holdersRefusalOf`), and by a layer above that
+ * configures a viewer off the runtime's door: a copy of it elsewhere drifts the day the rule changes.
  */
 export const heldHarnessesOf = (harnesses: Record<string, HarnessConfig>): string[] =>
   Object.entries(harnesses)
-    .filter(([, h]) => h === 'claude')
+    .filter(([, h]) => declarationOf(h)?.can.includes('hold') === true)
     .map(([name]) => name);
+
+/** The booleans a `HarnessSpec` said what it takes by, before its `can` list replaced them: each refused at `Engine.layer`, by name. */
+const RETIRED_SPEC_FIELDS = ['claudeFlags', 'codexArgs', 'commandArgs', 'env', 'projectMcp', 'enabledSkills', 'mounts', 'callAdmission'];
+
+/**
+ * Why a spec's declaration cannot be read, or `undefined`: a boolean `can` replaced, which would be read as nothing; a `can` that is no
+ * list of capability words; a range of windows with no `contextTokens` in `can`, or that word with no range.
+ */
+const specRefusalOf = (name: string, h: HarnessSpec): string | undefined => {
+  const retired = RETIRED_SPEC_FIELDS.find((field) => Object.hasOwn(h, field));
+  if (retired !== undefined) {
+    return `the \`${name}\` harness's spec carries \`${retired}\`, which a spec no longer says what it takes by: list it in \`can\` instead (\`can: ['${retired === 'mounts' ? 'readOnlyMount' : retired}', ...]\`, the words of \`CAPABILITIES\`), and take \`${retired}\` off.`;
+  }
+  const can: unknown = h.can;
+  const stray = Array.isArray(can) ? can.find((word) => !(CAPABILITIES as readonly unknown[]).includes(word)) : undefined;
+  if (!Array.isArray(can) || stray !== undefined) {
+    return `the \`${name}\` harness's spec has the \`can\` ${JSON.stringify(stray ?? can) ?? String(can)}, which is no list of what a harness takes. Give \`can\` the words of \`CAPABILITIES\` it takes, like \`['env', 'memoryLimit']\`, or \`[]\` for none.`;
+  }
+  if (can.includes('contextTokens') !== (h.contextTokens !== undefined)) {
+    return `the \`${name}\` harness's spec ${h.contextTokens === undefined ? 'lists `contextTokens` in `can` with no range of windows' : 'gives a range of `contextTokens` its `can` does not list'}: give both, \`can: ['contextTokens', ...]\` and \`contextTokens: { least, most }\`, or neither.`;
+  }
+  return undefined;
+};
 
 /**
  * Why one of `options.holder`'s names cannot be taken, or `undefined`: the first `holderRefusal` refuses, in the options' order.
@@ -378,7 +417,8 @@ const limitsRefusalOf = (options: Omit<EngineOptions, 'root'>): string | undefin
 
 /**
  * Why the harness `name` cannot be taken as given, or `undefined`: a word other than `'claude'` — `'claude-bg'`, the `claude --bg`
- * road a former runtime had, named with what replaced it — a `pool` that is not a name, and a remote agent's config.
+ * road a former runtime had, named with what replaced it — a `pool` that is not a name, a spec's declaration (`specRefusalOf`) and a
+ * remote agent's config.
  */
 const harnessConfigRefusalOf = (name: string, h: HarnessConfig): string | undefined => {
   if ((h as unknown) === 'claude-bg') {
@@ -391,6 +431,7 @@ const harnessConfigRefusalOf = (name: string, h: HarnessConfig): string | undefi
   if (Object.hasOwn(pooled, 'pool') && (typeof pooled.pool !== 'string' || !pooled.pool.trim())) {
     return `the \`${name}\` harness names the \`pool\` ${JSON.stringify(pooled.pool) ?? String(pooled.pool)}, which is not a name. Give the name of the pool its sessions share a ceiling in, or leave it out for a pool of its own.`;
   }
+  if (typeof h === 'object' && h !== null && isSpec(h)) return specRefusalOf(name, h);
   const { pool: _, ...agent } = pooled;
   return typeof h === 'object' && h !== null && isRemote(h) ? remoteConfigRefusal(name, agent) : undefined;
 };
@@ -398,9 +439,10 @@ const harnessConfigRefusalOf = (name: string, h: HarnessConfig): string | undefi
 /**
  * Why an engine cannot be built from these options, in a sentence that says what to do instead — or `undefined`. Asked of the options as
  * handed in, untyped, and refuses, in this order: a `sayTimeoutMs`, which no harness reads now; a `maxConcurrent` that is not a whole
- * number from 1; a harness named by a word other than `'claude'`, or brought as an object whose `pool` is not a name; a remote agent's
- * entry `remoteConfigRefusal` refuses, its `pool` aside; a `holder` entry `holderRefusal` refuses; an `unschedulable`, a `credentials` or a
- * `missingCredential` that is not a function; and a `telemetry` that names no collector.
+ * number from 1; a harness named by a word other than `'claude'`, or brought as an object whose `pool` is not a name; a spec whose `can`
+ * cannot be read, or that carries a boolean `can` replaced (`specRefusalOf`); a remote agent's entry `remoteConfigRefusal` refuses, its
+ * `pool` aside; a `holder` entry `holderRefusal` refuses; an `unschedulable`, a `credentials` or a `missingCredential` that is not a
+ * function; and a `telemetry` that names no collector.
  */
 export const optionsRefusalOf = (options: Omit<EngineOptions, 'root'>): string | undefined => {
   if (Object.hasOwn(options, 'sayTimeoutMs')) {

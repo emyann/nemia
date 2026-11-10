@@ -11,16 +11,14 @@
 import type { FramedFor, SpeakerNameRefusal, SpeakerRefusal, WithSpeaker, WithoutSpeaker } from '../../contracts/speaker.contract.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import type { EnginePhase } from '../views/views-words.ts';
-import type { SaidAfter } from 'objects';
+import type { CallState, ChatFrom, SaidAfter } from 'objects';
 
 /**
- * Who a message is from: the task's agent (`agent`), the person, the keeper, whose words are a quiet marker, or another agent that
- * wrote to the task in its chat under a name the person allowed (`peer`, the message carrying its `name`).
+ * Who a message is from (`ChatFrom`, objects' `CHAT_FROM`): the task's agent (`agent`), the person, the keeper, whose words are a quiet
+ * marker, or another agent that wrote to the task in its chat under a name the person allowed (`peer`, the message carrying its `name`);
+ * and where a tool call stands (`CallState`, objects' `CALL_STATES`): done, at work, failed, not begun, or waiting on the person.
  */
-export type ChatFrom = 'agent' | 'person' | 'keeper' | 'peer';
-
-/** Where a tool call stands: done, at work, failed, not begun, or waiting on the person. */
-export type CallState = 'done' | 'running' | 'error' | 'pending' | 'waits';
+export type { CallState, ChatFrom };
 
 /**
  * One event of a chat, unique by its `id`:

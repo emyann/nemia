@@ -67,7 +67,7 @@ export function labelsRefusal(labels: Labels): string | undefined {
 }
 
 /** One edit of a map, as kubectl spells it: `key=value` sets the key, `key-` removes it. */
-export type LabelEdit =
+export type LabelChange =
   | { readonly key: string; readonly op: 'set'; readonly value: string }
   | { readonly key: string; readonly op: 'remove' };
 
@@ -78,11 +78,11 @@ const EDIT_FORM = 'label edits are key=value to set a key and key- to remove one
  * The edits `texts` spell, or the refusal of the first that is wrong: a word that is neither `key=value` nor `key-`, a key or a value
  * a label cannot hold, and one key edited twice in one list, which says nothing of which edit wins. Pure.
  */
-export function parseLabelEdits(texts: readonly string[]): { readonly edits: readonly LabelEdit[] } | { readonly refused: string } {
-  const edits: LabelEdit[] = [];
+export function parseLabelEdits(texts: readonly string[]): { readonly edits: readonly LabelChange[] } | { readonly refused: string } {
+  const edits: LabelChange[] = [];
   for (const text of texts) {
     const at = text.indexOf('=');
-    const edit: LabelEdit | undefined =
+    const edit: LabelChange | undefined =
       at > 0
         ? { key: text.slice(0, at), op: 'set', value: text.slice(at + 1) }
         : at < 0 && text.length > 1 && text.endsWith('-')
@@ -113,7 +113,7 @@ export const labelEdits: LabelEdits = (current, edits, overwrite) => {
 };
 
 /** `current` with each edit applied: a set writes its key, a remove deletes it. */
-function applied(current: Labels, edits: readonly LabelEdit[]): Labels {
+function applied(current: Labels, edits: readonly LabelChange[]): Labels {
   const out: Record<string, string> = { ...current };
   for (const edit of edits) {
     if (edit.op === 'set') out[edit.key] = edit.value;
@@ -139,7 +139,7 @@ export type Inherited = { readonly labels: Labels; readonly leftOut: readonly Le
 export function inheritedLabels(input: {
   readonly parents: readonly ParentLabels[];
   readonly card?: Labels;
-  readonly edits?: readonly LabelEdit[];
+  readonly edits?: readonly LabelChange[];
 }): Inherited {
   const card = input.card ?? {};
   const edits = input.edits ?? [];

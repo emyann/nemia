@@ -29,7 +29,8 @@ process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 
 type AgentListing = import('./agents.ts').AgentListing;
-type AgentSaved = import('./agents.ts').AgentSaved;
+/** What the board read of a write of an agent before the Agent object: the agent as it now reads, and its files. */
+type AgentSaved = { agent: AgentListing; written: string[]; removed: string[] };
 
 const STORE = path.join(root, 'workflows');
 const AGENTS = path.join(STORE, 'agents');
@@ -44,7 +45,7 @@ fs.cpSync(path.join(TEAM, 'dev'), path.join(STORE, 'dev'), { recursive: true });
 const json = { 'content-type': 'application/json' };
 /**
  * A request this story wrote for the routes the Agent object replaced (`/api/agents/<from>[/<name>[/card]]`), sent to the object's path
- * in `default` (definitions/agents.ts): a draft's `body` and `schema` sent as the spec's `instructions` and `output`, its `version` and a
+ * in `default` (agents/handlers.ts): a draft's `body` and `schema` sent as the spec's `instructions` and `output`, its `version` and a
  * new `name` as `metadata`, a removal's `version` as `?resourceVersion=`, and a read's place as `?origin=`. An Agent answered is read as
  * `{ agent }`, the listing the story asserts on (`asListing`); a refusal as it is.
  */
@@ -273,7 +274,7 @@ test('a person reads the agents: both places listed, one read by name, the card 
   await s.test('an agent is answered as an A2A Agent Card, with what it leaves out said beside it and never inside it', async () => {
     const res = await readAt('/api/agents/repo/reviewer/card');
     assert.equal(res.status, 200, await res.clone().text());
-    const answer = (await res.json()) as import('./agents.ts').AgentCardAnswer;
+    const answer = (await res.json()) as import('objects').AgentCard;
     assert.equal(answer.servedOverA2A, false);
     assert.match(answer.why, /Nothing here serves reviewer over A2A/);
     assert.match(answer.why, /`supportedInterfaces` REQUIRED/);

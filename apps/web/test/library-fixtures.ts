@@ -6,18 +6,11 @@
  */
 import type { Agent, Skill, Workflow } from 'objects';
 import { writtenStepOf } from '../src/lib/api/workflows.ts';
-import type {
-  AgentListing,
-  AgentSkill,
-  KeyForm,
-  LibraryAgent,
-  SkillDetail,
-  SkillPlace,
-  SkillRow,
-  WorkflowListing,
-  WorkflowStepPage,
-  WorkflowStepSpec,
-} from '../src/lib/api.ts';
+import type { AgentListing, LibraryAgent } from '../src/lib/api/agents.ts';
+import type { AgentSkill, WorkflowStepSpec } from '../src/lib/api/library.ts';
+import type { KeyForm } from '../src/lib/api/builder.ts';
+import type { SkillDetail, SkillPlace, SkillRow } from '../src/lib/api/skills.ts';
+import type { WorkflowListing, WorkflowStepPage } from '../src/lib/api/workflows.ts';
 
 /** A card entry that says every key the A2A protocol has. */
 export const skillEntry = (extra: Partial<AgentSkill> = {}): AgentSkill => ({

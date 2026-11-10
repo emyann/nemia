@@ -16,7 +16,7 @@ import {
 } from '../frontmatter/frontmatter.ts';
 import { ALLOW_EXAMPLE, BUDGET_EXAMPLE, DISALLOW_EXAMPLE, TOOLS_EXAMPLE } from '../keys/index.ts';
 import type { AgentOwnKey, HarnessPrompt, RoleKey } from '../agents/agents.ts';
-import { DEFAULT_HARNESS, fenceKeysOf, HARNESS_FENCE_KEYS } from '../harness/harness.ts';
+import { DEFAULT_HARNESS, fenceKeyOf, fenceKeysOf, HARNESS_FENCE_KEYS } from '../harness/harness.ts';
 import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
 
 /**
@@ -74,7 +74,7 @@ export function codexSandboxNamed<K extends string>(
   harness: string | undefined,
 ): Partial<Record<K | 'permissionMode' | 'sandbox', string>> {
   const word = meta.permissionMode;
-  if (harness !== 'codex' || word === undefined) return meta;
+  if (fenceKeyOf(harness) !== 'sandbox' || word === undefined) return meta;
   if (meta.sandbox !== undefined) {
     refuse(
       `${file}: \`permissionMode: ${word}\` and \`sandbox: ${meta.sandbox}\` are both set, and on codex they are one key: \`permissionMode:\` is the former name of a codex step's sandbox, and \`sandbox:\` is Codex's own name for it. Keep the \`sandbox:\` line and delete the other.`,

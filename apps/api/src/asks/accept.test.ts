@@ -20,7 +20,7 @@ import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
-import type { RunDecision } from '../decide/decision.ts';
+import type { RunDecision } from 'objects';
 import { acceptFile, acceptRun, list, roundRun, runStore } from 'agent-orchestrator';
 import { story } from 'test-kit/checkpoints';
 import { objectOf, stepOf } from '../../test/run-reads.ts';
@@ -157,15 +157,20 @@ const refusedWith = async (res: Response, status: number, said: string): Promise
 };
 
 test('POST …/approve of a loop: what it refuses — a body, a run or step not there, words missing or empty, a loop the package will not end — and nothing written', async (t) => {
-  await t.test('a body that is not an acceptance is a 400, naming what it takes', async () => {
-    const bodies: Array<[unknown, RegExp]> = [
-      ['not json', /^POST …\/approve takes a JSON body/],
-      [[WHY], /^POST …\/approve takes a JSON object/],
-      [null, /^POST …\/approve takes a JSON object/],
-      [{ message: 42 }, /^`message`[^]*was 42/],
-      [{ message: null }, /^`message`[^]*was null/],
+  await t.test('a body `RunApprove` does not read is a 400, naming the key it refused', async () => {
+    const bodies: Array<[unknown, string]> = [
+      ['not json', 'payload'],
+      [[WHY], 'payload'],
+      [null, 'payload'],
+      [{ message: 42 }, 'payload.message'],
+      [{ message: null }, 'payload.message'],
     ];
-    for (const [body, fact] of bodies) assert.match(await refusedWith(await acceptOver('review', body), 400, JSON.stringify(body)), fact);
+    for (const [body, field] of bodies) {
+      const res = await acceptOver('review', body);
+      assert.equal(res.status, 400, JSON.stringify(body));
+      const said = (await res.json()) as { field?: string };
+      assert.ok(said.field?.startsWith(field), `${JSON.stringify(body)} names ${field}: ${JSON.stringify(said)}`);
+    }
     nothingWritten('a body that is not an acceptance');
   });
 

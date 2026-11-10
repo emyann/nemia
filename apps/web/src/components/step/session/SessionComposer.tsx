@@ -13,7 +13,7 @@
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Composer } from '@/components/conversation/Composer';
-import { sayToStep, type Said } from '@/lib/api';
+import { sayToStep, type Said } from '@/lib/api/asks';
 import { useRunNamespace } from '@/lib/runNamespace';
 import { mark } from '@/lib/conversation';
 

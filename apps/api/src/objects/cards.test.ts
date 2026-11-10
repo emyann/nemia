@@ -1,14 +1,14 @@
 /**
  * The cards group served (src/objects): a page walked by `continue` answers each card once, in name order, its `remainingItemCount`
  * counting down, and refuses a limit or a token that is not one; the namespaces are the cards' factories, `default` those that name none;
- * `labelSelector` and its retired spelling select alike; and every write is guarded before its body is read.
+ * `labelSelector` and its retired spelling select alike. The guard before every write is `test/guarded.test.ts`'s.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Card, CardList } from 'objects';
+import { TABLE_ACCEPT, type Card, type CardList, type Table } from 'objects';
 import { app } from '../app.ts';
 
 const inbox = path.join(root, 'inbox');
@@ -77,31 +77,6 @@ test('?labelSelector= and the retired ?selector= select the same cards, and a ma
     by,
   );
   assert.equal((await app.request('/api/cards?labelSelector=team%20in%20(core')).status, 422);
-});
-
-/** Each write of the cards group, by its method and path. */
-const WRITES = [
-  ['POST', '/api/namespaces/default/cards'],
-  ['DELETE', '/api/namespaces/default/cards/c-1'],
-  ['POST', '/api/namespaces/default/cards/c-1/start'],
-  ['POST', '/api/namespaces/default/cards/c-1/queue'],
-  ['POST', '/api/namespaces/default/cards/c-1/unqueue'],
-  ['POST', '/api/namespaces/default/cards/c-1/labels'],
-  ['PUT', '/api/namespaces/default/cards/c-1'],
-] as const;
-
-test('each write of the cards group is 403 for another site and 415 for a body that is not JSON, the card left as it was', async () => {
-  for (const [method, url] of WRITES) {
-    const site = await app.request(url, {
-      method,
-      headers: { 'content-type': 'application/json', 'sec-fetch-site': 'cross-site' },
-      body: '{}',
-    });
-    assert.equal(site.status, 403, `${method} ${url} from another site`);
-    const form = await app.request(url, { method, headers: { 'content-type': 'text/plain' }, body: 'labels=team-' });
-    assert.equal(form.status, 415, `${method} ${url} sent as text`);
-  }
-  assert.ok(fs.existsSync(path.join(inbox, 'c-1.md')), 'the card is there still');
 });
 
 test('a card filed, labelled, queued, taken off and dropped through the verbs is the object read after each', async () => {
@@ -206,4 +181,37 @@ test('PUT a card whole: spec.from set and answered; REFUSED: a stale resourceVer
   const started = await put(startedAt, { metadata: {}, spec: { body: 'Do it otherwise.' } });
   assert.equal(started.status, 409);
   assert.equal(fs.readFileSync(path.join(inbox, 'w-started.md'), 'utf8'), before, 'a started card keeps its file');
+});
+
+test('a card file that does not parse is listed all the same, its status saying why, and read alone with that why', async (t) => {
+  fs.mkdirSync(inbox, { recursive: true });
+  fs.writeFileSync(path.join(inbox, 'y-broken.md'), '---\nnot-a-key: 1\n---\nDo it.\n');
+  t.after(() => fs.rmSync(path.join(inbox, 'y-broken.md'), { force: true }));
+  const listed = (await list('/api/cards')).body.items.find((c) => c.metadata.name === 'y-broken');
+  assert.ok(listed, 'listed, never hidden');
+  assert.equal(listed.spec.body, undefined, 'no body read of a card that does not parse');
+  assert.match(listed.status.error ?? '', /not-a-key/, 'its status says why, naming the key');
+  const read = (await (await app.request('/api/namespaces/default/cards/y-broken')).json()) as typeof Card.Type;
+  assert.match(read.status.error ?? '', /not-a-key/);
+});
+
+test('a list asked as a Table answers the columns nemia inbox prints and a row per card of the page, the card beside its cells', async () => {
+  const res = await app.request('/api/namespaces/default/cards?limit=2&labelSelector=team%3Dcore', { headers: { accept: TABLE_ACCEPT } });
+  assert.equal(res.status, 200);
+  const table = (await res.json()) as Table;
+  assert.equal(table.kind, 'Table');
+  assert.equal(table.apiVersion, 'meta.k8s.io/v1');
+  const names = table.columnDefinitions.map((c) => c.name);
+  assert.deepEqual(names.slice(0, 4), ['Name', 'Title', 'Workflow', 'Repo']);
+  const cell = (row: Table['rows'][number], name: string) => row.cells[names.indexOf(name)];
+  assert.deepEqual(
+    table.rows.map((row) => [cell(row, 'Name'), cell(row, 'Title'), cell(row, 'State'), cell(row, 'Queued')]),
+    [
+      ['c-2', 'Do c-2.', 'filed', null],
+      ['c-4', 'Do c-4.', 'filed', null],
+    ],
+  );
+  assert.equal((table.rows[0]?.object as Card | undefined)?.kind, 'Card');
+  const plain = await list('/api/cards');
+  assert.equal(plain.body.kind, 'CardList', 'a list asked for no Table is the CardList');
 });

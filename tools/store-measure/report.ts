@@ -249,12 +249,12 @@ function feedOf(wf: string): FeedRead {
   return { file, lines: starts.length, cursor: starts.length > FEED_BACK ? starts[starts.length - FEED_BACK] : 0, end, read: 0 };
 }
 
-/** The lines the events of `chunk` carry, and the cursor after the last; whether the stream's opening comment is among them. */
+/** The lines the events of `chunk` carry, and the cursor after the last; whether the stream's opening event (`opened`) is among them. */
 function eventsIn(chunk: readonly string[], cursor: number): { lines: number; cursor: number; opened: boolean } {
   let lines = 0;
   let opened = false;
   for (const event of chunk) {
-    if (event.startsWith(':')) opened = true;
+    if (/^event: ?opened$/m.test(event)) opened = true;
     const id = /^id: ?(\d+)$/m.exec(event);
     if (id && !/^event: ?bookmark$/m.test(event)) {
       lines++;

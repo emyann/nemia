@@ -3,7 +3,10 @@
  * step added or removed, a value set — and put back in the listing's shape. Pure. What a step may say is the package's to judge when the
  * draft is saved; the draft judges only what it needs to stay a draft: one step per name, and a name to call it by.
  */
-import type { GraphEdge, KeyField, KeyForm, ListedStep, RunGraph, SchemaFile, StepWritten, WorkflowListing, WorkflowStepSpec } from './api';
+import type { GraphEdge, RunGraph } from './api/graph.ts';
+import type { KeyField, KeyForm } from './api/builder.ts';
+import type { ListedStep, StepWritten, WorkflowListing } from './api/workflows.ts';
+import type { SchemaFile, WorkflowStepSpec } from './api/library.ts';
 import { COLUMN_WIDTH, layout, stepsOf, type Point } from './layout.ts';
 
 /**
@@ -440,7 +443,10 @@ export function tokensOf(typed: string): number | null {
   return Number.isSafeInteger(n) && n > 0 ? n : null;
 }
 
-/** A context window as the package's `renderStep` writes it: thousands with `k` when it is a whole number of them, digits otherwise. */
+/**
+ * A context window as the package's `renderStep` writes it: thousands with `k` when it is a whole number of them, digits otherwise. A copy
+ * that stays: the board writes the step's text in the browser before anything is sent, and the api serves no rendering of a step's keys.
+ */
 export const contextText = (tokens: number): string => (tokens % 1_000 === 0 ? `${tokens / 1_000}k` : String(tokens));
 
 /**

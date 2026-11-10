@@ -2,7 +2,7 @@ import { RouteLink, AgentLink } from '../agent/AgentParts';
 import { Markdown } from '../markdown/Markdown';
 import { StepHire } from './StepHire';
 import { Skills } from './Told';
-import type { ListedStep, PagePlace, WorkflowListing } from '../../lib/api';
+import type { ListedStep, PagePlace, WorkflowListing } from '../../lib/api/workflows.ts';
 
 const LINK =
   'rounded-sm font-mono text-body-medium font-semibold underline decoration-outline underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/50';

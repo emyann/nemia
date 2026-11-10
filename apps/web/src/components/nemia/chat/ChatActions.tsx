@@ -8,7 +8,7 @@
  * `drawnAsk` says when an ask is drawn this way; one whose choices explain themselves is `ChatAsk`, and several questions `ChatAskMany`.
  */
 import { Button } from '@/components/ui/button';
-import type { AskPick } from '@/lib/api';
+import type { AskPick } from '@/lib/api/chat';
 import type { ChatAsk as Ask } from '@/lib/chatFollowing';
 import { AskChose, AskHead, AskWords } from './ChatAsk';
 

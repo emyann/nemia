@@ -1,13 +1,13 @@
 import { CircleSlash } from 'lucide-react';
-import type { RunView } from '@/lib/runView';
+import type { RunDetail } from '@/lib/runView';
 import { titleOf } from '@/lib/factory';
 
 /**
- * In place of a run's page, or of one of its steps', when the store has no such run (`runGone`). Given the `run` last read, it was removed
+ * In place of a run's page, or of one of its steps', when the store has no such run (`readGone`). Given the `run` last read, it was removed
  * while the page was open, and what was read is not drawn under it, so nothing on the page looks live, or offers a button for a run that
  * is not there. Given only its `id`, the address was visited with no read of it: removed, or never a run of the store.
  */
-export function RunGone(props: { run: RunView } | { id: string }) {
+export function RunGone(props: { run: RunDetail } | { id: string }) {
   const id = 'run' in props ? props.run.id : props.id;
   return (
     <p data-run-gone={id} role="status" className="max-w-3xl text-body-medium text-yours">

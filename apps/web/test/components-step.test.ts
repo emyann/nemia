@@ -13,12 +13,12 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import { coded, type Word } from './run-fixtures.ts';
 import './tsx.ts';
 import {
   at,
   atGate,
+  classesAt,
   closeoutSaying,
   cut,
   endingRun,
@@ -49,6 +49,24 @@ const { StatusChip, StepNote } = await import('../src/components/step/StatusChip
 const { StepTabs } = await import('../src/components/step/StepInspector.tsx');
 const { StepNode } = await import('../src/components/step/StepNode.tsx');
 const { afterEdges, readEdges, stepData, stepEdges } = await import('../src/components/step/stepGraph.ts');
+type StepGraphFacts = import('../src/components/step/stepGraph.ts').StepGraphFacts;
+
+/** Of a run, exactly what its graph's edges are drawn from (`StepGraphFacts`): a test of `stepEdges` gives it no more. */
+const factsOf = (run: RunDetail): StepGraphFacts => ({
+  cancelledAt: run.cancelledAt,
+  holding: run.holding,
+  graph: run.graph,
+  steps: run.steps.map(({ name, phase, reason, on, via, note, roundDue, message }) => ({
+    name,
+    phase,
+    reason,
+    on,
+    via,
+    note,
+    roundDue,
+    message,
+  })),
+});
 const { StepRail, StepTiles } = await import('../src/components/step/StepRail.tsx');
 const { flowSteps, railOf, tilesOf } = await import('../src/lib/flow.ts');
 const { StateEdge } = await import('../src/components/step/StateEdge.tsx');
@@ -58,27 +76,27 @@ const { ReactFlowProvider } = await import('@xyflow/react');
 const { AllowedReach } = await import('../src/components/step/Reach.tsx');
 const { PERSON } = await import('../src/lib/words.ts');
 const { StepBody, StepPolicy, Told } = await import('../src/components/step/Told.tsx');
-type RunView = import('../src/lib/runView.ts').RunView;
-type StepReach = import('../src/lib/api.ts').StepReach;
-type ReadOnlyCommands = import('../src/lib/api.ts').ReadOnlyCommands;
-type StepAttempts = import('../src/lib/api.ts').StepAttempts;
-type GraphEdge = import('../src/lib/api.ts').GraphEdge;
-type RunSummary = import('../src/lib/api.ts').RunSummary;
-type StepLayers = import('../src/lib/api.ts').StepLayers;
-type TaskPart = import('../src/lib/api.ts').TaskPart;
+type RunDetail = import('../src/lib/runView.ts').RunDetail;
+type StepReach = import('../src/lib/api/capabilities.ts').StepReach;
+type ReadOnlyCommands = import('../src/lib/api/capabilities.ts').ReadOnlyCommands;
+type StepAttempts = import('../src/lib/api/tries.ts').StepAttempts;
+type GraphEdge = import('../src/lib/api/graph.ts').GraphEdge;
+type RunView = import('../src/lib/api/judged.ts').RunView;
+type StepLayers = import('../src/lib/api/layers.ts').StepLayers;
+type TaskPart = import('../src/lib/api/layers.ts').TaskPart;
 type StateFlowEdge = import('../src/components/step/StateEdge.tsx').StateFlowEdge;
 type EdgeMarker = import('@xyflow/react').EdgeMarker;
 const { SessionOwn } = await import('../src/components/step/session/SessionOwn.tsx');
 const { SessionTalk } = await import('../src/components/step/session/SessionTalk.tsx');
 const { foldTranscript, tailStart } = await import('../src/lib/transcript.ts');
 const { sessionItems } = await import('../src/lib/sessionItems.ts');
-type TranscriptEvent = import('../src/lib/api.ts').TranscriptEvent;
-type WorkflowStepSpec = import('../src/lib/api.ts').WorkflowStepSpec;
+type TranscriptEvent = import('../src/lib/api/steps.ts').TranscriptEvent;
+type WorkflowStepSpec = import('../src/lib/api/library.ts').WorkflowStepSpec;
 const { Artifacts, TryCloseouts } = await import('../src/components/step/Closeout.tsx');
 const facts = await import('../src/components/step/Facts.tsx');
-type StepCloseout = import('../src/lib/api.ts').StepCloseout;
-type StepSpec = import('../src/lib/runView.ts').StepSpecView;
-type StepFiled = import('../src/lib/runView.ts').StepFiledView;
+type StepCloseout = import('../src/lib/api/tries.ts').StepCloseout;
+type StepSpec = import('../src/lib/api/judged.ts').StepSpecView;
+type StepFiled = import('../src/lib/api/judged.ts').StepFiledView;
 const { answersFrom, chosenDraft, recommendedDraft, unanswered } = await import('../src/components/gate/Questions.tsx');
 const Closeouts = await import('../src/components/step/Closeout.tsx');
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
@@ -179,7 +197,7 @@ test("the inspector's Details show a step's note under its chip", () => {
  * both read it — inside the provider its handles read. A server render of the whole canvas draws no node: React Flow puts
  * its nodes in its store in an effect.
  */
-function nodeMarkup(run: RunView): string {
+function nodeMarkup(run: RunDetail): string {
   const props = {
     id: 'review',
     type: 'step' as const,
@@ -246,7 +264,7 @@ test('a step a person has sent round or asked to retry is no gate from the momen
  * `reviewDue` says. Neither step has a spec — as when the api could not read one — so what is drawn is the api's graph, and nothing a
  * step's spec says.
  */
-function loopRun(notes: { implement: string | null; review: string | null }, reviewDue = false): RunView {
+function loopRun(notes: { implement: string | null; review: string | null }, reviewDue = false): RunDetail {
   const base = runWith(null);
   const step = { ...base.steps[0], ...coded('unverified · done'), spec: null };
   return {
@@ -273,7 +291,7 @@ test("the loop's edge goes back to its target, whatever the steps' specs lack", 
     review: 'round 3 of 3, and it asked again — once more: nemia retry r-1 review --round',
   });
 
-  const edges = stepEdges(run, 'r-1/');
+  const edges = stepEdges(factsOf(run));
   const shape = ({ id, source, target, type, sourceHandle, targetHandle, label, data }: StateFlowEdge) => ({
     id,
     source,
@@ -288,9 +306,9 @@ test("the loop's edge goes back to its target, whatever the steps' specs lack", 
     edges.map(shape),
     [
       {
-        id: 'r-1/implement->review',
-        source: 'r-1/implement',
-        target: 'r-1/review',
+        id: 'implement->review',
+        source: 'implement',
+        target: 'review',
         type: 'state',
         sourceHandle: undefined,
         targetHandle: undefined,
@@ -298,9 +316,9 @@ test("the loop's edge goes back to its target, whatever the steps' specs lack", 
         data: { state: 'done', loop: false },
       },
       {
-        id: 'r-1/loop:review->implement',
-        source: 'r-1/review',
-        target: 'r-1/implement',
+        id: 'loop:review->implement',
+        source: 'review',
+        target: 'implement',
         type: 'state',
         sourceHandle: LOOP_SOURCE,
         targetHandle: LOOP_TARGET,
@@ -312,14 +330,14 @@ test("the loop's edge goes back to its target, whatever the steps' specs lack", 
   );
 
   const due = stepEdges(
-    loopRun({ implement: null, review: 'round 2 of 3 due — review asked again, and the next tick files implement' }, true),
+    factsOf(loopRun({ implement: null, review: 'round 2 of 3 due — review asked again, and the next tick files implement' }, true)),
   );
   assert.deepEqual([due[1].label, due[1].data], ['round 2 of 3', { state: 'running', loop: true }]);
-  const first = stepEdges(loopRun({ implement: null, review: null }));
+  const first = stepEdges(factsOf(loopRun({ implement: null, review: null })));
   assert.deepEqual([first[1].label, first[1].data], [undefined, { state: 'to-come', loop: true }]);
 
   const chain = { ...run, graph: { roots: ['implement', 'review'], edges: [] } };
-  assert.deepEqual(stepEdges(chain), [], 'a run with no loop draws no edge back');
+  assert.deepEqual(stepEdges(factsOf(chain)), [], 'a run with no loop draws no edge back');
 });
 
 /**
@@ -366,7 +384,7 @@ const legendMarkup = (): string => renderToStaticMarkup(createElement(ReactFlowP
 
 test("a loop's edge is drawn from under its looping step, dashed, into its target with the arrow and the round beside it", () => {
   const [, back] = stepEdges(
-    loopRun({ implement: 'round 3 of 3', review: 'round 3 of 3, and it asked again — once more: nemia retry r-1 review --round' }),
+    factsOf(loopRun({ implement: 'round 3 of 3', review: 'round 3 of 3, and it asked again — once more: nemia retry r-1 review --round' })),
   );
   const html = withMotion(false, () => edgeMarkup(back));
   const d = pathOf(html);
@@ -394,7 +412,7 @@ test("a loop's edge is drawn from under its looping step, dashed, into its targe
 });
 
 /** A run of steps, each its name, the word `wf ls` gives it, and the step it comes after, if any: the roots are the rest. */
-function runOfSteps(steps: Array<[name: string, status: Word, after?: string]>): RunView {
+function runOfSteps(steps: Array<[name: string, status: Word, after?: string]>): RunDetail {
   const base = runWith(null);
   const edges = steps.flatMap(([name, , from]): GraphEdge[] => (from ? [{ from, to: name, kind: 'after' }] : []));
   return {
@@ -419,7 +437,7 @@ test('a running edge carries a dot travelling its own path; an edge done, to com
     ['ask', 'needs-human', 'tokens'],
     ['draft', 'running (working)'],
   ]);
-  const drawn = stepEdges(run);
+  const drawn = stepEdges(factsOf(run));
   const html = new Map(drawn.map((edge) => [edge.id, withMotion(false, () => edgeMarkup(edge))]));
   const moving = ['implement->review', 'tokens->theme'];
   assert.deepEqual(
@@ -460,7 +478,7 @@ test('a running edge carries a dot travelling its own path; an edge done, to com
  * The Factory's fake run as `GET /api/runs` lists it: implement → review → respond, implement → respond, tokens → theme; review at work,
  * theme waiting at its gate, an ending, on you.
  */
-function summaryRun(): RunSummary {
+function summaryRun(): RunView {
   const none = { needs: null, waitingFor: null, approve: null, denied: null, sessionUnread: null };
   const step = (name: string, status: Word, extra = {}) => ({
     name,
@@ -504,10 +522,10 @@ function summaryRun(): RunSummary {
     waitingOnYou: ['theme'],
     waitingOnYouWords: ['approve theme'],
     toDecide: { kind: 'approve', step: 'theme', back: [] },
-  } as unknown as RunSummary;
+  } as unknown as RunView;
 }
 
-const railMarkup = (run: RunSummary, reduce = false): string =>
+const railMarkup = (run: RunView, reduce = false): string =>
   withMotion(reduce, () =>
     renderToStaticMarkup(
       createElement(StepRail, {
@@ -522,7 +540,7 @@ const railMarkup = (run: RunSummary, reduce = false): string =>
     ),
   );
 
-const tilesMarkup = (run: RunSummary, selected: string | null = null, reduce = false): string =>
+const tilesMarkup = (run: RunView, selected: string | null = null, reduce = false): string =>
   withMotion(reduce, () =>
     renderToStaticMarkup(
       createElement(StepTiles, {
@@ -614,7 +632,9 @@ test("an opened card's tiles each name the step, its chip and what it waits on a
 
 test("a loop's edge back moves as a running edge does while its round is due, along its curve and keeping its round", () => {
   const [, due] = stepEdges(
-    loopRun({ implement: 'round 2 of 3', review: 'round 2 of 3 due — review asked again, and the next tick files implement' }, true),
+    factsOf(
+      loopRun({ implement: 'round 2 of 3', review: 'round 2 of 3 due — review asked again, and the next tick files implement' }, true),
+    ),
   );
   const html = withMotion(false, () => edgeMarkup(due));
   const d = pathOf(html);
@@ -628,13 +648,17 @@ test("a loop's edge back moves as a running edge does while its round is due, al
 
 test('where the person asked for reduced motion nothing travels — on a running edge, a loop whose round is due, or the legend — and colour and arrow still say it', () => {
   const [running] = stepEdges(
-    runOfSteps([
-      ['implement', 'verified ✓'],
-      ['review', 'running (working)', 'implement'],
-    ]),
+    factsOf(
+      runOfSteps([
+        ['implement', 'verified ✓'],
+        ['review', 'running (working)', 'implement'],
+      ]),
+    ),
   );
   const [, due] = stepEdges(
-    loopRun({ implement: 'round 2 of 3', review: 'round 2 of 3 due — review asked again, and the next tick files implement' }, true),
+    factsOf(
+      loopRun({ implement: 'round 2 of 3', review: 'round 2 of 3 due — review asked again, and the next tick files implement' }, true),
+    ),
   );
   assert.equal((running.markerEnd as EdgeMarker).color, 'var(--edge-running)');
 
@@ -820,7 +844,7 @@ test('a line the harness wrote on its own is a quiet note; one between two calls
   );
 });
 
-test('the Activity tab draws the session compact, over the last of its turns, and links to the whole of it', () => {
+test('the Activity tab draws the session compact, over the last of its turns, and links to the whole of it', async () => {
   const compact = renderToStaticMarkup(createElement(SessionTalk, { who: 'implement', turns: [], live: false, density: 'compact' }));
   assert.match(compact, /data-session-talk="latest"[^>]*class="[^"]*gap-2"/, 'the tab stands its items closer than the page does');
   assert.doesNotMatch(
@@ -829,14 +853,40 @@ test('the Activity tab draws the session compact, over the last of its turns, an
     'and the page stands them at the room they want',
   );
 
-  const inspector = fs.readFileSync(new URL('../src/components/step/StepInspector.tsx', import.meta.url), 'utf8');
-  assert.match(inspector, /const tail = turns\.slice\(-ACTIVITY_TURNS\);/, 'the tab draws the tail of the conversation, not the whole');
-  assert.match(
-    inspector,
-    /<SessionTalk who=\{step\.name\} turns=\{tail\} live=\{following\.live\} density="compact" \/>/,
-    'drawn by the family, compact, over that tail',
+  const { ActivityTail, ACTIVITY_TURNS } = await import('../src/components/step/StepInspector.tsx');
+  const { unread } = await import('../src/lib/following.ts');
+  const { prerender } = await import('react-dom/static');
+  const { createMemoryHistory, createRootRoute, createRouter, RouterContextProvider } = await import('@tanstack/react-router');
+  const said = (i: number) => `turn-${String(i).padStart(2, '0')}`;
+  const events: TranscriptEvent[] = Array.from({ length: ACTIVITY_TURNS + 5 }, (_, i) => ({
+    id: `a-${i}:0`,
+    at,
+    role: 'assistant',
+    kind: 'text',
+    text: said(i),
+  }));
+  const run = runWith(null);
+  const step = { ...run.steps[0], taskId: 't-1', attempts: ranOnce };
+  const router = createRouter({ routeTree: createRootRoute(), history: createMemoryHistory() });
+  const tab = createElement(ActivityTail, { run, step, following: { ...unread(false), events } });
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  const { prelude } = await prerender(createElement(RouterContextProvider, { router, children: tab }));
+  const html = await new Response(prelude).text();
+
+  const shown = [...html.matchAll(/turn-\d\d/g)].map((m) => m[0]);
+  assert.deepEqual(
+    shown,
+    Array.from({ length: ACTIVITY_TURNS }, (_, i) => said(i + 5)),
+    'the tab draws the tail of the conversation, in its order, not the whole',
   );
-  assert.match(inspector, /Open the session/, 'and the whole of it is one click away');
+  assert.ok(
+    textsOf(html)
+      .join(' ')
+      .includes(`The last ${ACTIVITY_TURNS} of ${ACTIVITY_TURNS + 5}.`),
+    'and says it is the tail',
+  );
+  assert.ok(classesAt(html, 'data-session-talk="latest"').includes('gap-2'), 'drawn compact');
+  assert.ok(textsOf(html).includes('Open the session'), 'and the whole of it is one click away');
 });
 
 test('the message being written is drawn after the turns, until the whole of it takes its place', () => {
@@ -1087,7 +1137,7 @@ test('a step with more than three tools counts them on its node, named in the ti
 
 test("the inspector's Details say what a step used and what it cost beside its sessions — `not measured`, never 0", () => {
   const run = runWith(null);
-  const rows = (step: RunView['steps'][number]) =>
+  const rows = (step: RunDetail['steps'][number]) =>
     [...renderToStaticMarkup(createElement(StepTabs, { run, step })).matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map(
       (m) => [m[1], m[2].replace(/<[^>]+>/g, '')],
     );
@@ -1532,7 +1582,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     'high · default',
     'auto · default',
     'Read, Grep · default',
-    '3600 s · default',
+    '1h 00m · default',
   ]);
 
   assert.equal(
@@ -1611,7 +1661,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     remote: null,
     bridge: null,
   };
-  assert.deepEqual(ranWith(rowsOf(set, asSet)), ['opus', 'high', 'dontAsk', 'none', '600 s'], "the workflow's words");
+  assert.deepEqual(ranWith(rowsOf(set, asSet)), ['opus', 'high', 'dontAsk', 'none', '10m 00s'], "the workflow's words");
   assert.equal(
     ['max attempts', 'attempts'].some((row) => row in rowsOf(set, asSet) || row in rowsOf(unset, bare) || row in rowsOf(unset, null)),
     false,
@@ -1641,7 +1691,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
   assert.equal(rowsOf(unset, null).context, '—');
 
   assert.deepEqual(ranWith(rowsOf(unset, null)), ['—', '—', '—', '—', '—'], 'not filed: a dash where the workflow sets nothing');
-  assert.deepEqual(ranWith(rowsOf(set, null)), ['opus', 'high', 'dontAsk', 'none', '600 s'], "and the workflow's words where it does");
+  assert.deepEqual(ranWith(rowsOf(set, null)), ['opus', 'high', 'dontAsk', 'none', '10m 00s'], "and the workflow's words where it does");
 });
 
 test('a step on a remote A2A agent says the agent and its address, and no model, effort, context, fence or tools the run never chose', () => {
@@ -1892,7 +1942,7 @@ test('a step at its gate is a human gate on the canvas, and its node says what i
     `<span class="font-semibold">${PERSON['awaiting-approval'].rail}</span><span data-need="approve"> · approve review&#x27;s hand-off</span>`,
     'what approving does, in a line that names the step as `wf ls` does: a step that ran hands on',
   );
-  const spec = { ...atGate().steps[0].spec, workspace: 'base' } as RunView['steps'][number]['spec'];
+  const spec = { ...atGate().steps[0].spec, workspace: 'base' } as RunDetail['steps'][number]['spec'];
   const ending = nodeMarkup(atGate({ taskId: null, spec, attempts: { count: 0, latest: null } }));
   assert.match(ending, /<span data-need="approve"> · approve review to run it<\/span>/, 'an ending not filed runs');
   assert.match(ending, />not filed yet</, 'an ending at its gate has not been filed: not `no session yet`');
@@ -1903,7 +1953,7 @@ test('a step at its gate is a human gate on the canvas, and its node says what i
 test("REFUSED: an ending's gate brief quotes the package's `toDecide.says` alone — never its step's body, which opens with its agent's instructions", () => {
   const led = endingRun();
   const ship = { ...led.steps[1], body: "You are Otto, a release engineer. You land a run's result.\n\nNever push." };
-  const brief = (toDecide: RunView['toDecide']) =>
+  const brief = (toDecide: RunDetail['toDecide']) =>
     textsOf(withClient(createElement(StepTabs, { run: { ...led, toDecide, steps: [led.steps[0], ship] }, step: ship }))).join(' ');
   for (const toDecide of [null, { ...toShip, step: 'implement' }]) {
     const said = brief(toDecide);
@@ -1915,7 +1965,7 @@ test("REFUSED: an ending's gate brief quotes the package's `toDecide.says` alone
 
 test("a step's facts say `workspace` only where the step says it: the step that ends the run in the checkout, and no empty row for the rest", () => {
   const [implement, ship] = endingRun().steps;
-  const rowsOf = (step: RunView['steps'][number]) => specRows(step.spec!).map(([key, value]) => [key, value === null ? null : 'set']);
+  const rowsOf = (step: RunDetail['steps'][number]) => specRows(step.spec!).map(([key, value]) => [key, value === null ? null : 'set']);
   assert.ok(
     rowsOf(ship).some(([key]) => key === 'workspace'),
     JSON.stringify(rowsOf(ship)),
@@ -1974,7 +2024,7 @@ test("the Factory's legend adds the edge between two cards, dashed and still as 
 });
 
 /** What the api says of a card that still waits on `runs` before anything of it is filed (`RunWaiting`); null for none. */
-const waitingOnRuns = (runs: string[]): RunSummary['waiting'] =>
+const waitingOnRuns = (runs: string[]): RunView['waiting'] =>
   runs.length
     ? { runs: runs.map((run) => ({ run, missing: false, cancelledAt: null, gone: [] })), word: '', advice: '', waitingOnYou: false }
     : null;
@@ -2031,7 +2081,7 @@ const pricedRun = (
   cost: ReturnType<typeof priced>,
   waitingOnYou: string[] = [],
   cancelledAt: string | null = null,
-): RunView => {
+): RunDetail => {
   const run = runOf(status, { waitingOnYou, cancelledAt });
   return { ...run, steps: [{ ...run.steps[0], ...cost }] };
 };
@@ -2079,8 +2129,8 @@ test('REFUSED: a step past its budget is no gate where the api does not say it w
 
 test("the inspector's Details say what every try cost of its cap — `spent`, red once past it — and add nothing for a step on its one try with no cap", () => {
   const run = runWith(null);
-  const markup = (step: RunView['steps'][number]) => renderToStaticMarkup(createElement(StepTabs, { run, step }));
-  const rows = (step: RunView['steps'][number]) =>
+  const markup = (step: RunDetail['steps'][number]) => renderToStaticMarkup(createElement(StepTabs, { run, step }));
+  const rows = (step: RunDetail['steps'][number]) =>
     Object.fromEntries(
       [...markup(step).matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], m[2].replace(/<[^>]+>/g, '')]),
     );
@@ -2110,7 +2160,7 @@ test("the inspector's Details say what every try cost of its cap — `spent`, re
 });
 
 test("a step past its budget is offered a raise: its word with the amounts, a box started above what it cost with no floor of the board's, and Raise the budget and try again — answer, for a step that asks; its check again, where one did not pass; go round again, for its loop", () => {
-  type RetryMode = import('../src/lib/api.ts').RetryMode;
+  type RetryMode = import('../src/lib/api/asks.ts').RetryMode;
   const checkRaise = {
     by: 'retry' as const,
     above: 4.25,
@@ -2509,7 +2559,7 @@ test("a held run's rail draws its gate held, its steps not filed as any step to 
     toDecide: null,
     holdUntil: ['p-1'],
     holding: HOLDING,
-  } as unknown as RunSummary;
+  } as unknown as RunView;
   const html = railMarkup(held);
   const pills = Object.fromEntries([...html.matchAll(/<li data-step="([^"]+)" data-state="([^"]+)"/g)].map((m) => [m[1], m[2]]));
   assert.deepEqual(pills, { implement: 'verified', tokens: 'unverified', review: 'working', theme: 'held', respond: 'waiting' }, html);
@@ -2544,7 +2594,7 @@ test('a hold is drawn between two cards as an --after edge is: from the run it i
 });
 
 /** The looping run's one step, at plan's gate with that closeout — or signed off with none, or still running. */
-function gatedRun(closeout: StepCloseout | null, status: Word = 'awaiting approval'): RunView {
+function gatedRun(closeout: StepCloseout | null, status: Word = 'awaiting approval'): RunDetail {
   const run = runOf(status, { waitingOnYou: closeout ? ['review'] : [] });
   const [step] = run.steps;
   return {
@@ -2596,7 +2646,7 @@ test('what the run did not accept of a closeout is drawn under its words, each u
 });
 
 test('the inspector opens on Output for a step that has a closeout — at its gate, blocked or done — and on Details for one that has none', () => {
-  const inspect = (run: RunView) => withClient(createElement(StepTabs, { run, step: run.steps[0] }));
+  const inspect = (run: RunDetail) => withClient(createElement(StepTabs, { run, step: run.steps[0] }));
   const atGate = inspect(gatedRun(planCloseout));
   assert.equal(tabSelected(atGate), 'Output');
   assert.match(atGate, /data-field="approach"/, 'the Output tab is drawn: the approach is there without a press');
@@ -2784,7 +2834,7 @@ test("a workflow's step is marked as inspected only while the bar shows it, and 
 });
 
 /** The bar's body for the step `step` of `listing`, as the bar for a workflow's step draws it. */
-async function specBodyMarkup(listing: import('../src/lib/api.ts').WorkflowListing, step: string): Promise<string> {
+async function specBodyMarkup(listing: import('../src/lib/api/workflows.ts').WorkflowListing, step: string): Promise<string> {
   const { SpecBody } = await import('../src/components/step/SpecBar.tsx');
   return renderToStaticMarkup(createElement(SpecBody, { listing, step }));
 }

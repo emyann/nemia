@@ -87,10 +87,30 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   `timeToTheSecond`; a component draws one with `Instant` (`components/time/Instant.tsx`). date-fns is imported only in the four files that
   write a moment (`lib/timeOfDay.ts`, `lib/instant.ts`, `lib/runWords.ts`, `lib/quota.ts`); a fifth that needs it joins the list with
   its reason.
-- A time on the runs page is `whenWords`, and how long ago something was, in a table's column, is `agoWords` (`3 minutes ago`,
-  `4 months ago`, `just now` under a minute; date-fns's `formatDistanceStrict`, which writes no `about`), the whole instant staying on
-  hover (`instantWhole`); a date's parts are `dateParts`. A schedule's far fire is `instantWords` (`14 Oct 12:00 PM`,
-  `1 Jan 2027, 4:00 AM`); `whenWords` keeps dropping the time in another year.
+- A time on the runs page is `whenWords`, and how long ago something was, in a table's column, is `agoWords` (`3 minutes ago`, `4 months
+  ago`, `just now` under a minute; date-fns's `formatDistanceStrict`, which writes no `about`), the board's only writer of how long ago
+  (the quota's age, the daemon's line and the queue's ghosts too), the whole instant staying on hover (`instantWhole`); a date's parts
+  are `dateParts`. A schedule's far fire is `instantWords` (`14 Oct 12:00 PM`, `1 Jan 2027, 4:00 AM`); `whenWords` keeps dropping the
+  time in another year.
+- How long something took has one writer, `durationWords(ms, grain)` (`lib/duration.ts`): to the second (`45s`, `12m 04s`, `1h 05m`,
+  `1d 2h`) for a try, a turn, a run's clock and Facts; to the minute (`under 1m`, `3m`, `1h 30m`) for a breakdown's rows, a wait, the
+  strip, a step card, the quota's keep and the pause's `cut in`.
+- An amount of money has one writer, `dollars` (`lib/money.ts`), by the package's rule: `$0.004` under a cent, `$12.50`, `-$0.13`, `—`
+  for none; a budget as its author writes it is `budgetWord` (`$16`, `$2.50`). How a run ended, its word, sentence and hue, is `ENDED`.
+- What this browser keeps (a layout, the open runs, the bar's width, the chat's unsent message) goes through `lib/stored.ts`
+  (`readStored`, `store`, `forgetStored`), never `localStorage` by hand. A copy control's copied or failed moment, 1500 ms, is `useCopy`
+  (`lib/useCopy.ts`); a media query is `useMedia` (`lib/useMedia.ts`), which `useIsMobile`, `useSheetPreview` and `useReducedMotion`
+  read; a frame's size is `useFrameSize`, never a ResizeObserver by hand.
+- An approval is `useApprove` (`lib/useApprove.ts`) wherever a person approves; an ending's warning is `endingWarning` (`lib/gate.ts`),
+  the card's and the gate's confirm alike. A run's wait on runs, or its hold, is drawn by `components/run/RunWait.tsx`, a proposal's
+  phase tag and Widens mark by `components/gate/ProposalTags.tsx`, and a graph's edges from `StepGraphFacts` (`stepEdges`).
+- A class string two features share (a button, a field, a popover, the floor's frame) is `lib/classes.ts`'s, never a feature
+  component's export.
+- A followed stream's event is decoded by `streamDataOf` (`lib/api/stream.ts`); one that does not decode is an `UnreadAnswer`, which
+  `follow` says as its could-not-be-read line while the stream goes on.
+- No export of `src` is dead: `test/dead-exports.test.ts` refuses a name no other file of `src`, `test`, `.storybook` or `contracts`
+  imports. Unexport a name used only in its own file, delete one used nowhere; the vendored folders, stories, `main.tsx`,
+  `routeTree.gen.ts`, a route's `Route` and the look's door are exempt.
 - A colour says one thing: `yours` (waits on a person), `alive`, `money` (an amount), `rest` (grey, and sage for done) and `failure`.
   `src/styles.css` reads each from a theme role once (`--meaning-*`, `bg-yours`); `lib/meaning.ts` holds the drawn forms, each class a
   whole literal.
@@ -134,18 +154,24 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   origin (`sourceOf`) and a card entry copied (`cardEntryOf`) sit in `library.ts`, which `workflows.ts`, `agents.ts`, `skills.ts` and
   `inbox.ts` all read.
 - A kind of `objects` (the Run, the Card, the Factory, the McpServer, the Schedule, the Hire, the Volume, the Workflow, the Agent, the
-  Skill) is read through `lib/api/objects.ts`, never a schema of the board's: its client is made from `objects`' `Api`, and each call rejects as `get` and
-  `send` do (`ReadRefusal`, `WriteRefusal`, `UnreadAnswer`). The inbox's entry is made of a `Card` in one place (`entryOf`,
-  `lib/api/inbox.ts`), and the pages' view of a factory of a `Factory`, its `FactoryCommands` and its schedules in one place
+  Skill) is read through `lib/api/objects.ts`, never a schema of the board's: its client is made from `objects`' `Api`, and each call
+  rejects with `ReadRefusal`, `WriteRefusal` or `UnreadAnswer` (`lib/api/read.ts`). The inbox's entry is made of a `Card` in one place (`entryOf`,
+- `lib/api/inbox.ts`), and the pages' view of a factory of a `Factory`, its `FactoryCommands` and its schedules in one place
   (`factoryViewOf`, `lib/api/factories.ts`), which `factoriesQuery` reads together. A hire is written to its `Hire`, named
   `<workflow>.<step>`; a server's header is served as the mask (`HEADER_MASK`), and a form sends it back unchanged to keep the value.
   A definition is seen as the board's view of its kind in one place each — `workflowViewOf` (`lib/api/workflows.ts`), `agentViewOf`
   (`agents.ts`), `skillRowOf` and `skillDetailOf` (`skills.ts`) — read in `default` where the board has no factory, else in the factory's
   namespace; the Agents and Skills pages read each origin whole (`?origin=`), shadowed or not, and a page's `$from` is the origin, `factory`
   among its words, a definition of the factory's own offering no write and saying its way (`FACTORY_WAY`, `lib/factories.ts`). A save of
-  the builder sends each step as its file writes it (`writtenStepOf`). The routes kept on Hono (a step's page, a start, a card's
-  `from:`) read the factory's tree as `repo` (`sourceOf`), and an address naming `repo` finds a workflow of the factory's (`fromMatches`). `test/structure.test.ts` refuses a `*.gen.ts` under `src/lib/api` and a
-  Schema of `src` named as a kind of `objects`.
+  the builder sends each step as its file writes it (`writtenStepOf`). A step's page, a start and a card's `from:` read
+  the factory's tree as `repo` (`sourceOf`), and an address naming `repo` finds a workflow of the factory's (`fromMatches`).
+  `test/structure.test.ts` refuses a `*.gen.ts` under `src/lib/api` and a Schema of `src` named as a kind of `objects`.
+- Every answer of the api is read through the objects' client (`call` of `lib/api/objects.ts`, with `read` or `write`), its type
+  `objects`' own: no file of `src` but that one calls `fetch`, and no `Schema.Struct` of `src` has the keys of a struct `objects`
+  answers (`clientBreaks`, `test/api-files.test.ts`). Where `objects` carries a part as JSON (the capabilities' lists, a pass's phases,
+  the stats' totals) the board decodes the keys it draws from that part, saying beside it why the copy stays. The streams stay
+  `EventSource`s of the same paths, each event's data decoded by `objects`' schema of it (`STEP_STREAM_SCHEMAS`,
+  `CHAT_STREAM_SCHEMAS`). A file imports each read from its own file under `lib/api/`: there is no barrel.
 
 ## Invariants no test holds
 
@@ -156,7 +182,7 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - A link to a route is `routeLink` (`components/nav/routeLink.tsx`), under the root's `RouterProvider`: Enter on a React Aria link is two
   clicks, and each would navigate.
 - A suspense query keeps what it showed when a read fails: a page that must say a thing is gone reads the query's `error`, and a query
-  whose 404 is an answer does not retry it (`runGone`, `retryRun` in `lib/api/gone.ts`).
+  whose 404 is an answer does not retry it (`readGone`, `retryUnlessGone` in `lib/api/gone.ts`, for a run's, a fact's and a proposal's read alike).
 - A query keyed by the state it answers for is not invalidated by a write: a write invalidates the run's record alone (`exact: true`).
   A run's step sub-resources (its tries and told, `lib/api/run.ts`) are keyed by `stepStamp` (`lib/lifecyclePath.ts`) and never named by
   a step's event on the feed; a run's event, a removal and a write (`runsMoved` given the run) read every stamp of them by prefix.
@@ -169,26 +195,18 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - A form keyed on an agent's version is thrown away with its draft when a write beside the agent moves the version (`keptAfterCopy`,
   `formKeyOf` in `lib/agents.ts`).
 - A step's state is read from the codes the api carries (`phase`, `reason`, a check's `verdict`), never from its sentence (`message`),
-  which is shown as it comes. A reason the api adds is refused at the decode until the board's copy (`lib/api/reasons.ts`, held equal by
-  `test/wire.test.ts`) has it, and then by the compiler until `STATE_OF` (`lib/status.ts`) draws it: add its state there, its drawing
+  which is shown as it comes. A reason the api adds is in `objects`' words the board reads (`STEP_REASONS`), and the compiler refuses the
+  board until `STATE_OF` (`lib/status.ts`) draws it: add its state there, its drawing
   (`stateDrawn`, whose hue gives the chip's class and the minimap's fill) and `offersOf`, and its words in `PERSON` (`lib/words.ts`:
   rail, meaning, and the words of its wait if the api lists it as waiting on a person), in the same change; the compiler refuses a state
   `PERSON` lacks. A card's kind is its phase's (`kindOf`).
 - A page that must agree with a verb's refusal reads the package's decision (`Decidable.awaiting`), never the list's `toDecide`.
-- A read decodes with `get` (`lib/api/read.ts`) through a schema beside its plain type, written `const XSchema = decodes<X>()(…)`
-  (`lib/api/decodes.ts`), which the barrel never exports (`export type *`): every key the board reads required, an unknown key dropped.
-  `decodes` refuses at compile time a schema whose decoded type is not `X` both ways — a word left out, a `null` refused, a `?` key
-  required, a `Schema.Any`. `test/wire.test.ts` holds each type documented `Mirrors …` equal to the api's own answer type, both ways, by
-  `import type` from `apps/api/src` (the board's `src` still imports none of it), and refuses a mirror with no entry there. A mirror that
-  reads fewer keys than the api's says so in its entry (`Pick` or `Omit`) with a line saying why; an api answer with no named type gets a
-  type-only `export type` in `apps/api/src`.
-- A write sends with `send` (`lib/api/read.ts`) through a schema beside its answer's type, with `may` words saying what to look at before
-  sending it again; an answer that does not decode is an `UnreadAnswer`, never a refusal.
-- A mirror narrower than the api's type drops the key on decode, and a write that sends the read back loses it (the builder's save, a
-  step's `workspace` and `slot`): `test/wire.test.ts` refuses a mirror narrower than the api's type unless its entry names the keys it
-  leaves out.
+- A read or a write decodes its answer with `objects`' schema (`call`, `lib/api/objects.ts`): every key it declares required, an unknown
+  key dropped; a write says with its `may` words what to look at before sending it again, and an answer that does not decode is an
+  `UnreadAnswer`, never a refusal. A schema the board still keeps (`decodes<X>()(…)`, `lib/api/decodes.ts`) is refused at compile time
+  where its decoded type is not `X` both ways — a word left out, a `null` refused, a `?` key required, a `Schema.Any`.
 - `Schema.Union` takes the first member that decodes and drops the keys it does not know: put a member that owns more keys before one it
-  extends (`StepArtifactSchema`, `RunDecisionSchema`), and prove the order with an answer the wrong order strips.
+  extends (`objects`' `StepArtifact`, `RunDecision`), and prove the order with an answer the wrong order strips.
 
 ## Node tests of `src`
 

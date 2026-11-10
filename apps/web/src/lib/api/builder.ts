@@ -1,78 +1,32 @@
 /**
- * The builder's form (apps/api/src/workflows/builder.ts). Its writes of a folder of yours answer the folder as the list reads it, and sit
- * beside that read's schema, in workflows.ts.
+ * The builder's form (`GET /api/workflows/keys`), read through the objects' client as `objects` says it (`KeyForm`, `KeyField`). Its
+ * writes of a folder of yours answer the folder as the list reads it, in workflows.ts.
  */
 import { queryOptions } from '@tanstack/react-query';
-import { Schema } from 'effect';
-import { decodes } from './decodes.ts';
-import { get } from './read.ts';
-import { StepKeySchema, StepSpecPartSchema, type StepKey, type WorkflowStepSpec } from './library.ts';
+import type { KeyForm as KeyFormAnswer } from 'objects';
+import { workflows } from './objects.ts';
+import { decoded } from './read.ts';
+import { StepSpecPartSchema, type WorkflowStepSpec } from './library.ts';
 
-/** Mirrors `KeyKind` in apps/api/src/workflows/words.ts: how a key is set on a step's form. */
-export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'list' | 'count' | 'dollars' | 'tokens' | 'flag' | 'schema';
-
-/** Decodes a `KeyKind`. */
-const KeyKindSchema = decodes<KeyKind>()(
-  Schema.Literals(['steps', 'step', 'choice', 'harness-word', 'text', 'list', 'count', 'dollars', 'tokens', 'flag', 'schema']),
-);
-
-/** A list of strings, as a decoded answer holds it: mutable, as the plain types say. */
-const Strings = Schema.mutable(Schema.Array(Schema.String));
+export type { KeyField } from 'objects';
 
 /**
- * Mirrors `KeyField` in apps/api/src/workflows/builder.ts: one key of a step's form, its line of meaning, how it is set, and the words it
- * may take.
+ * Every key a step may set, as `objects` says it, with what each agent of yours gives a step (`agents`) read as the board reads a step's
+ * keys (`WorkflowStepSpec`, `library.ts`): `objects` carries them as a step's file writes them, any key beside its own.
  */
-export type KeyField = {
-  key: StepKey;
-  meaning: string;
-  kind: KeyKind;
-  choices: string[] | null;
-  byHarness: Record<string, string[]> | null;
-};
+export type KeyForm = Omit<KeyFormAnswer, 'agents'> & { agents: Record<string, Partial<WorkflowStepSpec>> };
 
-/** Decodes a `KeyField`. */
-const KeyFieldSchema = decodes<KeyField>()(
-  Schema.Struct({
-    key: StepKeySchema,
-    meaning: Schema.String,
-    kind: KeyKindSchema,
-    choices: Schema.NullOr(Strings),
-    byHarness: Schema.NullOr(Schema.Record(Schema.String, Strings)),
-  }),
-);
-
-/**
- * Mirrors `KeyForm` in apps/api/src/workflows/builder.ts: every key a step may set, in the package's order, the harness a step runs on when
- * it names none, the keys a step with an agent takes from it (`roleKeys`), those its file sets as its policy over the agent's
- * (`policyKeys`: the fence keys and the skills and servers it adds), what each agent of yours gives a step (`agents`), and how a step
- * names a remote A2A agent — `harness: <prefix><name>` — with the keys such a step may not set (`remote`), which the form leaves off it
- * (`takes`).
- */
-export type KeyForm = {
-  keys: KeyField[];
-  defaultHarness: string;
-  roleKeys: StepKey[];
-  policyKeys: StepKey[];
-  agents: Record<string, Partial<WorkflowStepSpec>>;
-  remote: { prefix: string; refuses: StepKey[] };
-};
-
-/** Decodes a `KeyForm`: each key the board reads, of its type and words; a key it does not know is dropped. */
-const KeyFormSchema = decodes<KeyForm>()(
-  Schema.Struct({
-    keys: Schema.mutable(Schema.Array(KeyFieldSchema)),
-    defaultHarness: Schema.String,
-    roleKeys: Schema.mutable(Schema.Array(StepKeySchema)),
-    policyKeys: Schema.mutable(Schema.Array(StepKeySchema)),
-    agents: Schema.Record(Schema.String, StepSpecPartSchema),
-    remote: Schema.Struct({ prefix: Schema.String, refuses: Schema.mutable(Schema.Array(StepKeySchema)) }),
-  }),
-);
+/** `form` with each agent's keys read as a step's. */
+const keyFormOf = (form: KeyFormAnswer): KeyForm => ({
+  ...form,
+  agents: Object.fromEntries(
+    Object.entries(form.agents).map(([name, keys]) => [name, decoded('GET /api/workflows/keys', StepSpecPartSchema, keys)]),
+  ),
+});
 
 /** What a step's form is drawn from. It changes with the package, so once a visit. */
 export const keyFormQuery = queryOptions({
   queryKey: ['step-keys'],
-  queryFn: () => get('/api/workflows/keys', KeyFormSchema),
+  queryFn: () => workflows.keys().then(keyFormOf),
   staleTime: Infinity,
 });

@@ -131,7 +131,8 @@ function namedWords(step: string, files: HandedFiles | undefined): string {
  * then the folders it is filed with beyond them (`folders`, as `filedFolders`
  * in filed.ts files them), to read and never write: its own files directory (`own`), the artifacts folders of the steps before it
  * (`handed`), each with how to list it, the store's folders its `reads:` names (`store`), the folders of the run that routed on to this
- * one (`caller`), and the run's copy of its workflow folder (`workflow`), by its path and its variable (`WF_WORKFLOW_FILES`); a blank line
+ * one (`caller`), and the run's copies of its workflow folder (`workflow`) and its carried files (`carried`), each by its path and its
+ * variable (`WF_WORKFLOW_FILES`, `WF_CARRIED_FILES`); a blank line
  * before them. Nothing for a run
  * that mounts none and a step given no other folder, and for a step on a remote agent, which is filed none.
  */
@@ -145,7 +146,11 @@ export const mountsLine = (
   const volumes = volumeLines(volumeMounts(step, run.volumes));
   const { handed, store } = local ? folders : { handed: [], store: [] };
   const own = (local ? folders.own : undefined) ?? [];
-  const workflow = [...callerLines(local, folders.caller), ...workflowLines(local, folders.workflow)];
+  const workflow = [
+    ...callerLines(local, folders.caller),
+    ...workflowLines(local, folders.workflow),
+    ...carriedLines(local, folders.carried),
+  ];
   if (!mounts?.length && !volumes.length && !own.length && !handed.length && !store.length && !workflow.length) return [];
   const writes = (mounts ?? []).filter((m) => !m.readOnly);
   const reads = (mounts ?? []).filter((m) => m.readOnly);
@@ -218,6 +223,18 @@ const workflowLines = (local: boolean, workflow: readonly Mount[] | undefined): 
   local && workflow?.length
     ? [
         `This workflow's own files, as the run took them, which you may read and must not write: ${pathsOf(workflow)}, named \`$WF_WORKFLOW_FILES\` in your environment. It is mounted read-only; run a script of the workflow from there (\`node "$WF_WORKFLOW_FILES/<script>.ts"\`), never from the folder it was started on, which may have changed since.`,
+      ]
+    : [];
+
+/**
+ * What a brief says of the run's copy of its carried files (`carried`, as `workflowMounts` files it, read-only), for a local step: its
+ * path and its variable (`CARRIED_FILES` in filed.ts, spelled out here as `workflowLines` spells its own), to read and never write.
+ * Nothing where it is not mounted, and for a remote agent.
+ */
+const carriedLines = (local: boolean, carried: readonly Mount[] | undefined): string[] =>
+  local && carried?.length
+    ? [
+        `The files this workflow shares with the others beside it, as the run took them, which you may read and must not write: ${pathsOf(carried)}, named \`$WF_CARRIED_FILES\` in your environment. It is mounted read-only; run a shared script from there (\`node "$WF_CARRIED_FILES/<script>.ts"\`).`,
       ]
     : [];
 

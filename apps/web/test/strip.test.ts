@@ -7,10 +7,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-import type { Factory, QuotaWindow, RunSummary } from '../src/lib/api.ts';
-import { coded, summary } from './run-fixtures.ts';
+import type { Factory } from '../src/lib/api/factories.ts';
+import type { QuotaWindow } from '../src/lib/api/quota.ts';
+import type { RunView } from '../src/lib/api/judged.ts';
+import { atWorkSince, coded, givenAgent, summary } from './run-fixtures.ts';
 import { ceilings } from './factory-fixtures.ts';
-import { dayStartOf, dollars, quotaLineOf, readoutOf, runsOutAt, stripOf } from '../src/lib/strip.ts';
+import { dollars } from '../src/lib/money.ts';
+import { dayStartOf, quotaLineOf, readoutOf, runsOutAt, stripOf } from '../src/lib/strip.ts';
 
 const WEB = path.join(import.meta.dirname, '..');
 const MIN = 60_000;
@@ -19,7 +22,7 @@ const NOW = DAY + 10 * 60 * MIN;
 const at = (ms: number) => new Date(ms).toISOString();
 
 /** A run whose work stopped at `end`, as `status` says, costing `usd`. */
-const ended = (id: string, status: RunSummary['status'], end: number, usd: number, extra: Partial<RunSummary> = {}): RunSummary =>
+const ended = (id: string, status: RunView['status'], end: number, usd: number, extra: Partial<RunView> = {}): RunView =>
   summary([['work', status === 'awaiting approval' ? 'awaiting approval' : 'succeeded']], {
     id,
     status,
@@ -45,9 +48,12 @@ const factory = (name: string, hires: Record<string, string>): Factory => ({
 });
 
 /** A step of `run` at work by `agent` since `since`. */
-const atWorkBy = (run: RunSummary, step: string, agent: string, since: number): RunSummary => ({
+const atWorkBy = (run: RunView, step: string, agent: string, since: number): RunView => ({
   ...run,
-  steps: [...run.steps.filter((s) => s.name !== step), { ...run.steps[0], name: step, message: 'running', agent, since: at(since) }],
+  steps: [
+    ...run.steps.filter((s) => s.name !== step),
+    { ...run.steps[0], name: step, message: 'running', spec: givenAgent(agent), timeline: atWorkSince(at(since)) },
+  ],
 });
 
 const landedToday = ended('r-landed', 'succeeded', DAY + 10 * MIN, 6);
@@ -188,7 +194,7 @@ test("runsOutAt and quotaLineOf: when a window runs out, and the quota's line", 
 });
 
 /** Tokens of a run: `total` split over the four kinds, `unmeasured` sessions besides. */
-const tokensOf = (total: number, unmeasured = 0, more: Partial<NonNullable<RunSummary['tokens']>> = {}): RunSummary['tokens'] => ({
+const tokensOf = (total: number, unmeasured = 0, more: Partial<NonNullable<RunView['tokens']>> = {}): RunView['tokens'] => ({
   total,
   input: total / 2,
   output: total / 2,
@@ -218,8 +224,8 @@ test('stripOf: what counts today, landed, failed, waiting and spent', async (t) 
     assert.deepEqual([s.landed, s.perLanding], [2, 6]);
   });
   await t.test('a step not at work is no row, though its task started: one that asks a person waits on them', () => {
-    const asks = atWorkBy(summary([['plan', 'running']], { id: 'r-asks' }), 'plan', 'iris', NOW - 3 * MIN);
-    asks.steps[0] = { ...asks.steps[0], ...coded('needs-human') };
+    const working = atWorkBy(summary([['plan', 'running']], { id: 'r-asks' }), 'plan', 'iris', NOW - 3 * MIN);
+    const asks = { ...working, steps: working.steps.map((s) => ({ ...s, ...coded('needs-human') })) };
     const s = stripOf({ runs: [asks], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
     assert.deepEqual([s.rows.length, s.agents.count, s.sessions.count], [0, 0, 0]);
   });
@@ -241,9 +247,9 @@ test('stripOf: what counts today, landed, failed, waiting and spent', async (t) 
     const quiet = stripOf({ runs: [idleSinceYesterday], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
     assert.deepEqual([quiet.waitsOnYou, quiet.spentUsd], [1, 0], 'an open run not worked since midnight spends nothing today');
     assert.equal(dollars(null), '—');
-    assert.equal(dollars(7.851), '$7.85', 'to the cent below $10');
-    assert.equal(dollars(12.684), '$13', 'whole from $10, so a sticker stays as narrow');
-    assert.equal(dollars(230.4), '$230');
+    assert.equal(dollars(7.851), '$7.85', 'to the cent');
+    assert.equal(dollars(12.684), '$12.68', 'to the cent above $10 too, as every page says an amount');
+    assert.equal(dollars(230.4), '$230.40');
   });
   await t.test("REFUSED: Spent's tokens of a run Spent does not count: they are those of exactly the runs worked today", () => {
     const today = { ...landedToday, tokens: tokensOf(800, 1) };

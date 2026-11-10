@@ -27,7 +27,7 @@ runtime's `contract.test.ts`, the web's and the cli's `structure.test.ts`):
 
 - the web reaches the api over HTTP alone, and the shapes of what it serves by `objects` (`apps/web/test/structure.test.ts`, and the
   web's lint block);
-- the cli reaches the api over HTTP alone, the shapes of its answers by `import type` from `apps/api/src/client/client.ts`, the store's
+- the cli reaches the api over HTTP alone, the shapes of its answers by `objects`' Schemas and the error body by `import type` from `apps/api/src/client/client.ts`, the store's
   daemon by its lease (`daemon.json`'s `url`) in `src/where.ts`, and the in-process path by spawning `agent-orchestrator/bin` from
   `src/local.ts` (`apps/cli/test/structure.test.ts`, the cli's lint block, and the resolve in
   `packages/agent-orchestrator/test/contract.test.ts`). What it does not move — `decide` and every write but one — stays on that path;
@@ -72,7 +72,7 @@ not that session's end — its run file says `idle`, its input stays open, and a
 idle (`idleOf`), with `held` and the holder's `pid` on it.
 
 **The claude.ai bridge of any Claude Code session is the runtime's**, opened through the Agent SDK's own control request on the
-`query()` object at the session's `system`/`init` message (`enableBridge`, `bridgeDue`, `src/harness/claude/attached-bridge.ts`), for
+`query()` object at the session's `system`/`init` message (`enableBridge`, `bridgeDue`, `src/harness/claude/session-bridge.ts`), for
 a job and a held session alike; its facts kept on the run file (a job's on the bridge file beside its run) and its link answered on the
 sighting. A job's bridge closes with it. A session whose SDK carries no such request runs on without one and says why.
 
@@ -264,7 +264,7 @@ was read at, and an agent of yours tried on a short brief, each one entry of the
 (`src/agents/library.verb.ts`, `src/skills/skills.verb.ts`, `src/workflows/workflows.verb.ts`), its handler refusing a place but yours. The
 command line reads a person's file or draft folder into the form the board sends (`src/cli/writers.ts`); the api guards the write and
 words the board's answer. Both sides hand a handler only what its one spec gives it (`test/writers-cli.test.ts`,
-`apps/api/src/commands/writers.test.ts`).
+`apps/api/src/agents/writers.test.ts`).
 
 **A proposal is how a factory's definitions change by an agent's hand**, and each layer owns one part of it. The kinds are
 `objects`'s (`Proposal` and `Delegation`, `packages/objects/src/proposal.ts` and `delegation.ts`, their words closed in `words.ts`:
@@ -335,14 +335,19 @@ own `continue` token. The
 board reads the object, each step's tries and told at `…/steps/:step/tries` and `…/steps/:step/told`, keyed by the step's stamp so a step
 reads again only when it moved, and the lines once at `GET /api/runs/:runId/lines` (`RunLinesAnswer`, mirrored by hand); the api's tests
 read the same. The run's named actions — its start (`POST /api/namespaces/<factory>/runs`), removal, refresh, prune, labels and hold,
-and a step's retry, approval and words — are endpoints of the same `Api` on the namespaced path alone, each served through the pipeline a
-route the command table generates runs (`commandAnswered`, `apps/api/src/commands/routes.ts`). The api serves the object, its list, its
+and a step's retry, approval and words — are endpoints of the same `Api` on the namespaced path alone, each handler calling the
+orchestrator's entry by its exported name with its typed `input` (`apps/api/src/objects/runs.ts`). The api serves the object, its list, its
 sub-resources and its actions through the `Api` of `objects` (`apps/api/src/objects/`, off the command table's entries and the app's one
 informer), and its OpenAPI 3.1 document is `OpenApi.fromApi(Api)` (`apps/api/src/openapi/`, printed by its `print.ts`), and `GET /openapi` serves a page to browse it (Scalar's
 reference, its script served by the api from the installed package, reading the document at its route). The board reads the Run and
 the Card through a client made from the same `Api` (`apps/web/src/lib/api/objects.ts`), with no schema of its own for either.
 
-**In the api today, below its layer**: `src/capabilities/reach.ts` re-implementing permission matching. Its readers that touch the machine
+**What a harness can do is the runtime's**: each harness declares it once (`HarnessDeclaration`, agent-runtime's
+`src/harness/declaration.ts`), and every check above that used to name a harness reads the declaration — the orchestrator through
+`agent-runtime/vocabulary`, the api through the orchestrator. Claude Code's permission matching and the tool sets measured on it have
+moved there too (`src/harness/claude/rules.ts`, `CLAUDE_DECLARATION.rules`); the api's `src/capabilities/reach.ts` keeps only `reachOf`.
+
+**In the api today, below its layer**: what remains of it is counted. Its readers that touch the machine
 are counted against a baseline that only shrinks (`MOVES` in `apps/api/test/kinds.test.ts`), each entry naming the card that moves it,
 else the move and where it goes.
 
@@ -432,7 +437,7 @@ writes) and a memory stand-in (`workflowDoorMemory`, `src/workflows/memory.store
 (`test/workflow-walks.ts`). A write checks each step's name, then the draft through the model's `Workflow`, whose checks are its
 invariants (one step at least, no name twice, every `after:` naming a step of it, no steps waiting on each other), and then the version
 it was read at, judged by a pure function (`workflowVersionRefusal`, `src/folder/folder.ts`, which `contracts/workflow-version.contract.ts`
-proves). What still calls the folder's stores is counted per file in `test/workflow-door.baseline.ts`, which only shrinks; `write.store.ts`'s
+proves). What once called the folder's stores around the door is paid, and its store test refuses any use; `write.store.ts`'s
 functions each take the store's root first (`writeWorkflowAt`, `isWorkflowsHolderAt`, `knownReposAt`, `placesAroundAt`), its old
 spellings the same functions at the module's root. A read and a write parse the steps against the agents and skills the door finds
 through the Agent and Skill doors (`agents.found`, `skills.found`), at the places its layer says (`around`), and hand them to the layer:
@@ -472,8 +477,8 @@ the place's skills, then Nemia's builtin skills, found last. A write checks the 
 `Skill`, then the version it was read at, judged by `definitionVersionRefusal` (`src/agents/agents.ts`,
 `contracts/definition-version.contract.ts`) before either layer acts; the place, a link, a sidecar and a step still naming an agent stay
 the files' own refusals. What still calls the agent and skill stores — the folder's load for its synchronous readers and the version,
-the roster, a start, the tick, the revisions pinned, a template, the sources — is counted per file in `test/agent-door.baseline.ts`,
-which only shrinks. The api reads agents and skills through the two doors alone, each handler running its program over the request's
+the roster, a start, the tick, the revisions pinned, a template, the sources — once went around the door; that debt is paid, and its
+store test refuses any use. The api reads agents and skills through the two doors alone, each handler running its program over the request's
 own services (`inRequest`, `apps/api/src/layer.ts`), so the door is the app's rooted one or the stand-in a test merged into the app's
 layer; `src/agents/agent-door.store.test.ts` counts the api's calls of the stores, none allowed. The stand-ins reach the api's tests on
 the testing entry (`agent-orchestrator/testing`, `packages/agent-orchestrator/testing.ts`) beside the test place, never a program.
@@ -486,7 +491,7 @@ built the one way (`subscriptionDoorOver`), the files (`subscriptionFiles(home)`
 once, checked by `SubscriptionName.OnCreate` and the model's `Subscription` — a name taken is `Conflict` (the files' `wx`), one dropped
 that is not there `Missing` — and a delivery written is decoded through the model's `Delivery`. Its list answers the unreadable ones
 apart (`left`), and the deliverer says each once: the store writes no stderr. A delivery's cursor may fall below where its subscription
-began, since a cut feed sets it to 0. What still calls its module spellings is counted in `test/subscription-door.baseline.ts`.
+began, since a cut feed sets it to 0. What once called its module spellings is paid, and its store test refuses any use.
 
 **The Ledger door.** The revision ledger — the numbers each content of a workflow, an agent, a skill or a factory's rules was given —
 is read and appended to through `LedgerDoor` (`packages/agent-orchestrator/src/revisions/revisions.store.ts`), by `RevisionOf`, a kind
@@ -648,11 +653,11 @@ the entry files, `main.ts`, `app.ts` and `layer.ts`, which may read the environm
 which import no node:fs (nor fs/promises), node:child_process, node:http, node:https, node:net or node:os, nor `@hono/node-server`,
 and read neither `process.env` nor `fetch`. A reader that does today is listed with what it reaches (`MOVES`), and the list only
 shrinks. Its `src/` is a folder per page or verb a
-person uses — `runs/`, `objects/` (the handlers of `objects`' `Api`, the run object and the cards, built into one web handler mounted on Hono's routes for the paths it serves), `openapi/`, `steps/`, `decide/`, `asks/`, `inbox/`, `factory/`, `capabilities/`, `workflows/`,
+person uses — `runs/`, `objects/` (the handlers of the run object and the cards, and the mount that serves every endpoint of `objects`' `Api`, the one route table, under Hono as host), `openapi/`, `steps/`, `decide/`, `server/`, `nemia/`, `asks/`, `inbox/`, `factory/`, `capabilities/`, `workflows/`,
 `agents/`. The root holds `main.ts`, `app.ts`, `port.ts`, `guard.ts`, `store.ts`, `layer.ts` (the services a handler reads, and
-`served`, which runs it on the app's `ManagedRuntime`) and `body.ts` (the request-body reader every folder uses) and nothing else.
+`served`, which runs it on the app's `ManagedRuntime`) and nothing else; the mount decodes a body by its endpoint's Schema (`decodeRefused`, `objects/serve.ts`).
 Its folders keep the rule every package keeps, *Folders, in every package* below; a folder of two files or more has a face,
-`index.ts`, which holds only re-exports by name, and one of one file has none. `app.ts` mounts each folder through its face. An
+`index.ts`, which holds only re-exports by name, and one of one file has none. `app.ts` mounts `objects`' `Api` once, and each folder's handlers are built from it through its face. An
 import between two folders names the file it needs wherever the face would close a cycle — `steps/` reads a run's try — since a cycle
 of values passes the typecheck and fails only as the modules load. Test: `apps/api/test/layout.test.ts`.
 

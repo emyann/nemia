@@ -8,7 +8,7 @@ import { rootGiven } from '../config/root.store.ts';
 import { tried } from '../runtime-client.ts';
 import type { Args } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { PAUSE, PAUSE_NOW, PAUSED, RESUME } from '../command/runs.verb.ts';
+import { PAUSE, PAUSE_NOW, PAUSED, RESUME } from './commands.verb.ts';
 import { timeoutAt, putTimeout, type TimeoutAt } from './pause-timeout.store.ts';
 import { timeoutRefusal, timeoutWords } from './pause.ts';
 

@@ -5,7 +5,7 @@ import { LinkButton } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { Separator } from '@/components/ui/separator';
-import type { Factory, FactorySchedule } from '../../lib/api';
+import type { Factory, FactorySchedule } from '../../lib/api/factories.ts';
 import { fireWord } from '../../lib/schedules';
 import { useNow } from '../../lib/useNow';
 import { CopyButton } from '../command/CopyButton';

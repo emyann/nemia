@@ -1,7 +1,8 @@
 /**
- * The board's view of one run, as its pages draw it: composed from the run object (`runObjectQuery`), every step's tries and what it was
- * told (`stepTriesQuery`, `stepToldQuery`), and the run's lines (`runLinesQuery`). Not a mirror of the api: every type here is made from
- * the objects' own types (`objects`) and the lines' (`RunLines`), under the names the run's components read.
+ * A run's detail (`RunDetail`), as its page, its bar and its previews draw it: the board's one view of the run (`RunView`, api/judged.ts)
+ * with what its page reads beside the object — every step's tries and what it was told (`stepTriesQuery`, `stepToldQuery`), and the
+ * run's lines (`runLinesQuery`). Not a mirror of the api: every type here is made from the objects' own types (`objects`) and the lines'
+ * (`RunLines`), under the names the board's components read.
  */
 import { useMemo } from 'react';
 import {
@@ -13,34 +14,19 @@ import {
   type QueryKey,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import type { Run, RunSpec, RunSpecStep, RunStatus, RunStepStatus, StepTold, StepTry } from 'objects';
+import type { Run, RunStepStatus, StepTold, StepTry } from 'objects';
+import { runViewOf, type RunStep, type RunView } from './api/judged.ts';
 import type { StepCloseout, StepTry as StepTryRead, StepUnreadable } from './api/tries.ts';
 import type { WorkflowPageAddress } from './api/address.ts';
-import { runGone, runLinesQuery, runObjectQuery, stepToldQuery, stepTriesQuery, type RunLines, type StepCommands } from './api/run.ts';
+import { readGone, runLinesQuery, runObjectQuery, stepToldQuery, stepTriesQuery, type RunLines, type StepCommands } from './api/run.ts';
 import { stepStamp } from './lifecyclePath.ts';
 import type { Frozen } from './frozen.ts';
 
-/** An edge of the run's graph as its pages draw it: what a step waits on, and a loop; never what it is handed (`input`). */
-export type RunViewEdge = Exclude<RunStatus['graph']['edges'][number], { kind: 'input' }>;
-
-/** A step as the run froze it. Null where the run froze none of it. */
-export type StepSpecView = Omit<RunSpecStep, 'name' | 'input'>;
-
-/** What the engine filed a step's current try with. */
-export type StepFiledView = NonNullable<RunStepStatus['filed']>;
-
 /**
- * One step of the view: its status in the object, its frozen spec, its lines, what it was told, and its tries whole, with its current
- * try's closeout, or why it could not be read.
- *
- * Its closeout, its tries and its current try's short (`current`, absent from the page) are typed as the decision's mirror has them
- * (`api/tries.ts`), read only, which the objects' ones are too. `current` is optional for a view built with no try read, as a
- * workflow's unstarted run is (`unstartedRun`).
+ * One step of a run's detail: the step (`RunStep`), its lines, what it was told, and its tries whole, with its current try's closeout, or
+ * why it could not be read. Its closeout and its tries are typed as the tries' reads have them (`api/tries.ts`), read only.
  */
-export type StepView = Omit<RunStepStatus, 'status' | 'filed' | 'current'> & {
-  readonly current?: RunStepStatus['current'];
-  readonly spec: StepSpecView | null;
-  readonly filed: StepFiledView | null;
+export type StepView = RunStep & {
   readonly commands: StepCommands;
   readonly body: string | null;
   readonly told: string | null;
@@ -51,58 +37,29 @@ export type StepView = Omit<RunStepStatus, 'status' | 'filed' | 'current'> & {
   readonly tries: readonly Frozen<StepTryRead>[];
 };
 
-/** One run as its pages draw it: its object's spec and status, its lines, and its steps (`StepView`). */
-export type RunView = Pick<
-  RunSpec,
-  'brief' | 'repo' | 'place' | 'work' | 'workflowDir' | 'try' | 'baseRef' | 'branch' | 'isolate' | 'after' | 'context'
-> &
-  Omit<RunStatus, 'graph' | 'steps' | 'timeline'> & {
-    /** The run's whole label map, as its record's `metadata.labels` says it: its own, `workflow`, and `factory` when it names one. */
-    labels: Readonly<Record<string, string>>;
-    readonly id: string;
-    readonly createdAt: string;
-    /** The line that prints what there is to decide on the run. */
-    readonly decide: string;
-    /** The line that takes the new revisions. */
-    readonly refresh: string;
-    readonly workflowPage: WorkflowPageAddress | null;
-    /** The inbox card the run was started from, and the words that say so: both absent for a run started from none. */
-    readonly from?: { readonly inbox: string };
-    readonly fromNote?: string;
-    readonly graph: {
-      readonly roots: readonly string[];
-      readonly edges: readonly RunViewEdge[];
-      /** Its conditions and workflow nodes beside its steps: absent on a workflow with neither. */
-      readonly nodes?: RunStatus['graph']['nodes'];
-    };
-    readonly steps: readonly StepView[];
-    readonly timeline: Pick<RunStatus['timeline'], 'rounds' | 'run'>;
-  };
-
-/** The view's spec of a step, from the object's frozen step; null for a step the run froze none of. */
-const specOf = (s: RunSpecStep | undefined): StepSpecView | null => {
-  if (!s) return null;
-  const { name: _name, input: _input, ...rest } = s;
-  return rest;
+/**
+ * A run's detail, as its page, its bar and its previews draw it (`runDetailOf`): the run's view (`RunView`) with its lines, and each step
+ * with what was read of it (`StepView`).
+ */
+export type RunDetail = Omit<RunView, 'steps'> & {
+  /** The line that prints what there is to decide on the run. */
+  readonly decide: string;
+  /** The line that takes the new revisions. */
+  readonly refresh: string;
+  readonly workflowPage: WorkflowPageAddress | null;
+  /** The words that say which inbox card the run was started from: absent for a run started from none. */
+  readonly fromNote?: string;
+  readonly steps: readonly StepView[];
 };
 
 /** No lines for a step the lines name none of: a step not frozen, which the api builds none for. */
 const NO_LINES: StepCommands = { approve: '', retry: '', say: '' };
 
-/** One step of the view, from its status in the object, the frozen steps, its tries whole and what it was told. */
-const stepViewOf = (
-  step: RunStepStatus,
-  frozen: readonly RunSpecStep[],
-  lines: RunLines,
-  tries: readonly StepTry[],
-  told: StepTold | null,
-): StepView => {
-  const { status: _word, filed, ...rest } = step;
+/** One step of the detail, from the step, the lines, its tries whole and what it was told. */
+const stepViewOf = (step: RunStep, lines: RunLines, tries: readonly StepTry[], told: StepTold | null): StepView => {
   const current = tries.find((t) => t.current);
   return {
-    ...rest,
-    spec: specOf(frozen.find((s) => s.name === step.name)),
-    filed,
+    ...step,
     commands: lines.steps[step.name] ?? NO_LINES,
     body: told?.body ?? null,
     told: told?.told ?? null,
@@ -115,44 +72,23 @@ const stepViewOf = (
 };
 
 /**
- * The view of a run (`RunView`): the object's spec and status under the names its pages read, its lines, the graph without what a step is
- * handed, and each step with its tries and what it was told — none and nothing for a step whose sub-resources were not read.
+ * The detail of a run (`RunDetail`): its view (`runViewOf`), its lines, and each step with its tries and what it was told — none and
+ * nothing for a step whose sub-resources were not read.
  */
-export const runViewOf = (
+export const runDetailOf = (
   object: Run,
   lines: RunLines,
   tries: Readonly<Record<string, readonly StepTry[] | undefined>>,
   told: Readonly<Record<string, StepTold | null | undefined>>,
-): RunView => {
-  const { metadata, spec, status } = object;
-  const { graph, steps, timeline, ...judged } = status;
+): RunDetail => {
+  const view = runViewOf(object);
   return {
-    ...judged,
-    id: metadata.name,
-    createdAt: metadata.creationTimestamp,
-    labels: metadata.labels,
-    brief: spec.brief,
-    repo: spec.repo,
-    place: spec.place,
-    work: spec.work,
-    workflowDir: spec.workflowDir,
-    try: spec.try,
-    baseRef: spec.baseRef,
-    branch: spec.branch,
-    isolate: spec.isolate,
-    after: spec.after,
-    context: spec.context,
-    ...(spec.from ? { from: spec.from, fromNote: lines.fromNote ?? '' } : {}),
+    ...view,
+    ...(view.from ? { fromNote: lines.fromNote ?? '' } : {}),
     decide: lines.decide,
     refresh: lines.refresh,
     workflowPage: lines.workflowPage,
-    graph: {
-      roots: graph.roots,
-      edges: graph.edges.filter((e): e is RunViewEdge => e.kind !== 'input'),
-      ...(graph.nodes ? { nodes: graph.nodes } : {}),
-    },
-    steps: steps.map((step) => stepViewOf(step, spec.steps, lines, tries[step.name] ?? [], told[step.name] ?? null)),
-    timeline: { rounds: timeline.rounds, run: timeline.run },
+    steps: view.steps.map((step) => stepViewOf(step, lines, tries[step.name] ?? [], told[step.name] ?? null)),
   };
 };
 
@@ -205,15 +141,15 @@ function useStepReads(
   return { tries: tries.data, told: told.data, error: tries.error ?? told.error };
 }
 
-/** The view of `object` with its lines and its steps' reads, each step's by its name. */
-const viewOf = (
+/** The detail of `object` with its lines and its steps' reads, each step's by its name. */
+const detailOf = (
   object: Run,
   lines: RunLines,
   tries: ReadonlyArray<readonly StepTry[] | undefined>,
   told: ReadonlyArray<StepTold | null | undefined>,
-): RunView => {
+): RunDetail => {
   const steps = object.status.steps;
-  return runViewOf(
+  return runDetailOf(
     object,
     lines,
     Object.fromEntries(steps.map((step, i) => [step.name, tries[i]])),
@@ -222,24 +158,24 @@ const viewOf = (
 };
 
 /**
- * The view of the run `id`, and the error of its object's last read — a run gone (`runGone`) is said by the page, which keeps what it
+ * The detail of the run `id`, and the error of its object's last read — a run gone (`readGone`) is said by the page, which keeps what it
  * last read. Its object and lines are suspense reads, which the route's loader has read (`loadRun`); each step's tries and told are read
  * under its stamp (`useStepReads`).
  */
-export function useRunView(id: string): { view: RunView; error: unknown } {
+export function useRunView(id: string): { view: RunDetail; error: unknown } {
   const { data: object, error } = useSuspenseQuery(runObjectQuery(id));
   const { data: lines } = useSuspenseQuery(runLinesQuery(id));
   const { tries, told } = useStepReads(id, object.status.steps);
-  const view = useMemo(() => viewOf(object, lines, tries, told), [object, lines, tries, told]);
+  const view = useMemo(() => detailOf(object, lines, tries, told), [object, lines, tries, told]);
   return { view, error };
 }
 
 /**
- * The view of the run `id` where no loader has read it — a bar, a preview, a try — and the error of its object's or its lines' last
+ * The detail of the run `id` where no loader has read it — a bar, a preview, a try — and the error of its object's or its lines' last
  * read. Undefined until the object, the lines and every step's tries and told are read, so it is drawn whole or not at all; once drawn it
  * stays, through a failed read (a run gone keeps what it last read) and while a step that moved is read again.
  */
-export function useRunRead(id: string): { view: RunView | undefined; error: unknown } {
+export function useRunRead(id: string): { view: RunDetail | undefined; error: unknown } {
   const object = useQuery(runObjectQuery(id));
   const lines = useQuery(runLinesQuery(id));
   const { tries, told, error: stepError } = useStepReads(id, object.data?.status.steps ?? NO_STEPS);
@@ -247,7 +183,9 @@ export function useRunRead(id: string): { view: RunView | undefined; error: unkn
   const said = lines.data;
   const view = useMemo(
     () =>
-      run && said && tries.every((t) => t !== undefined) && told.every((t) => t !== undefined) ? viewOf(run, said, tries, told) : undefined,
+      run && said && tries.every((t) => t !== undefined) && told.every((t) => t !== undefined)
+        ? detailOf(run, said, tries, told)
+        : undefined,
     [run, said, tries, told],
   );
   return { view, error: object.error ?? lines.error ?? stepError };
@@ -255,7 +193,7 @@ export function useRunRead(id: string): { view: RunView | undefined; error: unkn
 
 /**
  * What a run's page loads before it draws: the run object into `client`'s cache (`runObjectQuery`), then its lines and every step's tries
- * and told at once, so the page draws whole on its first paint; and `gone` when the store has no such run (`runGone`), so the page says so
+ * and told at once, so the page draws whole on its first paint; and `gone` when the store has no such run (`readGone`), so the page says so
  * in place of a failure. Any other failure is thrown, for the route's error to say.
  */
 export const loadRun = (client: QueryClient, id: string): Promise<{ gone: boolean }> =>
@@ -272,7 +210,7 @@ export const loadRun = (client: QueryClient, id: string): Promise<{ gone: boolea
         }),
       ]).then(() => ({ gone: false })),
     (error: unknown) => {
-      if (runGone(error)) return { gone: true };
+      if (readGone(error)) return { gone: true };
       throw error;
     },
   );

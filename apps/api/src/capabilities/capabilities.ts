@@ -11,7 +11,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { Context, Effect, Layer } from 'effect';
 import { MCP_TRANSPORTS as HARNESS_TRANSPORTS, transportOf, type McpTransport as HarnessTransport, type Running } from 'agent-orchestrator';
-import { WorkflowError, readFrontmatter, splitFrontmatter } from 'agent-orchestrator/workflow';
+import { CLAUDE_RULES, WorkflowError, readFrontmatter, splitFrontmatter } from 'agent-orchestrator/workflow';
 import type { FrontmatterEntry } from 'agent-orchestrator/workflow';
 
 /** A skill or an agent: what its frontmatter calls it, what it says it is for, and the file it was read from. */
@@ -74,7 +74,7 @@ export type Capabilities = {
   asked: DeniedRule[];
   /**
    * `permissions.allow` in `.claude/settings.json`, in its order: what a session runs without asking, beside what asks for no rule — Claude
-   * Code's read-only commands (`READ_ONLY_COMMANDS`) among it. In `dontAsk`, all it runs of what asks.
+   * Code's read-only commands (`CLAUDE_RULES.readOnlyCommands`) among it. In `dontAsk`, all it runs of what asks.
    */
   allowed: DeniedRule[];
   /** A file that is there and does not read: what was left out because of it, and the fix. */
@@ -162,7 +162,7 @@ export async function capabilitiesOf(
       const answer = await asker(repo, stdio, launch, deadlineMs);
       return {
         ...entry,
-        tools: answer.tools?.map((tool) => ({ ...tool, denied: denyingRule(deny, server.name, tool.name) })) ?? null,
+        tools: answer.tools?.map((tool) => ({ ...tool, denied: CLAUDE_RULES.denyingRule(deny, server.name, tool.name) })) ?? null,
         error: answer.error,
         checkedAt: answer.checkedAt,
       };
@@ -178,147 +178,6 @@ export async function capabilitiesOf(
     allowed: allow.map((rule) => ({ rule, source: SETTINGS })),
     warnings,
   };
-}
-
-/**
- * What a measurement carries so that it is never read as current: the harness it was taken on, that harness's version, the day, and where
- * it is recorded.
- */
-export type Dated = { harness: string; version: string; measuredAt: string; source: string };
-
-/**
- * `measurement`, refused unless it says what it was taken on and when: a harness named, a version numbered as Claude Code numbers its own
- * (`2.1.272`), a day that is on the calendar, written `YYYY-MM-DD` — not the 30th of February — and where it is recorded. A list without
- * them reads as a claim about today, which nothing here can check: the page says which day and which version, and those are all that hold
- * it to what was measured.
- */
-export function dated<T extends Dated>(name: string, measurement: T): T {
-  const { harness, version, measuredAt, source } = measurement as Partial<Dated>;
-  const said = (value: unknown): value is string => typeof value === 'string' && value.trim() !== '';
-  const at = said(measuredAt) && /^\d{4}-\d{2}-\d{2}$/.test(measuredAt) ? new Date(`${measuredAt}T00:00:00Z`) : null;
-  const day = at !== null && !Number.isNaN(at.getTime()) && at.toISOString().startsWith(measuredAt as string);
-  const wrong = [
-    ...(said(harness) ? [] : ['no `harness`']),
-    ...(said(version) && /^\d+\.\d+\.\d+$/.test(version)
-      ? []
-      : [`no \`version\` numbered as 2.1.272 (${JSON.stringify(version ?? null)})`]),
-    ...(day ? [] : [`no \`measuredAt\` day written as 2026-09-15 (${JSON.stringify(measuredAt ?? null)})`]),
-    ...(said(source) ? [] : ['no `source`']),
-  ];
-  if (wrong.length === 0) return measurement;
-  throw Object.assign(
-    new Error(
-      `${name} has ${wrong.join(', ')}. A measurement is data of one day and one version: give it the day it was taken, the version it was taken on, and where that is recorded.`,
-    ),
-    { exitCode: 2 },
-  );
-}
-
-/**
- * The read-only commands as `dated` holds a measurement, and more: `measured` and `documented` each a list of commands, one word each, with
- * none listed twice and none both measured and documented, and `docs` saying when the docs were read.
- */
-export function readOnlyCommands<T extends Dated & { measured: readonly string[]; documented: readonly string[]; docs: string }>(
-  name: string,
-  commands: T,
-): T {
-  dated(name, commands);
-  const listed = (value: unknown): value is readonly string[] =>
-    Array.isArray(value) && value.every((c) => typeof c === 'string' && /^[a-z][\w-]*$/.test(c));
-  const { measured, documented, docs } = commands as Partial<T>;
-  const all = [...(listed(measured) ? measured : []), ...(listed(documented) ? documented : [])];
-  const twice = [...new Set(all.filter((c, i) => all.indexOf(c) !== i))];
-  const wrong = [
-    ...(listed(measured) && measured.length > 0 ? [] : ['no `measured` list of commands, one word each']),
-    ...(listed(documented) ? [] : ['no `documented` list of commands, one word each']),
-    ...(twice.length === 0 ? [] : [`${twice.join(', ')} listed twice`]),
-    ...(typeof docs === 'string' && /read \d{4}-\d{2}-\d{2}$/.test(docs)
-      ? []
-      : ['no `docs` ending in the day they were read ("read 2026-09-16")']),
-  ];
-  if (wrong.length === 0) return commands;
-  throw Object.assign(new Error(`${name} has ${wrong.join(', ')}. Fix the list where it is declared.`), { exitCode: 2 });
-}
-
-/**
- * Why a tool the fenced reviewer had is taken to be in the unfenced set: `tools:` narrows the harness's own set, and adds nothing to it.
- */
-const ON_THE_FENCED =
-  "Not named by the unfenced measurement. The fenced reviewer had it the same day, and `tools:` only narrows the harness's own set.";
-/** Why Edit and Write are taken to be in it: nothing measured names them. */
-const EDITS_WITH = 'Not named by any measurement. A step filed with no `tools:` changes files with it.';
-
-/**
- * What a Claude Code step with no `tools:` has: the harness's own set, as measured — `claude -p` spawned with the engine's flags, as an
- * `implement` step, on the day and the version it names (`measuredAt`, `version`), recorded where `source` says. Data with its date and
- * version, and nothing here asks the harness again: a later Claude Code may give another set, so the page says when and on which version
- * this was measured, and never that it is current.
- *
- * `tools` are the built-in tools that measurement names, as it writes them (`Cron*` and `Task*` a family each), and nothing else: the api's
- * test refuses a name the ledger's bullet does not write as a tool of its own. `inferred` are tools such a step is taken to have that no
- * unfenced measurement names, each with why, which the page marks as inferred and never as measured. `lacks` are the ones the measurement
- * found absent. MCP tools are in neither: the checkout's servers reach a step whatever its `tools:`
- * (packages/agent-orchestrator/docs/features.md, measured), and each lists its own.
- */
-export const MEASURED_TOOLS = dated('MEASURED_TOOLS', {
-  harness: 'Claude Code',
-  version: '2.1.270',
-  measuredAt: '2026-09-14',
-  source: 'docs/plan-hold-the-bar.md §4b, "what a worker gets, measured"',
-  tools: [
-    'Agent',
-    'Cron*',
-    'Monitor',
-    'NotebookEdit',
-    'RemoteTrigger',
-    'ScheduleWakeup',
-    'SendMessage',
-    'Task*',
-    'WebFetch',
-    'WebSearch',
-    'Workflow',
-  ],
-  inferred: [
-    { name: 'Bash', why: ON_THE_FENCED },
-    { name: 'Glob', why: ON_THE_FENCED },
-    { name: 'Grep', why: ON_THE_FENCED },
-    { name: 'Read', why: ON_THE_FENCED },
-    { name: 'Skill', why: ON_THE_FENCED },
-    { name: 'Edit', why: EDITS_WITH },
-    { name: 'Write', why: EDITS_WITH },
-  ],
-  lacks: ['Artifact', 'AskUserQuestion'],
-} as const);
-
-/**
- * The Bash commands Claude Code runs without a prompt in every mode, `dontAsk` among them, with no rule allowing them — unless a deny names
- * them, or an ask rule does, which makes one ask, and in `dontAsk` denied. Data with its date and version, as `MEASURED_TOOLS` is: nothing
- * here asks the harness again, and the page never says it is current.
- *
- * `measured` are what a session in `dontAsk` ran, under this repository's settings of the day `measuredAt` names, which allowed none of
- * them, recorded where `source` says: `cat`, `ls` and `grep` alone and `head` and `tail` in a pipe, while `node -e` was denied. That is
- * what was measured, and it stays so whatever the settings allow: a rule allowing `ls` proves nothing of that day's run, and takes nothing
- * from it. So nothing checks the list against the settings; `readOnlyCommands` holds its shape and its
- * date, and the page says the day. `documented` are the rest of what Claude Code's docs name, which say the set includes them, not that it
- * is all of it; `git` is its read-only forms, which they do not list.
- */
-export const READ_ONLY_COMMANDS = readOnlyCommands('READ_ONLY_COMMANDS', {
-  harness: 'Claude Code',
-  version: '2.1.272',
-  measuredAt: '2026-09-15',
-  source: "B9's last review (docs/plan-hold-the-bar.md §6 item 30)",
-  measured: ['cat', 'grep', 'head', 'ls', 'tail'],
-  documented: ['cd', 'diff', 'du', 'echo', 'find', 'git', 'pwd', 'stat', 'wc', 'which'],
-  docs: 'code.claude.com/docs/en/permissions, "Read-only commands", read 2026-09-16',
-} as const);
-
-/**
- * The rule in `deny` that refuses the tool `mcp__<server>__<tool>`, if one does: one naming the tool, the whole
- * server (`mcp__<server>`), or every tool of it (`mcp__<server>__*`). A rule naming a prefix of either refuses nothing.
- */
-export function denyingRule(deny: readonly string[], server: string, tool: string): string | null {
-  const prefix = `mcp__${server}`;
-  return deny.find((rule) => rule === `${prefix}__${tool}` || rule === prefix || rule === `${prefix}__*`) ?? null;
 }
 
 /** `.claude/skills/*\/SKILL.md`, by directory. A directory without a SKILL.md is not a skill. */
@@ -537,17 +396,26 @@ export class McpAsker extends Context.Service<McpAsker, AskServer>()('api/McpAsk
 const SAID_LINES = 20;
 
 /**
- * How long a server that failed to list its tools is given for the last of its stderr to arrive before the error quotes it: the transport
- * closes a server that exits before its stderr has been read to the end.
+ * The most a server that failed to list its tools, once stopped, is waited on for its stderr to end before the error quotes what it has
+ * printed: a stopped server's stderr ends as its process does, so this bounds only a stream that never says so.
  */
-const STDERR_SETTLE_MS = 50;
+const STDERR_END_MS = 2_000;
+
+/** When `stream` ends — its end, its close or its error — or at once where there is none. */
+const endOf = (stream: { once(event: string, listener: () => void): unknown } | null): Promise<void> =>
+  new Promise((resolve) => {
+    if (stream === null) return resolve();
+    for (const event of ['end', 'close', 'error']) stream.once(event, () => resolve());
+  });
 
 /** A server as the api starts it: its name, and the command and args `.mcp.json` writes, which an error quotes. */
 type Started = Pick<Declared, 'name' | 'args'> & { command: string };
 
 /**
  * Start the server as `launch` says, in the repository, ask it `tools/list` over stdio, and stop it. Succeeds with the tools, or with why
- * not and what it printed (after `STDERR_SETTLE_MS`), quoting the entry as `.mcp.json` writes it; never fails. The client and its server
+ * not and what it printed, quoting the entry as `.mcp.json` writes it; never fails. What it printed is read to its end: a server that
+ * failed is stopped (`client.close()`) and its stderr waited on until it ends (`endOf`, at most `STDERR_END_MS`), so a line it printed
+ * after the client saw it fail is quoted too; a server that never started has no stderr to wait on. The client and its server
  * are taken in the ask's scope and closed as it closes (`client.close()`: stdin ended, then SIGTERM, then SIGKILL), whatever ends it: an
  * answer, `deadlineMs` passed, or an interruption; a request of the listing still in flight is rejected by that close. The listing is given
  * no abort signal: the client closes itself on an aborted `connect` and does not wait for the server, which a close after it then misses.
@@ -555,7 +423,7 @@ type Started = Pick<Declared, 'name' | 'args'> & { command: string };
 export const serverAsk = (repo: string, server: Started, launch: Launch, deadlineMs: number): Effect.Effect<Answer> =>
   Effect.gen(function* () {
     let said = '';
-    const { client, transport } = yield* Effect.acquireRelease(
+    const { client, transport, ended } = yield* Effect.acquireRelease(
       Effect.sync(() => {
         const transport = new StdioClientTransport({
           command: launch.command,
@@ -565,7 +433,7 @@ export const serverAsk = (repo: string, server: Started, launch: Launch, deadlin
           stderr: 'pipe',
         });
         transport.stderr?.on('data', (chunk: Buffer) => (said = (said + chunk.toString()).slice(-16_000)));
-        return { transport, client: new Client({ name: 'nemia-api', version: '0.0.0' }) };
+        return { transport, client: new Client({ name: 'nemia-api', version: '0.0.0' }), ended: endOf(transport.stderr) };
       }),
       ({ client }) => Effect.promise(() => client.close().catch(() => {})),
     );
@@ -576,7 +444,7 @@ export const serverAsk = (repo: string, server: Started, launch: Launch, deadlin
       }),
       Effect.map((tools): Answer => ({ tools, error: null, checkedAt: new Date().toISOString() })),
       Effect.catch((err) =>
-        Effect.sleep(STDERR_SETTLE_MS).pipe(
+        stderrEnded(client, err, ended).pipe(
           Effect.map((): Answer => {
             const tail = said.trimEnd().split('\n').slice(-SAID_LINES).join('\n');
             const printed = tail ? `\nWhat it printed on stderr:\n${tail}` : '';
@@ -586,6 +454,18 @@ export const serverAsk = (repo: string, server: Started, launch: Launch, deadlin
       ),
     );
   }).pipe(Effect.scoped);
+
+/**
+ * A server that failed (`err`) stopped, and its stderr ended: at once for one that never started — no command to run, which printed
+ * nothing — else once the stream says so, at most `STDERR_END_MS` after the server was stopped.
+ */
+const stderrEnded = (client: Client, err: unknown, ended: Promise<void>): Effect.Effect<void> =>
+  (err as NodeJS.ErrnoException)?.code === 'ENOENT'
+    ? Effect.void
+    : Effect.promise(() => client.close().catch(() => {})).pipe(
+        Effect.andThen(Effect.promise(() => ended).pipe(Effect.timeoutOption(STDERR_END_MS))),
+        Effect.asVoid,
+      );
 
 /**
  * The tools a connected server lists, every page of them. A server that offers no tools — only prompts or resources — has no `tools/list`

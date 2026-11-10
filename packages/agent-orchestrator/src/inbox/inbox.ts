@@ -587,7 +587,7 @@ export function queueLine(q: QueueStarted): string {
  * factory picks said as such — and why; refused, how to have it tried again, and running `nemia up` elsewhere only when the daemon's
  * repository was the one; failed otherwise, that the tick tries it again. Empty for a card not tried.
  */
-function triedClause(l: InboxListing, unfactoredStarts: boolean): string {
+export function triedClause(l: InboxListing, unfactoredStarts: boolean): string {
   const t = l.tried;
   if (!t) return '';
   const said = l.error === null && !l.repo && (l.factory !== null || unfactoredStarts);
@@ -624,7 +624,7 @@ export function inboxLines(listing: readonly InboxListing[], unfactoredStarts = 
 /**
  * A started card's state as `nemia inbox` says it beside its run: its run's phase, and `waiting on you` for a run that waits on a person.
  */
-const phaseSaid = (state: CardState): string => (state === 'waiting' ? 'waiting on you' : state);
+export const phaseSaid = (state: CardState): string => (state === 'waiting' ? 'waiting on you' : state);
 
 /** What `nemia inbox` shows of each card's labels: all of them (`--show-labels`), and a segment per key asked for (`-L`), in order. */
 export type LabelsShown = { readonly showLabels?: boolean; readonly columns?: readonly string[] };

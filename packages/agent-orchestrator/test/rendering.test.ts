@@ -785,9 +785,10 @@ test("where a skill or an agent is found: the workflow's own root, the repositor
       },
     ],
     [
-      "F21's models: the three measured, and a name that only begins like one is not it",
+      "F21's models: the two measured, and a name that only begins like one is not it",
       () => {
-        assert.deepEqual([...CLAUDE_AUTO_DROPPED], ['haiku', 'claude-haiku-4-5', 'claude-sonnet-4-5'], 'a new one is measured first');
+        assert.deepEqual([...CLAUDE_AUTO_DROPPED], ['claude-haiku-4-5', 'claude-sonnet-4-5'], 'a new one is measured first');
+        assert.equal(autoDropped('claude', 'haiku', undefined), undefined, 'the alias resolves to a model that keeps `auto`');
         assert.ok(autoDropped('claude', 'claude-sonnet-4-5-20250929', undefined));
         assert.equal(autoDropped('claude', 'claude-sonnet-5', undefined), undefined);
       },

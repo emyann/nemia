@@ -6,17 +6,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { broughtFacts } from '../src/lib/brought.ts';
-import type { RunView } from '../src/lib/runView.ts';
+import type { RunDetail } from '../src/lib/runView.ts';
 import { coded, detail, step as fixtureStep, type Word } from './run-fixtures.ts';
 
-type Step = RunView['steps'][number];
+type Step = RunDetail['steps'][number];
 
 /** A step named `name` saying `word`, with no gate words, no raise, no denial and no try asked unless `over` gives one. */
 const step = (name: string, word: Word, over: Partial<Step> = {}): Step =>
   fixtureStep({ name, ...coded(word), approve: null, raise: null, denied: null, asked: null, needs: null, ...over });
 
 /** A run nobody holds or called off, holding `steps`, waiting on the person for `waiting`. */
-const run = (steps: Step[], waiting: string[], over: Partial<RunView> = {}): RunView =>
+const run = (steps: Step[], waiting: string[], over: Partial<RunDetail> = {}): RunDetail =>
   detail({ holding: null, cancelledAt: null, steps, waitingOnYou: waiting, ...over });
 
 const ASKED = { try: 2, mode: 'continue', model: null, message: null, stopFirst: false } as const;
@@ -36,7 +36,7 @@ test("broughtFacts: a step she brings, read as the run's page reads it", () => {
   const waiting = ['design', 'implement', 'lint', 'test', 'review', 'plan'];
   const live = run(steps, waiting);
 
-  const rows: Array<[string, RunView, string, ReturnType<typeof broughtFacts>]> = [
+  const rows: Array<[string, RunDetail, string, ReturnType<typeof broughtFacts>]> = [
     ['a step at its gate, waiting on you', live, 'design', { found: true, atGate: true, offer: null, asked: false }],
     ['signed off blocked', live, 'implement', { found: true, atGate: false, offer: 'answer', asked: false }],
     ['held on its budget', live, 'lint', { found: true, atGate: false, offer: 'raise', asked: false }],

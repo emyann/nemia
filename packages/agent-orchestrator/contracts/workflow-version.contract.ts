@@ -1,7 +1,7 @@
 /**
  * A write or a removal of a workflow folder, judged against the version it was read at (agent-orchestrator, src/folder/folder.ts,
  * `workflowVersionRefusal`): what is at the folder now (`WorkflowThere`), the version the writer read it at, if any, and the refusal's
- * kind, or null where the act goes on. The words are nobody's law; the kind is the api's answer (`REFUSAL_STATUS`).
+ * kind, or null where the act goes on. The words are nobody's law; the kind is the api's answer (its `refusedAs`).
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 import type { VersionRefused, WorkflowThere } from '../src/folder/folder.ts';

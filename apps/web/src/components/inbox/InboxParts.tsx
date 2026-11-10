@@ -5,7 +5,8 @@
 import { LabelTags } from '../field/Labels';
 import type { ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
-import { workflowNameOf, type CardState, type InboxEntry } from '../../lib/api';
+import { workflowNameOf } from '../../lib/api/workflows.ts';
+import { type CardState, type InboxEntry } from '../../lib/api/inbox.ts';
 import { hasPage, queueable, queueNeedsFactory, triedLine, unassigned, type CardRefusal } from '../../lib/inbox';
 import { instantWords } from '../../lib/instant';
 import { container } from '../../lib/meaning';
@@ -13,13 +14,7 @@ import { CARD_WORDS } from '../../lib/words';
 import { useNow } from '../../lib/useNow';
 import { FactoryTag } from '../factory/FactoryTag';
 import { Instant } from '../time/Instant';
-
-/** A button that does what its form or card is for. */
-export const PRIMARY =
-  'rounded bg-primary px-3 py-1.5 text-body-medium font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary';
-/** A button beside it. */
-export const SECONDARY =
-  'rounded border border-outline px-3 py-1.5 text-body-medium font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40';
+import { BUTTON_OUTLINED } from '../../lib/classes';
 
 /**
  * A card's line under its title: its name; the factory it names, linked to its floor, or, for a card that names none (`unassigned`),
@@ -78,7 +73,7 @@ export function QueueButtons({ entry, pending, onQueue }: { entry: InboxEntry; p
           type="button"
           disabled={pending}
           onClick={() => onQueue(false)}
-          className={SECONDARY}
+          className={BUTTON_OUTLINED}
           title="Start it on its own, in its factory and on its workflow, when a run slot frees"
         >
           {pending ? 'Queueing…' : 'Queue'}
@@ -89,7 +84,7 @@ export function QueueButtons({ entry, pending, onQueue }: { entry: InboxEntry; p
           type="button"
           disabled={pending}
           onClick={() => onQueue(true)}
-          className={SECONDARY}
+          className={BUTTON_OUTLINED}
           title="Take it off the queue: it waits on you to start it"
         >
           {pending ? 'Unqueueing…' : 'Unqueue'}
@@ -176,7 +171,7 @@ export function GoneItem({ entry, refusal, onDismiss }: { entry: InboxEntry; ref
             <span>Gone from the inbox since this page listed it.</span>
           </p>
         </div>
-        <button type="button" onClick={onDismiss} className={`${SECONDARY} shrink-0`}>
+        <button type="button" onClick={onDismiss} className={`${BUTTON_OUTLINED} shrink-0`}>
           Dismiss
         </button>
       </div>

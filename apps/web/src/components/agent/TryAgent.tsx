@@ -1,6 +1,9 @@
 import { useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { runGone, runsQuery, tryAgent, type AgentListing } from '../../lib/api';
+import { readGone } from '../../lib/api/gone.ts';
+import { runsQuery } from '../../lib/api/runs.ts';
+import { judged } from '../../lib/api/judged.ts';
+import { tryAgent, type AgentListing } from '../../lib/api/agents.ts';
 import { useRunRead } from '../../lib/runView';
 import { latestTryOf, TRY_FENCE, TRY_TERMS, tryHeld } from '../../lib/agents';
 import { costText } from '../../lib/cost';
@@ -31,7 +34,7 @@ function TryForm({ agent }: { agent: AgentListing }) {
   const [brief, setBrief] = useState('');
   const [started, setStarted] = useState<string | null>(null);
   const { data: runs } = useQuery(runsQuery);
-  const latest = latestTryOf(runs ?? [], agent.name);
+  const latest = latestTryOf((runs ?? []).filter(judged), agent.name);
   const shown = started ?? latest?.id ?? null;
   const field = useId();
   const start = useMutation({
@@ -108,7 +111,7 @@ export function TryRun({ id }: { id: string }) {
       {id}
     </RouteLink>
   );
-  if (runGone(error)) {
+  if (readGone(error)) {
     return (
       <p data-try-gone className="text-body-small text-muted-foreground">
         The try {code(id)} was removed.

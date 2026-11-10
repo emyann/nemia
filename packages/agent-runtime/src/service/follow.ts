@@ -1,7 +1,7 @@
 /** The engine's `follow` verb, and what refuses it: the session of a task's latest attempt, followed live by its harness. */
 import type { Harnessed } from './harnessed.ts';
 import { Effect, Schema } from 'effect';
-import { fold, nameFor, type Event, type State } from '../core/index.ts';
+import { fold, nameFor, unknownTask, type Event, type State } from '../core/index.ts';
 import type { JournalError } from '../core/engine/index.ts';
 
 /** A session `follow` will not follow, and why: a task the journal has no record of, a harness that does not stream. */
@@ -21,7 +21,7 @@ export const followVerbOf = (
   Effect.fn('Engine.follow')(function* (taskId: string) {
     const refuse = (message: string) => Effect.fail(new FollowRefused({ message }));
     const events = yield* read(taskId);
-    if (!events.length) return yield* refuse(`\`${taskId}\` is not a task in this store. \`ae ls\`, or \`list()\`, gives the ones it has.`);
+    if (!events.length) return yield* refuse(unknownTask(taskId));
     const state = fold(taskId, events);
     const { name: harness, runner } = harnessOf(state);
     const follow = runner.follow;

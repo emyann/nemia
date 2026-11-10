@@ -5,15 +5,15 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { RunView } from '../src/lib/runView.ts';
+import type { RunDetail } from '../src/lib/runView.ts';
 import { kindOf, stepCardOf, type StepCardFacts, type StepKind } from '../src/lib/stepCard.ts';
-import type { StepPhase } from '../src/lib/api/reasons.ts';
+import type { StepPhase } from 'objects';
 import type { StepState } from '../src/lib/status.ts';
 import { PERSON } from '../src/lib/words.ts';
-import { aCardOpen, CARD_REACH, cardOpened, previewSide, SHEET_QUERY } from '../src/lib/useSheetPreview.ts';
-import { coded, detail, step, summary, triedAs, type Word } from './run-fixtures.ts';
+import { aCardOpen, CARD_REACH, cardOpened, previewSide } from '../src/lib/useSheetPreview.ts';
+import { coded, detail, givenAgent, step, summary, triedAs, type Word } from './run-fixtures.ts';
 
-type Step = RunView['steps'][number];
+type Step = RunDetail['steps'][number];
 
 const NOW = new Date('2026-09-30T05:20:00.000Z');
 
@@ -50,8 +50,8 @@ const aTry = (n: number, round = 1): Step['tries'][number] => ({
 
 /** The card of `name` on a run of design, implement, review whose steps say `words`, its answer's steps `steps`. */
 function cardOf(name: string, words: Record<string, Word>, steps: Step[], agent: string | null = 'Ada'): StepCardFacts {
-  const row = summary(Object.entries(words));
-  row.steps = row.steps.map((s) => ({ ...s, agent: s.name === name ? agent : null }));
+  const listed = summary(Object.entries(words));
+  const row = { ...listed, steps: listed.steps.map((s) => ({ ...s, spec: s.name === name && agent ? givenAgent(agent) : null })) };
   return stepCardOf({
     run: row,
     step: name,
@@ -230,9 +230,6 @@ test("stepCardOf: a step's card in each of its states, its facts, its note and i
 });
 
 test("useSheetPreview: where a step's card opens, and which stays open", async (t) => {
-  await t.test('a preview opens as a sheet where no pointer hovers or the window is compact, under 600 pixels', () => {
-    assert.equal(SHEET_QUERY, '(hover: none), (max-width: 599px)');
-  });
   await t.test(
     "a step's card stands beside its rail where the window has room for it on a side, and under the rail where it has none",
     () => {

@@ -30,12 +30,12 @@
  * cycle can form (`test/boundary.test.ts`).
  */
 export { attemptVerdict, CHECK_RESULTS, checkVerdictOf, verdictWord, type CheckResult, type CheckVerdict } from './check/check.ts';
-export { VERSION } from './version/version.ts';
+export { VERSION } from './version/version.store.ts';
 export { leaseRelease, trialRefusal, checkoutPromiseLine, type Running } from './release/release.ts';
 export type { SessionHarness, SessionRelease } from './release/release.ts';
 export { currentRelease } from './release/release.store.ts';
 export { runningRelease } from './release/version.verb.ts';
-export { Conflict, Invalid, isRefusal, Missing, type Refusal } from './refusal/refusal.ts';
+export { Conflict, Forbidden, Invalid, isRefusal, Missing, type Refusal } from './refusal/refusal.ts';
 export { maxConcurrent, maxRuns, verifiesRest, wfRoot } from './config/config.store.ts';
 export { StoreRoot, storeRootLayer } from './config/root.store.ts';
 export {
@@ -49,7 +49,7 @@ export {
   parseGlobs,
   touchedLines,
 } from './branches/index.ts';
-export { LARGE_CONTEXT, budgetWord, dollars, peakMark, readWords, rebuiltCache, sumUsage, usedLines } from './status/status.ts';
+export { budgetWord, dollars, peakMark, readWords, rebuiltCache, sumUsage, usedLines } from './status/status.ts';
 export { answerIn, deniedWords, harnessWaitLine, isRepositoryRun, placeOf, waitingWords } from './run.ts';
 /**
  * The name the engine gives a task's session, which is the name `claude agents` lists it under: what a person is told to look for when
@@ -82,7 +82,7 @@ export {
   pruningBytes,
   sizeOf,
 } from './run.ts';
-export type { FeedSaid, FeedWords, FolderRun, Hold, PlaceKind, Pruned, PrunedFiles, PruneFacts, Pruning, RepositoryRun } from './run.ts';
+export type { FeedWords, Hold, PlaceKind, Pruned, Pruning, RepositoryRun } from './run.ts';
 export { BY_CAP, heldRefusal, holdAdvice, holdRefusal, holdsOf, holdWord, oneLine, WHY_CAP } from './run.ts';
 export {
   acceptAsk,
@@ -104,7 +104,6 @@ export {
   resultSteps,
   sendBackTo,
   toDecideWords,
-  budgetRefusal,
   roundBudgetRefusal,
   ceilingLines,
   forgetLine,
@@ -122,9 +121,7 @@ export {
   owedFields,
   roundDueNote,
   runCostLines,
-  runSpend,
   saidLines,
-  spentWord,
   stepSpend,
   taskSpend,
   tryNote,
@@ -133,36 +130,32 @@ export {
 } from './run.ts';
 export { envelopeRefusals, outputLines } from './closeout/index.ts';
 export { answersOr, askedQuestions, closeoutRefusals, questionLines } from './question/index.ts';
-export { budgetArgs, type ProposedBudget, type StepBudget } from './budget/budget.ts';
-export type { GateBudget, GateBudgets, GateBudgetsFrom } from './gate-budgets/gate-budgets.ts';
+export { type StepBudget } from './budget/budget.ts';
+export type { GateBudgets } from './gate-budgets/gate-budgets.ts';
 export { dueNote, messageRefusal, signoffsSpent } from './retry/index.ts';
 export { atWork, firstFiledAt, runStartedAt, runTokens, timeline, timelineLines, timelineTotalLines } from './timeline/index.ts';
 export type {
   Acceptance,
   Approval,
   AskName,
-  BranchFate,
   BranchStanding,
-  ToDecide,
   CloseoutAsked,
   ForgetHow,
   Forgot,
   ParentCloseout,
   ParentRun,
-  ParentStep,
   Raise,
   Round,
   RoundAsk,
   RunSlot,
   Said,
-  SaidTo,
   Landed,
   Spend,
   SpendOf,
   TaskSpend,
   Wait,
 } from './run.ts';
-export type { AtWork, RunTokens, SlotWait, TaskSpan, Timeline, TimelineTotal, TimelineTry } from './timeline/index.ts';
+export type { AtWork, RunTokens, TaskSpan, Timeline, TimelineTotal, TimelineTry } from './timeline/index.ts';
 export type { Retry, RetryAsk, RetryHow, RetryMode, StepRaise } from './retry/index.ts';
 export { agentUsers, formerKeyLines, workflowDescription, workflowFolder, workflowReadme, workflowsIn } from './folder/folder.store.ts';
 export { cardSkills, isBuiltinPlace, lookupRoots, oneFolder, preloads, skillsFor, skillVersion } from './skills/read.store.ts';
@@ -175,22 +168,19 @@ export { cardToStart, planLines, planStopped, type Card, type Planned } from './
 export {
   INBOX_KEY_MEANINGS,
   INBOX_KEYS,
-  ignoredRepoLine,
   inboxLines,
   inboxNameRefusal,
   noCardLine,
-  parseInboxCard,
   queueLine,
   queueOrder,
   workflowAt,
 } from './inbox/index.ts';
-export type { CardListing, CardRun, CardState, InboxCard, InboxListing, QueueStarted, MissedStart } from './inbox/index.ts';
+export type { CardRun, CardState, InboxListing, QueueStarted, MissedStart } from './inbox/index.ts';
 export {
   DEFAULT_FACTORY,
   factoryLines,
   factoryNameRefusal,
   factoryRepo,
-  writersOf,
   fillsOf,
   hireRefusal,
   hireRefusalOf,
@@ -203,13 +193,10 @@ export type {
   Factory,
   FactoryCondition,
   FactoryConditionReason,
-  FactoryConditionType,
   FactoryListing,
   FactoryTemplate,
   Hires,
-  InstructionAt,
   Schedule,
-  TemplateStatus,
 } from './factory/factory.ts';
 export {
   ENGINE_REASON,
@@ -218,15 +205,13 @@ export {
   REASON_CODES,
   REASON_OF,
   REMOVED,
-  RUN_PHASE_OF,
   RUN_PHASES,
-  RUN_REASON_OF,
   RUN_REASONS,
   runCodes,
   STEP_PHASES,
   STEP_REASONS,
 } from './feed/index.ts';
-export type { AnswerVia, FeedLine, FeedPublished, Reason, RunPhase, RunReason, StepPhase, StepReason, WaitOn } from './feed/index.ts';
+export type { AnswerVia, FeedLine, Reason, RunPhase, RunReason, StepPhase, StepReason, WaitOn } from './feed/index.ts';
 export { formerHints } from './former-reason/former-reason.ts';
 export { BOOKMARK_EVERY, bookmarkLine, DEFAULT_SELECTORS, subscriptionNameRefusal, watchedLine } from './subscription/index.ts';
 export {
@@ -236,47 +221,29 @@ export {
   RESERVED_KEYS,
   selectableOf,
   SELECTABLE_KEYS,
-  SELECTOR_FORM,
   selectorsRefusal,
   selects,
   selectsLabels,
 } from './watch/selector.ts';
 export { labelsText, metadataLabels, type Labels } from './labels/labels.ts';
-export { LabelEdit, Labelled } from './labels/labels.model.ts';
 export { LABEL_CARD, LABEL_RUN } from './labels/commands.verb.ts';
 export type { Clause, Selectors } from './watch/selector.ts';
 export type { Watched } from './subscription/index.ts';
 export {
-  DAEMON_FILE,
   DEFAULT_EVERY_MS,
   MAX_EVERY_MS,
   STALE_FLOOR_MS,
-  STALE_PASSES,
   daemonLine,
   everyOf,
   holderName,
-  holderWords,
   livenessLine,
   livenessWords,
   staleAfterMs,
-  START_WORDS,
-  takenFromLine,
   takeoverLine,
 } from './daemon/daemon.ts';
-export type { DaemonFile, DaemonStanding, HolderKind, Identity, Liveness } from './daemon/daemon.ts';
-export {
-  HOME,
-  acceptFile,
-  approvalFile,
-  artifactsDir,
-  askFile,
-  inputsDir,
-  readAcceptances,
-  readApprovals,
-  roundAskFile,
-  runId,
-} from './record/record.store.ts';
-export { parentRecord, stepsOf } from './steps/steps.verb.ts';
+export type { DaemonFile, DaemonStanding, Identity, Liveness } from './daemon/daemon.ts';
+export { HOME, acceptFile, approvalFile, artifactsDir, askFile, inputsDir, roundAskFile, runId } from './record/record.store.ts';
+export { stepsOf } from './steps/steps.verb.ts';
 export { inboxDir, keptRuns, runStore } from './record/files.store.ts';
 export { type RunStore, lackedOf } from './record/record.ts';
 export { alive } from './process/alive.store.ts';
@@ -294,28 +261,15 @@ export {
   procStartOf,
   releaseStore,
   servesOnStore,
-  stillHeld,
   storeRefusal,
   takeStore,
 } from './daemon/daemon.store.ts';
 export type { TakenStore } from './daemon/daemon.store.ts';
-export { holdUrl, type QuotaAsk, runMain, up, type UpOptions } from './daemon/up.verb.ts';
+export { holdUrl, runMain, up } from './daemon/up.verb.ts';
 export { ensureDaemon, liveDemandHost, type DemandHost } from './demand/demand.verb.ts';
 export { telemetryLayer } from './telemetry/telemetry.store.ts';
 export { addPass, breakdownLines, heaviest, PHASES, STATS_EVERY_MS, summaryDue, summaryLine } from './meter/index.ts';
-export type {
-  HarnessCost,
-  Interval,
-  PassBucket,
-  PassCost,
-  PassCostRead,
-  PassesRead,
-  PassPart,
-  PassSummary,
-  Phase,
-  PhaseCost,
-  RecentPass,
-} from './meter/index.ts';
+export type { HarnessCost, Interval, PassCost, PassCostRead, PassesRead, Phase, PhaseCost, RecentPass } from './meter/index.ts';
 export { feedCursorRefusal, feedFile, feedSize, freshFeedMemo, readFeed, readFeedEnds, watchFeed } from './feed/feed.store.ts';
 export { cursorFileStart, cutCursorFile, keepCursor } from './watch/cursor.store.ts';
 export { emitFeed, FEED_FOLLOW_BEATS, FEED_FOLLOW_READS, FEED_FOLLOWERS, FeedHub, feedHubLayer, followFeed } from './feed/feed.verb.ts';
@@ -325,27 +279,21 @@ export type { Followed } from './feed/feed.verb.ts';
 export { lockfileParts, provisionDeps } from './workspace/worktree.store.ts';
 export { artifactFiles, missingArtifacts } from './artifacts/artifacts.store.ts';
 export { lackLines } from './artifacts/artifacts.ts';
-export { branchStandings, resultBranches, type BranchReader } from './branches/branches.store.ts';
+export { type BranchReader } from './branches/branches.store.ts';
 export { passStanding, standingLive, standingLiveOf, standingReader, standingSnapshot, standingWhen } from './standing/standing.verb.ts';
 export { changesOf, type BranchChanges, type Note } from './branches/changes.store.ts';
 export { evictedBy, recordMemo, type RecordMemo } from './rest/index.ts';
-export { removeAgent, writeAgent, type AgentSchema, type AgentSidecar, type AgentWritten } from './agents/agents.store.ts';
+export { removeAgent, writeAgent, type AgentSchema } from './agents/agents.store.ts';
 export { copySkill, givenSkills, skillDirIn, skillFolders, skillRead, skillText, writeSkill } from './skills/skills.store.ts';
 export { PlaceService, type Place } from './place/place.store.ts';
 export { builtin, builtinGitPlace, gitPlaceLayer } from './place/builtin.store.ts';
 export { briefNow } from './tick/told.verb.ts';
 export type {
-  BranchStood,
-  ChangedFile,
   Changes,
-  HandedOff,
   Held,
-  Inventory,
-  PlaceLanded,
   Made,
   Opened,
   PlaceAnswers,
-  PlaceDeclared,
   PlaceOutcome,
   PlaceRequests,
   PlaceVerb,
@@ -359,18 +307,15 @@ export { draftSteps, loadWorkflows, writeWorkflow } from './workflows/workflows.
 export { workflowStale, workflowTaken } from './folder/folder.ts';
 export { workflowVersion } from './folder/version.store.ts';
 export { foldersIn } from './folder/lookup.store.ts';
-export { agentPlaces, agentRead, agentSkillsFound, findAgent, listAgents, type Readings } from './roster/roster.store.ts';
+export { agentRead, agentSkillsFound, listAgents, type Readings } from './roster/roster.store.ts';
 export { agentFileOf, factoriesFilling, stepsFilled } from './roster/fills.store.ts';
 export { inFactory } from './roster/roster.ts';
 export { TRY_STEP, triesDir, tryDir, tryFolder, writeTryFolder } from './try/try.store.ts';
 export { skillCopyCommand, untriedOf, yourAgentsDir, type Untried } from './try/try.ts';
-export { repoWriteRefusal } from './yours/yours.ts';
-export type { AgentCopiedFrom, AgentFill, AgentPlace, AgentReading, AgentsRead, AgentUser, CardRead, FilledStep } from './roster/roster.ts';
-export type { AgentSource, AgentSourcePlace } from './sources/sources.ts';
-export type { GivenRead, SkillChange, SkillCopied, SkillRead, SkillWritten } from './skills/skills.store.ts';
-export type { WorkflowWritten } from './folder/write.store.ts';
-export { addToInbox, dropFromInbox, inboxEntries, inboxNameAt, queueInInbox, readInbox } from './inbox/inbox.store.ts';
-export type { InboxDropped, InboxQueued } from './inbox/inbox.store.ts';
+export type { AgentFill, AgentPlace, AgentReading, AgentsRead, AgentUser, CardRead } from './roster/roster.ts';
+export type { AgentSource } from './sources/sources.ts';
+export type { SkillChange, SkillRead } from './skills/skills.store.ts';
+export { addToInbox, dropFromInbox, inboxNameAt, queueInInbox, readInbox } from './inbox/inbox.store.ts';
 export {
   addFactory,
   attachWorkflow,
@@ -390,7 +335,7 @@ export {
 } from './factory/factory.store.ts';
 export { EngineService, HARNESSES, asked, engine, engineOf, remoteAgents, runWith } from './runtime-client.ts';
 export { HARNESS_CHOICES } from 'agent-runtime/vocabulary';
-export { A2A_AGENTS_FILE, envNameOf } from './harness/a2a.store.ts';
+export { envNameOf } from './harness/a2a.store.ts';
 export {
   bridgeOf,
   closeoutAsked,
@@ -404,47 +349,38 @@ export {
   parentsRead,
   filingsRead,
   taskPhasesRead,
-  saidCount,
   spendReader,
   viewedOnce,
-  unjudgedWord,
   waitingOf,
 } from './views/views.verb.ts';
-export { endWords, phaseOfView, wordOfView, type AttemptEnd, type EngineOutcome } from './views/views-words.ts';
+export { endWords, phaseOfView, type AttemptEnd, type EngineOutcome } from './views/views-words.ts';
 export type { Bridge, CheckReport } from './views/views.verb.ts';
-export { readPlan } from './plan/plan.store.ts';
-export { leftOutMounts, repoFor, startRun } from './start/start.verb.ts';
-export { startFromInbox, startQueued, type InboxStart, type InboxStarted } from './inbox/inbox.verb.ts';
-export { startPlan, type PlanStarted } from './plan/plan.verb.ts';
+export { repoFor, startRun } from './start/start.verb.ts';
+export { startFromInbox, startQueued } from './inbox/inbox.verb.ts';
+export { startPlan } from './plan/plan.verb.ts';
 export { advanceRun, type Advanced } from './tick/advance.verb.ts';
 export { refusalLines, tickRun, type Pass } from './tick/tick.verb.ts';
 export { checkoutHold } from './ending/ending.verb.ts';
-export { runSlots, type Slots, slotsOf } from './cap/cap.verb.ts';
-export type { MergeWord, StandingMerge } from './branches/index.ts';
+export { runSlots, slotsOf } from './cap/cap.verb.ts';
+export type { StandingMerge } from './branches/index.ts';
 export type { Collision, Collisions } from './collide/collide.ts';
 export { factoryDraftOf, foldersLoaded, type FolderLoaded } from './workflows/workflows.verb.ts';
 export type { SkillPage } from './skills/skills.verb.ts';
 export { acceptRun, roundRun, type Accepted, type RoundAsked } from './round/round.verb.ts';
 export { mergeRun } from './merge/merge.verb.ts';
 export { approveRun, type Approved } from './gate/gate.verb.ts';
-export { askedNow } from './question/asked.verb.ts';
 export { cancelRun, type Cancelled } from './cancel/cancel.verb.ts';
 export { hold, type Holding, unhold } from './wait/wait.verb.ts';
-export { holdNeedsYou } from './wait/wait.ts';
 export {
-  finishingWords,
   heldLines,
-  heldWords,
   pausedLines,
   pausedWords,
   pauseWords,
   RESUMED,
-  stagedWords,
   type Finishing,
   type Interrupt,
   type Pause,
   type Paused,
-  type PausedNow,
   type PauseHeld,
   type PauseStaged,
 } from './pause/pause.ts';
@@ -453,52 +389,82 @@ export { retryRun, type Asked } from './retry/retry.verb.ts';
 export { sayRun, type Told } from './say/say.verb.ts';
 export { COMMANDS, TABLE } from './command/commands.verb.ts';
 export { admitted } from './admission/admit.verb.ts';
-export { PRUNE, RM } from './command/runs.verb.ts';
-export { CLOSEOUT, LOGS, STATS, TOLD, TRIES, TRY } from './command/reads.verb.ts';
+export { HOLD } from './wait/commands.verb.ts';
+export { PRUNE, RM } from './forget/commands.verb.ts';
+export { CLOSEOUT, LOGS, SHOW, TOLD, TRIES, TRY } from './object/commands.verb.ts';
+export { STATS } from './stats/commands.verb.ts';
+export { STEP_ARTIFACT, STEP_FILE, STEP_PATH, STEP_TRANSCRIPT } from './steps/commands.verb.ts';
 export { runObject, type RunObjectAnswer, type TryCloseout } from './object/run.verb.ts';
 export { runLines, type RunLines, type StepCommands } from './object/lines.verb.ts';
-export { cardList, cardObject, cardWriteRefusal, replaceCard, type CardQuery, type CardReplaced } from './object/card.verb.ts';
+export { cardList, cardObject, cardTable, cardWriteRefusal, replaceCard, type CardQuery, type CardReplaced } from './object/card.verb.ts';
 export { runIn, runList, runNamespace, type RunQuery } from './run-list/run-list.verb.ts';
+export { RUN_COLUMNS, runCells, runTable } from './run-list/index.ts';
 export { continueToken, continuedAfter, listPage, pageOf, type PageAsked, type Paged } from './object/page.ts';
 export { watchChanges, type Versioned } from './list-watch/list-watch.ts';
-export { measuredToNow, runWatchVersion } from './runlist/runlist.ts';
-export { resourcesOf, routeOf, type ApiRoute } from './discovery/discovery.ts';
+export { runWatchVersion } from './runlist/runlist.ts';
 export { factoryCommandsOf, factoryList, factoryObject } from './factory/object/factory.verb.ts';
-export type { ObjectQuery } from './object/listed.verb.ts';
+export { objectsListed, type ObjectQuery } from './object/listed.verb.ts';
 export { builtinServerList, mcpServerList, mcpServerObject } from './factory/object/mcp-server.verb.ts';
 export { scheduleList, scheduleObject } from './factory/object/schedule.verb.ts';
 export { hireList, hireObject } from './factory/object/hire.verb.ts';
 export { volumeList, volumeObject } from './factory/object/volume.verb.ts';
-export { eventKept, eventList, eventObject, type EventQuery } from './event-object/event.verb.ts';
+export { eventKept, eventList, eventObject } from './event-object/event.verb.ts';
 export { subscriptionList, subscriptionObject } from './subscription-object/subscription.verb.ts';
-export { templateList, templateObject, templateTree, TemplateRenders, type TemplateTreeRendered } from './template/object/template.verb.ts';
-export { folderRefusal, START } from './start/commands.verb.ts';
-export { INBOX, INBOX_ADD, INBOX_QUEUE } from './inbox/commands.verb.ts';
+export { templateList, templateObject, templateTree, TemplateRenders } from './template/object/template.verb.ts';
+export { CONCLUDED, folderRefusal, START, StartInput } from './start/commands.verb.ts';
+export { INBOX, INBOX_ADD, INBOX_QUEUE, INBOX_RM } from './inbox/commands.verb.ts';
 export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction, type FactoryInstruction } from './factory/instruction.verb.ts';
 export { FACTORY_RULES, factoryRules, type FactoryRules } from './factory/rules/rules.verb.ts';
-/** A factory's own MCP servers: the entry that lists its record with each server's state, and the name rule the board shares. */
-export { FACTORY_SERVERS } from './factory/servers/servers.verb.ts';
+/**
+ * A factory's own MCP servers: the entries that list its record with each server's state, record one (its flags mapped by `serverAddOf`)
+ * and take one off, and the name rule the board shares.
+ */
+export { FACTORY_SERVER_ADD, FACTORY_SERVER_RM, FACTORY_SERVERS, serverAddOf } from './factory/servers/servers.verb.ts';
+export { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE } from './factory/schedule/schedule.verb.ts';
 export { serverNameRefusal, type BuiltinServer } from './factory/servers/index.ts';
 export { BUILTIN_SERVERS, builtinServers } from './factory/servers/servers.store.ts';
 /** A factory's server signed in to and out of from the board, through the engine; the builtin secret stays inside the package. */
 export { serverSignIn, serverSignInState, serverSignOut } from './factory/servers/sign-in.verb.ts';
-export type { ServerSignInStarted, ServerSignInState } from './factory/servers/sign-in.verb.ts';
 export { AGENTS_CUSTOM } from './custom/custom.verb.ts';
 export { POLICY_PROPOSE } from './auto/auto.verb.ts';
 export type { Command, Ran } from './command/entry.verb.ts';
-export { CLI, CLI_VERBS, commandBreaks, commandLine, generated, helpOf, leftOut, parseArgv, routeList } from './command/command.ts';
+/**
+ * The table's entries the api calls by type, each with its `input` (`Command<D, I>`): `factory hire` and `factory fire`, the Hire's writes.
+ */
+export { FACTORY_FIRE, FACTORY_HIRE } from './factory/factory.verb.ts';
+export { LS } from './list/commands.verb.ts';
+export { REFRESH } from './revisions/commands.verb.ts';
+export { RETRY } from './retry/commands.verb.ts';
+export { SAY } from './say/commands.verb.ts';
+export { APPROVE } from './gate/commands.verb.ts';
+/** Nemia's entries the api calls by type (the nemia group of `objects`' Api): her level, her memory, and an agent's rules for auto. */
+export { LEVEL } from './nemia/level.verb.ts';
+export { MEMORY } from './nemia/memory.verb.ts';
+export { POLICY, POLICY_CONFIRM, POLICY_DROP } from './auto/auto.verb.ts';
+/**
+ * The definitions' entries the api calls by type, each with its `input`: the agents listed, read as a card, written, removed,
+ * tried, looked for (`sources`), copied in and their custom instructions; the skills listed, shown and written; a workflow folder
+ * written, removed, and one step of it read.
+ */
+export { AGENTS, AGENT_CARD } from './roster/commands.verb.ts';
+export { AGENTS_REMOVE, AGENTS_TRY, AGENTS_WRITE } from './agents/library.verb.ts';
+export { AGENTS_SOURCES } from './sources/sources.verb.ts';
+export { AGENTS_COPY } from './sources/copy.verb.ts';
+export { SKILLS_LIST, SKILLS_READ, SKILLS_WRITE } from './skills/skills.verb.ts';
+export { WORKFLOWS_REMOVE, WORKFLOWS_STEP, WORKFLOWS_WRITE } from './workflows/workflows.verb.ts';
+export { CLI, CLI_VERBS, commandBreaks, commandLine, helpOf, leftOut, parseArgv } from './command/command.ts';
 export { renamedIn, renamedValues } from './command/command.ts';
-export type { Args, CommandSpec, Flag, Positional, Route, Spec } from './command/command.ts';
+export type { Args, CommandSpec, Flag, Spec } from './command/command.ts';
 export { forgetRun, runsForgetting } from './forget/forget.verb.ts';
 export { freeingMany, judgingMany, prune, type Listed, type Turned } from './forget/prune/prune.verb.ts';
 export { decideRun, type Answered, type Decided } from './decide/decide.verb.ts';
-export { freshStatsMemo, statsRun, type StatsMemo, type StatsOptions } from './stats/stats.verb.ts';
-export { seriesMemo, type Health, type SeriesMemo, type SeriesPoint, type SeriesRead } from './series/series.ts';
-export { BY_KEYS, statsLine, statsLines, statsQueryOf, type ByKey, type QueryKey, type Stats, type StatsQuery } from './stats/index.ts';
-export { list, pausedRead, runReading, unjudgedOf, type ReadingHow, type RunReading } from './list/list.verb.ts';
+export { freshStatsMemo, statsRun, type StatsMemo } from './stats/stats.verb.ts';
+export { seriesMemo, type Health, type SeriesMemo, type SeriesRead } from './series/series.ts';
+export { statsLine, statsLines, statsQueryOf, type QueryKey, type Stats, type StatsQuery } from './stats/index.ts';
+export { list, pausedRead, runReading, unjudgedOf, type RunReading } from './list/list.verb.ts';
 export type { DecideCommand } from './decide/decide.ts';
 export type { RunsListed, Unjudged } from './list/list.ts';
-export { graphOf, runGraph, typedGraphOf, type GraphEdge, type GraphStep, type RunGraph, type TypedGraph } from './summary/graph.ts';
+export { graphOf, runGraph, typedGraphOf, type GraphEdge, type RunGraph } from './summary/graph.ts';
 export {
   bare,
   filedTimes,
@@ -507,17 +473,16 @@ export {
   seenBy,
   stepNames,
   tryOf,
-  unreadableOf,
   viewsFor,
   viewsOf,
   workflowsOf,
 } from './summary/reads.verb.ts';
 export type { Filings, TaskView, Unreadable, Views } from './summary/reads.verb.ts';
-export { holdingOf, judge, needsOf, runSaid, runWaitingOf, spentOf, standingsOf, stepSaid, wordOf } from './summary/judged.verb.ts';
+export { judge, needsOf, spentOf, stepSaid, wordOf } from './summary/judged.verb.ts';
 export { atHarness } from './summary/judged.verb.ts';
-export type { GitAsked, JudgeHow, RunHolding, RunStatus, RunToDecide, RunWaiting, Spent, StepNeeds } from './summary/judged.verb.ts';
+export type { RunHolding, RunStatus, RunToDecide, RunWaiting, Spent, StepNeeds } from './summary/judged.verb.ts';
 export { dropInformed, Informer, informerLayer, informerMemo, informerRead } from './rest/informer.verb.ts';
-export type { InformerMemo, InformerRead } from './rest/informer.verb.ts';
+export type { InformerMemo } from './rest/informer.verb.ts';
 export type { Judgement } from './summary/judgement.verb.ts';
 export type { ScheduleRuns } from './factory/schedule/listed.store.ts';
 export type { PauseRuns } from './pause/pause.ts';
@@ -533,13 +498,13 @@ export type { StepFiled, TaskPart } from './resource/told.verb.ts';
 export { totalOf, usedOf, type RunRead, type StepUsed, type Usage } from './resource/usage.ts';
 export { tailOf, type LastSaid, type StepCheck, type StepLog } from './resource/checks.verb.ts';
 export { refusedName, typeOf, type StepArtifact, type StepValue } from './resource/files.store.ts';
-export { driftWords, kindsDrift, revisionNow, REVISION_KINDS, stepsDrift, type Drift, type KindName } from './revisions/revisions.ts';
+export { kindsDrift, revisionNow, REVISION_KINDS, stepsDrift, type Drift } from './revisions/revisions.ts';
 export { driftNow } from './revisions/pin.verb.ts';
-export type { Pin, Revision, RevisionKind } from './revisions/revisions.ts';
+export type { Pin } from './revisions/revisions.ts';
 export { definitionRevision, ledgerOf } from './revisions/revisions.store.ts';
 export { chatAnswer, chatHistory, chatRead, chatSay, chatStop, FILES_CHECK_MS, followChat, RECORD_BEAT_MS } from './chat/chat.verb.ts';
-export type { ChatChanges, ChatFollow, ChatFollowed, ChatHistory, ChatPlace, ChatReads, ChatSent } from './chat/chat.verb.ts';
-export type { Ask, AskAnswer, AskEvent, AskOption, AskPick, AskQuestion, CallState, ChatEvent, ChatFrom, Presence } from './chat/chat.ts';
+export type { ChatChanges, ChatFollow, ChatFollowed, ChatHistory, ChatReads, ChatSent } from './chat/chat.verb.ts';
+export type { Ask, AskEvent, AskOption, AskPick, AskQuestion, ChatEvent, Presence } from './chat/chat.ts';
 export { nemiaChatPlace } from './nemia/level.store.ts';
 
 import * as RunModel from './record/record.model.ts';
@@ -551,12 +516,19 @@ import * as RunObject from './object/run.model.ts';
  */
 export { RunModel, RunObject };
 
-export { callerOf, liveSession, sessionCaller, SESSION_TOKEN, TokenDoor, tokenDigest, tokenDoorFiles } from './token/caller.verb.ts';
-export type { CallerOf, TokenDoorShape, TokenFiled, TokenRecord } from './token/caller.verb.ts';
-export { Forbidden, PERSON, type Caller, type ProposalCaller } from './caller/index.ts';
+export { sessionCaller, SESSION_TOKEN, TokenDoor, tokenDigest, tokenDoorFiles } from './token/caller.verb.ts';
+export type { CallerOf } from './token/caller.verb.ts';
+export { PERSON, type Caller, type ProposalCaller } from './caller/index.ts';
 export { proposeProgram, undoProgram } from './propose/propose.verb.ts';
-export type { ProposalNeeds, ProposalPlace } from './propose/current.verb.ts';
+export type { ProposalPlace } from './propose/current.verb.ts';
 export { approveProgram, declineProgram, proposalGet, proposalsList } from './approval/approve.verb.ts';
 export { ProposalDoor, proposalDoorFiles, type ProposalDoorShape } from './proposal/proposal.store.ts';
 export { delegationGet, delegationPut, delegationRemove, delegationsList } from './delegation/delegation.verb.ts';
 export { DelegationDoor, delegationDoorFiles, type DelegationDoorShape } from './delegation/delegation.store.ts';
+export { decisionRead, diffFiles, DIFF_LINES, runDecision, type DecisionRead } from './decide/decision.verb.ts';
+export { CEILINGS } from './cap/commands.verb.ts';
+export { PAUSE, PAUSE_NOW, PAUSED, RESUME, pauseNowPreview, pauseNowPreviewLines } from './pause/commands.verb.ts';
+export { PASSES } from './meter/passes.verb.ts';
+export { SERIES } from './series/commands.verb.ts';
+export { SUBSCRIBE, UNSUBSCRIBE } from './subscription/subscription.verb.ts';
+export { FACTORY_ADD } from './factory/factory.verb.ts';

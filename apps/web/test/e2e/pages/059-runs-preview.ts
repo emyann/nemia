@@ -1,10 +1,12 @@
+import type * as RunObject from 'objects';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { photograph, reachClock, themeOf, rowsAnswered } from '../board.ts';
 import { expectCount, expectNone, expectVisible, idle, Refused } from '../checks.ts';
-import type { RunLines, RunObject } from '../../../src/lib/api.ts';
+import type { RunLines } from '../../../src/lib/api/run.ts';
 import { agentViewOf } from '../../../src/lib/api/agents.ts';
-import { runViewOf } from '../../../src/lib/runView.ts';
+import { agentOf } from '../../../src/lib/api/judged.ts';
+import { runDetailOf } from '../../../src/lib/runView.ts';
 import { stepCardOf, type StepCardFacts } from '../../../src/lib/stepCard.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
@@ -126,14 +128,17 @@ async function aBar(page: Page): Promise<{ bar: Locator; run: string; step: stri
     );
   if (bars.length === 0) throw new Refused('the table in flight draws its rails as buttons — no bar is a button');
   const runs = await rowsAnswered(page);
-  const worked = bars.find(({ run, step }) => runs.find((r) => r.id === run)?.steps.find((s) => s.name === step)?.agent);
+  const worked = bars.find(({ run, step }) => {
+    const listed = runs.find((r) => r.id === run)?.steps.find((s) => s.name === step);
+    return listed !== undefined && agentOf(listed) !== null;
+  });
   const { run, step } = worked ?? bars[0];
   return { bar: page.locator(`${FLIGHT} tr[data-run="${run}"] [data-step-bar="${step}"]`), run, step };
 }
 
 /**
  * The card the board's rule gives for the step, from the api's own answers: the run's object, its lines and each of its steps' tries and
- * told, composed as the board composes them (`runViewOf`): a step the api has none of reads as none, as the board's reads do.
+ * told, composed as the board composes them (`runDetailOf`): a step the api has none of reads as none, as the board's reads do.
  */
 async function expected(page: Page, run: string, step: string): Promise<StepCardFacts> {
   const at = `/api/runs/${encodeURIComponent(run)}`;
@@ -153,7 +158,7 @@ async function expected(page: Page, run: string, step: string): Promise<StepCard
     Promise.all(names.map((name) => answer<Partial<RunObject.StepTries>>(page, sub(name, 'tries')))),
     Promise.all(names.map((name) => answer<RunObject.StepTold | { error: string }>(page, sub(name, 'told')))),
   ]);
-  const detail = runViewOf(
+  const detail = runDetailOf(
     object,
     lines,
     Object.fromEntries(names.map((name, i) => [name, tries[i].tries ?? []])),

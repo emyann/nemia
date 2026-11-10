@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import type { KeyRow } from '../../lib/api';
+import type { KeyRow } from '../../lib/api/library.ts';
 import { cn } from '../../lib/utils';
 import { Markdown } from '../markdown/Markdown';
 

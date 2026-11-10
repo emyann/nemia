@@ -6,13 +6,13 @@
  */
 import { Effect } from 'effect';
 import type { Proposal } from 'objects';
-import { Conflict, Missing, type Refusal } from '../refusal/refusal.ts';
+import { Conflict, Forbidden, Missing, type Refusal } from '../refusal/refusal.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { proposalApproval } from './approval.ts';
 import { applyProgram, type RunStateOf } from '../apply/apply.verb.ts';
 import type { ProposalNeeds, ProposalPlace } from '../propose/current.verb.ts';
-import { Forbidden, type ProposalCaller } from '../caller/index.ts';
+import type { ProposalCaller } from '../caller/index.ts';
 import { ProposalDoor } from '../proposal/proposal.store.ts';
 import { factsOf, standingOf } from './standing.verb.ts';
 
@@ -58,7 +58,7 @@ export const approveProgram = Effect.fn('approveProgram')(function* (
   factory: string,
   name: string,
   place: ProposalPlace,
-): Effect.fn.Return<Proposal, Refusal | Forbidden, ProposalNeeds> {
+): Effect.fn.Return<Proposal, Refusal, ProposalNeeds> {
   const proposal = yield* proposalAt(factory, name);
   const standing =
     caller.kind === 'person' ? { level: 'manual' as const, grants: [], rules: [] } : yield* standingOf(place.home, caller.agent, factory);
@@ -88,7 +88,7 @@ export const declineProgram = Effect.fn('declineProgram')(function* (
   caller: ProposalCaller,
   factory: string,
   name: string,
-): Effect.fn.Return<Proposal, Refusal | Forbidden> {
+): Effect.fn.Return<Proposal, Refusal> {
   if (caller.kind !== 'person')
     return yield* Effect.fail(
       new Forbidden({ reason: 'person-only', message: `the person declines a proposal, never an agent: ask them to decline ${name}.` }),

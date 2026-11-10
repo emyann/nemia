@@ -5,11 +5,14 @@
 import { useId, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { factoriesQuery, factoryWorkflowsQuery, fileCard, storeQuery, type Factory, type Place } from '../../lib/api';
+import { factoriesQuery, type Factory } from '../../lib/api/factories.ts';
+import { factoryWorkflowsQuery, type Place } from '../../lib/api/workflows.ts';
+import { fileCard } from '../../lib/api/inbox.ts';
+import { storeQuery } from '../../lib/api/store.ts';
 import { keptBy } from '../../lib/factories';
 import { cardFiling, factoriesOffered, factoryPreset, workflowKey } from '../../lib/inbox';
-import { PRIMARY } from './InboxParts';
 import { FIELD, WorkflowOptions, WorkflowsUnread } from '../workflow/WorkflowOptions';
+import { BUTTON } from '../../lib/classes';
 
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 
@@ -92,7 +95,7 @@ export function FileCard({ shown }: { shown: string | undefined }) {
         </p>
       )}
       <div className="flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={!idea.trim() || file.isPending} className={PRIMARY}>
+        <button type="submit" disabled={!idea.trim() || file.isPending} className={BUTTON}>
           {file.isPending ? 'Filing…' : 'File'}
         </button>
         <span className="text-body-small text-muted-foreground">Parked, not started: nothing runs until you start it.</span>

@@ -6,8 +6,9 @@
  * sentences joining them are the board's, so a person reads what approving does without knowing the package: the CLI's `ls` prints the
  * command.
  */
-import type { Collision, Collisions, Decidable, RunSummary } from './api';
-import type { RunView, StepView } from './runView';
+import type { Collision, Collisions, Decidable } from './api/decision.ts';
+import type { RunView } from './api/judged.ts';
+import type { RunDetail, StepView } from './runView';
 import { askedSaid, needsOf, stepAnchor, type Need } from './asks.ts';
 import { touchedSummary } from './decide.ts';
 import { verdictWords } from './words.ts';
@@ -32,7 +33,7 @@ export type GateAsk = { step: string; ends: boolean; back: readonly string[]; on
  * goes, which the package would refuse for an ending, in its words.
  */
 export function gateOfSummary(
-  run: Pick<RunSummary, 'cancelledAt' | 'waitingOnYou' | 'steps' | 'toDecide'> & { holding?: RunSummary['holding'] },
+  run: Pick<RunView, 'cancelledAt' | 'waitingOnYou' | 'steps' | 'toDecide'> & { holding?: RunView['holding'] },
 ): GateAsk | null {
   if (run.cancelledAt !== null || run.holding != null) return null;
   const decide = run.toDecide;
@@ -50,7 +51,7 @@ export function gateOfSummary(
  * edges for an ending that has no task yet.
  */
 export function gateOfStep(
-  run: Pick<RunView, 'cancelledAt' | 'waitingOnYou' | 'branch' | 'graph'>,
+  run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | 'branch' | 'graph'>,
   step: Pick<DetailStep, 'name' | 'approve' | 'spec' | 'taskId'>,
 ): GateAsk | null {
   if (run.cancelledAt !== null || !step.approve || !run.waitingOnYou.includes(step.name)) return null;
@@ -63,6 +64,13 @@ export function gateOfStep(
 
 /** Who a send-back names in a sentence: the one step, or `the work` where there are several to pick from. */
 export const backName = (back: readonly string[]): string => (back.length === 1 ? back[0] : 'the work');
+
+/**
+ * What approving an ending does, said before a person approves it, on the card and at the run page's gate alike: it runs in the
+ * repository's own checkout, on the base branch where it is known (`onto`), and cannot be taken back.
+ */
+export const endingWarning = (step: string, onto: string | null): string =>
+  `This runs ${step} in the repository's own checkout${onto ? ` on ${onto}` : ''}, and it cannot be taken back.`;
 
 /**
  * The card's words for a gate, in its one row: what approving does, and where a send-back goes.
@@ -135,7 +143,7 @@ export const takenLine = (
 export type GateFact = { label: string; said: string; state?: 'good' | 'bad'; step?: string };
 
 /** What a person's approval of a loop out of rounds adds to its last review's fact — its words, and the findings left open — or null. */
-function acceptedWords(looping: Pick<RunView['steps'][number], 'gate'>, findings: number | null): string | null {
+function acceptedWords(looping: Pick<RunDetail['steps'][number], 'gate'>, findings: number | null): string | null {
   const approval = looping.gate?.approval;
   if (!approval) return null;
   return `; a person accepted the work as it stands, with ${findings === 1 ? 'it' : 'them'} open${approval.message ? `: ${approval.message}` : ''}`;
@@ -151,7 +159,7 @@ function acceptedWords(looping: Pick<RunView['steps'][number], 'gate'>, findings
  * loop, its gate's approval) is said accepted as it stands, with their words, not as asking another round, though its closeout still says
  * `again: true` (`acceptedWords`).
  */
-export function gateFacts(run: Pick<RunView, 'steps' | 'cost'>, decision: Decidable | null): GateFact[] {
+export function gateFacts(run: Pick<RunDetail, 'steps' | 'cost'>, decision: Decidable | null): GateFact[] {
   const facts: GateFact[] = [];
   const loops = run.steps.filter((s) => s.spec?.loop);
   const round = Math.max(1, ...run.steps.flatMap((s) => s.tries.map((t) => t.round)));
@@ -223,13 +231,6 @@ export function collisionFacts(collisions: Collisions): GateFact[] {
     ...(semantic ? [{ label: 'semantic', said: semantic.said, state: 'bad', step: semantic.step } satisfies GateFact] : []),
   ];
 }
-
-/**
- * What a run waits on a person for other than a gate, in words, for the card and the inspector: a step's question, a session the harness
- * blocked, or a result nobody decided — each answered on the run's page, which these link to (`step` names the section, or none for the
- * Decide section). Inline answers are for gates alone.
- */
-export type Waits = { said: string; step: string | null };
 
 /**
  * The card's line for a result nobody decided, which fits whatever the branch is called: `decide its result: a branch ahead of the base

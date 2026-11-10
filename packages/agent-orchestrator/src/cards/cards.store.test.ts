@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
+import { debtBreaks, seamUses, sourcesUnder } from 'test-kit/debt';
 import { scratch } from 'test-kit/scratch';
 import { act, done, doorFrom, walksOn } from '../../test/door-walks.ts';
 import { aCard, CARD_WALKS } from '../../test/card-walks.ts';
@@ -111,35 +112,21 @@ test('the default door reads the files at the store root the program is given, a
 const PKG = path.join(import.meta.dirname, '..', '..');
 
 /** Every file of `src` but the tests and the Card door's own folder, by its path from the package. */
-function sourcesOfSrc(): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const entry of fs.readdirSync(path.join(PKG, 'src'), { recursive: true, withFileTypes: true })) {
-    if (!entry.isFile() || !entry.name.endsWith('.ts') || entry.name.endsWith('.test.ts')) continue;
-    const file = path.relative(PKG, path.join(entry.parentPath, entry.name)).split(path.sep).join('/');
-    if (!file.startsWith('src/cards/')) out[file] = fs.readFileSync(path.join(PKG, file), 'utf8');
-  }
-  return out;
-}
+const outsideCards = (): Record<string, string> =>
+  Object.fromEntries(Object.entries(sourcesUnder(PKG, 'src')).filter(([file]) => !file.startsWith('src/cards/')));
 
-/** The files of `sources` that call the door's files layer by hand, comment lines left out, rather than yielding `CardDoor`. */
-const byHand = (sources: Record<string, string>): string[] =>
-  Object.entries(sources)
-    .filter(([, text]) =>
-      /(?<![\w$.])cardFiles\s*\(/.test(
-        text
-          .split('\n')
-          .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))
-          .join('\n'),
-      ),
-    )
-    .map(([file]) => file);
+/** A call of the door's files layer by hand (`cardFiles(`), not a method of the same name, rather than yielding `CardDoor`. */
+const BY_HAND = /(?<![\w$.])cardFiles\s*\(/g;
 
 test("no file of src but the Card door's reads the inbox's files by hand (`cardFiles`): each yields CardDoor", () => {
-  assert.deepEqual(byHand(sourcesOfSrc()), []);
+  assert.deepEqual(debtBreaks(seamUses(outsideCards(), BY_HAND), {}), []);
 });
 
 test('REFUSED: a file of src that calls cardFiles', () => {
-  const sources = sourcesOfSrc();
+  const sources = outsideCards();
   const again = { ...sources, 'src/cli/start.ts': `${sources['src/cli/start.ts'] ?? ''}\nconst x = cardFiles(home).cards.entries();\n` };
-  assert.deepEqual(byHand(again), ['src/cli/start.ts']);
+  assert.deepEqual(
+    debtBreaks(seamUses(again, BY_HAND), {}).map((b) => b.file),
+    ['src/cli/start.ts'],
+  );
 });

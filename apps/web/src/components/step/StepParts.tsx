@@ -4,7 +4,8 @@
  * run's step to this page (`StepPageLink`).
  */
 import { Badge } from '@/components/ui/badge';
-import type { PagePlace, WorkflowPageAddress, WorkflowStepPage } from '../../lib/api';
+import type { PagePlace, WorkflowStepPage } from '../../lib/api/workflows.ts';
+import type { WorkflowPageAddress } from '../../lib/api/address.ts';
 import { stepAnchor } from '../../lib/asks';
 import { SOURCE_BADGES } from '../../lib/skills';
 import { titleOf } from '../../lib/factory';
@@ -80,7 +81,7 @@ export function StepAgent({ page, place = {} }: { page: WorkflowStepPage; place?
  * for one with no page that the repository has, a skill named with its folder, its name as written and that it is the repository's.
  * `place` is the factory and repository the page is read in, kept on the way to the builder.
  */
-export function homesOf(page: WorkflowStepPage, place: PagePlace): LayerHomes {
+function homesOf(page: WorkflowStepPage, place: PagePlace): LayerHomes {
   const agent = page.layers.agent;
   const file = `${page.dir}/${page.step}.md`;
   return {

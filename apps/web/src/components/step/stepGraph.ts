@@ -1,5 +1,5 @@
 import { MarkerType } from '@xyflow/react';
-import type { RunView } from '../../lib/runView';
+import type { RunDetail, StepView } from '../../lib/runView';
 import { edgesOf, edgeStroke, LOOP_SOURCE, LOOP_TARGET, type EdgeState } from '../../lib/canvas';
 import { contextEdges, runEdges } from '../../lib/factory';
 import { nodeKinds, routedOf, routesOf, takenRoutes } from '../../lib/routing';
@@ -12,7 +12,7 @@ import type { StepNodeData } from './StepNode';
  * `waitingOnYou` decides the human gate beside the step's own word; for a condition or a workflow node, its graph node, and what its
  * sentence says of its route or its card (`routedOf`).
  */
-export const stepData = (run: RunView, index: number): StepNodeData => ({
+export const stepData = (run: RunDetail, index: number): StepNodeData => ({
   step: run.steps[index],
   index,
   runCancelled: run.cancelledAt !== null,
@@ -45,25 +45,31 @@ function drawn(id: string, source: string, target: string, state: EdgeState, loo
 }
 
 /**
- * A run's edges as its graph draws them, on its page and on the Factory alike: the api's `graph`, never a step's spec —
+ * What a graph's edges are drawn from, and no more: whether the run was called off or is held, its graph, and of each step what its
+ * state (`stepState`), its note, its round due and the route it took (`takenRoutes`, off its `message`) are read from. A run's view is
+ * one; a workflow's steps, none of them started, are another.
+ */
+export type StepGraphFacts = Pick<RunDetail, 'cancelledAt' | 'holding' | 'graph'> & {
+  readonly steps: ReadonlyArray<Pick<StepView, 'name' | 'phase' | 'reason' | 'on' | 'via' | 'note' | 'roundDue' | 'message'>>;
+};
+
+/**
+ * A graph's edges as a run's page draws them, on the Factory and a workflow's page alike: the api's `graph`, never a step's spec —
  * an edge per `after`, and for a loop, the edge back from its looping step to the step a round runs again, under both
  * nodes and labelled with the round once past the first; a route's edge labelled with its route, thin and faint where it was not
  * taken. Each says what `edgesOf` reads off the steps at its ends.
- *
- * `prefix` goes before every node's id, for a floor that draws two runs' steps, which may each have an
- * `implement`: nothing on the run's page and the workflow's, which draw one.
  */
-export function stepEdges(run: RunView, prefix = ''): StateFlowEdge[] {
-  const runCancelled = run.cancelledAt !== null;
-  const runHeld = run.holding != null;
-  const steps = run.steps.map((s) => ({
+export function stepEdges(facts: StepGraphFacts): StateFlowEdge[] {
+  const runCancelled = facts.cancelledAt !== null;
+  const runHeld = facts.holding != null;
+  const steps = facts.steps.map((s) => ({
     name: s.name,
     state: stepState(s, runCancelled, runHeld),
     note: s.note,
     roundDue: s.roundDue,
   }));
-  return edgesOf(run.graph, steps, takenRoutes(run.steps)).map((e) => {
-    const edge = drawn(prefix + e.id, prefix + e.source, prefix + e.target, e.state, e.kind === 'loop', e.untaken);
+  return edgesOf(facts.graph, steps, takenRoutes(facts.steps)).map((e) => {
+    const edge = drawn(e.id, e.source, e.target, e.state, e.kind === 'loop', e.untaken);
     const labelled = e.label ? { ...edge, label: e.label } : edge;
     return e.kind === 'loop' ? { ...labelled, sourceHandle: LOOP_SOURCE, targetHandle: LOOP_TARGET } : labelled;
   });

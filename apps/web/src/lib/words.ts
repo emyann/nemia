@@ -7,7 +7,10 @@
 import type { ProposalPhase } from 'objects';
 import type { CardState } from './api/inbox.ts';
 import type { RunOutcome } from './api/runs.ts';
-import type { CheckVerdict, WaitOn } from './api/reasons.ts';
+import type { StepCheck, WaitOn } from 'objects';
+
+/** A check's verdict: its result, and the code it exited with. */
+type CheckVerdict = NonNullable<StepCheck['verdict']>;
 import type { OfferCase } from './asks.ts';
 import type { Hue } from './meaning.ts';
 import type { StepState } from './status.ts';
@@ -217,12 +220,15 @@ export const RUN_WAITS: Record<'hold' | 'after' | 'unfinished', WaitWords> = {
 /** The words of a wait the board has no kind for. */
 export const ANY_WAIT: WaitWords = { tag: () => GATE, sentence: () => 'It waits on you.', open: opens };
 
-/** How a finished run ended, as the page says it: a word, and its whole sentence. */
-export const ENDED: Record<RunOutcome, { word: string; title: string }> = {
-  succeeded: { word: 'done', title: 'Every step of it is done.' },
-  cancelled: { word: 'called off', title: 'Somebody called it off.' },
-  failed: { word: 'failed', title: 'It stopped on a step that failed.' },
-  undecided: { word: 'undecided', title: 'Nobody has decided its result.' },
+/** How a finished run ended, as every page says it: a word, its whole sentence, and the hue it is drawn in. */
+type Ended = { word: string; title: string; hue: Hue };
+
+/** How a finished run of each outcome ended (`Ended`): the one table of an outcome's word and hue. */
+export const ENDED: Record<RunOutcome, Ended> = {
+  succeeded: { word: 'done', title: 'Every step of it is done.', hue: 'sage' },
+  cancelled: { word: 'called off', title: 'Somebody called it off.', hue: 'grey' },
+  failed: { word: 'failed', title: 'It stopped on a step that failed.', hue: 'failure' },
+  undecided: { word: 'undecided', title: 'Nobody has decided its result.', hue: 'yours' },
 };
 
 /**
@@ -237,10 +243,10 @@ export const CARD_WORDS: Record<CardState, { word: string; title: string; hue: H
   pending: { word: 'waiting its turn', title: 'Its run is started and waits its turn: nothing of it is at work yet.', hue: 'grey' },
   running: { word: 'at work', title: 'Its run is at work.', hue: 'alive' },
   waiting: { word: 'waits on you', title: 'Its run waits on you: open it to see what it asks.', hue: 'yours' },
-  succeeded: { word: ENDED.succeeded.word, title: `Its run is done. ${ENDED.succeeded.title}`, hue: 'sage' },
-  failed: { word: ENDED.failed.word, title: `Its run failed. ${ENDED.failed.title}`, hue: 'failure' },
+  succeeded: { word: ENDED.succeeded.word, title: `Its run is done. ${ENDED.succeeded.title}`, hue: ENDED.succeeded.hue },
+  failed: { word: ENDED.failed.word, title: `Its run failed. ${ENDED.failed.title}`, hue: ENDED.failed.hue },
   stopped: { word: 'stopped', title: 'Its run was stopped before it ended.', hue: 'grey' },
-  cancelled: { word: ENDED.cancelled.word, title: `Its run was called off. ${ENDED.cancelled.title}`, hue: 'grey' },
+  cancelled: { word: ENDED.cancelled.word, title: `Its run was called off. ${ENDED.cancelled.title}`, hue: ENDED.cancelled.hue },
 };
 
 /**
@@ -332,7 +338,7 @@ export const OFFERS = {
 } as const satisfies Record<OfferCase, OfferWords & Readonly<Record<string, unknown>>>;
 
 /** What every offer's words hold (`OFFERS`). */
-export interface OfferWords {
+interface OfferWords {
   readonly said: string | null | Readonly<Record<string, string>> | ((calls: string | null) => string);
   readonly form: (step: string) => string;
   readonly field: (step: string) => string;

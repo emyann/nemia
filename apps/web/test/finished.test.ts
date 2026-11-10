@@ -123,15 +123,14 @@ test('finishedRunsQuery: the RunList asked by state read as a page, nine at a ti
       client.clear();
       globalThis.fetch = before;
     });
-    assert.equal(FINISHED_SIZE, 9);
     await client.fetchQuery(finishedRunsQuery('harbour', ['f.a', 'f.b']));
     await client.fetchQuery(finishedRunsQuery(undefined, []));
     const urls = asked.map((at) => new URL(at, 'http://board'));
     assert.deepEqual(
       urls.map((url) => [url.pathname, Object.fromEntries(url.searchParams)]),
       [
-        ['/api/namespaces/harbour/runs', { fieldSelector: 'status.state=finished', limit: '9', continue: 'f.b' }],
-        ['/api/runs', { fieldSelector: 'status.state=finished', limit: '9' }],
+        ['/api/namespaces/harbour/runs', { fieldSelector: 'status.state=finished', limit: String(FINISHED_SIZE), continue: 'f.b' }],
+        ['/api/runs', { fieldSelector: 'status.state=finished', limit: String(FINISHED_SIZE) }],
       ],
     );
     assert.deepEqual(finishedRunsQuery('harbour', ['f.a', 'f.b']).queryKey, ['runs-finished', 'harbour', 'f.b']);

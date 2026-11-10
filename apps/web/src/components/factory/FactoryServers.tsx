@@ -33,7 +33,7 @@ import {
   type BuiltinServer,
   type FactoryServer,
   type McpServerWrite,
-} from '../../lib/api';
+} from '../../lib/api/factories.ts';
 
 /** What a person asks of a factory's record: one server recorded, or one taken off. */
 type Change = { kind: 'record'; server: string; body: McpServerWrite } | { kind: 'remove'; server: string };

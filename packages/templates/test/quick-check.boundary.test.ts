@@ -3,8 +3,9 @@
  * committed scratch repository whose base is `WF_BASE_REF`, a bounded subprocess, with `npx` and `npm` stubs first on the path that
  * record what they are handed. The script says the size and refuses none, and quick's implement check, as sdlc renders it for a
  * factory (`nemia factory apply` and the controller on a scratch store), is run whole as the run runs a check (`checkArgv`), so the
- * measure is proven wired and first: from the run's frozen workflow files (`WF_WORKFLOW_FILES`, here the rendered folder) on a base that
- * holds none of the team, and refused, never read from the base, where the variable is unset.
+ * measure is proven wired and first: from the run's frozen workflow files (`WF_WORKFLOW_FILES`, here the rendered folder) and carried
+ * files (`WF_CARRIED_FILES`, the rendered carried folder) on a base that holds none of the team, and refused, never read from the base,
+ * where the variable is unset.
  *
  * Its `origin` is a bare repository and its `gh` a stub (`test/origin.ts`), for the two clauses that push the branch and read CI on
  * GitHub (`github=true`); at sdlc's default, in the checkout, the check runs the local check in their place, and pushes nothing.
@@ -28,6 +29,9 @@ const SDLC = path.join(import.meta.dirname, '..', 'sdlc');
 const QUICK = path.join(SDLC, 'workflows', 'quick');
 
 const SCRIPT = path.join(QUICK, 'change.ts');
+
+/** The carried folder, where the scripts quick runs beside its own are kept once. */
+const CARRIED = path.join(SDLC, 'carried');
 
 /** sdlc as a factory gets it: the factory's rendered tree, and the scratch store it is in. */
 type Rendered = { tree: string; store: string };
@@ -140,13 +144,19 @@ function closeoutFile(more: Record<string, unknown>): string {
   return file;
 }
 
-/** The scripts a run's base could hold, which the check never reads from it: quick's `change.ts` and the scripts it carries. */
-const SCRIPTS = Object.fromEntries(
-  ['change.ts', 'ci-log.ts', 'landing.ts', 'parts.ts', 'probe.ts', 'pull-request.ts'].map((name) => [
-    `workflows/quick/${name}`,
-    fs.readFileSync(path.join(QUICK, name), 'utf8'),
-  ]),
-);
+/** The scripts a run's base could hold, which the check never reads from it: quick's `change.ts` and the carried scripts, each where
+ * the template keeps it and at the base's root. */
+const SCRIPTS = Object.fromEntries([
+  ['workflows/quick/change.ts', fs.readFileSync(SCRIPT, 'utf8')],
+  ['change.ts', fs.readFileSync(SCRIPT, 'utf8')],
+  ...fs.readdirSync(CARRIED).flatMap((name) => {
+    const text = fs.readFileSync(path.join(CARRIED, name), 'utf8');
+    return [
+      [`carried/${name}`, text],
+      [name, text],
+    ];
+  }),
+]);
 
 /**
  * The four ways the tests render sdlc, applied on one scratch store and rendered by one `nemia up` (`rendered`), each over a repository
@@ -169,16 +179,22 @@ const TREES = await (async () => {
   return { sdlc: treeOf('sdlc'), checkout: treeOf('checkout'), github: treeOf('github'), local: treeOf('local') };
 })();
 
-/** sdlc rendered for a factory on GitHub, and quick's folder in it: what a run freezes as `WF_WORKFLOW_FILES`. */
+/** sdlc rendered for a factory on GitHub, and quick's folder and the carried one in it: what a run freezes as its two variables. */
 const RENDERED = TREES.sdlc;
-const FROZEN = path.join(RENDERED.tree, 'workflows', 'quick');
+const FROZEN = {
+  WF_WORKFLOW_FILES: path.join(RENDERED.tree, 'workflows', 'quick'),
+  WF_CARRIED_FILES: path.join(RENDERED.tree, 'workflows', 'carried'),
+};
 
 /** Quick's implement check, as the rendered tree gives it to a run. */
 const CHECK = stepsOf(RENDERED, 'quick').find((step) => step.name === 'implement')?.check ?? '';
 
 /** sdlc rendered at its default way, in the checkout, and quick's folder and implement check in it. */
 const LOCAL = TREES.checkout;
-const LOCAL_FROZEN = path.join(LOCAL.tree, 'workflows', 'quick');
+const LOCAL_FROZEN = {
+  WF_WORKFLOW_FILES: path.join(LOCAL.tree, 'workflows', 'quick'),
+  WF_CARRIED_FILES: path.join(LOCAL.tree, 'workflows', 'carried'),
+};
 const LOCAL_CHECK = stepsOf(LOCAL, 'quick').find((step) => step.name === 'implement')?.check ?? '';
 
 /** sdlc rendered with a check of the factory's own, on GitHub and in the checkout. */
@@ -200,7 +216,7 @@ function waysOf(check: string): { before: string; github: string; local: string 
 /**
  * Run the rendered check of quick's implement in `repo` as a check runs, its argv `checkArgv`'s, over the stubs, which exit as
  * `failing` says; `files` is the step's files directory, one of its own where none is given, and `more` is the rest of its environment:
- * the run's frozen workflow files, the rendered quick folder, unless it says otherwise.
+ * the run's frozen workflow and carried files, the rendered quick and carried folders, unless it says otherwise.
  */
 function shipped(
   repo: string,
@@ -209,7 +225,7 @@ function shipped(
   failing: Failing = {},
   files = scratch('wf-quick-files-'),
   rules?: readonly Rule[],
-  more: Record<string, string> = { WF_WORKFLOW_FILES: FROZEN },
+  more: Record<string, string> = FROZEN,
 ): Ran {
   assert.ok(CHECK, "sdlc's quick has an implement step with a check");
   const { bin, said } = stubs(failing);
@@ -352,7 +368,7 @@ test("REFUSED at shipped defaults, in the checkout: implement's check runs the s
     const [cmd, ...args] = checkArgv(LOCAL_CHECK);
     const ran = spawnSync(cmd, args, {
       cwd: repo,
-      env: envOf(repo, base, bin, { WF_CLOSEOUT: closeoutFile({ plan: 'p' }), WF_WORKFLOW_FILES: LOCAL_FROZEN }),
+      env: envOf(repo, base, bin, { WF_CLOSEOUT: closeoutFile({ plan: 'p' }), ...LOCAL_FROZEN }),
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
       timeout: 120_000,
@@ -400,6 +416,7 @@ test("the factory's own check, set, runs after the parts and before the push or 
         WF_CLOSEOUT: closeoutFile({ plan: 'p' }),
         WF_CI_POLL_SECONDS: '0',
         WF_WORKFLOW_FILES: path.join(OWN_RENDERED[way].tree, 'workflows', 'quick'),
+        WF_CARRIED_FILES: path.join(OWN_RENDERED[way].tree, 'workflows', 'carried'),
       }),
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -540,14 +557,14 @@ test("REFUSED: a note or a README that says a bound on the size, or other clause
   for (const file of ['implement.md', 'review.md', 'README.md']) assert.doesNotMatch(said(file), bound, `${file} bounds no size`);
   const { before, github, local } = waysOf(CHECK);
   const check = before + github;
-  const clauses = [...check.matchAll(/node\s+"\$WF_WORKFLOW_FILES\/([\w-]+\.ts)"\s+(size|tests|pages|push|wait)?/g)].map(
-    ([, script, verb]) => (verb ? `${script} ${verb}` : script),
-  );
+  const clauses = [
+    ...check.matchAll(/node\s+"\$\{WF_(?:WORKFLOW|CARRIED)_FILES:\?[^}]*\}\/([\w-]+\.ts)"\s+(size|tests|pages|push|wait)?/g),
+  ].map(([, script, verb]) => (verb ? `${script} ${verb}` : script));
   assert.deepEqual(clauses, ['change.ts size', 'probe.ts', 'parts.ts', 'pull-request.ts push', 'pull-request.ts wait']);
   assert.doesNotMatch(check, /\bnpm\b|\bnpx\b/);
   assert.equal(local, '; else { npm run --if-present lint && npm run --if-present typecheck && npm run --if-present test; }; fi');
-  const ahead = [...before.matchAll(/node\s+"\$WF_WORKFLOW_FILES\/([\w-]+\.ts)"\s+(size)?/g)].map(([, script, verb]) =>
-    verb ? `${script} ${verb}` : script,
+  const ahead = [...before.matchAll(/node\s+"\$\{WF_(?:WORKFLOW|CARRIED)_FILES:\?[^}]*\}\/([\w-]+\.ts)"\s+(size)?/g)].map(
+    ([, script, verb]) => (verb ? `${script} ${verb}` : script),
   );
   assert.deepEqual(
     ahead,

@@ -20,12 +20,14 @@ import fs from 'node:fs';
 import { isDeepStrictEqual } from 'node:util';
 import { UsageSchema } from '../../core/event-schema.ts';
 import { readText } from '../../core/engine/tally.ts';
+import { replaceFile } from '../../core/replace.ts';
 import type { HarnessOutput, HarnessSpec } from './detached.ts';
 import { overNow, type RunFile } from './run-file.ts';
 
 /**
  * The shipped readers' version — `claudeResultOutput`, `claudeStreamOutput` and `codexOutput`: a kept output of another
  * version is read again from its capture. Goes up with every change to what a reader reads, as `SAID_DIGEST` does.
+ * Exported only for the tests that import it.
  */
 export const SAID_VERSION = 10;
 
@@ -34,12 +36,14 @@ export const SAID_VERSION = 10;
  * taken as it is, with the capture's key, and its log not read again — the added fields absent, which is the truth of a
  * capture read before they were. A version leaves this list the moment a reader changes what one of its fields says, or
  * stops saying one: the digest pin catches a reader that reads otherwise, never a version wrongly left here.
+ * Exported only for the tests that import it.
  */
 export const SAID_EXTENDED: readonly number[] = [1, 2, 3, 4, 6];
 
 /**
  * The digest of what the shipped readers read of the streams in `test/reader-streams.ts`: a reader that reads otherwise fails
  * `test/said.test.ts` until this is recorded again, beside a `SAID_VERSION` gone up with it.
+ * Exported only for the tests that import it.
  */
 export const SAID_DIGEST = '8c1b17b6907a4e77e79c0bc33e19c51abb44eb213a1d383e699519e36a971298';
 
@@ -47,7 +51,7 @@ export const SAID_DIGEST = '8c1b17b6907a4e77e79c0bc33e19c51abb44eb213a1d383e6995
 export type SaidKey = { size: number; mtimeMs: number };
 
 /** What a spec's reader says of one output: what it read, or why it refused it (`wrong`, its words). */
-export type Said = { read: HarnessOutput } | { wrong: string };
+type Said = { read: HarnessOutput } | { wrong: string };
 
 /** What this process has read of each run's capture, by the run's name, with the key it read it at. */
 export type SaidMemo = Map<string, SaidKey & { said: Said }>;
@@ -73,7 +77,10 @@ const isKept = Schema.is(KeptSchema);
 /** Whether a kept output of `version` is taken: the shipped readers' own, or one of `SAID_EXTENDED`. */
 const isTaken = (version: number): boolean => version === SAID_VERSION || SAID_EXTENDED.includes(version);
 
-/** What `file` keeps of a capture known by `key` — or nothing, when it is not there, not whole, not decoded, or of another key. */
+/**
+ * What `file` keeps of a capture known by `key` — or nothing, when it is not there, not whole, not decoded, or of another key.
+ * Exported only for the tests that import it.
+ */
 export const keptSaid = (file: string, key: SaidKey): HarnessOutput | undefined => {
   let parsed: unknown;
   try {
@@ -87,19 +94,13 @@ export const keptSaid = (file: string, key: SaidKey): HarnessOutput | undefined 
 
 /** Keeps `read` in `file`, known by `key`: written beside it under this process's name, then renamed over it. A failure is none. */
 export const keepSaid = (file: string, key: SaidKey, read: HarnessOutput): void => {
-  const own = `${file}.${process.pid}.tmp`;
   try {
-    fs.writeFileSync(own, JSON.stringify({ version: SAID_VERSION, ...key, read }));
-    fs.renameSync(own, file);
-  } catch {
-    try {
-      fs.rmSync(own, { force: true });
-    } catch {}
-  }
+    replaceFile(file, JSON.stringify({ version: SAID_VERSION, ...key, read }));
+  } catch {}
 };
 
 /** What `reader` says of `text`: what it read, or why it refused it, in its words. */
-export const saidOf = (reader: NonNullable<HarnessSpec['readOutput']>, text: string): Said => {
+const saidOf = (reader: NonNullable<HarnessSpec['readOutput']>, text: string): Said => {
   try {
     return { read: reader(text) };
   } catch (e) {
@@ -136,19 +137,13 @@ export const keptText = (
  * modification times, then renamed over it, so a reader finds the whole capture or the kept one, never a part.
  */
 export const replaceCapture = (file: string, key: SaidKey, kept: string): SaidKey | undefined => {
-  const own = `${file}.${process.pid}.tmp`;
   try {
     const { size, mtimeMs, atimeMs } = fs.statSync(file);
     if (size !== key.size || mtimeMs !== key.mtimeMs) return undefined;
-    fs.writeFileSync(own, kept);
-    fs.utimesSync(own, atimeMs / 1000, mtimeMs / 1000);
-    fs.renameSync(own, file);
+    replaceFile(file, kept, { times: { atimeMs, mtimeMs } });
     const now = fs.statSync(file);
     return { size: now.size, mtimeMs: now.mtimeMs };
   } catch {
-    try {
-      fs.rmSync(own, { force: true });
-    } catch {}
     return undefined;
   }
 };
@@ -179,7 +174,7 @@ export const captureAt = (file: string): { key: SaidKey; text: string } | undefi
 };
 
 /** Where a run's capture is (`log`), what was read of it is kept (`kept`), and, for a spec that keeps it, its whole stdout (`stdout`). */
-export type SaidFiles = { log: string; kept: string; stdout?: string };
+type SaidFiles = { log: string; kept: string; stdout?: string };
 
 /** The files of the run whose files begin `base`: `.log`, `.said`, and `.stdout` for a spec that keeps its `streams` whole. */
 export const saidFilesAt = (base: string, streams?: true): SaidFiles => ({
@@ -192,7 +187,7 @@ export const saidFilesAt = (base: string, streams?: true): SaidFiles => ({
  * What to do with a run's capture once read: `over`, the run no longer works, so what was read is kept on disk; `ended`, its run
  * file says its worker wrote its end, so nothing writes the capture again, and `keep`, a spec's `keepOutput`, rewrites it.
  */
-export type SaidWhen = { over: boolean; ended?: boolean; keep?: (output: string) => string };
+type SaidWhen = { over: boolean; ended?: boolean; keep?: (output: string) => string };
 
 /** When `run`'s capture is read (`SaidWhen`): over as of now, its lease gone included; ended once its worker wrote its end. */
 export const saidWhen = (run: RunFile, keep?: (output: string) => string): SaidWhen => ({

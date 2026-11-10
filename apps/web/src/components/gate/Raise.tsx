@@ -4,13 +4,15 @@
  */
 import { useId, useState } from 'react';
 import type { RaiseBy } from 'objects';
-import type { Question, QuestionAnswer, RetryMode } from '../../lib/api';
+import type { Question } from '../../lib/api/tries.ts';
+import type { QuestionAnswer, RetryMode } from '../../lib/api/asks.ts';
 import { askedSaid, raiseTo, type Answer } from '../../lib/asks';
 import { cn } from '../../lib/utils';
 import { OFFERS } from '../../lib/words';
-import { BUTTON, MODES, Refusal, TEXTAREA, useAsk, useRound } from './Ask';
+import { MODES, Refusal, useAsk, useRound } from './Ask';
 import { answersFrom, Asks, QuestionFields, RecommendButton, unanswered, type Draft } from './Questions';
 import type { Frozen } from '../../lib/frozen';
+import { BUTTON, TEXTAREA } from '../../lib/classes';
 
 const AMOUNT =
   'w-24 rounded border border-outline bg-background px-2 py-1 font-mono text-body-medium focus:border-on-surface-variant focus:outline-none';

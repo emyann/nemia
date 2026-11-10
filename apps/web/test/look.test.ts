@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { ours } from './ours.ts';
 
 const WEB = path.join(import.meta.dirname, '..');
 const SRC = path.join(WEB, 'src');
@@ -70,7 +71,7 @@ test("the look's door: every part with its stories, no import past the door, and
     assert.deepEqual(pastDoor('routes/x.tsx', "import { Plate } from '../components/look';\nimport { cn } from '@/lib/look/cut';"), []);
     assert.deepEqual(pastDoor('components/x.tsx', "import { Plate } from './look/index';"), []);
     assert.deepEqual(pastDoor('components/look/CutButton.tsx', "import { cutRing } from './cut';"), [], 'a part reaches its siblings');
-    const files = filesUnder(SRC).filter((file) => /\.tsx?$/.test(file) && !file.startsWith('components/ui/ds/'));
+    const files = filesUnder(SRC).filter((file) => /\.tsx?$/.test(file) && ours(`src/${file}`));
     assert.ok(files.includes('components/run/WaitingCard.tsx'), 'the source is read');
     const through = files.filter((file) =>
       /from '(?:\.\.?\/look|\.\.\/components\/look|@\/components\/look)'/.test(fs.readFileSync(path.join(SRC, file), 'utf8')),
@@ -178,7 +179,7 @@ test("the cut and the grain in the board's source: no ring a clip breaks, the co
   await t.test("REFUSED: a grain's tile written outside the look's grain, which holds three, each once", () => {
     const sources = Object.fromEntries(
       filesUnder(SRC)
-        .filter((file) => /\.(?:tsx?|css)$/.test(file) && !file.startsWith('components/ui/ds/'))
+        .filter((file) => /\.(?:tsx?|css)$/.test(file) && ours(`src/${file}`))
         .map((file) => [file, fs.readFileSync(path.join(SRC, file), 'utf8')]),
     );
     assert.ok('styles.css' in sources && 'components/look/Sticker.tsx' in sources, 'the source is read');

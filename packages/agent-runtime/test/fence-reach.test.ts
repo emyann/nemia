@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { fenceReach, unruledIn } from '../src/harness/reach.ts';
 import { CLAUDE_PERMISSION_MODES } from '../src/harness/claude/vocabulary.ts';
 import { CODEX_SANDBOXES } from '../src/harness/codex/vocabulary.ts';
-import { attachedOptions } from '../src/harness/claude/attached-options.ts';
+import { attachedOptions } from '../src/harness/claude/session-options.ts';
 import { codex } from '../src/harness/codex/codex.ts';
 
 /** The harness names that run Claude Code; `claude-detached`, the `claude -p` road, is no longer one, and reaches nothing. */
@@ -17,10 +17,10 @@ const CLAUDES = ['claude'];
 const after = (args: readonly string[], flag: string): string | undefined => args[args.indexOf(flag) + 1];
 
 test('Claude Code drops auto on a listed model, named or with a suffix, and on no other; codex drops nothing', () => {
-  for (const model of ['haiku', 'claude-haiku-4-5', 'claude-haiku-4-5-20251001', 'claude-sonnet-4-5']) {
+  for (const model of ['claude-haiku-4-5', 'claude-haiku-4-5-20251001', 'claude-sonnet-4-5']) {
     for (const harness of CLAUDES) assert.deepEqual(fenceReach(harness, model)!.dropped, ['auto'], `${harness} ${model}`);
   }
-  for (const model of ['opus', 'sonnet', 'claude-haiku-4-50', 'xhaiku', undefined]) {
+  for (const model of ['haiku', 'opus', 'sonnet', 'claude-haiku-4-50', 'xhaiku', undefined]) {
     assert.deepEqual(fenceReach('claude', model)!.dropped, [], String(model));
   }
   assert.deepEqual(fenceReach('codex', 'haiku')!.dropped, []);

@@ -2,9 +2,9 @@
  * A remote agent's registry, `remote/` under the store: one entry a session, `<name>.json` with the name URI-encoded, moved to
  * `remote/done/` once let go of. What an entry holds, how an older one is read, and how a session's entry is forgotten.
  */
-import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs';
+import { replaceFile } from '../core/replace.ts';
 import { formerStateOf, isSessionState, type Sighting } from '../core/index.ts';
 import { forgetFiles, keptOf, type RunnerOps } from '../harness/index.ts';
 import type { Monotonic } from '../core/clock.ts';
@@ -54,7 +54,7 @@ const upgraded = (e: Entry): Entry => {
 };
 
 /** The file of the session `name`'s entry in the registry folder `under`. */
-export const entryFileOf = (under: string, name: string): string => path.join(under, `${encodeURIComponent(name)}.json`);
+const entryFileOf = (under: string, name: string): string => path.join(under, `${encodeURIComponent(name)}.json`);
 
 /** The entry in `file`, read as this code reads it (`upgraded`); `undefined` when there is none. */
 export const readEntry = (file: string): Entry | undefined => {
@@ -76,7 +76,7 @@ const entryFilesOf = (dir: string, name: string): [open: string, done: string] =
  * The remote harness `harness`'s `forget`, its registry in `dir`: the session's entry, open or let go of, removed or with `dry`
  * listed, and the Task the agent made of it named as left, since the remote party keeps it.
  */
-export const forgetEntryOf =
+const forgetEntryOf =
   (harness: string, dir: string): NonNullable<RunnerOps['forget']> =>
   (session, options) => {
     const files = entryFilesOf(dir, session.name);
@@ -91,7 +91,7 @@ export const forgetEntryOf =
  * The remote harness `harness`'s `kept`, its registry in `dir`: each session's entry, open or let go of. It names no record: the
  * Task the agent made of a session is the remote party's, and on no disk of ours.
  */
-export const keptEntryOf =
+const keptEntryOf =
   (harness: string, dir: string): NonNullable<RunnerOps['kept']> =>
   (sessions) =>
     keptOf(harness, sessions, ({ name }) => ({ files: entryFilesOf(dir, name), records: [] }));
@@ -124,9 +124,7 @@ export const registryOf = (harness: string, root: string) => {
   const fileOf = (name: string, under = dir) => entryFileOf(under, name);
   const write = (e: Entry, under = dir) => {
     fs.mkdirSync(under, { recursive: true });
-    const tmp = `${fileOf(e.name, under)}.${process.pid}.${randomUUID()}.tmp`;
-    fs.writeFileSync(tmp, `${JSON.stringify(e)}\n`);
-    fs.renameSync(tmp, fileOf(e.name, under));
+    replaceFile(fileOf(e.name, under), `${JSON.stringify(e)}\n`);
   };
   const entriesIn = (under: string): Entry[] =>
     entryNames(under).flatMap((f) => {

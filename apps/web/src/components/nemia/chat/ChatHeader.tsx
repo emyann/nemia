@@ -7,7 +7,7 @@ import { ExternalLinkIcon, Maximize2Icon, Minimize2Icon, XIcon } from 'lucide-re
 import { IconButton } from '@/components/ui/ds';
 import { LinkButton } from '@/components/ui/button';
 import { chatHeaderLine, spendWords } from '@/lib/nemia';
-import type { NemiaLevel } from '@/lib/api';
+import type { NemiaLevel } from '@/lib/api/nemia';
 import type { Presence } from '@/lib/presence';
 import { NemiaFace } from '../NemiaFace';
 import { routeLink } from '../../nav/routeLink';

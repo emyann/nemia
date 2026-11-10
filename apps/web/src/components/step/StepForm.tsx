@@ -1,5 +1,7 @@
 import { useId, useState, type ReactNode } from 'react';
-import type { KeyField, KeyForm, StepLayers, WorkflowStepSpec } from '../../lib/api';
+import type { KeyField, KeyForm } from '../../lib/api/builder.ts';
+import type { StepLayers } from '../../lib/api/layers.ts';
+import type { WorkflowStepSpec } from '../../lib/api/library.ts';
 import {
   contextText,
   listOf,

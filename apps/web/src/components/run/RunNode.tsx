@@ -2,10 +2,13 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
-import { ChevronRight } from 'lucide-react';
+import { ArrowUpRight, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { decisionQuery, type RunSummary, type RunWaiting } from '@/lib/api';
+import { decisionQuery } from '@/lib/api/decision';
+import type { RunView } from '@/lib/api/judged';
+import { judged, type RunRow, type UnjudgedRun } from '@/lib/api/judged';
+import { type RunWaiting } from '@/lib/api/judged';
 import { TryTag } from './TryTag';
 import { needLine, needsOf, stepAnchor } from '@/lib/asks';
 import { spentTitle } from '@/lib/cost';
@@ -28,8 +31,8 @@ import { StepRail, StepTiles, type TilesRead } from '../step/StepRail';
  * `onToggle` opens or closes the card, and `onStep` shows a step of it in the bar. `reads` is a line per run it reads as context, its id
  * and title (`readsLines`).
  */
-export type RunNodeData = {
-  run: RunSummary;
+type RunNodeData = {
+  run: RunRow;
   reads: string[];
   finished: boolean;
   open: boolean;
@@ -72,14 +75,62 @@ export type RunFlowNode = Node<RunNodeData, 'run'>;
  *   not be read.
  * - In its footer, so the card is no taller for them than a line (`CELL_HEIGHT`): what it has cost, `≥` where an ended attempt has none
  *   on it; the tokens its sessions used, `≥` where one measured none, their split on hover; and on its right, or under them where both   do
- *   not fit, its chips; the hold lifted here, as the CLI's `hold --off` lifts it (`CardLift`); pruned; and why the run is not judged
- *   (`RunSummary.unreadable`), whole on hover; and how many runs it reads as context, which it does not wait on, each on hover.
+ *   not fit, its chips; the hold lifted here, as the CLI's `hold --off` lifts it (`CardLift`); pruned; and how many runs it reads as
+ *   context, which it does not wait on, each on hover.
  * - A handle on its left where the edge from a run it waits on comes in, and one on its right where the edge into each card that   waits on
  *   it leaves.
+ *
+ * A run the list could not judge (`UnjudgedRun`) is a bare card (`UnjudgedCard`).
  */
-export function RunNode({
-  data: { run, reads, finished, open, detail, trouble, inspected, selected, onToggle, onStep },
-}: NodeProps<RunFlowNode>) {
+export function RunNode({ data }: NodeProps<RunFlowNode>) {
+  const { run } = data;
+  return judged(run) ? <JudgedCard data={{ ...data, run }} /> : <UnjudgedCard run={run} inspected={data.inspected} />;
+}
+
+/**
+ * A run the list could not judge, a task it reads having a journal that does not read: its id as its title, a link to its page, the id
+ * under it, and in its footer that it is unreadable, the list's words on hover. Nothing of it is judged, so it has no steps to open, no
+ * clock and no chip but that one.
+ */
+function UnjudgedCard({ run, inspected }: { run: UnjudgedRun; inspected: boolean }) {
+  return (
+    <Card
+      size="sm"
+      {...(inspected && { 'data-inspected': true as const })}
+      className={`w-fit flex-row items-start gap-0 shadow-sm transition-opacity ${inspected ? 'ring-2 ring-ring' : ''}`}
+    >
+      <div className="flex w-88 shrink-0 flex-col gap-3">
+        <div className="min-w-0 px-3">
+          <Link
+            to="/runs/$runId"
+            params={{ runId: run.id }}
+            preload={false}
+            title={run.id}
+            className="nodrag block min-w-0 truncate text-body-medium font-semibold hover:underline"
+          >
+            {run.id}
+          </Link>
+          <p className="mt-0.5 truncate font-mono text-body-small text-muted-foreground" title={run.id}>
+            {run.id}
+          </p>
+        </div>
+        <div className="flex min-h-6 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t px-3 pt-2">
+          <span className="ml-auto flex items-center gap-1">
+            <Badge variant="outline" data-unreadable title={run.unjudged} className="border-failure text-failure">
+              unreadable
+            </Badge>
+          </span>
+        </div>
+      </div>
+      <Handle type="target" position={Position.Left} isConnectable={false} className="opacity-0" />
+      <Handle type="source" position={Position.Right} isConnectable={false} className="opacity-0" />
+    </Card>
+  );
+}
+
+/** A run judged, on the floor: every part `RunNode` says. */
+function JudgedCard({ data }: { data: RunNodeData & { run: RunView } }) {
+  const { run, reads, finished, open, detail, trouble, inspected, selected, onToggle, onStep } = data;
   const now = useNow(clockCounts(run, finished) ? 1_000 : 30_000);
   const cancelled = run.cancelledAt !== null;
   const title = titleOf(run);
@@ -203,7 +254,7 @@ export function RunNode({
  * A run card's title line: its title, a link to the run's page, not preloaded; and the chevron that opens or
  * closes its steps (`onToggle`). Neither button drags the card nor shows the run in the bar.
  */
-function CardTitle({ run, title, open, onToggle }: { run: RunSummary; title: string; open: boolean; onToggle: (runId: string) => void }) {
+function CardTitle({ run, title, open, onToggle }: { run: RunView; title: string; open: boolean; onToggle: (runId: string) => void }) {
   return (
     <div className="flex items-center gap-1">
       <Link
@@ -244,7 +295,7 @@ type Look = { ghost: boolean; className: string; marks: { 'data-ghost-run'?: tru
  * the one finished card that waits for a person; else a ghost while it waits on runs and nothing else (`waitsOnRuns`); else dimmed once
  * `finished`.
  */
-function lookOf(run: RunSummary, finished: boolean, inspected: boolean): Look {
+function lookOf(run: RunView, finished: boolean, inspected: boolean): Look {
   const ghost = waitsOnRuns(run);
   const marks = { ...(ghost && { 'data-ghost-run': true as const }), ...(inspected && { 'data-inspected': true as const }) };
   if (inspected) return { ghost, className: 'ring-2 ring-ring', marks };
@@ -255,7 +306,8 @@ function lookOf(run: RunSummary, finished: boolean, inspected: boolean): Look {
 
 /**
  * What a run started `--after` runs waits on, in the CLI `ls`'s word (`waiting.word`), with what the CLI's `decide` says on hover. Yours
- * when only a person moves it; on a ghost's card (`ghost`), each run it waits on a link to that run's page.
+ * when only a person moves it; on a ghost's card (`ghost`), after the word an arrow to each run it waits on, named by its label, so the
+ * word names each run once.
  */
 function WaitingLine({ waiting, ghost }: { waiting: RunWaiting; ghost: boolean }) {
   return (
@@ -264,32 +316,26 @@ function WaitingLine({ waiting, ghost }: { waiting: RunWaiting; ghost: boolean }
       title={waiting.advice}
       className={`mt-1 line-clamp-2 font-mono text-body-small break-words ${waiting.waitingOnYou ? 'text-yours' : 'text-muted-foreground'}`}
     >
-      {ghost ? (
-        <>
-          waiting on{' '}
-          {waiting.runs.map(({ run }, i) => (
-            <span key={run}>
-              {i > 0 && ', '}
-              <RouteLink
-                to="/runs/$runId"
-                params={{ runId: run }}
-                data-waits-on={run}
-                className="nodrag text-foreground/80 hover:underline"
-              >
-                {run}
-              </RouteLink>
-            </span>
-          ))}
-        </>
-      ) : (
-        waiting.word
-      )}
+      {waiting.word}
+      {ghost &&
+        waiting.runs.map(({ run }) => (
+          <RouteLink
+            key={run}
+            to="/runs/$runId"
+            params={{ runId: run }}
+            data-waits-on={run}
+            aria-label={`Open ${run}`}
+            className="nodrag ml-1 inline-flex align-middle text-foreground/80 hover:text-foreground"
+          >
+            <ArrowUpRight aria-hidden className="size-3.5" />
+          </RouteLink>
+        ))}
     </p>
   );
 }
 
 /** What a run waiting on you touched, in a line: `touched 2 packages · +979 −12`, from its decision, read once for its state. */
-function TouchedLine({ run }: { run: RunSummary }) {
+function TouchedLine({ run }: { run: RunView }) {
   const { data, error } = useQuery(decisionQuery(run.id, decisionStamp(run)));
   if (error) {
     return (
@@ -311,7 +357,7 @@ function TouchedLine({ run }: { run: RunSummary }) {
  * What a run took, at the left of its card's footer: its clock (`runClock`), with the times in full on hover; what it has cost, `≥`
  * where an ended attempt has none on it; and the tokens its sessions used, their split on hover. Each figure only once there is one.
  */
-function Took({ run, clock }: { run: RunSummary; clock: ReturnType<typeof runClock> }) {
+function Took({ run, clock }: { run: RunView; clock: ReturnType<typeof runClock> }) {
   return (
     <span className="flex min-w-0 items-baseline gap-1.5 font-mono text-body-small text-muted-foreground">
       <time dateTime={clock.at} title={clock.title} className="truncate">
@@ -333,9 +379,9 @@ function Took({ run, clock }: { run: RunSummary; clock: ReturnType<typeof runClo
 
 /**
  * A card's chips, on the right of its footer: how many runs it reads as context, each on hover (`reads`); to decide (`decide`); waiting on
- * you; held, with the hold lifted here (`CardLift`); `cancelled`; pruned; and unreadable, why on hover.
+ * you; held, with the hold lifted here (`CardLift`); `cancelled`; and pruned.
  */
-function Chips({ run, decide, cancelled, reads }: { run: RunSummary; decide: boolean; cancelled: boolean; reads: string[] }) {
+function Chips({ run, decide, cancelled, reads }: { run: RunView; decide: boolean; cancelled: boolean; reads: string[] }) {
   return (
     <span className="ml-auto flex items-center gap-1">
       {run.context.length > 0 && (
@@ -353,13 +399,8 @@ function Chips({ run, decide, cancelled, reads }: { run: RunSummary; decide: boo
       {run.holding && !cancelled && <CardLift id={run.id} namespace={namespaceOf(run.factory)} />}
       {cancelled && <Badge variant="outline">{ENDED.cancelled.word}</Badge>}
       {run.pruned && (
-        <Badge variant="outline" data-pruned title={run.pruned.said} className="text-on-surface-variant">
+        <Badge variant="outline" data-pruned title={run.pruned.said ?? ''} className="text-on-surface-variant">
           pruned
-        </Badge>
-      )}
-      {run.unreadable && (
-        <Badge variant="outline" data-unreadable title={run.unreadable} className="border-failure text-failure">
-          unreadable
         </Badge>
       )}
     </span>

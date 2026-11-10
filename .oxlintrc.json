@@ -3,10 +3,11 @@
   "options": {
     "typeAware": true
   },
-  // The design system kit is another repository's code (french-tech-homies/design-system): the shadcn CLI writes it into the board from
-  // the `@ds` registry, its skills beside it, and an update fetches it again and is read as a diff. Nothing here shapes it, so no rule
-  // reads it. tools/guards/test/comments.test.ts holds this list and refuses a folder that joins it.
-  "ignorePatterns": ["apps/web/src/components/ui/ds/**", "apps/web/.claude/**"],
+  // The code that is not ours, as .gitattributes marks it: the design system kit the shadcn CLI writes into the board from the `@ds`
+  // registry and its skills beside it (another project's, vendored unchanged), and the route tree TanStack Router's plugin writes.
+  // Nothing here shapes them, so no rule reads them. tools/guards/test/comments.test.ts holds this list to .gitattributes: a file of
+  // code marked there that no glob here skips is refused, and so is a glob that skips a file of ours.
+  "ignorePatterns": ["apps/web/src/components/ui/ds/**", "apps/web/.claude/**", "apps/web/src/routeTree.gen.ts"],
   "jsPlugins": [
     { "name": "comments", "specifier": "./lint/comments.ts" },
     { "name": "sonarjs", "specifier": "eslint-plugin-sonarjs" }
@@ -67,8 +68,8 @@
     // at 800 code lines for every file, with no ceiling for any one (docs/architecture.md, "Folders, in every package"): a file that
     // reaches it is cut along its concepts, and no file under it is split for its size. A file over a function limit today has its own
     // ceiling in an override below, and never a higher one (docs/design-2026-09-28-feature-folders.md, "The limits").
-    // tools/guards/test/limits.test.ts holds these thresholds and the per-file ceilings, refuses a ceiling on max-lines, and refuses a
-    // disable that names a limit.
+    // tools/guards/test/limits.test.ts reads these thresholds and the per-file ceilings from here, refuses a ceiling on max-lines, and
+    // refuses a disable that names a limit.
     "max-lines": ["error", { "max": 800, "skipBlankLines": true, "skipComments": true }],
     "max-lines-per-function": ["error", { "max": 80, "skipBlankLines": true, "skipComments": true }],
     // Cyclomatic counts the paths, so it says how many tests a function needs; cognitive weighs the nesting, which cyclomatic does not.
@@ -93,14 +94,11 @@
         "packages/agent-orchestrator/src/daemon/daemon.store.ts",
         "packages/agent-orchestrator/src/inbox/inbox.store.ts",
         "packages/agent-orchestrator/src/feed/feed.store.ts",
-        "apps/api/src/body.ts",
         "apps/api/src/agents/agents.ts",
-        "apps/api/src/commands/routes.ts",
-        "apps/api/src/commands/extend.ts",
+        "apps/api/src/runs/start.ts",
         "apps/api/src/workflows/builder.ts",
         "apps/api/src/inbox/inbox.ts",
-        "apps/api/src/runs/runs.ts",
-        "apps/api/src/agents/skills.ts",
+        "apps/api/src/skills/skills.ts",
         "apps/api/src/workflows/workflows.ts",
         "apps/web/src/lib/api/read.ts",
         "apps/web/src/lib/api/judged.ts",
@@ -417,8 +415,9 @@
       }
     },
     // The objects sit at the bottom beside the runtime, and every layer above reads them, the board in a browser: they import `effect`
-    // and their own files alone (`./x.ts`), no other package, no node built-in and no path out of src. One group refuses every import and
-    // lets those three through by negation: oxlint's regex reads no lookahead, and refuses nothing with one. packages/objects/CLAUDE.md.
+    // and their own files alone (`./x.ts`), no other package, no node built-in and no path out of src but a contract's type
+    // (`../contracts/<name>.contract.ts`, imported by `import type`, which no build keeps). One group refuses every import and lets those
+    // through by negation: oxlint's regex reads no lookahead, and refuses nothing with one. packages/objects/CLAUDE.md.
     {
       "files": ["packages/objects/src/**"],
       "rules": {
@@ -427,7 +426,7 @@
           {
             "patterns": [
               {
-                "group": ["**", "!effect", "!effect/**", "!./**"],
+                "group": ["**", "!effect", "!effect/**", "!./**", "!../contracts/*.contract.ts"],
                 "message": "The objects import effect and their own files alone: write it with effect's Schema, in a file of packages/objects/src"
               }
             ]
@@ -446,14 +445,12 @@
         "sonarjs/cognitive-complexity": "off"
       }
     },
-    // The shadcn components are written by the shadcn CLI, through apps/web/components.json, and pinned by skills-lock.json.
+    // The shadcn components are written by the shadcn CLI, through apps/web/components.json, but are ours to edit, so the limits hold
+    // them: the sidebar's one function over its threshold has a ceiling like any other file's.
     {
-      "files": ["apps/web/src/components/ui/**"],
+      "files": ["apps/web/src/components/ui/sidebar.tsx"],
       "rules": {
-        "max-lines": "off",
-        "max-lines-per-function": "off",
-        "complexity": "off",
-        "sonarjs/cognitive-complexity": "off"
+        "max-lines-per-function": ["error", { "max": 95, "skipBlankLines": true, "skipComments": true }]
       }
     },
     // The route tree is generated by TanStack Router's plugin on every build.
@@ -468,11 +465,11 @@
     },
     // Each file over a limit today, at its own ceiling: its measure, rule by rule, and nothing higher. Lint refuses the file that grows.
     // The ceilings only fall: a limit is met by cutting, never by raising a ceiling. tools/guards/test/limits.test.ts
-    // ratchets them: it refuses a ceiling above the measure, and holds each file's count of offenders.
+    // ratchets them: it refuses a ceiling above the measured worst of its file.
     {
       "files": ["apps/api/src/capabilities/reach.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 137, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 131, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 25 }],
         "sonarjs/cognitive-complexity": ["error", 26]
       }
@@ -492,7 +489,7 @@
     {
       "files": ["apps/web/src/components/factory/FactoryCanvas.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 249, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 248, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -523,7 +520,7 @@
     {
       "files": ["apps/web/src/components/run/RunNode.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 111, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 110, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 31 }],
         "sonarjs/cognitive-complexity": ["error", 21]
       }
@@ -834,13 +831,6 @@
       }
     },
     {
-      "files": ["packages/agent-runtime/src/service/harness-refusal.ts"],
-      "rules": {
-        "complexity": ["error", { "max": 22 }],
-        "sonarjs/cognitive-complexity": ["error", 22]
-      }
-    },
-    {
       "files": ["packages/agent-runtime/src/harness/args.ts"],
       "rules": {
         "complexity": ["error", { "max": 28 }],
@@ -870,7 +860,7 @@
     {
       "files": ["packages/agent-runtime/src/service/engine.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 147, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 125, "skipBlankLines": true, "skipComments": true }]
       }
     }
   ],

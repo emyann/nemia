@@ -1,16 +1,10 @@
 import { useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import {
-  repositoryQuery,
-  runsQuery,
-  startCard,
-  startRun,
-  type Place,
-  type RunSummary,
-  type Started,
-  type WorkflowListing,
-} from '../../lib/api';
+import { repositoryQuery, startRun, type Place, type Started, type WorkflowListing } from '../../lib/api/workflows.ts';
+import { runsQuery } from '../../lib/api/runs.ts';
+import { judged, type RunView } from '../../lib/api/judged.ts';
+import { startCard } from '../../lib/api/inbox.ts';
 import { standingOf, titleOf } from '../../lib/factory';
 import { afterFor, ignoredRepoNote } from '../../lib/inbox';
 import { ContextPicker } from '../agent/ContextPicker';
@@ -191,21 +185,13 @@ function Where({ workflow, repo, factory, card }: { workflow: WorkflowListing; r
  * it is not the api's own: an inbox card's `repo:`. The runs are read as the page opens, not on the list's beat: a run started since is
  * listed on the next visit. A title wraps within its row, read whole, and no row runs past the card it is in, however long the title.
  */
-export function AfterPicker({
-  selected,
-  onChange,
-  repo,
-}: {
-  selected: readonly string[];
-  onChange: (after: string[]) => void;
-  repo?: string;
-}) {
+function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]; onChange: (after: string[]) => void; repo?: string }) {
   const repository = useQuery(repositoryQuery);
   const runs = useQuery({ ...runsQuery, refetchInterval: false });
   const legend = useId();
   const error = repository.error ?? runs.error;
   const where = repo ?? repository.data?.repo;
-  const onRepo = where && runs.data ? newestFirst(runs.data.filter((run) => run.repo === where)) : null;
+  const onRepo = where && runs.data ? newestFirst(runs.data.filter(judged).filter((run) => run.repo === where)) : null;
 
   return (
     <fieldset aria-labelledby={legend} className="min-w-0 space-y-1.5">
@@ -249,5 +235,5 @@ export function AfterPicker({
   );
 }
 
-const newestFirst = (runs: readonly RunSummary[]): RunSummary[] =>
+const newestFirst = (runs: readonly RunView[]): RunView[] =>
   [...runs].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));

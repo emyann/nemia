@@ -1,9 +1,9 @@
 /** What the look's stories draw their parts with: runs' steps in each state a rail shows, and the grounds a part is shown on. */
 import type { CSSProperties } from 'react';
-import type { RunSummary } from '@/lib/api';
+import type { RunView } from '@/lib/api/judged';
 
 /** A step of a rail, by its name and its codes, and its check's verdict. */
-type RailStep = Pick<RunSummary['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via' | 'verdict'>;
+type RailStep = Pick<RunView['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via' | 'verdict'>;
 
 /** The codes of each state the stories draw. */
 const VERIFIED = { phase: 'succeeded', reason: 'CheckPassed', on: null, via: null, verdict: { result: 'passed', exit: 0 } } as const;

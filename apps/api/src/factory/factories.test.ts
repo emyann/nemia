@@ -42,7 +42,7 @@ import { Effect } from 'effect';
 const onStore = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, root));
 
 type WorkflowListing = import('../workflows/workflows.ts').WorkflowListing;
-type WorkflowStepPage = import('../step/step.ts').WorkflowStepPage;
+type WorkflowStepPage = import('objects').WorkflowStepPage;
 type Factory = import('objects').Factory;
 type FactoryList = import('objects').FactoryList;
 type FactoryCommands = import('objects').FactoryCommands;
@@ -228,7 +228,7 @@ test('a person works in a factory with hires: the listing names what is unfilled
   await s.test(
     "a step's page in a factory is read with its hires, and a workflow it has not attached is a 404 naming its own fix alone",
     async () => {
-      const page = await get<WorkflowStepPage>('/api/workflows/repo/alpha/implement?factory=hired');
+      const page = await get<WorkflowStepPage>('/api/namespaces/hired/workflows/alpha/steps/implement');
       assert.equal(page.status, 200);
       assert.equal(page.body.keys.find((k) => k.key === 'agent')?.value, 'ada');
       assert.deepEqual(
@@ -236,11 +236,13 @@ test('a person works in a factory with hires: the listing names what is unfilled
         ['hired', 'ada', 'ada', 'You implement what you are asked.', []],
         'the factory hires ada into the step: the page marks it hired, and what a run would be told starts from her instructions',
       );
-      const unhired = await get<WorkflowStepPage>('/api/workflows/repo/alpha/implement?factory=solo');
+      const unhired = await get<WorkflowStepPage>('/api/namespaces/solo/workflows/alpha/steps/implement');
       assert.equal(unhired.body.keys.find((k) => k.key === 'agent')?.value, null);
       assert.deepEqual([unhired.body.hired, unhired.body.layers.agent], [null, null], 'a factory that hires no one into it hires no one');
 
-      const plain = await get<WorkflowStepPage>(`/api/workflows/repo/alpha/implement?repo=${encodeURIComponent(repoR)}`);
+      const plain = await get<WorkflowStepPage>(
+        `/api/namespaces/default/workflows/alpha/steps/implement?repo=${encodeURIComponent(repoR)}`,
+      );
       assert.deepEqual(
         [plain.body.factory, plain.body.hired, plain.body.layers.agent],
         [null, null, null],
@@ -262,10 +264,10 @@ test('a person works in a factory with hires: the listing names what is unfilled
         'the default factory hires no one',
       );
 
-      const gamma = await get<unknown>('/api/workflows/repo/gamma/plan?factory=hired');
+      const gamma = await get<unknown>('/api/namespaces/hired/workflows/gamma/steps/plan');
       assert.equal(gamma.status, 404);
       assert.doesNotMatch(said(gamma.body), /default factory/, "only the factory's own fix");
-      const offered = await get<WorkflowStepPage>(`/api/workflows/repo/gamma/plan?repo=${encodeURIComponent(repoR)}`);
+      const offered = await get<WorkflowStepPage>(`/api/namespaces/default/workflows/gamma/steps/plan?repo=${encodeURIComponent(repoR)}`);
       assert.equal(offered.status, 200, 'the default factory offers it');
     },
   );
@@ -294,13 +296,13 @@ test('a person works in a factory with hires: the listing names what is unfilled
         "the lines read beside its object (`…/lines`) give the address of the run's workflow page, in its factory, which the run object and the RunList leave out",
       );
 
-      const page = await get<WorkflowStepPage>('/api/workflows/repo/alpha/implement?factory=hired');
+      const page = await get<WorkflowStepPage>('/api/namespaces/hired/workflows/alpha/steps/implement');
       assert.deepEqual(
         page.body.recentRuns.map((r) => [r.id, r.brief, r.factory]),
         [[id, 'Add a cache', 'hired']],
         "the step's page lists the run among its recent runs",
       );
-      const elsewhere = await get<WorkflowStepPage>('/api/workflows/repo/alpha/implement?factory=solo');
+      const elsewhere = await get<WorkflowStepPage>('/api/namespaces/solo/workflows/alpha/steps/implement');
       assert.ok(!elsewhere.body.recentRuns.some((r) => r.id === id), "and only in its factory: another factory's page does not");
     },
   );
@@ -609,7 +611,7 @@ test('a person reads the factories: the default first, each by name, a broken fi
           ],
           "alpha is the tree's, served as `factory`, which shadows the repository's; gamma, which the tree has not, is the repository's",
         );
-        const page = await get<WorkflowStepPage>('/api/workflows/repo/alpha/implement?factory=treed');
+        const page = await get<WorkflowStepPage>('/api/namespaces/treed/workflows/alpha/steps/implement');
         assert.equal(page.status, 200);
         assert.equal(page.body.dir, path.join(tree, 'workflows', 'alpha'));
         assert.match(page.body.source, /Implement it, as the tree says\./, "the tree's step file, as written");

@@ -4,6 +4,9 @@ import { holdable, holdCandidates } from '../src/lib/hold.ts';
 
 type Run = Parameters<typeof holdCandidates>[1][number] & Parameters<typeof holdable>[0];
 
+/** What a prune took, as a run pruned says it. */
+const PRUNED: NonNullable<Run['pruned']> = { at: '2026-09-30T06:00:00.000Z', worktrees: [], artifacts: null, said: 'pruned' };
+
 /** A repository run of `/code/app` in flight, held by nobody: what the page offers a hold of, and what a hold may wait on. */
 const run = (extra: Partial<Run> = {}): Run => ({
   id: 'r-1',
@@ -32,7 +35,7 @@ test('holdable, holdCandidates: which run is offered a hold, and which runs a ho
     const cases: Array<[string, Partial<Run>]> = [
       ['called off', { cancelledAt: 'now', status: 'cancelled' }],
       ['called off, its status not yet said', { cancelledAt: 'now' }],
-      ['pruned', { pruned: { said: 'pruned' } }],
+      ['pruned', { pruned: PRUNED }],
       ['held', { holding, holdUntil: ['r-2'] }],
       ['held until a person lifts it', { holding: { ...holding, word: 'held until a person lifts it' }, holdUntil: [] }],
       ['held, its words not read', { holdUntil: ['r-2'] }],
@@ -65,7 +68,7 @@ test('holdable, holdCandidates: which run is offered a hold, and which runs a ho
         run({ id: 'folder', place: 'folder', repo: null }),
         run({ id: 'cancelled', cancelledAt: 'now', status: 'cancelled' }),
         run({ id: 'cancelled-running', cancelledAt: 'now' }),
-        run({ id: 'pruned', pruned: { said: 'pruned' } }),
+        run({ id: 'pruned', pruned: PRUNED }),
         run({ id: 'landed', status: 'succeeded' }),
       ];
       assert.deepEqual(holdCandidates(run(), runs), []);

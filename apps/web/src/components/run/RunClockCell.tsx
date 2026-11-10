@@ -1,5 +1,5 @@
 import { Button } from 'react-aria-components';
-import type { ListedRun, RunClock } from '@/lib/api';
+import type { ListedRun, RunClock } from '@/lib/api/runs';
 import { clockBreakdown } from '@/lib/breakdown';
 import { runClock } from '@/lib/factory';
 import { whenWords } from '@/lib/runWords';

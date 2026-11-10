@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { setCardFrom, type InboxEntry } from '../../lib/api';
+import { setCardFrom, type InboxEntry } from '../../lib/api/inbox.ts';
 import type { CardRefusal } from '../../lib/inbox';
 import { ContextPicker } from '../agent/ContextPicker';
-import { SECONDARY } from './InboxParts';
+import { BUTTON_OUTLINED } from '../../lib/classes';
 
 /**
  * A card's `from:`, the runs its run is handed as context: each linked to its page, and, on a card that can still start (`editable`), a
@@ -55,7 +55,7 @@ export function CardFrom({
             type="button"
             aria-expanded={editing}
             onClick={() => setEditing(!editing)}
-            className={`${SECONDARY} px-2 py-0.5 text-body-small`}
+            className={`${BUTTON_OUTLINED} px-2 py-0.5 text-body-small`}
           >
             {editing ? 'Done' : 'Change'}
           </button>

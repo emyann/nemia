@@ -1,4 +1,4 @@
-import type { RunView } from './runView.ts';
+import type { RunDetail } from './runView.ts';
 import type { Decidable, RunDecision } from './api/decision.ts';
 import { isDecidable } from './decide.ts';
 import type { PruneHow } from './api/runs.ts';
@@ -19,7 +19,7 @@ export type PruneChoice = {
 /** What the board offers to prune of a run, and what a prune `--unmerged` gives up, said plainly (`unmergedWarning`). */
 export type PruneOffer = { choices: PruneChoice[]; warning: string | null };
 
-type Prunable = Pick<RunView, 'id' | 'place' | 'status' | 'moving' | 'onDisk'>;
+type Prunable = Pick<RunDetail, 'id' | 'place' | 'status' | 'moving' | 'onDisk'>;
 
 /**
  * Whether the run finished and nobody has decided it, as the api's decision says it off the package's own (`Decidable['awaiting']`): the
@@ -102,7 +102,7 @@ export function pruneOffer(run: Prunable, awaiting: Awaiting | null): PruneOffer
  * What `--unmerged` gives up, said plainly: no branch is deleted, and the run's result branches become the only copy of its work — or, for
  * a run that worked on its base branch itself, what it would be decided on is gone.
  */
-export function unmergedWarning(awaiting: Awaiting): string {
+function unmergedWarning(awaiting: Awaiting): string {
   const after = 'No branch is ever deleted, and none of its steps can be tried again, sent round or approved.';
   if (awaiting.direct)
     return `It worked on ${awaiting.branches[0] ?? 'its base branch'} itself and nobody has decided it: once pruned, the files you would read to decide it are gone. ${after}`;

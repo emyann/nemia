@@ -6,7 +6,9 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Factory, InboxEntry, RunSummary } from '../src/lib/api.ts';
+import type { Factory } from '../src/lib/api/factories.ts';
+import type { InboxEntry } from '../src/lib/api/inbox.ts';
+import type { RunView } from '../src/lib/api/judged.ts';
 import {
   conditionAmiss,
   blockOf,
@@ -59,7 +61,7 @@ const factory = (name: string, extra: Partial<Factory> = {}): Factory => ({
 const fallback = factory('default', { default: true, repos: ['/code/app'], workflows: null, hires: {} });
 
 /** A run finished in `factory`, which nothing moves and nobody is asked about; `extra` puts keys over it. */
-const run = (id: string, factoryName: string | null, extra: Partial<RunSummary> = {}): FactoryRun & { id: string } => ({
+const run = (id: string, factoryName: string | null, extra: Partial<RunView> = {}): FactoryRun & { id: string } => ({
   id,
   factory: factoryName,
   status: 'succeeded',

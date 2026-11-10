@@ -15,7 +15,7 @@ import type { SpawnRequest } from '../src/harness/seam.ts';
 import { traceparentOf, withoutTelemetry, type Telemetry } from '../src/harness/telemetry.ts';
 import { claudeTelemetryEnv } from '../src/harness/claude/telemetry.ts';
 import { CLAUDE_JOB_ENV, claudeJob, claudeJobSpec } from '../src/harness/claude/code.ts';
-import { attachedOptions } from '../src/harness/claude/attached-options.ts';
+import { attachedOptions } from '../src/harness/claude/session-options.ts';
 import { STAND_IN } from './attached-held.ts';
 import { commandHarness } from '../src/harness/command/command.ts';
 import { asyncOps } from './promise-runner.ts';

@@ -1397,7 +1397,7 @@ export const AGENTS = {
   made: {
     name: 'notary',
     description: 'Use this when a decision needs writing down.',
-    /** Not haiku: an agent that runs in `auto`, the runtime's default mode, on a model that cannot is refused. */
+    /** Not `claude-haiku-4-5`: an agent that runs in `auto`, the runtime's default mode, on a model that cannot is refused. */
     model: 'sonnet',
     edited: 'opus',
     /**

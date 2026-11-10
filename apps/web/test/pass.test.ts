@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { PassCost } from '../src/lib/api.ts';
+import type { PassCost } from '../src/lib/api/ceilings.ts';
 import { bytesWord, msWord, PASS_PHASES, passLine, passTitle, seenWords } from '../src/lib/pass.ts';
 import { REPO } from './e2e/world.ts';
 import { scratch } from 'test-kit/scratch';

@@ -7,7 +7,7 @@ import path from 'node:path';
 import type { McpServer, SpawnRequest } from '../seam.ts';
 import type { HarnessSpec } from '../detached/detached.ts';
 import { CODEX_START, codexOutput, codexPartials } from './stream.ts';
-import { CODEX_DEFAULT_SANDBOX, CODEX_EFFORTS, CODEX_SANDBOXES } from './vocabulary.ts';
+import { CODEX_DECLARATION, CODEX_DEFAULT_SANDBOX, CODEX_EFFORTS, CODEX_SANDBOXES } from './vocabulary.ts';
 import { codexRolloutEvents, codexRolloutFile } from './transcript.ts';
 import { codexMcpServerNames, codexMcpServers, mcpRefuses, pickedProjectMcp } from '../mcp.ts';
 
@@ -16,6 +16,7 @@ import { codexMcpServerNames, codexMcpServers, mcpRefuses, pickedProjectMcp } fr
  *
  * Reads only `[projects."<path>"]` tables holding `trust_level = "trusted"` — the shape Codex writes
  * itself — not TOML in general. A config it cannot read trusts nothing.
+ * Exported only for the tests that import it.
  */
 export const trustedProjects = (toml: string): Set<string> => {
   const trusted = new Set<string>();
@@ -137,10 +138,7 @@ const codexPicked = (r: SpawnRequest): Record<string, McpServer> | undefined => 
  */
 export const codex: HarnessSpec = {
   name: 'codex',
-  codexArgs: true,
-  projectMcp: true,
-  env: true,
-  mounts: { readOnly: true },
+  can: CODEX_DECLARATION.can,
   command: (r, io) => ({
     cmd: 'codex',
     args: [
@@ -191,7 +189,7 @@ export const codex: HarnessSpec = {
   partials: codexPartials,
   transcript: { file: codexRolloutFile, events: codexRolloutEvents },
   noChannel:
-    '`codex exec` reads its prompt once and takes nothing while it runs: there is no channel into a running Codex session. Continue its thread with a new task that carries the words (`resumeFrom`), as `wf retry --message` does.',
+    '`codex exec` reads its prompt once and takes nothing while it runs: there is no channel into a running Codex session. Continue its thread with a new task that carries the words, its `resumeFrom` naming this session (`ae file`).',
   start: CODEX_START,
   /**
    * Trust is extended, never granted.

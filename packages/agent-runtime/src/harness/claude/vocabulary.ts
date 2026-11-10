@@ -3,7 +3,9 @@
  * asked for, as sentences. Harness vocabulary, so it lives beside the runners
  * that speak it and never in `domain.ts`.
  */
+import type { FenceReach, HarnessDeclaration } from '../declaration.ts';
 import type { SpawnRequest } from '../seam.ts';
+import { CLAUDE_RULES } from './rules.ts';
 
 /**
  * The permission modes Claude Code takes. Harness vocabulary, so it lives beside the runner that
@@ -29,7 +31,7 @@ export const CLAUDE_PERMISSION_MODES: readonly string[] = [
  * `acceptEdits` writes in its directory unasked; `auto` lets a classifier allow what it judges safe; `bypassPermissions` asks about
  * nothing. Every word of `CLAUDE_PERMISSION_MODES` has one (`test/fence-reach.test.ts`).
  */
-export const CLAUDE_MODE_RANK = {
+const CLAUDE_MODE_RANK = {
   plan: 0,
   dontAsk: 1,
   default: 1,
@@ -47,21 +49,21 @@ export const CLAUDE_MODE_RANK = {
  * (`bypassPermissions`) allows what no rule names, which no list can model; `plan` refuses by its own kind, and what it does with a tool
  * that neither reads nor writes is unmeasured, so neither is here.
  */
-export const CLAUDE_REFUSING_MODES: readonly string[] = ['default', 'dontAsk', 'manual', 'acceptEdits'];
+const CLAUDE_REFUSING_MODES: readonly string[] = ['default', 'dontAsk', 'manual', 'acceptEdits'];
 
 /**
  * The tools a session calls inside its own directory with no allow rule naming them, in every permission mode: the three that only read,
  * and the load of a skill. Every other tool is refused under a mode of `CLAUDE_REFUSING_MODES` until a rule allows it or the mode grants
  * it (`CLAUDE_GRANTED`) — `Bash` among them, whose built-in read-only commands run with no rule without making the tool itself unruled.
  */
-export const CLAUDE_UNFENCED: readonly string[] = ['Read', 'Grep', 'Glob', 'Skill'];
+const CLAUDE_UNFENCED: readonly string[] = ['Read', 'Grep', 'Glob', 'Skill'];
 
 /**
  * The tools a mode grants with no allow rule naming them, beyond `CLAUDE_UNFENCED`, by the mode that grants them; a mode that grants
  * none is absent. `acceptEdits` approves a write in the session's directory itself, so the Edit tool's family needs no rule there — and
  * nothing else does: a command it would ask about is still denied a job.
  */
-export const CLAUDE_GRANTED: Readonly<Record<string, readonly string[]>> = {
+const CLAUDE_GRANTED: Readonly<Record<string, readonly string[]>> = {
   acceptEdits: ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'],
 };
 
@@ -69,20 +71,21 @@ export const CLAUDE_GRANTED: Readonly<Record<string, readonly string[]>> = {
 export const CLAUDE_DEFAULT_MODE = 'auto';
 
 /** The permission mode a session held to its directory runs in: what its rules allow, and nothing it would ask about. */
-export const CLAUDE_HELD_MODE = 'dontAsk';
+const CLAUDE_HELD_MODE = 'dontAsk';
 
 /**
  * The permission modes a session runs in without stopping to ask a person, the held mode first: every other mode can stop on a
  * prompt, which a session nobody watches leaves waiting for someone to answer it.
  */
-export const CLAUDE_UNASKING_MODES: readonly string[] = [CLAUDE_HELD_MODE, 'bypassPermissions'];
+const CLAUDE_UNASKING_MODES: readonly string[] = [CLAUDE_HELD_MODE, 'bypassPermissions'];
 
 /**
  * The models on which Claude Code drops `auto`: the session starts in `auto` and says `default` from its first turn. Each matches the
- * name as given or with a `-` suffix after it (`claude-haiku-4-5-20251001`). Measured on Claude Code 2.1.282; a model not listed is let
- * through, since the list is what is known to fail. The runtime refuses none of them: it answers the fact (`fenceReach`).
+ * name as given or with a `-` suffix after it (`claude-haiku-4-5-20251001`). Measured on Claude Code 2.1.316, the Agent SDK's, by the
+ * `permissionMode` of the session's `init` line: `haiku`, now `claude-haiku-5-5`, keeps `auto` and is not listed. A model not listed is
+ * let through, since the list is what is known to fail. The runtime refuses none of them: it answers the fact (`fenceReach`).
  */
-export const CLAUDE_AUTO_DROPPED: readonly string[] = ['haiku', 'claude-haiku-4-5', 'claude-sonnet-4-5'];
+export const CLAUDE_AUTO_DROPPED: readonly string[] = ['claude-haiku-4-5', 'claude-sonnet-4-5'];
 
 /**
  * The efforts Claude Code takes. Refused here rather than left to the CLI, because the CLI does not
@@ -119,7 +122,7 @@ export type ClaudeFlags = {
   /**
    * Bridge the session to claude.ai, where anyone signed in to the account can drive it — type into it, answer its prompts, stop
    * it — from a browser or a phone. Never a default, for that reason. Opened on the SDK's control request at the session's first
-   * message (`attached-bridge.ts`), never as a flag: a job's bridge ends with the job, a long-lived session's outlives its holder and
+   * message (`session-bridge.ts`), never as a flag: a job's bridge ends with the job, a long-lived session's outlives its holder and
    * is re-attached by the next. A journal an older runtime wrote may carry it as a harness argument of its own, which `upgrade` moves
    * here (`FORMER_ARGS`). Taken on any `'claude'` task, and refused on a `HarnessSpec`; a harness brought as a `RunnerOps` is handed
    * it on the spawn, and asked only its own `refuses`.
@@ -136,6 +139,7 @@ export type ClaudeFlags = {
  * `settingSources` is given to every session, which reads its checkout's shared settings and neither the operator's nor the
  * checkout's local file (`attachedOptions`). `print`, `p` and the stream flags stay refused: a session the runtime runs on the
  * Agent SDK prints its own stream, and a task that named one would ask for another.
+ * Exported only for the tests that import it.
  */
 export const CLAUDE_OWNED_FLAGS: readonly string[] = [
   'print',
@@ -205,7 +209,7 @@ export const claudeAllows = (config: SpawnRequest['config']): string[] => [
  * sibling the glob matches be read, and one named with a backslash before a letter let the sibling without the backslash be read, and
  * not itself. An escape is read: a rule naming `\*` let the folder named with the `*` be read, and not its sibling.
  */
-export const CLAUDE_UNRULED = /[()*?[\]\\]|[^\S ]/;
+const CLAUDE_UNRULED = /[()*?[\]\\]|[^\S ]/;
 
 /**
  * Why a task's mount cannot be held by Claude Code — or `undefined`: its path has a character the permission rule that denies an
@@ -224,7 +228,7 @@ const claudeMountRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefine
  * Why a task's admission cannot be merged into its Claude Code settings — or `undefined`: settings given as a file, which the runtime
  * does not rewrite, or JSON that is no object.
  */
-export const claudeAdmissionRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
+const claudeAdmissionRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
   const settings = task.config?.claude?.settings;
   if (task.config?.callAdmission === undefined || settings === undefined) return undefined;
   if (settingsObject(settings) !== undefined) return undefined;
@@ -243,7 +247,7 @@ export const settingsObject = (settings: string): Record<string, unknown> | unde
 
 /**
  * Whether a task asks for its session bridged to claude.ai (`config.claude.remoteControl`): opened on the SDK's control request at the
- * session's first message, a job's and a long-lived session's alike (`attached-bridge.ts`), and never spelt as a flag.
+ * session's first message, a job's and a long-lived session's alike (`session-bridge.ts`), and never spelt as a flag.
  */
 export const bridgeAsked = (task: { config?: { claude?: ClaudeFlags } }): boolean => task.config?.claude?.remoteControl !== undefined;
 
@@ -270,12 +274,6 @@ export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefi
 };
 
 /**
- * What Claude Code cannot be asked for as the engine runs it (`'claude'`): what Claude Code cannot (`claudeRefuses`), and nothing
- * more. A job and a long-lived session alike take a spend cap, a closed list of skills and a bridge to claude.ai, on the Agent SDK.
- */
-export const claudeCodeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined => claudeRefuses(task);
-
-/**
  * A worktree name for this attempt. Derived from the session name when the task did not pick one,
  * so it is stable, greppable, and — the point — never absent.
  */
@@ -287,3 +285,63 @@ export const worktreeName = (r: SpawnRequest): string =>
  * in the session (its `CLAUDE.md` is not read). Taken whole, since what it does with the folder's other subfolders is unmeasured.
  */
 export const CLAUDE_CONFIG_FOLDERS: readonly [string, ...string[]] = ['.claude'];
+
+/** Whether Claude Code drops `auto` on `model`: one of `CLAUDE_AUTO_DROPPED`, as named or with a `-` suffix. */
+const dropsAuto = (model: string | undefined): boolean =>
+  model !== undefined && CLAUDE_AUTO_DROPPED.some((m) => model === m || model.startsWith(`${m}-`));
+
+/** Claude Code's fence on `model`, run as a job or a background session alike. */
+const claudeReach = (model: string | undefined): FenceReach => ({
+  by: 'mode',
+  rank: CLAUDE_MODE_RANK,
+  given: CLAUDE_DEFAULT_MODE,
+  writes: CLAUDE_MODE_RANK.acceptEdits,
+  held: CLAUDE_HELD_MODE,
+  unasking: CLAUDE_UNASKING_MODES,
+  dropped: dropsAuto(model) ? ['auto'] : [],
+  refusing: CLAUDE_REFUSING_MODES,
+  unfenced: CLAUDE_UNFENCED,
+  granted: CLAUDE_GRANTED,
+});
+
+/**
+ * What Claude Code declares, as the engine runs it (`'claude'`), a job and a long-lived session alike: every key of a task's config
+ * but Codex's and a command's, a session kept open and a call held for a person (attached, in the holder), and every Engine verb that is
+ * not a task's. Its job's `HarnessSpec` declares the same `can` (`claudeJobSpec`, held equal by `test/declaration.test.ts`).
+ */
+export const CLAUDE_DECLARATION: HarnessDeclaration = {
+  can: [
+    'contextTokens',
+    'claudeFlags',
+    'env',
+    'readOnlyMount',
+    'writableMount',
+    'callAdmission',
+    'projectMcp',
+    'enabledSkills',
+    'memoryLimit',
+    'bridge',
+    'keepsOpen',
+    'holdsCalls',
+    'interrupt',
+    'answerAsk',
+    'quota',
+    'mcp',
+    'hold',
+    'drain',
+  ],
+  ownKey: 'claude',
+  knobs: {
+    effort: CLAUDE_EFFORTS,
+    fence: { key: 'permissionMode', words: CLAUDE_PERMISSION_MODES, lists: ['tools', 'allowedTools', 'disallowedTools'] },
+    context: true,
+    flags: { owned: CLAUDE_OWNED_FLAGS },
+  },
+  contextTokens: CLAUDE_CONTEXT_TOKENS,
+  reach: claudeReach,
+  unruled: CLAUDE_UNRULED,
+  asks: { remoteControl: { claude: { remoteControl: true } } },
+  runsBrief: true,
+  recordsDenials: true,
+  rules: CLAUDE_RULES,
+};

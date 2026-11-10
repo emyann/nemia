@@ -13,14 +13,12 @@ import {
   besideBar,
   besideOpen,
   drawnWhole,
-  duration,
   edgeLine,
   edgesOf,
   edgeState,
   edgeStroke,
   forgetFactoryLayout,
   forgetFactoryOpen,
-  forgetFactoryLeftovers,
   forgetLayout,
   LEAST_ZOOM,
   LOOP_DEPTH,
@@ -39,7 +37,7 @@ import {
   saveLayout,
   type EdgeStep,
 } from '../src/lib/canvas.ts';
-import type { GraphEdge, RunGraph } from '../src/lib/api.ts';
+import type { GraphEdge, RunGraph } from '../src/lib/api/graph.ts';
 import type { StepState } from '../src/lib/status.ts';
 
 const after = (from: string, to: string): GraphEdge => ({ from, to, kind: 'after' });
@@ -47,22 +45,7 @@ const loop = (from: string, to: string, rounds = 3): GraphEdge => ({ from, to, k
 const graphOf = (...edges: GraphEdge[]): RunGraph => ({ roots: [], edges });
 const step = (name: string, state: StepState, note: string | null = null, roundDue = false): EdgeStep => ({ name, state, note, roundDue });
 
-test("duration and attemptLine: an attempt's time", async (t) => {
-  await t.test(
-    "a duration reads in its two largest units, and one below zero — the engine's clock ahead of this one — as nothing elapsed yet",
-    () => {
-      const s = 1000;
-      const cases: Array<[number, string]> = [
-        [0, '0s'],
-        [42 * s, '42s'],
-        [12 * 60 * s + 4 * s, '12m 04s'],
-        [3 * 3600 * s + 12 * 60 * s + 59 * s, '3h 12m'],
-        [2 * 86400 * s + 4 * 3600 * s, '2d 4h'],
-        [-5 * s, '0s'],
-      ];
-      for (const [ms, said] of cases) assert.equal(duration(ms), said, String(ms));
-    },
-  );
+test("attemptLine: an attempt's time", async (t) => {
   await t.test('an attempt that runs counts its time; one that is over says when it started', () => {
     const now = Date.parse('2026-09-13T01:00:00.000Z');
     const startedAt = '2026-09-13T00:47:56.000Z';
@@ -494,37 +477,12 @@ test('the layout store: per run and per Factory, until forgotten, on storage tha
     assert.deepEqual(readFactoryOpen(), []);
     assert.deepEqual(Object.fromEntries(readFactoryLayout()!), { 'r-1': { x: 320, y: 0 } });
   });
-  await t.test('what an older board kept for the Factory is forgotten, and nothing else with them', (t) => {
-    const kept = new Map([
-      ['hkb:factory-steps', JSON.stringify({ 'r-1/review': { x: 40, y: -10 } })],
-      ['hkb:factory-layout:v2', JSON.stringify({ 'r-2': { x: 0, y: 0 } })],
-      ['hkb:factory-open', JSON.stringify(['r-2'])],
-    ]);
-    stubStorage(t, memory(kept));
-    saveFactoryOpen(['r-1']);
-    saveFactoryLayout(new Map([['r-1', { x: 320, y: 0 }]]));
-    forgetFactoryLeftovers();
-    assert.deepEqual([...kept.keys()].sort(), ['nemia:factory-layout:v2', 'nemia:factory-open']);
-    assert.deepEqual(readFactoryOpen(), ['r-1'], 'the open runs stay');
-    assert.deepEqual(Object.fromEntries(readFactoryLayout()!), { 'r-1': { x: 320, y: 0 } }, 'and the arrangement');
-  });
-  await t.test('a browser that refuses storage forgets no step, and throws nothing', (t) => {
-    const refuse = () => {
-      throw new Error('SecurityError: storage is disabled');
-    };
-    stubStorage(t, { getItem: refuse, setItem: refuse, removeItem: refuse });
-    assert.doesNotThrow(() => forgetFactoryLeftovers());
-  });
-  await t.test('a browser that refuses storage keeps no run open, and throws nothing — nor one where storage is not there at all', (t) => {
+  await t.test('a browser that refuses storage keeps no run open, and throws nothing', (t) => {
     const refuse = () => {
       throw new Error('SecurityError: storage is disabled');
     };
     stubStorage(t, { getItem: refuse, setItem: refuse, removeItem: refuse });
     assert.deepEqual(readFactoryOpen(), []);
-    assert.doesNotThrow(() => saveFactoryOpen(['r-1']));
-    assert.doesNotThrow(() => forgetFactoryOpen());
-    Object.defineProperty(globalThis, 'localStorage', { get: refuse, configurable: true });
-    assert.deepEqual(readFactoryOpen(), [], 'a sandboxed frame throws on reading `localStorage` itself, before any call');
     assert.doesNotThrow(() => saveFactoryOpen(['r-1']));
     assert.doesNotThrow(() => forgetFactoryOpen());
   });

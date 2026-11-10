@@ -31,8 +31,6 @@ fs.writeFileSync(path.join(ROOT, 'inbox', 'notes'), 'a stray file, no card\n');
 fs.writeFileSync(path.join(ROOT, 'inbox', 'notes.md'), CARD);
 
 test("`INBOX_FROM`: the command line's alone, the api writing `from:` as the Card's update; its print unchanged", () => {
-  assert.equal(INBOX_FROM.route, undefined);
-  assert.equal(INBOX_FROM.apiKeys, undefined);
   assert.equal(INBOX_FROM.only?.side, 'cli');
   const card = { name: 'notes', file: 'notes.md', body: 'Cache the engine views.' };
   assert.deepEqual(

@@ -1,4 +1,5 @@
 import { Bot, ChartColumn, Factory, House, Inbox, List, type LucideIcon, MessageCircle, Settings, Waypoints } from 'lucide-react';
+import { openRunsQuery } from '../../lib/api/runs.ts';
 import { factorySearch } from '../../lib/factories.ts';
 
 /** Whether `path` is `to` or a page under it: `/agents/new` is under `/agents`, `/agentsx` is not. */
@@ -35,13 +36,13 @@ const ownDefinitionAt = (path: string): { kind: 'agent' | 'skill'; name: string 
 };
 
 /** The tabs of Settings, in their order: what is set for the whole store, and what the repository offers a step. */
-export const SETTINGS_TABS = [
+const SETTINGS_TABS = [
   { to: '/settings', label: 'Settings' },
   { to: '/capabilities', label: 'Capabilities' },
 ] as const;
 
 /** A tab of Settings (`SETTINGS_TABS`): its page and its name. */
-export type SettingsTab = (typeof SETTINGS_TABS)[number];
+type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 /** The tabs of the place whose tab's page `path` is, itself and not a page under it; none on any other page. */
 export const tabsOf = (path: string): readonly SettingsTab[] | undefined =>
@@ -104,13 +105,20 @@ export function pickedOf(path: string, search: Record<string, unknown>): string 
   return ownerOf(path) ?? (isListing(path) || workflowPageAt(path) || ownDefinitionAt(path) ? factorySearch(search).factory : undefined);
 }
 
+/**
+ * The open runs the frame counts at `path` with `search`: the run list of the factory the address picks (`pickedOf`), every factory's
+ * under none — the one query the rail's Runs badge and Nemia's cue read their `counts.waiting` from, and the Runs page's own when no
+ * label selector narrows it, so the three say one number and are read again together.
+ */
+export const frameRunsQuery = (path: string, search: Record<string, unknown>) => openRunsQuery(pickedOf(path, search));
+
 /** `search` without its `repo`. */
 const withoutRepo = ({ repo: _repo, ...kept }: Record<string, unknown>): Record<string, unknown> => kept;
 
 /**
  * Where a pick goes: a section's page with its search, a workflow's page or a step's in the picked factory, a factory's floor, or Overview.
  */
-export type PickTarget =
+type PickTarget =
   | { to: Listing; search: Record<string, unknown> }
   | { to: '/workflows/$from/$workflow'; params: { from: string; workflow: string }; search: Record<string, unknown> }
   | { to: '/workflows/$from/$workflow/$step'; params: { from: string; workflow: string; step: string }; search: Record<string, unknown> }

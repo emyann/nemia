@@ -1,10 +1,9 @@
 /**
  * A person's ask of a step's next try, as the board's rows make it: the CLI `retry`'s ways, the button and box every ask is made with, the
- * ask itself through the api (`useAsk`), and the api's refusal of it, verbatim (`Refusal`); and the asks of a loop's round (`useRound`)
- * and of its approval as it stands (`useApprove`).
+ * ask itself through the api (`useAsk`), and the api's refusal of it, verbatim (`Refusal`); and the ask of a loop's round (`useRound`).
  */
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { approveStep, askRound, askTry, type QuestionAnswer, type RetryMode } from '../../lib/api';
+import { askRound, askTry, type QuestionAnswer, type RetryMode } from '../../lib/api/asks.ts';
 import { runsMoved } from '@/lib/runWrites';
 import { useRunNamespace } from '@/lib/runNamespace';
 
@@ -14,12 +13,6 @@ export const MODES: Record<RetryMode, string> = {
   fresh: 'a new session',
   recheck: 'its check again, and no session',
 };
-
-export const BUTTON =
-  'rounded bg-primary px-3 py-1.5 text-body-medium font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary';
-
-export const TEXTAREA =
-  'block w-full resize-y rounded border border-outline bg-background px-2 py-1.5 text-body-medium placeholder:text-muted-foreground focus:border-on-surface-variant focus:outline-none';
 
 /**
  * An ask for a step's next try through the api (`askTry`), and the run read again once the api has it: its own record alone (`exact`),
@@ -49,22 +42,6 @@ export function useAsk(runId: string, step: string, onAsked: () => void, namespa
     }) => namespaceNow().then((ns) => askTry(ns, runId, to ?? step, how)),
     onSuccess: () => {
       onAsked();
-      void runsMoved(queryClient, runId);
-    },
-  });
-}
-
-/**
- * An approval of a loop out of rounds as it stands through the api (`approveStep`), which on a loop ends it as the CLI's `approve` does,
- * and the run read again once the api has it — its detail, and the list the Factory's card reads, each by its own key (`exact`): a
- * decision is keyed by the state it was read for, and the next state is a key of its own.
- */
-export function useApprove(runId: string, step: string) {
-  const queryClient = useQueryClient();
-  const namespaceNow = useRunNamespace(runId);
-  return useMutation({
-    mutationFn: (how: { message: string }) => namespaceNow().then((ns) => approveStep(ns, runId, step, how)),
-    onSuccess: () => {
       void runsMoved(queryClient, runId);
     },
   });

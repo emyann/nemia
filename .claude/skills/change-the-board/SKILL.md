@@ -172,7 +172,7 @@ is written, the commands, and what its own code promises — and this section ho
 
 ### React, Query and the compiler
 
-- The React Compiler skips a function with an optional call inside a `try`: write `.then(ok, fail)` (`CodeBlockCopyButton`). It skips an
+- The React Compiler skips a function with an optional call inside a `try`: write `.then(ok, fail)` (`copyAndSay` in `lib/useCopy.ts`). It skips an
   arrow written as a parameter's default: declare it at module level (`asIs` in `StepForm.tsx`).
 - React Aria's `DisclosurePanel` keeps and lays out what it holds while closed: draw a fold's content only while open.
 - Call `requestAnimationFrame` as `(f) => requestAnimationFrame(f)`, never off another object.

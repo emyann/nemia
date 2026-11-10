@@ -1,7 +1,7 @@
 /** The label selector the board's reads are filtered by: apps/api's `?selector=`, repeated for OR. */
 
 /** The query keys a read sends for `selector`: one `selector=` each, the api reading repeats as OR; none for none. */
-export const selectorQuery = (selector: string | undefined): string =>
+const selectorQuery = (selector: string | undefined): string =>
   selector === undefined || selector.trim() === '' ? '' : `selector=${encodeURIComponent(selector.trim())}`;
 
 /** `path` with `selector`'s query keys added after its own. */

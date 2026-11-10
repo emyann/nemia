@@ -1,7 +1,7 @@
 /**
  * What the side Grafana (`tools/observe/`) changes in its image to time a step: the collector overlay's command head and test scope,
- * Tempo's span metrics, its retention and the reach of its queries, the compose file that mounts both and keeps metrics 90 days, and
- * the README's word on how a change to a mounted file is taken.
+ * Tempo's span metrics, its retention and the reach of its queries, the compose file that mounts both and keeps metrics past
+ * Prometheus's default, the README's word on how a change to a mounted file is taken, and the README's numbers, held to the configs'.
  *
  * The command head is read as the collector runs it: the pattern is taken out of `otelcol.yaml`'s OTTL string (`\\` one backslash,
  * `$$` the collector's `$`) and run over a table of commands, a match setting the head and any other command left `other`. The test
@@ -241,7 +241,23 @@ const DIMENSIONS = [
 /** Attributes a span carries that span time is never kept by: each value would be a series of its own, never ended. */
 const UNBOUNDED = ['run', 'task', 'try', 'full_command', 'agent_id', 'session.id'];
 
-/** What is wrong with Tempo's `config`, each said in a line. */
+/** A Tempo duration (`336h`, `2m`, `30s`) in milliseconds, or `undefined` for none or one of another shape. */
+const msOf = (duration: string | undefined): number | undefined => {
+  const found = /^(\d+)(ms|s|m|h)$/.exec(duration ?? '');
+  return found ? Number(found[1]) * { ms: 1, s: 1000, m: 60_000, h: 3_600_000 }[found[2] as 'ms' | 's' | 'm' | 'h'] : undefined;
+};
+
+/**
+ * The image's own defaults for what `tempo.yaml` changes, as its comments say them: the values the config must write longer, since each
+ * default was measured to drop what a step's time needs. Tempo's, not this repository's, so they are no copy of the config.
+ */
+const TEMPO_DEFAULTS = { reach: '24h', late: '30s', long: '2m' } as const;
+
+/**
+ * What is wrong with Tempo's `config`, each said in a line: span time kept by an unbounded attribute or without a step's and a tool's
+ * names, a subagent's spans counted, a retention left to the default or planned and run at two lengths, a query reaching past the traces
+ * kept or no further than the default, and a slack left at its default. The numbers are the config's own; this reads how they relate.
+ */
 function tempoFaults(config: Tempo): string[] {
   const faults: string[] = [];
   const spanMetrics = config.metrics_generator?.processor?.span_metrics;
@@ -253,27 +269,44 @@ function tempoFaults(config: Tempo): string[] {
       exclude?.match_type === 'regex' && (exclude.attributes ?? []).some((a) => a.key === 'span.agent_id' && a.value === '.+'),
   );
   if (!subagent) faults.push("a subagent's spans are kept in span time, counted again beside its Agent tool");
-  const kept = {
-    'the scheduler keeps traces': config.backend_scheduler?.provider?.compaction?.compaction?.block_retention,
-    'the worker keeps traces': config.backend_worker?.compaction?.block_retention,
-  };
-  for (const [what, value] of Object.entries(kept)) if (value !== '336h') faults.push(`${what} ${value ?? 'by default'}, not 336h`);
+  const planned = config.backend_scheduler?.provider?.compaction?.compaction?.block_retention;
+  const run = config.backend_worker?.compaction?.block_retention;
+  if (msOf(planned) === undefined) faults.push('the scheduler keeps traces by default: write its block_retention out');
+  if (msOf(run) === undefined) faults.push('the worker keeps traces by default: write its block_retention out');
+  else if (msOf(planned) !== undefined && msOf(planned) !== msOf(run))
+    faults.push(`the scheduler plans traces kept ${planned} and the worker keeps them ${run}: write one length in both`);
   const reach = config.query_frontend?.metrics?.max_duration;
-  if (reach !== '168h') faults.push(`a TraceQL metrics query reaches ${reach ?? '24h'}, not 168h`);
+  const reachMs = msOf(reach) ?? msOf(TEMPO_DEFAULTS.reach) ?? 0;
+  if (reachMs <= (msOf(TEMPO_DEFAULTS.reach) ?? 0))
+    faults.push(`a TraceQL metrics query reaches ${reach ?? TEMPO_DEFAULTS.reach}, no further than the image's default`);
+  if (msOf(run) !== undefined && reachMs > (msOf(run) ?? 0))
+    faults.push(`a TraceQL metrics query reaches ${reach}, past the ${run} traces are kept`);
   const late = config.metrics_generator?.metrics_ingestion_time_range_slack;
-  if (late !== '2m') faults.push(`span time is kept for a span ended ${late ?? '30s'} before it arrived, not 2m`);
+  if ((msOf(late) ?? 0) <= (msOf(TEMPO_DEFAULTS.late) ?? 0))
+    faults.push(`span time is kept for a span ended ${late ?? TEMPO_DEFAULTS.late} before it arrived, no longer than the default`);
   const long = config.live_store?.wal?.ingestion_time_range_slack;
-  if (long !== '24h') faults.push(`a TraceQL metrics query counts a span begun ${long ?? '2m'} before it arrived, not 24h`);
+  if ((msOf(long) ?? 0) <= (msOf(TEMPO_DEFAULTS.long) ?? 0))
+    faults.push(`a TraceQL metrics query counts a span begun ${long ?? TEMPO_DEFAULTS.long} before it arrived, no longer than the default`);
   return faults;
 }
 
 /** The compose file's service, as far as the checker reads it. */
 type Service = { volumes?: string[]; environment?: Record<string, string> };
 
-/** Where the image's collector reads the overlay, its Tempo its config, and the flag keeping metrics 90 days. */
+/** Where the image's collector reads the overlay, its Tempo its config, and the flag that sets how long Prometheus keeps metrics. */
 const OVERLAY = '/otel-lgtm/nemia/otelcol.yaml';
 const TEMPO_CONFIG = '/otel-lgtm/tempo-config.yaml';
-const RETENTION = '--storage.tsdb.retention.time=90d';
+const RETENTION = '--storage.tsdb.retention.time=';
+
+/** Prometheus's own default retention, which the compose file must write longer: metrics are read month over month. */
+const PROMETHEUS_DEFAULT_DAYS = 15;
+
+/** The days Prometheus keeps metrics, as `service`'s flag writes them (`90d`), or `undefined` where it writes none in days. */
+const metricDays = (service: Service): number | undefined => {
+  const flag = (service.environment?.PROMETHEUS_EXTRA_ARGS ?? '').split(/\s+/).find((arg) => arg.startsWith(RETENTION));
+  const found = /^(\d+)d$/.exec(flag?.slice(RETENTION.length) ?? '');
+  return found ? Number(found[1]) : undefined;
+};
 
 /** What is wrong with how `service` brings in the overlay and Tempo's config and keeps metrics, each said in a line. */
 function composeFaults(service: Service): string[] {
@@ -283,7 +316,8 @@ function composeFaults(service: Service): string[] {
   if (!mounted('./tempo.yaml', TEMPO_CONFIG)) faults.push(`./tempo.yaml is not mounted, read-only, over ${TEMPO_CONFIG}`);
   const env = service.environment ?? {};
   if (env.OTELCOL_EXTRA_ARGS !== `--config=${OVERLAY}`) faults.push(`the collector is not given --config=${OVERLAY}`);
-  if (!(env.PROMETHEUS_EXTRA_ARGS ?? '').split(/\s+/).includes(RETENTION)) faults.push(`Prometheus is not given ${RETENTION}`);
+  if ((metricDays(service) ?? 0) <= PROMETHEUS_DEFAULT_DAYS)
+    faults.push(`Prometheus is not given ${RETENTION}<days>d longer than its default of ${PROMETHEUS_DEFAULT_DAYS} days`);
   return faults;
 }
 
@@ -297,6 +331,30 @@ function recreateFaults(text: string): string[] {
     faults.push('the README does not say a change to tempo.yaml or otelcol.yaml is taken by up -d --force-recreate');
   if (!/`docker\s+compose\s+restart`\s+fails\s+on\s+WSL/.test(text))
     faults.push('the README does not say docker compose restart fails on WSL');
+  return faults;
+}
+
+/**
+ * Where the README `text` restates a number of the configs, what it says that they do not: the days traces are kept and the `h` it gives
+ * for them, the days a query reaches back, and the days metrics are kept, each read from `tempo` and `service`. A number the README does
+ * not state is not refused: the configs are the source, and the README's sentences a copy held to them.
+ */
+function readmeFaults(text: string, tempo: Tempo, service: Service): string[] {
+  const faults: string[] = [];
+  const days = (duration: string | undefined): number | undefined => {
+    const ms = msOf(duration);
+    return ms === undefined ? undefined : ms / 86_400_000;
+  };
+  const kept = tempo.backend_worker?.compaction?.block_retention;
+  const traces = /Traces are kept (\d+) days \(`(\d+h)`/.exec(text);
+  if (traces && (Number(traces[1]) !== days(kept) || traces[2] !== kept))
+    faults.push(`the README says traces are kept ${traces[1]} days (${traces[2]}), and tempo.yaml keeps them ${kept ?? 'by default'}`);
+  const metrics = /and metrics (\d+) \(`PROMETHEUS_EXTRA_ARGS`/.exec(text);
+  if (metrics && Number(metrics[1]) !== metricDays(service))
+    faults.push(`the README says metrics are kept ${metrics[1]} days, and compose.yaml keeps them ${metricDays(service) ?? 'by default'}`);
+  const reach = tempo.query_frontend?.metrics?.max_duration;
+  for (const [, back] of text.matchAll(/reaches (\d+) days back \(`max_duration`\)/g))
+    if (Number(back) !== days(reach)) faults.push(`the README says a drill-down reaches ${back} days back, and tempo.yaml says ${reach}`);
   return faults;
 }
 
@@ -446,7 +504,7 @@ test('REFUSED: the scope after the batch, on every span, copied from the command
   );
 });
 
-test("Tempo keeps span time by a step's and a tool's names, never a run's, and traces two weeks", () => {
+test("Tempo keeps span time by a step's and a tool's names, never a run's, and writes out how long it keeps traces", () => {
   assert.deepEqual(tempoFaults(TEMPO), []);
 });
 
@@ -481,30 +539,45 @@ test("REFUSED: span time by run or task, without the command head or the test sc
   );
   assert.deepEqual(
     changed((t) => {
-      t.backend_worker!.compaction!.block_retention = '168h';
+      t.backend_worker!.compaction!.block_retention = '72h';
     }),
-    ['the worker keeps traces 168h, not 336h'],
+    [
+      `the scheduler plans traces kept ${TEMPO.backend_scheduler?.provider?.compaction?.compaction?.block_retention} and the worker keeps them 72h: write one length in both`,
+      `a TraceQL metrics query reaches ${TEMPO.query_frontend?.metrics?.max_duration}, past the 72h traces are kept`,
+    ],
   );
   assert.deepEqual(
     changed((t) => {
       delete t.backend_scheduler;
       delete t.query_frontend;
     }),
-    ['the scheduler keeps traces by default, not 336h', 'a TraceQL metrics query reaches 24h, not 168h'],
+    [
+      'the scheduler keeps traces by default: write its block_retention out',
+      "a TraceQL metrics query reaches 24h, no further than the image's default",
+    ],
   );
   assert.deepEqual(
     changed((t) => {
       delete t.live_store;
-      delete t.metrics_generator!.metrics_ingestion_time_range_slack;
+      t.metrics_generator!.metrics_ingestion_time_range_slack = '30s';
     }),
     [
-      'span time is kept for a span ended 30s before it arrived, not 2m',
-      'a TraceQL metrics query counts a span begun 2m before it arrived, not 24h',
+      'span time is kept for a span ended 30s before it arrived, no longer than the default',
+      'a TraceQL metrics query counts a span begun 2m before it arrived, no longer than the default',
     ],
   );
 });
 
-test("the compose file mounts the overlay and Tempo's config where the image reads them, and keeps metrics 90 days", () => {
+test("a retention, a reach and a slack changed together in tempo.yaml are followed, not refused: the numbers are the config's", () => {
+  const config = structuredClone(TEMPO);
+  config.backend_scheduler!.provider!.compaction!.compaction!.block_retention = '720h';
+  config.backend_worker!.compaction!.block_retention = '720h';
+  config.query_frontend!.metrics!.max_duration = '336h';
+  config.live_store!.wal!.ingestion_time_range_slack = '12h';
+  assert.deepEqual(tempoFaults(config), []);
+});
+
+test("the compose file mounts the overlay and Tempo's config where the image reads them, and keeps metrics past Prometheus's default", () => {
   assert.deepEqual(composeFaults(SERVICE), []);
 });
 
@@ -521,7 +594,24 @@ test("REFUSED: an overlay the collector is not told of, Tempo's config mounted e
     `./otelcol.yaml is not mounted, read-only, at ${OVERLAY}`,
   ]);
   const { PROMETHEUS_EXTRA_ARGS: _, ...rest } = SERVICE.environment ?? {};
-  assert.deepEqual(changed({ environment: rest }), [`Prometheus is not given ${RETENTION}`]);
+  const unkept = changed({ environment: rest });
+  assert.equal(unkept.length, 1, unkept.join('\n'));
+  assert.match(unkept[0], /^Prometheus is not given --storage\.tsdb\.retention\.time=/);
+});
+
+test("the README's numbers are the configs': the days traces and metrics are kept, and the days a query reaches back", () => {
+  assert.deepEqual(readmeFaults(README, TEMPO, SERVICE), []);
+});
+
+test('REFUSED: a README number the configs no longer hold, read from the configs and not restated here', () => {
+  const shorter = structuredClone(TEMPO);
+  shorter.backend_worker!.compaction!.block_retention = '168h';
+  shorter.query_frontend!.metrics!.max_duration = '72h';
+  const refused = readmeFaults(README, shorter, { ...SERVICE, environment: { PROMETHEUS_EXTRA_ARGS: `${RETENTION}30d` } });
+  assert.equal(refused.length >= 3, true, refused.join('\n'));
+  assert.match(refused.join('\n'), /traces are kept \d+ days .*168h/);
+  assert.match(refused.join('\n'), /metrics are kept \d+ days.* 30$/m);
+  assert.match(refused.join('\n'), /reaches \d+ days back.* 72h/);
 });
 
 test('the README says a change to the mounted files is taken by up -d --force-recreate, and that restart fails on WSL', () => {

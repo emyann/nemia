@@ -12,7 +12,7 @@
  * A long-lived session runs attached, in the process that holds the sessions (a daemon), and nowhere else: with no holder its spawn
  * is refused, `unstartable`, in words naming the holder to start (`LONG_LIVED_UNHELD`).
  *
- * Either is bridged to claude.ai where its task asks (`claude.remoteControl`), on its first message (`attached-bridge.ts`): a held
+ * Either is bridged to claude.ai where its task asks (`claude.remoteControl`), on its first message (`session-bridge.ts`): a held
  * session's bridge is on its run file, a job's on the bridge file its own process writes beside its run (`HarnessIO.bridgeFile`),
  * which this runner reads into the job's sighting on every look.
  *
@@ -41,13 +41,14 @@ import {
   type HarnessSpec,
   type StartEvent,
 } from '../detached/detached.ts';
-import { sessionDrainFile, sessionDrainOf, readJobHold, type JobHold } from './job-hold.ts';
+import { readJobHold, type JobHold } from './job-hold.ts';
+import { sessionDrainFile, sessionDrainOf } from '../../core/engine/drain.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile, claudeTranscriptRecords } from './transcript.ts';
-import { CLAUDE_CONTEXT_TOKENS, bridgeAsked, claudeCodeRefuses, claudeRefuses } from './vocabulary.ts';
+import { CLAUDE_CONTEXT_TOKENS, CLAUDE_DECLARATION, bridgeAsked, claudeRefuses } from './vocabulary.ts';
 import { claudePartials, claudeStreamKept, claudeStreamOutput } from '../detached/output.ts';
 import { projectMcpConfig } from '../mcp.ts';
 import { RunnerError } from '../error.ts';
-import { BridgeFactsSchema, bridgeOf, type AttachedBridge } from './attached-bridge.ts';
+import { BridgeFactsSchema, bridgeOf, type AttachedBridge } from './session-bridge.ts';
 import type { Attached } from './attached.ts';
 
 /** What Claude Code's runner is built from (`claudeCodeOps`). */
@@ -71,11 +72,14 @@ export type ClaudeOptions = {
 };
 
 /** What a job's process is handed to be held by the sessions' drain: the store whose drain it reads, and the bounds a test shortens. */
-export type JobHoldOptions = { root: string; holdMs?: number; holdPollMs?: number };
+type JobHoldOptions = { root: string; holdMs?: number; holdPollMs?: number };
 
 export { CLAUDE_JOB_ENV } from './job-env.ts';
 
-/** How a job's stream starts: its first line, `system`/`init`, and its `session_id`. */
+/**
+ * How a job's stream starts: its first line, `system`/`init`, and its `session_id`.
+ * Exported only for the tests that import it.
+ */
 export const CLAUDE_INIT_START: StartEvent = { event: { type: 'system', subtype: 'init' }, id: 'session_id' };
 
 /** The end of the file a job's process writes its bridge on, beside its run (`besideRun`). */
@@ -92,7 +96,7 @@ const HOLD_END = 'hold';
  * job is held by (`hold`), the job's hold file beside its run (`holdFile`), cleared the same way, the store's sessions' drain
  * (`drainFile`), and the bounds a test shortened (`holdMs`, `holdPollMs`), each only where given.
  */
-export const claudePrepare = (r: SpawnRequest, beside?: (end: string) => string, hold?: JobHoldOptions): Partial<HarnessIO> => {
+const claudePrepare = (r: SpawnRequest, beside?: (end: string) => string, hold?: JobHoldOptions): Partial<HarnessIO> => {
   const found = r.config?.projectMcp ? undefined : projectMcpConfig(r.cwd);
   const io: Partial<HarnessIO> = { ...(found ? { projectMcpConfig: found } : {}), ...(beside ? holdIo(beside, hold) : {}) };
   if (!bridgeAsked(r) || beside === undefined) return io;
@@ -114,7 +118,10 @@ const holdIo = (beside: (end: string) => string, hold?: JobHoldOptions): Partial
   };
 };
 
-/** The process one Claude Code job's session runs in, `bin/ae-claude-job.ts`, found from this file's own folder as `WORKER` is. */
+/**
+ * The process one Claude Code job's session runs in, `bin/ae-claude-job.ts`, found from this file's own folder as `WORKER` is.
+ * Exported only for the tests that import it.
+ */
 export const CLAUDE_JOB_BIN = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'bin', 'ae-claude-job.ts');
 
 /**
@@ -153,6 +160,7 @@ export const CLAUDE_JOB_BIN = path.join(path.dirname(fileURLToPath(import.meta.u
  *   is not JSON refuses the spawn here, before the worker starts, so the attempt ends `unstartable` in those words rather than
  *   failing inside the bin.
  * - `refuses`: what Claude Code cannot be asked for (`claudeRefuses`); a bridge it opens itself.
+ * Exported only for the tests that import it.
  */
 export const claudeJobSpec = (executable?: string, hold?: JobHoldOptions): HarnessSpec => ({
   name: 'claude',
@@ -179,24 +187,23 @@ export const claudeJobSpec = (executable?: string, hold?: JobHoldOptions): Harne
   partials: claudePartials,
   prepare: (r, beside) => claudePrepare(r, beside, hold),
   refuses: claudeRefuses,
+  bridgeAsked,
+  can: CLAUDE_DECLARATION.can,
   contextTokens: CLAUDE_CONTEXT_TOKENS,
-  projectMcp: true,
-  enabledSkills: true,
-  env: true,
-  claudeFlags: true,
-  mounts: { readOnly: true, writable: true },
-  callAdmission: true,
   resumeCostCarried: true,
 });
 
-/** A job's spec as the engine runs it with the Claude Code on the PATH: `claudeJobSpec()`, named for the readers that take a spec. */
+/**
+ * A job's spec as the engine runs it with the Claude Code on the PATH: `claudeJobSpec()`, named for the readers that take a spec.
+ * Exported only for the tests that import it.
+ */
 export const claudeJob: HarnessSpec = claudeJobSpec();
 
 /**
  * Why a long-lived Claude Code spawn is refused where no process holds this runtime's sessions: such a session runs attached, in the
  * holder, and nowhere else. A `RunnerError` with `refused`, so the attempt ends `unstartable` in these words and is not restarted.
  */
-export const LONG_LIVED_UNHELD = (name: string): string =>
+const LONG_LIVED_UNHELD = (name: string): string =>
   `\`${name}\` is a long-lived Claude Code session (\`restartPolicy: 'Always'\`), which runs attached in the process that holds this runtime's sessions, and no process holds them now: start the daemon that holds them, then file the task again — or leave \`restartPolicy\` off to run it as a job.`;
 
 /**
@@ -243,7 +250,7 @@ const withBridgeFiles = (job: RunnerOps, root: string): RunnerOps => ({
  *
  * A job stopped by a person (`canceled`) is read as its worker wrote it.
  */
-export const heldSighting = (s: Sighting, hold: JobHold | null, lost: () => boolean, drained: () => boolean): Sighting => {
+const heldSighting = (s: Sighting, hold: JobHold | null, lost: () => boolean, drained: () => boolean): Sighting => {
   if (s.state === 'working') return workingWith(s, hold);
   if (hold?.parked && s.state !== 'canceled') return { ...s, state: 'failed', parked: callOf(hold.parked.calling) };
   const held = () => hold?.heldBack !== undefined || hold?.draining !== undefined || drained();
@@ -320,7 +327,8 @@ export const claudeCodeOps = (options: ClaudeOptions, attached?: Attached): Runn
       r.restartPolicy === 'Always' && !attachedLongLived(r, attached)
         ? Effect.fail(new RunnerError({ verb: 'spawn', message: LONG_LIVED_UNHELD(r.name), refused: true }))
         : job.spawn(r),
-    refuses: claudeCodeRefuses,
+    refuses: claudeRefuses,
+    bridgeAsked,
     interrupt: (session) => interruptThrough(job, session),
     ...answerOf(attached),
     quota: claudeQuota(),
@@ -355,6 +363,7 @@ const answerOf = (attached?: Attached): Pick<RunnerOps, 'answer'> => (attached ?
  * its calls caught and its turn stoppable — and is refused `unstartable` when nothing holds it (`LONG_LIVED_UNHELD`). A job runs on
  * its own process holder or not, so a restart of the holder neither ends it nor moves it to the new release. Read off the world,
  * never off a word invented for one kind of task: every long-lived Claude Code task goes attached without knowing it.
+ * Exported only for the tests that import it.
  */
 export const attachedLongLived = (r: Pick<SpawnRequest, 'restartPolicy'>, attached?: Pick<Attached, 'holding'>): boolean =>
   r.restartPolicy === 'Always' && attached?.holding() === true;

@@ -35,7 +35,7 @@ import { inboxDir, runStore } from '../record/files.store.ts';
 import { storeRootRefusal } from './store-root.ts';
 import { HOME, artifactsDir, inputsDir, runId, runsDir } from '../record/record.store.ts';
 import { writeAgentFiles } from '../agents/agents.store.ts';
-import { freezeWorkflowFiles, workflowFilesOf } from '../frozen/frozen.store.ts';
+import { carriedFilesOf, freezeCarriedFiles, freezeWorkflowFiles, workflowFilesOf } from '../frozen/frozen.store.ts';
 import { PlaceService, openPlace } from '../place/place.store.ts';
 import { parentRecord } from '../steps/steps.verb.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
@@ -61,7 +61,7 @@ import { factoryFills } from '../factory/rules/rules.store.ts';
 import { Context, Effect } from 'effect';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
-import { inheritedLabels, parseLabelEdits, type Inherited, type LabelEdit, type Labels, type LeftOut } from '../labels/labels.ts';
+import { inheritedLabels, parseLabelEdits, type Inherited, type LabelChange, type Labels, type LeftOut } from '../labels/labels.ts';
 
 /**
  * A workflow folder's steps, as a run in `factory` runs them: each step its hires fill (`factoryFills`, by the folder's name) resolved
@@ -550,16 +550,20 @@ function copyInputs(run: Run, inputs: readonly InputFile[]): void {
 
 /**
  * Renders the steps' agents into the run's `agents/` (`writeAgentFiles`), with the skills the Skill door `found` in the folder's places,
- * then copies the workflow folder into the run's own `workflow/<hex>/` (`freezeWorkflowFiles`), and answers the copy's hex; throws with
- * exit 1 when either cannot be written, the run's directory removed. A link or a file of another kind in the folder is refused before
- * the run has an id (`workflowFilesOf`), so what fails here is a write.
+ * then copies the workflow folder into the run's own `workflow/<hex>/` (`freezeWorkflowFiles`) and the carried folder beside it, where
+ * one is there, into `carried/<hex>/` (`freezeCarriedFiles`), and answers each copy's hex; throws with exit 1 when one cannot be written,
+ * the run's directory removed. A link or a file of another kind in either folder is refused before the run has an id
+ * (`workflowFilesOf`), so what fails here is a write.
  */
-function renderAgents(run: Run, steps: readonly Workflow[], found: SkillsFound): string {
+function renderAgents(run: Run, steps: readonly Workflow[], found: SkillsFound): Pick<Run, 'workflowFiles' | 'carriedFiles'> {
   let what = `the steps' agents could not be rendered into ${path.join(runsDir(), run.id, 'agents')}`;
   try {
     writeAgentFiles(run, steps, found);
     what = `the workflow's files could not be copied into ${path.join(runsDir(), run.id, 'workflow')}`;
-    return freezeWorkflowFiles(run, run.workflowDir);
+    const workflowFiles = freezeWorkflowFiles(run, run.workflowDir);
+    what = `the carried files could not be copied into ${path.join(runsDir(), run.id, 'carried')}`;
+    const carriedFiles = freezeCarriedFiles(run, run.workflowDir);
+    return carriedFiles === undefined ? { workflowFiles } : { workflowFiles, carriedFiles };
   } catch (err) {
     runStore.runs.forget(run.id);
     throw Object.assign(
@@ -612,8 +616,9 @@ export const repoFor = (name: string | undefined, named: string | undefined, fal
  *
  * The workflow folder is copied whole into the run's own `workflow/<hex>/` (`freezeWorkflowFiles`), its digest frozen on the record as
  * `workflowFiles`, so each check and session reads the folder's files as they were now (`WF_WORKFLOW_FILES`), whatever repository the
- * run is on and whatever the folder holds later. A link or a file of another kind in the folder is refused (`Invalid`) before anything
- * is written (`workflowFilesOf`).
+ * run is on and whatever the folder holds later; the carried folder beside it (`carried/`), where one is there, is copied the same way
+ * into `carried/<hex>/`, frozen as `carriedFiles` and told as `WF_CARRIED_FILES`. A link or a file of another kind in either folder is
+ * refused (`Invalid`) before anything is written (`workflowFilesOf`).
  *
  * `factory` names the factory the run is started in (`nemia start --factory`): its hires fill the workflow's steps (`stepsToStart`), read
  * as they are now and frozen into the run's steps, so a later hire changes no run started. Refused before anything is written when it names
@@ -680,6 +685,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const refusedInputs = inputRefusal(inputs);
   if (refusedInputs) return yield* Effect.fail(new Invalid({ message: refusedInputs }));
   yield* tried(() => workflowFilesOf(opts.workflowDir));
+  yield* tried(() => carriedFilesOf(opts.workflowDir));
   let id = runId(opts.brief);
   while (runStore.runs.taken(id)) id = runId(opts.brief);
   const refusedContext = contextRefusal(opts.context ?? [], opts.after ?? [], runStore.runs.exists, id);
@@ -696,7 +702,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const stepRecords = Object.fromEntries(steps.map((s) => [s.name, { taskId: null }]));
   const run = yield* folder ? folderRun(id, told, stepRecords) : repositoryRun(id, told, stepRecords, opts.repo, isolate);
   yield* tried(() => copyInputs(run, inputs));
-  run.workflowFiles = yield* tried(() => renderAgents(run, steps, found));
+  Object.assign(run, yield* tried(() => renderAgents(run, steps, found)));
   const pinned = yield* pinsOf(run, steps, run.createdAt);
   if (pinned.length) run.pinned = pinned;
   yield* (yield* RunDoor).runs.create(run);
@@ -711,7 +717,7 @@ const labelEditsOf = Effect.fnUntraced(function* (opts: StartOptions) {
 });
 
 /** The labels a run of `opts` is created with (`inheritedLabels`): its `after` and `context` runs' read through the Run door. */
-const inheritedOf = Effect.fnUntraced(function* (opts: StartOptions, edits: readonly LabelEdit[]) {
+const inheritedOf = Effect.fnUntraced(function* (opts: StartOptions, edits: readonly LabelChange[]) {
   const door = yield* RunDoor;
   const named = [...new Set([...(opts.after ?? []), ...(opts.context ?? [])])];
   const parents = yield* Effect.forEach(named, (parent) =>

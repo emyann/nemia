@@ -7,7 +7,8 @@
   // Code only. Markdown is prose (briefs, agents, docs, and CLAUDE.md merged by union); JSON holds test fixtures pinned byte for byte
   // and agent schemas whose bytes are digested into versions; the route tree and the board's run mirror are generated; the skills are
   // vendored. So is the design system kit the shadcn CLI writes into the board, with its skills, and the board's theme is generated from
-  // its DESIGN.md.
+  // its DESIGN.md. What is not ours is said by .gitattributes: tools/guards/test/comments.test.ts refuses a file marked there that no
+  // glob here skips.
   "ignorePatterns": [
     "**/*.md",
     "**/*.json",

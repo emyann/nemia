@@ -13,12 +13,15 @@ import {
   type OpenRuns,
   type WaitingRun,
 } from '../../../src/lib/api/runs.ts';
+import { judged } from '../../../src/lib/api/judged.ts';
 import type { WorkflowPageAddress } from '../../../src/lib/api/address.ts';
 import { rowsSaid } from '../../../src/lib/finished.ts';
 import { workflowNameOf } from '../../../src/lib/api/workflows.ts';
 import { runClock, titleOf } from '../../../src/lib/factory.ts';
 import { tokensBreakdown } from '../../../src/lib/breakdown.ts';
-import { agoWords, endedWords, openWord, presentWait, sinceShort, waitSentence, waitTag } from '../../../src/lib/runWords.ts';
+import { durationWords } from '../../../src/lib/duration.ts';
+import { agoWords, openWord, presentWait, waitSentence, waitTag } from '../../../src/lib/runWords.ts';
+import { ENDED } from '../../../src/lib/words.ts';
 import {
   answered,
   fed,
@@ -179,7 +182,7 @@ async function waitSaid(page: Page, run: WaitingRun, asOf: string): Promise<void
   }, `the card of ${run.id} says how long it has waited this time, since ${run.waitingSince}`);
 }
 
-/** The whole minutes a figure says, of `2h 5m` or `25m`; none for `under 1m` and `none`. */
+/** The whole minutes a figure says, of `2h 05m` or `25m`; none for `under 1m` and `none`. */
 const minutesIn = (said: string): number => {
   const [, h, m] = /(?:(\d+)h)?\s*(?:(\d+)m)?$/.exec(said.replace(/^under 1m$/, '')) ?? [];
   return Number(h ?? 0) * 60 + Number(m ?? 0);
@@ -190,7 +193,7 @@ const minutesIn = (said: string): number => {
  * on a person summed, over twenty minutes. A card that read the sum would say the row's figure. The open tooltip is photographed.
  */
 async function secondGate(page: Page, open: OpenRuns): Promise<void> {
-  const run = open.waiting.find((waiting) => waiting.id === REGATED.id);
+  const run = open.waiting.filter(judged).find((waiting) => waiting.id === REGATED.id);
   if (!run?.clock || run.waitingSince === null) throw new Refused(`${REGATED.id} waits on you, and the api dates its present wait`);
   const [present, summed] = [Date.parse(open.asOf) - Date.parse(run.waitingSince), run.clock.personMs];
   if (present >= 10 * 60_000 || summed < 20 * 60_000)
@@ -223,7 +226,7 @@ async function cardSays(page: Page, run: WaitingRun): Promise<void> {
   const card = cardOf(page, run.id);
   const open = `[href="/runs/${run.id}"]`;
   await expectTexts(card.locator('[data-wait-tag]'), [waitTag(run)], `the card of ${run.id} says what is asked of you`);
-  await expectTexts(card.locator('[data-sentence]'), [run.unreadable ?? waitSentence(run)], 'one plain sentence');
+  await expectTexts(card.locator('[data-sentence]'), [waitSentence(run)], 'one plain sentence');
   await expectTexts(card.getByRole('heading', { level: 3 }).locator(`a${open}`), [titleOf(run)], "the run's title, a link to its page");
   await expectTexts(card.locator('[data-run-id]'), [run.id], 'its id');
   await expectTexts(
@@ -533,7 +536,7 @@ async function finger(page: Page, open: OpenRuns, finished: FinishedPage): Promi
  */
 async function clocksSay(page: Page, open: OpenRuns, finished: FinishedPage): Promise<void> {
   const tables = [
-    { where: 'in-flight' as const, at: Date.parse(open.asOf), done: false, runs: open.inFlight },
+    { where: 'in-flight' as const, at: Date.parse(open.asOf), done: false, runs: open.inFlight.filter(judged) },
     { where: 'finished' as const, at: Date.parse(finished.asOf), done: true, runs: finished.runs },
   ];
   let wallsDiffered = 0;
@@ -544,7 +547,7 @@ async function clocksSay(page: Page, open: OpenRuns, finished: FinishedPage): Pr
     const want = table.runs.map((run) => runClock(run, table.at, table.done, 'row').words);
     if (words.join('|') !== want.join('|'))
       throw new Refused(`the ${table.where} Clock column says the time at work — expected ${want.join(', ')}, found ${words.join(', ')}`);
-    wallsDiffered += table.runs.filter((run, i) => words[i] !== sinceShort(run.wallMs)).length;
+    wallsDiffered += table.runs.filter((run, i) => words[i] !== durationWords(run.wallMs, 'minute')).length;
     await photograph(section(page, table.where), path.join(OUT, `runs-table-${table.where}-${await themeOf(page)}.png`));
   }
   if (!wallsDiffered)
@@ -665,7 +668,7 @@ async function pricedRows(page: Page): Promise<{ open: OpenRuns; finished: Finis
 async function costsSay(page: Page): Promise<void> {
   const priced = await pricedRows(page);
   try {
-    const short = await costSays(page, 'in-flight', priced.open.inFlight);
+    const short = await costSays(page, 'in-flight', priced.open.inFlight.filter(judged));
     if (!short.includes('≥2.48M tokens'))
       throw new Refused(`a run a session of which measured no tokens says its total is the least it was, with ≥ — it says "${short}"`);
     const whole = await costSays(page, 'finished', priced.finished.runs);
@@ -742,7 +745,7 @@ function finishedDrawn(page: Page): { last: () => FinishedPage | undefined; stop
 
 /** A row in flight and a finished row say their plain facts: the factory, the steps, what it does now; how it ended, and when. */
 async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage, given: () => FinishedPage | undefined): Promise<void> {
-  const flying = open.inFlight.find((run) => !run.unreadable)!;
+  const flying = open.inFlight.filter(judged)[0];
   const row = section(page, 'in-flight').locator(`tr[data-run="${flying.id}"]`);
   await expectTexts(row.locator(`a[href="/runs/${flying.id}"]`), [titleOf(flying)], 'a row in flight says its title, a link to the run');
   await expectTexts(row.locator('[data-run-id]'), [flying.id], 'its id');
@@ -771,7 +774,7 @@ async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage, given
     );
   await expectTexts(
     section(page, 'finished').locator('tr[data-run] [data-ended]'),
-    finished.runs.map((run) => endedWords(run.outcome).word),
+    finished.runs.map((run) => ENDED[run.outcome].word),
     'each finished row says how it ended, newest finished first as the api pages them',
   );
   await expectTexts(
@@ -1126,12 +1129,12 @@ async function withRegated(page: Page, drawn: () => FinishedPage | undefined): P
   const finished = await finishedAnswered(page);
   await twoReads(page);
   await threeParts(page, open, finished);
-  for (const run of open.waiting) {
+  for (const run of open.waiting.filter(judged)) {
     await cardSays(page, run);
     await waitSaid(page, run, open.asOf);
   }
   await gatesSay(page);
-  const costly = open.waiting.find((run) => run.id === COSTLY.id);
+  const costly = open.waiting.filter(judged).find((run) => run.id === COSTLY.id);
   if (!costly?.clock || !costly.stepCosts) throw new Refused(`${COSTLY.id} waits on you, and the api breaks its clock and its cost down`);
   await photographBothWidths(page, OUT, 'runs', 'page');
   await closeUps(page);

@@ -1,7 +1,5 @@
 /** The workflow feed followed, as server-sent events: every line the tick writes, relayed as it is written. */
-import { Hono } from 'hono';
-import { type SSEMessage, streamSSE } from 'hono/streaming';
-import { type Duration, Effect, Stream } from 'effect';
+import { type Context, type Duration, Effect, Stream } from 'effect';
 import {
   BOOKMARK_EVERY,
   feedCursorRefusal,
@@ -10,14 +8,17 @@ import {
   followFeed,
   formerHints,
   type Followed,
-  Invalid,
   parseSelectors,
   REMOVED,
   type Selectors,
   selectorsRefusal,
   selects,
 } from 'agent-orchestrator';
-import { type ApiEnv, Beats } from '../layer.ts';
+import { BadRequest, type FeedStreamEvent, Invalid } from 'objects';
+import type { BeatsShape } from '../layer.ts';
+
+/** One event of the stream, as objects' `FeedStreamEvent` says it. */
+type SSEMessage = FeedStreamEvent;
 
 /**
  * What a line of the workflow feed is about, as its SSE event names it: the store, its pause put or lifted (`store`), a daemon that took
@@ -109,11 +110,12 @@ const messageOf = (f: Followed): SSEMessage =>
       : { event: 'readable', data: '{}' };
 
 /**
- * What the stream sends the moment it opens, before any line: a comment, which an EventSource reads as nothing. A proxy that sends a
- * response's head with its first bytes (Vite's, before the board) holds the stream's answer until then, and a feed with no line yet to send
- * would leave the board saying it is still connecting.
+ * What the stream sends the moment it opens, before any line: an event of its own, `opened`, with nothing in it, which every reader of the
+ * stream skips. A proxy that sends a response's head with its first bytes (Vite's, before the board) holds the stream's answer until then,
+ * and a feed with no line yet to send would leave the board saying it is still connecting. An event, not a comment: the stream is written
+ * by HttpApi's `StreamSse`, which writes events alone.
  */
-export const OPENED = ': open\n\n';
+export const OPENED: SSEMessage = { event: 'opened', data: '' };
 
 /**
  * The feed from `from` as the stream's events (`messageOf`), read by the package's live reader (`followFeed`) on the runtime it runs on:
@@ -174,12 +176,12 @@ export const feedEvents = (
 /**
  * `GET /api/feed/stream` — the workflow feed followed, as server-sent events: every line from the cursor, then each as the tick writes it,
  * handed on by the package's live reader (`followFeed`): from the lines the daemon in this process publishes as it writes them, and from
- * the file for every line none brought, on the reader's beat — another process's (`--no-tick`, `nemia tick`). It opens with a comment
- * (`OPENED`), before any line. One event a line, named by what the line is about (`feedEventOf`), its data the line as written and its id
- * the cursor just after it. It starts after the Last-Event-ID an EventSource sends when it reconnects, else after `after`, so a reconnect
- * resumes after the last line it was sent. The api relays and decides nothing: the tick has judged it all before it is written. The
- * engine's feed is not in it: a step's filing, its start and its settling reach this one as the step's word, and the engine's is keyed
- * by task.
+ * the file for every line none brought, on the reader's beat — another process's (`--no-tick`, `nemia tick`). It opens with an `opened`
+ * event (`OPENED`), before any line, which every reader skips. One event a line, named by what the line is about (`feedEventOf`), its
+ * data the line as written and its id the cursor just after it. It starts after the Last-Event-ID an EventSource sends when it
+ * reconnects, else after `after`, so a reconnect resumes after the last line it was sent. The api relays and decides nothing: the tick
+ * has judged it all before it is written. The engine's feed is not in it: a step's filing, its start and its settling reach this one as
+ * the step's word, and the engine's is keyed by task.
  *
  * `selector`, given again for each further selector, keeps only the lines they select, in the grammar the package owns whole
  * (`selectorsRefusal`, `parseSelectors`, `selects`): every clause of one selector holds of a line it takes, and one selector of them does.
@@ -200,42 +202,44 @@ export const feedEvents = (
  * A selector that names a former reason (`formerHints`) is sent its hint first, a `hint` event whose data carries the sentence as
  * `message`, before any line: the code is still read, and the hint says what to type instead.
  *
- * A cursor the feed never gave is refused with 400 before the stream opens, an answer with a status, not an event. A selector the grammar
- * refuses is the package's `Invalid` with `SELECTOR_ASKED` after it, 422 before the stream opens, and no reader is started for it. On the
+ * A cursor the feed never gave is refused with 400 before the stream opens (`BadRequest`, an error the endpoint declares), an answer with
+ * a status, not an event. A selector the grammar refuses is an `Invalid` in the package's words with `SELECTOR_ASKED` after it, 422
+ * before the stream opens, and no reader is started for it. On the
  * stream, a refusal (exit 2) — the feed truncated or replaced under the cursor, including between the check and the reader's first
  * read — is an `unreadable` event with `retrying: false`, said once, and ends the stream rather than fail every second; a reader opens
  * it again with no cursor and reads the feed it has now. Any other failure is of that read, not the feed: it is said once as
  * `unreadable` with
  * `retrying: true`, the reader reads again on its next beat from the same cursor, and the first read that works clears it with
- * `readable`, before the lines it found. The relay runs on the app's runtime, whose layer holds the hub (`feedHubLayer`), and the reader
- * is held in the scope of `feedEvents`, which the request's abort interrupts: when the reader goes, or the feed does, it is let go on that
+ * `readable`, before the lines it found. The relay is given the app's services (`context`, read by the handler through `inRequest`),
+ * whose layer holds the hub (`feedHubLayer`), and the reader is held in the scope of `feedEvents`, which HttpApi's stream ends as the
+ * request is aborted: when the reader goes, or the feed does, it is let go on that
  * one path, its subscription with it, and no longer counted among the feed's followers (`FEED_FOLLOWERS`).
+ *
+ * The stream `query` and `lastEventId` ask for, or the refusal that answers before it opens: `beats.feed` the reader's beat, and
+ * `context` the app's services the relay reads (the hub, the store's root).
  */
-export const feed = new Hono<ApiEnv>().get('/api/feed/stream', (c) => {
-  const start = feedStartOf(c.req.query('from'));
-  if (typeof start !== 'number') return c.json({ error: start.error }, 400);
-  const cursor = c.req.header('Last-Event-ID') || c.req.query('after') || undefined;
-  const from = cursor === undefined ? start : feedCursorOf(cursor);
-  if (typeof from !== 'number') return c.json({ error: from.error }, 400);
-  const until = feedEndOf(c.req.query('until'));
-  if (typeof until === 'object') return c.json({ error: until.error }, 400);
-  const asked = c.req.queries('selector') ?? [];
-  const refused = selectorsRefusal(asked);
-  if (refused) throw new Invalid({ message: `${refused}. ${SELECTOR_ASKED}` });
-  const selectors = parseSelectors(asked);
-  const hints = asked.flatMap(formerHints);
-  return streamSSE(c, async (stream) => {
-    const gone = new AbortController();
-    stream.onAbort(() => gone.abort());
-    if (stream.aborted) gone.abort();
-    await stream.write(OPENED);
-    for (const hint of hints) await stream.writeSSE(hinted(hint));
-    const relayed = Effect.gen(function* () {
-      const beats = yield* Beats;
-      return yield* feedEvents(from, selectors, BOOKMARK_EVERY, beats.feed, until).pipe(
-        Stream.runForEach((message) => Effect.promise(() => stream.writeSSE(message))),
-      );
-    }).pipe(Effect.catch((err) => Effect.promise(() => stream.writeSSE(unreadable(err, false)))));
-    await c.var.runtime.runPromiseExit(relayed, { signal: gone.signal });
+export const feedOpened = (
+  query: { readonly from?: string; readonly after?: string; readonly until?: string; readonly selector?: string | readonly string[] },
+  lastEventId: string | undefined,
+  beats: BeatsShape,
+  context: Context.Context<never>,
+): Effect.Effect<Stream.Stream<SSEMessage>, BadRequest | Invalid> =>
+  Effect.gen(function* () {
+    const start = feedStartOf(query.from);
+    if (typeof start !== 'number') return yield* Effect.fail(new BadRequest({ error: start.error }));
+    const cursor = lastEventId || query.after || undefined;
+    const from = cursor === undefined ? start : feedCursorOf(cursor);
+    if (typeof from !== 'number') return yield* Effect.fail(new BadRequest({ error: from.error }));
+    const until = feedEndOf(query.until);
+    if (typeof until === 'object') return yield* Effect.fail(new BadRequest({ error: until.error }));
+    const asked = typeof query.selector === 'string' ? [query.selector] : [...(query.selector ?? [])];
+    const refused = selectorsRefusal(asked);
+    if (refused) return yield* Effect.fail(new Invalid({ error: `${refused}. ${SELECTOR_ASKED}` }));
+    const selectors = parseSelectors(asked);
+    const hints = asked.flatMap(formerHints).map(hinted);
+    const relayed = feedEvents(from, selectors, BOOKMARK_EVERY, beats.feed, until).pipe(
+      Stream.catch((err) => Stream.make(unreadable(err, false))),
+      Stream.provideContext(context),
+    );
+    return Stream.concat(Stream.fromIterable([OPENED, ...hints]), relayed);
   });
-});

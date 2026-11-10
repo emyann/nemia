@@ -285,7 +285,8 @@ test('proposals approve and decline call their endpoints, each printing the phas
     assert.equal(said.code, 0, said.err);
     assert.deepEqual(
       requests.map((r) => `${r.method} ${r.path}`),
-      [`POST /api/namespaces/f1/proposals/implementer-ab12c/${action}`],
+      ['GET /api/health', `POST /api/namespaces/f1/proposals/implementer-ab12c/${action}`],
+      'its readiness asked first, then the one request',
     );
     assert.match(said.out, new RegExp(`^proposals/implementer-ab12c ${phase}\\b`, 'm'));
   }

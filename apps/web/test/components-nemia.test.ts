@@ -24,11 +24,11 @@ const { NemiaFace } = await import('../src/components/nemia/NemiaFace.tsx');
 const { UP } = await import('../src/lib/presence.ts');
 const { ChatLostBand, ChatRetryingBand, ChatStoppedBand, ChatUnreadableBand } = await import('../src/components/nemia/chat/ChatBand.tsx');
 const { dockWords } = await import('../src/lib/presence.ts');
-type ChatEvent = import('../src/lib/api.ts').ChatEvent;
+type ChatEvent = import('../src/lib/api/chat.ts').ChatEvent;
 const { ChatAsk } = await import('../src/components/nemia/chat/ChatAsk.tsx');
 const { ChatAskMany } = await import('../src/components/nemia/chat/ChatAskMany.tsx');
 const { ChatActions } = await import('../src/components/nemia/chat/ChatActions.tsx');
-type AskQuestion = import('../src/lib/api.ts').AskQuestion;
+type AskQuestion = import('../src/lib/api/chat.ts').AskQuestion;
 
 /** Nemia's section, drawn over a cache holding `level`, her memory, `facts`, and each fact's words, read as if opened once. */
 async function nemiaWith(level: Record<string, unknown>, facts: string[] = []): Promise<string> {
@@ -212,7 +212,7 @@ test('Nemia not filed, or waiting on her trust, names no task; filed, it names i
 
 test("Nemia's face is her blobatar on its plate, dimmed in dark, and wears the expression her presence picks", () => {
   const up = renderToStaticMarkup(createElement(NemiaFace, { presence: UP }));
-  const waits = renderToStaticMarkup(createElement(NemiaFace, { presence: { ...UP, waitsOnYou: 2, answering: true } }));
+  const waits = renderToStaticMarkup(createElement(NemiaFace, { presence: { ...UP, runsWaiting: 2, answering: true } }));
   assert.match(up, /data-agent-face="nemia"/);
   assert.match(up, /dark:\[&amp;&gt;path\]:opacity-25|dark:\[&>path\]:opacity-25/, 'the plate, dimmed in dark');
   assert.match(up, /data-nemia-face="idle"/);
@@ -241,15 +241,17 @@ test("her session stopped is a status, the daemon lost an alert in the failure's
 test("her docked face is called by the presence that gives it its expression, in the owner's order", () => {
   assert.equal(dockWords(UP, false), "Open Nemia's chat. Her session is up.");
   assert.equal(dockWords(UP, true), "Close Nemia's chat. Her session is up.");
-  assert.equal(dockWords({ ...UP, waitsOnYou: 2 }, false), "Open Nemia's chat. 2 wait on you.");
-  assert.equal(dockWords({ ...UP, waitsOnYou: 1 }, false), "Open Nemia's chat. 1 waits on you.");
+  assert.equal(dockWords({ ...UP, runsWaiting: 2 }, false), "Open Nemia's chat. 2 wait on you.");
+  assert.equal(dockWords({ ...UP, runsWaiting: 1 }, false), "Open Nemia's chat. 1 waits on you.");
+  assert.equal(dockWords({ ...UP, asksWaiting: 2 }, false), "Open Nemia's chat. 2 asks of hers wait on you.");
+  assert.equal(dockWords({ ...UP, asksWaiting: 1 }, false), "Open Nemia's chat. 1 ask of hers waits on you.");
   assert.equal(dockWords({ ...UP, notSent: true }, false), "Open Nemia's chat. A message was not sent.");
   assert.equal(dockWords({ ...UP, down: true }, false), "Open Nemia's chat. Her session is down.");
   assert.equal(dockWords({ ...UP, answering: true }, false), "Open Nemia's chat. She is answering.");
   assert.equal(dockWords({ ...UP, unread: 2 }, true), "Close Nemia's chat. 2 new answers.");
   assert.equal(dockWords({ ...UP, unread: 1 }, false), "Open Nemia's chat. 1 new answer.");
   assert.equal(
-    dockWords({ waitsOnYou: 2, notSent: true, down: true, answering: true, unread: 3 }, false),
+    dockWords({ runsWaiting: 2, asksWaiting: 1, notSent: true, down: true, answering: true, unread: 3 }, false),
     "Open Nemia's chat. 2 wait on you.",
     'what waits on a person comes first, as her face does',
   );

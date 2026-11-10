@@ -1,5 +1,6 @@
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
-import type { GraphNode, WorkflowStepSpec } from '../../lib/api';
+import type { GraphNode } from '../../lib/api/graph.ts';
+import type { WorkflowStepSpec } from '../../lib/api/library.ts';
 import type { StepView } from '../../lib/runView';
 import { deniedNodeText, needNodeText, needOf, needText, type Need } from '../../lib/asks';
 import { gateNodeLine } from '../../lib/gate';
@@ -204,7 +205,7 @@ export const runsOn = (spec: { agent?: string | null; harness: string | null; mo
  * the builder has it (`WorkflowBuilder`): whether it has changes not saved, whether the last save was refused for it, and whether it is the
  * one its form shows. `inspected` while the frame's bar shows it, on the workflow's canvas (`WorkflowCanvas`); never in the builder.
  */
-export type SpecNodeData = {
+type SpecNodeData = {
   name: string;
   index: number;
   spec: WorkflowStepSpec;
@@ -220,7 +221,7 @@ export type SpecFlowNode = Node<SpecNodeData, 'spec'>;
 const TOOLS_WRITTEN_OUT = 3;
 
 /** What a step that sets no effort, or no tools, runs with: its harness's, as the run page's spec rows say it. */
-export const HARNESS_OWN = "harness's own";
+const HARNESS_OWN = "harness's own";
 
 /**
  * What a step is set to do beyond what it runs on, as its node lists it: its check, its effort, its context window, its tools, its

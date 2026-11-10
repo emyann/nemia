@@ -14,6 +14,7 @@ import path from 'node:path';
 import type { Event } from '../domain.ts';
 import type { StoredEvent } from '../event-schema.ts';
 import { readText } from './tally.ts';
+import { replaceFile } from '../replace.ts';
 
 /** A body's name: the sha256 of its text's UTF-8, in 64 lowercase hex digits. */
 export type BodyRef = string;
@@ -21,7 +22,10 @@ export type BodyRef = string;
 /** The shape of a `BodyRef`. */
 export const BODY_REF = /^[0-9a-f]{64}$/;
 
-/** The size, in bytes of UTF-8, from which a text is kept as a body rather than in its line. */
+/**
+ * The size, in bytes of UTF-8, from which a text is kept as a body rather than in its line.
+ * Exported only for the tests that import it.
+ */
 export const BODY_MIN_BYTES = 1024;
 
 /**
@@ -56,7 +60,10 @@ export type BodyOps = {
   readonly located?: (ref: BodyRef) => string;
 };
 
-/** The reference of `text`: the sha256 of its UTF-8. */
+/**
+ * The reference of `text`: the sha256 of its UTF-8.
+ * Exported only for the tests that import it.
+ */
 export const refOf = (text: string): BodyRef => crypto.createHash('sha256').update(text, 'utf8').digest('hex');
 
 const wellFormed = (text: string) => Buffer.from(text, 'utf8').toString('utf8') === text;
@@ -85,9 +92,7 @@ export const filesBodies = (root: string): BodyOps => {
             if (!missing(cause)) throw cause;
           }
           fs.mkdirSync(dir, { recursive: true });
-          const temp = path.join(dir, `.${ref}.${process.pid}.${crypto.randomUUID()}`);
-          fs.writeFileSync(temp, text);
-          fs.renameSync(temp, at(ref));
+          replaceFile(at(ref), text);
         },
         catch: failure,
       }),

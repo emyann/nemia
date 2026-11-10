@@ -13,7 +13,9 @@
  * `followChat` is the one follower both conversations run on, `lib/follow.ts`.
  */
 import type { AskPick, AskQuestion, ChatEvent, ChatPresence } from './api/chat.ts';
-import { chatDataOf } from './api/chat.ts';
+import { CHAT_STREAM_SCHEMAS } from './api/chat.ts';
+import { UnreadAnswer } from './api/read.ts';
+import { streamDataOf } from './api/stream.ts';
 import type { ConversationItem, ConversationLine } from './conversation.ts';
 import { follow, type Followed, type Follower, type Frames, type StreamLike } from './follow.ts';
 import type { Presence } from './presence.ts';
@@ -38,7 +40,7 @@ export type ChatAsk = Extract<ChatEvent, { kind: 'question' | 'proposal' | 'perm
 const isAsk = (event: ChatEvent): event is ChatAsk => event.kind === 'question' || event.kind === 'proposal' || event.kind === 'permission';
 
 /** How an ask is drawn: as the action buttons of a proposal, as the radio form of one question, or as the flow of several. */
-export type AskDrawn = 'actions' | 'form' | 'many';
+type AskDrawn = 'actions' | 'form' | 'many';
 
 /**
  * How the ask `questions` is drawn, the canvas's three boards: `many` for several questions (board 7b, a tab for each and a recap);
@@ -127,7 +129,7 @@ export function mergeChatEvents(known: readonly ChatEvent[], incoming: readonly 
 }
 
 /** What one frame of her chat's stream does to what the panel holds: events, where she is, or a read that failed. */
-export type ChatChange =
+type ChatChange =
   | { kind: 'events'; events: ChatEvent[] }
   | { kind: 'presence'; presence: ChatPresence }
   | { kind: 'cursor'; cursor: string };
@@ -139,26 +141,27 @@ export function changedChat(s: ChatFollowed, c: ChatChange): ChatFollowed {
   return { ...s, cursor: c.cursor };
 }
 
-/** The arrivals one of her stream's events brings: what it decoded, and the cursor its id is, each only where there is one. */
-const brought = (event: ChatChange | null, id: string): ChatChange[] => [
-  ...(event ? [event] : []),
+/** The arrivals one of her stream's events brings: what it decoded, or its decode's `UnreadAnswer`, and the cursor its id is, if any. */
+const brought = (event: ChatChange | UnreadAnswer, id: string): (ChatChange | UnreadAnswer)[] => [
+  event,
   ...(id ? [{ kind: 'cursor' as const, cursor: id }] : []),
 ];
 
 /**
  * What her chat's stream means, for `follow`: `presence` replaces where she is, `chat` merges one event by its id, and either moves the
- * cursor to the id it came with; each event's data is decoded by its schema (`chatDataOf`), and one that does not decode is ignored.
+ * cursor to the id it came with; each event's data is decoded by its schema (`streamDataOf`), and one that does not decode is handed to
+ * `follow` to say as it is (an `UnreadAnswer`), its cursor moved all the same, while the stream goes on.
  * Her chat has no event that ends it: the api follows it for as long as the panel is open.
  */
 const chatFollower: Follower<ChatFollowed, ChatChange> = {
   reads: {
     presence: (m) => {
-      const presence = chatDataOf('presence', m.data);
-      return brought(presence ? { kind: 'presence', presence } : null, m.lastEventId);
+      const presence = streamDataOf(CHAT_STREAM_SCHEMAS, 'presence', m.data);
+      return brought(presence instanceof UnreadAnswer ? presence : { kind: 'presence', presence }, m.lastEventId);
     },
     chat: (m) => {
-      const event = chatDataOf('chat', m.data);
-      return brought(event ? { kind: 'events', events: [event] } : null, m.lastEventId);
+      const event = streamDataOf(CHAT_STREAM_SCHEMAS, 'chat', m.data);
+      return brought(event instanceof UnreadAnswer ? event : { kind: 'events', events: [event] }, m.lastEventId);
     },
   },
   over: [],
@@ -170,7 +173,10 @@ const chatFollower: Follower<ChatFollowed, ChatChange> = {
   },
   ending: (s) => s,
   opened: (s) => (s.live ? s : { ...s, live: true }),
-  unreadable: (m) => chatDataOf('unreadable', m.data) ?? null,
+  unreadable: (m) => {
+    const said = streamDataOf(CHAT_STREAM_SCHEMAS, 'unreadable', m.data);
+    return said instanceof UnreadAnswer ? null : said;
+  },
   words: {
     unread: 'Her chat could not be read.',
     refused: 'The api refused to follow her chat any further. Reload the page to read it again.',
@@ -185,13 +191,17 @@ export const followChat = (stream: StreamLike, update: (change: (s: ChatFollowed
   follow(stream, chatFollower, update, frames);
 
 /**
- * Where she is as her face and its cues read it (`lib/presence.ts`), the one writer of it: the api's presence `api`, and whether this
- * browser keeps a message the api would not take (`notSent`). She reads as down when her session is not up, and only then: no level
- * says it, since a factory raised above Manual keeps her session up while the store's own level is at Manual. Whether she is at
- * Manual everywhere is `anyAbove` (`lib/nemia.ts`), off every factory's level the api answers.
+ * Where she is as her face and its cues read it (`lib/presence.ts`), the one writer of it: the api's presence `api`, whether this
+ * browser keeps a message the api would not take (`notSent`), the runs that wait on the person as the run list counts them
+ * (`runsWaiting`, its `counts.waiting`, the number the Runs page and the rail say: `frameRunsQuery`), and her asks the person has not
+ * answered among `events` (`asksOpen`). The api's own `waitsOnYou` adds those two into one number of its own, from a reading of the runs
+ * that is not the run list's, so neither part is read from it. She reads as down when her session is not up, and only then: no level
+ * says it, since a factory raised above Manual keeps her session up while the store's own level is at Manual. Whether she is at Manual
+ * everywhere is `anyAbove` (`lib/nemia.ts`), off every factory's level the api answers.
  */
-export const presenceOf = (api: ChatPresence, notSent: boolean): Presence => ({
-  waitsOnYou: api.waitsOnYou,
+export const presenceOf = (api: ChatPresence, notSent: boolean, runsWaiting: number, events: readonly ChatEvent[]): Presence => ({
+  runsWaiting,
+  asksWaiting: asksOpen(events).length,
   notSent,
   down: !api.up,
   answering: api.answering,
@@ -205,7 +215,7 @@ export type ChatItem = { kind: 'event'; event: ChatEvent } | ChatTurn;
  * Her calls between two of anything else, as one turn: its `id` the first call's, its calls in the order they came, `running` while
  * one of them is at work or waits on the person, and `ms` from the first call to the last.
  */
-export type ChatTurn = { kind: 'turn'; id: string; calls: ChatCall[]; running: boolean; ms: number };
+type ChatTurn = { kind: 'turn'; id: string; calls: ChatCall[]; running: boolean; ms: number };
 
 /** The milliseconds from the first of `calls` to the last, 0 where either moment does not parse. */
 const spanOf = (calls: readonly ChatCall[]): number => {
@@ -269,7 +279,7 @@ export function newFrom(events: readonly ChatEvent[], unread: number): string | 
 export const readableFrom = (events: readonly ChatEvent[]): string | null => events.filter(hers).at(-1)?.id ?? null;
 
 /** A link read out of her words: the words it was written on, and where it goes. */
-export type ChatLink = { words: string; href: string };
+type ChatLink = { words: string; href: string };
 
 /** A markdown link in her words: its words, then its address. */
 const LINK = /\[([^\]\n]+)\]\(([^()\s]+)\)/g;
@@ -297,10 +307,10 @@ export function linksOf(text: string): { text: string; links: ChatLink[] } {
 }
 
 /** A step of a run her words link to, which her talk draws under them as the run's page's own part for it (`ChatBrought`). */
-export type ChatBrought = { kind: 'brought'; run: string; step: string };
+type ChatBrought = { kind: 'brought'; run: string; step: string };
 
 /** A proposal her words link to, which her talk draws under them as the proposal page's own part (`ChatProposal`). */
-export type ChatBroughtProposal = { kind: 'brought-proposal'; factory: string; name: string };
+type ChatBroughtProposal = { kind: 'brought-proposal'; factory: string; name: string };
 
 /** What her talk draws itself, through the family's one escape hatch: an ask of hers, or a step or a proposal her words bring. */
 export type ChatOwn = ChatAsk | ChatBrought | ChatBroughtProposal;

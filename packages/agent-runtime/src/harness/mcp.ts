@@ -13,7 +13,7 @@ import type { TransportOf } from '../../contracts/transport.contract.ts';
 
 /**
  * The transports Claude Code loads a server of a `.mcp.json` over, the Agent SDK's words (`McpServerConfigForProcessTransport`, its
- * in-process `sdk` aside), held equal to them in `claude/attached-options.ts`.
+ * in-process `sdk` aside), held equal to them in `claude/session-options.ts`.
  */
 export const MCP_TRANSPORTS = ['stdio', 'http', 'sse'] as const;
 

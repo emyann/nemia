@@ -1,50 +1,52 @@
 /**
- * The runs group's handlers (`objects`' `Api`): the runs as a `RunList` (`runList`), across namespaces and in one; a run in its namespace
- * (`get`) and across them (`show`), the run object off the app's informer (`runObject`); its four sub-resources, the entries `tries`,
- * `try`, `closeout` and `told`; a run started (`create`, `runStart`); and the run's named actions, each the command of the package's
- * table that `nemia` runs, through the api's one pipeline for a command (`commandAnswered`, commands/routes.ts) — its words, its body,
- * its extension, its check and its refusals as a route the table generates has them.
+ * The runs group's handlers (`objects`' `Api`): the runs as a `RunList` (`runList`), across namespaces and in one, or as the `Table` its
+ * page prints (`runTable`) where the request asks for one; a run in its namespace (`get`) and across them (`show`), the run object off the
+ * app's informer (`runObject`); what is read beside it — its lines (`runLines`), what it concludes (`CONCLUDED`), its record (`SHOW`,
+ * raw), `nemia ls`'s listing (`LS`); its four sub-resources, the entries `tries`, `try`, `closeout` and `told`; a run started (`create`,
+ * `runStart`); and the run's named actions, each its body decoded by its endpoint (`objects`' `RunRetry`, `RunApprove`, …) and handed with
+ * the path's names to the orchestrator's typed entry `nemia` runs (`RETRY`, `APPROVE`, `SAY`, `REFRESH`, `HOLD`, `RM`, `PRUNE`,
+ * `LABEL_RUN`).
  *
  * A run's namespace is its factory, `default` for one that names none (`runNamespace`): a run read or acted on under another is
- * `Missing`, a 404, as one the store does not list is; one a task of which does not read is `Unjudged`, a 502, in the list's words.
- * An action reads its body itself (`handleRaw`), so the pipeline refuses it in its route's words — a key it does not take, a key another
- * route takes — as it did on Hono's route: the `Api`'s Schema of each body is the document's, held equal to the pipeline's by the parity
- * test (`run-actions.test.ts`).
+ * `Missing`, a 404, as one the store does not list is, and so is a step the run does not have; one a task of which does not read is
+ * `Unjudged`, a 502, in the list's words. An action's refusal is the entry's, answered by its kind (`refusedAs`); a failure that is no
+ * refusal is a `WriteFailed`, a 502 in its own words, and asking again may work. Every action takes its run out of the app's informer
+ * once it has run (`dropInformed`), whatever it did, so the next read judges it again at once. The removal removes a try alone (`RM`'s
+ * `onlyTry`), and the removal and the prune fail with what did nothing (`refuses`), which the command line says as a line.
  */
 import { Effect } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
-import type { HttpServerRequest } from 'effect/http';
 import {
-  type Command,
+  APPROVE,
+  CONCLUDED,
+  dropInformed,
+  HOLD,
   Informer,
   informerMemo,
-  type Route,
-  routeList,
+  LABEL_RUN,
+  LS,
+  PRUNE,
+  REFRESH,
+  RETRY,
+  RM,
   runIn,
+  runLines,
   runList,
   runObject,
+  runTable,
+  SAY,
+  SHOW,
   type SummaryHow,
   verifiesRest,
 } from 'agent-orchestrator';
-import {
-  Api,
-  type Labelled,
-  Missing,
-  type RunAsked,
-  type RunApproved,
-  type RunHeld,
-  type RunPruned,
-  type RunRefreshed,
-  type RunRemoved,
-  type RunSaid,
-  Unjudged,
-} from 'objects';
-import { commandAnswered, type Params } from '../commands/routes.ts';
-import { type Named, runPath } from '../commands/words.ts';
+import { Api, Missing, type RunApprove, type RunPrune, type RunRefresh, type RunRetry, type RunSay, Unjudged, WriteFailed } from 'objects';
 import type { Served } from '../layer.ts';
-import { commandNamed, findRun, noSuchRun, runPlaced } from '../store.ts';
-import { runStart } from '../workflows/workflows.ts';
-import { actionAnswered, actionRefused, answered, orFailed } from './refused.ts';
+import { workflowPageOf } from '../step/step.ts';
+import { findRun, noSuchRun, taskOfStep } from '../store.ts';
+import { runStart } from '../runs/start.ts';
+import { answered, answeredIn, locatedAt, refusedAs, ServedNow } from './refused.ts';
+import { wantsTable } from './table.ts';
+import { decisionHandler } from '../decide/decide.ts';
 
 /**
  * `program` over the app's informer of each run's judgement (`Informer`, the package's), which the store's daemon's pass fills: what the
@@ -53,16 +55,6 @@ import { actionAnswered, actionRefused, answered, orFailed } from './refused.ts'
 export const informed = <A, E, R>({ informer }: Served, program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
   Effect.provideService(program, Informer, informer);
 
-/** The run object's sub-resources, each a read of the package's table. */
-const TRIES = commandNamed('tries');
-const TRY = commandNamed('try');
-const CLOSEOUT = commandNamed('closeout');
-const TOLD = commandNamed('told');
-
-/** What a sub-resource's entry answers for the path's parameters, bound to the argument keys of the same names, as the CLI's flags. */
-const subResource = <A>(command: Command, params: Record<string, string>) =>
-  answered(async (s) => (await runPlaced(s, s.e, informed(s, command.handler(params, s.env, s.home)))) as A);
-
 /** How a list of the runs judges each: off the app's informer and its feed's filing times, verified as the env says. */
 const howOf = (s: Served): SummaryHow => ({
   home: s.home,
@@ -70,6 +62,9 @@ const howOf = (s: Served): SummaryHow => ({
   filings: s.memo.filings,
   verify: verifiesRest(s.env),
 });
+
+/** A selector given once, several times, or not at all. */
+type Listed = string | readonly string[] | undefined;
 
 /** One selector, several, or none, as a list. */
 const listOf = (given: string | readonly string[] | undefined): string[] =>
@@ -81,29 +76,33 @@ type ListQuery = {
   readonly labelSelector?: string | readonly string[];
   readonly selector?: string | readonly string[];
   readonly fieldSelector?: string;
+  readonly watch?: string;
 };
 
 /**
  * A page of the runs of `namespace` (every run for none) the query asks for, `?selector=` read as `?labelSelector=`: a limit, a token or a
- * selector the package refuses is its `Invalid`, a 422. `?fieldSelector=status.state…` asks the board's list by state (`runList`).
+ * selector the package refuses is its `Invalid`, a 422. `?fieldSelector=status.state…` asks the board's list by state (`runList`). Asked
+ * for a `Table` (`wantsTable`), the page's table (`runTable`), the orchestrator's columns and cells; never on a watch, whose events carry
+ * the runs themselves.
  */
 const page = (namespace: string | undefined, query: ListQuery) =>
-  answered((s) =>
-    runPlaced(
-      s,
-      s.e,
-      informed(
-        s,
-        runList(s.e, howOf(s), s, {
-          namespace,
-          limit: query.limit === undefined ? null : Number(query.limit),
-          continue: query.continue,
-          labelSelector: [...listOf(query.labelSelector), ...listOf(query.selector)],
-          fieldSelector: query.fieldSelector,
-        }),
+  Effect.gen(function* () {
+    const listed = yield* answered((s) =>
+      s.inRequest(
+        informed(
+          s,
+          runList(s.e, howOf(s), s, {
+            namespace,
+            limit: query.limit === undefined ? null : Number(query.limit),
+            continue: query.continue,
+            labelSelector: [...listOf(query.labelSelector), ...listOf(query.selector)],
+            fieldSelector: query.fieldSelector,
+          }),
+        ),
       ),
-    ),
-  );
+    );
+    return query.watch !== 'true' && (yield* wantsTable) ? runTable(listed) : listed;
+  });
 
 /** The run `name`, judged into its object, where it is in `namespace` (none for every namespace): `Missing`, else, or `Unjudged`. */
 const one = (name: string, namespace?: string) =>
@@ -112,7 +111,7 @@ const one = (name: string, namespace?: string) =>
       const run = findRun(name);
       if (!run) return null;
       if (namespace !== undefined) await Effect.runPromise(runIn(run, namespace));
-      return runPlaced(s, s.e, informed(s, runObject(run, s)));
+      return s.inRequest(informed(s, runObject(run, s)));
     }),
     (object) =>
       object === null
@@ -122,123 +121,169 @@ const one = (name: string, namespace?: string) =>
           : Effect.succeed(object),
   );
 
-/** The run's path in the table, its run spelled `:runId` as the table spells it (the `Api` spells it `:name`). */
-const RUN = '/api/namespaces/:namespace/runs/:runId';
-
-/** The route of `command` an endpoint serves: its method on its path in the run's namespace, as the package's table has it. */
-const routeOf = (command: Command, method: Route['method'], path: string): Route => {
-  const found = routeList(command).find((r) => r.method === method && r.path === path);
-  if (found === undefined)
-    throw new Error(
-      `The command '${command.name}' has no route ${method} ${path} in the package's table: give it that route, or serve the endpoint from the route it has.`,
-    );
-  return found;
+/** The run `name` the store has, or `Missing` in the store's words. */
+const found = (name: string) => {
+  const run = findRun(name);
+  if (!run) throw new Missing({ error: noSuchRun(name) });
+  return run;
 };
-
-/** A named action: its command, and the route of it the endpoint serves. */
-type Action = { readonly command: Command; readonly route: Route };
-
-const action = (name: string, method: Route['method'], path: string): Action => {
-  const command = commandNamed(name);
-  return { command, route: routeOf(command, method, path) };
-};
-
-/** The run's named actions, by the `Api`'s endpoint, each its command's route in the table. */
-const ACTIONS = {
-  delete: action('rm', 'DELETE', RUN),
-  refresh: action('refresh', 'POST', `${RUN}/refresh`),
-  prune: action('prune', 'POST', `${RUN}/prune`),
-  labels: action('label run', 'POST', `${RUN}/labels`),
-  hold: action('hold', 'POST', `${RUN}/hold`),
-  unhold: action('hold', 'DELETE', `${RUN}/hold`),
-  retry: action('retry', 'POST', `${RUN}/steps/:step/retry`),
-  approve: action('approve', 'POST', `${RUN}/steps/:step/approve`),
-  say: action('say', 'POST', `${RUN}/steps/:step/say`),
-} as const;
-
-/**
- * `data` as JSON says it: a key whose value is undefined left out, as Hono's route answered it — a command's answer names each key the api
- * answers (`answerOf`), and a key of the `Api`'s answer that may be left out is refused present and undefined.
- */
-const asJson = (data: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> =>
-  Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined));
 
 /** A run's action's path names: its namespace, the run by the `Api`'s `name`, and its step where it names one. */
 type At = { readonly namespace: string; readonly name: string; readonly step?: string };
 
-/** Whether a body's read failed for its size: effect's server error, its reason a parse error of `BodyTooLarge`. */
-const tooLarge = (err: unknown): boolean => {
-  const reason: unknown = typeof err === 'object' && err !== null && 'reason' in err ? err.reason : undefined;
-  return typeof reason === 'object' && reason !== null && 'reason' in reason && reason.reason === 'BodyTooLarge';
-};
-
 /**
- * The text `request` sent as its body, or none where it did not read: the pipeline answers that as a body that is no JSON. A body over
- * the objects' limit (`OBJECT_BODY_LIMIT`, serve.ts) is effect's own failure, left to answer its 413, as every object's write is.
+ * The named action `work` on the run `at` names, in its namespace: the run found (`Missing` where none is, or it is in another namespace,
+ * and where it has no step `at.step`), then `work`, the run taken out of the app's informer once it has run (`dropInformed`). A refusal
+ * it throws is answered by its kind (`refusedAs`); a failure that is none is a `WriteFailed` in its words.
  */
-const sentBy = (request: HttpServerRequest.HttpServerRequest): Effect.Effect<string | undefined> =>
-  Effect.catch(request.text, (err) => (tooLarge(err) ? Effect.die(err) : Effect.succeed(undefined)));
-
-/**
- * The named action `act` on the run `at` names, in its namespace: the run found (`Missing` where none is, or it is in another namespace),
- * then the command's pipeline (`commandAnswered`) over the path's names by the table's route and the body `text`; its answer with its
- * `hint`, or its refusal as the `Api`'s error by its status (`actionRefused`). A refusal of the package's it throws is answered by its
- * kind.
- */
-const acted = <A>({ command, route }: Action, at: At, method: string, text: string | undefined) =>
-  actionAnswered(async (s): Promise<A> => {
-    const run = findRun(at.name);
-    if (!run) throw new Missing({ error: noSuchRun(at.name) });
-    await Effect.runPromise(runIn(run, at.namespace));
-    const params: Params = { namespace: at.namespace, runId: at.name, ...(at.step === undefined ? {} : { step: at.step }) };
-    const named: Named = {
-      runId: at.name,
-      step: at.step ?? '',
-      name: '',
-      factory: '',
-      namespace: at.namespace,
-      method,
-      path: `${runPath({ namespace: at.namespace, runId: at.name })}${route.path.slice(RUN.length).replace(':step', at.step ?? '')}`,
-    };
-    const answer = await commandAnswered(command, route, named, params, async () => text ?? Promise.reject(new Error('no body')), s);
-    if ('status' in answer) throw actionRefused(answer);
-    return asJson(answer.hint === undefined ? answer.data : { ...answer.data, hint: answer.hint }) as A;
+const acted = <A>(at: At, work: (s: Served) => Promise<A>) =>
+  Effect.gen(function* () {
+    const s = yield* ServedNow;
+    return yield* Effect.tryPromise({
+      try: async () => {
+        const run = found(at.name);
+        await Effect.runPromise(runIn(run, at.namespace));
+        if (at.step !== undefined) {
+          const step = taskOfStep(at.name, at.step, s.home);
+          if ('error' in step) throw new Missing({ error: step.error });
+        }
+        try {
+          return await work(s);
+        } finally {
+          if (s.informer) dropInformed(s.informer, at.name);
+        }
+      },
+      catch: (err) => err,
+    }).pipe(
+      Effect.catch((err) => {
+        const refused = refusedAs(err);
+        if (refused) return Effect.fail(refused);
+        return err instanceof Error ? Effect.fail(new WriteFailed({ error: err.message })) : Effect.die(err);
+      }),
+    );
   });
 
-/** An action with a body: its text read off the request, then `acted`. */
-const withBody =
-  <A>(act: Action) =>
-  ({ params, request }: { readonly params: At; readonly request: HttpServerRequest.HttpServerRequest }) =>
-    Effect.flatMap(sentBy(request), (text) => acted<A>(act, params, request.method, text));
+/** `value` under `key`, or nothing where it is undefined: a key an answer may leave out is never sent present and undefined. */
+const given = <K extends string, V>(key: K, value: V | undefined): Partial<Record<K, V>> =>
+  value === undefined ? {} : ({ [key]: value } as Record<K, V>);
+
+/**
+ * `value` as JSON says it, a key the orchestrator left undefined dropped: the record and the listing are the orchestrator's own objects,
+ * said by `Schema.Unknown`, which the Api's JSON encoding refuses where a key holds `undefined` (a 500), as `JSON.stringify` never did.
+ */
+const asJson = <A>(value: A): A => JSON.parse(JSON.stringify(value)) as A;
+
+/**
+ * The selectors a listing is asked for, under either spelling, under the key `nemia ls`'s entry reads them (`selector`), or none where
+ * none was given.
+ */
+const selected = ({ labelSelector, selector }: { readonly labelSelector?: Listed; readonly selector?: Listed }) => {
+  const selectors = [...listOf(labelSelector), ...listOf(selector)];
+  return selectors.length ? { selector: selectors } : {};
+};
+
+/** A try removed (`nemia rm`, a try alone, its refusals thrown): what the engine forgot of it. */
+const removed = (at: At) =>
+  acted(at, async (s) => {
+    const { id, removed, engine } = await s.inRequest(RM.handler({ runId: at.name, onlyTry: true, refuses: true }, s.env, s.home));
+    return { id, removed, engine };
+  });
+
+/** The run brought onto its workflow's newest revision or merged with its base (`nemia refresh`): what it asked, its keys given. */
+const refreshed = (at: At, payload: RunRefresh) =>
+  acted(at, async (s) => {
+    const { drift, step, target, onto, sha, round, file } = await s.inRequest(
+      REFRESH.handler({ runId: at.name, ...payload }, s.env, s.home),
+    );
+    return {
+      ...given('drift', drift),
+      ...given('step', step),
+      ...given('target', target),
+      ...given('onto', onto),
+      ...given('sha', sha),
+      ...given('round', round),
+      ...given('file', file),
+    };
+  });
+
+/** The run pruned (`nemia prune`, asked once, its refusals thrown): what it let go and what it left. */
+const pruned = (at: At, payload: RunPrune) =>
+  acted(at, async (s) => {
+    const done = await s.inRequest(PRUNE.handler({ runId: at.name, ...payload, yes: true, refuses: true }, s.env, s.home));
+    const { id, lines, worktrees, artifacts, left } = done;
+    return { id, pruned: done.pruned, lines, worktrees, artifacts, left };
+  });
+
+/** Another try or round of the step `at.step` asked for (`nemia retry`): the file the ask is written to, and what it asked. */
+const retried = (at: At & { readonly step: string }, payload: RunRetry) =>
+  acted(at, async (s) => {
+    const asked = await s.inRequest(RETRY.handler({ runId: at.name, step: at.step, ...payload }, s.env, s.home));
+    return {
+      ...given('try', asked.try),
+      file: asked.file,
+      ...given('stopFirst', asked.stopFirst),
+      ...given('step', asked.step),
+      ...given('round', asked.round),
+      ...given('hint', asked.hint),
+    };
+  });
+
+/** The step `at.step` approved at its gate (`nemia approve`): the approval written. */
+const approved = (at: At & { readonly step: string }, payload: RunApprove) =>
+  acted(at, async (s) => {
+    const done = await s.inRequest(APPROVE.handler({ runId: at.name, step: at.step, ...payload }, s.env, s.home));
+    return { step: done.step, try: done.try, at: done.at, message: done.message, file: done.file };
+  });
+
+/** Words said to the step `at.step`'s session (`nemia say`): when, to which attempt, and what follows them. */
+const said = (at: At & { readonly step: string }, payload: RunSay) =>
+  acted(at, async (s) => {
+    const { at: when, attempt, text, after } = await s.inRequest(SAY.handler({ runId: at.name, step: at.step, ...payload }, s.env, s.home));
+    return { at: when, attempt, text, after };
+  });
 
 export const runsHandlers = HttpApiBuilder.group(Api, 'runs', (handlers) =>
   handlers
     .handle('listAll', ({ query }) => page(undefined, query))
     .handle('list', ({ params: { namespace }, query }) => page(namespace, query))
     .handle('get', ({ params: { namespace, name } }) => one(name, namespace))
-    .handleRaw('create', ({ params: { namespace }, request }) =>
-      Effect.flatMap(sentBy(request), (text) =>
-        actionAnswered(
-          orFailed(async (s) => {
-            const started = await runStart(s, namespace, text);
-            if ('status' in started) throw actionRefused(started);
-            return started;
-          }),
-        ),
-      ),
+    .handle('create', ({ params: { namespace }, payload }) =>
+      answeredIn(namespace, (s) => runStart(s, payload)).pipe(Effect.tap(({ id }) => locatedAt(id))),
     )
-    .handle('delete', ({ params, request }) => acted<RunRemoved>(ACTIONS.delete, params, request.method, undefined))
-    .handle('unhold', ({ params, request }) => acted<RunHeld>(ACTIONS.unhold, params, request.method, undefined))
-    .handleRaw('refresh', withBody<RunRefreshed>(ACTIONS.refresh))
-    .handleRaw('prune', withBody<RunPruned>(ACTIONS.prune))
-    .handleRaw('labels', withBody<Labelled>(ACTIONS.labels))
-    .handleRaw('hold', withBody<RunHeld>(ACTIONS.hold))
-    .handleRaw('retry', withBody<RunAsked>(ACTIONS.retry))
-    .handleRaw('approve', withBody<RunApproved>(ACTIONS.approve))
-    .handleRaw('say', withBody<RunSaid>(ACTIONS.say))
-    .handle('show', ({ params: { runId } }) => one(runId))
-    .handle('tries', ({ params }) => subResource(TRIES, params))
-    .handle('try', ({ params }) => subResource(TRY, params))
-    .handle('closeout', ({ params }) => subResource(CLOSEOUT, params))
-    .handle('told', ({ params }) => subResource(TOLD, params)),
+    .handle('delete', ({ params: { namespace, name } }) => removed({ namespace, name }))
+    .handle('refresh', ({ params: { namespace, name }, payload }) => refreshed({ namespace, name }, payload))
+    .handle('prune', ({ params: { namespace, name }, payload }) => pruned({ namespace, name }, payload))
+    .handle('labels', ({ params: { namespace, name }, payload }) =>
+      acted({ namespace, name }, (s) => s.inRequest(LABEL_RUN.handler({ runId: name, ...payload }, s.env, s.home))),
+    )
+    .handle('hold', ({ params: { namespace, name }, payload }) =>
+      acted({ namespace, name }, (s) => s.inRequest(HOLD.handler({ runId: name, ...payload, off: false }, s.env, s.home))),
+    )
+    .handle('unhold', ({ params: { namespace, name } }) =>
+      acted({ namespace, name }, (s) => s.inRequest(HOLD.handler({ runId: name, off: true }, s.env, s.home))),
+    )
+    .handle('retry', ({ params, payload }) => retried(params, payload))
+    .handle('approve', ({ params, payload }) => approved(params, payload))
+    .handle('say', ({ params, payload }) => said(params, payload))
+    .handle('show', ({ params: { name } }) => one(name))
+    .handle('lines', ({ params: { name } }) =>
+      answered(async ({ repo, home }) => {
+        const run = found(name);
+        return { ...runLines(run), workflowPage: workflowPageOf(run, repo, home) };
+      }),
+    )
+    .handle('concluded', ({ params: { name } }) => answered((s) => s.inRequest(CONCLUDED.handler({ runId: name }, s.env, s.home))))
+    .handle('record', ({ params: { name } }) =>
+      answered(async (s) => {
+        found(name);
+        return asJson(await s.inRequest(SHOW.handler({ runId: name, raw: true }, s.env, s.home)));
+      }),
+    )
+    .handle('listing', ({ query }) =>
+      answered(async (s) => asJson(await s.inRequest(informed(s, LS.handler(selected(query), s.env, s.home))))),
+    )
+    .handle('listingOne', ({ params: { name }, query }) =>
+      answered(async (s) => asJson(await s.inRequest(informed(s, LS.handler({ runId: name, ...selected(query) }, s.env, s.home))))),
+    )
+    .handle('decision', ({ params: { runId }, query }) => decisionHandler(runId, query.sensitive)),
 );

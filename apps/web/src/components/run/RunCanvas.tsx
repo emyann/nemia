@@ -17,19 +17,22 @@ import {
   type NodeDimensionChange,
   type NodePositionChange,
 } from '@xyflow/react';
-import type { RunView } from '../../lib/runView';
+import type { RunDetail } from '../../lib/runView';
 import { besideOpen, drawnWhole, forgetLayout, LEAST_ZOOM, place, readLayout, saveLayout } from '../../lib/canvas';
 import { layout, stepsOf, type Point } from '../../lib/layout';
 import { useContent } from '../../lib/useContent';
 import { stepState } from '../../lib/status';
 import { useBarOver } from '../../lib/useBarOver';
 import { useCanvasPress } from '../../lib/useCanvasPress';
+import { useFrameSize } from '../../lib/useFrameSize';
+import { FLOOR_BOX } from '../../lib/classes';
+import { cn } from '../../lib/utils';
 import { CanvasLegend } from '../step/CanvasLegend';
 import { StateEdge } from '../step/StateEdge';
 import { stepData, stepEdges, stepMinimapFill } from '../step/stepGraph';
 import { StepNode, type StepFlowNode } from '../step/StepNode';
 
-type Props = { run: RunView };
+type Props = { run: RunDetail };
 
 /** The canvas's node types for React Flow, one object for the module's life. */
 const nodeTypes = { step: StepNode };
@@ -82,18 +85,13 @@ function fitBeside(frame: HTMLElement | null, flow: Flow, open: string | null) {
  * changes, as the bar opens, switches or closes, the whole run or that step. A canvas drawn with no step open keeps React Flow's own fit.
  */
 function useRefit(frame: RefObject<HTMLDivElement | null>, { open, resets }: { open: string | null; resets: number }, flow: Flow) {
+  const { width } = useFrameSize(frame, true);
+  const wide = useRef(0);
   useEffect(() => {
-    const el = frame.current;
-    if (!el) return;
-    let width = el.clientWidth;
-    const observer = new ResizeObserver(() => {
-      if (el.clientWidth === width) return;
-      width = el.clientWidth;
-      void flow.fitView({ ...(fitBeside(el, flow, null) ?? FIT), duration: 200 });
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [frame, flow]);
+    if (wide.current !== 0 && width !== wide.current)
+      void flow.fitView({ ...(fitBeside(frame.current, flow, null) ?? FIT), duration: 200 });
+    wide.current = width;
+  }, [width, frame, flow]);
 
   const was = useRef<string | null>(null);
   useEffect(() => {
@@ -166,7 +164,7 @@ const placing = (change: NodeChange<StepFlowNode>): change is NodePositionChange
  * What a press on the canvas of `run` does (`useCanvasPress`): a node shows its step in the frame's bar, or closes it, and a double click
  * opens the step's session. With the step the bar shows (`selected`), none when it shows anything else.
  */
-function usePress(run: RunView) {
+function usePress(run: RunDetail) {
   const navigate = useNavigate();
   const { shown, ...press } = useCanvasPress(
     (step) => ({ kind: 'step', run: run.id, step }),
@@ -273,7 +271,7 @@ function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point
   useRefit(frame, { open: selected, resets }, flow);
 
   return (
-    <div ref={frame} className="h-[30rem] overflow-hidden rounded border border-outline-variant">
+    <div ref={frame} className={cn(FLOOR_BOX, 'h-[30rem]')}>
       <ReactFlow
         nodes={nodes}
         edges={edges}

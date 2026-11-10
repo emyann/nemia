@@ -16,7 +16,7 @@ import { settingsObject, type ClaudeFlags } from './vocabulary.ts';
 const AE = [process.execPath, path.join(import.meta.dirname, '..', '..', '..', 'bin', 'ae.ts')];
 
 /** How long admission's command may take, in milliseconds, before the adapter answers `ask` for it. */
-export const ADMISSION_BOUND_MS = 20_000;
+const ADMISSION_BOUND_MS = 20_000;
 
 /** How long Claude Code waits on the hook, in seconds: past the adapter's own bound, so the adapter always answers first. */
 const HOOK_SECONDS = 30;
@@ -25,8 +25,7 @@ const HOOK_SECONDS = 30;
 const quoted = (word: string): string => `'${word.replaceAll("'", `'\\''`)}'`;
 
 /** The hook's command line: the adapter, then admission's command after `--`, every word quoted. */
-export const admissionHookCommand = (admission: Admission): string =>
-  [...AE, 'admission', '--', ...admission.command].map(quoted).join(' ');
+const admissionHookCommand = (admission: Admission): string => [...AE, 'admission', '--', ...admission.command].map(quoted).join(' ');
 
 /**
  * A task's Claude Code flags with its admission merged into `settings`: a `PreToolUse` hook matched to admission's tools alone, after
@@ -48,7 +47,10 @@ export const admittedFlags = (config: SpawnRequest['config']): ClaudeFlags | und
   };
 };
 
-/** What a run of admission's command gave: its exit status, what it printed, and whether it ran past its bound or did not start. */
+/**
+ * What a run of admission's command gave: its exit status, what it printed, and whether it ran past its bound or did not start.
+ * Exported only for the tests that import it.
+ */
 export type AdmissionRun = { status: number | null; stdout: string; failed: boolean };
 
 /** Runs admission's command with the call on its stdin, bounded (`ADMISSION_BOUND_MS`). */

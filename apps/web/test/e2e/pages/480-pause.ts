@@ -1,8 +1,9 @@
+import type * as RunObject from 'objects';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import type { Paused } from '../../../src/lib/api/pause.ts';
-import type { RunObject } from '../../../src/lib/api.ts';
+
 import { finishingSentence } from '../../../src/lib/pause.ts';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
@@ -168,7 +169,7 @@ export default {
           .locator('[data-pause-line]')
           .getByText(
             new RegExp(
-              `^Pausing: ${sessions} sessions? finishing a tool call, cut in (?:9|10) min — paused since .+ by ${put.by}: ${WHY}\\. Nothing new starts, and each working session stops when its current tool call ends`,
+              `^Pausing: ${sessions} sessions? finishing a tool call, cut in (?:8|9|10)m — paused since .+ by ${put.by}: ${WHY}\\. Nothing new starts, and each working session stops when its current tool call ends`,
             ),
           ),
         'its popover says how many sessions finish a tool call, when they are cut, since when, by whom and why',

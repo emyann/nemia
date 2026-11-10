@@ -1,5 +1,6 @@
 import { Link, linkOptions } from '@tanstack/react-router';
-import { workflowNameOf, type WorkflowPageAddress } from '../../lib/api';
+import { workflowNameOf } from '../../lib/api/workflows.ts';
+import { type WorkflowPageAddress } from '../../lib/api/address.ts';
 import { placeOfAddress } from '../../lib/factories';
 
 const LABEL = 'text-body-small text-muted-foreground hover:text-foreground';

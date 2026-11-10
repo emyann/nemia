@@ -18,6 +18,7 @@ import { story } from 'test-kit/checkpoints';
 
 const spec: HarnessSpec = {
   name: 'sh',
+  can: [],
   command: () => ({ cmd: 'sh', args: ['-c', 'true'] }),
   readOutput: claudeStreamOutput,
   keepOutput: claudeStreamKept,

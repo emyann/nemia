@@ -1,5 +1,5 @@
 /**
- * The debt the two rules of `test-rules.test.ts` open, counted per file, each list only shrinking.
+ * The debt the pinned-words rule of `test-rules.test.ts` opens, counted per file, the list only shrinking.
  *
  * `PINNED_WORDS`: every line of a test whose assertion over what the code said — a refusal's `message`, a process's `stderr`, the
  * reason a verb gives — expects a whole sentence, a string or a pattern of 60 characters or more. Root `CLAUDE.md`, *Rules the code
@@ -15,22 +15,20 @@
  * page's heading, a rendered line or a brief the test wrote itself is not counted for holding the word "refused" inside the
  * sentence it expects.
  *
- * `WAITED_OUT`: every line that floors a measured duration at a bound in milliseconds the shipped code owns, which no pass can run
- * in less than. It is empty, and the rule is what keeps it so: the sites the card named are each shortened at the seam the code
- * gives for them — `remoteOps`'s `requestMs`, `withFeedLock`'s bound, `ClaudeOptions.sayTimeoutMs` — and about 26 s came off every
- * pass of the runtime's suite with them. A later card that adds a bound adds a seam, never a line here.
+ * A floor at a bound the shipped code owns has no list here: none is left, so `test-rules.test.ts` refuses every one. A test that
+ * needs a bound shorter adds a seam to the code — as `remoteOps`'s `requestMs`, `withFeedLock`'s bound and `ClaudeOptions.sayTimeoutMs`
+ * are — never a line here.
  *
- * Both only shrink: an assertion unpinned takes its line away, a count cut is lowered here, and a file neither list names holds none
+ * The list only shrinks: an assertion unpinned takes its line away, a count cut is lowered here, and a file it does not name holds none
  * at all. The sweep refuses a new file by name, a count that has grown — a new assertion, or a number lowered while the lines are
  * still there — and a count that names more than are there, so a cut is the diff of both files and never of the number alone.
  */
 
 /** Each test file by its path from the repository root, and the lines of it that expect a whole sentence of what the code said. */
 export const PINNED_WORDS: Readonly<Record<string, number>> = {
-  'apps/api/src/agents/skills.test.ts': 3,
   'apps/api/src/asks/gate.test.ts': 2,
   'apps/api/src/capabilities/capabilities.test.ts': 15,
-  'apps/api/src/decide/decision.test.ts': 3,
+  'apps/api/src/decide/decision.test.ts': 1,
   'apps/api/src/decide/to-decide.test.ts': 1,
   'apps/api/src/factory/factories.test.ts': 1,
   'apps/api/src/gauges/feed.test.ts': 1,
@@ -38,6 +36,7 @@ export const PINNED_WORDS: Readonly<Record<string, number>> = {
   'apps/api/src/inbox/inbox.test.ts': 2,
   'apps/api/src/inbox/queue.test.ts': 1,
   'apps/api/src/runs/prune.test.ts': 2,
+  'apps/api/src/skills/skills.test.ts': 3,
   'apps/api/src/stats/stats.test.ts': 2,
   'apps/api/src/step/step.test.ts': 1,
   'apps/api/src/steps/path.test.ts': 1,
@@ -50,7 +49,7 @@ export const PINNED_WORDS: Readonly<Record<string, number>> = {
   'apps/api/test/nemia-chat.test.ts': 1,
   'apps/api/test/nemia.test.ts': 1,
   'apps/api/test/remote.test.ts': 2,
-  'apps/api/test/subscriptions.test.ts': 7,
+  'apps/api/test/subscriptions.test.ts': 4,
   'apps/api/test/waits.test.ts': 1,
   'apps/docs/test/waits.test.ts': 1,
   'apps/web/test/api.test.ts': 5,
@@ -67,7 +66,7 @@ export const PINNED_WORDS: Readonly<Record<string, number>> = {
   'apps/web/test/e2e-pages.test.ts': 15,
   'apps/web/test/e2e-print.test.ts': 1,
   'apps/web/test/e2e-runs-times.test.ts': 1,
-  'apps/web/test/e2e-timing.test.ts': 3,
+  'apps/web/test/e2e-timing.test.ts': 1,
   'apps/web/test/e2e/checks.test.ts': 15,
   'apps/web/test/e2e/visit.test.ts': 4,
   'apps/web/test/factory.test.ts': 9,
@@ -113,6 +112,3 @@ export const PINNED_WORDS: Readonly<Record<string, number>> = {
   'packages/agent-runtime/test/verb-refusals.test.ts': 4,
   'packages/agent-runtime/test/waits.test.ts': 3,
 };
-
-/** Each test file by its path from the repository root, and the lines of it that floor a duration at a bound the shipped code owns. */
-export const WAITED_OUT: Readonly<Record<string, number>> = {};

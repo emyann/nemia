@@ -3,7 +3,7 @@
  * each step's beside its controls (`stepCommands`), and where it came from (`fromNote`) — all of it `runLines`, read once for a run off
  * its record: constant for the run, judging nothing and reading no task.
  */
-import { commandLine } from '../command/command.ts';
+import { commandLine, type CommandSpec } from '../command/command.ts';
 import { COMMANDS } from '../command/commands.verb.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { fromNote } from '../start/index.ts';
@@ -19,11 +19,20 @@ function named(name: string): Command {
   return command;
 }
 
-const DECIDE = named('decide');
 const APPROVE = named('approve');
 const RETRY = named('retry');
 const SAY = named('say');
 const REFRESH = named('refresh');
+
+/** `nemia decide`, the CLI's own verb (`CLI_VERBS`), as its line takes the run: its read model is `decisionRead`, no entry of the table. */
+const DECIDE: Pick<CommandSpec, 'name' | 'spec'> = {
+  name: 'decide',
+  spec: {
+    positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],
+    flags: [],
+    unknown: (arg) => `nemia decide does not take ${arg}.`,
+  },
+};
 
 /** The line that prints what there is to decide on a run: `nemia decide <run>`. */
 export const decideLine = (runId: string): string => commandLine(DECIDE, { runId });

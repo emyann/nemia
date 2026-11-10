@@ -13,14 +13,24 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Run } from '../record/record.ts';
 import { runsDir } from '../record/record.store.ts';
-import { workflowFilesRoot } from '../record/places.store.ts';
+import { carriedFilesRoot, workflowFilesRoot } from '../record/places.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
+import { CARRIED_FOLDER } from '../step/step.ts';
 
 /**
  * The run's own copies of its workflow folder, `runs/<id>/workflow`, and with `hex` the one copy under that digest (`Run.workflowFiles`):
  * what a check and a session are told as `WF_WORKFLOW_FILES`. Beside the run's record, and removed with it (`nemia rm`).
  */
 export const workflowFilesDir = (run: Pick<Run, 'id'>, hex?: string): string => workflowFilesRoot(runsDir(), run.id, hex);
+
+/**
+ * The run's own copies of the carried folder, `runs/<id>/carried`, and with `hex` the one copy under that digest (`Run.carriedFiles`):
+ * what a check and a session are told as `WF_CARRIED_FILES`. Beside the run's record, and removed with it (`nemia rm`).
+ */
+export const carriedFilesDir = (run: Pick<Run, 'id'>, hex?: string): string => carriedFilesRoot(runsDir(), run.id, hex);
+
+/** The carried folder of the workflow at `workflowDir`: `carried/` beside it, the files the workflows of its folder share. */
+export const carriedDirOf = (workflowDir: string): string => path.join(path.dirname(path.resolve(workflowDir)), CARRIED_FOLDER);
 
 /** A file of a workflow folder: its path from the folder with `/` between parts, its permission bits, its bytes. */
 export type WorkflowFile = { path: string; mode: number; bytes: Uint8Array };
@@ -42,7 +52,7 @@ export function workflowFilesOf(dir: string): WorkflowFile[] {
       else
         throw new Invalid({
           message:
-            `${full}: ${st.isSymbolicLink() ? 'a symbolic link' : 'neither a file nor a folder'} in the workflow folder ${dir}, which a run ` +
+            `${full}: ${st.isSymbolicLink() ? 'a symbolic link' : 'neither a file nor a folder'} in ${dir}, a folder a run ` +
             `copies whole for its checks and sessions to read. ${st.isSymbolicLink() ? 'Copy what it points at here in its place' : 'Remove it'}, then start the run again.`,
         });
     }
@@ -70,12 +80,35 @@ export function workflowFilesDigest(files: readonly WorkflowFile[]): string {
  * Written into a sibling folder and renamed into place, each file with its write bits cleared; the sibling is removed where a write fails,
  * and the error thrown.
  */
-export function freezeWorkflowFiles(run: Pick<Run, 'id'>, dir: string): string {
-  const files = workflowFilesOf(dir);
+export const freezeWorkflowFiles = (run: Pick<Run, 'id'>, dir: string): string => freezeInto(workflowFilesOf(dir), run, 'workflow');
+
+/**
+ * Copies the carried folder beside the workflow at `workflowDir` (`carriedDirOf`) into the run's own `carried/<hex>/`
+ * (`carriedFilesDir`), as `freezeWorkflowFiles` copies the workflow's, and answers the hex; undefined where no such folder is there.
+ */
+export function freezeCarriedFiles(run: Pick<Run, 'id'>, workflowDir: string): string | undefined {
+  const files = carriedFilesOf(workflowDir);
+  return files === undefined ? undefined : freezeInto(files, run, 'carried');
+}
+
+/**
+ * Every file of the carried folder beside the workflow at `workflowDir`, read and refused as `workflowFilesOf` reads and refuses them;
+ * undefined where no such folder is there.
+ */
+export const carriedFilesOf = (workflowDir: string): WorkflowFile[] | undefined => {
+  const dir = carriedDirOf(workflowDir);
+  return fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory() ? workflowFilesOf(dir) : undefined;
+};
+
+/**
+ * Copies `files`, a folder as read, into the run's copies of its workflow folder or of its carried files (`which`), under its digest, as
+ * `freezeWorkflowFiles` says; answers the hex.
+ */
+function freezeInto(files: readonly WorkflowFile[], run: Pick<Run, 'id'>, which: 'workflow' | 'carried'): string {
   const hex = workflowFilesDigest(files);
-  const target = workflowFilesDir(run, hex);
+  const parent = which === 'workflow' ? workflowFilesDir(run) : carriedFilesDir(run);
+  const target = path.join(parent, hex);
   if (fs.existsSync(target)) return hex;
-  const parent = workflowFilesDir(run);
   fs.mkdirSync(parent, { recursive: true });
   const temp = fs.mkdtempSync(path.join(parent, `.${hex.slice(0, 12)}-`));
   try {

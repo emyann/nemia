@@ -5,11 +5,11 @@ import { Dialog, DialogTrigger, Form, Heading, Popover, TextField } from 'react-
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { POPOVER } from '../inbox/CardGate';
-import { pauseNowQuery, pauseQuery, putPause, resumePause } from '@/lib/api';
+import { pauseNowQuery, pauseQuery, putPause, resumePause } from '@/lib/api/pause';
 import { interruptSentence, PAUSE_PARKS, type PauseState, type PauseWords, pauseWords } from '@/lib/pause';
 import { cn } from '@/lib/utils';
 import { useNow } from '@/lib/useNow';
+import { POPOVER } from '../../lib/classes';
 
 /** The popover's heading: the pause's state. */
 const HEADINGS: Record<PauseState, string> = {

@@ -5,15 +5,18 @@
  */
 import { Effect } from 'effect';
 import { API_VERSION, PROPOSABLE_KINDS, RESOURCE_PLURALS, type Delegation, type DelegationWrite } from 'objects';
-import { Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
-import { Forbidden, type ProposalCaller } from '../caller/index.ts';
+import { Forbidden, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
+import type { ProposalCaller } from '../caller/index.ts';
 import { DelegationDoor, type DelegationRecord } from './delegation.store.ts';
+
+/** A delegation's `resourceVersion`: a position, not a digest — when it was last written, which a write moves on. */
+const writtenPosition = (record: DelegationRecord): string => record.since;
 
 /** A delegation as the object served: its agent's name in its factory's namespace, its grants, and when it was written. */
 export const delegationObject = (record: DelegationRecord): Delegation => ({
   apiVersion: API_VERSION,
   kind: 'Delegation',
-  metadata: { name: record.agent, namespace: record.factory, creationTimestamp: record.since, resourceVersion: record.since },
+  metadata: { name: record.agent, namespace: record.factory, creationTimestamp: record.since, resourceVersion: writtenPosition(record) },
   spec: record.spec,
 });
 
@@ -57,7 +60,7 @@ export const delegationPut = Effect.fn('delegationPut')(function* (
   factory: string,
   agent: string,
   spec: DelegationWrite,
-): Effect.fn.Return<Delegation, Refusal | Forbidden> {
+): Effect.fn.Return<Delegation, Refusal> {
   if (caller.kind !== 'person') return yield* Effect.fail(personOnly(factory, agent));
   const unknown = undelegable(spec);
   if (unknown.length > 0)
@@ -75,7 +78,7 @@ export const delegationRemove = Effect.fn('delegationRemove')(function* (
   caller: ProposalCaller,
   factory: string,
   agent: string,
-): Effect.fn.Return<boolean, Refusal | Forbidden> {
+): Effect.fn.Return<boolean, Refusal> {
   if (caller.kind !== 'person') return yield* Effect.fail(personOnly(factory, agent));
   return yield* (yield* DelegationDoor).delegations.remove(factory, agent);
 });

@@ -14,7 +14,9 @@
  * (`lib/conversation.ts`), as `chatItems` is hers: a file of its own, since the two together pass the 500 lines a file is
  * held to.
  */
-import type { Said, StepTry, TranscriptEvent } from './api';
+import type { Said } from './api/asks.ts';
+import type { StepTry } from './api/tries.ts';
+import type { TranscriptEvent } from './api/steps.ts';
 import type { StepView } from './runView';
 
 /**
@@ -40,17 +42,17 @@ export type ToolCall = {
   result: { text: string; isError: boolean } | null;
 };
 
-export type SaidTurn = { kind: 'said'; key: string; at: string; role: 'user' | 'assistant'; text: string };
+type SaidTurn = { kind: 'said'; key: string; at: string; role: 'user' | 'assistant'; text: string };
 /** `text` is null when the harness kept none: Claude Code often writes a thought with its text empty. */
 export type ThinkingTurn = { kind: 'thinking'; key: string; at: string; text: string | null };
-export type ToolTurn = { kind: 'tool'; key: string; call: ToolCall };
+type ToolTurn = { kind: 'tool'; key: string; call: ToolCall };
 export type SystemTurn = { kind: 'system'; key: string; at: string; text: string };
-export type CloseoutTurn = { kind: 'closeout'; key: string; call: ToolCall };
+type CloseoutTurn = { kind: 'closeout'; key: string; call: ToolCall };
 /**
  * Words a person said to the session (the CLI's `say`, or the session page's composer), off the engine's journal of the step's task: "you
  * said" — and when the session's transcript shows them reaching it (`heardIn`).
  */
-export type ToldTurn = { kind: 'told'; key: string; at: string; attempt: number; text: string; arrived: string | null };
+type ToldTurn = { kind: 'told'; key: string; at: string; attempt: number; text: string; arrived: string | null };
 /** What a fold holds, in order: its calls, and the thoughts and system lines between them. */
 export type FoldedTurn = ToolTurn | ThinkingTurn | SystemTurn;
 /** Two or more calls with nothing said between them. `failed` counts results that are errors; `waiting`, calls with no result yet. */
@@ -181,7 +183,7 @@ const timeOf = (turn: Turn): number => {
 };
 
 /** What was said to a session (`Said`), with when the session's own transcript shows its words reaching it — null until it does. */
-export type Heard = Said & { arrived: string | null };
+type Heard = Said & { arrived: string | null };
 
 /**
  * Whether a transcript event is the session's own record of `said` reaching it: a system line whose text is the words, as a working session
@@ -200,7 +202,7 @@ const arrivalOf = (event: TranscriptEvent, said: Said): boolean => {
  * before the words were handed over), the first when it has none, and none — the length of `events` — while the mark is not among them.
  */
 const firstAfter = (events: readonly TranscriptEvent[], said: Said): number => {
-  if (said.after === null) return 0;
+  if (!said.after) return 0;
   const { kind, id } = said.after;
   const mark = events.findIndex((event) => event.kind === kind && event.id === id);
   return mark === -1 ? events.length : mark + 1;
@@ -302,7 +304,7 @@ export function detailOf(call: ToolCall): string | null {
 }
 
 /** The longest summary a reader shows, an ellipsis included: the api's rule, said again here since the board imports no package. */
-export const SUMMARY_MAX = 120;
+const SUMMARY_MAX = 120;
 
 /**
  * A summary's one line as the board draws it, as text: a markdown heading's marks dropped, since a closeout given before v1 opens its
@@ -348,7 +350,7 @@ export function summaryLine(text: string): string {
  * (`summaryLine`), its body the markdown beneath, led by the whole summary where the cut changed it; its files by path and its values by
  * name. One given before the envelope was versioned has no body of its own.
  */
-export type Closeout = {
+type Closeout = {
   outcome: string;
   summary: string;
   body: string | null;

@@ -11,12 +11,12 @@ import './tsx.ts';
 
 const { createElement } = await import('react');
 const { renderToStaticMarkup } = await import('react-dom/server');
-type RunView = import('../src/lib/runView.ts').RunView;
-type StepAttempts = import('../src/lib/api.ts').StepAttempts;
-type StepUsed = import('../src/lib/api.ts').StepUsed;
-type StepTry = import('../src/lib/api.ts').StepTry;
-type StepCloseout = import('../src/lib/api.ts').StepCloseout;
-type Question = import('../src/lib/api.ts').Question;
+type RunDetail = import('../src/lib/runView.ts').RunDetail;
+type StepAttempts = import('../src/lib/api/tries.ts').StepAttempts;
+type StepUsed = import('../src/lib/api/usage.ts').StepUsed;
+type StepTry = import('../src/lib/api/tries.ts').StepTry;
+type StepCloseout = import('../src/lib/api/tries.ts').StepCloseout;
+type Question = import('../src/lib/api/tries.ts').Question;
 const Answering = await import('../src/components/gate/Decide.tsx');
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
 type Answer = import('../src/lib/asks.ts').Answer;
@@ -37,9 +37,10 @@ export const UNMEASURED: StepUsed = {
 };
 
 /** A run of one looping step out of rounds, as GET /api/runs/:id gives it, with `note` on its step. */
-export function runWith(note: string | null): RunView {
+export function runWith(note: string | null): RunDetail {
   return {
     id: 'r-1',
+    factory: null,
     labels: {},
     kinds: [],
     refresh: 'nemia refresh r-1',
@@ -160,13 +161,23 @@ export function runWith(note: string | null): RunView {
 export function runOf(
   status: Word,
   { note = null, waitingOnYou, cancelledAt = null }: { note?: string | null; waitingOnYou: string[]; cancelledAt?: string | null },
-): RunView {
+): RunDetail {
   const run = runWith(note);
   return { ...run, cancelledAt, waitingOnYou, waitingOnYouWords: waitingOnYou, steps: [{ ...run.steps[0], ...coded(status) }] };
 }
 
 export const unescaped = (text: string) =>
   text.replaceAll('&amp;', '&').replaceAll('&quot;', '"').replaceAll('&#x27;', "'").replaceAll('&lt;', '<').replaceAll('&gt;', '>');
+
+/**
+ * The class tokens of the first tag in `html` that carries `mark` (a data mark as the markup writes it, `data-unread="dev"`), and none
+ * where no tag does: a test reads one class that carries a meaning as a token, never the whole string of classes beside it.
+ */
+export const classesAt = (html: string, mark: string): string[] =>
+  new RegExp(`<[^>]*${mark}[^>]*>`)
+    .exec(html)?.[0]
+    .match(/\bclass="([^"]*)"/)?.[1]
+    .split(/\s+/) ?? [];
 
 /** A markup's text, tags taken for separators: each run of text between two tags, trimmed, and none of the empty ones. */
 export const textsOf = (html: string): string[] =>
@@ -299,9 +310,9 @@ export const WAIT = { words: 'waiting for a permission prompt', advice: 'answer 
 /** The run of one step, `review`, in `status`, with what the api says it needs and who it says is waited on. */
 export function needing(
   status: Word,
-  needs: Partial<Pick<RunView['steps'][number], 'needs' | 'waitingFor' | 'lastLine' | 'denied'>>,
+  needs: Partial<Pick<RunDetail['steps'][number], 'needs' | 'waitingFor' | 'lastLine' | 'denied'>>,
   over: { waitingOnYou: string[]; cancelledAt?: string | null },
-): RunView {
+): RunDetail {
   const run = runOf(status, over);
   return {
     ...run,
@@ -337,7 +348,7 @@ export const offersMarkup = (offers: Answer[], asked: Array<{ step: string; try:
   );
 
 /** The run of one step, `review`, waiting at its gate on you — as the api gives it: its word, the need, and its gate. */
-export const atGate = (over: Partial<RunView['steps'][number]> = {}, run: Partial<RunView> = {}): RunView => {
+export const atGate = (over: Partial<RunDetail['steps'][number]> = {}, run: Partial<RunDetail> = {}): RunDetail => {
   const base = runOf('awaiting approval', { waitingOnYou: ['review'] });
   return {
     ...base,
@@ -382,7 +393,7 @@ export const toShip = {
  * unfiled and `awaiting approval`, and the run carries what there is to decide. Ship's `spec`, off the workflow the run froze, is what the
  * board tells an ending's gate from another gate by.
  */
-export function endingRun(over: Partial<RunView> = {}): RunView {
+export function endingRun(over: Partial<RunDetail> = {}): RunDetail {
   const run = runWith(null);
   const base = run.steps[0];
   const implement = {
@@ -495,7 +506,10 @@ export async function pagedWith(
 }
 
 /** A factory as the api lists it, for the switcher: on one repository, offering one workflow; `extra` puts keys over it. */
-export const filed = (name: string, extra: Partial<import('../src/lib/api.ts').Factory> = {}): import('../src/lib/api.ts').Factory => ({
+export const filed = (
+  name: string,
+  extra: Partial<import('../src/lib/api/factories.ts').Factory> = {},
+): import('../src/lib/api/factories.ts').Factory => ({
   name,
   default: false,
   repos: ['/code/nemia'],

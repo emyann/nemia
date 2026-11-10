@@ -4,7 +4,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { GivenSkill, SkillDetail, SkillPlace, SkillRow } from '../src/lib/api.ts';
+import type { GivenSkill } from '../src/lib/api/library.ts';
+import type { SkillDetail, SkillPlace, SkillRow } from '../src/lib/api/skills.ts';
 import {
   costWords,
   draftOfForm,

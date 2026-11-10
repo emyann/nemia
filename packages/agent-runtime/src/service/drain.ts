@@ -4,8 +4,11 @@
  */
 import { Effect, Layer, Schema } from 'effect';
 import { SessionsDrained } from '../core/engine/index.ts';
-import { sessionDrainFile, sessionDrainOf } from '../harness/claude/index.ts';
-import { admissionOf, type EngineOptions, type HarnessConfig } from './options.ts';
+import { sessionDrainFile, sessionDrainOf } from '../core/engine/drain.ts';
+import { own } from '../core/index.ts';
+import { declares } from '../harness/declaration.ts';
+import { admissionOf, declarationOf, type EngineOptions, type HarnessConfig } from './options.ts';
+import { fallbackOf } from './verb-harness.ts';
 
 /** A drain this engine will not put, and why: a holder that is no process id. Nothing was written. */
 export class DrainRefused extends Schema.TaggedError<DrainRefused>()('DrainRefused', {
@@ -44,11 +47,30 @@ export const drainSessionsChecked = (args: readonly unknown[]): Effect.Effect<vo
 };
 
 /**
+ * Whether the sessions' drain, read standing (`stands`), holds a task of the harness `harness` of `harnesses` (`undefined`: the
+ * default, `fallback`): it stands, and the harness declares `drain`. A harness that does not — a Codex task, a command's, a remote
+ * agent's — is never held by it, its deadline counted on; a runner of the consumer's, which declares nothing, is held, as every
+ * harness was before harnesses declared, since the runtime cannot tell its parked end from another.
+ * Exported only for the tests that import it.
+ */
+export const drainHolds =
+  (stands: boolean, harnesses: Record<string, HarnessConfig>, fallback: string) =>
+  (harness: string | undefined): boolean => {
+    const config = own(harnesses, harness ?? fallback);
+    if (!stands || config === undefined) return false;
+    const can = declarationOf(config)?.can;
+    return can === undefined || declares(can, 'drain');
+  };
+
+/**
  * What each pass of an engine over `options` reads beside its store and its harnesses: what it admits under (`admissionOf`), and
- * whether the store's sessions' drain stands, read off its file once per pass (`SessionsDrained`, `Now.drained`).
+ * whether the store's sessions' drain stands, read off its file once per pass, then asked per task by its harness (`drainHolds`,
+ * `SessionsDrained`, `Now.drained`).
  */
 export const passReadsOf = (options: EngineOptions, harnesses: Record<string, HarnessConfig>) =>
   Layer.merge(
     admissionOf(options, harnesses),
-    Layer.succeed(SessionsDrained)(() => sessionDrainOf(sessionDrainFile(options.root)) !== null),
+    Layer.succeed(SessionsDrained)(() =>
+      drainHolds(sessionDrainOf(sessionDrainFile(options.root)) !== null, harnesses, fallbackOf(harnesses, options.defaultHarness)),
+    ),
   );

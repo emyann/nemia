@@ -13,7 +13,7 @@ import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { runLines } from 'agent-orchestrator';
-import type { RunLinesAnswer } from './runs.ts';
+import type { RunLines as RunLinesAnswer } from 'objects';
 import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
 import { listedOf } from '../../test/run-reads.ts';
 

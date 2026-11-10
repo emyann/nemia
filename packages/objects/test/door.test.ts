@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as objects from 'objects';
-import { API_VERSION, Api, KINDS } from 'objects';
+import { API_VERSION, Api, KINDS, RESOURCE_PLURALS } from 'objects';
 
 /** Each endpoint of the Api, by its method and its path. */
 const endpoints = Object.values(Api.groups).flatMap((group) =>
@@ -15,40 +15,33 @@ const endpoints = Object.values(Api.groups).flatMap((group) =>
 /** The object Schema `name` exports, as a struct of fields. */
 const schemaOf = (name: string) => (objects as unknown as Record<string, { fields?: Record<string, { literal?: unknown }> }>)[name];
 
-/** The literal the `kind` key of a struct's AST says, read off the AST since an annotated struct keeps no `fields`. */
-type StructAst = { propertySignatures?: ReadonlyArray<{ name: PropertyKey; type: { literal?: unknown } }> };
-const kindOf = (schema: { ast: unknown }): unknown =>
-  (schema.ast as StructAst).propertySignatures?.find((p) => p.name === 'kind')?.type.literal;
+/**
+ * The literals the `kind` key of a struct's AST says, read off the AST since an annotated struct keeps no `fields`: one for a struct, one
+ * for each member of a union — a list's `<Kind>List`, or its `Table` where one is asked.
+ */
+type StructAst = {
+  propertySignatures?: ReadonlyArray<{ name: PropertyKey; type: { literal?: unknown } }>;
+  types?: readonly StructAst[];
+};
+const kindsOf = (ast: StructAst): unknown[] =>
+  ast.types ? ast.types.flatMap(kindsOf) : [ast.propertySignatures?.find((p) => p.name === 'kind')?.type.literal];
 
 /** Each endpoint of the Api, by its method, its path and the kinds its answers say. */
 const answers = Object.values(Api.groups).flatMap((group) =>
   Object.values(group.endpoints).map((endpoint) => ({
     method: endpoint.method,
     path: endpoint.path,
-    kinds: [...endpoint.success].map(kindOf),
+    kinds: [...endpoint.success].flatMap((schema) => kindsOf(schema.ast as StructAst)),
   })),
 );
 
 /**
- * The path a kind's objects are got at: the Factory, the Template and the Subscription, which no namespace holds, by
- * their names, the Event by its name in any namespace, and every other kind by its namespace and name.
+ * Whether `path` gets one object of `kind`: its plural (`RESOURCE_PLURALS`, read off the group that serves it), then a name, under
+ * `/api/` or under a namespace — the Factory, the Template and the Subscription, which no namespace holds, by their names alone.
  */
-const GET_PATHS: Record<(typeof KINDS)[number], string> = {
-  Run: '/api/namespaces/:namespace/runs/:name',
-  Card: '/api/namespaces/:namespace/cards/:name',
-  Factory: '/api/factories/:name',
-  McpServer: '/api/namespaces/:namespace/mcpservers/:name',
-  Schedule: '/api/namespaces/:namespace/schedules/:name',
-  Hire: '/api/namespaces/:namespace/hires/:name',
-  Volume: '/api/namespaces/:namespace/volumes/:name',
-  Workflow: '/api/namespaces/:namespace/workflows/:name',
-  Agent: '/api/namespaces/:namespace/agents/:name',
-  Skill: '/api/namespaces/:namespace/skills/:name',
-  Template: '/api/templates/:name',
-  Subscription: '/api/subscriptions/:name',
-  Event: '/api/events/:name',
-  Proposal: '/api/namespaces/:namespace/proposals/:name',
-  Delegation: '/api/namespaces/:namespace/delegations/:name',
+const getsOne = (kind: (typeof KINDS)[number], path: string): boolean => {
+  const plural = RESOURCE_PLURALS[kind];
+  return new RegExp(`^/api/(namespaces/:namespace/)?${plural}/:[A-Za-z]+$`).test(path);
 };
 
 for (const kind of KINDS) {
@@ -56,7 +49,7 @@ for (const kind of KINDS) {
     const fields = schemaOf(kind)?.fields;
     assert.equal(fields?.apiVersion?.literal, API_VERSION);
     assert.equal(fields?.kind?.literal, kind);
-    assert.ok(endpoints.some((e) => e.method === 'GET' && e.path === GET_PATHS[kind]));
+    assert.ok(endpoints.some((e) => e.method === 'GET' && getsOne(kind, e.path)));
   });
 }
 
@@ -64,7 +57,11 @@ for (const kind of KINDS) {
   test(`${kind} has its ${kind}List, of kind ${kind}List, which a GET of the Api answers, and its get answers a ${kind}`, () => {
     assert.equal(schemaOf(`${kind}List`)?.fields?.kind?.literal, `${kind}List`);
     assert.ok(answers.some((e) => e.method === 'GET' && e.kinds.includes(`${kind}List`)));
-    assert.ok(answers.some((e) => e.method === 'GET' && e.path === GET_PATHS[kind] && e.kinds.includes(kind)));
+    assert.ok(answers.some((e) => e.method === 'GET' && getsOne(kind, e.path) && e.kinds.includes(kind)));
+    assert.ok(
+      answers.every((e) => e.method !== 'GET' || !getsOne(kind, e.path) || e.kinds.includes(kind)),
+      `every get of one ${kind} answers a ${kind}`,
+    );
   });
 }
 
@@ -115,11 +112,16 @@ test('a Card is read across namespaces by its name, and written whole by PUT in 
   assert.ok(endpoints.some((e) => e.method === 'PUT' && e.path === '/api/namespaces/:namespace/cards/:name'));
 });
 
-test('the Run is listed across namespaces and in one, read in one and across all by its id, and its named actions are served in its namespace', () => {
+test('the Run is listed across namespaces and in one, read in one and across all by its name with its reads beside it, and its named actions are served in its namespace', () => {
   for (const [method, path] of [
     ['GET', '/api/runs'],
     ['GET', '/api/namespaces/:namespace/runs'],
-    ['GET', '/api/runs/:runId'],
+    ['GET', '/api/runs/:name'],
+    ['GET', '/api/runs/:name/lines'],
+    ['GET', '/api/runs/:name/concluded'],
+    ['GET', '/api/runs/:name/record'],
+    ['GET', '/api/listing'],
+    ['GET', '/api/listing/:name'],
     ['POST', '/api/namespaces/:namespace/runs'],
     ['DELETE', '/api/namespaces/:namespace/runs/:name'],
     ['POST', '/api/namespaces/:namespace/runs/:name/refresh'],
@@ -136,6 +138,10 @@ test('the Run is listed across namespaces and in one, read in one and across all
       `${method} ${path} is an endpoint of the Api`,
     );
   assert.ok(answers.some((e) => e.method === 'GET' && e.path === '/api/runs' && e.kinds.includes('RunList')));
+  assert.ok(
+    answers.some((e) => e.method === 'GET' && e.path === '/api/runs' && e.kinds.includes('Table')),
+    'or its Table',
+  );
   assert.ok(
     !endpoints.some((e) => e.method !== 'GET' && e.path.startsWith('/api/runs')),
     'no action of a run is served under /api/runs: each is in its namespace',

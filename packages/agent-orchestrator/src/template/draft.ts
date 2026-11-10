@@ -14,7 +14,7 @@ import { budgetOf, countOf, gateOf, readsNamesOf, rulesOf, serverNamesOf, skillN
 import { FACTORY_RULES_FILE } from '../factory/rules/rules.ts';
 import { baseSpelled } from '../former/former.ts';
 import type { RevisionsPolicy } from '../factory/factory.ts';
-import { API_VERSION, HARNESS_FENCE_KEYS, type Profile, type Step, type TemplateRoute } from './layout.ts';
+import { TEMPLATE_LAYOUT_VERSION, HARNESS_FENCE_KEYS, type Profile, type Step, type TemplateRoute } from './layout.ts';
 
 /** A step as its file writes it: its name, its own keys as the parser names them (never its agent's), its body and its file. */
 export type StepSource = { name: string; keys: Readonly<Record<string, string>>; body: string; file: string };
@@ -251,7 +251,7 @@ const unplacedWords = (file: string, key: string): string =>
 
 /** A document of `kind` named `name`, with what a person reads of it and its `spec`. */
 const documentOf = (kind: string, name: string, description: string | null | undefined, spec: unknown) => ({
-  apiVersion: API_VERSION,
+  apiVersion: TEMPLATE_LAYOUT_VERSION,
   kind,
   metadata: { name, ...(description ? { description } : {}) },
   spec,

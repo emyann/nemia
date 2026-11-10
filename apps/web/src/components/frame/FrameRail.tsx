@@ -2,23 +2,26 @@ import { useQuery } from '@tanstack/react-query';
 import { PanelLeft } from 'lucide-react';
 import { IconButton, NavigationDrawer, type NavigationItem, NavigationRail } from '@/components/ui/ds';
 import { useSidebar } from '@/components/ui/sidebar';
-import { factoriesQuery, inboxQuery, openRunsQuery } from '@/lib/api';
+import { factoriesQuery } from '@/lib/api/factories';
+import { inboxQuery } from '@/lib/api/inbox';
 import { factoriesShown } from '@/lib/factories';
 import { inboxBadgeTitle, notStarted } from '@/lib/inbox';
 import { cn } from '@/lib/utils';
 import { StartFab } from '../factory/FactoryStart';
-import { destinationHref, destinationOf, DESTINATIONS, pickedOf } from '../nav/nav';
+import { destinationHref, destinationOf, DESTINATIONS, frameRunsQuery, pickedOf } from '../nav/nav';
 
 /** What the Runs badge says to a screen reader: how many runs wait on you. */
 const waitingTitle = (count: number): string => `${count} ${count === 1 ? 'waits' : 'wait'} on you`;
 
 /**
- * The rail's destinations (`DESTINATIONS`) with `picked` the factory the address picks: each a link where `destinationHref` says, Runs
- * counting the runs that wait on you and the Inbox its cards not yet started, both the api's, read as their pages read them, and none
- * before they are read.
+ * The rail's destinations (`DESTINATIONS`) at `path` with `search`, `picked` the factory the address picks: each a link where
+ * `destinationHref` says, Runs counting the runs that wait on you and the Inbox its cards not yet started, both the api's, read as their
+ * pages read them — Runs off the frame's one count of the runs (`frameRunsQuery`), which Nemia's cue reads too — and none before they
+ * are read.
  */
-function useRailItems(picked: string | undefined): NavigationItem[] {
-  const runs = useQuery(openRunsQuery(picked));
+function useRailItems(path: string, search: Record<string, unknown>): NavigationItem[] {
+  const picked = pickedOf(path, search);
+  const runs = useQuery(frameRunsQuery(path, search));
   const inbox = useQuery(inboxQuery);
   const factories = useQuery(factoriesQuery);
   const first = factories.data ? factoriesShown(factories.data, false)[0]?.name : undefined;
@@ -62,7 +65,7 @@ export function MenuButton() {
 export function FrameRail({ path, search }: { path: string; search: Record<string, unknown> }) {
   const { open, isMobile, openMobile, setOpenMobile } = useSidebar();
   const picked = pickedOf(path, search);
-  const items = useRailItems(picked);
+  const items = useRailItems(path, search);
   const selected = destinationOf(path)?.id ?? null;
   if (isMobile)
     return (

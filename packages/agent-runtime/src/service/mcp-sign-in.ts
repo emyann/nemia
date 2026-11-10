@@ -22,7 +22,9 @@ import {
   type McpSignInSession,
 } from '../harness/mcp-sign-in.ts';
 import type { RemoteMcpServer } from '../harness/seam.ts';
-import { heldHarnessesOf, mcpStateRefusal, type HarnessConfig } from './options.ts';
+import { verbHarnessOf, type HarnessDeclared } from '../harness/declaration.ts';
+import { mcpStateRefusal, type HarnessConfig } from './options.ts';
+import { declaredOf } from './verb-harness.ts';
 
 /**
  * A sign-in or sign-out this engine will not make, and why. `held` says it is refused because a sign-in already waits on the callback
@@ -46,7 +48,10 @@ export type McpSignInState = {
   readonly why?: string;
 };
 
-/** The folder, under the engine's root, a sign-in's `claude mcp add --scope local` files the server in, and its session runs in. */
+/**
+ * The folder, under the engine's root, a sign-in's `claude mcp add --scope local` files the server in, and its session runs in.
+ * Exported only for the tests that import it.
+ */
 export const SIGN_IN_FOLDER = 'mcp-sign-in';
 
 type Held = { readonly name: string; readonly session: McpSignInSession; readonly until: string };
@@ -71,7 +76,7 @@ const watched = (held: Held, withinMs: number, settle: (state: McpSignInState) =
 };
 
 /** The seams a test gives in place of Claude Code: the CLI child, the held session, and the sign-in's bound. */
-export type SignInSeams = { readonly cli?: McpCli; readonly ask?: McpSignInAsk; readonly withinMs?: number };
+type SignInSeams = { readonly cli?: McpCli; readonly ask?: McpSignInAsk; readonly withinMs?: number };
 
 /** The server a sign-in or sign-out may be asked of, or why not: a remote server with an OAuth client and a callback port. */
 const signInRefusal = (name: unknown, server: unknown): string | undefined => {
@@ -113,9 +118,13 @@ const portsHeld = (states: Map<string, McpSignInState>) => {
   return { byPort, claimed, waitsOn, portOf, settle };
 };
 
+/** Why a sign-in verb is refused by an engine none of whose harnesses, `declared`, declares `mcp`: the harnesses it has. */
+export const noSignInHarness = (declared: readonly HarnessDeclared[]): string =>
+  `a sign-in is made inside a Claude Code session, and this engine runs no Claude Code harness. Its harnesses are: ${declared.map((h) => h.name).join(', ') || 'none'}.`;
+
 /**
  * The three verbs over the harnesses this engine has, the hold of each waiting sign-in kept here by its callback port (`portsHeld`).
- * Each is refused, with nothing spawned, where the engine runs no Claude Code harness: only Claude Code is measured to sign in
+ * Each is refused, with nothing spawned, where no harness of the engine declares `mcp`: only Claude Code is measured to sign in
  * (`signsInMcp`), and Codex 0.154 hands GitHub no client secret.
  */
 export const mcpSignInVerbsOf = (
@@ -129,10 +138,8 @@ export const mcpSignInVerbsOf = (
   const cwd = path.join(root, SIGN_IN_FOLDER);
   const withinMs = seams.withinMs ?? SIGN_IN_MS;
   const refuse = (message: string, held = false) => Effect.fail(new McpSignInRefused({ message, held }));
-  const noClaude = () =>
-    heldHarnessesOf(harnesses).length
-      ? undefined
-      : `a sign-in is made inside a Claude Code session, and this engine runs no Claude Code harness. Its harnesses are: ${Object.keys(harnesses).join(', ') || 'none'}.`;
+  const declared = declaredOf(harnesses);
+  const noClaude = () => (verbHarnessOf('mcp', undefined, declared).kind === 'taken' ? undefined : noSignInHarness(declared));
   const cliOf = (): McpCli | string => {
     if (seams.cli) return seams.cli;
     const claude = claudeExecutableOf(executable);

@@ -1,0 +1,55 @@
+# What the read set (read-only.allow.yaml) would still let a read-only agent write, run or read outside the repository by, denied
+# beside it. A deny is matched against each part of a command as typed, a leading assignment or wrapper kept, so a leading `*`
+# reaches a part whatever comes before; an allow is matched with them stripped, so no allow can refuse what an assignment says.
+# These hold the spellings as typed: one the shell rejoins (quoted, escaped, brace-split, or built from a `$`) passes them.
+#
+# A session's working folder is the step's workspace: moving out of it leaves what its fence keeps inside behind.
+- Bash(cd:*)
+# `git grep`'s pager option runs a command on the files that matched. Short, `-O<command>`, bundled after other short options
+# (`-nOsh`): every capital O after `git grep`, a pattern holding one refused with it.
+- Bash(git grep *O*)
+# Long, `--open-files-in-pager`, which git takes abbreviated down to `--op` (`--o` alone it refuses as ambiguous).
+- Bash(git grep *--op*)
+# Git's environment names a program git runs: `GIT_EXTERNAL_DIFF`, and `diff.external` through `GIT_CONFIG_COUNT`. Without the
+# leading `*` the deny reaches only a part that opens `GIT_`, and a first assignment of another name, a `nohup` or a `timeout`
+# before it, carries git's environment through.
+- Bash(*GIT_*)
+# Any assignment before git: `HOME` and `XDG_CONFIG_HOME` name no variable of git's, yet move the configuration git reads to a
+# folder the change under review can carry, whose `diff.external` or `core.pager` git runs. A search for a word holding `=` stays
+# open, its `=` after `git`.
+- Bash(*=* git *)
+# `--output=<file>` creates or truncates the file it names, on `diff`, `diff-tree`, `log`, `show`, `rev-list`, `blame` and
+# `shortlog`, written anywhere after `git`: a deny naming it right after the verb misses it later in the line.
+- Bash(git *--output*)
+# `--no-index` on `diff` and `grep` reads files outside the repository (`grep` takes it down to `--no-ind`).
+- Bash(git *--no-ind*)
+# `blame --contents <file>` reads a file outside the repository (taken down to `--con`).
+- Bash(git blame *--con*)
+# `grep -f <file>` reads its patterns from a file outside the repository, first or late in the line: a word that opens `-f`, so
+# `--full-name` and `--files-with-matches` stay open. A bundled `-nf <file>` no glob tells from a pattern.
+- Bash(git grep -f*)
+- Bash(git grep * -f*)
+# `wc --files0-from=<file>` counts each path its file lists, outside the working tree too: the only long option of `wc` that opens
+# `--f`, and taken abbreviated.
+- Bash(wc *--f*)
+# gh, which a repository's own settings may allow every step: a browser.
+- Bash(gh *--web*)
+- Bash(gh * -w*)
+# A watch, which never returns.
+- Bash(gh *--watch*)
+# A jq query or a Go template, which read beyond the answer: jq reads the process's environment.
+- Bash(gh *--jq*)
+- Bash(gh * -q*)
+- Bash(gh *--template*)
+- Bash(gh * -t*)
+# Another repository, by option or by address.
+- Bash(gh *--repo*)
+- Bash(gh * -R*)
+- Bash(gh *//*)
+# A short option bundled after `-c`, which reaches any of the above.
+- Bash(gh * -c*)
+# Any assignment before gh: `GH_PAGER`, `PAGER`, `BROWSER`, `GH_CONFIG_DIR`, `HOME`.
+- Bash(*=* gh *)
+# Any assignment before nemia: an allow is matched with it stripped, so a session could drop its session token and propose, or
+# approve, as the person.
+- Bash(*=* nemia *)

@@ -160,12 +160,14 @@ export async function inboxAddRun(args: Args, e: Engine, place: Place): Promise<
     );
   const workflow = textOf(args, 'workflow');
   const repo = textOf(args, 'repo');
-  const asked: Args = {
-    ...args,
+  const factory = textOf(args, 'factory');
+  const asked = {
     idea: at ? fs.readFileSync(idea, 'utf8') : idea,
     ...(at ? { from: idea, dir: path.dirname(path.resolve(idea)) } : { dir: process.cwd() }),
-    workflow: workflow === undefined ? undefined : workflowAt(workflow, process.cwd()),
-    repo: repo === undefined ? undefined : path.resolve(repo),
+    ...(workflow === undefined ? {} : { workflow: workflowAt(workflow, process.cwd()) }),
+    ...(repo === undefined ? {} : { repo: path.resolve(repo) }),
+    ...(factory === undefined ? {} : { factory }),
+    label: Array.isArray(args.label) ? args.label.map(String) : [],
   };
   const data = await runWith(e, placedIn(place, INBOX_ADD.handler(asked, process.env, wfRoot(process.env))));
   for (const line of INBOX_ADD.print(data, asked)) console.log(line);
@@ -176,7 +178,11 @@ export async function inboxAddRun(args: Args, e: Engine, place: Place): Promise<
  */
 export async function inboxQueueRun(args: Args, e: Engine, place: Place): Promise<void> {
   const workflow = textOf(args, 'workflow');
-  const asked: Args = { ...args, workflow: workflow === undefined ? undefined : workflowAt(workflow, process.cwd()) };
+  const asked = {
+    name: textOf(args, 'name') ?? '',
+    ...(workflow === undefined ? {} : { workflow: workflowAt(workflow, process.cwd()) }),
+    ...(args.off === true ? { off: true } : {}),
+  };
   const data = await runWith(e, placedIn(place, INBOX_QUEUE.handler(asked, process.env, wfRoot(process.env))));
   for (const line of INBOX_QUEUE.print(data, asked)) console.log(line);
 }

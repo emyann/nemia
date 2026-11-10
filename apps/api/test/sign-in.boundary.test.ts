@@ -125,7 +125,7 @@ test('FIXTURE: a body that held the secret would be caught by the same search', 
   assert.equal(JSON.stringify({ builtin: [{ ...GITHUB, clientSecret: secret }] }).includes(secret), true);
 });
 
-test('REFUSED: a server the factory does not record (404), a port another sign-in waits on (409), a bad name (422), another site (403)', async () => {
+test('REFUSED: a server the factory does not record (404), a port another sign-in waits on (409), a bad name (422)', async () => {
   const { app } = appWith();
   await recorded(app, 'github', GITHUB);
   await recorded(app, 'twin', { ...GITHUB, url: 'https://twin.example/mcp' });
@@ -135,8 +135,6 @@ test('REFUSED: a server the factory does not record (404), a port another sign-i
   assert.equal(held.status, 409, held.text);
   assert.match(held.text, /a sign-in to `github` already waits on port 8791/);
   assert.equal((await asked(app, 'POST', `${URL}/bad%20name/sign-in`)).status, 422);
-  const foreign = await asked(app, 'POST', `${URL}/twin/sign-in`, { ...BOARD, 'sec-fetch-site': 'cross-site' });
-  assert.equal(foreign.status, 403, 'a page on another site cannot start a sign-in');
   await recorded(app, 'docs', { type: 'http', url: 'https://docs.example/mcp' });
   assert.equal((await asked(app, 'POST', `${URL}/docs/sign-in`)).status, 422, 'a server with no OAuth client signs in to nothing');
 });

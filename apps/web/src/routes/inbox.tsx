@@ -3,23 +3,15 @@ import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tansta
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { FactoryCardStart, UnassignedStart } from '../components/factory/FactoryCardStart';
 import { FileCard } from '../components/inbox/FileCard';
-import {
-  CardMeta,
-  GoneItem,
-  NoQueue,
-  PageLink,
-  QueueButtons,
-  PRIMARY,
-  Refused,
-  SECONDARY,
-  StartedAs,
-  Tried,
-} from '../components/inbox/InboxParts';
+import { CardMeta, GoneItem, NoQueue, PageLink, QueueButtons, Refused, StartedAs, Tried } from '../components/inbox/InboxParts';
 import { CardFrom } from '../components/inbox/CardFrom';
 import { Instant } from '../components/time/Instant';
 import { SelectorField } from '../components/field/SelectorField';
 import { Segment, SegmentedButton } from '../components/ui/ds/components/SegmentedButton';
-import { dropCard, factoriesQuery, inboxAllQuery, labelSearch, queueCard, type InboxEntry, type Started } from '../lib/api';
+import { dropCard, inboxAllQuery, queueCard, type InboxEntry } from '../lib/api/inbox.ts';
+import { factoriesQuery } from '../lib/api/factories.ts';
+import { labelSearch } from '../lib/api/labels.ts';
+import { type Started } from '../lib/api/workflows.ts';
 import { factorySearch, keptBy, shownIn } from '../lib/factories';
 import {
   cardLines,
@@ -36,6 +28,7 @@ import {
   unassigned,
   type CardRefusal,
 } from '../lib/inbox';
+import { BUTTON, BUTTON_OUTLINED } from '../lib/classes';
 
 export const Route = createFileRoute('/inbox')({
   validateSearch: (search: Record<string, unknown>) => ({ ...factorySearch(search), ...labelSearch(search), ...cardsSearch(search) }),
@@ -312,14 +305,14 @@ function CardItem({
               type="button"
               aria-expanded={starting}
               onClick={() => setStarting(!starting)}
-              className={starting ? SECONDARY : PRIMARY}
+              className={starting ? BUTTON_OUTLINED : BUTTON}
             >
               {starting ? 'Close' : 'Start'}
             </button>
           )}
           <QueueButtons entry={entry} pending={queue.isPending} onQueue={(off) => queue.mutate(off)} />
           {entry.file.endsWith('.md') && (
-            <button type="button" disabled={remove.isPending} onClick={() => remove.mutate()} className={SECONDARY}>
+            <button type="button" disabled={remove.isPending} onClick={() => remove.mutate()} className={BUTTON_OUTLINED}>
               {remove.isPending ? 'Removing…' : 'Remove'}
             </button>
           )}

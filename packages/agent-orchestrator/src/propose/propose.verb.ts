@@ -22,14 +22,14 @@ import {
   type ProposalChange,
   type ProposedObject,
 } from 'objects';
-import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
+import { Conflict, Forbidden, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
 import { brokenBy } from '../door/door.store.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { mayPropose } from '../approval/index.ts';
 import { accessChange, accessOf } from './access.ts';
 import { currentOf, type ProposalNeeds, type ProposalPlace } from './current.verb.ts';
 import { ProposalDoor } from '../proposal/proposal.store.ts';
-import { Forbidden, proposerOf, type ProposalCaller } from '../caller/index.ts';
+import { proposerOf, type ProposalCaller } from '../caller/index.ts';
 
 /** What a proposal of the Factory may change: its attached workflows, its rules and its instruction. */
 const FactoryProposed = Schema.Struct({
@@ -212,7 +212,7 @@ export const proposeProgram = Effect.fn('proposeProgram')(function* (
   factory: string,
   body: unknown,
   place: ProposalPlace,
-): Effect.fn.Return<Proposal, Refusal | Forbidden, ProposalNeeds> {
+): Effect.fn.Return<Proposal, Refusal, ProposalNeeds> {
   if (!mayPropose(caller, factory))
     return yield* Effect.fail(
       new Forbidden({
@@ -259,7 +259,7 @@ export const undoProgram = Effect.fn('undoProgram')(function* (
   factory: string,
   name: string,
   place: ProposalPlace,
-): Effect.fn.Return<Proposal, Refusal | Forbidden, ProposalNeeds> {
+): Effect.fn.Return<Proposal, Refusal, ProposalNeeds> {
   const door = (yield* ProposalDoor).proposals;
   const applied = yield* door.read(factory, name);
   if (applied === undefined)

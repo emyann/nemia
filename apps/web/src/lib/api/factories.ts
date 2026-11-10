@@ -173,7 +173,7 @@ export const factoryInstructionQuery = (name: string) =>
   queryOptions({ queryKey: ['factory-instruction', name], queryFn: () => factories.instruction(name) });
 
 /** Where an instruction is to be kept: a file in the factory's first folder, by its path from it, or the store. */
-export type InstructionPlace = FactoryInstructionWrite;
+type InstructionPlace = FactoryInstructionWrite;
 
 /**
  * Keep the instruction of the factory `name` at `place`: the instruction as it then reads. Rejects with a `WriteRefusal` in the package's

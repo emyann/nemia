@@ -129,7 +129,7 @@ export type TranscriptEvent = {
  * The words a harness has for where a transcript event came from, the Agent SDK's (`SDKMessageOrigin['kind']`), held equal to them in
  * Claude's reader.
  */
-export const ORIGIN_KINDS = [
+const ORIGIN_KINDS = [
   'human',
   'channel',
   'peer',
@@ -335,6 +335,12 @@ export type RunnerOps = {
    * with `Runner.of` and no layer.
    */
   readonly refuses?: (task: Omit<SpawnRequest, 'name'>) => string | undefined;
+  /**
+   * Whether `task` asked its harness to bridge its session to a remote control (`TaskView.bridge`), read off the task's config by the
+   * harness that has the word (Claude Code's `claude.remoteControl`), so the core never reads a harness's flag. Optional: a runner
+   * that bridges nothing never says a task asked.
+   */
+  readonly bridgeAsked?: (task: { readonly harness?: string; readonly config?: HarnessArgs }) => boolean;
   /**
    * Remove what this harness keeps of a session whose task is settled and forgotten: optional, for a harness that keeps files
    * of its own per session. Given the name the engine gave the session and the id the harness knew it by, when it had one;
@@ -556,6 +562,7 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
     },
 
     refuses: (task) => opsOf(task.harness)?.refuses?.(task),
+    bridgeAsked: (task) => opsOf(task.harness)?.bridgeAsked?.(task) === true,
 
     observe: observeAll((_, ops) => ({ read: listing(ops), expected: [] })).pipe(Effect.map((o) => o.seen)),
 

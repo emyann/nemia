@@ -6,11 +6,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Factory } from '../src/lib/api.ts';
+import type { Factory } from '../src/lib/api/factories.ts';
 import { bellRows } from '../src/lib/bell.ts';
 import { openBlockOf } from '../src/lib/factories.ts';
 import { inFlight, openRows } from '../src/lib/factory.ts';
 import { atWork } from '../src/lib/footer.ts';
+import { frameRunsQuery } from '../src/components/nav/nav.ts';
+import { openRunsQuery } from '../src/lib/api/runs.ts';
 import { listed, summary, waitingRun } from './run-fixtures.ts';
 
 const SRC = path.resolve(import.meta.dirname, '../src');
@@ -70,6 +72,7 @@ test("REFUSED: no reader of the frame applies the whole list's rule to the light
     'components/frame/GaugesBar.tsx',
     'components/frame/FrameHeader.tsx',
     'components/frame/FrameRail.tsx',
+    'components/nemia/NemiaDock.tsx',
   ];
   for (const file of [...frame, 'components/factory/FactoryBar.tsx', 'components/run/WaitingBar.tsx']) {
     assert.deepEqual(wholeListRule(read(file)), [], `${file} reads the api's counts, never inFlight nor waitsOnYou`);
@@ -84,4 +87,36 @@ test("REFUSED: no reader of the frame applies the whole list's rule to the light
   );
   assert.deepEqual(wholeListRule('runs: runs.filter(inFlight).length, waitsOnYou(run)'), ['inFlight', 'waitsOnYou']);
   assert.deepEqual(wholeListRule('inFlight: open.counts.inFlight, more: block.waitsOnYou > 0, inFlight?: number'), []);
+});
+
+/** The name `text` binds to the data of `useQuery(frameRunsQuery(path, search))`, where it reads that query. */
+const frameRunsRead = (text: string): string | undefined =>
+  /const (\w+) = useQuery\(\s*frameRunsQuery\(path, search\)\s*\)\.data;/.exec(text)?.[1];
+
+test("REFUSED: Nemia's cue, the rail's Runs badge and the Runs page's plate count the runs waiting off one query", async (t) => {
+  const read = (file: string) => fs.readFileSync(path.join(SRC, file), 'utf8');
+  await t.test("the frame's query at a page is the Runs page's own, every factory's or the one it picks", () => {
+    assert.deepEqual(frameRunsQuery('/runs', {}).queryKey, openRunsQuery(undefined, undefined).queryKey, 'All factories');
+    assert.deepEqual(frameRunsQuery('/runs', { factory: 'kit' }).queryKey, openRunsQuery('kit', undefined).queryKey, 'one factory');
+    assert.deepEqual(frameRunsQuery('/', {}).queryKey, openRunsQuery().queryKey, 'a page that picks none counts every factory');
+    assert.notDeepEqual(frameRunsQuery('/runs', { factory: 'kit' }).queryKey, openRunsQuery().queryKey, 'a key that tells them apart');
+  });
+  await t.test("her cue's runs are that query's counts.waiting, never her presence's own number", () => {
+    const dock = read('components/nemia/NemiaDock.tsx');
+    const counted = frameRunsRead(dock);
+    assert.ok(counted, "the dock reads the frame's query");
+    assert.match(dock, new RegExp(`presenceOf\\(\\s*chat\\.state\\.presence,[^,]+,\\s*${counted}\\?\\.counts\\.waiting\\b`));
+    assert.doesNotMatch(dock, /presence\.waitsOnYou/, "the api's own sum is no part of the cue");
+  });
+  await t.test("the rail's badge reads the same query, and the Runs page its plate off the same list", () => {
+    const rail = read('components/frame/FrameRail.tsx');
+    assert.match(rail, /useQuery\(frameRunsQuery\(path, search\)\)/);
+    assert.match(rail, /runs\.data\?\.counts\.waiting/);
+    const page = read('routes/runs.index.tsx');
+    assert.match(page, /useSuspenseQuery\(openRunsQuery\(search\.factory, search\.l\)\)/);
+    assert.match(page, /<Plate count=\{counts\.waiting\}/);
+  });
+  await t.test('the scan finds a dock that reads another query', () => {
+    assert.equal(frameRunsRead('const counted = useQuery(openRunsQuery()).data;'), undefined);
+  });
 });

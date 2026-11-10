@@ -17,13 +17,14 @@ import { Effect, Layer } from 'effect';
 import { AgentDoor, type AgentDoorShape } from 'agent-orchestrator';
 import { agentDoorMemory } from 'agent-orchestrator/testing';
 import { app, appOf, liveOf } from '../app.ts';
-import { DEFAULT_HARNESS, isRoleKey, putSchemasBack, stepsNamed } from './builder.ts';
+import { isRoleKey, putSchemasBack, stepsNamed } from './builder.ts';
 import { asWorkflowListing, listedIn } from '../../test/definitions.ts';
 import { StoreRoot, workflowVersion as versionIn } from 'agent-orchestrator';
 import { listWorkflows } from './workflows.ts';
 import { engine, builtinGitPlace, HARNESS_CHOICES, loadWorkflows, workflowTaken, writeWorkflow } from 'agent-orchestrator';
 import {
   AGENT_KEYS,
+  DEFAULT_HARNESS,
   HARNESSES,
   parseFolder,
   parseWorkflow,
@@ -44,7 +45,7 @@ const inRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot>): Promise<A> =>
 const versionOf = (dir: string): string =>
   Effect.runSync(versionIn(dir, { repo, home: root }).pipe(Effect.provideService(StoreRoot, root)));
 
-type KeyForm = import('./builder.ts').KeyForm;
+type KeyForm = import('objects').KeyForm;
 type WorkflowSaved = import('./builder.ts').WorkflowSaved;
 type BuildRefused = import('./builder.ts').BuildRefused;
 type ListedStep = import('./workflows.ts').ListedStep;
@@ -355,7 +356,6 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
         /`gate: false` is what a step without the line already is/,
         "gate's `false` is refused",
       );
-      assert.equal(form.defaultHarness, DEFAULT_HARNESS, "the default harness is the parser's");
       for (const mode of HARNESS_CHOICES.permissionMode[DEFAULT_HARNESS])
         parseWorkflow('a', `---\nplace: git\npermissionMode: ${mode}\n---\nDo a.\n`);
       assert.equal(Object.hasOwn(HARNESS_CHOICES.sandbox, DEFAULT_HARNESS), false, 'a step that names no harness takes no sandbox');
@@ -1140,7 +1140,11 @@ test("the builder's routes: a body not in its shape, a source not yours, a folde
           { file: 'a.json', text: again },
         ],
       });
-      assert.equal(twice.status, 422, 'a schema given twice: the api judges the schemas before it reads the folder');
+      assert.equal(
+        twice.status,
+        400,
+        'a schema given twice is refused as the request it is (400), the schemas judged before the folder is read',
+      );
       const twiceSaid = String(((await twice.json()) as { error?: string }).error);
       assert.match(
         twiceSaid,
@@ -1165,7 +1169,11 @@ test("the builder's routes: a body not in its shape, a source not yours, a folde
         ['tab\t.json', /control character/],
       ] as const) {
         const res = await put('shaped', { steps: [plan], schemas: [{ file, text: again }] });
-        assert.equal(res.status, 422, `${file}: not a file directly in the folder, the api's \`Invalid\` (${String(said)})`);
+        assert.equal(
+          res.status,
+          400,
+          `${file}: not a file directly in the folder, refused as the request it is (400, \`schemaNameRefusal\`) (${String(said)})`,
+        );
       }
       assert.deepEqual(snapshot(dir), before);
       assert.equal(fs.existsSync(path.join(STORE, 'x.json')), false);

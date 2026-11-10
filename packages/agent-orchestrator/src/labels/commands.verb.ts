@@ -1,23 +1,17 @@
 /**
  * `nemia label run` and `nemia label inbox`, entries of the command table: a person's labels on a run or a card edited, as `kubectl label`
- * spells it. The api serves each, a run's on the route the table generates and a card's as the Card's `labels` verb (`objects`' Api),
+ * spells it. The api serves each, a run's as the Run's `labels` action and a card's as the Card's `labels` verb (`objects`' Api),
  * its body a `LabelEdit` — `labels`, the edits, and `overwrite` — under the keys the command line gives them, so one handler reads both.
  */
-import { Effect } from 'effect';
-import { type Args, NAMED_ACTION, type Spec } from '../command/command.ts';
-import type { Command } from '../command/entry.verb.ts';
+import { Effect, Schema } from 'effect';
+import { type Args, type Spec } from '../command/command.ts';
+import { checked, type Command } from '../command/entry.verb.ts';
 import { rooted } from '../factory/wiring/wire.verb.ts';
-import type { Labelled } from './labels.model.ts';
+import { LabelEdit, type Labelled } from 'objects';
 import { labelCard, labelRun } from './labels.verb.ts';
 
 /** The edits under `labels`, in the order given. */
 const editsOf = (args: Args): string[] => (Array.isArray(args.labels) ? args.labels.map(String) : []);
-
-/** The text under `key`, or the empty text where none was given. */
-const textOf = (args: Args, key: string): string => {
-  const value = args[key];
-  return typeof value === 'string' ? value : '';
-};
 
 /**
  * What an edit did, a line per key it named, as `kubectl label` says it: set, changed from its value, removed, already so, or already
@@ -58,11 +52,15 @@ const CARD_SPEC = labelSpec('nemia label inbox', 'card', 'name', 'nemia inbox');
 const noEdits = (command: string, key: string) => (args: Args) =>
   editsOf(args).length ? null : `${command} takes the edits to make after the ${key}: key=value to set a key, key- to remove one.`;
 
+/** What `nemia label run` takes: the run, and the edit as the api is sent it (`objects`' `LabelEdit`: `labels`, `overwrite`). */
+export const LabelRunInput = Schema.Struct({ runId: Schema.String, ...LabelEdit.fields });
+export type LabelRunInput = typeof LabelRunInput.Type;
+
 /**
  * `nemia label run`: a run's person labels edited — in flight, waiting or finished — and written beside its record. The feed's lines
  * written after it carry the new labels; those before keep theirs.
  */
-export const LABEL_RUN: Command<Labelled> = {
+export const LABEL_RUN: Command<Labelled, LabelRunInput> = {
   name: 'label run',
   usage: '<runId> <key=value|key->... [--overwrite]',
   help: [
@@ -74,18 +72,25 @@ export const LABEL_RUN: Command<Labelled> = {
   check: noEdits('nemia label run', 'run'),
   writes: true,
   class: 'act',
-  route: { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/labels', status: 200, hand: NAMED_ACTION },
-  handler: (args, _env, home) =>
+  only: { side: 'cli', why: "the api serves it as the Run's `labels` of `objects`' Api, calling this handler" },
+  input: LabelRunInput,
+  handler: (input, _env, home) =>
     rooted(
       home,
       'label run',
-      Effect.suspend(() => labelRun(textOf(args, 'runId'), editsOf(args), args.overwrite === true)),
+      Effect.andThen(checked(noEdits('nemia label run', 'run')(input)), () =>
+        labelRun(input.runId, [...input.labels], input.overwrite === true),
+      ),
     ),
   print: labelledLines,
 };
 
+/** What `nemia label inbox`'s handler takes: the card's name, and `objects`' `LabelEdit` — the edits, and `overwrite`. */
+export const LabelCardInput = Schema.Struct({ name: Schema.String, ...LabelEdit.fields });
+export type LabelCardInput = typeof LabelCardInput.Type;
+
 /** `nemia label inbox`: an inbox card's `labels:` edited, every other key and its body kept; the run it starts is created with them. */
-export const LABEL_CARD: Command<Labelled> = {
+export const LABEL_CARD: Command<Labelled, LabelCardInput> = {
   name: 'label inbox',
   usage: '<name> <key=value|key->... [--overwrite]',
   help: [
@@ -99,13 +104,14 @@ export const LABEL_CARD: Command<Labelled> = {
   class: 'act',
   only: {
     side: 'cli',
-    why: "the api serves it as the Card's `labels` verb of `objects`' Api (`POST /api/namespaces/:namespace/cards/:name/labels`), which calls this entry's handler: no route of its own",
+    why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Card's `labels`, whose handler calls this one by its `input`",
   },
-  handler: (args, _env, home) =>
+  input: LabelCardInput,
+  handler: ({ name, labels, overwrite }, _env, home) =>
     rooted(
       home,
       'label inbox',
-      Effect.suspend(() => labelCard(textOf(args, 'name'), editsOf(args), args.overwrite === true)),
+      Effect.suspend(() => labelCard(name, [...labels], overwrite === true)),
     ),
   print: labelledLines,
 };

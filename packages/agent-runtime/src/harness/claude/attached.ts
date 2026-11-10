@@ -29,7 +29,7 @@
  *   usage); the conversation is Claude Code's own transcript, which is also where a follow's whole events and its cursor come from
  *   (`attached-follow.ts`), the same file `transcript` reads.
  */
-import { Effect, Option, Schedule, type Scope } from 'effect';
+import { Context, Effect, Option, Schedule, type Scope } from 'effect';
 import fs from 'node:fs';
 import { instantNow } from '../../core/engine/now.ts';
 import { elapsedMs, purseOf, type Purse } from '../../core/clock.ts';
@@ -61,12 +61,25 @@ import {
   writeRun,
   type AttachedRun,
 } from './attached-file.ts';
-import { cutTurn, gone, hear, interruptTurn, killGroup, startSession, toldCut, type Held, Refusal, type Live } from './attached-session.ts';
+import {
+  cutTurn,
+  gone,
+  GONE_POLL_MS,
+  hear,
+  HELD_POLL_MS,
+  interruptTurn,
+  killGroup,
+  startSession,
+  toldCut,
+  type Held,
+  Refusal,
+  type Live,
+} from './attached-session.ts';
 import type { ScopeAt } from '../scope.ts';
-import { sessionDrainFile, sessionDrainOf } from './job-hold.ts';
+import { sessionDrainFile, sessionDrainOf } from '../../core/engine/drain.ts';
 import { cutWords } from '../../core/restart.ts';
 import { pushesOf, type Pushes } from './attached-follow.ts';
-import { bridgeOf } from './attached-bridge.ts';
+import { bridgeOf } from './session-bridge.ts';
 
 /**
  * The attached sessions of one engine: the runner's verbs, `hold`, which makes this process their holder for a scope, and
@@ -111,6 +124,15 @@ const waitedOut = (over: () => boolean, ms: number): Effect.Effect<boolean> =>
     Effect.timeoutOption(ms),
     Effect.map(Option.isSome),
   );
+
+/**
+ * A failure of what `what` says — an ask of a session's this holder sends and does not wait on — recorded as a warning, with its
+ * cause, by the program whose services are `context`: what failed is said, never dropped.
+ */
+const recorded =
+  (context: Context.Context<never>, what: string) =>
+  (cause: unknown): void =>
+    void Effect.runForkWith(context)(Effect.logWarning(`${what}: ${cause instanceof Error ? cause.message : String(cause)}`, cause));
 
 /** What the capture of the session under `name` says, as a job's stream is read. */
 const saidBy = (root: string, name: string) => {
@@ -245,23 +267,25 @@ const toolOf = (l: Live): string => l.run.calling?.tool ?? 'a tool';
  * Uninterruptible as one: a second signal leaves no session neither parked nor running.
  */
 const parked = (root: string, live: Map<string, Live>, cut: boolean): Effect.Effect<void> =>
-  Effect.sync(() => {
-    for (const l of live.values()) {
-      if (!l.abort || (l.run.state !== 'working' && l.run.state !== 'idle')) continue;
-      cutAsks(root, l.run.name);
-      const kept = cut && workingIn(l) > 0 ? l.run.calling : undefined;
-      const working = l.run.state === 'working';
-      const { calling: _, hold: __, ...rest } = l.run;
-      l.run = { ...rest, state: 'parked', ...(kept ? { calling: kept } : {}) };
-      writeRun(root, l.run);
-      l.letGo = true;
-      const ask = working ? l.q?.interrupt : undefined;
-      void Promise.resolve()
-        .then(() => ask?.call(l.q))
-        .catch(() => undefined)
-        .finally(() => l.input?.close());
-    }
-  }).pipe(Effect.uninterruptible);
+  Effect.flatMap(Effect.context(), (context) =>
+    Effect.sync(() => {
+      for (const l of live.values()) {
+        if (!l.abort || (l.run.state !== 'working' && l.run.state !== 'idle')) continue;
+        cutAsks(root, l.run.name);
+        const kept = cut && workingIn(l) > 0 ? l.run.calling : undefined;
+        const working = l.run.state === 'working';
+        const { calling: _, hold: __, ...rest } = l.run;
+        l.run = { ...rest, state: 'parked', ...(kept ? { calling: kept } : {}) };
+        writeRun(root, l.run);
+        l.letGo = true;
+        const ask = working ? l.q?.interrupt : undefined;
+        void Promise.resolve()
+          .then(() => ask?.call(l.q))
+          .catch(recorded(context, `${l.run.name}'s turn was not interrupted as it was parked`))
+          .finally(() => l.input?.close());
+      }
+    }),
+  ).pipe(Effect.uninterruptible);
 
 /**
  * What is left of each session `parked` let go, ended: its query aborted, its Claude Code's process group killed where it outlived the
@@ -292,6 +316,7 @@ const ended = (root: string, live: Map<string, Live>): Effect.Effect<void> =>
  * the lease — can be set above one number. `purse` is the caller's so a test can read what each wait was given (`Purse.given`) and
  * show they add up to no more than the budget; `callsShare` is the share of it the calls in flight may take, `LET_GO_CALLS_SHARE` unless
  * the holder was given another.
+ * Exported only for the tests that import it.
  */
 export const letGoOf = (
   root: string,
@@ -330,12 +355,13 @@ const adoptIn =
     root: string,
     start: (r: SpawnRequest, run: AttachedRun, first: string, resume?: string) => void,
     stopped: (run: AttachedRun) => boolean,
+    gonePollMs: number,
   ) =>
   async (run: AttachedRun): Promise<void> => {
     cutAsks(root, run.name);
     const child = childOf(run);
     killGroup(child);
-    await gone(child);
+    await gone(child, gonePollMs);
     const { childPid: _, childStart: __, calling: ___, ownerStart: ____, cut: _____, hold: ______, ...rest } = run;
     const mine: AttachedRun = { ...rest, ...thisHolder() };
     if (stopped(run) || !run.sessionId) return writeRun(root, { ...mine, state: stopped(run) ? 'canceled' : 'failed' });
@@ -350,26 +376,42 @@ const adoptIn =
   };
 
 /**
+ * The interrupt file of `run`, which the holder runs as `at`, read on a look: dropped where its turn has ended, else its turn ended
+ * through the SDK (`interruptTurn`) and the file dropped once that was sent. A send that failed is `record`ed, and asked again on the
+ * next look, the file left.
+ */
+const interruptAsked = (root: string, at: Live | undefined, run: AttachedRun, record: (cause: unknown) => void): void => {
+  const file = filesOf(root, run.name).interrupt;
+  if (at === undefined || !fs.existsSync(file)) return;
+  if (run.state !== 'working') return fs.rmSync(file, { force: true });
+  void interruptTurn(at)
+    .then((sent) => void (sent && fs.rmSync(file, { force: true })))
+    .catch(record);
+};
+
+/**
  * The attached sessions under `root`: `executable` the Claude Code they run, the SDK's own when absent (a test's stand-in otherwise);
  * a session under a memory limit runs in a scope made in `options.cgroupParent` by `options.scopeProgram` (`ScopeAt`).
  *
  * A session's interrupt file is read on every look, never as a transition: another process's ask survives a restart of the holder,
  * and an ask that landed after its turn ended is dropped there, never kept for the next turn. `options` are its let-go's bound,
- * `letGoMs`, and the share of it the calls in flight may take, `callsShare` (`letGoOf`).
+ * `letGoMs`, and the share of it the calls in flight may take, `callsShare` (`letGoOf`), and how often a call held at its hook and a
+ * take-up's wait for a process to be gone read again, `holdPollMs` and `gonePollMs`, the shipped polls where none is given.
  */
 export const attachedSessions = (
   root: string,
   executable?: string,
-  options: { letGoMs?: number; callsShare?: number } & ScopeAt = {},
+  options: { letGoMs?: number; callsShare?: number; holdPollMs?: number; gonePollMs?: number } & ScopeAt = {},
 ): Attached => {
   const live = new Map<string, Live>();
-  const { letGoMs = LET_GO_MS, callsShare = LET_GO_CALLS_SHARE } = options;
+  const { letGoMs = LET_GO_MS, callsShare = LET_GO_CALLS_SHARE, holdPollMs = HELD_POLL_MS, gonePollMs = GONE_POLL_MS } = options;
   let holding = false;
   let draining = false;
+  let context: Context.Context<never> = Context.empty();
   const sessionsDrain = () => sessionDrainOf(sessionDrainFile(root));
   const held: Held = (l) => (draining || drainsThis(root) || sessionsDrain() !== null) && l.calls.size === 0;
   const pushes = pushesOf({ root, holds: (name) => live.has(name) });
-  const given = { held, scope: options, ...(executable ? { executable } : {}) };
+  const given = { held, holdPollMs, scope: options, ...(executable ? { executable } : {}) };
   const start = (r: SpawnRequest, run: AttachedRun, first: string, resume?: string) =>
     live.set(
       run.name,
@@ -378,21 +420,7 @@ export const attachedSessions = (
 
   const stopped = (run: AttachedRun) => fs.existsSync(filesOf(root, run.name).stop);
 
-  const interrupted = (run: AttachedRun) => {
-    const file = filesOf(root, run.name).interrupt;
-    if (!fs.existsSync(file)) return;
-    const at = live.get(run.name);
-    if (at === undefined) return;
-    if (run.state !== 'working') {
-      fs.rmSync(file, { force: true });
-      return;
-    }
-    void interruptTurn(at)
-      .then((sent) => void (sent && fs.rmSync(file, { force: true })))
-      .catch(() => undefined);
-  };
-
-  const adopt = adoptIn(root, start, stopped);
+  const adopt = adoptIn(root, start, stopped, gonePollMs);
 
   const paused = (at: Live): void => {
     if (!at.abort || at.letGo) return;
@@ -400,20 +428,23 @@ export const attachedSessions = (
     if (drain === null) return toldCut(root, at);
     if (at.run.cut || at.run.state !== 'working' || workingIn(at) === 0) return;
     if (elapsedMs({ at: Date.parse(drain.at) }, instantNow()) < drain.graceMs) return;
-    void cutTurn(root, at, toolOf(at)).catch(() => undefined);
+    void cutTurn(root, at, toolOf(at)).catch(recorded(context, `${at.run.name}'s call was not cut past its drain's grace`));
   };
 
   const looked = (run: AttachedRun): AttachedRun => {
     const at = live.get(run.name);
     if (!holding) return run;
     if (at && stopped(run) && isOpen(at.run.state)) at.abort.abort();
-    interrupted(run);
+    interruptAsked(root, at, run, recorded(context, `${run.name}'s turn was not interrupted as asked; the next look asks again`));
     if (at) paused(at);
     if (at?.input) hear(root, at);
     if (!at && orphaned(run)) {
       const placeholder = { run, letGo: true } as Live;
       live.set(run.name, placeholder);
-      void adopt(run).catch(() => live.delete(run.name));
+      void adopt(run).catch((cause: unknown) => {
+        live.delete(run.name);
+        recorded(context, `${run.name} was not taken up; the next look takes it up again`)(cause);
+      });
       return { ...run, state: 'working' };
     }
     return run;
@@ -436,7 +467,12 @@ export const attachedSessions = (
 
   return {
     hold: Effect.acquireRelease(
-      Effect.sync(() => void (holding = true)),
+      Effect.flatMap(Effect.context(), (held) =>
+        Effect.sync(() => {
+          context = held;
+          holding = true;
+        }),
+      ),
       () => letGo,
     ),
     holding: () => holding,

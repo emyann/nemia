@@ -12,10 +12,21 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
-import { AGENTS_FOLDER, isReadme, SKILLS_FOLDER, STEP_KEYS, WorkflowError, type StepKey, type Workflow } from '../step/step.ts';
+import {
+  AGENTS_FOLDER,
+  CARRIED_FOLDER,
+  isReadme,
+  SKILLS_FOLDER,
+  STEP_KEYS,
+  WorkflowError,
+  type StepKey,
+  type Workflow,
+} from '../step/step.ts';
 import { PLACES } from '../keys/index.ts';
 import {
   codexModeLine,
+  FORMER_HARNESS_PROMPTS,
+  FORMER_KEYS,
   formerKeyLine,
   formerKeysIn,
   formerFenceIn,
@@ -38,6 +49,7 @@ import {
 } from './folder.ts';
 import { WorkflowDir } from './folder.model.ts';
 import { HARNESS_PROMPTS } from '../agents/agents.ts';
+import { fenceKeyOf } from '../harness/harness.ts';
 import { entriesOf } from '../skills/read.store.ts';
 
 /**
@@ -145,7 +157,7 @@ const agentAt = (dir: string, agent: string): string => path.join(agentsDir(dir)
 
 /** The word a file on `harness` names its sandbox under as `permissionMode:`, the former name of `sandbox:` there; else undefined. */
 const formerModeOf = (text: string, harness: string | undefined): string | undefined =>
-  harness === 'codex' ? frontmatterKey(text, 'permissionMode', true) : undefined;
+  fenceKeyOf(harness) === 'sandbox' ? frontmatterKey(text, 'permissionMode', true) : undefined;
 
 /**
  * Each step file of the workflow in `dir` with its text, the agent it names and the harness it runs on: its own `harness:`, else its
@@ -178,7 +190,9 @@ function noStepsBecause(dir: string, entries: readonly string[]): string {
 /** The folders in `dir` that hold steps, sorted: the workflows a folder of workflows has. None for a folder that is not there. */
 export function workflowsIn(dir: string, entries?: readonly string[]): string[] {
   return (entries ?? entriesOf(dir))
-    .filter((name) => name !== AGENTS_FOLDER && name !== SKILLS_FOLDER && stepFiles(entriesOf(path.join(dir, name))).length > 0)
+    .filter(
+      (name) => ![AGENTS_FOLDER, SKILLS_FOLDER, CARRIED_FOLDER].includes(name) && stepFiles(entriesOf(path.join(dir, name))).length > 0,
+    )
     .sort();
 }
 
@@ -288,13 +302,22 @@ const OutputSchemaSchema = Schema.StructWithRest(
 );
 
 /**
+ * The words a former `systemPrompt:` line said: each former word of `harnessPrompt:` (`FORMER_HARNESS_PROMPTS`), and each word of it that
+ * kept its name (`no-coding`).
+ */
+const SYSTEM_PROMPT_WORDS: readonly string[] = [
+  ...Object.keys(FORMER_HARNESS_PROMPTS),
+  ...HARNESS_PROMPTS.filter((word) => !Object.values(FORMER_HARNESS_PROMPTS).includes(word)),
+];
+
+/**
  * The agent a step names, as the parser resolves it (`StepAgent`): each key it gives one a step has (`STEP_KEYS`) or had (`FORMER_KEYS`),
  * its harness prompt under its name now or its former one, in the words each had (`FORMER_OWN_KEYS`), every other key kept.
  */
 const StepAgentSchema = Schema.StructWithRest(
   Schema.Struct({
     name: Schema.String,
-    keys: Schema.mutable(Schema.Array(Schema.Literals([...STEP_KEYS, 'disallow', 'allow']))),
+    keys: Schema.mutable(Schema.Array(Schema.Literals([...STEP_KEYS, ...Object.keys(FORMER_KEYS)]))),
     body: Schema.String,
     given: Schema.Record(Schema.String, Schema.String),
     instructions: Schema.optionalKey(Schema.String),
@@ -305,7 +328,7 @@ const StepAgentSchema = Schema.StructWithRest(
     agentDenies: Schema.optionalKey(Strings),
     harnessPrompt: Schema.optionalKey(Schema.Literals(HARNESS_PROMPTS)),
     mcp: Schema.optionalKey(Strings),
-    systemPrompt: Schema.optionalKey(Schema.Literals(['default', 'no-coding', 'own'])),
+    systemPrompt: Schema.optionalKey(Schema.Literals(SYSTEM_PROMPT_WORDS)),
   }),
   Rest,
 );

@@ -4,7 +4,7 @@
  * relative path that leaves `apps/web` (`importBreaks`); the lint block for `apps/web/src` in
  * `.oxlintrc.json` refuses the same packages as they are typed. Only `lib/useFeed.ts` and `lib/useStepTranscript.ts` open an
  * `EventSource`, the api's two streams (`eventSourceBreaks`), and only `components/markdown/Markdown.tsx` imports a markdown renderer
- * (`rendererBreaks`). Its reads go through `lib/api/read.ts` (`unschemedReads`, `read.test.ts`).
+ * (`rendererBreaks`). Its reads go through `lib/api/objects.ts` (`clientBreaks`, `api-files.test.ts`).
  *
  * The frame, what the root route mounts on every page, never asks for the whole list of the runs: no file the root reaches names
  * `runsQuery` (`wholeListBreaks`), but the pickers a person opens (`OPENED`), a list that only shrinks.
@@ -175,7 +175,7 @@ test('the scan reads the board, and sees each way a file names a module', () => 
     "import 'node:fs';",
     "const m = await import('../../../api/src/app.ts');",
     "// from 'nowhere' in a comment is no import",
-    " * import('node:os') in a JSDoc is none either",
+    "/** import('node:os') in a JSDoc is none either */",
   ].join('\n');
   assert.deepEqual(importsIn(text), [
     '../../../api/src/app.ts',
@@ -415,7 +415,7 @@ const waitedBreaks = (text: string): string[] => {
 test('REFUSED: a waiting card whose figure reads the sum of the run’s waits on a person', () => {
   const card = sourceTexts().get('src/components/run/WaitingCard.tsx')!;
   assert.deepEqual(waitedBreaks(card), []);
-  const summed = card.replace(/\{\s*waited\s*\}/, '{sinceShort(run.clock.personMs)}');
+  const summed = card.replace(/\{\s*waited\s*\}/, "{durationWords(run.clock.personMs, 'minute')}");
   assert.notEqual(summed, card, 'the figure is planted over');
   assert.equal(waitedBreaks(summed).length, 2);
   assert.equal(waitedBreaks(card.replace(/presentWait\(run, asOf\)/, 'null')).length, 1);

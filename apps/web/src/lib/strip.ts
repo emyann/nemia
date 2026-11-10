@@ -3,18 +3,22 @@
  * work and when the quota runs out. Pure: the instant, the day's start and the time zone are handed in, the browser's own on the page.
  */
 import type { RunOutcome } from 'objects';
-import type { Ceilings, Factory, QuotaWindow, RunSummary } from './api';
+import type { Ceilings } from './api/ceilings.ts';
+import type { Factory } from './api/factories.ts';
+import type { QuotaWindow } from './api/quota.ts';
+import { agentOf, judged, sinceOf, type RunRow, type RunView } from './api/judged.ts';
 import type { TokenCounts } from './breakdown.ts';
 import { keptBy } from './factories.ts';
 import { inFlight, titleOf, waitsOnYou } from './factory.ts';
+import { durationWords } from './duration.ts';
 import { clockWord } from './quota.ts';
 import { stepState } from './status.ts';
 
 /** The rows of agents at work the strip shows before it says how many more there are. */
-export const ROWS_SHOWN = 3;
+const ROWS_SHOWN = 3;
 
 /** One step at work by an agent: who, which step of which run, and since when, in whole minutes and in words. */
-export type AgentRow = { agent: string; step: string; run: string; title: string; minutes: number; atWork: string };
+type AgentRow = { agent: string; step: string; run: string; title: string; minutes: number; atWork: string };
 
 /**
  * The strip's numbers. `waitsOnYou` and `inFlight` are the open runs, a run that waits on a person counted with the waiting alone;
@@ -41,8 +45,8 @@ export type Strip = {
 };
 
 /** What the strip reads: the whole list, the factories, the caps, now and the day's start in epoch ms, and the factory in view if any. */
-export type StripIn = {
-  runs: readonly RunSummary[];
+type StripIn = {
+  runs: readonly RunRow[];
   factories: readonly Factory[];
   ceilings: Ceilings | undefined;
   now: number;
@@ -58,27 +62,23 @@ export const dayStartOf = (now: number): number => {
 };
 
 /** When a finished run's work stopped: the later of its last task's end and its cancellation, else its creation (the api's own rule). */
-export const finishedAtOf = (run: Pick<RunSummary, 'atWork' | 'cancelledAt' | 'createdAt'>): string => {
+const finishedAtOf = (run: Pick<RunView, 'atWork' | 'cancelledAt' | 'createdAt'>): string => {
   const ends = [run.atWork?.endedAt ?? null, run.cancelledAt].filter((at): at is string => at !== null);
   return ends.sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? run.createdAt;
 };
 
 /** How a finished run ended (the api's own rule): called off, its result undecided, landed, or failed. */
-export const outcomeOf = (run: Pick<RunSummary, 'cancelledAt' | 'toDecide' | 'status'>): RunOutcome => {
+const outcomeOf = (run: Pick<RunView, 'cancelledAt' | 'toDecide' | 'status'>): RunOutcome => {
   if (run.cancelledAt) return 'cancelled';
   if (run.toDecide?.kind === 'result') return 'undecided';
   return run.status === 'succeeded' ? 'succeeded' : 'failed';
 };
 
-/** Minutes at work in words: `17m`, `2h 5m`. */
-export const minutesWord = (minutes: number): string =>
-  minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h${minutes % 60 ? ` ${minutes % 60}m` : ''}`;
-
 /** A cap as the readout says it: none where it is zero or unknown. */
 const capOf = (cap: number | null | undefined): number | null => (cap ? cap : null);
 
 /** A run's whole cost, nothing where none was measured. */
-const usdOf = (run: RunSummary): number => run.cost?.usd ?? 0;
+const usdOf = (run: RunView): number => run.cost?.usd ?? 0;
 
 /** A sum of parts, null where one of them is null, as a run's own tokens rule (`runTokens` in the orchestrator). */
 const partSum = (parts: ReadonlyArray<number | null>): number | null =>
@@ -88,7 +88,7 @@ const partSum = (parts: ReadonlyArray<number | null>): number | null =>
  * The tokens of `worked`, kind by kind: a kind null where one run lacks it; the sessions that measured none, each run's own and one for
  * each run with a cost and no tokens, which measured a cost and no token; null where no run measured any.
  */
-const tokensOf = (worked: readonly RunSummary[]): TokenCounts | null => {
+const tokensOf = (worked: readonly RunView[]): TokenCounts | null => {
   const counted = worked.flatMap((run) => (run.tokens ? [run.tokens] : []));
   if (counted.length === 0) return null;
   const sum = (key: 'total' | 'input' | 'output' | 'unmeasured') => counted.reduce((n, tokens) => n + tokens[key], 0);
@@ -104,7 +104,7 @@ const tokensOf = (worked: readonly RunSummary[]): TokenCounts | null => {
 };
 
 /** Whether an open run was worked since the day began: a task of it runs, or its last one ended today. */
-const workedToday = (run: RunSummary, dayStart: number): boolean =>
+const workedToday = (run: RunView, dayStart: number): boolean =>
   Boolean(run.atWork?.since) || (run.atWork?.endedAt != null && Date.parse(run.atWork.endedAt) >= dayStart);
 
 /** The agents hired in the factories in view, every factory where none is. */
@@ -122,33 +122,47 @@ const agentsOf = (rows: readonly AgentRow[], hired: ReadonlySet<string>): Strip[
 };
 
 /** Whether a step of `run` is at work: a session working or the run's check of it, as the board draws its state (`stepState`). */
-const working = (run: RunSummary, step: RunSummary['steps'][number]): boolean => {
+const working = (run: RunView, step: RunView['steps'][number]): boolean => {
   const state = stepState(step, false, run.holding != null);
   return state === 'working' || state === 'checking';
 };
 
 /** The steps of `open` at work by an agent, longest first. */
-const rowsOf = (open: readonly RunSummary[], now: number): AgentRow[] =>
+const rowsOf = (open: readonly RunView[], now: number): AgentRow[] =>
   open
     .flatMap((run) =>
       run.steps.flatMap((step) => {
-        if (step.agent === null || step.since === null || !working(run, step)) return [];
-        const minutes = Math.max(0, Math.floor((now - Date.parse(step.since)) / 60_000));
-        return [{ agent: step.agent, step: step.name, run: run.id, title: titleOf(run), minutes, atWork: minutesWord(minutes) }];
+        const agent = agentOf(step);
+        const since = sinceOf(step);
+        if (agent === null || since === null || !working(run, step)) return [];
+        const minutes = Math.max(0, Math.floor((now - Date.parse(since)) / 60_000));
+        return [
+          {
+            agent,
+            step: step.name,
+            run: run.id,
+            title: titleOf(run),
+            minutes,
+            atWork: durationWords(minutes * 60_000, 'minute'),
+          },
+        ];
       }),
     )
     .sort((a, b) => b.minutes - a.minutes || a.run.localeCompare(b.run) || a.step.localeCompare(b.step));
 
 /** The sessions at work in `open`: each step working or checking, a held run's that a hold did not stop among them. */
-const sessionsOf = (open: readonly RunSummary[]): number =>
+const sessionsOf = (open: readonly RunView[]): number =>
   open.reduce((n, run) => n + run.steps.filter((step) => working(run, step)).length, 0);
 
 /**
  * The strip's numbers off what the page reads (`StripIn`), of the factory in view (`keptBy`): a run called off is in no open count, and
- * counts in Spent alone once its work stopped today.
+ * counts in Spent alone once its work stopped today. A run the list could not judge is in flight, as the tick counts it, and adds to no
+ * other number.
  */
 export function stripOf(given: StripIn): Strip {
-  const runs = given.runs.filter(keptBy(given.factory));
+  const kept = given.runs.filter(keptBy(given.factory));
+  const runs = kept.filter(judged);
+  const unjudged = kept.length - runs.length;
   const waiting = runs.filter((run) => waitsOnYou(run));
   const flying = runs.filter((run) => !run.cancelledAt && !waitsOnYou(run) && inFlight(run));
   const finishedToday = runs.filter((run) => !waitsOnYou(run) && !inFlight(run) && Date.parse(finishedAtOf(run)) >= given.dayStart);
@@ -159,25 +173,19 @@ export function stripOf(given: StripIn): Strip {
   const rows = rowsOf(open, given.now);
   return {
     waitsOnYou: waiting.length,
-    inFlight: flying.length,
+    inFlight: flying.length + unjudged,
     landed: landed.length,
     failed: finishedToday.filter((run) => outcomeOf(run) === 'failed').length,
     spentUsd: worked.reduce((sum, run) => sum + usdOf(run), 0),
     spentTokens: tokensOf(worked),
     perLanding: priced.length ? priced.reduce((sum, run) => sum + usdOf(run), 0) / priced.length : null,
-    runs: { count: flying.length, cap: capOf(given.ceilings?.cap) },
+    runs: { count: flying.length + unjudged, cap: capOf(given.ceilings?.cap) },
     sessions: { count: sessionsOf(open), cap: capOf(given.ceilings?.last?.sessions) },
     agents: agentsOf(rows, hiredIn(given.factories, given.factory)),
     rows: rows.slice(0, ROWS_SHOWN),
     more: Math.max(0, rows.length - ROWS_SHOWN),
   };
 }
-
-/**
- * An amount in dollars as a sticker says it, never more than four figures wide below $10,000, so the six stickers keep one line: whole from
- * $10, to the cent below; `—` for none.
- */
-export const dollars = (usd: number | null): string => (usd === null ? '—' : usd >= 10 ? `$${Math.round(usd)}` : `$${usd.toFixed(2)}`);
 
 /** The readout of what is at work: `5 OF 7 RUNS · 2 OF 50 SESSIONS`, a part with no cap said without its `OF`. */
 export const readoutOf = ({ runs, sessions }: Pick<Strip, 'runs' | 'sessions'>): string => {

@@ -14,7 +14,7 @@ import type { Followed, Transcript, TranscriptCursor, TranscriptEvent } from '..
 import { nameOf, sightingOfTask } from './map.ts';
 
 /** The id an artifact's event, and the pieces of its text, go by. */
-export const artifactKey = (artifactId: string): string => `artifact:${artifactId}`;
+const artifactKey = (artifactId: string): string => `artifact:${artifactId}`;
 
 /** Whether a session in `state` has ended its turn: it no longer works, whether it ended or waits on its caller. */
 export const turnOver = (state: SessionState): boolean => !atWorkState(state);

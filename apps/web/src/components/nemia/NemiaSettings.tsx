@@ -9,12 +9,12 @@ import {
   nemiaFactQuery,
   nemiaMemoryQuery,
   putLevel,
-  type Bridge,
   type FactoryLevel,
   type Level,
   type LevelAsk,
   type NemiaLevel,
-} from '../../lib/api';
+} from '../../lib/api/nemia.ts';
+import { type Bridge } from '../../lib/api/bridge.ts';
 import { DEFAULT_NAME } from '../../lib/factories';
 import {
   factoryWords,

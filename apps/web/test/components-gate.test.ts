@@ -45,13 +45,13 @@ const { renderToStaticMarkup } = await import('react-dom/server');
 const { Chips, DecideSection, DiffFileView, GroupBar, LessonChip, TouchedBranch } = await import('../src/components/gate/Decide.tsx');
 const { OFFERS } = await import('../src/lib/words.ts');
 const { instantWhole } = await import('../src/lib/instant.ts');
-type RunView = import('../src/lib/runView.ts').RunView;
-type Decidable = import('../src/lib/api.ts').Decidable;
+type RunDetail = import('../src/lib/runView.ts').RunDetail;
+type Decidable = import('../src/lib/api/decision.ts').Decidable;
 const { TryCloseouts } = await import('../src/components/step/Closeout.tsx');
 const facts = await import('../src/components/step/Facts.tsx');
-type StepCloseout = import('../src/lib/api.ts').StepCloseout;
+type StepCloseout = import('../src/lib/api/tries.ts').StepCloseout;
 const { RecommendButton } = await import('../src/components/gate/Questions.tsx');
-type Question = import('../src/lib/api.ts').Question;
+type Question = import('../src/lib/api/tries.ts').Question;
 const Answering = await import('../src/components/gate/Decide.tsx');
 const { NeedsBanner, ToDecideBanner } = await import('../src/components/gate/Needs.tsx');
 const { container, hairline, ringed } = await import('../src/lib/meaning.ts');
@@ -546,7 +546,7 @@ test('a loop out of rounds is approved as it stands from the Answer section, wit
 });
 
 /** The banner, rendered inside the query client its Continue asks with. */
-const bannerMarkup = (run: RunView) =>
+const bannerMarkup = (run: RunDetail) =>
   renderToStaticMarkup(createElement(QueryClientProvider, { client: new QueryClient() }, createElement(NeedsBanner, { run })));
 
 test("the banner continues a session the harness blocked: Continue, and a box for anything to tell it, where the commands to copy were — and once asked, the step's note in `wf ls`'s words", () => {
@@ -560,7 +560,7 @@ test("the banner continues a session the harness blocked: Continue, and a box fo
     waitingFor: null,
     lastLine: null,
   };
-  const run: RunView = { ...base, waitingOnYou: ['implement'], waitingOnYouWords: ['implement'], steps: [asks, base.steps[0]] };
+  const run: RunDetail = { ...base, waitingOnYou: ['implement'], waitingOnYouWords: ['implement'], steps: [asks, base.steps[0]] };
   const html = bannerMarkup(run);
 
   assert.match(html, /^<section aria-label="Waiting on you"/);
@@ -807,7 +807,7 @@ const decidedAs = (standings: unknown[]) => ({
 /**
  * A component rendered with the run's decision already read, as the Decide section on the same page has read it for this state of the run.
  */
-function withDecision(run: RunView, decision: unknown, element: ReturnType<typeof createElement>): string {
+function withDecision(run: RunDetail, decision: unknown, element: ReturnType<typeof createElement>): string {
   const client = new QueryClient();
   client.setQueryData(['runs', run.id, 'decision', decisionStamp(run)], decision);
   return renderToStaticMarkup(createElement(QueryClientProvider, { client }, element));
@@ -973,6 +973,16 @@ test('the gate of an ending step says approving is what files it, and its send-b
   assert.doesNotMatch(held, /name="[^"]*-to"/, "and its send-back is the step's own");
 });
 
+test("the second press at an ending's gate reads the ending's warning, on its base branch, then the press that approves it", () => {
+  const onMain = textsOf(renderToStaticMarkup(createElement(Gates.EndingConfirm, { step: 'ship', onto: 'main' }))).join(' ');
+  assert.match(
+    onMain,
+    /runs ship in the repository's own checkout on main, and it cannot be taken back\. Press Run ship now to approve it\.$/,
+  );
+  const unknown = textsOf(renderToStaticMarkup(createElement(Gates.EndingConfirm, { step: 'ship', onto: null }))).join(' ');
+  assert.match(unknown, /own checkout, and it cannot be taken back\. Press Run ship now/, 'no branch is named where the run knows none');
+});
+
 test("the gate's own words at an ending: the approval's box says the step is handed them, and the word taken names the step it was about", () => {
   const html = withClient(
     createElement(Gates.Gate, { runId: 'r-1', step: 'ship', approveLine: 'nemia approve r-1 ship', back: ['review'], acts: true }),
@@ -1118,10 +1128,8 @@ test('what sessions read, by price: beside the cost, the peak marked at a cap or
   assert.deepEqual(readRows(null), []);
 
   const plain = markup(createElement(Read, { said: 'read 21.4M · wrote 412k · peak 167k', peak: null, rebuilt: 0 }));
-  assert.match(
-    plain,
-    /<span class="font-mono text-body-small"><span>read 21\.4M<\/span><span> · wrote 412k<\/span><span> · peak 167k<\/span><\/span>/,
-  );
+  assert.match(plain, /data-read/);
+  assert.deepEqual(textsOf(plain), ['read 21.4M', '· wrote 412k', '· peak 167k'], 'each count its own part, in the order said');
   assert.doesNotMatch(plain, /data-peak|data-rebuilt/, 'under its cap, and resumed from a warm cache: nothing marked');
 
   const capped = markup(
@@ -1167,7 +1175,7 @@ test('what sessions read, by price: beside the cost, the peak marked at a cap or
   const html = renderToStaticMarkup(createElement(DecideSection, { runId: 'r-1', decision }));
   assert.match(
     html,
-    /<dt[^>]*>cost<\/dt><dd[^>]*>\$3\.01<\/dd><\/div><div[^>]*class="contents"><dt[^>]*>read<\/dt><dd[^>]*><span data-read="true" class="block"><span class="font-mono text-body-small"><span>read 7\.3M<\/span>/,
+    /data-fact="cost"[^>]*>[\s\S]*?\$3\.01<\/dd><\/div><div data-fact="read"[\s\S]*?<span data-read="true"[\s\S]*?read 7\.3M</,
     "on the Decide section, beside the total's cost",
   );
 });
@@ -1290,6 +1298,26 @@ test("REFUSED: a banner that says a person is waited on is drawn in an amount's 
   }
   assert.equal(drawnYours(`rounded ${container.money}`), false, 'the amber of an amount is no wait');
   assert.equal(drawnYours(`rounded ${container.yours} ${container.failure}`), false);
+});
+
+test('a proposal the api says is not there (404) is said so, and one it could not read otherwise is a reading notice', async () => {
+  const { ProposalCard } = await import('../src/components/gate/ProposalCard.tsx');
+  const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
+  const { ReadRefusal } = await import('../src/lib/api/read.ts');
+  const failed = (error: Error) => {
+    const client = new QueryClient({ defaultOptions: { queries: { retryOnMount: false } } });
+    client
+      .getQueryCache()
+      .build(client, { queryKey: ['proposal', 'acme', 'nemia-ab12c'] })
+      .setState({ status: 'error', error, fetchStatus: 'idle' });
+    return renderToStaticMarkup(
+      createElement(QueryClientProvider, { client }, createElement(ProposalCard, { factory: 'acme', name: 'nemia-ab12c' })),
+    );
+  };
+  assert.match(failed(new ReadRefusal('no such proposal', 404)), /data-no-proposal="nemia-ab12c"/);
+  const down = failed(new ReadRefusal('the api is down', 502));
+  assert.doesNotMatch(down, /data-no-proposal=/, 'only a 404 is a proposal gone');
+  assert.match(down, /data-proposal-reading="nemia-ab12c"/);
 });
 
 test('a proposal shows its phase, its widens mark, its changes and the buttons its phase takes', async () => {

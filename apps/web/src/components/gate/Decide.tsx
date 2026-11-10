@@ -8,15 +8,15 @@ import {
   type DiffFile,
   type Group,
   type Lesson,
-  type RetryMode,
   type SensitiveDiff,
   type Touched,
-} from '../../lib/api';
-import type { RunView, StepView } from '../../lib/runView';
+} from '../../lib/api/decision.ts';
+import { type RetryMode } from '../../lib/api/asks.ts';
+import type { RunDetail, StepView } from '../../lib/runView';
 import { answersOf, askedOf, askedSaid, type Answer } from '../../lib/asks';
 import { barOf, changeOf, decidableRun, decisionStamp, diffLine, isDecidable, mostLines, type DiffLine } from '../../lib/decide';
 import { cn } from '../../lib/utils';
-import { BUTTON, MODES, Refusal, TEXTAREA, useAsk } from './Ask';
+import { MODES, Refusal, useAsk } from './Ask';
 import { CommandLine } from '../command/CommandLine';
 import { Facts, HEADING, pathRow, readRows, TrialMerges } from '../step/Facts';
 import { AskedRow, Asks, QuestionsForm } from './Questions';
@@ -24,6 +24,7 @@ import { EnoughRow } from '../step/Enough';
 import { RaiseRow } from './Raise';
 import { container, dashed, hairline, ringed } from '../../lib/meaning';
 import { OFFERS } from '../../lib/words';
+import { BUTTON, TEXTAREA } from '../../lib/classes';
 
 /**
  * The Decide section of a run's page: the answer each step waiting on you can be given (`answersOf`), then what the CLI's `decide` shows a
@@ -33,7 +34,7 @@ import { OFFERS } from '../../lib/words';
  * with a try asked of a session the harness blocked, continued from the banner, has that note and nothing to decide. An api that
  * refuses says why, here.
  */
-export function Decide({ run }: { run: RunView }) {
+export function Decide({ run }: { run: RunDetail }) {
   const decidable = decidableRun(run);
   const { data, error } = useQuery({ ...decisionQuery(run.id, decisionStamp(run)), enabled: decidable });
   const offers = answersOf(run);
@@ -92,7 +93,7 @@ export const DecideSection = ({ offers = null, ...parts }: DecisionProps & { off
 );
 
 /** What `DecisionParts` reads: the run's id, its decision, and where it worked, if known. */
-type DecisionProps = { runId: string; decision: Decidable; run?: Pick<RunView, 'place' | 'work'> | null };
+type DecisionProps = { runId: string; decision: Decidable; run?: Pick<RunDetail, 'place' | 'work'> | null };
 
 /** What there is to decide, after the answers, as `DecideSection` lists it; a fragment, so its parts sit in the frame's own spacing. */
 function DecisionParts({ runId, decision, run = null }: DecisionProps) {
@@ -205,7 +206,7 @@ function offerSaid(offer: Extract<Answer, { case: 'answer' | 'try-again' | 'deni
  * it; something to tell a try is optional, and none is sent when nothing was written or with a recheck, whatever the closed box still
  * holds.
  */
-export function OfferRow({ runId, offer }: { runId: string; offer: Extract<Answer, { case: 'answer' | 'try-again' | 'denied' }> }) {
+function OfferRow({ runId, offer }: { runId: string; offer: Extract<Answer, { case: 'answer' | 'try-again' | 'denied' }> }) {
   const [message, setMessage] = useState('');
   const [mode, setMode] = useState<RetryMode>(
     offer.case === 'try-again' && offer.unfinished ? 'recheck' : offer.case === 'denied' ? 'fresh' : 'continue',
@@ -550,7 +551,7 @@ export function LessonChip({ lesson }: { lesson: Lesson }) {
  * Land it, drop it, once more: each command on a line of its own with a button that copies it. The board runs none of them: what it
  * presses is an answer's, in the Answer section (`Offers`).
  */
-export function Commands({ commands }: { commands: readonly DecideCommand[] }) {
+function Commands({ commands }: { commands: readonly DecideCommand[] }) {
   return (
     <section aria-label="Commands" className="space-y-2">
       <h3 className={HEADING}>Commands — copy one to run it</h3>

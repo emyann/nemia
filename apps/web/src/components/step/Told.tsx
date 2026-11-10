@@ -12,7 +12,7 @@
  */
 import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
-import type { StepLayers, TaskPart } from '../../lib/api';
+import type { StepLayers, TaskPart } from '../../lib/api/layers.ts';
 import { RouteLink } from '../agent/AgentParts';
 import { Markdown } from '../markdown/Markdown';
 import type { Frozen } from '../../lib/frozen';
@@ -41,7 +41,7 @@ export const FACTORY_RULES = "4. The factory's rules";
 export const STEP_POLICY = "5. The step's policy";
 
 /** What the fold says of the numbers it heads its layers with. */
-export const PRECEDENCE_NOTE = 'Where two of them say different things, the higher number wins, and the task is above them all.';
+const PRECEDENCE_NOTE = 'Where two of them say different things, the higher number wins, and the task is above them all.';
 
 /** What the fold says of a step with no agent: Nemia composed no layer above its own words, which are its policy. */
 const noAgent = (will: boolean): string =>
@@ -243,7 +243,7 @@ const HANDED = { read: 'Read as context', waited: 'Waited on, landed' } as const
  * run was asked, linked to the run's page, over the section's body. A run the record names as neither waited on nor read is a plain
  * block, its section as it was written.
  */
-export function TaskParts({ parts }: { parts: Frozen<TaskPart[]> }) {
+function TaskParts({ parts }: { parts: Frozen<TaskPart[]> }) {
   return (
     <div className="flex flex-col gap-2">
       {parts.map((part, i) => {

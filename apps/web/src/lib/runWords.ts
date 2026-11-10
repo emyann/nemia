@@ -1,16 +1,16 @@
 /**
- * The runs page's plain words, without React: the one sentence a waiting run says, by the kind of its wait; how a finished run ended; a
- * wall time as a fact to the minute; and what a run's rail of steps says aloud. Each sentence is built from the row's steps and their
+ * The runs page's plain words, without React: the one sentence a waiting run says, by the kind of its wait; how long ago something was;
+ * and what a run's rail of steps says aloud. Each sentence is built from the row's steps and their
  * names alone: what the api advises a person to type is never repeated here. The words themselves are `words.ts`'s; this reads the row
  * and composes them. Pure.
  */
 import { format, formatDistanceStrict, isSameDay, isSameYear } from 'date-fns';
-import type { RunOutcome, RunSummary } from './api/runs.ts';
-import type { WaitOn } from './api/reasons.ts';
-import type { Hue } from './meaning.ts';
+import type { RunView } from './api/judged.ts';
+import type { WaitOn } from 'objects';
 import { stepState, type StepState } from './status.ts';
 import { timeOfDay, unreadable, UNREADABLE, zoneOf } from './timeOfDay.ts';
-import { ANY_WAIT, ENDED, OPENS, PERSON, RUN_WAITS, stateWordsOf, type Wait as Waited, type WaitWords } from './words.ts';
+import { durationWords } from './duration.ts';
+import { ANY_WAIT, OPENS, PERSON, RUN_WAITS, stateWordsOf, type Wait as Waited, type WaitWords } from './words.ts';
 
 /** Every kind of wait on a person the page has a sentence for. */
 export const WAIT_KINDS = ['approve', 'answer', 'check', 'unfinished', 'unsigned', 'denied', 'rounds', 'budget', 'hold', 'after'] as const;
@@ -50,16 +50,16 @@ export const waitKindOf: Record<StepState, WaitKind | null> = {
 };
 
 /** A step of a row as the words read it: its name, its codes, and its check's verdict. */
-type CodedStep = Pick<RunSummary['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via' | 'verdict'>;
+type CodedStep = Pick<RunView['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via' | 'verdict'>;
 
 /** What the words read of a row of the light answer: of each step its name and its codes, and of the run who it waits on. */
-export type WaitingRow = Pick<RunSummary, 'cancelledAt' | 'holding' | 'waiting' | 'waitingOnYou'> & { steps: ReadonlyArray<CodedStep> };
+type WaitingRow = Pick<RunView, 'cancelledAt' | 'holding' | 'waiting' | 'waitingOnYou'> & { steps: ReadonlyArray<CodedStep> };
 
 /** A row whose button is worded: a `WaitingRow` that says of each step the task of its work too, none for a step not filed yet. */
-export type OpenedRow = WaitingRow & { steps: ReadonlyArray<CodedStep & Pick<RunSummary['steps'][number], 'taskId'>> };
+type OpenedRow = WaitingRow & { steps: ReadonlyArray<CodedStep & Pick<RunView['steps'][number], 'taskId'>> };
 
 /** A wait: its kind, the step that waits, none for a wait of the run's own, and how many of the run's steps are done. */
-export type Wait = Waited & { kind: WaitKind };
+type Wait = Waited & { kind: WaitKind };
 
 /**
  * The kind of wait a step is on its row: its state's (`waitKindOf`), but `unfinished` where its check did not finish (its verdict's
@@ -143,7 +143,7 @@ export function openWord(row: OpenedRow): string {
 }
 
 /** What a row in flight says it does now: the word of the step it is on, and a note of which step, its place, and how long. */
-export type Now = { word: string; note: string };
+type Now = { word: string; note: string };
 
 /**
  * What a run in flight does now: its first step not done, by the rail's word for its state, and its name and its place among the run's
@@ -161,36 +161,12 @@ export function nowOf(row: WaitingRow): Now | null {
   return { word, note: `${step.name} (${at + 1} of ${states.length})` };
 }
 
-/** How a finished run ended, as the page says it: a word, its whole sentence, and the hue it is drawn in. */
-export type Ended = { word: string; title: string; hue: Hue };
-
-/** The hue each outcome is drawn in. */
-const ENDED_HUE: Record<RunOutcome, Hue> = { succeeded: 'sage', cancelled: 'grey', failed: 'failure', undecided: 'yours' };
-
-/** How a finished run of `outcome` ended. */
-export const endedWords = (outcome: RunOutcome): Ended => ({ ...ENDED[outcome], hue: ENDED_HUE[outcome] });
-
-/** `ms` of wall time to the minute: `under a minute`, `27m`, `3h 12m`, `2d 4h`, a part of none left out. */
-export function sinceWords(ms: number): string {
-  const minutes = Math.floor(Math.max(0, ms) / 60_000);
-  if (minutes < 1) return 'under a minute';
-  const [d, h, m] = [Math.floor(minutes / 1440), Math.floor((minutes % 1440) / 60), minutes % 60];
-  const parts = d > 0 ? [`${d}d`, h > 0 && `${h}h`] : h > 0 ? [`${h}h`, m > 0 && `${m}m`] : [`${m}m`];
-  return parts.filter(Boolean).join(' ');
-}
-
-/** `ms` of wall time to the minute where room is short, on a tile or in a column: `under 1m` for less than one, else as `sinceWords`. */
-export const sinceShort = (ms: number): string => (ms < 60_000 ? 'under 1m' : sinceWords(ms));
-
 /**
- * How long a waiting run has waited on a person this time, at `asOf`, as `sinceShort` says it: since `waitingSince`, never the sum of
- * its waits. Null for a run the answer dates no present wait of.
+ * How long a waiting run has waited on a person this time, at `asOf`, to the minute (`durationWords`): since `waitingSince`, never the
+ * sum of its waits. Null for a run the answer dates no present wait of.
  */
 export const presentWait = (run: { waitingSince: string | null }, asOf: Date): string | null =>
-  run.waitingSince === null ? null : sinceShort(asOf.getTime() - Date.parse(run.waitingSince));
-
-/** A run's wall time as a fact: `27m since it was created`. */
-export const sinceCreated = (ms: number): string => `${sinceWords(ms)} since it was created`;
+  run.waitingSince === null ? null : durationWords(asOf.getTime() - Date.parse(run.waitingSince), 'minute');
 
 /** What a distance under a minute says, a column having no room for seconds. */
 export const JUST_NOW = 'just now';
@@ -208,7 +184,7 @@ export function agoWords(at: Date, now: Date): string {
 
 /** A run's steps as the rail draws them: each by its name and its state. */
 export const railStates = (
-  steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via'>>,
+  steps: ReadonlyArray<Pick<RunView['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via'>>,
   cancelled: boolean,
   held: boolean,
 ): Array<{ name: string; state: StepState; on: WaitOn | null }> =>
@@ -217,7 +193,7 @@ export const railStates = (
 /** What the rail says aloud: each step and its word, in the run's order: `design verified, land waits on you`, a step a
  * check verified told from one done on its own word. */
 export const railSaid = (
-  steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via'>>,
+  steps: ReadonlyArray<Pick<RunView['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via'>>,
   cancelled: boolean,
   held: boolean,
 ): string =>

@@ -2,8 +2,19 @@
  * What the CLI's verbs and runners share: the help, a verb's shape, how a program is given its place, a usage refusal, a person's yes.
  */
 import readline from 'node:readline/promises';
-import { Effect } from 'effect';
-import { CLI_VERBS, Invalid, PlaceService, TABLE, helpOf, storeRootLayer, type engine, type StoreRoot, type Place } from '../runner.ts';
+import { Effect, Schema } from 'effect';
+import {
+  CLI_VERBS,
+  Invalid,
+  PlaceService,
+  TABLE,
+  helpOf,
+  storeRootLayer,
+  type Args,
+  type engine,
+  type StoreRoot,
+  type Place,
+} from '../runner.ts';
 
 /** The engine the verbs talk to: the board under `WF_ROOT`, unless a test hands one of its own. */
 export type Engine = ReturnType<typeof engine>;
@@ -88,4 +99,17 @@ export async function confirmed(question: string): Promise<boolean> {
   } finally {
     rl.close();
   }
+}
+
+/**
+ * `args` as the handler of `command` takes them, decoded through its `input`: a key its handler takes that a runner left out or gave
+ * another type refused, exit 2, before anything is read. What a runner hands a typed entry's handler.
+ */
+export function inputFor<I>(
+  command: { name: string; usage: string; input: Schema.Decoder<I> },
+  args: Args | Readonly<Record<string, unknown>>,
+): I {
+  const decoded = Schema.decodeUnknownExit(command.input)(args);
+  if (decoded._tag === 'Success') return decoded.value;
+  return usage(`nemia ${command.name} was given arguments its handler does not take: nemia ${command.name} ${command.usage}.`);
 }

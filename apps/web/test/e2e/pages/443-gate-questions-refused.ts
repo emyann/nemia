@@ -10,8 +10,8 @@ export default {
   /**
    * Answers the package refuses, given at a gate: the page reads `design` asking its questions, every read of the run then held as it was,
    * and the run's record loses the question field from `design`'s output before Approve is pressed — a step that asks none now. The api
-   * answers 400 in `answerRefusal`'s words, the gate says it under Not approved, and nothing is written. Its one refusal is the point, so
-   * its page counts exactly it; the run is taken back after.
+   * answers 422 (`Invalid`, its class's status) in `answerRefusal`'s words, the gate says it under Not approved, and nothing is written.
+   * Its one refusal is the point, so its page counts exactly it; the run is taken back after.
    */
   name: 'gate-questions-refused',
   route: '/runs',
@@ -55,7 +55,7 @@ export default {
         approve.click(),
       ]);
       const { error } = (await answered.json()) as { error?: string };
-      if (answered.status() !== 400 || !error?.startsWith('The step asks no questions now, so there is nothing to answer.'))
+      if (answered.status() !== 422 || !error?.startsWith('The step asks no questions now, so there is nothing to answer.'))
         throw new Refused(
           `the api refuses answers to a step that asks none now, in answerRefusal's words — it answered ${answered.status()}: ${JSON.stringify(error)}`,
         );
@@ -71,10 +71,10 @@ export default {
       await settled(refused);
       await photograph(refused, path.join(OUT, `gate-questions-refused-shown-${await themeOf(refused)}.png`), { fullPage: true });
       await idle(refused);
-      const expected = `request answered 400: POST ${answered.url()}`;
+      const expected = `request answered 422: POST ${answered.url()}`;
       const seen = problems();
       const others = seen.filter(
-        (p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 400\b/.test(p),
+        (p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 422\b/.test(p),
       );
       if (!seen.includes(expected) || others.length)
         throw new Refused(

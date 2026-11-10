@@ -1,4 +1,3 @@
-/** The workflows' routes, the builder's and your store's, as app.ts mounts them. */
-export { builder } from './builder.ts';
-export { workflows } from './workflows.ts';
-export { yours } from './yours.ts';
+/** The builder's routes, as app.ts mounts them, and your store as the server group reads it. */
+export { yourStore } from './yours.ts';
+export { treeWorkflowsHeld, workflowObjectsOf, workflowsHandlers } from './handlers.ts';

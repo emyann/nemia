@@ -8,6 +8,8 @@
 import { HttpApiBuilder } from 'effect/http-api';
 import {
   builtinServerList,
+  FACTORY_SERVER_ADD,
+  FACTORY_SERVER_RM,
   mcpServerList,
   mcpServerObject,
   serverNameRefusal,
@@ -16,14 +18,10 @@ import {
   serverSignOut,
   Invalid as Refused,
 } from 'agent-orchestrator';
-import { Api, type McpServerWrite } from 'objects';
+import { Api } from 'objects';
 import type { Served } from '../../layer.ts';
-import { commandNamed, runPlaced } from '../../store.ts';
 import { defaultRepo, factoryNamed, queryOf } from './parts.ts';
 import { answered } from '../../objects/refused.ts';
-
-const SERVER_ADD = commandNamed('factory server add');
-const SERVER_RM = commandNamed('factory server rm');
 
 /** The route of the server `name` of `namespace`, as a refusal says it. */
 const routeOf = (method: string, namespace: string, name: string, sub = ''): string =>
@@ -37,26 +35,14 @@ const named = (route: string, namespace: string, name: string): void => {
 };
 
 /** The server `name` of `namespace`, read now. */
-const serverIn = (s: Served, namespace: string, name: string) =>
-  runPlaced(s, s.e, mcpServerObject(s.home, defaultRepo(s), namespace, name));
-
-/** The arguments `nemia factory server add` takes for a write: its transport, url, headers as `name=value` and OAuth client. */
-const addArgs = (namespace: string, name: string, w: McpServerWrite) => ({
-  factory: namespace,
-  server: name,
-  url: w.url,
-  transport: w.type ?? 'http',
-  ...(w.headers === undefined ? {} : { header: Object.entries(w.headers).map(([k, v]) => `${k}=${v}`) }),
-  ...(w.oauth === undefined ? {} : { clientId: w.oauth.clientId }),
-  ...(w.oauth?.callbackPort === undefined ? {} : { callbackPort: String(w.oauth.callbackPort) }),
-});
+const serverIn = (s: Served, namespace: string, name: string) => s.inRequest(mcpServerObject(s.home, defaultRepo(s), namespace, name));
 
 export const mcpServersHandlers = HttpApiBuilder.group(Api, 'mcpservers', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
       answered((s) => {
         factoryNamed(`GET /api/namespaces/${namespace}/mcpservers`, namespace);
-        return runPlaced(s, s.e, mcpServerList(s.home, defaultRepo(s), namespace, queryOf(query)));
+        return s.inRequest(mcpServerList(s.home, defaultRepo(s), namespace, queryOf(query)));
       }),
     )
     .handle('get', ({ params: { namespace, name } }) =>
@@ -68,7 +54,7 @@ export const mcpServersHandlers = HttpApiBuilder.group(Api, 'mcpservers', (handl
     .handle('put', ({ params: { namespace, name }, payload }) =>
       answered(async (s) => {
         named(routeOf('PUT', namespace, name), namespace, name);
-        await runPlaced(s, s.e, SERVER_ADD.handler(addArgs(namespace, name, payload), s.env, s.home));
+        await s.inRequest(FACTORY_SERVER_ADD.handler({ factory: namespace, server: name, ...payload }, s.env, s.home));
         return serverIn(s, namespace, name);
       }),
     )
@@ -76,26 +62,26 @@ export const mcpServersHandlers = HttpApiBuilder.group(Api, 'mcpservers', (handl
       answered(async (s) => {
         named(routeOf('DELETE', namespace, name), namespace, name);
         const server = await serverIn(s, namespace, name);
-        await runPlaced(s, s.e, SERVER_RM.handler({ factory: namespace, server: name }, s.env, s.home));
+        await s.inRequest(FACTORY_SERVER_RM.handler({ factory: namespace, server: name }, s.env, s.home));
         return server;
       }),
     )
     .handle('signIn', ({ params: { namespace, name } }) =>
       answered(async (s) => {
         named(routeOf('POST', namespace, name, '/sign-in'), namespace, name);
-        return runPlaced(s, s.e, serverSignIn(namespace, name, s.home));
+        return s.inRequest(serverSignIn(namespace, name, s.home));
       }),
     )
     .handle('signInState', ({ params: { namespace, name } }) =>
       answered(async (s) => {
         named(routeOf('GET', namespace, name, '/sign-in'), namespace, name);
-        return runPlaced(s, s.e, serverSignInState(namespace, name, s.home));
+        return s.inRequest(serverSignInState(namespace, name, s.home));
       }),
     )
     .handle('signOut', ({ params: { namespace, name } }) =>
       answered(async (s) => {
         named(routeOf('DELETE', namespace, name, '/sign-in'), namespace, name);
-        return runPlaced(s, s.e, serverSignOut(namespace, name, s.home));
+        return s.inRequest(serverSignOut(namespace, name, s.home));
       }),
     ),
 );

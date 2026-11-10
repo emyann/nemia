@@ -1,7 +1,7 @@
 /**
  * `nemia closeout <run> <step> [--try <n>]`, read from the api through the objects' client: what a try of a step signed off with — the
  * one `--try` names (`…/tries/:try/closeout`), else its latest, the last of its tries (`…/tries`) — printed as the in-process command
- * prints it (`closeoutLines`, the orchestrator's `command/reads.verb.ts`, ported word for word). Any other words go to the old path.
+ * prints it (`closeoutLines`, the orchestrator's `object/commands.verb.ts`, ported word for word). Any other words go to the old path.
  */
 import type { StepCloseout, TryCloseout } from 'objects';
 import { Refused } from '../client.ts';
@@ -54,9 +54,9 @@ export async function closeout(args: readonly string[]): Promise<number> {
   if (typed === undefined) return spawned(['closeout', ...args]);
   const { runId, step, tryNo } = typed;
   let read: TryCloseout;
-  if (tryNo !== undefined) read = await asked('closeout', (client) => client.runs.closeout({ params: { runId, step, try: tryNo } }));
+  if (tryNo !== undefined) read = await asked('closeout', (client) => client.steps.closeout({ params: { runId, step, try: tryNo } }));
   else {
-    const { tries } = await asked('closeout', (client) => client.runs.tries({ params: { runId, step } }));
+    const { tries } = await asked('closeout', (client) => client.steps.tries({ params: { runId, step } }));
     const latest = tries.at(-1);
     if (latest === undefined)
       throw new Refused(

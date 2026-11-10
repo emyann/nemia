@@ -8,7 +8,9 @@
  */
 import path from 'node:path';
 import { Effect, Result } from 'effect';
+import { ownArgsOf } from 'agent-runtime/vocabulary';
 import { refusedTold } from './assess.ts';
+import { declarationOf, DEFAULT_HARNESS } from '../harness/harness.ts';
 import { mcpServerOf, over, type ClaudeFlags, type CodexArgs, type Engine, type TaskView } from '../runtime-client.ts';
 import {
   isRepositoryRun,
@@ -46,7 +48,7 @@ import type { Place } from '../place/place.store.ts';
 import type { PlaceSay } from '../place/place.ts';
 import { composeBrief } from '../brief/index.ts';
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
-import { workflowFilesDir } from '../frozen/frozen.store.ts';
+import { carriedFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { factoryServers } from '../factory/servers/servers.store.ts';
 import type { FactoryServers } from '../factory/servers/index.ts';
@@ -114,15 +116,21 @@ function skillAgainOf(name: string, from: string, text: string, why: string): Sk
 }
 
 /**
- * The harness's own arguments a step is filed with (`toldOf`), off the flags its agent rendered to and its repository's real path, which
- * is asked only of a step whose harness takes it. Pure but for `repoOf`.
+ * The harness's own arguments a step is filed with (`toldOf`): what its harness's declaration makes of the neutral asks (`ownArgsOf`) —
+ * trust the repository, at its real path, asked only of a step whose harness takes it; a remote control where the step says `remote:
+ * true` — with the flags its agent rendered to spread over them. A remote control its harness has no word for is filed in the words of
+ * the default harness's, which has one, so the runtime refuses it by its line at `nemia start` rather than the run dropping it. Pure but
+ * for `repoOf`.
  */
 export const ownOf = (step: Pick<Workflow, 'harness' | 'remote'>, rendered: ClaudeFlags | undefined, repoOf: () => string | undefined) => {
-  const repo = step.harness === 'codex' ? repoOf() : undefined;
-  return {
-    claude: step.remote ? { remoteControl: true as const, ...rendered } : rendered,
-    ...(repo === undefined ? {} : { codex: { trustFrom: repo } }),
+  const declaration = declarationOf(step.harness);
+  const remoteControl = step.remote === true;
+  const unanswered = remoteControl && declaration?.asks?.remoteControl === undefined;
+  const asked = {
+    ...(unanswered ? ownArgsOf(declarationOf(DEFAULT_HARNESS), { remoteControl }) : {}),
+    ...ownArgsOf(declaration, { trustRepository: repoOf, remoteControl }),
   };
+  return { ...asked, claude: asked.claude === undefined ? rendered : { ...asked.claude, ...rendered } };
 };
 
 /**
@@ -183,16 +191,17 @@ export function placeTold(
 /**
  * The folders a step of `run` is filed from (`filedFolders`): the run's artifacts folder, the store's inbox, the run's inputs
  * folder (`inputsDir`) only when its record names an input, so a run given none is filed and told as before, and the run's copy of its
- * workflow folder (`workflowFilesDir`) only when its record names one. What a *brief* reads, which asks for no server; `filedAt` is what
- * a filing takes.
+ * workflow folder (`workflowFilesDir`) and of its carried files (`carriedFilesDir`), each only when its record names one. What a *brief*
+ * reads, which asks for no server; `filedAt` is what a filing takes.
  */
 export const filedFoldersAt = (
-  run: Pick<Run, 'id' | 'inputs' | 'workflowFiles'>,
-): { runArtifacts: string; inbox: string; inputs?: string; workflowFiles?: string } => ({
+  run: Pick<Run, 'id' | 'inputs' | 'workflowFiles' | 'carriedFiles'>,
+): { runArtifacts: string; inbox: string; inputs?: string; workflowFiles?: string; carriedFiles?: string } => ({
   runArtifacts: path.dirname(artifactsDir(run, 'step')),
   inbox: inboxDir(),
   ...(run.inputs?.length ? { inputs: inputsDir(run) } : {}),
   ...(run.workflowFiles === undefined ? {} : { workflowFiles: workflowFilesDir(run, run.workflowFiles) }),
+  ...(run.carriedFiles === undefined ? {} : { carriedFiles: carriedFilesDir(run, run.carriedFiles) }),
 });
 
 /**
@@ -201,9 +210,16 @@ export const filedFoldersAt = (
  * reads a store nobody named (`test/root-given.test.ts`).
  */
 export const filedAt = (
-  run: Pick<Run, 'id' | 'inputs' | 'factory' | 'workflowFiles'>,
+  run: Pick<Run, 'id' | 'inputs' | 'factory' | 'workflowFiles' | 'carriedFiles'>,
   home: string,
-): { runArtifacts: string; inbox: string; inputs?: string; workflowFiles?: string; servers: FactoryServers } => ({
+): {
+  runArtifacts: string;
+  inbox: string;
+  inputs?: string;
+  workflowFiles?: string;
+  carriedFiles?: string;
+  servers: FactoryServers;
+} => ({
   ...filedFoldersAt(run),
   servers: recordedServers(run.factory, home),
 });

@@ -14,8 +14,8 @@ export { namespaceOf };
 /** A run by its name and the namespace its actions are sent in. */
 export type RunAt = { id: string; namespace: string };
 
-/** The namespace of a run object: its own, or, on an object served before a run had one, its `factory` label's. */
-export const namespaceOfRun = (run: Run): string => run.metadata.namespace ?? namespaceOf(run.metadata.labels.factory);
+/** The namespace of a run object: its own, `default` where it names none. */
+const namespaceOfRun = (run: Run): string => namespaceOf(run.metadata.namespace);
 
 /** The namespace of the run `id`, off its object in `client`'s cache, read once where it is not. */
 export const runNamespace = (client: QueryClient, id: string): Promise<string> =>

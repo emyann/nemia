@@ -3,29 +3,16 @@
  * complete, and where a person left the nodes — a run's steps, or the Factory's runs and which are open. Pure, apart
  * from the storage calls at the end, each of which survives a browser that refuses storage.
  */
-import type { GraphEdge, RunGraph, StepAttempts } from './api';
+import type { GraphEdge, RunGraph } from './api/graph.ts';
+import type { StepAttempts } from './api/tries.ts';
 import type { Point } from './layout';
 import { satisfiesAfter, type StepState } from './status.ts';
 import type { Frozen } from './frozen.ts';
+import { durationWords } from './duration.ts';
+import { forgetStored, readStored, store } from './stored.ts';
 
 /** A session is going, so its attempt's time is still counting. */
 export const isLive = (state: StepState): boolean => state === 'working' || state === 'asks-in-session';
-
-/**
- * A duration in its two largest units: `42s`, `12m 04s`, `3h 12m`, `2d 4h`; one below zero, where this clock is behind the engine's, is
- * `0s`.
- */
-export function duration(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ${pad(s % 60)}s`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ${pad(m % 60)}m`;
-  return `${Math.floor(h / 24)}d ${h % 24}h`;
-}
-
-const pad = (n: number) => String(n).padStart(2, '0');
 
 /**
  * `#<attempts> · <time>` for a step's latest attempt, or null before its first.
@@ -38,9 +25,9 @@ export function attemptLine(attempts: StepAttempts, live: boolean, now: number):
   const { count, latest } = attempts;
   if (!latest) return null;
   const started = Date.parse(latest.startedAt);
-  if (latest.ended === null && live) return `#${count} · ${duration(now - started)}`;
-  if (latest.endedAt) return `#${count} · ${duration(Date.parse(latest.endedAt) - started)}`;
-  return `#${count} · started ${duration(now - started)} ago`;
+  if (latest.ended === null && live) return `#${count} · ${durationWords(now - started, 'second')}`;
+  if (latest.endedAt) return `#${count} · ${durationWords(Date.parse(latest.endedAt) - started, 'second')}`;
+  return `#${count} · started ${durationWords(now - started, 'second')} ago`;
 }
 
 /**
@@ -65,7 +52,7 @@ export const edgeState = (sourceDone: boolean, target: StepState): EdgeState =>
  * may yet come: `running` while its next round is due, and `to-come` otherwise. `label`: on a `loop` edge past its first
  * round, the round it is on.
  */
-export type CanvasEdge = {
+type CanvasEdge = {
   id: string;
   source: string;
   target: string;
@@ -221,7 +208,7 @@ export function besideBar(width: number, over: number, nodes: number): Beside | 
 }
 
 /** The padding of a fit beside the floating bar (`besideBar`). */
-export type Beside = { left: '10%'; right: `${number}px`; y: '20%' };
+type Beside = { left: '10%'; right: `${number}px`; y: '20%' };
 
 /**
  * How a canvas `width` pixels wide, the bar `over` pixels over its right edge, is fitted as a step opens in the bar: the run's nodes,
@@ -312,36 +299,26 @@ const NARROW_FACTORY_KEY = 'hkb:factory-layout';
 /** The Factory's open runs, one list per browser, beside its arrangement: whose cards are open on their steps, in the order opened. */
 const FACTORY_OPEN_KEY = 'nemia:factory-open';
 
-/**
- * What a browser may keep for the Factory that nothing reads, each under the key an older board wrote: an arrangement of the steps of a
- * graph unfolded beside a card, and the arrangement and open runs kept before the keys were `nemia:`. Forgotten when the floor opens, so
- * they do not sit in a browser for ever.
- */
-const FACTORY_LEFTOVER_KEYS = ['hkb:factory-steps', 'hkb:factory-layout:v2', 'hkb:factory-open'];
+export const readLayout = (runId: string): Map<string, Point> | null => readStored(layoutKey(runId), parseLayout, null);
+export const saveLayout = (runId: string, at: ReadonlyMap<string, Point>): void =>
+  store(layoutKey(runId), JSON.stringify(Object.fromEntries(at)));
+export const forgetLayout = (runId: string): void => forgetStored(layoutKey(runId));
 
-export const readLayout = (runId: string): Map<string, Point> | null => readAt(layoutKey(runId), parseLayout, null);
-export const saveLayout = (runId: string, at: ReadonlyMap<string, Point>): void => saveAt(layoutKey(runId), Object.fromEntries(at));
-export const forgetLayout = (runId: string): void => forgetAt(layoutKey(runId));
-
-export const readFactoryLayout = (): Map<string, Point> | null => readAt(FACTORY_KEY, parseLayout, null);
+export const readFactoryLayout = (): Map<string, Point> | null => readStored(FACTORY_KEY, parseLayout, null);
 /** The arrangement saved while a cell was narrower, as it was saved: for `widenLayout`. */
-export const readNarrowFactoryLayout = (): Map<string, Point> | null => readAt(NARROW_FACTORY_KEY, parseLayout, null);
+export const readNarrowFactoryLayout = (): Map<string, Point> | null => readStored(NARROW_FACTORY_KEY, parseLayout, null);
 export const saveFactoryLayout = (at: ReadonlyMap<string, Point>): void => {
-  saveAt(FACTORY_KEY, Object.fromEntries(at));
-  forgetAt(NARROW_FACTORY_KEY);
+  store(FACTORY_KEY, JSON.stringify(Object.fromEntries(at)));
+  forgetStored(NARROW_FACTORY_KEY);
 };
 export const forgetFactoryLayout = (): void => {
-  forgetAt(FACTORY_KEY);
-  forgetAt(NARROW_FACTORY_KEY);
+  forgetStored(FACTORY_KEY);
+  forgetStored(NARROW_FACTORY_KEY);
 };
 
-export const readFactoryOpen = (): string[] => readAt(FACTORY_OPEN_KEY, parseOpen, []);
-export const saveFactoryOpen = (ids: readonly string[]): void => saveAt(FACTORY_OPEN_KEY, ids);
-export const forgetFactoryOpen = (): void => forgetAt(FACTORY_OPEN_KEY);
-
-export const forgetFactoryLeftovers = (): void => {
-  for (const key of FACTORY_LEFTOVER_KEYS) forgetAt(key);
-};
+export const readFactoryOpen = (): string[] => readStored(FACTORY_OPEN_KEY, parseOpen, []);
+export const saveFactoryOpen = (ids: readonly string[]): void => store(FACTORY_OPEN_KEY, JSON.stringify(ids));
+export const forgetFactoryOpen = (): void => forgetStored(FACTORY_OPEN_KEY);
 
 /** The open runs as they were saved: run ids, each once, in order; none for anything that is not a list of ids. */
 export function parseOpen(raw: string | null): string[] {
@@ -353,26 +330,4 @@ export function parseOpen(raw: string | null): string[] {
     return [];
   }
   return Array.isArray(value) && value.every((id) => typeof id === 'string' && id !== '') ? [...new Set<string>(value)] : [];
-}
-
-function readAt<T>(key: string, parse: (raw: string | null) => T, none: T): T {
-  try {
-    return parse(localStorage.getItem(key));
-  } catch {
-    return none;
-  }
-}
-
-/** Saves `value` under `key`: where storage is refused or full, nothing is kept, and the arrangement lasts as long as the page does. */
-function saveAt(key: string, value: unknown): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {}
-}
-
-/** Forgets what is kept under `key`: where storage is refused, nothing was kept to forget. */
-function forgetAt(key: string): void {
-  try {
-    localStorage.removeItem(key);
-  } catch {}
 }

@@ -12,7 +12,18 @@
  * (`stateWordsOf`). A step at work, asking through its harness (`asks-in-session`), checking, or settled keeps its state too: what is in
  * flight runs on, and a verdict is a verdict.
  */
-import type { StepCodes, StepReason } from './api/reasons.ts';
+import type { AnswerVia, StepPhase, StepReason, WaitOn } from 'objects';
+
+/**
+ * A step's codes: its phase, its reason, what a `Waiting` waits on (`on`) and where an `AwaitingAnswer` is asked (`via`), each null on
+ * any other reason. What the board reads a step's state from (`stepState`).
+ */
+export interface StepCodes {
+  readonly phase: StepPhase;
+  readonly reason: StepReason;
+  readonly on: WaitOn | null;
+  readonly via: AnswerVia | null;
+}
 import { container, dashed, filled, hairline, meaningOf, paint, ringed, type Hue } from './meaning.ts';
 
 export type StepState =
@@ -95,7 +106,7 @@ const HELD_BY_A_HOLD: ReadonlySet<StepState> = new Set(['blocked', 'awaiting-app
  * is `blocked`, a closeout's; a session that ended on its own word (`Succeeded`) is at most `unverified`; one an operator or a cancel
  * stopped is drawn `cancelled`; a node its route passed by is `skipped`, and a workflow node that filed its card `sent`.
  */
-export const STATE_OF: Record<StepReason, StepState> = {
+const STATE_OF: Record<StepReason, StepState> = {
   Running: 'working',
   Checking: 'checking',
   Paused: 'paused',

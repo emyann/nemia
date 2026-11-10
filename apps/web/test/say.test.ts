@@ -5,7 +5,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Said, TranscriptEvent } from '../src/lib/api.ts';
+import type { Said } from '../src/lib/api/asks.ts';
+import type { TranscriptEvent } from '../src/lib/api/steps.ts';
 import { mergeSaid, sayable, type Sayable } from '../src/lib/say.ts';
 import { coded, type Word } from './run-fixtures.ts';
 import { foldTranscript, heardIn, tailStart, withSaid } from '../src/lib/transcript.ts';

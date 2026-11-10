@@ -16,7 +16,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { RunDecision } from '../src/decide/decision.ts';
+import type { RunDecision } from 'objects';
 import {
   askFile,
   decideRun,
@@ -276,23 +276,20 @@ const wordsOf = (usage: object) => usedLines(usage).map((line) => line.replace(/
 
 test("a raise the package refuses, by POST …/retry of a try and of a round: its status, the facts its words name, the verb's own words — and nothing written", async (t) => {
   await t.test(
-    "REFUSED at shipped defaults: a try's budget that is not an amount — 0, below it, a word — is a 400; a budget on a recheck a 422",
+    "REFUSED at shipped defaults: a try's budget not above zero — 0, below it — is a 422 in `nemia retry --budget`'s words, one that is no number a 400 naming `budget`; a budget on a recheck a 422",
     async () => {
       for (const budget of [0, -1]) {
         const how: RetryHow = { mode: 'continue', budget };
         const res = await askTry('tokens', how);
-        assert.equal(res.status, 400, String(budget));
+        assert.equal(res.status, 422, String(budget));
         const { error } = (await res.json()) as Refused;
         assert.ok(error.startsWith(`--budget ${budget} is not an amount.`), error);
       }
       for (const budget of ['five', '5', null]) {
         const res = await askTry('tokens', { mode: 'continue', budget });
         assert.equal(res.status, 400, JSON.stringify(budget));
-        const { error } = (await res.json()) as Refused;
-        assert.ok(error.startsWith('`budget` is the cap to raise to'), error);
-        assert.ok(error.includes('`nemia retry --budget <amount>`'), error);
-        assert.ok(error.includes('a JSON number above zero'), error);
-        assert.ok(error.includes(`This request's was ${JSON.stringify(budget)}`), error);
+        const { field } = (await res.json()) as { field?: string };
+        assert.ok(field?.startsWith('payload.budget'), `${JSON.stringify(budget)}: ${field}`);
       }
 
       const recheck: RetryHow = { mode: 'recheck', budget: 5 };
@@ -329,19 +326,19 @@ test("a raise the package refuses, by POST …/retry of a try and of a round: it
   );
 
   await t.test(
-    "REFUSED at shipped defaults: a round's budget not above zero, or a word, a round that is not `true`, and a body that is no object, are 400s",
+    "REFUSED at shipped defaults: a round's budget not above zero is a 422 in `nemia retry --round --budget`'s words; a word for it, a round that is not `true`, and a body that is no object, are 400s",
     async () => {
       const zero = await askRound({ budget: 0 });
-      assert.equal(zero.status, 400);
+      assert.equal(zero.status, 422);
       const { error: notAnAmount } = (await zero.json()) as Refused;
       assert.equal(notAnAmount, await roundRefuses(undefined, 0));
       assert.ok(notAnAmount.startsWith('--budget 0 is not an amount.'), notAnAmount);
       const word = await askRound({ step: 'review', budget: 'five' });
       assert.equal(word.status, 400);
-      assert.ok(((await word.json()) as Refused).error.startsWith('`budget` is the cap to raise to'));
+      assert.ok(((await word.json()) as { field?: string }).field?.startsWith('payload.budget'));
       const notTrue = await askRound({ round: 'yes' });
       assert.equal(notTrue.status, 400);
-      assert.ok(((await notTrue.json()) as Refused).error.startsWith('`round` asks for another round'));
+      assert.ok(((await notTrue.json()) as { field?: string }).field?.startsWith('payload.round'));
       assert.equal((await post(`/api/namespaces/default/runs/${R}/steps/review/retry`, ['review'])).status, 400, 'a list is no body');
       nothingWritten('a round body that is not one');
     },

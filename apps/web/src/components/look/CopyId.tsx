@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
 import { Check, Copy, type LucideIcon } from 'lucide-react';
 import { IconButton } from '@/components/ui/ds';
 import { cn } from '@/components/ui/ds/utils';
 import { edged } from '@/lib/meaning';
+import { useCopy, type CopySaid } from '@/lib/useCopy';
 
 /** What the copy control says to a screen reader once pressed. */
-const SAID = { copy: '', copied: 'Copied', failed: 'Could not copy: select the id and copy it' } as const;
+const SAID: Record<CopySaid, string> = { copy: '', copied: 'Copied', failed: 'Could not copy: select the id and copy it' };
 
 /** The box the look draws a short id in: a hairline around it, six pixels of room each side, on a line of eighteen. */
 const BOXED = 'border border-outline-variant px-1.5 py-px';
@@ -35,19 +35,7 @@ const PULLED = '-my-2 -ml-0.75';
  * id is drawn at least, so that ids of different lengths given the same room hold their controls, and what follows, at one edge.
  */
 export function CopyId({ id, short = false, room }: { id: string; short?: boolean; room?: number }) {
-  const [said, setSaid] = useState<keyof typeof SAID>('copy');
-  useEffect(() => {
-    if (said === 'copy') return;
-    const timer = setTimeout(() => setSaid('copy'), 1_600);
-    return () => clearTimeout(timer);
-  }, [said]);
-  const copy = () => {
-    const written = navigator.clipboard ? navigator.clipboard.writeText(id) : Promise.reject(new Error('no clipboard'));
-    written.then(
-      () => setSaid('copied'),
-      () => setSaid('failed'),
-    );
-  };
+  const { said, copy } = useCopy(id);
   const copied = said === 'copied';
   return (
     <span data-copy-id={id} data-copied={copied || undefined} className="inline-flex items-center">

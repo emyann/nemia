@@ -4,8 +4,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Quota, QuotaWindow } from '../src/lib/api.ts';
-import { agoWord, clockWord, lastWords, quotaTitle, windowWords } from '../src/lib/quota.ts';
+import type { Quota, QuotaWindow } from '../src/lib/api/quota.ts';
+import { clockWord, lastWords, quotaTitle, windowWords } from '../src/lib/quota.ts';
 
 const NOW = new Date('2026-09-19T10:00:00.000Z');
 const win = (over: Partial<QuotaWindow> = {}): QuotaWindow => ({
@@ -18,7 +18,7 @@ const win = (over: Partial<QuotaWindow> = {}): QuotaWindow => ({
   ...over,
 });
 
-test("clockWord, agoWord, windowWords, quotaTitle and lastWords: the quota's words", async (t) => {
+test("clockWord, windowWords, quotaTitle and lastWords: the quota's words", async (t) => {
   await t.test("a reset is said in the person's own time zone: the time on the same day, the weekday before it on another", () => {
     assert.equal(clockWord(new Date('2026-09-19T12:30:00Z'), NOW, 'UTC'), '12:30 PM');
     assert.equal(clockWord(new Date('2026-09-19T12:30:00Z'), NOW, 'Asia/Tokyo'), '9:30 PM');
@@ -26,14 +26,6 @@ test("clockWord, agoWord, windowWords, quotaTitle and lastWords: the quota's wor
     assert.equal(clockWord(new Date('2026-09-22T02:00:00Z'), NOW, 'America/New_York'), 'Mon 10:00 PM', 'still Monday in New York');
     assert.equal(clockWord(new Date('2026-09-19T20:00:00Z'), NOW, 'UTC'), '8:00 PM', 'the same instant is today in one zone');
     assert.equal(clockWord(new Date('2026-09-19T20:00:00Z'), NOW, 'Asia/Tokyo'), 'Sun 5:00 AM', 'and tomorrow in another');
-  });
-  await t.test('the age of a reading', () => {
-    assert.equal(agoWord(20_000), 'just now');
-    assert.equal(agoWord(4 * 60_000), '4 min ago');
-    assert.equal(agoWord(120 * 60_000), '2 h ago');
-    assert.equal(agoWord(125 * 60_000), '2 h 5 min ago');
-    assert.equal(agoWord(3 * 86_400_000), '3 d ago');
-    assert.equal(agoWord(-5_000), 'just now', 'a clock behind the writer’s reads as now, not as the future');
   });
   await t.test(
     'a window: its percentage rounded, when it resets, marked past the mark — and, reset since the reading, said so and not marked',
@@ -68,7 +60,7 @@ test("clockWord, agoWord, windowWords, quotaTitle and lastWords: the quota's wor
     };
     assert.equal(
       quotaTitle(fresh, NOW, 'UTC'),
-      'Asked of Claude Code (get_usage, max plan) at 9:58 AM; asked again at most every 3 min while a board is open. A window 80% used or more is marked.',
+      'Asked of Claude Code (get_usage, max plan) at 9:58 AM; asked again at most every 3m while a board is open. A window 80% used or more is marked.',
     );
     const failed: Quota = {
       ...fresh,
@@ -81,13 +73,13 @@ test("clockWord, agoWord, windowWords, quotaTitle and lastWords: the quota's wor
     };
     assert.equal(
       quotaTitle(failed, NOW, 'UTC'),
-      'Asked of Claude Code (get_usage); asked again at most every 3 min while a board is open. A window 80% used or more is marked. The dimmed numbers are the last reading, not now.',
+      'Asked of Claude Code (get_usage); asked again at most every 3m while a board is open. A window 80% used or more is marked. The dimmed numbers are the last reading, not now.',
     );
     assert.match(
       quotaTitle({ ...failed, keepMs: 0, last: null }, NOW, 'UTC'),
       /^Asked of Claude Code \(get_usage\); asked again on every read\. A window 80% used or more is marked\.$/,
     );
-    assert.match(quotaTitle({ ...fresh, keepMs: 90_000 }, NOW, 'UTC'), /at most every 90 s /);
+    assert.match(quotaTitle({ ...fresh, keepMs: 90_000 }, NOW, 'UTC'), /at most every 1m 30s /);
   });
   await t.test(
     'the last good reading beside a state with none: its windows, and as of when — in the header itself, never beside a fresh one',
@@ -106,7 +98,7 @@ test("clockWord, agoWord, windowWords, quotaTitle and lastWords: the quota's wor
         said: 'nothing this time',
       };
       const last = lastWords(unanswered, NOW, 'UTC');
-      assert.equal(last?.asOf, 'as of 9:35 AM, 25 min ago');
+      assert.equal(last?.asOf, 'as of 9:35 AM, 25 minutes ago');
       assert.deepEqual(
         last?.windows.map((w) => [w.label, w.used, w.resets, w.marked]),
         [

@@ -5,6 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { retryUnlessGone } from '../src/lib/api/gone.ts';
 import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
 import {
   levelQuery,
@@ -48,7 +49,7 @@ const up = nemiaLevel({
   level: 'semi-auto',
   since: '2026-10-05T12:00:00.000Z',
   task: 'nemia-1',
-  phase: 'running',
+  phase: 'working',
   sessionId: '0123456789abcdef',
   reach: ['attach 01234567', 'https://example.test/code/session_0123'],
   bridge: { url: 'https://example.test/code/session_0123', why: null },
@@ -100,7 +101,7 @@ test("sessionOf: her session's state, judged from the orchestrator's facts", asy
     assert.match(sessionOf({ ...up, stopped: true }).words, /stopped from outside/i);
   });
   await t.test('the phase is never read: any word there judges the same', () => {
-    for (const phase of ['running', 'settled', 'whatever']) assert.equal(sessionOf({ ...up, phase }).kind, 'up', phase);
+    for (const phase of ['working', 'idle', 'pending'] as const) assert.equal(sessionOf({ ...up, phase }).kind, 'up', phase);
   });
 });
 
@@ -213,5 +214,6 @@ test('levelQuery, nemiaMemoryQuery, nemiaFactQuery: what the api answers of her,
     assert.equal(retry(0, new ReadRefusal('no such fact', 404)), false);
     assert.equal(retry(0, new ReadRefusal('down', 500)), true);
     assert.equal(retry(3, new ReadRefusal('down', 500)), false, 'three tries, as by default');
+    assert.equal(retry, retryUnlessGone, 'the one rule of a read gone, never a copy');
   });
 });

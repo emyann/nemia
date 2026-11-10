@@ -3,7 +3,7 @@
  * others beside.
  */
 import path from 'node:path';
-import { Effect, Layer, Stream, type Duration } from 'effect';
+import { Effect, Layer, Schema, Stream, type Duration } from 'effect';
 import {
   breakdownLines,
   ceilingLines,
@@ -66,10 +66,22 @@ import {
   liveDemandHost,
   type DemandHost,
   renamedIn,
+  PAUSE,
+  pauseNowPreview,
+  pauseNowPreviewLines,
 } from '../runner.ts';
 import { HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
-import { admitRun, agentsCustomRun, policyProposeRun, factoryInstructRun, factoryRulesRun, pruneVerb, rmVerb } from './runs.ts';
+import {
+  admitRun,
+  agentsCustomRun,
+  policyProposeRun,
+  factoryInstructRun,
+  factoryRulesRun,
+  factoryServerAddRun,
+  pruneVerb,
+  rmVerb,
+} from './runs.ts';
 import { inboxAddRun, inboxQueueRun, startRun } from './start.ts';
 import { agentsWriteRun, skillsWriteRun, workflowsWriteRun } from './writers.ts';
 
@@ -356,17 +368,35 @@ function watchVerb(args: Args, e: Engine, place: Place): void | Promise<void> {
   return runMain(watching(from, how, undefined, { selectors, cursorFile }));
 }
 
+/**
+ * `nemia pause`'s runner: the CLI asks before it pauses at once — `--now` says what it would cut and writes nothing, and acts on `--yes`
+ * alone, since the verb takes no yes (`PAUSE`); every other pause is handed to its handler as any command is.
+ */
+async function pauseRun(args: Args, e: Engine, place: Place): Promise<void> {
+  if (args.now === true && args.yes !== true) {
+    for (const line of pauseNowPreviewLines(await runWith(e, placedIn(place, pauseNowPreview())))) console.log(line);
+    return;
+  }
+  const given = inputOf(PAUSE, args);
+  const data = await runWith(e, placedIn(place, PAUSE.handler(given, process.env, wfRoot(process.env))));
+  for (const line of PAUSE.print(data, given)) console.log(line);
+}
+
 /** Each verb `nemia` takes, by its name on the command line: a `Map`, so a name every object has is no verb. */
 export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([['decide', decideVerb]]);
+
+/** A runner of the CLI: the parsed line, the engine, the place, and the store's root the command line read where it was composed. */
+type Runner = (args: Args, e: Engine, place: Place, home: string) => void | Promise<void>;
 
 /**
  * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`); `nemia rm` and `nemia prune`,
  * whose runners walk the many runs a command line names through their handlers; and `nemia start`, `nemia inbox add`, `nemia inbox queue`,
  * `nemia agents custom`, `nemia factory instruct`, `nemia policy propose`, `nemia agents write`, `nemia skills write` and
- * `nemia workflows write`, whose runners read the files and folders a command line names before their handlers; and `nemia admit`, whose
- * runner reads the call on stdin: handed its arguments once read and checked.
+ * `nemia workflows write`, whose runners read the files and folders a command line names before their handlers; `nemia factory server
+ * add`, whose runner maps its flags to the write its handler takes; and `nemia admit`, whose runner reads the call on stdin: handed its
+ * arguments once read and checked.
  */
-export const RUNS: ReadonlyMap<string, (args: Args, e: Engine, place: Place) => void | Promise<void>> = new Map([
+export const RUNS: ReadonlyMap<string, Runner> = new Map<string, Runner>([
   ['tick', tickVerb],
   ['up', upVerb],
   ['watch', watchVerb],
@@ -378,11 +408,13 @@ export const RUNS: ReadonlyMap<string, (args: Args, e: Engine, place: Place) => 
   ['agents custom', agentsCustomRun],
   ['factory instruct', factoryInstructRun],
   ['factory rules', factoryRulesRun],
+  ['factory server add', factoryServerAddRun],
   ['policy propose', policyProposeRun],
   ['agents write', agentsWriteRun],
   ['skills write', skillsWriteRun],
   ['workflows write', workflowsWriteRun],
   ['admit', admitRun],
+  ['pause', pauseRun],
 ]);
 
 /**
@@ -399,12 +431,26 @@ async function commanded(command: Command | Ran, rest: string[], e: Engine, dema
   if (wrong) usage(wrong);
   if (command.ticks === true) await Effect.runPromise(ensureDaemon(demand()));
   const runner = RUNS.get(command.name);
-  if (runner) return runner(args, e, place);
+  if (runner) return runner(args, e, place, wfRoot(process.env));
   if (command.handler === undefined)
     throw new Error(`${command.name} has neither a runner nor a handler: give it one in RUNS or its entry`);
-  const data = await runWith(e, placedIn(place, command.handler(args, process.env, wfRoot(process.env))));
-  for (const line of command.print(data, args)) console.log(line);
-  for (const line of command.note?.(data, args) ?? []) console.error(line);
+  const given = inputOf(command, args);
+  const data = await runWith(e, placedIn(place, command.handler(given, process.env, wfRoot(process.env))));
+  for (const line of command.print(data, given)) console.log(line);
+  for (const line of command.note?.(data, given) ?? []) console.error(line);
+}
+
+/**
+ * The arguments `command`'s handler takes: the parsed `args` as they are, or decoded through its `input` where it says one, a key its
+ * handler takes that the parse left out or gave another type refused, exit 2, before anything is read. The decoded value is what the
+ * typed entry takes, its input erased as the table holds it (`tableEntry`).
+ */
+function inputOf<D extends object, I>(command: Command<D, I>, args: Args): I;
+function inputOf(command: Command, args: Args): Args {
+  if (command.input === undefined) return args;
+  const decoded = Schema.decodeUnknownExit(command.input)(args);
+  if (decoded._tag === 'Success') return decoded.value as Args;
+  return usage(`nemia ${command.name} was given arguments its handler does not take: nemia ${command.name} ${command.usage}.`);
 }
 
 /** The names `nemia` takes, its commands' and its verbs', a name of two words among them: `agents card`. */

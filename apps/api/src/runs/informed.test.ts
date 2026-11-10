@@ -1,8 +1,8 @@
 /**
  * The app's informer (`Informer`, the package's rest/informer.verb.ts, given one per app by `liveOf`): the run object, the runs list and
  * the sub-resources answer from one judgement of a run, the same for the object and the list (Q18), and a write made through the api is
- * seen on the very next request — the generic write mount takes the run it names out of the informer once it has run (`uninformed` in
- * commands/routes.ts). A cold app answers as a warm one.
+ * seen on the very next request — each of the run's named actions takes the run it names out of the informer once it has run
+ * (`dropInformed`, by `acted` in objects/runs.ts). A cold app answers as a warm one.
  *
  * On the stand-ins: the runtime's test engine, its tasks filed and settled by hand, and the test place, under the records this file seeds.
  * The stand-in's feed has no line, so a write that moves only the engine's journal — a word said to a session at work — moves nothing the
@@ -18,7 +18,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { Informer, informerMemo, type InformerMemo } from 'agent-orchestrator';
 import type { Labelled, RunList } from 'objects';
-import type { RunAnswer } from './runs.ts';
+import type { Run as RunAnswer } from 'objects';
 import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
 import { framedOf, listedRuns } from '../../test/run-reads.ts';
 

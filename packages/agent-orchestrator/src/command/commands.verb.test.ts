@@ -7,18 +7,19 @@ import assert from 'node:assert/strict';
 import { ANSWERS, PENDING, REFUSED_FLAGS, REFUSED_WORDS } from '../../test/command-words.ts';
 import type { CommandSpec } from './command.ts';
 import { TABLE } from './commands.verb.ts';
+import { CLI_VERBS } from './command.ts';
 
 test('no command is named by a refused word but those pending their decision', () => {
   const pending = new Set(PENDING.map((p) => p.name));
-  const refused = TABLE.filter((c) => !pending.has(c.name) && c.name.split(' ').some((w) => REFUSED_WORDS.includes(w)));
+  const refused = [...TABLE, ...CLI_VERBS].filter((c) => !pending.has(c.name) && c.name.split(' ').some((w) => REFUSED_WORDS.includes(w)));
   assert.deepEqual(
     refused.map((c) => c.name),
     [],
   );
 });
 
-test('every pending name is still in the table, so the list only shrinks', () => {
-  const names = new Set(TABLE.map((c) => c.name));
+test('every pending name is still in the table or among the CLI’s own verbs, so the list only shrinks', () => {
+  const names = new Set([...TABLE, ...CLI_VERBS].map((c) => c.name));
   assert.deepEqual(
     PENDING.filter((p) => !names.has(p.name)).map((p) => p.name),
     [],

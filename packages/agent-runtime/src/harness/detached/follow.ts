@@ -22,7 +22,7 @@ export type PartialMark = { begun: string } | { index: number; text: string } | 
  * run of it; `unread` while its file cannot be read), the file its stdout is kept in, the folder both are in and the prefix of their
  * names there, how its stdout's lines read (`partials`), and where its transcript is and how its lines read.
  */
-export type FollowSource = {
+type FollowSource = {
   harness: string;
   run: () => { state: SessionState; nativeId?: string } | { unread: string } | undefined;
   stdout: string;

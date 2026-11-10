@@ -1,6 +1,7 @@
 /**
- * `nemia factory servers`, `server add` and `server rm`, each an entry of the command table, served on the CLI and generated into the
- * api's routes: a factory's record listed with each server's state, a remote server recorded, and one taken off.
+ * `nemia factory servers`, `server add` and `server rm`, each an entry of the command table, served on the CLI: a factory's record listed
+ * with each server's state, a remote server recorded, and one taken off. The api's McpServer writes (`objects`' Api) call `server add` and
+ * `server rm` by their `input`.
  *
  * The states are the runtime's own words, carried whole and never worded again here: `connected`, `needs-auth`, `failed`, `pending`,
  * `disabled`. A factory's whole record is read in one ask of the engine, never one ask per server; a read that failed says the state is
@@ -9,7 +10,7 @@
  * The default factory is given a record here, in the controller, while `factories/default.json` stays refused in the store — as
  * `levels.verb.ts` has the default factory's special case.
  */
-import { Effect } from 'effect';
+import { Effect, Schema } from 'effect';
 import { EngineService, signsInMcp, tried, type McpServerState, type McpServersRead } from '../../runtime-client.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../../command/command.ts';
 import { rootGiven, StoreRoot } from '../../config/root.store.ts';
@@ -21,7 +22,7 @@ import { DEFAULT_FACTORY, noFactoryLine } from '../factory.ts';
 import { readFactories } from '../factory.store.ts';
 import { Invalid, Missing } from '../../refusal/refusal.ts';
 import { factoryServers, factoryServersFile } from './servers.store.ts';
-import { HEADER_MASK, type McpTransport } from 'objects';
+import { HEADER_MASK, McpServerWrite, type McpTransport } from 'objects';
 import { factoryServerRefusal, headerWritten, maskedHeaders, serverNameRefusal, type FactoryServers } from './servers.ts';
 
 /** The text under `key`, as the spec read it. */
@@ -195,13 +196,53 @@ function oauthOf(args: Args): { clientId: string; callbackPort?: number } | unde
   }
   if (!port) return { clientId };
   const n = Number(port);
-  if (!Number.isSafeInteger(n) || n < 1 || n > 65535) {
-    throw new Invalid({
-      message: `--callback-port takes the port the OAuth app's callback is registered on, a whole number from 1 to 65535, and \`${port}\` is not one: --callback-port 8791. Nothing was recorded.`,
-    });
-  }
+  if (!isPort(n)) throw new Invalid({ message: portRefusal(port) });
   return { clientId, callbackPort: n };
 }
+
+/** Whether `n` is a port an OAuth app's callback can be registered on: a whole number from 1 to 65535. */
+const isPort = (n: number): boolean => Number.isSafeInteger(n) && n >= 1 && n <= 65535;
+
+/** Why `port` is no callback port, naming the flag and the key that give it. */
+const portRefusal = (port: string): string =>
+  `--callback-port (\`oauth.callbackPort\`) takes the port the OAuth app's callback is registered on, a whole number from 1 to 65535, and \`${port}\` is not one: --callback-port 8791. Nothing was recorded.`;
+
+/** What `nemia factory server add` takes: the factory, the server's name, and the McpServer's write (`objects`' `McpServerWrite`). */
+export const ServerAddInput = Schema.Struct({ ...McpServerWrite.fields, factory: Schema.String, server: Schema.String });
+export type ServerAddInput = typeof ServerAddInput.Type;
+
+/** What `nemia factory server rm` takes: the factory, and the server taken off its record. */
+export const ServerRmInput = Schema.Struct({ factory: Schema.String, server: Schema.String });
+export type ServerRmInput = typeof ServerRmInput.Type;
+
+/**
+ * `nemia factory server add`'s command line as its handler takes it (`ServerAddInput`): `--transport` its `type`, http by default, each
+ * `--header <name>=<value>` a header by name, `--client-id` and `--callback-port` its `oauth`. Refused (`Invalid`) as the flags are
+ * (`headersOf`, `oauthOf`), and as a server the factory would not record (`factoryServerRefusal`), before anything is read.
+ */
+export function serverAddOf(args: Args): ServerAddInput {
+  const headers = headersOf(args);
+  const oauth = oauthOf(args);
+  const asked = {
+    factory: textOf(args, 'factory'),
+    server: textOf(args, 'server'),
+    type: textOf(args, 'transport') || 'http',
+    url: textOf(args, 'url'),
+    ...(headers === undefined ? {} : { headers }),
+    ...(oauth === undefined ? {} : { oauth }),
+  };
+  const refused = factoryServerRefusal(asked);
+  if (refused) throw new Invalid({ message: `${refused} Nothing was recorded.` });
+  return Schema.decodeUnknownSync(ServerAddInput)(asked);
+}
+
+/** Why a server's write is refused before anything is read, beside `factoryServerRefusal`: a header with no name, a port that is none. */
+const writeRefusal = (write: McpServerWrite): string | undefined => {
+  if (write.headers !== undefined && Object.hasOwn(write.headers, ''))
+    return 'A header is sent by its name, and one has none: give each header its name, as { "X-MCP-Toolsets": "actions,repos" }. Nothing was recorded.';
+  const port = write.oauth?.callbackPort;
+  return port === undefined || isPort(port) ? undefined : portRefusal(String(port));
+};
 
 /**
  * Refused (`Missing`): a factory the store has no file for, and one whose file does not read. The default factory passes — it is no
@@ -260,7 +301,7 @@ type Added = { file: string; name: string; server: FactoryServers[string]; repla
  * `nemia factory server add`: one remote MCP server recorded for a factory, a second of one name replacing the first. Refused before
  * anything is written: a name that is no server's, a local server, and an `Authorization` header (`factoryServerRefusal`).
  */
-export const FACTORY_SERVER_ADD: Command<Added> = {
+export const FACTORY_SERVER_ADD: Command<Added, ServerAddInput> = {
   name: 'factory server add',
   usage: ADD_USAGE,
   help: ["record a remote MCP server for a factory: its steps' sessions are", 'handed it, and an agent `mcp:` line names it'],
@@ -268,27 +309,23 @@ export const FACTORY_SERVER_ADD: Command<Added> = {
   check: addCheck,
   writes: true,
   class: 'ask',
-  only: { side: 'cli', why: "the api serves it as the McpServer's `put` of `objects`' Api, calling this handler" },
-  handler: (args, _env, home) =>
+  only: {
+    side: 'cli',
+    why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the McpServer's `put`, whose handler calls this one by its `input`; the command line's runner maps its flags to it (`serverAddOf`)",
+  },
+  input: ServerAddInput,
+  handler: ({ factory, server: name, type, ...write }, _env, home) =>
     rooted(
       home,
       'factory server add',
       Effect.gen(function* () {
         const store = yield* StoreRoot;
-        const factory = textOf(args, 'factory');
-        const name = textOf(args, 'server');
-        const transport = textOf(args, 'transport') || 'http';
         const bad = serverNameRefusal(name);
         if (bad) return yield* Effect.fail(new Invalid({ message: `${bad} Nothing was recorded.` }));
         yield* tried(() => factoryThere(factory, 'recorded'));
-        const headers = headersOf(args);
-        const oauth = oauthOf(args);
-        const server = {
-          type: transport as McpTransport,
-          url: textOf(args, 'url'),
-          ...(headers === undefined ? {} : { headers }),
-          ...(oauth === undefined ? {} : { oauth }),
-        };
+        const wrong = writeRefusal(write);
+        if (wrong) return yield* Effect.fail(new Invalid({ message: wrong }));
+        const server = { ...write, type: type ?? 'http' };
         const refused = factoryServerRefusal(server);
         if (refused) return yield* Effect.fail(new Invalid({ message: `${refused} Nothing was recorded.` }));
         const door = yield* FactoryDoor;
@@ -298,8 +335,8 @@ export const FACTORY_SERVER_ADD: Command<Added> = {
         return { file: factoryServersFile(store, factory), name, server: masked(kept), replaced: maskedOrNull(record[name]) };
       }),
     ),
-  print: ({ file, name, server, replaced }, args) => [
-    `${textOf(args, 'factory')}  ${name} → ${server.type} ${server.url}${replaced === null ? '' : ` (was ${replaced.url})`}`,
+  print: ({ file, name, server, replaced }, { factory }) => [
+    `${factory}  ${name} → ${server.type} ${server.url}${replaced === null ? '' : ` (was ${replaced.url})`}`,
     `recorded: ${file}${server.oauth === undefined ? '' : ' — sign the server in before a step needs it'}`,
   ],
 };
@@ -310,7 +347,7 @@ const RM_USAGE = '<factory> <server>';
  * `nemia factory server rm`: one server taken off a factory's record. The sign-in the harness filed for it is left: it is the
  * harness's own store, and nothing here writes it.
  */
-export const FACTORY_SERVER_RM: Command<{ file: string; removed: string }> = {
+export const FACTORY_SERVER_RM: Command<{ file: string; removed: string }, ServerRmInput> = {
   name: 'factory server rm',
   usage: RM_USAGE,
   help: ["take a server off a factory's record"],
@@ -326,15 +363,17 @@ export const FACTORY_SERVER_RM: Command<{ file: string; removed: string }> = {
   },
   writes: true,
   class: 'ask',
-  only: { side: 'cli', why: "the api serves it as the McpServer's `delete` of `objects`' Api, calling this handler" },
-  handler: (args, _env, home) =>
+  only: {
+    side: 'cli',
+    why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the McpServer's `delete`, whose handler calls this one by its `input`",
+  },
+  input: ServerRmInput,
+  handler: ({ factory, server: name }, _env, home) =>
     rooted(
       home,
       'factory server rm',
       Effect.gen(function* () {
         const store = yield* StoreRoot;
-        const factory = textOf(args, 'factory');
-        const name = textOf(args, 'server');
         yield* tried(() => factoryThere(factory, 'removed'));
         const door = yield* FactoryDoor;
         const record = yield* door.servers.read(FactoryName.read(factory));
@@ -351,8 +390,8 @@ export const FACTORY_SERVER_RM: Command<{ file: string; removed: string }> = {
         return { file: factoryServersFile(store, factory), removed: name };
       }),
     ),
-  print: ({ file, removed }, args) => [
-    `${textOf(args, 'factory')}  ${removed} removed`,
+  print: ({ file, removed }, { factory }) => [
+    `${factory}  ${removed} removed`,
     `recorded: ${file} — the sign-in the harness filed for it is left in the harness's own store`,
   ],
 };

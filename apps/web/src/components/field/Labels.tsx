@@ -9,7 +9,7 @@ const entriesOf = (map: Readonly<LabelMap>): Array<[string, string]> =>
   Object.entries(map).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
 
 /** One label, a cut tag reading `key=value`, linking to its label page. */
-export function LabelTag({ name, value }: { name: string; value: string }) {
+function LabelTag({ name, value }: { name: string; value: string }) {
   return (
     <CutTag>
       <TextLink to="/labels/$key/$value" params={{ key: name, value }} data-label={`${name}=${value}`}>

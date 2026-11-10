@@ -21,6 +21,7 @@ import { compactAsked, compactLines } from './compact.ts';
  * checked by `parseBrief`, so `deadlineSeconds: 5m` is refused rather than journalled as `null`. A test feeds every key
  * through the parser, so none can be accepted here and then dropped. A key is one of the task's, one of its harness's
  * arguments, or one of Codex's own, filed under `config.codex`.
+ * Exported only for the tests that import it.
  */
 export const BRIEF_KEYS = [
   'cwd',
@@ -40,6 +41,7 @@ export const BRIEF_KEYS = [
   'restartPolicy',
   'trustFrom',
 ] as const satisfies readonly (keyof TaskSpec | keyof HarnessArgs | keyof CodexArgs)[];
+/** Exported only for the tests that import it. */
 export type BriefKey = (typeof BRIEF_KEYS)[number];
 
 const isBriefKey = (key: string): key is BriefKey => (BRIEF_KEYS as readonly string[]).includes(key);
@@ -239,6 +241,7 @@ const worktreeOf = (worktree: string | undefined): true | string | undefined =>
  *   `config.codex`; whether it is absolute, and whether the harness is Codex, is `file()`'s to say.
  *
  * The harness's arguments go under `config`, as a task carries them; a brief writes them as keys like any other.
+ * Exported only for the tests that import it.
  */
 export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
   const { meta, brief } = briefParts(text);
@@ -356,7 +359,7 @@ const HELP = `ae — an engine for agent sessions
  * engine's option (`maxConcurrent`) and no variable's; read and dropped, the variable would have a person who set it believe in a
  * ceiling nothing keeps.
  */
-export const AE_MAX_CONCURRENT_RETIRED =
+const AE_MAX_CONCURRENT_RETIRED =
   'ae: `AE_MAX_CONCURRENT` is retired: `ae` runs its engine with no ceiling, since a ceiling is the option `maxConcurrent` a program gives `Engine.layer`. Unset it, file with `queued: true` and start each with `ae admit <id>` when it may run.';
 
 /**
@@ -420,7 +423,10 @@ const tickOnce = async (engine: EngineShape): Promise<void> => {
   for (const why of r.unreadable) console.error(`left out: ${why}`);
 };
 
-/** What `ae sweep` is asked, off the arguments after it: `{ yes }`, given `--yes`. Refuses, with exit code 2, any other argument. */
+/**
+ * What `ae sweep` is asked, off the arguments after it: `{ yes }`, given `--yes`. Refuses, with exit code 2, any other argument.
+ * Exported only for the tests that import it.
+ */
 export const sweepAsked = (rest: readonly string[]): { yes: boolean } => {
   const other = rest.filter((a) => a !== '--yes');
   if (other.length)
@@ -432,7 +438,10 @@ export const sweepAsked = (rest: readonly string[]): { yes: boolean } => {
 
 const bodies = (n: number) => `${n} bod${n === 1 ? 'y' : 'ies'}`;
 
-/** The line `ae sweep` prints for `report`: what it removed, when `yes`, else what it would remove; and what it keeps. */
+/**
+ * The line `ae sweep` prints for `report`: what it removed, when `yes`, else what it would remove; and what it keeps.
+ * Exported only for the tests that import it.
+ */
 export const sweepLine = (report: SweepReport, yes: boolean): string =>
   yes
     ? `${bodies(report.removed)} removed (${report.removedBytes} bytes), ${report.kept} kept`
@@ -447,6 +456,7 @@ const sweepBodies = async (engine: EngineShape, rest: readonly string[]): Promis
 /**
  * What `ae forget` is asked, off the arguments after it: the task ids, and `yes`, given `--yes`. Refuses, with exit code 2, no id or
  * a flag.
+ * Exported only for the tests that import it.
  */
 export const forgetAsked = (rest: readonly string[]): { taskIds: string[]; yes: boolean } => {
   const taskIds = rest.filter((a) => a !== '--yes');
@@ -464,6 +474,7 @@ export const forgetAsked = (rest: readonly string[]): { taskIds: string[]; yes: 
 /**
  * The lines `ae forget` prints for `report`: per task what went, or without `yes` what would, what each harness leaves, and the next
  * command.
+ * Exported only for the tests that import it.
  */
 export const forgetLines = (report: ForgetReport): string[] => {
   const lines: string[] = [];
@@ -490,7 +501,7 @@ const forgetTasks = async (engine: EngineShape, rest: readonly string[]): Promis
 };
 
 /** The line `ae feed` prints after a read from `after` when lines after it were forgotten, else none. */
-export const forgottenLine = (forgotten: number | undefined, after: number): string[] =>
+const forgottenLine = (forgotten: number | undefined, after: number): string[] =>
   forgotten ? [`${forgotten} lines of forgotten tasks were here, after cursor ${after}`] : [];
 
 /** `ae feed [cursor]`: the entries after `after`, what was forgotten after it, what was skipped, and the cursor to resume from. */
@@ -559,6 +570,7 @@ const keepingVerb = (verb: string | undefined) =>
 /**
  * The engine over `options`, its layer built once and kept for the process. Refused — rejects with an `Error` whose `exitCode` is 2, led
  * by `ae` (`refusalWords`) — for options the engine refuses; any other failure to build it is rejected as it is.
+ * Exported only for the tests that import it.
  */
 export const engineAt = (options: EngineOptions): Promise<EngineShape> =>
   ManagedRuntime.make(EngineService.layer(options))

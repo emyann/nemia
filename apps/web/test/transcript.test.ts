@@ -17,7 +17,7 @@ import {
   type ToolsTurn,
   type Turn,
 } from '../src/lib/transcript.ts';
-import type { TranscriptEvent } from '../src/lib/api.ts';
+import type { TranscriptEvent } from '../src/lib/api/steps.ts';
 
 let clock = Date.parse('2026-09-13T08:00:00.000Z');
 const at = () => new Date((clock += 1000)).toISOString();

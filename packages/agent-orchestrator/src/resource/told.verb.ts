@@ -10,6 +10,7 @@ import type { TaskView, Views } from '../summary/reads.verb.ts';
 import type { PlaceService } from '../place/place.store.ts';
 import { type Bridge, bridgeOf } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
+import { fenceReach } from 'agent-runtime/vocabulary';
 import { HARNESSES, remoteAgents } from '../runtime-client.ts';
 import type { HandedHow, RunsInBy } from 'objects';
 
@@ -175,18 +176,21 @@ const MODE_FLAGS: readonly string[] = ['--permission-mode', '-s', '--sandbox'];
  * A harness the run brings as a spec — `codex` — is asked with its own `command`, a pure function of the request: the mode it would
  * spawn the session with, and again without `tools`, which tells a sandbox the tools narrowed from one the task named. So a rule the
  * engine changes is the rule read here. `claude` is the engine's own harness, every session of it a job on the Agent SDK (or a
- * long-lived session, `restartPolicy: 'Always'`), whose spawn is no function it exports: it takes the mode filed, or `auto`
- * (`attachedOptions` in agent-runtime), which the api test holds to the argv the engine's job hands Claude Code. A task filed with
- * no harness ran on the engine's first (`fallback` in its facade). Null for a harness the api cannot ask, or one whose command names no
- * mode.
+ * long-lived session, `restartPolicy: 'Always'`), whose spawn is no function it exports: it takes the mode filed, or the word its fence
+ * gives a task naming none (`fenceReach`'s `given`, `auto`; `attachedOptions` in agent-runtime), which the api test holds to the argv
+ * the engine's job hands Claude Code. A task filed with no harness ran on the engine's first (`fallback` in its facade). Null for a
+ * harness the api cannot ask, or one whose command names no mode.
  */
 function runsInOf(state: TaskView['state']): StepFiled['runsIn'] {
   const name = state.harness ?? Object.keys(HARNESSES)[0];
   if (name === undefined || !Object.hasOwn(HARNESSES, name)) return null;
-  const harness = HARNESSES[name as keyof typeof HARNESSES];
+  const harness = HARNESSES[name];
   const { permissionMode, tools: filedTools } = state.config ?? {};
   const by = permissionMode === undefined ? 'default' : 'filed';
-  if (harness === 'claude') return { mode: permissionMode ?? 'auto', by };
+  if (typeof harness === 'string') {
+    const given = fenceReach(name)?.given;
+    return given === undefined ? null : { mode: permissionMode ?? given, by };
+  }
   if (typeof harness !== 'object' || !('command' in harness)) return null;
   const modeOf = (tools: string[] | undefined): string | undefined => {
     try {

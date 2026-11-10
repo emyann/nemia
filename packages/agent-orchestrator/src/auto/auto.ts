@@ -7,7 +7,7 @@
  * Pure, and naming no agent: admission reads a list for whichever agent it is given (`admissionOf`). The files are `auto.store.ts`'s, the
  * facts `facts.ts`'s, the commands `auto.verb.ts`'s.
  */
-import { CHANGE_VERBS, type ChangeVerb } from 'objects';
+import { CHANGE_VERBS, RULE_ANSWERS, type ChangeVerb, type RuleAnswer, type RuleOrigin } from 'objects';
 
 /**
  * The conditions a rule may need, each a fact admission reads of a run at the call: the step's agent recommends (`recommends`), its check
@@ -19,11 +19,8 @@ export const CONDITIONS = ['recommends', 'checked', 'accepted', 'withinBudget', 
 /** A condition a rule may need. */
 export type Condition = (typeof CONDITIONS)[number];
 
-/** The answers a rule may give unasked: a step approved at its gate, and a step tried again. */
-export const RULE_ANSWERS = ['approve', 'retry'] as const;
-
-/** An answer a rule may give unasked. */
-export type RuleAnswer = (typeof RULE_ANSWERS)[number];
+/** The answers a rule may give unasked (`RULE_ANSWERS`, objects' words): a step approved at its gate, and a step tried again. */
+export { RULE_ANSWERS, type RuleAnswer };
 
 /**
  * A rule at a gate: its `id`; the `answer` it gives unasked; the `steps` it covers, by name, every step where absent; the conditions it
@@ -36,7 +33,7 @@ export type GateRule = {
   steps?: string[];
   when: Condition[];
   under?: number;
-  from?: 'default' | 'proposed';
+  from?: RuleOrigin;
 };
 
 /** The answer of a rule under which the agent approves a proposal of its factory unasked (`contracts/proposal-approval.contract.ts`). */

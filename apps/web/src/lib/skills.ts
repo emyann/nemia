@@ -1,5 +1,6 @@
 import type { DefinitionOrigin } from 'objects';
-import type { GivenSkill, SkillCost, SkillDetail, SkillDraft, SkillPlace, SkillRow, SkillSource, SkillUser } from './api';
+import type { GivenSkill, SkillCost, SkillSource } from './api/library.ts';
+import type { SkillDetail, SkillDraft, SkillPlace, SkillRow, SkillUser } from './api/skills.ts';
 
 /** What each place of skills is called on the board. */
 export const PLACE_LABELS: Readonly<Record<SkillSource, string>> = {
@@ -48,7 +49,7 @@ export function givenRows(names: readonly string[], given: readonly GivenSkill[]
  * nowhere; that it is given already; that an agent of yours finds its name elsewhere — a builtin skill your library or the repository has,
  * so a copy would write over yours or hide the repository's; or why no agent can be given it, and nothing to press.
  */
-export type SkillOffer =
+type SkillOffer =
   | { kind: 'add' }
   | { kind: 'copy' }
   | { kind: 'given' }

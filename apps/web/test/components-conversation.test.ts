@@ -21,7 +21,7 @@ const { Worked, WorkedLine } = await import('../src/components/conversation/Work
 const { HARNESS_TOOL, THOUGHT_TOOL } = await import('../src/lib/sessionItems.ts');
 const { chatItems } = await import('../src/lib/chatFollowing.ts');
 type ConversationLine = import('../src/lib/conversation.ts').ConversationLine;
-type ChatEvent = import('../src/lib/api.ts').ChatEvent;
+type ChatEvent = import('../src/lib/api/chat.ts').ChatEvent;
 
 /** One tool call of hers. */
 const chatCall = (id: string, state: 'done' | 'running' | 'waits', second: number): Extract<ChatEvent, { kind: 'call' }> => ({

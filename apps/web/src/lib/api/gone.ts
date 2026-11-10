@@ -1,17 +1,19 @@
 /**
- * Whether a run's read found no run, and how such a read is tried again: what every read of a run shares — its object and its sub-resources
- * (`run.ts`).
+ * Whether a read found nothing at its address, and how such a read is tried again: the one rule of a 404 every read of a thing that can be
+ * gone shares — a run, its object and its sub-resources (`run.ts`), a fact she keeps (`nemia.ts`) and a proposal (`proposals.ts`).
  */
 import { ReadRefusal } from './read.ts';
 
 /**
- * Whether a read of a run's record found no run: the api's 404 (`noSuchRun`), as the CLI's `rm` leaves it. A page open on the run keeps
- * what it last read when a read again fails — a suspense query throws only while it has nothing — so the run's pages read the query's
- * `error` beside its `data`, and say the run is gone rather than draw it as it was.
+ * Whether a read found nothing at its address: the api's 404 — a run gone from the store (`noSuchRun`), as the CLI's `rm` leaves it, a
+ * fact she no longer keeps, a proposal no longer there. A page open on a run keeps what it last read when a read again fails — a
+ * suspense query throws only while it has nothing — so the run's pages read the query's `error` beside its `data`, and say the run is
+ * gone rather than draw it as it was.
  */
-export const runGone = (error: unknown): boolean => error instanceof ReadRefusal && error.status === 404;
+export const readGone = (error: unknown): boolean => error instanceof ReadRefusal && error.status === 404;
 
 /**
- * Every failure is tried again three times, as react-query does by default, but a run gone from the store: said at once, not seconds later.
+ * Every failure is tried again three times, as react-query does by default, but a read that found nothing (`readGone`): said at once, not
+ * seconds later.
  */
-export const retryRun = (failures: number, error: unknown): boolean => !runGone(error) && failures < 3;
+export const retryUnlessGone = (failures: number, error: unknown): boolean => !readGone(error) && failures < 3;

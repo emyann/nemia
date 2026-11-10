@@ -28,7 +28,7 @@ const ROOT = scratch('wf-watch-');
 process.env.WF_ROOT = ROOT;
 const FEED = path.join(ROOT, 'feed.jsonl');
 const { livenessLines, main, watching, watchPrinted } = await import('./main.ts');
-const { RAN } = await import('../command/runs.verb.ts');
+const { RAN } = await import('../command/commands.verb.ts');
 const { parseArgv } = await import('../command/command.ts');
 const { engineOf } = await import('../runtime-client.ts');
 

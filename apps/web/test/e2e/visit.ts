@@ -136,7 +136,9 @@ export async function visitAll(
     const now = Date.now();
     const timezoneId = middayZone(now);
     const context = await browser.newContext({ colorScheme: theme, viewport: { width: 1280, height: 800 }, timezoneId });
-    console.log(`e2e: the ${theme} theme's browser is in ${timezoneId}, where it is ${middayClock(now)}: its day began hours before the seed`);
+    console.log(
+      `e2e: the ${theme} theme's browser is in ${timezoneId}, where it is ${middayClock(now)}: its day began hours before the seed`,
+    );
     context.on('page', track);
     try {
       for (const spec of pages) {
@@ -163,7 +165,7 @@ export async function visitAll(
  * The zone a browser of the e2e is placed in: the whole-hour zone (`Etc/GMT±N`, whose sign POSIX inverts) where `now` reads between
  * noon and one, whatever the machine's own zone and hour. The seed dates its runs minutes to an hour before the instant it seeds, and a
  * page that reads "today" from the browser's midnight (the overview strip's Spent) counts them only once that midnight is behind them:
- * in the first hour after the machine's own midnight they fell on the day before (`ci` at 00:00:58 UTC, 2026-11-09). Placed at midday,
+ * in the first hour after the machine's own midnight they fell on the day before. Placed at midday,
  * the browser's day began twelve hours before the seed, and the visits have eleven hours before it ends, at every hour of the run.
  */
 export function middayZone(now: number): string {

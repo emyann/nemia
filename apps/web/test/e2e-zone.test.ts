@@ -9,7 +9,9 @@ import { middayZone } from './e2e/visit.ts';
 
 /** The hour and minute `at` reads in `zone`, as the browser placed there reads them. */
 const clockIn = (at: number, zone: string): { hour: number; minute: number } => {
-  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: zone, hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(at);
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: zone, hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(
+    at,
+  );
   const part = (type: 'hour' | 'minute') => Number(parts.find((p) => p.type === type)?.value);
   return { hour: part('hour'), minute: part('minute') };
 };

@@ -67,5 +67,5 @@ export async function servedStore(prefix: string, seed: (root: string) => void) 
     child.kill();
     await ended;
   };
-  return { root, home, nemia, stop, said: () => said };
+  return { root, home, env, nemia, stop, said: () => said };
 }

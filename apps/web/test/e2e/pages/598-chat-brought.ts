@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fed, herChat, openChat, photograph, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { ASKING, writeAsking } from '../seed.ts';
+import type { Request } from 'playwright';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -19,7 +20,8 @@ export default {
    * brief and its questions, and the step held on its budget, the Decide section's raise. Her bubble holds her words and none of the
    * step's questions. Answered in the chat, the approval goes to the step through the run's page's route, and the part then reads the
    * step as approved. Each part is pictured whole at the dock's width too, in a window tall enough that the dock holds it, since what a
-   * person presses is below the dock's fold. The link's button still opens the run's page with the step's bar. Every write is taken
+   * person presses is below the dock's fold. The link's button, hovered, preloads the run it names and no run whose id holds its
+   * query; pressed, it still opens the run's page with the step's bar. Every write is taken
    * back, and the run with it.
    */
   name: 'chat-brought',
@@ -85,7 +87,16 @@ export default {
       await settled(page);
       await photograph(panel, path.join(OUT, `chat-brought-answered-${await themeOf(page)}.png`));
 
-      await panel.getByRole('link', { name: `${gated} of ${id}`, exact: true }).click();
+      const link = panel.getByRole('link', { name: `${gated} of ${id}`, exact: true });
+      const read: string[] = [];
+      const reads = (request: Request) => void read.push(new URL(request.url()).pathname);
+      page.on('request', reads);
+      await link.hover();
+      await idle(page);
+      page.off('request', reads);
+      const queried = read.filter((pathname) => pathname.startsWith('/api/runs/') && decodeURIComponent(pathname).includes('?'));
+      if (queried.length > 0) throw new Refused(`the link's preload reads the run it names — it read ${queried.join(', ')}`);
+      await link.click();
       await page.waitForURL((url) => url.pathname === `/runs/${id}` && (url.searchParams.get('bar') ?? '') === `step:${id}/${gated}`, {
         timeout: WAIT_MS,
       });

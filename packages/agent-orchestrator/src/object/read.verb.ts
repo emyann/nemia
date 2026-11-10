@@ -88,7 +88,7 @@ export const stepsReadingOf = Effect.fnUntraced(function* (
   one: JudgedOrWhy,
   folder: ReturnType<typeof workflowsOf>,
 ) {
-  if ('unjudged' in one) return { unjudged: one.unjudged };
+  if ('unjudged' in one) return { unjudged: one.unjudged, steps: one.steps };
   const { judgement } = one;
   const stderr = yield* Effect.promise(() => refusedStderr(e, run, judgement.views));
   const checks = yield* Effect.promise(() => checksOf(e, run, judgement.steps, judgement.views, stderr));

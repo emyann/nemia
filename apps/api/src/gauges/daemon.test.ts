@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { app } from '../app.ts';
 import { daemonOf } from './daemon.ts';
-import { daemonLine, PHASES, procStartOf, staleAfterMs, STALE_FLOOR_MS } from 'agent-orchestrator';
+import { daemonLine, PHASES, procStartOf, staleAfterMs, STALE_FLOOR_MS, standingLine } from 'agent-orchestrator';
 const FILE = path.join(root, 'daemon.json');
 const STATS = path.join(root, 'tick-stats.json');
 
@@ -226,6 +226,7 @@ test("daemonOf: the standing as facts, nemia ls's line with them, and what the l
       identity: 'unknown',
       line: daemonLine(standing, now),
       unobserved: [],
+      branchesLine: standingLine({ none: true }, standing, now),
     });
     assert.equal(staleAfterMs(120_000), 20 * MIN, 'ten of its intervals, over the floor');
     assert.equal(daemonOf({ kind: 'ticking', file, last: Date.parse(file.beatAt!), quiet: 0, identity: 'same' }, now).ticking, true);
@@ -237,6 +238,23 @@ test("daemonOf: the standing as facts, nemia ls's line with them, and what the l
         Array(9).fill(null),
       );
     }
+  });
+  await t.test("daemonOf: nemia ls's line on where the branches stand, none while a ticking daemon read them lately", () => {
+    const now = Date.parse('2026-09-22T10:00:00.000Z');
+    const file: DaemonFile = {
+      pid: 42,
+      by: 'up',
+      startedAt: '2026-09-22T09:00:00.000Z',
+      cwd: '/r',
+      every: 4_000,
+      passedAt: '2026-09-22T09:59:58.000Z',
+      beatAt: '2026-09-22T09:59:58.000Z',
+    };
+    const ticking = { kind: 'ticking' as const, file, last: Date.parse(file.beatAt!), quiet: 2_000, identity: 'same' as const };
+    assert.equal(daemonOf(ticking, now, null, { at: '2026-09-22T09:59:58.000Z' }).branchesLine, null, 'read lately');
+    const stale = daemonOf(ticking, now, null, { at: '2026-09-22T09:00:00.000Z' }).branchesLine;
+    assert.ok(stale?.includes('1h00m'), 'read an hour ago, past the floor, says how long ago');
+    assert.ok(daemonOf({ kind: 'none' }, now, null, { none: true }).branchesLine, 'no pass read them');
   });
   await t.test('daemonOf: what the last pass could not read is said only of a ticking daemon, by a pass since its start', () => {
     const now = Date.parse('2026-09-22T10:00:00.000Z');

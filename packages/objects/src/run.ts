@@ -386,6 +386,8 @@ export const RunStepStatus = Schema.Struct({
   used: Schema.NullOr(StepUsed),
   spent: Schema.NullOr(Spent),
   budget: Schema.NullOr(StepBudget),
+  /** How many questions its closeout asks, on a step waiting on a person whose closeout asks some (`Listing`'s `asks`); left out else. */
+  asks: Schema.optionalKey(Schema.Finite),
 }).annotate({ identifier: 'RunStepStatus' });
 export type RunStepStatus = typeof RunStepStatus.Type;
 
@@ -498,6 +500,11 @@ export const RunStatus = Schema.Struct({
   warning: NullString,
   kinds: List(RunDrift),
   /**
+   * Where its work ended up (`resultBranches`): the branches of its result steps that have one, named as soon as one does, landed or
+   * not; left out where none has.
+   */
+  result: Schema.optionalKey(Strings),
+  /**
    * The parts of the board's frame, present on a list asked by state (`?fieldSelector=status.state…`) alone and measured to its
    * `metadata.asOf`: a plain list, a run read alone and their watches never carry them. Its state in the list (`RUN_STATES`); its
    * wall time in ms, from its creation until its work stopped or until `asOf`; where that time went (`clock`, frozen at its finish
@@ -533,6 +540,11 @@ export const RunUnjudged = Schema.Struct({
   name: Schema.String,
   namespace: Schema.optionalKey(Schema.String),
   error: Schema.String,
+  /**
+   * Each step's word as the engine last read it off the run's record — `unreadable` for one a task of which does not read, `pending` for
+   * one with none — and its branch, null where it has none; left out by a list that read none.
+   */
+  steps: Schema.optionalKey(List(Schema.Struct({ name: Schema.String, message: Schema.String, branch: NullString }))),
   /** Its state in the list (`RUN_STATES`), on a list asked by state alone: what its summary says, which reads without its tasks. */
   state: Schema.optionalKey(Schema.Literals(RUN_STATES)),
 }).annotate({ identifier: 'RunUnjudged' });

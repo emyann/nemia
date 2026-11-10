@@ -125,6 +125,69 @@ journal('t-working', [
     harnessVersion: '0.200.0',
   },
 ]);
+/**
+ * A run of the one step `build`, its task `taskId`, with `more` on its record and `step` on its step's: the seed of `nemia ls`'s lines
+ * around and under its table — `standing.json` read long ago, a finished run's result branch, a run whose journal does not read, and a
+ * step blocked asking two questions its folder's `output:` declares a field of.
+ */
+const oneStepRun = (id: string, taskId: string, more: object = {}, step: object = {}) =>
+  write(
+    path.join(root, 'runs', `${id}.json`),
+    JSON.stringify({
+      id,
+      place: { kind: 'folder' },
+      workspace: root,
+      brief: `The run ${id}`,
+      workflowDir: path.join(root, 'no-such-workflow'),
+      createdAt: at(200),
+      workflow: [{ name: 'build', after: [], body: 'Build it.', workspace: 'folder', harness: 'codex' }],
+      steps: { build: { taskId, ...step } },
+      ...more,
+    }),
+  );
+write(path.join(root, 'standing.json'), JSON.stringify({ v: 1, at: at(0), places: [] }));
+oneStepRun('r-landed', 't-landed', {}, { branch: 'wf/r-landed/build' });
+settled('t-landed', { outcome: 'done', summary: 'Built it.', needs: null, artifacts: [] }, 210);
+oneStepRun('r-unread', 't-unread', {}, { branch: 'wf/r-unread/build' });
+write(path.join(root, 'engine', 'tasks', 't-unread.jsonl'), '{ this is no journal\n');
+const asker = path.join(root, 'asker');
+write(path.join(asker, 'plan.md'), '---\nworkspace: folder\nharness: codex\noutput: plan.schema.json\n---\nPlan it.\n');
+write(
+  path.join(asker, 'plan.schema.json'),
+  JSON.stringify({
+    type: 'object',
+    properties: { open: { 'x-shape': 'questions', description: 'What is undecided.' } },
+    required: ['open'],
+    additionalProperties: false,
+  }),
+);
+write(
+  path.join(root, 'runs', 'r-asking.json'),
+  JSON.stringify({
+    id: 'r-asking',
+    place: { kind: 'folder' },
+    workspace: root,
+    brief: 'The run r-asking',
+    workflowDir: asker,
+    createdAt: at(300),
+    steps: { plan: { taskId: 't-asking' } },
+  }),
+);
+const question = (title: string) => ({
+  title,
+  body: 'Either.',
+  options: [
+    { label: 'one', meaning: 'One way.' },
+    { label: 'two', meaning: 'Another.' },
+  ],
+  recommended: null,
+  multiple: false,
+});
+settled(
+  't-asking',
+  { outcome: 'blocked', summary: 'Half.', needs: 'Two questions.', artifacts: [], open: [question('How?'), question('Where?')] },
+  310,
+);
 write(
   path.join(root, 'inbox', 'cache-the-views.md'),
   "---\nworkflow: dev\nlabels:\n  team: core\n---\nCache the engine's views between passes.\n",
@@ -234,6 +297,22 @@ test('`nemia ls` says the pause first, and after the runs a line per schedule an
   assert.ok(scheduled > 0, `a line per schedule: ${listed.out}`);
   assert.ok(lines.findIndex((l) => l.startsWith('r-')) < scheduled, 'after the runs');
   assert.match(lines.at(-1) ?? '', /^daemon: /, 'the daemon, last');
+});
+
+test('`nemia ls` says again what it said before the table: how old where the branches stand is, a step asking, a run unread, a result', async () => {
+  const listed = await nemia(['ls']);
+  assert.equal(listed.code, 0, listed.err);
+  const lines = listed.out.trimEnd().split('\n');
+  const stood = lines.findIndex((l) => /^where branches stand: read \d+d\d+h ago$/.test(l));
+  assert.ok(stood > 0, `how long ago the last pass read where the branches stand: ${listed.out}`);
+  assert.ok(lines.findIndex((l) => l.startsWith('r-')) < stood, 'after the runs');
+  assert.ok(stood < lines.findIndex((l) => l.startsWith('scheduled ')), 'before the schedules');
+  assert.match(listed.out, /^r-landed .*result: wf\/r-landed\/build — nemia decide r-landed$/m, "a finished run's result branch");
+  const wide = await nemia(['ls', '-o', 'wide']);
+  assert.equal(wide.code, 0, wide.err);
+  assert.match(wide.out, /^r-asking .*plan succeeded · BLOCKED · asks 2 questions$/m, 'a step notes the questions it asks');
+  assert.match(wide.out, /^r-unread .*unreadable: .*build unreadable wf\/r-unread\/build$/m, "an unread run's steps off its record");
+  assert.match(wide.out, /^r-working .*build .*· on v1\.2\.0, codex 0\.200\.0$/m, 'what the session of a step at work runs on');
 });
 
 test('`nemia ls -l <selector> --show-labels -L <key>`: the runs a selector takes, with their labels column and a column of the key', async () => {

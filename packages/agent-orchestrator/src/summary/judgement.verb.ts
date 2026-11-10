@@ -24,6 +24,7 @@ import {
   workflowsOf,
 } from './reads.verb.ts';
 import { type GitAsked, judge, standingsOf } from './judged.verb.ts';
+import { unjudgedWord } from '../views/views.verb.ts';
 
 /** What the run is judged as (`judge`), when it is. */
 export type JudgedRun = Extract<Effect.Success<ReturnType<typeof judge>>, object>;
@@ -42,11 +43,23 @@ export type Judgement = {
   readonly asked: GitAsked;
 };
 
-/** A run judged (`judgement`), or why it is not, in the words the list says it with (`unjudged`). */
-export type JudgedOrWhy = { judgement: Judgement } | { unjudged: string };
+/** A step of a run left unjudged: its word off the views that did read (`unjudgedWord`), and its branch, null where it has none. */
+export type UnjudgedStep = { readonly name: string; readonly message: string; readonly branch: string | null };
+
+/**
+ * A run judged (`judgement`), or why it is not, in the words the list says it with (`unjudged`), with each step's word off its record
+ * (`steps`).
+ */
+export type JudgedOrWhy = { judgement: Judgement } | { unjudged: string; steps: readonly UnjudgedStep[] };
 
 /** What `judgementsOf` read: each run's judgement or why it has none, and the views and unreadable journals of the one listing. */
 export type Judgements = { readonly runs: ReadonlyMap<string, JudgedOrWhy>; readonly views: Views; readonly unreadable: Unreadable };
+
+/** Each of `names` of `run` as a run left unjudged words it (`unjudgedWord`), off the views that did read, with its branch. */
+const unjudgedSteps = (run: Run, names: readonly string[], views: Views, unreadable: Unreadable): UnjudgedStep[] => {
+  const wordOf = unjudgedWord(views, unreadable);
+  return names.map((name) => ({ name, message: wordOf(run.steps[name]), branch: run.steps[name]?.branch ?? null }));
+};
 
 /**
  * `runs` judged, off one listing of their tasks and of the runs they wait on, found among `store` (`viewsFor`), through a reader that
@@ -77,7 +90,7 @@ export const judgementsOf = Effect.fn('judgementsOf')(function* (
       run.id,
       'judged' in one
         ? { judgement: { run, names, steps: judgedSteps(run, folder), views, judged: one.judged, asked } }
-        : { unjudged: one.unreadable },
+        : { unjudged: one.unreadable, steps: unjudgedSteps(run, names, views, unreadable) },
     );
   }
   return { runs: out, views, unreadable } satisfies Judgements;

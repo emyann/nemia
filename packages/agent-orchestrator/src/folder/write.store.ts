@@ -286,5 +286,5 @@ export function placesAroundAt(home: string, workflowDir: string): Places {
   return { ...(knownReposAt(home).has(repo) || factoryTrees(home).has(repo) ? { repo } : {}), home };
 }
 
-/** `removeWorkflowAt`, under the name the package exports: the store's root first. */
+/** A plain alias of `removeWorkflowAt`, the old spelling left in this module: the store's root first all the same. */
 export const removeWorkflow = removeWorkflowAt;

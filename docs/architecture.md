@@ -444,12 +444,12 @@ writes) and a memory stand-in (`workflowDoorMemory`, `src/workflows/memory.store
 invariants (one step at least, no name twice, every `after:` naming a step of it, no steps waiting on each other), and then the version
 it was read at, judged by a pure function (`workflowVersionRefusal`, `src/folder/folder.ts`, which `contracts/workflow-version.contract.ts`
 proves). What once called the folder's stores around the door is paid, and its store test refuses any use; `write.store.ts`'s
-functions each take the store's root first (`writeWorkflowAt`, `isWorkflowsHolderAt`, `knownReposAt`, `placesAroundAt`), its old
-spellings the same functions at the module's root. A read and a write parse the steps against the agents and skills the door finds
-through the Agent and Skill doors (`agents.found`, `skills.found`), at the places its layer says (`around`), and hand them to the layer:
-those of `workflowDoorOver`'s `defs` where given, else those the program is given, so a program given `agentDoorMemory()` and a store's
-root reads a workflow on the files whose step names an agent the memory holds. The version (`workflowVersion`) still reads the files'
-agents and skills, and moves with the revisions' pin.
+functions each take the store's root first (`writeWorkflowAt`, `isWorkflowsHolderAt`, `knownReposAt`, `placesAroundAt`), and the one
+old spelling left, `removeWorkflow`, is a plain alias of `removeWorkflowAt` in that module, the root first all the same. A read and a
+write parse the steps against the agents and skills the door finds through the Agent and Skill doors (`agents.found`, `skills.found`),
+at the places its layer says (`around`), and hand them to the layer: those of `workflowDoorOver`'s `defs` where given, else those the
+program is given, so a program given `agentDoorMemory()` and a store's root reads a workflow on the files whose step names an agent the
+memory holds. The version (`workflowVersion`) still reads the files' agents and skills, and moves with the revisions' pin.
 
 **The Template door.** A factory template — a folder that holds its `nemia.yaml`, or an archive `nemia template pack` wrote — is read,
 written as a new folder and packed as a new archive through `TemplateDoor` (`packages/agent-orchestrator/src/template/door/templates.store.ts`),

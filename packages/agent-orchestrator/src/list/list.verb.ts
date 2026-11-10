@@ -1,5 +1,5 @@
 /**
- * The package's one reading of a run (`runReading`), which `nemia ls` (`list`, `runsListed`) and the api's list answer from: the pure
+ * The package's one reading of a run (`listReading`), which `nemia ls` (`list`, `runsListed`) and the api's list answer from: the pure
  * listing over one read of each task, and what `assess` says of the run on the same inputs. And the runs nobody judged (`unjudgedOf`).
  * `nemia ls` reads the repository's own checkout as the pass that would file into it reads it (`checkoutHold`, in `ending.verb.ts`). A
  * controller, reaching the runtime through the client (`runtime-client.ts`).
@@ -26,24 +26,19 @@ import { headsOver, standingReader, standingSnapshot, type PassStanding } from '
 import { daemonStanding } from '../daemon/daemon.store.ts';
 import { schedulesListed } from '../factory/schedule/listed.store.ts';
 import {
-  closeoutAsked,
   closeoutOf,
-  closeoutReader,
   deniedOf,
   ranOnOf,
-  exitVerdicts,
-  harnessBlocked,
   parentsRead,
   passParents,
   saidCount,
-  spendReader,
-  taskPhasesRead,
   unjudgedWord,
   viewedOnce,
   waitingOf,
 } from '../views/views.verb.ts';
-import { engineWord, killedMemoryOf, parkedOf, phaseOfView } from '../views/views-words.ts';
+import { engineWord, killedMemoryOf, parkedOf } from '../views/views-words.ts';
 import { checkoutHold } from '../ending/ending.verb.ts';
+import { readRun } from '../tick/told.verb.ts';
 import { landsOnCheck } from '../status/status.ts';
 import { mergeStaged, statusMemo } from '../place/landing.store.ts';
 import { PlaceService } from '../place/place.store.ts';
@@ -51,7 +46,7 @@ import { readPause } from '../pause/pause.store.ts';
 import { currentTasks, finishingAmong, parkedAmong, type Pause, type Paused, type PauseHeld, type PauseStaged } from '../pause/pause.ts';
 
 /**
- * How a caller reads a run (`runReading`): what it already holds, and what it asks to be read. Each left out is read as `nemia ls` reads
+ * How a caller reads a run (`listReading`): what it already holds, and what it asks to be read. Each left out is read as `nemia ls` reads
  * it.
  *
  * @param views The engine's view of every task the run filed, an earlier try's included; left out, read one by one (`taskPhasesRead`).
@@ -61,17 +56,21 @@ import { currentTasks, finishingAmong, parkedAmong, type Pause, type Paused, typ
  *   branch of the run, as `git` reads it (`standingsOf`).
  * @param slot The cap on runs in flight holding this run (`runSlots`), said where `waiting` would be; left out, none.
  * @param checkout Where the branches stand, as `git` was read off it, to read the run whose `workspace: base` step holds the repository's
- *   own checkout over (`checkoutHold`); left out, none is read.
+ *   own checkout over (`checkoutHold`), as the pass reads it; left out, the tick's last reading (`standingSnapshot`), read only where the
+ *   run's ending asks for the checkout.
+ * @param env The environment the cap on runs in flight (`WF_MAX_RUNS`) is read over where the checkout is (`checkoutHold`); left out,
+ *   the process's.
  * @param git The call's branch reader (`standingReader`): what was read of where the result branches stand, never git asked as it goes.
  * @param parent The runs it waits on and is held until, as `parentsRead` read them; left out, read here.
  */
-export type ReadingHow = {
+export type ListReadingHow = {
   views?: ReadonlyMap<string, TaskView>;
   steps?: readonly Workflow[];
   shown?: readonly Workflow[];
   standings?: (status: Assessment['status'], steps: readonly Workflow[]) => readonly BranchStanding[];
   slot?: RunSlot;
   checkout?: PassStanding;
+  env?: NodeJS.ProcessEnv;
   git: BranchReader;
   parent?: (id: string) => ParentRun;
   /**
@@ -82,11 +81,11 @@ export type ReadingHow = {
 };
 
 /**
- * A run as the package reads it once (`runReading`): what `nemia ls` lists (`Listing`) and what `assess` says of the run on the same inputs
- * (`assessed`) — with `assessOf` to ask it again of the record as it would stand (a hold lifted), each task's phase as the tick reads it
- * (`phaseOf`), the asks that carried a message (`answers`), what each task cost (`spendOf`), and the whole run's spend (`spend`).
+ * A run as the package reads it once (`listReading`): what `nemia ls` lists (`Listing`) and what `assess` says of the run on the same
+ * inputs (`assessed`) — with `assessOf` to ask it again of the record as it would stand (a hold lifted), each task's phase as the tick
+ * reads it (`phaseOf`), the asks that carried a message (`answers`), what each task cost (`spendOf`), and the whole run's spend (`spend`).
  */
-export type RunReading = Listing & {
+export type ListReading = Listing & {
   assessed: Assessment;
   assessOf: (on: Run) => Assessment;
   phaseOf: (taskId: string) => TaskPhase;
@@ -105,43 +104,32 @@ export type RunReading = Listing & {
  * branches stand is asked once its status is known.
  * Untraced: a list runs it once per run, and a span each would bury the list's trace under hundreds.
  */
-export const runReading = Effect.fnUntraced(function* (e: Engine, run: Run, how: ReadingHow) {
+export const listReading = Effect.fnUntraced(function* (e: Engine, run: Run, how: ListReadingHow) {
   const { git } = how;
-  const steps = how.steps ?? (yield* stepsOf(run));
-  const views = how.views ?? (yield* taskPhasesRead(run).pipe(over(e))).views;
-  const phaseOf = (taskId: string): TaskPhase => phaseOfView(views.get(taskId));
-  const closeoutsAsked = closeoutAsked(views);
-  const verdictOf = exitVerdicts(views, run);
-  const { asks, rounds } = runStore.asks.read(run.id);
-  const answers = runStore.asks.answers(run.id);
-  const spendOf = spendReader(views);
-  const assessOf = (on: Run): Assessment =>
-    assess(steps, on, phaseOf, closeoutReader(views, run, steps), closeoutsAsked, verdictOf, asks, rounds, harnessBlocked(views), spendOf);
-  const assessed = assessOf(run);
-  const standings = how.standings ? how.standings(assessed.status, steps) : standingsOf(run, steps, git);
+  const given = { ...(how.steps ? { steps: [...how.steps] } : {}), ...(how.views ? { views: new Map(how.views) } : {}) };
+  const { read: base } = yield* readRun(e, run, given);
+  const { steps, views, phaseOf, answers, spendOf } = base;
   const memo = statusMemo(headsOver(git), yield* PlaceService);
-  const checkout = how.checkout
-    ? yield* checkoutHold(e, run, steps, { standing: Effect.succeed(how.checkout) }, process.env, memo)
-    : undefined;
+  const standing = how.checkout ? Effect.succeed(how.checkout) : standingSnapshot();
+  const checkout = yield* checkoutHold(e, run, steps, { standing }, how.env ?? process.env, memo);
+  const held = { ...base, checkout };
+  const standings = how.standings ? how.standings(assess(held).status, steps) : standingsOf(run, steps, git);
+  const read = { ...held, standings };
+  const assessed = assess(read);
+  const assessOf = (on: Run): Assessment => assess({ ...read, run: on });
   const parent = how.parent ?? (yield* parentsRead(run, git).pipe(over(e)));
-  const scripted = closeoutReader(views, run, steps);
+  const scripted = base.signedOff;
   const listed = listing({
     steps: how.shown ?? steps,
-    run,
+    read,
+    assessed,
     phaseOf: engineWord(views),
     closeoutOf: (name) =>
       steps.some((s) => s.name === name && s.route?.kind === 'script') ? scripted(name) : closeoutOf(views, run, name),
-    askedCloseout: closeoutsAsked,
-    verdictOf,
-    asks,
-    roundAsks: rounds,
     answers,
     waits: waitsOf(run, parent),
     saidTo: saidCount(views, run),
-    spendOf,
     slot: how.slot,
-    standings,
-    checkout,
     waitingOf: waitingOf(views),
     deniedOf: deniedOf(views),
     ...(how.releases === undefined ? {} : { ranOnOf: ranOnOf(views, how.releases) }),
@@ -149,11 +137,11 @@ export const runReading = Effect.fnUntraced(function* (e: Engine, run: Run, how:
     memoryOf: (taskId) => killedMemoryOf(views.get(taskId)),
     holds: holdsOf(run, parent),
   });
-  return { ...listed, assessed, assessOf, phaseOf, answers, spendOf, spend: runSpend(run, spendOf) } satisfies RunReading;
+  return { ...listed, assessed, assessOf, phaseOf, answers, spendOf, spend: runSpend(run, spendOf) } satisfies ListReading;
 });
 
 /**
- * What `nemia ls` shows for one run (`runReading`): where every result branch stands as the tick's last pass read it (`standing`; left
+ * What `nemia ls` shows for one run (`listReading`): where every result branch stands as the tick's last pass read it (`standing`; left
  * out, `standingSnapshot`), with no process, and the run holding the checkout read.
  *
  * The phase beside a step is the engine's own word (`working`, `needs-human`), not the narrowed `TaskPhase` the DAG decides on: a
@@ -162,7 +150,7 @@ export const runReading = Effect.fnUntraced(function* (e: Engine, run: Run, how:
  */
 export const list = Effect.fn('list')(function* (e: Engine, run: Run, slot?: RunSlot, standing?: PassStanding, releases?: string) {
   const read = standing ?? (yield* standingSnapshot());
-  return yield* runReading(e, run, { slot, git: standingReader(read), checkout: read, ...(releases === undefined ? {} : { releases }) });
+  return yield* listReading(e, run, { slot, git: standingReader(read), checkout: read, ...(releases === undefined ? {} : { releases }) });
 });
 
 /**
@@ -230,7 +218,7 @@ export const runsListed = Effect.fn('runsListed')(function* (runId?: string, sel
  * A run, the package's reading of it or why it is left unjudged, its steps (`stepsAmong`: none for a run whose unfrozen folder does not
  * load, which then names no result branch), and whether a merge is staged in its checkout (`mergeStaged`).
  */
-type Read = { run: Run; read: RunReading | Unjudged; steps: readonly Workflow[]; staged: () => boolean };
+type Read = { run: Run; read: ListReading | Unjudged; steps: readonly Workflow[]; staged: () => boolean };
 
 /**
  * The checks of `run` the pause keeps from being filed (`waitingOnPause.checks`, `assess`'s): each landing with its merge staged — an
@@ -304,12 +292,12 @@ const holdingReads = Effect.fnUntraced(function* (e: Engine, runs: readonly Run[
   const among = yield* stepsAmong(runs);
   const holding = runs.flatMap((run) => {
     const steps = among.get(run.id) ?? [];
-    if (mergeStaged(run, steps, memo)) return [{ run, steps, how: { git } satisfies ReadingHow, staged: () => true }];
-    return checkDue(run, steps) ? [{ run, steps, how: { git, standings: () => [] } satisfies ReadingHow, staged: () => false }] : [];
+    if (mergeStaged(run, steps, memo)) return [{ run, steps, how: { git } satisfies ListReadingHow, staged: () => true }];
+    return checkDue(run, steps) ? [{ run, steps, how: { git, standings: () => [] } satisfies ListReadingHow, staged: () => false }] : [];
   });
   const reads = yield* Effect.all(
     holding.map(({ run, steps, how, staged }) =>
-      Effect.exit(runReading(e, run, how)).pipe(
+      Effect.exit(listReading(e, run, how)).pipe(
         Effect.flatMap((exit) => {
           if (Exit.isSuccess(exit)) return Effect.succeed<Read | undefined>({ run, read: exit.value, steps, staged });
           return unreadableJournal(Cause.squash(exit.cause)) === undefined ? Effect.failCause(exit.cause) : Effect.succeed(undefined);

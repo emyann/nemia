@@ -54,7 +54,7 @@ import {
 } from '../src/run.ts';
 import type { RetryAsk } from '../src/retry/retry-ask.ts';
 import { parseAgent, parseWorkflow, type OutputSchema, type Workflow } from '../src/workflow.ts';
-import { listing, names, namesFor, phases, run, step, STEPS } from './assessed.ts';
+import { aRead, listing, names, namesFor, phases, run, step, STEPS } from './assessed.ts';
 import type { Closeout } from '../src/closeout/closeout.ts';
 
 const DONE = phases({ t1: 'succeeded', t2: 'succeeded' });
@@ -185,7 +185,7 @@ test("an ending's gate holds it before it is filed, and `to decide` says the ste
     () => {
       const r = atEnd();
       for (const pass of [1, 2, 3]) {
-        const a = assess(ENDS, r, DONE, signedDone, asked);
+        const a = assess(aRead(ENDS, r, { phaseOf: DONE, signedOff: signedDone, asked }));
         assert.deepEqual([a.ready, a.check, a.retry, a.round], [[], [], [], []], `pass ${pass}: nothing is filed`);
         assert.deepEqual(a.toDecide, {
           kind: 'approve',
@@ -194,7 +194,7 @@ test("an ending's gate holds it before it is filed, and `to decide` says the ste
           filed: false,
         });
       }
-      const approved = assess(ENDS, atEnd({ approvals: [approval('ship', 1)] }), DONE, signedDone, asked);
+      const approved = assess(aRead(ENDS, atEnd({ approvals: [approval('ship', 1)] }), { phaseOf: DONE, signedOff: signedDone, asked }));
       assert.deepEqual(
         [approved.ready, approved.toDecide],
         [['ship'], undefined],
@@ -212,7 +212,7 @@ test("an ending's gate holds it before it is filed, and `to decide` says the ste
   await t.test(
     "REFUSED: a gate's `to decide` never quotes its step's agent — an ending led by an agent that says `You are …` is said in the step's own note, or from facts where it has none",
     () => {
-      const noted = assess(landing(`${LANDS}\n\nAbort on a conflict.\n`), atOtto(), DONE, signedDone, asked);
+      const noted = assess(aRead(landing(`${LANDS}\n\nAbort on a conflict.\n`), atOtto(), { phaseOf: DONE, signedOff: signedDone, asked }));
       assert.deepEqual(
         noted.toDecide,
         { kind: 'approve', step: 'land', says: LANDS, filed: false },
@@ -220,7 +220,7 @@ test("an ending's gate holds it before it is filed, and `to decide` says the ste
       );
       assert.equal(toDecideWords(atOtto(), noted.toDecide), `${LANDS} — nemia approve r-1 land`);
 
-      const bare = assess(landing(''), atOtto(), DONE, signedDone, asked);
+      const bare = assess(aRead(landing(''), atOtto(), { phaseOf: DONE, signedOff: signedDone, asked }));
       assert.deepEqual(
         bare.toDecide,
         { kind: 'approve', step: 'land', says: null, filed: false },
@@ -238,7 +238,11 @@ test("an ending's gate holds it before it is filed, and `to decide` says the ste
       const running = atEnd({ steps: { review: { taskId: 't2', workspace: '/wt', branch: 'wf/r-1/implement' } } });
       const p = phases({ t1: 'succeeded', t2: 'running' });
       assert.equal(stepStatus(SHIP, running, p, signedDone, asked, ENDS), 'pending');
-      assert.deepEqual(assess(ENDS, running, p, signedDone, asked).toDecide, undefined, 'nothing to decide while it runs');
+      assert.deepEqual(
+        assess(aRead(ENDS, running, { phaseOf: p, signedOff: signedDone, asked })).toDecide,
+        undefined,
+        'nothing to decide while it runs',
+      );
       assert.equal(
         approvalRefusal(ENDS, running, 'ship', undefined, p, signedDone, asked),
         "ship is not at its gate yet: it ends the run in the repository's own checkout, and its gate holds once review has handed on — " +
@@ -251,7 +255,7 @@ test("an ending's gate holds it before it is filed, and `to decide` says the ste
         'a step that broke leaves no gate to approve either',
       );
       assert.deepEqual(
-        assess(ENDS, atEnd(), broke, signedDone, asked).toDecide,
+        assess(aRead(ENDS, atEnd(), { phaseOf: broke, signedOff: signedDone, asked })).toDecide,
         undefined,
         'the run waits on you for that step, not for its ending',
       );
@@ -418,7 +422,7 @@ test("`nemia ls`, `nemia rm` and `nemia cancel` at an ending's gate", async (t) 
         null,
         'an ending approved, run and signed off holds nothing',
       );
-      assert.deepEqual(cancelPlan(ENDS, atEnd(), DONE, signedDone, asked), { kind: 'cancel', stop: [] });
+      assert.deepEqual(cancelPlan(aRead(ENDS, atEnd(), { phaseOf: DONE, signedOff: signedDone, asked })), { kind: 'cancel', stop: [] });
     },
   );
 
@@ -466,17 +470,17 @@ test("an ending's gate does not hold while the work goes round again or is being
         name === 'review' ? { outcome: 'done' as const, summary: 's', artifacts: [], output: { again } } : signedDone();
 
       const going = assess(
-        looping,
-        r,
-        DONE,
-        said(true),
-        asked,
-        () => undefined,
-        [],
-        [],
-        () => false,
-        () => undefined,
-        AHEAD,
+        aRead(looping, r, {
+          phaseOf: DONE,
+          signedOff: said(true),
+          asked,
+          verdictOf: () => undefined,
+          asks: [],
+          roundAsks: [],
+          sessionBlocked: () => false,
+          spendOf: () => undefined,
+          standings: AHEAD,
+        }),
       );
       assert.deepEqual(
         [going.round.map((x) => x.round), going.status, going.toDecide],
@@ -498,17 +502,17 @@ test("an ending's gate does not hold while the work goes round again or is being
       assert.deepEqual([l.steps[2].message, l.waitingOnYou, l.toDecide], ['pending', [], undefined]);
 
       const handed = assess(
-        looping,
-        r,
-        DONE,
-        said(false),
-        asked,
-        () => undefined,
-        [],
-        [],
-        () => false,
-        () => undefined,
-        AHEAD,
+        aRead(looping, r, {
+          phaseOf: DONE,
+          signedOff: said(false),
+          asked,
+          verdictOf: () => undefined,
+          asks: [],
+          roundAsks: [],
+          sessionBlocked: () => false,
+          spendOf: () => undefined,
+          standings: AHEAD,
+        }),
       );
       assert.deepEqual(
         [handed.round, handed.toDecide?.kind],
@@ -550,17 +554,17 @@ test("an ending's gate does not hold while the work goes round again or is being
         at: '2026-09-17T09:00:00.000Z',
       };
       const a = assess(
-        ENDS,
-        atEnd(),
-        DONE,
-        signedDone,
-        asked,
-        () => undefined,
-        [ask],
-        [],
-        () => false,
-        () => undefined,
-        AHEAD,
+        aRead(ENDS, atEnd(), {
+          phaseOf: DONE,
+          signedOff: signedDone,
+          asked,
+          verdictOf: () => undefined,
+          asks: [ask],
+          roundAsks: [],
+          sessionBlocked: () => false,
+          spendOf: () => undefined,
+          standings: AHEAD,
+        }),
       );
       assert.deepEqual([a.retry.map((r) => `${r.step} try ${r.try}`), a.status, a.toDecide], [['review try 2'], 'running', undefined]);
       assert.deepEqual(unheld(ENDS, atEnd(), a.retry, a.round), new Set(['ship']));
@@ -576,14 +580,8 @@ test("an ending's gate does not hold while the work goes round again or is being
       assert.deepEqual([l.steps[2].message, l.waitingOnYou, l.toDecide], ['pending', [], undefined]);
 
       const d = decision(
-        ENDS,
-        atEnd(),
-        DONE,
+        aRead(ENDS, atEnd(), { phaseOf: DONE, signedOff: signedDone, asked, verdictOf: () => undefined, asks: [ask] }),
         () => false,
-        signedDone,
-        asked,
-        () => undefined,
-        [ask],
       );
       assert.deepEqual(
         [d.kind, d.kind === 'running' ? d.waiting : []],
@@ -612,17 +610,17 @@ test("an ending's gate does not hold while the work goes round again or is being
 
       assert.deepEqual(
         assess(
-          ENDS,
-          atEnd(),
-          DONE,
-          signedDone,
-          asked,
-          () => undefined,
-          [],
-          [],
-          () => false,
-          () => undefined,
-          AHEAD,
+          aRead(ENDS, atEnd(), {
+            phaseOf: DONE,
+            signedOff: signedDone,
+            asked,
+            verdictOf: () => undefined,
+            asks: [],
+            roundAsks: [],
+            sessionBlocked: () => false,
+            spendOf: () => undefined,
+            standings: AHEAD,
+          }),
         ).toDecide?.kind,
         'approve',
         'the ask taken back, the gate holds again: nothing was stored either way, and all three say so again',
@@ -891,24 +889,24 @@ test("`composeBrief` of a step in the repository's own checkout: where the work 
 
 test("decision: landed is asked of git and never stored, and a finished run is a person's to decide", async (t) => {
   await t.test('a run still going has nothing to decide, and says what it is waiting on', () => {
-    const d = decision(STEPS, run({ implement: 't1', review: null }), phases({ t1: 'running' }), nothingShipped);
+    const d = decision(aRead(STEPS, run({ implement: 't1', review: null }), { phaseOf: phases({ t1: 'running' }) }), nothingShipped);
     assert.equal(d.kind, 'running');
     assert.deepEqual(d.kind === 'running' && d.waiting, ['implement']);
   });
 
   await t.test('a cancelled run has nothing to decide either', () => {
-    const d = decision(STEPS, finished({ cancelledAt: '2026-01-01T00:00:00Z' }), DONE, nothingShipped);
+    const d = decision(aRead(STEPS, finished({ cancelledAt: '2026-01-01T00:00:00Z' }), { phaseOf: DONE }), nothingShipped);
     assert.equal(d.kind, 'cancelled');
   });
 
   await t.test('a finished run is AWAITING a person — succeeding is not deciding', () => {
-    const d = decision(STEPS, finished(), DONE, nothingShipped);
+    const d = decision(aRead(STEPS, finished(), { phaseOf: DONE }), nothingShipped);
     assert.equal(d.kind, 'awaiting');
     assert.deepEqual(d.kind === 'awaiting' && d.branches, ['wf/r-1/review']);
   });
 
   await t.test('landed is asked of git, not stored on the run', () => {
-    const d = decision(STEPS, finished(), DONE, (b) => b === 'wf/r-1/review');
+    const d = decision(aRead(STEPS, finished(), { phaseOf: DONE }), (b) => b === 'wf/r-1/review');
     assert.equal(d.kind, 'landed');
   });
 
@@ -925,12 +923,12 @@ test("decision: landed is asked of git and never stored, and a finished run is a
       },
     );
     const all = phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' });
-    assert.equal(decision(fan, r, all, (b) => b === 'wf/r-1/docs').kind, 'awaiting');
-    assert.equal(decision(fan, r, all, () => true).kind, 'landed');
+    assert.equal(decision(aRead(fan, r, { phaseOf: all }), (b) => b === 'wf/r-1/docs').kind, 'awaiting');
+    assert.equal(decision(aRead(fan, r, { phaseOf: all }), () => true).kind, 'landed');
   });
 
   await t.test('a FAILED run is still decided, and names the step that failed', () => {
-    const d = decision(STEPS, finished(), phases({ t1: 'succeeded', t2: 'failed' }), nothingShipped);
+    const d = decision(aRead(STEPS, finished(), { phaseOf: phases({ t1: 'succeeded', t2: 'failed' }) }), nothingShipped);
     assert.equal(d.kind, 'awaiting', 'a run marked failed whose branch holds real work nobody read is still for a person to decide');
     assert.equal(d.kind === 'awaiting' && d.outcome, 'failed');
     assert.deepEqual(d.kind === 'awaiting' && d.failed, ['review']);
@@ -946,7 +944,7 @@ test("decision: landed is asked of git and never stored, and a finished run is a
     );
     const everythingShipped = () => true;
 
-    const failed = decision(STEPS, direct, phases({ t1: 'succeeded', t2: 'failed' }), everythingShipped);
+    const failed = decision(aRead(STEPS, direct, { phaseOf: phases({ t1: 'succeeded', t2: 'failed' }) }), everythingShipped);
     assert.equal(
       failed.kind,
       'awaiting',
@@ -955,15 +953,15 @@ test("decision: landed is asked of git and never stored, and a finished run is a
     assert.equal(failed.kind === 'awaiting' && failed.outcome, 'failed', 'classified as for any run');
     assert.equal(failed.kind === 'awaiting' && failed.direct, true);
 
-    const done = decision(STEPS, direct, DONE, everythingShipped);
+    const done = decision(aRead(STEPS, direct, { phaseOf: DONE }), everythingShipped);
     assert.equal(done.kind, 'awaiting', 'nothing to merge is not the same as merged');
 
-    const isolated = decision(STEPS, finished(), DONE, everythingShipped);
+    const isolated = decision(aRead(STEPS, finished(), { phaseOf: DONE }), everythingShipped);
     assert.equal(isolated.kind, 'landed', 'a worktree run is still asked of git');
   });
 
   await t.test('a run that never filed anything has no branch to land, and is not "landed"', () => {
-    const d = decision(STEPS, run({ implement: null, review: null }), phases({}), () => true);
+    const d = decision(aRead(STEPS, run({ implement: null, review: null }), { phaseOf: phases({}) }), () => true);
     assert.equal(d.kind, 'running');
   });
 
@@ -973,19 +971,22 @@ test("decision: landed is asked of git and never stored, and a finished run is a
       const unchanged = () => 'unchanged' as const;
       const says = (outcome: Closeout['outcome']) => (): Closeout => ({ outcome, summary: 's', artifacts: [] });
       const cases: Array<[string, Decision, string, string[]]> = [
-        ['failed', decision(STEPS, finished(), phases({ t1: 'succeeded', t2: 'failed' }), unchanged), 'failed', ['review']],
-        ['stopped', decision(STEPS, finished(), phases({ t1: 'succeeded', t2: 'stopped' }), unchanged), 'failed', ['review']],
-        ['blocked', decision(STEPS, finished(), DONE, unchanged, says('blocked')), 'waiting', []],
+        [
+          'failed',
+          decision(aRead(STEPS, finished(), { phaseOf: phases({ t1: 'succeeded', t2: 'failed' }) }), unchanged),
+          'failed',
+          ['review'],
+        ],
+        [
+          'stopped',
+          decision(aRead(STEPS, finished(), { phaseOf: phases({ t1: 'succeeded', t2: 'stopped' }) }), unchanged),
+          'failed',
+          ['review'],
+        ],
+        ['blocked', decision(aRead(STEPS, finished(), { phaseOf: DONE, signedOff: says('blocked') }), unchanged), 'waiting', []],
         [
           'unsigned',
-          decision(
-            STEPS,
-            finished(),
-            DONE,
-            unchanged,
-            () => undefined,
-            () => true,
-          ),
+          decision(aRead(STEPS, finished(), { phaseOf: DONE, signedOff: () => undefined, asked: () => true }), unchanged),
           'waiting',
           [],
         ],
@@ -999,21 +1000,25 @@ test("decision: landed is asked of git and never stored, and a finished run is a
       }
       const checked: Workflow[] = [step('implement'), { ...step('review', ['implement']), check: 'npm test' }];
       const refused = decision(
-        checked,
-        run(
-          {},
-          {
-            steps: {
-              implement: { taskId: 't1', branch: 'wf/r-1/implement' },
-              review: { taskId: 't2', branch: 'wf/r-1/review', check: { taskId: 'c2' } },
+        aRead(
+          checked,
+          run(
+            {},
+            {
+              steps: {
+                implement: { taskId: 't1', branch: 'wf/r-1/implement' },
+                review: { taskId: 't2', branch: 'wf/r-1/review', check: { taskId: 'c2' } },
+              },
             },
+          ),
+          {
+            phaseOf: phases({ t1: 'succeeded', t2: 'succeeded', c2: 'failed' }),
+            signedOff: says('done'),
+            asked: () => true,
+            verdictOf: () => 1,
           },
         ),
-        phases({ t1: 'succeeded', t2: 'succeeded', c2: 'failed' }),
         unchanged,
-        says('done'),
-        () => true,
-        () => 1,
       );
       assert.deepEqual(
         refused.kind === 'awaiting' && [refused.outcome, refused.failedCheck],
@@ -1022,16 +1027,16 @@ test("decision: landed is asked of git and never stored, and a finished run is a
       );
 
       assert.deepEqual(
-        decision(STEPS, finished(), DONE, unchanged),
+        decision(aRead(STEPS, finished(), { phaseOf: DONE }), unchanged),
         { kind: 'landed', branches: ['wf/r-1/review'] },
         'every step succeeded, with nothing to commit: landed',
       );
+      assert.deepEqual(decision(aRead(STEPS, finished(), { phaseOf: DONE, signedOff: says('done'), asked: () => true }), unchanged), {
+        kind: 'landed',
+        branches: ['wf/r-1/review'],
+      });
       assert.deepEqual(
-        decision(STEPS, finished(), DONE, unchanged, says('done'), () => true),
-        { kind: 'landed', branches: ['wf/r-1/review'] },
-      );
-      assert.deepEqual(
-        decision(STEPS, finished(), phases({ t1: 'succeeded', t2: 'failed' }), () => true),
+        decision(aRead(STEPS, finished(), { phaseOf: phases({ t1: 'succeeded', t2: 'failed' }) }), () => true),
         { kind: 'landed', branches: ['wf/r-1/review'] },
         'work past the base, merged by a person: landed though a step failed',
       );
@@ -1048,17 +1053,23 @@ test("decision: landed is asked of git and never stored, and a finished run is a
         },
       );
       const half = (b: string) => (b === 'wf/r-1/docs' ? true : ('unchanged' as const));
-      const failing = decision(fan, r, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'failed' }), half);
+      const failing = decision(aRead(fan, r, { phaseOf: phases({ t1: 'succeeded', t2: 'succeeded', t3: 'failed' }) }), half);
       assert.deepEqual(
         failing.kind === 'awaiting' && [failing.outcome, failing.failed],
         ['failed', ['tests']],
         'a fan-out lands on its work only when every branch has some on the base; one that never moved leaves a failed run decided',
       );
-      assert.equal(decision(fan, r, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }), half).kind, 'landed');
-      assert.equal(decision(fan, r, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'failed' }), () => true).kind, 'landed');
+      assert.equal(
+        decision(aRead(fan, r, { phaseOf: phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }) }), half).kind,
+        'landed',
+      );
+      assert.equal(
+        decision(aRead(fan, r, { phaseOf: phases({ t1: 'succeeded', t2: 'succeeded', t3: 'failed' }) }), () => true).kind,
+        'landed',
+      );
 
       const asked: string[] = [];
-      decision(fan, r, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'failed' }), (b) => {
+      decision(aRead(fan, r, { phaseOf: phases({ t1: 'succeeded', t2: 'succeeded', t3: 'failed' }) }), (b) => {
         asked.push(b);
         return b !== 'wf/r-1/docs' && 'unchanged';
       });
@@ -1073,7 +1084,7 @@ test("an ending's gate and git's word: what is to decide, read off where the res
     () => {
       const merged = () => true as const;
       const ahead = () => false as const;
-      const d = decision(ENDS, atEnd(), DONE, ahead, signedDone, asked);
+      const d = decision(aRead(ENDS, atEnd(), { phaseOf: DONE, signedOff: signedDone, asked }), ahead);
       assert.equal(d.kind, 'awaiting');
       if (d.kind !== 'awaiting') return;
       assert.deepEqual([d.outcome, d.awaitingApproval, d.branches, d.direct], ['waiting', ['ship'], ['wf/r-1/implement'], false]);
@@ -1083,14 +1094,14 @@ test("an ending's gate and git's word: what is to decide, read off where the res
         'a run waiting on it is not ready',
       );
 
-      const byHand = decision(ENDS, atEnd(), DONE, merged, signedDone, asked);
+      const byHand = decision(aRead(ENDS, atEnd(), { phaseOf: DONE, signedOff: signedDone, asked }), merged);
       assert.deepEqual(
         [byHand.kind, byHand.kind === 'landed' ? byHand.branches : []],
         ['landed', ['wf/r-1/implement']],
         'merged by hand before the ending ran: the gate held the merge and nothing else, and git has it: landed, so a run --after it starts',
       );
       assert.equal(
-        decision(ENDS, atEnd(), DONE, () => 'unchanged' as const, signedDone, asked).kind,
+        decision(aRead(ENDS, atEnd(), { phaseOf: DONE, signedOff: signedDone, asked }), () => 'unchanged' as const).kind,
         'landed',
         "the work committed nothing past the run's base: on the base as the no-ending kind reads it, landed once every step finished",
       );
@@ -1105,14 +1116,17 @@ test("an ending's gate and git's word: what is to decide, read off where the res
           },
         },
       );
-      const held = decision(accepted, signed, DONE, merged, signedDone, asked);
+      const held = decision(aRead(accepted, signed, { phaseOf: DONE, signedOff: signedDone, asked }), merged);
       assert.deepEqual(
         [held.kind, held.kind === 'awaiting' ? held.awaitingApproval : []],
         ['awaiting', ['review']],
         "any other gate is a person's word git cannot give: a gated step that has run and signed off, its branch merged, is still awaiting it",
       );
       const ran = atEnd({ steps: { ship: { taskId: 't3', workspace: '/repo', branch: 'main' } }, approvals: [approval('ship', 1)] });
-      const landed = decision(ENDS, ran, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }), merged, signedDone, asked);
+      const landed = decision(
+        aRead(ENDS, ran, { phaseOf: phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }), signedOff: signedDone, asked }),
+        merged,
+      );
       assert.deepEqual(
         [landed.kind, landed.kind === 'landed' ? landed.branches : []],
         ['landed', ['wf/r-1/implement']],
@@ -1127,17 +1141,17 @@ test("an ending's gate and git's word: what is to decide, read off where the res
       const ON = [{ branch: 'wf/r-1/implement', where: 'on' as const }];
       const GONE = [{ branch: 'wf/r-1/implement', where: 'gone' as const }];
       const onBase = assess(
-        ENDS,
-        atEnd(),
-        DONE,
-        signedDone,
-        asked,
-        () => undefined,
-        [],
-        [],
-        () => false,
-        () => undefined,
-        ON,
+        aRead(ENDS, atEnd(), {
+          phaseOf: DONE,
+          signedOff: signedDone,
+          asked,
+          verdictOf: () => undefined,
+          asks: [],
+          roundAsks: [],
+          sessionBlocked: () => false,
+          spendOf: () => undefined,
+          standings: ON,
+        }),
       );
       assert.deepEqual([onBase.ready, onBase.toDecide], [[], undefined], 'nothing filed, and nothing to decide');
       const l = listing({
@@ -1208,17 +1222,17 @@ test("an ending's gate and git's word: what is to decide, read off where the res
       ] as const) {
         assert.equal(
           assess(
-            ENDS,
-            atEnd(),
-            DONE,
-            signedDone,
-            asked,
-            () => undefined,
-            [],
-            [],
-            () => false,
-            () => undefined,
-            standings,
+            aRead(ENDS, atEnd(), {
+              phaseOf: DONE,
+              signedOff: signedDone,
+              asked,
+              verdictOf: () => undefined,
+              asks: [],
+              roundAsks: [],
+              sessionBlocked: () => false,
+              spendOf: () => undefined,
+              standings,
+            }),
           ).toDecide?.kind,
           'approve',
           said,
@@ -1273,17 +1287,17 @@ test("an ending's gate and git's word: what is to decide, read off where the res
       );
       assert.deepEqual(
         assess(
-          accepted,
-          signed,
-          DONE,
-          signedDone,
-          asked,
-          () => undefined,
-          [],
-          [],
-          () => false,
-          () => undefined,
-          ON,
+          aRead(accepted, signed, {
+            phaseOf: DONE,
+            signedOff: signedDone,
+            asked,
+            verdictOf: () => undefined,
+            asks: [],
+            roundAsks: [],
+            sessionBlocked: () => false,
+            spendOf: () => undefined,
+            standings: ON,
+          }),
         ).toDecide,
         { kind: 'approve', step: 'review', says: null, filed: true },
         "a gate on a last step that has run and merges nothing is acceptance of what it did, not a merge: git's standing does not answer it",
@@ -1311,17 +1325,17 @@ test("an ending's gate and git's word: what is to decide, read off where the res
     '`to decide` in a folder with no ending step: a finished run whose branch is ahead of the base and not gone, read off git each pass — and nothing once it is merged',
     () => {
       const ahead = assess(
-        STEPS,
-        finished(),
-        DONE,
-        signedDone,
-        asked,
-        () => undefined,
-        [],
-        [],
-        () => false,
-        () => undefined,
-        AHEAD,
+        aRead(STEPS, finished(), {
+          phaseOf: DONE,
+          signedOff: signedDone,
+          asked,
+          verdictOf: () => undefined,
+          asks: [],
+          roundAsks: [],
+          sessionBlocked: () => false,
+          spendOf: () => undefined,
+          standings: AHEAD,
+        }),
       );
       assert.deepEqual([ahead.status, ahead.toDecide], ['succeeded', { kind: 'result', branches: ['wf/r-1/implement'] }]);
       assert.equal(
@@ -1332,17 +1346,17 @@ test("an ending's gate and git's word: what is to decide, read off where the res
       for (const where of ['on', 'gone'] as const) {
         assert.equal(
           assess(
-            STEPS,
-            finished(),
-            DONE,
-            signedDone,
-            asked,
-            () => undefined,
-            [],
-            [],
-            () => false,
-            () => undefined,
-            standing(where),
+            aRead(STEPS, finished(), {
+              phaseOf: DONE,
+              signedOff: signedDone,
+              asked,
+              verdictOf: () => undefined,
+              asks: [],
+              roundAsks: [],
+              sessionBlocked: () => false,
+              spendOf: () => undefined,
+              standings: standing(where),
+            }),
           ).toDecide,
           undefined,
           where,
@@ -1350,32 +1364,32 @@ test("an ending's gate and git's word: what is to decide, read off where the res
       }
       assert.equal(
         assess(
-          STEPS,
-          finished(),
-          DONE,
-          signedDone,
-          asked,
-          () => undefined,
-          [],
-          [],
-          () => false,
-          () => undefined,
+          aRead(STEPS, finished(), {
+            phaseOf: DONE,
+            signedOff: signedDone,
+            asked,
+            verdictOf: () => undefined,
+            asks: [],
+            roundAsks: [],
+            sessionBlocked: () => false,
+            spendOf: () => undefined,
+          }),
         ).toDecide,
         undefined,
         'nothing read off git says nothing',
       );
       const broke = assess(
-        STEPS,
-        finished(),
-        phases({ t1: 'succeeded', t2: 'failed' }),
-        signedDone,
-        asked,
-        () => undefined,
-        [],
-        [],
-        () => false,
-        () => undefined,
-        AHEAD,
+        aRead(STEPS, finished(), {
+          phaseOf: phases({ t1: 'succeeded', t2: 'failed' }),
+          signedOff: signedDone,
+          asked,
+          verdictOf: () => undefined,
+          asks: [],
+          roundAsks: [],
+          sessionBlocked: () => false,
+          spendOf: () => undefined,
+          standings: AHEAD,
+        }),
       );
       assert.deepEqual(
         [broke.status, broke.toDecide],
@@ -1384,51 +1398,51 @@ test("an ending's gate and git's word: what is to decide, read off where the res
       );
       assert.equal(
         assess(
-          STEPS,
-          finished(CANCELLED),
-          DONE,
-          signedDone,
-          asked,
-          () => undefined,
-          [],
-          [],
-          () => false,
-          () => undefined,
-          AHEAD,
+          aRead(STEPS, finished(CANCELLED), {
+            phaseOf: DONE,
+            signedOff: signedDone,
+            asked,
+            verdictOf: () => undefined,
+            asks: [],
+            roundAsks: [],
+            sessionBlocked: () => false,
+            spendOf: () => undefined,
+            standings: AHEAD,
+          }),
         ).toDecide,
         undefined,
         'and only one nobody called off',
       );
       assert.equal(
         assess(
-          STEPS,
-          run({ implement: 't1', review: null }),
-          phases({ t1: 'running' }),
-          signedDone,
-          asked,
-          () => undefined,
-          [],
-          [],
-          () => false,
-          () => undefined,
-          AHEAD,
+          aRead(STEPS, run({ implement: 't1', review: null }), {
+            phaseOf: phases({ t1: 'running' }),
+            signedOff: signedDone,
+            asked,
+            verdictOf: () => undefined,
+            asks: [],
+            roundAsks: [],
+            sessionBlocked: () => false,
+            spendOf: () => undefined,
+            standings: AHEAD,
+          }),
         ).toDecide,
         undefined,
         'still running',
       );
       assert.deepEqual(
         assess(
-          ENDS,
-          atEnd(),
-          DONE,
-          signedDone,
-          asked,
-          () => undefined,
-          [],
-          [],
-          () => false,
-          () => undefined,
-          AHEAD,
+          aRead(ENDS, atEnd(), {
+            phaseOf: DONE,
+            signedOff: signedDone,
+            asked,
+            verdictOf: () => undefined,
+            asks: [],
+            roundAsks: [],
+            sessionBlocked: () => false,
+            spendOf: () => undefined,
+            standings: AHEAD,
+          }),
         ).toDecide,
         {
           kind: 'approve',
@@ -1455,17 +1469,17 @@ test("an ending's gate and git's word: what is to decide, read off where the res
       );
 
       const held = assess(
-        gatedLast,
-        r,
-        DONE,
-        signedDone,
-        asked,
-        () => undefined,
-        [],
-        [],
-        () => false,
-        () => undefined,
-        AHEAD,
+        aRead(gatedLast, r, {
+          phaseOf: DONE,
+          signedOff: signedDone,
+          asked,
+          verdictOf: () => undefined,
+          asks: [],
+          roundAsks: [],
+          sessionBlocked: () => false,
+          spendOf: () => undefined,
+          standings: AHEAD,
+        }),
       );
       assert.deepEqual(
         held.toDecide,
@@ -1476,17 +1490,17 @@ test("an ending's gate and git's word: what is to decide, read off where the res
 
       const approved = () =>
         assess(
-          gatedLast,
-          finished({ approvals: [approval('review', 1)] }),
-          DONE,
-          signedDone,
-          asked,
-          () => undefined,
-          [],
-          [],
-          () => false,
-          () => undefined,
-          AHEAD,
+          aRead(gatedLast, finished({ approvals: [approval('review', 1)] }), {
+            phaseOf: DONE,
+            signedOff: signedDone,
+            asked,
+            verdictOf: () => undefined,
+            asks: [],
+            roundAsks: [],
+            sessionBlocked: () => false,
+            spendOf: () => undefined,
+            standings: AHEAD,
+          }),
         );
       assert.deepEqual(
         [approved().status, approved().toDecide],
@@ -1494,33 +1508,33 @@ test("an ending's gate and git's word: what is to decide, read off where the res
         'approved: nothing merges its branch, so the run is one to decide until git says the branch landed',
       );
       const landed = assess(
-        gatedLast,
-        finished({ approvals: [approval('review', 1)] }),
-        DONE,
-        signedDone,
-        asked,
-        () => undefined,
-        [],
-        [],
-        () => false,
-        () => undefined,
-        [{ branch: 'wf/r-1/implement', where: 'on' }],
+        aRead(gatedLast, finished({ approvals: [approval('review', 1)] }), {
+          phaseOf: DONE,
+          signedOff: signedDone,
+          asked,
+          verdictOf: () => undefined,
+          asks: [],
+          roundAsks: [],
+          sessionBlocked: () => false,
+          spendOf: () => undefined,
+          standings: [{ branch: 'wf/r-1/implement', where: 'on' }],
+        }),
       );
       assert.equal(landed.toDecide, undefined, 'merged by hand, it is decided');
       const ran = atEnd({ steps: { ship: { taskId: 't3', workspace: '/repo', branch: 'main' } }, approvals: [approval('ship', 1)] });
       assert.equal(
         assess(
-          ENDS,
-          ran,
-          phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }),
-          signedDone,
-          asked,
-          () => undefined,
-          [],
-          [],
-          () => false,
-          () => undefined,
-          AHEAD,
+          aRead(ENDS, ran, {
+            phaseOf: phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }),
+            signedOff: signedDone,
+            asked,
+            verdictOf: () => undefined,
+            asks: [],
+            roundAsks: [],
+            sessionBlocked: () => false,
+            spendOf: () => undefined,
+            standings: AHEAD,
+          }),
         ).toDecide,
         undefined,
         "a folder whose ending merges says nothing once that step has run: the branch is its business, not a person's git",

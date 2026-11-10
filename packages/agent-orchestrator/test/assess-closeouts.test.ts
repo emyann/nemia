@@ -39,7 +39,7 @@ import { lackedOf } from '../src/record/record.ts';
 import { nextTry } from '../src/retry/index.ts';
 import { roundFiled } from '../src/round/round.ts';
 import { sentBack } from '../src/status/status.ts';
-import { listing, names, phases, run, step, STEPS } from './assessed.ts';
+import { aRead, listing, names, phases, run, step, STEPS } from './assessed.ts';
 
 const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
 const nothingShipped = () => false;
@@ -154,7 +154,9 @@ test('assess, stepStatus and decision of how a step signed off', async (t) => {
     const blockedAt = (name: string) => (s: string) =>
       s === name ? { outcome: 'blocked' as const, summary: 'stuck', artifacts: [], needs: 'pick one' } : undefined;
 
-    const a = assess(STEPS, run({ implement: 't1', review: null }), phases({ t1: 'succeeded' }), blockedAt('implement'));
+    const a = assess(
+      aRead(STEPS, run({ implement: 't1', review: null }), { phaseOf: phases({ t1: 'succeeded' }), signedOff: blockedAt('implement') }),
+    );
     assert.deepEqual(
       a.ready,
       [],
@@ -164,7 +166,7 @@ test('assess, stepStatus and decision of how a step signed off', async (t) => {
   });
   await t.test('a blocked run is AWAITING you, and is not called failed', () => {
     const blocked = () => ({ outcome: 'blocked' as const, summary: 's', artifacts: [], needs: 'pick one' });
-    const d = decision(STEPS, finished(), DONE, nothingShipped, blocked);
+    const d = decision(aRead(STEPS, finished(), { phaseOf: DONE, signedOff: blocked }), nothingShipped);
     assert.equal(d.kind, 'awaiting');
     assert.equal(d.kind === 'awaiting' && d.outcome, 'waiting');
     assert.deepEqual(d.kind === 'awaiting' && d.failed, [], 'nothing broke');
@@ -186,13 +188,13 @@ test('assess, stepStatus and decision of how a step signed off', async (t) => {
         'unsigned',
         `${why}: held to it by its own file, whatever the engine recorded of the filing`,
       );
-      const a = assess(steps, r, p, signed(said), asked);
+      const a = assess(aRead(steps, r, { phaseOf: p, signedOff: signed(said), asked }));
       assert.deepEqual([a.ready, a.unreachable, a.status], [[], ['respond'], 'waiting'], why);
-      const d = decision(steps, r, p, nothingShipped, signed(said), asked);
+      const d = decision(aRead(steps, r, { phaseOf: p, signedOff: signed(said), asked }), nothingShipped);
       assert.deepEqual(d.kind === 'awaiting' && d.unsigned, ['review'], why);
     }
     assert.equal(stepStatus(REVIEW, r, p, signed(reviewSaid()), asked), 'unverified', 'given, it is signed like any other');
-    assert.deepEqual(assess(steps, r, p, signed(reviewSaid()), asked).ready, ['respond']);
+    assert.deepEqual(assess(aRead(steps, r, { phaseOf: p, signedOff: signed(reviewSaid()), asked })).ready, ['respond']);
     assert.equal(
       stepStatus(REVIEW, r, p, signed({ ...reviewSaid(), output: { findings: [] } }), asked),
       'unverified',

@@ -13,6 +13,7 @@ import type { MeasuredToNow } from '../../contracts/measured-to-now.contract.ts'
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { labelsText, metadataLabels, type Labels } from '../labels/labels.ts';
 import type { Run } from '../record/record.ts';
+import { waitsOnYou } from '../phase/phase.ts';
 import { selectsLabels, type Selectors } from '../watch/selector.ts';
 
 /** What the rules read of a run's summary, as the whole list answers it. */
@@ -31,18 +32,11 @@ export type Listed = {
 };
 
 /**
- * Whether a run waits on a person: nobody called it off, and a step of it waits on one, or a run it waits on never lands without one,
- * or a hold on it only a person lifts.
- */
-const waitsOnPerson = (run: Listed): boolean =>
-  !run.cancelledAt && (run.waitingOnYou.length > 0 || Boolean(run.waiting?.waitingOnYou) || Boolean(run.holding?.waitingOnYou));
-
-/**
- * The kind of a listed run, asked in this order so each run has one: `waiting`, it waits on a person, though something of it may still
- * move; else `inFlight`, something of it moves, or it is running and waits on nobody; else `finished`.
+ * The kind of a listed run, asked in this order so each run has one: `waiting`, it waits on a person (`waitsOnYou`), though something
+ * of it may still move; else `inFlight`, something of it moves, or it is running and waits on nobody; else `finished`.
  */
 export const kindOf = (run: Listed): RunState => {
-  if (waitsOnPerson(run)) return 'waiting';
+  if (waitsOnYou(run)) return 'waiting';
   if (run.moving || (run.status === 'running' && !run.waiting?.waitingOnYou && !run.holding?.waitingOnYou)) return 'inFlight';
   return 'finished';
 };

@@ -35,7 +35,7 @@ import {
 import { PRECEDENCE } from '../src/brief/index.ts';
 import type { Closeout } from '../src/closeout/closeout.ts';
 import type { OutputSchema, Workflow } from '../src/workflow.ts';
-import { listing, names, phases, run, step, STEPS } from './assessed.ts';
+import { aRead, listing, names, phases, run, step, STEPS } from './assessed.ts';
 import type { RetryAsk, RetryHow } from '../src/retry/retry-ask.ts';
 
 /** `plan → implement → review`, as dev-planned is. */
@@ -97,24 +97,35 @@ const OBJECTION = 'nemia retry r-1 plan --message "<objection>"';
 test('assess: a run stopped on a person says what it waits on', async (t) => {
   const statusOf = (...given: Parameters<typeof assess>) => assess(...given).status;
   await t.test('a gate alone: awaiting approval', () => {
-    assert.equal(statusOf(PLANNED, atPlan(), PLAN_DONE, signedDone, asked), 'awaiting approval');
+    assert.equal(statusOf(aRead(PLANNED, atPlan(), { phaseOf: PLAN_DONE, signedOff: signedDone, asked })), 'awaiting approval');
   });
   await t.test('a question alone: blocked', () => {
     const blocked = (name: string) => (name === 'implement' ? said('blocked') : undefined);
-    assert.equal(statusOf(STEPS, run({ implement: 't1', review: null }), PLAN_DONE, blocked, asked), 'waiting');
+    assert.equal(
+      statusOf(aRead(STEPS, run({ implement: 't1', review: null }), { phaseOf: PLAN_DONE, signedOff: blocked, asked })),
+      'waiting',
+    );
   });
   await t.test('REFUSED failed for a task failed', () => {
-    assert.equal(statusOf(STEPS, run({ implement: 't1', review: null }), phases({ t1: 'failed' }), undefined, asked), 'failed');
+    assert.equal(statusOf(aRead(STEPS, run({ implement: 't1', review: null }), { phaseOf: phases({ t1: 'failed' }), asked })), 'failed');
   });
   await t.test('REFUSED failed for a check refused', () => {
     assert.equal(
-      statusOf(CHECKED, withCheck('c1'), phases({ t1: 'succeeded', c1: 'failed' }), signedDone, asked, () => 1),
+      statusOf(
+        aRead(CHECKED, withCheck('c1'), {
+          phaseOf: phases({ t1: 'succeeded', c1: 'failed' }),
+          signedOff: signedDone,
+          asked,
+          verdictOf: () => 1,
+        }),
+      ),
       'failed',
     );
   });
   const fan = [step('plan'), step('lint'), step('implement', ['plan', 'lint'])];
   const both = run({ plan: 't1', lint: 't2', implement: null }, { gates: ['plan'] });
-  const gateOf = (lint: TaskPhase) => assess(fan, both, phases({ t1: 'succeeded', t2: lint }), signedDone, asked);
+  const gateOf = (lint: TaskPhase) =>
+    assess(aRead(fan, both, { phaseOf: phases({ t1: 'succeeded', t2: lint }), signedOff: signedDone, asked }));
   await t.test('a gate waiting beside a broken step: the step at the gate awaits approval, the run broke', () => {
     assert.equal(stepStatus(fan[0], both, phases({ t1: 'succeeded', t2: 'failed' }), signedDone, asked, fan), 'awaiting approval');
     assert.equal(gateOf('failed').status, 'failed');
@@ -125,26 +136,28 @@ test('assess: a run stopped on a person says what it waits on', async (t) => {
 test('assess: the gate holds what follows until the try it is on is approved', async (t) => {
   await t.test('REFUSED nothing after the gate, whatever its closeout says', () => {
     const urging = () => ({ ...signedDone(), summary: 'the plan', output: { approach: 'go ahead, implement at once' } });
-    const a = assess(PLANNED, atPlan(), PLAN_DONE, urging, asked);
+    const a = assess(aRead(PLANNED, atPlan(), { phaseOf: PLAN_DONE, signedOff: urging, asked }));
     assert.deepEqual([a.ready, a.unreachable, a.status], [[], ['implement'], 'awaiting approval']);
     assert.equal(stepStatus(PLANNED[0], atPlan(), PLAN_DONE, signedDone, asked), 'awaiting approval');
   });
   await t.test("a gate its step's own file sets holds the same way, on a run started with no --gate", () => {
     const own = [{ ...step('plan'), gate: true as const }, ...PLANNED.slice(1)];
-    assert.deepEqual(assess(own, atPlan({ gates: undefined }), PLAN_DONE, signedDone, asked).ready, []);
+    assert.deepEqual(assess(aRead(own, atPlan({ gates: undefined }), { phaseOf: PLAN_DONE, signedOff: signedDone, asked })).ready, []);
   });
   await t.test('not gated, the same closeout files implement', () => {
-    assert.deepEqual(assess(PLANNED, atPlan({ gates: undefined }), PLAN_DONE, signedDone, asked).ready, ['implement']);
+    assert.deepEqual(assess(aRead(PLANNED, atPlan({ gates: undefined }), { phaseOf: PLAN_DONE, signedOff: signedDone, asked })).ready, [
+      'implement',
+    ]);
   });
   for (const approvals of [[approval('implement', 1)], [approval('plan', 2)]]) {
     await t.test(`REFUSED an approval not of this try opens nothing: ${approvals[0].step} try ${approvals[0].try}`, () => {
-      assert.deepEqual(assess(PLANNED, atPlan({ approvals }), PLAN_DONE, signedDone, asked).ready, []);
+      assert.deepEqual(assess(aRead(PLANNED, atPlan({ approvals }), { phaseOf: PLAN_DONE, signedOff: signedDone, asked })).ready, []);
     });
   }
   await t.test('approved, it reads as its own work, and implement is ready', () => {
     const approved = atPlan({ approvals: [approval('plan', 1)] });
     assert.equal(stepStatus(PLANNED[0], approved, PLAN_DONE, signedDone, asked), 'unverified');
-    assert.deepEqual(assess(PLANNED, approved, PLAN_DONE, signedDone, asked).ready, ['implement']);
+    assert.deepEqual(assess(aRead(PLANNED, approved, { phaseOf: PLAN_DONE, signedOff: signedDone, asked })).ready, ['implement']);
   });
 });
 
@@ -153,7 +166,7 @@ test('assess: a gated step with a check is verified first, then held', async (t)
   const at = (checkId: string | null, extra: Partial<RepositoryRun> = {}) => withCheck(checkId, { gates: ['implement'], ...extra });
   const passed = phases({ t1: 'succeeded', c1: 'succeeded' });
   await t.test('its check is filed first', () => {
-    const due = assess(gated, at(null), phases({ t1: 'succeeded' }), signedDone, asked);
+    const due = assess(aRead(gated, at(null), { phaseOf: phases({ t1: 'succeeded' }), signedOff: signedDone, asked }));
     assert.deepEqual([due.check, due.ready], [['implement'], []]);
   });
   await t.test('checking while its check runs', () => {
@@ -164,8 +177,11 @@ test('assess: a gated step with a check is verified first, then held', async (t)
   });
   await t.test('awaiting approval once it passes, nothing ready until approved', () => {
     assert.equal(stepStatus(gated[0], at('c1'), passed, signedDone, asked), 'awaiting approval');
-    assert.deepEqual(assess(gated, at('c1'), passed, signedDone, asked).ready, []);
-    assert.deepEqual(assess(gated, at('c1', { approvals: [approval('implement', 1)] }), passed, signedDone, asked).ready, ['review']);
+    assert.deepEqual(assess(aRead(gated, at('c1'), { phaseOf: passed, signedOff: signedDone, asked })).ready, []);
+    assert.deepEqual(
+      assess(aRead(gated, at('c1', { approvals: [approval('implement', 1)] }), { phaseOf: passed, signedOff: signedDone, asked })).ready,
+      ['review'],
+    );
   });
   await t.test('a step that did not finish its work is not at its gate: blocked is blocked', () => {
     assert.equal(stepStatus(PLANNED[0], atPlan(), PLAN_DONE, blockedOn, asked), 'blocked');
@@ -185,11 +201,11 @@ test('assess: a gated step with a check is verified first, then held', async (t)
   const again = (value: boolean) => (name: string) =>
     name === 'review' ? { outcome: 'done' as const, summary: 's', artifacts: [], output: { again: value } } : signedDone();
   await t.test('a gated looping step that asks for another round is not held: the round is filed', () => {
-    const round = assess(looped, r, DONE, again(true), asked);
+    const round = assess(aRead(looped, r, { phaseOf: DONE, signedOff: again(true), asked }));
     assert.deepEqual([round.round.map((x) => x.round), round.ready], [[2], []]);
   });
   await t.test('a gated looping step that hands on (`again: false`) is held', () => {
-    const handed = assess(looped, r, DONE, again(false), asked);
+    const handed = assess(aRead(looped, r, { phaseOf: DONE, signedOff: again(false), asked }));
     assert.deepEqual(
       [stepStatus(looped[1], r, DONE, again(false), asked, looped), handed.ready, handed.unreachable],
       ['awaiting approval', [], ['ship']],
@@ -247,7 +263,7 @@ test('decision at a gate', async (t) => {
   const gatedAtReview = (extra: Partial<RepositoryRun> = {}) => finished({ gates: ['review'], ...extra });
   const merged = () => true as const;
   await t.test('the run awaits you, its outcome blocked, the step under awaitingApproval beside how it ended', () => {
-    const d = decision(STEPS, gatedAtReview(), DONE, () => false, signedDone, asked);
+    const d = decision(aRead(STEPS, gatedAtReview(), { phaseOf: DONE, signedOff: signedDone, asked }), () => false);
     assert.equal(d.kind, 'awaiting');
     assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.awaitingApproval, d.unverified, d.awaitingAnswer], [
       'waiting',
@@ -257,27 +273,31 @@ test('decision at a gate', async (t) => {
     ]);
   });
   await t.test('work merged by a person is landed for any other run', () => {
-    assert.equal(decision(STEPS, finished(), DONE, merged, signedDone, asked).kind, 'landed');
+    assert.equal(decision(aRead(STEPS, finished(), { phaseOf: DONE, signedOff: signedDone, asked }), merged).kind, 'landed');
   });
   await t.test('REFUSED landed for one whose last step waits at its gate, merged or not', () => {
-    assert.equal(decision(STEPS, gatedAtReview(), DONE, merged, signedDone, asked).kind, 'awaiting');
-    assert.equal(decision(STEPS, gatedAtReview(), DONE, () => 'unchanged', signedDone, asked).kind, 'awaiting');
+    assert.equal(decision(aRead(STEPS, gatedAtReview(), { phaseOf: DONE, signedOff: signedDone, asked }), merged).kind, 'awaiting');
+    assert.equal(
+      decision(aRead(STEPS, gatedAtReview(), { phaseOf: DONE, signedOff: signedDone, asked }), () => 'unchanged').kind,
+      'awaiting',
+    );
   });
   const child = run({ implement: null, review: null }, { after: ['r-1'] });
   const shippedParent = (parent: Run) => (id: string) =>
-    id === 'r-1' && decision(STEPS, parent, DONE, merged, signedDone, asked).kind === 'landed';
+    id === 'r-1' && decision(aRead(STEPS, parent, { phaseOf: DONE, signedOff: signedDone, asked }), merged).kind === 'landed';
   await t.test('REFUSED a run --after a parent at its gate is not ready', () => {
     assert.equal(runReady(child, shippedParent(gatedAtReview())), false);
   });
   await t.test('approved and merged, the parent lands and the child is ready', () => {
     const approved = gatedAtReview({ approvals: [approval('review', 1)] });
     assert.equal(runReady(child, shippedParent(approved)), true);
-    assert.equal(decision(STEPS, approved, DONE, merged, signedDone, asked).kind, 'landed');
+    assert.equal(decision(aRead(STEPS, approved, { phaseOf: DONE, signedOff: signedDone, asked }), merged).kind, 'landed');
   });
 });
 
 test('slotNeed at a gate', async (t) => {
-  const need = (r: Run) => slotNeed(r, PLAN_DONE, assess(PLANNED, r, PLAN_DONE, signedDone, asked), () => true);
+  const need = (r: Run) =>
+    slotNeed(r, PLAN_DONE, assess(aRead(PLANNED, r, { phaseOf: PLAN_DONE, signedOff: signedDone, asked })), () => true);
   await t.test('no session runs and no slot is held while a run waits at its gate', () => {
     assert.deepEqual(need(atPlan()), { inFlight: false, wants: false });
   });
@@ -305,14 +325,22 @@ const atEnd = (extra: Partial<RepositoryRun> = {}) =>
 
 test('cancelPlan and forgetRefusal at a gate', async (t) => {
   await t.test('a run waiting at its gate is not finished: cancel calls it off, with nothing to stop', () => {
-    assert.deepEqual(cancelPlan(PLANNED, atPlan(), PLAN_DONE, signedDone, asked), { kind: 'cancel', stop: [] });
+    assert.deepEqual(cancelPlan(aRead(PLANNED, atPlan(), { phaseOf: PLAN_DONE, signedOff: signedDone, asked })), {
+      kind: 'cancel',
+      stop: [],
+    });
   });
   await t.test('a run with no gate held is finished as before', () => {
     const all = atPlan({ gates: undefined, steps: { plan: { taskId: 't1' }, implement: { taskId: 't2' }, review: { taskId: 't3' } } });
-    assert.deepEqual(cancelPlan(PLANNED, all, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }), signedDone, asked), {
-      kind: 'finished',
-      status: 'succeeded',
-    });
+    assert.deepEqual(
+      cancelPlan(
+        aRead(PLANNED, all, { phaseOf: phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }), signedOff: signedDone, asked }),
+      ),
+      {
+        kind: 'finished',
+        status: 'succeeded',
+      },
+    );
   });
   await t.test('REFUSED forgetting a run at its gate, naming the approval and the cancel', () => {
     names(
@@ -421,7 +449,7 @@ test('REFUSED once pruned: a step at its gate is offered no approval and no send
     assert.deepEqual(gateLines(ENDS, r, DONE, signedDone, asked), { ship: PRUNED_LINE });
   });
   await t.test('its approval is refused, so it is not what is left to decide', () => {
-    assert.equal(assess(ENDS, r, DONE, signedDone, asked).toDecide, undefined);
+    assert.equal(assess(aRead(ENDS, r, { phaseOf: DONE, signedOff: signedDone, asked })).toDecide, undefined);
   });
   await t.test('nemia ls says it, waits on nobody, and offers no verb a pruned run refuses', () => {
     const l = listing({ steps: ENDS, run: r, phaseOf: DONE, closeoutOf: signedDone, askedCloseout: asked });
@@ -487,7 +515,7 @@ test('retryable and retryRefusal: sending back from a gate is `nemia retry --mes
     assert.equal(retryRefusal(terminal, { ...last, approvals: undefined }, 'implement', more, passed, signedDone, asked), null);
   });
   await t.test('nemia decide offers a gate its own lines, never a try with nothing to change (retryLines)', () => {
-    const d = decision(PLANNED, atPlan(), PLAN_DONE, () => false, signedDone, asked);
+    const d = decision(aRead(PLANNED, atPlan(), { phaseOf: PLAN_DONE, signedOff: signedDone, asked }), () => false);
     assert.deepEqual(retryLines(PLANNED, atPlan(), d, PLAN_DONE, signedDone, asked), []);
   });
 });
@@ -544,7 +572,9 @@ test('REFUSED at a gate, pass after pass: a wordless ask for the next try is not
   });
   await t.test('signed off at its gate, it is not due, pass after pass', () => {
     for (let pass = 1; pass <= 3; pass++) {
-      const a = assess(PLANNED, atPlan(), PLAN_DONE, signedDone, asked, () => undefined, [wordless]);
+      const a = assess(
+        aRead(PLANNED, atPlan(), { phaseOf: PLAN_DONE, signedOff: signedDone, asked, verdictOf: () => undefined, asks: [wordless] }),
+      );
       const status = stepStatus(PLANNED[0], atPlan(), PLAN_DONE, signedDone, asked);
       assert.deepEqual([a.retry, a.ready, status], [[], [], 'awaiting approval'], `pass ${pass}`);
     }

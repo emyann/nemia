@@ -587,7 +587,7 @@ const fullPass = Effect.fnUntraced(function* (e: Engine, run: Run, pass: PassRea
  * files in the store stamp the same, the pass was handed the memo's own run for it (`keptOf`), nothing of its tasks is on the feed since
  * (`restingPass`), and every result branch it would read the tip of is where its record says (`tipsSeen`, off the heads the pass's one
  * `standing` a repository read, `tipsHold`). Otherwise a full pass (`advancePass`), kept in the memo if the run is at rest after it and the
- * pass left the run as it read.
+ * pass left the run as it read: the run it advanced, with its marks laid over it (`advanced.run`), reads as the record did.
  *
  * Answered from memory, it costs no journal read, no observe and no git process of its own, and is counted (`rested`). With `verify`, it is
  * judged in full as well (`verified`), and a difference is died of: a change the memo missed is a bug in what it watches. Untraced: a run
@@ -614,7 +614,7 @@ const advanceResting = Effect.fnUntraced(function* (e: Engine, run: Run, pass: P
   memo.runs.delete(run.id);
   const record = JSON.stringify(run);
   const { advanced, rest } = yield* fullPass(e, run, pass, slot);
-  if (rest && stamp !== undefined && JSON.stringify(run) === record) {
+  if (rest && stamp !== undefined && JSON.stringify(advanced.run) === record) {
     const { run: _, facts: __, ...answered } = advanced;
     memo.runs.set(run.id, { stamp, run, tipped: rest.tipped, advanced: answered });
   }
@@ -653,11 +653,11 @@ const verified = Effect.fn('verified')(function* (
       ),
     );
   const {
-    advanced: { run: _, ...judged },
+    advanced: { run: after, ...judged },
     blockers,
     rest,
   } = yield* fullPass(e, fresh, pass, slot);
-  if (rest && isDeepStrictEqual(judged, kept) && JSON.stringify(fresh) === record) return;
+  if (rest && isDeepStrictEqual(judged, kept) && JSON.stringify(after) === record) return;
   return yield* Effect.die(
     new Error(
       `the tick answered ${run.id} from its memo of runs at rest, and a full pass ${rest ? 'answers otherwise' : `finds it not at rest (${blockers.join(', ')})`}: ` +

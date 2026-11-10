@@ -14,6 +14,7 @@ import type { Pin } from '../revisions/revisions.ts';
 import type { Labels } from '../labels/labels.ts';
 import type { HarnessSettings } from '../harness-settings/harness-settings.ts';
 import type { PlaceKind, StepStatusWord } from 'objects';
+import type { EndedForGood, HonoursAsks } from '../../contracts/honours-asks.contract.ts';
 
 /**
  * A folder a step may reach beyond its workspace, as the runtime takes it (`config.mounts`): an absolute path, and whether the step may
@@ -381,6 +382,20 @@ export const stopsFollowers = (s: StepStatus): boolean =>
   s === 'failed (check)' ||
   s === 'failed' ||
   s === 'stopped';
+
+/**
+ * Whether the run will never file anything again: it was called off (`nemia cancel`) or pruned (`nemia prune`). A hold ends nothing, since
+ * it lifts and the run files on after it: a read of what the run still needs once a hold lifts reads this. Pure, and proved by
+ * `contracts/honours-asks.contract.ts`.
+ */
+export const endedForGood: EndedForGood = (run) => run.cancelledAt !== undefined || run.pruned !== undefined;
+
+/**
+ * Whether a person's ask of the run is honoured, and anything may be asked of a person, on this pass: never of a run called off, pruned
+ * or held (a hold until it lifts). A read of what the run does on this pass reads this. Pure, and proved by
+ * `contracts/honours-asks.contract.ts`.
+ */
+export const honoursAsks: HonoursAsks = (run) => !endedForGood(run) && run.hold === undefined;
 
 /** The first line of some prose that is not blank, trimmed; empty where there is none. Pure. */
 export const firstLine = (body: string): string =>

@@ -6,21 +6,14 @@
  */
 import os from 'node:os';
 import { Effect } from 'effect';
-import { type Hold, type Run } from '../record/record.ts';
+import { honoursAsks, type Hold, type Run } from '../record/record.ts';
 import { holdRefusal } from './wait.ts';
 import { idRefusal } from '../forget/forget.ts';
 import { assess } from '../tick/assess.ts';
-import { stepsOf } from '../steps/steps.verb.ts';
 import { standingLiveOf } from '../standing/standing.verb.ts';
-import {
-  closeoutAsked,
-  closeoutReader,
-  exitVerdicts,
-  harnessBlocked,
-  parentRead,
-  spendReader,
-  taskPhasesRead,
-} from '../views/views.verb.ts';
+import { parentRead } from '../views/views.verb.ts';
+import { readRun } from '../tick/told.verb.ts';
+import { EngineService } from '../runtime-client.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
@@ -69,24 +62,11 @@ export const hold = Effect.fn('hold')(function* (id: string, until: readonly str
     ),
   );
   let finished: 'landed' | 'succeeded' | undefined;
-  if (!run.cancelledAt && !run.pruned && !run.hold) {
+  if (honoursAsks(run)) {
     if ((yield* parentRead(id, git)).landed) finished = 'landed';
     else {
-      const steps = yield* stepsOf(run);
-      const { views, phaseOf } = yield* taskPhasesRead(run);
-      const { asks, rounds } = yield* (yield* RunDoor).asks.read(RunId.read(id));
-      const { status } = assess(
-        steps,
-        run,
-        phaseOf,
-        closeoutReader(views, run, steps),
-        closeoutAsked(views),
-        exitVerdicts(views, run),
-        asks,
-        rounds,
-        harnessBlocked(views),
-        spendReader(views),
-      );
+      const { read: runRead } = yield* readRun(yield* EngineService, run);
+      const { status } = assess(runRead);
       if (status === 'succeeded') finished = 'succeeded';
     }
   }

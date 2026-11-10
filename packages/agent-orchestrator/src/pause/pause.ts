@@ -14,7 +14,7 @@ import type { RecordMemo } from '../rest/index.ts';
 import type { RetryAsk } from '../retry/index.ts';
 import { endsOnBase, type Workflow } from '../step/step.ts';
 import { landsOnCheck } from '../status/status.ts';
-import { parkedOf, phaseOfView, type WordView } from '../views/views-words.ts';
+import { blockedWord, parkedOf, phaseOfView, type WordView } from '../views/views-words.ts';
 
 /**
  * A person's pause on the store, as its file says it: when it was put, who put it, and the person's words for why (`why`, absent when none
@@ -279,7 +279,7 @@ const atWorkNow = (taskId: string, viewOf: (taskId: string) => FinishingView | u
 /** Whether a task's view is at work: pending or running, neither queued for a slot nor waiting on a person. */
 const atWork = (view: FinishingView): boolean => {
   const phase = phaseOfView(view);
-  return (phase === 'pending' || phase === 'running') && view.admission !== 'queued' && view.phase !== 'needs-human';
+  return (phase === 'pending' || phase === 'running') && view.admission !== 'queued' && !blockedWord(view.phase);
 };
 
 /** Since when, by whom and why, in words: what each line of the pause says of it. */

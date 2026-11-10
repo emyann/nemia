@@ -22,7 +22,7 @@ import type { Verdict } from '../check/check.ts';
 /** What a pass files of its due work: the steps ready (`Assessment.ready`) and the workflow nodes due their card (`Assessment.send`). */
 export type Due = { ready: readonly string[]; send: readonly string[] };
 
-/** What a pass read that a route's words are read by: the tick's `PassReads`, which this names no further to keep the import one way. */
+/** What a pass read that a route's words are read by: the tick's `RunRead`, which this names no further to keep the import one way. */
 export type SendReads = {
   steps: Workflow[];
   phaseOf: (taskId: string) => TaskPhase;

@@ -10,7 +10,7 @@
  */
 import type { FramedFor, SpeakerNameRefusal, SpeakerRefusal, WithSpeaker, WithoutSpeaker } from '../../contracts/speaker.contract.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import type { EnginePhase } from '../views/views-words.ts';
+import { blockedWord, type EnginePhase } from '../views/views-words.ts';
 import type { CallState, ChatFrom, SaidAfter } from 'objects';
 
 /**
@@ -368,7 +368,7 @@ const stopEvent = (stop: SourceStop): ChatEvent => ({
  */
 export function projectChat(sources: ChatSources): ChatEvent[] {
   const claims = claimsOf(sources);
-  const live = sources.phase === 'needs-human' ? 'waits' : 'running';
+  const live = blockedWord(sources.phase) ? 'waits' : 'running';
   const lastAttempt = sources.sessions.at(-1)?.attempt;
   const out: ChatEvent[] = [];
   for (const [i, session] of sources.sessions.entries()) {

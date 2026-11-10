@@ -12,12 +12,13 @@ import { type Implementation, spec } from '@emyann/tsverify';
 
 /**
  * The marks of a run the two read, as `readRun` composes them on the record: `cancelledAt`, the moment `nemia cancel` wrote; `pruned`,
- * what `nemia prune` recorded; `hold`, the hold a person put. Each absent while it is not so.
+ * what `nemia prune` recorded; `hold`, the hold a person put. Each absent while it is not so. Of `pruned` and `hold` only the moment
+ * each was written is named (`at`, which `Pruned` and `Hold` both carry): the verifier models no bare `object`.
  */
 export type RunMarks = {
   readonly cancelledAt?: string | undefined;
-  readonly pruned?: object | undefined;
-  readonly hold?: object | undefined;
+  readonly pruned?: { readonly at: string } | undefined;
+  readonly hold?: { readonly at: string } | undefined;
 };
 
 /** The run was called off. */

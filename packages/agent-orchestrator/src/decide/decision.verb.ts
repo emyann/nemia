@@ -117,7 +117,7 @@ export const decisionRead = Effect.fn('decisionRead')(function* (id: string, env
   if (holding) return { decision: { holding }, ...none } satisfies DecisionRead;
   const folder = workflowsOf(run, yield* StoreRoot).steps;
   const views = yield* viewsOf(run, e);
-  const judgedOver = (git: BranchReader) => judge(run, stepNames(run, folder), folder, views, { reader: e, git, parent });
+  const judgedOver = (git: BranchReader) => judge(run, stepNames(run, folder), folder, views, { reader: e, git, parent, env });
   const unasked = yield* judgedOver(yield* live.when(false));
   const settled = unasked.status === 'running' && !unasked.waitingOnYou.length;
   const git = yield* live.when(!settled);

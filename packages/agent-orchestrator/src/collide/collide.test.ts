@@ -102,6 +102,12 @@ test('collisionsDue reads the ending waiting at its gate, or one whose landing a
     'ship',
     "an ungated ending lands on its check in the same way, so its refused merge owes the same trials: quick's land, filed by its review",
   );
+  const held = { ...refused(SHA), hold: { at: '2026-10-05T02:00:00.000Z', until: ['r-0'] } };
+  assert.equal(
+    collisionsDue(STEPS, held, undefined),
+    'ship',
+    'a hold ends nothing: the held landing still owes its trials once the hold lifts',
+  );
 });
 
 test('REFUSED: collisionsDue for a result left to the person, an ending landed or untouched, a run called off or pruned', () => {

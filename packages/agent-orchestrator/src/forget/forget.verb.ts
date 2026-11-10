@@ -35,8 +35,9 @@ import { standingsOf, type BranchReader } from '../branches/branches.store.ts';
 import { headsOver, NOTHING_READ, standingLive, standingReader } from '../standing/standing.verb.ts';
 import { statusMemo } from '../place/landing.store.ts';
 import { merging, resolved } from './prune/prune.verb.ts';
-import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRead } from '../views/views.verb.ts';
-import { adoptChecks, adoptRounds, adoptTries, unrecordedSteps } from '../tick/advance.verb.ts';
+import { taskPhasesRead } from '../views/views.verb.ts';
+import { readAndAdopt } from '../adopt/run-adopt.verb.ts';
+import { readersOf } from '../tick/told.verb.ts';
 import { closeWaitingTasks } from '../tick/held.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { engineForgetting, forgetTasks } from './forgetting/forgetting.verb.ts';
@@ -158,19 +159,14 @@ const frozenSteps = (run: Run): Effect.Effect<{ steps?: Workflow[]; unfrozen?: s
 const readForgetting = Effect.fn('readForgetting')(function* (e: Engine, id: string) {
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
   const { steps, unfrozen } = yield* frozenSteps(run);
-  const { views, phaseOf } = yield* taskPhasesRead(run).pipe(over(e));
-  const { asks, rounds } = yield* (yield* RunDoor).asks.read(RunId.read(id));
-  const reader = closeoutReader(views, run, steps);
-  const asked = closeoutAsked(views);
-  const verdictOf = exitVerdicts(views, run);
-  const spendOf = spendReader(views);
-  if (steps) {
-    yield* adoptRounds(e, run, steps, views, phaseOf, reader, asked, rounds, spendOf);
-    yield* adoptTries(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, spendOf);
-    yield* adoptChecks(e, run, steps, views, phaseOf, reader, asked, spendOf);
-    const unrecorded = yield* unrecordedSteps(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, rounds, spendOf);
-    for (const { name, taskId } of unrecorded) run.steps[name] = { ...run.steps[name], taskId };
+  if (!steps) {
+    const { views } = yield* taskPhasesRead(run).pipe(over(e));
+    const { asks, rounds } = yield* (yield* RunDoor).asks.read(RunId.read(id));
+    const { phaseOf, signedOff: reader, asked, verdictOf, spendOf } = readersOf(views, run, []);
+    return { run, steps, unfrozen, views, phaseOf, asks, rounds, reader, asked, verdictOf, spendOf };
   }
+  const { read } = yield* readAndAdopt(e, run, { steps, unrecorded: true });
+  const { views, phaseOf, signedOff: reader, asked, verdictOf, spendOf, asks, roundAsks: rounds } = read;
   return { run, steps, unfrozen, views, phaseOf, asks, rounds, reader, asked, verdictOf, spendOf };
 });
 

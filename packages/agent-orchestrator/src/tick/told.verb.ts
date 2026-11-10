@@ -2,14 +2,16 @@
  * A step as the tick tells it (`toldOf`): the step its brief is composed for, the harness's own arguments it is filed with (`ownOf`), and
  * what its place says to it (`placeTold`); the files its last closeout lacked (`lacksTold`), and which files the steps before it named
  * are there (`foldersTold`); and what a pass named, found or thrown as its fault (`found`, `recordNamed`). And what one pass reads of a
- * run before it adopts or files anything (`readPass`): the engine's views of its tasks, the readers made of them, and the asks beside
+ * run before it adopts or files anything (`readRun`): the engine's views of its tasks, the readers made of them, and the asks beside
  * it, through the Run door — the asks waiting, and every answer a person gave, waiting or consumed, which the steps after each are told.
  * A controller: it reads the run's rendered agent folder, the skills where a start of the run's folder finds them, and the run's place.
  */
 import path from 'node:path';
 import { Effect, Result } from 'effect';
 import { ownArgsOf } from 'agent-runtime/vocabulary';
-import { refusedTold } from './assess.ts';
+import { assess, refusedTold, type AssessRead } from './assess.ts';
+import { standingReader, type PassStanding } from '../standing/standing.verb.ts';
+import { standingsOf } from '../branches/branches.store.ts';
 import { declarationOf, DEFAULT_HARNESS } from '../harness/harness.ts';
 import { mcpServerOf, over, type ClaudeFlags, type CodexArgs, type Engine, type TaskView } from '../runtime-client.ts';
 import {
@@ -27,10 +29,10 @@ import { filedFolders, type FiledFolders } from '../filed/filed.ts';
 import { artifactFiles, filesHanded, holdsCloseout } from '../artifacts/artifacts.store.ts';
 import { lackLines } from '../artifacts/artifacts.ts';
 import type { EndingStopped, RetryBriefing } from '../brief/index.ts';
-import { budgetOf, ownStatus, type RoundAsk, type SpendOf } from '../status/status.ts';
+import { budgetOf, ownStatus, type SpendOf } from '../status/status.ts';
 import type { Retry, RetryAsk } from '../retry/index.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, saidIn, spendReader, taskPhasesRead } from '../views/views.verb.ts';
-import { StoreRoot } from '../config/root.store.ts';
+import { phaseOfView } from '../views/views-words.ts';
 import { RunId } from '../record/record.model.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
@@ -42,7 +44,7 @@ import { workflowDescription } from '../folder/folder.store.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
 import { SkillName } from '../agents/agents.model.ts';
 import { enabledSkillsOf, renderedFlags, rendersAgent, unrendered, type SkillAgain } from '../agents/agents.ts';
-import type { LandingWords, Verdict } from '../check/check.ts';
+import type { LandingWords } from '../check/check.ts';
 import { landingWords, placeSay } from '../place/landing.store.ts';
 import type { Place } from '../place/place.store.ts';
 import type { PlaceSay } from '../place/place.ts';
@@ -364,40 +366,77 @@ export const tryTold = (
  */
 const underBudget = (steps: readonly Workflow[], run: Run): boolean => steps.some((s) => budgetOf(s, run) !== undefined);
 
-/** A pass's reads of a run, before it adopts or files anything: the engine's views of its tasks, the readers made of them, and its asks. */
-export const readPass = Effect.fnUntraced(function* (e: Engine, run: Run) {
-  const steps = yield* stepsOf(run);
-  const { views, phaseOf } = yield* taskPhasesRead(run, { earlierTries: underBudget(steps, run) }).pipe(over(e));
-  const signedOff = closeoutReader(views, run, steps);
-  const asked = closeoutAsked(views);
-  const verdictOf = exitVerdicts(views, run);
-  const sessionBlocked = harnessBlocked(views);
-  const spendOf = spendReader(views);
+/**
+ * The readers a run is judged by, made once of the engine's views of its tasks: each task's phase, how each step signed off, whether a
+ * task was asked its closeout, each step's check's exit, whether a session is blocked by its harness, and what each task cost. Pure: the
+ * one place they are made, so the pass, the verbs and the screens read a run through the same ones.
+ */
+export const readersOf = (views: ReadonlyMap<string, TaskView>, run: Run, steps: readonly Workflow[]) => ({
+  phaseOf: (taskId: string): TaskPhase => phaseOfView(views.get(taskId)),
+  signedOff: closeoutReader(views, run, steps),
+  asked: closeoutAsked(views),
+  verdictOf: exitVerdicts(views, run),
+  sessionBlocked: harnessBlocked(views),
+  spendOf: spendReader(views),
+});
+
+/** How a caller of `readRun` reads beside the pass: the steps or views it read already, and which earlier tries it views. */
+export type RunReadHow = {
+  readonly steps?: Workflow[];
+  readonly views?: Map<string, TaskView>;
+  /**
+   * Which earlier tries are viewed: `every` (a verb, whose cost and timeline read them all) or `budgeted`, only where a step has a cap in
+   * force (`underBudget`), as the tick's pass reads them. Left out, `every`.
+   */
+  readonly earlierTries?: 'every' | 'budgeted';
+};
+
+/**
+ * The one read of a run (`RunRead`) every reader of it judges it by — the tick's pass, every verb, `nemia ls`, the api's listing and the
+ * run object: its frozen steps, the engine's views of its tasks and the readers made of them (`readersOf`), and a person's asks, through
+ * the Run door. Where the result branches stand and who holds the checkout are a caller's to add, each read where it reads them
+ * (`standings`, `checkout`): left as none here. With it, the notes the asks' read said (`askNotes`).
+ */
+export const readRun = Effect.fnUntraced(function* (e: Engine, run: Run, how: RunReadHow = {}) {
+  const steps = how.steps ?? (yield* stepsOf(run));
+  const earlierTries = how.earlierTries === 'budgeted' ? underBudget(steps, run) : true;
+  const views = how.views ?? (yield* taskPhasesRead(run, { earlierTries }).pipe(over(e))).views;
   const door = yield* RunDoor;
   const { asks, rounds: roundAsks, notes: askNotes } = yield* door.asks.read(RunId.read(run.id));
   const answers = yield* door.asks.answers(RunId.read(run.id));
-  const home = yield* StoreRoot;
-  const reads: PassReads = { steps, views, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks, answers, home };
-  return { reads, askNotes };
+  const read: RunRead = {
+    run,
+    steps,
+    views,
+    ...readersOf(views, run, steps),
+    asks,
+    roundAsks,
+    answers,
+    standings: [],
+    checkout: undefined,
+  };
+  return { read, askNotes };
 });
 
 /**
- * What a pass read of a run before it filed anything (`advanceRun`): the run's steps, the engine's views of its tasks and the readers made
- * of them, and a person's asks. One for the pass: every phase of it reads the same.
+ * `read` with where its result branches stand, as `standing` read them (`standingsOf` over `standingReader`: no process, a branch no pass
+ * read is unread): what says a finished run with no gated ending is one nobody has decided. Read only for a run neither running nor
+ * cancelled, since nothing of a run still going is decided on them; none where no standing is given.
  */
-export type PassReads = {
-  steps: Workflow[];
-  views: Map<string, TaskView>;
-  phaseOf: (taskId: string) => TaskPhase;
-  signedOff: (step: string) => Closeout | undefined;
-  asked: (taskId: string) => CloseoutAsked;
-  verdictOf: (step: string) => Verdict | undefined;
-  sessionBlocked: (taskId: string) => boolean;
-  spendOf: SpendOf;
-  asks: RetryAsk[];
-  roundAsks: RoundAsk[];
+export const withStandings = <R extends AssessRead>(read: R, standing: PassStanding | undefined): R => {
+  if (!standing) return read;
+  const { status } = assess(read);
+  if (status === 'running' || status === 'cancelled') return read;
+  return { ...read, standings: standingsOf(read.run, read.steps, standingReader(standing)) };
+};
+
+/**
+ * One read of a run (`readRun`): what `assess` reads (`AssessRead`), and what a filing reads besides — the engine's views themselves and
+ * every answer a person gave. One for the pass: every phase of it reads the same.
+ */
+export type RunRead = AssessRead & {
+  readonly steps: Workflow[];
+  readonly views: Map<string, TaskView>;
   /** Every answer a person gave with `nemia retry --message` on the run, waiting or consumed: what the steps after each are handed. */
-  answers: readonly RetryAsk[];
-  /** The store's root, as the pass was given it (`StoreRoot`): where a filing reads the run's factory's MCP server record. */
-  home: string;
+  readonly answers: readonly RetryAsk[];
 };

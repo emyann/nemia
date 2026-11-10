@@ -9,6 +9,7 @@ import {
   andList,
   prunedWords,
   satisfiesAfter,
+  honoursAsks,
   stopsFollowers,
   tryOf,
   type Acceptance,
@@ -451,7 +452,7 @@ function gateNotLoop(
   spendOf: SpendOf,
   verdictOf: (step: string) => Verdict | undefined,
 ): string | undefined {
-  if (run.cancelledAt || run.pruned || run.hold) return undefined;
+  if (!honoursAsks(run)) return undefined;
   const words = runWords(steps, run, phaseOf, closeoutOf, askedCloseout, spendOf, verdictOf);
   if (steps.some((s) => s.loop && words.get(s.name) === 'exhausted')) return undefined;
   const gates = steps.filter((s) => words.get(s.name) === 'awaiting approval').map((s) => s.name);
@@ -616,7 +617,7 @@ const overWords = (over: ReadonlyArray<{ name: string; spent: Spend; cap: number
  * written around the command.
  */
 export function roundOffers(steps: readonly Workflow[], run: Run, d: Decision, spendOf: SpendOf = () => undefined): Offer[] {
-  if (d.kind !== 'awaiting' || run.pruned || run.hold) return [];
+  if (d.kind !== 'awaiting' || !honoursAsks(run)) return [];
   return steps
     .filter((s) => s.loop && (d.exhausted.includes(s.name) || d.overBudget.includes(s.name)))
     .flatMap((looping) => {

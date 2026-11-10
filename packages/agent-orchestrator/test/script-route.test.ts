@@ -120,8 +120,9 @@ const rowsOf = async (b: Board, id: string) => {
   const run = readRun(id);
   const steps = run.workflow ?? [];
   const { views, phaseOf } = await stage.runWith(b.e, taskPhasesRead(run).pipe(over(b.e)));
-  const input = { steps, run, phaseOf, closeoutOf: closeoutReader(views, run, steps) };
-  return routedRows(input, listedWords(input));
+  const signedOff = closeoutReader(views, run, steps);
+  const read = { steps, run, phaseOf, signedOff, asked: () => false, verdictOf: () => undefined, spendOf: () => undefined };
+  return routedRows({ steps, run, closeoutOf: signedOff }, listedWords(read));
 };
 
 test('an unsure script reads blocked and offers nemia route; the route a person gives files its node, and the run goes on', async () => {

@@ -6,9 +6,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { choicesOf, type Decision, type Offer } from './decide.ts';
 import type { Run } from '../record/record.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 
-const STEPS: Workflow[] = [
+const STEPS: StepSpec[] = [
   { name: 'plan', after: [], body: 'Plan it.' },
   { name: 'implement', after: ['plan'], body: 'Build it.' },
 ];
@@ -94,7 +94,7 @@ test('choicesOf', async (t) => {
   );
 
   await t.test('a workflow whose step merges is offered no land it nor drop it', () => {
-    const merging = [...STEPS, { name: 'ship', after: ['implement'], body: 'Land it.', workspace: 'base' }] as Workflow[];
+    const merging = [...STEPS, { name: 'ship', after: ['implement'], body: 'Land it.', workspace: 'base' }] as StepSpec[];
     assert.deepEqual(choicesOf(merging, RUN, awaiting(), []), []);
   });
 

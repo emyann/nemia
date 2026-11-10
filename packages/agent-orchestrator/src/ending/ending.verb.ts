@@ -10,7 +10,7 @@ import { Effect } from 'effect';
 import { asked, over, type Engine } from '../runtime-client.ts';
 import type { Refusal } from '../refusal/refusal.ts';
 import type { Verdict } from '../check/check.ts';
-import type { Workflow } from '../workflow.ts';
+import type { StepSpec } from '../workflow.ts';
 import { sizeOf } from '../artifacts/artifacts.ts';
 import { heldCheckouts, runAdmitted, type MainClaim, type RunSlot } from '../cap/cap.ts';
 import { endingClaimedAt, landedWords, landingDue, landingOpen } from './ending.ts';
@@ -63,7 +63,7 @@ const inFlightPhase = (phase: TaskPhase): boolean => phase === 'pending' || phas
 export const checkoutHold = (
   e: Engine,
   run: Run,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   from: { read: PassRead; slot: RunSlot | undefined } | { standing: Effect.Effect<PassStanding, Refusal> },
   config: Settings,
   memo: StatusMemo,
@@ -189,7 +189,7 @@ const mainClaim = Effect.fnUntraced(function* (
  */
 export function landEnding(
   run: Run,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   phaseOf: (taskId: string) => TaskPhase,
   signedOff: (step: string) => Closeout | undefined,
   asked: (taskId: string) => CloseoutAsked,

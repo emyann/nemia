@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';
 import { EngineService, over, tried, type Engine } from '../runtime-client.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { isRepositoryRun, namesInOrder, runTasks, type RepositoryRun, type Run } from '../record/record.ts';
 import { approvedFirst, landsOnCheck } from '../status/status.ts';
 import {
@@ -147,7 +147,7 @@ const forgetMissing = Effect.fn('forgetMissing')(function* (id: string, dir: str
  * A run's frozen steps, or, for a record with no frozen workflow whose folder does not read, why (`unfrozen`): whatever reading it throws,
  * a plain `ENOENT` included, so the run is judged without its steps.
  */
-const frozenSteps = (run: Run): Effect.Effect<{ steps?: Workflow[]; unfrozen?: string }> =>
+const frozenSteps = (run: Run): Effect.Effect<{ steps?: StepSpec[]; unfrozen?: string }> =>
   stepsOf(run).pipe(
     Effect.map((steps) => ({ steps })),
     Effect.catch((err) => Effect.succeed({ unfrozen: err instanceof UnloadedFolder ? err.why : err.message })),
@@ -199,7 +199,7 @@ export const runsForgetting = Effect.fn('runsForgetting')(function* (runIds: rea
  * Whether `nemia rm` reads where `run`'s result stands: for an ending gated before it runs that has not run, or one that lands on its
  * check, whose staged merge is read off its result tips.
  */
-const asksStanding = (run: Run, steps: readonly Workflow[] | undefined): boolean =>
+const asksStanding = (run: Run, steps: readonly StepSpec[] | undefined): boolean =>
   isRepositoryRun(run) && (steps ?? []).some((s) => (approvedFirst(s, run) && !run.steps[s.name]?.taskId) || landsOnCheck(s, run));
 
 /**
@@ -234,7 +234,7 @@ function refusalOf(id: string, f: Forgetting, git: BranchReader, place: Place): 
  * Remove a repository run's worktrees through its place (`runWorktrees`, `handWorktree`), in one `remove`, which prunes git's list, and
  * answer what was removed, handed off, already gone and left — a directory in `dir` git does not know among what is left (`strays`).
  */
-function removeWorktrees(run: RepositoryRun, steps: readonly Workflow[] | undefined, dir: string, place: RunPlaceRead): Worktrees {
+function removeWorktrees(run: RepositoryRun, steps: readonly StepSpec[] | undefined, dir: string, place: RunPlaceRead): Worktrees {
   const within = resolved(dir);
   const recorded = {
     ...run,

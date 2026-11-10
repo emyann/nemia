@@ -4,7 +4,7 @@
  * (`stepLabels`), and a log as the line `nemia up` prints (`lineOf`). The layer that acts on them is `telemetry.store.ts`'s.
  */
 import type { Run } from '../record/record.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { runKeys, stepKeys, type StepKeys } from '../meter/index.ts';
 
 /**
@@ -86,7 +86,7 @@ export function toolDetailsRefusalOf(env: Readonly<Record<string, string | undef
  * The labels a step's task is filed with and its spans and logs say: the run `run`, and the step's own (`stepKeys`): its factory, its
  * workflow, the step and its agent, the same its metrics are kept by. Its sessions' telemetry says them beside the runtime's own task.
  */
-export const stepLabels = (run: Pick<Run, 'id' | 'factory' | 'workflowDir'>, step: Workflow): StepLabels => ({
+export const stepLabels = (run: Pick<Run, 'id' | 'factory' | 'workflowDir'>, step: StepSpec): StepLabels => ({
   run: run.id,
   ...stepKeys(run, step),
 });

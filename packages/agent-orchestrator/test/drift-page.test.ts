@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Run } from '../src/run.ts';
-import type { Workflow } from '../src/workflow.ts';
+import type { StepSpec } from '../src/workflow.ts';
 import { driftOf } from '../src/resource/tries.verb.ts';
 
 /** A run of one step `build`. */
@@ -20,7 +20,7 @@ const runWith = (): Run => ({
 });
 
 test('driftOf: the folder’s own drift is a name-level warning, and none where the names agree', async (t) => {
-  const steps = (...names: string[]): Workflow[] => names.map((name) => ({ name, after: [], body: '' }));
+  const steps = (...names: string[]): StepSpec[] => names.map((name) => ({ name, after: [], body: '' }));
   await t.test('the same names: no warning', () => {
     assert.equal(driftOf(runWith(), steps('build')), null);
   });

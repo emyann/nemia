@@ -19,7 +19,7 @@ const { REFUSING, artifactLines, artifactPlace, artifactsContract, filesDue, nea
 import type { Run } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import type { StepRecord } from '../record/record.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { names } from '../../test/assessed.ts';
 
 /** A run whose step `build` works in `workspace`, with its files directory made: the run, and that directory. */
@@ -190,7 +190,7 @@ test('filesHanded', async (t) => {
 const STEPS = [
   { name: 'implement', after: [] },
   { name: 'review', after: ['implement'], loop: 'implement' },
-] as unknown as Workflow[];
+] as unknown as StepSpec[];
 
 /** A run whose `implement` is on task `t1`, with `settlesCounted` as given (none for `null`). */
 const runOf = (record: Partial<StepRecord> = {}, counted: string[] | null = []): Run =>
@@ -200,7 +200,7 @@ const NAMING = () => ({ artifacts: ['a.md'] });
 const SUCCEEDED = (): 'succeeded' => 'succeeded';
 
 test('filesDue: the files of a task are read once, on the pass that first reads it signed, and never of one an earlier tick left unread', async (t) => {
-  const rows: Array<[string, Workflow[], Run, (id: string) => string, () => { artifacts: string[] } | undefined, string[]]> = [
+  const rows: Array<[string, StepSpec[], Run, (id: string) => string, () => { artifacts: string[] } | undefined, string[]]> = [
     ['signed, naming a file, and unread: due', STEPS, runOf(), SUCCEEDED, NAMING, ['implement']],
     ['still running', STEPS, runOf(), () => 'running', NAMING, []],
     ['failed', STEPS, runOf(), () => 'failed', NAMING, []],

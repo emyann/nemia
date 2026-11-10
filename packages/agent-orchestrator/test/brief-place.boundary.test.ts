@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { composeBrief, type RepositoryRun, type Run } from '../src/run.ts';
-import type { Workflow } from '../src/workflow.ts';
+import type { StepSpec } from '../src/workflow.ts';
 import type { Closeout } from '../src/closeout/closeout.ts';
 import type { BriefPlace } from '../src/brief/brief.ts';
 import { SKILL_SECTIONS, type PlaceSay } from '../src/place/place.ts';
@@ -24,7 +24,7 @@ const PINNED = path.join(import.meta.dirname, 'fixtures', 'briefs');
 const STEPS = loadWorkflows(TEAM_DEV);
 
 /** The step `name` of the tests' team. */
-const stepNamed = (name: string): Workflow => {
+const stepNamed = (name: string): StepSpec => {
   const found = STEPS.find((s) => s.name === name);
   if (!found) throw new Error(`the tests' team has no step ${name}`);
   return found;
@@ -55,7 +55,7 @@ const REVIEWED: Closeout = { outcome: 'done', summary: 'fine', output: { again: 
 const NONE = [undefined, undefined, undefined, undefined, undefined, undefined, undefined] as const;
 
 /** What a run's place tells one of its steps' briefs. */
-type Telling = (run: Run, step: Workflow) => BriefPlace;
+type Telling = (run: Run, step: StepSpec) => BriefPlace;
 
 /** What `placeTold` tells a step, by `place`, the package's git place when given none. */
 const toldBy =

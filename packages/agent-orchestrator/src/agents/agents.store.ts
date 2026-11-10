@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Run } from '../record/record.ts';
-import { AGENTS_FOLDER, splitFrontmatter, WorkflowError, type Workflow } from '../step/step.ts';
+import { AGENTS_FOLDER, splitFrontmatter, WorkflowError, type StepSpec } from '../step/step.ts';
 import {
   agentNameRefusal,
   parseAgent,
@@ -54,7 +54,7 @@ export const agentFilesDir = (run: Pick<Run, 'id'>, step: string): string => pat
  * name one (`namesPlugin`). A folder rendered under another plugin name, as one `nemia start` wrote before the plugin was renamed, is not:
  * its flags would name a plugin that is not there.
  */
-export const renderedIn = (dir: string, step: Workflow): boolean =>
+export const renderedIn = (dir: string, step: StepSpec): boolean =>
   isDirectory(dir) && (!namesPlugin(step) || (step.agent !== undefined && isDirectory(path.join(dir, pluginOf(step.agent.name)))));
 
 /**
@@ -66,7 +66,7 @@ export const renderedIn = (dir: string, step: Workflow): boolean =>
  * workflow does. A skill is copied as its files, never a link, and one holding a link that is not followed is refused
  * (`copySkillFiles`): the folder is the step's own.
  */
-export function writeAgentFiles(run: Pick<Run, 'id'>, steps: readonly Workflow[], skills: SkillsFound): void {
+export function writeAgentFiles(run: Pick<Run, 'id'>, steps: readonly StepSpec[], skills: SkillsFound): void {
   for (const step of steps.filter(rendersAgent)) {
     const agent = step.agent;
     if (agent === undefined) continue;
@@ -102,7 +102,7 @@ export function writeAgentFiles(run: Pick<Run, 'id'>, steps: readonly Workflow[]
  * read off its copy, filed under its bare name, in the step's folder (`agentFilesDir`): a skill whose copy is not there — a step whose
  * agent is not rendered, a folder gone — is left out.
  */
-export function renderedSkillVersions(run: Pick<Run, 'id'>, step: Workflow): Map<string, string> {
+export function renderedSkillVersions(run: Pick<Run, 'id'>, step: StepSpec): Map<string, string> {
   const agent = step.agent;
   if (!agent?.skills) return new Map();
   const skills = path.join(agentFilesDir(run, step.name), pluginOf(agent.name), 'skills');
@@ -119,7 +119,7 @@ export function renderedSkillVersions(run: Pick<Run, 'id'>, step: Workflow): Map
  * off its copy in the step's folder (`agentFilesDir`): a skill whose copy is not there, that declares none, or whose `rules.json` does not
  * read is left out.
  */
-export function renderedSkillRules(run: Pick<Run, 'id'>, step: Workflow): Map<string, SkillRule[]> {
+export function renderedSkillRules(run: Pick<Run, 'id'>, step: StepSpec): Map<string, SkillRule[]> {
   const agent = step.agent;
   if (!agent?.skills) return new Map();
   const skills = path.join(agentFilesDir(run, step.name), pluginOf(agent.name), 'skills');
@@ -141,7 +141,7 @@ export function renderedSkillRules(run: Pick<Run, 'id'>, step: Workflow): Map<st
  * read off its copy's SKILL.md in the step's folder (`agentFilesDir`): a skill whose copy is not there, or that declares none, is left
  * out.
  */
-export function renderedSkillApplies(run: Pick<Run, 'id'>, step: Workflow): Map<string, string[]> {
+export function renderedSkillApplies(run: Pick<Run, 'id'>, step: StepSpec): Map<string, string[]> {
   const agent = step.agent;
   if (!agent?.skills) return new Map();
   const skills = path.join(agentFilesDir(run, step.name), pluginOf(agent.name), 'skills');

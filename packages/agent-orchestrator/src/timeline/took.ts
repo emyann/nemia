@@ -8,7 +8,7 @@
 import { runTasks, type Run } from '../record/record.ts';
 import { sessionTasks } from '../status/status.ts';
 import { count, type Consumed } from '../usage/usage.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { signedAndHeld, taskUsage, type AttemptClock, type TaskClock, type Timeline, type TimelineTry } from './timeline.ts';
 
 /**
@@ -169,7 +169,7 @@ const msBetween = (from: string | null, to: string): number | null => (from ? Ma
 export function gateWaitOf(
   run: Pick<Run, 'approvals'>,
   tl: Timeline,
-  step: Pick<Workflow, 'name' | 'after'>,
+  step: Pick<StepSpec, 'name' | 'after'>,
   t: TimelineTry,
 ): number | null {
   const approval = run.approvals?.find((a) => a.step === step.name && a.try === t.try);

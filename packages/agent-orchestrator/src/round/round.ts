@@ -4,7 +4,7 @@
  * Pure.
  */
 import { filedOn } from '../pinned/pinned.ts';
-import { DEFAULT_ROUNDS, type Workflow } from '../step/step.ts';
+import { DEFAULT_ROUNDS, type StepSpec } from '../step/step.ts';
 import {
   andList,
   prunedWords,
@@ -69,7 +69,7 @@ import type { LandingSaid, Verdict } from '../check/check.ts';
  *   over its budget (`standing`).
  */
 export function roundsDue(
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
@@ -103,8 +103,8 @@ export function roundsDue(
  * @param at The looping step's status, its own, and the round it would go.
  */
 function askedRound(
-  steps: readonly Workflow[],
-  step: Workflow,
+  steps: readonly StepSpec[],
+  step: StepSpec,
   run: Run,
   at: { status: StepStatus; own: StepStatus; round: number },
   closeoutOf: (step: string) => Closeout | undefined,
@@ -141,7 +141,7 @@ function askedRound(
  * The target's record keeps what its new try is filed on (`filedOn`): the revisions of its agent and its skills, and the digest of the
  * closeout schema it is given, as every other filing keeps them.
  */
-export function roundFiled(steps: readonly Workflow[], run: Run, r: Round, taskId: string): Run['steps'] {
+export function roundFiled(steps: readonly StepSpec[], run: Run, r: Round, taskId: string): Run['steps'] {
   const looping = steps.find((s) => s.name === r.step);
   const filed = filedOn(
     { run, reads: { steps } },
@@ -164,7 +164,7 @@ export function roundFiled(steps: readonly Workflow[], run: Run, r: Round, taskI
 }
 
 /** The pass's line for a round it filed: its round and on whose word, or the merge it files (`mergeNote`). */
-export const roundFiledNote = (r: Round, looping: Workflow): string =>
+export const roundFiledNote = (r: Round, looping: StepSpec): string =>
   r.merge
     ? mergeNote(r)
     : `${r.step}: round ${r.round} — ${r.by === 'again' ? `again, rounds: ${capOf(looping)}` : `nemia retry --round${r.budget !== undefined ? ` --budget ${r.budget}` : ''}`}; ${r.target} goes again`;
@@ -173,7 +173,7 @@ export const roundFiledNote = (r: Round, looping: Workflow): string =>
  * What a round filed tells its target of itself (`RoundBriefing`): its loop, its number, the loop's `rounds:`, on whose word, and what it
  * merges — with what the ending's check said of the merged tree, where a merge is asked on its refusal (`landing`).
  */
-export const roundBriefed = (r: Round, looping: Workflow, landing?: LandingSaid) => ({
+export const roundBriefed = (r: Round, looping: StepSpec, landing?: LandingSaid) => ({
   loop: r.step,
   round: r.round,
   rounds: capOf(looping),
@@ -199,7 +199,7 @@ export const roundBudgetRefusal = (id: string, budget?: number): string | null =
  * the next tick files anyway, or a merge it would drop (`mergeWaits`). `over` is what each step of the loop over its budget has cost
  * (`loopOver`). Undefined when none is.
  */
-function roundWaits(run: Run, looping: Workflow, asks: readonly RoundAsk[], over: ReturnType<typeof loopOver>): string | undefined {
+function roundWaits(run: Run, looping: StepSpec, asks: readonly RoundAsk[], over: ReturnType<typeof loopOver>): string | undefined {
   const now = roundOf(run, looping.name);
   const above = Math.max(0, ...over.map((o) => o.spent.usd));
   const pending = asks.find((a) => a.step === looping.name && a.round === now + 1);
@@ -240,7 +240,7 @@ function roundWaits(run: Run, looping: Workflow, asks: readonly RoundAsk[], over
  * @param verdictOf What each step's current check exited with (`exitVerdicts`): a step of the loop is named as `nemia ls` names it.
  */
 export function roundAsk(
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   run: Run,
   name: string | undefined,
   phaseOf: (taskId: string) => TaskPhase,
@@ -294,7 +294,7 @@ export function roundAsk(
   const waits = roundWaits(run, looping, asks, over);
   if (waits) return no(waits);
 
-  const at = (s: Workflow) => standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
+  const at = (s: StepSpec) => standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
   const held = spanRefusal(spanSteps(steps, looping), looping, run, now, at);
   if (held) return no(held);
   const { status, own } = at(looping);
@@ -367,7 +367,7 @@ export function roundAsk(
 }
 
 /** The steps of `looping`'s loop (`loopSpan`), in the workflow's order. */
-const spanSteps = (steps: readonly Workflow[], looping: Workflow): Workflow[] => {
+const spanSteps = (steps: readonly StepSpec[], looping: StepSpec): StepSpec[] => {
   const names = loopSpan(steps, looping);
   return steps.filter((s) => names.includes(s.name));
 };
@@ -376,7 +376,7 @@ const spanSteps = (steps: readonly Workflow[], looping: Workflow): Workflow[] =>
  * The step whose loop a person means: the one they `named`, or where they name none the run's one loop, of its `loops`; undefined
  * where they name none and the run has no loop, or several.
  */
-const loopingOf = (named: Workflow | undefined, loops: readonly Workflow[]): Workflow | undefined =>
+const loopingOf = (named: StepSpec | undefined, loops: readonly StepSpec[]): StepSpec | undefined =>
   named ?? (loops.length === 1 ? loops[0] : undefined);
 
 /**
@@ -394,7 +394,7 @@ export const acceptWordsRefusal = (message: string | undefined, command: string)
  * Why an acceptance of `looping`'s work waits on an ask already there: a round about to be filed, or a merge that sends the work back
  * (`mergeWaits`). Undefined when neither is.
  */
-function acceptWaits(run: Run, looping: Workflow, asks: readonly RoundAsk[]): string | undefined {
+function acceptWaits(run: Run, looping: StepSpec, asks: readonly RoundAsk[]): string | undefined {
   const now = roundOf(run, looping.name);
   const pending = asks.find((a) => a.step === looping.name && a.round === now + 1);
   if (pending) {
@@ -417,11 +417,11 @@ function acceptWaits(run: Run, looping: Workflow, asks: readonly RoundAsk[]): st
  * `nemia retry` takes it (`tryCommand`), or one at its gate, pointed to a person's word — or undefined.
  */
 function spanRefusal(
-  span: readonly Workflow[],
-  looping: Workflow,
+  span: readonly StepSpec[],
+  looping: StepSpec,
   run: Run,
   now: number,
-  at: (s: Workflow) => { status: StepStatus; own: StepStatus },
+  at: (s: StepSpec) => { status: StepStatus; own: StepStatus },
 ): string | undefined {
   const stopping = span.find((s) => at(s).own !== 'exhausted' && stopsFollowers(at(s).own));
   if (stopping) {
@@ -443,7 +443,7 @@ function spanRefusal(
  * refusals come after.
  */
 function gateNotLoop(
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined,
@@ -481,7 +481,7 @@ function gateNotLoop(
  * @param verdictOf What each step's current check exited with (`exitVerdicts`): the loop read as `nemia ls` reads it.
  */
 export function acceptAsk(
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   run: Run,
   name: string | undefined,
   message: string | undefined,
@@ -562,11 +562,11 @@ export function acceptAsk(
 /**
  * A loop a person ended as it stands, beside its looping step's line: the round it was on, that it asked again, and when they said enough.
  */
-export const acceptedNote = (step: Workflow, run: Run, a: Acceptance): string =>
+export const acceptedNote = (step: StepSpec, run: Run, a: Acceptance): string =>
   `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again — accepted as it stands at ${a.at}, its findings open`;
 
 /** A round due now, as `nemia ls` and `nemia decide` say it. */
-export function roundDueNote(steps: readonly Workflow[], r: Round): string {
+export function roundDueNote(steps: readonly StepSpec[], r: Round): string {
   const looping = steps.find((s) => s.name === r.step);
   if (r.by === 'merge') return mergeDueNote(r);
   return r.by === 'ask'
@@ -579,14 +579,14 @@ export function roundDueNote(steps: readonly Workflow[], r: Round): string {
  * step's. On a pruned run, where it stands and why there is no more: `nemia retry --round` is refused there (`prunedRefusal`), and a note
  * never offers a refused verb.
  */
-export const exhaustedNote = (step: Workflow, run: Run, raise = false): string =>
+export const exhaustedNote = (step: StepSpec, run: Run, raise = false): string =>
   `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again — ${run.pruned ? noMoreRounds(run.pruned) : run.hold ? heldLater(run.hold, 'once more') : `once more: nemia retry ${run.id} ${step.name} --round${raise ? ' --budget <amount>' : ''}`}`;
 
 /**
  * A loop whose round waits on a step's budget, beside its looping step's line: where it stands, and the command that raises the cap for the
  * round — or, pruned, why there is none.
  */
-export const heldNote = (step: Workflow, run: Run): string =>
+export const heldNote = (step: StepSpec, run: Run): string =>
   `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again, past a budget — ${run.pruned ? noMoreRounds(run.pruned) : run.hold ? heldLater(run.hold, 'once more') : `once more: nemia retry ${run.id} ${step.name} --round --budget <amount>`}`;
 
 const noMoreRounds = (pruned: Pruned): string => `no round more, since the run was ${prunedWords(pruned)}`;
@@ -615,7 +615,7 @@ const overWords = (over: ReadonlyArray<{ name: string; spent: Spend; cap: number
  * for a budget raising it is the way on (`acceptAsk`). Each offer is its sentence and the bare command it ends on (`Offer`), the sentence
  * written around the command.
  */
-export function roundOffers(steps: readonly Workflow[], run: Run, d: Decision, spendOf: SpendOf = () => undefined): Offer[] {
+export function roundOffers(steps: readonly StepSpec[], run: Run, d: Decision, spendOf: SpendOf = () => undefined): Offer[] {
   if (d.kind !== 'awaiting' || !honoursAsks(run)) return [];
   return steps
     .filter((s) => s.loop && (d.exhausted.includes(s.name) || d.overBudget.includes(s.name)))

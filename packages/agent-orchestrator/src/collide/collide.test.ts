@@ -7,10 +7,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { collisionsDue, collisionsOf, othersInFlight, trialsOf } from './collide.ts';
 import type { RepositoryRun, Run } from '../record/record.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import type { TrialMerge } from '../place/place.ts';
 
-const STEPS: Workflow[] = [
+const STEPS: StepSpec[] = [
   { name: 'implement', after: [], body: 'Build it.' },
   { name: 'ship', after: ['implement'], body: 'Ship it.', workspace: 'base', check: 'npm test' },
 ];

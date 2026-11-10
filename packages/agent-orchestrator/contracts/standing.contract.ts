@@ -9,7 +9,7 @@ import { assume, type Implementation, spec } from '@emyann/tsverify';
 import type { Verdict } from '../src/check/check.ts';
 import type { Closeout } from '../src/closeout/index.ts';
 import { type CloseoutAsked, type Run, type StepStatus, type TaskPhase, TRIED_FROM } from '../src/record/record.ts';
-import type { Workflow } from '../src/step/step.ts';
+import type { StepSpec } from '../src/step/step.ts';
 import { askedAgain, notHandedOn, overBudget, ownStatus, type SpendOf } from '../src/status/status.ts';
 import { loopSpan } from '../src/workflow/validate.ts';
 import { declaredOutput } from '../src/closeout/closeout.ts';
@@ -18,12 +18,12 @@ import { approved, gated } from './laws.ts';
 
 /** Where a step stands, as `standing` takes and answers it: its own status, and the one a person reads. */
 type Stands = (
-  step: Workflow,
+  step: StepSpec,
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined,
   askedCloseout: (taskId: string) => CloseoutAsked,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   spendOf: SpendOf,
   verdictOf?: (step: string) => Verdict | undefined,
 ) => { status: StepStatus; own: StepStatus };
@@ -176,12 +176,12 @@ export type WhereAStepStands = Implementation<typeof standingSpec>;
 /** `ownStatus` itself: what it says is a step's own status, never one `standing` holds it at. */
 const ownStatusSpec = spec<
   (
-    step: Workflow,
+    step: StepSpec,
     run: Run,
     phaseOf: (taskId: string) => TaskPhase,
     closeoutOf: (step: string) => Closeout | undefined,
     askedCloseout: (taskId: string) => CloseoutAsked,
-    steps: readonly Workflow[],
+    steps: readonly StepSpec[],
     spendOf: SpendOf,
   ) => StepStatus
 >({

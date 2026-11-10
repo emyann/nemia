@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Run } from '../src/run.ts';
-import type { Workflow } from '../src/step/step.ts';
+import type { StepSpec } from '../src/step/step.ts';
 import { CHECK_NICENESS, checkArgv } from '../src/check/check.ts';
 import { scratch } from 'test-kit/scratch';
 import { until, WAITED, type Waiter } from 'agent-runtime/testing';
@@ -92,7 +92,7 @@ const handed = async (id: string, engine = e) => {
   const steps = [
     { name: 'implement', after: [], check: COMMAND },
     { name: 'review', after: ['implement'] },
-  ] as unknown as Workflow[];
+  ] as unknown as StepSpec[];
   const [said] = await runWith(engine, checksHandedRead(run, steps, steps[1]));
   return said;
 };

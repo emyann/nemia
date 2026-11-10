@@ -11,7 +11,7 @@ import { Effect } from 'effect';
 import type { Engine } from '../runtime-client.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
 import { runTasks, type Run } from '../record/record.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import {
   judgedSteps,
   judgedUnlessUnreadable,
@@ -37,7 +37,7 @@ export type JudgedRun = Extract<Effect.Success<ReturnType<typeof judge>>, object
 export type Judgement = {
   readonly run: Run;
   readonly names: readonly string[];
-  readonly steps: readonly Workflow[];
+  readonly steps: readonly StepSpec[];
   readonly views: Views;
   readonly judged: JudgedRun;
   readonly asked: GitAsked;

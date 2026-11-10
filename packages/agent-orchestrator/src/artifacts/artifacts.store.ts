@@ -13,7 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { handedCloseout, type Closeout } from '../closeout/index.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { inside } from '../workspace/workspace.ts';
 import { artifactPlace, HANDED_CLOSEOUT, sizeOf, type ArtifactFile, type HandedFiles, type MissingArtifact } from './artifacts.ts';
 import { isRepositoryRun, type LackedFile, type Run } from '../record/record.ts';
@@ -104,7 +104,7 @@ function workspaceLacks(workspace: string | undefined, rel: string, dir: string)
  * on the pass that hands the step off, after it collected what the closeout named, so it holds the current try's closeout. A link a step
  * left at that name is taken away first, and never written through. Answers a note when the write failed; it never throws.
  */
-export function handCloseout(run: Run, step: Workflow, said: Closeout | undefined): string[] {
+export function handCloseout(run: Run, step: StepSpec, said: Closeout | undefined): string[] {
   if (!said) return [];
   const dir = artifactsDir(run, step.name);
   const file = path.join(dir, HANDED_CLOSEOUT);

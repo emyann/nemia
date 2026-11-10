@@ -5,7 +5,7 @@
  */
 import { Cause, Effect, Exit, Result } from 'effect';
 import { asked, over, type Engine } from '../runtime-client.ts';
-import type { Workflow } from '../workflow.ts';
+import type { StepSpec } from '../workflow.ts';
 import type { Run } from '../record/record.ts';
 import { resultSteps, routedResult } from '../branches/index.ts';
 import { artifactsDir } from '../record/record.store.ts';
@@ -21,7 +21,7 @@ import { firstPiece } from '../piece/piece.ts';
  * What the step `step` of the run `record` said, on the engine's record of its current try (`closeoutOf`) — or why it cannot be given: it
  * was never filed, the engine could not be asked, it holds no closeout, or the closeout does not parse. Never fails.
  */
-const stepSaid = Effect.fn('stepSaid')(function* (e: Engine, record: Run, step: Workflow) {
+const stepSaid = Effect.fn('stepSaid')(function* (e: Engine, record: Run, step: StepSpec) {
   const taskId = record.steps[step.name]?.taskId;
   if (!taskId) return { name: step.name, unreadable: 'it was never filed' } satisfies ParentStep;
   const viewed = yield* Effect.exit(asked('view', e.view(taskId)));
@@ -75,7 +75,7 @@ export const parentCloseouts = Effect.fn('parentCloseouts')(function* (
       out.push({ run: id, unreadable: `its record cannot be read: ${read.failure.message}`, how, landed: false });
       continue;
     }
-    const steps: Workflow[] = read.success;
+    const steps: StepSpec[] = read.success;
     const said: ParentStep[] = [];
     const routed = routedResult(steps, record).length > 0;
     for (const step of resultSteps(steps, record)) said.push(filesNamed(yield* stepSaid(e, record, step), record, routed));

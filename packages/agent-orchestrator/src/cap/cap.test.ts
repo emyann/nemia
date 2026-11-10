@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Run, TaskPhase } from '../record/record.ts';
 import type { RepositoryRun } from '../run.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { assess } from '../tick/assess.ts';
 import { listing, type ListedPhase } from '../list/list.ts';
 import { admissionOrder, ceilingLines, heldRuns, runAdmitted, slotNeed, slotWord } from './cap.ts';
@@ -18,15 +18,15 @@ const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
 const signedDone = () => ({ outcome: 'done' as const, summary: 's', artifacts: [], needs: undefined });
 /** Every task here was filed asking for a closeout — which is what the runner does. */
 const asked = () => true;
-const CHECKED: Workflow[] = [{ ...step('implement'), check: 'npm test' }, step('review', ['implement'])];
+const CHECKED: StepSpec[] = [{ ...step('implement'), check: 'npm test' }, step('review', ['implement'])];
 /** `implement` filed, its check filed under `checkId`. */
 const withCheck = (checkId: string, extra: Partial<RepositoryRun> = {}) =>
   run({}, { steps: { implement: { taskId: 't1', check: { taskId: checkId } }, review: { taskId: null } }, ...extra });
 /** A watcher's workflow: one step that takes no slot. */
-const WATCHING = [{ name: 'supervise', after: [], body: 'x', slot: 'none' } as Workflow];
+const WATCHING = [{ name: 'supervise', after: [], body: 'x', slot: 'none' } as StepSpec];
 
 /** What `r` asks of the cap with its tasks in `p`, as `steps` say (none: every run counted), the runs it waits on landed or not. */
-const need = (r: Run, p: Record<string, TaskPhase>, o: { landed?: boolean; steps?: readonly Workflow[]; wf?: Workflow[] } = {}) =>
+const need = (r: Run, p: Record<string, TaskPhase>, o: { landed?: boolean; steps?: readonly StepSpec[]; wf?: StepSpec[] } = {}) =>
   slotNeed(
     r,
     phases(p),

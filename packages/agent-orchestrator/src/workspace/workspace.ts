@@ -24,7 +24,7 @@
  * which finished steps hand their work off on a pass (`handOffDue`).
  */
 import path from 'node:path';
-import { endsOnBase, type Workflow } from '../step/step.ts';
+import { endsOnBase, type StepSpec } from '../step/step.ts';
 import { placeOf, type Run, type TaskPhase } from '../record/record.ts';
 
 /** One entry of a `node_modules` directory as the runner read it: its name, and a link's target as written. */
@@ -274,7 +274,7 @@ export function depsLines(deps: Provisioned | undefined): string[] {
  * And once for each try (`handedOff`): what is in the workspace after the hand-off is a person's, or
  * the next step's, and not this step's to sign.
  */
-export function handOffDue(steps: readonly Workflow[], run: Run, phaseOf: (taskId: string) => TaskPhase): string[] {
+export function handOffDue(steps: readonly StepSpec[], run: Run, phaseOf: (taskId: string) => TaskPhase): string[] {
   const finished = ['succeeded', 'failed', 'stopped'];
   return Object.entries(run.steps)
     .filter(([name]) => !endsOnBase(steps.find((s) => s.name === name) ?? {}))
@@ -291,7 +291,7 @@ export function handOffDue(steps: readonly Workflow[], run: Run, phaseOf: (taskI
 }
 
 /** Every step that waits on `name`, directly or through another. */
-export function downstreamOf(steps: readonly Workflow[], name: string): Set<string> {
+export function downstreamOf(steps: readonly StepSpec[], name: string): Set<string> {
   const found = new Set<string>();
   const queue = [name];
   for (let current = queue.pop(); current !== undefined; current = queue.pop()) {
@@ -377,7 +377,7 @@ export function givenPlan(run: Pick<Run, 'place' | 'inputs' | 'steps'>, plan: Wo
  * Which workspace a step needs (`WorkspacePlan`). Pure. `main` is said by the step (`workspace: base`), never read off the shape; a fan-in
  * merges onto the first of its parents by name.
  */
-export function workspacePlan(steps: readonly Workflow[], step: Workflow): WorkspacePlan {
+export function workspacePlan(steps: readonly StepSpec[], step: StepSpec): WorkspacePlan {
   if (endsOnBase(step)) return { kind: 'base' };
   const [first, ...also] = [...step.after].sort();
   if (first === undefined) return { kind: 'fork', from: null };
@@ -404,7 +404,7 @@ export const LINE_NAME = 'run';
  * Every other cut keeps its step's name — a fork with a parent, a fan-in merge, and a second root of a run that starts wide — because
  * those are lines of work beside the run's own, and each needs a worktree and a branch of its own.
  */
-export function cutName(steps: readonly Workflow[], step: Workflow): string {
+export function cutName(steps: readonly StepSpec[], step: StepSpec): string {
   const line = steps.find((s) => {
     const plan = workspacePlan(steps, s);
     return plan.kind === 'fork' && plan.from === null;

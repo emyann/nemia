@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { isReadme, WorkflowError, type Workflow } from '../step/step.ts';
+import { isReadme, WorkflowError, type StepSpec } from '../step/step.ts';
 import { codexModeWritten } from '../former/former.ts';
 import { fenceKeyOf } from '../harness/harness.ts';
 import { agentDeniesOf, parseWorkflow, renderStep, type StepDraft } from '../workflow/index.ts';
@@ -34,7 +34,7 @@ import { doorAtOnce } from '../factory/door/factories.store.ts';
  * What `writeWorkflow` did: the folder, its steps as they now read, and its files by name — written, left as they were because they already
  * read so, and removed.
  */
-export type WorkflowWritten = { dir: string; steps: Workflow[]; written: string[]; kept: string[]; removed: string[] };
+export type WorkflowWritten = { dir: string; steps: StepSpec[]; written: string[]; kept: string[]; removed: string[] };
 
 /**
  * A workflow folder written from its steps: what the board's builder saves, and the inverse of `loadWorkflows`.

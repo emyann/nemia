@@ -20,7 +20,7 @@ import {
   STEP_KEYS,
   WorkflowError,
   type StepKey,
-  type Workflow,
+  type StepSpec,
 } from '../step/step.ts';
 import { PLACES } from '../keys/index.ts';
 import {
@@ -59,7 +59,7 @@ import { entriesOf } from '../skills/read.store.ts';
  * (`orderSteps`), not the folder's, each resolved against the agent it names, and each skill that agent gives found. A step `fills` hires
  * an agent into is resolved against that agent, found the same way (`Fills`).
  */
-export function loadWorkflowsWith(dir: string, found: Found, fills?: Fills): Workflow[] {
+export function loadWorkflowsWith(dir: string, found: Found, fills?: Fills): StepSpec[] {
   if (!fs.existsSync(dir)) throw new WorkflowError(`no workflow folder at ${dir}`);
   const agents = agentsFolderRefusal(dir);
   if (agents) throw new WorkflowError(agents);
@@ -406,7 +406,7 @@ const formerStepFields = { disallow: frozenStepFields.disallowedTools, allow: fr
 const retiredStepFields = { background: Schema.optionalKey(Schema.Boolean) };
 
 /**
- * A step as the run froze it at `nemia start`: the parser's output (`Workflow`), each key of `STEP_KEYS`, each under its former name
+ * A step as the run froze it at `nemia start`: the parser's output (`StepSpec`), each key of `STEP_KEYS`, each under its former name
  * (`FORMER_KEYS`), and each key retired since (`retiredStepFields`), checked for the type the parser gives it. It checks the shape, not
  * the vocabulary: a harness, a model or a mode is any text, a count any number, judged when the step is filed, so a word retired since
  * the run started does not lose the run. Every key it does not name is kept, as a record a newer `nemia` wrote keeps it. Read under the

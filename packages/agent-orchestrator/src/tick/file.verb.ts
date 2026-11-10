@@ -19,7 +19,7 @@ import {
   type CheckHanded,
   type LandingSaid,
 } from '../check/check.ts';
-import { isRemoteHarness, type Workflow } from '../workflow.ts';
+import { isRemoteHarness, type StepSpec } from '../workflow.ts';
 import { holdsOpen } from '../gate/gate.ts';
 import { checkTaskId, isRepositoryRun, stepTaskId, tryOf, type Run, type StepRecord, type StepStatus } from '../record/record.ts';
 import {
@@ -74,7 +74,7 @@ type Spec = Parameters<Engine['file']>[0];
  * default stands (`WF_MEMORY_LIMIT`). On a session alone, inside `localFields`, since the runtime refuses a limit on a remote agent; a
  * check is filed without it, and takes the engine's default.
  */
-const limitsOf = (step: Workflow): Pick<Spec, 'resources'> =>
+const limitsOf = (step: StepSpec): Pick<Spec, 'resources'> =>
   step.memory === undefined ? {} : { resources: { limits: { memory: step.memory } } };
 
 /**
@@ -148,7 +148,7 @@ const stopFirst = Effect.fnUntraced(function* (f: Filing, r: Retry, taskId: stri
  * The step's task held open a try answers, where the try is a person's continue answering it in the session that signed, rather than a
  * task of its own; undefined where it is not.
  */
-const heldAnswered = (f: Filing, r: Retry, step: Workflow, record: StepRecord): string | undefined => {
+const heldAnswered = (f: Filing, r: Retry, step: StepSpec, record: StepRecord): string | undefined => {
   const { run, reads } = f;
   const taskId = record.taskId;
   if (!taskId || !f.closer.awaitsWord(taskId)) return undefined;
@@ -169,7 +169,7 @@ const heldAnswered = (f: Filing, r: Retry, step: Workflow, record: StepRecord): 
  */
 export const tryFiled = (
   f: Parameters<typeof filedOn>[0],
-  step: Workflow | undefined,
+  step: StepSpec | undefined,
   record: StepRecord,
   retry: Retry,
   taskId: string,
@@ -221,7 +221,7 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
  * What recent runs of the run's workflow cost (`costsRead`), for a new session of a step on a local harness whose `reads:` names `costs`;
  * undefined for any other, and for a session continued, told them on its first brief.
  */
-const costsFor = Effect.fnUntraced(function* (f: Filing, step: Workflow, resumed: boolean) {
+const costsFor = Effect.fnUntraced(function* (f: Filing, step: StepSpec, resumed: boolean) {
   if (resumed || isRemoteHarness(step.harness) || !step.reads?.includes('costs')) return undefined;
   return yield* costsRead(f.e, f.run);
 });
@@ -240,7 +240,7 @@ const remoteTry = (r: Retry, status: StepStatus): RetryBriefing => ({
  * Send a try to the engine, told what its place says to it (`PlaceTold`): filed as a task of its own, or given as the answer to the
  * task held open (`answers`). Answers with the engine's refusal of the answer, or undefined.
  */
-const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow, taskId: string, answers: boolean, landing: PlaceTold) {
+const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: StepSpec, taskId: string, answers: boolean, landing: PlaceTold) {
   const { e, run, reads } = f;
   const record = recordNamed(run, r.step);
   const files = artifactsDir(run, r.step);
@@ -297,7 +297,7 @@ const askingReads = Effect.fnUntraced(function* (f: Filing, r: Retry, resumeFrom
 const trySpec = (
   f: Filing,
   r: Retry,
-  step: Workflow,
+  step: StepSpec,
   record: StepRecord,
   t: { taskId: string; brief: string; resumeFrom: string | undefined; budgetUsd: number | undefined; told: Told },
 ): Spec => ({
@@ -387,8 +387,8 @@ const landingOf = Effect.fnUntraced(function* (f: Filing, r: Round) {
 function roundSpec(
   f: Filing,
   r: Round,
-  looping: Workflow,
-  target: Workflow,
+  looping: StepSpec,
+  target: StepSpec,
   taskId: string,
   told: StepTold,
   said: PlaceTold & { landing?: LandingSaid; costs?: WorkflowCosts },
@@ -566,7 +566,7 @@ const sessionOf = (f: Filing, stepName: string): string | undefined => {
  */
 function readySpec(
   f: Filing,
-  step: Workflow,
+  step: StepSpec,
   place: Cut,
   files: string,
   told: StepTold,

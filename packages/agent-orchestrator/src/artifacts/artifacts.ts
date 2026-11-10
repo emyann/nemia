@@ -8,7 +8,7 @@ import path from 'node:path';
 import { CONFIG_FOLDERS, configFolderIn } from 'agent-runtime/vocabulary';
 import { filesPrunedWords, type Mount, type Pruned, type Run, type TaskPhase } from '../record/record.ts';
 import { sandboxed, upstreamOf } from '../workflow/index.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 
 /**
@@ -289,7 +289,7 @@ export const sizeOf = (bytes: number): string =>
  * does not come after: a sibling, a step after it. None on a harness fenced by a sandbox, which reads the disk already, nor on a remote
  * agent, filed no local field.
  */
-export const handedMounts = (step: Pick<Workflow, 'name' | 'harness'>, steps: readonly Workflow[], runArtifacts: string): Mount[] => {
+export const handedMounts = (step: Pick<StepSpec, 'name' | 'harness'>, steps: readonly StepSpec[], runArtifacts: string): Mount[] => {
   if (isRemoteHarness(step.harness) || sandboxed(step.harness ?? DEFAULT_HARNESS)) return [];
   const upstream = upstreamOf(steps, step.name);
   return steps.filter((s) => upstream.has(s.name)).map((s) => ({ path: path.join(runArtifacts, s.name), readOnly: true }));
@@ -304,7 +304,7 @@ export const handedMounts = (step: Pick<Workflow, 'name' | 'harness'>, steps: re
  * settle, and one whose check is filed already. None of a pruned run, whose files may be gone.
  */
 export function filesDue(
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => { artifacts: readonly string[] } | undefined,

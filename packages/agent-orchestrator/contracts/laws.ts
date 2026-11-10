@@ -3,12 +3,12 @@
  * person approved that try, each written once, in the record's words.
  */
 import type { Run } from '../src/record/record.ts';
-import type { Workflow } from '../src/step/step.ts';
+import type { StepSpec } from '../src/step/step.ts';
 import type { Factory } from '../src/factory/factory.ts';
 import { hiresInto, type WiringChange } from '../src/factory/wiring/wiring.ts';
 
 /** Whether a step is gated: by its workflow, or by the run (`--gate`). */
-export const gated = (step: Workflow, run: Run): boolean => step.gate === true || (run.gates ?? []).includes(step.name);
+export const gated = (step: StepSpec, run: Run): boolean => step.gate === true || (run.gates ?? []).includes(step.name);
 /** The try a step is on, from 1: one past the tries its record keeps. */
 export const tryNow = (run: Run, name: string): number => {
   const tries = run.steps[name]?.tries;

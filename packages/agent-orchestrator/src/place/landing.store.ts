@@ -14,7 +14,7 @@ import { resultTips } from '../branches/index.ts';
 import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';
 import type { MergeState, PlaceOutcome, PlaceSay } from './place.ts';
 import { landsOnCheck } from '../status/status.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import type { Place } from './place.store.ts';
 
 /** The checkout as the place's `status` answered it, or why it gave no answer: an unread or refused `status` is never a verdict. */
@@ -47,7 +47,7 @@ export function stagedHere(run: Pick<RepositoryRun, 'stagedFile'>): boolean | un
  * `run`'s checkout as its place's `status` answers it, with the run's result tips off the heads `memo` reads (`resultTips`), asked once per
  * checkout and run within one pass, of the place `memo` names. A refusal and an unread answer are `{ unread }`, in words.
  */
-export function checkoutStatus(run: RepositoryRun, steps: readonly Workflow[], memo: StatusMemo): CheckoutRead {
+export function checkoutStatus(run: RepositoryRun, steps: readonly StepSpec[], memo: StatusMemo): CheckoutRead {
   const key = JSON.stringify([path.resolve(run.repo), run.id]);
   const known = memo.reads.get(key);
   if (known) return known;
@@ -71,7 +71,7 @@ const statusRead = (place: Place, repo: string, tips: Readonly<Record<string, st
  * `checkoutStatus`, asked off the loop (`ask`) and kept in `memo`, so the `checkoutStatus` that follows it for the same run answers
  * from there and starts no process: for a caller the daemon's pass must not wait on.
  */
-export const askCheckoutStatus = (run: RepositoryRun, steps: readonly Workflow[], memo: StatusMemo): Effect.Effect<CheckoutRead> => {
+export const askCheckoutStatus = (run: RepositoryRun, steps: readonly StepSpec[], memo: StatusMemo): Effect.Effect<CheckoutRead> => {
   const key = JSON.stringify([path.resolve(run.repo), run.id]);
   const known = memo.reads.get(key);
   if (known) return Effect.succeed(known);
@@ -90,7 +90,7 @@ export const askCheckoutStatus = (run: RepositoryRun, steps: readonly Workflow[]
  * landing among `steps` is filed and not landed, and true where it gives no answer — a merge nobody can read is held, never let go.
  * False for a folder run and for a run with no such ending.
  */
-export function mergeStaged(run: Run, steps: readonly Workflow[], memo: StatusMemo): boolean {
+export function mergeStaged(run: Run, steps: readonly StepSpec[], memo: StatusMemo): boolean {
   if (!isRepositoryRun(run)) return false;
   const landings = steps.filter((s) => landsOnCheck(s, run));
   if (!landings.length) return false;
@@ -137,8 +137,8 @@ export function landingDenies(run: Run, place: Place): readonly string[] {
  */
 export function landingWords(
   run: Run,
-  steps: readonly Workflow[],
-  step: Workflow,
+  steps: readonly StepSpec[],
+  step: StepSpec,
   place: Place,
   heads?: Readonly<Record<string, string>>,
 ): LandingWords | undefined {

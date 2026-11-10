@@ -4,14 +4,14 @@
  */
 import assert from 'node:assert/strict';
 import { listing as listed, type ListedPhase, type RepositoryRun, type Run, type TaskPhase } from '../src/run.ts';
-import type { Workflow } from '../src/workflow.ts';
+import type { StepSpec } from '../src/workflow.ts';
 import { feedPhase, feedWords, PHASE_OF, reasonOf } from '../src/feed/index.ts';
 import type { AssessRead } from '../src/tick/assess.ts';
 import type { ListingInput } from '../src/list/list.ts';
 import type { Closeout } from '../src/closeout/closeout.ts';
 
 /** A step of a workflow, waiting on `after`. */
-export const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: `do ${name}` });
+export const step = (name: string, after: string[] = []): StepSpec => ({ name, after, body: `do ${name}` });
 
 /** `implement → review`, the workflow most rows read. */
 export const STEPS = [step('implement'), step('review', ['implement'])];
@@ -39,7 +39,7 @@ export const run = (steps: Record<string, string | null>, rest: Partial<Reposito
  * left out (`undefined`) — and a reader given as `undefined` is left out: on an empty view `exitVerdicts` reads every check on the
  * record as `unfinished`, which no table means by leaving it out.
  */
-export const aRead = (steps: readonly Workflow[], r: Run, partial: Partial<Omit<AssessRead, 'steps' | 'run'>> = {}): AssessRead => ({
+export const aRead = (steps: readonly StepSpec[], r: Run, partial: Partial<Omit<AssessRead, 'steps' | 'run'>> = {}): AssessRead => ({
   steps,
   run: r,
   ...EMPTY_VIEW,

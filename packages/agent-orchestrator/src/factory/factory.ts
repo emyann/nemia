@@ -5,7 +5,7 @@
  * The default factory holds everything that names no factory. It is no file: it is listed first, and never added, removed or hired into.
  */
 import path from 'node:path';
-import { AGENTS_FOLDER, CARRIED_FOLDER, SKILLS_FOLDER, type Workflow } from '../step/step.ts';
+import { AGENTS_FOLDER, CARRIED_FOLDER, SKILLS_FOLDER, type StepSpec } from '../step/step.ts';
 import { stepNameRefusal } from '../folder/folder.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import type { Mount } from '../record/record.ts';
@@ -331,11 +331,11 @@ export function fillsOf(hires: Hires, workflow: string): Record<string, string> 
  * no hire fills it, and it runs on no remote agent — named, with the hire that fills each: in a factory, hiring is the way to fill a step.
  */
 /** Whether a step runs an agent: every step but a condition a table or a script answers, and a workflow node, which files a card. */
-const runsAnAgent = (s: Pick<Workflow, 'routes' | 'route' | 'workflow'>): boolean =>
+const runsAnAgent = (s: Pick<StepSpec, 'routes' | 'route' | 'workflow'>): boolean =>
   s.workflow === undefined && (s.routes === undefined || s.route?.kind === 'judge');
 
 export function unfilledRefusal(
-  steps: readonly Pick<Workflow, 'name' | 'agent' | 'harness' | 'routes' | 'route' | 'workflow'>[],
+  steps: readonly Pick<StepSpec, 'name' | 'agent' | 'harness' | 'routes' | 'route' | 'workflow'>[],
   factory: string,
   workflow: string,
 ): string | undefined {
@@ -494,14 +494,14 @@ export function factoryMounts(factory: Pick<Factory, 'repos'>, repo: string | un
  * The folders the step `step` is filed with, of those its run mounts (`mounts`, frozen at start): each writable that its `writable:` names
  * by its directory's name, and read-only otherwise. Undefined for a run that mounts none.
  */
-export function stepMounts(step: Pick<Workflow, 'writable'>, mounts: readonly Mount[] | undefined): Mount[] | undefined {
+export function stepMounts(step: Pick<StepSpec, 'writable'>, mounts: readonly Mount[] | undefined): Mount[] | undefined {
   if (!mounts) return undefined;
   return mounts.map((m) => (step.writable?.includes(path.basename(m.path)) ? { path: m.path, readOnly: false } : m));
 }
 
 /** Each folder of `mounts` a local step of `steps` writes (`stepMounts`), with those steps by name, in `mounts`' order. */
 export const writersOf = (
-  steps: readonly Pick<Workflow, 'name' | 'harness' | 'writable'>[],
+  steps: readonly Pick<StepSpec, 'name' | 'harness' | 'writable'>[],
   mounts: readonly Mount[] | undefined,
 ): { path: string; steps: string[] }[] =>
   (mounts ?? [])
@@ -512,7 +512,7 @@ export const writersOf = (
     .filter((w) => w.steps.length);
 
 /** The `<workflow>/<step>` where and the line a `writable:` refusal starts with. */
-const writableSaid = (workflow: string, step: Pick<Workflow, 'name' | 'writable'>): string =>
+const writableSaid = (workflow: string, step: Pick<StepSpec, 'name' | 'writable'>): string =>
   `${workflow}/${step.name}: \`writable: ${(step.writable ?? []).join(', ')}\``;
 
 /**
@@ -544,7 +544,7 @@ function writableNameRefusal(
  * one that is no directory at start (`writableNameRefusal`); or names any in a run started in no factory, which mounts none.
  */
 export function writableRefusal(
-  steps: readonly Pick<Workflow, 'name' | 'writable'>[],
+  steps: readonly Pick<StepSpec, 'name' | 'writable'>[],
   workflow: string,
   factory: Pick<Factory, 'name' | 'repos'> | undefined,
   repo: string | undefined,

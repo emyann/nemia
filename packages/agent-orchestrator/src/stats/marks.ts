@@ -7,7 +7,7 @@
  * and a first appearance has nothing to compare with.
  */
 import { createHash } from 'node:crypto';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { ownNote } from '../ending/ending.ts';
 import { skillLayers } from '../agents/agents.ts';
 import type { RunKeys } from './stats.ts';
@@ -50,7 +50,7 @@ const digestOf = (value: unknown): string =>
     .slice(0, 16);
 
 /** A step's own digest: its resolved keys, but its body and its agent, with its own note (`ownNote`) and its agent's name. */
-function stepItem(step: Workflow): FrozenItem {
+function stepItem(step: StepSpec): FrozenItem {
   const { body: _body, agent, ...keys } = step;
   const name = agent?.name ?? null;
   return {
@@ -77,7 +77,7 @@ function merged(items: FrozenItem[], item: FrozenItem): FrozenItem[] {
  * carries its instructions, else the agent unknown, and each skill it gives, by the digest of its rendered copy in `skills` (step → skill →
  * digest): its agent's with the agent, those the step's line adds with the step alone.
  */
-function itemsOf(step: Workflow, skills: ReadonlyMap<string, ReadonlyMap<string, string>>): FrozenItem[] {
+function itemsOf(step: StepSpec, skills: ReadonlyMap<string, ReadonlyMap<string, string>>): FrozenItem[] {
   const agent = step.agent;
   if (!agent) return [stepItem(step)];
   const layers = skillLayers(step);
@@ -106,7 +106,7 @@ function itemsOf(step: Workflow, skills: ReadonlyMap<string, ReadonlyMap<string,
  */
 export const frozenOf = (
   head: Omit<RunFrozen, 'items'>,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   skills: ReadonlyMap<string, ReadonlyMap<string, string>>,
 ): RunFrozen => ({ ...head, items: steps.flatMap((s) => itemsOf(s, skills)).reduce(merged, []) });
 

@@ -11,7 +11,7 @@ import { Effect } from 'effect';
 import { asked, type Engine, type TaskView } from '../runtime-client.ts';
 import { CHECK_DEADLINE_SECONDS, CHECK_NICENESS, checkEnvOf, type Verdict } from '../check/check.ts';
 import { stepTaskId, tryOf, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { MOMENTUM, stepStatus, type SpendOf } from '../status/status.ts';
 import { answeredRoute, routeSettled } from '../route/routed/index.ts';
 import type { Closeout } from '../closeout/index.ts';
@@ -28,7 +28,7 @@ export type ScriptFiling = {
   e: Engine;
   run: Run;
   reads: {
-    steps: Workflow[];
+    steps: StepSpec[];
     views: Map<string, TaskView>;
     phaseOf: (taskId: string) => TaskPhase;
     signedOff: (step: string) => Closeout | undefined;
@@ -92,7 +92,7 @@ export const fileScripts = Effect.fn('fileScripts')(function* (f: ScriptFiling, 
 });
 
 /** File one script condition, or adopt the task a pass before this one filed under its id: answers with whether it is on the record. */
-const fileScript = Effect.fnUntraced(function* (f: ScriptFiling, step: Workflow & { routes: string[] }) {
+const fileScript = Effect.fnUntraced(function* (f: ScriptFiling, step: StepSpec & { routes: string[] }) {
   const { e, run } = f;
   const script = step.route?.kind === 'script' ? step.route.script : '';
   if (run.workflowFiles === undefined) {

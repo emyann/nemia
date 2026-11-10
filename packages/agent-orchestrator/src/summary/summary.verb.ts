@@ -7,7 +7,7 @@
  * branches stand off `standing.json` (`standingSnapshot`).
  */
 import { Effect } from 'effect';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import type { Engine } from '../runtime-client.ts';
 import { type AtWork, atWork, runStartedAt, type RunTokens, runTokens } from '../timeline/index.ts';
 import { UNREADABLE, unjudgedWord, type UnjudgedWord } from '../views/views.verb.ts';
@@ -251,7 +251,7 @@ export function unjudgedFields(): JudgedFields {
 }
 
 /** The agent each step of a run is given, by its name, off the workflow it is judged by (`judgedSteps`); null for a step given none. */
-function agentsOf(run: Run, folder: readonly Workflow[] | null): (name: string) => string | null {
+function agentsOf(run: Run, folder: readonly StepSpec[] | null): (name: string) => string | null {
   const steps = judgedSteps(run, folder);
   return (name) => steps.find((step) => step.name === name)?.agent?.name ?? null;
 }

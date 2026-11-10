@@ -8,9 +8,9 @@ import { Effect } from 'effect';
 import { StoreRoot } from '../src/config/root.store.ts';
 import { stepsOf } from '../src/steps/steps.verb.ts';
 import type { Run } from '../src/record/record.ts';
-import type { Workflow } from '../src/workflow.ts';
+import type { StepSpec } from '../src/workflow.ts';
 
-export const stepsNow = (run: Run): Workflow[] => {
+export const stepsNow = (run: Run): StepSpec[] => {
   const root = process.env.WF_ROOT;
   assert.ok(root, 'the test process names its store: set WF_ROOT, as test/ambient.ts does');
   return Effect.runSync(Effect.provideService(stepsOf(run), StoreRoot, root));

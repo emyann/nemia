@@ -24,7 +24,7 @@
  * Pure: no disk, no process, no engine. `file.verb.ts` is the file that files these.
  */
 import { isRepositoryRun, type Run, type StepRecord, type StepStatus, type TaskPhase } from '../record/record.ts';
-import { endsOnBase, type Workflow } from '../step/step.ts';
+import { endsOnBase, type StepSpec } from '../step/step.ts';
 import { outOfMemoryWords } from '../out-of-memory/out-of-memory.ts';
 import { firstPiece } from '../piece/piece.ts';
 import type { KilledAtLimit } from '../../contracts/out-of-memory.contract.ts';
@@ -130,7 +130,7 @@ export type CheckEnv = {
  */
 export const checkEnvOf = (
   run: Run,
-  step: Pick<Workflow, 'name' | 'workspace'>,
+  step: Pick<StepSpec, 'name' | 'workspace'>,
   t: { workspace: string; files: string; closeout: string | undefined; workflowFiles?: string; carriedFiles?: string },
 ): CheckEnv => ({
   WF_RUN: run.id,
@@ -492,7 +492,7 @@ function codeSpan(text: string): string {
  * committed or aborted it. Read of a signed step, and of one whose session was ended at its budget once a recheck filed its check. Pure.
  */
 export const onItsCheck = (
-  step: Workflow,
+  step: StepSpec,
   record: StepRecord,
   phaseOf: (taskId: string) => TaskPhase,
 ): Extract<StepStatus, 'verified' | 'failed (check)' | 'failed' | 'checking'> => {

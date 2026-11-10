@@ -9,7 +9,7 @@
  * `writable:` is the one key that reaches past the fence's directory, and it widens where a step's writes reach, never what it may do:
  * `refuseUnwritable` refuses it over a fence that writes nothing.
  */
-import { AGENTS_FOLDER, refuse, type StepAgent, type StepKey, type Workflow } from '../step/step.ts';
+import { AGENTS_FOLDER, refuse, type StepAgent, type StepKey, type StepSpec } from '../step/step.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { bareSkillOf, rulesOf, toolsOf } from '../keys/index.ts';
 import type { Agent } from '../agents/agents.ts';
@@ -161,7 +161,7 @@ function narrowerThan(reach: FenceReach, asked: string, own: string): string[] |
  * its agent's and widens nothing, nor does its `disallowedTools:`, which adds to its agent's (`deniesWith`). A remote step is left to
  * `remoteRefusal` in harness.ts, which refuses every fence key there. The refusal names the step, the key, what it would add, and the fix.
  */
-export function fenceRefusal(step: string, agent: Agent, own: Partial<Record<StepKey, string>>, resolved: Workflow): string | undefined {
+export function fenceRefusal(step: string, agent: Agent, own: Partial<Record<StepKey, string>>, resolved: StepSpec): string | undefined {
   const harness = resolved.harness ?? DEFAULT_HARNESS;
   if (isRemoteHarness(harness)) return undefined;
   const file = `${AGENTS_FOLDER}/${agent.name}.md`;
@@ -194,7 +194,7 @@ export function addedSkillsRefusal(
   agent: Agent,
   line: string,
   added: readonly string[],
-  resolved: Workflow,
+  resolved: StepSpec,
 ): string | undefined {
   const harness = resolved.harness ?? DEFAULT_HARNESS;
   if (isRemoteHarness(harness) || sandboxed(harness)) return undefined;
@@ -398,7 +398,7 @@ function unwrittenBy(step: Fenced): string | undefined {
 }
 
 /** A step as `unwrittenBy` reads it: any of its lines, its fence's among them. */
-export type Fenced = Partial<Workflow>;
+export type Fenced = Partial<StepSpec>;
 
 /**
  * Whether `step`'s fence, as resolved with its agent's, writes nothing (`unwrittenBy`): the one judgement `refuseUnwritable` refuses
@@ -414,7 +414,7 @@ export const fencedItself = (step: Fenced): boolean => FENCE_KEYS.some((key) => 
  * Refuses `writable:` on a step whose fence, as resolved with its agent's (`agent`, by name), writes nothing (`unwrittenBy`). The key
  * widens where a step's writes reach, and gives no write to a step that has none.
  */
-export function refuseUnwritable(step: Workflow, agent: string | undefined): void {
+export function refuseUnwritable(step: StepSpec, agent: string | undefined): void {
   if (!step.writable) return;
   const why = unwrittenBy(step);
   if (!why) return;

@@ -3,7 +3,7 @@
  * a time (`heldCheckouts`), and what is still in flight when a run is called off (`inFlight`). Pure. Sessions at work per pool are the
  * runtime's to admit, under the ceiling `engine()` hands it (`runtime-client.ts`).
  */
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import type { Run, TaskPhase } from '../record/record.ts';
 import { hasStarted, runReady } from '../wait/wait.ts';
 import type { Assessment } from '../tick/assess.ts';
@@ -83,7 +83,7 @@ export function slotNeed(
   phaseOf: (taskId: string) => TaskPhase,
   a: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round' | 'waitingOnCheckout' | 'waitingOnPause'>,
   landed: (runId: string) => boolean,
-  steps: readonly Pick<Workflow, 'slot'>[] = [],
+  steps: readonly Pick<StepSpec, 'slot'>[] = [],
 ): { inFlight: boolean; wants: boolean } {
   if (takesNoSlot(steps)) return { inFlight: false, wants: false };
   const started = hasStarted(run);
@@ -100,14 +100,14 @@ export function slotNeed(
  * Whether a run of these steps is outside the cap on runs in flight: its workflow says `slot: none`, which `validate` allows only on a
  * workflow of one step. Pure. It counts against nothing and waits for nothing — a session that watches the runs the cap holds.
  */
-export const takesNoSlot = (steps: readonly Pick<Workflow, 'slot'>[]): boolean => steps.some((s) => s.slot === 'none');
+export const takesNoSlot = (steps: readonly Pick<StepSpec, 'slot'>[]): boolean => steps.some((s) => s.slot === 'none');
 
 /**
  * Whether the tick may file the roots of this run on this pass: fewer runs in flight than the cap, or no cap. Pure. Always, for a run that
  * has started — the cap holds only a run with nothing filed — for one judged with no slot, which is `advance` called outside a tick, and
  * for one whose workflow takes no slot at all (`takesNoSlot`).
  */
-export const runAdmitted = (run: Run, slot: RunSlot | undefined, steps: readonly Pick<Workflow, 'slot'>[] = []): boolean =>
+export const runAdmitted = (run: Run, slot: RunSlot | undefined, steps: readonly Pick<StepSpec, 'slot'>[] = []): boolean =>
   hasStarted(run) || !slot || slotFree(slot) || takesNoSlot(steps);
 
 /**

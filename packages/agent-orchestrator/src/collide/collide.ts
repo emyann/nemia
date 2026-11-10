@@ -7,7 +7,7 @@
 import path from 'node:path';
 import type { Trials } from '../place/place.ts';
 import { endedForGood, isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { type ToDecide } from '../ending/ending.ts';
 import { landsOnCheck } from '../status/status.ts';
 import { landingRefusedOn } from '../merge/merge.ts';
@@ -72,10 +72,10 @@ export const trialsOf = (onto: string, ours: readonly string[], theirs: readonly
  * The refused landing is read over `landsOnCheck` rather than over the gated endings (`endingSteps`): an ending with no gate, filed by its
  * workflow once its review passed, lands on its check in the same way, and its refused merge owes the same trials.
  */
-export function collisionsDue(steps: readonly Workflow[], run: Run, decide: ToDecide | undefined): string | undefined {
+export function collisionsDue(steps: readonly StepSpec[], run: Run, decide: ToDecide | undefined): string | undefined {
   if (decide?.kind === 'approve') return decide.step;
   if (endedForGood(run)) return undefined;
-  const aborted = (s: Workflow): boolean => {
+  const aborted = (s: StepSpec): boolean => {
     const landed = run.steps[s.name]?.landed;
     return Boolean(landed && 'aborted' in landed);
   };

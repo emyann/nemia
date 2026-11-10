@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseAgent, parseWorkflow, WorkflowError, type Agents, type Workflow } from '../src/workflow.ts';
+import { parseAgent, parseWorkflow, WorkflowError, type Agents, type StepSpec } from '../src/workflow.ts';
 import { fenceReach } from 'agent-runtime/vocabulary';
 import { directoryFence } from '../src/workflow/fence.ts';
 import { renderedFlags } from '../src/agents/agents.ts';
@@ -25,7 +25,7 @@ const agentsOf = (files: Record<string, string>): Agents =>
   new Map(Object.entries(files).map(([name, text]) => [name, parseAgent(name, text)]));
 
 /** The step `name` written with `lines` as its frontmatter, resolved with `agents`. */
-const stepOf = (agents: Agents, lines: string, name = 'build'): Workflow =>
+const stepOf = (agents: Agents, lines: string, name = 'build'): StepSpec =>
   parseWorkflow(name, `---\nplace: git\n${lines}\n---\nDo it.\n`, undefined, agents);
 
 /** What `fn` was refused with: a `WorkflowError`'s message, or a failed assertion when it was not refused. */

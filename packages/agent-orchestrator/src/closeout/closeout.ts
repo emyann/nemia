@@ -6,7 +6,7 @@
  * `advance.verb.ts` files each step with `closeoutSchemaOf`, and the controllers read the engine's record with `parseCloseout`; nothing
  * here reads a disk or calls the engine.
  */
-import { isObject, JUDGE_ROUTE, LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
+import { isObject, JUDGE_ROUTE, LOOP_REPLIES, outputFields, type StepSpec } from '../step/step.ts';
 import { digestOf } from '../revisions/revisions.ts';
 import type { Outcome } from 'objects';
 import {
@@ -55,7 +55,7 @@ export type CloseoutSchema = { type: string; properties: Record<string, object>;
  * tool, and a session continued under another one pays for the whole conversation again. What
  * is owed, and when, is `owedFields`'. On a judge, `route` too, one of its routes (`judgeRouteSchema`).
  */
-export function closeoutSchemaOf(step: Workflow, steps: readonly Workflow[]): CloseoutSchema {
+export function closeoutSchemaOf(step: StepSpec, steps: readonly StepSpec[]): CloseoutSchema {
   const replies = isLoopTarget(steps, step.name);
   const properties = { ...step.output?.schema.properties, ...judgeRouteSchema(step) };
   if (!Object.keys(properties).length && !replies) return CLOSEOUT_SCHEMA;
@@ -67,7 +67,7 @@ export function closeoutSchemaOf(step: Workflow, steps: readonly Workflow[]): Cl
 }
 
 /** What the run adds to a judge's closeout schema (`route: judge`): `route`, one of its routes. Empty for any other step. */
-const judgeRouteSchema = (step: Workflow): Record<string, object> =>
+const judgeRouteSchema = (step: StepSpec): Record<string, object> =>
   step.route?.kind === 'judge' ? { [JUDGE_ROUTE]: { type: 'string', enum: [...(step.routes ?? [])] } } : {};
 
 /**
@@ -75,7 +75,7 @@ const judgeRouteSchema = (step: Workflow): Record<string, object> =>
  * that session, which starts fresh instead where this has moved. A continued session is asked for its closeout by the tool it was given;
  * asked in another shape it would pay for the whole conversation again for an answer in the wrong one.
  */
-export const closeoutHashOf = (step: Workflow, steps: readonly Workflow[]): string => digestOf([closeoutSchemaOf(step, steps)]);
+export const closeoutHashOf = (step: StepSpec, steps: readonly StepSpec[]): string => digestOf([closeoutSchemaOf(step, steps)]);
 
 /**
  * What a step says on its way out, as every reader reads it, whichever version it was given in (`parseCloseout`).
@@ -169,7 +169,7 @@ function objectOf(value: unknown): Record<string, unknown> | string {
  * own, never as the prototype.
  */
 export function declaredOutput(
-  step: Workflow,
+  step: StepSpec,
   said: Closeout | undefined,
   fields: readonly string[] = outputFields(step),
 ): { given: Record<string, unknown>; missing: string[] } {
@@ -189,7 +189,7 @@ export function declaredOutput(
  * `name: value`. A declared field the closeout did not give is named, since it is why the step reads
  * unsigned. `fields` as `declaredOutput` takes them: `owedFields`, so a loop's target's `replies` are printed too.
  */
-export function outputLines(step: Workflow, said: Closeout, fields: readonly string[] = outputFields(step)): string[] {
+export function outputLines(step: StepSpec, said: Closeout, fields: readonly string[] = outputFields(step)): string[] {
   const { given, missing } = declaredOutput(step, said, fields);
   const lines: string[] = [];
   for (const [name, value] of Object.entries(given)) {
@@ -266,7 +266,7 @@ function itemLines(item: unknown): string[] {
  * `owed` for a step answering findings, and `none` on a loop's target with none to answer, since its
  * schema asks for them on every try (`closeoutSchemaOf`).
  */
-export const closeoutContract = (step?: Workflow, replies: 'owed' | 'none' | false = false, inFolder = false): string => {
+export const closeoutContract = (step?: StepSpec, replies: 'owed' | 'none' | false = false, inFolder = false): string => {
   const output = step?.output;
   const declared =
     step && output
@@ -330,7 +330,7 @@ export const closeoutContract = (step?: Workflow, replies: 'owed' | 'none' | fal
 /**
  * Whether a step is some step's `loop:` target, in the workflow the run froze: filed with `replies` in its closeout schema on every try.
  */
-export const isLoopTarget = (steps: readonly Workflow[], name: string): boolean => steps.some((s) => s.loop === name);
+export const isLoopTarget = (steps: readonly StepSpec[], name: string): boolean => steps.some((s) => s.loop === name);
 
 /**
  * What the run adds to a loop's target's closeout (`LOOP_REPLIES`): an answer to each finding it was handed. Strict, as every schema handed

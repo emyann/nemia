@@ -3,11 +3,11 @@
  * step's (`filedRefusal`): its words, after the line a person wrote. Pure.
  */
 import { contextText, MOUNTED_READS } from './keys.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 
 /** A step's keys a filed config is written from. */
 export type FiledStep = Pick<
-  Workflow,
+  StepSpec,
   | 'model'
   | 'effort'
   | 'context'

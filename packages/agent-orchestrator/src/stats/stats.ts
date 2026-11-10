@@ -16,7 +16,7 @@ import path from 'node:path';
 import { Invalid } from '../refusal/refusal.ts';
 import { isRepositoryRun, tryOf, type Run } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
-import { endsOnBase, type Workflow } from '../step/step.ts';
+import { endsOnBase, type StepSpec } from '../step/step.ts';
 import { askedAgain, landsOnCheck } from '../status/status.ts';
 import { gateWaitOf, tryEndOf, type Timeline, type TimelineTry } from '../timeline/index.ts';
 import { healthOf, type Health } from '../series/series.ts';
@@ -120,7 +120,7 @@ export type Facts = { tries: TryFact[]; runs: RunFact[]; frozen: RunFrozen[] };
  */
 export type RunRead = {
   run: Run;
-  steps: readonly Workflow[];
+  steps: readonly StepSpec[];
   timeline: Timeline;
   succeeded: (taskId: string) => boolean;
   verdictOf: (checkTaskId: string) => CheckVerdict | null;
@@ -128,8 +128,8 @@ export type RunRead = {
   deniedOf: (taskId: string) => string[] | null;
   skillsOf: (taskId: string, given: readonly string[]) => string[] | null;
   filesOf: (taskId: string) => string[] | null;
-  rulesOf: (step: Workflow) => ReadonlyMap<string, readonly SkillRule[]>;
-  appliesOf: (step: Workflow) => ReadonlyMap<string, readonly string[]>;
+  rulesOf: (step: StepSpec) => ReadonlyMap<string, readonly SkillRule[]>;
+  appliesOf: (step: StepSpec) => ReadonlyMap<string, readonly string[]>;
   closeoutOfTask: (taskId: string) => Closeout | undefined;
   deadlineOf: (taskId: string) => number | null;
 };
@@ -152,7 +152,7 @@ export const keysOf = (run: Run): RunKeys => ({
 });
 
 /** The deadline in ms a try's check was filed with, where its step lands the run on that check (`landsOnCheck`); else null. */
-function landingDeadlineOf(r: RunRead, step: Workflow, t: TimelineTry): number | null {
+function landingDeadlineOf(r: RunRead, step: StepSpec, t: TimelineTry): number | null {
   if (!t.check || !isRepositoryRun(r.run) || !landsOnCheck(step, r.run)) return null;
   const seconds = r.deadlineOf(t.check.taskId);
   return seconds === null ? null : seconds * 1000;
@@ -218,7 +218,7 @@ function runCostOf(t: Timeline): number | null {
  * Whether a step's current try ended as work that is done: its session succeeded and did not sign off blocked nor, looping, ask for another
  * round nobody accepted (`askedAgain`), and its check, where the step has one, passed.
  */
-function doneStep(r: RunRead, step: Workflow): boolean {
+function doneStep(r: RunRead, step: StepSpec): boolean {
   const record = r.run.steps[step.name];
   if (!record?.taskId || !r.succeeded(record.taskId) || r.closeoutOf(step.name)?.outcome === 'blocked') return false;
   if (askedAgain(step, r.run, r.closeoutOf)) return false;
@@ -232,7 +232,7 @@ function doneStep(r: RunRead, step: Workflow): boolean {
  * (`landsOnCheck`) and has not landed, a run that waits on a person — a check refused, a session failed or blocked, a loop that asked for
  * another round nobody accepted — and a run still going.
  */
-function finishedAt(r: RunRead, ending: Workflow | undefined): string | null {
+function finishedAt(r: RunRead, ending: StepSpec | undefined): string | null {
   if (r.run.cancelledAt) return null;
   if (ending && (r.run.steps[ending.name]?.landed || landsOnCheck(ending, r.run))) {
     const last = r.timeline.steps[ending.name]?.at(-1);

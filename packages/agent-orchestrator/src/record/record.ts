@@ -6,7 +6,7 @@
  * Pure: `record.store.ts` reads and writes the record.
  */
 import type { Verdict } from '../check/check.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import type { EarlierTry, RetryAsk } from '../retry/index.ts';
 import type { MergeOf, RoundAsk } from '../status/status.ts';
 import type { Pause } from '../pause/pause.ts';
@@ -104,7 +104,7 @@ type RunBase = {
    * could rewrite would be a step marking its own homework. Every pass reads this. Absent, the folder
    * is read.
    */
-  workflow?: Workflow[];
+  workflow?: StepSpec[];
   /**
    * The runs this one waits on (`nemia start --after`), frozen at start like the workflow: none of its steps is filed until
    * every one of them has landed (`runReady`). Absent on a run that waits on none.
@@ -455,7 +455,7 @@ export const stepTaskId = (run: Pick<Run, 'id'>, step: string, n = 1): string =>
  * the workflow does not, in the record's order. Pure. What `nemia decide` prints each step in: a record may be keyed in the folder's order,
  * and read by its keys a `plan → implement ⇄ review` run would print implement first.
  */
-export const namesInOrder = (run: Pick<Run, 'steps'>, steps: readonly Pick<Workflow, 'name'>[]): string[] => [
+export const namesInOrder = (run: Pick<Run, 'steps'>, steps: readonly Pick<StepSpec, 'name'>[]): string[] => [
   ...steps.map((s) => s.name).filter((name) => Object.hasOwn(run.steps, name)),
   ...Object.keys(run.steps).filter((name) => !steps.some((s) => s.name === name)),
 ];

@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseAgent, WorkflowError, type StepDraft, type Workflow } from '../src/workflow.ts';
+import { parseAgent, WorkflowError, type StepDraft, type StepSpec } from '../src/workflow.ts';
 import { agentDeniesOf } from '../src/workflow/index.ts';
 import { scratch } from 'test-kit/scratch';
 import { TEAM, TEAM_DEV } from './team.ts';
@@ -81,7 +81,7 @@ test('a step changed is rendered and written, a step unchanged keeps its file, a
   const dir = devIn('changed');
   fs.copyFileSync(path.join(STORE, 'agents', 'review.schema.json'), path.join(dir, 'review.schema.json'));
   const before = snapshot(dir);
-  const [implement, review, ship] = loadWorkflows(dir) as [Workflow, Workflow, Workflow];
+  const [implement, review, ship] = loadWorkflows(dir) as [StepSpec, StepSpec, StepSpec];
 
   const fewer = writeWorkflow(dir, [implement, { ...review, rounds: 2 }, ship]);
   assert.deepEqual([fewer.written, fewer.kept, fewer.removed], [['review.md'], ['implement.md', 'ship.md'], []]);
@@ -201,7 +201,7 @@ const loadRefusal = (file: string, text: string): string => {
 };
 
 /** dev's steps, in a copy of its own. */
-const devSteps = (dir: string) => loadWorkflows(dir) as [Workflow, Workflow, Workflow];
+const devSteps = (dir: string) => loadWorkflows(dir) as [StepSpec, StepSpec, StepSpec];
 
 /** What each linked file pointed at held when it was linked, by the path it points at. */
 const linkedTo = new Map<string, string>();
@@ -433,7 +433,7 @@ const caseSensitive = (() => {
 
 test('the files of the steps the folder no longer has go before a byte of the new ones is written', (t) => {
   const dir = devIn('order');
-  const [implement, review] = loadWorkflows(dir) as [Workflow, Workflow];
+  const [implement, review] = loadWorkflows(dir) as [StepSpec, StepSpec];
   const order: string[] = [];
   const { rmSync, writeFileSync } = fs;
   const removals = t.mock.method(fs, 'rmSync', (at: fs.PathLike, opts?: fs.RmOptions) => {
@@ -470,7 +470,7 @@ test(
   { skip: caseSensitive && 'this filesystem tells implement.md from Implement.md apart, where a rename by case is an ordinary rename' },
   () => {
     const dir = devIn('case');
-    const [implement] = loadWorkflows(dir) as [Workflow];
+    const [implement] = loadWorkflows(dir) as [StepSpec];
     const done = writeWorkflow(dir, [{ ...implement, name: 'Implement' }]);
     assert.deepEqual([done.written, done.removed], [['Implement.md'], ['implement.md', 'review.md', 'ship.md']]);
     assert.deepEqual(
@@ -488,10 +488,10 @@ test(
 
 test('a line break in a value is written as a literal block, and read back as the one value, never as a key of its own', () => {
   const dir = devIn('names');
-  const [implement, review] = loadWorkflows(dir) as [Workflow, Workflow];
+  const [implement, review] = loadWorkflows(dir) as [StepSpec, StepSpec];
   writeWorkflow(dir, [{ ...implement, check: 'npm test\nharness: codex' }, review]);
   assert.match(fs.readFileSync(path.join(dir, 'implement.md'), 'utf8'), /^check: \|-$/m);
-  const [read] = loadWorkflows(dir) as [Workflow];
+  const [read] = loadWorkflows(dir) as [StepSpec];
   assert.equal(read.check, 'npm test\nharness: codex');
   assert.equal(read.harness, implement.harness);
 });

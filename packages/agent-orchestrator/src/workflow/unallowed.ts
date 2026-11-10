@@ -7,7 +7,7 @@
  * Pure: the rules of the repository the run works in arrive as data (`projectAllows`, read through the client), and which words refuse
  * such a call and which tools run with no rule are the runtime's answers (`fenceReach`).
  */
-import { AGENTS_FOLDER, type Workflow } from '../step/step.ts';
+import { AGENTS_FOLDER, type StepSpec } from '../step/step.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { toolOf } from './fence.ts';
 import { EDITING_TOOLS } from '../keys/index.ts';
@@ -23,7 +23,7 @@ type Unallowed = { readonly tool: string; readonly tools: readonly string[]; rea
  * The fence word step `step` runs its sessions in on `reach` — its own, else the word a task naming none runs in — where that word
  * refuses what no allow rule reaches; `undefined` where it asks about such a call instead, or where the harness takes no rule at all.
  */
-function refusingWord(step: Workflow, reach: FenceReach): string | undefined {
+function refusingWord(step: StepSpec, reach: FenceReach): string | undefined {
   if (reach.by !== 'mode') return undefined;
   const word = step.permissionMode ?? reach.given;
   return reach.refusing.includes(word) ? word : undefined;
@@ -44,7 +44,7 @@ const namedBy = (tool: string): readonly string[] => (tool === 'Edit' ? EDITING_
  * `undefined` for a step with no `tools:` line, which is given every tool, for one whose fence word asks rather than refuses, and for
  * one on a remote agent, whose operator holds its fence.
  */
-function unallowedIn(step: Workflow, allows: readonly string[]): Unallowed | undefined {
+function unallowedIn(step: StepSpec, allows: readonly string[]): Unallowed | undefined {
   const harness = step.harness ?? DEFAULT_HARNESS;
   const reach = isRemoteHarness(harness) ? undefined : fenceReach(harness);
   const word = reach === undefined ? undefined : refusingWord(step, reach);
@@ -58,10 +58,10 @@ function unallowedIn(step: Workflow, allows: readonly string[]): Unallowed | und
 }
 
 /** Where step `step`'s fence is written: its agent's file, or `undefined` for a step that is its own fence. */
-const fenceFile = (step: Workflow): string | undefined => (step.agent === undefined ? undefined : `${AGENTS_FOLDER}/${step.agent.name}.md`);
+const fenceFile = (step: StepSpec): string | undefined => (step.agent === undefined ? undefined : `${AGENTS_FOLDER}/${step.agent.name}.md`);
 
 /** The allow lists the refusal says held no rule for the tool, in the order a session gets them. */
-function lists(step: Workflow, found: Unallowed): string {
+function lists(step: StepSpec, found: Unallowed): string {
   const file = fenceFile(step);
   const own = file === undefined ? "not this step's `allowedTools:`" : `not ${file}'s \`allowedTools:\`, not this step's`;
   return found.checkout
@@ -70,7 +70,7 @@ function lists(step: Workflow, found: Unallowed): string {
 }
 
 /** Where the allow belongs, and what taking the tool off instead costs: an agent's file reaches every step of it, a step's line one. */
-function fixes(step: Workflow, found: Unallowed): string {
+function fixes(step: StepSpec, found: Unallowed): string {
   const file = fenceFile(step);
   const editing = EDITING_TOOLS.includes(found.tool);
   const narrowed = editing
@@ -88,7 +88,7 @@ function fixes(step: Workflow, found: Unallowed): string {
  * Why step `step` is given the tool `found.tool` it can never call, in words that name the step, the tool, the word it runs in, where
  * its fence is written and the fixes; `untrusted` is appended where it says something.
  */
-const said = (step: Workflow, found: Unallowed, untrusted: string | undefined): string =>
+const said = (step: StepSpec, found: Unallowed, untrusted: string | undefined): string =>
   `${step.name}: \`tools: ${found.tools.join(', ')}\` gives its session \`${found.tool}\`, and it runs in \`${found.word}\`, in which a ` +
   `call no allow rule reaches is refused and never asked about: nothing its session gets allows \`${found.tool}\` — ` +
   `${lists(step, found)}. Every call of it would be refused, looking in the feed like a fence doing its job. ${fixes(step, found)}` +
@@ -105,7 +105,7 @@ const said = (step: Workflow, found: Unallowed, untrusted: string | undefined): 
  *   alone reads the harness's own file.
  */
 export function unallowedRefusal(
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   allows: readonly string[],
   untrusted: () => string | undefined = () => undefined,
 ): string | undefined {

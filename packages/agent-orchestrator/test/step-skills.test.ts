@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { Effect, Result, Schema } from 'effect';
-import { parseAgent, parseWorkflow, renderStep, splitFrontmatter, WorkflowError, type Agents, type Workflow } from '../src/workflow.ts';
+import { parseAgent, parseWorkflow, renderStep, splitFrontmatter, WorkflowError, type Agents, type StepSpec } from '../src/workflow.ts';
 import { headedLayers } from '../src/workflow/index.ts';
 import { briefBody, enabledSkillsOf, pluginOf, unrendered } from '../src/agents/agents.ts';
 import { scratch } from 'test-kit/scratch';
@@ -103,7 +103,7 @@ const entriesOf = (dir: string): Record<string, string> =>
   );
 
 /** The step `name` of `steps`. */
-const stepNamed = (steps: readonly Workflow[], name: string): Workflow => steps.find((s) => s.name === name)!;
+const stepNamed = (steps: readonly StepSpec[], name: string): StepSpec => steps.find((s) => s.name === name)!;
 
 /** The team's one skill told whole after its agent's instructions (`preload: true`): the shipper's merge. */
 const PRELOADED = 'trial-merge-a-branch';
@@ -132,7 +132,7 @@ test('a step given skills from four places: frozen as files under bare names, na
   const review = fs.readFileSync(path.join(dev, 'review.md'), 'utf8');
   fs.writeFileSync(path.join(dev, 'review.md'), review.replace('agent: reviewer\n', 'agent: reviewer\nskills: y\n'));
   let run: { id: string } = { id: '' };
-  let record: Workflow[] = [];
+  let record: StepSpec[] = [];
   let files: Record<string, string> = {};
 
   await s.test("the folder's check gives implement its agent's skills, then its step's, each once, the step's own line kept apart", () => {
@@ -286,7 +286,7 @@ const agentsOf = (files: Record<string, string>): Agents =>
   new Map(Object.entries(files).map(([name, text]) => [name, parseAgent(name, text)]));
 
 /** The step `build` written with `lines` as its frontmatter, resolved with `agents`. */
-const stepOf = (agents: Agents, lines: string): Workflow =>
+const stepOf = (agents: Agents, lines: string): StepSpec =>
   parseWorkflow('build', `---\nplace: git\n${lines}\n---\nDo it.\n`, undefined, agents);
 
 /** What `fn` was refused with: a `WorkflowError`'s message, or a failed assertion when it was not refused. */
@@ -352,7 +352,7 @@ test("a step's own `skills:` line, read beside its agent's: what it adds, what i
       assert.ok(Result.isSuccess(read), Result.isFailure(read) ? String(read.failure) : '');
       assert.deepEqual(read.success, frozen);
     }
-    const plain = JSON.parse(JSON.stringify(step)) as Workflow;
+    const plain = JSON.parse(JSON.stringify(step)) as StepSpec;
     assert.ok(Result.isFailure(decode({ ...plain, skills: 'beta' })), 'a line that is not a list');
     assert.ok(Result.isFailure(decode({ ...plain, agent: { ...plain.agent, addedSkills: 'gamma' } })), 'added skills not a list');
   });

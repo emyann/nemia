@@ -7,7 +7,7 @@
  * meanings and runs its check, and the steps after it in the loop read the merge. No round is spent (`roundIn`), so a loop out of rounds
  * can still take one.
  */
-import { outputFields, type Workflow } from '../step/step.ts';
+import { outputFields, type StepSpec } from '../step/step.ts';
 import {
   dataBlock,
   isRepositoryRun,
@@ -45,9 +45,9 @@ import type { Offer } from '../decide/decide.ts';
  * was approved for (`endingStopped`), and whether a loop goes round again on its own word (`roundsDue`).
  */
 export type MergeReads = {
-  standingOf: (step: Workflow) => { status: StepStatus; own: StepStatus };
-  stopped: (step: Workflow) => boolean;
-  goesRound: (looping: Workflow) => boolean;
+  standingOf: (step: StepSpec) => { status: StepStatus; own: StepStatus };
+  stopped: (step: StepSpec) => boolean;
+  goesRound: (looping: StepSpec) => boolean;
 };
 
 /**
@@ -63,7 +63,7 @@ export type Tried = { readonly trial: Trial; readonly base: string | null };
 export type MergeAsk = RoundAsk & { merge: MergeOf };
 
 /** The merge a person asked of a loop and the run has not filed: an ask naming the target's next try. */
-export const mergePending = (run: Run, looping: Workflow, asks: readonly RoundAsk[]): RoundAsk | undefined =>
+export const mergePending = (run: Run, looping: StepSpec, asks: readonly RoundAsk[]): RoundAsk | undefined =>
   asks.find((a) => a.merge && a.step === looping.name && a.merge.target === looping.loop && a.merge.try === tryOf(run, a.merge.target) + 1);
 
 /** The merge asks a record already answers — each names a try its target has reached. The tick consumes these. */
@@ -74,7 +74,7 @@ export const mergeSpent = (run: Run, a: RoundAsk): boolean => (a.merge ? tryOf(r
  * or an acceptance written over it would drop it unsaid. `ended` says what the verb would do to the merge, `instead` the verb to ask once
  * the merge is taken back. Undefined when no merge is pending.
  */
-export function mergeWaits(run: Run, looping: Workflow, asks: readonly RoundAsk[], ended: string, instead: string): string | undefined {
+export function mergeWaits(run: Run, looping: StepSpec, asks: readonly RoundAsk[], ended: string, instead: string): string | undefined {
   const pending = mergePending(run, looping, asks);
   const merge = pending?.merge;
   if (!merge) return undefined;
@@ -91,7 +91,7 @@ const loopDone = (status: StepStatus): boolean => satisfiesAfter(status) || stat
  * The steps waiting on the looping step that a merge sends the work back from: every one filed, when each stopped on the base branch
  * (`endingStopped`) — or undefined when one filed has not, since a merge would file the work again under a step that runs on it.
  */
-function backOf(steps: readonly Workflow[], run: Run, looping: Workflow, stopped: (step: Workflow) => boolean): string[] | undefined {
+function backOf(steps: readonly StepSpec[], run: Run, looping: StepSpec, stopped: (step: StepSpec) => boolean): string[] | undefined {
   const filed = steps.filter((s) => s.after.includes(looping.name) && run.steps[s.name]?.taskId);
   return filed.every(stopped) ? filed.map((s) => s.name) : undefined;
 }
@@ -102,12 +102,12 @@ function backOf(steps: readonly Workflow[], run: Run, looping: Workflow, stopped
  * on, which the merge does not spend.
  */
 export function mergeDue(
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   run: Run,
-  looping: Workflow,
+  looping: StepSpec,
   status: StepStatus,
   asks: readonly RoundAsk[],
-  stopped: (step: Workflow) => boolean,
+  stopped: (step: StepSpec) => boolean,
 ): Round | undefined {
   const merge = mergePending(run, looping, asks)?.merge;
   const back = merge && loopDone(status) ? backOf(steps, run, looping, stopped) : undefined;
@@ -152,7 +152,7 @@ export const mergeDueNote = (r: Round): string =>
   `merge of ${r.merge?.onto} asked (nemia refresh --base) — the next tick files ${r.target}, round ${r.round} unchanged`;
 
 /** What `nemia refresh --base` says once its ask is written. */
-export const mergeAskedLine = (a: MergeAsk, looping: Workflow): string =>
+export const mergeAskedLine = (a: MergeAsk, looping: StepSpec): string =>
   `asked: merge ${a.merge.onto} at ${a.merge.sha.slice(0, 7)} into ${a.merge.target}'s work${a.merge.landing ? `, where ${semantic(a.merge, a.merge.landing)}` : ''} — the next tick files it, once; ${roundWord(a.round, capOf(looping))} unchanged`;
 
 /**
@@ -171,7 +171,7 @@ export const mergeAskedLine = (a: MergeAsk, looping: Workflow): string =>
  * base, or a check that did not finish, lets nothing through: the landing is tried again on the base as it is.
  */
 export function mergeAsk(
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   run: Run,
   name: string | undefined,
   reads: MergeReads,
@@ -211,7 +211,7 @@ export function mergeAsk(
 }
 
 /** The looping step `name` names — itself, or a step of its loop — or the run's one loop; or why there is none to merge through. */
-function loopNamed(steps: readonly Workflow[], run: Run, name: string | undefined): Workflow | { refusal: string } {
+function loopNamed(steps: readonly StepSpec[], run: Run, name: string | undefined): StepSpec | { refusal: string } {
   const loops = steps.filter((s) => s.loop);
   if (name !== undefined && !run.steps[name])
     return { refusal: `${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.` };
@@ -230,10 +230,10 @@ function loopNamed(steps: readonly Workflow[], run: Run, name: string | undefine
 }
 
 /** The step whose work a run's ending lands: the one its ending waits on, or the workflow's last. */
-const resultStep = (steps: readonly Workflow[]): string => steps.find(endsOnBase)?.after[0] ?? steps.at(-1)?.name ?? '<step>';
+const resultStep = (steps: readonly StepSpec[]): string => steps.find(endsOnBase)?.after[0] ?? steps.at(-1)?.name ?? '<step>';
 
 /** Why a merge cannot be asked over an ask already there: a merge, or a round, of this loop. */
-function askedRefusal(run: Run, looping: Workflow, asks: readonly RoundAsk[]): string | undefined {
+function askedRefusal(run: Run, looping: StepSpec, asks: readonly RoundAsk[]): string | undefined {
   const merge = mergePending(run, looping, asks);
   if (merge)
     return `a merge of ${merge.merge?.onto} into ${looping.loop}'s work is already asked (at ${merge.at}), and the next tick files it once. Wait for it: nemia ls ${run.id}.`;
@@ -245,7 +245,7 @@ function askedRefusal(run: Run, looping: Workflow, asks: readonly RoundAsk[]): s
 }
 
 /** Why the loop cannot take a merge as it stands: it goes round itself, its round still runs, or a step of it stopped. */
-function loopRefusal(steps: readonly Workflow[], run: Run, looping: Workflow, reads: MergeReads): string | undefined {
+function loopRefusal(steps: readonly StepSpec[], run: Run, looping: StepSpec, reads: MergeReads): string | undefined {
   const now = roundOf(run, looping.name);
   if (reads.goesRound(looping))
     return `the run goes round again itself: ${looping.name} asked for round ${now + 1}, which ${looping.loop} works on as the base is. Merge once it ends, if the base still conflicts: nemia refresh ${run.id} ${looping.name} --base.`;
@@ -266,7 +266,7 @@ function loopRefusal(steps: readonly Workflow[], run: Run, looping: Workflow, re
  * `cause: 'merge'` on the very pass that files the landing, which is the collision this refusal exists to prevent. Read before the trial
  * merge, so it answers whether the base conflicts or not (`test/ship.test.ts`, *a merge asked of quick's shape*).
  */
-function followerRefusal(steps: readonly Workflow[], run: Run, looping: Workflow, reads: MergeReads): string | undefined {
+function followerRefusal(steps: readonly StepSpec[], run: Run, looping: StepSpec, reads: MergeReads): string | undefined {
   const approved = steps.find(
     (s) => s.after.includes(looping.name) && approvedFirst(s, run) && !run.steps[s.name]?.taskId && approvalOf(run, s.name),
   );
@@ -282,14 +282,14 @@ function followerRefusal(steps: readonly Workflow[], run: Run, looping: Workflow
 }
 
 /** The ending that waits on a loop: the step after it that acts on the base branch, gated or routed by that loop — or undefined. */
-const endingAfter = (steps: readonly Workflow[], looping: Workflow): Workflow | undefined =>
+const endingAfter = (steps: readonly StepSpec[], looping: StepSpec): StepSpec | undefined =>
   steps.find((s) => s.after.includes(looping.name) && endsOnBase(s));
 
 /**
  * The landing of the ending after `looping` that its check refused on `sha` (`MergeLanding`): its record says it aborted the merge staged
  * on that commit of the base (`LandingRecord`'s `refusedOn`), and names its check's task — or undefined.
  */
-function refusedLanding(steps: readonly Workflow[], run: Run, looping: Workflow, sha: string): MergeLanding | undefined {
+function refusedLanding(steps: readonly StepSpec[], run: Run, looping: StepSpec, sha: string): MergeLanding | undefined {
   const ending = endingAfter(steps, looping);
   const check = ending ? landingRefusedOn(run.steps[ending.name], sha) : undefined;
   return ending && check ? { step: ending.name, check } : undefined;
@@ -313,7 +313,7 @@ export function landingRefusedOn(record: StepRecord | undefined, sha: string): s
  * either stopped, which the line above answers, or running, which `followerRefusal` answers. `test/ship.test.ts`, *a merge asked of
  * quick's shape*, reads `routed`'s words back on a clean base and a moved one alike.
  */
-function cleanNext(steps: readonly Workflow[], run: Run, looping: Workflow, reads: MergeReads): string {
+function cleanNext(steps: readonly StepSpec[], run: Run, looping: StepSpec, reads: MergeReads): string {
   const ending = endingAfter(steps, looping);
   if (!ending) return `see where the run stands: nemia decide ${run.id}`;
   if (run.steps[ending.name]?.taskId && reads.stopped(ending)) return `land it again: nemia retry ${run.id} ${ending.name}`;
@@ -331,10 +331,10 @@ function cleanNext(steps: readonly Workflow[], run: Run, looping: Workflow, read
  * @param say The run's place's words for a merge (`PlaceSay`). Absent, and the step is sent to its place's skill.
  */
 export function mergeSection(
-  step: Workflow,
+  step: StepSpec,
   merge: { onto: string; sha: string; landing?: LandingSaid },
   loop: string,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   say?: PlaceSay,
 ): string {
   const looping = steps.find((s) => s.name === loop);
@@ -401,7 +401,7 @@ const mergeRead = (onto: string, say: PlaceSay | undefined): string[] =>
  * @param closeoutOf How each step signed off; the looping step's own is its closeout before the merge.
  * @param say The run's place's words for reading a merge (`PlaceSay`). Absent, and the step is sent to its place's skill.
  */
-export function mergeReviewSection(step: Workflow, run: Run, closeoutOf: (step: string) => Closeout | undefined, say?: PlaceSay): string {
+export function mergeReviewSection(step: StepSpec, run: Run, closeoutOf: (step: string) => Closeout | undefined, say?: PlaceSay): string {
   const target = step.loop;
   const round = roundOf(run, step.name);
   const cap = capOf(step);

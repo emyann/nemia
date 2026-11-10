@@ -25,7 +25,7 @@ import path from 'node:path';
 import { Context, Effect, Layer, Schema } from 'effect';
 import { brokenBy, doorOf, fromThrow, rootedDoor, type DoorOf } from '../door/door.store.ts';
 import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
-import { WorkflowError, type Workflow as Step } from '../step/step.ts';
+import { WorkflowError, type StepSpec as Step } from '../step/step.ts';
 import type { StepDraft } from '../workflow/index.ts';
 import type { Places } from '../skills/read.store.ts';
 import { workflowVersionRefusal, type Fills, type Found, type WorkflowThere } from '../folder/folder.ts';

@@ -10,7 +10,7 @@ import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { Cause, Effect, Exit } from 'effect';
 import { EngineService, type Engine } from '../../runtime-client.ts';
-import type { Workflow } from '../../step/step.ts';
+import type { StepSpec } from '../../step/step.ts';
 import type { MergeState } from '../../place/place.ts';
 import { pruneAgain, pruneRefusal, type PruneFacts, type Pruning } from './prune.ts';
 import { filesPrunedWords, isRepositoryRun, namesInOrder, type RepositoryRun, type Pruned, type Run } from '../../record/record.ts';
@@ -36,7 +36,7 @@ import { Conflict, Invalid, type Refusal } from '../../refusal/refusal.ts';
  * place's `status` reads it (`checkoutStatus`), through `memo`. Refuses (`Conflict`) a checkout the place did not read, in its words:
  * nothing is removed on a guess.
  */
-export function merging(run: Run, steps: readonly Workflow[] | undefined, memo: StatusMemo): MergeState['merging'] {
+export function merging(run: Run, steps: readonly StepSpec[] | undefined, memo: StatusMemo): MergeState['merging'] {
   if (!readsCheckout(run, steps)) return 'none';
   const read = checkoutStatus(run, steps ?? [], memo);
   if ('unread' in read) throw new Conflict({ message: `run ${run.id}: ${read.unread}; read its checkout, ${run.repo}, then try again` });
@@ -44,7 +44,7 @@ export function merging(run: Run, steps: readonly Workflow[] | undefined, memo: 
 }
 
 /** Whether `merging` asks the place how `run`'s checkout stands: never for a run it answers `none` of without a question. */
-function readsCheckout(run: Run, steps: readonly Workflow[] | undefined): run is RepositoryRun {
+function readsCheckout(run: Run, steps: readonly StepSpec[] | undefined): run is RepositoryRun {
   if (!isRepositoryRun(run)) return false;
   const landings = (steps ?? []).filter((s) => landsOnCheck(s, run));
   const marked = stagedHere(run);
@@ -191,11 +191,11 @@ export const sized = Effect.fn('prune.sized')(function* (ready: Ready) {
  * A run's frozen steps, or, for a record with no frozen workflow whose folder does not load, why (`unfrozen`): the run is judged without
  * them, and its facts say why.
  */
-const frozenSteps = (run: Run): Effect.Effect<{ steps?: Workflow[]; unfrozen?: string }, Refusal> =>
+const frozenSteps = (run: Run): Effect.Effect<{ steps?: StepSpec[]; unfrozen?: string }, Refusal> =>
   Effect.map(stepsOrWhy(run), (read) => ('steps' in read ? { steps: read.steps } : { unfrozen: read.unloaded }));
 
 /** The run's worktrees inside `within` as its place's inventory read them (`runWorktrees`), the record's paths read as git names them. */
-function placeWorktrees(run: RepositoryRun, steps: readonly Workflow[] | undefined, within: string, place: RunPlaceRead) {
+function placeWorktrees(run: RepositoryRun, steps: readonly StepSpec[] | undefined, within: string, place: RunPlaceRead) {
   const recorded = {
     ...run,
     steps: Object.fromEntries(
@@ -251,7 +251,7 @@ export function dropEmpty(within: string): void {
 const judgedOf = Effect.fn('prune.judged')(function* (
   e: Engine,
   run: RepositoryRun,
-  steps: Workflow[] | undefined,
+  steps: StepSpec[] | undefined,
   flags: { unmerged: boolean; artifacts: boolean },
 ) {
   const judged: Pick<PruneFacts, 'decided' | 'held' | 'owed'> = { decided: undefined, held: null, owed: [] };

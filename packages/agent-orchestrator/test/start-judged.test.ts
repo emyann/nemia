@@ -40,7 +40,7 @@ const { main } = await import('../src/cli/main.ts');
 const { filesStore: runStore } = await import('../src/record/files.store.ts');
 const stage = staged({ runWith, main, engineOf });
 type ConfigRefused = import('../src/start/start.verb.ts').ConfigRefused;
-type Workflow = import('../src/step/step.ts').Workflow;
+type Workflow = import('../src/step/step.ts').StepSpec;
 type Refusal = Error & { _tag?: string; exitCode?: number };
 
 /** A holder of the workflow folder `name` of `steps`, and of `agents` beside it: the folder's path. */

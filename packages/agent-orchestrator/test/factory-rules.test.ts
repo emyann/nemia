@@ -16,7 +16,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Workflow } from '../src/workflow.ts';
+import type { StepSpec } from '../src/workflow.ts';
 import { headedLayers } from '../src/workflow/index.ts';
 import { scratch } from 'test-kit/scratch';
 import { teamCopy } from './team.ts';
@@ -74,7 +74,7 @@ const started = (here: { repo: string; dev: string }, brief: string, factory?: s
   runPlaced(startRun({ brief, repo: here.repo, workflowDir: here.dev, ...(factory !== undefined && { factory }) }));
 
 /** The steps a run froze at its start. */
-const frozen = (id: string): Workflow[] => runRecord(id).workflow ?? [];
+const frozen = (id: string): StepSpec[] => runRecord(id).workflow ?? [];
 
 /** The prompt rendered for a step of a run at its start. */
 const promptOf = (run: Parameters<typeof agentFilesDir>[0], step: string): string =>
@@ -103,7 +103,7 @@ const printedBy = async (t: Mocker, ...argv: string[]): Promise<string[]> => {
 };
 
 /** A step's keys, its words and its rules set aside: what the rules must not move. */
-const keysOf = (steps: Workflow[]) =>
+const keysOf = (steps: StepSpec[]) =>
   steps.map(({ body: _b, agent, ...keys }) => ({ ...keys, agent: { ...agent, factoryRules: undefined } }));
 
 test("a factory's rules and its instruction, from none to cleared: told as their own layer, frozen at the start, reaching later runs", async (t) => {
@@ -198,7 +198,7 @@ test("a factory's rules and its instruction, from none to cleared: told as their
   await s.test(
     "a factory's page of a step loads it with the rules, and leaves out rules that cannot be told, refusing nothing",
     async () => {
-      const step = async (): Promise<Workflow> => {
+      const step = async (): Promise<StepSpec> => {
         const args = { from: 'yours', name: 'dev', step: 'implement', dir: here.dev, factory: 'pipao' };
         return (await stage.runWith(stage.board().e, WORKFLOWS_STEP.handler(args))).step!;
       };

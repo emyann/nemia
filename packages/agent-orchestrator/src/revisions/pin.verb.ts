@@ -16,7 +16,7 @@ import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { Cache, Cause, Effect } from 'effect';
-import { AGENTS_FOLDER, type Workflow } from '../step/step.ts';
+import { AGENTS_FOLDER, type StepSpec } from '../step/step.ts';
 import { stepSetRefusal, unallowedRefusal } from '../workflow/index.ts';
 import { lookupRoots, type Places } from '../skills/read.store.ts';
 import { placesOf } from '../folder/lookup.store.ts';
@@ -49,7 +49,7 @@ import { RunId } from '../record/record.model.ts';
 import { firstPiece } from '../piece/piece.ts';
 
 /** What a run resolved on a pass: the steps it now holds, and the revision of each kind they were read at. */
-export type Resolved = { steps: Workflow[]; pins: Pin[] };
+export type Resolved = { steps: StepSpec[]; pins: Pin[] };
 
 /** Why a pass took nothing of the world and the run keeps what it froze, in one line, for the note the pass says. */
 export type Kept = { kept: string };
@@ -72,14 +72,14 @@ const stepsNow = (
   run: Pick<Run, 'workflowDir' | 'repo' | 'factory'>,
   places: Places,
   factory: Factory | undefined,
-): Effect.Effect<Workflow[], Refusal> =>
+): Effect.Effect<StepSpec[], Refusal> =>
   Effect.gen(function* () {
     const fills = factory ? factoryFills(factory, workflowName(run.workflowDir)).fills : undefined;
     return yield* (yield* WorkflowDoor).workflows.read(WorkflowDir.read(run.workflowDir), places, fills);
   });
 
 /** The agents and skills `steps` name, each once, in the order the steps run. */
-function kindsIn(run: Pick<Run, 'workflowDir' | 'factory'>, steps: readonly Workflow[]): KindName[] {
+function kindsIn(run: Pick<Run, 'workflowDir' | 'factory'>, steps: readonly StepSpec[]): KindName[] {
   const named: KindName[] = [{ kind: 'workflow', name: workflowName(run.workflowDir) }];
   for (const step of steps) {
     const agent = step.agent;
@@ -167,7 +167,7 @@ function once<A extends unknown[], T>(f: (...args: A) => T, key: (...args: A) =>
 export type PassRevisions = {
   readonly factory: (run: Pick<Run, 'factory'>) => Effect.Effect<Factory | undefined, Refusal>;
   readonly skills: (run: FolderRun) => Effect.Effect<SkillsFound, Refusal>;
-  readonly steps: (run: FolderRun) => Effect.Effect<Workflow[], Refusal>;
+  readonly steps: (run: FolderRun) => Effect.Effect<StepSpec[], Refusal>;
   readonly allows: (run: FolderRun) => Allows;
   readonly digest: (of: KindName, run: FolderRun) => Effect.Effect<string | null, Refusal>;
   readonly revision: Numbering;
@@ -261,7 +261,7 @@ const readOr = (read: PassRevisions | undefined): Effect.Effect<PassRevisions, n
  */
 export const pinsOf = Effect.fn('pinsOf')(function* (
   run: FolderRun,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   at: string,
   given?: PassRevisions,
   numbering?: Numbering,
@@ -283,9 +283,9 @@ export const pinsOf = Effect.fn('pinsOf')(function* (
  * not load, so the run keeps the workflow it froze. Each run is handed its own copy of the steps, since `firstResolve` puts them on the
  * record and a write onto one run's must leave the other's alone.
  */
-const folderNow = (run: FolderRun, read: PassRevisions): Effect.Effect<Workflow[] | undefined> =>
+const folderNow = (run: FolderRun, read: PassRevisions): Effect.Effect<StepSpec[] | undefined> =>
   read.steps(run).pipe(
-    Effect.map((steps): Workflow[] | undefined => structuredClone(steps)),
+    Effect.map((steps): StepSpec[] | undefined => structuredClone(steps)),
     Effect.catchCause(() => Effect.succeed(undefined)),
   );
 
@@ -327,7 +327,7 @@ export const refreshedNow = Effect.fn('refreshedNow')(function* (run: Run, at: s
 });
 
 /** The steps a filed run's next filing would take (`refreshedNow`'s): undefined where the folder does not load. */
-const refreshedSteps = (run: Run, read: PassRevisions): Effect.Effect<Workflow[] | undefined> =>
+const refreshedSteps = (run: Run, read: PassRevisions): Effect.Effect<StepSpec[] | undefined> =>
   Effect.flatMap(folderNow(run, read), (found) => {
     if (!found) return Effect.succeed(undefined);
     const byName = new Map(found.map((s) => [s.name, s]));
@@ -388,7 +388,7 @@ export const behindNow = Effect.fn('behindNow')(function* (run: Run, succeeded: 
  * copied again with it (`freezeCarriedFiles`), and `run.carriedFiles` set to what is there now: none where the folder is gone. A folder
  * that is no directory on the disk — a workflow read through another door — keeps the copies the run had.
  */
-export const renderAgain = Effect.fn('renderAgain')(function* (run: Run, steps: readonly Workflow[], given?: PassRevisions) {
+export const renderAgain = Effect.fn('renderAgain')(function* (run: Run, steps: readonly StepSpec[], given?: PassRevisions) {
   const found = yield* (yield* readOr(given)).skills(run);
   const copies = yield* Effect.try({
     try: () =>

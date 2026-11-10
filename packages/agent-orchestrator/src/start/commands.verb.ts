@@ -18,7 +18,7 @@ import { isRepositoryRun, type Run } from '../record/record.ts';
 import { inputsDir } from '../record/record.store.ts';
 import { carriedFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
 import { frozenStepsOf } from '../steps/steps.ts';
-import type { Workflow } from '../workflow.ts';
+import type { StepSpec } from '../workflow.ts';
 import { approvedFirst, gatesOf } from '../status/status.ts';
 import { fromNote } from './inputs.ts';
 import { leftOutMounts, leftOutVolumes, startRun, type StartedRun } from './start.verb.ts';
@@ -166,7 +166,7 @@ type Started = {
 };
 
 /** The steps of a run just started: the workflow `nemia start` froze on its record, which every run it writes has (`frozenStepsOf`). */
-const startedSteps = (run: Run): Workflow[] => frozenStepsOf(run) ?? [];
+const startedSteps = (run: Run): StepSpec[] => frozenStepsOf(run) ?? [];
 
 /**
  * The folders of its factory a run mounts, read-only, and those left out because they were no directory; none in the default factory.

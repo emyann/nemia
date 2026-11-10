@@ -13,7 +13,7 @@ import type { Verdict } from '../src/check/check.ts';
 import type { Closeout } from '../src/closeout/index.ts';
 import type { CloseoutAsked, Run, TaskPhase } from '../src/record/record.ts';
 import type { RetryAsk } from '../src/retry/index.ts';
-import type { Workflow } from '../src/step/step.ts';
+import type { StepSpec } from '../src/step/step.ts';
 import { retryable } from '../src/retry/retry.ts';
 import { type BranchStanding, notHandedOn, type SpendOf, standing } from '../src/status/status.ts';
 import { runWords } from '../src/route/routed/routed-words.ts';
@@ -42,7 +42,7 @@ export const theRunsWords = assume(runWords, {
 
 /** The word the run reads for the step `name` on this pass (`runWords`), the callbacks left out given as the gate defaults them. */
 const theRunsWord = (
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   run: Run,
   name: string,
   p: (taskId: string) => TaskPhase,
@@ -60,7 +60,7 @@ const theRunsWord = (
  * a real run: it says that a filed step's gate is its session's.
  */
 const atItsGate = (
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   run: Run,
   name: string,
   p: (taskId: string) => TaskPhase,
@@ -81,7 +81,7 @@ const atItsGate = (
  * Whether a step is an ending not yet filed whose approval would take what is not there to take: a step it comes after is sent
  * back, or every result branch is already on the base.
  */
-const anEndingNotToTake = (step: Workflow, run: Run, asks: readonly RetryAsk[], standings: readonly BranchStanding[]): boolean =>
+const anEndingNotToTake = (step: StepSpec, run: Run, asks: readonly RetryAsk[], standings: readonly BranchStanding[]): boolean =>
   step.workspace === 'base' &&
   gated(step, run) &&
   !run.steps[step.name]?.taskId &&
@@ -89,7 +89,7 @@ const anEndingNotToTake = (step: Workflow, run: Run, asks: readonly RetryAsk[], 
 
 const approvalRefusalSpec = spec<
   (
-    steps: readonly Workflow[],
+    steps: readonly StepSpec[],
     run: Run,
     name: string,
     message: string | undefined,
@@ -216,12 +216,12 @@ export type ApprovalRefusal = Implementation<typeof approvalRefusalSpec>;
 
 const holdsOpenSpec = spec<
   (
-    step: Workflow,
+    step: StepSpec,
     run: Run,
     phaseOf: (taskId: string) => TaskPhase,
     closeoutOf: (step: string) => Closeout | undefined,
     askedCloseout: (taskId: string) => CloseoutAsked,
-    steps: readonly Workflow[],
+    steps: readonly StepSpec[],
     spendOf: SpendOf,
     verdictOf?: (step: string) => Verdict | undefined,
   ) => boolean

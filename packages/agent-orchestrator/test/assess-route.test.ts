@@ -15,7 +15,7 @@ import { ranShape } from '../src/workspace/worktree.store.ts';
 import { workspacePlan } from '../src/workspace/workspace.ts';
 import type { Closeout } from '../src/closeout/closeout.ts';
 import type { Run, StepRecord, TaskPhase } from '../src/record/record.ts';
-import type { Workflow } from '../src/step/step.ts';
+import type { StepSpec } from '../src/step/step.ts';
 import { aRead, listing, listingInput, phases, run, step, STEPS, type ListedInput } from './assessed.ts';
 import { decision, onYouWords } from '../src/run.ts';
 import { listing as listed } from '../src/list/list.ts';
@@ -28,7 +28,7 @@ const PLAN_SCHEMA = {
 };
 
 /** plan → triage (a table over plan's surface; docs ends the run) → build-web | build-backend, and log on every route → notes. */
-const TRIAGE: Workflow[] = [
+const TRIAGE: StepSpec[] = [
   { ...step('plan'), output: { file: 'plan.schema.json', schema: PLAN_SCHEMA } },
   {
     ...step('triage', ['plan']),
@@ -44,7 +44,7 @@ const TRIAGE: Workflow[] = [
 ];
 
 /** The world of one pass: which steps are filed, the engine's phase of each task, and plan's surface. */
-type Pass = { filed?: Record<string, TaskPhase>; surface?: string; steps?: Workflow[]; records?: Record<string, Partial<StepRecord>> };
+type Pass = { filed?: Record<string, TaskPhase>; surface?: string; steps?: StepSpec[]; records?: Record<string, Partial<StepRecord>> };
 
 const NAMES = ['plan', 'triage', 'build-web', 'build-backend', 'log', 'notes'];
 

@@ -22,7 +22,7 @@ import {
   WorkflowError,
   type StepDraft,
   type StepKey,
-  type Workflow,
+  type StepSpec,
 } from '../workflow.ts';
 import { endsOnBase } from '../step/step.ts';
 import { readsMounts } from '../filed/filed.ts';
@@ -74,7 +74,7 @@ async function table(t: TestContext, rows: readonly Row[]): Promise<void> {
 }
 
 /** A row reading step `name` with `lines`, its fields as `is` says. */
-const reads = (row: string, name: string, lines: string, is: Partial<Record<keyof Workflow, unknown>>): Row => ({
+const reads = (row: string, name: string, lines: string, is: Partial<Record<keyof StepSpec, unknown>>): Row => ({
   row,
   run: () => {
     const w = fm(name, lines) as Record<string, unknown>;
@@ -761,7 +761,7 @@ test('the former names a file may still say: read under the names they have now,
       run: () => {
         const now = fm('write', 'disallowedTools: SendMessage\nallowedTools: Edit(**)');
         assert.equal(asNamed(now), now, 'nothing to rename, nothing copied');
-        const frozen = { name: 'write', after: [], body: 'Write.', disallow: ['SendMessage'], allow: ['Edit(**)'] } as unknown as Workflow;
+        const frozen = { name: 'write', after: [], body: 'Write.', disallow: ['SendMessage'], allow: ['Edit(**)'] } as unknown as StepSpec;
         assert.deepEqual(asNamed(frozen), {
           name: 'write',
           after: [],
@@ -776,7 +776,7 @@ test('the former names a file may still say: read under the names they have now,
           allow: ['Edit(**)'],
           disallow: ['SendMessage'],
           agent: { name: 'writer', keys: ['allow'], body: '', given: { disallow: 'SendMessage' } },
-        } as unknown as Workflow;
+        } as unknown as StepSpec;
         assert.deepEqual(asNamed(resolved), {
           name: 'write',
           after: [],
@@ -785,7 +785,7 @@ test('the former names a file may still say: read under the names they have now,
           disallowedTools: ['SendMessage'],
           agent: { name: 'writer', keys: ['allowedTools'], body: '', given: { disallowedTools: 'SendMessage' } },
         });
-        const both = { name: 'write', after: [], body: 'Write.', allow: ['Read'], allowedTools: ['Edit(**)'] } as unknown as Workflow;
+        const both = { name: 'write', after: [], body: 'Write.', allow: ['Read'], allowedTools: ['Edit(**)'] } as unknown as StepSpec;
         assert.deepEqual(asNamed(both), { name: 'write', after: [], body: 'Write.', allowedTools: ['Edit(**)'] }, "the new name's value");
       },
     },
@@ -862,7 +862,7 @@ test('the former names a file may still say: read under the names they have now,
         assert.equal(endsOnBase(former), true);
         assert.match(renderStep(former), /^workspace: base$/m);
         assert.doesNotMatch(renderStep(former), /workspace: main/);
-        const frozen = { name: 'ship', after: ['review'], body: 'Ship.', workspace: 'main' } as unknown as Workflow;
+        const frozen = { name: 'ship', after: ['review'], body: 'Ship.', workspace: 'main' } as unknown as StepSpec;
         assert.deepEqual(
           asNamed(frozen),
           { name: 'ship', after: ['review'], body: 'Ship.', workspace: 'base' },
@@ -952,7 +952,7 @@ test('`renderStep`: the parser run backwards, in one canonical form, and refusin
           .map(([k, v]) => `${k}: ${v}`)
           .join('\n')}\n---\n\nDo the work.\n\nAll of it.\n\n`;
         const step = parseWorkflow('review', text, readLooping);
-        for (const key of Object.keys(EVERY) as Array<keyof Workflow>) assert.notEqual(step[key], undefined, key);
+        for (const key of Object.keys(EVERY) as Array<keyof StepSpec>) assert.notEqual(step[key], undefined, key);
         assert.equal(
           roundTrip('review', text, readLooping),
           [

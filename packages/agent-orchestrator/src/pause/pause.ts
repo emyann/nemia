@@ -12,7 +12,7 @@ import type { Identity } from '../daemon/daemon.ts';
 import type { Run } from '../record/record.ts';
 import type { RecordMemo } from '../rest/index.ts';
 import type { RetryAsk } from '../retry/index.ts';
-import { endsOnBase, type Workflow } from '../step/step.ts';
+import { endsOnBase, type StepSpec } from '../step/step.ts';
 import { landsOnCheck } from '../status/status.ts';
 import { blockedWord, parkedOf, phaseOfView, type WordView } from '../views/views-words.ts';
 
@@ -164,7 +164,7 @@ export const RESUME_LINE = 'nemia resume';
  */
 export function finishingOf(
   run: Run,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   viewOf: (taskId: string) => FinishingView | undefined,
   asks: readonly RetryAsk[] = [],
 ): Finishing[] {
@@ -183,7 +183,7 @@ export function finishingOf(
 /** The session and the check of `step` in `run` at work (`atWork`), each with its task id and its view; a session parked is not. */
 const stepAtWork = (
   run: Run,
-  step: Workflow,
+  step: StepSpec,
   viewOf: (taskId: string) => FinishingView | undefined,
 ): { taskId: string; kind: 'session' | 'check'; view: FinishingView }[] => {
   const record = run.steps[step.name];
@@ -211,7 +211,7 @@ export const parkedAmong = (runs: readonly Run[], viewOf: (taskId: string) => Fi
  * The tasks of `run` a pause at once stops: those still at work as `finishingOf` reads them, but a step's in the repository's own
  * checkout (`workspace: base`), whose session, check and merge are a landing and finish, and one the engine was already asked to stop.
  */
-export function interruptsOf(run: Run, steps: readonly Workflow[], viewOf: (taskId: string) => FinishingView | undefined): Interrupt[] {
+export function interruptsOf(run: Run, steps: readonly StepSpec[], viewOf: (taskId: string) => FinishingView | undefined): Interrupt[] {
   return steps
     .filter((step) => !endsOnBase(step))
     .flatMap((step) =>
@@ -225,7 +225,7 @@ export function interruptsOf(run: Run, steps: readonly Workflow[], viewOf: (task
 export function interruptsAmong(
   runs: readonly Run[],
   viewOf: (taskId: string) => FinishingView | undefined,
-  stepsOf: (run: Run) => readonly Workflow[],
+  stepsOf: (run: Run) => readonly StepSpec[],
 ): Interrupt[] {
   return runs.filter((run) => live(run, viewOf)).flatMap((run) => interruptsOf(run, stepsOf(run), viewOf));
 }
@@ -241,7 +241,7 @@ const live = (run: Pick<Run, 'steps'>, viewOf: (taskId: string) => FinishingView
 export function finishingAmong(
   runs: readonly Run[],
   viewOf: (taskId: string) => FinishingView | undefined,
-  stepsOf: (run: Run) => readonly Workflow[],
+  stepsOf: (run: Run) => readonly StepSpec[],
   asksOf: (run: Run) => readonly RetryAsk[] = () => [],
 ): Finishing[] {
   return runs.filter((run) => live(run, viewOf)).flatMap((run) => finishingOf(run, stepsOf(run), viewOf, asksOf(run)));

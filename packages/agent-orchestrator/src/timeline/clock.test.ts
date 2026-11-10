@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { RepositoryRun } from '../record/record.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { clockOf, waitingSinceOf, type RunClock } from './clock.ts';
 import type { AttemptClock, TaskClock } from './timeline.ts';
 import { filedViews } from '../../test/filed.ts';
@@ -32,7 +32,7 @@ const STEPS = [
   { name: 'plan', after: [], body: '', gate: true },
   { name: 'side', after: [], body: '' },
   { name: 'build', after: ['plan'], body: '' },
-] as unknown as Workflow[];
+] as unknown as StepSpec[];
 
 /**
  * A run created at 10:00 that waited on another run until 10:10, then for a run slot until its first filing at 10:20. `plan`, gated,

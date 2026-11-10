@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { looseAt, type Closeout } from '../closeout/closeout.ts';
 import { closeoutRefusals, expandShapes } from '../question/question.ts';
-import { parseWorkflow, type Workflow } from '../workflow.ts';
+import { parseWorkflow, type StepSpec } from '../workflow.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { budgetOf, stepStatus } from '../status/status.ts';
 import type { Run } from '../record/record.ts';
@@ -38,13 +38,13 @@ const design = parseWorkflow('design', '---\nplace: git\ngate: true\nbudget: 12\
     additionalProperties: false,
   }),
 );
-const STEPS: Workflow[] = [
+const STEPS: StepSpec[] = [
   { name: 'intake', after: [], body: 'x' },
   { ...design, after: ['intake'] },
   { name: 'implement', after: ['design'], body: 'x', budget: 40 },
   { name: 'review', after: ['implement'], body: 'x', budget: 10 },
 ];
-const [, DESIGN, IMPLEMENT] = STEPS as [Workflow, Workflow, Workflow, Workflow];
+const [, DESIGN, IMPLEMENT] = STEPS as [StepSpec, StepSpec, StepSpec, StepSpec];
 
 /** A closeout of design proposing `budgets`, flat as a harness gives it under `output`. */
 const proposing = (budgets: unknown): Closeout => ({ outcome: 'done', summary: 's', artifacts: [], output: { budgets } });

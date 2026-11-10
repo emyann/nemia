@@ -14,7 +14,7 @@ import { EngineService, denialText, over, unreadableJournal, type Engine, type T
 import { refusedCheck, type Run } from '../record/record.ts';
 import { attemptVerdict } from '../check/check.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { timeline } from '../timeline/index.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
@@ -46,7 +46,7 @@ function verdictOf(view: TaskView | undefined): CheckVerdict {
  * What a run froze (`frozenOf`): its steps, and each skill by the version of its rendered copy (`renderedSkillVersions`), where the copy
  * is there.
  */
-const frozenRun = (run: Run, steps: readonly Workflow[]): RunFrozen =>
+const frozenRun = (run: Run, steps: readonly StepSpec[]): RunFrozen =>
   frozenOf(
     { ...keysOf(run), day: dayOf(run.createdAt), at: run.createdAt, workflowDir: run.workflowDir },
     steps,
@@ -57,7 +57,7 @@ const frozenRun = (run: Run, steps: readonly Workflow[]): RunFrozen =>
  * One run's facts (`factsOf`) off its frozen `steps` and the engine's view of every task of every try, and whether every one of those
  * tasks had settled. Rejects with what a view rejected with, a journal that does not read among it.
  */
-const runFacts = Effect.fnUntraced(function* (e: Engine, run: Run, steps: Workflow[]) {
+const runFacts = Effect.fnUntraced(function* (e: Engine, run: Run, steps: StepSpec[]) {
   const { views } = yield* taskPhasesRead(run).pipe(over(e));
   const everyTry = yield* everyTryOf(e, run, views);
   const settled = [...everyTry.values()].every((v) => Boolean(v.state.settled));

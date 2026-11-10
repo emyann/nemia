@@ -22,7 +22,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { EnginePhase } from '../src/views/views-words.ts';
 import { CLOSEOUT_SCHEMA, closeoutSchemaOf } from '../src/closeout/closeout.ts';
-import type { Workflow } from '../src/workflow.ts';
+import type { StepSpec } from '../src/workflow.ts';
 import { scratch } from 'test-kit/scratch';
 import { TEAM } from './team.ts';
 import { testEngine } from 'agent-runtime/testing';
@@ -120,7 +120,7 @@ const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null 
 async function walk(
   dir: string,
   first: { mode: 'continue' | 'fresh'; model?: string } = { mode: 'continue' },
-): Promise<{ id: string; filed: Filed[]; target: string; looping: string; steps: Workflow[] }> {
+): Promise<{ id: string; filed: Filed[]; target: string; looping: string; steps: StepSpec[] }> {
   const run = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir }));
   const steps = stepsOf(run);
   const looping = steps.find((s) => s.loop)!;
@@ -278,8 +278,8 @@ test("a loop's target with a context window keeps it on every try — a nudge, a
 });
 
 test('REFUSED by the check: a chain that changes its schema — round 1 without `replies`, round 2 with them, as it was filed before — or its model, effort, tools, fence or mode', () => {
-  const target: Workflow = { name: 'implement', after: [], body: 'implement it' };
-  const steps: Workflow[] = [target, { name: 'review', after: ['implement'], body: 'review it', loop: 'implement' }];
+  const target: StepSpec = { name: 'implement', after: [], body: 'implement it' };
+  const steps: StepSpec[] = [target, { name: 'review', after: ['implement'], body: 'review it', loop: 'implement' }];
   const was = { ...closeoutSchemaOf(target, steps), properties: CLOSEOUT_SCHEMA.properties, required: CLOSEOUT_SCHEMA.required };
   const chain: Filed[] = [
     { id: 'r-implement', closeoutSchema: was, config: { model: 'opus', effort: 'high' } },

@@ -27,7 +27,7 @@ import {
   WorkflowError,
   type Agent,
   type Agents,
-  type Workflow,
+  type StepSpec,
 } from '../workflow.ts';
 import { FrozenStepSchema, workflowFolder, workflowsIn } from '../folder/folder.store.ts';
 import { loadWorkflows } from '../workflows/workflows.store.ts';
@@ -639,21 +639,21 @@ const hire = (name: string, step = 'implement') => ({ agent: name, factory: 'acm
 
 /** The scout, with `lines` in its frontmatter, and the step `look` naming it (or no agent) with `step` in its own. */
 const scoutWith = (lines: string) => agent('scout', `---\ndescription: Looks.\n${lines}---\nYou look.\n`);
-const lookOf = (named: Agent | undefined, lines = ''): Workflow =>
+const lookOf = (named: Agent | undefined, lines = ''): StepSpec =>
   parseWorkflow(
     'look',
     `---\nplace: git\n${named ? `agent: ${named.name}\n` : ''}${lines}---\nLook.\n`,
     undefined,
     named && new Map([[named.name, named]]),
   );
-const filed = (step: Workflow) =>
+const filed = (step: StepSpec) =>
   filedConfig(
     step,
     [step],
     { gates: [] },
     { model: undefined, budgetUsd: undefined, runArtifacts: '/runs/r/artifacts', inbox: '/inbox', own: {}, landingDenied: () => [] },
   );
-const fromRecord = (step: Workflow): Workflow => Schema.decodeUnknownSync(FrozenStepSchema)(JSON.parse(JSON.stringify(step))) as Workflow;
+const fromRecord = (step: StepSpec): StepSpec => Schema.decodeUnknownSync(FrozenStepSchema)(JSON.parse(JSON.stringify(step))) as StepSpec;
 
 test("a step resolved with the agent it names: the agent's keys and words, the step's own winning and its own kept", async (t) => {
   const agents = agentsOf({ implementer: IMPLEMENTER });
@@ -894,7 +894,7 @@ test("a step resolved with the agent it names: the agent's keys and words, the s
           assert.ok(Result.isSuccess(read), Result.isFailure(read) ? String(read.failure) : '');
           assert.deepEqual(read.success, frozen);
         }
-        const step = JSON.parse(JSON.stringify(buildOf(told))) as Workflow;
+        const step = JSON.parse(JSON.stringify(buildOf(told))) as StepSpec;
         assert.ok(Result.isFailure(decode({ ...step, agent: { ...step.agent, customInstructions: 7 } })));
         assert.deepEqual(fromRecord(lookOf(scoutWith('mcp: playwright\n'))).agent?.mcp, ['playwright']);
       },

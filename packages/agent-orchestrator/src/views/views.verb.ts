@@ -21,7 +21,7 @@ import {
   type LandingSaid,
   type Verdict,
 } from '../check/check.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { attemptIn, scriptCloseouts } from '../script/script.store.ts';
 import { resultSteps } from '../branches/index.ts';
 import { isRepositoryRun, stepTasks, type CloseoutAsked, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
@@ -420,7 +420,7 @@ export type CheckReport = CheckRefusal & { passed: boolean };
  */
 export const checkReportsRead = Effect.fn('checkReports')(function* (
   run: Run,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   phaseOf: (taskId: string) => TaskPhase,
   want: (phase: TaskPhase) => boolean,
 ) {
@@ -490,7 +490,7 @@ const unreadWords = (taskId: string, cause: Cause.Cause<unknown>): string => {
  * What a step is told its checked steps' checks said (`checkHandedRead`): for each step it waits on (`after:`) that has a `check:` whose
  * task is on the record, the check of its current try or round, read on the pass that files the step and never carried from another.
  */
-export const checksHandedRead = Effect.fn('checksHanded')(function* (run: Run, steps: readonly Workflow[], step: Workflow) {
+export const checksHandedRead = Effect.fn('checksHanded')(function* (run: Run, steps: readonly StepSpec[], step: StepSpec) {
   const out: CheckHanded[] = [];
   for (const name of step.after) {
     const command = steps.find((s) => s.name === name)?.check;
@@ -578,7 +578,7 @@ export function taskCloseout(views: ReadonlyMap<string, TaskView>, taskId: strin
 export const closeoutReader = (
   views: ReadonlyMap<string, TaskView>,
   run: Run,
-  steps?: readonly Workflow[],
+  steps?: readonly StepSpec[],
 ): ((stepName: string) => Closeout | undefined) => {
   const read = (stepName: string): Closeout | undefined => {
     const taskId = run.steps[stepName]?.taskId;

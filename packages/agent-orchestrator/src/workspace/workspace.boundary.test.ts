@@ -18,7 +18,7 @@ import { execFileSync } from 'node:child_process';
 import { depsPlan, lockfileParting, workspaceModules, type DepsListing } from './workspace.ts';
 import type { Run } from '../record/record.ts';
 import { composeBrief } from '../brief/index.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { scratch } from 'test-kit/scratch';
 import { importsIn } from 'test-kit/imports';
 
@@ -232,8 +232,8 @@ test('the brief says a tree was installed, under Where to look and before the cl
     steps: { implement: { taskId: 't1' }, review: { taskId: null } },
     createdAt: '2026-01-01T00:00:00Z',
   };
-  const implement: Workflow = { name: 'implement', after: [], body: 'do implement' };
-  const review: Workflow = { name: 'review', after: ['implement'], body: 'do review' };
+  const implement: StepSpec = { name: 'implement', after: [], body: 'do implement' };
+  const review: StepSpec = { name: 'review', after: ['implement'], body: 'do review' };
   const steps = [implement, review];
 
   const first = composeBrief(implement, { ...run, steps: { implement: { taskId: null } } }, [implement], undefined, undefined, {

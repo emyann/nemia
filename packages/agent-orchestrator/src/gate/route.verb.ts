@@ -8,7 +8,7 @@ import { Effect } from 'effect';
 import type { Args } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
-import { WorkflowError, type Workflow } from '../step/step.ts';
+import { WorkflowError, type StepSpec } from '../step/step.ts';
 import { tryOf, type Run } from '../record/record.ts';
 import { RunId } from '../record/record.model.ts';
 import { asksDir } from '../record/record.store.ts';
@@ -19,7 +19,7 @@ import { writerText as textOf } from '../yours/yours.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /** The follower of a condition already filed or sent its card, which settles its route; undefined while none is. */
-export const settledBy = (condition: string, run: Run, steps: readonly Workflow[]): string | undefined =>
+export const settledBy = (condition: string, run: Run, steps: readonly StepSpec[]): string | undefined =>
   steps.find((s) => s.after.includes(condition) && Boolean(run.steps[s.name]?.taskId || run.steps[s.name]?.sent))?.name;
 
 /**
@@ -28,7 +28,7 @@ export const settledBy = (condition: string, run: Run, steps: readonly Workflow[
  */
 export function routeRefused(
   run: Run,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   step: string,
   route: string,
 ): WorkflowError | Conflict | Missing | undefined {

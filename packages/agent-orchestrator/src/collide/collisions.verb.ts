@@ -6,7 +6,7 @@
 import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
-import type { Workflow } from '../workflow.ts';
+import type { StepSpec } from '../workflow.ts';
 import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';
 import type { BranchStanding } from '../status/status.ts';
 import { runsAtOnce } from '../runs/runs.store.ts';
@@ -39,7 +39,7 @@ function collisionsRead(
   git: BranchReader,
   place: Place,
   others: readonly RepositoryRun[],
-  steps: ReadonlyMap<string, readonly Workflow[]>,
+  steps: ReadonlyMap<string, readonly StepSpec[]>,
 ): Collisions {
   const theirs: Theirs[] = others.flatMap((other) =>
     ahead(standingsOf(other, steps.get(other.id) ?? [], git)).map((branch) => ({ run: other.id, branch })),

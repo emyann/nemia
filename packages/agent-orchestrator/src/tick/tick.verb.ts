@@ -28,7 +28,7 @@ import { finishingAmong, parkedAmong, type Finishing, type Parked, type Pause, t
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { unloadedFolder } from '../steps/steps.ts';
 import { stepsAmong } from '../steps/steps.verb.ts';
-import type { Workflow } from '../workflow.ts';
+import type { StepSpec } from '../workflow.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { ceilings, identify, recordCeilings, recordPassCost, recordRecentPass } from '../daemon/daemon.store.ts';
 import { type Settings, setting, StoreConfig } from '../config/config.store.ts';
@@ -356,7 +356,7 @@ const parkedReported = (runs: readonly Run[], views: readonly TaskView[]): Parke
 const finishingReported = (
   runs: readonly Run[],
   views: readonly TaskView[],
-  among: ReadonlyMap<string, readonly Workflow[]>,
+  among: ReadonlyMap<string, readonly StepSpec[]>,
 ): Finishing[] => {
   const reported = new Map(views.map((v) => [v.id, v]));
   return finishingAmong(

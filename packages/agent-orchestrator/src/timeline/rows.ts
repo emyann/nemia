@@ -7,7 +7,7 @@
  */
 import type { Run } from '../record/record.ts';
 import { hasGate } from '../status/status.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import type { Timeline } from './timeline.ts';
 import { gateWaitOf } from './took.ts';
 import { answerWaitOf } from './turns.ts';
@@ -75,7 +75,7 @@ function stepRows(tl: Timeline, step: string, label: string): TimelineRow[] {
  * it), the time its checks ran, the time people took at its gates (`gateWaitOf`), and the time it waited on a person's answer to a
  * session held open (`answerWaitOf`), each 0 where there was none.
  */
-function runRows(run: Pick<Run, 'approvals' | 'gates'>, tl: Timeline, steps: readonly Workflow[]): TimelineRow[] {
+function runRows(run: Pick<Run, 'approvals' | 'gates'>, tl: Timeline, steps: readonly StepSpec[]): TimelineRow[] {
   if (tl.run.wallMs === null) return [];
   const tries = Object.values(tl.steps).flat();
   const check = tries.reduce((ms, t) => ms + (t.check?.ranMs ?? 0), 0);
@@ -98,7 +98,7 @@ function runRows(run: Pick<Run, 'approvals' | 'gates'>, tl: Timeline, steps: rea
  * step's, in that order; the wall time of each round of each loop where it is known; and the run's, where its wall time is. Times are in
  * ms and a cost in dollars. A number nobody measured is no row.
  */
-export function timelineRows(run: Pick<Run, 'approvals' | 'gates'>, tl: Timeline, steps: readonly Workflow[]): TimelineRow[] {
+export function timelineRows(run: Pick<Run, 'approvals' | 'gates'>, tl: Timeline, steps: readonly StepSpec[]): TimelineRow[] {
   return [
     ...steps.flatMap((step, i) => stepRows(tl, step.name, `${padded(i + 1)} ${step.name}`)),
     ...tl.rounds.flatMap((r) =>

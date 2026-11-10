@@ -6,7 +6,7 @@
 import path from 'node:path';
 import { GIVEN } from '../workspace/workspace.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import type { Mount, Run } from '../record/record.ts';
 import { stepMounts } from '../factory/factory.ts';
 import type { FiledFolders } from '../filed/filed.ts';
@@ -137,7 +137,7 @@ function namedWords(step: string, files: HandedFiles | undefined): string {
  * that mounts none and a step given no other folder, and for a step on a remote agent, which is filed none.
  */
 export const mountsLine = (
-  step: Pick<Workflow, 'harness' | 'writable'> & Fenced,
+  step: Pick<StepSpec, 'harness' | 'writable'> & Fenced,
   run: Pick<Run, 'mounts' | 'volumes'>,
   folders: FiledFolders = { handed: [], store: [], inputs: [] },
 ): string[] => {

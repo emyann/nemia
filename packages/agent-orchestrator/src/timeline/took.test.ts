@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { RepositoryRun } from '../record/record.ts';
 import type { Consumed } from '../usage/usage.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { timeline, type AttemptClock, type TaskClock } from './timeline.ts';
 import { atWork, gateWaitOf, ranMs, runTokens, tryEndOf, unionMs } from './took.ts';
 
@@ -56,7 +56,7 @@ const used = (input: number, output: number, read?: number, write?: number): Con
   ...(read !== undefined ? { cacheReadTokens: read, cacheWriteTokens: write!, uncachedTokens: input - read - write! } : {}),
 });
 
-const ASK = { name: 'ask', gate: true, after: [] } as unknown as Workflow;
+const ASK = { name: 'ask', gate: true, after: [] } as unknown as StepSpec;
 
 /** A run of one gated step held open on task `T`: it signed off blocked, a person answered, and its second try is that answer's turn. */
 const answered = (approved: { try: number; at: string }): RepositoryRun => ({

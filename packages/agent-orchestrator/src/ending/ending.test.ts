@@ -11,7 +11,7 @@ import type { MergeState } from '../place/place.ts';
 import type { RepositoryRun, Run, StepRecord, TaskPhase } from '../run.ts';
 import type { StepStatus } from '../record/record.ts';
 import type { Verdict } from '../check/check.ts';
-import type { Workflow } from '../workflow.ts';
+import type { StepSpec } from '../workflow.ts';
 import { phases, run } from '../../test/assessed.ts';
 
 const ARTIFACTS = '/store/runs/r1/artifacts';
@@ -44,7 +44,7 @@ test('filedAllows', async (t) => {
 });
 
 /** `implement → ship`, ship an ending with a check: approved first, in the repository's checkout (`landsOnCheck`). */
-const LANDER: Workflow = { name: 'ship', after: ['implement'], body: 'ship it', workspace: 'base', gate: true, check: 'npm test' };
+const LANDER: StepSpec = { name: 'ship', after: ['implement'], body: 'ship it', workspace: 'base', gate: true, check: 'npm test' };
 /** ship filed, signed, its check filed: every phase given, the checkout's state given. */
 const atLanding = (rest: Partial<RepositoryRun> = {}, ship: Partial<StepRecord> = {}): Run => ({
   ...run({ implement: 't-impl' }, { approvals: [{ step: 'ship', try: 1, at: '2026-01-01T00:30:00Z' }], ...rest }),

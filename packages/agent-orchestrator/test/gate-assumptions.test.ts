@@ -10,10 +10,10 @@ import { brokenOn } from '@emyann/tsverify';
 import { theRunsWords } from '../contracts/gate.contract.ts';
 import type { Closeout } from '../src/closeout/closeout.ts';
 import type { RepositoryRun, Run, TaskPhase } from '../src/record/record.ts';
-import type { Workflow } from '../src/step/step.ts';
+import type { StepSpec } from '../src/step/step.ts';
 import { phases, run, step } from './assessed.ts';
 
-const TRIAGE: Workflow[] = [
+const TRIAGE: StepSpec[] = [
   step('plan'),
   {
     ...step('triage', ['plan']),
@@ -23,8 +23,8 @@ const TRIAGE: Workflow[] = [
   { ...step('build-web', ['triage']), when: ['web'] },
   { ...step('build-backend', ['triage']), when: ['backend'] },
 ];
-const PLANNED: Workflow[] = [step('plan'), step('implement', ['plan'])];
-const ENDING: Workflow[] = [step('implement'), { ...step('land', ['implement']), workspace: 'base', gate: true }];
+const PLANNED: StepSpec[] = [step('plan'), step('implement', ['plan'])];
+const ENDING: StepSpec[] = [step('implement'), { ...step('land', ['implement']), workspace: 'base', gate: true }];
 
 const done = (surface?: string): Closeout => ({
   outcome: 'done',
@@ -37,7 +37,7 @@ const approval = (name: string) => ({ step: name, try: 1, at: '2026-11-05T17:00:
 const asked = () => true;
 
 type Input = [
-  readonly Workflow[],
+  readonly StepSpec[],
   Run,
   (taskId: string) => TaskPhase,
   (step: string) => Closeout | undefined,
@@ -45,7 +45,7 @@ type Input = [
   () => undefined,
   () => undefined,
 ];
-const input = (steps: Workflow[], r: Run, p: (id: string) => TaskPhase, c: (s: string) => Closeout | undefined): Input => [
+const input = (steps: StepSpec[], r: Run, p: (id: string) => TaskPhase, c: (s: string) => Closeout | undefined): Input => [
   steps,
   r,
   p,

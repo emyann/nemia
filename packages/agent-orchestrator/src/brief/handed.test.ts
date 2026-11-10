@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { contextSection, fromRunSection, handedParts, handedSection, type ParentCloseout } from './handed.ts';
 import { composeBrief } from './brief.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { run, step, STEPS } from '../../test/assessed.ts';
 
 const source = (over: Partial<Extract<ParentCloseout, { asked: string }>> = {}): ParentCloseout => ({
@@ -22,7 +22,7 @@ const source = (over: Partial<Extract<ParentCloseout, { asked: string }>> = {}):
 
 /** A root of a run after three parents, and the brief it composes with none handed. */
 const implement = step('implement');
-const review: Workflow = {
+const review: StepSpec = {
   ...step('review', ['implement']),
   output: {
     file: 'review.schema.json',

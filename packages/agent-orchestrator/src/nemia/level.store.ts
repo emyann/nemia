@@ -12,7 +12,7 @@ import { Result, Schema } from 'effect';
 import { CONFIG_FOLDERS } from 'agent-runtime/vocabulary';
 import { parseAgent } from '../agents/agents.ts';
 import { stepFrom } from '../workflow/index.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { firstRefusal } from '../record/record.store.ts';
 import { POLICY_FOLDER } from '../auto/index.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
@@ -84,7 +84,7 @@ export function writeLevel(home: string, level: LevelFile): void {
  * (`Invalid`): a mode but `auto`, in which she reads unasked while her derived fence asks; and an `askTools:` line or a rule on `nemia` in
  * her `allowedTools:`, which her fence derives from the command table (`nemiaFence`): a hand list there would drift from it.
  */
-export function readNemia(file: string = nemiaDefinition()): Workflow {
+export function readNemia(file: string = nemiaDefinition()): StepSpec {
   const text = fs.readFileSync(file, 'utf8');
   if (/^askTools:/m.test(text))
     throw new Invalid({ message: `${file}: her askTools: is derived from the command table: take it out of nemia.md.` });

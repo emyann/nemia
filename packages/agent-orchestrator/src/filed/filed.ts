@@ -1,6 +1,6 @@
 /** The configuration a step's task is filed with, built in one place for its first filing, a try, a round, and the asks before them. */
 import path from 'node:path';
-import { modeOf, sessionContext, type Workflow } from '../workflow.ts';
+import { modeOf, sessionContext, type StepSpec } from '../workflow.ts';
 import { isFolderTeam, sandboxed, writesOutsideByRule } from '../workflow/index.ts';
 import { filedAllows, filedDenies } from '../ending/ending.ts';
 import { sessionModel, type RetryHow } from '../retry/index.ts';
@@ -31,8 +31,8 @@ import { splitServers, type FactoryServer, type FactoryServers } from '../factor
  * `budgetUsd` is the harness's own cap, and whether the step went over is this package's (`ownStatus`). Pure.
  */
 export const filedConfig = <Own extends object>(
-  step: Workflow,
-  steps: readonly Workflow[],
+  step: StepSpec,
+  steps: readonly StepSpec[],
   run: Pick<Run, 'gates' | 'mounts' | 'volumes' | 'harnessSettings' | 'labels'>,
   t: {
     model: string | undefined;
@@ -81,7 +81,7 @@ export const filedConfig = <Own extends object>(
  * (`SETTINGS_HARNESS`): its rendered `settings` laid over the allowed ones (`filedSettings`), a step with no agent given the harness's key
  * for them. As they were for a run that froze none, on another harness, and on a remote agent.
  */
-function ownWith<Own extends object>(step: Pick<Workflow, 'harness'>, frozen: Run['harnessSettings'], own: Own): Own {
+function ownWith<Own extends object>(step: Pick<StepSpec, 'harness'>, frozen: Run['harnessSettings'], own: Own): Own {
   const harness = step.harness ?? DEFAULT_HARNESS;
   const given = frozen?.[SETTINGS_HARNESS];
   if (harness !== SETTINGS_HARNESS || given === undefined) return own;
@@ -132,7 +132,7 @@ export const SESSION_TOKEN = 'WF_SESSION_TOKEN';
  * `RUN_LABELS`, and its session token as `SESSION_TOKEN` where one was minted (`sessionToken`).
  */
 const stepFilesEnv = (
-  step: Pick<Workflow, 'name'>,
+  step: Pick<StepSpec, 'name'>,
   runArtifacts: string,
   copies: { workflowFiles: string | undefined; carriedFiles: string | undefined },
   labels: Run['labels'],
@@ -148,7 +148,7 @@ const stepFilesEnv = (
 });
 
 /** A step's files directory, the run's artifacts folder of that step under `runArtifacts`: what `STEP_FILES` names to its session. */
-const stepFilesOf = (step: Pick<Workflow, 'name'>, runArtifacts: string): string => path.join(runArtifacts, step.name);
+const stepFilesOf = (step: Pick<StepSpec, 'name'>, runArtifacts: string): string => path.join(runArtifacts, step.name);
 
 /**
  * The step's own files directory (`stepFilesOf`), read-only, for a step whose permission mode writes outside its directory only where a
@@ -161,7 +161,7 @@ const stepFilesOf = (step: Pick<Workflow, 'name'>, runArtifacts: string): string
  * holding a `(`): the deny that holds it read-only could not name it, and the session runs as it did before, rather than the step being
  * refused. No other step's folder: those are the handed ones (`handedMounts`).
  */
-export const ownMounts = (step: Workflow, runArtifacts: string): Mount[] => {
+export const ownMounts = (step: StepSpec, runArtifacts: string): Mount[] => {
   const own = stepFilesOf(step, runArtifacts);
   return local(step.harness) && writesOutsideByRule(modeOf(step)) && unruledIn(step.harness ?? DEFAULT_HARNESS, own) === undefined
     ? [{ path: own, readOnly: true }]
@@ -198,8 +198,8 @@ export type FiledFolders = {
  * (`callerMounts` in brief/handed.ts). Pure.
  */
 export const filedFolders = (
-  step: Workflow,
-  steps: readonly Workflow[],
+  step: StepSpec,
+  steps: readonly StepSpec[],
   t: { runArtifacts: string; inbox: string; inputs?: string; workflowFiles?: string; carriedFiles?: string; caller?: readonly Mount[] },
 ): FiledFolders => ({
   own: ownMounts(step, t.runArtifacts),
@@ -233,7 +233,7 @@ const local = (harness: string | undefined): boolean => !isRemoteHarness(harness
  * cards and writes none of them, whatever its fence. None on a harness fenced by a sandbox, which reads the disk already, nor on a remote
  * agent, filed no local field.
  */
-export const readsMounts = (step: Pick<Workflow, 'harness' | 'reads'>, inbox: string): Mount[] =>
+export const readsMounts = (step: Pick<StepSpec, 'harness' | 'reads'>, inbox: string): Mount[] =>
   local(step.harness) && step.reads?.includes('inbox') ? [{ path: inbox, readOnly: true }] : [];
 
 /**
@@ -243,8 +243,8 @@ export const readsMounts = (step: Pick<Workflow, 'harness' | 'reads'>, inbox: st
  * folder.
  */
 export const inputsMounts = (
-  step: Pick<Workflow, 'harness'>,
-  steps: readonly Pick<Workflow, 'place'>[],
+  step: Pick<StepSpec, 'harness'>,
+  steps: readonly Pick<StepSpec, 'place'>[],
   dir: string | undefined,
 ): Mount[] => (dir !== undefined && local(step.harness) && !isFolderTeam(steps) ? [{ path: dir, readOnly: true }] : []);
 
@@ -256,7 +256,7 @@ export const inputsMounts = (
  * no mount — nor on a remote agent, filed no local field. Nor where the harness's permission rules cannot carry a character of its path
  * (`unruledIn`), as for the step's own files directory (`ownMounts`): the session is still told the folder (`WORKFLOW_FILES`).
  */
-export const workflowMounts = (step: Pick<Workflow, 'harness'>, dir: string | undefined): Mount[] => {
+export const workflowMounts = (step: Pick<StepSpec, 'harness'>, dir: string | undefined): Mount[] => {
   const harness = step.harness ?? DEFAULT_HARNESS;
   return dir !== undefined && fenceReach(harness)?.by === 'mode' && unruledIn(harness, dir) === undefined
     ? [{ path: dir, readOnly: true }]
@@ -275,7 +275,7 @@ export const workflowMounts = (step: Pick<Workflow, 'harness'>, dir: string | un
  * did.
  */
 const serversOf = (
-  step: Pick<Workflow, 'agent'>,
+  step: Pick<StepSpec, 'agent'>,
   record: FactoryServers | undefined,
 ): { projectMcp?: string[]; mcp?: Record<string, FactoryServer> } => {
   if (step.agent === undefined) return { projectMcp: [] };
@@ -288,5 +288,5 @@ const serversOf = (
 const mountsOf = (mounts: Mount[]): { mounts?: Mount[] } => (mounts.length ? { mounts } : {});
 
 /** The model a try runs on: a fresh one on the model it asked for, or the step's; any other on the one its session was started on. */
-export const tryModel = (step: Workflow, record: StepRecord | undefined, how: Pick<RetryHow, 'mode' | 'model'>): string | undefined =>
+export const tryModel = (step: StepSpec, record: StepRecord | undefined, how: Pick<RetryHow, 'mode' | 'model'>): string | undefined =>
   how.mode === 'fresh' ? (how.model ?? step.model) : sessionModel(step, record);

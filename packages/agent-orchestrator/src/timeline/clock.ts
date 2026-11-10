@@ -8,7 +8,7 @@
  */
 import { runTasks, type Run } from '../record/record.ts';
 import { hasGate, sessionTasks } from '../status/status.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { timeline, type TaskClock, type TaskSpan, type Timeline, type TimelineTry } from './timeline.ts';
 import { gateWaitOf, ranIn, tryEndOf, unionMs, type Ran } from './took.ts';
@@ -45,7 +45,7 @@ const spanOf = (from: string | null | undefined, to: string | null): Ran[] =>
   from ? [{ from: Date.parse(from), to: to === null ? null : Date.parse(to) }] : [];
 
 /** The waits at a gate that an approval closed: each approved try of a gated step, for as long as `gateWaitOf` says. */
-const gateWaits = (run: Run, tl: Timeline, steps: readonly Workflow[]): Ran[] =>
+const gateWaits = (run: Run, tl: Timeline, steps: readonly StepSpec[]): Ran[] =>
   steps
     .filter((step) => hasGate(step, run))
     .flatMap((step) =>
@@ -79,7 +79,7 @@ const lastEndOf = (tries: readonly TimelineTry[]): string | null =>
  * The waits still open on a person: each step of `waiting`, from the end of its last try, or, for one whose last try has no end — a step
  * held at its gate before it is filed — from the latest end of the steps it comes after; none where neither is known.
  */
-const openWaits = (tl: Timeline, steps: readonly Workflow[], waiting: readonly string[]): Ran[] =>
+const openWaits = (tl: Timeline, steps: readonly StepSpec[], waiting: readonly string[]): Ran[] =>
   waiting.flatMap((name) => {
     const own = tl.steps[name]?.at(-1);
     const after = steps.find((s) => s.name === name)?.after ?? [];
@@ -115,7 +115,7 @@ const slotWaits = (run: Run, tl: Timeline): Ran[] => {
 export function clockOf(
   run: Run,
   views: ReadonlyMap<string, TaskClock>,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   waiting: readonly string[],
   until: number,
 ): RunClock {
@@ -156,7 +156,7 @@ export function clockOf(
 export function waitingSinceOf(
   run: Run,
   views: ReadonlyMap<string, TaskClock>,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   waiting: readonly string[],
   held: string | null,
 ): string | null {

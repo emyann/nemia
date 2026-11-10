@@ -4,7 +4,7 @@
  * (`remoteRefusal`, `REMOTE_REFUSED_KEYS`). The words each harness takes are the runtime's, asked at `nemia start` (`configRefused` in
  * start.verb.ts).
  */
-import { refuse, STEP_KEYS, type StepKey, type Workflow } from '../step/step.ts';
+import { refuse, STEP_KEYS, type StepKey, type StepSpec } from '../step/step.ts';
 import { DEFAULT_HARNESS, HARNESS_DECLARATIONS, HARNESS_KNOBS, type HarnessDeclaration, type HarnessKnobs } from 'agent-runtime/vocabulary';
 
 /** The harness a step runs on when it names none: the runtime's. */
@@ -101,7 +101,7 @@ const REMOTE_REFUSED: Partial<Record<StepKey, string>> = {
  * in, or undefined for a local harness: the tick files a remote try with no harness arguments (`localFields`), so the flag would be
  * dropped.
  */
-export function remoteRetryRefusal(step: Workflow, flag: 'model' | 'budget', value: string | number, command: string): string | undefined {
+export function remoteRetryRefusal(step: StepSpec, flag: 'model' | 'budget', value: string | number, command: string): string | undefined {
   if (!isRemoteHarness(step.harness)) return undefined;
   return `\`--${flag} ${value}\` ${REMOTE_REFUSED[flag]}, and ${step.name} runs on \`harness: ${step.harness}\`, a remote A2A agent: its try would be sent without it. Ask without --${flag}: ${command}.`;
 }

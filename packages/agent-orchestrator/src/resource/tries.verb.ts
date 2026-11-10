@@ -26,7 +26,7 @@ import {
   type StepRecord,
   tryNote,
 } from '../run.ts';
-import { LOOP_REPLIES, outputFields, type Workflow } from '../workflow.ts';
+import { LOOP_REPLIES, outputFields, type StepSpec } from '../workflow.ts';
 import { closeoutRefusals } from '../question/index.ts';
 import { gateBudgets, type GateBudgets } from '../gate-budgets/gate-budgets.ts';
 import type { SpendOf } from '../status/status.ts';
@@ -189,10 +189,10 @@ const attemptsOn = (state: TaskView['state'] | undefined, turn?: number): TaskVi
 export function closeoutIn(
   run: Run,
   name: string,
-  step: Workflow,
+  step: StepSpec,
   taskId: string | null,
   views: Views,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   turn?: number,
 ): StepCloseout | null {
   const said = taskId ? attemptsOn(views.get(taskId)?.state, turn).at(-1)?.closeout : undefined;
@@ -262,7 +262,7 @@ export const turnOfTry = (before: readonly EarlierTry[], at: EarlierTry): number
 export function triesOf(
   run: Run,
   name: string,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   views: Views,
   current: Pick<StepTry, 'phase' | 'reason' | 'on' | 'via' | 'message' | 'check' | 'closeout' | 'unreadable' | 'attempts'> & {
     verdict?: unknown;
@@ -339,7 +339,7 @@ export function attemptsIn(taskId: string | null, views: Views, releases: string
 }
 
 /** How the folder has moved away from the steps the run started with, or null if it has not. */
-export function driftOf(run: Run, workflows: readonly Workflow[]): string | null {
+export function driftOf(run: Run, workflows: readonly StepSpec[]): string | null {
   const inFolder = new Set(workflows.map((s) => s.name));
   const removed = Object.keys(run.steps).filter((name) => !inFolder.has(name));
   const added = workflows.map((s) => s.name).filter((name) => !Object.hasOwn(run.steps, name));
@@ -361,9 +361,9 @@ export function driftOf(run: Run, workflows: readonly Workflow[]): string | null
  */
 export function gateOf(
   run: Run,
-  step: Workflow,
+  step: StepSpec,
   reason: StepReason,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   closeoutOf: (step: string) => Closeout | undefined,
   spendOf: SpendOf,
 ): StepGate | null {

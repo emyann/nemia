@@ -12,7 +12,7 @@ import { EngineService, asked, over, unreadableJournal, type Engine, type TaskVi
 import type { RunSlot } from '../cap/cap.ts';
 import { runSlots } from '../cap/cap.verb.ts';
 import { isRepositoryRun, runTasks, unjudgedWords, unloadedWords, type Run, type TaskPhase } from '../record/record.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { holdsOf, waitsOf, type ParentRun } from '../wait/wait.ts';
 import { listing, type Listing, type RunsListed, type Unjudged } from './list.ts';
 import { assess, type Assessment } from '../tick/assess.ts';
@@ -68,9 +68,9 @@ import { currentTasks, finishingAmong, parkedAmong, type Pause, type Paused, typ
  */
 export type ListReadingHow = {
   views?: ReadonlyMap<string, TaskView>;
-  steps?: readonly Workflow[];
-  shown?: readonly Workflow[];
-  standings?: (status: Assessment['status'], steps: readonly Workflow[]) => readonly BranchStanding[];
+  steps?: readonly StepSpec[];
+  shown?: readonly StepSpec[];
+  standings?: (status: Assessment['status'], steps: readonly StepSpec[]) => readonly BranchStanding[];
   slot?: RunSlot;
   checkout?: PassStanding;
   config?: Settings;
@@ -224,7 +224,7 @@ export const runsListed = Effect.fn('runsListed')(function* (runId?: string, sel
  * A run, the package's reading of it or why it is left unjudged, its steps (`stepsAmong`: none for a run whose unfrozen folder does not
  * load, which then names no result branch), and whether a merge is staged in its checkout (`mergeStaged`).
  */
-type Read = { run: Run; read: ListReading | Unjudged; steps: readonly Workflow[]; staged: () => boolean };
+type Read = { run: Run; read: ListReading | Unjudged; steps: readonly StepSpec[]; staged: () => boolean };
 
 /**
  * The checks of `run` the pause keeps from being filed (`waitingOnPause.checks`, `assess`'s): each landing with its merge staged — an
@@ -287,7 +287,7 @@ export const pausedRead = Effect.fn('pausedRead')(function* () {
 });
 
 /** Whether `run` has a step with a `check:` whose session was filed and whose check was not: one the pause can hold. */
-const checkDue = (run: Run, steps: readonly Workflow[]): boolean =>
+const checkDue = (run: Run, steps: readonly StepSpec[]): boolean =>
   steps.some((s) => s.check !== undefined && run.steps[s.name]?.taskId && !run.steps[s.name]?.check);
 
 /**

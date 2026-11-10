@@ -11,7 +11,7 @@
  * `**` and its slash cross none as well, so the root's `package.json` is in the list — and a trailing
  * `/` takes everything below.
  */
-import { endsOnBase, type Workflow } from '../step/step.ts';
+import { endsOnBase, type StepSpec } from '../step/step.ts';
 import { terminalSteps } from '../workflow/index.ts';
 import type { Run } from '../record/record.ts';
 import { conditionOf } from '../route/index.ts';
@@ -28,7 +28,7 @@ import type { LessonState } from 'objects';
  * the result, its `main` would be the run's own branch, and every question about the run's result — has it landed, what did it touch,
  * what is there to decide — would be asked of the base branch and answered yes.
  */
-export function resultSteps(steps: readonly Workflow[], run?: Run): Workflow[] {
+export function resultSteps(steps: readonly StepSpec[], run?: Run): StepSpec[] {
   const routed = run ? routedResult(steps, run) : [];
   if (routed.length) return routed;
   const ends = terminalSteps(steps);
@@ -40,7 +40,7 @@ export function resultSteps(steps: readonly Workflow[], run?: Run): Workflow[] {
  * The result of a run that routed on to another workflow: for each workflow node that filed its card (`StepRecord.sent`), what its
  * condition read — its `input:`, or the steps it waits on where it names none. What the routed run is handed. Empty for any other run.
  */
-export function routedResult(steps: readonly Workflow[], run: Run): Workflow[] {
+export function routedResult(steps: readonly StepSpec[], run: Run): StepSpec[] {
   const read = steps.flatMap((s) => {
     const condition = s.workflow !== undefined && run.steps[s.name]?.sent ? conditionOf(s, steps) : undefined;
     const names = condition ? (condition.input ?? condition.after) : [];
@@ -54,7 +54,7 @@ export function routedResult(steps: readonly Workflow[], run: Run): Workflow[] {
  * ending step is told to run again on the merge, so a shipper written once reads its folder's check off its brief rather than carrying
  * one in its words. Pure.
  */
-export function workChecks(steps: readonly Workflow[]): string[] {
+export function workChecks(steps: readonly StepSpec[]): string[] {
   return [...new Set(steps.flatMap((s) => (!endsOnBase(s) && s.check ? [s.check] : [])))];
 }
 
@@ -63,7 +63,7 @@ export function workChecks(steps: readonly Workflow[]): string[] {
  * neither running nor cancelled — when it cut worktrees and did not work on its base branch itself. What `nemia decide` offers to land.
  * None for any other run, so git is not asked about it.
  */
-export function tipBranches(run: Run, steps: readonly Workflow[], status: Assessment['status']): string[] {
+export function tipBranches(run: Run, steps: readonly StepSpec[], status: Assessment['status']): string[] {
   if (!run.isolate || status === 'running' || status === 'cancelled') return [];
   const branches = resultSteps(steps)
     .map((s) => run.steps[s.name]?.branch)

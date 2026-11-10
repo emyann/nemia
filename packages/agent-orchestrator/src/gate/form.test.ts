@@ -2,13 +2,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { approveFormOf, type ApproveForm } from './gate.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 
 const STEPS = [
   { name: 'plan', gate: true },
   { name: 'review', loop: 'implement' },
   { name: 'judge', gate: true, loop: 'implement' },
-] as unknown as Workflow[];
+] as unknown as StepSpec[];
 
 test('`approveFormOf`: a gate where the step is gated, a loop where it closes one, and a step both by whether it waits at its gate', async (t) => {
   const rows: Array<[string, string | undefined, boolean, ApproveForm]> = [

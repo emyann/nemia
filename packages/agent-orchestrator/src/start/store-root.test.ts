@@ -5,17 +5,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { storeRootRefusal } from './store-root.ts';
 
-const IMPLEMENT = { name: 'implement', after: [] } as unknown as Workflow;
-const SHIP = { name: 'ship', after: ['implement'], workspace: 'base' } as unknown as Workflow;
-const LONE_SHIP = { name: 'ship', after: [], workspace: 'base' } as unknown as Workflow;
-const REVIEW = { name: 'review', after: ['implement'] } as unknown as Workflow;
-const TRIAGE = { name: 'triage', after: [], reads: ['inbox'] } as unknown as Workflow;
+const IMPLEMENT = { name: 'implement', after: [] } as unknown as StepSpec;
+const SHIP = { name: 'ship', after: ['implement'], workspace: 'base' } as unknown as StepSpec;
+const LONE_SHIP = { name: 'ship', after: [], workspace: 'base' } as unknown as StepSpec;
+const REVIEW = { name: 'review', after: ['implement'] } as unknown as StepSpec;
+const TRIAGE = { name: 'triage', after: [], reads: ['inbox'] } as unknown as StepSpec;
 
 /** The refusal of `steps` in a store at `root`, its run's artifacts folder and inbox under it. */
-const refusal = (root: string, steps: readonly Workflow[]) =>
+const refusal = (root: string, steps: readonly StepSpec[]) =>
   storeRootRefusal(root, steps, { runArtifacts: path.join(root, 'runs', 'r', 'artifacts'), inbox: path.join(root, 'inbox') });
 
 test("REFUSED: a `(` in the root, under an ending after a step, in the store's words naming WF_ROOT, its value, the `(` and the fix", () => {

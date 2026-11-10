@@ -12,12 +12,12 @@ import path from 'node:path';
 import { artifactsDir } from '../src/record/record.store.ts';
 import type { Views } from '../src/summary/reads.verb.ts';
 import type { Run } from '../src/run.ts';
-import type { Workflow } from '../src/workflow.ts';
+import type { StepSpec } from '../src/workflow.ts';
 import { closeoutIn } from '../src/resource/tries.verb.ts';
 import { artifactOf, folderFiles, valueOf } from '../src/resource/files.store.ts';
 
 const RUN = { id: 'r-closeout', steps: {} } as unknown as Run;
-const STEP = { name: 'implement', after: [], body: 'x' } as unknown as Workflow;
+const STEP = { name: 'implement', after: [], body: 'x' } as unknown as StepSpec;
 
 /** The closeout `said` as the step's detail reads it, off an engine whose task holds it as its last attempt's. */
 const read = (said: unknown) =>

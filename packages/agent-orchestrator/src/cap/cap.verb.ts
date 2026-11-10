@@ -4,7 +4,7 @@
  */
 import { Cause, Deferred, Effect, Exit, Result } from 'effect';
 import { asked, over, unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
-import type { Workflow } from '../workflow.ts';
+import type { StepSpec } from '../workflow.ts';
 import type { Refusal } from '../refusal/refusal.ts';
 import { admissionOrder, heldRuns, slotNeed, type RunSlot } from './cap.ts';
 import { runTasks, type Run } from '../record/record.ts';
@@ -46,7 +46,7 @@ const needOf = Effect.fnUntraced(function* (
   seen: Engine,
   listed: ReadonlyMap<string, TaskView>,
   run: Run,
-  steps: Workflow[],
+  steps: StepSpec[],
   parents: Parents,
 ) {
   const { read } = yield* readRun(seen, run, { steps, views: new Map(listed) });
@@ -101,7 +101,7 @@ export const slotsOf = Effect.fn('slotsOf')(function* (
       if (unloadedFolder(read.failure) !== undefined) needs.push({ id: run.id, createdAt: run.createdAt, ...UNJUDGED });
       continue;
     }
-    const steps: Workflow[] = read.success;
+    const steps: StepSpec[] = read.success;
     let need: { inFlight: boolean; wants: boolean } = UNJUDGED;
     if (!runTasks(run).some((taskId) => unreadable.has(taskId))) {
       const judged = yield* Effect.exit(needOf(seen, listed, run, steps, parents));

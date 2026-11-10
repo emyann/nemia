@@ -50,7 +50,7 @@ import { CLOSEOUT_SCHEMA, type Closeout } from '../src/closeout/closeout.ts';
 import { closeoutAsked, closeoutOf, deniedOf, harnessBlocked } from '../src/views/views.verb.ts';
 import { endWords, phaseOfView } from '../src/views/views-words.ts';
 import type { Verdict } from '../src/check/check.ts';
-import type { Workflow } from '../src/workflow.ts';
+import type { StepSpec } from '../src/workflow.ts';
 import { aRead, listing, names, phases, run, signedOffOnce, step, STEPS } from './assessed.ts';
 
 const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
@@ -80,7 +80,7 @@ const finished = (extra: Partial<RepositoryRun> = {}) =>
   );
 const SETTLED = shown({ t1: 'succeeded', t2: 'succeeded' });
 /** `implement` declares a check; `review` waits on it. */
-const CHECKED: Workflow[] = [{ ...step('implement'), check: 'npm test' }, step('review', ['implement'])];
+const CHECKED: StepSpec[] = [{ ...step('implement'), check: 'npm test' }, step('review', ['implement'])];
 const signedDone = () => ({ outcome: 'done' as const, summary: 's', artifacts: [], needs: undefined });
 /** Every task here was filed asking for a closeout — which is what the runner does. */
 const asked = () => true;
@@ -94,7 +94,7 @@ const withCheck = (checkId: string | null, extra: Partial<RepositoryRun> = {}) =
     },
   );
 /** `implement` checked, with `retries: 2`; `review` waits on it. */
-const RETRIED: Workflow[] = [{ ...step('implement'), check: 'npm test', retries: 2 }, step('review', ['implement'])];
+const RETRIED: StepSpec[] = [{ ...step('implement'), check: 'npm test', retries: 2 }, step('review', ['implement'])];
 /** `implement` on the try after `tries`: its task `t1`, its check `check`. `review` not filed. */
 const onTry = (tries: EarlierTry[] = [], check: string | null = 'c1', extra: Partial<RepositoryRun> = {}) =>
   run(
@@ -211,7 +211,7 @@ test('cancelPlan and decision of a step with a check', async (t) => {
     assert.deepEqual(live, { kind: 'cancel', stop: [{ name: 'implement (check)', taskId: 'c1' }] });
   });
   await t.test('a run with a check still due is cancelled rather than called finished', () => {
-    const fan: Workflow[] = [{ ...step('a'), check: 'npm test' }, step('b')];
+    const fan: StepSpec[] = [{ ...step('a'), check: 'npm test' }, step('b')];
     const r = run({}, { steps: { a: { taskId: 't1' }, b: { taskId: 't2' } } });
     assert.deepEqual(
       cancelPlan(aRead(fan, r, { phaseOf: phases({ t1: 'succeeded', t2: 'failed' }), signedOff: signedDone, asked })),
@@ -220,7 +220,7 @@ test('cancelPlan and decision of a step with a check', async (t) => {
     );
   });
   await t.test('`nemia decide` names every step that did not earn a follower, each in its own word', () => {
-    const four: Workflow[] = [{ ...step('a'), check: 'npm test' }, step('b'), step('c'), step('d')];
+    const four: StepSpec[] = [{ ...step('a'), check: 'npm test' }, step('b'), step('c'), step('d')];
     const r = run(
       {},
       {
@@ -264,7 +264,7 @@ test('cancelPlan and decision of a step with a check', async (t) => {
 
 test("listing of a step's check: what the run established, not only what the engine settled", async (t) => {
   await t.test('verified, checking, refused with its exit, unverified and unsigned; the refused and the unsigned wait on you', () => {
-    const five: Workflow[] = [...['a', 'b', 'c'].map((n) => ({ ...step(n), check: 'npm test' })), step('d'), step('e')];
+    const five: StepSpec[] = [...['a', 'b', 'c'].map((n) => ({ ...step(n), check: 'npm test' })), step('d'), step('e')];
     const r = run(
       {},
       {
@@ -580,7 +580,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
       names(lines[0], 'implement:', 'no retry was spent', 'nemia retry r-1 implement --recheck');
     });
   await t.test('a check that did not finish on a step over its budget: --recheck offered, and a new session needs --budget', () => {
-    const capped: Workflow[] = [{ ...RETRIED[0], budget: 3 }, RETRIED[1]];
+    const capped: StepSpec[] = [{ ...RETRIED[0], budget: 3 }, RETRIED[1]];
     const over: SpendOf = (id) => (id === 't1' ? { usd: 4, measured: 1, unmeasured: 0, budgetEnded: false } : undefined);
     const p = phases({ t1: 'succeeded', c1: 'stopped' });
     const d = decision(
@@ -745,7 +745,7 @@ test('UNSIGNED: the run nudges a step to sign off ITSELF, once a round, before i
     );
     assert.deepEqual(due(r, [], asked), [], "failed for another reason: a person's");
     assert.deepEqual(retriesDue(STEPS, r, phases({ t1: 'succeeded' }), none, asked), [], "a journal's `done` without a statement");
-    const capped: Workflow[] = [{ ...step('implement'), budget: 3 }, step('review', ['implement'])];
+    const capped: StepSpec[] = [{ ...step('implement'), budget: 3 }, step('review', ['implement'])];
     assert.deepEqual(due(r, [], unsignedEnd, spends({ t1: 4 }), capped), [], 'over budget');
     assert.deepEqual(
       due(r, [], unsignedEnd, spends({ t1: 2 }), capped).map((x) => x.by),
@@ -762,10 +762,10 @@ test('UNSIGNED: the run nudges a step to sign off ITSELF, once a round, before i
 
 test("composeBrief of a step's check and of its tries", async (t) => {
   await t.test('a step with `check:` is told the command before it is judged by it — resumed, merged or not — the closeout last', () => {
-    const implement: Workflow = { ...step('implement'), check: 'npm test && npm run typecheck' };
-    const respond: Workflow = { name: 'respond', after: ['implement'], body: 'answer', resume: 'implement', check: 'npm test' };
-    const integrate: Workflow = { name: 'integrate', after: ['a', 'b'], body: 'combine', check: 'npm run build' };
-    const cases: Array<[Workflow, Workflow[]]> = [
+    const implement: StepSpec = { ...step('implement'), check: 'npm test && npm run typecheck' };
+    const respond: StepSpec = { name: 'respond', after: ['implement'], body: 'answer', resume: 'implement', check: 'npm test' };
+    const integrate: StepSpec = { name: 'integrate', after: ['a', 'b'], body: 'combine', check: 'npm run build' };
+    const cases: Array<[StepSpec, StepSpec[]]> = [
       [implement, [implement]],
       [{ ...step('review', ['implement']), check: 'npm test' }, STEPS],
       [respond, [implement, respond]],
@@ -782,7 +782,7 @@ test("composeBrief of a step's check and of its tries", async (t) => {
     for (const s of [step('implement'), step('review', ['implement'])])
       assert.doesNotMatch(composeBrief(s, run({ implement: 't1', review: null }), STEPS), /Before you sign off|must exit 0/);
   });
-  const implement: Workflow = { ...step('implement'), check: 'npm test && npm run typecheck', retries: 1 };
+  const implement: StepSpec = { ...step('implement'), check: 'npm test && npm run typecheck', retries: 1 };
   const refusal = {
     command: 'npm test && npm run typecheck',
     verdict: 1 as Verdict,
@@ -819,7 +819,7 @@ test("composeBrief of a step's check and of its tries", async (t) => {
     );
   });
   await t.test('a new session is told the whole brief, even for a step that resumes another', () => {
-    const respond: Workflow = { name: 'respond', after: ['implement'], resume: 'implement', body: 'answer the review', check: 'npm test' };
+    const respond: StepSpec = { name: 'respond', after: ['implement'], resume: 'implement', body: 'answer the review', check: 'npm test' };
     const fresh = composeBrief(
       respond,
       run({ implement: 't1', respond: 't2' }),
@@ -1360,7 +1360,7 @@ const headingsOf = (brief: string): string[] => {
 };
 
 test("composeBrief of an answer: `## Your answer`, the person's text untouched in a fence", async (t) => {
-  const implement: Workflow = { ...step('implement'), check: 'npm test' };
+  const implement: StepSpec = { ...step('implement'), check: 'npm test' };
   const briefOf = (told: RetryBriefing, message?: string) =>
     composeBrief(implement, run({ implement: 't1' }), [implement], undefined, undefined, undefined, {
       ...told,
@@ -1427,7 +1427,7 @@ test("composeBrief of an answer: `## Your answer`, the person's text untouched i
 });
 
 test("composeBrief after an answered step: `## Answered`, a person's answer handed to every step after it", async (t) => {
-  const steps: Workflow[] = [step('plan'), step('implement', ['plan']), step('review', ['implement'])];
+  const steps: StepSpec[] = [step('plan'), step('implement', ['plan']), step('review', ['implement'])];
   const cut = 'Cut the board out of this build: it is a card of its own.';
   const answer = (n: number, message: string, at: string, mode: RetryMode = 'continue'): RetryAsk => ({
     step: 'implement',
@@ -1446,7 +1446,7 @@ test("composeBrief after an answered step: `## Answered`, a person's answer hand
       },
     },
   );
-  const briefHandedAnswers = (s: Workflow, r: Run, answers: readonly RetryAsk[]) =>
+  const briefHandedAnswers = (s: StepSpec, r: Run, answers: readonly RetryAsk[]) =>
     composeBrief(
       s,
       r,
@@ -1582,7 +1582,7 @@ test('`nemia ls` says what the session of a step at work runs on in its note, be
 });
 
 test('`denials: fail`: a step that signed off denied a call reads denied', async (t) => {
-  const DENYING: Workflow[] = [{ ...step('implement'), check: 'npm test', retries: 2, denials: 'fail' }, step('review', ['implement'])];
+  const DENYING: StepSpec[] = [{ ...step('implement'), check: 'npm test', retries: 2, denials: 'fail' }, step('review', ['implement'])];
   const r = run({ implement: 't1', review: null });
   const p = phases({ t1: 'succeeded' });
   const denied = deniedSpend({ t1: ['Write(/tmp/w/notes.md)', 'Bash(pytest)'] });
@@ -1593,7 +1593,7 @@ test('`denials: fail`: a step that signed off denied a call reads denied', async
       'running',
     );
     assert.equal(stepStatus(DENYING[0], r, p, signedDone, asked, DENYING, deniedSpend({ t1: [] })), 'checking', 'denied nothing');
-    const CHECKED: Workflow[] = [{ ...step('implement'), check: 'npm test' }, step('review', ['implement'])];
+    const CHECKED: StepSpec[] = [{ ...step('implement'), check: 'npm test' }, step('review', ['implement'])];
     assert.equal(stepStatus(CHECKED[0], r, p, signedDone, asked, CHECKED, denied), 'checking', 'no `denials:` line: a note, never a stop');
     assert.equal(
       stepStatus(DENYING[0], r, p, () => undefined, asked, DENYING, denied),
@@ -1692,7 +1692,7 @@ test('`denials: fail`: a step that signed off denied a call reads denied', async
     );
     assert.equal(refusal({ mode: 'fresh' }), null);
     assert.equal(refusal({ mode: 'continue' }), null);
-    const GATED: Workflow[] = [{ ...DENYING[0], gate: true }, DENYING[1]];
+    const GATED: StepSpec[] = [{ ...DENYING[0], gate: true }, DENYING[1]];
     names(
       approvalRefusal(GATED, r, 'implement', undefined, p, signedDone, asked, () => undefined, [], denied),
       'implement signed off',
@@ -1702,7 +1702,7 @@ test('`denials: fail`: a step that signed off denied a call reads denied', async
     );
   });
   await t.test('past its budget too: held there and named for both, the raise offered first', () => {
-    const BUDGETED: Workflow[] = [{ ...DENYING[0], budget: 3 }, DENYING[1]];
+    const BUDGETED: StepSpec[] = [{ ...DENYING[0], budget: 3 }, DENYING[1]];
     const over: SpendOf = (id) =>
       id === 't1' ? { usd: 4, measured: 1, unmeasured: 0, budgetEnded: false, denied: ['Bash(pytest)'] } : undefined;
     assert.deepEqual(
@@ -1734,10 +1734,10 @@ test('`denials: fail`: a step that signed off denied a call reads denied', async
 });
 
 test("retryLines of a denied step: a new session with the bare `--fresh`, and the rule a new run's `allowedTools:` needs", async (t) => {
-  const DENYING: Workflow[] = [{ ...step('implement'), denials: 'fail' }, step('review', ['implement'])];
+  const DENYING: StepSpec[] = [{ ...step('implement'), denials: 'fail' }, step('review', ['implement'])];
   const r = run({ implement: 't1', review: null });
   const p = phases({ t1: 'succeeded' });
-  const offer = (steps: Workflow[], x: Run, denied: SpendOf) => {
+  const offer = (steps: StepSpec[], x: Run, denied: SpendOf) => {
     const d = decision(
       aRead(steps, x, {
         phaseOf: p,
@@ -1782,7 +1782,7 @@ test("retryLines of a denied step: a new session with the bare `--fresh`, and th
     assert.doesNotMatch(line, /r-1\/implement\/notes|runs\/r-1\//, 'no rule names this run');
   });
   await t.test('no allow rule for a call its own disallowedTools: may have denied, since a deny beats every allow', () => {
-    const own: Workflow[] = [
+    const own: StepSpec[] = [
       { ...step('implement'), denials: 'fail', disallowedTools: ['Bash(npm run build)', 'SendMessage'] },
       step('review', ['implement']),
     ];

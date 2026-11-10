@@ -7,7 +7,7 @@ import type { NodeFate } from '../../contracts/join.contract.ts';
 import type { ScriptRoute } from '../../contracts/route-answer.contract.ts';
 import type { TableRoute } from '../../contracts/route-table.contract.ts';
 import { stopsFollowers } from '../record/record.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import type { NodeKind } from 'objects';
 
 export type { Fate } from '../../contracts/join.contract.ts';
@@ -47,9 +47,9 @@ export const nodeFate: NodeFate = (when, answered, parents) => {
 /** What kind of node a step is: a condition (`routes:`), a route to a workflow (`workflow:`), or a step. */
 export type { NodeKind };
 
-export const nodeKind = (step: Pick<Workflow, 'routes' | 'workflow'>): NodeKind =>
+export const nodeKind = (step: Pick<StepSpec, 'routes' | 'workflow'>): NodeKind =>
   step.routes !== undefined ? 'condition' : step.workflow !== undefined ? 'workflow' : 'step';
 
 /** The one condition among a `when:` node's parents (load holds there is exactly one); undefined on a node with no `when:`. */
-export const conditionOf = (step: Workflow, steps: readonly Workflow[]): Workflow | undefined =>
+export const conditionOf = (step: StepSpec, steps: readonly StepSpec[]): StepSpec | undefined =>
   step.when === undefined ? undefined : steps.find((s) => step.after.includes(s.name) && s.routes !== undefined);

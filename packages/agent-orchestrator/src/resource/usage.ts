@@ -1,7 +1,7 @@
 /** What sessions consumed, in `nemia decide`'s words: a step's, several steps' together, and what a run's sessions read. */
 import { type Consumed, peakMark, readWords, sumUsage, usedLines } from '../usage/usage.ts';
 import { dollars } from '../money/money.ts';
-import type { Workflow } from '../workflow.ts';
+import type { StepSpec } from '../workflow.ts';
 import type { PeakMark } from 'objects';
 
 /** What a session consumed as the engine's `Usage` carries it (`consumption`): a count nobody measured is absent, never 0. */
@@ -67,7 +67,7 @@ export function usedOf(usage: Usage | undefined, cap?: number, read: Usage | und
  * is the peak of: two steps' caps are not one cap, and the largest peak was reached under its own. So are its compactions: that step's
  * own say whether it reached its cap, and another's, under another cap or none, would say it of a step that did not.
  */
-export function totalOf(steps: readonly Workflow[], usages: ReadonlyArray<readonly [name: string, usage: Usage | undefined]>): StepUsed {
+export function totalOf(steps: readonly StepSpec[], usages: ReadonlyArray<readonly [name: string, usage: Usage | undefined]>): StepUsed {
   const total = sumUsage(usages.map(([, u]) => u));
   const peakOf = usages.find(([, u]) => total?.peakContextTokens !== undefined && u?.peakContextTokens === total.peakContextTokens)?.[0];
   const compactions = sumUsage(usages.filter(([name]) => name === peakOf).map(([, u]) => u))?.compactions;

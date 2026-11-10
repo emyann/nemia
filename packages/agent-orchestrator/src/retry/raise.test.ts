@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import type { Closeout } from '../closeout/closeout.ts';
 import { decision } from '../decide/decide.ts';
 import type { Run, TaskPhase } from '../record/record.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import type { SpendOf } from '../status/status.ts';
 import { answerLines, overBudgetLine, retryOffers, stepRaise, type RaiseReads } from './retry.ts';
 import { aRead, phases, run, step } from '../../test/assessed.ts';
@@ -29,7 +29,7 @@ const reads = (phaseOf: (id: string) => TaskPhase, closeoutOf: (name: string) =>
 
 test('decide names the raise the run page shows: one judgement, read by both', async (t) => {
   await t.test('a try over its budget, signed off blocked: the answer line asks for a budget above the raise', () => {
-    const steps: Workflow[] = [{ ...step('implement'), budget: 3 }, step('review', ['implement'])];
+    const steps: StepSpec[] = [{ ...step('implement'), budget: 3 }, step('review', ['implement'])];
     const r = run({ implement: 't1', review: null });
     const spent = spends({ t1: 4 });
     const settled = phases({ t1: 'succeeded' });
@@ -45,7 +45,7 @@ test('decide names the raise the run page shows: one judgement, read by both', a
     assert.ok(line.includes(`its cap raised above ${raise?.said}:`), line);
   });
   await t.test('a loop whose round waits on a step over its budget: raised by round, above what that step cost', () => {
-    const steps: Workflow[] = [
+    const steps: StepSpec[] = [
       { ...step('implement'), check: 'npm test', budget: 3 },
       { ...step('review', ['implement']), loop: 'implement', rounds: 3 },
       step('ship', ['review']),
@@ -81,7 +81,7 @@ test('decide names the raise the run page shows: one judgement, read by both', a
     assert.ok(line.includes(`review (held: its round would file implement again, which has cost ${raise?.said} `), line);
   });
   await t.test('none on a run called off: cancelled, pruned or held', () => {
-    const steps: Workflow[] = [{ ...step('implement'), budget: 3 }];
+    const steps: StepSpec[] = [{ ...step('implement'), budget: 3 }];
     const stuck = (): Closeout => ({ outcome: 'blocked', summary: 's', artifacts: [], needs: 'which' });
     const settled = phases({ t1: 'succeeded' });
     const spent = spends({ t1: 4 });

@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { configRefusal, readRemote, tried } from '../runtime-client.ts';
 import { remoteAgentsFile } from '../harness/a2a.store.ts';
-import { type Workflow } from '../step/step.ts';
+import { type StepSpec } from '../step/step.ts';
 import { DEFAULT_HARNESS, isRemoteHarness, remoteNameOf } from '../harness/harness.ts';
 import { filedRefusal, lineOf } from '../keys/index.ts';
 import { filedConfig } from '../filed/filed.ts';
@@ -136,7 +136,7 @@ export const stepsToStart = Effect.fn('stepsToStart')(function* (
 
 /** `stepsToStart`'s judgement of the steps read, past the folder's load: each refusal it names thrown as `Invalid`. */
 function startable(
-  steps: Workflow[],
+  steps: StepSpec[],
   workflowDir: string,
   isolate: boolean,
   places: Places,
@@ -149,7 +149,7 @@ function startable(
     allows,
     harnessSettings,
   }: { refused: ConfigRefused; given: boolean; allows: Allows; harnessSettings?: HarnessSettings },
-): Workflow[] {
+): StepSpec[] {
   const set = stepSetRefusal(steps, isolate);
   if (set) throw new Invalid({ message: set });
   const unallowed = unallowedRefusal(steps, allows.rules, allows.untrusted);
@@ -174,7 +174,7 @@ function startable(
  * (`isBuiltinPlace`), which acts on a repository a folder run does not have; undefined for a repository team, or where none is. The skills
  * are those the Skill door `found` in the folder's places, read only for a folder team.
  */
-function placeSkillRefusal(steps: readonly Workflow[], found: SkillsFound | undefined): string | undefined {
+function placeSkillRefusal(steps: readonly StepSpec[], found: SkillsFound | undefined): string | undefined {
   if (!isFolderTeam(steps) || found === undefined) return undefined;
   for (const step of steps) {
     const skill = step.agent?.skills?.find((name) => {
@@ -200,7 +200,7 @@ function placeSkillRefusal(steps: readonly Workflow[], found: SkillsFound | unde
  * `permissionMode:` (`written`, by the step's name) is quoted by that line.
  */
 export const configRefused = (
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   places: Places,
   gates: readonly string[],
   denied: readonly string[],
@@ -217,7 +217,7 @@ const startArtifacts = (): string => path.dirname(artifactsDir({ id: 'run' }, 's
  * `denied`.
  */
 function refusedStep(
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   places: Places,
   gates: readonly string[],
   written: Readonly<Record<string, string>>,
@@ -225,7 +225,7 @@ function refusedStep(
   denied: readonly string[],
   volumes: readonly Mount[] = [],
   harnessSettings?: HarnessSettings,
-): { step: Workflow; why: string } | undefined {
+): { step: StepSpec; why: string } | undefined {
   for (const step of steps.filter((s) => !isRemoteHarness(s.harness))) {
     const own = ownOf(step, renderedFlags(step, '.'), () => places.repo);
     const runArtifacts = startArtifacts();
@@ -251,7 +251,7 @@ function refusedStep(
 
 /** What `stepsToStart` asks last of a folder's steps: why the runtime refuses one's first filing, or undefined (`configRefused`). */
 export type ConfigRefused = (
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   places: Places,
   gates: readonly string[],
   denied: readonly string[],
@@ -269,10 +269,10 @@ export const StartRefusal = Context.Reference<ConfigRefused>('orchestrator/Start
  * refused by the runtime, in the file's words (`readRemote`) — and only when a step names a remote agent, and only the entry it names:
  * `engine()` leaves out what is refused, and every other command and run works on.
  */
-function undeclaredRefusal(steps: readonly Workflow[], home: string): string | undefined {
+function undeclaredRefusal(steps: readonly StepSpec[], home: string): string | undefined {
   const remote = steps
     .map((s) => ({ s, name: remoteNameOf(s.harness) }))
-    .filter((r): r is { s: Workflow; name: string } => r.name !== undefined);
+    .filter((r): r is { s: StepSpec; name: string } => r.name !== undefined);
   const [first] = remote;
   if (first === undefined) return undefined;
   const read = readRemote(home);
@@ -376,7 +376,7 @@ const volumesAt = (factory: Factory | undefined): Mount[] => (factory ? factoryV
  */
 function mountRefusal(
   opts: StartOptions,
-  steps: Workflow[],
+  steps: StepSpec[],
   places: Places,
   factory: Factory | undefined,
   own: string | undefined,
@@ -387,7 +387,7 @@ function mountRefusal(
   const workflow = path.basename(path.resolve(opts.workflowDir));
   const unwritable = writableRefusal(steps, workflow, factory, own, mounts);
   if (unwritable || !factory || (!mounts.length && !volumes.length)) return unwritable;
-  const ask = (asked: readonly Workflow[], given: readonly Mount[] = []) =>
+  const ask = (asked: readonly StepSpec[], given: readonly Mount[] = []) =>
     refusedStep(asked, places, opts.gates ?? [], formerModesWritten(opts.workflowDir), mounts, denied, given, harnessSettings);
   const reading = ask(steps.map(({ writable: _, ...step }) => step));
   if (reading) return factoryMountRefusal(factory, `${workflow}/${reading.step.name}`, reading.why);
@@ -444,7 +444,7 @@ function leftOut(home: string, run: Run): { mounts: string[]; volumes: string[] 
  */
 function toldOf(
   opts: StartOptions,
-  steps: Workflow[],
+  steps: StepSpec[],
   inputs: readonly InputFile[],
   factory: Factory | undefined,
   mounts: Mount[],
@@ -556,7 +556,7 @@ function copyInputs(run: Run, inputs: readonly InputFile[]): void {
  * the run's directory removed. A link or a file of another kind in either folder is refused before the run has an id
  * (`workflowFilesOf`), so what fails here is a write.
  */
-function renderAgents(run: Run, steps: readonly Workflow[], found: SkillsFound): Pick<Run, 'workflowFiles' | 'carriedFiles'> {
+function renderAgents(run: Run, steps: readonly StepSpec[], found: SkillsFound): Pick<Run, 'workflowFiles' | 'carriedFiles'> {
   let what = `the steps' agents could not be rendered into ${path.join(runsDir(), run.id, 'agents')}`;
   try {
     writeAgentFiles(run, steps, found);

@@ -27,7 +27,7 @@ import {
 } from './workspace.ts';
 import { folderPlace } from '../record/places.store.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { HOME, lstatOf, runsDir } from '../record/record.store.ts';
 import { countSpawn } from '../meter/tally.store.ts';
 import type { Place } from '../place/place.store.ts';
@@ -374,7 +374,7 @@ const madeBy = Effect.fn('madeBy')(function* (place: Place, request: PlaceReques
  * condition's first parent, and a parent never filed — skipped, off the route taken — is left out, so a fan-in merges only what ran and
  * forks from the one parent that did.
  */
-export const workspaceFor = Effect.fn('workspaceFor')(function* (run: Run, frozen: readonly Workflow[], routed: Workflow, place: Place) {
+export const workspaceFor = Effect.fn('workspaceFor')(function* (run: Run, frozen: readonly StepSpec[], routed: StepSpec, place: Place) {
   const { steps, step } = ranShape(run, frozen, routed);
   const plan = workspacePlan(steps, step);
   const cut = (made: Cut): CutOutcome => ({ cut: made });
@@ -414,7 +414,7 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (run: Run, froze
  * instead, its own workspace being that parent's; and `step` waiting only on the parents that ran — filed, or a condition's first parent
  * that was — so a skipped one, never filed, is no line of work to merge. A workflow with no condition is the workflow. Pure.
  */
-export function ranShape(run: Pick<Run, 'steps'>, steps: readonly Workflow[], step: Workflow): { steps: Workflow[]; step: Workflow } {
+export function ranShape(run: Pick<Run, 'steps'>, steps: readonly StepSpec[], step: StepSpec): { steps: StepSpec[]; step: StepSpec } {
   const byName = new Map(steps.map((s) => [s.name, s]));
   const through = (name: string, seen: ReadonlySet<string> = new Set()): string[] => {
     const s = byName.get(name);
@@ -422,7 +422,7 @@ export function ranShape(run: Pick<Run, 'steps'>, steps: readonly Workflow[], st
     const [first] = [...s.after].sort();
     return first === undefined ? [] : through(first, new Set([...seen, name]));
   };
-  const parents = (s: Workflow): string[] => [...new Set(s.after.flatMap((a) => through(a)))];
+  const parents = (s: StepSpec): string[] => [...new Set(s.after.flatMap((a) => through(a)))];
   const shaped = steps.filter((s) => s.routes === undefined).map((s) => ({ ...s, after: parents(s) }));
   const filed = (name: string): boolean => Boolean(run.steps[name]?.taskId || run.steps[name]?.workspace);
   const ran = { ...step, after: parents(step).filter(filed) };

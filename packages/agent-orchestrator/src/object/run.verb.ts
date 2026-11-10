@@ -26,7 +26,7 @@ import {
   type SpendOf,
   stepSpend,
 } from '../run.ts';
-import { loopSpan, type Workflow } from '../workflow.ts';
+import { loopSpan, type StepSpec } from '../workflow.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import type { Retry } from '../retry/index.ts';
 import { stepRaise } from '../retry/index.ts';
@@ -82,7 +82,7 @@ export const tryShort = (t: StepTry): TryShort => ({
 });
 
 /** A step's frontmatter as the object's spec holds it, each null where the step does not set it. */
-const specStepOf = (s: Workflow): RunSpec['steps'][number] => ({
+const specStepOf = (s: StepSpec): RunSpec['steps'][number] => ({
   name: s.name,
   after: [...s.after],
   input: [...(s.input ?? [])],
@@ -150,7 +150,7 @@ function costOf(run: Run, name: string, at: RunReading): Pick<RunStepStatus, 'sp
  * What a round of a loop cost: the session of each try the package's `timeline` counts in that round — the steps the loop files again
  * (`loopSpan`), a session each once, which a try a recheck reached has none of — added up (`addSpend`).
  */
-function roundSpend(clock: Timeline, steps: readonly Workflow[], total: TimelineTotal, spendOf: SpendOf): Spend {
+function roundSpend(clock: Timeline, steps: readonly StepSpec[], total: TimelineTotal, spendOf: SpendOf): Spend {
   const looping = steps.find((s) => s.name === total.loop);
   const names = looping ? loopSpan(steps, looping) : [];
   return addSpend(
@@ -287,7 +287,7 @@ const stepStatusOf = Effect.fnUntraced(function* (name: string, at: StepAt) {
 });
 
 /** Where the run's work ended up (`resultBranches`), where a result step has a branch. */
-const resultOf = (run: Run, steps: readonly Workflow[]): Pick<RunStatus, 'result'> => {
+const resultOf = (run: Run, steps: readonly StepSpec[]): Pick<RunStatus, 'result'> => {
   const result = resultBranches(run, steps);
   return result.length ? { result } : {};
 };

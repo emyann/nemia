@@ -11,7 +11,7 @@ import { endsOnBase } from '../step/step.ts';
 import { Effect } from 'effect';
 import { EngineService, denialText, over, type Engine, type TaskView } from '../runtime-client.ts';
 import { wordFeed } from '../feed/word-feed.verb.ts';
-import type { Workflow } from '../workflow.ts';
+import type { StepSpec } from '../workflow.ts';
 import { folderPlace } from '../record/places.store.ts';
 import { tipBranches, tipsSeen } from '../branches/index.ts';
 import { inFlight, runAdmitted, slotNeed, slotWord, takesNoSlot, type RunSlot } from '../cap/cap.ts';
@@ -276,7 +276,7 @@ const followedDue = Effect.fnUntraced(function* (
  * no mark.
  */
 function settledOf(run: Run, r: RunRead): ReturnType<typeof settledOnce> {
-  const statusOf = (step: Workflow) => stepStatus(step, run, r.phaseOf, r.signedOff, r.asked, r.steps, r.spendOf, r.verdictOf);
+  const statusOf = (step: StepSpec) => stepStatus(step, run, r.phaseOf, r.signedOff, r.asked, r.steps, r.spendOf, r.verdictOf);
   return settledOnce(run, r.steps, { views: r.views, spendOf: r.spendOf, signedOff: r.signedOff, statusOf });
 }
 
@@ -535,7 +535,7 @@ const headsOf = (run: Run, standing: PassStanding | undefined, place: Place): He
  */
 function keepTips(
   run: Run,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   status: Assessment['status'],
   heads: () => Readonly<Record<string, string>> | undefined,
 ): { tipped: string[]; tips: Run['tips'] | undefined } {
@@ -607,7 +607,7 @@ function answerOf(
  * rest, and have `nemia prune` refuse the run as still owed one. What the pass hands off, what its memo judges, and what `nemia prune`
  * waits for, read off this one function.
  */
-export const handOffOwed = (steps: readonly Workflow[], run: Run, phaseOf: (taskId: string) => TaskPhase): string[] =>
+export const handOffOwed = (steps: readonly StepSpec[], run: Run, phaseOf: (taskId: string) => TaskPhase): string[] =>
   run.pruned
     ? []
     : handOffDue(steps, run, phaseOf).filter((name) => {

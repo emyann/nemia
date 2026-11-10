@@ -33,7 +33,7 @@ import type { Closeout } from '../src/closeout/closeout.ts';
 import { admissionOf } from '../src/admission/index.ts';
 import { TABLE } from '../src/command/commands.verb.ts';
 import { waitsOnPerson } from '../src/retry/index.ts';
-import type { Workflow } from '../src/workflow.ts';
+import type { StepSpec } from '../src/workflow.ts';
 import { aRead, listing, phases, run, signedOffOnce, step, STEPS } from './assessed.ts';
 
 const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
@@ -52,7 +52,7 @@ const said = (outcome: Closeout['outcome']): Closeout => ({
 });
 const nothingShipped = () => false;
 /** `implement` declares a check; `review` waits on it. */
-const CHECKED: Workflow[] = [{ ...step('implement'), check: 'npm test' }, step('review', ['implement'])];
+const CHECKED: StepSpec[] = [{ ...step('implement'), check: 'npm test' }, step('review', ['implement'])];
 const signedDone = () => ({ outcome: 'done' as const, summary: 's', artifacts: [], needs: undefined });
 /** Every task here was filed asking for a closeout — which is what the runner does. */
 const asked = () => true;
@@ -83,7 +83,7 @@ const deniedSpend =
 const blockedRun = (rest: Partial<RepositoryRun> = {}) => run({ implement: 't1', review: null }, rest);
 const BLOCKED_SAID = signedOff({ implement: said('blocked') });
 /** `step`'s brief in `r`, told the test place's words for reading the work (`say`). */
-const placed = (s: Workflow, r: Run, steps: readonly Workflow[]): string =>
+const placed = (s: StepSpec, r: Run, steps: readonly StepSpec[]): string =>
   composeBrief(
     s,
     r,
@@ -295,8 +295,8 @@ test('cancelPlan and inFlight: what `nemia cancel` stops, and whether a run is f
   await t.test(
     'REFUSED to be finished: a run waiting on a person in any status `nemia ls` says so of — unsigned, budget exhausted, denied, an unreadable closeout — is called off by `nemia cancel`',
     () => {
-      const DENYING: Workflow[] = [{ ...step('implement'), denials: 'fail' }, step('review', ['implement'])];
-      const cases: Array<[string, Workflow[], RepositoryRun, ReturnType<typeof signedOff>, SpendOf, StepStatus]> = [
+      const DENYING: StepSpec[] = [{ ...step('implement'), denials: 'fail' }, step('review', ['implement'])];
+      const cases: Array<[string, StepSpec[], RepositoryRun, ReturnType<typeof signedOff>, SpendOf, StepStatus]> = [
         ['unsigned, its nudge spent', STEPS, signedOffOnce(blockedRun()) as RepositoryRun, signedOff({}), () => undefined, 'unsigned'],
         ['cut off at its budget', STEPS, blockedRun(), signedOff({ implement: said('done') }), spends({}, ['t1']), 'budget exhausted'],
         ['denied a call', DENYING, blockedRun(), signedOff({ implement: said('done') }), deniedSpend({ t1: ['Bash(x)'] }), 'denied'],
@@ -336,7 +336,7 @@ test('cancelPlan and inFlight: what `nemia cancel` stops, and whether a run is f
   await t.test(
     'a stopped step holds its run but waits on no one for admission: Nemia retries an unsigned step and a failed check unasked, and `nemia cancel` calls the run off',
     () => {
-      const cases: Array<[StepStatus, Workflow[], RepositoryRun, Parameters<typeof phases>[0], (name: string) => Closeout | undefined]> = [
+      const cases: Array<[StepStatus, StepSpec[], RepositoryRun, Parameters<typeof phases>[0], (name: string) => Closeout | undefined]> = [
         ['unsigned', STEPS, signedOffOnce(blockedRun()) as RepositoryRun, { t1: 'succeeded' }, () => undefined],
         ['failed (check)', CHECKED, withCheck('c1'), { t1: 'succeeded', c1: 'failed' }, signedDone],
       ];
@@ -421,7 +421,7 @@ test('composeBrief: what a step is told of the request, the work before it and i
   });
 
   await t.test('a resumed step is told only its own prose — it already has the context', () => {
-    const respond: Workflow = { name: 'respond', after: ['implement'], body: 'answer the review', resume: 'implement' };
+    const respond: StepSpec = { name: 'respond', after: ['implement'], body: 'answer the review', resume: 'implement' };
     const brief = composeBrief(respond, run({ implement: 't1', respond: null }), [step('implement'), respond]);
     assert.ok(brief.startsWith(`${PRECEDENCE}\n\nanswer the review`), brief);
     assert.doesNotMatch(brief, /What was asked for/, 'it was there when the request came in');
@@ -436,7 +436,7 @@ test('composeBrief: what a step is told of the request, the work before it and i
   await t.test(
     "a fan-in step is told it is holding merged work, and the conflicts its place's merge left, with the place's words for seeing them",
     () => {
-      const merge: Workflow = { name: 'integrate', after: ['a', 'b'], body: 'combine them' };
+      const merge: StepSpec = { name: 'integrate', after: ['a', 'b'], body: 'combine them' };
       const steps = [step('a'), step('b'), merge];
       const r = run({ a: 't1', b: 't2', integrate: null });
       const told = (conflicts: string[]) =>
@@ -476,7 +476,7 @@ test('composeBrief: what a step is told of the request, the work before it and i
   await t.test(
     "a folder run is briefed on folders, never on git: a chain continues its parent's folder, a fork and a fan-in are told where the steps before them worked, and a new session is told what it left is still here",
     () => {
-      const f = (name: string, after: string[] = [], rest: Partial<Workflow> = {}): Workflow => ({
+      const f = (name: string, after: string[] = [], rest: Partial<StepSpec> = {}): StepSpec => ({
         ...step(name, after),
         place: 'folder',
         ...rest,
@@ -760,7 +760,7 @@ test('handOffDue: which finished steps are handed off', async (t) => {
   });
 
   await t.test("a step is no longer handed off once a later step works in its workspace — what is there is that step's", () => {
-    const chain: Workflow[] = [step('implement'), { ...step('review', ['implement']), check: 'npm test' }];
+    const chain: StepSpec[] = [step('implement'), { ...step('review', ['implement']), check: 'npm test' }];
     const withReview = (review: Run['steps'][string]) => run({}, { steps: { implement: { taskId: 't1', workspace: '/w' }, review } });
 
     assert.deepEqual(handOffDue(chain, withReview({ taskId: null }), phases({ t1: 'succeeded' })), ['implement'], 'nothing after it yet');
@@ -788,7 +788,7 @@ test('handOffDue: which finished steps are handed off', async (t) => {
   await t.test(
     'REFUSED at shipped defaults: a step is handed off once for each try — what a person leaves in its workspace afterwards is not committed under its name',
     () => {
-      const chain: Workflow[] = [step('review'), { ...step('ship', ['review']), workspace: 'base', gate: true }];
+      const chain: StepSpec[] = [step('review'), { ...step('ship', ['review']), workspace: 'base', gate: true }];
       const p = phases({ t1: 'succeeded', t2: 'succeeded', t9: 'failed' });
       const at = (review: Run['steps'][string]) => run({}, { steps: { review, ship: { taskId: 't9', workspace: '/repo' } } });
       assert.deepEqual(handOffDue(chain, at({ taskId: 't1', workspace: '/w' }), p), ['review'], 'not yet handed off: due');

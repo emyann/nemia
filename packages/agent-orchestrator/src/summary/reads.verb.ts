@@ -20,7 +20,7 @@ import { runsAtOnce } from '../runs/runs.store.ts';
 import { type Run, runTasks, unjudgedWords, unloadedWords } from '../record/record.ts';
 import { unloadedOf } from '../steps/steps.verb.ts';
 import { triesDir } from '../try/try.store.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 
 export type { TaskView };
 export type Views = ReadonlyMap<string, TaskView>;
@@ -155,7 +155,7 @@ const stopped = (why: string): string => (/[.!?]$/.test(why) ? why : `${why}.`);
  * says nothing the page draws comes from the folder. On a run that froze none, it is the folder's words alone: such a run is not judged
  * (`judgedUnlessUnreadable` answers `unloadedWords`), and its page says that instead.
  */
-export function workflowsOf(run: Run, home: string): { steps: Workflow[]; warning: null } | { steps: null; warning: string } {
+export function workflowsOf(run: Run, home: string): { steps: StepSpec[]; warning: null } | { steps: null; warning: string } {
   const { fills, unread } = factoryRead(run, home);
   try {
     const read = Effect.gen(function* () {
@@ -205,7 +205,7 @@ export function folderReader(home: string): (run: Run) => ReturnType<typeof work
  * run froze — `driftOf` names it instead. On a record that froze none, the folder, whose added steps the
  * tick does file.
  */
-export function stepNames(run: Run, workflows: readonly Workflow[] | null): string[] {
+export function stepNames(run: Run, workflows: readonly StepSpec[] | null): string[] {
   const added = (run.workflow ?? workflows ?? []).map((s) => s.name).filter((name) => !Object.hasOwn(run.steps, name));
   return [...Object.keys(run.steps), ...added];
 }
@@ -215,11 +215,11 @@ export function stepNames(run: Run, workflows: readonly Workflow[] | null): stri
  * record.store.ts), and for a record that froze none, the folder. A record whose folder does not read is
  * judged from the record alone, a `bare` step each.
  */
-export const judgedSteps = (run: Run, folder: readonly Workflow[] | null): readonly Workflow[] =>
+export const judgedSteps = (run: Run, folder: readonly StepSpec[] | null): readonly StepSpec[] =>
   run.workflow ?? folder ?? Object.keys(run.steps).map(bare);
 
 /** A step nothing defines: all the record says of it is its name, with no `after`, `check:` or `output:`. */
-export const bare = (name: string): Workflow => ({ name, after: [], body: '' });
+export const bare = (name: string): StepSpec => ({ name, after: [], body: '' });
 
 /** The agent a run tried, when it is a try: started from a folder directly under `tries/`. Null for every other run. */
 export function tryOf(run: Pick<Run, 'workflowDir'>, home: string): { agent: string } | null {

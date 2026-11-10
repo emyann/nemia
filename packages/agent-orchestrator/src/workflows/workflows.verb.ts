@@ -24,7 +24,7 @@ import { inboxDir } from '../record/files.store.ts';
 import { runsAtOnce } from '../runs/runs.store.ts';
 import { isDirectory } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import type { StepDraft } from '../workflow/index.ts';
 import { stillNeeded, type Fills } from '../folder/folder.ts';
 import { workflowDirAt } from '../folder/folder.store.ts';
@@ -259,7 +259,7 @@ export const WORKFLOWS_REMOVE: Command<WorkflowRemoved, WorkflowRemoveInput> = {
 const unloaded = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 /** A folder loaded (`steps`), or why it does not load (`error`, the loader's words). */
-export type FolderLoaded = { steps: Workflow[] } | { error: string };
+export type FolderLoaded = { steps: StepSpec[] } | { error: string };
 
 /**
  * Each folder of `dirs`, loaded as a start in `places` would load it, in `factory` with its hires and its rules where one is given
@@ -288,7 +288,7 @@ export const foldersLoaded = Effect.fn('foldersLoaded')(function* (
  * One step of the folder `dir`, the workflow `name`, loaded as a start would load it, in the factory named with its hires: the step, or
  * null where the folder has none of that name, and the names of the steps it has.
  */
-export const WORKFLOWS_STEP: Command<{ step: Workflow | null; steps: string[] }, WorkflowStepInput> = {
+export const WORKFLOWS_STEP: Command<{ step: StepSpec | null; steps: string[] }, WorkflowStepInput> = {
   name: 'workflows step',
   usage: '<from> <name> <step>',
   help: ['one step of a workflow folder, loaded'],

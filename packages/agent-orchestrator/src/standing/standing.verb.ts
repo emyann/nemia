@@ -17,8 +17,8 @@ import { hasStarted, waitedOn } from '../wait/wait.ts';
 import { resultBranches, type BranchReader } from '../branches/branches.store.ts';
 import { landedOver } from '../branches/index.ts';
 import { runsAtOnce } from '../runs/runs.store.ts';
-import { stepsOf } from '../steps/steps.verb.ts';
-import type { Workflow } from '../workflow.ts';
+import { stepsOrWhy } from '../steps/steps.verb.ts';
+import type { Refusal } from '../refusal/refusal.ts';
 import { readStanding, writeStanding, type StandingFile, type StoodRead } from './standing.store.ts';
 
 /** How long a pass waits for one `standing`: past it, the repository reads unread on this pass, and is asked again on the next. */
@@ -26,12 +26,15 @@ export const STANDING_DEADLINE_MS = 15_000;
 
 /**
  * What was read of where repositories stand: each repository and base branch asked, when it was read (`at`, absent where nothing was: no
- * `standing.json` yet), and the words a question nobody asked is unread with (`unasked`).
+ * `standing.json` yet), the words a question nobody asked is unread with (`unasked`), and, by run id, why a run's own branches were not
+ * asked: its unfrozen workflow folder does not load (`unloaded`, `UnloadedFolder`'s own words), so it names no branch. Read live alone:
+ * `standing.json` keeps the readings, and a snapshot says such a run's branches were not asked.
  */
 export type PassStanding = {
   readonly read: ReadonlyMap<string, StoodRead>;
   readonly at?: string;
   readonly unasked?: string;
+  readonly unloaded?: ReadonlyMap<string, string>;
 };
 
 /** A repository and base branch as one key. */
@@ -104,16 +107,19 @@ const remember = (memo: StandingMemo, asks: readonly Ask[], read: readonly Stood
   for (const [key, kept] of next) memo.set(key, kept);
 };
 
-/** Each repository run's result branches by its id, read once (`stepsOf`): none where its steps cannot be read. */
-const branchesAmong = (runs: readonly Run[]): Effect.Effect<ReadonlyMap<string, readonly string[]>> =>
+/**
+ * Each repository run's result branches by its id, read once (`stepsOrWhy`), and, by id, why a run whose unfrozen folder does not load
+ * names none (`unloaded`): that run alone asks nothing, never the pass. Fails any other refusal of the steps' read.
+ */
+const branchesAmong = (
+  runs: readonly Run[],
+): Effect.Effect<{ branches: ReadonlyMap<string, readonly string[]>; unloaded: ReadonlyMap<string, string> }, Refusal> =>
   Effect.map(
-    Effect.forEach(runs.filter(isRepositoryRun), (run) =>
-      Effect.map(
-        Effect.orElseSucceed(stepsOf(run), (): Workflow[] => []),
-        (steps) => [run.id, resultBranches(run, steps)] as const,
-      ),
-    ),
-    (pairs) => new Map(pairs),
+    Effect.forEach(runs.filter(isRepositoryRun), (run) => Effect.map(stepsOrWhy(run), (read) => [run, read] as const)),
+    (reads) => ({
+      branches: new Map(reads.map(([run, read]) => [run.id, 'steps' in read ? resultBranches(run, read.steps) : []])),
+      unloaded: new Map(reads.flatMap(([run, read]) => ('unloaded' in read ? [[run.id, read.unloaded] as const] : []))),
+    }),
   );
 
 /**
@@ -189,10 +195,11 @@ export const standingNow = Effect.fn('standingNow')(function* (
   memo?: StandingMemo,
 ) {
   const place = yield* PlaceService;
-  const asks = asksOf(runs, own, yield* branchesAmong(runs));
+  const { branches, unloaded } = yield* branchesAmong(runs);
+  const asks = asksOf(runs, own, branches);
   const read = yield* Effect.forEach(asks, (ask) => stoodRead(place, ask, memo), { concurrency: 'unbounded' });
   if (memo) remember(memo, asks, read);
-  return { read: byKey(read), at: new Date().toISOString() } satisfies PassStanding;
+  return { read: byKey(read), at: new Date().toISOString(), ...(unloaded.size ? { unloaded } : {}) } satisfies PassStanding;
 });
 
 /**
@@ -275,7 +282,7 @@ export const standingWhen = Effect.fn('standingWhen')(function* (runs: readonly 
   return {
     standing,
     read: (): BranchReader => standingReader(asked),
-    when: (need: boolean): Effect.Effect<BranchReader> =>
+    when: (need: boolean): Effect.Effect<BranchReader, Refusal> =>
       need ? Effect.map(standing, standingReader) : Effect.succeed(standingReader(NOTHING_READ)),
   };
 });
@@ -323,7 +330,8 @@ const repoHeads = (standing: PassStanding, repo: string): Readonly<Record<string
 /**
  * The `BranchReader` that answers off what was read (`PassStanding`), with no process of its own. A question nobody asked — a run whose
  * repository, place and base were not read, a branch not asked of — and one on a reading that is unread are unread (`unread` says why):
- * not landed, never gone, ahead by none. Whether git has a branch is read off any answered reading of its repository.
+ * not landed, never gone, ahead by none; a branch of a run whose folder does not load says that folder's words (`unloaded`). Whether git
+ * has a branch is read off any answered reading of its repository.
  */
 export function standingReader(standing: PassStanding): BranchReader {
   const unasked = standing.unasked ?? 'not asked on this read';
@@ -340,6 +348,8 @@ export function standingReader(standing: PassStanding): BranchReader {
     ahead: (run, branch) => stoodBranch(run, branch)?.ahead ?? 0,
     heads: (repo) => new Map(Object.entries(repoHeads(standing, repo) ?? {})),
     unread: (run, branch) => {
+      const unloaded = branch === undefined ? undefined : standing.unloaded?.get(run.id);
+      if (unloaded !== undefined) return unloaded;
       const stood = stoodOf(standing, run);
       if (!stood) return unasked;
       if ('unread' in stood) return stood.unread;

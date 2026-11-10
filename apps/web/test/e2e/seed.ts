@@ -592,6 +592,11 @@ export const DIAMOND = {
    */
   ranOn: { tag: 'v1.2.0', harnessVersion: '2.1.316' },
   /**
+   * The mode `running`'s session was filed with, and the one its harness says it runs in: another, as Claude Code drops `auto` on a
+   * model that has none. The board marks it `by harness`.
+   */
+  ranIn: { filed: 'auto', measured: 'default' },
+  /**
    * What `landed`'s implement session recorded of its memory as it ended: the kernel killed one process at its 4Gi limit. Its step
    * names no `memory:`, so its note names `WF_MEMORY_LIMIT`.
    */
@@ -1108,7 +1113,7 @@ export function seedDiamond(repo: string, root: string, now = Date.now()): void 
   write(
     path.join(root, 'engine', 'tasks', `${task(running)}.jsonl`),
     lines([
-      filed(running, 1.2),
+      { ...filed(running, 1.2), permissionMode: DIAMOND.ranIn.filed },
       { kind: 'starting', at: ago(1.1), attempt: 1 },
       { kind: 'spawned', at: ago(1.1), attempt: 1 },
       {
@@ -1117,6 +1122,7 @@ export function seedDiamond(repo: string, root: string, now = Date.now()): void 
         attempt: 1,
         image: path.join(root, 'releases', DIAMOND.ranOn.tag, 'packages', 'agent-runtime'),
         harnessVersion: DIAMOND.ranOn.harnessVersion,
+        ranIn: DIAMOND.ranIn.measured,
       },
     ]),
   );

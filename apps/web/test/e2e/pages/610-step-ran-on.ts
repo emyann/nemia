@@ -10,7 +10,7 @@ const STEP = 'implement';
 
 /**
  * What a step's session ran on, in its inspector's facts: the DIAMOND's running step, whose attempt recorded an image under the store's
- * `releases/<tag>/` and Claude Code's version, says the tag and the version; its top, whose attempt recorded neither, says `not recorded`
+ * `releases/<tag>/` and Claude Code's version, says the tag and the version, and the mode its harness ran it in, filed with another; its top, whose attempt recorded neither, says `not recorded`
  * on its Details tab, a finished step's inspector opening on its Output.
  */
 export default {
@@ -22,6 +22,10 @@ export default {
     await expectVisible(
       bar.locator('[data-fact="ran on"] dd', { hasText: `${DIAMOND.ranOn.tag} · claude ${DIAMOND.ranOn.harnessVersion}` }),
       'the step at work says the release and the Claude Code its session runs on',
+    );
+    await expectVisible(
+      bar.locator('[data-fact="permission mode"] dd', { hasText: DIAMOND.ranIn.measured }).filter({ hasText: 'by harness' }),
+      'and the mode its session says it runs in, marked as its harness\'s where it was filed with another',
     );
     await photograph(bar, path.join(OUT, `step-ran-on-inspector-${await themeOf(page)}.png`));
 

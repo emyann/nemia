@@ -99,7 +99,8 @@ export const runListOf = Effect.fn('runListOf')(function* <R extends Listed, E, 
   for (const [i, run] of page.items.entries()) {
     const answer = answers[i];
     if (answer === undefined) return yield* Effect.die(new Error(`Run ${run.id} was handed to the list's judgement and not judged.`));
-    if ('unjudged' in answer) unjudged.push({ name: run.id, namespace: runNamespace(run.factory), error: answer.unjudged });
+    if ('unjudged' in answer)
+      unjudged.push({ name: run.id, namespace: runNamespace(run.factory), error: answer.unjudged, steps: [...answer.steps] });
     else items.push(answer);
   }
   const answered: RunList = { ...listOf('Run', page, items), ...(unjudged.length ? { unjudged } : {}) };
@@ -255,6 +256,7 @@ const byState = Effect.fnUntraced(function* <E, R, O>(
         name: one.name,
         namespace: runNamespace(one.run.factory),
         error: 'unjudged' in answer ? answer.unjudged : '',
+        ...('unjudged' in answer ? { steps: [...answer.steps] } : {}),
         state: one.state,
       });
     else items.push(framed(answer, framePartsOf(one.summary, one.one.judgement, filed, now)));

@@ -18,6 +18,7 @@ const stepOf = (name: string, message: string, more: Record<string, unknown> = {
   spent: null,
   denied: null,
   waitingFor: null,
+  attempts: { count: 0, latest: null },
   ...more,
 });
 
@@ -161,13 +162,56 @@ test('a run waiting on a run that never lands waits on you with its advice; a se
   assert.equal(cellOf(run, 'Steps'), 'build needs-human: a permission');
 });
 
+test('a step notes the questions its closeout asks and what its session at work runs on; an ended attempt says nothing it ran on', () => {
+  const latest = (ended: string | null) => ({
+    count: 1,
+    latest: { ended, release: { kind: 'install', tag: 'v1.2.0' }, harness: { name: 'claude', version: '2.1.0' } },
+  });
+  const run = runOf('r-asks', {
+    status: {
+      status: 'waiting',
+      steps: [
+        stepOf('plan', 'succeeded · BLOCKED', { asks: 2 }),
+        stepOf('build', 'working', { attempts: latest(null) }),
+        stepOf('done', 'verified ✓', { attempts: latest('succeeded') }),
+      ],
+    },
+  });
+  assert.equal(
+    cellOf(run, 'Steps'),
+    'plan succeeded · BLOCKED · asks 2 questions; build working · on v1.2.0, claude 2.1.0; done verified ✓',
+  );
+});
+
+test('a run whose result steps have branches names them with `nemia decide <run>`, but not twice where what to decide names them', () => {
+  const landed = runOf('r-landed', { status: { status: 'landed', result: ['wf/r-landed/implement'] } });
+  assert.equal(cellOf(landed, 'Waits'), 'result: wf/r-landed/implement — nemia decide r-landed');
+  const deciding = runOf('r-decide', {
+    status: {
+      status: 'succeeded',
+      result: ['wf/r-decide/implement'],
+      toDecide: { kind: 'result', branches: ['wf/r-decide/implement'], said: 'wf/r-decide/implement is ahead of main' },
+    },
+  });
+  assert.equal(cellOf(deciding, 'Waits'), 'to decide: wf/r-decide/implement is ahead of main');
+});
+
 test('a page is a Table: its place kept, a row per judged run with its metadata, then a row per run that could not be judged', () => {
   const list = {
     apiVersion: 'nemia/v1',
     kind: 'RunList',
     metadata: { continue: 'r-2' },
     items: [runOf('r-1'), runOf('r-2')],
-    unjudged: [{ name: 'r-3', error: 'its journal does not read' }],
+    unjudged: [
+      {
+        name: 'r-3',
+        error: 'its journal does not read',
+        steps: [
+          { name: 'build', message: 'unreadable', branch: 'wf/r-3/build' },
+          { name: 'review', message: 'pending', branch: null },
+        ],
+      },
+    ],
   } as unknown as RunList;
   const table = runTable(list);
   assert.equal(table.kind, 'Table');
@@ -185,5 +229,6 @@ test('a page is a Table: its place kept, a row per judged run with its metadata,
   assert.equal(table.rows[2]?.object, undefined, 'a run not judged has no object');
   assert.ok(String(table.rows[2]?.cells[4]).includes('its journal does not read'), 'its note says why');
   assert.equal(table.rows[2]?.cells.length, RUN_COLUMNS.length, 'a cell per column');
+  assert.equal(table.rows[2]?.cells[7], 'build unreadable wf/r-3/build; review pending', 'its steps as its record says them');
   assert.equal(Object.hasOwn(runTable({ ...list, metadata: {} }).metadata, 'continue'), false, 'a last page has no place');
 });

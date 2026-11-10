@@ -36,6 +36,8 @@ import { runInputGraph } from '../summary/graph.ts';
 import { bare, type Filings, tryOf } from '../summary/reads.verb.ts';
 import { atHarness, needsOf, spentOf, stepSaid } from '../summary/judged.verb.ts';
 import { judgedFields } from '../summary/summary.verb.ts';
+import type { UnjudgedStep } from '../summary/judgement.verb.ts';
+import { resultBranches } from '../branches/branches.store.ts';
 import { runLabels } from '../telemetry/telemetry.ts';
 import { metadataLabels } from '../labels/labels.ts';
 import { runStartedAt, type Timeline, type TimelineTotal } from '../timeline/index.ts';
@@ -66,8 +68,8 @@ export type RunReads = {
   readonly listed?: boolean;
 };
 
-/** The object of a run, or why it is not judged, in the words the list says it with. */
-export type RunObjectAnswer = RunObject | { unjudged: string };
+/** The object of a run, or why it is not judged, in the words the list says it with, and each step's word off its record. */
+export type RunObjectAnswer = RunObject | { unjudged: string; steps: readonly UnjudgedStep[] };
 
 /** The short of a try (`TryShort`): its number, round and codes, how it signed off and its check's verdict. */
 export const tryShort = (t: StepTry): TryShort => ({
@@ -231,6 +233,12 @@ const stepWord = ({ run, steps, views, judged }: StepAt, name: string): RunStepS
   );
 };
 
+/** How many questions the step's closeout asks of a person it waits on (`Judged`'s `beside`), where it asks any. */
+const asksOf = (judged: RunReading['judged'], name: string): Pick<RunStepStatus, 'asks'> => {
+  const asks = judged.beside.get(name)?.asks;
+  return asks ? { asks } : {};
+};
+
 /**
  * One step's status (`RunStepStatus`), off what `runObject` read once for the run (`StepAt`), its current try's short read off its tries.
  * One more observation for a blocked session's last line (`lastLineOf`).
@@ -273,9 +281,16 @@ const stepStatusOf = Effect.fnUntraced(function* (name: string, at: StepAt) {
     attempts: current.attempts,
     used: taskId ? usedOf(used[name], judgedContext) : null,
     ...costOf(run, name, at),
+    ...asksOf(judged, name),
   };
   return status;
 });
+
+/** Where the run's work ended up (`resultBranches`), where a result step has a branch. */
+const resultOf = (run: Run, steps: readonly Workflow[]): Pick<RunStatus, 'result'> => {
+  const result = resultBranches(run, steps);
+  return result.length ? { result } : {};
+};
 
 /**
  * The object's run-level status beyond the list's judged fields, the graph, the timeline and the steps: the rest the board shows but the
@@ -295,6 +310,7 @@ const restOf = (run: Run, at: RunReading, kinds: readonly Drift[]) => {
     gates: gatesOf(steps, run),
     warning: null,
     kinds: [...kinds],
+    ...resultOf(run, steps),
   } satisfies Partial<RunStatus>;
 };
 
@@ -310,7 +326,7 @@ const restOf = (run: Run, at: RunReading, kinds: readonly Drift[]) => {
  */
 export const runObject = Effect.fn('runObject')(function* (run: Run, { memo, inRequest, listed = false }: RunReads) {
   const at = yield* runReading(run, memo.filings);
-  if ('unjudged' in at) return { unjudged: at.unjudged } satisfies RunObjectAnswer;
+  if ('unjudged' in at) return { unjudged: at.unjudged, steps: at.steps } satisfies RunObjectAnswer;
   return yield* runObjectOf(run, at, { said: memo.said, listed, ...(inRequest ? { inRequest } : {}) });
 });
 

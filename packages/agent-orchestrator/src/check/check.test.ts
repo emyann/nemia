@@ -131,7 +131,8 @@ test('attemptVerdict: the exit code an attempt recorded, else unfinished', async
   for (const [name, attempt] of unfinished) await t.test(`unfinished: ${name}`, () => assert.equal(attemptVerdict(attempt), 'unfinished'));
   await t.test('the one judgement: no other source reads an end cut short by its reason', () => {
     const src = path.resolve(import.meta.dirname, '..');
-    const cut = /reason\s*!==?=?\s*'(?:deadline|operator)'/;
+    const cut = /reason\s*[!=]==?\s*'(?:deadline|operator)'|'(?:deadline|operator)'\s*[!=]==?\s*[\w.?]*reason\b/;
+    assert.ok(cut.test("a.reason === 'deadline' ? undefined : a.exitCode"), 'the scan refuses a reading by equality too');
     const reading = fs
       .readdirSync(src, { recursive: true, encoding: 'utf8' })
       .filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts'))

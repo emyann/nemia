@@ -51,7 +51,7 @@ const READS: readonly Command[] = [tableEntry(SHOW), CLOSEOUT, TRIES, TRY, TOLD,
 /** The commands the CLI serves alone and runs itself, in the order `nemia`'s help lists them. */
 export const RAN: readonly Ran[] = [TICK, UP, WATCH];
 
-/** Every command with a handler defined once, in the order `nemia`'s help lists them: what the api may serve. */
+/** Every command with a handler defined once, in the order `nemia`'s help lists them: the in-process CLI's list of entries. */
 export const COMMANDS: readonly Command[] = [
   START,
   tableEntry(CONCLUDED),

@@ -325,7 +325,8 @@ on disk, and a memory stand-in a test gives its program with `Effect.provide(pro
 first: a new run, or one written back, that breaks an invariant of the run's model (`src/record/record.model.ts`) is refused
 `Invalid` and nothing is written, and a new run at an id that has a record is refused `Conflict`. A program given no door reads the
 files. A synchronous caller reads through it at once (`runsAtOnce`), and no file of `src` but the door's reads the files store
-(`test/run-store.test.ts`).
+(`test/run-store.test.ts`). `runsAtOnce` and `keptRuns` read the files at the module's root whatever door a program is given: a debt
+counted per file in `test/run-door.baseline.ts`, which only shrinks, until the door is rooted.
 
 ## The Factory door
 

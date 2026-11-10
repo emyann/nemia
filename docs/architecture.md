@@ -394,7 +394,9 @@ program's requirements change while the run store's callers move onto it. A defa
 `RunDoor` is no fact of where a program runs, as the place and the root are, and requiring it would have changed the type of every
 controller and of each of their callers at once. A synchronous caller — the stats, the run list, the pages, the command line — reads
 through the door at once (`runsAtOnce`, the same file), so its writes are checked as the door checks them; no file of `src` but the
-door's reads the files store (`filesStore`), which `test/run-store.test.ts` refuses with no baseline. A run from a card is created once: on the files the create writes the record `wx`,
+door's reads the files store (`filesStore`), which `test/run-store.test.ts` refuses with no baseline. The door is not rooted yet:
+`runsAtOnce` and `keptRuns` read the files at the module's root whatever door or `StoreRoot` a program is given, a debt counted per
+file in `packages/agent-orchestrator/test/run-door.baseline.ts`, which only shrinks. A run from a card is created once: on the files the create writes the record `wx`,
 then claims the card with a `wx` create of `<root>/started/<card>.json` naming the run — outside `runs/`, so no listing, prune or sweep
 of runs reads it — and a loser forgets its own record and is refused `Conflict` (`cardStartedTwice`). Forgetting a run (`runs.forget`,
 `nemia rm`) removes the claim that names it, so a store keeps no claim of a run it no longer has; a claim whose run has no record all the

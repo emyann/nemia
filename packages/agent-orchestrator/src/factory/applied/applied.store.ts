@@ -18,26 +18,14 @@ import { writeWhole } from '../../whole-file/whole-file.store.ts';
 /** The folder the store `home` keeps a factory's own files in, beside its `<name>.json`. */
 const folderAt = (home: string, name: string): string => path.join(home, 'factories', name);
 
-/** The folder the store keeps a factory's own files in, at the module's root. */
-const folderOf = (home: string, name: string): string => folderAt(home, name);
-
-/** The folder a templated factory of the store `home` runs from (`treeDir`). */
-export const treeDirAt = (home: string, name: string): string => path.join(folderAt(home, name), 'tree');
-
-/** The base of a templated factory of the store `home`: the template as last rendered into it (`appliedDir`). */
-export const appliedDirAt = (home: string, name: string): string => path.join(folderAt(home, name), 'applied');
-
-/** What the controller last observed of a templated factory of the store `home` (`readStatus`). */
-export const readStatusAt = (home: string, name: string): Status | undefined => statusIn(path.join(folderAt(home, name), 'status.json'));
-
 /** The folder a templated factory runs from: today's format, seeded once from its base, then the person's. */
-export const treeDir = (home: string, name: string): string => path.join(folderOf(home, name), 'tree');
+export const treeDir = (home: string, name: string): string => path.join(folderAt(home, name), 'tree');
 
 /** The template as the controller last rendered it into the factory: read-only, the base of an upgrade's merge. */
-export const appliedDir = (home: string, name: string): string => path.join(folderOf(home, name), 'applied');
+export const appliedDir = (home: string, name: string): string => path.join(folderAt(home, name), 'applied');
 
 /** What the controller last observed of a templated factory, written by it alone. */
-export const statusFile = (home: string, name: string): string => path.join(folderOf(home, name), 'status.json');
+export const statusFile = (home: string, name: string): string => path.join(folderAt(home, name), 'status.json');
 
 /** One file of a folder to stage: its path in it, its bytes, and its mode where it keeps one (an executable script of a skill). */
 export type Entry = { path: string; bytes: Buffer; mode?: number };
@@ -67,10 +55,6 @@ const wiringFile = (home: string, name: string): string => path.join(treeDir(hom
  */
 export const readTreeWiring = (home: string, name: string): { wiring: TreeWiring } | { absent: true } | { error: string } =>
   wiringIn(wiringFile(home, name));
-
-/** The wiring of the factory `name`'s tree in the store `home` (`readTreeWiring`). */
-export const readTreeWiringAt = (home: string, name: string): { wiring: TreeWiring } | { absent: true } | { error: string } =>
-  wiringIn(path.join(treeDirAt(home, name), 'factory.json'));
 
 /** The wiring a tree's `file` holds, none while it is not there, or why it does not read. */
 function wiringIn(file: string): { wiring: TreeWiring } | { absent: true } | { error: string } {
@@ -110,10 +94,6 @@ function wiringOfText(file: string, text: string): { wiring: TreeWiring } | { er
 
 /** The tree's wiring of the factory `name` written whole, `workflows` kept sorted. */
 export const writeTreeWiring = (home: string, name: string, wiring: TreeWiring): void => wiringWritten(wiringFile(home, name), wiring);
-
-/** The tree's wiring of the factory `name` in the store `home` written whole (`writeTreeWiring`). */
-export const writeTreeWiringAt = (home: string, name: string, wiring: TreeWiring): void =>
-  wiringWritten(path.join(treeDirAt(home, name), 'factory.json'), wiring);
 
 /** `wiring` written whole onto a tree's `file`, `workflows` kept sorted. */
 const wiringWritten = (file: string, wiring: TreeWiring): void =>
@@ -315,7 +295,7 @@ const ResolutionsSchema = Schema.StructWithRest(
 export type Resolutions = typeof ResolutionsSchema.Type;
 
 /** The file of the person's choices for the factory `name`'s upgrade, written by `nemia factory resolve` alone. */
-export const resolutionsFile = (home: string, name: string): string => path.join(folderOf(home, name), 'resolutions.json');
+export const resolutionsFile = (home: string, name: string): string => path.join(folderAt(home, name), 'resolutions.json');
 
 /** The person's choices for the factory `name`'s upgrade, or none where there are none or they do not read. */
 export function readResolutions(home: string, name: string): Resolutions | undefined {

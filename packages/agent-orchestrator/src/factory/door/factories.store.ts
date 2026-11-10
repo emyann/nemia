@@ -45,7 +45,7 @@ import {
 } from '../factory.store.ts';
 import { levelDiffers } from './generation.ts';
 import type { FactoryLevelFile } from '../../level/level.ts';
-import { readFactoryLevelAt, writeFactoryLevelAt } from '../../level/level.store.ts';
+import { readFactoryLevel, writeFactoryLevel } from '../../level/level.store.ts';
 import { readRules, rulesAtHome, rulesCleared, rulesWritten, type RulesRead } from '../rules/rules.store.ts';
 import type { FactoryServers } from '../servers/index.ts';
 import { factoryServers, writeFactoryServers } from '../servers/servers.store.ts';
@@ -251,10 +251,10 @@ export function factoryFiles(home: string): FactoryLayer {
       remove: (name) => removeFactoryAt(home, name).file,
     },
     level: {
-      read: (name) => readFactoryLevelAt(home, name),
+      read: (name) => readFactoryLevel(home, name),
       write: (name, level) => {
-        const was = levelHeld(() => readFactoryLevelAt(home, name));
-        writeFactoryLevelAt(home, name, level);
+        const was = levelHeld(() => readFactoryLevel(home, name));
+        writeFactoryLevel(home, name, level);
         if (levelDiffers(was, level) && factoryNamesAt(home).includes(name))
           rewriteFactoryAt(home, readFactoryAt(home, name), 'Nothing was written.', true);
       },

@@ -84,7 +84,10 @@ const worldOf = (layer: Layer.Layer<never>): World => {
 /** A store of a story's own, in memory: the doors' memory layers, made new, holding no subscription and no feed. */
 const inMemory = (): World => worldOf(Layer.mergeAll(subscriptionDoorMemory(), feedDoorMemory()));
 
-/** The store on the files at `ROOT`, the module's root and every deliverer's `StoreRoot`: for what only a file can hold. */
+/**
+ * The store on the files at `ROOT`, the root the file's synchronous spellings are handed and every deliverer's `StoreRoot`: for what only
+ * a file can hold.
+ */
 const onFiles = (): World => worldOf(Layer.mergeAll(subscriptionDoorFiles(ROOT), feedDoorFiles(ROOT)));
 
 /** An act of a door, run at once: a refusal thrown as it is. */

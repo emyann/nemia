@@ -22,7 +22,7 @@ import {
   type FactoryStatus,
   type ObjectMeta,
 } from 'objects';
-import { readStatusAt } from '../applied/applied.store.ts';
+import { readStatus } from '../applied/applied.store.ts';
 import { commandLine } from '../../command/command.ts';
 import { COMMANDS } from '../../command/commands.verb.ts';
 import { generationOf } from '../door/generation.ts';
@@ -130,7 +130,7 @@ const ownLevel = (home: string, name: string): { level: Level } | { error: strin
 export const factoryObjectOf = (listing: FactoryListing, listed: FactoryListed, home: string): FactoryObject => {
   const { metadata, spec } = filedOf(listing, home);
   if ('error' in listing) return objectOf(metadata, spec, { conditions: [], untrusted: [], error: `${listing.file} ${listing.error}` });
-  const written = readStatusAt(home, listing.name);
+  const written = readStatus(home, listing.name);
   const level = ownLevel(home, listing.name);
   const status: FactoryStatus = {
     ...(written?.observedGeneration === undefined ? {} : { observedGeneration: written.observedGeneration }),

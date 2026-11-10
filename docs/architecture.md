@@ -382,21 +382,23 @@ came to empty the person's own `~/.agent-workflows/runs`. The runtime's half is 
 **The Run door.** A run — its record, and the asks, holds, refresh asks and forgetting markers a person keeps beside it — is read and
 written through one Effect service, `RunDoor` (`packages/agent-orchestrator/src/runs/runs.store.ts`), whose methods take a `RunId` and
 answer Effects failing with a refusal. It has two layers built the one way (`runDoorOver`): the files (`runDoorFiles`, over
-`filesStore`, so a record keeps its bytes) and a memory stand-in (`runDoorMemory`, `src/runs/memory.store.ts`, which no file of `src`
+`filesStoreAt(home)`, so a record keeps its bytes) and a memory stand-in (`runDoorMemory`, `src/runs/memory.store.ts`, which no file of `src`
 imports: `STAND_INS` in `test/boundary.test.ts`). Each write is checked first, on both: a new run decodes through the model's `Run`
 (`src/record/record.model.ts`) with its id as `RunId.OnCreate` checks it, a run written back through `Run`, and a break of an invariant
 is `Invalid`; a new run at an id with a record is `Conflict`, the files' `wx`. One table of walks holds the layers to each other
 (`test/run-walks.ts`, run on files by `test/run-store.test.ts` and on memory by `src/runs/memory.store.test.ts`), as the place's do;
 the pattern — `doorOf`, `checked`, `fromThrow` and `rootedDoor` in `src/door/door.store.ts`, and the walk runner `test/door-walks.ts` — names no
 aggregate, for the doors after it. Unlike `PlaceService` and `StoreRoot`, the door has a default: it is a `Context.Reference` whose
-default value is the files door, so a program given none reads today's records and one given the memory layer reads that, and no
-program's requirements change while the run store's callers move onto it. A default here departs from the rule above on purpose:
+default value is rooted (`rootedDoor`) — the files door at the `StoreRoot` the program is given, refused `Invalid` where it was given
+none — so a program given no door reads the records of its own store, one given the memory layer reads that with no root at all, and
+no program's requirements change while the run store's callers move onto it. A default here departs from the rule above on purpose:
 `RunDoor` is no fact of where a program runs, as the place and the root are, and requiring it would have changed the type of every
 controller and of each of their callers at once. A synchronous caller — the stats, the run list, the pages, the command line — reads
 through the door at once (`runsAtOnce`, the same file), so its writes are checked as the door checks them; no file of `src` but the
-door's reads the files store (`filesStore`), which `test/run-store.test.ts` refuses with no baseline. The door is not rooted yet:
-`runsAtOnce` and `keptRuns` read the files at the module's root whatever door or `StoreRoot` a program is given, a debt counted per
-file in `packages/agent-orchestrator/test/run-door.baseline.ts`, which only shrinks. A run from a card is created once: on the files the create writes the record `wx`,
+door's reads the files store (`filesStoreAt`), which `test/run-store.test.ts` refuses with no baseline. `runsAtOnce(home)` and
+`keptRuns(home, …)` read the files at the root they are handed, whatever door a program is given, so a test's memory door never sees
+them: each such read past the door is a debt counted per file in `packages/agent-orchestrator/test/run-door.baseline.ts`, which only
+shrinks. A run from a card is created once: on the files the create writes the record `wx`,
 then claims the card with a `wx` create of `<root>/started/<card>.json` naming the run — outside `runs/`, so no listing, prune or sweep
 of runs reads it — and a loser forgets its own record and is refused `Conflict` (`cardStartedTwice`). Forgetting a run (`runs.forget`,
 `nemia rm`) removes the claim that names it, so a store keeps no claim of a run it no longer has; a claim whose run has no record all the
@@ -617,8 +619,9 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
 - **client** is `src/runtime-client.ts`, the subject of the third rule.
 - **model** is a layer's declaration of its entities as Effect Schemas — its branded ids, its aggregates and their invariants —
   beside each context's glossary (`record/record.model.ts` for run-core), with the printer and the whole diagram in `src/model/`,
-  which holds model files alone. It imports Effect, other model files and pure files, nothing else, and no pure file imports it, so
-  `agent-orchestrator/run` and `/workflow` load none. A model reshapes nothing: its doors adopt it slice by slice, each read
+  which holds model files alone. It imports Effect, other model files and pure files, nothing else, and no pure file imports it but for
+  its types alone (`import type`, erased as the file loads: `record.ts`'s `Run` is the model's encoded type), so
+  `agent-orchestrator/run` and `/workflow` load none (`TYPES_OF` in `test/boundary.test.ts`). A model reshapes nothing: its doors adopt it slice by slice, each read
   decoding through it once its slice comes (`packages/agent-orchestrator/docs/model.md`).
 
 A place's code (`place/<name>/`, the git place's `place.ts`, `git.ts` and `verbs/`) is none of the five, and stands beside `src`: it

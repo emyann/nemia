@@ -14,7 +14,7 @@
  * before the check still reads. The walks of `test/ledger-walks.ts` hold both layers to one table.
  *
  * The door's default is rooted (`rootedDoor`). `ledgerOf` and `appendRevision` are its synchronous spellings for the callers that are
- * not programs yet, over the files at the module's root (`test/ledger-door.baseline.ts` counts them, and only shrinks).
+ * not programs yet, over the files at the root `home` they are handed (`test/ledger-door.baseline.ts` counts them, and only shrinks).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -156,20 +156,20 @@ export const LedgerDoor = Context.Reference<LedgerDoorShape>('agent-orchestrator
 /** The Ledger door over the files of the store `root`, as a layer: for a program that names its root by the door, not by `StoreRoot`. */
 export const ledgerDoorFiles = (root: string): Layer.Layer<never> => Layer.succeed(LedgerDoor)(ledgerDoorOver(ledgerFiles(root)));
 
-/** An act of the door over the ledger at the module's root, run now: what it answers, or the refusal thrown. */
-const atModuleRoot = <A>(home: string, act: (door: LedgerDoorShape) => Effect.Effect<A, unknown>): A =>
+/** An act of the door over the ledger at the root `home`, run now: what it answers, or the refusal thrown. */
+const atRoot = <A>(home: string, act: (door: LedgerDoorShape) => Effect.Effect<A, unknown>): A =>
   Effect.runSync(act(ledgerDoorOver(ledgerIn(revisionsDir(home)))));
 
-/** The entries kept for `kind` and `name` at the module's root (`LedgerLayer['entries']['of']`): the door's synchronous spelling. */
+/** The entries kept for `kind` and `name` at the root `home` (`LedgerLayer['entries']['of']`): the door's synchronous spelling. */
 export const ledgerOf = (home: string, kind: RevisionKind, name: string): Revision[] =>
-  atModuleRoot(home, (door) => door.entries.of({ kind, name }));
+  atRoot(home, (door) => door.entries.of({ kind, name }));
 
 /**
- * The revision `hash` stands at for `kind` and `name` at the module's root, appended when new (`LedgerLayer['entries']['append']`): the
+ * The revision `hash` stands at for `kind` and `name` at the root `home`, appended when new (`LedgerLayer['entries']['append']`): the
  * door's synchronous spelling, refused as the door refuses.
  */
 export const appendRevision = (home: string, kind: RevisionKind, name: string, hash: string, at: string): Revision =>
-  atModuleRoot(home, (door) => door.entries.append({ kind, name }, hash, at));
+  atRoot(home, (door) => door.entries.append({ kind, name }, hash, at));
 
 /**
  * The ledger's number for what a definition holds now, by its digest (`version`), read through the Ledger door and never appended: the

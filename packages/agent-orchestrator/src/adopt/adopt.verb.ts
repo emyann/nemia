@@ -18,7 +18,7 @@ import { FactoryDoor, filedFactory, refuseName } from '../factory/door/factories
 import { StoreRoot } from '../config/root.store.ts';
 import type { Factory, FactoryTemplate } from '../factory/factory.ts';
 import { renderedAt } from '../factory/applied/applied.verb.ts';
-import { treeDirAt } from '../factory/applied/applied.store.ts';
+import { treeDir } from '../factory/applied/applied.store.ts';
 import { sourceGiven } from '../template/door/templates.ts';
 import { adopted, adoptPlan, adoptRefusal, templatedAdoptRefusal, type AdoptPlan } from './adopt.ts';
 import { adoptionAt, planDigest, stageAdoption } from './adopt.store.ts';
@@ -207,7 +207,7 @@ const adoptedNow = Effect.fn('adoptedNow')(function* (args: Args) {
   if (refused !== null) return yield* Effect.fail(new Conflict({ message: `${verb}: ${refused.message} ${notDone}` }));
   yield* tried(() => stageAdoption(home, factory.name, render.entries));
   const template: FactoryTemplate = { source, version: render.version, params: render.params };
-  const tree = treeDirAt(home, factory.name);
+  const tree = treeDir(home, factory.name);
   const file = yield* (yield* FactoryDoor).factories.rewrite(adopted(factory, read.adoption.wiring, template, tree));
   return { name: factory.name, file, template, tree } satisfies Adopted;
 });

@@ -1,8 +1,8 @@
 /**
  * `nemia factory rules`, an entry of the command table: a factory's rules, the words told to every agent hired into it — read bare,
  * written from `--file`, removed with `--clear`. The api's Factory `rules`, `putRules` and `deleteRules` (`objects`' Api) call its handler
- * by its `input`. Both through the Factory door (`FactoryDoor`); `factoryRules` reads the module's root,
- * for the package's callers not yet on it.
+ * by its `input`. Both through the Factory door (`FactoryDoor`); `factoryRules(home, name)` reads the files
+ * at the root it is handed, for the package's callers not yet on it.
  */
 import { doorAtOnce, FactoryDoor } from '../door/factories.store.ts';
 import { leftOut, type Flag, type Spec } from '../../command/command.ts';

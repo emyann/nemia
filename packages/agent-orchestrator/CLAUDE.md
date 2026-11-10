@@ -169,8 +169,8 @@ too, which holds parity with this one until the in-process reads retire.
   `src/subscription/subscription.store.ts`), the revision ledger through the Ledger door (`LedgerDoor`, `src/revisions/revisions.store.ts`)
   and the feed through the Feed door (`FeedDoor`, `src/feed/feed.store.ts`), each rooted as the Factory door is**: a program that yields
   one is given `StoreRoot`, or a test gives it `subscriptionDoorMemory()`, `ledgerDoorMemory()` or `feedDoorMemory()` (each a
-  `memory.store.ts` beside its store). A synchronous caller still on the module spellings (`listSubscriptions`, `ledgerOf`, `readFeed`, …)
-  reads the module's root whatever door was given, counted per door in `test/ledger-door.baseline.ts` and `test/feed-door.baseline.ts`;
+  `memory.store.ts` beside its store). A synchronous caller still on the synchronous spellings (`listSubscriptions`, `ledgerOf`, `readFeed`, …)
+  reads the files at the root it hands them whatever door was given, counted per door in `test/ledger-door.baseline.ts` and `test/feed-door.baseline.ts`;
   none is left on the subscriptions' (`src/subscription/subscription.store.test.ts` refuses one). The feed's fold memo is `emitFeed`'s, never the layer's.
 - **A file written back is decoded by a `StructWithRest`**: a `Struct` strips the keys it does not name, and a record written by a newer
   tick keeps them. `Struct({})` accepts an array; a struct with a key refuses one. A frozen step is decoded by `FrozenStepSchema`

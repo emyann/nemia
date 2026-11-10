@@ -32,7 +32,6 @@ import {
   stageFolder,
   swapTree,
   treeDir,
-  treeDirAt,
   writeStatus,
   choicesFor,
   type Condition,
@@ -553,7 +552,7 @@ const applied = Effect.fn('applied')(function* (args: Args) {
       }),
     );
   const template = { source, version: read.version, params: read.params };
-  const tree = treeDirAt(yield* StoreRoot, name);
+  const tree = treeDir(yield* StoreRoot, name);
   const factory: Factory = { name, repos, workflows: [], hires: {}, schedules: {}, template, tree };
   const file = yield* (yield* FactoryDoor).factories.create(factory);
   const place = builtinPlace(source, yield* BuiltinTemplates);

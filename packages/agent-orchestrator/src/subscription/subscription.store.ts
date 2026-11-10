@@ -16,8 +16,8 @@
  * A file that does not read is no stop: the listing answers it in `left`, with its words, and the deliverer says each once; the store
  * writes nothing to stderr. A file a former nemia wrote still reads: its `wake` list is converted on every read (`selectorsOfWake`).
  *
- * The door's default is rooted (`rootedDoor`). The module's spellings (`listSubscriptions`, `putSubscription`, …) are the door over the
- * files at the module's root, run at once, for a caller that is no program; no file of `src` calls them
+ * The door's default is rooted (`rootedDoor`). The synchronous spellings (`listSubscriptions`, `putSubscription`, …) are the door over the
+ * files at the root `home` they are handed, run at once, for a caller that is no program; no file of `src` calls them
  * (`src/subscription/subscription.store.test.ts`).
  */
 import fs from 'node:fs';
@@ -347,8 +347,8 @@ export const SubscriptionDoor = Context.Reference<SubscriptionDoorShape>('agent-
 export const subscriptionDoorFiles = (root: string): Layer.Layer<never> =>
   Layer.succeed(SubscriptionDoor)(subscriptionDoorOver(subscriptionFiles(root)));
 
-/** An act of the door over the files at the module's root, run at once: a refusal is thrown as it is. */
-const atModule = <A>(home: string, act: (door: SubscriptionDoorShape) => Effect.Effect<A, unknown>): A =>
+/** An act of the door over the files at the root `home`, run at once: a refusal is thrown as it is. */
+const atRoot = <A>(home: string, act: (door: SubscriptionDoorShape) => Effect.Effect<A, unknown>): A =>
   Effect.runSync(act(subscriptionDoorOver(subscriptionFiles(home))));
 
 const named = SubscriptionName.read;
@@ -358,31 +358,31 @@ const named = SubscriptionName.read;
  * nothing where not.
  */
 export function listSubscriptions(home: string, said?: (line: string) => void): Listed[] {
-  const { listed, left } = atModule(home, (door) => door.subscriptions.list());
+  const { listed, left } = atRoot(home, (door) => door.subscriptions.list());
   for (const one of left) said?.(one.words);
   return listed;
 }
 
-/** The names of the deliverer's files at the module's root (`deliveries.list`). */
-export const listDeliveries = (home: string): string[] => atModule(home, (door) => door.deliveries.list());
+/** The names of the deliverer's files at the root `home` (`deliveries.list`). */
+export const listDeliveries = (home: string): string[] => atRoot(home, (door) => door.deliveries.list());
 
-/** Puts a subscription at the module's root (`subscriptions.put`). */
+/** Puts a subscription at the root `home` (`subscriptions.put`). */
 export const putSubscription = (home: string, name: string, subscription: Subscription): void =>
-  atModule(home, (door) => door.subscriptions.put(named(name), subscription));
+  atRoot(home, (door) => door.subscriptions.put(named(name), subscription));
 
-/** Removes a subscription at the module's root (`subscriptions.drop`). */
-export const dropSubscription = (home: string, name: string): void => atModule(home, (door) => door.subscriptions.drop(named(name)));
+/** Removes a subscription at the root `home` (`subscriptions.drop`). */
+export const dropSubscription = (home: string, name: string): void => atRoot(home, (door) => door.subscriptions.drop(named(name)));
 
-/** Where the deliverer is with a subscription at the module's root, or undefined; a file that does not read told to `said`. */
+/** Where the deliverer is with a subscription at the root `home`, or undefined; a file that does not read told to `said`. */
 export function readDelivery(home: string, name: string, said?: (line: string) => void): KeptDelivery | undefined {
-  const read = atModule(home, (door) => door.deliveries.read(named(name)));
+  const read = atRoot(home, (door) => door.deliveries.read(named(name)));
   if (read !== null && 'unread' in read) said?.(read.unread);
   return read !== null && 'kept' in read ? read.kept : undefined;
 }
 
-/** Writes where the deliverer is with a subscription at the module's root (`deliveries.write`). */
+/** Writes where the deliverer is with a subscription at the root `home` (`deliveries.write`). */
 export const writeDelivery = (home: string, name: string, delivery: KeptDelivery): void =>
-  atModule(home, (door) => door.deliveries.write(named(name), delivery));
+  atRoot(home, (door) => door.deliveries.write(named(name), delivery));
 
-/** Removes the deliverer's file of a subscription at the module's root (`deliveries.drop`). */
-export const dropDelivery = (home: string, name: string): void => atModule(home, (door) => door.deliveries.drop(named(name)));
+/** Removes the deliverer's file of a subscription at the root `home` (`deliveries.drop`). */
+export const dropDelivery = (home: string, name: string): void => atRoot(home, (door) => door.deliveries.drop(named(name)));

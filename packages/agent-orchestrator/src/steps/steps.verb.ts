@@ -1,8 +1,8 @@
 /**
  * A run's steps, read as a program (`stepsOf`): the workflow the record froze, with no door and no root, or for a record that froze none,
- * its folder read through the Workflow door the program is given, at the store's root it is given (`StoreRoot`) — never the disk at the
- * module's root. Read again on every call, never kept between passes. A controller, since the door reaches `record.store.ts`, which no
- * store beneath it may close a cycle over (`test/boundary.test.ts`); the refusal and the frozen read are pure (`steps.ts`).
+ * its folder read through the Workflow door the program is given, at the store's root it is given (`StoreRoot`). Read again on every
+ * call, never kept between passes. A controller, since the door reaches `record.store.ts`, which no store beneath it may close a cycle over
+ * (`test/boundary.test.ts`); the refusal and the frozen read are pure (`steps.ts`).
  */
 import { Cause, Effect, Exit, Option } from 'effect';
 import type { StepSpec } from '../workflow.ts';

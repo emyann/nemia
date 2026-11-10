@@ -6,7 +6,7 @@
  * to run: a `nemia` command is run as this client runs that verb, the words a placeholder holds (`"<objection>"`) asked first; a `git`
  * command is printed and never run. Off a terminal it prints and runs nothing.
  *
- * It refuses `--local`, as every verb of the client's own, and `--sensitive`, which the api's read does not take yet.
+ * It refuses `--local`, as every verb of the client's own; `--sensitive <globs>` is sent as the read's `?sensitive=`.
  */
 import readline from 'node:readline';
 import type { DecideCommand, Decidable, RunDecision } from 'objects';
@@ -166,6 +166,28 @@ const terminal = (run: DecideIo['run']): DecideIo => ({
   run,
 });
 
+/**
+ * `--sensitive <globs>` (or `--sensitive=<globs>`) taken out of `args`, once, its comma-separated globs sent as the read's `?sensitive=`;
+ * refused given twice or with no glob, before any run is read.
+ */
+function sensitiveOf(args: readonly string[]): { rest: string[]; sensitive?: string } {
+  const rest: string[] = [];
+  let sensitive: string | undefined;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i] ?? '';
+    const given = arg === '--sensitive' ? args[++i] : arg.startsWith('--sensitive=') ? arg.slice('--sensitive='.length) : null;
+    if (given === null) {
+      rest.push(arg);
+      continue;
+    }
+    if (sensitive !== undefined) throw new Refused('nemia decide takes --sensitive once: give every glob in it, comma-separated');
+    if (given === undefined || given.startsWith('-') || given.split(',').every((glob) => glob.trim() === ''))
+      throw new Refused('nemia decide --sensitive takes its globs, comma-separated: nemia decide <runId> --sensitive "src/**,*.json"');
+    sensitive = given;
+  }
+  return sensitive === undefined ? { rest } : { rest, sensitive };
+}
+
 /** `nemia decide <args>`: the screen of a run's decision, then, at a terminal, the command a person picks run. Answers its exit code. */
 export async function decide(args: readonly string[], run: DecideIo['run'], io: DecideIo = terminal(run)): Promise<number> {
   if (args.includes('--local')) throw noLocal('decide');
@@ -173,14 +195,13 @@ export async function decide(args: readonly string[], run: DecideIo['run'], io: 
     io.output.write(`${DECIDE_HELP}\n`);
     return 0;
   }
-  if (args.includes('--sensitive'))
-    throw new Refused(
-      'nemia decide takes no --sensitive here: the api reads the default check-affecting globs alone. Type it again without --sensitive',
-    );
-  const [runId, ...more] = args;
+  const { rest, sensitive } = sensitiveOf(args);
+  const [runId, ...more] = rest;
   if (runId === undefined || runId === '' || runId.startsWith('-') || more.length)
-    throw new Refused(`nemia decide takes the run alone: nemia decide <runId> (nemia decide --help)`);
-  const decision = await asked('decide', (client) => client.runs.decision({ params: { runId } }));
+    throw new Refused(`nemia decide takes the run alone, and --sensitive <globs>: nemia decide <runId> (nemia decide --help)`);
+  const decision = await asked('decide', (client) =>
+    client.runs.decision({ params: { runId }, query: sensitive === undefined ? {} : { sensitive } }),
+  );
   for (const line of decisionLines(runId, decision)) io.output.write(`${line}\n`);
   const commands = 'commands' in decision ? decision.commands : [];
   return io.interactive && commands.length ? picked(commands, io) : 0;

@@ -66,8 +66,8 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   going run's `wallMs` and `clock`), or its watch sends a MODIFIED of each on every read. Discovery (`GET /api`,
   `src/discovery/discovery.ts`) is read off the `Api` by `objects`' `resourcesOf`. The feed and a step's stream are `StreamSse`
   endpoints.
-- **A request body is decoded by its endpoint's Schema** and refused 400 with the `field` it stopped at (`src/body.ts`, read by
-  `serve.ts`): no schema message reaches a response. A new key goes into the Schema in `objects`, with a test that makes it refuse.
+- **A request body is decoded by its endpoint's Schema** and refused 400 with the `field` it stopped at (`decodeRefused` in
+  `src/objects/serve.ts`): no schema message reaches a response. A new key goes into the Schema in `objects`, with a test that makes it refuse.
 - **A server-side `Table`** (Kubernetes' `Accept: application/json;as=Table;g=meta.k8s.io;v=v1`, `TABLE_ACCEPT`) is answered where an
   endpoint declares `Table` beside its list (runs, cards) and the request accepts it (`wantsTable`, `src/objects/table.ts`).
 - **A feed fixture writes the events the runtime writes**: the runtime decodes its feed, so a fixture event missing a field the

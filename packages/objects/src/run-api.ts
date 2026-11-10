@@ -162,6 +162,8 @@ export class RunsGroup extends HttpApiGroup.make('runs').add(
   }),
   HttpApiEndpoint.get('decision', '/api/runs/:runId/decision', {
     params: { runId: Schema.String },
+    /** Comma-separated globs whose changed files the decision shows in full (`nemia decide --sensitive`); else the defaults. */
+    query: { sensitive: Schema.optionalKey(Schema.String) },
     success: RunDecision,
     error: [Missing, Unjudged],
   }),

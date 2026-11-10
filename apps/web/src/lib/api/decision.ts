@@ -39,7 +39,7 @@ export type Collision = Collisions['colliding'][number];
 export const decisionQuery = (id: string, stamp: string) =>
   queryOptions({
     queryKey: ['runs', id, 'decision', stamp],
-    queryFn: () => call((c) => c.runs.decision({ params: { runId: id } }), read(RunDecision)),
+    queryFn: () => call((c) => c.runs.decision({ params: { runId: id }, query: {} }), read(RunDecision)),
     placeholderData: keepPreviousData,
     staleTime: Infinity,
     refetchOnWindowFocus: false,

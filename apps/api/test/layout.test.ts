@@ -92,9 +92,9 @@ test('no source file imports a test, and every face re-exports by name', () => {
 
 test('REFUSED: an api path in .oxlintrc.json that is not there; a glob is not a path', () => {
   const config = JSON.stringify({
-    overrides: [{ files: ['apps/api/src/body.ts', 'apps/api/src/gone.ts', 'apps/api/**', 'packages/x/src/gone.ts'] }],
+    overrides: [{ files: ['apps/api/src/guard.ts', 'apps/api/src/gone.ts', 'apps/api/**', 'packages/x/src/gone.ts'] }],
   });
-  const there = new Set(['apps/api/src/body.ts']);
+  const there = new Set(['apps/api/src/guard.ts']);
   assert.deepEqual(
     missingPaths(`// the decode override\n${config}`, (f) => there.has(f)),
     ['.oxlintrc.json names apps/api/src/gone.ts, which is not there: move its entry with the file'],
@@ -103,7 +103,7 @@ test('REFUSED: an api path in .oxlintrc.json that is not there; a glob is not a 
 
 test('every api path .oxlintrc.json names is there', () => {
   const config = fs.readFileSync(path.join(ROOT, '.oxlintrc.json'), 'utf8');
-  assert.ok(apiPathsIn(config).includes('apps/api/src/body.ts'), 'the scan reads the decode override');
+  assert.ok(apiPathsIn(config).includes('apps/api/src/agents/agents.ts'), 'the scan reads the decode override');
   assert.deepEqual(
     missingPaths(config, (f) => fs.existsSync(path.join(ROOT, f))),
     [],
@@ -111,7 +111,7 @@ test('every api path .oxlintrc.json names is there', () => {
 });
 
 /** What the root of `src` holds: the process, the mount, the port, the guard every route passes, the shared store, the body reader. */
-const ROOT_FILES = ['src/app.ts', 'src/body.ts', 'src/guard.ts', 'src/layer.ts', 'src/main.ts', 'src/port.ts', 'src/store.ts'];
+const ROOT_FILES = ['src/app.ts', 'src/guard.ts', 'src/layer.ts', 'src/main.ts', 'src/port.ts', 'src/store.ts'];
 
 /** The folder of `src` a file sits in, or undefined for a file at the root. */
 const folderOf = (file: string): string | undefined => /^src\/([^/]+)\//.exec(file)?.[1];

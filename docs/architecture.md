@@ -655,7 +655,7 @@ and read neither `process.env` nor `fetch`. A reader that does today is listed w
 shrinks. Its `src/` is a folder per page or verb a
 person uses — `runs/`, `objects/` (the handlers of the run object and the cards, and the mount that serves every endpoint of `objects`' `Api`, the one route table, under Hono as host), `openapi/`, `steps/`, `decide/`, `server/`, `nemia/`, `asks/`, `inbox/`, `factory/`, `capabilities/`, `workflows/`,
 `agents/`. The root holds `main.ts`, `app.ts`, `port.ts`, `guard.ts`, `store.ts`, `layer.ts` (the services a handler reads, and
-`served`, which runs it on the app's `ManagedRuntime`) and `body.ts` (the mount's body decoder, naming the `field` a 400 stopped at) and nothing else.
+`served`, which runs it on the app's `ManagedRuntime`) and nothing else; the mount decodes a body by its endpoint's Schema (`decodeRefused`, `objects/serve.ts`).
 Its folders keep the rule every package keeps, *Folders, in every package* below; a folder of two files or more has a face,
 `index.ts`, which holds only re-exports by name, and one of one file has none. `app.ts` mounts `objects`' `Api` once, and each folder's handlers are built from it through its face. An
 import between two folders names the file it needs wherever the face would close a cycle — `steps/` reads a run's try — since a cycle

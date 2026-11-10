@@ -96,7 +96,7 @@ export const writeGuard: MiddlewareHandler = async (c, next) => {
 };
 
 /**
- * One status and what to do next: what the api's own readers (body.ts, the inbox's and the extensions' checks) answer before they hand a
- * request to the package. Kept here until the parts that move those readers onto the `Api`'s Schemas remove it.
+ * One status and what to do next: what the inbox's own check of a card's folder answers before it hands a request to the
+ * package (`inbox/inbox.ts`).
  */
 export type Refusal = { status: 400 | 403 | 404 | 409 | 415 | 422; error: string };

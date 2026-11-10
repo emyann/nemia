@@ -285,5 +285,5 @@ export const runsHandlers = HttpApiBuilder.group(Api, 'runs', (handlers) =>
     .handle('listingOne', ({ params: { name }, query }) =>
       answered(async (s) => asJson(await s.inRequest(informed(s, LS.handler({ runId: name, ...selected(query) }, s.env, s.home))))),
     )
-    .handle('decision', ({ params: { runId } }) => decisionHandler(runId)),
+    .handle('decision', ({ params: { runId }, query }) => decisionHandler(runId, query.sensitive)),
 );

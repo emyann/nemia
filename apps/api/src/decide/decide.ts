@@ -8,9 +8,21 @@ import { Unjudged } from 'objects';
 import { runDecision } from 'agent-orchestrator';
 import { answered } from '../objects/refused.ts';
 
-/** The handler of the runs group's `decision` endpoint, the run `runId`'s decision read over the request's services. */
-export const decisionHandler = (runId: string) =>
+/** The globs `?sensitive=` names, comma-separated, each trimmed and none empty; none asked where it is not given. */
+const globsOf = (sensitive: string | undefined): { sensitive?: string[] } => {
+  const globs = (sensitive ?? '')
+    .split(',')
+    .map((glob) => glob.trim())
+    .filter((glob) => glob !== '');
+  return globs.length ? { sensitive: globs } : {};
+};
+
+/**
+ * The handler of the runs group's `decision` endpoint, the run `runId`'s decision read over the request's services; `sensitive`, the
+ * query's comma-separated globs, names the files shown in full in place of the defaults.
+ */
+export const decisionHandler = (runId: string, sensitive?: string) =>
   Effect.flatMap(
-    answered((s) => s.inRequest(runDecision(runId, s.env))),
+    answered((s) => s.inRequest(runDecision(runId, s.env, globsOf(sensitive)))),
     (read) => ('unjudged' in read ? Effect.fail(new Unjudged({ error: read.unjudged })) : Effect.succeed(read.decision)),
   );

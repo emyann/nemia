@@ -94,7 +94,6 @@
         "packages/agent-orchestrator/src/daemon/daemon.store.ts",
         "packages/agent-orchestrator/src/inbox/inbox.store.ts",
         "packages/agent-orchestrator/src/feed/feed.store.ts",
-        "apps/api/src/body.ts",
         "apps/api/src/agents/agents.ts",
         "apps/api/src/runs/start.ts",
         "apps/api/src/workflows/builder.ts",

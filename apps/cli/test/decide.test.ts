@@ -2,7 +2,7 @@
  * `nemia decide`, a verb of the client's own, on a stub server that answers `GET /api/health` and `GET /api/runs/:runId/decision` as the
  * api does (`objects`' `RunDecision`): the screen printed off the read, the commands numbered; at a terminal the one picked run as the
  * client runs that verb, its placeholder asked first, a `git` one printed and never run; off a terminal nothing run. `--local` and
- * `--sensitive` refused, exit 2, before any read.
+ * `--sensitive <globs>` sent as the read's `?sensitive=`, and refused with no glob or given twice, exit 2, before any read.
  */
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -73,7 +73,7 @@ const DECISIONS: Record<string, unknown> = {
 const asked: string[] = [];
 const stub = http.createServer((req, res) => {
   asked.push(req.url ?? '');
-  const id = /^\/api\/runs\/([^/]+)\/decision$/.exec(req.url ?? '')?.[1];
+  const id = /^\/api\/runs\/([^/?]+)\/decision(?:\?.*)?$/.exec(req.url ?? '')?.[1];
   const body = req.url === '/api/health' ? { ok: true } : id !== undefined ? DECISIONS[id] : undefined;
   res.writeHead(body === undefined ? 404 : 200, { 'content-type': 'application/json' });
   res.end(JSON.stringify(body ?? { error: `no run ${id}: list the runs with nemia ls` }));
@@ -151,9 +151,16 @@ test('a run waiting on another says what it waits on, and offers nothing', async
   assert.deepEqual(ran, []);
 });
 
-test('REFUSED: --local, --sensitive, no run and an unknown run, each exit 2; the first three before any read', async () => {
+test("--sensitive <globs> is sent as the read's ?sensitive=, as typed", async () => {
+  const { io } = ioOf(false);
+  assert.equal(await decide(['r-1', '--sensitive', 'src/**,*.json'], io.run, io), 0);
+  const read = [...asked].reverse().find((url) => url.startsWith('/api/runs/r-1/decision'));
+  assert.equal(new URL(read ?? '', 'http://x').searchParams.get('sensitive'), 'src/**,*.json');
+});
+
+test('REFUSED: --local, --sensitive with no glob or twice, no run and an unknown run, each exit 2; all but the last before any read', async () => {
   const before = asked.length;
-  for (const args of [['r-1', '--local'], ['r-1', '--sensitive', 'src/**'], []]) {
+  for (const args of [['r-1', '--local'], ['r-1', '--sensitive'], ['r-1', '--sensitive', 'a', '--sensitive=b'], []]) {
     const { io } = ioOf(false);
     await assert.rejects(decide(args, io.run, io), (err: unknown) => err instanceof Refused && err.code === 2, args.join(' '));
   }

@@ -88,8 +88,9 @@ too, which holds parity with this one until the in-process reads retire.
 
 ## Refusals
 
-- **A new refusal chooses its kind, never a status**: the api reads the kind off `agent-orchestrator` and answers it from one
-  table (`REFUSAL_STATUS` in `apps/api/src/app.ts`); a plain `Error` there is a 500.
+- **A new refusal chooses its kind, never a status**: the api reads the kind off `agent-orchestrator` and answers it by one
+  map (`refusedAs` and `statusOf` in `apps/api/src/objects/refused.ts`), its status the one its `objects` error class declares; a
+  plain `Error` there is a 500.
 
 ## Runs, phases and asks
 

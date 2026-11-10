@@ -94,7 +94,7 @@ const LAYERS: { name: string; at: string[]; refused: string[]; allowed: string[]
       '../../../packages/agent-orchestrator/src/run.ts',
       'objects/src/run.ts',
     ],
-    allowed: ['agent-orchestrator', 'agent-orchestrator/run', 'agent-orchestrator/workflow', 'hono', 'effect', './body.ts', 'objects'],
+    allowed: ['agent-orchestrator', 'agent-orchestrator/run', 'agent-orchestrator/workflow', 'hono', 'effect', './guard.ts', 'objects'],
   },
   {
     name: 'orchestrator',

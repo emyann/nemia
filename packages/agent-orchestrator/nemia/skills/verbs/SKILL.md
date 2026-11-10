@@ -181,7 +181,7 @@ They write nothing: run them unasked, as often as you need. One that sets with s
 They write, and are yours to run unasked, on your judgement: say what you did.
 
 ```text
-  nemia start <brief.md|card.md|"text"|folder> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--from <runId> ...] [--input <file> ...] [--gate <step> ...] [--factory <name>] [--brief "<brief>"]
+  nemia start <brief.md|card.md|"text"|folder> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--from <runId> ...] [--input <file> ...] [--card <name> ...] [--gate <step> ...] [--factory <name>] [--brief "<brief>"]
                                --after <runId>: file nothing of this run until nemia decide says that
                                run has landed — finished, and its result branch on the base
                                branch — and start from the base as it is then; once per run.
@@ -201,6 +201,10 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                never taken as the brief: file an inbox card with nemia inbox add <file>
                                --input <file>: copied into the run's own inputs/ directory, and named
                                on every step's brief under what was asked for; once per file
+                               --card <name>: an inbox card, as nemia inbox lists it, copied as it
+                               reads now into the run's inputs/cards/<name>.md and named on every
+                               step's brief beside the files; once per card. A name with no card is
+                               refused before anything is written
                                --factory <name>: the workflow must be attached to the factory, whose
                                hires fill its steps, and a step left with no agent is refused (nemia
                                factory --help). A factory with one repository gives the run its

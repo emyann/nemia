@@ -255,6 +255,12 @@ const runFields = {
    */
   inputs: Schema.optional(Schema.Array(Schema.String)),
   /**
+   * The inbox cards `nemia start --card` handed the run, by name, in the order given: each copied at start into the run's
+   * `inputs/cards/<name>.md` (`cardsDir` in record.store.ts), so a card edited or removed since reads as it was. Named on every step's
+   * brief beside the inputs (`inputsLine`). Absent on a run handed none.
+   */
+  cards: Schema.optional(Schema.Array(Schema.String)),
+  /**
    * The digest's hex of the run's own copy of its workflow folder (`workflowFilesDir` in frozen.store.ts), which its next filings take:
    * every check and session is told the folder as `WF_WORKFLOW_FILES`. Taken at `nemia start` (`freezeWorkflowFiles`) and again wherever
    * the run's pins move (`renderAgain`), so a check line and the scripts it runs are the one revision. Absent on a run started before

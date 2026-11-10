@@ -4,15 +4,15 @@
  * (`handedParts`). Pure.
  */
 import { outputFields, type StepSpec } from '../step/step.ts';
-import { dataBlock, fenced, type Mount } from '../record/record.ts';
+import { dataBlock, fenced } from '../record/record.ts';
 import { declaredOutput, type Closeout } from '../closeout/index.ts';
 import type { HandedHow } from 'objects';
 
 /**
- * A terminal step of a run another waited on: its step and how it signed off, and for a run that routed on to this one its artifacts
- * folder (`files`), mounted read-only on this run's roots (`callerMounts`) — or its name, and why that cannot be given.
+ * A terminal step of a run another waited on: its step and how it signed off — or its name, and why that cannot be given. Its folders,
+ * for a run this one is handed, are mounted on every step (`handedRunMounts`, filed.ts), not named here.
  */
-export type ParentStep = { step: StepSpec; said: Closeout; files?: string } | { name: string; unreadable: string };
+export type ParentStep = { step: StepSpec; said: Closeout } | { name: string; unreadable: string };
 
 /**
  * A run this one waited on (`--after`) or was handed as context (`--from`), as the pass that files this run's roots read it off the store
@@ -23,18 +23,6 @@ export type ParentCloseout = ({ run: string; asked: string; steps: readonly Pare
   how: HandedHow;
   landed: boolean;
 };
-
-/**
- * The artifacts folders of the result steps of each run that routed on to this one (`ParentStep.files`), each read-only, for a root of
- * this run (a step with no `after:`): filed with its mounts (`FiledFolders.caller`) and named by its brief's mount line (`mountsLine`),
- * as the folders of the steps before a step are. None for a step after a root, or a run handed none.
- */
-export const callerMounts = (step: Pick<StepSpec, 'after'>, parents: readonly ParentCloseout[] | undefined): Mount[] =>
-  step.after.length
-    ? []
-    : (parents ?? []).flatMap((p) =>
-        'steps' in p ? p.steps.flatMap((s) => ('files' in s && s.files ? [{ path: s.files, readOnly: true }] : [])) : [],
-      );
 
 /** What a section says of a run that is all its work a remote step is given. */
 const STAYS = 'Its work stays on the machine that runs this workflow and is not sent to you';

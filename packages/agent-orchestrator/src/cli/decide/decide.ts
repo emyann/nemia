@@ -231,7 +231,7 @@ type Closeout = NonNullable<Decided['closeouts'][string]>;
  * has one.
  */
 function headOf(home: string, run: Decided['run']): string {
-  const given = inputsNote(inputsDir(home, run), run.inputs);
+  const given = inputsNote(inputsDir(home, run), run.inputs, run.cards);
   const from = fromNote(run);
   const pruned = run.pruned ? `${prunedWords(run.pruned)}; ${prunedKept(run.pruned)}` : '';
   const end = run.brief.indexOf('\n');

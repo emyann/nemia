@@ -359,9 +359,9 @@ export type Given = { inputs: string | null; from: readonly GivenFrom[] };
  * step that continues another's folder (`inherit`) is given nothing more: it is standing in the folder that was given it, and an
  * `inherit` chain ends at a step that made one. Pure.
  */
-export function givenPlan(run: Pick<Run, 'place' | 'inputs' | 'steps'>, plan: WorkspacePlan): Given {
+export function givenPlan(run: Pick<Run, 'place' | 'inputs' | 'cards' | 'steps'>, plan: WorkspacePlan): Given {
   if (placeOf(run) !== 'folder' || plan.kind === 'base') return { inputs: null, from: [] };
-  const inputs = run.inputs?.length ? `${GIVEN}/inputs` : null;
+  const inputs = run.inputs?.length || run.cards?.length ? `${GIVEN}/inputs` : null;
   if (plan.kind === 'inherit') return { inputs, from: [] };
   const parents = plan.kind === 'merge' ? [plan.from, ...plan.also] : plan.from ? [plan.from] : [];
   return {

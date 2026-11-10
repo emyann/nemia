@@ -31,6 +31,7 @@ export type Asked =
       brief: string;
       after: string[] | undefined;
       context: string[] | undefined;
+      cards: string[] | undefined;
       label: string[] | undefined;
       card?: undefined;
     }
@@ -39,6 +40,7 @@ export type Asked =
       brief: string | undefined;
       after: string[] | undefined;
       context: string[] | undefined;
+      cards: string[] | undefined;
       label: string[] | undefined;
       card: string;
     };
@@ -47,15 +49,21 @@ export type Asked =
  * What a start starts off its decoded body, or why it does not: the workflow it names (404, 409), and the brief (422) — the api's
  * own, since `startRun` takes any string and `nemia start` prints its help for none. The body's shape (400) is its endpoint's.
  *
- * `after`, `context` and `label` are only shaped by the body: whether this run may wait on each run, be handed each, or take each label is
- * `startRun`'s to say (`afterRefusal`, `contextRefusal`, `parseLabelEdits`), in its words. With a `card` the brief is what the person made
- * of its body, and may be left out, for the body as it is; a blank one is the package's to refuse, as `nemia start <card> --brief ""` is.
+ * `after`, `context`, `cards` and `label` are only shaped by the body: whether this run may wait on each run, be handed each run or card,
+ * or take each label is `startRun`'s to say (`afterRefusal`, `contextRefusal`, `cardsRefusal`, `parseLabelEdits`), in its words. With a
+ * `card` the brief is what the person made of its body, and may be left out, for the body as it is; a blank one is the package's to
+ * refuse, as `nemia start <card> --brief ""` is.
  */
 function startOf(body: Omit<RunStart, 'card'> & { card?: string }, repo: string, home: string, tree?: string): Asked | Refusal {
-  const { workflow, brief, from, after, context, card, label } = body;
+  const { workflow, brief, from, after, context, cards, card, label } = body;
   const folder = folderOf(workflow, from, repo, home, tree);
   if ('status' in folder) return folder;
-  const handed = { after: after && [...after], context: context && [...context], label: label && [...label] };
+  const handed = {
+    after: after && [...after],
+    context: context && [...context],
+    cards: cards && [...cards],
+    label: label && [...label],
+  };
   if (card !== undefined) return { dir: folder.dir, brief, ...handed, card };
   if (brief === undefined || !brief.trim()) return { status: 422, error: NO_BRIEF };
   return { dir: folder.dir, brief: brief.trim(), ...handed };
@@ -99,6 +107,7 @@ async function cardStarted(s: Served, asked: Extract<Asked, { card: string }>, f
     instead: asked.brief,
     after: asked.after,
     context: asked.context,
+    cards: asked.cards,
     label: asked.label,
   };
   const started = await s.inRequest(START.handler(given));
@@ -137,6 +146,7 @@ export async function runStart(s: Served, body: RunStart): Promise<{ id: string 
     workflows: asked.dir,
     after: asked.after,
     context: asked.context,
+    cards: asked.cards,
     label: asked.label,
     factory: found.factory?.name,
   };

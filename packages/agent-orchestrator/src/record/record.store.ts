@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Result, Schema, SchemaIssue } from 'effect';
-import { BY_CAP, oneLine, WHY_CAP, type Acceptance, type Approval, type Hold, type Pruned, type Run } from './record.ts';
+import { BY_CAP, CARDS_FOLDER, oneLine, WHY_CAP, type Acceptance, type Approval, type Hold, type Pruned, type Run } from './record.ts';
 import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
 import { personRoutes, unrouted, withRoutes } from '../route/index.ts';
 import { spentRoundAsks } from '../round/round.ts';
@@ -75,6 +75,7 @@ const runBase = {
   after: Schema.optional(Strings),
   context: Schema.optional(Strings),
   inputs: Schema.optional(Strings),
+  cards: Schema.optional(Strings),
   from: Schema.optional(Schema.StructWithRest(Schema.Struct({ inbox: Schema.String }), Rest)),
   scheduled: Schema.optional(Kept({ factory: Schema.String, workflow: Schema.String, due: Schema.String })),
   gates: Schema.optional(Strings),
@@ -806,6 +807,9 @@ export const artifactsDir = (home: string, run: Pick<Run, 'id'>, step: string): 
  * `places.store.ts`'s (`inputsRoot`), as that is where the copy is read from.
  */
 export const inputsDir = (home: string, run: Pick<Run, 'id'>): string => inputsRoot(runsDir(home), run.id);
+
+/** The directory `nemia start --card` copies each card a run is handed into, as `<name>.md`: `cards/` under its inputs (`inputsDir`). */
+export const cardsDir = (home: string, run: Pick<Run, 'id'>): string => path.join(inputsDir(home, run), CARDS_FOLDER);
 
 export const lstatOf = (p: string) => fs.lstatSync(p, { throwIfNoEntry: false });
 

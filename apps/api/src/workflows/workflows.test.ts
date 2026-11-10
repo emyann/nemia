@@ -632,6 +632,22 @@ test('a person starts runs from the board: the record as `nemia start` writes it
   );
 
   await s.test(
+    "POST /api/namespaces/default/runs takes `cards` and passes them to `start()`, which copies each into the run's inputs/cards as `nemia start --card` does",
+    async () => {
+      fs.mkdirSync(path.join(root, 'inbox'), { recursive: true });
+      fs.writeFileSync(path.join(root, 'inbox', 'rows-qeyh.md'), 'Say which rows a run reads.\n');
+      const res = await post({ workflow: 'good', from: 'repo', brief: 'Read it.', cards: ['rows-qeyh'] });
+      assert.equal(res.status, 201, await res.clone().text());
+      const { id } = (await res.json()) as { id: string };
+      assert.deepEqual(runsAtOnce(root).runs.read(id).cards, ['rows-qeyh']);
+      assert.equal(
+        fs.readFileSync(path.join(root, 'runs', id, 'inputs', 'cards', 'rows-qeyh.md'), 'utf8'),
+        'Say which rows a run reads.\n',
+      );
+    },
+  );
+
+  await s.test(
     "a step's page reads its recent runs off the app's memo: a run whose record has not moved is answered from it, and one written since is on the page",
     async () => {
       const runs = path.join(root, 'runs');
@@ -836,6 +852,20 @@ test('POST /api/namespaces/default/runs: what a start refuses, writing nothing, 
       const missingSaid = ((await missing.json()) as { error: string }).error;
       assert.ok(missingSaid.startsWith('--from no-such-run: '), missingSaid);
       for (const fact of ['no run no-such-run', 'nemia ls']) assert.ok(missingSaid.includes(fact), `${fact}: ${missingSaid}`);
+      assert.deepEqual(runFiles(), before);
+      assert.deepEqual(filedTasks(), []);
+    },
+  );
+
+  await t.test(
+    '`cards` with a blank name is a 400 naming the key, and a card the inbox does not have a 404 — and nothing is written',
+    async () => {
+      const before = runFiles();
+      const blank = await post({ workflow: 'good', from: 'repo', brief: 'Read it.', cards: ['  '] });
+      assert.equal(blank.status, 400);
+      assert.ok((await fieldOf(blank)).startsWith('payload.cards'));
+      const missing = await post({ workflow: 'good', from: 'repo', brief: 'Read it.', cards: ['no-such-card'] });
+      assert.equal(missing.status, 404);
       assert.deepEqual(runFiles(), before);
       assert.deepEqual(filedTasks(), []);
     },

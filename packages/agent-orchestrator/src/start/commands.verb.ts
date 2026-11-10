@@ -15,7 +15,7 @@ import { WorkflowDir } from '../folder/folder.model.ts';
 import { ignoredRepoLine } from '../inbox/index.ts';
 import { startFromInbox } from '../inbox/inbox.verb.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
-import { inputsDir } from '../record/record.store.ts';
+import { cardsDir, inputsDir } from '../record/record.store.ts';
 import { carriedFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
 import { frozenStepsOf } from '../steps/steps.ts';
 import type { StepSpec } from '../workflow.ts';
@@ -109,6 +109,12 @@ const START_SPEC: Spec = {
       cli: 'a file is read from where nemia start is typed: the api reads no file a body names',
     }),
     startFlag(
+      '--card',
+      'cards',
+      "an inbox card to hand the run's steps, by its name, copied as it reads now: nemia start <brief> --card <name> [--card <name> ...]",
+      { many: true },
+    ),
+    startFlag(
       '--gate',
       'gates',
       'the step whose closeout waits for a person before anything after it is filed: nemia start <brief> --gate <step> [--gate <step> ...]',
@@ -139,7 +145,7 @@ const START_SPEC: Spec = {
   ],
   unknown: (arg) =>
     arg.startsWith('-')
-      ? `nemia start does not take ${arg}. It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on; --from <runId> once per run to read as context; --input <file> once per file to hand its steps; --gate <step> once per step to gate; --label key=value (or key-) once per label; --factory <name>; and, for an inbox card, --brief "<brief>".`
+      ? `nemia start does not take ${arg}. It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on; --from <runId> once per run to read as context; --input <file> once per file to hand its steps; --card <name> once per inbox card to hand its steps; --gate <step> once per step to gate; --label key=value (or key-) once per label; --factory <name>; and, for an inbox card, --brief "<brief>".`
       : `nemia start takes one brief, and ${arg} is a second. Quote a brief with spaces — nemia start "<brief>" — or give it as a file: nemia start ./brief.md.`,
   apart: (_value, flag) => START_SPEC.flags.find((f) => f.flag === flag)?.takes ?? '',
 };
@@ -281,6 +287,7 @@ function startedLines(started: Started): string[] {
     ...mountLines(started),
     `workspace: ${run.workspace}${isRepositoryRun(run) ? '' : ' — a folder per step, made as each is filed, with no git repository'}`,
     ...(run.inputs?.length ? [`inputs: ${run.inputs.join(', ')} — copied into ${inputsDir(home, run)}`] : []),
+    ...(run.cards?.length ? [`cards: ${run.cards.join(', ')} — copied into ${cardsDir(home, run)}`] : []),
     ...(run.workflowFiles === undefined ? [] : [`workflow files: copied into ${workflowFilesDir(home, run, run.workflowFiles)}`]),
     ...(run.carriedFiles === undefined ? [] : [`carried files: copied into ${carriedFilesDir(home, run, run.carriedFiles)}`]),
     ...(run.after?.length
@@ -318,6 +325,7 @@ const cardStart = Effect.fnUntraced(function* (card: string, given: StartInput) 
     after: [...(given.after ?? [])],
     context: [...(given.context ?? [])],
     inputs: [...(given.inputs ?? [])],
+    cards: [...(given.cards ?? [])],
     gates: [...(given.gates ?? [])],
     labels: [...(given.label ?? [])],
     ...(factory !== undefined ? { factory } : {}),
@@ -335,7 +343,7 @@ const cardStart = Effect.fnUntraced(function* (card: string, given: StartInput) 
 
 /** `nemia start`'s usage, as the help lists it. */
 const START_USAGE =
-  '<brief.md|card.md|"text"|folder> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--from <runId> ...] [--input <file> ...] [--gate <step> ...] [--factory <name>] [--brief "<brief>"]';
+  '<brief.md|card.md|"text"|folder> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--from <runId> ...] [--input <file> ...] [--card <name> ...] [--gate <step> ...] [--factory <name>] [--brief "<brief>"]';
 
 /** `nemia start`'s help lines, under its usage. */
 const START_LINES: readonly string[] = [
@@ -358,6 +366,10 @@ const START_LINES: readonly string[] = [
   'never taken as the brief: file an inbox card with nemia inbox add <file>',
   "--input <file>: copied into the run's own inputs/ directory, and named",
   "on every step's brief under what was asked for; once per file",
+  '--card <name>: an inbox card, as nemia inbox lists it, copied as it',
+  "reads now into the run's inputs/cards/<name>.md and named on every",
+  "step's brief beside the files; once per card. A name with no card is",
+  'refused before anything is written',
   '--factory <name>: the workflow must be attached to the factory, whose',
   'hires fill its steps, and a step left with no agent is refused (nemia',
   'factory --help). A factory with one repository gives the run its',
@@ -384,9 +396,9 @@ const Texts = Schema.optional(Schema.Array(Schema.String));
 
 /**
  * What `nemia start`'s handler is handed (`START`): a brief's start — `brief`, `workflows` (the folder), `repo` and `repoNamed`, the
- * runs it waits on (`after`) and is handed as context (`context`), `inputs`, `gates`, its `label` edits, `noWorktree` and `factory` — or
- * an inbox card's under `card`, with `instead`, `at` and `fix`. What a caller found, never a body: the api finds the folder from the
- * Run's `RunStart` (`objects`), the CLI from where it is typed.
+ * runs it waits on (`after`) and is handed as context (`context`), `inputs`, the inbox cards it is handed (`cards`), `gates`, its
+ * `label` edits, `noWorktree` and `factory` — or an inbox card's under `card`, with `instead`, `at` and `fix`. What a caller found,
+ * never a body: the api finds the folder from the Run's `RunStart` (`objects`), the CLI from where it is typed.
  */
 export const StartInput = Schema.Struct({
   brief: Text,
@@ -396,6 +408,7 @@ export const StartInput = Schema.Struct({
   after: Texts,
   context: Texts,
   inputs: Texts,
+  cards: Texts,
   gates: Texts,
   label: Texts,
   noWorktree: Schema.optional(Schema.Boolean),
@@ -503,6 +516,7 @@ const startOf = Effect.fnUntraced(function* (given: StartInput) {
     after: [...(given.after ?? [])],
     context: [...(given.context ?? [])],
     inputs: [...(given.inputs ?? [])],
+    cards: [...(given.cards ?? [])],
     gates: [...(given.gates ?? [])],
     labels: { edits: [...(given.label ?? [])] },
     ...(factory !== undefined ? { factory } : {}),
@@ -520,6 +534,8 @@ const FOLDER_REFUSES: Readonly<Record<string, string>> = {
     'nemia start <folder> does not take --workflows: each card names its own, in its workflow: — a folder under <repo>/workflows/, or a path from the plan folder.',
   '--input':
     'nemia start <folder> does not take --input: a card has no input files of its own. Start that card by hand with its files: nemia start <card.md> --workflows <dir> --input <file>.',
+  '--card':
+    "nemia start <folder> does not take --card: a plan's cards are handed no other card. Start that card by hand with the cards to hand it: nemia start <card.md> --workflows <dir> --card <name>.",
   '--gate':
     "nemia start <folder> does not take --gate: a plan's cards are gated by their workflows' own gate: true. To gate one card's run at a step, start that card by hand: nemia start <card.md> --workflows <dir> --gate <step>.",
   '--brief':

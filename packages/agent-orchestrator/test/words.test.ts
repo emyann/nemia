@@ -193,8 +193,7 @@ export type Baseline = Readonly<Record<string, Entry>>;
 const FENCE_WORDS: Baseline = {
   'apps/api/src/capabilities/reach.ts': { count: 17, ...MOVES.fenceForm },
   'apps/api/src/workflows/builder.ts': { count: 1, ...MOVES.fenceForm },
-  'apps/api/src/workflows/words.ts': { count: 5, ...MOVES.fenceForm },
-  'apps/api/src/workflows/workflows.ts': { count: 13, ...MOVES.fenceForm },
+  'apps/api/src/workflows/workflows.ts': { count: 6, ...MOVES.fenceForm },
   'apps/web/src/components/agent/AgentForm.tsx': { count: 5, ...MOVES.fenceForm },
   'apps/web/src/components/step/Facts.tsx': { count: 1, ...MOVES.fenceForm },
   'apps/web/src/components/step/StepForm.tsx': { count: 1, ...MOVES.fenceForm },
@@ -259,7 +258,7 @@ const HARNESS_WORDS: Baseline = {
   'apps/api/src/gauges/quota.ts': { count: 36, ...MOVES.quota },
   'apps/api/src/stats/stats.ts': { count: 1, card: 'u42s' },
   'apps/api/src/workflows/builder.ts': { count: 1, ...MOVES.defaults },
-  'apps/api/src/workflows/workflows.ts': { count: 8, ...MOVES.api },
+  'apps/api/src/workflows/workflows.ts': { count: 1, ...MOVES.api },
   'apps/web/src/components/agent/AgentCard.tsx': { count: 1, ...MOVES.prompt },
   'apps/web/src/components/agent/AgentForm.tsx': { count: 7, ...MOVES.web },
   'apps/web/src/components/gate/Decide.tsx': { count: 1, ...MOVES.checkout },

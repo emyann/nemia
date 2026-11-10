@@ -6,7 +6,7 @@
  */
 import { Effect } from 'effect';
 import { labelEdits, parseLabelEdits, type Labels } from './labels.ts';
-import type { Labelled } from './labels.model.ts';
+import type { Labelled } from 'objects';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';

@@ -5,7 +5,7 @@
  * orchestrator through `agent-orchestrator`, `/run`, `/workflow` and `/effect` alone, and never the runtime or a harness SDK; the
  * orchestrator imports no harness SDK; the runtime imports no layer above it. The objects (`packages/objects`) sit at the bottom beside
  * the runtime: the board, the client, the api and the orchestrator import them by their one entry, `objects`, and never a path into
- * them; the runtime never imports them; and they import `effect` and their own files alone.
+ * them; the runtime never imports them; and they import `effect` and their own files alone, and a contract's type beside them.
  *
  * `.oxlintrc.json` sets `no-restricted-imports` in one override block per layer, over its source alone. Oxlint accepts an option it does
  * not understand without a word, so these tests read the blocks out of the config, run oxlint with them on files planted in a scratch
@@ -133,9 +133,10 @@ const LAYERS: { name: string; at: string[]; refused: string[]; allowed: string[]
       'objects',
       '../../agent-orchestrator/src/run.ts',
       '../test/fixtures.ts',
+      '../contracts/laws.ts',
       ...SDKS,
     ],
-    allowed: ['effect', 'effect/unstable/httpapi', './meta.ts'],
+    allowed: ['effect', 'effect/unstable/httpapi', './meta.ts', 'type:../contracts/discovery.contract.ts'],
   },
 ];
 

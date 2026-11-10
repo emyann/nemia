@@ -12,29 +12,7 @@
  * parser reads only the `Api`, so it is the objects', which import `effect` alone. The laws are the orchestrator's, unchanged.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import type { ResourceVerb } from '../src/words.ts';
-
-/** A method a route of the `Api` answers, as discovery reads it. Implement moves it into `src/discovery.ts`. */
-export type RouteMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-
-/**
- * A route as its path reads: the plural after `/api/` or `/api/namespaces/:namespace/`, whether it is under a namespace, whether a name
- * follows the plural (`item`), and the words after it with the names left out (`sub`, `steps/retry`), null where none follow.
- * Implement moves it into `src/discovery.ts`.
- */
-export type ApiRoute = {
-  readonly method: RouteMethod;
-  readonly plural: string;
-  readonly namespaced: boolean;
-  readonly item: boolean;
-  readonly sub: string | null;
-};
-
-/** A kind the api serves, and the plural its paths name it by. Implement moves it into `src/discovery.ts`. */
-export type KindPlural = { readonly kind: string; readonly plural: string };
-
-/** A resource discovery lists: its name (a plural, or `<plural>/<sub>`), its kind, its scope and its verbs. Moved into `src` too. */
-export type Resource = { readonly name: string; readonly kind: string; readonly namespaced: boolean; readonly verbs: ResourceVerb[] };
+import type { ApiRoute, KindPlural, Resource } from '../src/discovery.ts';
 
 /**
  * The name of `plural`'s sub-resource `sub`, `<plural>/<sub>`. Joined with `+`, which the verifier reads as the strings joined, where it

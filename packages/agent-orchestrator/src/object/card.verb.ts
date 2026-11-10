@@ -1,12 +1,12 @@
 /**
  * The inbox's cards as objects (`Card`, `CardList`, from `objects`): the listing the inbox reads (`InboxListing`, its state judged by
- * `inboxJudged`) and each card's text, read through the Card door. A card's namespace is its factory, `default` for a card that names
- * none; its `creationTimestamp` when it was filed; its `resourceVersion` a digest of its text, which changes on every write of it; its
- * labels a person's, and a selector reads them with its `workflow:` and `factory:` (`cardLabels`). A list is selected first, sorted by
- * name, then cut into a page (`pageOf`), so `remainingItemCount` counts what the selector keeps. An entry of the inbox that is no
- * markdown file (`idea.txt`, a folder `sub/`) is no card, and is listed all the same, never hidden: under its file, which is its name,
- * its `status.error` saying why, dated by when it was last written (`entryAt`); one that does not read is listed too, its error saying
- * why. Either is read by its name, for its page (`cardObjectOf`), a card first, and pressed by none.
+ * `inboxJudged`) and each card's text, read through the Card door. A card's namespace is its factory, `default` for a card that names none;
+ * its `creationTimestamp` when it was filed; its `resourceVersion` a digest of its text, which changes on every write of it; its labels a
+ * person's, and a selector reads them with its `workflow:` and `factory:` (`cardLabels`). A list is selected first, sorted by name, then
+ * cut into a page, the one list page (`pageListed`), so `remainingItemCount` counts what the selector keeps. An entry of the inbox that is
+ * no markdown file (`idea.txt`, a folder `sub/`) is no card, and is listed all the same, never hidden: under its file, which is its name,
+ * its `status.error` saying why, dated by when it was last written (`entryAt`); one that does not read is listed too, its error saying why.
+ * Either is read by its name, for its page (`cardObjectOf`), a card first, and pressed by none.
  */
 import { Effect } from 'effect';
 import { API_VERSION, type Card, type CardList, DEFAULT_NAMESPACE } from 'objects';
@@ -21,9 +21,8 @@ export { cardWriteRefusal } from '../card-write/index.ts';
 export { replaceCard, type CardReplaced } from '../card-write/card-write.verb.ts';
 import type { SummaryHow } from '../summary/summary.verb.ts';
 import type { Engine } from '../runtime-client.ts';
-import { Invalid, Missing } from '../refusal/refusal.ts';
-import { parseSelectors, selectorsRefusal, selectsLabels } from '../watch/selector.ts';
-import { pageOf } from './page.ts';
+import { Missing } from '../refusal/refusal.ts';
+import { listOf, pageListed } from './listed.verb.ts';
 
 /** What a list of cards is asked: its namespace (none for every card), `?limit=`, `?continue=`, and its label selectors, OR'd. */
 export type CardQuery = {
@@ -38,12 +37,10 @@ const namespaceOf = (l: InboxListing): string => l.factory ?? DEFAULT_NAMESPACE;
 
 /**
  * What a list orders an entry by and a token carries: its name, then its file, so a stray `notes` and the card `notes.md`, both named
- * `notes`, are two places of the list. A line break sorts below every letter a name holds, so the order is the names' first.
+ * `notes`, are two places of the list, sorted by its UTF-16 code units, as `<` compares. A line break sorts below every letter a name
+ * holds, so the order is the names' first.
  */
 const keyOf = (l: InboxListing): string => `${l.name}\n${l.file}`;
-
-/** Entries in the order a list answers them and a token reads them: by their key's UTF-16 code units, as `<` compares. */
-const byName = (a: InboxListing, b: InboxListing): number => (keyOf(a) < keyOf(b) ? -1 : keyOf(a) > keyOf(b) ? 1 : 0);
 
 /** The body a card's text holds, or none where it does not read. */
 const bodyOf = (l: InboxListing, text: string): string | undefined => {
@@ -110,15 +107,6 @@ const objectOf = Effect.fnUntraced(function* (l: InboxListing, source = false) {
   return text === null || filedAt === null ? null : cardOf(l, text, filedAt, source);
 });
 
-/** The listed cards `selectors` keep, sorted by name, or `Invalid` naming the clause that is not a selector's. */
-const selected = (listing: readonly InboxListing[], selectors: readonly string[]): Effect.Effect<InboxListing[], Invalid> => {
-  const refusal = selectorsRefusal(selectors);
-  if (refusal !== undefined)
-    return Effect.fail(new Invalid({ message: `labelSelector: ${refusal}. Correct it, or leave labelSelector out to list every card` }));
-  const parsed = parseSelectors(selectors);
-  return Effect.succeed(listing.filter((l) => selectsLabels(parsed, cardLabels(l))).sort(byName));
-};
-
 /**
  * A page of the cards `listing` holds (`CardList`): those of `query.namespace` (every card where none is given) that its label selectors
  * keep, sorted by name, cut by its `limit` after its `continue`. `Invalid` for a selector, a limit or a token that is not one.
@@ -126,19 +114,9 @@ const selected = (listing: readonly InboxListing[], selectors: readonly string[]
 export const cardListOf = Effect.fn('cardListOf')(function* (listing: readonly InboxListing[], query: CardQuery) {
   const { namespace } = query;
   const inNamespace = namespace === undefined ? listing : listing.filter((l) => namespaceOf(l) === namespace);
-  const kept = yield* selected(inNamespace, query.labelSelector ?? []);
-  const page = pageOf(kept, keyOf, { limit: query.limit ?? null, continue: query.continue });
-  if (page instanceof Invalid) return yield* Effect.fail(page);
+  const page = yield* pageListed(inNamespace, query, 'card', { key: keyOf, labels: cardLabels });
   const items = (yield* Effect.forEach(page.items, (l) => objectOf(l))).filter((c): c is Card => c !== null);
-  const answered: CardList = {
-    apiVersion: API_VERSION,
-    kind: 'CardList',
-    metadata: {
-      remainingItemCount: page.remainingItemCount,
-      ...(page.continue !== undefined ? { continue: page.continue } : {}),
-    },
-    items,
-  };
+  const answered: CardList = listOf('Card', page, items);
   return answered;
 });
 

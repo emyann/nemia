@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as objects from 'objects';
-import { API_VERSION, Api, KINDS } from 'objects';
+import { API_VERSION, Api, KINDS, RESOURCE_PLURALS } from 'objects';
 
 /** Each endpoint of the Api, by its method and its path. */
 const endpoints = Object.values(Api.groups).flatMap((group) =>
@@ -30,25 +30,12 @@ const answers = Object.values(Api.groups).flatMap((group) =>
 );
 
 /**
- * The path a kind's objects are got at: the Factory, the Template and the Subscription, which no namespace holds, by
- * their names, the Event by its name in any namespace, and every other kind by its namespace and name.
+ * Whether `path` gets one object of `kind`: its plural (`RESOURCE_PLURALS`, read off the group that serves it), then a name, under
+ * `/api/` or under a namespace — the Factory, the Template and the Subscription, which no namespace holds, by their names alone.
  */
-const GET_PATHS: Record<(typeof KINDS)[number], string> = {
-  Run: '/api/namespaces/:namespace/runs/:name',
-  Card: '/api/namespaces/:namespace/cards/:name',
-  Factory: '/api/factories/:name',
-  McpServer: '/api/namespaces/:namespace/mcpservers/:name',
-  Schedule: '/api/namespaces/:namespace/schedules/:name',
-  Hire: '/api/namespaces/:namespace/hires/:name',
-  Volume: '/api/namespaces/:namespace/volumes/:name',
-  Workflow: '/api/namespaces/:namespace/workflows/:name',
-  Agent: '/api/namespaces/:namespace/agents/:name',
-  Skill: '/api/namespaces/:namespace/skills/:name',
-  Template: '/api/templates/:name',
-  Subscription: '/api/subscriptions/:name',
-  Event: '/api/events/:name',
-  Proposal: '/api/namespaces/:namespace/proposals/:name',
-  Delegation: '/api/namespaces/:namespace/delegations/:name',
+const getsOne = (kind: (typeof KINDS)[number], path: string): boolean => {
+  const plural = RESOURCE_PLURALS[kind];
+  return new RegExp(`^/api/(namespaces/:namespace/)?${plural}/:[A-Za-z]+$`).test(path);
 };
 
 for (const kind of KINDS) {
@@ -56,7 +43,7 @@ for (const kind of KINDS) {
     const fields = schemaOf(kind)?.fields;
     assert.equal(fields?.apiVersion?.literal, API_VERSION);
     assert.equal(fields?.kind?.literal, kind);
-    assert.ok(endpoints.some((e) => e.method === 'GET' && e.path === GET_PATHS[kind]));
+    assert.ok(endpoints.some((e) => e.method === 'GET' && getsOne(kind, e.path)));
   });
 }
 
@@ -64,7 +51,11 @@ for (const kind of KINDS) {
   test(`${kind} has its ${kind}List, of kind ${kind}List, which a GET of the Api answers, and its get answers a ${kind}`, () => {
     assert.equal(schemaOf(`${kind}List`)?.fields?.kind?.literal, `${kind}List`);
     assert.ok(answers.some((e) => e.method === 'GET' && e.kinds.includes(`${kind}List`)));
-    assert.ok(answers.some((e) => e.method === 'GET' && e.path === GET_PATHS[kind] && e.kinds.includes(kind)));
+    assert.ok(answers.some((e) => e.method === 'GET' && getsOne(kind, e.path) && e.kinds.includes(kind)));
+    assert.ok(
+      answers.every((e) => e.method !== 'GET' || !getsOne(kind, e.path) || e.kinds.includes(kind)),
+      `every get of one ${kind} answers a ${kind}`,
+    );
   });
 }
 

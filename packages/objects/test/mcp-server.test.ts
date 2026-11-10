@@ -1,12 +1,13 @@
 /**
- * The McpServer (`src/mcp-server.ts`): a server and a page of them decoded from JSON and encoded back equal, its headers masked as the
- * api serves them; a builtin server, with no namespace and no status; its transport and state closed words; the write body and the
- * sign-in's answers decoded as the api is sent and answers them.
+ * The McpServer (`src/mcp-server.ts`): a server and a page of them as the Api's endpoints answer them, every key kept, its headers
+ * masked as the api serves them; a builtin server, with no namespace and no status; its transport and state closed words; the write body
+ * and the sign-in's answers as the Api's endpoints take and answer them.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import { API_VERSION, HEADER_MASK, McpServer, McpServerList, McpServerWrite, SignInStarted, SignInState, SignedOut } from 'objects';
+import { API_VERSION, HEADER_MASK, McpServer, McpServerWrite, SignInState } from 'objects';
+import { answered, taken } from './served.ts';
 
 const github = {
   apiVersion: API_VERSION,
@@ -29,33 +30,36 @@ const builtin = {
   spec: { type: 'sse', url: 'https://docs.example/mcp' },
 } as const;
 
-const roundTrip = <S extends Schema.Codec<unknown, unknown>>(schema: S, value: unknown): unknown =>
-  JSON.parse(JSON.stringify(Schema.encodeSync(schema)(Schema.decodeUnknownSync(schema)(JSON.parse(JSON.stringify(value))))));
-
-test('a server and a page of them decode from JSON and encode back the same, a builtin one with spec alone', () => {
-  assert.deepEqual(roundTrip(McpServer, github), github);
-  assert.deepEqual(roundTrip(McpServer, builtin), builtin);
-  assert.deepEqual(roundTrip(McpServer, { ...github, status: {} }), { ...github, status: {} });
+test("the Api's get answers a server, its list and the builtin list a page of them, a builtin one with spec alone", () => {
+  assert.deepEqual(answered('mcpservers', 'get', github), github);
+  assert.deepEqual(answered('mcpservers', 'get', builtin), builtin);
+  assert.deepEqual(answered('mcpservers', 'get', { ...github, status: {} }), { ...github, status: {} });
   const page = { apiVersion: API_VERSION, kind: 'McpServerList', metadata: {}, items: [builtin] };
-  assert.deepEqual(roundTrip(McpServerList, page), page);
+  assert.deepEqual(answered('mcpservers', 'list', page), page);
+  assert.deepEqual(answered('builtin', 'mcpservers', page), page);
+  assert.equal(answered('mcpservers', 'get', { ...github, kind: 'Server' }), undefined);
+  assert.equal(answered('builtin', 'mcpservers', { ...page, kind: 'ServerList' }), undefined);
 });
 
 test("the header mask is no value a header is sent with, and the write takes the old route's server and a server read back", () => {
   assert.equal(HEADER_MASK, '********');
   const read = { type: 'http', url: 'https://api.githubcopilot.com/mcp/', headers: { 'X-MCP-Toolsets': HEADER_MASK } };
-  assert.deepEqual(roundTrip(McpServerWrite, read), read);
-  assert.deepEqual(roundTrip(McpServerWrite, { url: 'https://x.example/mcp' }), { url: 'https://x.example/mcp' });
+  assert.deepEqual(taken('mcpservers', 'put', read), read);
+  assert.deepEqual(taken('mcpservers', 'put', { url: 'https://x.example/mcp' }), { url: 'https://x.example/mcp' });
   const signedIn = { url: 'https://x.example/mcp', oauth: { clientId: 'abc' } };
-  assert.deepEqual(roundTrip(McpServerWrite, signedIn), signedIn);
+  assert.deepEqual(taken('mcpservers', 'put', signedIn), signedIn);
+  assert.equal(taken('mcpservers', 'put', { type: 'http' }), undefined);
 });
 
-test("the sign-in's answers decode as the api answers them", () => {
+test("the sign-in's answers are the Api's endpoints', and one endpoint's answer is not another's", () => {
   const started = { authUrl: 'https://github.com/login/oauth/authorize?x=1', until: '2026-11-04T00:05:00.000Z' };
-  assert.deepEqual(roundTrip(SignInStarted, started), started);
-  assert.deepEqual(roundTrip(SignInState, { state: 'none' }), { state: 'none' });
+  assert.deepEqual(answered('mcpservers', 'signIn', started), started);
+  assert.deepEqual(answered('mcpservers', 'signInState', { state: 'none' }), { state: 'none' });
   const failed = { state: 'failed', until: '2026-11-04T00:05:00.000Z', why: 'denied' };
-  assert.deepEqual(roundTrip(SignInState, failed), failed);
-  assert.deepEqual(roundTrip(SignedOut, { signedOut: true }), { signedOut: true });
+  assert.deepEqual(answered('mcpservers', 'signInState', failed), failed);
+  assert.deepEqual(answered('mcpservers', 'signOut', { signedOut: true }), { signedOut: true });
+  assert.equal(answered('mcpservers', 'signOut', started), undefined);
+  assert.equal(answered('mcpservers', 'signIn', { signedOut: true }), undefined);
 });
 
 test('REFUSED: a transport, a state or a sign-in state off its words, a write with no url, and another kind', () => {

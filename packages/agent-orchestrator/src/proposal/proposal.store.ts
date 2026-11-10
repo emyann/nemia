@@ -9,7 +9,7 @@
  *
  * Every function here takes the store's root as a required `home: string`, as `src/factory/servers/` does.
  */
-import { createHash } from 'node:crypto';
+import { valueVersion } from '../digest/digest.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Context, Effect, Layer, Result, Schema } from 'effect';
@@ -57,10 +57,7 @@ export function factoryOf(proposal: Proposal): string {
 
 /** The `resourceVersion` of a proposal: a digest of its spec and status, so every change of either is a new one. */
 export const proposalVersion = (proposal: Pick<Proposal, 'spec' | 'status'>): string =>
-  createHash('sha256')
-    .update(JSON.stringify({ spec: proposal.spec, status: proposal.status }))
-    .digest('hex')
-    .slice(0, 16);
+  valueVersion({ spec: proposal.spec, status: proposal.status });
 
 /** `proposal` stamped with its `resourceVersion`. */
 export const stamped = (proposal: Proposal): Proposal => ({

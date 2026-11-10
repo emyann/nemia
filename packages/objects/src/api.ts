@@ -75,25 +75,6 @@ export {
 
 export { KINDS, type Kind };
 
-/** The plural each kind is served by, its paths' collection: `/api/<plural>` and `/api/namespaces/<namespace>/<plural>`. */
-export const RESOURCE_PLURALS: { readonly [K in Kind]: string } = {
-  Run: 'runs',
-  Card: 'cards',
-  Factory: 'factories',
-  McpServer: 'mcpservers',
-  Schedule: 'schedules',
-  Hire: 'hires',
-  Volume: 'volumes',
-  Workflow: 'workflows',
-  Agent: 'agents',
-  Skill: 'skills',
-  Template: 'templates',
-  Subscription: 'subscriptions',
-  Event: 'events',
-  Proposal: 'proposals',
-  Delegation: 'delegations',
-};
-
 /** The Card and a page of them, named so that the document holds each as a component, as it holds the Run. */
 const CardObject = Card.annotate({ identifier: 'Card' });
 const CardListObject = CardList.annotate({ identifier: 'CardList' });
@@ -565,12 +546,34 @@ export class EventsGroup extends HttpApiGroup.make('events').add(
   }),
 ) {}
 
-/** Everything the api serves as objects. */
 /** The api's discovery: every resource it serves, read off this definition (Kubernetes' `/api`, for Nemia's one group version). */
 export class DiscoveryGroup extends HttpApiGroup.make('discovery').add(
   HttpApiEndpoint.get('resources', '/api', { success: APIResourceList.annotate({ identifier: 'APIResourceList' }) }),
 ) {}
 
+/**
+ * The plural each kind is served by, its paths' collection (`/api/<plural>` and `/api/namespaces/<namespace>/<plural>`): the name of the
+ * group that serves it, read off the group.
+ */
+export const RESOURCE_PLURALS = {
+  Run: RunsGroup.identifier,
+  Card: CardsGroup.identifier,
+  Factory: FactoriesGroup.identifier,
+  McpServer: McpServersGroup.identifier,
+  Schedule: SchedulesGroup.identifier,
+  Hire: HiresGroup.identifier,
+  Volume: VolumesGroup.identifier,
+  Workflow: WorkflowsGroup.identifier,
+  Agent: AgentsGroup.identifier,
+  Skill: SkillsGroup.identifier,
+  Template: TemplatesGroup.identifier,
+  Subscription: SubscriptionsGroup.identifier,
+  Event: EventsGroup.identifier,
+  Proposal: ProposalsGroup.identifier,
+  Delegation: DelegationsGroup.identifier,
+} as const satisfies { readonly [K in Kind]: string };
+
+/** Everything the api serves as objects. */
 export const Api = HttpApi.make('nemia')
   .add(RunsGroup)
   .add(CardsGroup)

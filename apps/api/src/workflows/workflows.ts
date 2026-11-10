@@ -55,98 +55,20 @@ import { type ApiEnv, served, type Served } from '../layer.ts';
 import { StoreRoot, type Engine, type RunsOn } from '../store.ts';
 import { graphOf, workflowVersion, type RunGraph } from 'agent-orchestrator';
 import { runPlaced } from '../store.ts';
-import type { DefinitionOrigin, PlaceKind } from 'objects';
+import type { DefinitionOrigin, StepKeys } from 'objects';
 
 /** Where a workflow is read from: the repository's `workflows/`, or yours, in the store. */
 export type WorkflowSource = Extract<DefinitionOrigin, 'repo' | 'yours'>;
 
+/** A list as the board holds it, writable: objects' Schemas read a list as `readonly`. */
+type Writable<T> = T extends readonly (infer U)[] ? U[] : T;
+
 /**
- * A step's frontmatter as the loader read it, before any run has frozen it: `null` where the step does not set it. The run object has
- * its steps' frozen spec (`spec.steps`), the keys a run shows; this has every key, since choosing a workflow is reading them.
+ * A step's frontmatter as the loader read it, before any run has frozen it: every key of objects' `StepKeys`, each its value as that
+ * Schema reads it, `null` where the step does not set it (a list's empty where its unset is no list). The run object has its steps'
+ * frozen spec (`spec.steps`), the keys a run shows; this has every key, since choosing a workflow is reading them.
  */
-export type WorkflowStepSpec = {
-  harness: string | null;
-  model: string | null;
-  effort: string | null;
-  /** The session's context window, in tokens (`context:`, written `200k`, read into the number): null for the model's whole window. */
-  context: number | null;
-  after: string[];
-  resume: string | null;
-  input: string[];
-  /**
-   * `place: folder`: the step works in a folder the run makes, in a run with no repository; `git`: on branches of a repository. Every step
-   * file says one; null only for a step frozen on a run record before the key, which worked on a repository.
-   */
-  place: PlaceKind | null;
-  /** `workspace: base`: the step runs in the repository's own checkout, on the base branch. Null for a step without the line. */
-  workspace: 'base' | null;
-  /** The factory's folders the step may write (`writable:`), each by its directory's name: empty where it writes none of them. */
-  writable: string[];
-  /** What of the store the step reads and never writes (`reads:`), each by its name (`inbox`, `costs`): empty where it reads none. */
-  reads: string[];
-  /**
-   * `slot: none`: the run takes no run slot (`WF_MAX_RUNS`). Null for a step without the line, which is the only other thing a step can
-   * say.
-   */
-  slot: 'none' | null;
-  /** The agent attached to the step (`agent:`), in agents/ beside the folder: the rest of the keys are resolved with it. Null for none. */
-  agent: string | null;
-  /** The skills the step adds to its agent's (`skills:`), as its own line names them: empty where it adds none. */
-  skills: string[];
-  /** The MCP servers the step adds to its agent's (`mcp:`), as its own line names them: empty where it adds none. */
-  mcp: string[];
-  /** Claude Code's permission mode (`permissionMode:`): null on codex, whose fence is `sandbox`. */
-  permissionMode: string | null;
-  /**
-   * Codex's sandbox (`sandbox:`, or the former key `permissionMode:` a codex file may still carry): null on Claude Code, and where a codex
-   * step names none.
-   */
-  sandbox: string | null;
-  tools: string[] | null;
-  /** What the session may not have, in Claude Code's permission rules (`disallowedTools:`): empty where the step denies nothing. */
-  disallowedTools: string[];
-  /**
-   * What the session may do without being asked, in the same rules (`allowedTools:`): empty where the step allows nothing beyond its mode.
-   */
-  allowedTools: string[];
-  /**
-   * `denials: fail`: a try the harness denied a call reads `denied` and waits on a person. Null for a step without the line, whose denials
-   * decide nothing.
-   */
-  denials: 'fail' | null;
-  /** `remote:` as written, `true` or `false`: null where the step has no line. */
-  remote: boolean | null;
-  deadlineSeconds: number | null;
-  /** `memory:` as written, the session's memory limit, a container's `resources.limits.memory` (`8Gi`): null without the line. */
-  memory: string | null;
-  /** The most the step's tries may cost together, in dollars (`budget:`). */
-  budget: number | null;
-  check: string | null;
-  retries: number | null;
-  /**
-   * `gate: true`: the step's closeout waits for a person. Null for a step without the line, which is the only other thing a step can say.
-   */
-  gate: true | null;
-  /** The schema file `output:` names, beside the step. */
-  output: string | null;
-  /**
-   * What `nemia stats` counts of the step's closeouts (`tally:`), each a field its `output:` declares, `field.flag` or `field.key=value`:
-   * empty for none.
-   */
-  tally: string[];
-  loop: string | null;
-  rounds: number | null;
-  /** A condition's routes (`routes:`): null for a step that is no condition. */
-  routes: string[] | null;
-  /** How a condition answers, as its line writes it: `judge`, `{ script: <file> }` or `{ from: <step>.<field>, table: { … } }`. */
-  route: string | null;
-  /** The routes of its condition a node runs on (`when:`): null for every route. */
-  when: string[] | null;
-  /** The routes of a condition on which the run ends (`ends:`): null for none. */
-  ends: string[] | null;
-  /** The workflow a workflow node files a card for (`workflow:`). */
-  workflow: string | null;
-};
+export type WorkflowStepSpec = { -readonly [K in StepKey]-?: Writable<Exclude<StepKeys[K], undefined>> };
 
 /**
  * A workflow as the board lists it. `name` is its folder's. Each step is its name, its keys (`spec`) and its `body`, what its agent is

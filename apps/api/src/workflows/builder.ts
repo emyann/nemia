@@ -46,7 +46,8 @@ import {
 } from 'agent-orchestrator/workflow';
 import { type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, type Served, served } from '../layer.ts';
-import { KINDS, schemaNameRefusal, WORDS, type KeyKind } from './words.ts';
+import { STEP_KEY_FORM } from 'objects';
+import { schemaNameRefusal, WORDS, type KeyKind } from './words.ts';
 import type { Engine } from '../store.ts';
 import { listed, loadedAt, loadedOf, placesOf, specOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
 import { commandNamed, runPlaced } from '../store.ts';
@@ -149,7 +150,7 @@ export const keyForm = (yours: YourAgents): KeyForm => ({
   keys: STEP_KEYS.map((key) => ({
     key,
     meaning: STEP_KEY_MEANINGS[key],
-    kind: KINDS[key],
+    kind: STEP_KEY_FORM[key],
     choices: key === 'harness' ? harnessChoices() : key === 'agent' ? [...yours.names] : (WORDS[key] ?? null),
     byHarness: key === 'effort' || key === 'permissionMode' || key === 'sandbox' ? HARNESS_CHOICES[key] : null,
   })),
@@ -189,8 +190,8 @@ export function stepsNamed(message: string, names: readonly string[]): string[] 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /**
- * A step as a request sends it, its keys in the order they are refused. Each key of `spec` is typed by its kind (`KINDS`, in `draftOf`),
- * and a key no step has is passed on as it came, for the package to refuse in its words.
+ * A step as a request sends it, its keys in the order they are refused. Each key of `spec` is typed by its form (objects'
+ * `STEP_KEY_FORM`, in `draftOf`), and a key no step has is passed on as it came, for the package to refuse in its words.
  */
 const STEP_BODY = Schema.Struct({
   name: Schema.String,
@@ -251,7 +252,7 @@ export function draftOf(step: StepBody, at: string, route: string, shape: string
   const mine = spec.agent != null ? (own ?? null) : null;
   for (const [key, value] of Object.entries(spec)) {
     if (value === null || value === undefined) continue;
-    const kind = (KINDS as Record<string, KeyKind | undefined>)[key];
+    const kind = (STEP_KEY_FORM as Record<string, KeyKind | undefined>)[key];
     if (kind && !TYPES[kind].is(value)) {
       return {
         status: 400,

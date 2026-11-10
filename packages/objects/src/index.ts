@@ -227,6 +227,11 @@ export { GraphEdge, GraphNode, ObjectGraph, TypedGraph } from './graph.ts';
 export { CardSkill, Origin, SkillCost, WriteMeta } from './definition.ts';
 export {
   SchemaFile,
+  STEP_KEYS,
+  type StepKey,
+  STEP_KEY_FORMS,
+  type StepKeyForm,
+  STEP_KEY_FORM,
   StepKeys,
   StepLayers,
   Workflow,
@@ -257,7 +262,16 @@ export { Subscription, SubscriptionList, SubscriptionScope, SubscriptionSpec, Su
 export { Event, EventInvolved, EventList } from './event.ts';
 export { WATCH_EVENT_TYPES, type WatchEventType, RESOURCE_VERBS, type ResourceVerb } from './words.ts';
 export { AnyObjectList, BookmarkObject, WatchedObject, watchEventOf } from './watch.ts';
-export { APIResource, APIResourceList } from './discovery.ts';
+export {
+  APIResource,
+  APIResourceList,
+  type ApiRoute,
+  type KindPlural,
+  type Resource,
+  type RouteMethod,
+  resourcesOf,
+  routeOf,
+} from './discovery.ts';
 export {
   ApprovedByOf,
   Proposal,

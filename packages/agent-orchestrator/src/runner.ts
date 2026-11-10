@@ -242,7 +242,6 @@ export {
   selectsLabels,
 } from './watch/selector.ts';
 export { labelsText, metadataLabels, type Labels } from './labels/labels.ts';
-export { LabelEdit, Labelled } from './labels/labels.model.ts';
 export { LABEL_CARD, LABEL_RUN } from './labels/commands.verb.ts';
 export type { Clause, Selectors } from './watch/selector.ts';
 export type { Watched } from './subscription/index.ts';
@@ -462,9 +461,8 @@ export { runIn, runList, runNamespace, type RunQuery } from './run-list/run-list
 export { continueToken, continuedAfter, listPage, pageOf, type PageAsked, type Paged } from './object/page.ts';
 export { watchChanges, type Versioned } from './list-watch/list-watch.ts';
 export { measuredToNow, runWatchVersion } from './runlist/runlist.ts';
-export { resourcesOf, routeOf, type ApiRoute } from './discovery/discovery.ts';
 export { factoryCommandsOf, factoryList, factoryObject } from './factory/object/factory.verb.ts';
-export type { ObjectQuery } from './object/listed.verb.ts';
+export { objectsListed, type ObjectQuery } from './object/listed.verb.ts';
 export { builtinServerList, mcpServerList, mcpServerObject } from './factory/object/mcp-server.verb.ts';
 export { scheduleList, scheduleObject } from './factory/object/schedule.verb.ts';
 export { hireList, hireObject } from './factory/object/hire.verb.ts';

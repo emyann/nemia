@@ -7,7 +7,7 @@ import { Effect } from 'effect';
 import { type Args, NAMED_ACTION, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { rooted } from '../factory/wiring/wire.verb.ts';
-import type { Labelled } from './labels.model.ts';
+import type { Labelled } from 'objects';
 import { labelCard, labelRun } from './labels.verb.ts';
 
 /** The edits under `labels`, in the order given. */

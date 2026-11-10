@@ -9,11 +9,14 @@ import { Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
 import { Forbidden, type ProposalCaller } from '../caller/index.ts';
 import { DelegationDoor, type DelegationRecord } from './delegation.store.ts';
 
+/** A delegation's `resourceVersion`: a position, not a digest — when it was last written, which a write moves on. */
+const writtenPosition = (record: DelegationRecord): string => record.since;
+
 /** A delegation as the object served: its agent's name in its factory's namespace, its grants, and when it was written. */
 export const delegationObject = (record: DelegationRecord): Delegation => ({
   apiVersion: API_VERSION,
   kind: 'Delegation',
-  metadata: { name: record.agent, namespace: record.factory, creationTimestamp: record.since, resourceVersion: record.since },
+  metadata: { name: record.agent, namespace: record.factory, creationTimestamp: record.since, resourceVersion: writtenPosition(record) },
   spec: record.spec,
 });
 

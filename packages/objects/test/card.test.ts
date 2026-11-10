@@ -1,24 +1,13 @@
 /**
- * The Card (`src/card.ts`): a card and a page of cards encoded to JSON and decoded back equal, its optional keys absent where they were;
- * its state a closed word; and the bodies of its verbs decoded as the api is sent them.
+ * The Card (`src/card.ts`): a card and a page of cards as the Api's endpoints answer them, every key kept, its optional keys absent where
+ * they were; its state a closed word; and the bodies of its verbs as the Api's endpoints take them.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { OpenApi } from 'effect/http-api';
-import {
-  API_VERSION,
-  Api,
-  CARD_KEYS,
-  CARD_KEY_MEANINGS,
-  CARD_STATES,
-  Card,
-  CardFile,
-  CardList,
-  CardStart,
-  CardWrite,
-  LabelEdit,
-} from 'objects';
+import { API_VERSION, Api, CARD_KEYS, CARD_KEY_MEANINGS, CARD_STATES, Card, CardFile, CardWrite } from 'objects';
+import { answered, taken } from './served.ts';
 
 const filed = {
   apiVersion: API_VERSION,
@@ -49,19 +38,18 @@ const broken = {
   status: { state: 'filed', runs: [], error: 'broken.md: a key it does not have', inPlay: true },
 } as const;
 
-const roundTrip = <S extends Schema.Codec<unknown, unknown>>(schema: S, value: unknown): unknown =>
-  JSON.parse(JSON.stringify(Schema.encodeSync(schema)(Schema.decodeUnknownSync(schema)(JSON.parse(JSON.stringify(value))))));
-
-test('a card and a page of cards decode from JSON and encode back to the same JSON, absent keys left absent', () => {
-  assert.deepEqual(roundTrip(Card, filed), filed);
-  assert.deepEqual(roundTrip(Card, broken), broken);
+test("the Api's get answers a card and its list a page of cards, every key kept, absent keys left absent; another kind refused", () => {
+  assert.deepEqual(answered('cards', 'get', filed), filed);
+  assert.deepEqual(answered('cards', 'get', broken), broken);
   const page = {
     apiVersion: API_VERSION,
     kind: 'CardList',
     metadata: { continue: 'YnJva2Vu', remainingItemCount: 1 },
     items: [filed, broken],
   };
-  assert.deepEqual(roundTrip(CardList, page), page);
+  assert.deepEqual(answered('cards', 'list', page), page);
+  assert.equal(answered('cards', 'get', { ...filed, kind: 'Run' }), undefined);
+  assert.equal(answered('cards', 'list', { ...page, kind: 'RunList' }), undefined);
 });
 
 test("the card's states are its own three words, then the run phases in their order", () => {
@@ -79,12 +67,14 @@ test("the card's states are its own three words, then the run phases in their or
   ]);
 });
 
-test("the verbs' bodies decode as the api is sent them", () => {
+test("the verbs' bodies are taken by the Api's endpoints as the api is sent them, and a body of another verb is refused", () => {
   const file = { body: 'An idea', workflow: 'build', from: 'repo', repo: '/repo', factory: 'a', label: ['team=core'] };
-  assert.deepEqual(roundTrip(CardFile, file), file);
+  assert.deepEqual(taken('cards', 'create', file), file);
   const start = { workflow: 'build', after: ['r-1'], context: ['r-2'], brief: 'do it', label: ['team=core', 'old-'] };
-  assert.deepEqual(roundTrip(CardStart, start), start);
-  assert.deepEqual(roundTrip(LabelEdit, { labels: ['team=core'], overwrite: true }), { labels: ['team=core'], overwrite: true });
+  assert.deepEqual(taken('cards', 'start', start), start);
+  assert.deepEqual(taken('cards', 'labels', { labels: ['team=core'], overwrite: true }), { labels: ['team=core'], overwrite: true });
+  assert.equal(taken('cards', 'create', start), undefined);
+  assert.equal(taken('cards', 'labels', file), undefined);
 });
 
 test('REFUSED: a card whose state is no card state, whose kind is another, or a filing with no body', () => {
@@ -105,8 +95,8 @@ test("a card's whole write decodes as the api is sent it, and refuses a spec.fro
 
 test("a read of one card carries its file as written in status.source; a list's items need none", () => {
   const one = { ...filed, status: { ...filed.status, source: '---\nworkflow: build\n---\nCache the views.\n' } };
-  assert.deepEqual(roundTrip(Card, one), one);
-  assert.deepEqual(roundTrip(Card, filed), filed);
+  assert.deepEqual(answered('cards', 'get', one), one);
+  assert.deepEqual(answered('cards', 'get', filed), filed);
 });
 
 test("each of a card's keys has one meaning, and the Card's spec fields carry theirs as the document's description", () => {

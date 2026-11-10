@@ -6,7 +6,7 @@
  * only the skill reads (`skills/read.store.ts`, `test/boundary.test.ts`), so the workflow folder read (`folder/folder.store.ts`) and the
  * one writer of custom instructions (`src/custom/custom.store.ts`) both read through it.
  */
-import { createHash } from 'node:crypto';
+import { valueVersion } from '../digest/digest.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Result, Schema } from 'effect';
@@ -211,7 +211,7 @@ export function agentVersion(dir: string, name: string, skills?: SkillsFound): s
       return [`skills/${skill}`, typeof folder === 'string' ? folderForVersion(folder) : { missing: skill }];
     }),
   ];
-  return createHash('sha256').update(JSON.stringify(files)).digest('hex').slice(0, 16);
+  return valueVersion(files);
 }
 
 /**

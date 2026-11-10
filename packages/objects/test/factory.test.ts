@@ -1,22 +1,13 @@
 /**
- * The Factory (`src/factory.ts`): a factory and a page of them decoded from JSON and encoded back equal, a factory missing every optional
- * key read; its condition words closed; and its sub-resources — its rules, its instruction and its commands, the old route's lines
- * decoded as the board read them — decoded as the api answers them.
+ * The Factory (`src/factory.ts`): a factory and a page of them as the Api's endpoints answer them, every key kept, a factory missing
+ * every optional key read; its condition words closed; and its sub-resources — its rules, its instruction and its commands, the old
+ * route's lines as the board read them — as the Api's endpoints answer them and take their writes.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import {
-  API_VERSION,
-  Factory,
-  FactoryCommands,
-  FactoryInstruction,
-  FactoryInstructionWords,
-  FactoryInstructionWrite,
-  FactoryList,
-  FactoryRules,
-  FactoryRulesWrite,
-} from 'objects';
+import { API_VERSION, Factory, FactoryCommands } from 'objects';
+import { answered, taken } from './served.ts';
 
 const templated = {
   apiVersion: API_VERSION,
@@ -66,31 +57,33 @@ const stray = {
   status: { conditions: [], untrusted: [], error: 'broken.json does not read as JSON' },
 } as const;
 
-const roundTrip = <S extends Schema.Codec<unknown, unknown>>(schema: S, value: unknown): unknown =>
-  JSON.parse(JSON.stringify(Schema.encodeSync(schema)(Schema.decodeUnknownSync(schema)(JSON.parse(JSON.stringify(value))))));
-
-test('a factory and a page of them decode from JSON and encode back the same, absent keys left absent', () => {
-  assert.deepEqual(roundTrip(Factory, templated), templated);
-  assert.deepEqual(roundTrip(Factory, bare), bare);
-  assert.deepEqual(roundTrip(Factory, stray), stray);
+test("the Api's get answers a factory and its list a page of them, every key kept, absent keys left absent; another kind refused", () => {
+  assert.deepEqual(answered('factories', 'get', templated), templated);
+  assert.deepEqual(answered('factories', 'get', bare), bare);
+  assert.deepEqual(answered('factories', 'get', stray), stray);
   const page = { apiVersion: API_VERSION, kind: 'FactoryList', metadata: { continue: 'bWlsbA', remainingItemCount: 1 }, items: [bare] };
-  assert.deepEqual(roundTrip(FactoryList, page), page);
+  assert.deepEqual(answered('factories', 'listAll', page), page);
+  assert.equal(answered('factories', 'get', { ...bare, kind: 'Card' }), undefined);
+  assert.equal(answered('factories', 'listAll', { ...page, kind: 'CardList' }), undefined);
 });
 
-test("the factory's sub-resources decode as the api answers them and as it is sent them", () => {
+test("the factory's sub-resources as the Api's endpoints answer them and take them, one's answer not another's", () => {
   const rules = { name: 'mill', file: '/store/factories/mill/rules.md', words: 'Be brief.', error: null, revision: 'r3' };
-  assert.deepEqual(roundTrip(FactoryRules, rules), rules);
+  assert.deepEqual(answered('factories', 'rules', rules), rules);
   const removed = { name: 'mill', file: '/store/factories/mill/rules.md', words: null, error: null, removed: true };
-  assert.deepEqual(roundTrip(FactoryRules, removed), removed);
+  assert.deepEqual(answered('factories', 'rules', removed), removed);
   const instruction = { name: 'mill', path: null, store: true, file: '/store/mill.md', words: 'Hi', error: null, stored: true };
-  assert.deepEqual(roundTrip(FactoryInstruction, instruction), instruction);
-  assert.deepEqual(roundTrip(FactoryRulesWrite, { words: 'Be brief.' }), { words: 'Be brief.' });
-  assert.deepEqual(roundTrip(FactoryInstructionWrite, { path: 'NEMIA.md' }), { path: 'NEMIA.md' });
-  assert.deepEqual(roundTrip(FactoryInstructionWrite, { store: true }), { store: true });
-  assert.deepEqual(roundTrip(FactoryInstructionWords, { words: 'Hi' }), { words: 'Hi' });
+  assert.deepEqual(answered('factories', 'instruction', instruction), instruction);
+  assert.deepEqual(taken('factories', 'putRules', { words: 'Be brief.' }), { words: 'Be brief.' });
+  assert.deepEqual(taken('factories', 'putInstruction', { path: 'NEMIA.md' }), { path: 'NEMIA.md' });
+  assert.deepEqual(taken('factories', 'putInstruction', { store: true }), { store: true });
+  assert.deepEqual(taken('factories', 'putInstructionWords', { words: 'Hi' }), { words: 'Hi' });
+  assert.notDeepEqual(answered('factories', 'rules', instruction), instruction, "the rules keep none of the instruction's own keys");
+  assert.equal(answered('factories', 'instruction', rules), undefined);
+  assert.equal(taken('factories', 'putRules', {}), undefined);
 });
 
-test("FactoryCommands decodes the old route's lines, with unschedule by workflow and volume rm by volume name", () => {
+test("the Api's commands answer the old route's lines, with unschedule by workflow and volume rm by volume name", () => {
   const commands = {
     attach: 'nemia factory attach mill <workflow>',
     rm: 'nemia factory rm mill',
@@ -101,8 +94,8 @@ test("FactoryCommands decodes the old route's lines, with unschedule by workflow
     unschedule: { build: 'nemia factory unschedule mill build' },
     volumeRm: { data: 'nemia factory volume rm mill /a/data' },
   };
-  assert.deepEqual(roundTrip(FactoryCommands, commands), commands);
-  assert.deepEqual(roundTrip(FactoryCommands, { ...commands, unschedule: {}, volumeRm: {} }), {
+  assert.deepEqual(answered('factories', 'commands', commands), commands);
+  assert.deepEqual(answered('factories', 'commands', { ...commands, unschedule: {}, volumeRm: {} }), {
     ...commands,
     unschedule: {},
     volumeRm: {},

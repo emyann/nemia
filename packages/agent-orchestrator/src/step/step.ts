@@ -7,7 +7,7 @@
  */
 import { Invalid } from '../refusal/refusal.ts';
 import type { HarnessPrompt } from '../agents/agents.ts';
-import type { PlaceKind } from 'objects';
+import type { PlaceKind, STEP_KEY_FORM, STEP_KEYS as SERVED_STEP_KEYS } from 'objects';
 
 export type Workflow = {
   /** The step's name — the file's, minus `.md`. What `after` refers to. */
@@ -352,8 +352,12 @@ export type OutputSchema = {
   [key: string]: unknown;
 };
 
-/** Every key a step may set, in the order a person reads them. Anything else is refused by name. */
-export const STEP_KEYS = [
+/**
+ * Every key a step may set, in the order a person reads them. Anything else is refused by name. Typed by objects' `STEP_KEYS`, the one
+ * list, whose copy this is: the entries a pure reader loads (`agent-orchestrator/workflow`, `/run`) must not load `objects`, which loads
+ * effect (`test/refusal.test.ts`), so the list is written here again, and its type refuses any key, order or length that differs.
+ */
+export const STEP_KEYS: typeof SERVED_STEP_KEYS = [
   'after',
   'resume',
   'input',
@@ -391,7 +395,7 @@ export const STEP_KEYS = [
   'when',
   'ends',
   'workflow',
-] as const;
+];
 export type StepKey = (typeof STEP_KEYS)[number];
 
 /**
@@ -419,12 +423,18 @@ export const LIST_KEYS: readonly string[] = [
   'allow',
 ];
 
-/** The keys that are counts: what each counts, the least that means anything, and an example. */
+/** The keys whose form is a count in objects' `STEP_KEY_FORM`, the keys `COUNTS` is typed by. */
+type CountKey = { [K in StepKey]: (typeof STEP_KEY_FORM)[K] extends 'count' ? K : never }[StepKey];
+
+/**
+ * The keys that are counts: what each counts, the least that means anything, and an example. Its keys are exactly the `count`s of
+ * objects' `STEP_KEY_FORM`: one left out, or one more, does not typecheck.
+ */
 export const COUNTS = {
   deadlineSeconds: { least: 1, counts: 'the seconds the engine lets the step run before stopping it', example: 900 },
   retries: { least: 0, counts: 'how many times the run re-files the step after its check refuses it', example: 1 },
   rounds: { least: 1, counts: 'how many rounds `loop:` may run, the first included', example: 3 },
-} as const;
+} as const satisfies { readonly [K in CountKey]: { least: number; counts: string; example: number } };
 
 /**
  * What each key means, in one line, in `STEP_KEYS`' order: what the board shows beside a step's value, in the README's sense of the key.

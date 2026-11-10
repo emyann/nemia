@@ -17,51 +17,170 @@ const Strings = Schema.Array(Schema.String);
 const Text = Schema.NullOr(Schema.String);
 
 /**
+ * Every key a step has, in the order a step's file writes them and a refusal names them: the one list of them. The orchestrator's parser
+ * holds its copy typed by this one (`STEP_KEYS` in its `src/step/step.ts`, which the entries a pure reader loads read without loading
+ * effect), so the two cannot drift; every other list of the keys reads this, held by `tools/guards/test/step-keys.test.ts`.
+ */
+export const STEP_KEYS = [
+  'after',
+  'resume',
+  'input',
+  'place',
+  'workspace',
+  'writable',
+  'reads',
+  'slot',
+  'agent',
+  'skills',
+  'mcp',
+  'harness',
+  'model',
+  'effort',
+  'context',
+  'permissionMode',
+  'sandbox',
+  'tools',
+  'disallowedTools',
+  'allowedTools',
+  'denials',
+  'remote',
+  'deadlineSeconds',
+  'memory',
+  'budget',
+  'check',
+  'retries',
+  'gate',
+  'output',
+  'tally',
+  'loop',
+  'rounds',
+  'routes',
+  'route',
+  'when',
+  'ends',
+  'workflow',
+] as const;
+
+/** One of `STEP_KEYS`. */
+export type StepKey = (typeof STEP_KEYS)[number];
+
+/**
+ * How a key is set on a step's form, which is what its value is in JSON: `steps`, a list of the workflow's steps (`after`, `input`);
+ * `step`, one of them (`resume`, `loop`); `choice`, one of the words offered (`harness`); `harness-word`, one of the words the step's
+ * harness takes (`effort`, `permissionMode`, `sandbox`); `text`, one line (`model`, `check`); `list`, names (`tools`, `disallowedTools`);
+ * `count`, a whole number, the parser's counts; `dollars`, an amount; `tokens`, a number of tokens, which the form writes as a person
+ * does (`context`, `200k`); `flag`, `true` or `false` (`remote`, `gate`); `schema`, a file beside the step (`output`).
+ */
+export const STEP_KEY_FORMS = [
+  'steps',
+  'step',
+  'choice',
+  'harness-word',
+  'text',
+  'list',
+  'count',
+  'dollars',
+  'tokens',
+  'flag',
+  'schema',
+] as const;
+
+/** One of `STEP_KEY_FORMS`. */
+export type StepKeyForm = (typeof STEP_KEY_FORMS)[number];
+
+/**
+ * Each key's form (`STEP_KEY_FORMS`), in `STEP_KEYS`' order: a key added to `STEP_KEYS` without one does not typecheck. `place` is a
+ * `choice` of its words, `git` and `folder`; `workspace` of one, `base`, `slot` of one, `none`, and `denials` of one, `fail`, since a
+ * step either says it or says nothing; `agent` a `choice` of the agents offered. The `count`s are the parser's counts, whose keys are
+ * typed by these.
+ */
+export const STEP_KEY_FORM = {
+  after: 'steps',
+  resume: 'step',
+  input: 'steps',
+  place: 'choice',
+  workspace: 'choice',
+  writable: 'list',
+  reads: 'list',
+  slot: 'choice',
+  agent: 'choice',
+  skills: 'list',
+  mcp: 'list',
+  harness: 'choice',
+  model: 'text',
+  effort: 'harness-word',
+  context: 'tokens',
+  permissionMode: 'harness-word',
+  sandbox: 'harness-word',
+  tools: 'list',
+  disallowedTools: 'list',
+  allowedTools: 'list',
+  denials: 'choice',
+  remote: 'flag',
+  deadlineSeconds: 'count',
+  memory: 'text',
+  budget: 'dollars',
+  check: 'text',
+  retries: 'count',
+  gate: 'flag',
+  output: 'schema',
+  tally: 'list',
+  loop: 'step',
+  rounds: 'count',
+  routes: 'list',
+  route: 'text',
+  when: 'list',
+  ends: 'list',
+  workflow: 'text',
+} as const satisfies { readonly [K in StepKey]: StepKeyForm };
+
+/** Each key a step has as the loader reads it, every one optional: a key added to `STEP_KEYS` without one does not typecheck. */
+const stepKeyFields = {
+  after: Schema.optionalKey(Strings),
+  resume: Schema.optionalKey(Text),
+  input: Schema.optionalKey(Strings),
+  place: Schema.optionalKey(Schema.NullOr(Schema.Literals(PLACE_KINDS))),
+  workspace: Schema.optionalKey(Schema.NullOr(Schema.Literal('base'))),
+  writable: Schema.optionalKey(Strings),
+  reads: Schema.optionalKey(Strings),
+  slot: Schema.optionalKey(Schema.NullOr(Schema.Literal('none'))),
+  agent: Schema.optionalKey(Text),
+  skills: Schema.optionalKey(Strings),
+  mcp: Schema.optionalKey(Strings),
+  harness: Schema.optionalKey(Text),
+  model: Schema.optionalKey(Text),
+  effort: Schema.optionalKey(Text),
+  context: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  permissionMode: Schema.optionalKey(Text),
+  sandbox: Schema.optionalKey(Text),
+  tools: Schema.optionalKey(Schema.NullOr(Strings)),
+  disallowedTools: Schema.optionalKey(Strings),
+  allowedTools: Schema.optionalKey(Strings),
+  denials: Schema.optionalKey(Schema.NullOr(Schema.Literal('fail'))),
+  remote: Schema.optionalKey(Schema.NullOr(Schema.Boolean)),
+  deadlineSeconds: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  memory: Schema.optionalKey(Text),
+  budget: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  check: Schema.optionalKey(Text),
+  retries: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  gate: Schema.optionalKey(Schema.NullOr(Schema.Literal(true))),
+  output: Schema.optionalKey(Text),
+  tally: Schema.optionalKey(Strings),
+  loop: Schema.optionalKey(Text),
+  rounds: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  routes: Schema.optionalKey(Schema.NullOr(Strings)),
+  route: Schema.optionalKey(Text),
+  when: Schema.optionalKey(Schema.NullOr(Strings)),
+  ends: Schema.optionalKey(Schema.NullOr(Strings)),
+  workflow: Schema.optionalKey(Text),
+} satisfies { readonly [K in StepKey]: Schema.Top };
+
+/**
  * A step's keys, each as the loader reads it, every one optional: in `spec` only those its file writes, in `status` every key resolved,
  * `null` where it is unset. `route` is its line as written (`judge`, `{ script: … }`, `{ from: …, table: … }`). A key no step has is kept
  * as it was sent, never dropped, so a write of one is refused in the package's words rather than lost unsaid.
  */
-export const StepKeys = Schema.StructWithRest(
-  Schema.Struct({
-    harness: Schema.optionalKey(Text),
-    model: Schema.optionalKey(Text),
-    effort: Schema.optionalKey(Text),
-    context: Schema.optionalKey(Schema.NullOr(Schema.Number)),
-    after: Schema.optionalKey(Strings),
-    resume: Schema.optionalKey(Text),
-    input: Schema.optionalKey(Strings),
-    place: Schema.optionalKey(Schema.NullOr(Schema.Literals(PLACE_KINDS))),
-    workspace: Schema.optionalKey(Schema.NullOr(Schema.Literal('base'))),
-    writable: Schema.optionalKey(Strings),
-    reads: Schema.optionalKey(Strings),
-    slot: Schema.optionalKey(Schema.NullOr(Schema.Literal('none'))),
-    agent: Schema.optionalKey(Text),
-    skills: Schema.optionalKey(Strings),
-    mcp: Schema.optionalKey(Strings),
-    permissionMode: Schema.optionalKey(Text),
-    sandbox: Schema.optionalKey(Text),
-    tools: Schema.optionalKey(Schema.NullOr(Strings)),
-    disallowedTools: Schema.optionalKey(Strings),
-    allowedTools: Schema.optionalKey(Strings),
-    denials: Schema.optionalKey(Schema.NullOr(Schema.Literal('fail'))),
-    remote: Schema.optionalKey(Schema.NullOr(Schema.Boolean)),
-    deadlineSeconds: Schema.optionalKey(Schema.NullOr(Schema.Number)),
-    budget: Schema.optionalKey(Schema.NullOr(Schema.Number)),
-    check: Schema.optionalKey(Text),
-    retries: Schema.optionalKey(Schema.NullOr(Schema.Number)),
-    gate: Schema.optionalKey(Schema.NullOr(Schema.Literal(true))),
-    output: Schema.optionalKey(Text),
-    tally: Schema.optionalKey(Strings),
-    loop: Schema.optionalKey(Text),
-    rounds: Schema.optionalKey(Schema.NullOr(Schema.Number)),
-    routes: Schema.optionalKey(Schema.NullOr(Strings)),
-    route: Schema.optionalKey(Text),
-    when: Schema.optionalKey(Schema.NullOr(Strings)),
-    ends: Schema.optionalKey(Schema.NullOr(Strings)),
-    workflow: Schema.optionalKey(Text),
-  }),
-  [Schema.Record(Schema.String, Schema.Unknown)],
-);
+export const StepKeys = Schema.StructWithRest(Schema.Struct(stepKeyFields), [Schema.Record(Schema.String, Schema.Unknown)]);
 export type StepKeys = typeof StepKeys.Type;
 
 /** A step as its file writes it: its name, the keys its file sets, and its note — all of its body for a step with no agent. */

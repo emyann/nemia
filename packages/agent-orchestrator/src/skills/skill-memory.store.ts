@@ -11,7 +11,7 @@
  * its SKILL.md alone, written through the renders the files write through (`renderSkill`, `withPreload`); a link, a file beside SKILL.md
  * and a skill named with its repository's folder (`folder:name`) are the files' to read.
  */
-import { createHash } from 'node:crypto';
+import { versionDigest } from '../digest/digest.ts';
 import path from 'node:path';
 import { Layer } from 'effect';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
@@ -29,7 +29,7 @@ export const MEMORY_ROOT = '/memory';
 const MEMORY_WORKFLOWS = path.posix.join(MEMORY_ROOT, 'workflows');
 
 /** The version of a SKILL.md held: a digest of its text, as `skillVersion` digests a skill's folder. */
-const versionOf = (text: string): string => createHash('sha256').update(text).digest('hex').slice(0, 16);
+const versionOf = versionDigest;
 
 /** Why a write or a copy may not go to the folder of skills `at`, as the files refuse it, or nothing. */
 function placeRefusal(at: string, where: SkillWhere | undefined): Invalid | undefined {

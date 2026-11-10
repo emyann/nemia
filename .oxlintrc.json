@@ -417,8 +417,9 @@
       }
     },
     // The objects sit at the bottom beside the runtime, and every layer above reads them, the board in a browser: they import `effect`
-    // and their own files alone (`./x.ts`), no other package, no node built-in and no path out of src. One group refuses every import and
-    // lets those three through by negation: oxlint's regex reads no lookahead, and refuses nothing with one. packages/objects/CLAUDE.md.
+    // and their own files alone (`./x.ts`), no other package, no node built-in and no path out of src but a contract's type
+    // (`../contracts/<name>.contract.ts`, imported by `import type`, which no build keeps). One group refuses every import and lets those
+    // through by negation: oxlint's regex reads no lookahead, and refuses nothing with one. packages/objects/CLAUDE.md.
     {
       "files": ["packages/objects/src/**"],
       "rules": {
@@ -427,7 +428,7 @@
           {
             "patterns": [
               {
-                "group": ["**", "!effect", "!effect/**", "!./**"],
+                "group": ["**", "!effect", "!effect/**", "!./**", "!../contracts/*.contract.ts"],
                 "message": "The objects import effect and their own files alone: write it with effect's Schema, in a file of packages/objects/src"
               }
             ]

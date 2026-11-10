@@ -61,7 +61,7 @@ import { factoryFills } from '../factory/rules/rules.store.ts';
 import { Context, Effect } from 'effect';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
-import { inheritedLabels, parseLabelEdits, type Inherited, type LabelEdit, type Labels, type LeftOut } from '../labels/labels.ts';
+import { inheritedLabels, parseLabelEdits, type Inherited, type LabelChange, type Labels, type LeftOut } from '../labels/labels.ts';
 
 /**
  * A workflow folder's steps, as a run in `factory` runs them: each step its hires fill (`factoryFills`, by the folder's name) resolved
@@ -711,7 +711,7 @@ const labelEditsOf = Effect.fnUntraced(function* (opts: StartOptions) {
 });
 
 /** The labels a run of `opts` is created with (`inheritedLabels`): its `after` and `context` runs' read through the Run door. */
-const inheritedOf = Effect.fnUntraced(function* (opts: StartOptions, edits: readonly LabelEdit[]) {
+const inheritedOf = Effect.fnUntraced(function* (opts: StartOptions, edits: readonly LabelChange[]) {
   const door = yield* RunDoor;
   const named = [...new Set([...(opts.after ?? []), ...(opts.context ?? [])])];
   const parents = yield* Effect.forEach(named, (parent) =>

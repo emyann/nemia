@@ -4,6 +4,9 @@
  * `CLAUDE.md` of the repository — the root's, each package's and each app's — is read here, and a citation that resolves to no test
  * file, or to a name that file does not hold, is refused. It is the shape `comments.test.ts` has for a name a comment quotes.
  *
+ * Which files are read is git's to say, not a list's: every `CLAUDE.md` and every test file git lists (`files` of `test-kit/repo`), less
+ * what `.gitattributes` marks another project's or generated (`notOurs`), so a `CLAUDE.md` a change adds is read the day it lands.
+ *
  * A cited path is read as the files cite them today: from the repository root (`packages/agent-orchestrator/test/boundary.test.ts`),
  * from a package by its name (`agent-runtime/test/engine.test.ts`), from the folder of the file that cites it
  * (`test/boundary.test.ts`), or by its name alone (`suite.test.ts`) — so a citation names a test when a test file of the repository
@@ -15,37 +18,29 @@
  * The test reads files outside this package: after a change to a `CLAUDE.md` or to a test's name, `npx turbo run test --force`.
  *
  * How many citations the files hold is no measure of this guard: the files are being cut down to what no test can refuse, so the corpus
- * shrinks on purpose and a floor near its size would refuse a cut rather than a broken citation. The floor below only says the walk
- * read the files at all; that a citation is read, and a name with it, is proven by the `REFUSED:` fixture.
+ * shrinks on purpose and a floor near its size would refuse a cut rather than a broken citation. The floor below only says the files were
+ * read at all; that a citation is read, and a name with it, is proven by the `REFUSED:` fixture.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { files, notOurs, REPO } from 'test-kit/repo';
 import { scratch } from 'test-kit/scratch';
 
-const ROOT = path.join(import.meta.dirname, '..', '..', '..');
+/** Every file of ours git lists in the repository at `root`, on disk, by its path from `root`, sorted. */
+const oursIn = (root: string): string[] => {
+  const listed = files(root).filter((file) => fs.existsSync(path.join(root, file)));
+  const marked = notOurs(listed, root);
+  return listed.filter((file) => !marked.has(file)).sort();
+};
 
-/** The folders a walk never enters: another repository's code, a build's output, a cache, and the package manager's tree. */
-const SKIPPED = new Set(['node_modules', '.git', '.turbo', 'dist', 'build', '.e2e', 'ds']);
+/** Every `CLAUDE.md` of the repository at `root`, by its path from `root`. */
+export const claudeFiles = (root: string): string[] => oursIn(root).filter((file) => path.posix.basename(file) === 'CLAUDE.md');
 
-/** Every file under `root` whose name `wanted` accepts, by its path from `root`, in order, the skipped folders left unentered. */
-function walk(root: string, wanted: (name: string) => boolean, at = ''): string[] {
-  const found: string[] = [];
-  for (const entry of fs.readdirSync(path.join(root, at), { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
-    const here = at === '' ? entry.name : `${at}/${entry.name}`;
-    if (entry.isDirectory()) {
-      if (!SKIPPED.has(entry.name) && !entry.name.startsWith('.claude')) found.push(...walk(root, wanted, here));
-    } else if (entry.isFile() && wanted(entry.name)) found.push(here);
-  }
-  return found;
-}
-
-/** Every `CLAUDE.md` under `root`, by its path from `root`. */
-export const claudeFiles = (root: string): string[] => walk(root, (name) => name === 'CLAUDE.md');
-
-/** Every test file under `root`, beside the code or under a `test/`, by its path from `root`. */
-export const testFiles = (root: string): string[] => walk(root, (name) => /\.test\.tsx?$/.test(name));
+/** Every test file of the repository at `root`, beside the code or under a `test/`, by its path from `root`. */
+export const testFiles = (root: string): string[] => oursIn(root).filter((file) => /\.test\.tsx?$/.test(file));
 
 /** A test path a citation holds: a path of names ending `.test.ts`, with no glob, placeholder or space in it. */
 const PATH = /^[\w./-]+\.test\.tsx?$/;
@@ -106,6 +101,7 @@ export function brokenCites(root: string, doc: string, files: string[]): string[
 /** A fixture repository under a scratch root: a `CLAUDE.md` of `text`, and a test file holding one test, named `held`. */
 function fixture(text: string, held: string): string {
   const root = scratch('claude-cites-');
+  execFileSync('git', ['init', '-q', root]);
   fs.mkdirSync(path.join(root, 'test'), { recursive: true });
   fs.writeFileSync(path.join(root, 'CLAUDE.md'), text);
   fs.writeFileSync(path.join(root, 'test', 'there.test.ts'), `test(${JSON.stringify(held)}, () => {});\n`);
@@ -143,27 +139,32 @@ test('a citation whose test file and name are both there, on one line or over tw
   assert.deepEqual(brokenCites(root, 'CLAUDE.md', testFiles(root)), []);
 });
 
-test("every CLAUDE.md of the repository is read, the root's and each package's, app's and the guards'", () => {
-  assert.deepEqual([...claudeFiles(ROOT)].sort(), [
-    'CLAUDE.md',
-    'apps/api/CLAUDE.md',
-    'apps/cli/CLAUDE.md',
-    'apps/docs/CLAUDE.md',
-    'apps/web/CLAUDE.md',
-    'packages/agent-orchestrator/CLAUDE.md',
-    'packages/agent-runtime/CLAUDE.md',
-    'packages/objects/CLAUDE.md',
-    'packages/templates/CLAUDE.md',
-    'tools/guards/CLAUDE.md',
-  ]);
+test('REFUSED: a CLAUDE.md planted anywhere in a repository is read with no list naming it, and one in a vendored folder is not', () => {
+  const root = fixture('A rule whose test is gone (`test/gone.test.ts`).\n', HELD);
+  fs.mkdirSync(path.join(root, 'deep', 'er'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'deep', 'er', 'CLAUDE.md'), 'Gone too (`gone.test.ts`).\n');
+  fs.mkdirSync(path.join(root, 'kit'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'kit', 'CLAUDE.md'), "Another project's (`missing.test.ts`).\n");
+  fs.writeFileSync(path.join(root, '.gitattributes'), 'kit/** linguist-vendored\n');
+  const docs = claudeFiles(root);
+  assert.deepEqual(docs, ['CLAUDE.md', 'deep/er/CLAUDE.md']);
+  assert.deepEqual(
+    docs.flatMap((doc) => brokenCites(root, doc, testFiles(root))).map((refusal) => refusal.split(' ')[0]),
+    ['CLAUDE.md:1', 'deep/er/CLAUDE.md:1'],
+  );
+});
+
+test("the repository's own CLAUDE.md files are read: the root's, and the guards' among the packages'", () => {
+  const docs = claudeFiles(REPO);
+  assert.ok(docs.includes('CLAUDE.md') && docs.includes('tools/guards/CLAUDE.md'), `git listed ${docs.join(', ')}`);
 });
 
 test('every test file each CLAUDE.md cites is there, and every test name it quotes is one that file holds', () => {
-  const files = testFiles(ROOT);
-  assert.ok(files.length > 200, `the walk found ${files.length} test files, far fewer than the repository has`);
-  const docs = claudeFiles(ROOT);
-  const cited = docs.flatMap((doc) => citesOf(fs.readFileSync(path.join(ROOT, doc), 'utf8')));
+  const files = testFiles(REPO);
+  assert.ok(files.length > 200, `git listed ${files.length} test files, far fewer than the repository has`);
+  const docs = claudeFiles(REPO);
+  const cited = docs.flatMap((doc) => citesOf(fs.readFileSync(path.join(REPO, doc), 'utf8')));
   assert.ok(cited.length > 20, `the files cite ${cited.length} tests, far fewer than they do`);
-  const broken = docs.flatMap((doc) => brokenCites(ROOT, doc, files));
+  const broken = docs.flatMap((doc) => brokenCites(REPO, doc, files));
   assert.deepEqual(broken, [], 'correct the citation to the test that holds the rule, or delete the line with its test');
 });

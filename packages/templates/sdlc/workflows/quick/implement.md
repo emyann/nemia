@@ -5,10 +5,10 @@ and only it, then the part headed *Either way*.
 
 **Open the pull request before you sign off**, once a round and after you merged the base: this run's change is judged on GitHub, and
 your fence refuses every `git push` and every `gh` call, so the push and the pull request are one frozen script, read from the run's
-frozen workflow files (`$WF_WORKFLOW_FILES`) as your check reads it. Run it:
+frozen carried files (`$WF_CARRIED_FILES`) as your check reads it. Run it:
 
 ```
-node "$WF_WORKFLOW_FILES/pull-request.ts" open --title "<the card's line>" --body-file "$WF_STEP_FILES/pr-body.md" --labels "${{ parameters.pullRequestLabels }}"
+node "$WF_CARRIED_FILES/pull-request.ts" open --title "<the card's line>" --body-file "$WF_STEP_FILES/pr-body.md" --labels "${{ parameters.pullRequestLabels }}"
 ```
 
 Type the `--labels` as it stands: those are the factory's rules, and the script labels the pull request by them, from the run's
@@ -87,12 +87,12 @@ branch, never your branch into the base. On a try whose brief is headed `## Merg
 **Settle every part of the run before you sign off.** Where you built through parts, each on a branch of its own beside yours
 (`wf/<run>/<part>`), the landing refuses a part whose work the branch it lands does not hold, by patch (`git cherry`), so each is
 taken into your branch, by a merge or as commits of your own, or settled. A part whose work your branch replaced (an earlier cut of
-it, its work moved or made again) you declare replaced: `node "$WF_WORKFLOW_FILES/parts.ts" replaced <part>…` removes its branch,
+it, its work moved or made again) you declare replaced: `node "$WF_CARRIED_FILES/parts.ts" replaced <part>…` removes its branch,
 keeping its tip as `refs/backup/wf/<run>/<part>`, which a step may not do by hand; name each part you declared, and what replaced it,
 in your closeout. Your check runs `parts.ts check`, which refuses while a part is neither, naming each and both ways to settle it.
 
 When you start a Claude Code session of your own to measure something, a probe, start it through the run's frozen copy, `node
-"$WF_WORKFLOW_FILES/probe.ts" start <label> -- <prompt>`: a bare `claude --bg` or Remote Control is refused to you.
+"$WF_CARRIED_FILES/probe.ts" start <label> -- <prompt>`: a bare `claude --bg` or Remote Control is refused to you.
 It names the session for the run, runs it in the machinery's trusted folder (`$WF_ROOT/probes`), and tells the person no action is
 needed; pass `--settings` rather than edit a folder's settings. Only when the measurement needs the person's answer, add `--answer
 "<what to press>"`: the session then reaches their phone, and you stop `blocked` with the `needs` line it prints. Read your probes with

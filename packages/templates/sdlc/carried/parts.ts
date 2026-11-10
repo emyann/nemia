@@ -10,7 +10,7 @@
  * - `replaced <part>…`, which the engineer types for a part whose work her branch replaced (an earlier cut of it, its work moved or
  *   made again): it removes each `wf/<run>/<part>` branch, never another, keeping its tip as `refs/backup/wf/<run>/<part>` so nothing
  *   is lost, and prints what it removed and kept. A step may not delete a branch, so the removal is this script's, read from the run's
- *   frozen workflow files (`$WF_WORKFLOW_FILES`) as `pull-request.ts` is; the engineer names each part she declared in her closeout.
+ *   frozen carried files (`$WF_CARRIED_FILES`) as `pull-request.ts` is; the engineer names each part she declared in her closeout.
  *
  * The run is read from `HEAD`, never given: a run's branch is `wf/<run>/<leaf>`, and its parts are the other branches under `wf/<run>/`.
  * Refuses, exit 1 on stderr with what to do next: a `HEAD` on no such branch; a verb it has not; a `replaced` with no part, or naming its
@@ -77,7 +77,7 @@ const leftOut = (branch: string, tip: string, head: string): string[] =>
     .map((line) => line.slice(2, 14));
 
 /** The command that declares `parts` replaced, as the engineer types it. */
-const replacedLine = (parts: readonly string[]): string => `node "$WF_WORKFLOW_FILES/parts.ts" replaced ${parts.join(' ')}`;
+const replacedLine = (parts: readonly string[]): string => `node "$WF_CARRIED_FILES/parts.ts" replaced ${parts.join(' ')}`;
 
 /** `check`: refuses while a part of this run holds a commit `HEAD` has no patch of. */
 function check(args: string[]): string[] {
@@ -112,7 +112,7 @@ const checkedOut = (): Set<string> =>
 
 /** `replaced <part>…`: removes each part's branch, keeping its tip under `refs/backup/`; refuses all before it removes any. */
 function replaced(args: string[]): string[] {
-  if (args.length === 0) throw new Refusal('`replaced` names the parts it declares: `node "$WF_WORKFLOW_FILES/parts.ts" replaced <part>…`');
+  if (args.length === 0) throw new Refusal('`replaced` names the parts it declares: `node "$WF_CARRIED_FILES/parts.ts" replaced <part>…`');
   const { branch, run: id, leaf } = branchOf();
   const head = git('what commit HEAD is', 'rev-parse', 'HEAD');
   const parts = new Map(partsOf(id, branch).map((part) => [part.branch, part.tip]));

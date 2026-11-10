@@ -28,10 +28,9 @@ code of a layer. A tool beside the layers, not a layer: no package or app import
   inputs.
 - **`test/test-rules.baseline.ts` only shrinks**: the pinned-words debt left is the runtime's, the api's and the web's; the
   orchestrator's is gone.
-- **`test/glossary.baseline.ts` only shrinks**: a change that removes a retired spelling from a file lowers its count there in the same
-  commit, and takes the entry off where none is left; a new retired row in a glossary table adds its files' counts the day it lands
-  (`test/glossary.test.ts`).
-- **`test/closed-state.baseline.ts` only shrinks**: it holds, by key, each field at a door that says a state or a kind as a `string`
-  (`test/closed-state.test.ts`). A change that closes a field takes its entry off in the same commit, and a rename moves its key with it;
-  a new field at a door is typed as a closed union named in its glossary, never added to the baseline. Today's printout:
-  `node tools/guards/test/closed-state.ts`.
+- **`test/glossary.baseline.ts` holds only the renames in flight, and only shrinks**: a change that removes a retired spelling from a
+  file lowers its count there in the same commit, and takes the entry off where none is left. A spelling that stays on purpose (a value a
+  record on disk holds, a former spelling read with a hint, another sense of the word) is a `kept` path, with why, on its row of the
+  glossary table, never a count (`test/glossary.test.ts`).
+- **`test/closed-state.test.ts` has no baseline**: no field at a door says a state or a kind as a `string`; a new one is typed as a
+  closed union named in its glossary. Today's open fields, which should be none: `node tools/guards/test/closed-state.ts`.

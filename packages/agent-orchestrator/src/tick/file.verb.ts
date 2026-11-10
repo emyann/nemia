@@ -45,7 +45,7 @@ import { filedOn, resumeOn } from '../pinned/pinned.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from '../closeout/index.ts';
 import { modeWord, nextTry, sessionModel, tryWord, type Retry } from '../retry/index.ts';
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
-import { workflowFilesDir } from '../frozen/frozen.store.ts';
+import { carriedFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
 import { checkCloseout, writeCheckCloseout } from '../check/check.store.ts';
 import { checkoutParts, cutNotes, workspaceFor, type Cut } from '../workspace/worktree.store.ts';
 import { checksHandedRead, landingSaidRead, refusalRead, reportedEngine, saidIn, sessionIn } from '../views/views.verb.ts';
@@ -477,6 +477,7 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
       files,
       closeout: closeout && writeCheckCloseout(taskId, closeout),
       ...(run.workflowFiles === undefined ? {} : { workflowFiles: workflowFilesDir(run, run.workflowFiles) }),
+      ...(run.carriedFiles === undefined ? {} : { carriedFiles: carriedFilesDir(run, run.carriedFiles) }),
     });
     yield* asked(
       'file',

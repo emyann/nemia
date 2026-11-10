@@ -1,7 +1,8 @@
 /**
  * A checked template rendered into a factory's own folder, in today's format (`renderFactory`): the inverse of `nemia template export`'s
  * `draftOf`. Each workflow's steps become step files (`renderStep`), a step's own closeout schema named beside it, each agent an agent
- * file (`renderAgent`) with its output schema beside it, each skill's folder is carried as it is, and the manifest's hires, its revisions
+ * file (`renderAgent`) with its output schema beside it, its fence lists written whole with the lines their `{ path }` items name
+ * (`withSharedLines`), each skill's folder and the template's `carried/` are carried as they are, and the manifest's hires, its revisions
  * policy and the workflows become the factory's wiring (`factory.json`), its instruction `NEMIA.md`, its rules `RULES.md`. The tree is
  * laid out as yours is: `workflows/<workflow>/`, `workflows/agents/` and `workflows/skills/`, so today's readers load it unchanged. Pure:
  * the store reads the folder and the files a document names, and writes what comes back. A key today's format has no place for is refused
@@ -13,14 +14,21 @@ import { renderAgent, type AgentDraft } from '../../agents/agents.ts';
 import { DEFAULT_HARNESS } from '../../harness/harness.ts';
 import { REVISIONS_POLICIES, type RevisionsPolicy } from '../factory.ts';
 import { FACTORY_RULES_FILE, factoryRulesRefusal } from '../rules/rules.ts';
-import { AGENTS_FOLDER, SKILLS_FOLDER, type RouteEval } from '../../step/step.ts';
-import { isMap, type ReadFolder } from '../../template/index.ts';
+import { AGENTS_FOLDER, CARRIED_FOLDER, SKILLS_FOLDER, type RouteEval } from '../../step/step.ts';
+import { isMap, listItemsOf, withSharedLines, type ReadFolder } from '../../template/index.ts';
 import { renderStep } from '../../workflow/index.ts';
 import { baseSpelled } from '../../former/former.ts';
 import { interpolated, substitute, type Params } from './params.ts';
 
-/** A checked template as the store hands it in: its folder as read, and the text of one of its files by its path. */
-export type TemplateRead = { folder: ReadFolder; text: (file: string) => string };
+/**
+ * A checked template as the store hands it in: its folder as read, the text of one of its files by its path, and the lines of a file of
+ * shared lines (`sharedLinesOf`), undefined where it is no list of strings.
+ */
+export type TemplateRead = {
+  folder: ReadFolder;
+  text: (file: string) => string;
+  lines: (file: string) => readonly string[] | undefined;
+};
 
 /**
  * The wiring a factory made from a template is given: every workflow it holds, by name, who fills each `<workflow>/<step>`, and whether
@@ -73,11 +81,23 @@ function carriedOr(value: unknown, file: string, read: TemplateRead): string | u
   return read.folder.files.includes(file) ? read.text(file) : undefined;
 }
 
+/**
+ * A fence key's value as its line writes it: a tool list whole, each `{ path }` item in it replaced by the lines of the template's file it
+ * names (`withSharedLines`), so the factory's tree holds the full list; a word as it is. A file that is no list of strings, which the
+ * lint refuses before a render, gives none.
+ */
+function fenceLine(value: unknown, read: TemplateRead): string {
+  if (!Array.isArray(value)) return lineOf(value);
+  const items = listItemsOf(value);
+  const linesOf = Object.fromEntries(items.flatMap((item) => ('path' in item ? [[item.path, read.lines(item.path) ?? []]] : [])));
+  return lineOf(withSharedLines(items, linesOf));
+}
+
 /** The keys the block `block` of the harness `name` writes as today's lines name them, its `options` refused into `refusals`. */
-function blockLines(where: string, name: string, block: Spec, refusals: string[]): Record<string, string> {
+function blockLines(where: string, name: string, block: Spec, read: TemplateRead, refusals: string[]): Record<string, string> {
   const keys: Record<string, string> = {};
   for (const key of BLOCK_WORDS) if (block[key] !== undefined) keys[key] = lineOf(block[key]);
-  if (isMap(block.fence)) for (const [key, value] of Object.entries(block.fence)) keys[key] = lineOf(value);
+  if (isMap(block.fence)) for (const [key, value] of Object.entries(block.fence)) keys[key] = fenceLine(value, read);
   if (block.options !== undefined)
     refusals.push(
       `${where}: \`${name}.options\` is handed to ${name} as it is, and a factory's folder has no line for it yet. Remove it, and apply again.`,
@@ -90,11 +110,11 @@ function blockLines(where: string, name: string, block: Spec, refusals: string[]
  * (`permissionMode`, `sandbox`, a tool list). Refused into `refusals`: `options`, which today's format has no line for, and a block of
  * another harness than the one it runs on, since today's folder holds the keys of one.
  */
-function blockKeys(where: string, blocks: Spec, harness: string, refusals: string[]): Record<string, string> {
+function blockKeys(where: string, blocks: Spec, harness: string, read: TemplateRead, refusals: string[]): Record<string, string> {
   let keys: Record<string, string> = {};
   for (const [name, block] of Object.entries(blocks)) {
     if (!isMap(block)) continue;
-    if (name === harness) keys = blockLines(where, name, block, refusals);
+    if (name === harness) keys = blockLines(where, name, block, read, refusals);
     else
       refusals.push(
         `${where}: \`${name}:\` is a block for ${name}, and this runs on ${harness}: a factory's folder holds the keys of the harness it runs on alone. Remove the block, or run it on ${name}.`,
@@ -167,7 +187,7 @@ function stepFile(
   if (typeof overrides.harness === 'string') keys.harness = overrides.harness;
   if (overrides.skills !== undefined) keys.skills = lineOf(overrides.skills);
   if (overrides.mcp !== undefined) keys.mcp = lineOf(overrides.mcp);
-  Object.assign(keys, blockKeys(where, blocksOf(overrides, ['harness', 'skills', 'mcp']), harness, refusals));
+  Object.assign(keys, blockKeys(where, blocksOf(overrides, ['harness', 'skills', 'mcp']), harness, read, refusals));
   const body = textOr(step.instruction, `${WORKFLOWS}/${workflow}/${name}.md`, read, params) ?? '';
   const route = routeEvalOf(step.route);
   try {
@@ -216,6 +236,7 @@ function renderAgentOf(name: string, spec: Spec, read: TemplateRead, params: Par
     where,
     blocksOf(spec, ['role', 'description', 'instructions', 'skills', 'mcp', 'overridable', 'output', 'harness']),
     harness,
+    read,
     out.refusals,
   );
   if (typeof spec.harness === 'string') keys.harness = spec.harness;
@@ -283,17 +304,23 @@ export function renderFactory(read: TemplateRead, params: Params): Rendered {
   const agents = new Map(namesOf(read, 'agents', 'agent.yaml').map((name) => [name, specAt(read, `agents/${name}/agent.yaml`, params)]));
   const substituted: TemplateRead = {
     text: read.text,
+    lines: read.lines,
     folder: {
       ...read.folder,
       documents: new Map([...read.folder.documents].map(([file, doc]) => [file, substitute(doc, params)])),
     },
   };
+  if (workflows.includes(CARRIED_FOLDER))
+    out.refusals.push(
+      `${WORKFLOWS}/${CARRIED_FOLDER}/workflow.yaml: ${CARRIED_FOLDER}/ beside the workflows is the folder of carried files, the template's own ${CARRIED_FOLDER}/ rendered, and no workflow has its name. Rename the workflow's folder, and apply again.`,
+    );
   for (const workflow of workflows) renderWorkflow(workflow, substituted, params, agents, hires, out);
   for (const [name, spec] of agents) renderAgentOf(name, spec, read, params, out);
   for (const file of read.folder.files) {
     const [holder, , leaf] = file.split('/');
     if (holder === SKILLS_FOLDER && !(leaf === 'skill.yaml' && file.split('/').length === 3))
       out.copies.push({ path: `${WORKFLOWS}/${file}`, from: file });
+    if (holder === CARRIED_FOLDER) out.copies.push({ path: `${WORKFLOWS}/${file}`, from: file });
   }
   const instruction = textOr(manifest.instruction, 'NEMIA.md', read, params);
   if (instruction !== undefined) out.files.push({ path: 'NEMIA.md', text: `${instruction.trim()}\n` });

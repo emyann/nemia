@@ -9,6 +9,7 @@ import { HARNESS_FENCE_KEYS } from '../harness/harness.ts';
 import { SKILL_NAME } from '../keys/index.ts';
 import { REVISIONS_POLICIES, type RevisionsPolicy } from '../factory/factory.ts';
 import type { TemplateParameterType } from 'objects';
+import type { InLayout } from '../../contracts/template-layout.contract.ts';
 
 /** The schema every document of a template is written in. */
 export const API_VERSION = 'nemia.dev/v1alpha1';
@@ -37,8 +38,11 @@ export type Text = string | { path: string } | ParamRef;
 /** A value the person gives when the template is applied: its type, what it is for, and the value taken when they give none. */
 export type Parameter = { type: TemplateParameterType; description: string; default?: string | number | boolean };
 
-/** What a harness's block fences: the word of its fence key, and the tool lists of a harness that takes them. */
-export type Fence = Readonly<Record<string, string | readonly string[]>>;
+/**
+ * What a harness's block fences: the word of its fence key, and the tool lists of a harness that takes them, a `{ path }` in one naming
+ * a file of the template whose lines it takes (`withSharedLines`).
+ */
+export type Fence = Readonly<Record<string, string | ReadonlyArray<string | { path: string }>>>;
 
 /** One harness's block, in its own words: its model, effort, context window, fence, and the flags handed to it as they are. */
 export type Profile = {
@@ -147,29 +151,47 @@ const ROOT_FILES = ['nemia.yaml', 'NEMIA.md', 'RULES.md', 'nemia.lock.yaml'];
 const LAYOUT =
   "A template holds nemia.yaml, NEMIA.md, RULES.md and nemia.lock.yaml at its root; workflows/<workflow>/workflow.yaml, its steps' <step>.md, " +
   'README.md and any file that is not .md or .yaml; agents/<agent>/agent.yaml, instructions.md and output.schema.json; ' +
-  'skills/<skill>/SKILL.md and anything beside it; and a file a {path:} names';
+  'skills/<skill>/SKILL.md and anything beside it; carried/ and any file in it, the files its workflows share; and a file a {path:} names';
 
-/** Whether `file`, in a workflow's folder (`rest`, the parts after its name), is one the layout gives it. */
-const inWorkflow = (rest: readonly string[]): boolean => {
-  const [only, ...more] = rest;
-  const last = rest.at(-1);
-  return (
-    (only !== undefined && !more.length && (only === 'workflow.yaml' || only.endsWith('.md'))) ||
-    last === undefined ||
-    !/\.(md|yaml)$/.test(last)
-  );
+/**
+ * Whether `rest`, a file's path in a workflow's folder after the folder's name, is one the layout gives it: the workflow's document and a
+ * step's note directly in it, and any file that is no `.md` or `.yaml`, at any depth.
+ */
+const inWorkflow = (rest: string): boolean => {
+  const direct = !rest.includes('/');
+  return (direct && (rest === 'workflow.yaml' || rest.endsWith('.md'))) || !(rest.endsWith('.md') || rest.endsWith('.yaml'));
 };
 
-/** Whether the layout gives `file` a place; `named` are the files a `{ path }` of a document names. */
-function inLayout(file: string, named: ReadonlySet<string>): boolean {
+/**
+ * What follows the folder's name in `inHolder`, a file's path under a holder (`workflows/`, `agents/`, `skills/`) after the holder's own
+ * `/`: none where the path holds no file of a folder.
+ */
+const pastFolder = (inHolder: string): string | undefined => {
+  const slash = inHolder.indexOf('/');
+  if (slash < 0) return undefined;
+  const rest = inHolder.slice(slash).slice(1);
+  return rest.length === 0 ? undefined : rest;
+};
+
+/**
+ * Whether the layout gives `file` a place (the contract `template-layout.contract.ts`); `named` are the files a `{ path }` of a document
+ * names. Read by the holder's prefix rather than by splitting the path, which the verifier does not model.
+ */
+export const inLayout: InLayout = (file, named) => {
   if (named.has(file) || ROOT_FILES.includes(file)) return true;
-  const [holder, name, ...rest] = file.split('/');
-  if (name === undefined || rest.length === 0) return false;
-  if (holder === 'workflows') return inWorkflow(rest);
-  const [first] = rest;
-  if (holder === 'agents') return rest.length === 1 && first !== undefined && AGENT_FILES.includes(first);
-  return holder === 'skills';
-}
+  if (!file.includes('/')) return false;
+  if (file.startsWith('carried/')) return file.length > 'carried/'.length && !file.endsWith('/');
+  if (file.startsWith('workflows/')) {
+    const rest = pastFolder(file.slice('workflows/'.length));
+    return rest !== undefined && inWorkflow(rest);
+  }
+  if (file.startsWith('agents/')) {
+    const rest = pastFolder(file.slice('agents/'.length));
+    return rest !== undefined && !rest.includes('/') && AGENT_FILES.includes(rest);
+  }
+  if (file.startsWith('skills/')) return pastFolder(file.slice('skills/'.length)) !== undefined;
+  return false;
+};
 
 /** The file each folder of a kind must hold, and what the folder is. */
 const HOLDS = { workflows: ['workflow.yaml', 'a workflow'], agents: ['agent.yaml', 'an agent'], skills: ['SKILL.md', 'a skill'] } as const;
@@ -213,7 +235,20 @@ export function layoutRefusals(folder: Pick<ReadFolder, 'files'>, named: Readonl
 }
 
 /** A value's leaf kinds: what it must be, a `{ param }` allowed for `words` and `count`, and `not-yet` for a git or url source. */
-type Leaf = 'string' | 'number' | 'boolean' | 'strings' | 'text' | 'words' | 'count' | 'option' | 'revisions' | 'route' | 'any' | 'not-yet';
+type Leaf =
+  | 'string'
+  | 'number'
+  | 'boolean'
+  | 'strings'
+  | 'lines'
+  | 'text'
+  | 'words'
+  | 'count'
+  | 'option'
+  | 'revisions'
+  | 'route'
+  | 'any'
+  | 'not-yet';
 
 /** A document's shape: a leaf, a list of one shape, or named fields, some required, and the shape of any other key (`rest`). */
 type Shape =
@@ -232,7 +267,7 @@ const PROFILE: Shape = {
     model: 'words',
     effort: 'words',
     context: 'words',
-    fence: { fields: Object.fromEntries(HARNESS_FENCE_KEYS.map((key) => [key, isList(key) ? 'strings' : 'string'])) },
+    fence: { fields: Object.fromEntries(HARNESS_FENCE_KEYS.map((key) => [key, isList(key) ? 'lines' : 'string'])) },
     options: { fields: {}, rest: 'option' },
   },
 };
@@ -366,6 +401,13 @@ function textRefusal(value: unknown, at: ReadonlyArray<string | number>): string
 /** Whether `value` is a list of strings. */
 const isStrings = (value: unknown): boolean => Array.isArray(value) && value.every((item) => typeof item === 'string');
 
+/** Whether `value` is a `{ path }` and nothing more: a file of the template named in a list. */
+export const isPathItem = (value: unknown): value is { path: string } =>
+  isMap(value) && Object.keys(value).length === 1 && typeof value.path === 'string';
+
+/** Whether `value` is a harness's tool list: lines, each a string or a `{ path }` naming a file of the template that holds more. */
+const isLines = (value: unknown): boolean => Array.isArray(value) && value.every((item) => typeof item === 'string' || isPathItem(item));
+
 /** Whether `value` is a `route:` (`TemplateRoute`). */
 const isRoute = (value: unknown): boolean => {
   if (value === 'judge') return true;
@@ -386,6 +428,7 @@ const LEAVES: Readonly<Record<Exclude<Leaf, 'text' | 'not-yet'>, [(value: unknow
   number: [(v) => typeof v === 'number', 'a number'],
   boolean: [(v) => typeof v === 'boolean', 'true or false'],
   strings: [isStrings, 'a list of strings'],
+  lines: [isLines, 'a list of strings and {path: <file>} items, each file a YAML list of strings'],
   words: [(v) => typeof v === 'string' || isParam(v), 'a string or {param: <name>}'],
   count: [(v) => typeof v === 'number' || isParam(v), 'a number or {param: <name>}'],
   option: [(v) => ['string', 'number'].includes(typeof v) || v === true || isStrings(v), 'a string, a number, true or a list of strings'],

@@ -11,7 +11,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
@@ -88,7 +87,7 @@ test('applied with every parameter set, each is written where the template says,
   assert.match(checkOf(tree, 'quick', 'implement'), ciCheck('gate'));
   for (const workflow of ['build', 'quick'])
     assert.ok(
-      checkOf(tree, workflow, 'implement').includes('push --labels "work=fix:fix";'),
+      checkOf(tree, workflow, 'implement').includes('push --labels "work=fix:fix" && '),
       `${workflow}/implement labels by the rules set`,
     );
   for (const workflow of ['build', 'quick']) assert.match(stepIn(tree, workflow, 'land').body, ciCheck('gate'), `${workflow}/land`);
@@ -111,7 +110,7 @@ test('applied with no --set, each parameter takes its default', () => {
   assert.ok(build.includes('{ npm run --if-present lint && npm run --if-present typecheck; }'), build);
   assert.match(build, ciCheck('ci'));
   for (const workflow of ['build', 'quick'])
-    assert.ok(checkOf(tree, workflow, 'implement').includes('push --labels "";'), `${workflow}/implement labels nothing by default`);
+    assert.ok(checkOf(tree, workflow, 'implement').includes('push --labels "" && '), `${workflow}/implement labels nothing by default`);
   for (const workflow of ['build', 'quick']) assert.match(stepIn(tree, workflow, 'land').body, ciCheck('ci'), `${workflow}/land`);
   for (const [workflow, step] of WAYS) {
     const check = checkOf(tree, workflow, step);
@@ -135,8 +134,7 @@ test("build's and quick's implement try again on their own twice when their chec
 });
 
 /** The end of the parts.ts clause, the last of sdlc's own scripts that both ways run. */
-const PARTS_END =
-  'parts.ts" check; else echo "nemia check: WF_WORKFLOW_FILES is not set, so parts.ts is read from the run\'s frozen workflow files alone: this check runs in a run, which sets it" >&2; false; fi; } && ';
+const PARTS_END = '/parts.ts" check && ';
 
 /** The factory's own check, `command`, as the implement check runs it: a clause of its own, between sdlc's scripts and the way's `if`. */
 const ownClause = (command: string, github: boolean): string => `${PARTS_END}{ ${command}; } && ${branchOn(github)}`;
@@ -162,19 +160,10 @@ test("the factory's own check runs in build's and quick's implement check, eithe
     }
 });
 
-/** sha256 of each implement check sdlc 2.4.0 rendered at its defaults, before it had the factory's own check. */
-const BEFORE = {
-  build: 'f34b5cdfee30dbcaf03045dac42b7e070346faf5a665b9c3ee8a34e5075c5231',
-  quick: '3a0b737a51839a29466be2c71d4f69656c01f7007883f502fd1724f7652b380f',
-} as const;
-
-const sha256 = (text: string): string => crypto.createHash('sha256').update(text).digest('hex');
-
-test("unset, the factory's own check is a clause that does nothing, and the check is otherwise 2.4.0's byte for byte", () => {
+test("unset, the factory's own check is a clause that does nothing, and setting it changes that clause alone", () => {
   for (const workflow of ['build', 'quick'] as const) {
     const check = checkOf(treeOf('plain'), workflow, 'implement');
     assert.equal(count(check, ownClause('true', false)), 1, `${workflow}/implement runs \`true\` in its place:\n${check}`);
-    assert.equal(sha256(check.replace('{ true; } && ', '')), BEFORE[workflow], `${workflow}/implement is 2.4.0's but for it`);
     assert.equal(
       checkOf(treeOf('own'), workflow, 'implement').replace('{ echo own; }', '{ true; }'),
       check,
@@ -307,4 +296,89 @@ test("build's design, read with Seldon, hands the review the outside pages its s
   assert.deepEqual(sources?.items?.required, ['url', 'read', 'excerpt', 'claims']);
   const input = stepIn(tree, 'build', 'review').front.input;
   assert.ok([input].flat().includes('design'), "build's review reads design's declared fields");
+});
+
+/** The variables a check reads a frozen folder by, one of which names where each of sdlc's scripts is read from. */
+const FROZEN_FOLDERS = ['WF_CARRIED_FILES', 'WF_WORKFLOW_FILES'] as const;
+
+/** The script names `check` gives under any path: what a working folder would answer if the check read the script from there. */
+const scriptsIn = (check: string): string[] => [...new Set([...check.matchAll(/\/([\w-]+\.ts)"/g)].map(([, name]) => name ?? ''))];
+
+/**
+ * How `check` fails each variable it reads a frozen folder by, run as the run runs a check, by `sh -c`, in a working folder that holds
+ * each script it names as a marker that leaves a file when run, with that one variable unset and each other one naming a folder whose
+ * scripts do nothing: each case where it exits 0, says nothing of the variable on stderr, or ran a script of the working folder. Then
+ * once with every variable set, where a clause that reads the working folder after one that is guarded is seen too.
+ */
+function unguarded(check: string): string[] {
+  const root = scratch('nemia-sdlc-unset-');
+  const work = path.join(root, 'work');
+  const quiet = path.join(root, 'quiet');
+  for (const folder of [work, quiet]) fs.mkdirSync(folder);
+  for (const name of scriptsIn(check)) {
+    fs.writeFileSync(path.join(work, name), `import fs from 'node:fs';\nfs.writeFileSync(${JSON.stringify(`ran-${name}`)}, '');\n`);
+    fs.writeFileSync(path.join(quiet, name), 'export {};\n');
+  }
+  const read = FROZEN_FOLDERS.filter((name) => check.includes(name));
+  if (read.length === 0) return ['it reads no frozen folder'];
+  const runs = (unset: string | undefined): { status: number | null; stderr: string; markers: string[] } => {
+    const env: NodeJS.ProcessEnv = { ...storeEnv(root), WF_RUN: 'r' };
+    for (const name of FROZEN_FOLDERS) env[name] = quiet;
+    if (unset !== undefined) delete env[unset];
+    const ran = spawnSync('sh', ['-c', check], { cwd: work, env, encoding: 'utf8', timeout: 60_000 });
+    const markers = fs.readdirSync(work).filter((file) => file.startsWith('ran-'));
+    for (const marker of markers) fs.rmSync(path.join(work, marker));
+    return { status: ran.status, stderr: ran.stderr, markers: markers.map((marker) => marker.slice('ran-'.length)) };
+  };
+  return [
+    ...read.flatMap((unset) => {
+      const ran = runs(unset);
+      return [
+        ...(ran.status === 0 ? [`${unset} unset: it exited 0`] : []),
+        ...(ran.stderr.includes(unset) ? [] : [`${unset} unset: stderr names it not: ${ran.stderr.trim()}`]),
+        ...ran.markers.map((marker) => `${unset} unset: it ran the working folder's ${marker}`),
+      ];
+    }),
+    ...runs(undefined).markers.map((marker) => `every variable set: it ran the working folder's ${marker}`),
+  ];
+}
+
+/** What of `check` runs in the tree `name`: in the checkout (`plain`), what is before its GitHub branch, which is never taken there. */
+const takenIn = (name: string, check: string): string => (name === 'set' ? check : (check.split(branchOn(false))[0] ?? ''));
+
+test("REFUSED: a check that reads a script from the working folder where its frozen folder's variable is unset", () => {
+  assert.deepEqual(unguarded('node "./probe.ts" check && node "${WF_CARRIED_FILES:?run it in a run}/parts.ts" check'), [
+    "WF_CARRIED_FILES unset: it ran the working folder's probe.ts",
+    "every variable set: it ran the working folder's probe.ts",
+  ]);
+  assert.deepEqual(unguarded('node "${WF_CARRIED_FILES:?run it in a run}/probe.ts" check && node "./parts.ts" check'), [
+    "every variable set: it ran the working folder's parts.ts",
+  ]);
+  assert.equal(
+    unguarded('node "${WF_CARRIED_FILES:-.}/probe.ts" check').length,
+    3,
+    'a fallback to the working folder: exit 0, silent, ran',
+  );
+});
+
+test("each of sdlc's checks, either way, refuses with the variable it reads a frozen folder by unset, naming it, and runs nothing", () => {
+  let read = 0;
+  for (const name of ['set', 'plain'])
+    for (const workflow of ['build', 'quick', 'janitor'])
+      for (const file of fs.readdirSync(path.join(treeOf(name), 'workflows', workflow)).filter((it) => it.endsWith('.md'))) {
+        const check = checkOf(treeOf(name), workflow, file.replace(/\.md$/, ''));
+        const taken = takenIn(name, check);
+        if (!FROZEN_FOLDERS.some((variable) => taken.includes(variable))) continue;
+        read += 1;
+        assert.deepEqual(unguarded(check), [], `${name}: ${workflow}/${file}:\n${check}`);
+      }
+  assert.ok(read >= 8, `the checks that read a frozen folder were found: ${read}`);
+});
+
+test("quick's land step is told build's land note, rendered with the same values", () => {
+  for (const name of ['set', 'plain']) {
+    const build = stepIn(treeOf(name), 'build', 'land').body;
+    assert.ok(build.includes('landing.ts'), `${name}: build's land note is read`);
+    assert.equal(stepIn(treeOf(name), 'quick', 'land').body, build, `${name}: quick/land`);
+  }
 });

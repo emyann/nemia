@@ -436,6 +436,51 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
     assert.equal(check.config?.env?.WF_WORKFLOW_FILES, after, 'is told the new copy');
   });
 
+  await s.test(
+    'the carried folder beside the workflows is frozen at the start, told to the check, and frozen again by a refresh',
+    async () => {
+      const t = checked(team(), 'node "$WF_CARRIED_FILES/shared.ts"', 'unused');
+      const carried = path.join(path.dirname(t.dir), 'carried');
+      fs.mkdirSync(path.join(carried, 'deep'), { recursive: true });
+      fs.writeFileSync(path.join(carried, 'shared.ts'), helperSaying('first'));
+      fs.writeFileSync(path.join(carried, 'deep', 'more.ts'), helperSaying('deep'));
+      const run = await started(t.dir, aRepo());
+      const before = readRun(run.id).carriedFiles;
+      assert.equal(typeof before, 'string', 'the record names the copy');
+      const copy = path.join(ROOT, 'runs', run.id, 'carried', String(before));
+      assert.match(fs.readFileSync(path.join(copy, 'shared.ts'), 'utf8'), /first/);
+      assert.match(fs.readFileSync(path.join(copy, 'deep', 'more.ts'), 'utf8'), /deep/, 'at any depth');
+      const b = board();
+      await runWith(b.e, advanceRun(readRun(run.id)));
+      const session = b.tasks.get(`${run.id}-build`)!.spec;
+      assert.equal(session.config?.env?.WF_CARRIED_FILES, copy, 'the session is told the copy');
+      assert.ok(
+        session.config?.mounts?.some((m) => m.path === copy && m.readOnly),
+        'mounted read-only',
+      );
+      assert.match(session.brief, /\$WF_CARRIED_FILES/, 'and its brief names it');
+      fs.writeFileSync(path.join(carried, 'shared.ts'), helperSaying('second'));
+      checked(t, 'node "$WF_CARRIED_FILES/shared.ts" --again', 'unused');
+      await runPlaced(refreshRun(run.id));
+      await runWith(b.e, advanceRun(readRun(run.id)));
+      const after = readRun(run.id).carriedFiles;
+      assert.notEqual(after, before, 'the refresh froze the folder again');
+      const again = path.join(ROOT, 'runs', run.id, 'carried', String(after));
+      assert.match(fs.readFileSync(path.join(again, 'shared.ts'), 'utf8'), /second/);
+      b.settle(`${run.id}-build`, 'succeeded', { closeout: SIGNED });
+      await runWith(b.e, advanceRun(readRun(run.id)));
+      assert.equal(b.tasks.get(`${run.id}-build-check`)!.spec.config?.env?.WF_CARRIED_FILES, again, 'the check is told the new copy');
+    },
+  );
+
+  await s.test('a run whose workflows hold no carried folder records none, and its check is told none', async () => {
+    const t = checked(team(), 'node "$WF_WORKFLOW_FILES/helper.ts"', 'first');
+    const run = await started(t.dir, aRepo());
+    assert.equal('carriedFiles' in readRun(run.id), false);
+    const env = await checkEnvAfterBuild(board(), run.id);
+    assert.equal('WF_CARRIED_FILES' in env, false);
+  });
+
   await s.test('a refresh can no longer give a run a check its base cannot run: the scripts ride with the line', async () => {
     const t = team();
     const repo = aRepo();

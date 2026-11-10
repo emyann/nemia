@@ -7,7 +7,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { LineCounter, parseAllDocuments, stringify, type Document } from 'yaml';
+import { LineCounter, parse, parseAllDocuments, stringify, type Document } from 'yaml';
 import type { Agent, SkillsFound } from '../agents/agents.ts';
 import { outsideRefusal, type Factory } from '../factory/factory.ts';
 import { workflowDescription, workflowsIn } from '../folder/folder.store.ts';
@@ -33,6 +33,20 @@ import { templateNameRefusal, type Problem } from './door/templates.ts';
 import { checkTemplate, documentFile, draftOf, type Draft, type ReadFolder, type Source, type StepSource } from './index.ts';
 
 export type { Problem } from './door/templates.ts';
+
+/**
+ * The lines a file of shared lines holds, read from its text: a YAML list of strings, a comment beside a line saying why it is there.
+ * Undefined for a text that does not parse, or parses to anything else, which the lint refuses at the file (`checkTemplate`).
+ */
+export const sharedLinesOf = (text: string): string[] | undefined => {
+  let read: unknown;
+  try {
+    read = parse(text);
+  } catch {
+    return undefined;
+  }
+  return Array.isArray(read) && read.every((line) => typeof line === 'string') ? read : undefined;
+};
 
 /** A document as parsed, with what turns its offsets into lines. */
 type Parsed = { doc: Document.Parsed | undefined; lines: LineCounter };
@@ -106,7 +120,7 @@ export function checkedTree(tree: TemplateTree, packageSkills: readonly string[]
     const found = byPath.get(file);
     return found === undefined ? '' : Buffer.from(found.bytes).toString('utf8');
   };
-  for (const refusal of checkTemplate(folder, [...packageSkills], text)) {
+  for (const refusal of checkTemplate(folder, [...packageSkills], text, (file) => sharedLinesOf(text(file)))) {
     const doc = parsed.get(refusal.file);
     const at = doc ? lineOf(doc, refusal.at) : { line: refusal.line, col: refusal.col };
     problems.push({ file: refusal.file, ...at, message: refusal.message });
@@ -116,8 +130,15 @@ export function checkedTree(tree: TemplateTree, packageSkills: readonly string[]
   return { ...tree, problems, folder, version: manifest?.spec?.version };
 }
 
-/** A template opened for a render: `checkedTree`'s, one of its files by its path in it (`file`), and that file's text (`text`). */
-export type OpenTemplate = CheckedTemplate & { file: (at: string) => TreeFile; text: (at: string) => string };
+/**
+ * A template opened for a render: `checkedTree`'s, one of its files by its path in it (`file`), that file's text (`text`), and the lines
+ * of a file of shared lines (`lines`, `sharedLinesOf`).
+ */
+export type OpenTemplate = CheckedTemplate & {
+  file: (at: string) => TreeFile;
+  text: (at: string) => string;
+  lines: (at: string) => string[] | undefined;
+};
 
 /**
  * The tree read from `source`, checked (`checkedTree`), each of its files then read off the tree. Refused: a file asked for that is no
@@ -132,7 +153,8 @@ export function openedTree(source: string, tree: TemplateTree, packageSkills: re
       throw new Invalid({ message: `${at} is no file of the template ${source}: name a file of the template, by its path in it.` });
     return found;
   };
-  return { ...checked, file, text: (at) => Buffer.from(file(at).bytes).toString('utf8') };
+  const text = (at: string): string => Buffer.from(file(at).bytes).toString('utf8');
+  return { ...checked, file, text, lines: (at) => sharedLinesOf(text(at)) };
 }
 
 /** The tree `name` of `files` as a read of a folder answers it: each path longer than an archive holds a problem, else its digest. */

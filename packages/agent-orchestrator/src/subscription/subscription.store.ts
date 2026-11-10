@@ -17,7 +17,8 @@
  * writes nothing to stderr. A file a former nemia wrote still reads: its `wake` list is converted on every read (`selectorsOfWake`).
  *
  * The door's default is rooted (`rootedDoor`). The module's spellings (`listSubscriptions`, `putSubscription`, …) are the door over the
- * files at the module's root, run at once, for a caller that is no program (`test/subscription-door.baseline.ts`).
+ * files at the module's root, run at once, for a caller that is no program; no file of `src` calls them
+ * (`src/subscription/subscription.store.test.ts`).
  */
 import fs from 'node:fs';
 import path from 'node:path';

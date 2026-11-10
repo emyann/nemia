@@ -1,9 +1,10 @@
 /**
  * `node landing.ts <verb>` — the two acts a landing is made of, which no agent may type: the merge of this run's own pull request on
  * GitHub, and the receipt that it happened. A Bash prefix rule cannot tell `gh pr merge 7` from `gh pr merge 9`, and `gh` is denied whole
- * to the agents that land, so the act is this script, read from the run's frozen workflow files (`$WF_WORKFLOW_FILES`) and run with `node`,
- * as `pull-request.ts` carries the push and the pull request. It imports `ci-log.ts`, beside it, for how a check of a commit reads, as
- * `pull-request.ts` does: the run freezes the workflow's whole folder, so a script may import a sibling it holds. It is told the name of
+ * to the agents that land, so the act is this script, read from the run's frozen carried files (`$WF_CARRIED_FILES`) and run with `node`,
+ * as `pull-request.ts` carries the push and the pull request. It imports `ci-log.ts`, beside it, for how a check of a commit reads, and
+ * `exec.ts`, for how a command is run and CI waited on, as `pull-request.ts` does: the run freezes the carried folder whole, so a script
+ * may import a sibling it holds. It is told the name of
  * the CI context it reads (`--check <name>`), since that name is the repository's, never the script's.
  *
  * - `merge --run <id> --subject <line> --body-file <f> --check <name>`, which the landing session types once its step has been filed — on a
@@ -40,7 +41,6 @@
  * declines. The receipt takes the merged pull request among whatever the run has — a closed one beside it is no refusal, a second merged
  * one is — and refuses where none is merged.
  */
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import {
   type Landing,
@@ -57,9 +57,7 @@ import {
   unfinished,
   verdict,
 } from './ci-log.ts';
-
-/** A reason the verb is refused: said on stderr, exit 1. */
-class Refusal extends Error {}
+import { POLL_SECONDS, Refusal, START_SECONDS, WHOLE_SECONDS, authed, base, git, noGh, run, seconds, sleep } from './exec.ts';
 
 /** The one `mergeable` GitHub gives a pull request that can be merged now; `CONFLICTING` and `UNKNOWN` are both refusals. */
 const MERGEABLE = 'MERGEABLE';
@@ -67,31 +65,13 @@ const MERGEABLE = 'MERGEABLE';
 /** The step a refusal's `nemia retry` line names, where the environment does not say which step is landing. */
 const STEP = 'land';
 
-/** How long a call of `git` or `gh` may take, in milliseconds. */
-const BOUND = 120_000;
-
 /**
  * An entry of a commit's checks: a check run, or a status context, as `gh pr view --json statusCheckRollup` gives one, or as `entriesAt`
- * maps one read over REST.
+ * maps one read over REST. Apart from `pull-request.ts`'s on purpose: a landing re-runs no workflow, so it reads no `workflowName`.
  */
 type Entry = Partial<Record<'name' | 'context' | 'status' | 'state' | 'conclusion' | 'detailsUrl' | 'targetUrl' | 'startedAt', string>>;
 
-/**
- * How long the CI context has to be reported at the merge commit at all, in seconds; `WF_CI_START_SECONDS` lowers it for a test. A
- * context never reported is most often a CI that does not run on pushes to the base.
- */
-const START_SECONDS = 1800;
-
-/**
- * How long the whole wait at the merge commit may take, in seconds, the start included; `WF_CI_WAIT_SECONDS` lowers it for a test. It
- * stays well under the landing check's own deadline, or the engine would kill the wait and the person would get no refusal in words.
- */
-const WHOLE_SECONDS = 2400;
-
-/** How long the wait sleeps between two reads of the merge commit's checks, in seconds; `WF_CI_POLL_SECONDS` lowers it for a test. */
-const POLL_SECONDS = 15;
-
-/** A pull request as this script reads one. */
+/** A pull request as this script reads one; apart from `pull-request.ts`'s, which reads labels, never a state or a merge commit. */
 type Pr = {
   number: number;
   url: string;
@@ -104,39 +84,24 @@ type Pr = {
   mergeCommit?: { oid?: string } | null;
 };
 
-/** What a command printed: its exit, its streams, and whether there was no such command on the PATH. */
-type Ran = { status: number | null; out: string; err: string; missing: boolean };
-
-/** Run `cmd` with `args`, bounded, reading nothing from stdin. */
-function run(cmd: string, args: string[]): Ran {
-  const r = spawnSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: BOUND });
-  const missing = r.error !== undefined && 'code' in r.error && r.error.code === 'ENOENT';
-  return { status: r.status, out: r.stdout ?? '', err: (r.stderr ?? '').trim() || (r.error?.message ?? ''), missing };
-}
-
-/** What git printed for `args`, trimmed; refuses, saying what could not be told, when git fails. */
-function git(what: string, ...args: string[]): string {
-  const ran = run('git', args);
-  if (ran.status !== 0) throw new Refusal(`cannot tell ${what}, since \`git ${args.join(' ')}\` failed: ${ran.err}`);
-  return ran.out.trim();
-}
-
 /** Whether `git args` exited 0, for a question whose answer is its exit code. */
 const asks = (...args: string[]): boolean => run('git', args).status === 0;
 
-/** What `gh` printed for `args`, trimmed; refuses, naming what it was asked, when `gh` fails or is not there. */
+/**
+ * What `gh` printed for `args`, trimmed; refuses, naming what it was asked, when `gh` fails or is not there. Apart from
+ * `pull-request.ts`'s on purpose: a landing has no tries of its own, so a missing `gh` is a plain refusal here, never a person's.
+ */
 function gh(...args: string[]): string {
   const ran = run('gh', args);
-  if (ran.missing) throw new Refusal(MISSING_GH);
+  if (ran.missing) throw new Refusal(noGh(MERGING));
   if (ran.status !== 0) throw new Refusal(`\`gh ${args.join(' ')}\` failed: ${ran.err}`);
   return ran.out.trim();
 }
 
-/** What a person types where there is no `gh` to merge with. */
-const MISSING_GH =
-  "no `gh` on the PATH, and the merge of the pull request is GitHub's CLI's. Install it (https://cli.github.com) and run `gh auth login`";
+/** The act a landing needs `gh` for, which a refusal names where there is none. */
+const MERGING = 'the merge of the pull request';
 
-/** `text` parsed as JSON; refuses, naming what was read, when it does not parse. */
+/** `text` parsed as JSON; refuses, naming what was read, when it does not parse. Apart from `pull-request.ts`'s, which also hints. */
 function parsed<T>(what: string, text: string): T {
   try {
     return JSON.parse(text) as T;
@@ -145,30 +110,13 @@ function parsed<T>(what: string, text: string): T {
   }
 }
 
-/** `gh auth status` passing; refuses with the one command a person types when it does not. */
-function authed(): void {
-  const status = run('gh', ['auth', 'status']);
-  if (status.missing) throw new Refusal(MISSING_GH);
-  if (status.status !== 0) throw new Refusal(`\`gh\` is not authenticated here: run \`gh auth login\`. It said: ${status.err}`);
-}
-
-/** The remote `origin`; refuses, naming the read, where there is none. */
+/** The remote `origin`; refuses, naming the read, where there is none. Apart on purpose: a landing needs no address of it. */
 function origin(): void {
   if (!asks('remote', 'get-url', 'origin'))
     throw new Refusal(
       'this repository has no `origin` remote, and the pull request is merged on it: see `git remote -v`, and add it with ' +
         '`git remote add origin <address>`',
     );
-}
-
-/** The remote's default branch, which this run's pull request is based on and which the checkout lands on. */
-function base(): string {
-  const name = parsed<{ defaultBranchRef?: { name?: string } }>(
-    "the remote's default branch",
-    gh('repo', 'view', '--json', 'defaultBranchRef'),
-  ).defaultBranchRef?.name;
-  if (!name) throw new Refusal('`gh repo view --json defaultBranchRef` named no default branch: the base of the landing is unknown');
-  return name;
 }
 
 /**
@@ -254,7 +202,7 @@ function onBase(branch: string, onto: string): void {
 /** The fields of a pull request this script reads, as `gh pr list --json` takes them. */
 const FIELDS = 'number,url,state,isDraft,baseRefName,headRefName,headRefOid,mergeable,mergeCommit';
 
-/** The pull requests of `state` whose head is one of this run's result branches. */
+/** The pull requests of `state` whose head is one of this run's result branches; apart: `pull-request.ts` reads one branch's open ones. */
 function pulls(id: string, state: string): Pr[] {
   const text = gh('pr', 'list', '--state', state, '--limit', '100', '--json', FIELDS);
   const all = parsed<Pr[]>(`the ${state} pull requests`, text);
@@ -279,7 +227,10 @@ const twoMerged = (found: readonly Pr[], id: string): string =>
   `one: which of them is this run's landing is a person's to say, and the run records only one commit. Read ` +
   `${found.map((pr) => pr.url).join(' and ')}.`;
 
-/** The one pull request of this run, read as each verb requires one; refuses none, and two. */
+/**
+ * The one pull request of this run, read as each verb requires one; refuses none, and two. Apart from `pull-request.ts`'s, which judges
+ * a draft and a base where this one tells a merged pull request from an open one.
+ */
 function sole(found: readonly Pr[], id: string, state: string, open: string): Pr {
   if (found.length === 0)
     throw new Refusal(
@@ -406,8 +357,8 @@ function merge(args: string[]): string[] {
   const named = tips(id);
   const branch = settled();
   origin();
-  authed();
-  const onto = base();
+  authed(MERGING);
+  const onto = base('the landing', gh);
   onBase(branch, onto);
   const { merged: already, open } = standing(id);
   if (already.length > 1) throw new Refusal(twoMerged(already, id));
@@ -444,7 +395,7 @@ function merge(args: string[]): string[] {
     '--body-file',
     file,
   ]);
-  if (merged.missing) throw new Refusal(MISSING_GH);
+  if (merged.missing) throw new Refusal(noGh(MERGING));
   if (merged.status !== 0)
     throw new Refusal(
       `GitHub declined to merge #${pr.number} at ${pr.headRefOid.slice(0, 12)}: ${merged.err}\n` +
@@ -482,8 +433,8 @@ function receipt(args: string[]): string[] {
   const [id, check, waits] = [opts['--run'], opts['--check'], waitsOf(opts['--wait-on-ci'])];
   const named = tips(id);
   origin();
-  authed();
-  const onto = base();
+  authed(MERGING);
+  const onto = base('the landing', gh);
   const { all, merged } = standing(id);
   if (merged.length > 1) throw new Refusal(twoMerged(merged, id));
   if (merged.length === 0)
@@ -536,29 +487,19 @@ function waitsOf(value: string): boolean {
   );
 }
 
-/** The number of seconds `name` holds, or `fallback` where it holds no number. */
-function seconds(name: string, fallback: number): number {
-  const said = Number(process.env[name]);
-  return Number.isFinite(said) && said >= 0 ? said : fallback;
-}
-
-/** Sleep `secs` seconds, the thread held, so the poll is one process and no timer outlives it. */
-function sleep(secs: number): void {
-  if (secs <= 0) return;
-  const held = new Int32Array(new SharedArrayBuffer(4));
-  Atomics.wait(held, 0, 0, secs * 1000);
-}
-
 /** What GitHub's REST API answers at `repos/{owner}/{repo}/<path>`, parsed; refuses where `gh` fails or the answer is no JSON. */
 const api = <T>(path: string): T => parsed<T>(`gh api ${path}`, gh('api', `repos/{owner}/{repo}/${path}`));
 
-/** A check run or a status context as GitHub's REST API gives one: lower-case, a field absent or `null` where it has none. */
+/**
+ * A check run or a status context as GitHub's REST API gives one: lower-case, a field absent or `null` where it has none. Apart from
+ * `pull-request.ts`'s, which reads no `null`: it spreads the entry whole rather than naming each field.
+ */
 type Rest = Partial<Record<string, string | null>>;
 
 /**
  * A commit's check runs and status contexts as `Entry`s, read over REST: check runs come lower-case, so they are upper-cased here. One
  * page of 100 check runs is read. The combined status's own `state` is never read: a repository whose CI is all check runs answers
- * `pending` with no context in it.
+ * `pending` with no context in it. Apart from `pull-request.ts`'s on purpose: a read that fails is refused here, and `readAt` reads again.
  */
 function entriesAt(sha: string): Entry[] {
   const runs = api<{ check_runs?: Rest[] }>(`commits/${sha}/check-runs?per_page=100`).check_runs ?? [];

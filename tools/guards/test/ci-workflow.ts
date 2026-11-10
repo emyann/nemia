@@ -38,8 +38,11 @@ export const BUILD = 'build';
  */
 export const GENERATED = ['apps/web/src/routeTree.gen.ts', 'apps/web/theme/'];
 
-/** What the build job's staleness step is called, so the guard and the boundary test find the same step. */
-export const STALE_STEP = 'Refuse a stale generated file';
+/**
+ * The `id:` of the build job's staleness step, so the guard and the boundary test find the same step: an id, not its `name:`, which is
+ * a sentence for a person and free to change.
+ */
+export const STALE_STEP = 'stale';
 
 /**
  * The workspace that has a job of its own rather than a leg, by its turbo name and its folder, and that job: the guards' suite runs
@@ -110,10 +113,10 @@ export const shardRunStep = (workflow: Workflow): Step | undefined =>
   runSteps(workflow, E2E).find((step) => step.run?.includes(E2E_COMMAND) === true);
 
 /**
- * The build job's staleness step, by its name: what it decides is run rather than matched (`ci-build.boundary.test.ts`), since a
+ * The build job's staleness step, by its id: what it decides is run rather than matched (`ci-build.boundary.test.ts`), since a
  * `git diff --exit-code` and a `git diff --name-only` that forgets to fail read alike to a pattern.
  */
-export const staleStep = (workflow: Workflow): Step | undefined => runSteps(workflow, BUILD).find((step) => step.name === STALE_STEP);
+export const staleStep = (workflow: Workflow): Step | undefined => runSteps(workflow, BUILD).find((step) => step.id === STALE_STEP);
 
 /**
  * The gate's steps that run a command and decide: the one that turns the needed jobs' results into the `ci` context. The steps that post
@@ -131,18 +134,19 @@ export const SCAN = 'gitleaks';
 export const SCAN_CONFIG = '.gitleaks.toml';
 
 /**
- * What the scan job's step that proves its own allowlist is called, so the guard and the boundary test find the same step. What it
+ * The `id:` of the scan job's step that proves its own allowlist, so the guard and the boundary test find the same step. What it
  * decides is run rather than matched (`ci-scan.boundary.test.ts`): the config's meaning is not in its text, and neither is the step's.
  */
-export const ALLOWLIST_STEP = 'Prove the allowlist allows the stubs and nothing wider';
+export const ALLOWLIST_STEP = 'allowlist';
 
-/** The scan job's step that scans the push's own commits, by the flags it carries: the one step of the job that reads git. */
-export const scanStep = (workflow: Workflow): Step | undefined =>
-  runSteps(workflow, SCAN).find((step) => step.run?.includes('--log-opts') === true);
+/** The `id:` of the scan job's step that scans the push's own commits: the one step of the job that reads git. */
+export const SCAN_STEP = 'scan';
 
-/** The scan job's step that proves its allowlist, by its name. */
-export const allowlistStep = (workflow: Workflow): Step | undefined =>
-  runSteps(workflow, SCAN).find((step) => step.name === ALLOWLIST_STEP);
+/** The scan job's step that scans the push's own commits, by its id. */
+export const scanStep = (workflow: Workflow): Step | undefined => runSteps(workflow, SCAN).find((step) => step.id === SCAN_STEP);
+
+/** The scan job's step that proves its allowlist, by its id. */
+export const allowlistStep = (workflow: Workflow): Step | undefined => runSteps(workflow, SCAN).find((step) => step.id === ALLOWLIST_STEP);
 
 /**
  * GitHub's own action, taken by major tag: the pointer floats to its latest release, and a third party's never matches. This clause and

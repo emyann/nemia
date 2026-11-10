@@ -18,3 +18,14 @@ CLAUDE.md merge=union
 # diff and a quick run's `change.ts size`, which leaves out each file marked so, measures the change a person wrote and not its output.
 /apps/web/theme/** linguist-generated
 /apps/web/src/routeTree.gen.ts linguist-generated
+
+# What is not ours: another project's files, vendored unchanged, and what a tool writes. Marked once here, in git's own words, so that
+# GitHub folds them in a diff and every guard that leaves them unread asks git rather than keeping a list of its own (test-kit's `notOurs`,
+# `git check-attr`). The design system kit and its skills (french-tech-homies/design-system), the skills vendored at the root and pinned in
+# skills-lock.json, and npm's lockfile.
+/apps/web/src/components/ui/ds/** linguist-vendored
+/apps/web/.claude/** linguist-vendored
+/.claude/skills/shadcn/** linguist-vendored
+/.claude/skills/react-aria/** linguist-vendored
+/.claude/skills/tsverify/** linguist-vendored
+/package-lock.json linguist-generated

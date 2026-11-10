@@ -17,36 +17,25 @@
  *   (`apps/api/test/placed.ts`) makes one per test. Held over `apps/api` alone, with no baseline: none is left there.
  *
  * Each rule is a pure function over one test file's source text, proven first on planted sources it must refuse and must not, then
- * swept over every test file of the repository. What still holds one is counted per file in `test/test-rules.baseline.ts`: the sweep
- * refuses a file the baseline does not name, a count that has grown, and an entry whose lines are gone, so each list only shrinks.
- * The ~1,760 assertions that pin a sentence today cannot be unpinned in the run that writes this rule; a baseline makes them a debt
- * a later card walks down, where a lint rule could only be switched off.
+ * swept over every test file of the repository. A pinned sentence still held is counted per file in `test/test-rules.baseline.ts`: the
+ * sweep refuses a file the baseline does not name, a count that has grown, and an entry whose lines are gone, so the list only shrinks.
+ * The ~1,760 assertions that pinned a sentence could not be unpinned in the run that wrote this rule; a baseline made them a debt a
+ * later card walks down, where a lint rule could only be switched off. A floor at a shipped bound has no baseline: none is left.
+ *
+ * Each source is read with its comments blanked by TypeScript's own scanner (`withoutComments` of `test-kit/imports`), never a lexer of
+ * this file's: a hand-written one once blanked the code after a `//` in a string, and every assertion it held passed the sweep unread.
+ * The test files are git's list (`files` of `test-kit/repo`), less what `.gitattributes` marks another project's or generated (`ours`).
  *
  * The test reads files outside this package, as `claude-md-cites.test.ts` does: after a change to a test anywhere, `npx turbo run
- * test --force`. The walk is a copy of that file's and not an import of it — importing a test file would run its tests here.
+ * test --force`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { PINNED_WORDS, WAITED_OUT } from './test-rules.baseline.ts';
-
-const ROOT = path.join(import.meta.dirname, '..', '..', '..');
-
-/** The folders a walk never enters: another repository's code, a build's output, a cache, and the package manager's tree. */
-const SKIPPED = new Set(['node_modules', '.git', '.turbo', 'dist', 'build', '.e2e', 'ds']);
-
-/** Every file under `root` whose name `wanted` accepts, by its path from `root`, in order, the skipped folders left unentered. */
-function walk(root: string, wanted: (name: string) => boolean, at = ''): string[] {
-  const found: string[] = [];
-  for (const entry of fs.readdirSync(path.join(root, at), { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
-    const here = at === '' ? entry.name : `${at}/${entry.name}`;
-    if (entry.isDirectory()) {
-      if (!SKIPPED.has(entry.name) && !entry.name.startsWith('.claude')) found.push(...walk(root, wanted, here));
-    } else if (entry.isFile() && wanted(entry.name)) found.push(here);
-  }
-  return found;
-}
+import { files, ours, REPO } from 'test-kit/repo';
+import { withoutComments } from 'test-kit/imports';
+import { PINNED_WORDS } from './test-rules.baseline.ts';
 
 /**
  * The one file neither sweep reads: this one. Its planted sources are the fixtures of the two rules, so a sentence expected in one
@@ -55,65 +44,10 @@ function walk(root: string, wanted: (name: string) => boolean, at = ''): string[
 const ALLOWED = ['tools/guards/test/test-rules.test.ts'];
 
 /** Every test file of the repository but this one, beside the code or under a `test/`, by its path from the root. */
-const testFiles = (): string[] => walk(ROOT, (name) => /\.test\.tsx?$/.test(name)).filter((f) => !ALLOWED.includes(f));
-
-/** Where the string or template opened by the quote at `i` of `text` ends, past its closing quote; a string ends at a line break. */
-const pastQuote = (text: string, i: number, quote: string): number => {
-  let k = i + 1;
-  for (; k < text.length; k++) {
-    if (text[k] === '\\') k++;
-    else if (text[k] === quote || (quote !== '`' && text[k] === '\n')) break;
-  }
-  return k + 1;
-};
-
-/** Whether the `/` at `i` of `text` opens a pattern rather than divides: what stands before it is no value. */
-const opensPattern = (text: string, i: number): boolean => {
-  let k = i - 1;
-  while (k >= 0 && /\s/.test(text[k])) k--;
-  return k < 0 || /[(,=:[!&|?{};+\-*%<>~^]/.test(text[k]) || /\b(?:return|typeof|of|in)$/.test(text.slice(Math.max(0, k - 6), k + 1));
-};
-
-/**
- * `text` with every comment blanked and its line breaks kept, so a sentence quoted in prose — a header paragraph, the example above a
- * signature — is passed over while the line numbers still read true. Read a character at a time, past each string, template and
- * pattern, so a `//` in a URL or a `/*` in a glob is no comment: a pattern of the text alone blanked the code after one, and every
- * assertion it held passed the sweep unread.
- */
-const uncommented = (text: string): string => {
-  const out = text.split('');
-  const blank = (from: number, to: number) => {
-    for (let k = from; k < to; k++) if (out[k] !== '\n') out[k] = ' ';
-  };
-  let i = 0;
-  while (i < text.length) {
-    const c = text[i];
-    const next = text[i + 1];
-    if (c === '/' && next === '/') {
-      const end = text.indexOf('\n', i);
-      const to = end === -1 ? text.length : end;
-      blank(i, to);
-      i = to;
-    } else if (c === '/' && next === '*') {
-      const end = text.indexOf('*/', i + 2);
-      const to = end === -1 ? text.length : end + 2;
-      blank(i, to);
-      i = to;
-    } else if (c === "'" || c === '"' || c === '`') i = pastQuote(text, i, c);
-    else if (c === '/' && opensPattern(text, i)) {
-      let k = i + 1;
-      let inClass = false;
-      while (k < text.length && text[k] !== '\n' && (inClass || text[k] !== '/')) {
-        if (text[k] === '\\') k++;
-        else if (text[k] === '[') inClass = true;
-        else if (text[k] === ']') inClass = false;
-        k++;
-      }
-      i = k + 1;
-    } else i++;
-  }
-  return out.join('');
-};
+const testFiles = (): string[] =>
+  files()
+    .filter((f) => /\.test\.tsx?$/.test(f) && !ALLOWED.includes(f) && ours(f) && fs.existsSync(path.join(REPO, f)))
+    .sort();
 
 /**
  * The text of the call whose `(` stands at `open`, to the `)` that closes it, or `undefined` where none does. A call and not a line:
@@ -203,7 +137,7 @@ const secondArg = (call: string): { from: number; to: number } | undefined => {
  * that have to change, which is what makes the baseline's falling a measure of the work.
  */
 export const pinnedWords = (text: string): string[] => {
-  const clean = uncommented(text);
+  const clean = withoutComments(text);
   const lineAt = (index: number) => clean.slice(0, index).split('\n').length;
   const found = new Map<number, string>();
   for (const { at, call, refusal } of assertions(clean)) {
@@ -256,7 +190,7 @@ const shippedBounds = (clean: string): string[] => {
  * which carries node's per-test timeout and measures no waiting at all.
  */
 export const waitedOut = (text: string): string[] => {
-  const clean = uncommented(text);
+  const clean = withoutComments(text);
   const bounds = shippedBounds(clean);
   if (!bounds.length) return [];
   const lineAt = (index: number) => clean.slice(0, index).split('\n').length;
@@ -278,7 +212,7 @@ export const waitedOut = (text: string): string[] => {
  * calling it, and a call inside a test or a helper is indented.
  */
 export const sharedStandIns = (text: string): string[] => {
-  const clean = uncommented(text);
+  const clean = withoutComments(text);
   const found: string[] = [];
   clean.split('\n').forEach((line, i) => {
     if (/^\S/.test(line) && /(?<![\w$.])(?:testPlace|testEngine)\s*\(/.test(line)) found.push(`${i + 1}: ${line.trim()}`);
@@ -423,11 +357,14 @@ test('REFUSED: the baseline cannot grow, cannot be lowered while the lines are t
   ]);
 });
 
-/** What each test file of the repository holds under `rule`, by its path from the root, the files that hold none left out. */
-const sweep = (files: readonly string[], rule: (text: string) => string[]): Record<string, number> => {
+/** A test file's source, by its path from the root. */
+const readFile = (file: string): string => fs.readFileSync(path.join(REPO, file), 'utf8');
+
+/** What each of `files` holds under `rule`, each read by `read`, by its path from the root, the files that hold none left out. */
+const sweep = (files: readonly string[], rule: (text: string) => string[], read = readFile): Record<string, number> => {
   const held: Record<string, number> = {};
   for (const file of files) {
-    const lines = rule(fs.readFileSync(path.join(ROOT, file), 'utf8'));
+    const lines = rule(read(file));
     if (lines.length) held[file] = lines.length;
   }
   return held;
@@ -448,17 +385,30 @@ test('no test of the repository pins a sentence of what the code said but those 
   );
 });
 
+/**
+ * Each of `files` that floors a measured duration at a bound the shipped code owns, read by `read`, with the fix: no baseline names one,
+ * so every floor is refused.
+ */
+const floorsIn = (files: readonly string[], read = readFile): string[] =>
+  Object.entries(sweep(files, waitedOut, read)).map(
+    ([file, count]) =>
+      `${file} floors ${count} measured durations at a bound the shipped code owns: shorten the bound at the seam the code gives for it and measure the floor there (\`packages/templates/sdlc/skills/implement-a-change/SKILL.md\`, step 2)`,
+  );
+
+test('REFUSED: a test file of the sweep that floors a duration at a shipped bound is found, with no baseline to let it through', () => {
+  const planted = 'packages/agent-runtime/test/planted-floor.test.ts';
+  const text = "import { FEED_LOCK_WAIT_MS } from '../src/core/engine/feed.ts';\nassert.ok(waited >= FEED_LOCK_WAIT_MS);\n";
+  const files = [...testFiles(), planted];
+  assert.deepEqual(
+    floorsIn(files, (file) => (file === planted ? text : readFile(file))).map((refusal) => refusal.split(' ')[0]),
+    [planted],
+  );
+});
+
 test('no test of the repository floors a measured duration at a bound the shipped code owns', () => {
   const files = testFiles();
   assert.ok(files.length > 200, 'the sweep reads the repository’s test files');
-  assert.deepEqual(
-    owingOf(
-      sweep(files, waitedOut),
-      WAITED_OUT,
-      'shorten the bound at the seam the code gives for it and measure the floor there (`packages/templates/sdlc/skills/implement-a-change/SKILL.md`, step 2)',
-    ),
-    [],
-  );
+  assert.deepEqual(floorsIn(files), []);
 });
 
 test('no test of the api shares a stand-in across its tests: each makes its own with `eachTest` (`apps/api/test/placed.ts`)', () => {
@@ -467,9 +417,9 @@ test('no test of the api shares a stand-in across its tests: each makes its own 
   assert.deepEqual(sweep(files, sharedStandIns), {});
 });
 
-test('every file either baseline names is a test file of the repository', () => {
+test('every file the baseline names is a test file of the repository', () => {
   const files = testFiles();
-  for (const file of [...Object.keys(PINNED_WORDS), ...Object.keys(WAITED_OUT)]) {
+  for (const file of Object.keys(PINNED_WORDS)) {
     assert.ok(files.includes(file), `${file} is no test file of the repository: take its line out of the baseline`);
   }
 });

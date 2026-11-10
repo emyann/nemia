@@ -1,5 +1,5 @@
 /**
- * The world the pull-request script acts in (`workflows/build/pull-request.ts`), for the tests that drive it and for the three that run
+ * The world the pull-request script acts in (`carried/pull-request.ts`), for the tests that drive it and for the three that run
  * a shipped check whole: a bare repository as `origin`, so a push is a real push and its refusal a real rejection, and a stub `gh` first
  * on the PATH that records each call and answers from a fixture a test writes, as `observe-render.boundary.test.ts` stubs `docker`.
  *

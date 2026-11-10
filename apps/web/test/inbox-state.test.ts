@@ -7,10 +7,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { ours } from './ours.ts';
 
-const SRC = path.resolve(import.meta.dirname, '..', 'src');
-/** The design system kit, another repository's files, which know no card. */
-const KIT = path.join(SRC, 'components', 'ui', 'ds');
+const WEB = path.resolve(import.meta.dirname, '..');
+const SRC = path.join(WEB, 'src');
 
 /** A read of `startedAs` that decides whether a card started — its length, or a search of it — across line breaks too. */
 const REBUILT = /startedAs\s*\.\s*(length|includes|some|find|every)\b/g;
@@ -27,7 +27,7 @@ const sources = (dir: string): string[] =>
     .readdirSync(dir, { withFileTypes: true, recursive: true })
     .filter((e) => e.isFile() && /\.tsx?$/.test(e.name))
     .map((e) => path.join(e.parentPath, e.name))
-    .filter((file) => !file.startsWith(KIT + path.sep));
+    .filter((file) => ours(path.relative(WEB, file).split(path.sep).join('/')));
 
 test("REFUSED: a card's state rebuilt from startedAs is found, on one line or across two; a read of its runs to list them is not", () => {
   const lines = (found: string[]) => found.map((at) => at.split(' ')[0]);

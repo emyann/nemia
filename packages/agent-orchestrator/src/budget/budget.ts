@@ -10,7 +10,7 @@
 import type { AboveTheWorkflow, ApprovedCaps, CapInForce, ProposalRefusal, Unchanged } from '../../contracts/budget.contract.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { fieldsOf, itemsOf, sameSchema } from '../shape/shape.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { downstreamOf } from '../workspace/workspace.ts';
 import { tryOf, type Run } from '../record/record.ts';
 
@@ -46,7 +46,7 @@ export const BUDGETS_SCHEMA = {
 };
 
 /** The fields a step's `output:` declares whose schema is `BUDGETS_SCHEMA`, in the schema's order: none for a step without `output:`. */
-export const budgetFields = (step: Workflow | undefined): string[] =>
+export const budgetFields = (step: StepSpec | undefined): string[] =>
   Object.entries(step?.output?.schema.properties ?? {})
     .filter(([, schema]) => sameSchema(schema, [BUDGETS_SCHEMA]))
     .map(([name]) => name);
@@ -90,7 +90,7 @@ export function budgetsOf(value: unknown): ProposedBudget[] | { error: string } 
  * for a closeout that is not there or did not read. A closeout whose budgets the run refuses (`budgetRefusals`) reads `unsigned`, and no
  * gate waits on it.
  */
-export function proposedBudgets(step: Workflow | undefined, said: Closeout | { error: string } | undefined): ProposedBudget[] {
+export function proposedBudgets(step: StepSpec | undefined, said: Closeout | { error: string } | undefined): ProposedBudget[] {
   if (!said || 'error' in said) return [];
   return budgetFields(step).flatMap((field) => {
     const read = budgetsOf(said.output?.[field]);
@@ -99,7 +99,7 @@ export function proposedBudgets(step: Workflow | undefined, said: Closeout | { e
 }
 
 /** The steps a gate at `step` can set a cap for: every step that waits on it, directly or through another, in the workflow's order. */
-export const laterSteps = (steps: readonly Workflow[], step: string): string[] => {
+export const laterSteps = (steps: readonly StepSpec[], step: string): string[] => {
   const later = downstreamOf(steps, step);
   return steps.filter((s) => later.has(s.name)).map((s) => s.name);
 };
@@ -110,8 +110,8 @@ export const laterSteps = (steps: readonly Workflow[], step: string): string[] =
  * twice. None for a closeout not there or unreadable, nor of a field it did not give.
  */
 export function budgetRefusals(
-  step: Workflow | undefined,
-  steps: readonly Workflow[],
+  step: StepSpec | undefined,
+  steps: readonly StepSpec[],
   said: Closeout | { error: string } | undefined,
 ): string[] {
   if (!step || !said || 'error' in said) return [];
@@ -178,7 +178,7 @@ export const aboveTheWorkflow: AboveTheWorkflow = (caps, ceilings) => {
 };
 
 /** The steps' own budgets, as the ceilings `aboveTheWorkflow` reads: none of a step with no `budget:`. */
-export const ceilingsOf = (steps: readonly Workflow[]): StepBudget[] =>
+export const ceilingsOf = (steps: readonly StepSpec[]): StepBudget[] =>
   steps.flatMap((s) => (s.budget === undefined ? [] : [{ step: s.name, usd: s.budget }]));
 
 /**
@@ -207,7 +207,7 @@ export const approvedCapsOf = (run: Run, step: string): number[] => {
  * --round --budget`), else the last cap an approval in force set for it (`approvedCapsOf`: `nemia approve --budget`, or the budgets its
  * gated step proposed), else its `budget:`. Read from the record and the approvals on every pass, nothing carried.
  */
-export const budgetOf = (step: Workflow, run: Run): number | undefined =>
+export const budgetOf = (step: StepSpec, run: Run): number | undefined =>
   capInForce({
     raised: [...(run.steps[step.name]?.tries ?? [])].reverse().find((t) => t.budget !== undefined)?.budget,
     approved: approvedCapsOf(run, step.name),

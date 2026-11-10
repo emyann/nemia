@@ -2,20 +2,18 @@
  * What the store reads back, read against what the tick and the verbs write: a run record, a person's asks and markers. A record that does
  * not read as a run is refused by `runRecord` with its fix and left out of `listRuns`; an ask a verb would not write is not honoured, and
  * says why in the verb's words; a marker that does not read still holds its run. Every shape a former `nemia` wrote reads as it did.
- * `WF_ROOT` is set before the import, since the module reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
+import * as store from './record.store.ts';
+import { routeAsk } from '../route/index.ts';
 
 const ROOT = scratch('wf-record-read-');
-process.env.WF_ROOT = ROOT;
-const store = await import('./record.store.ts');
-const { routeAsk } = await import('../route/index.ts');
 /** A person's route file for a condition's try, where `nemia route` writes it. */
-const routeFile = (id: string, step: string, n: number): string => path.join(store.asksDir(id), routeAsk(step, n));
+const routeFile = (id: string, step: string, n: number): string => path.join(store.asksDir(ROOT, id), routeAsk(step, n));
 const {
   UnreadableRecord,
   acceptanceIn,
@@ -31,7 +29,7 @@ const {
   holdFile,
 } = store;
 
-fs.mkdirSync(runsDir(), { recursive: true });
+fs.mkdirSync(runsDir(ROOT), { recursive: true });
 
 /** A repository run's record as the tick writes one today, frozen steps and all. */
 const aRecord = (id: string): Record<string, unknown> => ({
@@ -52,12 +50,12 @@ const aRecord = (id: string): Record<string, unknown> => ({
 });
 
 const put = (id: string, record: unknown): void =>
-  fs.writeFileSync(runFile(id), typeof record === 'string' ? record : JSON.stringify(record, null, 2));
+  fs.writeFileSync(runFile(ROOT, id), typeof record === 'string' ? record : JSON.stringify(record, null, 2));
 
 /** What `runRecord` is refused with, as its message — exit code 2, and an `UnreadableRecord`. */
 const refusalOf = (id: string): string => {
   try {
-    runRecord(id);
+    runRecord(ROOT, id);
   } catch (err) {
     assert.ok(err instanceof UnreadableRecord, `refused as unreadable, not ${String(err)}`);
     assert.equal(err.exitCode, 2);
@@ -181,7 +179,7 @@ test("a record the tick did not write is refused by `runRecord` at its field, ex
       put(id, record);
       const said = refusalOf(id);
       assert.ok(said.includes(says), said);
-      assert.ok(said.startsWith(`run ${id}: its record, ${runFile(id)}, `), said);
+      assert.ok(said.startsWith(`run ${id}: its record, ${runFile(ROOT, id)}, `), said);
       assert.ok(said.includes(FIX), said);
       if (typeof record !== 'string') assert.ok(!said.includes('Expected'), `in wf's words, not the parser's: ${said}`);
     });
@@ -194,28 +192,28 @@ test("a record the tick did not write is refused by `runRecord` at its field, ex
     const said = refusalOf('r-huge');
     assert.ok(said.includes(`its \`workflow.0.after\` is "${'x'.repeat(59)}…, where nemia writes`), said.slice(0, 300));
     assert.ok(said.length < 2_000, `${said.length} characters`);
-    fs.rmSync(runFile('r-huge'));
+    fs.rmSync(runFile(ROOT, 'r-huge'));
   });
 
   await t.test('a run id with no record is told to try `nemia ls`, not called unreadable', () => {
     assert.throws(
-      () => runRecord('r-nobody'),
+      () => runRecord(ROOT, 'r-nobody'),
       (err: Error) => !(err instanceof UnreadableRecord) && err.message === "no such run: r-nobody  (try 'nemia ls')",
     );
   });
 
   await t.test('the step with every key right reads as it was frozen; a record with no `factory` is in the default one', () => {
     put('r-agent', withAgent('r-agent'));
-    assert.deepEqual(runRecord('r-agent').workflow![1], (withAgent('r-agent').workflow as unknown[])[1], 'read as it was frozen');
+    assert.deepEqual(runRecord(ROOT, 'r-agent').workflow![1], (withAgent('r-agent').workflow as unknown[])[1], 'read as it was frozen');
     put('r-nofactory', aRecord('r-nofactory'));
-    assert.equal('factory' in runRecord('r-nofactory'), false);
+    assert.equal('factory' in runRecord(ROOT, 'r-nofactory'), false);
     put('r-other', { ...aRecord('r-other'), factory: 'acme' });
-    assert.equal(runRecord('r-other').factory, 'acme');
+    assert.equal(runRecord(ROOT, 'r-other').factory, 'acme');
   });
 
   await t.test('`listRuns` leaves out each record refused above, says each with its fix, and lists every other run', () => {
     const said: string[] = [];
-    const listed = listRuns((line) => said.push(line)).map((r) => r.id);
+    const listed = listRuns(ROOT, (line) => said.push(line)).map((r) => r.id);
     assert.ok(
       ['r-agent', 'r-nofactory', 'r-other'].every((id) => listed.includes(id)),
       listed.join(', '),
@@ -226,7 +224,7 @@ test("a record the tick did not write is refused by `runRecord` at its field, ex
         said.some((l) => l.startsWith(`left out: run ${id}: its record, `) && l.includes(FIX)),
         `${id} said: ${said.join('\n')}`,
       );
-      fs.rmSync(runFile(id));
+      fs.rmSync(runFile(ROOT, id));
     }
   });
 });
@@ -234,9 +232,10 @@ test("a record the tick did not write is refused by `runRecord` at its field, ex
 test('`listRuns` lists the run `kept` answers for an id as given, its record never read; an id it does not answer is read as before', () => {
   put('r-kept', '{"id": "r-kept", "repo"');
   put('r-read', aRecord('r-read'));
-  const stand = { ...runRecord('r-read'), id: 'r-kept', brief: 'what the memo holds' };
+  const stand = { ...runRecord(ROOT, 'r-read'), id: 'r-kept', brief: 'what the memo holds' };
   const said: string[] = [];
   const listed = listRuns(
+    ROOT,
     (line) => said.push(line),
     (id) => (id === 'r-kept' ? stand : undefined),
   );
@@ -248,28 +247,28 @@ test('`listRuns` lists the run `kept` answers for an id as given, its record nev
   assert.ok(!said.some((l) => l.includes('r-kept')), `and nothing is said of it, since it was not read: ${said.join('\n')}`);
   assert.equal(listed.find((r) => r.id === 'r-read')?.brief, 'add a flag', 'an id kept does not answer is read off disk');
   const unkept: string[] = [];
-  assert.ok(!listRuns((line) => unkept.push(line)).some((r) => r.id === 'r-kept'), 'with no kept, the record is read, and left out');
+  assert.ok(!listRuns(ROOT, (line) => unkept.push(line)).some((r) => r.id === 'r-kept'), 'with no kept, the record is read, and left out');
   assert.ok(unkept.some((l) => l.startsWith('left out: run r-kept: its record, ')));
-  for (const id of ['r-kept', 'r-read']) fs.rmSync(runFile(id));
+  for (const id of ['r-kept', 'r-read']) fs.rmSync(runFile(ROOT, id));
 });
 
 test("what the tick does not name survives a read and a rewrite: a key on the record and on a frozen step, and a git record's `placeSkill`", () => {
   const record: Record<string, unknown> = { ...aRecord('r-newer'), fromANewerWf: { kept: true } };
   (record.workflow as Array<Record<string, unknown>>)[0].aNewStepKey = 3;
   put('r-newer', record);
-  assert.ok(rewriteRun(runRecord('r-newer')));
-  const written = JSON.parse(fs.readFileSync(runFile('r-newer'), 'utf8')) as Record<string, unknown>;
+  assert.ok(rewriteRun(ROOT, runRecord(ROOT, 'r-newer')));
+  const written = JSON.parse(fs.readFileSync(runFile(ROOT, 'r-newer'), 'utf8')) as Record<string, unknown>;
   assert.deepEqual(written.fromANewerWf, { kept: true });
   assert.equal((written.workflow as Array<Record<string, unknown>>)[0].aNewStepKey, 3);
 
   const placeSkill = { skill: 'git', version: 'abc123def456' };
   put('r-placed', { ...aRecord('r-placed'), placeSkill });
-  const run = runRecord('r-placed');
+  const run = runRecord(ROOT, 'r-placed');
   assert.deepEqual(run.placeSkill, placeSkill);
-  assert.ok(rewriteRun(run));
-  assert.deepEqual((JSON.parse(fs.readFileSync(runFile('r-placed'), 'utf8')) as Record<string, unknown>).placeSkill, placeSkill);
+  assert.ok(rewriteRun(ROOT, run));
+  assert.deepEqual((JSON.parse(fs.readFileSync(runFile(ROOT, 'r-placed'), 'utf8')) as Record<string, unknown>).placeSkill, placeSkill);
   put('r-unplaced', { ...aRecord('r-unplaced'), fromAnOlderWf: 1 });
-  const older = runRecord('r-unplaced');
+  const older = runRecord(ROOT, 'r-unplaced');
   assert.equal('placeSkill' in older, false, 'one with none reads as before');
   assert.equal((older as unknown as Record<string, unknown>).fromAnOlderWf, 1);
 });
@@ -281,21 +280,21 @@ test("a person's route is read onto its condition's record for the try it names,
   fs.mkdirSync(path.dirname(routeFile('r-routed', 'review', 1)), { recursive: true });
   fs.writeFileSync(routeFile('r-routed', 'review', 1), JSON.stringify({ route: 'docs', at: '2026-09-01T00:00:00.000Z' }));
   fs.writeFileSync(routeFile('r-routed', 'review', 2), JSON.stringify({ route: 'backend', at: '2026-09-01T00:00:00.000Z' }));
-  const run = runRecord('r-routed');
+  const run = runRecord(ROOT, 'r-routed');
   assert.deepEqual(run.steps.review?.route, { route: 'docs', try: 1, by: 'person' }, 'the try it is on; a later try is not read');
-  assert.ok(rewriteRun(run));
-  const written = JSON.parse(fs.readFileSync(runFile('r-routed'), 'utf8')) as { steps: Record<string, { route?: unknown }> };
+  assert.ok(rewriteRun(ROOT, run));
+  const written = JSON.parse(fs.readFileSync(runFile(ROOT, 'r-routed'), 'utf8')) as { steps: Record<string, { route?: unknown }> };
   assert.equal(written.steps.review?.route, undefined, "the person's route is their file's, never the record's");
   put('r-unrouted', aRecord('r-unrouted'));
   fs.mkdirSync(path.dirname(routeFile('r-unrouted', 'review', 1)), { recursive: true });
   fs.writeFileSync(routeFile('r-unrouted', 'review', 1), JSON.stringify({ at: '2026-09-01T00:00:00.000Z' }));
-  assert.equal(runRecord('r-unrouted').steps.review?.route, undefined, 'a file naming no route routes nothing');
+  assert.equal(runRecord(ROOT, 'r-unrouted').steps.review?.route, undefined, 'a file naming no route routes nothing');
 });
 
 test('a marker that does not read still holds its run: a prune marker is pruned, a hold holds, whatever their fields say', () => {
   put('r-marked', aRecord('r-marked'));
   fs.writeFileSync(
-    pruneFile('r-marked'),
+    pruneFile(ROOT, 'r-marked'),
     JSON.stringify({
       at: 7,
       worktrees: [
@@ -305,8 +304,8 @@ test('a marker that does not read still holds its run: a prune marker is pruned,
       artifacts: {},
     }),
   );
-  fs.writeFileSync(holdFile('r-marked'), 'not json');
-  const run = runRecord('r-marked');
+  fs.writeFileSync(holdFile(ROOT, 'r-marked'), 'not json');
+  const run = runRecord(ROOT, 'r-marked');
   assert.deepEqual(run.pruned, { at: '', worktrees: [{ path: '/v', bytes: 2 }], artifacts: { at: '', bytes: 0 } });
   assert.deepEqual(run.hold, { at: '', until: [] });
 });

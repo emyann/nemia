@@ -20,7 +20,7 @@ import { scratch } from 'test-kit/scratch';
 import type { RunDecision } from 'objects';
 import { listedOf as listed, objectOf, specOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
-import { engine, passStanding, runStore } from 'agent-orchestrator';
+import { engine, passStanding, runsAtOnce } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
 
 /** The real `git`, behind one first on PATH that notes each call in `gitCalls` and runs it: what says which runs the api asks git about. */
@@ -66,7 +66,7 @@ function branchOff(repo: string, branch: string, file: string, text: string) {
  * A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what the list and a run's page read,
  * with no `git` of their own.
  */
-const aPass = () => runWith(engine(process.env), passStanding(runStore.runs.list()));
+const aPass = () => runWith(engine(process.env), passStanding(runsAtOnce(root).runs.list()));
 
 /** The tick's last reading, gone: no pass has read where anything stands. */
 const noPass = () => fs.rmSync(path.join(root, 'standing.json'), { force: true });

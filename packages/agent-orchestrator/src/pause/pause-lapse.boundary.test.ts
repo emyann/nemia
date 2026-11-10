@@ -4,17 +4,15 @@
  * gone, this process for one that runs. The process table is this file's whole subject, so it is a boundary test. The rest of the
  * pause's file is `pause.store.test.ts`'s.
  */
-import { rootNow } from '../../test/config-given.ts';
 import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { scratch } from 'test-kit/scratch';
+import { cutPause, liftLapsedPause, pauseFile, readPauseFile, resumePause, putPause, readPause } from './pause.store.ts';
+import { identify, thisProcess } from '../daemon/daemon.store.ts';
 
 const ROOT = scratch('wf-pause-lapse-');
-process.env.WF_ROOT = ROOT;
-const { cutPause, liftLapsedPause, pauseFile, readPauseFile, resumePause, putPause, readPause } = await import('./pause.store.ts');
-const { identify, thisProcess } = await import('../daemon/daemon.store.ts');
 
 /** The pid of a process spawned and waited to its exit: one the process table says is gone. */
 const gonePid = (): number => {
@@ -26,13 +24,13 @@ const gonePid = (): number => {
 test("a take-over's pause names its process, and the pass lifts it once that process is gone, never a person's", async (t) => {
   const AT = new Date('2026-11-05T12:30:00.000Z');
   await t.test('a holder is written to the file and kept off the pause the store serves', () => {
-    const put = putPause(rootNow(), { by: 'nemia service restart' }, AT, undefined, thisProcess());
+    const put = putPause(ROOT, { by: 'nemia service restart' }, AT, undefined, thisProcess());
     assert.deepEqual(put, { at: AT.toISOString(), by: 'nemia service restart' });
-    assert.deepEqual(readPause(rootNow()), put, 'the served pause carries no holder');
-    assert.equal(readPauseFile(rootNow())?.heldBy?.pid, process.pid);
-    cutPause(rootNow());
-    assert.equal(readPauseFile(rootNow())?.heldBy?.pid, process.pid, 'nemia pause --now keeps who holds the pause');
-    resumePause(rootNow());
+    assert.deepEqual(readPause(ROOT), put, 'the served pause carries no holder');
+    assert.equal(readPauseFile(ROOT)?.heldBy?.pid, process.pid);
+    cutPause(ROOT);
+    assert.equal(readPauseFile(ROOT)?.heldBy?.pid, process.pid, 'nemia pause --now keeps who holds the pause');
+    resumePause(ROOT);
   });
   const rows: { name: string; heldBy?: unknown; lifted: boolean }[] = [
     { name: 'held by a process gone since: lifted', heldBy: { pid: gonePid() }, lifted: true },
@@ -44,20 +42,20 @@ test("a take-over's pause names its process, and the pass lifts it once that pro
   for (const row of rows)
     await t.test(row.name, () => {
       const pause = { at: AT.toISOString(), by: 'nemia service restart' };
-      fs.writeFileSync(pauseFile(rootNow()), `${JSON.stringify(row.heldBy === undefined ? pause : { ...pause, heldBy: row.heldBy })}\n`);
-      const lifted = liftLapsedPause(rootNow(), identify);
+      fs.writeFileSync(pauseFile(ROOT), `${JSON.stringify(row.heldBy === undefined ? pause : { ...pause, heldBy: row.heldBy })}\n`);
+      const lifted = liftLapsedPause(ROOT, identify);
       assert.equal(lifted !== null, row.lifted);
-      assert.equal(readPause(rootNow()) === null, row.lifted, 'the file is gone exactly when the pause was lifted');
-      if (!row.lifted) resumePause(rootNow());
+      assert.equal(readPause(ROOT) === null, row.lifted, 'the file is gone exactly when the pause was lifted');
+      if (!row.lifted) resumePause(ROOT);
     });
   await t.test('a pause put again between the judging and the lift stands', () => {
-    putPause(rootNow(), { by: 'nemia service restart' }, AT, undefined, { pid: gonePid() });
-    const lifted = liftLapsedPause(rootNow(), (holder) => {
-      fs.writeFileSync(pauseFile(rootNow()), `${JSON.stringify({ at: AT.toISOString(), by: 'ann' })}\n`);
+    putPause(ROOT, { by: 'nemia service restart' }, AT, undefined, { pid: gonePid() });
+    const lifted = liftLapsedPause(ROOT, (holder) => {
+      fs.writeFileSync(pauseFile(ROOT), `${JSON.stringify({ at: AT.toISOString(), by: 'ann' })}\n`);
       return identify(holder);
     });
     assert.equal(lifted, null);
-    assert.equal(readPause(rootNow())?.by, 'ann');
-    resumePause(rootNow());
+    assert.equal(readPause(ROOT)?.by, 'ann');
+    resumePause(ROOT);
   });
 });

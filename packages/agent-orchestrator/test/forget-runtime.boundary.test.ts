@@ -8,7 +8,7 @@
  * place. One engine serves the file, since a pass reads every run of the store, but for `lacking`, the runtime's engine over the same
  * store without a harness a task ran on.
  *
- * `WF_ROOT` is set before the runner is imported: it is read as the module loads. `WF_VERIFY_REST` judges in full every run a pass answers
+ * The test's store is its own, at `ROOT`, given as `ENV`. `WF_VERIFY_REST` judges in full every run a pass answers
  * from its memo of runs at rest, and throws on a difference; `WF_MAX_CONCURRENT` admits sessions enough, and no cap is set on runs.
  */
 import { test, type TestContext } from 'node:test';
@@ -22,22 +22,21 @@ import { asyncOps, plainEngine, type AsyncRunner } from './promised.ts';
 import type { Engine } from '../src/runtime-client.ts';
 import { scratch } from 'test-kit/scratch';
 import { runGiven, runOver } from './placed.ts';
+import { advanceRun, forgetRun, retryRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import { runTasks } from '../src/record/record.ts';
+import { tickRun } from '../src/tick/tick.verb.ts';
+import { main } from '../src/cli/main.ts';
+import { filesStoreAt } from '../src/record/files.store.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-forget-runtime-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-process.env.WF_MAX_CONCURRENT = '10';
-delete process.env.WF_MAX_RUNS;
-const { advanceRun, forgetRun, retryRun, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
-const { runRecord } = await import('../src/record/record.store.ts');
-const { runTasks } = await import('../src/record/record.ts');
-const { filesStore: runStore } = await import('../src/record/files.store.ts');
-const { tickRun } = await import('../src/tick/tick.verb.ts');
-const { main } = await import('../src/cli/main.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: '10', WF_MAX_RUNS: undefined };
+const runWith = runOver(runEngine, gitPlaceLayer, ENV);
+const runPlaced = runGiven(gitPlaceLayer, ENV);
+const files = filesStoreAt(ROOT);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
@@ -119,7 +118,7 @@ const sign = (taskId: string, n: number, closeout: object) => {
 /** What the daemon does: the engine's tick, then the run's pass. */
 const pass = async (id: string) => {
   await Effect.runPromise(e.tick());
-  return runWith(e, advanceRun(runRecord(id)));
+  return runWith(e, advanceRun(runRecord(ROOT, id)));
 };
 
 /** The ids of the tasks the engine has a record of. */
@@ -151,7 +150,7 @@ const finished = async () => {
   sessions.set(check, { ...sessions.get(check)!, state: 'completed', busy: false, exitCode: 0 });
   await pass(run.id);
   assert.equal((await pass(run.id)).status, 'succeeded');
-  const tasks = runTasks(runRecord(run.id));
+  const tasks = runTasks(runRecord(ROOT, run.id));
   assert.deepEqual(
     [...tasks].sort(),
     [`${run.id}-implement`, `${run.id}-implement-try2`, `${run.id}-implement-try2-check`],
@@ -169,7 +168,7 @@ const typedOn = async (t: TestContext, engine: Engine, ...args: string[]) => {
     printed.push(a.join(' '));
   });
   try {
-    await main(args, engine);
+    await main(args, engine, undefined, undefined, ENV);
     return { printed, error: undefined };
   } catch (err) {
     return { printed, error: err as Error & { exitCode?: number } };
@@ -217,7 +216,7 @@ test("an engine without the harness a task ran on refuses it by name: `nemia rm`
   assert.ok(said.printed[0].includes(words), said.printed.join('\n'));
   assert.ok(said.printed[0].endsWith(`only a person removes it, once nothing of them is wanted: rm ${marker}`), said.printed[0]);
   assert.ok(!said.printed[0].includes('waits'), said.printed[0]);
-  assert.deepEqual(runStore.forgetting.read(run.id), [task], 'the marker keeps its id');
+  assert.deepEqual(files.forgetting.read(run.id), [task], 'the marker keeps its id');
 
   const before = lackingForgets.length;
   const done = await runWith(lacking, tickRun({ repo: ROOT }));

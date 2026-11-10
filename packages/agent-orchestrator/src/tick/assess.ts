@@ -15,7 +15,7 @@ import {
   type SpendOf,
 } from '../status/status.ts';
 import { toDecide, type ToDecide } from '../ending/ending.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import {
   honoursAsks,
@@ -102,7 +102,7 @@ export type Assessment = {
  * filing reads besides; a pure caller is handed one.
  */
 export type AssessRead = {
-  readonly steps: readonly Workflow[];
+  readonly steps: readonly StepSpec[];
   readonly run: Run;
   /** Each task's phase, as the engine's view of it says (`phaseOfView`). */
   readonly phaseOf: (taskId: string) => TaskPhase;
@@ -195,7 +195,7 @@ export function assess(read: AssessRead): Assessment {
       ? stoppedOnWord(steps.flatMap((s) => wordsOf(status.get(s.name), stood.get(s.name))))
       : 'running';
 
-  if (run.hold) return { ...nothing, unreachable, status: 'running', holdUntil: run.hold.until };
+  if (run.hold) return { ...nothing, unreachable, status: 'running', holdUntil: [...run.hold.until] };
   const decide = toDecide(steps, run, overall, (name) => status.get(name) ?? 'pending', standings);
   const assessed: Assessment = {
     ready,
@@ -220,7 +220,7 @@ export function assess(read: AssessRead): Assessment {
  * never a table condition, which the pass answers unfiled — and one that waits on a step that stops it, unreachable. Pure.
  */
 function dueSteps(
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   run: Run,
   status: ReadonlyMap<string, StepStatus>,
   closeoutOf: (step: string) => Closeout | undefined,
@@ -285,9 +285,9 @@ function stoppedOnWord(each: ReadonlyArray<{ status: StepStatus; own: StepStatus
 
 /** What the run refused of the last try's closeout (`closeoutRefusals`), as its next try is told it; nothing for none. */
 export const refusedTold = (
-  step: Workflow | undefined,
+  step: StepSpec | undefined,
   said: Closeout | undefined,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
 ): Pick<RetryBriefing, 'refused'> => {
   const refused = said ? closeoutRefusals(step, said, steps) : [];
   return refused.length ? { refused } : {};
@@ -299,5 +299,5 @@ export const refusedTold = (
  * it. The runtime refuses a `config` with any key in it, one whose value is undefined included (`remoteRefuses`), so the fields are left
  * out, not emptied; and a try of a remote step is a new Task, never a turn of the last one.
  */
-export const localFields = <T extends object>(step: Workflow, fields: () => T): T | Record<string, never> =>
+export const localFields = <T extends object>(step: StepSpec, fields: () => T): T | Record<string, never> =>
   isRemoteHarness(step.harness) ? {} : fields();

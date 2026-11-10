@@ -2,7 +2,7 @@
  * `nemia prune` on git itself, for what the test place does not model and `prune.test.ts` cannot tell: a worktree's `node_modules`, which
  * git ignores, removed with it, a link in it not followed and a file of main's hardlinked into it not counted nor touched; a worktree on
  * no branch and a locked one, each refused with the command that clears it; and a worktree detached since a prompt's listing, judged
- * again and kept. On `gitPlaceLayer` and the engine's stand-in; a file of its own, since `WF_ROOT` is read once, as the package loads.
+ * again and kept. On `gitPlaceLayer` and the engine's stand-in, over a store of its own at `ROOT`, given as `ENV`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,21 +16,20 @@ import type { PlaceRequests, PlaceVerb } from '../src/place/place.ts';
 import { scratch } from 'test-kit/scratch';
 import { names } from './assessed.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
+import { advanceRun, prune, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import { freeingMany, judgingMany } from '../src/forget/prune/prune.verb.ts';
+import { PlaceService } from '../src/place/place.store.ts';
+import { StoreRoot } from '../src/config/root.store.ts';
+import { builtinGitPlace } from '../src/place/builtin.store.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-prune-git-');
-process.env.WF_ROOT = ROOT;
-process.env.WF_DEFAULT_FACTORY_STARTS = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { advanceRun, prune, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
-const { runRecord } = await import('../src/record/record.store.ts');
-const { freeingMany, judgingMany } = await import('../src/forget/prune/prune.verb.ts');
-const { PlaceService } = await import('../src/place/place.store.ts');
-const { builtinGitPlace } = await import('../src/place/builtin.store.ts');
-const { engineOf } = await import('../src/runtime-client.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_DEFAULT_FACTORY_STARTS: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
 const engine = eachTest(testEngine);
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
+const runWith = runOver(runEngine, gitPlaceLayer, ENV);
+const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 const git = (cwd: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
@@ -65,8 +64,8 @@ const ONE_STEP = (() => {
 const aFinished = async (repo = aRepo(), work = 'fix.ts') => {
   const e = engineOf(engine().layer);
   const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: ONE_STEP }));
-  await runWith(e, advanceRun(runRecord(run.id)));
-  const wt = runRecord(run.id).steps.implement.workspace!;
+  await runWith(e, advanceRun(runRecord(ROOT, run.id)));
+  const wt = runRecord(ROOT, run.id).steps.implement.workspace!;
   fs.writeFileSync(path.join(wt, work), 'export const fixed = true;\n');
   git(wt, 'add', '-A');
   git(wt, 'commit', '-q', '-m', `add ${work}`);
@@ -81,8 +80,8 @@ const aFinished = async (repo = aRepo(), work = 'fix.ts') => {
   if (!fs.existsSync(path.join(wt, 'node_modules', 'big', 'index.js')))
     fs.linkSync(path.join(repo, 'node_modules', 'big', 'index.js'), path.join(wt, 'node_modules', 'big', 'index.js'));
   engine().settle(`${run.id}-implement`, 'succeeded', { closeout: { outcome: 'done', summary: 'did it', artifacts: [], needs: null } });
-  await runWith(e, advanceRun(runRecord(run.id)));
-  git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', runRecord(run.id).steps.implement.branch!);
+  await runWith(e, advanceRun(runRecord(ROOT, run.id)));
+  git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', runRecord(ROOT, run.id).steps.implement.branch!);
   return { e, run, repo, wt, outside };
 };
 
@@ -148,9 +147,9 @@ test('after a prompt each run is judged again before its removal: one whose work
   };
   const place = PlaceService.layer(counting);
   const e = first.e;
-  const listed = await runEngine(e, judgingMany(ids).pipe(Effect.provide(place)));
+  const listed = await runEngine(e, Effect.provideService(judgingMany(ids), StoreRoot, ROOT).pipe(Effect.provide(place)));
   detach(first.wt);
-  const done = await runEngine(e, freeingMany(listed, { yes: false }).pipe(Effect.provide(place)));
+  const done = await runEngine(e, Effect.provideService(freeingMany(listed, { yes: false }), StoreRoot, ROOT).pipe(Effect.provide(place)));
   assert.deepEqual(
     done.map((d) => ('failed' in d ? 'failed' : d.pruning.kind)),
     ['refused', 'pruned'],

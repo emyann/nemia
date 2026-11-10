@@ -12,7 +12,7 @@ import { Effect } from 'effect';
 import { AGENTS, AgentDoor, fillsOf, hireRefusalOf, keptRuns, listedAtOnce, Missing, SkillDoor, WORKFLOWS_STEP } from 'agent-orchestrator';
 import type { AgentReading, Factory, FactoryListing } from 'agent-orchestrator';
 import { toldLayers, type Run, type ToldLayers } from 'agent-orchestrator/run';
-import type { SkillsFound, Workflow } from 'agent-orchestrator/workflow';
+import type { SkillsFound, StepSpec } from 'agent-orchestrator/workflow';
 import { DEFAULT_NAMESPACE, type WorkflowStepPage } from 'objects';
 import { foundInOf, sourceOf, type SkillSource } from '../skills/skills.ts';
 import type { Served } from '../layer.ts';
@@ -140,7 +140,7 @@ export const unreadAgentsRefusal = (message: string): string =>
 export async function hiringOf(
   factory: Pick<Factory, 'name' | 'workflows'> | undefined,
   workflow: string,
-  step: Pick<Workflow, 'agent'>,
+  step: Pick<StepSpec, 'agent'>,
   hired: string | null,
   from: WorkflowSource,
   agents: () => Promise<readonly Pick<AgentReading, 'name' | 'from' | 'description' | 'error'>[]>,
@@ -217,6 +217,6 @@ export async function stepPage(
     hiredIn: factory ? [] : hiredInOf(listedAtOnce(home), name, found.name, from, repo),
     hiring: await hiringOf(factory, name, found, hired, from, agents),
     skillsFrom: skillsFromOf(layers, defs.skills, repo, home),
-    recentRuns: recentRunsOf(keptRuns(memo.records.step, stepRun, s.config.verifyRest), dir, found.name, factory?.name ?? null),
+    recentRuns: recentRunsOf(keptRuns(home, memo.records.step, stepRun, s.config.verifyRest), dir, found.name, factory?.name ?? null),
   };
 }

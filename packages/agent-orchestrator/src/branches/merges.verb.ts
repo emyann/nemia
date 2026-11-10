@@ -5,14 +5,15 @@ import { isRepositoryRun } from '../record/record.ts';
 import { runsAtOnce } from '../runs/runs.store.ts';
 import { PlaceService, trialMerges, type Place } from '../place/place.store.ts';
 import { mergeWord, mergeWordOf, type StandingMerge } from './merges.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /**
  * Whether each of `branches` merges onto the base branch of the run `runId` (`StandingMerge`), keyed by branch, by `place`'s trial
  * merges (`trialMerges`); none for a run that is not a repository run, which has no base to merge onto. Throws `Missing` for a run the
  * store does not have.
  */
-export function mergesOf(place: Place, runId: string, branches: readonly string[]): Record<string, StandingMerge> {
-  const run = runsAtOnce.runs.read(runId);
+export function mergesOf(home: string, place: Place, runId: string, branches: readonly string[]): Record<string, StandingMerge> {
+  const run = runsAtOnce(home).runs.read(runId);
   if (!isRepositoryRun(run)) return {};
   const { trials } = trialMerges(
     run.repo,
@@ -32,7 +33,8 @@ export function mergesOf(place: Place, runId: string, branches: readonly string[
  * for no branch. Fails with `Missing` for a run the store does not have.
  */
 export const mergesRead = Effect.fn('mergesRead')(function* (runId: string, branches: readonly string[]) {
+  const home = yield* StoreRoot;
   if (!branches.length) return {};
   const place = yield* PlaceService;
-  return yield* tried(() => mergesOf(place, runId, branches));
+  return yield* tried(() => mergesOf(home, place, runId, branches));
 });

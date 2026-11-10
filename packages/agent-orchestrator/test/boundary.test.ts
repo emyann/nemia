@@ -9,8 +9,8 @@
  * parses, calls and prints, and so reaches the package through `runner.ts` and the format through `workflow.ts` alone — as each bin
  * reaches it through the CLI. The client and the controllers import one another with no cycle. `MODEL` files are a layer's declaration
  * of its entities as Effect Schemas, beside each context's glossary (`modelBreaks`): they import Effect, the objects' entry (`OBJECTS`),
- * other model files and pure files alone, and no pure file imports one, so the pure entries load none. A file in `src/` or `bin/` that
- * no kind names fails the suite: a new file is sorted when it is written.
+ * other model files and pure files alone, and no pure file imports one but for its types alone (`TYPES_OF`), so the pure entries load
+ * none. A file in `src/` or `bin/` that no kind names fails the suite: a new file is sorted when it is written.
  *
  * **A file in a feature folder takes its kind from its name** (`kindOf`): `<name>.store.ts` is a store, `<name>.verb.ts` a controller,
  * `<name>.model.ts` a model, any other `<name>.ts` pure, and every file under `src/cli/` is the CLI. A file at the root of `src` or in
@@ -35,7 +35,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { builtinModules } from 'node:module';
 import path from 'node:path';
-import { resolved, specifiersIn, withoutComments } from 'test-kit/imports';
+import { importsIn as erasedIn, resolved, specifiersIn, withoutComments } from 'test-kit/imports';
 import { cycles } from 'test-kit/layout';
 
 const PKG = path.join(import.meta.dirname, '..');
@@ -115,7 +115,7 @@ const STORE_BOTTOM = [
  * on both (`folder.store.ts`), the run store on them and the
  * store's pause on the bottom,
  * the schedules' cron and tries on the run store, a templated factory's tree, base and status on it (`applied.store.ts`), the factories on
- * the run store and both, and the run store's files on them and on the configuration (`runStore`, whose `keptRuns` reads
+ * the run store and both, and the run store's files on them and on the configuration (`record/files.store.ts`, whose `keptRuns` reads
  * `WF_VERIFY_REST`), the door's pattern on the store's root (`door.store.ts`) and each door on it and the stores it is over — the Run
  * door on the run store's files, the Factory door on the factories and a factory's level, rules and servers, each on the run store, the
  * Workflow door on the folders, their versions (`version.store.ts`, on the skills read and the Agent and Skill doors it reads a
@@ -306,10 +306,25 @@ function globalsIn(text: string): string[] {
 const packagePath = (file: string, mod: string): string => resolved(file, mod) ?? mod;
 
 /** Each source file's imports, resolved, and the impure globals it reads: `src/` and `bin/`, every `.ts`. */
-function sourcesOf(texts: Record<string, string>): Sources {
-  return Object.fromEntries(
-    Object.entries(texts).map(([file, text]) => [file, [...importsIn(text).map((m) => packagePath(file, m)), ...globalsIn(text)]]),
+/**
+ * A model file a pure file imports for its types alone, as the scan names it: erased as the file loads, it loads no Effect, so a pure
+ * file may name the model's types by it (record.ts's `Run`, the model's encoded run) and the pure rules do not count it.
+ */
+const TYPES_OF = 'types:';
+
+/** The modules `file` names, a model file a pure file imports for its types alone named under `TYPES_OF`. */
+function modulesOf(file: string, text: string): string[] {
+  const valued = new Set(
+    erasedIn(text)
+      .filter((i) => !i.typeOnly)
+      .map((i) => i.spec),
   );
+  const erased = (m: string): boolean => kindsOf(file)[0] === 'PURE' && m.endsWith('.model.ts') && !valued.has(m);
+  return importsIn(text).map((m) => (erased(m) ? `${TYPES_OF}${packagePath(file, m)}` : packagePath(file, m)));
+}
+
+function sourcesOf(texts: Record<string, string>): Sources {
+  return Object.fromEntries(Object.entries(texts).map(([file, text]) => [file, [...modulesOf(file, text), ...globalsIn(text)]]));
 }
 
 let scanned: Sources | undefined;
@@ -733,6 +748,23 @@ test('REFUSED: a pure file that imports a model file, and a model file that impo
     'src/record/record.ts is pure and imports src/record/record.model.ts',
   ]);
   assert.deepEqual(impurities(adding('src/run.ts', 'src/model/er.model.ts')), ['src/run.ts is pure and imports src/model/er.model.ts']);
+  const valued = "import { Run } from './record.model.ts';\nimport type { Step } from './record.model.ts';";
+  assert.deepEqual(
+    sourcesOf({ 'src/record/record.ts': valued })['src/record/record.ts'],
+    ['src/record/record.model.ts'],
+    'a model file a pure file imports a value of is the model file, a type beside it or not',
+  );
+  assert.deepEqual(
+    sourcesOf({ 'src/record/record.ts': "import type { Run } from './record.model.ts';" }),
+    { 'src/record/record.ts': [`${TYPES_OF}src/record/record.model.ts`] },
+    'and one it imports types of alone is erased, and loads nothing',
+  );
+  assert.deepEqual(
+    sourcesOf({ 'src/record/record.store.ts': "import type { Run } from './record.model.ts';" }),
+    { 'src/record/record.store.ts': ['src/record/record.model.ts'] },
+    'only a pure file is read so',
+  );
+  assert.deepEqual(impurities(adding('src/record/record.ts', `${TYPES_OF}src/record/record.model.ts`)), []);
   for (const m of ['src/record/record.store.ts', 'node:fs', 'agent-runtime', 'objects/src/run.ts'])
     assert.deepEqual(modelBreaks(adding('src/record/record.model.ts', m)), [
       `src/record/record.model.ts is a model file and imports ${m}: a model imports effect, objects, other model files and pure files alone`,

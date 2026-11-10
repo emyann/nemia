@@ -6,7 +6,7 @@
  * condition on the tests' team, approved with `nemia approve` once its table answered, which sends its workflow node. Each story one test
  * on the stage (`story.ts`).
  *
- * `WF_ROOT` is set before the runner is imported, which reads it as it loads.
+ * The store is the file's own, at `ROOT`, given as `ENV`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,24 +15,23 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { TEAM } from './team.ts';
+import { advanceRun, startRun, startFromInbox, runWith, list } from '../src/runner.ts';
+import { artifactsDir, runRecord, rewriteRun } from '../src/record/record.store.ts';
+import { resultSteps } from '../src/branches/branches.ts';
+import { stepsOf } from '../src/steps/steps.verb.ts';
+import { inboxAt } from '../src/cards/cards.store.ts';
+import { filesStoreAt } from '../src/record/files.store.ts';
+import { parseInboxCard } from '../src/inbox/inbox.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import { main } from '../src/cli/main.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-route-send-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-process.env.WF_ROOT = ROOT;
-process.env.WF_DEFAULT_FACTORY_STARTS = '1';
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_DEFAULT_FACTORY_STARTS: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
 process.env.NEMIA_DAEMON_START = 'off';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { advanceRun, startRun, startFromInbox, runWith, list } = await import('../src/runner.ts');
-const { artifactsDir, runRecord, rewriteRun } = await import('../src/record/record.store.ts');
-const { resultSteps } = await import('../src/branches/branches.ts');
-const { stepsOf } = await import('../src/steps/steps.verb.ts');
-const { inboxAt } = await import('../src/cards/cards.store.ts');
-const { filesStore: runStore } = await import('../src/record/files.store.ts');
-const { parseInboxCard } = await import('../src/inbox/inbox.ts');
-const { engineOf } = await import('../src/runtime-client.ts');
-const { main } = await import('../src/cli/main.ts');
-const stage = staged({ runWith, main, engineOf });
+const stage = staged({ runWith, main, engineOf, env: ENV });
+const files = filesStoreAt(ROOT);
 
 const SCHEMA = JSON.stringify({
   type: 'object',
@@ -61,7 +60,7 @@ const started = async () => {
   return stage.runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: folder() }));
 };
 
-const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(id)));
+const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
 
 /** The inbox's cards, by file. */
 const cards = (): string[] => (fs.existsSync(inboxAt(ROOT)) ? fs.readdirSync(inboxAt(ROOT)).filter((f) => f.endsWith('.md')) : []);
@@ -72,7 +71,7 @@ const cards = (): string[] => (fs.existsSync(inboxAt(ROOT)) ? fs.readdirSync(inb
  */
 const planned = async (surface: string, given: { title?: string; labels?: Record<string, string> } = {}) => {
   const run = await started();
-  if (given.labels) runStore.labels.put(run.id, given.labels);
+  if (given.labels) files.labels.put(run.id, given.labels);
   assert.deepEqual((await pass(run.id)).filed, ['plan']);
   stage.board().settle(`${run.id}-plan`, 'succeeded', {
     outcome: 'done',
@@ -97,7 +96,9 @@ const routedCard = (id: string) => {
 
 /** What `nemia ls <id>` words each step. */
 const words = async (id: string) =>
-  Object.fromEntries((await stage.runWith(stage.board().e, list(stage.board().e, runRecord(id)))).steps.map((s) => [s.name, s.message]));
+  Object.fromEntries(
+    (await stage.runWith(stage.board().e, list(stage.board().e, runRecord(ROOT, id)))).steps.map((s) => [s.name, s.message]),
+  );
 
 /** The refusal's kind and exit code, never its sentence. */
 const refusedAs = (tag: string) => (err: Error & { _tag?: string; exitCode?: number }) => {
@@ -119,31 +120,31 @@ test('a condition that routes to a workflow node files one queued card, and no p
     assert.match(text, /^workflow: deliver$/m);
     assert.match(text, new RegExp(`^from: ${id}$`, 'm'));
     assert.match(text, /^queued: /m);
-    assert.equal(runRecord(id).steps.ship?.sent?.card, card);
+    assert.equal(runRecord(ROOT, id).steps.ship?.sent?.card, card);
     assert.equal((await words(id)).ship, `sent → ${card}`);
   });
 
   await s.test('a second pass files no second card', async () => {
     const before = cards().length;
-    const at = runRecord(id).steps.ship?.sent?.at;
+    const at = runRecord(ROOT, id).steps.ship?.sent?.at;
     await pass(id);
     assert.equal(cards().length, before);
-    assert.equal(runRecord(id).steps.ship?.sent?.at, at);
+    assert.equal(runRecord(ROOT, id).steps.ship?.sent?.at, at);
   });
 
   await s.test('a pass after a crash between the filing and the record adopts the card', async () => {
-    const run = runRecord(id);
+    const run = runRecord(ROOT, id);
     const { sent: _gone, ...rest } = run.steps.ship ?? { taskId: null };
     run.steps.ship = rest;
-    rewriteRun(run);
+    rewriteRun(ROOT, run);
     const before = cards().length;
     await pass(id);
     assert.equal(cards().length, before);
-    assert.equal(runRecord(id).steps.ship?.sent?.card, card);
+    assert.equal(runRecord(ROOT, id).steps.ship?.sent?.card, card);
   });
 
   await s.test("the caller's result is what the condition read", async () => {
-    const run = runRecord(id);
+    const run = runRecord(ROOT, id);
     const steps = await stage.runPlaced(stepsOf(run));
     assert.deepEqual(
       resultSteps(steps, run).map((x) => x.name),
@@ -171,7 +172,7 @@ test('nemia route: refused off the list and on a step that is no condition, acce
   await s.test("the person's route wins over the table's: docs ends the run and ship is skipped", async () => {
     await stage.main(['route', id, 'triage', 'docs']);
     await pass(id);
-    assert.equal(runRecord(id).steps.ship?.sent, undefined);
+    assert.equal(runRecord(ROOT, id).steps.ship?.sent, undefined);
     assert.equal((await words(id)).ship, 'skipped (triage: docs)');
     assert.ok(!cards().includes(`${id}-ship-routed.md`));
   });
@@ -209,18 +210,18 @@ test("a routed card takes its title from the producer's closeout, else the run's
 test("the run a routed card starts mounts the caller's result folders read-only on its root, and its brief names them", async (t) => {
   const s = story(t);
   const id = await planned('web');
-  const repo = runRecord(id).repo ?? '';
+  const repo = runRecord(ROOT, id).repo ?? '';
   const deliver = path.join(repo, 'workflows', 'deliver');
   fs.mkdirSync(deliver, { recursive: true });
   fs.writeFileSync(path.join(deliver, 'implement.md'), '---\nplace: git\n---\nbuild it\n');
   await pass(id);
-  const card = runRecord(id).steps.ship?.sent?.card ?? '';
-  const plan = artifactsDir(runRecord(id), 'plan');
+  const card = runRecord(ROOT, id).steps.ship?.sent?.card ?? '';
+  const plan = artifactsDir(ROOT, runRecord(ROOT, id), 'plan');
 
   await s.test('the card starts as the tick starts one, and the pass files its root with the caller folder mounted read-only', async () => {
     assert.ok(card, 'the card was sent');
     const routed = (await stage.runPlaced(startFromInbox({ name: card, callerRepo: repo }))).run.id;
-    assert.deepEqual(runRecord(routed).context, [id], 'handed the caller as context');
+    assert.deepEqual(runRecord(ROOT, routed).context, [id], 'handed the caller as context');
     await pass(routed);
     const spec = stage.board().specs.find((x) => x.id === `${routed}-implement`);
     assert.ok(spec, 'the root is filed');
@@ -250,20 +251,20 @@ test("a gated table condition on the tests' team: its producer signs off, a pers
   await s.test('the pass files nothing after triage, which nemia ls says waits at its gate on you', async () => {
     const after = await pass(id);
     assert.deepEqual(after.filed, []);
-    const listed = await stage.runWith(stage.board().e, list(stage.board().e, runRecord(id)));
+    const listed = await stage.runWith(stage.board().e, list(stage.board().e, runRecord(ROOT, id)));
     assert.equal(listed.steps.find((x) => x.name === 'triage')?.message, 'awaiting approval · proposes web');
     assert.deepEqual(listed.waitingOnYou, ['triage']);
   });
 
   await s.test('nemia approve <run> triage is accepted', async () => {
     await stage.main(['approve', id, 'triage']);
-    assert.ok(runRecord(id).approvals?.some((a) => a.step === 'triage' && a.try === 1));
+    assert.ok(runRecord(ROOT, id).approvals?.some((a) => a.step === 'triage' && a.try === 1));
   });
 
   await s.test('the next pass files build-web and sends handoff its card', async () => {
     const after = await pass(id);
     assert.ok(after.filed.includes('build-web'), JSON.stringify(after.filed));
-    assert.equal(runRecord(id).steps.handoff?.sent?.card, `${id}-handoff-routed`);
+    assert.equal(runRecord(ROOT, id).steps.handoff?.sent?.card, `${id}-handoff-routed`);
     assert.equal((await words(id))['build-backend'], 'skipped (triage: web)');
   });
 

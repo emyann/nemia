@@ -1,5 +1,5 @@
 /**
- * The step's shape: what a step file is once read (`Workflow`, `StepAgent`), the closed list of its keys (`STEP_KEYS`) with a line
+ * The step's shape: what a step file is once read (`StepSpec`, `StepAgent`), the closed list of its keys (`STEP_KEYS`) with a line
  * of meaning each, the fields every closeout carries, and the pieces every reader of a markdown file shares: the refusal a wrong file is
  * thrown as (`WorkflowError`), its frontmatter split from its body (`splitFrontmatter`), and the names of the folders beside the steps.
  *
@@ -9,7 +9,7 @@ import { Invalid } from '../refusal/refusal.ts';
 import type { HarnessPrompt } from '../agents/agents.ts';
 import type { PlaceKind, STEP_KEY_FORM, STEP_KEYS as SERVED_STEP_KEYS } from 'objects';
 
-export type Workflow = {
+export type StepSpec = {
   /** The step's name — the file's, minus `.md`. What `after` refers to. */
   name: string;
   /** What must have SUCCEEDED before this may run. `[]` means it starts at once. */
@@ -269,7 +269,7 @@ export type StepAgent = {
   /**
    * The agent's own instructions, the session's skills and what becomes of Claude Code's own prompt (`harnessPrompt:`), as the step was
    * resolved: what `nemia start` renders for a Claude Code step, which is then told its instructions in Claude Code's prompt and its note
-   * alone in its brief (`rendersAgent`, `briefBody`). The skills are the agent's, then those the step adds (`Workflow.skills`), each once.
+   * alone in its brief (`rendersAgent`, `briefBody`). The skills are the agent's, then those the step adds (`StepSpec.skills`), each once.
    * Absent on a record without them, whose step is told both in its brief.
    */
   instructions?: string;
@@ -301,7 +301,7 @@ export type StepAgent = {
   harnessPrompt?: HarnessPrompt;
   /**
    * The MCP servers the step's sessions load, by the names the checkout's `.mcp.json` gives them, its agent's `mcp:` line first, then those
-   * the step's own line adds (`Workflow.mcp`), each once: frozen at `nemia start` on every step with an agent, empty where neither names
+   * the step's own line adds (`StepSpec.mcp`), each once: frozen at `nemia start` on every step with an agent, empty where neither names
    * any, whose sessions load none. Absent on a record
    * frozen before the key, whose sessions load the whole file as they did.
    */
@@ -509,7 +509,7 @@ export const CLOSEOUT_FIELDS = ['apiVersion', 'outcome', 'summary', 'body', 'art
  * Where a step works: its `place:`, or `git` for a step frozen on a run record before the key, as every step worked then; a step file
  * without the line is refused at load (`placeRequired`). The one reader of a step's place. Pure.
  */
-export const stepPlace = (step: Pick<Workflow, 'place'>): PlaceKind => step.place ?? 'git';
+export const stepPlace = (step: Pick<StepSpec, 'place'>): PlaceKind => step.place ?? 'git';
 
 /**
  * Whether a step acts on the base branch itself: it works in the repository's own checkout (`workspace: base`). Pure, and read of the
@@ -518,10 +518,10 @@ export const stepPlace = (step: Pick<Workflow, 'place'>): PlaceKind => step.plac
  * It is what a run's ending is: the one step of a workflow that works where a person's own work is, on the branch everything lands on
  * (`validateBaseWorkspace` refuses a second, and refuses anything waiting on it).
  */
-export const endsOnBase = (step: Pick<Workflow, 'workspace'>): boolean => step.workspace === 'base';
+export const endsOnBase = (step: Pick<StepSpec, 'workspace'>): boolean => step.workspace === 'base';
 
 /** The fields a step's `output:` declares, in the schema's order. `[]` for a step that declares none. */
-export const outputFields = (step: Workflow): string[] => Object.keys(step.output?.schema.properties ?? {});
+export const outputFields = (step: StepSpec): string[] => Object.keys(step.output?.schema.properties ?? {});
 
 /**
  * Keys refused with a reason of their own, because each is one somebody will write expecting it to

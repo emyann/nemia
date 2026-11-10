@@ -35,7 +35,7 @@ import {
   SKILLS_FOLDER,
   splitFrontmatter,
   type StepAgent,
-  type Workflow,
+  type StepSpec,
   type WorkflowError,
 } from '../step/step.ts';
 import { bareSkillOf, composedRefusal, serverNamesOf, serversRefusal, SKILL_NAME, skillNamesOf } from '../keys/index.ts';
@@ -601,21 +601,21 @@ const toldWords = (agent: StepAgent): boolean => Boolean(agent.instructions || a
  * session of its own. A step that continues another's session keeps that session's prompt, so it is told its agent's instructions in its
  * brief (and may give no skills, nor a harness prompt: `composedRefusal`).
  */
-export const rendersAgent = (step: Workflow): boolean => {
+export const rendersAgent = (step: StepSpec): boolean => {
   const agent = step.agent;
   if (!agent || declarationOf(step.harness)?.can.includes('claudeFlags') !== true || step.resume) return false;
   return Boolean(toldWords(agent) || agent.skills?.length || (agent.harnessPrompt ?? 'keep') !== 'keep');
 };
 
 /** What a step's brief opens with: its own note alone when its agent is rendered, its agent's instructions and its note otherwise. */
-export const briefBody = (step: Workflow): string => (rendersAgent(step) && step.agent ? step.agent.body : step.body);
+export const briefBody = (step: StepSpec): string => (rendersAgent(step) && step.agent ? step.agent.body : step.body);
 
 /**
  * The skills of a step's session by layer, from its frozen record: its agent's own, and those its `skills:` line added (`addedSkills`),
  * each in the session's order. A record frozen before the added skills were kept apart counts every skill the step's line names as the
  * step's, one its agent names too among them. A step with no agent has neither.
  */
-export function skillLayers(step: Workflow): { agent: string[]; added: string[] } {
+export function skillLayers(step: StepSpec): { agent: string[]; added: string[] } {
   if (!step.agent) return { agent: [], added: [] };
   const added = step.agent.addedSkills ?? step.skills ?? [];
   return { agent: (step.agent.skills ?? []).filter((skill) => !added.includes(skill)), added };
@@ -635,7 +635,7 @@ export type SkillAgain = { name: string; text: string } | { name: string; missin
  * made since `nemia start` reaches it). Its session is given no skill to load (`enabledSkillsOf` answers `[]` for a step it no longer
  * renders): what its skills say is in its brief, and every other skill stays hidden from it, as from a rendered step.
  */
-export const unrendered = (step: Workflow, skills: readonly SkillAgain[] = []): Workflow => {
+export const unrendered = (step: StepSpec, skills: readonly SkillAgain[] = []): StepSpec => {
   if (!step.agent) return step;
   const { instructions: _i, customInstructions: _c, factoryRules: _r, skills: _s, harnessPrompt: _p, ...agent } = step.agent;
   if (!skills.length) return { ...step, agent };
@@ -667,7 +667,7 @@ export type RenderedSkill = { name: string; whole?: string };
  * are this agent's. A bare skill of the same name is hidden from the session (`sessionSettings`), so the name it is told is the only one it
  * sees.
  */
-export function renderedPrompt(step: Workflow, skills: readonly RenderedSkill[]): string {
+export function renderedPrompt(step: StepSpec, skills: readonly RenderedSkill[]): string {
   const agent = step.agent;
   if (agent === undefined)
     refuse(
@@ -717,7 +717,7 @@ export const pluginManifest = (agent: string): string =>
   ) + '\n';
 
 /** Whether a rendered step is filed with its plugin (`pluginOf`): when its agent has skills, or a style in it (`no-coding`). */
-export const namesPlugin = (step: Workflow): boolean => Boolean(step.agent?.skills?.length || step.agent?.harnessPrompt === 'no-coding');
+export const namesPlugin = (step: StepSpec): boolean => Boolean(step.agent?.skills?.length || step.agent?.harnessPrompt === 'no-coding');
 
 /**
  * The settings a rendered step's session is given (`--settings`), or `undefined` when it needs none: the style chosen (`no-coding`).
@@ -735,7 +735,7 @@ function sessionSettings(agent: StepAgent): string | undefined {
  * and is told its skills whole in its brief (`unrendered`). A session on a harness that declares no closed list (`enabledSkills`) holds
  * none, and is given the harness's own skills (`'default'`), with no list of names turned off. Pure.
  */
-export const enabledSkillsOf = (step: Workflow): string[] | 'default' => {
+export const enabledSkillsOf = (step: StepSpec): string[] | 'default' => {
   if (declarationOf(step.harness)?.can.includes('enabledSkills') !== true) return 'default';
   const agent = step.agent;
   if (!rendersAgent(step) || agent === undefined) return [];
@@ -750,7 +750,7 @@ export const enabledSkillsOf = (step: Workflow): string[] | 'default' => {
  * Undefined for a step not rendered (`rendersAgent`), which is filed with none.
  */
 export function renderedFlags(
-  step: Workflow,
+  step: StepSpec,
   dir: string,
 ): { appendSystemPromptFile?: string; systemPromptFile?: string; pluginDir?: string[]; settings?: string } | undefined {
   const agent = step.agent;

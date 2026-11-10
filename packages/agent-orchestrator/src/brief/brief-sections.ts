@@ -4,7 +4,7 @@
  * gate and of an accepted loop (`gateLines`, `acceptedLines`). Pure.
  */
 import { proposedBudgets } from '../budget/budget.ts';
-import { LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
+import { LOOP_REPLIES, outputFields, type StepSpec } from '../step/step.ts';
 import { andList, dataBlock, fenced, type CloseoutAsked, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
 import { declaredOutput, type Closeout } from '../closeout/index.ts';
 import { HANDED_CLOSEOUT } from '../artifacts/artifacts.ts';
@@ -40,9 +40,9 @@ import { answersOr } from '../question/index.ts';
  * section is given as continuing (`resumed: true`), since `retrySection` has said the session is new.
  */
 export function retriedInRound(
-  step: Workflow,
+  step: StepSpec,
   run: Run,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   retry: RetryBriefing,
   closeoutOf: (step: string) => Closeout | undefined,
 ): string {
@@ -103,7 +103,7 @@ export type EndingStopped = { step: string; status: StepStatus; summary?: string
  * data, then what this step is asked to do with them — say whether the work must change to hold on the base branch as it is now, and hand
  * the change to the work's next round with `again: true`, where merging the base branch into the run's branch is the work's to do.
  */
-function endingSection(step: Workflow, e: EndingStopped): string[] {
+function endingSection(step: StepSpec, e: EndingStopped): string[] {
   const said = [
     ...(e.summary ? ['', 'Its summary:', '', ...fenced(e.summary, 'text')] : []),
     ...(e.needs ? ['', 'What it needs:', '', ...fenced(e.needs, 'text')] : []),
@@ -183,7 +183,7 @@ const NEW_SESSION_IN_FOLDER =
   'You have not been given its reasoning, on purpose: read what it left, not an account of it.';
 
 /** Who filed a try, as its brief says it: the run — by `retries:`, a sign-off ask or the pause — or a person, by their `nemia retry`. */
-const whoOf = (step: Workflow, r: RetryBriefing): string => {
+const whoOf = (step: StepSpec, r: RetryBriefing): string => {
   if (r.by === 'retries') return `The run filed this try itself: this step declares \`retries: ${step.retries ?? 0}\`.`;
   if (r.by === 'signoff') return 'The run filed this try itself, once in a round, before it waits on a person.';
   if (r.by === 'pause') return PAUSED_WHO;
@@ -238,7 +238,7 @@ const whyEnded = (r: RetryBriefing): string =>
  * new session is told as any try is. A try sent back from an ending that stopped on the base branch is told why in the
  * ending's terms, then what it said (`endingSection`).
  */
-export function retrySection(step: Workflow, r: RetryBriefing, inFolder = false): string {
+export function retrySection(step: StepSpec, r: RetryBriefing, inFolder = false): string {
   const pastBudget =
     r.pastCap && r.status !== 'budget exhausted'
       ? ["And this step's tries had together cost its budget or more, so the run filed nothing more for it until a person raised the cap."]
@@ -327,9 +327,9 @@ export type RoundBriefing = {
  * handed the argument cold.
  */
 export function roundSection(
-  step: Workflow,
+  step: StepSpec,
   r: RoundBriefing,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   closeoutOf: (step: string) => Closeout | undefined,
   inFolder = false,
 ): string {
@@ -388,9 +388,9 @@ export function roundSection(
  * author who writes `loop:` does not explain the loop in prose, and cannot explain it wrong.
  */
 export function loopSection(
-  step: Workflow,
+  step: StepSpec,
   run: Run,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   closeoutOf: (step: string) => Closeout | undefined,
 ): string {
   const target = step.loop;
@@ -439,7 +439,7 @@ export function loopSection(
  * `## Replies from <target>`: a loop's target's `replies`, as data — through `declaredOutput`, so round 1's empty list, which every
  * closeout of a loop's target carries, is never handed on as an answer — and where the rest of its closeout is (`HANDED_CLOSEOUT`).
  */
-function repliesSection(step: Workflow, closeoutOf: (step: string) => Closeout | undefined): string {
+function repliesSection(step: StepSpec, closeoutOf: (step: string) => Closeout | undefined): string {
   const target = step.name;
   const { given } = declaredOutput(step, closeoutOf(target), [LOOP_REPLIES]);
   const head = ['', `## Replies from ${target}`, ''];
@@ -470,7 +470,7 @@ function repliesSection(step: Workflow, closeoutOf: (step: string) => Closeout |
  */
 export function fromSection(
   from: string,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   closeoutOf: (step: string) => Closeout | undefined,
   read: { because: string; omit: readonly string[] } = { because: `this step reads it (\`input: ${from}\`)`, omit: [] },
 ): string {
@@ -502,7 +502,7 @@ export function fromSection(
  * words are part of what the work after it is judged by — the implementer's, and the reviewer's after it. The approval of the try the gated
  * step is on (`approvalOf`): the one that let this step be filed.
  */
-export function approvedSection(step: Workflow, run: Run, steps: readonly Workflow[]): string {
+export function approvedSection(step: StepSpec, run: Run, steps: readonly StepSpec[]): string {
   const before = upstreamOf(steps, step.name);
   const approved = steps
     .filter((s) => hasGate(s, run) && (before.has(s.name) || (s.name === step.name && approvedFirst(s, run))))
@@ -556,7 +556,7 @@ const answerGiven = (run: Run, a: RetryAsk): boolean => {
  * a behaviour chosen — and the steps after it judge the work by it, or ask again for what the person already said. Read off the ask
  * files, waiting and consumed (`answers`), since the run's record keeps no message.
  */
-export function answeredSection(step: Workflow, run: Run, steps: readonly Workflow[], answers: readonly RetryAsk[]): string {
+export function answeredSection(step: StepSpec, run: Run, steps: readonly StepSpec[], answers: readonly RetryAsk[]): string {
   const before = upstreamOf(steps, step.name);
   const given = answers
     .filter((a): a is RetryAsk & { message: string } => a.message !== undefined && before.has(a.step) && answerGiven(run, a))
@@ -584,9 +584,9 @@ export function answeredSection(step: Workflow, run: Run, steps: readonly Workfl
  * merge nobody can read the reason of, and the findings are lost with the run.
  */
 export function acceptedSection(
-  step: Workflow,
+  step: StepSpec,
   run: Run,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   closeoutOf: (step: string) => Closeout | undefined,
 ): string {
   const before = upstreamOf(steps, step.name);
@@ -620,7 +620,7 @@ export function acceptedSection(
  * The approval a person types at `step`'s gate: an `--answer` for each question its closeout asks, and `[--budget <step>=<amount>]...`
  * where it proposes budgets for the steps after it.
  */
-function approveCommand(run: Run, step: Workflow, said: Closeout | undefined): string {
+function approveCommand(run: Run, step: StepSpec, said: Closeout | undefined): string {
   const budgets = proposedBudgets(step, said).length ? ' [--budget <step>=<amount>]...' : '';
   return `nemia approve ${run.id} ${step.name} ${answersOr(step, said, '[--message "<words>"]')}${budgets}`;
 }
@@ -639,7 +639,7 @@ function approveCommand(run: Run, step: Workflow, said: Closeout | undefined): s
  * @param roundAsks What people asked for with `nemia retry --round`, and the run has not consumed yet: the same.
  */
 export function gateLines(
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
@@ -685,7 +685,7 @@ export function gateLines(
  * which are the whole reason its findings are still open. Nothing for a loop nobody accepted, nor for an acceptance a later try has spent.
  * Pure.
  */
-export function acceptedLines(steps: readonly Workflow[], run: Run): Record<string, string> {
+export function acceptedLines(steps: readonly StepSpec[], run: Run): Record<string, string> {
   const lines: Record<string, string> = {};
   for (const step of steps) {
     const given = step.loop ? acceptanceOf(run, step.name) : undefined;

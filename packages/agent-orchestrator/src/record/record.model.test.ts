@@ -89,6 +89,17 @@ test("a run's invariants: each refuses its planted breach, and lets through what
   for (const [what, value, ok] of rows) await t.test(what, () => assert.equal(decodes(value), ok));
 });
 
+test('a run is a repository run or a folder run, and a repository field on a folder run is refused', async (t) => {
+  const { repo: _repo, baseRef: _baseRef, branch: _branch, isolate: _isolate, ...base } = run({ implement: null });
+  const folder = { ...base, workspace: '/runs/r-1/work', place: { kind: 'folder' } };
+  const rows: Array<[string, unknown, boolean]> = [
+    ['a repository run', run({ implement: null }), true],
+    ['a folder run', folder, true],
+    ['REFUSED: a folder run that names a repository', { ...folder, repo: '/repo' }, false],
+  ];
+  for (const [what, value, ok] of rows) await t.test(what, () => assert.equal(decodes(value), ok));
+});
+
 test('a landing is one of a commit, an abort or nothing touched', async (t) => {
   const rows: Array<[unknown, boolean]> = [
     [{ commit: 'fed789' }, true],

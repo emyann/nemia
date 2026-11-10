@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Run, StepRecord, TaskPhase } from '../record/record.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import type { SpendOf } from '../status/status.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import type { Verdict } from '../check/check.ts';
@@ -36,7 +36,7 @@ const signedBlocked = (): Closeout => ({ outcome: 'blocked', summary: 's', artif
 /** Every task here was filed asking for a closeout — which is what the runner does. */
 const asked = () => true;
 /** `implement` checked, with `retries: 2`; `review` waits on it. */
-const RETRIED: Workflow[] = [{ ...step('implement'), check: 'npm test', retries: 2 }, step('review', ['implement'])];
+const RETRIED: StepSpec[] = [{ ...step('implement'), check: 'npm test', retries: 2 }, step('review', ['implement'])];
 /** `implement` on the try after `tries`: its task `t1`, its check `check`. `review` not filed. */
 const onTry = (tries: EarlierTry[] = [], check: string | null = 'c1', extra: Partial<Run> = {}): Run =>
   run(
@@ -88,9 +88,9 @@ test('continuesFrom: the session a try continues (open issue 5)', async (t) => {
 });
 
 test("sessionModel: a continued try runs on the model its session was started on, and a `--fresh` one goes back to the step's", async (t) => {
-  const OPUS: Workflow = { ...step('implement'), model: 'opus' };
+  const OPUS: StepSpec = { ...step('implement'), model: 'opus' };
   const on = (...tries: EarlierTry[]): StepRecord => ({ taskId: 'now', tries });
-  const rows: Array<[string, Workflow, StepRecord | undefined, string | undefined]> = [
+  const rows: Array<[string, StepSpec, StepRecord | undefined, string | undefined]> = [
     ["the first try: the step's model", OPUS, undefined, 'opus'],
     ['a step with no model: the harness default, every try', step('implement'), on({ taskId: 'a', cause: 'continue' }), undefined],
     ["a `--model` try's model", OPUS, on({ taskId: 'a', cause: 'fresh', model: 'sonnet' }), 'sonnet'],
@@ -156,7 +156,7 @@ test('nextTry: the try a step moves behind', async (t) => {
   });
 });
 
-const IMPLEMENT: Workflow = { name: 'implement', after: [], body: 'do it', check: 'npm test' };
+const IMPLEMENT: StepSpec = { name: 'implement', after: [], body: 'do it', check: 'npm test' };
 
 /** A run whose implement is on its first try: its session `taskId`, and its check's where one is given. */
 const pauseRun = (taskId: string, check?: string): Run => ({
@@ -239,7 +239,7 @@ test('a pause ask (retriesDue, pauseAskVoid): due only on the very task it stopp
     assert.equal(pauseAskVoid(IMPLEMENT, pauseRun('t1', 'c1'), pauseAsk('c1', 'recheck'), refused), true);
   });
   await t.test('on a step its stopped session took over its budget: void', () => {
-    const capped: Workflow = { ...IMPLEMENT, budget: 1 };
+    const capped: StepSpec = { ...IMPLEMENT, budget: 1 };
     const p = phases({ t1: 'stopped' });
     assert.equal(pauseAskVoid(capped, pauseRun('t1'), pauseAsk('t1'), p, overOne), true);
     assert.equal(pauseAskVoid(capped, pauseRun('t1'), pauseAsk('t1'), p), false, 'under its budget, the same ask stands');
@@ -249,8 +249,8 @@ test('a pause ask (retriesDue, pauseAskVoid): due only on the very task it stopp
 test('dueNote: what `nemia ls` says of a try due, by who asked for it', async (t) => {
   const r = run({ implement: 't1', review: null });
   const lacking = run({}, { steps: { implement: { taskId: 't1', filesRead: { taskId: 't1', lacked: { 'notes.md': 'missing' } } } } });
-  const checked: Workflow = { ...step('implement'), retries: 2 };
-  const rows: Array<[string, Workflow, Run, Retry, string[]]> = [
+  const checked: StepSpec = { ...step('implement'), retries: 2 };
+  const rows: Array<[string, StepSpec, Run, Retry, string[]]> = [
     [
       'a person ask',
       IMPLEMENT,
@@ -308,10 +308,10 @@ const refusalOf = (
   asks: RetryAsk[] = [],
   name = 'implement',
   verdict: Verdict | undefined = 'unfinished',
-  steps: Workflow[] = RETRIED,
+  steps: StepSpec[] = RETRIED,
 ) => retryRefusal(steps, r, name, how, phases(p), signedDone, asked, () => verdict, asks);
 
-const remote: Workflow[] = [{ ...step('implement'), harness: 'a2a:reviewer' }, step('review', ['implement'])];
+const remote: StepSpec[] = [{ ...step('implement'), harness: 'a2a:reviewer' }, step('review', ['implement'])];
 const failedRun = () => run({ implement: 't1', review: null });
 const waiting = { t1: 'succeeded', c1: 'stopped' } as const;
 
@@ -368,7 +368,7 @@ test('retryRefusal: what `nemia retry` refuses, and what it says to do instead',
       () => true,
     );
     names(blocked, '--recheck', 'blocked by its harness', 'nemia retry r-1 implement (or --fresh)');
-    const DENYING: Workflow[] = [{ ...step('implement'), check: 'npm test', denials: 'fail' }, step('review', ['implement'])];
+    const DENYING: StepSpec[] = [{ ...step('implement'), check: 'npm test', denials: 'fail' }, step('review', ['implement'])];
     const deniedOf: SpendOf = (id) =>
       id === 't1' ? { usd: 0, measured: 0, unmeasured: 0, budgetEnded: false, denied: ['Bash(pytest)'] } : undefined;
     const denied = retryRefusal(
@@ -390,7 +390,7 @@ test('retryRefusal: what `nemia retry` refuses, and what it says to do instead',
     '--recheck of a step ended at its budget: let through with a check, refused with none to run or its merge taken back',
     () => {
       const cutOff: SpendOf = (id) => (id === 't1' ? { usd: 3.02, measured: 1, unmeasured: 0, budgetEnded: true } : undefined);
-      const at = (steps: Workflow[], r: Run) =>
+      const at = (steps: StepSpec[], r: Run) =>
         retryRefusal(
           steps,
           r,
@@ -404,11 +404,11 @@ test('retryRefusal: what `nemia retry` refuses, and what it says to do instead',
           () => false,
           cutOff,
         );
-      const checked: Workflow[] = [{ ...step('implement'), check: 'npm test', budget: 3 }, step('review', ['implement'])];
+      const checked: StepSpec[] = [{ ...step('implement'), check: 'npm test', budget: 3 }, step('review', ['implement'])];
       assert.equal(at(checked, failedRun()), null);
-      const unchecked: Workflow[] = [{ ...step('implement'), budget: 3 }, step('review', ['implement'])];
+      const unchecked: StepSpec[] = [{ ...step('implement'), budget: 3 }, step('review', ['implement'])];
       names(at(unchecked, failedRun()), '--recheck', 'no check', 'nemia retry r-1 implement --budget <amount>', '$3.02');
-      const ending: Workflow[] = [{ ...step('implement'), check: 'npm test', budget: 3, workspace: 'base' }];
+      const ending: StepSpec[] = [{ ...step('implement'), check: 'npm test', budget: 3, workspace: 'base' }];
       const aborted = run(
         {},
         { steps: { implement: { taskId: 't1', landed: { aborted: 'ended budget exhausted with its merge staged' } } } },

@@ -19,6 +19,7 @@ import {
 } from './forgetting.ts';
 import { RunDoor } from '../../runs/runs.store.ts';
 import { RunId } from '../../record/record.model.ts';
+import { StoreRoot } from '../../config/root.store.ts';
 
 /** A task of the engine's report as `EngineAnswer` keeps it: what its harness leaves, every session's together. */
 const forgottenOf = (t: ForgetReport['tasks'][number]): TaskForgotten => ({
@@ -65,8 +66,9 @@ export const engineForgetting = Effect.fn('engineForgetting')(function* (ids: re
  * (`finishForgetting`), and then named on the answer. Answers what the engine did with them.
  */
 export const forgetTasks = Effect.fn('forgetTasks')(function* (id: string, taskIds: readonly string[]) {
+  const home = yield* StoreRoot;
   const forgetting = forgettingOf(yield* engineForgetting(taskIds, { yes: true }), taskIds);
-  if (!forgettingDone(forgetting)) return { ...forgetting, marker: runsAtOnce.forgetting.where(id) };
+  if (!forgettingDone(forgetting)) return { ...forgetting, marker: runsAtOnce(home).forgetting.where(id) };
   yield* (yield* RunDoor).forgetting.lift(RunId.read(id));
   return forgetting;
 });
@@ -80,12 +82,13 @@ export type ForgettingLine = { text: string; warn?: true };
  * listed, and its views are read. Answers a line for each run the engine forgot something of, or refused, and for each marker that does
  * not read, which only a person removes; none when there is no marker, and then the engine is not asked. Never fails: what fails is a line.
  */
-export const finishForgetting = (): Effect.Effect<ForgettingLine[], never, EngineService> =>
+export const finishForgetting = (): Effect.Effect<ForgettingLine[], never, EngineService | StoreRoot> =>
   Effect.gen(function* () {
+    const home = yield* StoreRoot;
     const said: ForgettingLine[] = [];
     for (const id of yield* (yield* RunDoor).forgetting.list()) {
       if (yield* (yield* RunDoor).runs.exists(RunId.read(id))) continue;
-      const marker = runsAtOnce.forgetting.where(id);
+      const marker = runsAtOnce(home).forgetting.where(id);
       const taskIds = yield* (yield* RunDoor).forgetting.read(RunId.read(id));
       if (!taskIds) {
         said.push({

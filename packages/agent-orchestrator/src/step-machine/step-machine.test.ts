@@ -10,14 +10,14 @@ import { roundFiled, sentBack, type CloseoutAsked, type Run, type StepStatus, ty
 import { nextTry, type RetryMode } from '../retry/retry-ask.ts';
 import type { Closeout } from '../closeout/index.ts';
 import type { Verdict } from '../check/check.ts';
-import type { OutputSchema, Workflow } from '../workflow.ts';
+import type { OutputSchema, StepSpec } from '../workflow.ts';
 import { run, step } from '../../test/assessed.ts';
 import { STEP_EDGES, stepDiagram, stepMachineGraph, stepMove } from './step-machine.ts';
 import { runWords } from '../route/routed/index.ts';
 
 /** Every fact `stepStatus` reads: the workflow, the run's record, and what the engine, the closeouts and the checks say. */
 type World = {
-  steps: Workflow[];
+  steps: StepSpec[];
   run: Run;
   /** The engine's phase of each task, by its id. */
   phase: Record<string, TaskPhase>;
@@ -39,7 +39,7 @@ type Walk = { name: string; step: string; worlds: Array<[string, World]> };
 
 const AT = '2026-11-04T09:00:00.000Z';
 
-const world = (steps: Workflow[]): World => ({
+const world = (steps: StepSpec[]): World => ({
   steps,
   run: run(Object.fromEntries(steps.map((s) => [s.name, null]))),
   phase: {},
@@ -49,7 +49,7 @@ const world = (steps: Workflow[]): World => ({
   verdict: {},
 });
 
-const walk = (name: string, of: string, steps: Workflow[], ...moves: Move[]): Walk => {
+const walk = (name: string, of: string, steps: StepSpec[], ...moves: Move[]): Walk => {
   const worlds: Array<[string, World]> = [['before anything is filed', world(steps)]];
   for (const [label, move] of moves) {
     const last = worlds[worlds.length - 1];
@@ -183,32 +183,32 @@ const BLOCKED: Closeout = { outcome: 'blocked', summary: 'stuck', artifacts: [],
 
 /** A step with no check and no gate. */
 const PLAIN = [step('implement')];
-const CHECKED: Workflow[] = [{ ...step('implement'), check: 'npm test' }];
-const GATED: Workflow[] = [{ ...step('implement'), gate: true }];
-const GATED_CHECKED: Workflow[] = [{ ...step('implement'), gate: true, check: 'npm test' }];
-const DENYING: Workflow[] = [{ ...step('implement'), denials: 'fail' }];
-const BUDGETED: Workflow[] = [{ ...step('implement'), budget: 1 }];
-const BUDGETED_CHECKED: Workflow[] = [{ ...step('implement'), budget: 1, check: 'npm test' }];
+const CHECKED: StepSpec[] = [{ ...step('implement'), check: 'npm test' }];
+const GATED: StepSpec[] = [{ ...step('implement'), gate: true }];
+const GATED_CHECKED: StepSpec[] = [{ ...step('implement'), gate: true, check: 'npm test' }];
+const DENYING: StepSpec[] = [{ ...step('implement'), denials: 'fail' }];
+const BUDGETED: StepSpec[] = [{ ...step('implement'), budget: 1 }];
+const BUDGETED_CHECKED: StepSpec[] = [{ ...step('implement'), budget: 1, check: 'npm test' }];
 const LOOPING: OutputSchema = {
   type: 'object',
   properties: { findings: { type: 'array' }, again: { type: 'boolean' } },
   required: ['findings', 'again'],
   additionalProperties: false,
 };
-const loop = (rounds: number): Workflow[] => [
+const loop = (rounds: number): StepSpec[] => [
   { ...step('implement'), check: 'npm test' },
   { ...step('review', ['implement']), output: { file: 'review.schema.json', schema: LOOPING }, loop: 'implement', rounds },
 ];
 /** A loop with a checked step between its target and its looping step. */
-const LOOP_THROUGH_TEST: Workflow[] = [
+const LOOP_THROUGH_TEST: StepSpec[] = [
   step('implement'),
   { ...step('test', ['implement']), check: 'npm test' },
   { ...step('review', ['test']), output: { file: 'review.schema.json', schema: LOOPING }, loop: 'implement', rounds: 3 },
 ];
 /** A loop whose looping step has a budget of its own. */
-const BUDGETED_LOOP: Workflow[] = [step('implement'), { ...loop(3)[1], budget: 1 }];
+const BUDGETED_LOOP: StepSpec[] = [step('implement'), { ...loop(3)[1], budget: 1 }];
 /** An ending approved before it is filed: on the base branch, gated, landing on its check. */
-const ENDING: Workflow[] = [step('implement'), { ...step('land', ['implement']), workspace: 'base', gate: true, check: 'landing receipt' }];
+const ENDING: StepSpec[] = [step('implement'), { ...step('land', ['implement']), workspace: 'base', gate: true, check: 'landing receipt' }];
 
 /** One step's work to a sign-off: filed, signed, and its session settled. */
 const works = (name: string, taskId: string, said: Closeout = done()): Move[] => [
@@ -224,15 +224,15 @@ const SURFACE: OutputSchema = {
   additionalProperties: false,
 };
 /** plan → triage, a condition whose table reads plan's surface → build-web | build-backend. */
-const routed = (route: Workflow['route'] = { kind: 'table', from: 'plan.surface', table: { web: 'web', backend: 'backend' } }) => [
+const routed = (route: StepSpec['route'] = { kind: 'table', from: 'plan.surface', table: { web: 'web', backend: 'backend' } }) => [
   { ...step('plan'), output: { file: 'plan.schema.json', schema: SURFACE } },
   { ...step('triage', ['plan']), input: ['plan'], routes: ['web', 'backend'], route },
   { ...step('build-web', ['triage']), when: ['web'] },
   { ...step('build-backend', ['triage']), when: ['backend'] },
 ];
-const ROUTED: Workflow[] = routed();
+const ROUTED: StepSpec[] = routed();
 /** The same, with build-backend a route to the workflow `build`. */
-const ROUTED_TO_BUILD: Workflow[] = ROUTED.map((s) => (s.name === 'build-backend' ? { ...s, workflow: 'build' } : s));
+const ROUTED_TO_BUILD: StepSpec[] = ROUTED.map((s) => (s.name === 'build-backend' ? { ...s, workflow: 'build' } : s));
 
 const WALKS: Walk[] = [
   walk('a table condition answered', 'triage', ROUTED, ...works('plan', 'p1', done({ surface: 'web' }))),

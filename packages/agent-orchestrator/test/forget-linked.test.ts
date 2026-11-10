@@ -1,7 +1,8 @@
 /**
  * `nemia rm` on a store under a link. Git names a worktree by its real path, every link on the way followed, so a store reached through one
  * — a home directory on another disk, or a temporary directory on macOS, `/var` in `/private/var` — reads its worktrees under a path the
- * store never wrote. A file of its own, since `WF_ROOT` is read once, as the package loads.
+ * store never wrote. The test's store is its own, at `ROOT`, given as `ENV`.
+
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,17 +12,18 @@ import { execFileSync } from 'node:child_process';
 import { scratch } from 'test-kit/scratch';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
+import { advanceRun, forgetRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import { LINE_NAME } from '../src/run.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const REAL = scratch('wf-linked-');
 const ROOT = path.join(scratch('wf-link-'), 'store');
 fs.mkdirSync(path.join(REAL, 'store'));
 fs.symlinkSync(path.join(REAL, 'store'), ROOT);
-process.env.WF_ROOT = ROOT;
-const { advanceRun, forgetRun, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
-const { runRecord } = await import('../src/record/record.store.ts');
-const { LINE_NAME } = await import('../src/run.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT };
+const runWith = runOver(runEngine, gitPlaceLayer, ENV);
+const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 const git = (cwd: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
@@ -60,8 +62,8 @@ test("REFUSED before, now forgotten: a store under a link — git lists each wor
   });
 
   const run = await runPlaced(startRun({ brief: 'under a link', repo, workflowDir: folder }));
-  await runWith(e, advanceRun(runRecord(run.id)));
-  const wt = runRecord(run.id).steps.implement.workspace!;
+  await runWith(e, advanceRun(runRecord(ROOT, run.id)));
+  const wt = runRecord(ROOT, run.id).steps.implement.workspace!;
   assert.ok(wt.startsWith(ROOT), 'the record names it through the link');
   assert.match(
     git(repo, 'worktree', 'list', '--porcelain'),

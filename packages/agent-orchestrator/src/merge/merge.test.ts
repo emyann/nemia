@@ -7,11 +7,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mergeAsk, type MergeReads } from './merge.ts';
 import type { StepStatus } from '../record/record.ts';
-import type { Workflow } from '../workflow.ts';
+import type { StepSpec } from '../workflow.ts';
 import { names, run, step } from '../../test/assessed.ts';
 
 /** implement ⇄ review: review closes the loop on implement. */
-const LOOP: Workflow[] = [step('implement'), { ...step('review', ['implement']), loop: 'implement' }];
+const LOOP: StepSpec[] = [step('implement'), { ...step('review', ['implement']), loop: 'implement' }];
 const LOOPING = run({ implement: 't1', review: 't2' });
 
 /** Reads where each step stands as `standing` says (its status and its own), and whether the loop goes round itself. */

@@ -8,7 +8,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DEFAULT_INSTRUCTION, factoryNameRefusal, type InstructionPlace } from './factory.ts';
 import { Conflict, Invalid } from '../refusal/refusal.ts';
-import { HOME } from '../record/record.store.ts';
 
 /** The words of a factory's instruction, null where there is no file; and why the file there does not read, null where it reads. */
 export type InstructionRead = { words: string | null; error: string | null };
@@ -30,7 +29,7 @@ export type FactoryInstruction = {
 };
 
 /** The folder the store keeps the factory `name`'s instruction in, beside its file: `$WF_ROOT/factories/<name>`. Refused: a bad name. */
-export const instructionFolder = (name: string): string => instructionFolderAt(HOME, name);
+export const instructionFolder = (home: string, name: string): string => instructionFolderAt(home, name);
 
 /** The folder the store `home` keeps the factory `name`'s instruction in (`instructionFolder`). Refused: a bad name (`Invalid`). */
 export function instructionFolderAt(home: string, name: string): string {
@@ -40,7 +39,7 @@ export function instructionFolderAt(home: string, name: string): string {
 }
 
 /** The file the store keeps the factory `name`'s instruction in: `NEMIA.md` in its folder (`instructionFolder`). */
-export const instructionFile = (name: string): string => path.join(instructionFolder(name), DEFAULT_INSTRUCTION);
+export const instructionFile = (home: string, name: string): string => path.join(instructionFolder(home, name), DEFAULT_INSTRUCTION);
 
 /** The file the store `home` keeps the factory `name`'s instruction in (`instructionFile`). */
 export const instructionFileAt = (home: string, name: string): string => path.join(instructionFolderAt(home, name), DEFAULT_INSTRUCTION);
@@ -107,7 +106,7 @@ export function readInstructionAt(at: InstructionPlace): InstructionRead {
  * Whether the store keeps text for the factory `name`, read or not: a file, or anything else, at its place, `file` where it was made from
  * a template (its tree's).
  */
-export const storeKeeps = (name: string, file = instructionFile(name)): boolean =>
+export const storeKeeps = (home: string, name: string, file = instructionFile(home, name)): boolean =>
   fs.lstatSync(file, { throwIfNoEntry: false }) !== undefined;
 
 /**
@@ -116,7 +115,13 @@ export const storeKeeps = (name: string, file = instructionFile(name)): boolean 
  * replaced, never written through. Refused, writing nothing: blank words (`Invalid`), and a tree not rendered yet (`Conflict`), which a
  * write would leave unseeded.
  */
-export function writeInstructionText(name: string, words: string, file = instructionFile(name), storeFile = instructionFile(name)): string {
+export function writeInstructionText(
+  home: string,
+  name: string,
+  words: string,
+  file = instructionFile(home, name),
+  storeFile = instructionFile(home, name),
+): string {
   if (!words.trim())
     throw new Invalid({
       message: `the instruction of ${name} is blank. Write the words Nemia is to know of the factory, or clear it: nemia factory instruct ${name} --clear. Nothing was written.`,
@@ -135,15 +140,15 @@ export function writeInstructionText(name: string, words: string, file = instruc
 }
 
 /** The instruction the store keeps for the factory `name` removed, at `file` where it was made from a template: whether there was one. */
-export function clearInstructionText(name: string, file = instructionFile(name)): boolean {
+export function clearInstructionText(home: string, name: string, file = instructionFile(home, name)): boolean {
   if (!fs.lstatSync(file, { throwIfNoEntry: false })) return false;
   fs.rmSync(file, { recursive: true, force: true });
   return true;
 }
 
 /** The store's folder for the factory `name` removed whole, as `nemia factory rm` removes the factory: the folder, or null for none. */
-export function removeInstructionFolder(name: string): string | null {
-  const folder = instructionFolder(name);
+export function removeInstructionFolder(home: string, name: string): string | null {
+  const folder = instructionFolder(home, name);
   if (!fs.lstatSync(folder, { throwIfNoEntry: false })) return null;
   fs.rmSync(folder, { recursive: true, force: true });
   return folder;

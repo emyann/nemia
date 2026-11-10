@@ -5,7 +5,7 @@
  * (`numberedAnswers`), before the package's `answerRefusal` and `answerText` read them. Pure.
  */
 import type { Closeout } from '../closeout/index.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { askedQuestions, recommendedOf, type Answer, type Asked, type Question } from './question.ts';
 
 /** The letter of the option at `index` from 0: `a` to `z`, then `aa`, `ab`… */
@@ -41,7 +41,7 @@ export const answerForm = (count: number): string => Array.from({ length: count 
  * What a line offering `nemia retry` or `nemia approve` to `step` gives after its name: an `--answer` for each question its closeout
  * `said` asks, and the note beside them; or `words`, the `--message` it offers where the closeout asks none.
  */
-export const answersOr = (step: Workflow | undefined, said: Closeout | { error: string } | undefined, words: string): string => {
+export const answersOr = (step: StepSpec | undefined, said: Closeout | { error: string } | undefined, words: string): string => {
   const count = askedQuestions(step, said).flatMap((a) => a.questions).length;
   return count ? `${answerForm(count)} [--message "<note>"]` : words;
 };

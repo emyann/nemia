@@ -1,8 +1,8 @@
 /**
  * A run's steps as a program (`stepsOf`, `steps.verb.ts`): a frozen record's read with no door and no root; an unfrozen one's folder read
- * through the Workflow door the program is given, at the store's root it is given, its agents found through the Agent door — never the
- * disk at the module's root — and refused `UnloadedFolder` where it does not load, a defect of the read included; refused `Invalid`, and
- * not as a folder that does not load, where no root was given. `stepsOrNone` and `unloadedOf` read the refusal alone, and `stepsOrWhy`
+ * through the Workflow door the program is given, at the store's root it is given, its agents found through the Agent door, and
+ * refused `UnloadedFolder` where it does not load, a defect of the read included; refused `Invalid`, and not as a folder that does not
+ * load, where no root was given. `stepsOrNone` and `unloadedOf` read the refusal alone, and `stepsOrWhy`
  * keeps its reason, as `parentRecord` does for a run waited on.
  */
 import { test } from 'node:test';

@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Result, Schema } from 'effect';
 import { factoryNameRefusal } from '../factory/factory.ts';
-import { firstRefusal, HOME, When } from '../record/record.store.ts';
+import { firstRefusal, When } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { LEVELS, type FactoryLevelFile } from './level.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
@@ -23,11 +23,8 @@ const FactoryLevelSchema = Schema.StructWithRest(
   [Schema.Record(Schema.String, Schema.Unknown)],
 );
 
-/** The file the factory `name`'s level is kept in, at the module's root (`factoryLevelFileAt`). */
-export const factoryLevelFile = (name: string): string => factoryLevelFileAt(HOME, name);
-
 /** The file the factory `name`'s level is kept in, under the store `home`. Refused (`Invalid`): a name that is no factory's. */
-export function factoryLevelFileAt(home: string, name: string): string {
+export function factoryLevelFile(home: string, name: string): string {
   const bad = factoryNameRefusal(name);
   if (bad) throw new Invalid({ message: bad });
   return path.join(home, 'factories', name, 'level.json');
@@ -37,11 +34,7 @@ export function factoryLevelFileAt(home: string, name: string): string {
  * The factory `name`'s level file, or undefined where none was written. Refused (`Invalid`), naming the file, its first wrong field and the
  * command that writes it again, where it does not read as one.
  */
-export const readFactoryLevel = (name: string): FactoryLevelFile | undefined => levelIn(factoryLevelFile(name), name);
-
-/** The factory `name`'s level file under the store `home` (`readFactoryLevel`). */
-export const readFactoryLevelAt = (home: string, name: string): FactoryLevelFile | undefined =>
-  levelIn(factoryLevelFileAt(home, name), name);
+export const readFactoryLevel = (home: string, name: string): FactoryLevelFile | undefined => levelIn(factoryLevelFile(home, name), name);
 
 /** The level `file` of the factory `name` holds, or undefined where it is not there; refused where it does not read. */
 function levelIn(file: string, name: string): FactoryLevelFile | undefined {
@@ -69,11 +62,8 @@ function levelIn(file: string, name: string): FactoryLevelFile | undefined {
 }
 
 /** Writes the factory `name`'s level file whole; a file with neither a level nor a raise is removed, and the factory follows the store. */
-export const writeFactoryLevel = (name: string, level: FactoryLevelFile): void => levelWritten(factoryLevelFile(name), level);
-
-/** Writes the factory `name`'s level file under the store `home` (`writeFactoryLevel`). */
-export const writeFactoryLevelAt = (home: string, name: string, level: FactoryLevelFile): void =>
-  levelWritten(factoryLevelFileAt(home, name), level);
+export const writeFactoryLevel = (home: string, name: string, level: FactoryLevelFile): void =>
+  levelWritten(factoryLevelFile(home, name), level);
 
 /** `level` written whole onto `file`, or the file removed where it says neither a level nor a raise. */
 function levelWritten(file: string, level: FactoryLevelFile): void {

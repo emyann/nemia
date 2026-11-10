@@ -6,9 +6,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { validate } from '../workflow/validate.ts';
 import { parseWorkflow, renderStep } from '../workflow/step-file.ts';
-import { DEFAULT_ROUNDS, WorkflowError, type Workflow } from '../step/step.ts';
+import { DEFAULT_ROUNDS, WorkflowError, type StepSpec } from '../step/step.ts';
 
-const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: `do ${name}` });
+const step = (name: string, after: string[] = []): StepSpec => ({ name, after, body: `do ${name}` });
 
 /** `plan` declares `surface`, a fact: the surface the change touches, one of three. */
 const PLAN_SCHEMA = {
@@ -20,7 +20,7 @@ const PLAN_SCHEMA = {
 const TABLE = { kind: 'table' as const, from: 'plan.surface', table: { web: 'web', backend: 'backend', docs: 'docs' } };
 
 /** plan → triage (a table over plan's surface, docs ends the run) → build-web | build-backend → notes. */
-const TRIAGE = (): Workflow[] => [
+const TRIAGE = (): StepSpec[] => [
   { ...step('plan'), output: { file: 'plan.schema.json', schema: PLAN_SCHEMA } },
   { ...step('triage', ['plan']), input: ['plan'], routes: ['web', 'backend', 'docs'], route: TABLE, ends: ['docs'] },
   { ...step('build-web', ['triage']), when: ['web'] },
@@ -29,11 +29,11 @@ const TRIAGE = (): Workflow[] => [
 ];
 
 /** The triage workflow with the step `name` replaced by what `change` makes of it, or added where it has none. */
-const changed = (name: string, change: (s: Workflow) => Workflow, steps = TRIAGE()): Workflow[] =>
+const changed = (name: string, change: (s: StepSpec) => StepSpec, steps = TRIAGE()): StepSpec[] =>
   steps.some((s) => s.name === name) ? steps.map((s) => (s.name === name ? change(s) : s)) : [...steps, change(step(name))];
 
 /** The triage workflow with triage a judge on the reviewer, read-only (`dontAsk`), with what `keys` change of it. */
-const judged = (keys: Partial<Workflow> = {}): Workflow[] =>
+const judged = (keys: Partial<StepSpec> = {}): StepSpec[] =>
   changed('triage', (s) => ({
     ...s,
     route: { kind: 'judge' },
@@ -42,7 +42,7 @@ const judged = (keys: Partial<Workflow> = {}): Workflow[] =>
     ...keys,
   }));
 
-const refusedAtLoad = (steps: Workflow[]): void => {
+const refusedAtLoad = (steps: StepSpec[]): void => {
   assert.throws(
     () => validate(steps),
     (e: unknown) => e instanceof WorkflowError && e.exitCode === 2,
@@ -50,7 +50,7 @@ const refusedAtLoad = (steps: Workflow[]): void => {
 };
 
 test('load refuses a workflow whose routes do not close', async (t) => {
-  const rows: Array<[string, Workflow[]]> = [
+  const rows: Array<[string, StepSpec[]]> = [
     ['a judge whose agent runs in a mode that writes', judged({ permissionMode: 'acceptEdits' })],
     ['a judge whose agent writes with its tools, unasked', judged({ permissionMode: 'auto', tools: ['Read', 'Edit'] })],
     ['a judge with no agent whose own fence writes', judged({ agent: undefined, permissionMode: 'auto' })],
@@ -150,7 +150,7 @@ test('load refuses a workflow whose routes do not close', async (t) => {
 });
 
 test('load takes a workflow whose routes close', async (t) => {
-  const rows: Array<[string, Workflow[]]> = [
+  const rows: Array<[string, StepSpec[]]> = [
     ['the triage workflow', TRIAGE()],
     ['a node after a condition with no when:, on every route', changed('log', (s) => ({ ...s, after: ['triage'] }))],
     [

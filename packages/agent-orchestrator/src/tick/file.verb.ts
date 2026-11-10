@@ -19,7 +19,7 @@ import {
   type CheckHanded,
   type LandingSaid,
 } from '../check/check.ts';
-import { isRemoteHarness, type Workflow } from '../workflow.ts';
+import { isRemoteHarness, type StepSpec } from '../workflow.ts';
 import { holdsOpen } from '../gate/gate.ts';
 import { checkTaskId, isRepositoryRun, stepTaskId, tryOf, type Run, type StepRecord, type StepStatus } from '../record/record.ts';
 import {
@@ -65,6 +65,7 @@ import { sendCards, type Due } from '../send/send.verb.ts';
 import { answerTables, fileScripts } from '../script/script.verb.ts';
 import { filedAt, foldersTold, placeTold, toldOf, type RunRead, type PlaceTold, type StepTold, type Told } from './told.verb.ts';
 import { found, recordNamed, stepNamed, taskToStop, tryTold } from './told.verb.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /** A task as the engine is asked to file it (`e.file`). */
 type Spec = Parameters<Engine['file']>[0];
@@ -74,7 +75,7 @@ type Spec = Parameters<Engine['file']>[0];
  * default stands (`WF_MEMORY_LIMIT`). On a session alone, inside `localFields`, since the runtime refuses a limit on a remote agent; a
  * check is filed without it, and takes the engine's default.
  */
-const limitsOf = (step: Workflow): Pick<Spec, 'resources'> =>
+const limitsOf = (step: StepSpec): Pick<Spec, 'resources'> =>
   step.memory === undefined ? {} : { resources: { limits: { memory: step.memory } } };
 
 /**
@@ -148,7 +149,7 @@ const stopFirst = Effect.fnUntraced(function* (f: Filing, r: Retry, taskId: stri
  * The step's task held open a try answers, where the try is a person's continue answering it in the session that signed, rather than a
  * task of its own; undefined where it is not.
  */
-const heldAnswered = (f: Filing, r: Retry, step: Workflow, record: StepRecord): string | undefined => {
+const heldAnswered = (f: Filing, r: Retry, step: StepSpec, record: StepRecord): string | undefined => {
   const { run, reads } = f;
   const taskId = record.taskId;
   if (!taskId || !f.closer.awaitsWord(taskId)) return undefined;
@@ -169,7 +170,7 @@ const heldAnswered = (f: Filing, r: Retry, step: Workflow, record: StepRecord): 
  */
 export const tryFiled = (
   f: Parameters<typeof filedOn>[0],
-  step: Workflow | undefined,
+  step: StepSpec | undefined,
   record: StepRecord,
   retry: Retry,
   taskId: string,
@@ -221,7 +222,7 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
  * What recent runs of the run's workflow cost (`costsRead`), for a new session of a step on a local harness whose `reads:` names `costs`;
  * undefined for any other, and for a session continued, told them on its first brief.
  */
-const costsFor = Effect.fnUntraced(function* (f: Filing, step: Workflow, resumed: boolean) {
+const costsFor = Effect.fnUntraced(function* (f: Filing, step: StepSpec, resumed: boolean) {
   if (resumed || isRemoteHarness(step.harness) || !step.reads?.includes('costs')) return undefined;
   return yield* costsRead(f.e, f.run);
 });
@@ -240,10 +241,11 @@ const remoteTry = (r: Retry, status: StepStatus): RetryBriefing => ({
  * Send a try to the engine, told what its place says to it (`PlaceTold`): filed as a task of its own, or given as the answer to the
  * task held open (`answers`). Answers with the engine's refusal of the answer, or undefined.
  */
-const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow, taskId: string, answers: boolean, landing: PlaceTold) {
+const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: StepSpec, taskId: string, answers: boolean, landing: PlaceTold) {
+  const home = yield* StoreRoot;
   const { e, run, reads } = f;
   const record = recordNamed(run, r.step);
-  const files = artifactsDir(run, r.step);
+  const files = artifactsDir(home, run, r.step);
   fs.mkdirSync(files, { recursive: true });
   const remote = isRemoteHarness(step.harness);
   const continued = r.mode === 'continue' && !remote && record.taskId !== null ? sessionIn(reads.views, record.taskId) : undefined;
@@ -263,12 +265,12 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow
         closeouts,
         files,
         undefined,
-        tryTold(f, r, record, { status, resumeFrom, refusal }),
+        tryTold(home, f, r, record, { status, resumeFrom, refusal }),
         undefined,
         undefined,
-        inputsDir(run),
+        inputsDir(home, run),
         checked,
-        foldersTold(run, reads, told.step),
+        foldersTold(home, run, reads, told.step),
         yield* costsFor(f, step, Boolean(resumeFrom)),
         { words: told.words, say: told.say, targets: told.targets },
         undefined,
@@ -297,7 +299,7 @@ const askingReads = Effect.fnUntraced(function* (f: Filing, r: Retry, resumeFrom
 const trySpec = (
   f: Filing,
   r: Retry,
-  step: Workflow,
+  step: StepSpec,
   record: StepRecord,
   t: { taskId: string; brief: string; resumeFrom: string | undefined; budgetUsd: number | undefined; told: Told },
 ): Spec => ({
@@ -341,6 +343,7 @@ export const fileRounds = Effect.fn('fileRounds')(function* (f: Filing, round: r
  * the loop on (`roundFiled`). Nothing but the note where the engine refuses the close.
  */
 const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: string[]) {
+  const home = yield* StoreRoot;
   const { e, run, notes } = f;
   const looping = stepNamed(f, r.step);
   const target = stepNamed(f, r.target);
@@ -362,7 +365,7 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
       landing: yield* landingOf(f, r),
       costs: yield* costsFor(f, target, Boolean(record.taskId && sessionIn(f.reads.views, record.taskId))),
     };
-    yield* asked('file', e.file(roundSpec(f, r, looping, target, taskId, yield* toldOf(run, target), said)));
+    yield* asked('file', e.file(roundSpec(home, f, r, looping, target, taskId, yield* toldOf(run, target), said)));
   }
   Object.assign(run.steps, roundFiled(f.reads.steps, run, r, taskId));
   if (r.merge && isRepositoryRun(run)) run.baseRef = r.merge.sha;
@@ -385,17 +388,18 @@ const landingOf = Effect.fnUntraced(function* (f: Filing, r: Round) {
  * tells it (`told`, which its caller yields of `toldOf`).
  */
 function roundSpec(
+  home: string,
   f: Filing,
   r: Round,
-  looping: Workflow,
-  target: Workflow,
+  looping: StepSpec,
+  target: StepSpec,
   taskId: string,
   told: StepTold,
   said: PlaceTold & { landing?: LandingSaid; costs?: WorkflowCosts },
 ): Spec {
   const { run, reads } = f;
   const record = recordNamed(run, r.target);
-  const files = artifactsDir(run, r.target);
+  const files = artifactsDir(home, run, r.target);
   fs.mkdirSync(files, { recursive: true });
   const resumeFrom = resumeOn(record.taskId ? sessionIn(reads.views, record.taskId) : undefined, target, f, record);
   return {
@@ -415,9 +419,9 @@ function roundSpec(
         ...(resumeFrom ? { said: saidIn(record.taskId === null ? undefined : reads.views.get(record.taskId)) } : {}),
       },
       undefined,
-      inputsDir(run),
+      inputsDir(home, run),
       undefined,
-      foldersTold(run, reads, told.step),
+      foldersTold(home, run, reads, told.step),
       said.costs,
       { words: said.words, say: said.say },
       undefined,
@@ -465,6 +469,7 @@ export const fileChecks = Effect.fn('fileChecks')(function* (f: Filing, names: r
  * A check filed is noted to the pass's meter by what it belongs to (`noteFiledCheck`), never its run.
  */
 const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
+  const home = yield* StoreRoot;
   const { e, run } = f;
   const step = stepNamed(f, name);
   const record = recordNamed(run, name);
@@ -472,8 +477,8 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
   const taskId = checkTaskId(run, name);
   if (!(yield* asked('view', e.view(taskId))).state.brief) {
     const command = found(step.check, `a check of step ${name}`);
-    fs.mkdirSync(path.dirname(checkCloseout(taskId)), { recursive: true });
-    const files = artifactsDir(run, name);
+    fs.mkdirSync(path.dirname(checkCloseout(home, taskId)), { recursive: true });
+    const files = artifactsDir(home, run, name);
     fs.mkdirSync(files, { recursive: true });
     const lands = isRepositoryRun(run) && landsOnCheck(step, run);
     const install = lands ? (checkoutParts(workspace) ?? undefined) : undefined;
@@ -485,9 +490,9 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
     const env = checkEnvOf(run, step, {
       workspace,
       files,
-      closeout: closeout && writeCheckCloseout(taskId, closeout),
-      ...(run.workflowFiles === undefined ? {} : { workflowFiles: workflowFilesDir(run, run.workflowFiles) }),
-      ...(run.carriedFiles === undefined ? {} : { carriedFiles: carriedFilesDir(run, run.carriedFiles) }),
+      closeout: closeout && writeCheckCloseout(home, taskId, closeout),
+      ...(run.workflowFiles === undefined ? {} : { workflowFiles: workflowFilesDir(home, run, run.workflowFiles) }),
+      ...(run.carriedFiles === undefined ? {} : { carriedFiles: carriedFilesDir(home, run, run.carriedFiles) }),
     });
     yield* asked(
       'file',
@@ -516,6 +521,7 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
  * tasks (`fileScripts`), answered among the steps filed.
  */
 export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, starting: boolean, git: BranchReader) {
+  const home = yield* StoreRoot;
   const { e, run } = f;
   answerTables(f);
   const ready = due.ready;
@@ -530,12 +536,12 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, 
     const step = stepNamed(f, name);
     if (unsignedStep(servers, step, f.notes)) continue;
     const landing = placeTold(run, f.reads.steps, step, placed, f.heads?.());
-    const made = yield* withinEffect('act', workspaceFor(run, f.reads.steps, step, placed));
+    const made = yield* withinEffect('act', workspaceFor(home, run, f.reads.steps, step, placed));
     f.notes.push(...cutNotes(name, made));
     if (!('cut' in made)) continue;
     const place = made.cut;
     if (!f.mayFile()) break;
-    const files = artifactsDir(run, name);
+    const files = artifactsDir(home, run, name);
     fs.mkdirSync(files, { recursive: true });
     const checked = isRemoteHarness(step.harness) ? [] : yield* checksHandedRead(run, f.reads.steps, step).pipe(over(asRead(f)));
     const said = {
@@ -547,7 +553,9 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, 
       say: landing.say,
       targets: landing.targets,
     };
-    const taskId = yield* asked('file', e.file(readySpec(f, step, place, files, yield* toldOf(run, step), said))).pipe(forStep(run, step));
+    const taskId = yield* asked('file', e.file(readySpec(home, f, step, place, files, yield* toldOf(run, step), said))).pipe(
+      forStep(run, step),
+    );
     run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch, ...filedOn(f, step) };
     filed.push(name);
   }
@@ -565,8 +573,9 @@ const sessionOf = (f: Filing, stepName: string): string | undefined => {
  * and what recent runs of its workflow cost where it reads them, as the tick tells it (`told`, which its caller yields of `toldOf`).
  */
 function readySpec(
+  home: string,
   f: Filing,
-  step: Workflow,
+  step: StepSpec,
   place: Cut,
   files: string,
   told: StepTold,
@@ -601,9 +610,9 @@ function readySpec(
           undefined,
           undefined,
           step.after.length ? undefined : parents,
-          inputsDir(run),
+          inputsDir(home, run),
           said.checked,
-          foldersTold(run, reads, told.step, callerMounts(step, parents)),
+          foldersTold(home, run, reads, told.step, callerMounts(step, parents)),
           said.costs,
           { words: said.words, say: said.say, targets: said.targets },
           place.merge,

@@ -2,7 +2,7 @@
  * Words a person says to a step's session while it runs (`nemia say`): what the engine journalled (`Said`, `SaidTo`), what the package
  * refuses before the engine is asked (`sayRefusal`), and how `nemia ls` and `nemia decide` show them (`saidWord`, `saidLines`). Pure.
  */
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { fenced, prunedWords, tryOf, type Run, type TaskPhase } from '../record/record.ts';
 import { holdWord } from '../wait/wait.ts';
 import type { SaidAfter } from 'objects';
@@ -33,7 +33,7 @@ export type SaidTo = Said & { try: number };
  * not started, a harness with no way in, a session its harness does not list — is the engine's to refuse, in its own words (`Engine.say`).
  * A settled step of a pruned or a held run is told that the try that would carry the words is refused (`prunedRefusal`, `heldRefusal`).
  */
-export function sayRefusal(steps: readonly Workflow[], run: Run, name: string, phaseOf: (taskId: string) => TaskPhase): string | null {
+export function sayRefusal(steps: readonly StepSpec[], run: Run, name: string, phaseOf: (taskId: string) => TaskPhase): string | null {
   if (!steps.some((s) => s.name === name) || !run.steps[name])
     return `${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.`;
   if (run.cancelledAt) {

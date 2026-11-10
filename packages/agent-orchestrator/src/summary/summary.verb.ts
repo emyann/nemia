@@ -7,7 +7,7 @@
  * branches stand off `standing.json` (`standingSnapshot`).
  */
 import { Effect } from 'effect';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import type { Engine } from '../runtime-client.ts';
 import { type AtWork, atWork, runStartedAt, type RunTokens, runTokens } from '../timeline/index.ts';
 import { UNREADABLE, unjudgedWord, type UnjudgedWord } from '../views/views.verb.ts';
@@ -45,6 +45,7 @@ import {
   stepSaid,
   type StepNeeds,
 } from './judged.verb.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 export type RunSummary = {
   id: string;
@@ -251,7 +252,7 @@ export function unjudgedFields(): JudgedFields {
 }
 
 /** The agent each step of a run is given, by its name, off the workflow it is judged by (`judgedSteps`); null for a step given none. */
-function agentsOf(run: Run, folder: readonly Workflow[] | null): (name: string) => string | null {
+function agentsOf(run: Run, folder: readonly StepSpec[] | null): (name: string) => string | null {
   const steps = judgedSteps(run, folder);
   return (name) => steps.find((step) => step.name === name)?.agent?.name ?? null;
 }
@@ -281,10 +282,10 @@ export function summaryOf({ run, names, steps, views, judged }: Judgement, home:
     createdAt: run.createdAt,
     cancelledAt: run.cancelledAt ?? null,
     pruned: run.pruned ? { said: `${prunedWords(run.pruned)}; ${prunedKept(run.pruned)}` } : null,
-    after: run.after ?? [],
-    context: run.context ?? [],
+    after: [...(run.after ?? [])],
+    context: [...(run.context ?? [])],
     ...judgedFields(run, judged, views),
-    holdUntil: judged.holding && run.hold ? run.hold.until : [],
+    holdUntil: judged.holding && run.hold ? [...run.hold.until] : [],
     steps: names.map((name) => ({
       name,
       taskId: run.steps[name]?.taskId ?? null,
@@ -342,10 +343,10 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
     createdAt: run.createdAt,
     cancelledAt: run.cancelledAt ?? null,
     pruned: run.pruned ? { said: `${prunedWords(run.pruned)}; ${prunedKept(run.pruned)}` } : null,
-    after: run.after ?? [],
-    context: run.context ?? [],
+    after: [...(run.after ?? [])],
+    context: [...(run.context ?? [])],
     ...unjudgedFields(),
-    holdUntil: run.hold && !run.cancelledAt ? run.hold.until : [],
+    holdUntil: run.hold && !run.cancelledAt ? [...run.hold.until] : [],
     steps: names.map((name) => ({
       name,
       taskId: run.steps[name]?.taskId ?? null,
@@ -416,9 +417,10 @@ export type SummaryHow = {
  * run, a run whose files stamp as they did given as the run the informer kept. Every listed run stays in the informer, and no other.
  */
 const listedThrough = Effect.fnUntraced(function* (e: Engine, memo: InformerMemo, verify: boolean) {
+  const home = yield* StoreRoot;
   const git = standingReader(yield* standingSnapshot());
   const read = yield* informerRead(e, memo, verify, git, sameJudgement);
-  const all = runsAtOnce.runs.list(undefined, read.given);
+  const all = runsAtOnce(home).runs.list(undefined, read.given);
   read.only(all.map((run) => run.id));
   return { git, read, all };
 });

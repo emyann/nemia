@@ -13,8 +13,8 @@
  * The stage is what a story's checkpoints share, made new for each top-level test (`eachTest`): the test place, the engine's stand-in
  * and the controllers' engine over it, `runWith`/`runPlaced`/`main` given that place, and a steered clock made on first ask. It
  * reaches nothing real, so a file told on it stays off `stand-ins.baseline.ts`. The file hands in the runner's `runWith`, the CLI's
- * `main` and the client's `engineOf`, which it imports after setting its environment: this module loads no value of `src`, where a
- * store may read its root as it loads, so a file may import it at its head.
+ * `main` and the client's `engineOf`, and the environment its store is named by (`env`, `{ WF_ROOT: ROOT, … }`), which the stage's
+ * programs are given as `StoreRoot` and `StoreConfig` and `main` reads; without one, the throwaway `test/ambient.ts` names.
  */
 import type { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
@@ -22,7 +22,7 @@ import { testPlace } from '../place/memory/index.ts';
 import type { Engine, EngineService, engineOf } from '../src/runtime-client.ts';
 import type { Place, PlaceService } from '../src/place/place.store.ts';
 import type { StoreRoot } from '../src/config/root.store.ts';
-import type { StoreConfig } from '../src/config/config.store.ts';
+import type { Env, StoreConfig } from '../src/config/config.store.ts';
 import type { ProposalsAct } from '../src/apply/act.verb.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
 import { steeredClock, type Steered } from './steered.ts';
@@ -34,7 +34,7 @@ export { story, type Story, type Teller } from 'test-kit/checkpoints';
 type RunWith = <A, E>(e: Engine, program: Effect.Effect<A, E, EngineService>) => Promise<A>;
 
 /** The CLI's `main`, as `src/cli/main.ts` exports it: argv, an engine, the demand host (its default), and the place it is given. */
-type Main = (argv: string[], e: Engine | undefined, demand: undefined, place: Place) => Promise<unknown>;
+type Main = (argv: string[], e: Engine | undefined, demand: undefined, place: Place, env?: Env) => Promise<unknown>;
 
 /** The engine's stand-in, as `testEngine` makes it. */
 type TestEngine = ReturnType<typeof testEngine>;
@@ -72,7 +72,7 @@ export type Stage = {
  * The stage of each top-level test of the file that calls this at its head, as `eachTest` makes it: a story's checkpoints, its
  * subtests, share their test's.
  */
-export function staged(given: { runWith: RunWith; main: Main; engineOf: typeof engineOf }): Stage {
+export function staged(given: { runWith: RunWith; main: Main; engineOf: typeof engineOf; env?: Env }): Stage {
   const stand = eachTest(testPlace);
   const each = eachTest(() => {
     const made = testEngine();
@@ -84,9 +84,9 @@ export function staged(given: { runWith: RunWith; main: Main; engineOf: typeof e
   return {
     place: stand,
     board: () => each().board,
-    runWith: runOver(given.runWith, () => stand().layer),
-    runPlaced: runGiven(() => stand().layer),
-    main: (argv, e) => given.main(argv, e ?? each().board.e, undefined, stand().place),
+    runWith: runOver(given.runWith, () => stand().layer, given.env),
+    runPlaced: runGiven(() => stand().layer, given.env),
+    main: (argv, e) => given.main(argv, e ?? each().board.e, undefined, stand().place, given.env),
     clock: () => {
       const now = each();
       now.clock ??= steeredClock();

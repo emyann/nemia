@@ -12,16 +12,19 @@ import path from 'node:path';
 import { artifactsDir } from '../src/record/record.store.ts';
 import type { Views } from '../src/summary/reads.verb.ts';
 import type { Run } from '../src/run.ts';
-import type { Workflow } from '../src/workflow.ts';
+import type { StepSpec } from '../src/workflow.ts';
 import { closeoutIn } from '../src/resource/tries.verb.ts';
 import { artifactOf, folderFiles, valueOf } from '../src/resource/files.store.ts';
+import { STORE } from './ambient.ts';
 
 const RUN = { id: 'r-closeout', steps: {} } as unknown as Run;
-const STEP = { name: 'implement', after: [], body: 'x' } as unknown as Workflow;
+const STEP = { name: 'implement', after: [], body: 'x' } as unknown as StepSpec;
 
 /** The closeout `said` as the step's detail reads it, off an engine whose task holds it as its last attempt's. */
 const read = (said: unknown) =>
-  closeoutIn(RUN, 'implement', STEP, 't1', new Map([['t1', { state: { attempts: [{ closeout: said }] } }]]) as unknown as Views, [STEP]);
+  closeoutIn(STORE, RUN, 'implement', STEP, 't1', new Map([['t1', { state: { attempts: [{ closeout: said }] } }]]) as unknown as Views, [
+    STEP,
+  ]);
 
 test("closeoutIn: a step's closeout read in either version", async (t) => {
   await t.test(
@@ -69,7 +72,7 @@ test("what a step's values and files link: valueOf, folderFiles, artifactOf", as
     assert.equal(valueOf({ name: 'a', value: 'see https://x.test' }).link, null);
   });
   await t.test("a step's folder listing leaves out the closeout.json the run wrote there", () => {
-    const dir = artifactsDir(RUN, 'implement');
+    const dir = artifactsDir(STORE, RUN, 'implement');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'closeout.json'), '{}');
     fs.writeFileSync(path.join(dir, 'notes.md'), 'n');
@@ -80,11 +83,11 @@ test("what a step's values and files link: valueOf, folderFiles, artifactOf", as
   });
   const pictures = { id: 'r-pictures' };
   await t.test('a picture in the step files directory reads with its url and as an image', () => {
-    const dir = artifactsDir(pictures, 'design');
+    const dir = artifactsDir(STORE, pictures, 'design');
     fs.mkdirSync(dir, { recursive: true });
     const picture = path.join(dir, 'page-1.png');
     fs.writeFileSync(picture, 'png');
-    assert.deepEqual(artifactOf(pictures, 'design', picture), {
+    assert.deepEqual(artifactOf(STORE, pictures, 'design', picture), {
       path: picture,
       name: 'page-1.png',
       url: '/api/runs/r-pictures/steps/design/artifacts/page-1.png',
@@ -93,6 +96,8 @@ test("what a step's values and files link: valueOf, folderFiles, artifactOf", as
     });
   });
   await t.test('one under /tmp/playwright-mcp, by its path alone', () => {
-    assert.deepEqual(artifactOf(pictures, 'design', '/tmp/playwright-mcp/page-1.png'), { path: '/tmp/playwright-mcp/page-1.png' });
+    assert.deepEqual(artifactOf(STORE, pictures, 'design', '/tmp/playwright-mcp/page-1.png'), {
+      path: '/tmp/playwright-mcp/page-1.png',
+    });
   });
 });

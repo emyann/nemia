@@ -3,7 +3,7 @@
  * step and the folders beside it may take, and `parseFolder`, which reads every step and checks them together.
  */
 import path from 'node:path';
-import { AGENTS_FOLDER, CARRIED_FOLDER, FRONTMATTER, isReadme, SKILLS_FOLDER, type Workflow } from '../step/step.ts';
+import { AGENTS_FOLDER, CARRIED_FOLDER, FRONTMATTER, isReadme, SKILLS_FOLDER, type StepSpec } from '../step/step.ts';
 import { orderSteps, parseWorkflow, validate, type Hire } from '../workflow/index.ts';
 import type { Agents, SkillsFound } from '../agents/agents.ts';
 import type { WorkflowDirRefusal } from '../../contracts/workflow-dir.contract.ts';
@@ -170,7 +170,7 @@ export function parseFolder(
   agents?: Agents,
   skills?: SkillsFound,
   fills?: Fills,
-): Workflow[] {
+): StepSpec[] {
   const byFile = [...files].sort(([a], [b]) => (`${a}.md` < `${b}.md` ? -1 : `${a}.md` > `${b}.md` ? 1 : 0));
   const steps = byFile.map(([name, text]) => parseWorkflow(name, text, read, agents, skills, hireOf(fills, name), fills?.rules));
   validate(steps);

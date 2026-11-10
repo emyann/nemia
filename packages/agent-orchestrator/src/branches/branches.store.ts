@@ -11,10 +11,10 @@ import { resultSteps } from './branches.ts';
 import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';
 import type { BranchStanding } from '../status/status.ts';
 import type { Landed } from '../decide/decide.ts';
-import type { Workflow } from '../workflow.ts';
+import type { StepSpec } from '../workflow.ts';
 
 /** Where a run's result branches stand, as `branchStandings` says: none for a folder run, which has no branch. */
-export const standingsOf = (run: Run, steps: readonly Workflow[], git: BranchReader): BranchStanding[] =>
+export const standingsOf = (run: Run, steps: readonly StepSpec[], git: BranchReader): BranchStanding[] =>
   isRepositoryRun(run) ? branchStandings(run, resultBranches(run, steps), git) : [];
 
 /** Whether a branch of the run is on its base, as `git` says: never, for a folder run, which has no branch to ask about. */
@@ -73,7 +73,7 @@ export type BranchReader = {
  * A branch, not a directory: the worktree is scaffolding and gets removed, the branch is the result and stays in the repository. A
  * terminal step's branch is named as soon as it has one, so it is useful while the run is still going, not only afterwards.
  */
-export function resultBranches(run: Run, steps: readonly Workflow[]): string[] {
+export function resultBranches(run: Run, steps: readonly StepSpec[]): string[] {
   return resultSteps(steps)
     .map((s) => run.steps[s.name]?.branch)
     .filter((b): b is string => Boolean(b));

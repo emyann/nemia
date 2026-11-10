@@ -71,9 +71,10 @@ holds what every change needs.
   each file whose hit lines or branches fell; records on each side of a `--` say apart, as varying, a line they disagree on. A session's measure, never run by the suite or CI: it runs the package's whole suite.
 - **A run's checks inherit the daemon's environment** (`WF_MAX_CONCURRENT=50` on the owner's machine): a test that relies on a default
   passes there and fails by hand. All of it but the telemetry, which the runtime takes out of every child that is no session, and the
-  daemon's per-session variables (`WF_SESSION_TOKEN`, `WF_MEMORY_LIMIT`, `WF_CGROUP_PARENT`): the three test seats
-  (`packages/agent-orchestrator/test/ambient.ts`, `apps/api/test/harness.ts`, and `apps/cli/test/ambient.ts`, which each cli spawn's
-  environment is built on) drop the telemetry and all three, so a step's own run reads what CI reads, and a test that means one sets
+  daemon's per-session variables (`WF_SESSION_TOKEN`, `WF_MEMORY_LIMIT`, `WF_CGROUP_PARENT`): the four test seats
+  (`packages/agent-orchestrator/test/ambient.ts`, `apps/api/test/harness.ts`, `apps/cli/test/ambient.ts`, which each cli spawn's
+  environment is built on, and `packages/templates/test/template.ts`) drop the telemetry and all three, by the orchestrator's one list
+  (`SESSION_VARIABLES`, held by `tools/guards/test/env-given.test.ts`), so a step's own run reads what CI reads, and a test that means one sets
   it itself.
 - **No test refuses a byte order mark.** A file written through a tool can turn an escape into the character it names, so after writing
   an escape of a NUL, DEL or byte order mark, look for the raw bytes (`grep -rl $'\xEF\xBB\xBF'`).

@@ -198,7 +198,7 @@ const branchesOf = Effect.fnUntraced(function* (
   awaiting: string[] | undefined,
   collisions: Collisions | null,
   how: DecisionHow,
-): Effect.fn.Return<{ touched: BranchChanges[]; results: BranchChanges[]; standings: Standing[] }, Refusal, PlaceService> {
+): Effect.fn.Return<{ touched: BranchChanges[]; results: BranchChanges[]; standings: Standing[] }, Refusal, PlaceService | StoreRoot> {
   if (!isRepositoryRun(run)) return { touched: [], results: [], standings: [] };
   const place = yield* PlaceService;
   const results = [

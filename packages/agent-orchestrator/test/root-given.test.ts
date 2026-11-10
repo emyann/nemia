@@ -6,18 +6,15 @@
  * `~/.agent-workflows/runs`.
  *
  * The rule is a pure function over a file's text (`globalRoots`), proven first on planted sources it must refuse, then swept over
- * `src/**`. What holds one is in `test/global-roots.baseline.ts`, with the count of its lines that do: the sweep refuses a file the
- * baseline does not name, and refuses a count that has grown or an entry that no longer holds one, so the list only shrinks and the
- * card that opened it is done when it is empty.
+ * `src/**`, which holds none: the sweep refuses every file that does, with no baseline to name it.
  *
  * `src/config/root.store.ts` is the one file allowed to turn a root into a layer, and it is handed its environment: it is in
- * `ALLOWED`, and nowhere in the baseline.
+ * `ALLOWED`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { GLOBAL_ROOTS } from './global-roots.baseline.ts';
 
 const PACKAGE = path.join(import.meta.dirname, '..');
 const SRC = path.join(PACKAGE, 'src');
@@ -33,8 +30,8 @@ const uncommented = (text: string): string => text.replace(/\/\*[\s\S]*?(?:\*\/|
 
 /**
  * The names `text` holds a store root under: one a module-level binding reads from `wfRoot` (`export const HOME = wfRoot();`, `const
- * ROOT = wfRoot(process.env)`), and `HOME` where the file imports it — `record/record.store.ts`'s, the root 40 files of `src`
- * share. Read from the text alone, so the rule stays a pure function over one file.
+ * ROOT = wfRoot(process.env)`), and `HOME` where the file imports it — the spelling `record/record.store.ts` exported while 40 files of
+ * `src` shared it. Read from the text alone, so the rule stays a pure function over one file.
  */
 const rootNames = (clean: string): string[] => {
   const names = new Set<string>();
@@ -68,8 +65,7 @@ const withoutBindings = (clean: string): string => clean.replace(BINDINGS, (foun
  *   the worst of it, since the function takes no root at all and a caller cannot name one even when it wants to. An `import` or an
  *   `export` line is passed over: that binds the name rather than reading the store under it.
  *
- * So the count per file is the lines that have to change for that file to take its root as a parameter, which is what makes the
- * baseline's falling a measure of the work and not of the bindings alone.
+ * So what is found in a file is the lines that have to change for that file to take its root as a parameter.
  */
 export const globalRoots = (text: string): string[] => {
   const clean = uncommented(text);
@@ -169,6 +165,11 @@ test('REFUSED: a body that reads an imported root by name is found, and a file t
     ],
     "a module's own binding counts, and so does each body that reads it",
   );
+  assert.deepEqual(
+    globalRoots(`${importing}export const filesStore = { read: () => path.join(HOME, 'runs') };\n`),
+    ["2: this line reads HOME, a root read as this module loaded — export const filesStore = { read: () => path.join(HOME, 'runs') };"],
+    "a store object whose method reads the imported root is refused: the root is `filesStoreAt(home)`'s to be handed",
+  );
   assert.deepEqual(globalRoots(importing), [], 'the import alone binds the name and reads no store under it');
   assert.deepEqual(globalRoots("export { HOME } from './record/record.store.ts';\n"), [], 'and so does a re-export: the door, not a read');
   assert.deepEqual(
@@ -200,37 +201,23 @@ const sources = (): string[] =>
     .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
     .map((f) => `src/${f.split(path.sep).join('/')}`);
 
-test('no file of src holds a store root as it loads but those the baseline names, with the count it names', () => {
+test('no file of src holds a store root as it loads', () => {
   const files = sources();
   assert.ok(files.length > 50, 'the sweep reads the sources');
   const refused: string[] = [];
   for (const file of files) {
     if (ALLOWED.includes(file)) continue;
     const held = globalRoots(fs.readFileSync(path.join(PACKAGE, file), 'utf8'));
-    const owed = GLOBAL_ROOTS[file];
-    if (owed === undefined) {
-      if (held.length) {
-        refused.push(
-          `${file} holds ${held.length} store root(s) read as it loads, and the baseline names none: take the root as a required \`home: string\` and let the caller read \`StoreRoot\` (src/config/root.store.ts) — ${held.join(' | ')}`,
-        );
-      }
-      continue;
-    }
-    if (held.length === 0) {
-      refused.push(`${file} holds none any more: take its line out of test/global-roots.baseline.ts, which only shrinks`);
-    } else if (held.length !== owed) {
+    if (held.length) {
       refused.push(
-        `${file} holds ${held.length} where the baseline names ${owed}: ${held.length > owed ? 'no new module-level root — take the root as a required `home: string`' : 'lower the count in test/global-roots.baseline.ts'} — ${held.join(' | ')}`,
+        `${file} holds ${held.length} store root(s) read as it loads: take the root as a required \`home: string\` and let the caller read \`StoreRoot\` (src/config/root.store.ts) — ${held.join(' | ')}`,
       );
     }
   }
   assert.deepEqual(refused, []);
 });
 
-test('every file the baseline names is a source of this package, and the service itself is in none of it', () => {
+test('the one file allowed a root is a source of this package', () => {
   const files = sources();
-  for (const file of Object.keys(GLOBAL_ROOTS)) {
-    assert.ok(files.includes(file), `${file} is no source of this package: take its line out of the baseline`);
-    assert.equal(ALLOWED.includes(file), false, `${file} is allowed a root and must not be counted as a debt`);
-  }
+  for (const file of ALLOWED) assert.ok(files.includes(file), `${file} is no source of this package: take it out of ALLOWED`);
 });

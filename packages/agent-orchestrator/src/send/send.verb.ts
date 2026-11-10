@@ -3,7 +3,7 @@
  * Card door, under a name its run and node derive (`sentCardName`), and its record keeps `sent` once. A controller.
  */
 import { Effect } from 'effect';
-import type { Workflow } from '../workflow.ts';
+import type { StepSpec } from '../workflow.ts';
 import { isRepositoryRun, type CloseoutAsked, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
 import { stepStatus, type SpendOf } from '../status/status.ts';
 import { CardDoor } from '../cards/cards.store.ts';
@@ -24,7 +24,7 @@ export type Due = { ready: readonly string[]; send: readonly string[] };
 
 /** What a pass read that a route's words are read by: the tick's `RunRead`, which this names no further to keep the import one way. */
 export type SendReads = {
-  steps: Workflow[];
+  steps: StepSpec[];
   phaseOf: (taskId: string) => TaskPhase;
   signedOff: (step: string) => Closeout | undefined;
   asked: (taskId: string) => CloseoutAsked;
@@ -52,7 +52,7 @@ export const sentCardName = (run: string, node: string): string => `${run}-${nod
  * The step whose closeout a condition's route was read from: a table's producer (`route: { from: <producer>.<field> }`), else the
  * condition itself, a judge or a script whose own closeout said the route.
  */
-export const routeProducer = (condition: Workflow): string =>
+export const routeProducer = (condition: StepSpec): string =>
   condition.route?.kind === 'table' ? firstPiece(condition.route.from, '.') : condition.name;
 
 /**
@@ -72,7 +72,7 @@ export function sentCardTitle(run: Run, producer: Closeout | undefined): string 
  */
 export function sentCardText(
   run: Run,
-  node: Workflow,
+  node: StepSpec,
   condition: string,
   route: string | undefined,
   at: string,

@@ -1,15 +1,18 @@
 /**
  * `nemia decide`'s whole screen, line by line, as a pin compares it: each value a test cannot know before it runs (a run id, a scratch
  * path, a branch) put back as the placeholder it is given under, the longest value first, so `wf/<id>` is read before `<id>`. Every other
- * character is the screen's own. `main` is imported on the first call, once the test file has set `WF_ROOT`.
+ * character is the screen's own.
  */
 import type { TestContext } from 'node:test';
 import type { Engine } from '../src/runtime-client.ts';
 import type { Place } from '../src/place/place.store.ts';
+import type { Env } from '../src/config/config.store.ts';
+import { main } from '../src/cli/main.ts';
 
 /**
  * What `nemia decide <argv>` prints, split on line breaks, with each value of `as` replaced by its key: `{ '<id>': run.id }`. A value that
- * is empty is refused, as it would match between every two characters. `main` is handed `place`, and takes its own where given none.
+ * is empty is refused, as it would match between every two characters. `main` is handed `place`, and takes its own where given none,
+ * and `env`, the environment the test's store is named by (the process's where given none).
  */
 export async function decideScreen(
   t: TestContext,
@@ -17,14 +20,14 @@ export async function decideScreen(
   argv: string[],
   as: Record<string, string>,
   place?: Place,
+  env?: Env,
 ): Promise<string[]> {
-  const { main } = await import('../src/cli/main.ts');
   const out: string[] = [];
   const log = t.mock.method(console, 'log', (...args: unknown[]) => {
     out.push(args.map(String).join(' '));
   });
   try {
-    await main(['decide', ...argv], e, undefined, place);
+    await main(['decide', ...argv], e, undefined, place, env);
   } finally {
     log.mock.restore();
   }

@@ -6,10 +6,10 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { splitFrontmatter, type Workflow } from '../src/workflow.ts';
+import { splitFrontmatter, type StepSpec } from '../src/workflow.ts';
 import { skillsFor } from '../src/skills/read.store.ts';
 
-export function toldIn(dir: string, step: Workflow): string {
+export function toldIn(dir: string, step: StepSpec): string {
   const found = skillsFor(dir);
   const skills = (step.agent?.skills ?? []).map((name) => {
     const at = found.at.get(name);

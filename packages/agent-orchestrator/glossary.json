@@ -32,6 +32,10 @@
               "why": "the record's names for what a loop's end writes, as the files on disk are named"
             },
             {
+              "path": "packages/agent-orchestrator/src/record/record.model.ts",
+              "why": "the doc of the run's `acceptances` names the file a loop's end writes, `accept-<step>-<try>`, as it is named on disk"
+            },
+            {
               "path": "packages/agent-orchestrator/src/round/round.ts",
               "why": "the file a loop's end writes, and the word's own sense: a person accepts the work as it stands"
             },
@@ -653,6 +657,11 @@
       "type": "StepName"
     },
     {
+      "term": "StepSpec",
+      "meaning": "one step file as the parser reads it (`packages/agent-orchestrator/src/step/step.ts`): every key of `STEP_KEYS` typed, its agent, its output; what a run freezes of a step at `nemia start`. It was the step's `Workflow` until that word was left to the folder alone.",
+      "type": "StepSpec"
+    },
+    {
       "term": "Sub-resource",
       "meaning": "what the run object leaves out and serves on a path under its step: its `tries`, one `try`, a try's `closeout`, and what the step was `told`. Each is an entry of the command table, on the api and, for the closeout, the CLI, and answers with a Schema of its own beside the object's (`StepTries`, `StepTry`, `TryCloseout`, `StepTold`, in `packages/objects/src/run.ts` and `packages/objects/src/run-told.ts`, re-exported by `packages/agent-orchestrator/src/object/run.model.ts`)."
     },
@@ -874,7 +883,7 @@
           "kept": [
             {
               "path": "packages/agent-orchestrator/src/runner.ts",
-              "why": "`runStore` is an entry alias of `runsAtOnce` until the api's tests and the board's e2e world read `runsAtOnce`; `RunStore` is the store's interface, exported beside it"
+              "why": "`RunStore`, the store's interface, exported by the entry: matched in any case, it is another word"
             },
             {
               "path": "packages/agent-orchestrator/src/record/record.ts",

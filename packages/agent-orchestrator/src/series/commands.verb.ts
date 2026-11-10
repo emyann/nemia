@@ -1,5 +1,6 @@
 /** `nemia series`, an entry of the command table: what the system's passes were, kept a minute and an hour at a time (`seriesRead`). */
-import { Schema } from 'effect';
+import { Effect, Schema } from 'effect';
+import { StoreRoot } from '../config/root.store.ts';
 import { tried } from '../runtime-client.ts';
 import { RANGE_TAKES, seriesRead } from './series.store.ts';
 import { seriesLines, type SeriesRead } from './series.ts';
@@ -32,6 +33,6 @@ export const SERIES: Command<SeriesRead, SeriesInput> = {
   writes: false,
   class: 'read',
   input: SeriesInput,
-  handler: (input, kept?: Kept) => tried(() => seriesRead(input.range, kept?.series)),
+  handler: (input, kept?: Kept) => Effect.flatMap(StoreRoot, (home) => tried(() => seriesRead(home, input.range, kept?.series))),
   print: (read, args) => (args.json === true ? [JSON.stringify(read, null, 2)] : seriesLines(read)),
 };

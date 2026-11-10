@@ -21,7 +21,7 @@ import type { Assessment } from '../tick/assess.ts';
 import { inFlight } from '../cap/cap.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import type { CheckVerdict } from '../check/check.ts';
 import {
   runCodes,
@@ -65,7 +65,7 @@ export type RunToDecide = (
  * What a person has to decide, as the board is given it: the package's own reading, with its words and the command that ends them. Null
  * where the package leaves it — a run still going, one called off, one whose ending has run, and a branch already on the base.
  */
-function toDecideOf(run: Run, t: ToDecide | undefined, steps: readonly Workflow[]): RunToDecide | null {
+function toDecideOf(run: Run, t: ToDecide | undefined, steps: readonly StepSpec[]): RunToDecide | null {
   if (!t) return null;
   const said = toDecideWords(run, t);
   if (t.kind === 'result') return { ...t, said, command: `nemia decide ${run.id}` };
@@ -341,7 +341,7 @@ type Judged = {
  * merges answers for its own branch; a pruned run's branches are kept, and still decide. Pure, and off the record alone: what
  * `standingsOf` asks git about, and nothing more.
  */
-const toDecideBranches = (run: Run, steps: readonly Workflow[], status: RunStatus): string[] =>
+const toDecideBranches = (run: Run, steps: readonly StepSpec[], status: RunStatus): string[] =>
   run.cancelledAt || status !== 'succeeded' || !run.isolate || merges(steps)
     ? []
     : [
@@ -373,7 +373,7 @@ const onTheBase = new Map<string, string>();
  * The work a run has filed, for the memo above: each result step's current task and how many tries are behind it. A try a person asked for,
  * or a round, files a task of its own, so this changes exactly when the work that could grow a result branch has been done again.
  */
-const workFiled = (run: Run, steps: readonly Workflow[]): string =>
+const workFiled = (run: Run, steps: readonly StepSpec[]): string =>
   resultSteps(steps)
     .map((s) => `${s.name}:${run.steps[s.name]?.taskId ?? ''}:${run.steps[s.name]?.tries?.length ?? 0}`)
     .join(' ');
@@ -397,7 +397,7 @@ const workFiled = (run: Run, steps: readonly Workflow[]): string =>
  */
 export function standingsOf(
   run: Run,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   status: RunStatus,
   git: BranchReader,
   asked?: GitAsked,
@@ -433,7 +433,7 @@ export type GitAsked = { branches: string[]; failed: boolean };
 export type JudgeHow = {
   reader: Engine;
   git: BranchReader;
-  standings?: (status: RunStatus, steps: readonly Workflow[]) => readonly BranchStanding[];
+  standings?: (status: RunStatus, steps: readonly StepSpec[]) => readonly BranchStanding[];
   parent?: (id: string) => ParentRun;
   /** The settings the checkout's claim reads the cap on runs in flight from (`ListReadingHow`'s `config`); left out, the program's. */
   config?: Settings;
@@ -466,7 +466,7 @@ export type JudgeHow = {
 export const judge = Effect.fn('judge')(function* (
   run: Run,
   names: readonly string[],
-  folder: readonly Workflow[] | null,
+  folder: readonly StepSpec[] | null,
   views: Views,
   { reader, git, standings = () => [], parent, config }: JudgeHow,
 ) {

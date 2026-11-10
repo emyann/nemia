@@ -12,7 +12,7 @@ import { Effect, Metric, Tracer } from 'effect';
 import { OtlpExporter } from 'effect/observability';
 import type { Closeout } from '../closeout/index.ts';
 import type { Run } from '../record/record.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import type { TaskSpend } from '../status/status.ts';
 import {
   boundedAttributes,
@@ -45,8 +45,8 @@ const refusedInvalid = (err: unknown): true => {
   return true;
 };
 
-const WORK = { name: 'work', agent: { name: 'ada' } } as Workflow;
-const REVIEW = { name: 'review' } as Workflow;
+const WORK = { name: 'work', agent: { name: 'ada' } } as StepSpec;
+const REVIEW = { name: 'review' } as StepSpec;
 
 const RUN = {
   id: 'r-1',
@@ -148,8 +148,8 @@ const CLOCKED = new Map([
   ['r-1-work-try2-check', clocked('10:05', '10:06', '10:09', 'failed', 1)],
 ]);
 
-const PLAN = { name: 'plan', gate: true, after: [] } as unknown as Workflow;
-const BUILD = { name: 'build', after: ['plan'] } as unknown as Workflow;
+const PLAN = { name: 'plan', gate: true, after: [] } as unknown as StepSpec;
+const BUILD = { name: 'build', after: ['plan'] } as unknown as StepSpec;
 const GATED = {
   id: 'r-2',
   workflowDir: '/w/build',
@@ -166,8 +166,8 @@ const GATED_VIEWS = new Map([
   ['r-2-build', clocked('10:30', '10:31', '10:40')],
 ]);
 
-const SHIP = { name: 'ship', gate: true, after: ['plan'] } as unknown as Workflow;
-const UNGATED_PLAN = { name: 'plan', after: [] } as unknown as Workflow;
+const SHIP = { name: 'ship', gate: true, after: ['plan'] } as unknown as StepSpec;
+const UNGATED_PLAN = { name: 'plan', after: [] } as unknown as StepSpec;
 const PRE_APPROVED = {
   id: 'r-3',
   workflowDir: '/w/build',
@@ -181,7 +181,7 @@ const PRE_APPROVED_VIEWS = new Map([
   ['r-3-ship', clocked('10:30', '10:31', '10:40')],
 ]);
 
-const ASK = { name: 'ask', gate: true, after: [] } as unknown as Workflow;
+const ASK = { name: 'ask', gate: true, after: [] } as unknown as StepSpec;
 
 /** A gated step held open: it signed off blocked, a person answered, and try 2, that answer's turn, was approved. Its timeline is due. */
 const ANSWERED = {
@@ -260,8 +260,8 @@ const timed = (filed: string, spawned: string, ended: string | null): FactView =
   },
 });
 
-const TL_WORK = { name: 'work', after: [], agent: { name: 'worker' }, check: 'npm test' } as unknown as Workflow;
-const TL_REVIEW = { name: 'review', after: ['work'], loop: 'work', rounds: 3 } as unknown as Workflow;
+const TL_WORK = { name: 'work', after: [], agent: { name: 'worker' }, check: 'npm test' } as unknown as StepSpec;
+const TL_REVIEW = { name: 'review', after: ['work'], loop: 'work', rounds: 3 } as unknown as StepSpec;
 const TL_STEPS = [TL_WORK, TL_REVIEW];
 const TL_RUN = {
   id: 'r-1',

@@ -31,6 +31,7 @@ import { type Judgements, type Judgement, type JudgedOrWhy, judgementsOf, restin
 import { followedFeed } from './rest.verb.ts';
 import { evictedBy, informedOf, type Watch } from './rest.ts';
 import type { Run as RunObject } from '../object/run.model.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /**
  * One run's kept value and what it was judged on: the run as it was read, which `given` hands back in place of its record; whether it was
@@ -192,9 +193,10 @@ export const informerRead = Effect.fn('informerRead')(function* <T, O = unknown>
   git: BranchReader,
   same: (kept: T, fresh: T) => boolean = isDeepStrictEqual,
 ) {
+  const home = yield* StoreRoot;
   const fed = yield* followedFeed(e, memo);
   const readTo = memo.cursor;
-  const stamps = runsAtOnce.runs.stamps();
+  const stamps = runsAtOnce(home).runs.stamps();
   const heads = new Map<string, ReadonlyMap<string, string>>();
   const now = (repo: string) => {
     const at = path.resolve(repo);

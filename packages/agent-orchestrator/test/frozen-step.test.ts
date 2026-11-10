@@ -1,7 +1,7 @@
 /**
  * The schema a frozen step is read back by (`FrozenStepSchema`), held to the parser it reads the output of: every step of the tests'
  * team, of a copy of it whose implement has a closeout schema of its own, and of the package's examples, as `nemia start` freezes it,
- * reads back as it was; the decoded type and `Workflow` are each the other;
+ * reads back as it was; the decoded type and `StepSpec` are each the other;
  * and a key of `STEP_KEYS` the schema has no field for fails the typecheck.
  */
 import { test } from 'node:test';
@@ -11,7 +11,7 @@ import path from 'node:path';
 import { Result, Schema } from 'effect';
 import { FrozenStepSchema, type FrozenStepFields } from '../src/folder/folder.store.ts';
 import { loadWorkflows } from '../src/workflows/workflows.store.ts';
-import { asNamed, FORMER_KEYS, type Workflow } from '../src/workflow.ts';
+import { asNamed, FORMER_KEYS, type StepSpec } from '../src/workflow.ts';
 import { ownDenies } from '../src/workflow/index.ts';
 import { plantStepOutput, TEAM_DEV, teamCopy } from './team.ts';
 
@@ -32,7 +32,7 @@ const FOLDERS = [
 const decode = Schema.decodeUnknownResult(FrozenStepSchema);
 
 /** A step as a record holds it: through JSON, as `nemia start` writes it and `readRun` reads it. */
-const frozen = (step: Workflow): unknown => JSON.parse(JSON.stringify(step));
+const frozen = (step: StepSpec): unknown => JSON.parse(JSON.stringify(step));
 
 test("every step of the tests' team, of its copy with a step's own schema and of the examples, frozen, reads back by the schema as it was frozen", () => {
   assert.ok(FOLDERS.includes(TEAM_DEV), `the team is read: ${FOLDERS.join(', ')}`);
@@ -54,7 +54,7 @@ test("every step of the tests' team, of its copy with a step's own schema and of
 });
 
 test('a step with every key the parser types, its agent and its output reads as it was frozen; one key off, it is refused', () => {
-  const step: Workflow = {
+  const step: StepSpec = {
     name: 'review',
     after: ['implement'],
     body: 'Read it.',
@@ -107,7 +107,7 @@ test('a step with every key the parser types, its agent and its output reads as 
   const decoded = decode(frozen(step));
   assert.ok(Result.isSuccess(decoded));
   assert.deepEqual(decoded.success, frozen(step), "the agent's denies kept apart among them");
-  assert.deepEqual(ownDenies(decoded.success as Workflow), [], "and the step's own line is what its agent did not deny");
+  assert.deepEqual(ownDenies(decoded.success as StepSpec), [], "and the step's own line is what its agent did not deny");
 
   for (const [key, value] of [
     ['context', '1M'],
@@ -137,7 +137,7 @@ test('a step with every key the parser types, its agent and its output reads as 
 });
 
 test('a condition of each eval, a node after it and a workflow node read as they were frozen; a route of no eval is refused', () => {
-  const conditions: Workflow[] = [
+  const conditions: StepSpec[] = [
     {
       name: 'triage',
       after: ['plan'],
@@ -192,11 +192,11 @@ test('every former name of a key (`FORMER_KEYS`) is checked as the key it is now
   }
 });
 
-test('the decoded step, read under the names its keys have now, is a `Workflow`, and a `Workflow` is a decoded step', () => {
+test('the decoded step, read under the names its keys have now, is a `StepSpec`, and a `StepSpec` is a decoded step', () => {
   type Decoded = typeof FrozenStepSchema.Type;
-  const toWorkflow = (step: Decoded): Workflow => asNamed(step);
-  const fromWorkflow = (step: Workflow): Decoded => step;
-  const step: Workflow = { name: 'implement', after: [], body: '' };
+  const toWorkflow = (step: Decoded): StepSpec => asNamed(step);
+  const fromWorkflow = (step: StepSpec): Decoded => step;
+  const step: StepSpec = { name: 'implement', after: [], body: '' };
   assert.deepEqual(toWorkflow(fromWorkflow(step)), step);
 });
 

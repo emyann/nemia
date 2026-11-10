@@ -8,8 +8,8 @@
  * on the feed takes out.
  *
  * Walked through the runtime itself, `plainEngine` over an in-memory journal whose feed every append reaches, as the runtime's own
- * journal does, and the engine's `view` counted by task id. A file of its own, since `stats` reads every run under `WF_ROOT`, read as the
- * store loads, so it is set before the import.
+ * journal does, and the engine's `view` counted by task id. A file of its own, since `stats` reads every run of its
+ * store, at `ROOT`.
  */
 import { test } from 'node:test';
 import { story } from 'test-kit/checkpoints';
@@ -21,13 +21,12 @@ import { Engine } from 'agent-runtime';
 import { scratch } from 'test-kit/scratch';
 import { Effect } from 'effect';
 import { plainEngine } from '../../test/promised.ts';
+import { freshStatsMemo, statsRun } from './stats.verb.ts';
+import { runWith } from '../runtime-client.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 const ROOT = scratch('wf-stats-memo-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-process.env.WF_ROOT = ROOT;
-const { freshStatsMemo, statsRun } = await import('./stats.verb.ts');
-const { runWith } = await import('../runtime-client.ts');
-const { StoreRoot } = await import('../config/root.store.ts');
 
 type Event = Parameters<AsyncJournal['append']>[1];
 
@@ -279,7 +278,7 @@ test("A serving process's memo: each call reads again only the runs whose inputs
     kept.facts.runs = [];
     assert.notDeepStrictEqual(await through(memo), fresh, 'unverified, the stale answer is given');
     await assert.rejects(
-      runWith(e, statsRun({}, NOW, { memo, verify: true })),
+      runWith(e, rooted(statsRun({}, NOW, { memo, verify: true }))),
       (err: Error) => err.message.includes('the run s-a ') && err.message.includes('stamp'),
     );
     viewedRuns();
@@ -295,14 +294,14 @@ test("A serving process's memo: each call reads again only the runs whose inputs
 
   await s.test('an engine whose feed does not read, or with no feed, answers nothing from memory, and keeps nothing', async () => {
     const unfed = { ...e, feed: () => Effect.fail(new Error('the feed does not read') as never) };
-    await runWith(unfed, statsRun({}, NOW, { memo, ...unverified }));
+    await runWith(unfed, rooted(statsRun({}, NOW, { memo, ...unverified })));
     assert.deepEqual(viewedRuns(), [...FINISHED, 's-moving']);
     assert.equal(memo.runs.size, 0);
     await through(memo);
     viewedRuns();
     assert.ok(memo.runs.size > 0, 'the feed reads again: the memo keeps again');
     const feedless = { ...e, feed: undefined } as never;
-    await runWith(feedless, statsRun({}, NOW, { memo, ...unverified }));
+    await runWith(feedless, rooted(statsRun({}, NOW, { memo, ...unverified })));
     assert.deepEqual(viewedRuns(), [...FINISHED, 's-moving']);
     assert.equal(memo.runs.size, 0);
   });
@@ -319,7 +318,7 @@ test("RACE: a call keeps nothing once another has read the engine's feed on past
   };
   await through(memo);
   assert.equal(during, undefined, 'the overlapping call ran');
-  const answer = await runWith(e, statsRun({}, NOW, { memo, verify: true }));
+  const answer = await runWith(e, rooted(statsRun({}, NOW, { memo, verify: true })));
   assert.deepStrictEqual(answer, await afresh());
   viewed = [];
 });

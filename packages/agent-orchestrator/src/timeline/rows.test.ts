@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Run } from '../record/record.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { timeline, type TaskClock } from './timeline.ts';
 import { gateWaitOf } from './took.ts';
 import { TIMELINE_OF, TIMELINE_PARTS, timelineRows, type TimelineRow } from './rows.ts';
@@ -33,9 +33,9 @@ const task = (spawned: string, ended: string | null, costUsd?: number): TaskCloc
   },
 });
 
-const PLAN = { name: 'plan', gate: true, after: [] } as unknown as Workflow;
-const BUILD = { name: 'build', after: ['plan'], check: 'npm test' } as unknown as Workflow;
-const REVIEW = { name: 'review', after: ['build'], loop: 'build', rounds: 3 } as unknown as Workflow;
+const PLAN = { name: 'plan', gate: true, after: [] } as unknown as StepSpec;
+const BUILD = { name: 'build', after: ['plan'], check: 'npm test' } as unknown as StepSpec;
+const REVIEW = { name: 'review', after: ['build'], loop: 'build', rounds: 3 } as unknown as StepSpec;
 const STEPS = [PLAN, BUILD, REVIEW];
 
 /** A run of `plan`, approved at its gate, then two rounds of `build`, checked, and `review`. */
@@ -76,7 +76,7 @@ const valueOf = (rows: readonly TimelineRow[], row: string, part: TimelineRow['p
 };
 
 /** A gated step held open on one task: blocked at 10:05, answered into a turn from 10:11 to 10:20, and try 2 approved at 10:29. */
-const ASK = { name: 'ask', gate: true, after: [] } as unknown as Workflow;
+const ASK = { name: 'ask', gate: true, after: [] } as unknown as StepSpec;
 const ANSWERED = {
   id: 'r-3',
   workflowDir: '/w/intake',
@@ -156,7 +156,7 @@ test("`timelineRows`: a run's timeline as rows, each the timeline's own field, s
   });
   await t.test("the rows' names, sorted as text, are the workflow's order with each check under its step", () => {
     const names = ['k', 'j', 'i', 'h', 'g', 'f', 'e', 'd', 'c', 'b', 'a'];
-    const steps = names.map((name, i) => ({ name, after: i ? [names[i - 1]] : [], check: 'npm test' }) as unknown as Workflow);
+    const steps = names.map((name, i) => ({ name, after: i ? [names[i - 1]] : [], check: 'npm test' }) as unknown as StepSpec);
     const run = {
       id: 'r-2',
       workflowDir: '/w/long',

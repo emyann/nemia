@@ -11,16 +11,18 @@ import { scratch } from 'test-kit/scratch';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven } from '../../test/placed.ts';
 import { names } from '../../test/assessed.ts';
+import { startRun } from './start.verb.ts';
+import { START } from './commands.verb.ts';
+import { filesStoreAt } from '../record/files.store.ts';
+import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-start-labels-');
-process.env.WF_ROOT = ROOT;
+const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 const RUNS_DIR = path.join(ROOT, 'runs');
-const { startRun } = await import('./start.verb.ts');
-const { START } = await import('./commands.verb.ts');
-const { filesStore: runStore } = await import('../record/files.store.ts');
+const files = filesStoreAt(ROOT);
 
 const stand = eachTest(testPlace);
-const runPlaced = runGiven(() => stand().layer);
+const runPlaced = runGiven(() => stand().layer, ENV);
 
 /** A workflow folder of one step, in git. */
 const folder = (): string => {
@@ -32,7 +34,7 @@ const folder = (): string => {
 /** A repository of the test place's, and a run started in it now with `labels` put on it: its id. */
 const parent = async (repo: string, labels: Record<string, string>) => {
   const run = await runPlaced(startRun({ brief: 'a parent', repo, workflowDir: folder(), isolate: true }));
-  runStore.labels.put(run.id, labels);
+  files.labels.put(run.id, labels);
   return run.id;
 };
 
@@ -81,7 +83,7 @@ test('a key two named runs disagree on is left out, and `nemia start` names it, 
       ],
     },
   ]);
-  const line = START.print({ id: run.id, run }, {}).find((l) => l.includes('team') && l.includes('not inherited'));
+  const line = START.print({ home: ROOT, id: run.id, run }, {}).find((l) => l.includes('team') && l.includes('not inherited'));
   names(line, 'team', a, 'core', b, 'infra', `nemia label run ${run.id} team=`);
   const typed = await runPlaced(
     startRun({ brief: 'typed', repo, workflowDir: folder(), context: [a, b], labels: { edits: ['team=ops'] } }),
@@ -94,7 +96,7 @@ test('a run started with no labels writes no .labels file, and its start prints 
   assert.equal(fs.existsSync(labelsFile(run.id)), false);
   assert.equal(run.labels, undefined);
   assert.equal(
-    START.print({ id: run.id, run }, {}).some((l) => l.startsWith('label')),
+    START.print({ home: ROOT, id: run.id, run }, {}).some((l) => l.startsWith('label')),
     false,
   );
 });

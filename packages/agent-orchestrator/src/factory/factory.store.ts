@@ -40,7 +40,7 @@ import {
 import { firesOf } from './schedule/schedule.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { firstRefusal, isDirectory } from '../record/record.store.ts';
-import { readStatusAt, readTreeWiringAt, treeDirAt, writeTreeWiringAt } from './applied/applied.store.ts';
+import { readStatus, readTreeWiring, treeDir, writeTreeWiring } from './applied/applied.store.ts';
 import { rewired, wiringRefusal, type WiringChange } from './wiring/wiring.ts';
 import { ownAgentRefusal } from './wiring/own-agent.store.ts';
 import { generationWritten } from './door/generation.ts';
@@ -142,7 +142,7 @@ function factoryFile(home: string, name: string): FileRead {
  * do not read.
  */
 function treeWiringOf(home: string, name: string): Pick<Factory, 'workflows' | 'hires' | 'revisions'> | { error: string } {
-  const read = readTreeWiringAt(home, name);
+  const read = readTreeWiring(home, name);
   if ('absent' in read) return { workflows: [], hires: {} };
   if ('error' in read) return read;
   const { workflows, hires, revisions } = read.wiring;
@@ -166,7 +166,7 @@ function factoryOf(home: string, name: string, content: FactoryFile): Factory | 
     ...wiring,
     schedules: content.schedules ?? {},
     ...(content.instruction === undefined ? {} : { instruction: content.instruction }),
-    ...(template === undefined ? {} : { template, tree: treeDirAt(home, name) }),
+    ...(template === undefined ? {} : { template, tree: treeDir(home, name) }),
     ...(content.volumes?.length ? { volumes: content.volumes.map(volumeEntry) } : {}),
     ...(content.harnessSettings === undefined ? {} : { harnessSettings: content.harnessSettings }),
     ...(content.generation === undefined ? {} : { generation: content.generation }),
@@ -183,7 +183,7 @@ function factoryAt(home: string, file: string): FactoryListing {
   const factory = 'error' in read ? read : factoryOf(home, name, read.content);
   if ('error' in factory) return { name, file: read.file, error: factory.error };
   if (factory.template === undefined) return { ...factory, file: read.file };
-  const status = readStatusAt(home, name);
+  const status = readStatus(home, name);
   return { ...factory, file: read.file, status: { applied: status?.version ?? null, conditions: status?.conditions ?? [] } };
 }
 
@@ -241,7 +241,7 @@ export function addFactoryAt(
   refuseName(opts.name, 'add');
   const repos = factoryRepos(opts.name, opts.repos);
   const template = opts.template;
-  const made = template === undefined ? {} : { template, tree: treeDirAt(home, opts.name) };
+  const made = template === undefined ? {} : { template, tree: treeDir(home, opts.name) };
   const factory: Factory = { name: opts.name, repos, workflows: [], hires: {}, schedules: {}, ...made };
   return { factory, file: createFactoryAt(home, factory) };
 }
@@ -255,7 +255,7 @@ export function addFactoryAt(
  */
 export function createFactoryAt(home: string, factory: Factory): string {
   if (factory.template !== undefined && (factory.workflows.length || Object.keys(factory.hires).length || factory.revisions !== undefined))
-    throw new Conflict({ message: unrenderedTreeRefusal(factory.name, treeDirAt(home, factory.name), 'Nothing was filed.') });
+    throw new Conflict({ message: unrenderedTreeRefusal(factory.name, treeDir(home, factory.name), 'Nothing was filed.') });
   fs.mkdirSync(factoriesDirAt(home), { recursive: true });
   const file = fileAt(home, factory.name);
   const hidden = path.join(factoriesDirAt(home), `.${factory.name}.json.${process.pid}.${randomBytes(4).toString('hex')}`);
@@ -439,7 +439,7 @@ const wiringKey = (wiring: Pick<Factory, 'workflows' | 'hires' | 'revisions'>): 
 
 /** The file a factory's wiring is kept in: its tree's `factory.json` where it is made from a template, else its own file. */
 const wiringFileAt = (home: string, factory: Factory): string =>
-  factory.template === undefined ? fileAt(home, factory.name) : path.join(treeDirAt(home, factory.name), 'factory.json');
+  factory.template === undefined ? fileAt(home, factory.name) : path.join(treeDir(home, factory.name), 'factory.json');
 
 /**
  * The factory `factory` written back into the store `home`, the file it was read from: its file, every key the model does not name
@@ -460,7 +460,7 @@ export function rewriteFactoryAt(home: string, factory: Factory, notDone = 'Noth
   const written = generationWritten(factoryOf(home, name, content), factory, counted);
   let changed = read.file;
   if ((content.template ?? factory.template) !== undefined) {
-    const tree = readTreeWiringAt(home, name);
+    const tree = readTreeWiring(home, name);
     if ('error' in tree) throw new Invalid({ message: `the factory ${name}: ${tree.error} ${notDone}` });
     const was = 'absent' in tree ? { workflows: [], hires: {} } : tree.wiring;
     const { revisions: _was, ...rest } = was;
@@ -471,9 +471,9 @@ export function rewriteFactoryAt(home: string, factory: Factory, notDone = 'Noth
       ...(factory.revisions === undefined ? {} : { revisions: factory.revisions }),
     };
     if (wiringKey(was) !== wiringKey(next)) {
-      if ('absent' in tree) throw new Conflict({ message: unrenderedTreeRefusal(name, treeDirAt(home, name), notDone) });
-      writeTreeWiringAt(home, name, next);
-      changed = path.join(treeDirAt(home, name), 'factory.json');
+      if ('absent' in tree) throw new Conflict({ message: unrenderedTreeRefusal(name, treeDir(home, name), notDone) });
+      writeTreeWiring(home, name, next);
+      changed = path.join(treeDir(home, name), 'factory.json');
     }
   }
   const after = fileContentOf(content, written);
@@ -596,7 +596,7 @@ export function setInstructionAt(home: string, opts: { factory: string; at: Inst
   const factory = toChange(home, opts.factory, 'instruction');
   if (factory.template !== undefined)
     throw new Invalid({
-      message: `${opts.factory} is made from a template, and its instruction is its tree's NEMIA.md, at ${path.join(treeDirAt(home, opts.factory), 'NEMIA.md')}: write it with nemia factory instruct ${opts.factory} --file <path>. Nothing was changed.`,
+      message: `${opts.factory} is made from a template, and its instruction is its tree's NEMIA.md, at ${path.join(treeDir(home, opts.factory), 'NEMIA.md')}: write it with nemia factory instruct ${opts.factory} --file <path>. Nothing was changed.`,
     });
   const { instruction: _was, ...rest } = factory;
   const kept = at === undefined ? undefined : 'path' in at ? { path: path.normalize(at.path) } : { store: true as const };

@@ -3,7 +3,8 @@
  * own checkout is switched to a branch a person made. The handle of the test place switches no checkout to another branch, so this
  * keeps the git place; the rest of `--after` is walked in store.test.ts.
  *
- * `WF_ROOT` is set before the runner is imported, since it is read as the module loads.
+ * The test's store is its own, at `ROOT`, given to every program as `ENV`.
+
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,6 +17,10 @@ import { scratch } from 'test-kit/scratch';
 import { isRepositoryRun } from '../src/run.ts';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
+import { advanceRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
+import { markCancelled, runRecord } from '../src/record/record.store.ts';
+import type { Env } from '../src/config/config.store.ts';
+import { main } from '../src/cli/main.ts';
 
 const ROOT = scratch('wf-after-elsewhere-');
 const WORKFLOW = path.join(ROOT, 'workflow');
@@ -24,14 +29,9 @@ fs.mkdirSync(WORKFLOW, { recursive: true });
 fs.writeFileSync(path.join(WORKFLOW, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
 fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
 
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { advanceRun, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
-const { markCancelled, runRecord } = await import('../src/record/record.store.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
+const runWith = runOver(runEngine, gitPlaceLayer, ENV);
+const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
@@ -221,8 +221,8 @@ const aParent = async (
   }: { work?: string; signed?: boolean; workflowDir?: string; brief?: string } = {},
 ) => {
   const run = repositoryRunOf(await runPlaced(startRun({ brief, repo, workflowDir: workflowDir ?? oneStep() })));
-  await runWith(b.e, advanceRun(runRecord(run.id)));
-  const wt = runRecord(run.id).steps.implement.workspace!;
+  await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+  const wt = runRecord(ROOT, run.id).steps.implement.workspace!;
   if (work) {
     fs.writeFileSync(path.join(wt, work), `${work}\n`);
     gitIn(wt, 'add', '-A');
@@ -241,7 +241,7 @@ test("REFUSED at `nemia start`, before a run is written: --after an unknown run,
   const p = await aParent(repo, b, { work: 'parent.txt' });
   const other = await aParent(aRepo(), b, { work: 'other.txt' });
   const called = await aParent(repo, b, { work: 'called.txt' });
-  markCancelled(called.run.id);
+  markCancelled(ROOT, called.run.id);
   const direct = await runPlaced(startRun({ brief: 'the direct parent', repo, workflowDir: oneStep(), isolate: false }));
   const before = runsWritten();
   const starting =
@@ -275,8 +275,9 @@ test("REFUSED at `nemia start`, before a run is written: --after an unknown run,
   gitIn(repo, 'checkout', '-q', p.run.branch);
   assert.equal(runsWritten(), before, 'no run written');
 
-  const { main } = await import('../src/cli/main.ts');
-  const typed = (...flags: string[]) => main(['start', 'a child', '--workflows', folder(), '--repo', repo, ...flags]);
+  const typed = (...flags: string[]) =>
+    main(['start', 'a child', '--workflows', folder(), '--repo', repo, ...flags], undefined, undefined, undefined, ENV);
+
   await assert.rejects(typed('--after'), refusedWith(/^--after takes the run this one waits on, by its id/));
   await assert.rejects(typed('--after', '--no-worktree'), refusedWith(/^--after takes the run this one waits on/));
   await assert.rejects(typed('--after', p.run.id, '--after', p.run.id), refusedWith(/is given twice/));
@@ -301,7 +302,7 @@ test("REFUSED at `nemia start`, before a run is written: --after an unknown run,
   const second = await aParent(repo, b, { work: 'second.txt' });
   await typed('--after', p.run.id, `--after=${second.run.id}`);
   const id = printed[0].split(' ')[0];
-  assert.deepEqual(runRecord(id).after, [p.run.id, second.run.id], '--after is allowed as often as there are runs to wait on');
+  assert.deepEqual(runRecord(ROOT, id).after, [p.run.id, second.run.id], '--after is allowed as often as there are runs to wait on');
   assert.match(
     printed.join('\n'),
     new RegExp(

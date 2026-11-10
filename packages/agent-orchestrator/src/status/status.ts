@@ -6,7 +6,7 @@
  * run's judgement; it reads the record alone.
  */
 import { onItsCheck, type Verdict } from '../check/check.ts';
-import { DEFAULT_ROUNDS, endsOnBase, JUDGE_ROUTE, LOOP_REPLIES, type Workflow } from '../step/step.ts';
+import { DEFAULT_ROUNDS, endsOnBase, JUDGE_ROUTE, LOOP_REPLIES, type StepSpec } from '../step/step.ts';
 import { loopSpan } from '../workflow/index.ts';
 import { isJudge } from '../route/index.ts';
 import { budgetWord, dollars } from '../money/money.ts';
@@ -39,11 +39,11 @@ import type { OwnStatus, WhereAStepStands } from '../../contracts/standing.contr
 /**
  * Whether a step's closeout waits for a person before anything after it is filed: its own `gate: true`, or a gate the run was started with.
  */
-export const hasGate = (step: Pick<Workflow, 'name' | 'gate'>, run: Pick<Run, 'gates'>): boolean =>
+export const hasGate = (step: Pick<StepSpec, 'name' | 'gate'>, run: Pick<Run, 'gates'>): boolean =>
   step.gate === true || Boolean(run.gates?.includes(step.name));
 
 /** The steps a run is gated at, in the order they run: those its workflow gates, and those it was started with. Pure. */
-export const gatesOf = (steps: readonly Workflow[], run: Pick<Run, 'gates'>): string[] =>
+export const gatesOf = (steps: readonly StepSpec[], run: Pick<Run, 'gates'>): string[] =>
   steps.filter((s) => hasGate(s, run)).map((s) => s.name);
 
 /**
@@ -57,7 +57,7 @@ export const approvalOf = (run: Run, step: string): Approval | undefined =>
  * it keeps a session open (`keepsOpen`; agent-runtime's open issue 28). A step on any other is filed to settle when it signs, and a
  * person's word to it is a try of its own. Never a check.
  */
-export const holdsOpenOn = (step: Pick<Workflow, 'harness'>): boolean => declarationOf(step.harness)?.can.includes('keepsOpen') === true;
+export const holdsOpenOn = (step: Pick<StepSpec, 'harness'>): boolean => declarationOf(step.harness)?.can.includes('keepsOpen') === true;
 
 /**
  * The approvals a later try of their step has spent: each names a try the step is past. The tick consumes these, as it does a spent ask.
@@ -86,7 +86,7 @@ export const spentAcceptances = (run: Run): Acceptance[] => (run.acceptances ?? 
  * the next round is due (`roundsDue`, twice). A person's acceptance turns the word off for all five at once — read it in four places and
  * the fifth files a round nobody asked for, which is the paid round this exists to spare them.
  */
-export const askedAgain = (step: Pick<Workflow, 'name' | 'loop'>, run: Run, closeoutOf: (step: string) => Closeout | undefined): boolean =>
+export const askedAgain = (step: Pick<StepSpec, 'name' | 'loop'>, run: Run, closeoutOf: (step: string) => Closeout | undefined): boolean =>
   Boolean(step.loop) && closeoutOf(step.name)?.output?.again === true && !acceptanceOf(run, step.name);
 
 /**
@@ -104,7 +104,7 @@ export const gateWords = (run: Run, step: string): string => {
  * holds it: the round is its loop's, and the gate is on what comes after. A later try of an ending approved before it is filed
  * (`approvedFirst`) is that act again, with nothing to hand on, so no gate holds it, though its approval names a try it is past. Pure.
  */
-function atGate(step: Workflow, run: Run, own: StepStatus, closeoutOf: (step: string) => Closeout | undefined): boolean {
+function atGate(step: StepSpec, run: Run, own: StepStatus, closeoutOf: (step: string) => Closeout | undefined): boolean {
   if (!satisfiesAfter(own) || !hasGate(step, run)) return false;
   if (approvedFirst(step, run) && run.steps[step.name]?.tries?.length) return false;
   if (askedAgain(step, run, closeoutOf)) return false;
@@ -125,7 +125,7 @@ export { endsOnBase };
  * `quick`'s land, which its review routes. Nothing of this holds such a step: there is no approval to wait for, and nothing for a person
  * to decide (`toDecide`, `endingSteps`).
  */
-export const approvedFirst = (step: Pick<Workflow, 'name' | 'gate' | 'workspace'>, run: Pick<Run, 'gates'>): boolean =>
+export const approvedFirst = (step: Pick<StepSpec, 'name' | 'gate' | 'workspace'>, run: Pick<Run, 'gates'>): boolean =>
   endsOnBase(step) && hasGate(step, run);
 
 /**
@@ -136,12 +136,12 @@ export const approvedFirst = (step: Pick<Workflow, 'name' | 'gate' | 'workspace'
  * cancelled run, which files nothing, so that its unfiled steps read as waiting.
  */
 export function waitsAtGate(
-  step: Workflow,
+  step: StepSpec,
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined,
   askedCloseout: (taskId: string) => CloseoutAsked,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   spendOf: SpendOf,
   verdictOf: (step: string) => Verdict | undefined,
 ): boolean {
@@ -163,12 +163,12 @@ export function waitsAtGate(
  * it so keeps this from asking itself where it stands.
  */
 export function notHandedOn(
-  step: Workflow,
+  step: StepSpec,
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined,
   askedCloseout: (taskId: string) => CloseoutAsked,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   spendOf: SpendOf,
   verdictOf: (step: string) => Verdict | undefined,
 ): string[] {
@@ -195,7 +195,7 @@ export function notHandedOn(
  * Also an ending that stopped on the base branch whose work a try due sends back (`Retry.back`), or a merge of the base due (`Round.back`):
  * the pass that files it moves the ending's try behind (`sentBack`), and it waits for the work again.
  */
-export function unheld(steps: readonly Workflow[], run: Run, retry: readonly Retry[], round: readonly Round[]): Set<string> {
+export function unheld(steps: readonly StepSpec[], run: Run, retry: readonly Retry[], round: readonly Round[]): Set<string> {
   const filing = new Set([...retry.map((r) => r.step), ...roundSpans(steps, round)]);
   const held = steps.filter((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId && s.after.some((a) => filing.has(a)));
   return new Set([...held.map((s) => s.name), ...[...retry, ...round].flatMap((r) => r.back ?? [])]);
@@ -211,12 +211,12 @@ export function unheld(steps: readonly Workflow[], run: Run, retry: readonly Ret
  * goes back through the folder's loop, and the ending returns to its gate once that settles (`sentBack`).
  */
 export function endingStopped(
-  step: Workflow,
+  step: StepSpec,
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined,
   askedCloseout: (taskId: string) => CloseoutAsked,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   spendOf: SpendOf,
 ): boolean {
   const taskId = run.steps[step.name]?.taskId;
@@ -240,7 +240,7 @@ export function sentBack(record: StepRecord): StepRecord {
  * The steps a send-back at a gate goes to: the gated step itself, once it has run — or, at a gate held before its step is filed, the steps
  * it waits on, whose work the objection is about. Pure.
  */
-export const sendBackTo = (step: Workflow, run: Run): string[] => (run.steps[step.name]?.taskId ? [step.name] : [...step.after]);
+export const sendBackTo = (step: StepSpec, run: Run): string[] => (run.steps[step.name]?.taskId ? [step.name] : [...step.after]);
 
 /**
  * Whether an ending's merge is landed by the run on its check: it acts on the base branch (`endsOnBase`) and has a `check:` — which a
@@ -255,14 +255,14 @@ export const sendBackTo = (step: Workflow, run: Run): string[] => (run.steps[ste
  * It still takes the run, which it no longer reads, so that every caller reads a step beside the run it belongs to and a gate started with
  * cannot be made to change the answer by leaving it out.
  */
-export const landsOnCheck = (step: Pick<Workflow, 'name' | 'gate' | 'workspace' | 'check'>, _run: Pick<Run, 'gates'>): boolean =>
+export const landsOnCheck = (step: Pick<StepSpec, 'name' | 'gate' | 'workspace' | 'check'>, _run: Pick<Run, 'gates'>): boolean =>
   endsOnBase(step) && step.check !== undefined;
 
 /**
  * Whether this step waits on the checkout on a pass: it works in the repository's own checkout (`workspace: base`), and another run's
  * step is in that one directory (`heldCheckouts`). Pure. Nothing of it is filed while that is so — a first session, or another try.
  */
-export const waitsOnCheckout = (steps: readonly Workflow[], name: string, checkout: CheckoutHold | undefined): boolean =>
+export const waitsOnCheckout = (steps: readonly StepSpec[], name: string, checkout: CheckoutHold | undefined): boolean =>
   Boolean(checkout) && steps.some((s) => s.name === name && endsOnBase(s));
 
 /**
@@ -358,12 +358,12 @@ export const resultOnBase = (standings: readonly BranchStanding[]): boolean =>
  *   Left out, no check has refused, so a step whose check did not pass reads `failed (check)`, as `retriesDue` reads it: no try due.
  */
 export const stepStatus = (
-  step: Workflow,
+  step: StepSpec,
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
-  steps: readonly Workflow[] = [],
+  steps: readonly StepSpec[] = [],
   spendOf: SpendOf = () => undefined,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
 ): StepStatus => standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status;
@@ -387,12 +387,12 @@ export const standing: WhereAStepStands = (step, run, phaseOf, closeoutOf, asked
  * that signed off, `awaiting approval`, since a try of it is a send-back from its gate (`retryable`), approved or not. Pure.
  */
 export function triedFrom(
-  step: Workflow,
+  step: StepSpec,
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined,
   askedCloseout: (taskId: string) => CloseoutAsked,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   spendOf: SpendOf,
 ): StepStatus {
   const own = ownStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
@@ -406,13 +406,13 @@ export function triedFrom(
  * budget, itself included: the round would file each of them again.
  */
 function held(
-  step: Workflow,
+  step: StepSpec,
   run: Run,
   own: StepStatus,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined,
   askedCloseout: (taskId: string) => CloseoutAsked,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   spendOf: SpendOf,
   verdictOf: (step: string) => Verdict | undefined,
 ): boolean {
@@ -429,12 +429,12 @@ function held(
 
 /** Whether a looping step asked for a round its `rounds:` still allows — signed, and `again: true` — which the run files on its word. */
 function roundWanted(
-  looping: Workflow,
+  looping: StepSpec,
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined,
   askedCloseout: (taskId: string) => CloseoutAsked,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   spendOf: SpendOf,
 ): boolean {
   return (
@@ -446,7 +446,7 @@ function roundWanted(
  * Whether `said` signs off `blocked` and the run accepts it: a blocked closeout whose questions do not read is refused
  * (`closeoutRefusals`).
  */
-const blockedAccepted = (step: Workflow, said: Closeout | undefined, steps: readonly Workflow[]): boolean =>
+const blockedAccepted = (step: StepSpec, said: Closeout | undefined, steps: readonly StepSpec[]): boolean =>
   said?.outcome === 'blocked' && !closeoutRefusals(step, said, steps).length;
 
 /**
@@ -491,7 +491,7 @@ export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseo
  * looping step's with no yes or no for `again`, one that named a file the run did not have when it signed off, as the tick read it
  * (`lackedOf`), or one the run refuses (`closeoutRefusals`: a `needs` on a `done` v1 closeout, a question field that does not read).
  */
-const unaccepted = (step: Workflow, run: Run, steps: readonly Workflow[], said: Closeout): boolean =>
+const unaccepted = (step: StepSpec, run: Run, steps: readonly StepSpec[], said: Closeout): boolean =>
   declaredOutput(step, said, owedFields(step, run, steps, said)).missing.length > 0 ||
   (Boolean(step.loop) && typeof said.output?.again !== 'boolean') ||
   lackedOf(run.steps[step.name]).length > 0 ||
@@ -557,7 +557,7 @@ export const runSpend = (run: Run, spendOf: SpendOf): Spend =>
  * they cost, and the cap. Undefined for any other. Pure. At the cap and not only past it, so a session filed for a step not held always has
  * something left, which `budgetUsdFor` hands a harness that keeps a cap.
  */
-export function overBudget(step: Workflow, run: Run, spendOf: SpendOf): { spent: Spend; cap: number } | undefined {
+export function overBudget(step: StepSpec, run: Run, spendOf: SpendOf): { spent: Spend; cap: number } | undefined {
   const cap = budgetOf(step, run);
   if (cap === undefined) return undefined;
   const spent = stepSpend(run, step.name, spendOf);
@@ -566,8 +566,8 @@ export function overBudget(step: Workflow, run: Run, spendOf: SpendOf): { spent:
 
 /** The steps of a looping step's loop (`loopSpan`) that are over budget, in its order: what holds its next round. */
 export const loopOver = (
-  steps: readonly Workflow[],
-  looping: Workflow,
+  steps: readonly StepSpec[],
+  looping: StepSpec,
   run: Run,
   spendOf: SpendOf,
 ): Array<{ name: string; spent: Spend; cap: number }> =>
@@ -611,7 +611,7 @@ export const MOMENTUM = 1;
  * are filed as the run starts, so a newer run never goes before one in flight; `MOMENTUM` for a step after another. A try, a round and a
  * check are never a run's first filing, and carry `MOMENTUM` whatever step they are of.
  */
-export const stepMomentum = (step: Pick<Workflow, 'after'>): number => (step.after.length ? MOMENTUM : 0);
+export const stepMomentum = (step: Pick<StepSpec, 'after'>): number => (step.after.length ? MOMENTUM : 0);
 
 /**
  * The floor of a `--budget` on a step with a cap, and what a person's try of a step over its budget, or ended at it, has to carry: a
@@ -619,7 +619,7 @@ export const stepMomentum = (step: Pick<Workflow, 'after'>): number => (step.aft
  */
 export type Raise = { above: number; spent: Spend; cap: number };
 
-export function raiseOf(step: Workflow, run: Run, spendOf: SpendOf): Raise | undefined {
+export function raiseOf(step: StepSpec, run: Run, spendOf: SpendOf): Raise | undefined {
   const cap = budgetOf(step, run);
   if (cap === undefined) return undefined;
   const spent = stepSpend(run, step.name, spendOf);
@@ -693,7 +693,7 @@ export type MergeLanding = { step: string; check: string };
 export type RoundAsk = { step: string; round: number; budget?: number; at: string; merge?: MergeOf };
 
 /** The rounds a looping step's loop runs on its own word: its `rounds:`, which the parser always sets. */
-export const capOf = (looping: Workflow): number => looping.rounds ?? DEFAULT_ROUNDS;
+export const capOf = (looping: StepSpec): number => looping.rounds ?? DEFAULT_ROUNDS;
 
 /**
  * The round a step's record is on: the first, and one more for each round that moved a try behind it. A merge (`cause: 'merge'`) is not
@@ -705,7 +705,7 @@ export const roundIn = (record: StepRecord | undefined): number => 1 + (record?.
 export const roundOf = (run: Run, step: string): number => roundIn(run.steps[step]);
 
 /** The looping step whose loop `name` is in — as its target, a step between, or itself — if any. */
-export const loopOf = (steps: readonly Workflow[], name: string): Workflow | undefined =>
+export const loopOf = (steps: readonly StepSpec[], name: string): StepSpec | undefined =>
   steps.find((s) => s.loop && loopSpan(steps, s).includes(name));
 
 /** A round, as `nemia ls` says it: `round 2 of 3`, or past the cap, where only a person's word takes a loop. */
@@ -717,7 +717,7 @@ export const roundWord = (round: number, cap: number): string =>
  * but a try after a merge (`merged`), which was handed a base to merge and no findings. Round 1's are asked for all the same
  * (`closeoutSchemaOf`), and owed nothing: an empty list, read by nobody.
  */
-export const owesReplies = (steps: readonly Workflow[], run: Run, name: string): boolean =>
+export const owesReplies = (steps: readonly StepSpec[], run: Run, name: string): boolean =>
   isLoopTarget(steps, name) && roundOf(run, name) > 1 && !merged(run.steps[name]);
 
 /**
@@ -734,7 +734,7 @@ export const merged = (record: StepRecord | undefined): boolean =>
  * behind it, on this try. `advance` reads it from there for a new session of the target within the round — a fresh try, or a continue with
  * no session left to continue — which would otherwise be asked for replies to findings nobody handed it.
  */
-export function askingTry(steps: readonly Workflow[], run: Run, name: string): { looping: Workflow; taskId: string } | undefined {
+export function askingTry(steps: readonly StepSpec[], run: Run, name: string): { looping: StepSpec; taskId: string } | undefined {
   const looping = steps.find((s) => s.loop === name);
   if (!looping || !owesReplies(steps, run, name)) return undefined;
   const taskId = [...(run.steps[looping.name]?.tries ?? [])].reverse().find((t) => t.cause === 'round')?.taskId;
@@ -746,7 +746,7 @@ export function askingTry(steps: readonly Workflow[], run: Run, name: string): {
  * and `replies` on a loop's target past round 1 — where an empty list is no answer (`declaredOutput`) — and `route` on a judge
  * (`JUDGE_ROUTE`).
  */
-export const owedFields = (step: Workflow, run: Run, steps: readonly Workflow[], said: Closeout | undefined): string[] => [
+export const owedFields = (step: StepSpec, run: Run, steps: readonly StepSpec[], said: Closeout | undefined): string[] => [
   ...filedOwed(step, run, said),
   ...(owesReplies(steps, run, step.name) ? [LOOP_REPLIES] : []),
   ...(isJudge(step) ? [JUDGE_ROUTE] : []),
@@ -758,7 +758,7 @@ export const owedFields = (step: Workflow, run: Run, steps: readonly Workflow[],
  * once a person raised the cap above what was spent (`nemia retry --round --budget`), and held, the run read as waiting on that person for
  * a tick after they had answered.
  */
-export const roundSpans = (steps: readonly Workflow[], rounds: readonly Round[]): Set<string> =>
+export const roundSpans = (steps: readonly StepSpec[], rounds: readonly Round[]): Set<string> =>
   new Set(
     rounds.flatMap((r) => {
       const looping = steps.find((s) => s.name === r.step);

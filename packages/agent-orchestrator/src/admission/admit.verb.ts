@@ -14,7 +14,6 @@ import type { Ran } from '../command/entry.verb.ts';
 import { LEVELS, type Level } from '../level/level.ts';
 import { levelOfFactory, runFactory } from '../level/levels.verb.ts';
 import { agentNameRefusal } from '../agents/agents.ts';
-import { HOME } from '../record/record.store.ts';
 import { RULE_ANSWERS, factsOf, listInForce, type PolicyRule, type Facts } from '../auto/index.ts';
 import { readConfirmed } from '../auto/auto.store.ts';
 import { admissionOf, answerOf, namedIn, typedIn, type PolicyReads, type Scope } from './admission.ts';
@@ -162,11 +161,11 @@ const policyRead = Effect.fnUntraced(function* (line: string, table: Parameters<
  * (`policyRead`). A call that is no call is asked of the person.
  */
 export const admitted = Effect.fnUntraced(function* (
+  home: string,
   given: string,
   table: Parameters<typeof admissionOf>[1],
   atLeast?: Level,
   policyAgent?: string,
-  home: string = HOME,
 ) {
   const call = callOf(given);
   if (call === undefined) return { decision: 'ask', message: 'nemia admit was handed no call it reads.' } satisfies AdmissionAnswer;

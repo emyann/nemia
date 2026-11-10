@@ -3,7 +3,7 @@
  * name, and `route:` as a condition's eval (`RouteEval`) from its map — `{ from, table }`, `{ script }` — or `judge`, each refused in the
  * file's words where it cannot be read (`routingOf`), and written back as the parser reads it (`routeWritten`).
  */
-import { refuse, type RouteEval, type StepKey, type Workflow } from '../step/step.ts';
+import { refuse, type RouteEval, type StepKey, type StepSpec } from '../step/step.ts';
 import type { FrontmatterValue } from '../frontmatter/frontmatter.ts';
 
 /** A route's name, a step's `when:` and a condition's `routes:` and `ends:` alike: a lowercase word. */
@@ -13,7 +13,7 @@ const ROUTE_WORD = /^[a-z][a-z0-9-]*$/;
 export function routingOf(
   step: string,
   meta: Partial<Record<StepKey, string>>,
-): Pick<Workflow, 'routes' | 'route' | 'when' | 'ends' | 'workflow'> {
+): Pick<StepSpec, 'routes' | 'route' | 'when' | 'ends' | 'workflow'> {
   const { routes, route, ends } = conditionKeysOf(step, meta);
   const workflow = workflowOf(step, meta.workflow, routes !== undefined);
   return {
@@ -26,7 +26,7 @@ export function routingOf(
 }
 
 /** A condition's own keys: `routes:` (two or more), `route:` beside it and never without it, and `ends:` on a condition alone. */
-function conditionKeysOf(step: string, meta: Partial<Record<StepKey, string>>): Pick<Workflow, 'routes' | 'route' | 'ends'> {
+function conditionKeysOf(step: string, meta: Partial<Record<StepKey, string>>): Pick<StepSpec, 'routes' | 'route' | 'ends'> {
   const routes = wordsOf(step, 'routes', meta.routes);
   const route = meta.route === undefined ? undefined : routeOf(step, meta.route);
   const ends = wordsOf(step, 'ends', meta.ends);

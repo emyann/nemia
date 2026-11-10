@@ -21,7 +21,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import type { RunDecision } from 'objects';
-import { acceptFile, acceptRun, list, roundRun, runStore } from 'agent-orchestrator';
+import { acceptFile, acceptRun, list, roundRun, runsAtOnce } from 'agent-orchestrator';
 import { story } from 'test-kit/checkpoints';
 import { objectOf, stepOf } from '../../test/run-reads.ts';
 
@@ -251,7 +251,7 @@ test('a person accepts a loop out of rounds on the board: the acceptance written
       took = (await res.json()) as Acceptance & { file: string };
       assert.deepEqual(
         { ...took, at: undefined },
-        { step: 'review', try: 2, at: undefined, message: WHY, file: acceptFile(R, 'review', 2) },
+        { step: 'review', try: 2, at: undefined, message: WHY, file: acceptFile(root, R, 'review', 2) },
       );
       assert.ok(!Number.isNaN(Date.parse(took.at)), took.at);
       assert.deepEqual(JSON.parse(fs.readFileSync(took.file, 'utf8')), { step: 'review', try: 2, at: took.at, message: WHY });
@@ -268,7 +268,7 @@ test('a person accepts a loop out of rounds on the board: the acceptance written
       const run = await objectOf(app(), R);
       const review = stepOf(run, 'review');
       assert.deepEqual(review.gate, { awaiting: false, approval: { try: 2, at: took.at, message: WHY } });
-      const words = await runWith(engine(), list(engine(), runStore.runs.read(R)));
+      const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)));
       const listed = words.steps.find((s) => s.name === 'review')!;
       assert.equal(review.message, listed.message, 'as `nemia ls` has it until the tick files what waits');
       assert.notEqual(review.message, 'exhausted', "the loop over on the person's word");

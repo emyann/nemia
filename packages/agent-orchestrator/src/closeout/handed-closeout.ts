@@ -2,7 +2,7 @@
  * The closeout a step hands the steps after it, as the tick writes it in the step's files directory (`HANDED_CLOSEOUT`): v1's envelope
  * as the person reads it, its artifacts typed, and its declared output. Pure: the files that are there are handed to it.
  */
-import { LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
+import { LOOP_REPLIES, outputFields, type StepSpec } from '../step/step.ts';
 import { declaredOutput, type Closeout } from './closeout.ts';
 import { CLOSEOUT_V1 } from './envelope.ts';
 import type { Outcome } from 'objects';
@@ -23,7 +23,7 @@ export type HandedCloseout = {
  * reader reads them (`parseCloseout`), each file it named that is `there`, by its absolute path in its files directory, then each value,
  * and the fields its `output:` declares that it gave, its `replies` with them where it gave some.
  */
-export function handedCloseout(step: Workflow, said: Closeout, there: readonly string[]): HandedCloseout {
+export function handedCloseout(step: StepSpec, said: Closeout, there: readonly string[]): HandedCloseout {
   const replies = said.output && Object.hasOwn(said.output, LOOP_REPLIES) ? [LOOP_REPLIES] : [];
   return {
     apiVersion: CLOSEOUT_V1,

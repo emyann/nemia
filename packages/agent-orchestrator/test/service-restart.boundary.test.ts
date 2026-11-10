@@ -9,7 +9,6 @@
  * The stub runs as a real process, so the file is a boundary test. The scratch-unit repro on a real systemd user manager is a by-hand
  * measure, written in the change's closeout and never in the suite.
  */
-import { rootNow } from './config-given.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -21,10 +20,13 @@ import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runOver } from './placed.ts';
+import { liveHost } from '../src/service/service.verb.ts';
+import { restartService } from '../src/service/restart.verb.ts';
+import { readPause, resumePause } from '../src/pause/pause.store.ts';
+import { engineOf, runWith as runEngine } from '../src/runtime-client.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-service-restart-');
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
 const HOME = path.join(ROOT, 'home');
 const BIN = path.join(ROOT, 'bin');
 const UNIT = path.join(ROOT, 'unit');
@@ -35,13 +37,10 @@ fs.mkdirSync(UNIT, { recursive: true });
 process.env.SYSTEMCTL_STUB = UNIT;
 process.env.PATH = `${BIN}${path.delimiter}${process.env.PATH ?? ''}`;
 
-const { liveHost } = await import('../src/service/service.verb.ts');
-const { restartService } = await import('../src/service/restart.verb.ts');
-const { readPause, resumePause } = await import('../src/pause/pause.store.ts');
-const { engineOf, runWith: runEngine } = await import('../src/runtime-client.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
-const runWith = runOver(runEngine, () => stand().layer);
+const runWith = runOver(runEngine, () => stand().layer, ENV);
 
 const OLD = 4242;
 const NEW = 5151;
@@ -125,7 +124,7 @@ function hostOf(start: string, linger: number) {
   let signalled = false;
   let newReads = 0;
   return {
-    ...liveHost(rootNow()),
+    ...liveHost(ROOT),
     machine: () => ({ platform: 'linux', wsl: false, systemd: true }),
     dirs: () => ({ home: HOME, configHome: path.join(HOME, '.config') }),
     roots: () => ({ root: ROOT, defaultRoot: ROOT }),
@@ -167,7 +166,7 @@ test('nemia service restart on a stub systemctl: the unit started once it has en
       const log = stubLog();
       assert.ok(!log.includes('start no-op'), log.join('\n'));
       assert.ok(log.indexOf('start') > log.lastIndexOf(`show active ${OLD}`), log.join('\n'));
-      assert.equal(readPause(rootNow()), null, "the first pass lifted the restart's pause");
+      assert.equal(readPause(ROOT), null, "the first pass lifted the restart's pause");
     },
   );
 
@@ -177,8 +176,8 @@ test('nemia service restart on a stub systemctl: the unit started once it has en
       conflict((m) => /systemctl --user start nemia\.service/.test(m) && !/was started/.test(m)),
     );
     assert.ok(stubLog().includes('start nothing'));
-    assert.match(readPause(rootNow())?.by ?? '', /nemia service restart/, "the restart's pause stands");
-    resumePause(rootNow());
+    assert.match(readPause(ROOT)?.by ?? '', /nemia service restart/, "the restart's pause stands");
+    resumePause(ROOT);
   });
 
   await t.test("a start systemd refuses: Conflict carrying systemd's line and the start command", async () => {
@@ -186,6 +185,6 @@ test('nemia service restart on a stub systemctl: the unit started once it has en
       restart(hostOf('fail', 0)),
       conflict((m) => /Job for nemia\.service failed\./.test(m) && /systemctl --user start nemia\.service/.test(m)),
     );
-    resumePause(rootNow());
+    resumePause(ROOT);
   });
 });

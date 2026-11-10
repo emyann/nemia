@@ -6,14 +6,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from 'test-kit/scratch';
-
-process.env.WF_ROOT = scratch('wf-verbs-skill-');
-const { REGENERATE, verbsSkill, verbsSkillOf } = await import('../src/nemia/verbs.verb.ts');
-const { TABLE } = await import('../src/command/commands.verb.ts');
-const { CLI_VERBS } = await import('../src/command/command.ts');
-const { VERBS } = await import('../src/cli/main.ts');
-const { ANSWERS, PENDING, REFUSED_FLAGS, REFUSED_WORDS } = await import('./command-words.ts');
+import { REGENERATE, verbsSkill, verbsSkillOf } from '../src/nemia/verbs.verb.ts';
+import { TABLE } from '../src/command/commands.verb.ts';
+import { CLI_VERBS } from '../src/command/command.ts';
+import { VERBS } from '../src/cli/main.ts';
+import { ANSWERS, PENDING, REFUSED_FLAGS, REFUSED_WORDS } from './command-words.ts';
 
 const SKILL = path.join(import.meta.dirname, '..', 'nemia', 'skills', 'verbs', 'SKILL.md');
 

@@ -4,7 +4,7 @@
  */
 import type { Verdict } from '../check/check.ts';
 import type { MergeState } from '../place/place.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { sandboxed, terminalSteps } from '../workflow/index.ts';
 import type { RetryAsk } from '../retry/index.ts';
 import {
@@ -42,7 +42,7 @@ import type { ClaimedAt } from '../../contracts/checkout-claim.contract.ts';
  * as such (`landingDue`'s `onHead`). The parser refuses a landing on codex, which takes no deny list. Pure.
  */
 export const filedDenies = (
-  step: Pick<Workflow, 'name' | 'gate' | 'workspace' | 'check' | 'disallowedTools'>,
+  step: Pick<StepSpec, 'name' | 'gate' | 'workspace' | 'check' | 'disallowedTools'>,
   run: Pick<Run, 'gates'>,
   landingDenied: () => readonly string[],
 ): string[] | undefined =>
@@ -55,14 +55,14 @@ export const filedDenies = (
  * person's "don't ask again" writes, reach no step's session; the rule grants a read of that one run's folder and no write. Any other
  * step is filed with its own list. Pure.
  */
-export const filedAllows = (step: Pick<Workflow, 'workspace' | 'harness' | 'allowedTools'>, runArtifacts: string): string[] | undefined =>
+export const filedAllows = (step: Pick<StepSpec, 'workspace' | 'harness' | 'allowedTools'>, runArtifacts: string): string[] | undefined =>
   readsRunArtifacts(step) ? [...new Set([...(step.allowedTools ?? []), `Read(/${runArtifacts}/**)`])] : step.allowedTools;
 
 /**
  * Whether a step is filed a rule reading its run's artifacts folder (`filedAllows`): one in the repository's own checkout
  * (`workspace: base`) on a local harness fenced by a permission mode and its rules, not by a sandbox. Pure.
  */
-export const readsRunArtifacts = (step: Pick<Workflow, 'workspace' | 'harness'>): boolean =>
+export const readsRunArtifacts = (step: Pick<StepSpec, 'workspace' | 'harness'>): boolean =>
   endsOnBase(step) && !sandboxed(step.harness ?? DEFAULT_HARNESS) && !isRemoteHarness(step.harness);
 
 /**
@@ -105,7 +105,7 @@ export type Landing =
  *   while the check ran); or the check ended and the merge it judged is no longer staged.
  */
 export function landingDue(
-  step: Workflow,
+  step: StepSpec,
   run: Run,
   own: StepStatus,
   phaseOf: (taskId: string) => TaskPhase,
@@ -161,7 +161,7 @@ export function landingDue(
  * have stopped running; undefined while either runs, and for a step that lands nothing or has landed. Pure.
  */
 const landingSettled = (
-  step: Workflow,
+  step: StepSpec,
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
 ): { session: TaskPhase; check: TaskPhase | undefined } | undefined => {
@@ -187,7 +187,7 @@ const refusedBase = (tip: string | undefined, check: TaskPhase, verdict: Verdict
  * `nemia rm` from forgetting a run whose merge nothing would then commit or abort (`forgetRefusal`). Pure.
  */
 export const landingOpen = (
-  step: Workflow,
+  step: StepSpec,
   run: Run,
   own: StepStatus,
   phaseOf: (taskId: string) => TaskPhase,
@@ -222,7 +222,7 @@ export const LANDED_CAP = 160;
  * each the run's creation; this stays the person's word alone, as the rest blocker
  * `checkoutAsked` reads it. Pure.
  */
-export const endingAsked = (run: Run, step: Workflow, asks: readonly RetryAsk[]): string | undefined =>
+export const endingAsked = (run: Run, step: StepSpec, asks: readonly RetryAsk[]): string | undefined =>
   run.steps[step.name]?.taskId
     ? asks.find((a) => a.step === step.name && a.try === tryOf(run, step.name) + 1)?.at
     : approvalOf(run, step.name)?.at;
@@ -243,7 +243,7 @@ const landedCommit = (landed: LandingRecord | undefined): boolean => landed !== 
  * `claimedAt` of a run's ending, read off its record and its asks (`checkoutHold`, `mainClaim`): `landed` is whether its try landed a
  * commit, which a filed ending that aborted, ended untouched or never landed has not. Pure.
  */
-export const endingClaimedAt = (run: Run, step: Workflow, asks: readonly RetryAsk[]): string | undefined =>
+export const endingClaimedAt = (run: Run, step: StepSpec, asks: readonly RetryAsk[]): string | undefined =>
   claimedAt({
     asked: endingAsked(run, step, asks),
     gated: hasGate(step, run),
@@ -300,7 +300,7 @@ export const onBaseNote = (run: Pick<Run, 'id' | 'branch'>, step: string, standi
  * broke says so.
  */
 export function toDecide(
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   run: Run,
   status: Assessment['status'],
   statusOf: (step: string) => StepStatus,
@@ -322,7 +322,7 @@ export function toDecide(
  * Whether the workflow has a step that acts on the base branch itself (`endsOnBase`): the folder says what happens when the work is
  * done, so nobody is handed its branch and told to type `git merge`. Pure.
  */
-export const merges = (steps: readonly Workflow[]): boolean => steps.some(endsOnBase);
+export const merges = (steps: readonly StepSpec[]): boolean => steps.some(endsOnBase);
 
 /**
  * The workflow's ending steps: the steps nothing waits on that have a gate (`hasGate`). Pure.
@@ -336,14 +336,14 @@ export const merges = (steps: readonly Workflow[]): boolean => steps.some(endsOn
  * (`quick`'s land, routed by its review), and there is nothing for a person to decide about it. It still lands on its check
  * (`landsOnCheck`), which is what the landing reads.
  */
-export const endingSteps = (steps: readonly Workflow[], run: Pick<Run, 'gates'>): Workflow[] =>
+export const endingSteps = (steps: readonly StepSpec[], run: Pick<Run, 'gates'>): StepSpec[] =>
   terminalSteps(steps).filter((s) => hasGate(s, run));
 
 /**
  * The words a step's own file says, below its frontmatter: its note alone where it names an agent, since `body` then opens with the
  * heading of that agent's instructions (`LAYER_HEADINGS` in `workflow/layers.ts`), and its whole body otherwise. Pure.
  */
-export const ownNote = (step: Pick<Workflow, 'body' | 'agent'>): string => (step.agent ? step.agent.body : step.body);
+export const ownNote = (step: Pick<StepSpec, 'body' | 'agent'>): string => (step.agent ? step.agent.body : step.body);
 
 /**
  * What a run waits on a person to decide (`toDecide`): its ending step, which approving runs or accepts — or its result branches, which a
@@ -365,7 +365,7 @@ export const toDecideWords = (run: Pick<Run, 'id' | 'branch'>, t: ToDecide): str
  */
 export function gateRefusal(
   gates: readonly string[],
-  steps: readonly Pick<Workflow, 'name'>[],
+  steps: readonly Pick<StepSpec, 'name'>[],
   said: (step: string) => string = (step) => `--gate ${step}`,
 ): string | null {
   const seen = new Set<string>();
@@ -383,5 +383,5 @@ export function gateRefusal(
  * Whether `name` is an ending at its gate that has not run: approved first (`approvedFirst`) and never filed. What `decision` and the
  * listing read where the result git already has (`resultOnBase`) was merged by hand, so the ending's gate holds nothing.
  */
-export const unrunEnding = (steps: readonly Workflow[], run: Run, name: string): boolean =>
+export const unrunEnding = (steps: readonly StepSpec[], run: Run, name: string): boolean =>
   !run.steps[name]?.taskId && steps.some((s) => s.name === name && approvedFirst(s, run));

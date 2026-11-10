@@ -5,8 +5,8 @@
  * through.
  *
  * The instruction kept in a folder and in the store, written and cleared, and the rules told and frozen, are a person's story in
- * `test/factory-rules.test.ts`; their removal with the factory, in `test/factory-start.test.ts`. `WF_ROOT` is set before the import,
- * since the modules read it as they load.
+ * `test/factory-rules.test.ts`; their removal with the factory, in `test/factory-start.test.ts`. Its store is at `ROOT`, given as
+ * `ENV`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,22 +18,23 @@ import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
 import { names } from '../../test/assessed.ts';
+import { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction, runWith as runEngine } from '../runner.ts';
+import { readFactoriesAt, setInstructionAt } from './factory.store.ts';
+import { readInstructionAt, writeInstructionText } from './instruction.store.ts';
+import { clearRules, readRules, writeRules } from './rules/rules.store.ts';
+import { main as cli } from '../cli/main.ts';
+import { engineOf } from '../runtime-client.ts';
+import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-instruction-');
 const FACTORIES = path.join(ROOT, 'factories');
 
-process.env.WF_ROOT = ROOT;
-const { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction, runWith: runEngine } = await import('../runner.ts');
-const { readFactories, setInstruction } = await import('../../testing.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 const stand = eachTest(testPlace);
-const runWith = runOver(runEngine, () => stand().layer);
-const { readInstructionAt, writeInstructionText } = await import('./instruction.store.ts');
-const { clearRules, readRules, writeRules } = await import('./rules/rules.store.ts');
-const { main: cli } = await import('../cli/main.ts');
+const runWith = runOver(runEngine, () => stand().layer, ENV);
 /** `nemia`, as a person types it, its commands given this test's place. */
-const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place);
+const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place, ENV);
 
-const { engineOf } = await import('../runtime-client.ts');
 const engine = eachTest(testEngine);
 heldUnasked(engine);
 
@@ -63,17 +64,22 @@ function filed(extra: Record<string, unknown> = {}): string {
 
 test('REFUSED: `nemia factory instruction`, the record unchanged', async (t) => {
   const rows: Array<[string, () => unknown, 'Missing' | 'Conflict' | 'Invalid', string[]]> = [
-    ['the default factory', () => setInstruction({ factory: 'default', at: { store: true } }), 'Conflict', ['nemia factory instruction']],
+    [
+      'the default factory',
+      () => setInstructionAt(ROOT, { factory: 'default', at: { store: true } }),
+      'Conflict',
+      ['nemia factory instruction'],
+    ],
     [
       'the default factory, by its handler',
       () => runWith(noEngine(), FACTORY_INSTRUCTION.handler({ factory: 'default' })),
       'Conflict',
       ['nemia factory instruction'],
     ],
-    ['a name with no factory', () => setInstruction({ factory: 'nope', at: { store: true } }), 'Missing', ['nope', 'pipao']],
-    ['a record that does not read', () => setInstruction({ factory: 'torn', at: { store: true } }), 'Invalid', ['torn', 'JSON']],
-    ['an absolute path', () => setInstruction({ factory: 'pipao', at: { path: '/etc/passwd' } }), 'Invalid', ['`/etc/passwd`']],
-    ['a path that climbs out', () => setInstruction({ factory: 'pipao', at: { path: '../x' } }), 'Invalid', ['`../x`']],
+    ['a name with no factory', () => setInstructionAt(ROOT, { factory: 'nope', at: { store: true } }), 'Missing', ['nope', 'pipao']],
+    ['a record that does not read', () => setInstructionAt(ROOT, { factory: 'torn', at: { store: true } }), 'Invalid', ['torn', 'JSON']],
+    ['an absolute path', () => setInstructionAt(ROOT, { factory: 'pipao', at: { path: '/etc/passwd' } }), 'Invalid', ['`/etc/passwd`']],
+    ['a path that climbs out', () => setInstructionAt(ROOT, { factory: 'pipao', at: { path: '../x' } }), 'Invalid', ['`../x`']],
     [
       'two places at once, by the check, before anything is read',
       () => main(['factory', 'instruction', 'pipao', '--path', 'X.md', '--store'], noEngine()),
@@ -115,7 +121,7 @@ test('REFUSED: `nemia factory instruct`, nothing written', async (t) => {
   );
   await t.test('blank words', () => {
     filed({ instruction: { store: true } });
-    assert.throws(() => writeInstructionText('pipao', ' \n'), refused('Invalid', 'pipao'));
+    assert.throws(() => writeInstructionText(ROOT, 'pipao', ' \n'), refused('Invalid', 'pipao'));
     assert.ok(!fs.existsSync(path.join(storeFolder('pipao'), 'NEMIA.md')));
   });
 });
@@ -146,7 +152,7 @@ test('a rules or instruction file that cannot be told is read with why, and neve
     const linked = readRules(RULES);
     assert.equal(linked.words, null);
     names(linked.error, 'RULES.md', 'link');
-    writeRules({ name: 'pipao' }, 'Our own words.');
+    writeRules(ROOT, { name: 'pipao' }, 'Our own words.');
     assert.equal(fs.lstatSync(RULES).isSymbolicLink(), false);
     assert.equal(fs.readFileSync(outside, 'utf8'), 'Words from elsewhere.\n', 'never written through');
     assert.deepEqual(readRules(RULES), { words: 'Our own words.', error: null });
@@ -155,7 +161,7 @@ test('a rules or instruction file that cannot be told is read with why, and neve
     filed();
     fs.mkdirSync(RULES, { recursive: true });
     names(readRules(RULES).error, 'RULES.md', 'not a file');
-    assert.equal(clearRules({ name: 'pipao' }), true);
+    assert.equal(clearRules(ROOT, { name: 'pipao' }), true);
     assert.equal(fs.existsSync(RULES), false);
   });
   await t.test('instruction in the store: a link is read with why, and a write replaces it without touching what it pointed at', () => {
@@ -163,7 +169,7 @@ test('a rules or instruction file that cannot be told is read with why, and neve
     fs.mkdirSync(storeFolder('pipao'), { recursive: true });
     fs.symlinkSync(outside, path.join(storeFolder('pipao'), 'NEMIA.md'));
     names(factoryInstruction(ROOT, 'pipao').error, 'link');
-    writeInstructionText('pipao', 'mine');
+    writeInstructionText(ROOT, 'pipao', 'mine');
     assert.equal(fs.readFileSync(outside, 'utf8'), 'Words from elsewhere.\n');
     assert.ok(!fs.lstatSync(path.join(storeFolder('pipao'), 'NEMIA.md')).isSymbolicLink());
   });
@@ -194,7 +200,7 @@ test('a rules or instruction file that cannot be told is read with why, and neve
     filed({ instruction: 5 });
     fs.writeFileSync(recordOf('half'), JSON.stringify({ repos: ['/x'], instruction: { store: false } }));
     assert.deepEqual(
-      readFactories().map((l) => ('error' in l ? [l.name, l.error.includes('`instruction')] : [l.name, 'read'])),
+      readFactoriesAt(ROOT).map((l) => ('error' in l ? [l.name, l.error.includes('`instruction')] : [l.name, 'read'])),
       [
         ['half', true],
         ['pipao', true],

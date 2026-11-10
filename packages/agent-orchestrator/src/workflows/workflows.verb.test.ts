@@ -2,8 +2,8 @@
  * The board's workflow entries (`WORKFLOWS_WRITE`, `WORKFLOWS_REMOVE`, `WORKFLOWS_STEP`), and the folders it lists (`foldersLoaded`): a
  * folder written from its steps, or refused in the writer's words whole; a folder of yours removed whole, or refused with nothing removed
  * while it is not yours or something still needs it; each folder listed loaded, or with the loader's refusal, never failing the others;
- * and one step of a folder, or none, with the names of those it has. `WF_ROOT` is set before the import, since the store reads it as it
- * loads.
+ * and one step of a folder, or none, with the names of those it has. On a store of its own at `ROOT`,
+ * given as `ENV`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,30 +15,31 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 import { storeGiven } from '../../test/config-given.ts';
+import { foldersLoaded, WORKFLOWS_REMOVE, WORKFLOWS_STEP, WORKFLOWS_WRITE } from './workflows.verb.ts';
+import { runWith as runEngine } from '../runner.ts';
+import { engineOf } from '../runtime-client.ts';
+import { workflowVersion } from '../folder/version.store.ts';
+import { removeWorkflowAt } from '../folder/write.store.ts';
+import { filesStoreAt } from '../record/files.store.ts';
+import * as verbs from '../inbox/inbox.store.ts';
+import { StoreRoot } from '../config/root.store.ts';
+import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
+import { workflowDoorMemory } from './memory.store.ts';
+import { AgentDoor } from '../agents/agent-door.store.ts';
+import { agentDoorMemory } from '../agents/agent-memory.store.ts';
+import { SkillDoor } from '../skills/skill-door.store.ts';
+import { skillDoorMemory } from '../skills/skill-memory.store.ts';
+import { doorFrom } from '../../test/door-walks.ts';
+import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-workflows-root-');
-process.env.WF_ROOT = ROOT;
-const { foldersLoaded, WORKFLOWS_REMOVE, WORKFLOWS_STEP, WORKFLOWS_WRITE } = await import('./workflows.verb.ts');
-const { runWith: runEngine } = await import('../runner.ts');
-const { engineOf } = await import('../runtime-client.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
-const runWith = runOver(runEngine, () => stand().layer);
-const { filesStore: runStore } = await import('../record/files.store.ts');
-const { workflowVersion } = await import('../folder/version.store.ts');
-const { removeWorkflowAt } = await import('../folder/write.store.ts');
-const verbs = await import('../inbox/inbox.store.ts');
-const { StoreRoot } = await import('../config/root.store.ts');
+const runWith = runOver(runEngine, () => stand().layer, ENV);
+const runFiles = filesStoreAt(ROOT);
 /** `nemia inbox queue`'s verb run at this test's store root and settings, as `nemia` gives them: its answer, or its refusal thrown. */
-const queueInInbox = (...args: Parameters<typeof verbs.queueInInbox>) =>
-  Effect.runSync(storeGiven(ROOT, process.env)(verbs.queueInInbox(...args)));
-const { Conflict, Invalid, Missing } = await import('../refusal/refusal.ts');
-const { workflowDoorMemory } = await import('./memory.store.ts');
-const { AgentDoor } = await import('../agents/agent-door.store.ts');
-const { agentDoorMemory } = await import('../agents/agent-memory.store.ts');
-const { SkillDoor } = await import('../skills/skill-door.store.ts');
-const { skillDoorMemory } = await import('../skills/skill-memory.store.ts');
-const { doorFrom } = await import('../../test/door-walks.ts');
+const queueInInbox = (...args: Parameters<typeof verbs.queueInInbox>) => Effect.runSync(storeGiven(ROOT, ENV)(verbs.queueInInbox(...args)));
 
 const e = () => engineOf(engine().layer);
 
@@ -145,7 +146,7 @@ async function refused(dir: string, kind: new (...args: never[]) => Error, messa
 
 /** A run's record whose steps are read from `dir`: frozen at its start, or not. */
 function runOn(id: string, dir: string, frozen: boolean): void {
-  runStore.runs.create({
+  runFiles.runs.create({
     id,
     repo: dir,
     workspace: dir,
@@ -292,11 +293,11 @@ test('REFUSED: a run that froze no workflow reads it from the folder, and one th
     Conflict,
     `${dir} is still needed: run r-reads froze no workflow at its start and reads its steps from ${dir}: nemia rm r-reads forgets it. Nothing was removed.`,
   );
-  runStore.runs.forget('r-reads');
+  runFiles.runs.forget('r-reads');
   runOn('r-froze', dir, true);
   await remove(dir);
   assert.equal(fs.existsSync(dir), false);
-  runStore.runs.forget('r-froze');
+  runFiles.runs.forget('r-froze');
 });
 
 test('REFUSED: a card queued on the folder, freed by the commands its refusal names, and a card not queued does not stop the removal', async () => {

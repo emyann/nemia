@@ -26,7 +26,7 @@ import {
   type SpendOf,
   stepSpend,
 } from '../run.ts';
-import { loopSpan, type Workflow } from '../workflow.ts';
+import { loopSpan, type StepSpec } from '../workflow.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import type { Retry } from '../retry/index.ts';
 import { stepRaise } from '../retry/index.ts';
@@ -82,7 +82,7 @@ export const tryShort = (t: StepTry): TryShort => ({
 });
 
 /** A step's frontmatter as the object's spec holds it, each null where the step does not set it. */
-const specStepOf = (s: Workflow): RunSpec['steps'][number] => ({
+const specStepOf = (s: StepSpec): RunSpec['steps'][number] => ({
   name: s.name,
   after: [...s.after],
   input: [...(s.input ?? [])],
@@ -118,8 +118,8 @@ const specOf = (run: Run, at: RunReading): RunSpec => ({
   work: isRepositoryRun(run) ? null : run.workspace,
   workflowDir: run.workflowDir,
   try: tryOf(run, at.home),
-  after: run.after ?? [],
-  context: run.context ?? [],
+  after: [...(run.after ?? [])],
+  context: [...(run.context ?? [])],
   from: run.from ? { inbox: run.from.inbox } : null,
 });
 
@@ -150,7 +150,7 @@ function costOf(run: Run, name: string, at: RunReading): Pick<RunStepStatus, 'sp
  * What a round of a loop cost: the session of each try the package's `timeline` counts in that round — the steps the loop files again
  * (`loopSpan`), a session each once, which a try a recheck reached has none of — added up (`addSpend`).
  */
-function roundSpend(clock: Timeline, steps: readonly Workflow[], total: TimelineTotal, spendOf: SpendOf): Spend {
+function roundSpend(clock: Timeline, steps: readonly StepSpec[], total: TimelineTotal, spendOf: SpendOf): Spend {
   const looping = steps.find((s) => s.name === total.loop);
   const names = looping ? loopSpan(steps, looping) : [];
   return addSpend(
@@ -191,7 +191,7 @@ const prunedOf = (run: Run): RunStatus['pruned'] =>
 
 /** What of a run `nemia prune` would find on disk: two stats, and no git. */
 function onDiskOf(run: Run, home: string): RunStatus['onDisk'] {
-  const files = path.dirname(artifactsDir(run, '_'));
+  const files = path.dirname(artifactsDir(home, run, '_'));
   return { worktrees: isRepositoryRun(run) && fs.existsSync(path.join(home, 'worktrees', run.id)), files: fs.existsSync(files) };
 }
 
@@ -244,11 +244,12 @@ const asksOf = (judged: RunReading['judged'], name: string): Pick<RunStepStatus,
  * One more observation for a blocked session's last line (`lastLineOf`).
  */
 const stepStatusOf = Effect.fnUntraced(function* (name: string, at: StepAt) {
+  const home = yield* StoreRoot;
   const { e, run, steps, views, judged, used, clock, said: memoSaid, listed } = at;
   const taskId = run.steps[name]?.taskId ?? null;
   const judgedContext = steps.find((s) => s.name === name)?.context;
-  const current = currentOf(at, name);
-  const tries = triesIn(at, name, current);
+  const current = currentOf(home, at, name);
+  const tries = triesIn(home, at, name, current);
   const latest = tries.find((t) => t.current);
   const lastLine = !listed && atHarness(current) ? yield* Effect.promise(() => lastLineOf(e, views, taskId, memoSaid)) : null;
   const status: RunStepStatus = {
@@ -287,7 +288,7 @@ const stepStatusOf = Effect.fnUntraced(function* (name: string, at: StepAt) {
 });
 
 /** Where the run's work ended up (`resultBranches`), where a result step has a branch. */
-const resultOf = (run: Run, steps: readonly Workflow[]): Pick<RunStatus, 'result'> => {
+const resultOf = (run: Run, steps: readonly StepSpec[]): Pick<RunStatus, 'result'> => {
   const result = resultBranches(run, steps);
   return result.length ? { result } : {};
 };
@@ -303,7 +304,7 @@ const restOf = (run: Run, at: RunReading, kinds: readonly Drift[]) => {
     cancelledAt: run.cancelledAt ?? null,
     pruned: prunedOf(run),
     onDisk: { worktrees: false, files: false },
-    holdUntil: judged.holding && run.hold ? run.hold.until : [],
+    holdUntil: judged.holding && run.hold ? [...run.hold.until] : [],
     read: runRead(at),
     waitingOnYou: judged.waitingOnYou,
     waitingOnYouWords: judged.waitingOnYouWords,
@@ -464,14 +465,16 @@ const tryIn = (runId: string, step: string, tries: readonly StepTry[], asked: st
 
 /** A step's tries, earliest first, the current one last (`StepTries`). */
 export const stepTries = Effect.fn('stepTries')(function* (runId: string, step: string) {
+  const home = yield* StoreRoot;
   const at = yield* stepRead(runId, step);
-  return { tries: triesIn(at, step) };
+  return { tries: triesIn(home, at, step) };
 });
 
 /** One try of a step (`StepTry`): `asked`, or its latest. */
 export const stepTry = Effect.fn('stepTry')(function* (runId: string, step: string, asked?: string) {
+  const home = yield* StoreRoot;
   const at = yield* stepRead(runId, step);
-  return yield* tryIn(runId, step, triesIn(at, step), asked);
+  return yield* tryIn(runId, step, triesIn(home, at, step), asked);
 });
 
 export type { TryCloseout };

@@ -21,7 +21,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { approvalFile, approveRun, askFile, list, retryRun, runStore } from 'agent-orchestrator';
+import { approvalFile, approveRun, askFile, list, retryRun, runsAtOnce } from 'agent-orchestrator';
 import { answerText, approvedAnswerText, onYouWords, type Question } from 'agent-orchestrator/run';
 import { parseWorkflow } from 'agent-orchestrator/workflow';
 import { Effect } from 'effect';
@@ -289,7 +289,7 @@ test('POST …/approve: what it refuses — a body, a run or step not there, emp
         await refused422(await approveOver('design', { answers: [{ question: cut.title, chose: ['a'] }] }, BOARD, id), id),
         /^"Where do the answers go\?" is not answered/,
       );
-      assert.ok(!fs.existsSync(approvalFile(id, 'design', 1)), 'no approval file');
+      assert.ok(!fs.existsSync(approvalFile(root, id, 'design', 1)), 'no approval file');
       const noList = await approveOver('design', { answers: 'a' }, BOARD, id);
       assert.equal(noList.status, 400, 'answers that are no list `RunApprove` reads');
       assert.ok(((await noList.json()) as { field?: string }).field?.startsWith('payload.answers'));
@@ -304,7 +304,7 @@ test('POST …/approve: what it refuses — a body, a run or step not there, emp
           JSON.stringify(answers),
         );
       }
-      assert.ok(!fs.existsSync(approvalFile(none, 'plan', 1)), 'no approval file');
+      assert.ok(!fs.existsSync(approvalFile(root, none, 'plan', 1)), 'no approval file');
     },
   );
 });
@@ -328,7 +328,7 @@ test('POST …/approve with `budgets`: the caps a person gives the later steps w
     gatedRun(id);
     const res = await approveOver('plan', { budgets: [{ step: 'review', usd: 4 }] }, BOARD, id);
     assert.equal(res.status, 202, await res.clone().text());
-    const written = JSON.parse(fs.readFileSync(approvalFile(id, 'plan', 1), 'utf8')) as { budgets?: unknown };
+    const written = JSON.parse(fs.readFileSync(approvalFile(root, id, 'plan', 1), 'utf8')) as { budgets?: unknown };
     assert.deepEqual(written.budgets, { review: 4 });
     const plan = (await object(id)).status.steps.find((s) => s.name === 'plan');
     assert.equal(plan?.gate?.budgets?.from, 'approved');
@@ -368,7 +368,7 @@ test('a person approves a gate on the board: the need on the list and the detail
       assert.deepEqual(run.status.waitingOnYou, ['plan']);
       assert.deepEqual(run.status.waitingOnYouWords, ['approve plan']);
 
-      const words = await runWith(engine(), list(engine(), runStore.runs.read(R)));
+      const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)));
       assert.deepEqual(run.status.waitingOnYouWords, onYouWords(words), 'as `nemia ls` has it after `→ waiting on you:`');
       const listed = await summary();
       assert.deepEqual(listed.waitingOnYou, words.waitingOnYou);
@@ -420,10 +420,10 @@ test('a person approves a gate on the board: the need on the list and the detail
       took = (await res.json()) as Approved;
       assert.deepEqual(
         { ...took, at: undefined },
-        { step: 'plan', try: 1, at: undefined, message: 'Ship the second reading.', file: approvalFile(R, 'plan', 1) },
+        { step: 'plan', try: 1, at: undefined, message: 'Ship the second reading.', file: approvalFile(root, R, 'plan', 1) },
       );
       assert.ok(!Number.isNaN(Date.parse(took.at)), took.at);
-      assert.deepEqual(JSON.parse(fs.readFileSync(approvalFile(R, 'plan', 1), 'utf8')), {
+      assert.deepEqual(JSON.parse(fs.readFileSync(approvalFile(root, R, 'plan', 1), 'utf8')), {
         step: 'plan',
         try: 1,
         at: took.at,
@@ -442,7 +442,7 @@ test('a person approves a gate on the board: the need on the list and the detail
     assert.deepEqual(plan.gate, { awaiting: false, approval: { try: 1, at: took.at, message: 'Ship the second reading.' } });
     assert.equal(plan.approve, null);
     assert.deepEqual([run.status.waitingOnYou, run.status.waitingOnYouWords], [[], []]);
-    const words = await runWith(engine(), list(engine(), runStore.runs.read(R)));
+    const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)));
     assert.equal(plan.message, words.steps.find((s) => s.name === 'plan')?.message, 'as `nemia ls` has it until the tick files what waits');
     assert.deepEqual((await summary()).waitingOnYou, words.waitingOnYou, 'and nobody waited on, as `nemia ls` has it');
   });
@@ -462,7 +462,7 @@ test('a person approves a gate on the board: the need on the list and the detail
     assert.equal(res.status, 202, await res.clone().text());
     const wordless = (await res.json()) as Approved;
     assert.equal(wordless.message, null);
-    const { at: when, ...written } = JSON.parse(fs.readFileSync(approvalFile(id, 'plan', 1), 'utf8'));
+    const { at: when, ...written } = JSON.parse(fs.readFileSync(approvalFile(root, id, 'plan', 1), 'utf8'));
     assert.deepEqual([written, when], [{ step: 'plan', try: 1 }, wordless.at]);
     assert.deepEqual((await object(id)).status.steps[0].gate, { awaiting: false, approval: { try: 1, at: wordless.at, message: null } });
   });
@@ -481,7 +481,7 @@ test('a person approves a gate on the board: the need on the list and the detail
       const answered = (await res.json()) as Approved;
       const words = approvedAnswerText('design', [cut, where], answers, 'Go.');
       assert.equal(answered.message, words);
-      const written = JSON.parse(fs.readFileSync(approvalFile(id, 'design', 1), 'utf8')) as { message: string };
+      const written = JSON.parse(fs.readFileSync(approvalFile(root, id, 'design', 1), 'utf8')) as { message: string };
       assert.equal(written.message, words);
       assert.ok(words.startsWith("The person's answers to design's questions:"), words);
       assert.ok(words.endsWith('Note: Go.\n\nAnswered by: person, on the board'), words);
@@ -516,7 +516,7 @@ test('a person sends a step back from its gate: refused without words, asked wit
     async () => {
       const back = await ask('plan', { mode: 'continue', message: 'Store the flag before you parse it.' }, id);
       assert.equal(back.status, 202, await back.clone().text());
-      assert.deepEqual(await back.json(), { try: 2, file: askFile(id, 'plan', 2), stopFirst: false });
+      assert.deepEqual(await back.json(), { try: 2, file: askFile(root, id, 'plan', 2), stopFirst: false });
       const plan = (await object(id)).status.steps[0];
       assert.deepEqual(plan.asked, {
         try: 2,
@@ -561,7 +561,7 @@ test('a person sends a step back from its gate: refused without words, asked wit
       ];
       const back = await ask('design', { mode: 'continue', message: 'Cut it smaller.', answers }, asks);
       assert.equal(back.status, 202, await back.clone().text());
-      const written = JSON.parse(fs.readFileSync(askFile(asks, 'design', 2), 'utf8')) as { message: string };
+      const written = JSON.parse(fs.readFileSync(askFile(root, asks, 'design', 2), 'utf8')) as { message: string };
       assert.equal(written.message, answerText([cut, where], answers, 'Cut it smaller.'));
       assert.deepEqual(asked(asks), ['retry-design-2']);
     },

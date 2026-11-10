@@ -12,7 +12,7 @@ import { filedRefusal, lineOf } from '../keys/index.ts';
 import { filedConfig, tryModel } from '../filed/filed.ts';
 import { budgetOf, budgetUsdFor, stepSpend, type SpendOf } from '../status/status.ts';
 import { filedAt, toldOf, type StepTold } from '../tick/told.verb.ts';
-import type { Workflow } from '../workflow.ts';
+import type { StepSpec } from '../workflow.ts';
 import { retryable, retryRefusal, type RetryAsk, type RetryHow } from './index.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { runsAtOnce } from '../runs/runs.store.ts';
@@ -99,7 +99,7 @@ export const retryRun = Effect.fn('retry')(function* (
     const { stray } = written;
     const why = yield* tried(
       () =>
-        refusal(runsAtOnce.asks.read(id).asks) ??
+        refusal(runsAtOnce(home).asks.read(id).asks) ??
         strayAsk(file, stray, `try ${ask.try} of ${stepName}`, `nemia retry ${id} ${stepName}`) ??
         `try ${ask.try} of ${stepName} is already asked for. Wait for it: nemia ls ${id}.`,
     );
@@ -123,8 +123,8 @@ export const retryRun = Effect.fn('retry')(function* (
  */
 function tryRefused(
   run: Run,
-  steps: readonly Workflow[],
-  step: Workflow,
+  steps: readonly StepSpec[],
+  step: StepSpec,
   how: RetryHow,
   spendOf: SpendOf,
   denied: readonly string[],

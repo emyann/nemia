@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { askingTry, budgetOf, budgetUsdFor, owedFields, spentAcceptances, taskSpend, type RepositoryRun, type Run } from '../run.ts';
 import { taskUsage, type AttemptReason, type TaskClock } from '../timeline/timeline.ts';
 import type { EarlierTry } from '../retry/retry-ask.ts';
-import type { OutputSchema, Workflow } from '../workflow.ts';
+import type { OutputSchema, StepSpec } from '../workflow.ts';
 import { closeoutHashOf, type Closeout } from '../closeout/index.ts';
 import { keptDeclared } from '../pinned/pinned.ts';
 import { run, step } from '../../test/assessed.ts';
@@ -95,7 +95,7 @@ test("taskUsage: a step's usage counts the resumed attempts that rebuilt their c
 });
 
 test('budgetUsdFor and budgetOf: what is left of the cap in force goes to the engine', async (t) => {
-  const capped: Workflow = { ...step('implement'), harness: 'claude', budget: 3 };
+  const capped: StepSpec = { ...step('implement'), harness: 'claude', budget: 3 };
   const onRecord = (record?: Run['steps'][string]): Run =>
     ({ id: 'r1', brief: 'b', workflowDir: '/w', createdAt: 'x', steps: record ? { implement: record } : {} }) as Run;
   const cost = (usd: number) => ({ usd, measured: 1, unmeasured: 0 });
@@ -129,9 +129,9 @@ const schemaOf = (...fields: string[]): OutputSchema => ({
   additionalProperties: false,
 });
 /** `implement` as a revision followed after its try was filed declares it: `goal` and a new `why`. */
-const GROWN: Workflow[] = [{ ...step('implement'), output: { file: 'implement.schema.json', schema: schemaOf('goal', 'why') } }];
+const GROWN: StepSpec[] = [{ ...step('implement'), output: { file: 'implement.schema.json', schema: schemaOf('goal', 'why') } }];
 /** The same step as it was filed: `goal` alone. */
-const FILED: Workflow[] = [{ ...step('implement'), output: { file: 'implement.schema.json', schema: schemaOf('goal') } }];
+const FILED: StepSpec[] = [{ ...step('implement'), output: { file: 'implement.schema.json', schema: schemaOf('goal') } }];
 /** A run on `GROWN` whose `implement` try's record says `record` of its filing, as `runRecord` reads it (`keptDeclared`). */
 const filedAs = (record: { declared?: string[]; closeoutHash?: string }): Run =>
   keptDeclared(run({ implement: 'i1' }, { steps: { implement: { taskId: 'i1', ...record } }, workflow: GROWN }));
@@ -143,7 +143,7 @@ const LOOPING: OutputSchema = {
   required: ['findings', 'again'],
   additionalProperties: false,
 };
-const LOOP: Workflow[] = [
+const LOOP: StepSpec[] = [
   { ...step('implement'), check: 'npm test' },
   { ...step('review', ['implement']), output: { file: 'review.schema.json', schema: LOOPING }, loop: 'implement', rounds: 3 },
   step('ship', ['review']),

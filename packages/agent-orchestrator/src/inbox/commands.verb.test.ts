@@ -1,7 +1,6 @@
 /**
  * `nemia inbox from` (`INBOX_FROM`), on the command line alone, and its print. And `nemia inbox` (`INBOX`): the cards in play
- * by default, every card with `--all`, each started card in its run's phase. `WF_ROOT` is set before the import, since the store
- * reads it as it loads.
+ * by default, every card with `--all`, each started card in its run's phase.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,15 +12,16 @@ import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
 import { Effect } from 'effect';
+import { INBOX, INBOX_FROM } from './commands.verb.ts';
+import { runWith as runEngine } from '../runtime-client.ts';
+import { engineOf } from '../runtime-client.ts';
+import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-inbox-card-');
-process.env.WF_ROOT = ROOT;
-const { INBOX, INBOX_FROM } = await import('./commands.verb.ts');
-const { runWith: runEngine } = await import('../runtime-client.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 const stand = eachTest(testPlace);
-const runWith = runOver(runEngine, () => stand().layer);
+const runWith = runOver(runEngine, () => stand().layer, ENV);
 
-const { engineOf } = await import('../runtime-client.ts');
 const engine = eachTest(testEngine);
 heldUnasked(engine);
 

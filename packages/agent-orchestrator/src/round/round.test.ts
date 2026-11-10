@@ -24,7 +24,7 @@ import {
 import { closeoutHashOf } from '../closeout/index.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import type { EarlierTry } from '../retry/retry-ask.ts';
-import type { OutputSchema, Workflow } from '../workflow.ts';
+import type { OutputSchema, StepSpec } from '../workflow.ts';
 import { aRead, names, namesFor, phases, run, step, STEPS } from '../../test/assessed.ts';
 import { decision } from '../decide/decide.ts';
 import { roundOffers } from './round.ts';
@@ -56,14 +56,14 @@ const LOOPING: OutputSchema = {
   required: ['findings', 'again'],
 };
 /** implement, checked → review, looping back to it with `rounds: 3` — and ship, after the loop. */
-const LOOP: Workflow[] = [
+const LOOP: StepSpec[] = [
   { ...step('implement'), check: 'npm test' },
   { ...step('review', ['implement']), output: { file: 'review.schema.json', schema: LOOPING }, loop: 'implement', rounds: 3 },
   step('ship', ['review']),
 ];
 const [IMPLEMENT, LOOPING_REVIEW] = [LOOP[0], LOOP[1]];
 /** implement checked with a $3 budget, in the loop. */
-const BUDGETED_LOOP: Workflow[] = [{ ...IMPLEMENT, budget: 3 }, LOOPING_REVIEW, LOOP[2]];
+const BUDGETED_LOOP: StepSpec[] = [{ ...IMPLEMENT, budget: 3 }, LOOPING_REVIEW, LOOP[2]];
 const FOUND = [{ file: 'src/run.ts', line: 183, what: 'a producer with no findings reads as done' }];
 const reviewed = (again: unknown): Closeout => ({
   outcome: 'done',
@@ -121,7 +121,7 @@ const refusalOf = (a: { refusal: string } | object): string =>
 test('acceptAsk: what `nemia approve` takes', async (t) => {
   const said = saidIn(3, true);
   const r = inRound(3);
-  const accept = (r: Run, name: string | undefined, message: string | undefined, more: Partial<{ s: typeof said; w: Workflow[] }> = {}) =>
+  const accept = (r: Run, name: string | undefined, message: string | undefined, more: Partial<{ s: typeof said; w: StepSpec[] }> = {}) =>
     acceptAsk(more.w ?? LOOP, r, name, message, ALL_SUCCEEDED, more.s ?? said, asked);
   await t.test('a loop out of rounds with `again` still true, keyed by its try; the only loop needs no naming', () => {
     assert.deepEqual(accept(r, 'review', ENOUGH), { step: 'review', try: 3 });
@@ -231,7 +231,7 @@ test('roundAsk: what `nemia retry --round` takes and refuses', async (t) => {
     names(noLoop, 'implement has no `loop:`', 'loops close at review', 'nemia retry r-1 implement');
     names(refusalOf(ask(inRound(3), saidIn(3, true), ALL_SUCCEEDED, 'deploy')), 'r-1 has no step "deploy"');
     names(refusalOf(roundAsk(STEPS, run({ implement: 't1', review: 't2' }), undefined, ALL_SUCCEEDED)), 'no step of r-1 has `loop:`');
-    const two: Workflow[] = [
+    const two: StepSpec[] = [
       ...LOOP.slice(0, 2),
       step('docs', ['review']),
       { ...step('proof', ['docs']), output: { file: 'proof.json', schema: LOOPING }, loop: 'docs', rounds: 2 },
@@ -344,7 +344,7 @@ test('roundsDue and spentRoundAsks: which round is due, and which asks are spent
 
 test('roundFiled: a round moves every step of the loop behind it', async (t) => {
   await t.test("the target continued under its next try's id, the rest unfiled, the record given unwritten", () => {
-    const chain: Workflow[] = [IMPLEMENT, step('test', ['implement']), { ...LOOPING_REVIEW, after: ['test'] }];
+    const chain: StepSpec[] = [IMPLEMENT, step('test', ['implement']), { ...LOOPING_REVIEW, after: ['test'] }];
     const where = { workspace: '/wt', branch: 'wf/r-1/implement' };
     const steps = {
       implement: { taskId: 'r-1-implement', ...where, check: { taskId: 'r-1-implement-check' } },

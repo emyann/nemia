@@ -22,15 +22,17 @@ too, which holds parity with this one until the in-process reads retire.
 - **The store's root is a service, `StoreRoot` (`src/config/root.store.ts`), given where a program is composed** —
   `src/cli/main.ts` and the api's `app.ts`, each from `WF_ROOT` through `storeConfigLayer(env)`, which gives the store's settings beside it (`StoreConfig`) — and a store function takes it as a
   required `home: string` with no default. `test/root-given.test.ts` refuses by name a new module-level root, a parameter defaulted to
-  one, and a new line of a body that reads one — the shape most of the debt is in, since such a function takes no root at all;
-  `test/global-roots.baseline.ts` counts the lines that still do, per file, and only shrinks.
+  one, and a line of a body that reads one, with no baseline: none is left. A test imports `src` at its head and hands its store
+  as an environment record (`const ENV: Env = { ...process.env, WF_ROOT: ROOT }`) to `runOver`, `runGiven`, `staged({ …, env })`,
+  `main(argv, e, undefined, place, ENV)`, `engine(ENV)` and `configGiven(ROOT, ENV)`; only `test/ambient.ts` writes a `WF_` variable
+  as it loads (`tools/guards/test/env-given.test.ts`).
 - **`src/factory/servers/` is the store that already takes its root by parameter**: `servers.store.ts`'s functions take a required
   `home: string` first, read from `StoreRoot` by `servers.verb.ts`'s handlers, which take their input alone, and by
-  the pass, which `advanceRun` hands to `filedAt` (`src/tick/told.verb.ts`). Copy it, not `level.store.ts`, for a new
-  per-factory file: it is in no line of `test/global-roots.baseline.ts`, and the baseline only shrinks.
+  the pass, which `advanceRun` hands to `filedAt` (`src/tick/told.verb.ts`). Copy it for a new per-factory file.
 - **Every test process starts with `WF_ROOT`, `AE_ROOT` and `HOME` pointed at throwaway folders** (`test/ambient.ts`, loaded with
-  `--import`), and the throwaway home carries a test git identity: a module that pins a root as it loads pins a throwaway one, and
-  `os.homedir()` answers a throwaway too. A test that needs the person's own home reads `REAL_HOME`.
+  `--import`), and the throwaway home carries a test git identity: a test that names no store of its own reads the throwaway
+  (`STORE`), and `os.homedir()` answers a throwaway too. The root-less helpers of `testing.ts` (`addFactory`, `readFactories`, …) read
+  the process's `WF_ROOT` when called: a test with a store of its own calls their `…At(ROOT, …)` forms (`src/factory/factory.store.ts`). A test that needs the person's own home reads `REAL_HOME`.
 - **A test is given its place by name**: `const stand = eachTest(testPlace);` with `runOver(runEngine, () => stand().layer)`
   (`test/placed.ts`), new for each test, and a verb it answers itself it answers with `placeOver` (`test/place-over.ts`), never a
   planted folder. The test place's merge is by file, with no rename, ignore rule, hook, lock or deadline: a test that needs one of
@@ -115,7 +117,7 @@ too, which holds parity with this one until the in-process reads retire.
 - **A seeded finished step with a worktree on disk owes a hand-off until its record says `handedOff`** (`handOffOwed`).
 - **A run is read and written through the Run door (`RunDoor`, `src/runs/runs.store.ts`), a `Context.Reference` whose default is
   the files**: a test that only needs a run to exist gives its programs one `runDoorMemory()` (`src/runs/memory.store.ts`, imported
-  by path, after the file sets `WF_ROOT`) and plants the run through it; code that reads the door at once (`runsAtOnce`) reads
+  by path) and plants the run through it; code that reads the door at once (`runsAtOnce(home)`) reads
   the files whatever door a program was given, so a test whose verb reaches it stays on files. A write breaking the model's `Run` is
   refused `Invalid`: build a fixture's task ids with `stepTaskId`. A run from a card is refused `Conflict` while another run from it
   stands: the files hold it by an exclusive claim, `<root>/started/<card>.json`, removed with the run that it names (`runs.forget`),
@@ -167,8 +169,8 @@ too, which holds parity with this one until the in-process reads retire.
   `src/subscription/subscription.store.ts`), the revision ledger through the Ledger door (`LedgerDoor`, `src/revisions/revisions.store.ts`)
   and the feed through the Feed door (`FeedDoor`, `src/feed/feed.store.ts`), each rooted as the Factory door is**: a program that yields
   one is given `StoreRoot`, or a test gives it `subscriptionDoorMemory()`, `ledgerDoorMemory()` or `feedDoorMemory()` (each a
-  `memory.store.ts` beside its store). A synchronous caller still on the module spellings (`listSubscriptions`, `ledgerOf`, `readFeed`, …)
-  reads the module's root whatever door was given, counted per door in `test/ledger-door.baseline.ts` and `test/feed-door.baseline.ts`;
+  `memory.store.ts` beside its store). A synchronous caller still on the synchronous spellings (`listSubscriptions`, `ledgerOf`, `readFeed`, …)
+  reads the files at the root it hands them whatever door was given, counted per door in `test/ledger-door.baseline.ts` and `test/feed-door.baseline.ts`;
   none is left on the subscriptions' (`src/subscription/subscription.store.test.ts` refuses one). The feed's fold memo is `emitFeed`'s, never the layer's.
 - **A file written back is decoded by a `StructWithRest`**: a `Struct` strips the keys it does not name, and a record written by a newer
   tick keeps them. `Struct({})` accepts an array; a struct with a key refuses one. A frozen step is decoded by `FrozenStepSchema`

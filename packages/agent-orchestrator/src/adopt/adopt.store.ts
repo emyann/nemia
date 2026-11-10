@@ -15,7 +15,7 @@ import { parseInboxCard } from '../inbox/index.ts';
 import { factoriesDirAt } from '../factory/door/factories.store.ts';
 import type { Factory, FactoryTemplate } from '../factory/factory.ts';
 import { readRules, rulesAtHome } from '../factory/rules/rules.store.ts';
-import { appliedDirAt, digestOf, entriesIn, stageFolder, treeDirAt, treeWiringOf, type Entry } from '../factory/applied/applied.store.ts';
+import { appliedDir, digestOf, entriesIn, stageFolder, treeDir, treeWiringOf, type Entry } from '../factory/applied/applied.store.ts';
 import type { Adoption, AdoptedCard } from './adopt.ts';
 
 /** A template rendered with a factory's parameters, as `renderedAt` answers it: its version, its parameters, and its files. */
@@ -67,7 +67,7 @@ export const adoptionAt = Effect.fn('adoptionAt')(function* (home: string, facto
   const adoption: Adoption = {
     wiring: read.wiring,
     cards,
-    leftovers: { base: folderDigest(appliedDirAt(home, factory.name)), tree: folderDigest(treeDirAt(home, factory.name)) },
+    leftovers: { base: folderDigest(appliedDir(home, factory.name)), tree: folderDigest(treeDir(home, factory.name)) },
     render: digestOf(render.entries),
   };
   return {
@@ -97,6 +97,6 @@ export function planDigest(home: string, name: string, render: RenderedAt, sourc
  * left as it is where it is there already (`stageFolder`), so a takeover stopped half way is finished by the next.
  */
 export function stageAdoption(home: string, name: string, entries: readonly Entry[]): void {
-  stageFolder(appliedDirAt(home, name), entries, true);
-  stageFolder(treeDirAt(home, name), entries, false);
+  stageFolder(appliedDir(home, name), entries, true);
+  stageFolder(treeDir(home, name), entries, false);
 }

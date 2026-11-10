@@ -10,6 +10,7 @@ import { artifactFile, fileIn } from '../artifacts/artifacts.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { isRepositoryRun } from '../record/record.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /** A text flag under `key`, as the api hands it. */
 const keyed = (key: string): Flag => ({ flag: `--${key}`, kind: 'text', key });
@@ -47,8 +48,9 @@ export const STEP_ARTIFACT: Command<{ file: Buffer | null }, StepFileInput> = {
   only: { side: 'api', why: "the board links each file a step's closeout named; at the command line a person opens the file" },
   input: StepFileInput,
   handler: Effect.fnUntraced(function* ({ runId, step, name }: StepFileInput) {
+    const home = yield* StoreRoot;
     const run = yield* (yield* RunDoor).runs.find(RunId.read(runId), () => {});
-    return yield* tried(() => ({ file: run ? artifactFile(run, step, name) : null }));
+    return yield* tried(() => ({ file: run ? artifactFile(home, run, step, name) : null }));
   }),
   print: () => [],
 };

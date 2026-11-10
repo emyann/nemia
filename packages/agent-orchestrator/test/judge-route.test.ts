@@ -12,7 +12,7 @@ import { closeoutSchemaOf, type Closeout } from '../src/closeout/closeout.ts';
 import { composeBrief } from '../src/brief/brief.ts';
 import { stepSetRefusal, validate } from '../src/workflow/validate.ts';
 import type { TaskPhase } from '../src/record/record.ts';
-import type { Workflow } from '../src/step/step.ts';
+import type { StepSpec } from '../src/step/step.ts';
 import { aRead, phases, run, step } from './assessed.ts';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,7 +22,7 @@ import { workflowTargets } from '../src/tick/told.verb.ts';
 const READER = { name: 'reviewer', keys: [], body: 'Read the change and choose.', given: {} };
 
 /** plan → triage (a judge on a read-only agent; docs ends the run) → build-web | to-backend (a card for backend). */
-const JUDGED: Workflow[] = [
+const JUDGED: StepSpec[] = [
   step('plan'),
   {
     ...step('triage', ['plan']),

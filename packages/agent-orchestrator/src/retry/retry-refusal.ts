@@ -2,7 +2,7 @@
  * What `nemia retry` refuses (`retryRefusal`): the ask read first, then the step's standing, each refusal a named phase, asked in the order
  * a person is told them. Pure; what may be tried is `retry.ts`'s (`retryable`, `retriesDue`).
  */
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import {
   lackedOf,
   refusedCheck,
@@ -43,7 +43,7 @@ import { heldRefusal, prunedRefusal } from '../forget/prune/prune.ts';
 
 /** What `retryRefusal` was asked: its arguments, and the command its refusals name. */
 type Asked = {
-  steps: readonly Workflow[];
+  steps: readonly StepSpec[];
   run: Run;
   name: string;
   how: RetryHow;
@@ -63,10 +63,10 @@ type Asked = {
  */
 type Judged = Asked &
   ReturnType<typeof retryable> & {
-    step: Workflow;
+    step: StepSpec;
     next: number;
     pending?: RetryAsk;
-    stoppedAt?: Workflow;
+    stoppedAt?: StepSpec;
     again: string;
     floor?: Raise;
   };
@@ -107,7 +107,7 @@ type Judged = Asked &
  * @param spendOf What each task's sessions cost (`taskSpend`). Left out, no step is over budget, and `--budget` is refused on every one.
  */
 export function retryRefusal(
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   run: Run,
   name: string,
   how: RetryHow,
@@ -151,7 +151,7 @@ export function retryRefusal(
  * The step asked for — or why the ask is refused before its standing is read: words or a budget that cannot ride on it, a step the run
  * does not have, a flag a remote step cannot take, a model an `auto` step would drop, and a run cancelled, pruned or held.
  */
-function askedStep(asked: Asked): string | Workflow {
+function askedStep(asked: Asked): string | StepSpec {
   const { steps, run, name, how, command } = asked;
   const wrong = messageRefusal(how, command) ?? budgetRefusal(how, command);
   if (wrong) return wrong;
@@ -179,7 +179,7 @@ function askedStep(asked: Asked): string | Workflow {
 }
 
 /** The ask with the step's standing read, once the step is known to exist. */
-function judged(asked: Asked, step: Workflow): Judged {
+function judged(asked: Asked, step: StepSpec): Judged {
   const { steps, run, name, phaseOf, closeoutOf, askedCloseout, asks, spendOf } = asked;
   const next = tryOf(run, name) + 1;
   const floor = raiseOf(step, run, spendOf);
@@ -198,7 +198,7 @@ function judged(asked: Asked, step: Workflow): Judged {
 }
 
 /** How an ending that stopped on the base branch is said: its name, its own status, and that it did not do what it was approved for. */
-function stoppedWords(c: Judged, ending: Workflow): string {
+function stoppedWords(c: Judged, ending: StepSpec): string {
   const { steps, run, phaseOf, closeoutOf, askedCloseout, spendOf } = c;
 
   return `${ending.name} stopped on the base branch (${ownStatus(ending, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)}) without doing what it was approved for`;

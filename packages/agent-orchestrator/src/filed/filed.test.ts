@@ -11,7 +11,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseWorkflow, type Workflow } from '../workflow.ts';
+import { parseWorkflow, type StepSpec } from '../workflow.ts';
 import { CARRIED_FILES, filedConfig, RUN_LABELS, SESSION_TOKEN, STEP_FILES, WORKFLOW_FILES, workflowMounts } from './filed.ts';
 import type { Run } from '../record/record.ts';
 import type { FactoryServers } from '../factory/servers/servers.ts';
@@ -19,8 +19,8 @@ import { configRefusal } from '../runtime-client.ts';
 import { filedRefusal, lineOf, type FiledFlags, type FiledStep } from '../keys/index.ts';
 import { names } from '../../test/assessed.ts';
 
-const stepOf = (lines = ''): Workflow => parseWorkflow('look', `---\nplace: git\n${lines}---\nLook.\n`);
-const filed = (step: Workflow, servers?: FactoryServers, labels?: Run['labels']) =>
+const stepOf = (lines = ''): StepSpec => parseWorkflow('look', `---\nplace: git\n${lines}---\nLook.\n`);
+const filed = (step: StepSpec, servers?: FactoryServers, labels?: Run['labels']) =>
   filedConfig(
     step,
     [step],
@@ -37,11 +37,11 @@ const filed = (step: Workflow, servers?: FactoryServers, labels?: Run['labels'])
   );
 
 /** An agent on the step, with the `mcp:` names it was frozen with. */
-const withAgent = (mcp: string | undefined): Workflow =>
+const withAgent = (mcp: string | undefined): StepSpec =>
   ({
     ...stepOf(),
     agent: { name: 'ada', ...(mcp === undefined ? {} : { mcp: mcp.split(', ') }) },
-  }) as Workflow;
+  }) as StepSpec;
 
 /** The hosted GitHub server as a factory records it. */
 const GITHUB = {
@@ -145,7 +145,7 @@ test('filedConfig: what a local step is filed beside its fence, its files direct
     "a local step is filed the run's copy of its workflow folder as WF_WORKFLOW_FILES, mounted read-only; given none, nothing changes",
     () => {
       const frozen = '/runs/r/workflow/ab12';
-      const withCopy = (step: Workflow) =>
+      const withCopy = (step: StepSpec) =>
         filedConfig(
           step,
           [step],
@@ -245,7 +245,7 @@ const said = (harness: string, step: FiledStep, config: Parameters<typeof config
 
 test("filedConfig: a Claude Code step is given its factory's harness settings beneath its own", async (t) => {
   const OFF = { attribution: { commit: '', pr: '' } };
-  const given = (step: Workflow, own: object, harnessSettings?: Run['harnessSettings']) =>
+  const given = (step: StepSpec, own: object, harnessSettings?: Run['harnessSettings']) =>
     filedConfig(
       step,
       [step],

@@ -3,8 +3,8 @@
  * whose manifest does not read listed all the same with its problems, an unknown name `Missing`, and a template's render written once
  * into its folder of renders, laid out as a factory's tree, and refused `Invalid` where it does not render. The folder of renders is this
  * user's own: named by uid and made `0700`, a render planted there with other content staged again, and a folder owned by another user
- * (a `RenderOwner` claimed for another uid, since a test cannot chown) refused `Conflict` and never served. `WF_ROOT` is set before the
- * import, since the store's modules read it as they load.
+ * (a `RenderOwner` claimed for another uid, since a test cannot chown) refused `Conflict` and never served. On a
+ * store of its own at `ROOT`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,14 +16,12 @@ import { Cause, Effect, Exit, Schema } from 'effect';
 import { Template, TemplateList } from 'objects';
 import { machineTempDir, scratch } from 'test-kit/scratch';
 import { teamCopy } from '../../../test/team.ts';
+import { templated, withBuiltins } from '../../../test/templated.ts';
+import { StoreRoot } from '../../config/root.store.ts';
+import { RenderOwner, TemplateRenders, templateDocumentsOf, templateList, templateObject, templateTree } from './template.verb.ts';
 
 const ROOT = scratch('wf-template-object-');
-process.env.WF_ROOT = ROOT;
-const { templated, withBuiltins } = await import('../../../test/templated.ts');
 const { exportTemplate } = templated(ROOT);
-const { StoreRoot } = await import('../../config/root.store.ts');
-const { RenderOwner, TemplateRenders, templateDocumentsOf, templateList, templateObject, templateTree } =
-  await import('./template.verb.ts');
 
 /**
  * A builtin folder holding `mill`, the tests' team exported; `asks`, the same with a parameter that has no default; `odd`, the same with

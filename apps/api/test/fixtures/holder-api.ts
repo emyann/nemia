@@ -50,10 +50,10 @@ const engine = await Effect.runPromise(
   ),
 );
 
-const taken = takeStore({ every: 4000, cwd: told.root, by: 'api' });
+const taken = takeStore(told.root, { every: 4000, cwd: told.root, by: 'api' });
 const served = await Effect.runPromise(Scope.provide(engine.hold(), scope));
 if (!served) throw new Error('the holder serves nothing: its engine runs no Claude Code attached');
-heldServes(served.cards);
+heldServes(told.root, served.cards);
 
 const taskId = await Effect.runPromise(
   engine.file({
@@ -77,7 +77,7 @@ const alive = setInterval(() => {}, 60_000);
 process.on('SIGTERM', () => {
   clearInterval(alive);
   void Effect.runPromise(Scope.close(scope, Exit.void)).then(() => {
-    releaseStore(taken.held);
+    releaseStore(told.root, taken.held);
     process.exit(0);
   });
 });

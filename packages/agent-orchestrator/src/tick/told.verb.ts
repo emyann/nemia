@@ -36,7 +36,7 @@ import { phaseOfView } from '../views/views-words.ts';
 import { RunId } from '../record/record.model.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
-import { splitFrontmatter, type Workflow } from '../step/step.ts';
+import { splitFrontmatter, type StepSpec } from '../step/step.ts';
 import { realRepoOf } from '../workspace/worktree.store.ts';
 import { agentFilesDir, renderedIn } from '../agents/agents.store.ts';
 import { placesOf } from '../folder/lookup.store.ts';
@@ -56,6 +56,7 @@ import { doorAtOnce } from '../factory/door/factories.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
 import type { FactoryServers } from '../factory/servers/index.ts';
 import { inboxDir } from '../record/files.store.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /**
  * A step as the tick tells it and files it: with its agent's instructions in Claude Code's prompt and its skills in a plugin, where
@@ -72,9 +73,10 @@ import { inboxDir } from '../record/files.store.ts';
  * off the step as it is told: one whose rendered folder is gone holds none, and is told them in its brief. All are the harness's own
  * arguments (`own`), which the first filing, a try and a round each spread into its `config`.
  */
-export const toldOf = Effect.fnUntraced(function* (run: Run, step: Workflow) {
-  const dir = agentFilesDir(run, step.name);
-  const told: Workflow =
+export const toldOf = Effect.fnUntraced(function* (run: Run, step: StepSpec) {
+  const home = yield* StoreRoot;
+  const dir = agentFilesDir(home, run, step.name);
+  const told: StepSpec =
     rendersAgent(step) && !renderedIn(dir, step) ? unrendered(step, step.agent?.skills?.length ? yield* skillsTold(step, run) : []) : step;
   return {
     step: told,
@@ -87,9 +89,10 @@ export const toldOf = Effect.fnUntraced(function* (run: Run, step: Workflow) {
  * its body, or why it could not be told — none found, refused, or a SKILL.md the door reads none of. The one read of a skill after a run
  * started, since the copy `nemia start` froze went with the folder; asked of the door, so a program given its memory tells what it holds.
  */
-const skillsTold = Effect.fnUntraced(function* (step: Workflow, run: Run) {
+const skillsTold = Effect.fnUntraced(function* (step: StepSpec, run: Run) {
+  const home = yield* StoreRoot;
   const door = (yield* SkillDoor).skills;
-  const found = yield* door.found({ dir: run.workflowDir, places: placesOf(run.repo) });
+  const found = yield* door.found({ dir: run.workflowDir, places: placesOf(home, run.repo) });
   const told: SkillAgain[] = [];
   for (const name of step.agent?.skills ?? []) {
     const from = found.at.get(name);
@@ -125,7 +128,7 @@ function skillAgainOf(name: string, from: string, text: string, why: string): Sk
  * the default harness's, which has one, so the runtime refuses it by its line at `nemia start` rather than the run dropping it. Pure but
  * for `repoOf`.
  */
-export const ownOf = (step: Pick<Workflow, 'harness' | 'remote'>, rendered: ClaudeFlags | undefined, repoOf: () => string | undefined) => {
+export const ownOf = (step: Pick<StepSpec, 'harness' | 'remote'>, rendered: ClaudeFlags | undefined, repoOf: () => string | undefined) => {
   const declaration = declarationOf(step.harness);
   const remoteControl = step.remote === true;
   const unanswered = remoteControl && declaration?.asks?.remoteControl === undefined;
@@ -150,7 +153,7 @@ export type PlaceTold = {
  * A step as the tick tells it (`toldOf`): the step its brief is composed for, and the harness's own arguments it is filed with.
  */
 export type StepTold = {
-  readonly step: Workflow;
+  readonly step: StepSpec;
   readonly own: { claude?: ClaudeFlags; codex?: CodexArgs; enabledSkills: string[] | 'default' };
 };
 
@@ -165,7 +168,7 @@ export type Told = StepTold & PlaceTold;
  * For a judge (`route: judge`), what each workflow a node after it routes to says it is for: its README's description, read from the
  * folder beside the run's own workflow, where a team keeps its workflows. Empty for any other step, and for a workflow with no description.
  */
-export function workflowTargets(run: Run, steps: readonly Workflow[], step: Workflow): Record<string, string> {
+export function workflowTargets(run: Run, steps: readonly StepSpec[], step: StepSpec): Record<string, string> {
   if (step.route?.kind !== 'judge') return {};
   const named = steps.filter((s) => s.after.includes(step.name)).flatMap((s) => (s.workflow === undefined ? [] : [s.workflow]));
   return Object.fromEntries(
@@ -178,8 +181,8 @@ export function workflowTargets(run: Run, steps: readonly Workflow[], step: Work
 
 export function placeTold(
   run: Run,
-  steps: readonly Workflow[],
-  step: Workflow,
+  steps: readonly StepSpec[],
+  step: StepSpec,
   place: Place,
   heads?: Readonly<Record<string, string>>,
 ): PlaceTold {
@@ -198,13 +201,14 @@ export function placeTold(
  * reads, which asks for no server; `filedAt` is what a filing takes.
  */
 export const filedFoldersAt = (
+  home: string,
   run: Pick<Run, 'id' | 'inputs' | 'workflowFiles' | 'carriedFiles'>,
 ): { runArtifacts: string; inbox: string; inputs?: string; workflowFiles?: string; carriedFiles?: string } => ({
-  runArtifacts: path.dirname(artifactsDir(run, 'step')),
-  inbox: inboxDir(),
-  ...(run.inputs?.length ? { inputs: inputsDir(run) } : {}),
-  ...(run.workflowFiles === undefined ? {} : { workflowFiles: workflowFilesDir(run, run.workflowFiles) }),
-  ...(run.carriedFiles === undefined ? {} : { carriedFiles: carriedFilesDir(run, run.carriedFiles) }),
+  runArtifacts: path.dirname(artifactsDir(home, run, 'step')),
+  inbox: inboxDir(home),
+  ...(run.inputs?.length ? { inputs: inputsDir(home, run) } : {}),
+  ...(run.workflowFiles === undefined ? {} : { workflowFiles: workflowFilesDir(home, run, run.workflowFiles) }),
+  ...(run.carriedFiles === undefined ? {} : { carriedFiles: carriedFilesDir(home, run, run.carriedFiles) }),
 });
 
 /**
@@ -223,7 +227,7 @@ export const filedAt = (
   carriedFiles?: string;
   servers: FactoryServers;
 } => ({
-  ...filedFoldersAt(run),
+  ...filedFoldersAt(home, run),
   servers: recordedServers(run.factory, home),
 });
 
@@ -248,7 +252,7 @@ const recordedServers = (factory: string | undefined, home: string): FactoryServ
  * What `step` of `run`, not yet filed, would be told now from `steps` (`composeBrief`), with what its place says to it (`placeTold`):
  * what the board shows of a step to come. Where the place gives no words, the brief sends the step to its place's skill.
  */
-export function briefNow(step: Workflow, run: Run, steps: readonly Workflow[], place: Place): string {
+export function briefNow(step: StepSpec, run: Run, steps: readonly StepSpec[], place: Place): string {
   const told = placeTold(run, steps, step, place);
   const none = [undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined] as const;
   return composeBrief(step, run, steps, ...none, told);
@@ -258,11 +262,11 @@ export function briefNow(step: Workflow, run: Run, steps: readonly Workflow[], p
  * The files the closeout of the try that ended named that the run did not have (`lackedOf`), as its next try is told them: a line each,
  * with a near name off what the step's files directory holds now (`lackLines`). Nothing for a try that lacked none.
  */
-export const lacksTold = (run: Run, name: string, record: StepRecord): Pick<RetryBriefing, 'lacks'> => {
+export const lacksTold = (home: string, run: Run, name: string, record: StepRecord): Pick<RetryBriefing, 'lacks'> => {
   const lacked = lackedOf(record);
   if (!lacked.length) return {};
-  const there = artifactFiles(run, name).map((file) => file.path);
-  return { lacks: lackLines(lacked, artifactsDir(run, name), there) };
+  const there = artifactFiles(home, run, name).map((file) => file.path);
+  return { lacks: lackLines(lacked, artifactsDir(home, run, name), there) };
 };
 
 /**
@@ -271,18 +275,19 @@ export const lacksTold = (run: Run, name: string, record: StepRecord): Pick<Retr
  * are there now (`filesHanded`): the brief lists those, and hands on no name with no file.
  */
 export const foldersTold = (
+  home: string,
   run: Run,
-  reads: { steps: readonly Workflow[]; signedOff: (step: string) => Closeout | undefined },
-  step: Workflow,
+  reads: { steps: readonly StepSpec[]; signedOff: (step: string) => Closeout | undefined },
+  step: StepSpec,
   caller: readonly Mount[] = [],
 ): FiledFolders => {
-  const folders = filedFolders(step, reads.steps, { ...filedFoldersAt(run), caller });
-  const closeouts = folders.handed.filter((m) => holdsCloseout(run, path.basename(m.path))).map((m) => m.path);
+  const folders = filedFolders(step, reads.steps, { ...filedFoldersAt(home, run), caller });
+  const closeouts = folders.handed.filter((m) => holdsCloseout(home, run, path.basename(m.path))).map((m) => m.path);
   const named = folders.handed
     .filter((m) => !closeouts.includes(m.path))
     .map((m) => {
       const from = path.basename(m.path);
-      return [m.path, filesHanded(run, from, reads.signedOff(from))] as const;
+      return [m.path, filesHanded(home, run, from, reads.signedOff(from))] as const;
     });
   return { ...folders, named: Object.fromEntries(named), closeouts };
 };
@@ -291,7 +296,7 @@ export const foldersTold = (
 type TriedReads = {
   run: Run;
   reads: {
-    steps: readonly Workflow[];
+    steps: readonly StepSpec[];
     views: ReadonlyMap<string, TaskView>;
     phaseOf: (taskId: string) => TaskPhase;
     signedOff: (step: string) => Closeout | undefined;
@@ -314,14 +319,14 @@ export const taskToStop = (run: Run, name: string): string =>
   found(recordNamed(run, name).taskId ?? undefined, `a task of step ${name} of run ${run.id}`);
 
 /** The step of this name, which the pass's assessment named: one the pass did not read is thrown (`found`). */
-export const stepNamed = (f: TriedReads, name: string): Workflow =>
+export const stepNamed = (f: TriedReads, name: string): StepSpec =>
   found(
     f.reads.steps.find((s) => s.name === name),
     `the step ${name}`,
   );
 
 /** What the ending a try is sent back from said, for the work's brief: its status, its summary and needs, and where it merges. */
-const endingSaid = (f: TriedReads, ending: Workflow): EndingStopped => {
+const endingSaid = (f: TriedReads, ending: StepSpec): EndingStopped => {
   const { run, reads } = f;
   const said = reads.signedOff(ending.name);
   return {
@@ -338,6 +343,7 @@ const endingSaid = (f: TriedReads, ending: Workflow): EndingStopped => {
  * to it, how the try before it ended, what its check refused, what was denied it, and the ending it was sent back from.
  */
 export const tryTold = (
+  home: string,
   f: TriedReads,
   r: Retry,
   record: StepRecord,
@@ -355,7 +361,7 @@ export const tryTold = (
   status: t.status,
   ...(t.refusal ? { refusal: t.refusal } : {}),
   ...(t.status === 'denied' ? { denied: (record.taskId === null ? undefined : f.reads.spendOf(record.taskId))?.denied ?? [] } : {}),
-  ...(t.status === 'unsigned' ? lacksTold(f.run, r.step, record) : {}),
+  ...(t.status === 'unsigned' ? lacksTold(home, f.run, r.step, record) : {}),
   ...(t.status === 'unsigned' ? refusedTold(stepNamed(f, r.step), f.reads.signedOff(r.step), f.reads.steps) : {}),
   ...(r.back?.[0] !== undefined ? { ending: endingSaid(f, stepNamed(f, r.back[0])) } : {}),
 });
@@ -365,14 +371,14 @@ export const tryTold = (
  * record, with nothing asked of the engine. What the tick's pass reads the earlier tries for (`taskPhases`): with no cap anywhere, what
  * they cost is a number nothing in the pass looks at, and a step answered without limit would grow that read for ever.
  */
-const underBudget = (steps: readonly Workflow[], run: Run): boolean => steps.some((s) => budgetOf(s, run) !== undefined);
+const underBudget = (steps: readonly StepSpec[], run: Run): boolean => steps.some((s) => budgetOf(s, run) !== undefined);
 
 /**
  * The readers a run is judged by, made once of the engine's views of its tasks: each task's phase, how each step signed off, whether a
  * task was asked its closeout, each step's check's exit, whether a session is blocked by its harness, and what each task cost. Pure: the
  * one place they are made, so the pass, the verbs and the screens read a run through the same ones.
  */
-export const readersOf = (views: ReadonlyMap<string, TaskView>, run: Run, steps: readonly Workflow[]) => ({
+export const readersOf = (views: ReadonlyMap<string, TaskView>, run: Run, steps: readonly StepSpec[]) => ({
   phaseOf: (taskId: string): TaskPhase => phaseOfView(views.get(taskId)),
   signedOff: closeoutReader(views, run, steps),
   asked: closeoutAsked(views),
@@ -383,7 +389,7 @@ export const readersOf = (views: ReadonlyMap<string, TaskView>, run: Run, steps:
 
 /** How a caller of `readRun` reads beside the pass: the steps or views it read already, and which earlier tries it views. */
 export type RunReadHow = {
-  readonly steps?: Workflow[];
+  readonly steps?: StepSpec[];
   readonly views?: Map<string, TaskView>;
   /**
    * Which earlier tries are viewed: `every` (a verb, whose cost and timeline read them all) or `budgeted`, only where a step has a cap in
@@ -436,7 +442,7 @@ export const withStandings = <R extends AssessRead>(read: R, standing: PassStand
  * every answer a person gave. One for the pass: every phase of it reads the same.
  */
 export type RunRead = AssessRead & {
-  readonly steps: Workflow[];
+  readonly steps: StepSpec[];
   readonly views: Map<string, TaskView>;
   /** Every answer a person gave with `nemia retry --message` on the run, waiting or consumed: what the steps after each are handed. */
   readonly answers: readonly RetryAsk[];

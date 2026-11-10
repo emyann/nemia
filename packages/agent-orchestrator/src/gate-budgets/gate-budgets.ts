@@ -7,7 +7,7 @@ import type { Closeout } from '../closeout/index.ts';
 import type { Run } from '../record/record.ts';
 import { approvalOf, budgetOf, hasGate, runSpend, spentWord, stepSpend, type SpendOf } from '../status/status.ts';
 import { dollars } from '../money/money.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { aboveTheWorkflow, budgetRefusals, ceilingsOf, proposedBudgets } from '../budget/budget.ts';
 import type { GateBudgetsFrom } from 'objects';
 
@@ -32,8 +32,8 @@ export type GateBudgets = { from: GateBudgetsFrom; steps: GateBudget[]; said: st
  */
 export function gateBudgets(
   run: Run,
-  step: Workflow,
-  steps: readonly Workflow[],
+  step: StepSpec,
+  steps: readonly StepSpec[],
   said: Closeout | { error: string } | undefined,
   spendOf: SpendOf,
 ): GateBudgets | undefined {
@@ -62,7 +62,7 @@ export function gateBudgets(
 }
 
 /** What the run has spent, and the most it may cost under `budgets` and the caps in force on every other step, in words. */
-function runLine(run: Run, steps: readonly Workflow[], budgets: readonly GateBudget[], spendOf: SpendOf): string {
+function runLine(run: Run, steps: readonly StepSpec[], budgets: readonly GateBudget[], spendOf: SpendOf): string {
   const spent = runSpend(run, spendOf);
   const uncapped: string[] = [];
   let most = 0;
@@ -81,7 +81,7 @@ function runLine(run: Run, steps: readonly Workflow[], budgets: readonly GateBud
 /** The budgets at every gate of `run` that has some (`gateBudgets`), by its step: what `nemia decide` carries beside its gate lines. */
 export const gatesBudgets = (
   run: Run,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   said: (step: string) => Closeout | undefined,
   spendOf: SpendOf,
 ): Record<string, GateBudgets> =>

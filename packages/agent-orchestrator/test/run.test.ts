@@ -20,7 +20,7 @@ import {
 import type {} from '../src/place/place.ts';
 import { type Closeout } from '../src/closeout/closeout.ts';
 import { type EarlierTry } from '../src/retry/retry-ask.ts';
-import { type OutputSchema, type Workflow } from '../src/workflow.ts';
+import { type OutputSchema, type StepSpec } from '../src/workflow.ts';
 import { listingInput, names, phases, run, step, STEPS } from './assessed.ts';
 
 const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
@@ -68,7 +68,7 @@ const LOOPING: OutputSchema = {
   required: ['findings', 'again'],
 };
 /** implement, checked → review, looping back to it with `rounds: 3` as the parser sets it — and ship, after the loop. */
-const LOOP: Workflow[] = [
+const LOOP: StepSpec[] = [
   { ...step('implement'), check: 'npm test' },
   { ...step('review', ['implement']), output: { file: 'review.schema.json', schema: LOOPING }, loop: 'implement', rounds: 3 },
   step('ship', ['review']),
@@ -231,7 +231,7 @@ test("`nemia ls` notes a step whose current try's session a person told somethin
 });
 
 test('`## Said to your session` goes inside `## Try <n>` on a try that continues the session — each message with its time, the words fenced, before `## Your answer` — and on no new session, nor where nothing was said', () => {
-  const implement: Workflow = { ...step('implement'), check: 'npm test' };
+  const implement: StepSpec = { ...step('implement'), check: 'npm test' };
   const briefOf = (told: RetryBriefing) =>
     composeBrief(implement, run({ implement: 't1' }), [implement], undefined, undefined, undefined, told);
   const said: Said[] = [

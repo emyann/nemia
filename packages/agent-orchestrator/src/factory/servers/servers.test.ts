@@ -6,8 +6,7 @@
  * precedence is proven by a name that is on both the record and the checkout's list, which must leave `projectMcp` altogether.
  *
  * The store takes its root as a required `home: string`, so every call here names this file's own scratch root and nothing reads the
- * person's: that is what `test/root-given.test.ts` holds for the whole package, and this file is the fixture that shows it. The
- * package is still imported dynamically, after `WF_ROOT` is set, because the modules beside the store read theirs as they load.
+ * person's: that is what `test/root-given.test.ts` holds for the whole package, and this file is the fixture that shows it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,12 +14,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { storeGiven } from '../../../test/config-given.ts';
+import { DEFAULT_NAMESPACE } from '../factory.ts';
+import { factoryServerRefusal, factoryServersRefusal, serverNameRefusal, splitServers } from './servers.ts';
+import { factoryServers, factoryServersFile, readFactoryServers, builtinServers, writeFactoryServers } from './servers.store.ts';
+import { Effect } from 'effect';
+import { HEADER_MASK } from 'objects';
+import { FACTORY_SERVER_ADD, listedOf } from './servers.verb.ts';
+import type { Env } from '../../config/config.store.ts';
 
 const ROOT = scratch('wf-servers-');
-process.env.WF_ROOT = ROOT;
-const { DEFAULT_NAMESPACE } = await import('../factory.ts');
-const { factoryServerRefusal, factoryServersRefusal, serverNameRefusal, splitServers } = await import('./servers.ts');
-const { factoryServers, factoryServersFile, readFactoryServers, builtinServers, writeFactoryServers } = await import('./servers.store.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 
 /** The hosted GitHub server as a factory records it: a toolset header, and the facts of an OAuth client with no secret. */
 const GITHUB = {
@@ -177,18 +180,15 @@ test('the split gives the factory precedence: a name it records leaves projectMc
 });
 
 test("a server's headers are served masked, and a mask sent back keeps the value the record holds", async (t) => {
-  const { Effect } = await import('effect');
-  const { HEADER_MASK } = await import('objects');
-  const { FACTORY_SERVER_ADD, listedOf } = await import('./servers.verb.ts');
   const root = scratch('wf-servers-mask-');
   const add = async (server: string, ...headers: string[]) => {
     const sent = Object.fromEntries(headers.map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
     const program = storeGiven(
       root,
-      process.env,
+      ENV,
     )(
       FACTORY_SERVER_ADD.handler({ factory: DEFAULT_NAMESPACE, server, url: 'https://docs.example/mcp', headers: sent }),
-    ) as unknown as import('effect').Effect.Effect<{ server: { headers?: Record<string, string> } }, { _tag?: string }>;
+    ) as unknown as Effect.Effect<{ server: { headers?: Record<string, string> } }, { _tag?: string }>;
     return Effect.runPromise(program).then(
       (answer) => answer,
       (err: { _tag?: string }) => ({ refused: err._tag }),

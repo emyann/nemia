@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import type { StepAgent, Workflow } from '../step/step.ts';
+import type { StepAgent, StepSpec } from '../step/step.ts';
 import { dayOf, statsOf } from './stats.ts';
 import { frozenOf, marksOf, type RunFrozen } from './marks.ts';
 
@@ -18,7 +18,7 @@ const SKILL = 'review-a-change';
 /** A review step filled by reviewer, or the agent `more` names, as the parser resolves it: its instructions before the step's own note. */
 function review(
   more: { agent?: string; instructions?: string | null; note?: string; model?: string; skills?: string[]; added?: string[] } = {},
-): Workflow {
+): StepSpec {
   const instructions = more.instructions === undefined ? 'You are Reviewer.' : more.instructions;
   const note = more.note ?? 'Review it.';
   const own = more.skills ?? [SKILL];
@@ -42,10 +42,10 @@ function review(
   };
 }
 
-const implement: Workflow = { name: 'implement', after: [], body: 'Do it.' };
+const implement: StepSpec = { name: 'implement', after: [], body: 'Do it.' };
 
 /** What run `run`, created at `at` in `dir`, froze of `steps`, its review's skill rendered at `version` (none where null). */
-function frozen(run: string, at: string, steps: Workflow[], version: string | null = 'v1', dir = BUILD): RunFrozen {
+function frozen(run: string, at: string, steps: StepSpec[], version: string | null = 'v1', dir = BUILD): RunFrozen {
   const head = {
     run,
     factory: 'default',
@@ -194,7 +194,7 @@ const ITEMS: Array<{ name: string; check: () => void }> = [
   {
     name: 'an agent that fills two steps is one item, and a skill two steps give is one item, with every step it belongs to',
     check: () => {
-      const second: Workflow = { ...review(), name: 'second' };
+      const second: StepSpec = { ...review(), name: 'second' };
       const { items } = frozenOf(
         { run: 'r1', factory: 'default', workflow: 'dev', repo: '/a', day: '2026-09-10', at: at(10), workflowDir: BUILD },
         [review(), second],

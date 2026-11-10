@@ -4,7 +4,6 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { HOME } from '../record/record.store.ts';
 import { kindAt, partOf, PER_RUN, type DiskPart, type DiskRoot } from './disk.ts';
 
 /** The bytes a block of `lstat` counts, whatever the file system's own block is. */
@@ -37,13 +36,13 @@ function runRoots(part: DiskPart, at: string): DiskRoot[] {
  * @returns The roots, the store's own first.
  * @throws When the store's root does not list: there is nothing to size, and a reading of nothing would say the store is empty.
  */
-export function storeRoots(): DiskRoot[] {
-  const names = fs.readdirSync(HOME);
+export function storeRoots(home: string): DiskRoot[] {
+  const names = fs.readdirSync(home);
   return [
-    alone('other', HOME),
+    alone('other', home),
     ...names.flatMap((name): DiskRoot[] => {
       const part = partOf(name);
-      const at = path.join(HOME, name);
+      const at = path.join(home, name);
       return PER_RUN.includes(part) ? runRoots(part, at) : [{ part, kind: kindAt(part), path: at }];
     }),
   ];
@@ -53,7 +52,7 @@ export function storeRoots(): DiskRoot[] {
  * The room on the file system that holds the store: the bytes free to this process, and the file system's size. Inside a virtual
  * machine it is the machine's own disk, whatever the host has left.
  */
-export function storeFree(): { free: number; size: number } {
-  const stat = fs.statfsSync(HOME);
+export function storeFree(home: string): { free: number; size: number } {
+  const stat = fs.statfsSync(home);
   return { free: stat.bavail * stat.bsize, size: stat.blocks * stat.bsize };
 }

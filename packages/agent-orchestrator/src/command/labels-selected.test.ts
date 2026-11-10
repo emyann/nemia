@@ -1,7 +1,6 @@
 /**
  * `nemia ls` and `nemia stats` and a run's labels, in process: `-l` keeps the runs a selector takes, `--show-labels` and `-L <key>` add
  * segments to each run's head line, and with neither the lines are as they were; `stats -l` sums the facts of the runs it takes alone.
- * `WF_ROOT` is set before the import, since the store reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,21 +11,21 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
 import { names } from '../../test/assessed.ts';
+import { COMMANDS } from './commands.verb.ts';
+import { parseArgv } from './command.ts';
+import { advanceRun, startRun, runWith as runEngine } from '../runner.ts';
+import { runRecord } from '../record/record.store.ts';
+import { Invalid } from '../refusal/refusal.ts';
+import { engineOf } from '../runtime-client.ts';
+import type { Env } from '../config/config.store.ts';
+import { filesStoreAt } from '../record/files.store.ts';
 
 const ROOT = scratch('wf-ls-labels-');
-process.env.WF_ROOT = ROOT;
-delete process.env.WF_MAX_RUNS;
-delete process.env.WF_MAX_CONCURRENT;
-const { COMMANDS } = await import('./commands.verb.ts');
-const { parseArgv } = await import('./command.ts');
-const { advanceRun, startRun, runWith: runEngine } = await import('../runner.ts');
-const { runRecord } = await import('../record/record.store.ts');
-const { filesStore: runStore } = await import('../record/files.store.ts');
-const { Invalid } = await import('../refusal/refusal.ts');
-const { engineOf } = await import('../runtime-client.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_MAX_RUNS: undefined, WF_MAX_CONCURRENT: undefined };
+const filed = filesStoreAt(ROOT);
 const stand = eachTest(testPlace);
-const runWith = runOver(runEngine, () => stand().layer);
-const runPlaced = runGiven(() => stand().layer);
+const runWith = runOver(runEngine, () => stand().layer, ENV);
+const runPlaced = runGiven(() => stand().layer, ENV);
 const engine = eachTest(testEngine);
 const noEngine = () => engineOf(engine().layer);
 const LS = COMMANDS.find((c) => c.name === 'ls')!;
@@ -60,7 +59,7 @@ test('nemia ls selects by -l, and adds the labels to each run’s head line by -
   const core = await started('the core one');
   const bare = await started('the bare one');
   const before = await printed();
-  runStore.labels.put(core.id, { team: 'core', tier: 'gold' });
+  filed.labels.put(core.id, { team: 'core', tier: 'gold' });
   const plain = await printed();
   assert.deepEqual(plain, before, 'with neither flag, a labelled run prints its lines byte for byte as before');
   const shown = await printed('--show-labels', '-L', 'team', '-L', 'workflow');
@@ -98,14 +97,14 @@ test('nemia stats -l sums the facts of the runs the selector takes alone', async
   fs.rmSync(path.join(ROOT, 'runs'), { recursive: true, force: true });
   const ended = async (brief: string) => {
     const run = await started(brief);
-    await runWith(noEngine(), advanceRun(runRecord(run.id)));
+    await runWith(noEngine(), advanceRun(runRecord(ROOT, run.id)));
     engine().settle(`${run.id}-implement`, 'succeeded', { closeout: { outcome: 'done', summary: 'did it', artifacts: [], needs: null } });
-    await runWith(noEngine(), advanceRun(runRecord(run.id)));
+    await runWith(noEngine(), advanceRun(runRecord(ROOT, run.id)));
     return run;
   };
   const core = await ended('the core one');
   await ended('the bare one');
-  runStore.labels.put(core.id, { team: 'core' });
+  filed.labels.put(core.id, { team: 'core' });
   const STATS = COMMANDS.find((c) => c.name === 'stats')!;
   const tries = async (args: Record<string, readonly string[]>) =>
     ((await runWith(noEngine(), STATS.handler(args))) as { all: { total: { tries: number } } }).all.total.tries;

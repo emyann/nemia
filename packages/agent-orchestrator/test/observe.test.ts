@@ -19,7 +19,7 @@
  * unseeded (`unmet`, `strayUnseeded`). Met is by name: no query is evaluated here, which the render itself does. The series a daemon
  * births at zero once it holds the store, and those alone, are seeded across a restart (`restartMismatch`).
  *
- * `WF_ROOT` is set before the runner is imported, which reads it as the module loads. `WF_VERIFY_REST=1` judges in full every run a pass
+ * The traced pass reads its own store at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, sessions enough are admitted for the one run, and no cap is set on runs.
  */
 import { test } from 'node:test';
@@ -34,29 +34,35 @@ import { asyncOps, asyncStore, type AsyncJournal, type AsyncRunner } from './pro
 import { testPlace } from '../place/memory/index.ts';
 import { runGiven } from './placed.ts';
 import { RUN, SEED, UNSEEDED, type ServiceSeed, type SpanSeed } from '../../../tools/observe/render/seed.ts';
+import { startRun } from '../src/runner.ts';
+import { tickRun } from '../src/tick/tick.verb.ts';
+import { EngineService, engineOf } from '../src/runtime-client.ts';
+import {
+  DENIED_SPAN,
+  DENIED_SPAN_KEYS,
+  PASS_METRICS,
+  STEP_METRICS,
+  TIMELINE_SPAN,
+  TIMELINE_SPAN_KEYS,
+  WAIT_SPAN_KEYS,
+  WAIT_SPANS,
+} from '../src/meter/meter.verb.ts';
+import { TIMELINE_OF, TIMELINE_PARTS } from '../src/timeline/index.ts';
+import { DISK_EVERY, DISK_METRICS, DISK_SPAN, DISK_SPAN_KEYS } from '../src/disk/disk.verb.ts';
+import { ALL_KINDS, DISK_KINDS, DISK_PARTS } from '../src/disk/disk.ts';
+import { STEP_ATTRIBUTE_KEYS } from '../src/meter/step.ts';
+import { DEFAULT_SERVICE_NAME } from '../src/telemetry/telemetry.ts';
+import { PHASES } from '../src/meter/meter.ts';
+import { DAEMON_SERIES } from '../src/daemon/up.verb.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-observe-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
-process.env.WF_ROOT = ROOT;
-process.env.WF_MAX_CONCURRENT = '10';
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_RUNS;
-const { startRun } = await import('../src/runner.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_MAX_CONCURRENT: '10', WF_VERIFY_REST: '1', WF_MAX_RUNS: undefined };
 const place = testPlace();
 const stand = () => place;
-const runPlaced = runGiven(() => stand().layer);
-const { tickRun } = await import('../src/tick/tick.verb.ts');
-const { EngineService, engineOf } = await import('../src/runtime-client.ts');
-const { DENIED_SPAN, DENIED_SPAN_KEYS, PASS_METRICS, STEP_METRICS, TIMELINE_SPAN, TIMELINE_SPAN_KEYS, WAIT_SPAN_KEYS, WAIT_SPANS } =
-  await import('../src/meter/meter.verb.ts');
-const { TIMELINE_OF, TIMELINE_PARTS } = await import('../src/timeline/index.ts');
-const { DISK_EVERY, DISK_METRICS, DISK_SPAN, DISK_SPAN_KEYS } = await import('../src/disk/disk.verb.ts');
-const { ALL_KINDS, DISK_KINDS, DISK_PARTS } = await import('../src/disk/disk.ts');
-const { STEP_ATTRIBUTE_KEYS } = await import('../src/meter/step.ts');
-const { DEFAULT_SERVICE_NAME } = await import('../src/telemetry/telemetry.ts');
-const { PHASES } = await import('../src/meter/meter.ts');
-const { DAEMON_SERIES } = await import('../src/daemon/up.verb.ts');
+const runPlaced = runGiven(() => stand().layer, ENV);
 
 const REPO_ROOT = path.join(import.meta.dirname, '..', '..', '..');
 const OBSERVE = path.join(REPO_ROOT, 'tools', 'observe');

@@ -6,7 +6,7 @@
  * - a merge whose lockfile is main's: no `npm` is run, proven by one planted first on the `PATH`, and `node_modules` is as it was;
  * - a merge its check refused: aborted with the branch's package left installed under an ignored `node_modules`, until `npm install`.
  *
- * `WF_ROOT` is set before the runner is imported: the module reads it as it loads.
+ * Its store is its own at `ROOT`, given as `ENV`.
  */
 
 import { test } from 'node:test';
@@ -21,18 +21,17 @@ import { TEAM, TEAM_DEV } from './team.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
 import { runGiven, runOver } from './placed.ts';
+import { advanceRun, approveRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import { checkoutParts } from '../src/workspace/worktree.store.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-ship-install-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
-process.env.WF_ROOT = ROOT;
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { advanceRun, approveRun, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
-const { runRecord } = await import('../src/record/record.store.ts');
-const { checkoutParts } = await import('../src/workspace/worktree.store.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
+const runWith = runOver(runEngine, gitPlaceLayer, ENV);
+const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 /**
  * The ending of the tests' team's `dev` (`team.ts`): the file a person reads, its keys and its agent. It names `agent: shipper`, so the
@@ -146,13 +145,13 @@ async function atTheGate(given: Given = {}) {
   const repo = given.repo ?? aRepo();
   const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: given.dir ?? folder() }));
   const { e, tasks, filings, settle } = given.board ?? board();
-  await runWith(e, advanceRun(runRecord(run.id)));
-  const work = runRecord(run.id).steps.implement;
+  await runWith(e, advanceRun(runRecord(ROOT, run.id)));
+  const work = runRecord(ROOT, run.id).steps.implement;
   (given.work ?? addSub)(work.workspace!);
   git(work.workspace!, 'add', '-A');
   git(work.workspace!, 'commit', '-q', '-m', 'add sub');
   settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  const pass = await runWith(e, advanceRun(runRecord(run.id)));
+  const pass = await runWith(e, advanceRun(runRecord(ROOT, run.id)));
   return { repo, id: run.id, branch: work.branch!, e, tasks, filings, settle, pass, base: git(repo, 'rev-parse', 'HEAD') };
 }
 
@@ -165,10 +164,10 @@ const MESSAGE = 'Add sub\n\nadd.ts exports sub beside add.\nThe run, its branch:
 async function stagedAndSigned(given: Given & { message?: string; artifacts?: string[] } = {}) {
   const at = await atTheGate(given);
   await runWith(at.e, approveRun(at.id, 'ship', 'Merge it.'));
-  assert.deepEqual((await runWith(at.e, advanceRun(runRecord(at.id)))).filed, ['ship']);
+  assert.deepEqual((await runWith(at.e, advanceRun(runRecord(ROOT, at.id)))).filed, ['ship']);
   git(at.repo, 'merge', '--no-ff', '--no-commit', at.branch);
   at.settle(`${at.id}-ship`, 'succeeded', { ...SIGNED, artifacts: given.artifacts ?? [], message: given.message ?? MESSAGE });
-  const signed = await runWith(at.e, advanceRun(runRecord(at.id)));
+  const signed = await runWith(at.e, advanceRun(runRecord(ROOT, at.id)));
   return { ...at, signed, checkId: `${at.id}-ship-check` };
 }
 
@@ -260,8 +259,8 @@ test("an ending's merge that brings a dependency: its check installs what the me
   );
 
   settle(checkId, 'succeeded', undefined, 0);
-  await runWith(e, advanceRun(runRecord(id)));
-  const landed = runRecord(id).steps.ship.landed;
+  await runWith(e, advanceRun(runRecord(ROOT, id)));
+  const landed = runRecord(ROOT, id).steps.ship.landed;
   assert.ok(landed && 'commit' in landed, JSON.stringify(landed));
   assert.equal(git(repo, 'rev-parse', 'HEAD^1'), base);
   assert.equal(git(repo, 'status', '--porcelain'), '', 'nothing left in the checkout');
@@ -295,9 +294,9 @@ test("a merge its check refused is aborted with the branch's packages left insta
   const { id, e, tasks, settle, checkId } = await stagedAndSigned({ repo, dir: requiringB(), work: addB });
   assert.equal(runCheck(tasks, checkId, repo).status, 0);
   settle(checkId, 'failed', undefined, 1);
-  await runWith(e, advanceRun(runRecord(id)));
+  await runWith(e, advanceRun(runRecord(ROOT, id)));
   assert.equal(mergeHead(repo), false, 'aborted');
-  assert.ok(runRecord(id).steps.ship.landed && 'aborted' in runRecord(id).steps.ship.landed!);
+  assert.ok(runRecord(ROOT, id).steps.ship.landed && 'aborted' in runRecord(ROOT, id).steps.ship.landed!);
   assert.equal(fs.existsSync(path.join(repo, 'packages', 'b')), false, 'the branch is gone from the checkout');
   assert.ok(fs.lstatSync(path.join(repo, 'node_modules', 'b')).isSymbolicLink(), 'and its package is still installed');
   assert.equal(checkoutParts(repo), null, 'a package the lockfile does not name is not looked for');

@@ -39,7 +39,7 @@ import {
   type AgentSkill,
   type SkillsFound,
   type StepKey,
-  type Workflow,
+  type StepSpec,
 } from 'agent-orchestrator/workflow';
 import { toldLayers, type ToldLayers } from 'agent-orchestrator/run';
 import type { Refusal } from '../guard.ts';
@@ -140,7 +140,7 @@ export type KeyRow = { key: string; value: string | null; meaning: string };
  * A step's value for `key`, as a row says it: a list joined, a count in digits, a context window in the package's one form (`200k`, as
  * `renderStep` writes it), `output:` as the file it names, `route:` as its line (`routeLine`), and null for none.
  */
-function keyValue(step: Workflow, key: StepKey): string | null {
+function keyValue(step: StepSpec, key: StepKey): string | null {
   const value = key === 'output' ? step.output?.file : key === 'agent' ? step.agent?.name : step[key];
   if (value === undefined) return null;
   if (key === 'context' && typeof value === 'number') return contextText(value);
@@ -153,7 +153,7 @@ function keyValue(step: Workflow, key: StepKey): string | null {
  * Every key a step may set, a row each, in `STEP_KEYS`' order: set or not, so a person reads what the step could say as well as what it
  * does.
  */
-export const keyRows = (step: Workflow): KeyRow[] =>
+export const keyRows = (step: StepSpec): KeyRow[] =>
   STEP_KEYS.map((key) => ({ key, value: keyValue(step, key), meaning: STEP_KEY_MEANINGS[key] }));
 
 /** The file of the step `name` in the workflow folder `dir`, as written: frontmatter and all. */
@@ -291,7 +291,7 @@ export function listed(
  */
 const listedStep =
   (hires: ReadonlyMap<string, string>) =>
-  (step: Workflow): ListedStep => ({
+  (step: StepSpec): ListedStep => ({
     name: step.name,
     spec: specOf(step),
     body: step.body,
@@ -317,7 +317,7 @@ function schemasIn(dir: string): string[] {
 }
 
 /** The keys of a step that are lists, each empty where the step leaves it unset. */
-const listsOf = (step: Workflow) => ({
+const listsOf = (step: StepSpec) => ({
   input: step.input ?? [],
   writable: step.writable ?? [],
   reads: step.reads ?? [],
@@ -329,7 +329,7 @@ const listsOf = (step: Workflow) => ({
 });
 
 /** Where a step works and what it waits on, each null where the step does not say it. */
-const wiringOf = (step: Workflow) => ({
+const wiringOf = (step: StepSpec) => ({
   after: step.after,
   resume: step.resume ?? null,
   place: step.place ?? null,
@@ -338,13 +338,13 @@ const wiringOf = (step: Workflow) => ({
 });
 
 /** What a step's session is bounded by, each null where the step does not say it: its time, its memory and its cost. */
-const boundsOf = (step: Workflow) => ({
+const boundsOf = (step: StepSpec) => ({
   deadlineSeconds: step.deadlineSeconds ?? null,
   memory: step.memory ?? null,
   budget: step.budget ?? null,
 });
 
-export const specOf = (step: Workflow): WorkflowStepSpec => ({
+export const specOf = (step: StepSpec): WorkflowStepSpec => ({
   ...listsOf(step),
   ...wiringOf(step),
   harness: step.harness ?? null,
@@ -368,7 +368,7 @@ export const specOf = (step: Workflow): WorkflowStepSpec => ({
 });
 
 /** A condition's keys and a node's, each null where the step does not say it. */
-const routingOf = (step: Workflow) => ({
+const routingOf = (step: StepSpec) => ({
   routes: step.routes ?? null,
   route: step.route ? routeLine(step.route) : null,
   when: step.when ?? null,
@@ -377,7 +377,7 @@ const routingOf = (step: Workflow) => ({
 });
 
 /** A condition's `route:` as its line writes it, in YAML flow. */
-const routeLine = (route: NonNullable<Workflow['route']>): string => {
+const routeLine = (route: NonNullable<StepSpec['route']>): string => {
   if (route.kind === 'judge') return 'judge';
   if (route.kind === 'script') return `{ script: ${route.script} }`;
   const rows = Object.entries(route.table).map(([value, to]) => `${value}: ${to}`);
@@ -426,7 +426,7 @@ export function folderOf(
  * step with no agent, one the folder's places do not have, and one whose card the package refuses. `found` is what the folder's places
  * hold, read through the Agent and Skill doors by the handler.
  */
-export function agentSkillsOf(step: Workflow, found: { readonly agents: Agents; readonly skills: SkillsFound }): AgentSkill[] | null {
+export function agentSkillsOf(step: StepSpec, found: { readonly agents: Agents; readonly skills: SkillsFound }): AgentSkill[] | null {
   const attached = step.agent ? found.agents.get(step.agent.name) : undefined;
   if (attached === undefined || attached instanceof Error) return null;
   try {

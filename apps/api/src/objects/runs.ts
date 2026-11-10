@@ -107,7 +107,7 @@ const page = (namespace: string | undefined, query: ListQuery) =>
 const one = (name: string, namespace?: string) =>
   Effect.flatMap(
     answered(async (s) => {
-      const run = findRun(name);
+      const run = findRun(s.home, name);
       if (!run) return null;
       if (namespace !== undefined) await Effect.runPromise(runIn(run, namespace));
       return s.inRequest(informed(s, runObject(run, s)));
@@ -120,9 +120,9 @@ const one = (name: string, namespace?: string) =>
           : Effect.succeed(object),
   );
 
-/** The run `name` the store has, or `Missing` in the store's words. */
-const found = (name: string) => {
-  const run = findRun(name);
+/** The run `name` the store at `home` has, or `Missing` in the store's words. */
+const found = (home: string, name: string) => {
+  const run = findRun(home, name);
   if (!run) throw new Missing({ error: noSuchRun(name) });
   return run;
 };
@@ -140,7 +140,7 @@ const acted = <A>(at: At, work: (s: Served) => Promise<A>) =>
     const s = yield* ServedNow;
     return yield* Effect.tryPromise({
       try: async () => {
-        const run = found(at.name);
+        const run = found(s.home, at.name);
         await Effect.runPromise(runIn(run, at.namespace));
         if (at.step !== undefined) {
           const step = taskOfStep(at.name, at.step, s.home);
@@ -265,14 +265,14 @@ export const runsHandlers = HttpApiBuilder.group(Api, 'runs', (handlers) =>
     .handle('show', ({ params: { name } }) => one(name))
     .handle('lines', ({ params: { name } }) =>
       answered(async ({ repo, home }) => {
-        const run = found(name);
+        const run = found(home, name);
         return { ...runLines(run), workflowPage: workflowPageOf(run, repo, home) };
       }),
     )
     .handle('concluded', ({ params: { name } }) => answered((s) => s.inRequest(CONCLUDED.handler({ runId: name }))))
     .handle('record', ({ params: { name } }) =>
       answered(async (s) => {
-        found(name);
+        found(s.home, name);
         return asJson(await s.inRequest(SHOW.handler({ runId: name, raw: true })));
       }),
     )

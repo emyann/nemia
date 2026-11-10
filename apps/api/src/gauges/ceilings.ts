@@ -25,11 +25,11 @@ export type { Ceilings, MetricRead };
 export async function ceilingsOf(s: Served): Promise<Ceilings> {
   const { cap, inFlight, held } = await s.inRequest(CEILINGS.handler({}));
   return {
-    last: lastCeilings() ?? null,
+    last: lastCeilings(s.home) ?? null,
     cap,
     inFlight,
     held: [...held].map(([run, slot]) => ({ run, ...slot, word: slotWord(slot) })),
-    pass: lastPassCost() ?? null,
+    pass: lastPassCost(s.home) ?? null,
   };
 }
 

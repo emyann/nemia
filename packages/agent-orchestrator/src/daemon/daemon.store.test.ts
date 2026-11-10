@@ -6,17 +6,16 @@
  * A store of its own, since the verbs read every run under `WF_ROOT`. The engine is a fake whose tick is all a pass over an empty store
  * asks of it, so a test counts the passes and reads the file between them. A holder that is alive is a real process of the test's — a
  * sleeper — written with its own start from `/proc`, as `nemia up` writes its own; one that is gone is a child that has exited; and a pid
- * reused after a crash is the sleeper under a start that is not its own. `WF_ROOT` is read as the module loads, so it is set before the
- * import; `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo of runs at rest, and a difference throws (`verifyRest`
+ * reused after a crash is the sleeper under a start that is not its own. Its store is at `ROOT`, given as `ENV`,
+ * where `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo of runs at rest, and a difference throws (`verifyRest`
  * in tick.verb.ts).
  */
-import { rootNow } from '../../test/config-given.ts';
 import { after, test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
-import { Effect } from 'effect';
+import { Effect, Metric } from 'effect';
 import type { RefusedMove, TickReport } from 'agent-runtime';
 import type { Engine } from '../runtime-client.ts';
 import { nodeChild } from '../../test/child.ts';
@@ -27,16 +26,8 @@ import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven } from '../../test/placed.ts';
 import { collector, seriesOf } from '../../test/collector.ts';
 import { story } from 'test-kit/checkpoints';
-
-const ROOT = scratch('wf-daemon-');
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_RUNS;
-delete process.env.WF_MAX_CONCURRENT;
-const { beat, daemonFile, daemonStanding, lastCeilings, procStartOf, readFeed } = await import('../runner.ts');
-const stand = eachTest(testPlace);
-const runPlaced = runGiven(() => stand().layer);
-const {
+import { beat, daemonFile, daemonStanding, lastCeilings, procStartOf, readFeed } from '../runner.ts';
+import {
   heldServes,
   servesOnStore,
   parseDaemonFile,
@@ -48,11 +39,22 @@ const {
   recordRecentPass,
   releaseStore,
   takeStore,
-} = await import('./daemon.store.ts');
-const { PHASES, passCost } = await import('../meter/meter.ts');
-const { main: cli } = await import('../cli/main.ts');
+} from './daemon.store.ts';
+import { PHASES, passCost } from '../meter/meter.ts';
+import { main as cli } from '../cli/main.ts';
+import { askedQuota, DAEMON_SERIES, holdUrl, up } from './up.verb.ts';
+import { telemetryLayer } from '../telemetry/telemetry.store.ts';
+import { dropSubscription, putSubscription } from '../subscription/subscription.store.ts';
+import { feedFile, feedSize } from '../feed/feed.store.ts';
+import { Invalid } from '../refusal/refusal.ts';
+import type { Env } from '../config/config.store.ts';
+
+const ROOT = scratch('wf-daemon-');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_RUNS: undefined, WF_MAX_CONCURRENT: undefined };
+const stand = eachTest(testPlace);
+const runPlaced = runGiven(() => stand().layer, ENV);
 /** `nemia`, as a person types it, its commands given this test's place. */
-const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place);
+const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place, ENV);
 
 const FILE = path.join(ROOT, 'daemon.json');
 
@@ -206,7 +208,7 @@ test(
   'a pass that runs long is heard from: the beat is written while the pass awaits, and the store reads as ticking throughout',
   WAITED,
   async (t) => {
-    assert.equal(daemonFile(), FILE);
+    assert.equal(daemonFile(ROOT), FILE);
     clear();
     seeded(t);
     const beats: string[] = [];
@@ -222,7 +224,7 @@ test(
           const f = read();
           assert.equal(f.passedAt, null, 'no pass completed: the beat is not a pass');
           if (f.beatAt && f.beatAt !== beats.at(-1)) beats.push(f.beatAt);
-          kinds.add(daemonStanding().kind);
+          kinds.add(daemonStanding(ROOT).kind);
           t.mock.timers.tick(1);
           return beats.length >= 2;
         },
@@ -356,9 +358,9 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
       const self = { pid: process.pid, by: 'up' as const, startedAt: minutesAgo(1), cwd: '/here', every: 4000, passedAt: minutesAgo(0.5) };
       fs.writeFileSync(FILE, JSON.stringify(self));
       const mono = monoAgo(0);
-      beat(self, { at: Date.parse('2026-09-22T12:00:00.000Z'), mono });
+      beat(ROOT, self, { at: Date.parse('2026-09-22T12:00:00.000Z'), mono });
       assert.deepEqual(read(), { ...self, beatAt: '2026-09-22T12:00:00.000Z', beatMono: mono }, 'its own file beats, its last pass kept');
-      beat(self, { at: Date.parse('2026-09-22T12:00:04.000Z') });
+      beat(ROOT, self, { at: Date.parse('2026-09-22T12:00:04.000Z') });
       assert.deepEqual(
         read(),
         { ...self, beatAt: '2026-09-22T12:00:04.000Z' },
@@ -370,11 +372,11 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
         ['an earlier start of this pid', { startedAt: minutesAgo(5) }],
       ] as const) {
         const text = holdBy(process.pid, { ...self, ...over });
-        beat(self);
+        beat(ROOT, self);
         assert.equal(fs.readFileSync(FILE, 'utf8'), text, name);
       }
       clear();
-      beat(self);
+      beat(ROOT, self);
       assert.equal(fs.existsSync(FILE), false, 'no file is not written by a beat');
     },
   );
@@ -382,16 +384,16 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
   await s.test('the lease names the release its daemon runs: as it takes the store, through a pass, a beat and its stop', async () => {
     clear();
     const release = { kind: 'install', root: path.join(ROOT, 'releases', 'v1'), tag: 'v1', commit: 'abcdef1234567890' } as const;
-    const { held } = takeStore({ every: 4000, cwd: '/here', by: 'api', release });
+    const { held } = takeStore(ROOT, { every: 4000, cwd: '/here', by: 'api', release });
     assert.deepEqual(read().release, release, 'as it takes the store');
-    const next = passed(held);
+    const next = passed(ROOT, held);
     assert.deepEqual(read().release, release, 'after a pass');
-    beat(next);
+    beat(ROOT, next);
     assert.deepEqual(read().release, release, 'after a beat');
-    releaseStore(next);
+    releaseStore(ROOT, next);
     assert.deepEqual(parseDaemonFile(fs.readFileSync(FILE, 'utf8'))?.release, release, 'after its stop, as the reader decodes it');
     clear();
-    takeStore({ every: 4000, cwd: '/here', by: 'api' });
+    takeStore(ROOT, { every: 4000, cwd: '/here', by: 'api' });
     assert.equal('release' in read(), false, 'a daemon given no release writes none');
     clear();
   });
@@ -604,8 +606,6 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
     'up as the api takes the store as the api, writes where it serves once it listens, and lets it go as its scope closes',
     async () => {
       clear();
-      const { up, holdUrl } = await import('./up.verb.ts');
-      const { Effect } = await import('effect');
       const seen: ReturnType<typeof read>[] = [];
       const e = engineOf((n) => {
         seen.push(read());
@@ -613,7 +613,7 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
       });
       const listening = Effect.sync(() => {
         assert.equal(read().url, undefined, 'no url before it listens');
-        assert.equal(holdUrl('http://127.0.0.1:8787'), true);
+        assert.equal(holdUrl(ROOT, 'http://127.0.0.1:8787'), true);
       });
       const threw = await runPlaced(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api', onTaken: () => listening }))).then(
         () => assert.fail('the daemon returned'),
@@ -630,7 +630,7 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
       );
       const stopped = read();
       assert.ok(stopped.stoppedAt, 'let go as its scope closed');
-      assert.equal(holdUrl('http://127.0.0.1:9999'), false, 'a lease let go takes no url');
+      assert.equal(holdUrl(ROOT, 'http://127.0.0.1:9999'), false, 'a lease let go takes no url');
       assert.equal(read().url, 'http://127.0.0.1:8787');
       clear();
     },
@@ -640,8 +640,6 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
     'REFUSED both ways round: an api holding the store refuses a nemia up and a nemia tick, and a nemia up holding it refuses an api',
     async (t) => {
       seeded(t);
-      const { up } = await import('./up.verb.ts');
-      const { Effect } = await import('effect');
       const text = holdBy(LIVE, { by: 'api', url: 'http://127.0.0.1:8787' });
       const e = engineOf();
       await assert.rejects(
@@ -672,8 +670,6 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
 
   await s.test('an api whose store is taken over while it runs stops at its next pass, naming the new holder', async () => {
     clear();
-    const { up } = await import('./up.verb.ts');
-    const { Effect } = await import('effect');
     let theirs = '';
     const e = engineOf((n) => {
       if (n === 1) theirs = holdBy(LIVE);
@@ -698,20 +694,20 @@ const CARDS = { claude: { name: 'claude', supportedInterfaces: [{ url: 'http://1
 test('what the lease serves: written by its holder alone, read back, and answered only of another live process', async (t) => {
   await t.test('written by the holding process, and read back key for key through the schema', async () => {
     clear();
-    const { held } = takeStore({ every: 4000, cwd: '/here', by: 'api' });
-    assert.equal(heldServes(CARDS), true, 'the process that holds the lease writes it');
+    const { held } = takeStore(ROOT, { every: 4000, cwd: '/here', by: 'api' });
+    assert.equal(heldServes(ROOT, CARDS), true, 'the process that holds the lease writes it');
     assert.deepEqual(read().serves, CARDS, 'on the file');
     assert.deepEqual(
       parseDaemonFile(fs.readFileSync(FILE, 'utf8'))?.serves,
       CARDS,
       'and back through the schema, which names the key — a key it does not name is dropped on the next write',
     );
-    const next = passed(held);
+    const next = passed(ROOT, held);
     assert.deepEqual(read().serves, CARDS, 'and a pass of its own daemon keeps it');
-    beat(next);
+    beat(ROOT, next);
     assert.deepEqual(read().serves, CARDS, 'as does its beat');
     clear();
-    takeStore({ every: 4000, cwd: '/here', by: 'api' });
+    takeStore(ROOT, { every: 4000, cwd: '/here', by: 'api' });
     assert.equal('serves' in read(), false, 'a daemon that writes none names none');
     clear();
   });
@@ -719,7 +715,7 @@ test('what the lease serves: written by its holder alone, read back, and answere
     for (const over of [{ holder: CARDS }, { by: 'wf up', holder: CARDS }, { by: 'up', serves: CARDS }]) {
       const held = parseDaemonFile(holdBy(process.pid, over));
       assert.deepEqual([held?.by, held?.serves], ['up', CARDS], JSON.stringify(over));
-      beat(held!);
+      beat(ROOT, held!);
       const { by, serves, holder, beatAt } = read();
       assert.deepEqual({ by, serves, holder, beat: beatAt !== undefined }, { by: 'up', serves: CARDS, holder: undefined, beat: true });
     }
@@ -732,30 +728,30 @@ test('what the lease serves: written by its holder alone, read back, and answere
       ['stopped', { stoppedAt: minutesAgo(0.1) }],
     ] as const) {
       const text = holdBy(process.pid, over);
-      assert.equal(heldServes(CARDS), false, `${name}: it answers it wrote nothing`);
+      assert.equal(heldServes(ROOT, CARDS), false, `${name}: it answers it wrote nothing`);
       assert.equal(fs.readFileSync(FILE, 'utf8'), text, `${name}: and the file is byte for byte as it was`);
     }
     clear();
-    assert.equal(heldServes(CARDS), false, 'no lease is no lease of this process’s');
+    assert.equal(heldServes(ROOT, CARDS), false, 'no lease is no lease of this process’s');
     assert.equal(fs.existsSync(FILE), false, 'and nothing is written');
   });
   await t.test('servesOnStore answers another live process alone: never its own, never a lease nobody ticks', async () => {
     clear();
-    assert.equal(servesOnStore(), undefined, 'no lease serves nothing');
+    assert.equal(servesOnStore(ROOT), undefined, 'no lease serves nothing');
     holdBy(LIVE, { serves: CARDS });
-    assert.deepEqual(servesOnStore(), CARDS, 'a ticking lease of another live process names what it serves');
+    assert.deepEqual(servesOnStore(ROOT), CARDS, 'a ticking lease of another live process names what it serves');
     holdBy(process.pid, { serves: CARDS });
-    assert.equal(servesOnStore(), undefined, 'a lease this process holds serves nothing to it: a viewer never dials itself');
+    assert.equal(servesOnStore(ROOT), undefined, 'a lease this process holds serves nothing to it: a viewer never dials itself');
     holdBy(LIVE, { serves: CARDS, stoppedAt: minutesAgo(0.1) });
-    assert.equal(servesOnStore(), undefined, 'a lease let go names a port no one listens on');
+    assert.equal(servesOnStore(ROOT), undefined, 'a lease let go names a port no one listens on');
     holdBy(GONE, { serves: CARDS });
-    assert.equal(servesOnStore(), undefined, 'nor does one whose process is gone');
+    assert.equal(servesOnStore(ROOT), undefined, 'nor does one whose process is gone');
     holdBy(LIVE, { serves: CARDS, passedAt: minutesAgo(30), startedAt: minutesAgo(40) });
-    assert.equal(servesOnStore(), undefined, 'nor one that has gone silent past its window');
+    assert.equal(servesOnStore(ROOT), undefined, 'nor one that has gone silent past its window');
     holdBy(LIVE);
-    assert.equal(servesOnStore(), undefined, 'a ticking lease that serves nothing answers none');
+    assert.equal(servesOnStore(ROOT), undefined, 'a ticking lease that serves nothing answers none');
     fs.writeFileSync(FILE, 'not json');
-    assert.equal(servesOnStore(), undefined, 'and a file that does not read as a lease answers none');
+    assert.equal(servesOnStore(ROOT), undefined, 'and a file that does not read as a lease answers none');
     clear();
   });
 });
@@ -828,7 +824,7 @@ test("`nemia up` stopped by a signal lets the store go on the way out, with the 
       const readIt = () => JSON.parse(fs.readFileSync(file, 'utf8')) as ReturnType<typeof read>;
       const w = nodeChild(
         `const { main } = await import(${JSON.stringify(cli)}); const { promised } = await import(${JSON.stringify(fake)}); await main(['up', '20'], promised({ tick: async () => ({ tasks: 0, actions: [], running: {}, views: [] }), admit: async () => [] }));`,
-        { ...process.env, WF_ROOT: root },
+        { ...ENV, WF_ROOT: root },
       );
       const { child } = w;
       try {
@@ -1038,31 +1034,31 @@ test('what a pass kept reads back: its cost, the recent passes, the ceilings; RE
     async (t) => {
       const errors: string[] = [];
       t.mock.method(process.stderr, 'write', (line: string) => errors.push(line) > 0);
-      fs.rmSync(recentFile(), { force: true });
+      fs.rmSync(recentFile(ROOT), { force: true });
       try {
-        assert.deepEqual(recentPasses(), [], 'none before any pass kept one');
-        for (const ms of [1, 2, 3, 4, 5]) recordRecentPass({ ...COST, ms }, 3);
+        assert.deepEqual(recentPasses(ROOT), [], 'none before any pass kept one');
+        for (const ms of [1, 2, 3, 4, 5]) recordRecentPass(ROOT, { ...COST, ms }, 3);
         assert.deepEqual(
-          recentPasses().map((r) => r.ms),
+          recentPasses(ROOT).map((r) => r.ms),
           [3, 4, 5],
         );
-        assert.equal(recentPasses()[0].runs, 40);
-        const kept = JSON.parse(fs.readFileSync(recentFile(), 'utf8')) as unknown[];
-        fs.writeFileSync(recentFile(), JSON.stringify([kept[0], { ...(kept[1] as object), ms: 'slow' }, kept[2], 7]));
+        assert.equal(recentPasses(ROOT)[0].runs, 40);
+        const kept = JSON.parse(fs.readFileSync(recentFile(ROOT), 'utf8')) as unknown[];
+        fs.writeFileSync(recentFile(ROOT), JSON.stringify([kept[0], { ...(kept[1] as object), ms: 'slow' }, kept[2], 7]));
         assert.deepEqual(
-          recentPasses().map((r) => r.ms),
+          recentPasses(ROOT).map((r) => r.ms),
           [3, 5],
         );
         assert.equal(errors.length, 1, errors.join(''));
-        assert.ok(errors[0].startsWith(`${recentFile()}: 2 of its passes`), errors[0]);
-        recordRecentPass({ ...COST, ms: 6 }, 3);
+        assert.ok(errors[0].startsWith(`${recentFile(ROOT)}: 2 of its passes`), errors[0]);
+        recordRecentPass(ROOT, { ...COST, ms: 6 }, 3);
         assert.deepEqual(
-          recentPasses().map((r) => r.ms),
+          recentPasses(ROOT).map((r) => r.ms),
           [3, 5, 6],
           'the next pass writes the file without them',
         );
       } finally {
-        fs.rmSync(recentFile(), { force: true });
+        fs.rmSync(recentFile(ROOT), { force: true });
       }
     },
   );
@@ -1077,9 +1073,9 @@ test('what a pass kept reads back: its cost, the recent passes, the ceilings; RE
         entries: [{ part: 'runs', ...(kind === undefined ? {} : { kind }), factory: 'nemia', bytes: 40, unread: 0 }],
       });
       const kept = (kind?: string) => {
-        fs.rmSync(recentFile(), { force: true });
-        recordRecentPass({ ...COST, ms: 1 }, 3);
-        const [pass] = JSON.parse(fs.readFileSync(recentFile(), 'utf8')) as object[];
+        fs.rmSync(recentFile(ROOT), { force: true });
+        recordRecentPass(ROOT, { ...COST, ms: 1 }, 3);
+        const [pass] = JSON.parse(fs.readFileSync(recentFile(ROOT), 'utf8')) as object[];
         return parseRecentPasses(JSON.stringify([{ ...pass, disk: disk(kind) }]));
       };
       try {
@@ -1087,7 +1083,7 @@ test('what a pass kept reads back: its cost, the recent passes, the ceilings; RE
         assert.deepEqual(kept().passes[0].disk, disk(), 'a pass kept before the kinds');
         assert.deepEqual([kept('photos').passes.length, kept('photos').unread], [0, 1]);
       } finally {
-        fs.rmSync(recentFile(), { force: true });
+        fs.rmSync(recentFile(ROOT), { force: true });
       }
     },
   );
@@ -1096,13 +1092,13 @@ test('what a pass kept reads back: its cost, the recent passes, the ceilings; RE
     const file = path.join(ROOT, 'tick.json');
     try {
       fs.writeFileSync(file, JSON.stringify({ sessions: 4, runs: 2 }));
-      assert.deepEqual(lastCeilings(), { sessions: 4, runs: 2 });
+      assert.deepEqual(lastCeilings(ROOT), { sessions: 4, runs: 2 });
       for (const bad of [{ sessions: 4, runs: -1 }, { sessions: 4, runs: 1.5 }, { sessions: '4', runs: 2 }, { sessions: 4 }, [4, 2]]) {
         fs.writeFileSync(file, JSON.stringify(bad));
-        assert.equal(lastCeilings(), undefined, JSON.stringify(bad));
+        assert.equal(lastCeilings(ROOT), undefined, JSON.stringify(bad));
       }
       fs.writeFileSync(file, '{"sessions": 4');
-      assert.equal(lastCeilings(), undefined, 'half a file');
+      assert.equal(lastCeilings(ROOT), undefined, 'half a file');
     } finally {
       fs.rmSync(file, { force: true });
     }
@@ -1111,17 +1107,17 @@ test('what a pass kept reads back: its cost, the recent passes, the ceilings; RE
   await t.test(
     'a recent pass keeps its quota and checks, a ring an older tick wrote without them reads, and REFUSED: a quota not a number',
     async () => {
-      fs.rmSync(recentFile(), { force: true });
+      fs.rmSync(recentFile(ROOT), { force: true });
       try {
         const check = { factory: 'nemia', workflow: 'build', step: 'implement', agent: 'ada' };
-        const { kept } = recordRecentPass(COST, 3, { quota: { h: { w: 12.5 } }, checks: [check] });
+        const { kept } = recordRecentPass(ROOT, COST, 3, { quota: { h: { w: 12.5 } }, checks: [check] });
         assert.deepEqual([kept.at(-1)?.quota, kept.at(-1)?.checks], [{ h: { w: 12.5 } }, [check]]);
-        assert.deepEqual(recentPasses(), kept, 'read back as kept');
+        assert.deepEqual(recentPasses(ROOT), kept, 'read back as kept');
         const { waitMs: _w, load: _l, quota: _q, checks: _c, ...older } = kept[0];
-        fs.writeFileSync(recentFile(), JSON.stringify([older, { ...kept[0], quota: { h: { w: 'most' } } }]));
-        assert.deepEqual(recentPasses(), [older], 'the older reads; the quota that is no number is left out');
+        fs.writeFileSync(recentFile(ROOT), JSON.stringify([older, { ...kept[0], quota: { h: { w: 'most' } } }]));
+        assert.deepEqual(recentPasses(ROOT), [older], 'the older reads; the quota that is no number is left out');
       } finally {
-        fs.rmSync(recentFile(), { force: true });
+        fs.rmSync(recentFile(ROOT), { force: true });
       }
     },
   );
@@ -1129,8 +1125,6 @@ test('what a pass kept reads back: its cost, the recent passes, the ceilings; RE
 
 test('the daemon names on the lease what its hold serves, and names none when it holds nothing', async () => {
   clear();
-  const { up } = await import('./up.verb.ts');
-  const { Effect } = await import('effect');
   const ran = async (held: unknown) => {
     const seen: ReturnType<typeof read>[] = [];
     const e = promised({
@@ -1170,9 +1164,7 @@ test('the daemon names on the lease what its hold serves, and names none when it
 test('`up` writes the feed a daemon started line once it holds the store, before it serves: the first, then one saying when the last stopped', async () => {
   clear();
   fs.rmSync(path.join(ROOT, 'feed.jsonl'), { force: true });
-  const { up } = await import('./up.verb.ts');
-  const { Effect } = await import('effect');
-  const daemonLines = () => readFeed(0).lines.filter((l) => 'daemon' in l);
+  const daemonLines = () => readFeed(ROOT, 0).lines.filter((l) => 'daemon' in l);
   const started: Array<ReturnType<typeof daemonLines>[number] | undefined> = [];
   const serving = Effect.sync(() => started.push(daemonLines().at(-1)));
   const once = () =>
@@ -1197,9 +1189,6 @@ test('`up` writes the feed a daemon started line once it holds the store, before
 
 test("`up` births the daemon's series and the caller's at zero and exports them before it serves; a pass then puts its values in", async (t) => {
   clear();
-  const { up, DAEMON_SERIES } = await import('./up.verb.ts');
-  const { telemetryLayer } = await import('../telemetry/telemetry.store.ts');
-  const { Effect, Metric } = await import('effect');
   const c = await collector(t);
   const theirs = Metric.counter('test.caller.series', { incremental: true });
   const metricsPosts = () => c.posts.filter((p) => p.path === '/v1/metrics').map((p) => seriesOf(p.body, () => true, true));
@@ -1239,9 +1228,6 @@ test("`up` births the daemon's series and the caller's at zero and exports them 
 
 test("REFUSED: a daemon refused the lease births no series, so the live daemon's are never read as reset", async (t) => {
   seeded(t);
-  const { up } = await import('./up.verb.ts');
-  const { telemetryLayer } = await import('../telemetry/telemetry.store.ts');
-  const { Effect, Metric } = await import('effect');
   const c = await collector(t);
   holdBy(LIVE);
   const e = engineOf();
@@ -1267,8 +1253,6 @@ test("REFUSED: a daemon refused the lease births no series, so the live daemon's
 
 test("the daemon asks each harness's quota and hands its reading to the passes; a harness that fails, dies or answers no windows keeps its last", async () => {
   clear();
-  const { up, askedQuota } = await import('./up.verb.ts');
-  const { Effect } = await import('effect');
   const answers: Record<string, import('effect').Effect.Effect<unknown, unknown>> = {
     a: Effect.succeed({ kind: 'windows', limits: [{ key: 'five', usedPercentage: 30, resetsAt: null }], subscription: null }),
     b: Effect.fail(new Error('no answer')),
@@ -1285,23 +1269,21 @@ test("the daemon asks each harness's quota and hands its reading to the passes; 
   });
   assert.deepEqual(last, { b: { week: 5 }, c: { week: 6 }, d: { week: 7 } }, 'the last reading is not changed in place');
 
-  fs.rmSync(recentFile(), { force: true });
+  fs.rmSync(recentFile(ROOT), { force: true });
   const e = engineOf((n) => {
-    if (recentPasses().at(-1)?.quota || n > 500) throw STOP;
+    if (recentPasses(ROOT).at(-1)?.quota || n > 500) throw STOP;
   });
   Object.assign(e, {
     quota: () => Effect.succeed({ kind: 'windows', limits: [{ key: 'w', usedPercentage: 12, resetsAt: null }], subscription: null }),
   });
   await assert.rejects(runPlaced(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api' }))), (err) => err === STOP);
-  const quota = recentPasses().at(-1)?.quota ?? {};
+  const quota = recentPasses(ROOT).at(-1)?.quota ?? {};
   assert.ok(Object.keys(quota).length > 0, 'a pass kept the reading');
   for (const windows of Object.values(quota)) assert.deepEqual(windows, { w: 12 });
   clear();
 });
 
 test("a good reading sets the quota's gauges by harness and window, through the ask handed down and never the engine's", async () => {
-  const { askedQuota } = await import('./up.verb.ts');
-  const { Effect, Metric } = await import('effect');
   const resetsAt = '2026-10-27T09:00:00.000Z';
   const answers: Record<string, unknown> = {
     claude: {
@@ -1340,12 +1322,13 @@ test("a good reading sets the quota's gauges by harness and window, through the 
 
 test('the daemon delivers the subscriptions: a wake line written to the feed is said to the subscribed task through the engine', async () => {
   clear();
-  const { up } = await import('./up.verb.ts');
-  const { Effect } = await import('effect');
-  const { dropSubscription, putSubscription } = await import('../subscription/subscription.store.ts');
-  const { feedFile, feedSize } = await import('../feed/feed.store.ts');
-  putSubscription(rootNow(), 'daemon', { task: 'nemia', selectors: ['reason=AwaitingApproval'], digestEvery: 60, from: feedSize() });
-  fs.appendFileSync(feedFile(), `${JSON.stringify({ at: at(0), run: 'r-1', step: 'plan', word: 'awaiting approval' })}\n`);
+  putSubscription(ROOT, 'daemon', {
+    task: 'nemia',
+    selectors: ['reason=AwaitingApproval'],
+    digestEvery: 60,
+    from: feedSize(ROOT),
+  });
+  fs.appendFileSync(feedFile(ROOT), `${JSON.stringify({ at: at(0), run: 'r-1', step: 'plan', word: 'awaiting approval' })}\n`);
   const told: string[] = [];
   const e = engineOf((n) => {
     if (told.length || n > 2000) throw STOP;
@@ -1358,38 +1341,29 @@ test('the daemon delivers the subscriptions: a wake line written to the feed is 
     /^nemia: The feed needs your judgement:\n {2}\S+ {2}r-1 {2}plan {2}awaiting approval(\n\nSince your last news:\n(1 routine line|2 routine lines) of the feed:(\n {2}\S+ {2}pid \d+ {2}daemon started {2}· first daemon on this store)?(\n {2}\S+ {2}r-1 {2}— {2}removed)?)?$/,
     "the wake alone, or with the routine lines the same read found riding it: the daemon's started line, and the tick's own line of r-1, which no run of the store names",
   );
-  dropSubscription(rootNow(), 'daemon');
+  dropSubscription(ROOT, 'daemon');
   clear();
 });
 
 test('REFUSED at start: a daemon with WF_MEMORY_LIMIT set on a host that cannot hold one takes no store, naming the variable to unset', async (t) => {
   clear();
-  const { up } = await import('./up.verb.ts');
-  const { Invalid } = await import('../refusal/refusal.ts');
-  const was = { memory: process.env.WF_MEMORY_LIMIT, parent: process.env.WF_CGROUP_PARENT };
-  t.after(() => {
-    for (const [name, value] of [
-      ['WF_MEMORY_LIMIT', was.memory],
-      ['WF_CGROUP_PARENT', was.parent],
-    ] as const)
-      if (value === undefined) delete process.env[name];
-      else process.env[name] = value;
-  });
-  process.env.WF_MEMORY_LIMIT = '4Gi';
-  process.env.WF_CGROUP_PARENT = 'agents.slice';
+  let env: Env = { ...ENV, WF_MEMORY_LIMIT: '4Gi', WF_CGROUP_PARENT: 'agents.slice' };
   const asked: Array<string | undefined> = [];
   const noted = (parent?: string): void => void asked.push(parent);
   const refusing = (parent?: string) => (noted(parent), 'this host has no systemd user manager.');
   const e = engineOf(() => {
     throw STOP;
   });
-  await assert.rejects(runPlaced(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api', scope: refusing }))), (err: unknown) => {
-    assert.ok(err instanceof Invalid, String(err));
-    assert.equal(err.exitCode, 2);
-    assert.ok(err.message.includes('this host has no systemd user manager.'), "the probe's words");
-    assert.ok(err.message.includes('unset WF_MEMORY_LIMIT'), err.message);
-    return true;
-  });
+  await assert.rejects(
+    runGiven(() => stand().layer, env)(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api', scope: refusing }))),
+    (err: unknown) => {
+      assert.ok(err instanceof Invalid, String(err));
+      assert.equal(err.exitCode, 2);
+      assert.ok(err.message.includes('this host has no systemd user manager.'), "the probe's words");
+      assert.ok(err.message.includes('unset WF_MEMORY_LIMIT'), err.message);
+      return true;
+    },
+  );
   assert.deepEqual(asked, ['agents.slice'], 'the probe asked once, for the slice the scopes are made in');
   assert.equal(e.passes, 0, 'no pass ran');
   assert.equal(fs.existsSync(FILE), false, 'the store was never taken');
@@ -1400,7 +1374,10 @@ test('REFUSED at start: a daemon with WF_MEMORY_LIMIT set on a host that cannot 
       return undefined;
     };
     await assert.rejects(
-      runPlaced(
+      runGiven(
+        () => stand().layer,
+        env,
+      )(
         Effect.scoped(
           up(
             engineOf(() => {
@@ -1412,9 +1389,12 @@ test('REFUSED at start: a daemon with WF_MEMORY_LIMIT set on a host that cannot 
       ),
       (err) => err === STOP,
     );
-    delete process.env.WF_MEMORY_LIMIT;
+    env = { ...env, WF_MEMORY_LIMIT: undefined };
     await assert.rejects(
-      runPlaced(
+      runGiven(
+        () => stand().layer,
+        env,
+      )(
         Effect.scoped(
           up(
             engineOf(() => {
@@ -1431,9 +1411,12 @@ test('REFUSED at start: a daemon with WF_MEMORY_LIMIT set on a host that cannot 
   });
 
   await t.test('REFUSED: a WF_MEMORY_LIMIT the runtime does not read, before any probe', async () => {
-    process.env.WF_MEMORY_LIMIT = '8 GB';
+    env = { ...env, WF_MEMORY_LIMIT: '8 GB' };
     await assert.rejects(
-      runPlaced(
+      runGiven(
+        () => stand().layer,
+        env,
+      )(
         Effect.scoped(
           up(
             engineOf(() => {

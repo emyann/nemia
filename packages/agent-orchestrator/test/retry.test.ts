@@ -7,7 +7,7 @@
  * `assess` decide is pure, in `src/retry/retry.test.ts` and `assess-*.test.ts`; a pass that died and a race with the engine are
  * `store.test.ts`'s, a task held open answered or closed `held.test.ts`'s.
  *
- * `WF_ROOT` is set before the runner is imported, which reads it as it loads, and `WF_DEFAULT_FACTORY_STARTS` beside it: its runs start
+ * The store is the file's own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` on it: its runs start
  * in repositories no factory holds.
  */
 import { test, type TestContext } from 'node:test';
@@ -24,25 +24,40 @@ import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
 import { answerText, approvedAnswerText, type Question } from '../src/question/question.ts';
+import {
+  advanceRun,
+  closeoutAsked,
+  decideRun,
+  exitVerdicts,
+  list,
+  Missing,
+  phaseOfView,
+  retryRun,
+  sayRun,
+  startRun,
+  runWith,
+} from '../src/runner.ts';
+import { stepsNow as stepsOf } from './steps-now.ts';
+import { askFile, asksDir, markCancelled, readAnswers, runRecord } from '../src/record/record.store.ts';
+import { filesStoreAt } from '../src/record/files.store.ts';
+import { isRepositoryRun, LINE_NAME, shownNote } from '../src/run.ts';
+import { verdictWord } from '../src/check/check.ts';
+import { configRefusal, engineOf } from '../src/runtime-client.ts';
+import { main } from '../src/cli/main.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-retry-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-process.env.WF_ROOT = ROOT;
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-process.env.WF_DEFAULT_FACTORY_STARTS = '1';
-process.env.WF_VERIFY_REST = '1';
-const { advanceRun, closeoutAsked, decideRun, exitVerdicts, list, Missing, phaseOfView, retryRun, sayRun, startRun, runWith } =
-  await import('../src/runner.ts');
-const { stepsNow: stepsOf } = await import('./steps-now.ts');
-const { askFile, asksDir, markCancelled, readAnswers, runRecord } = await import('../src/record/record.store.ts');
-const { filesStore } = await import('../src/record/files.store.ts');
-const { isRepositoryRun, LINE_NAME, shownNote } = await import('../src/run.ts');
-const { verdictWord } = await import('../src/check/check.ts');
-const { filesStore: runStore } = await import('../src/record/files.store.ts');
-const { configRefusal, engineOf } = await import('../src/runtime-client.ts');
-const { main } = await import('../src/cli/main.ts');
-const stage = staged({ runWith, main, engineOf });
+const ENV: Env = {
+  ...process.env,
+  WF_ROOT: ROOT,
+  WF_MAX_CONCURRENT: undefined,
+  WF_MAX_RUNS: undefined,
+  WF_DEFAULT_FACTORY_STARTS: '1',
+  WF_VERIFY_REST: '1',
+};
+const stage = staged({ runWith, main, engineOf, env: ENV });
+const filesStore = filesStoreAt(ROOT);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
@@ -61,7 +76,7 @@ const implementOnly = (lines: string[] = []): string => {
 /** A run of `workflowDir` started and ticked once on the stage's engine: its first step filed. */
 const startedOn = async (workflowDir: string, brief: string) => {
   const run = await stage.runPlaced(startRun({ brief, repo: aRepo(), workflowDir, isolate: false }));
-  await stage.runWith(stage.board().e, advanceRun(runRecord(run.id)));
+  await stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, run.id)));
   return run.id;
 };
 
@@ -89,15 +104,15 @@ test('a person tries a failed step again, fresh, on another model', async (t) =>
       stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'fresh', model: '' })),
       refusedAs('Invalid', 'implement:', "`--model ''`", '(filed as `model`)', harnessSaid!),
     );
-    assert.deepEqual(runStore.asks.read(id).asks, [], 'nothing written');
+    assert.deepEqual(filesStore.asks.read(id).asks, [], 'nothing written');
   });
   await s.test('a fresh try on a model its harness takes is asked for', async () => {
     const { ask } = await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'fresh', model: 'sonnet' }));
     assert.deepEqual([ask.try, ask.mode, ask.model], [2, 'fresh', 'sonnet']);
   });
   await s.test('the next tick files try 2, fresh on that model, the first behind it', async () => {
-    await stage.runWith(stage.board().e, advanceRun(runRecord(id)));
-    const record = runRecord(id).steps.implement;
+    await stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
+    const record = runRecord(ROOT, id).steps.implement;
     assert.equal(record.taskId, `${id}-implement-try2`);
     assert.deepEqual(
       record.tries?.map((x) => [x.taskId, x.cause, x.model]),
@@ -109,8 +124,8 @@ test('a person tries a failed step again, fresh, on another model', async (t) =>
 /** The ask `nemia pause --now` wrote for try 2 of a run's implement, which it stopped, written on disk where a pause writes it. */
 const pauseAskOf = (id: string) => {
   const ask = { step: 'implement', try: 2, mode: 'continue', interrupted: `${id}-implement`, at: '2026-10-04T12:00:00.000Z' };
-  fs.mkdirSync(asksDir(id), { recursive: true });
-  fs.writeFileSync(askFile(id, 'implement', 2), JSON.stringify(ask));
+  fs.mkdirSync(asksDir(ROOT, id), { recursive: true });
+  fs.writeFileSync(askFile(ROOT, id, 'implement', 2), JSON.stringify(ask));
   return ask;
 };
 const onDisk = (file: string): unknown => JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -129,16 +144,16 @@ test("a retry over a void pause ask waits for the pass that sets it aside, then 
       stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'fresh', message: 'start over' })),
       refusedAs('Conflict', 'try 2 of implement is held by the ask ', 'nemia pause --now', `nemia retry ${id} implement`),
     );
-    assert.deepEqual(onDisk(askFile(id, 'implement', 2)), pauseAsk);
-    assert.equal(fs.existsSync(path.join(asksDir(id), 'done')), false, 'the verb moves no file the tick reads');
+    assert.deepEqual(onDisk(askFile(ROOT, id, 'implement', 2)), pauseAsk);
+    assert.equal(fs.existsSync(path.join(asksDir(ROOT, id), 'done')), false, 'the verb moves no file the tick reads');
   });
   await s.test('a pass sets the void ask aside into done/', async () => {
-    await stage.runWith(stage.board().e, advanceRun(runRecord(id)));
-    assert.deepEqual(onDisk(path.join(asksDir(id), 'done', 'retry-implement-2')), pauseAsk);
+    await stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
+    assert.deepEqual(onDisk(path.join(asksDir(ROOT, id), 'done', 'retry-implement-2')), pauseAsk);
   });
   await s.test("the retry is then written at the ask's name", async () => {
     const { ask } = await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'fresh', message: 'start over' }));
-    assert.deepEqual(onDisk(askFile(id, 'implement', 2)), ask);
+    assert.deepEqual(onDisk(askFile(ROOT, id, 'implement', 2)), ask);
   });
 });
 
@@ -156,8 +171,8 @@ test('a pause ask still due holds a retry of its try, and is left as it is', asy
       stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'fresh' })),
       refusedAs('Conflict', 'try 2 of implement is asked by nemia pause --now'),
     );
-    assert.deepEqual(onDisk(askFile(id, 'implement', 2)), pauseAsk);
-    assert.equal(fs.existsSync(path.join(asksDir(id), 'done')), false);
+    assert.deepEqual(onDisk(askFile(ROOT, id, 'implement', 2)), pauseAsk);
+    assert.equal(fs.existsSync(path.join(asksDir(ROOT, id), 'done')), false);
   });
 });
 
@@ -208,7 +223,7 @@ const asking = async ({ gate = false, open = [cut, where] as unknown[] } = {}): 
   stage
     .board()
     .settle(`${id}-plan`, 'succeeded', { outcome, summary: 'Half.', artifacts: [], needs: gate ? null : 'Two questions.', open });
-  await stage.runWith(stage.board().e, advanceRun(runRecord(id)));
+  await stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
   return id;
 };
 
@@ -224,8 +239,8 @@ const printedBy = async (t: TestContext, argv: string[], e?: Engine) => {
   return printed.join('\n').split('\n');
 };
 
-const asksOf = (id: string) => (fs.existsSync(asksDir(id)) ? fs.readdirSync(asksDir(id)).filter((f) => f !== 'done') : []);
-const askRead = (id: string, name: string) => JSON.parse(fs.readFileSync(path.join(asksDir(id), name), 'utf8'));
+const asksOf = (id: string) => (fs.existsSync(asksDir(ROOT, id)) ? fs.readdirSync(asksDir(ROOT, id)).filter((f) => f !== 'done') : []);
+const askRead = (id: string, name: string) => JSON.parse(fs.readFileSync(path.join(asksDir(ROOT, id), name), 'utf8'));
 /** The line of `listed` for the step `plan` of the run `id`. */
 const planOf = (listed: string[], id: string) =>
   listed.slice(listed.findIndex((l) => l.startsWith(`${id}  `))).find((l) => l.startsWith('   plan '));
@@ -352,11 +367,11 @@ test('what `nemia decide` and `nemia ls` print of a step asking no question, or 
   await t.test('a question field that does not decode is refused back once, then printed as a field, saying why', async (sub) => {
     const open = [{ title: 'Half a question' }];
     const half = await asking({ open });
-    assert.equal(runRecord(half).steps.plan.tries?.at(-1)?.cause, 'signoff', 'the run asks the session to mend it');
+    assert.equal(runRecord(ROOT, half).steps.plan.tries?.at(-1)?.cause, 'signoff', 'the run asks the session to mend it');
     stage
       .board()
       .settle(`${half}-plan-try2`, 'succeeded', { outcome: 'blocked', summary: 'Half.', artifacts: [], needs: 'Two questions.', open });
-    await stage.runWith(stage.board().e, advanceRun(runRecord(half)));
+    await stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, half)));
     const screen = await printedBy(sub, ['decide', half]);
     assert.ok(screen.includes('    open:'), screen.join('\n'));
     assert.ok(!screen.some((l) => /^ {6}1\. /.test(l)), screen.join('\n'));
@@ -493,7 +508,7 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
       const pass = await tick(id());
       assert.deepEqual([pass.checked, pass.filed], [['implement'], []], 'the follower waits for the check, not for the agent');
       assert.deepEqual(
-        filedAs(runRecord(id()).steps.implement),
+        filedAs(runRecord(ROOT, id()).steps.implement),
         {
           taskId: `${id()}-implement`,
           workspace: run.repo,
@@ -525,7 +540,7 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
           WF_WORKSPACE: run.repo,
           WF_ARTIFACTS: path.join(ROOT, 'runs', id(), 'artifacts', 'implement'),
           WF_CLOSEOUT: path.join(ROOT, 'checks', `${check1()}.closeout.json`),
-          WF_WORKFLOW_FILES: path.join(ROOT, 'runs', id(), 'workflow', String(runRecord(id()).workflowFiles)),
+          WF_WORKFLOW_FILES: path.join(ROOT, 'runs', id(), 'workflow', String(runRecord(ROOT, id()).workflowFiles)),
           WF_LABELS: '{"work":"fix"}',
         },
         niceness: 10,
@@ -562,7 +577,7 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
         { cwd: spec.cwd, resumeFrom: spec.resumeFrom, harness: spec.harness },
         { cwd: run.repo, resumeFrom: `native-${id()}-implement`, harness: undefined },
       );
-      assert.deepEqual(filedAs(runRecord(id()).steps.implement), {
+      assert.deepEqual(filedAs(runRecord(ROOT, id()).steps.implement), {
         taskId: try2(),
         workspace: run.repo,
         branch: run.branch,
@@ -603,7 +618,7 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
     },
   );
   await s.test('`nemia ls` and `nemia decide` read the refused check from the streams the runtime kept, and it waits on you', async () => {
-    const l = await stage.runWith(b.e, list(b.e, runRecord(id())));
+    const l = await stage.runWith(b.e, list(b.e, runRecord(ROOT, id())));
     assert.deepEqual(
       l.steps.map((x) => x.message),
       ['failed ✗ check (exit 1)', 'pending'],
@@ -650,7 +665,7 @@ test('a check that refuses once, at length, is tried with no ask, its brief carr
     assert.deepEqual((await tick(id())).checked, ['implement']);
     ended(`${try2()}-check`, 'succeeded', { exitCode: 0 });
     assert.deepEqual((await tick(id())).filed, ['review']);
-    const l = await stage.runWith(b.e, list(b.e, runRecord(id())));
+    const l = await stage.runWith(b.e, list(b.e, runRecord(ROOT, id())));
     assert.deepEqual(l.waitingOnYou, []);
   });
 });
@@ -729,7 +744,7 @@ test('the step after a checked step is handed what the check said, and one after
         'never a check task, from the first pass to the last',
       );
       assert.equal(last.status, 'succeeded');
-      assert.equal(runRecord(plain.id).steps.implement?.check, undefined);
+      assert.equal(runRecord(ROOT, plain.id).steps.implement?.check, undefined);
     },
   );
 });
@@ -746,10 +761,10 @@ test('a check that ended stopped spends no retry, and `nemia retry --recheck` ru
       const after = await tick(run.id);
       assert.deepEqual([after.tried, after.filed, after.unreachable, after.status], [[], [], ['review'], 'failed'], `pass ${pass}`);
     }
-    assert.equal(runRecord(run.id).steps.implement?.tries, undefined, 'no try spent');
+    assert.equal(runRecord(ROOT, run.id).steps.implement?.tries, undefined, 'no try spent');
   });
   await s.test('it waits on you, and `nemia decide` says its check did not finish and offers --recheck', async () => {
-    assert.deepEqual((await stage.runWith(b.e, list(b.e, runRecord(run.id)))).waitingOnYou, ['implement']);
+    assert.deepEqual((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).waitingOnYou, ['implement']);
     const { decision: d, offers } = await stage.runWith(b.e, decideRun(run.id));
     assert.deepEqual(d.kind === 'awaiting' && [d.failedCheck, d.unfinishedCheck], [[], ['implement']]);
     assert.deepEqual(offers, [
@@ -763,7 +778,7 @@ test('a check that ended stopped spends no retry, and `nemia retry --recheck` ru
     assert.deepEqual(b.filings, [`${run.id}-implement`, check1(), check2()], 'a check, and no step');
     assert.equal(b.tasks.get(check2())!.spec.harness, 'check');
     const rechecked = [{ taskId: `${run.id}-implement`, check: { taskId: check1() }, cause: 'recheck' }];
-    assert.deepEqual(filedAs(runRecord(run.id).steps.implement), {
+    assert.deepEqual(filedAs(runRecord(ROOT, run.id).steps.implement), {
       taskId: `${run.id}-implement`,
       workspace: run.repo,
       branch: run.branch,
@@ -803,7 +818,7 @@ test('a session cut off at its budget before its check ran: `nemia retry --reche
     assert.deepEqual([pass.tried, pass.checked, pass.filed], [['implement'], ['implement'], []]);
     assert.deepEqual(b.filings, [session(), check2()], 'a check, and no session');
     assert.equal(b.tasks.get(check2())!.spec.harness, 'check');
-    assert.deepEqual(filedAs(runRecord(run.id).steps.implement), {
+    assert.deepEqual(filedAs(runRecord(ROOT, run.id).steps.implement), {
       taskId: session(),
       workspace: run.repo,
       branch: run.branch,
@@ -814,7 +829,7 @@ test('a session cut off at its budget before its check ran: `nemia retry --reche
   await s.test('the check exits 0: implement is verified as if its session had signed off, and review is filed', async () => {
     ended(check2(), 'succeeded', { exitCode: 0 });
     assert.deepEqual((await tick(run.id)).filed, ['review']);
-    assert.deepEqual((await stage.runWith(b.e, list(b.e, runRecord(run.id)))).waitingOnYou, []);
+    assert.deepEqual((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).waitingOnYou, []);
   });
   await s.test('a recheck that refuses waits on you as a failed check does, the budget stop still said', async () => {
     const refused = await cutOff();
@@ -823,7 +838,7 @@ test('a session cut off at its budget before its check ran: `nemia retry --reche
     ended(`${refused.id}-implement-try2-check`, 'failed', { exitCode: 1 });
     const after = await tick(refused.id);
     assert.deepEqual([after.tried, after.filed, after.unreachable], [[], [], ['review']]);
-    assert.deepEqual((await stage.runWith(b.e, list(b.e, runRecord(refused.id)))).waitingOnYou, ['implement']);
+    assert.deepEqual((await stage.runWith(b.e, list(b.e, runRecord(ROOT, refused.id)))).waitingOnYou, ['implement']);
     const { decision: d } = await stage.runWith(b.e, decideRun(refused.id));
     assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.failedCheck, d.budgetExhausted], ['failed', ['implement'], ['implement']]);
   });
@@ -850,11 +865,11 @@ test("`nemia retry` writes a person's ask, and the tick honours it once, consumi
       run = await throughCheck(['check: npm test'], 'failed', { exitCode: 1 });
       const asked = await stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'fresh', model: 'opus' }));
       file = asked.file;
-      assert.equal(file, path.join(asksDir(run.id), 'retry-implement-2'));
+      assert.equal(file, path.join(asksDir(ROOT, run.id), 'retry-implement-2'));
       written = fs.readFileSync(file, 'utf8');
       assert.deepEqual(JSON.parse(written), asked.ask);
-      assert.equal(runRecord(run.id).steps.implement?.tries, undefined, 'the verb writes no record');
-      assert.match((await stage.runWith(b.e, list(b.e, runRecord(run.id)))).steps[0].note ?? '', /^try 2 asked \(--model opus\)/);
+      assert.equal(runRecord(ROOT, run.id).steps.implement?.tries, undefined, 'the verb writes no record');
+      assert.match((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0].note ?? '', /^try 2 asked \(--model opus\)/);
     },
   );
   await s.test('the next pass files try 2, a new session on the model asked, told everything a step starting cold is', async () => {
@@ -865,19 +880,19 @@ test("`nemia retry` writes a person's ask, and the tick honours it once, consumi
   });
   await s.test('the ask is consumed, moved whole into done/, and a second pass files nothing', async () => {
     assert.deepEqual(retryAsks(run.id), []);
-    assert.equal(fs.readFileSync(path.join(asksDir(run.id), 'done', 'retry-implement-2'), 'utf8'), written);
+    assert.equal(fs.readFileSync(path.join(asksDir(ROOT, run.id), 'done', 'retry-implement-2'), 'utf8'), written);
     const second = await tick(run.id);
     assert.deepEqual([second.tried, second.filed, second.checked], [[], [], []]);
   });
   await s.test(
     'the ask put back, as a pass that filed the try and died before consuming it leaves it: spent, it files nothing',
     async () => {
-      fs.copyFileSync(path.join(asksDir(run.id), 'done', 'retry-implement-2'), file);
+      fs.copyFileSync(path.join(asksDir(ROOT, run.id), 'done', 'retry-implement-2'), file);
       const third = await tick(run.id);
       assert.deepEqual([third.tried, retryAsks(run.id)], [[], []]);
       assert.equal(b.filings.filter((f) => f === try2()).length, 1);
       assert.deepEqual(
-        runRecord(run.id).steps.implement?.tries?.map((x) => [x.cause, x.model]),
+        runRecord(ROOT, run.id).steps.implement?.tries?.map((x) => [x.cause, x.model]),
         [['fresh', 'opus']],
       );
     },
@@ -987,7 +1002,7 @@ test('REFUSED: `nemia retry` on what the run is in — exit 2, by kind and name,
       'a cancelled run',
       async () => {
         const { id } = await throughCheck(['check: npm test'], 'failed', { exitCode: 1 });
-        markCancelled(id);
+        markCancelled(ROOT, id);
         return {
           id,
           refused: () => stage.runWith(b.e, retryRun(id, 'implement', { mode: 'continue' })),
@@ -1043,7 +1058,7 @@ test('REFUSED: `nemia retry` on what the run is in — exit 2, by kind and name,
       refusedAs('Conflict', 'try 2 of implement is already asked for', '(--continue'),
     );
     assert.deepEqual(retryAsks(id), ['retry-implement-2']);
-    assert.equal(JSON.parse(fs.readFileSync(path.join(asksDir(id), 'retry-implement-2'), 'utf8')).mode, 'continue');
+    assert.equal(JSON.parse(fs.readFileSync(path.join(asksDir(ROOT, id), 'retry-implement-2'), 'utf8')).mode, 'continue');
   });
   await t.test('a message to a step whose check did not finish is no refusal: a person may have something to say', async () => {
     const { id } = await throughCheck(['check: npm test'], 'stopped');
@@ -1099,7 +1114,7 @@ test('`nemia retry --message` takes the next argument as the answer whatever it 
   const asked = async (sub: TestContext, ...flags: string[]) => {
     const { id } = await throughCheck(['check: npm test'], 'stopped');
     await printedBy(sub, ['retry', id, 'implement', ...flags]);
-    const { step: _, try: __, at: ___, ...how } = JSON.parse(fs.readFileSync(path.join(asksDir(id), 'retry-implement-2'), 'utf8'));
+    const { step: _, try: __, at: ___, ...how } = JSON.parse(fs.readFileSync(path.join(asksDir(ROOT, id), 'retry-implement-2'), 'utf8'));
     return how;
   };
   const rows: Array<[string, string[], object]> = [
@@ -1143,7 +1158,7 @@ test('a blocked step answered with `nemia retry --message`', async (t) => {
     });
     assert.equal(recordText(run.id), record, 'the verb writes no record');
     assert.equal(
-      (await stage.runWith(b.e, list(b.e, runRecord(run.id)))).steps[0].note,
+      (await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0].note,
       'try 2 asked (--continue, with your answer) — the next tick files it',
     );
   });
@@ -1154,14 +1169,14 @@ test('a blocked step answered with `nemia retry --message`', async (t) => {
     const brief = b.tasks.get(try2())!.spec.brief;
     assert.match(brief, /^## Try 2\n\nThe last try signed off `blocked`\./, 'its session continued, told why it is back');
     assert.ok(brief.includes(`\n\n## Your answer\n\n\`\`\`text\n${answer}\n\`\`\``), brief);
-    assert.equal(runRecord(run.id).steps.implement?.tries?.[0]?.cause, 'continue');
+    assert.equal(runRecord(ROOT, run.id).steps.implement?.tries?.[0]?.cause, 'continue');
     assert.ok(!recordText(run.id).includes('say so in the README'), 'the record keeps no message');
     assert.deepEqual(retryAsks(run.id), [], 'consumed');
   });
   await s.test('`nemia ls` says the try running was answered, read off the consumed ask; it is honoured once', async () => {
     ended(try2(), 'working');
-    assert.equal((await stage.runWith(b.e, list(b.e, runRecord(run.id)))).steps[0].note, 'try 2, continued on your word, answered');
-    assert.deepEqual(readAnswers(run.id), [{ ...ask }]);
+    assert.equal((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0].note, 'try 2, continued on your word, answered');
+    assert.deepEqual(readAnswers(ROOT, run.id), [{ ...ask }]);
     await tick(run.id);
     assert.equal(b.filings.filter((f) => f === try2()).length, 1);
   });
@@ -1185,7 +1200,7 @@ test('`nemia retry` on a step whose session its harness blocked: the tick stops 
     );
   });
   await s.test('`nemia ls` says the phase alone, and the try asked', async () => {
-    const { note, ...row } = (await stage.runWith(b.e, list(b.e, runRecord(run.id)))).steps[0];
+    const { note, ...row } = (await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0];
     assert.deepEqual(row, {
       name: 'implement',
       message: 'needs-human',
@@ -1225,7 +1240,7 @@ test('`nemia retry` on a step whose session its harness blocked: the tick stops 
       spec.brief,
       /^## Try 2\n\nThe last try's session was stopped before it signed off\.\nA person asked for this try: `nemia retry --continue`\./,
     );
-    assert.deepEqual(runRecord(run.id).steps.implement?.tries, [{ taskId: taskId(), cause: 'continue' }]);
+    assert.deepEqual(runRecord(ROOT, run.id).steps.implement?.tries, [{ taskId: taskId(), cause: 'continue' }]);
     assert.deepEqual(retryAsks(run.id), [], 'consumed');
     const after = await tick(run.id);
     assert.deepEqual([after.tried, b.stopped, b.filings.filter((f) => f === try2()).length], [[], [taskId()], 1]);
@@ -1244,7 +1259,7 @@ test('`nemia retry` on a blocked session that works again before any tick: stopp
     await printedBy(sub, ['retry', run.id, 'implement']);
     assert.deepEqual(retryAsks(run.id), ['retry-implement-2']);
     ended(taskId(), 'working');
-    const { note, ...row } = (await stage.runWith(b.e, list(b.e, runRecord(run.id)))).steps[0];
+    const { note, ...row } = (await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0];
     assert.deepEqual(row, { name: 'implement', message: 'working', reason: 'Running', phase: 'running', branch: run.branch });
     assert.equal(note, 'try 2 asked (--continue) — stopping its session, then the tick files it');
   });
@@ -1288,7 +1303,7 @@ test('a step that says `denials: fail`, denied a call, is stopped until a fresh 
     assert.deepEqual(b.filings, [taskId()]);
   });
   await s.test('`nemia ls` reads it denied, with the call, and waiting on you', async () => {
-    const listed = await stage.runWith(b.e, list(b.e, runRecord(run.id)));
+    const listed = await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)));
     assert.deepEqual(
       [listed.steps[0].message, shownNote(listed.steps[0]), listed.waitingOnYou],
       ['denied', 'denied: Write(/tmp/w/notes.md)', ['implement']],
@@ -1352,7 +1367,7 @@ test('telling a running step something with `nemia say`, and the try that contin
     assert.deepEqual(fs.readdirSync(path.join(ROOT, 'runs')).sort(), beside, 'the engine journal is the record');
   });
   await s.test('`nemia ls` notes the step said to, once and then twice', async () => {
-    assert.deepEqual((await stage.runWith(b.e, list(b.e, runRecord(run.id)))).steps[0], {
+    assert.deepEqual((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0], {
       name: 'implement',
       message: 'working',
       reason: 'Running',
@@ -1362,7 +1377,7 @@ test('telling a running step something with `nemia say`, and the try that contin
     });
     const told = await stage.runWith(b.e, sayRun(run.id, 'implement', 'Keep:\n```\n--flag\n```'));
     assert.deepEqual([told.taskId, told.try, told.said], [taskId(), 1, saidTo()[1]]);
-    assert.equal((await stage.runWith(b.e, list(b.e, runRecord(run.id)))).steps[0].note, 'said to 2×');
+    assert.equal((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0].note, 'said to 2×');
   });
   await s.test('signed off blocked, `nemia decide` prints each thing said under the step, before its closeout, fenced', async (sub) => {
     ended(taskId(), 'succeeded', {
@@ -1502,7 +1517,7 @@ test('REFUSED: `nemia say` — exit 2, a Conflict, by name; nothing said and not
     });
   await t.test('by the package: a cancelled run, its task still running', async () => {
     ended(taskId, 'working');
-    markCancelled(run.id);
+    markCancelled(ROOT, run.id);
     await assert.rejects(
       stage.main(['say', run.id, 'implement', 'Widen the scope.'], e),
       refusedAs('Conflict', `${run.id} was cancelled at `, 'not steered'),
@@ -1526,7 +1541,7 @@ test("a claude step over its `budget:`, its cap raised by a person's `--budget`"
     const frozen = await startedRun(dir);
     fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\nbudget: 500\n---\nimplement it\n');
     assert.deepEqual(
-      stepsOf(runRecord(frozen.id)).map((x) => [x.name, x.budget]),
+      stepsOf(runRecord(ROOT, frozen.id), ROOT).map((x) => [x.name, x.budget]),
       [
         ['implement', 2.5],
         ['review', undefined],
@@ -1559,7 +1574,7 @@ test("a claude step over its `budget:`, its cap raised by a person's `--budget`"
     },
   );
   await s.test('`nemia ls` says over budget with the amounts, waiting on you; `nemia decide` offers `--budget`', async () => {
-    const l = await stage.runWith(b.e, list(b.e, runRecord(run.id)));
+    const l = await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)));
     assert.deepEqual([l.steps[0].message, l.waitingOnYou], ['over budget $4.25 of $3', ['implement']]);
     const { offers, decision: d } = await stage.runWith(b.e, decideRun(run.id));
     assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.overBudget, d.failedCheck], ['failed', ['implement'], ['implement']]);
@@ -1585,13 +1600,13 @@ test("a claude step over its `budget:`, its cap raised by a person's `--budget`"
     const { ask } = await stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'continue', budget: 10 }));
     assert.equal(ask.budget, 10);
     assert.match(
-      (await stage.runWith(b.e, list(b.e, runRecord(run.id)))).steps[0].note ?? '',
+      (await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0].note ?? '',
       /^try 2 asked \(--continue, --budget 10\) — the next tick files it/,
     );
     const pass = await tick(run.id);
     assert.deepEqual(pass.tried, ['implement']);
     assert.ok(pass.notes.includes('implement: try 2 — nemia retry --continue --budget 10'), pass.notes.join('\n'));
-    assert.deepEqual(runRecord(run.id).steps.implement?.tries, [
+    assert.deepEqual(runRecord(ROOT, run.id).steps.implement?.tries, [
       { taskId: implement(), check: { taskId: `${implement()}-check` }, cause: 'continue', budget: 10 },
     ]);
     const spec = b.tasks.get(try2())!.spec;
@@ -1607,7 +1622,7 @@ test("a claude step over its `budget:`, its cap raised by a person's `--budget`"
     assert.deepEqual((await tick(run.id)).checked, ['implement']);
     ended(`${try2()}-check`, 'failed', { exitCode: 1 });
     assert.deepEqual((await tick(run.id)).tried, []);
-    const again = await stage.runWith(b.e, list(b.e, runRecord(run.id)));
+    const again = await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)));
     assert.deepEqual(
       [again.steps[0].message, again.steps[0].note],
       ['over budget $10.25 of $10', 'try 2, continued on your word, budget $10'],
@@ -1620,7 +1635,7 @@ test("a claude step over its `budget:`, its cap raised by a person's `--budget`"
       const id = `${unsigned.id}-implement`;
       await tick(unsigned.id);
       ended(id, 'succeeded', { usage: { costUsd: 4.25 } });
-      assert.equal((await stage.runWith(b.e, list(b.e, runRecord(unsigned.id)))).steps[0].message, 'over budget $4.25 of $3');
+      assert.equal((await stage.runWith(b.e, list(b.e, runRecord(ROOT, unsigned.id)))).steps[0].message, 'over budget $4.25 of $3');
       await stage.runWith(b.e, retryRun(unsigned.id, 'implement', { mode: 'continue', budget: 10 }));
       assert.deepEqual((await tick(unsigned.id)).tried, ['implement']);
       const brief = b.tasks.get(`${id}-try2`)!.spec.brief;
@@ -1659,7 +1674,7 @@ test("a claude job's cap, shared by its tries and raised by a person", async (t)
         [[], ['review']],
         '$3.00 of $3: nothing left, and `retries: 2` does not spend the try it has',
       );
-      assert.equal((await stage.runWith(b.e, list(b.e, runRecord(run.id)))).steps[0].message, 'over budget $3.00 of $3');
+      assert.equal((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0].message, 'over budget $3.00 of $3');
     },
   );
   let id = '';
@@ -1681,7 +1696,7 @@ test("a claude job's cap, shared by its tries and raised by a person", async (t)
       b.filings.filter((f) => f.startsWith(id)),
       [implement()],
     );
-    const l = await stage.runWith(b.e, list(b.e, runRecord(id)));
+    const l = await stage.runWith(b.e, list(b.e, runRecord(ROOT, id)));
     assert.deepEqual([l.steps[0].message, l.waitingOnYou], ['budget exhausted $3.02 of $3', ['implement']]);
   });
   await s.test('`nemia decide` offers `--budget`, and the retry is refused without one above what it spent', async () => {
@@ -1718,7 +1733,7 @@ test("a claude job's cap, shared by its tries and raised by a person", async (t)
     const asked = { outcome: 'blocked', summary: 'ran out of room', artifacts: [], needs: 'a try with a larger budget, about $15–25' };
     ended(blocked, 'succeeded', { closeout: asked, usage: { costUsd: 19.27 } });
     assert.deepEqual((await tick(run.id)).tried, []);
-    const l = await stage.runWith(b.e, list(b.e, runRecord(run.id)));
+    const l = await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)));
     assert.deepEqual([l.steps[0].message, l.waitingOnYou], ['succeeded · BLOCKED', ['implement']]);
     await assert.rejects(
       stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'continue', budget: 15 })),
@@ -1737,7 +1752,7 @@ test("a claude job's cap, shared by its tries and raised by a person", async (t)
     assert.deepEqual(retryAsks(run.id), []);
     await stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'continue', budget: 40 }));
     assert.deepEqual((await tick(run.id)).tried, ['implement']);
-    assert.deepEqual(runRecord(run.id).steps.implement?.tries, [{ taskId: blocked, cause: 'continue', budget: 40 }]);
+    assert.deepEqual(runRecord(ROOT, run.id).steps.implement?.tries, [{ taskId: blocked, cause: 'continue', budget: 40 }]);
     const spec = b.tasks.get(`${blocked}-try2`)!.spec;
     assert.deepEqual([spec.harness, spec.config?.budgetUsd], ['claude', 20.73], 'what is left of $40 after $19.27');
     assert.match(spec.brief, /A person asked for this try: `nemia retry --continue --budget 40`, raising this step's budget to \$40\./);
@@ -1770,7 +1785,7 @@ test("exitVerdicts: a check's verdict is its attempt's exit code, `unfinished` w
   for (const [name, end, verdict, tried] of rows)
     await t.test(name, async () => {
       const { id } = await throughCheck(['check: npm test', 'retries: 1'], 'failed', end);
-      const run = runRecord(id);
+      const run = runRecord(ROOT, id);
       const verdictOf = exitVerdicts(await viewsOf(b.e, run), run);
       assert.equal(verdictOf('implement'), verdict);
       assert.equal(verdictOf('review'), undefined, 'a step with no check filed has no verdict at all');
@@ -1832,13 +1847,13 @@ test("UNSIGNED is read off the LAST attempt of a try's task, on `nemia ls`, `nem
       ended(taskId, 'failed', endOf(reasons[1]));
       if (reasons[1] === 'unsigned') {
         assert.deepEqual((await tick(run.id)).tried, ['implement'], 'the run nudges it to sign off, itself');
-        assert.equal(runRecord(run.id).steps.implement?.tries?.at(-1)?.cause, 'signoff');
+        assert.equal(runRecord(ROOT, run.id).steps.implement?.tries?.at(-1)?.cause, 'signoff');
         ended(`${taskId}-try2`, 'failed', endOf('unsigned'));
       }
       const views = new Map([[taskId, await Effect.runPromise(b.e.view(taskId))]]);
       assert.deepEqual(views.get(taskId)!.state.attempts.map(wordOf), reasons);
       assert.deepEqual([phaseOfView(views.get(taskId)), closeoutAsked(views)(taskId)], ['failed', asked]);
-      const l = await stage.runWith(b.e, list(b.e, runRecord(run.id)));
+      const l = await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)));
       assert.deepEqual([l.steps[0].message, l.waitingOnYou], [word, onYou]);
       const { decision: d } = await stage.runWith(b.e, decideRun(run.id));
       assert.deepEqual(d.kind === 'awaiting' && { outcome: d.outcome, unsigned: d.unsigned, failed: d.failed }, {
@@ -1848,7 +1863,7 @@ test("UNSIGNED is read off the LAST attempt of a try's task, on `nemia ls`, `nem
       });
       await stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'continue' }));
       assert.deepEqual((await tick(run.id)).tried, ['implement']);
-      const now = runRecord(run.id).steps.implement.taskId!;
+      const now = runRecord(ROOT, run.id).steps.implement.taskId!;
       assert.ok(b.tasks.get(now)!.spec.brief.includes(told), `the try is told ${told}`);
     });
 });
@@ -1863,15 +1878,15 @@ test('a run frozen with a step of `maxAttempts: 2`, a key no step has now, still
     const record = JSON.parse(fs.readFileSync(file, 'utf8'));
     record.workflow = record.workflow.map((x: { name: string }) => (x.name === 'implement' ? { ...x, maxAttempts: 2 } : x));
     fs.writeFileSync(file, JSON.stringify(record));
-    const frozen: Record<string, unknown> = runRecord(run.id).workflow!.find((x) => x.name === 'implement')!;
+    const frozen: Record<string, unknown> = runRecord(ROOT, run.id).workflow!.find((x) => x.name === 'implement')!;
     assert.equal(frozen.maxAttempts, 2);
   });
   await s.test('implement is filed without it, and lists pending, then failed', async () => {
     assert.deepEqual((await tick(run.id)).filed, ['implement']);
     assert.equal('maxAttempts' in b.tasks.get(`${run.id}-implement`)!.spec, false);
-    assert.equal((await stage.runWith(b.e, list(b.e, runRecord(run.id)))).steps[0].message, 'pending');
+    assert.equal((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0].message, 'pending');
     ended(`${run.id}-implement`, 'failed');
-    assert.equal((await stage.runWith(b.e, list(b.e, runRecord(run.id)))).steps[0].message, 'failed');
+    assert.equal((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0].message, 'failed');
   });
   await s.test('a try of it is filed as any is, without it', async () => {
     await stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'fresh' }));

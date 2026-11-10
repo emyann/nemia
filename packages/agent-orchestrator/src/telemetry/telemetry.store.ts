@@ -10,7 +10,7 @@ import { FetchHttpClient } from 'effect/http';
 import { OtlpExporter, OtlpLogger, OtlpMetrics, OtlpSerialization, OtlpTracer } from 'effect/observability';
 import { lineOf, logsUrl, metricsUrl, otlpOf, stepLabels, tracesUrl } from './telemetry.ts';
 import type { Run } from '../record/record.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 
 /** Prints each log as its line (`lineOf`), its annotations unprinted: Info and below on stdout, Warn and above on stderr. */
 export const lineLogger = Logger.make<unknown, void>(({ message, logLevel, date }) => {
@@ -75,6 +75,6 @@ export const seriesBorn = Effect.fnUntraced(function* (series: ReadonlyArray<Met
  * the runtime's spans under it, and the journal it writes, say which they were for, beside the runtime's own task.
  */
 export const forStep =
-  (run: Pick<Run, 'id' | 'factory' | 'workflowDir'>, step: Workflow) =>
+  (run: Pick<Run, 'id' | 'factory' | 'workflowDir'>, step: StepSpec) =>
   <A, E, R>(filing: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
     filing.pipe(Effect.annotateLogs(stepLabels(run, step)), Effect.annotateSpans(stepLabels(run, step)));

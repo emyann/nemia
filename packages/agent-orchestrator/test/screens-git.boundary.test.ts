@@ -6,7 +6,7 @@
  * a binary file, a lint config's diff); and the git processes `nemia ls` costs. The test place says each in words of its own, so these
  * keep the git place; what the screens say of a run is told on the test place in decide.test.ts.
  *
- * `WF_ROOT` is set before the runner is imported, since it is read as the module loads.
+ * The store is the file's own, at `ROOT`, given as `ENV`.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,19 +22,7 @@ import { isRepositoryRun, shownNote } from '../src/run.ts';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
 import { story } from 'test-kit/checkpoints';
-
-const ROOT = scratch('wf-screens-git-');
-const WORKFLOW = path.join(ROOT, 'workflow');
-fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-fs.mkdirSync(WORKFLOW, { recursive: true });
-fs.writeFileSync(path.join(WORKFLOW, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
-fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
-
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const {
+import {
   advanceRun,
   builtinGitPlace,
   changesOf,
@@ -43,14 +31,28 @@ const {
   retryRun,
   startRun,
   touchedLines,
-  runWith: runEngine,
+  runWith as runEngine,
   gitPlaceLayer,
-} = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
-const { runRecord } = await import('../src/record/record.store.ts');
-const { metered } = await import('../src/meter/tally.store.ts');
-const { main } = await import('../src/cli/main.ts');
+} from '../src/runner.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import { metered } from '../src/meter/tally.store.ts';
+import { main } from '../src/cli/main.ts';
+import type { Env } from '../src/config/config.store.ts';
+
+const ROOT = scratch('wf-screens-git-');
+const WORKFLOW = path.join(ROOT, 'workflow');
+fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
+fs.mkdirSync(WORKFLOW, { recursive: true });
+fs.writeFileSync(path.join(WORKFLOW, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
+fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
+
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
+const runWith = runOver(runEngine, gitPlaceLayer, ENV);
+const runPlaced = runGiven(gitPlaceLayer, ENV);
+
+/** `nemia decide`'s screen over this file's store, `ENV` (`decideScreen`). */
+const screenOn = (...[t, e, argv, as, place]: Parameters<typeof decideScreen>): Promise<string[]> =>
+  decideScreen(t, e, argv, as, place, ENV);
 
 /**
  * A repository with one commit, so `nemia start` has a base to record. The screens below quote its branch by name, so the fixture
@@ -221,7 +223,7 @@ const started = async (dir: string) =>
  * `<root>`.
  */
 const whole = (t: TestContext, e: Engine, run: RepositoryRun, ...flags: string[]): Promise<string[]> =>
-  decideScreen(t, e, [run.id, ...flags], { '<id>': run.id, '<root>': ROOT, '<repo>': run.repo, '<base>': run.baseRef });
+  screenOn(t, e, [run.id, ...flags], { '<id>': run.id, '<root>': ROOT, '<repo>': run.repo, '<base>': run.baseRef });
 
 /** `git` in `repo`, as the test's own identity, its output as text. */
 const git = (repo: string, ...args: string[]) =>
@@ -339,17 +341,17 @@ test("what a step is told and what it shows, in the git place's words: a fan-in'
       const joined = async (left: [string, string], right: [string, string]) => {
         const run = await runPlaced(startRun({ brief: 'two halves', repo: aRepo(), workflowDir: dir }));
         const b = board();
-        assert.deepEqual((await runWith(b.e, advanceRun(runRecord(run.id)))).filed.sort(), ['left', 'right']);
+        assert.deepEqual((await runWith(b.e, advanceRun(runRecord(ROOT, run.id)))).filed.sort(), ['left', 'right']);
         for (const [step, [file, text]] of [
           ['left', left],
           ['right', right],
         ] as const) {
-          fs.writeFileSync(path.join(runRecord(run.id).steps[step].workspace!, file), text);
+          fs.writeFileSync(path.join(runRecord(ROOT, run.id).steps[step].workspace!, file), text);
           b.settle(`${run.id}-${step}`, 'succeeded', SIGNED);
         }
         for (let pass = 1; !b.tasks.has(`${run.id}-join`); pass++) {
-          assert.ok(pass <= 3, `join is filed within three passes: ${JSON.stringify(runRecord(run.id).steps)}`);
-          await runWith(b.e, advanceRun(runRecord(run.id)));
+          assert.ok(pass <= 3, `join is filed within three passes: ${JSON.stringify(runRecord(ROOT, run.id).steps)}`);
+          await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
         }
         return b.tasks.get(`${run.id}-join`)!.spec.brief;
       };
@@ -367,7 +369,7 @@ test("what a step is told and what it shows, in the git place's words: a fan-in'
     async (c) => {
       const run = await started(folder());
       const b = board();
-      await runWith(b.e, advanceRun(runRecord(run.id)));
+      await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
       const taskId = `${run.id}-implement`;
       b.denials.set(taskId, [
         { tool: 'Skill', what: 'look' },
@@ -375,18 +377,18 @@ test("what a step is told and what it shows, in the git place's words: a fan-in'
         { tool: 'Skill', what: 'look' },
       ]);
       b.settle(taskId, 'succeeded', SIGNED);
-      await runWith(b.e, advanceRun(runRecord(run.id)));
+      await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
       const printed: string[] = [];
       const log = c.mock.method(console, 'log', (...args: unknown[]) => {
         printed.push(args.join(' '));
       });
       const printedBy = async (...args: string[]) => {
         printed.length = 0;
-        await main(args, b.e);
+        await main(args, b.e, undefined, undefined, ENV);
         return printed.join('\n');
       };
 
-      const [implement, review] = (await runWith(b.e, list(b.e, runRecord(run.id)))).steps;
+      const [implement, review] = (await runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps;
       assert.deepEqual(
         [implement.message, shownNote(implement)],
         ['unverified · done', 'denied: Skill(look), Bash(pytest)'],
@@ -433,7 +435,7 @@ test('the whole screens of a run in the checkout, on master, by how its step end
         ),
       );
       const b = board();
-      await runWith(b.e, advanceRun(runRecord(run.id)));
+      await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
       const taskId = `${run.id}-implement`;
       b.tasks.get(taskId)!.phase = 'running';
       b.waiting.set(taskId, 'a permission prompt: Bash(npm test)');
@@ -449,7 +451,7 @@ test('the whole screens of a run in the checkout, on master, by how its step end
       ]);
       b.denials.set(taskId, [{ tool: 'Bash', what: 'npm test' }]);
       b.settle(taskId, 'succeeded', SIGNED);
-      await runWith(b.e, advanceRun(runRecord(run.id)));
+      await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
       b.settle(`${run.id}-review`, 'succeeded', SIGNED);
       assert.deepEqual(await whole(c, b.e, run), [
         '<id>  add a flag',
@@ -497,9 +499,9 @@ test('the whole screens of a run in the checkout, on master, by how its step end
   await s.test('the whole screen of a step its harness ended at its budget', async (c) => {
     const run = await started(folder());
     const b = board();
-    await runWith(b.e, advanceRun(runRecord(run.id)));
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     b.settle(`${run.id}-implement`, 'failed', undefined, undefined, 'budget');
-    await runWith(b.e, advanceRun(runRecord(run.id)));
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     assert.deepEqual(await whole(c, b.e, run), [
       '<id>  add a flag',
       '',
@@ -529,10 +531,10 @@ test('the whole screens of a run in the checkout, on master, by how its step end
   await s.test('the whole screen of a step that says `denials: fail`, denied a call', async (c) => {
     const run = await started(folder('denials: fail'));
     const b = board();
-    await runWith(b.e, advanceRun(runRecord(run.id)));
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     b.denials.set(`${run.id}-implement`, [{ tool: 'Write', what: '/tmp/w/notes.md' }]);
     b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
-    await runWith(b.e, advanceRun(runRecord(run.id)));
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     assert.deepEqual(await whole(c, b.e, run), [
       '<id>  add a flag',
       '',
@@ -564,10 +566,10 @@ test('the whole screens of a run in the checkout, on master, by how its step end
   await s.test('the whole screen of a step whose closeout does not read, never nudged', async (c) => {
     const run = await started(folder());
     const b = board();
-    await runWith(b.e, advanceRun(runRecord(run.id)));
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     b.closedOut.set(`${run.id}-implement`, true);
     b.settle(`${run.id}-implement`, 'succeeded', '{"outcome": "done", "summary": ');
-    await runWith(b.e, advanceRun(runRecord(run.id)));
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     assert.deepEqual(await whole(c, b.e, run), [
       '<id>  add a flag',
       '',
@@ -600,12 +602,12 @@ test('the whole screens of a run in the checkout, on master, by how its step end
     fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\ncheck: true\n---\nimplement it\n');
     const run = await started(dir);
     const b = board();
-    await runWith(b.e, advanceRun(runRecord(run.id)));
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
-    await runWith(b.e, advanceRun(runRecord(run.id)));
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     b.logs.set(`${run.id}-implement-check`, '# pass 1\n');
     b.settle(`${run.id}-implement-check`, 'succeeded', undefined, 0);
-    await runWith(b.e, advanceRun(runRecord(run.id)));
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     assert.deepEqual(await whole(c, b.e, run), [
       '<id>  add a flag',
       '',
@@ -654,15 +656,15 @@ test("a run waiting on you, on git: its whole screens, what its branches touched
         write(repo, 'logo.png', new Uint8Array([0, 1, 2, 0, 255]));
       });
       const b = timed();
-      await runWith(b.e, advanceRun(runRecord(run.id)));
+      await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
       b.settle(`${run.id}-implement`, 'succeeded', SIGNED, USAGE);
-      await runWith(b.e, advanceRun(runRecord(run.id)));
+      await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
       b.settle(`${run.id}-implement-check`, 'succeeded', undefined, undefined, 0);
       b.logs.set(`${run.id}-implement-check`, '# pass 1\n');
-      await runWith(b.e, advanceRun(runRecord(run.id)));
+      await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
       b.settle(`${run.id}-review`, 'succeeded', SIGNED);
-      const record = runRecord(run.id);
-      for (const step of Object.values(record.steps)) step.branch = branch;
+      const read = runRecord(ROOT, run.id);
+      const record = { ...read, steps: Object.fromEntries(Object.entries(read.steps).map(([name, step]) => [name, { ...step, branch }])) };
       fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(record, null, 2));
       a = { run, repo, branch, b };
 
@@ -841,7 +843,7 @@ test("a run waiting on you, on git: its whole screens, what its branches touched
       viewed.clear();
       const log = c.mock.method(console, 'log', () => {});
       try {
-        return (await metered(() => main(['ls'], e))).tallies!.kinds.place.spawned;
+        return (await metered(() => main(['ls'], e, undefined, undefined, ENV))).tallies!.kinds.place.spawned;
       } finally {
         log.mock.restore();
       }
@@ -849,16 +851,16 @@ test("a run waiting on you, on git: its whole screens, what its branches touched
     const oneStep = fs.mkdtempSync(path.join(ROOT, 'wf-'));
     fs.writeFileSync(path.join(oneStep, 'work.md'), '---\nplace: git\n---\nwork it\n');
     const first = (await runPlaced(startRun({ brief: 'first', repo: a.repo, workflowDir: oneStep, isolate: true }))).id;
-    await runWith(e, advanceRun(runRecord(first)));
+    await runWith(e, advanceRun(runRecord(ROOT, first)));
     settle(`${first}-work`, 'succeeded', SIGNED);
-    await runWith(e, advanceRun(runRecord(first)));
+    await runWith(e, advanceRun(runRecord(ROOT, first)));
     const before = await ls();
     for (let k = 1; k < 4; k++) {
       const more = await runPlaced(
         startRun({ brief: `more ${k}`, repo: a.repo, workflowDir: checked(), isolate: false, ...(k === 1 ? { after: [first] } : {}) }),
       );
       branchOff(a.repo, `wf/${more.id}`, () => write(a.repo, `more-${k}.txt`, 'x\n'));
-      const record = runRecord(more.id);
+      const record = runRecord(ROOT, more.id);
       record.steps.implement = { ...record.steps.implement, branch: `wf/${more.id}` };
       fs.writeFileSync(path.join(ROOT, 'runs', `${more.id}.json`), JSON.stringify(record, null, 2));
     }
@@ -886,10 +888,10 @@ test('the whole screens of a run through its tries and on two branches, and of `
         await runPlaced(startRun({ brief: 'add sub', repo: aPackage(), workflowDir: checked(), isolate: false })),
       );
       const { e, settle } = timed();
-      await runWith(e, advanceRun(runRecord(run.id)));
+      await runWith(e, advanceRun(runRecord(ROOT, run.id)));
       assert.deepEqual(await whole(c, e, run), ['<id>  add sub', '', '  still running: implement', '  nothing to decide yet']);
       settle(`${run.id}-implement`, 'succeeded', { outcome: 'blocked', summary: 'two readings', artifacts: [], needs: 'Rename --flag?' });
-      await runWith(e, advanceRun(runRecord(run.id)));
+      await runWith(e, advanceRun(runRecord(ROOT, run.id)));
       assert.deepEqual(await whole(c, e, run), [
         '<id>  add sub',
         '',
@@ -925,14 +927,14 @@ test('the whole screens of a run through its tries and on two branches, and of `
         '  implement: try 2 asked (--continue, with your answer) — the next tick files it',
         '  nothing to decide yet',
       ]);
-      await runWith(e, advanceRun(runRecord(run.id)));
+      await runWith(e, advanceRun(runRecord(ROOT, run.id)));
       settle(`${run.id}-implement-try2`, 'succeeded', {
         outcome: 'blocked',
         summary: 'one reading',
         artifacts: [],
         needs: 'And the README?',
       });
-      await runWith(e, advanceRun(runRecord(run.id)));
+      await runWith(e, advanceRun(runRecord(ROOT, run.id)));
       assert.deepEqual(await whole(c, e, run), [
         '<id>  add sub',
         '',
@@ -973,9 +975,9 @@ test('the whole screens of a run through its tries and on two branches, and of `
     fs.writeFileSync(path.join(dir, 'docs.md'), '---\nplace: git\n---\nwrite it down\n');
     const run = repositoryRunOf(await runPlaced(startRun({ brief: 'add sub', repo: aPackage(), workflowDir: dir })));
     const { e, settle } = timed();
-    await runWith(e, advanceRun(runRecord(run.id)));
+    await runWith(e, advanceRun(runRecord(ROOT, run.id)));
     const committed = (step: string, file: string, text: string) => {
-      const wt = runRecord(run.id).steps[step].workspace!;
+      const wt = runRecord(ROOT, run.id).steps[step].workspace!;
       write(wt, file, text);
       git(wt, 'add', '-A');
       git(wt, 'commit', '-q', '-m', `add ${file}`);
@@ -984,7 +986,7 @@ test('the whole screens of a run through its tries and on two branches, and of `
     committed('docs', 'NOTES.md', Array.from({ length: 123 }, (_, i) => `note ${i + 1}\n`).join(''));
     settle(`${run.id}-implement`, 'succeeded', SIGNED);
     settle(`${run.id}-docs`, 'succeeded', SIGNED);
-    await runWith(e, advanceRun(runRecord(run.id)));
+    await runWith(e, advanceRun(runRecord(ROOT, run.id)));
     assert.deepEqual(await whole(c, e, run), [
       '<id>  add sub',
       '',
@@ -1036,7 +1038,7 @@ test('the whole screens of a run through its tries and on two branches, and of `
     const { DECIDE_HELP } = await import('../src/cli/decide/decide.ts');
     const { HELP } = await import('../src/cli/flags.ts');
     const { e } = timed();
-    assert.deepEqual(await decideScreen(c, e, ['some-run', '--help'], {}), DECIDE_HELP.split('\n'));
-    assert.deepEqual(await decideScreen(c, e, [], {}), HELP.split('\n'));
+    assert.deepEqual(await screenOn(c, e, ['some-run', '--help'], {}), DECIDE_HELP.split('\n'));
+    assert.deepEqual(await screenOn(c, e, [], {}), HELP.split('\n'));
   });
 });

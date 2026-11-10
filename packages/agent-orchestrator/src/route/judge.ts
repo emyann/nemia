@@ -4,23 +4,23 @@
  */
 import { firstLine } from '../record/record.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
-import { JUDGE_ROUTE, type Workflow } from '../step/step.ts';
+import { JUDGE_ROUTE, type StepSpec } from '../step/step.ts';
 
 /** Whether `step` is a judge: a condition whose eval is `route: judge`. */
-export const isJudge = (step: Pick<Workflow, 'route'>): boolean => step.route?.kind === 'judge';
+export const isJudge = (step: Pick<StepSpec, 'route'>): boolean => step.route?.kind === 'judge';
 
 /**
  * How load and start tell a judge's fence, handed in from the fence's own judgement (workflow/fence.ts): whether it writes nothing, as
  * resolved with its agent's (`writesNothing`), and whether the step's own file sets one, which no hire's agent replaces (`fencedItself`).
  */
-export type JudgeFence = { writesNothing: (s: Workflow) => boolean; fencedItself: (s: Workflow) => boolean };
+export type JudgeFence = { writesNothing: (s: StepSpec) => boolean; fencedItself: (s: StepSpec) => boolean };
 
 /**
  * Why the judge `s` cannot run, or `undefined`: it declares the `route` the run owes it, or its fence writes (`JudgeFence`). A remote agent
  * writes nothing here. With `hireable`, at load, a judge with no agent and no fence of its own is left to the hire a factory files into
  * it; a start judges it again with its hire, or with none (`hireable` false).
  */
-export function judgeRefusal(s: Workflow, fence: JudgeFence, hireable: boolean): string | undefined {
+export function judgeRefusal(s: StepSpec, fence: JudgeFence, hireable: boolean): string | undefined {
   if (!isJudge(s)) return undefined;
   if (s.output && Object.hasOwn(s.output.schema.properties, JUDGE_ROUTE))
     return `${s.name}: \`output: ${s.output.file}\` declares \`${JUDGE_ROUTE}\`, and ${s.name} is a judge (\`route: judge\`), so the run adds \`${JUDGE_ROUTE}\` to its closeout: the route it takes. Rename the field.`;
@@ -34,7 +34,7 @@ export function judgeRefusal(s: Workflow, fence: JudgeFence, hireable: boolean):
  * What a target says it is for: a step's own note's first line; or, for a workflow node, the card it files and what its workflow says it is
  * for (`targets`, the workflow's description), else the node's own note.
  */
-function described(target: Workflow, targets: Readonly<Record<string, string>>): string {
+function described(target: StepSpec, targets: Readonly<Record<string, string>>): string {
   const note = firstLine(target.agent ? target.agent.body : target.body) || firstLine(target.body);
   if (target.workflow === undefined) return `the step ${target.name}${note ? `: ${note}` : ''}`;
   const about = targets[target.workflow] ?? note;
@@ -46,7 +46,7 @@ function described(target: Workflow, targets: Readonly<Record<string, string>>):
  * workflow node by its workflow's description (`targets`) — or that it ends the run (`ends:`), and the field its closeout owes. Empty for
  * any other step.
  */
-export function judgeSection(step: Workflow, steps: readonly Workflow[], targets: Readonly<Record<string, string>> = {}): string {
+export function judgeSection(step: StepSpec, steps: readonly StepSpec[], targets: Readonly<Record<string, string>> = {}): string {
   if (!isJudge(step)) return '';
   const followers = steps.filter((s) => s.after.includes(step.name));
   const lines = (step.routes ?? []).map((route) => {

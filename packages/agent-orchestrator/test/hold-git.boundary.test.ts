@@ -16,18 +16,16 @@ import { scratch } from 'test-kit/scratch';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
 import { names } from './assessed.ts';
+import { advanceRun, prune, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import { LINE_NAME } from '../src/run.ts';
+import { main } from '../src/cli/main.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-hold-git-');
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { advanceRun, prune, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
-const { runRecord } = await import('../src/record/record.store.ts');
-const { LINE_NAME } = await import('../src/run.ts');
-const { main } = await import('../src/cli/main.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
+const runWith = runOver(runEngine, gitPlaceLayer, ENV);
+const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 const git = (cwd: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
@@ -98,21 +96,21 @@ const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null 
 /** A run of `oneStep` in `repo`, its step filed, `fix.ts` committed on its branch and signed off: merged into main with `merged`. */
 const aDone = async (b: ReturnType<typeof board>, repo: string, { merged = false } = {}) => {
   const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: oneStep() }));
-  await runWith(b.e, advanceRun(runRecord(run.id)));
-  const wt = runRecord(run.id).steps.implement.workspace!;
+  await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+  const wt = runRecord(ROOT, run.id).steps.implement.workspace!;
   fs.writeFileSync(path.join(wt, `fix-${run.id}.ts`), 'export const fixed = true;\n');
   git(wt, 'add', '-A');
   git(wt, 'commit', '-q', '-m', 'add fix');
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  await runWith(b.e, advanceRun(runRecord(run.id)));
-  if (merged) git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', runRecord(run.id).steps.implement.branch!);
+  await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+  if (merged) git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', runRecord(ROOT, run.id).steps.implement.branch!);
   return run;
 };
 
 /** A run of `oneStep` in `repo`, its step filed and still running. */
 const aRunning = async (b: ReturnType<typeof board>, repo: string) => {
   const run = await runPlaced(startRun({ brief: 'still going', repo, workflowDir: oneStep() }));
-  await runWith(b.e, advanceRun(runRecord(run.id)));
+  await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
   return run;
 };
 
@@ -123,7 +121,7 @@ const typed = async (t: TestContext, e: Engine, ...argv: string[]) => {
     printed.push(a.join(' '));
   });
   try {
-    await main(argv, e);
+    await main(argv, e, undefined, undefined, ENV);
     return { printed: printed.join('\n'), error: undefined };
   } catch (err) {
     return { printed: printed.join('\n'), error: err as Error & { exitCode?: number; _tag?: string } };
@@ -199,7 +197,7 @@ test('REFUSED at shipped defaults: a hold on a pruned run and on a folder run, a
   );
 
   const dropped = await aDone(b, repo);
-  git(repo, 'worktree', 'remove', '--force', runRecord(dropped.id).steps.implement.workspace!);
+  git(repo, 'worktree', 'remove', '--force', runRecord(ROOT, dropped.id).steps.implement.workspace!);
   git(repo, 'branch', '-q', '-D', `wf/${dropped.id}/${LINE_NAME}`);
   await refused(
     t,

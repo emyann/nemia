@@ -1,7 +1,6 @@
 /**
  * The steps each agent fills (`stepsFilled`), and the factories that fill them (`factoriesFilling`): a step credited to the file a start
- * would run it with (`agentFileOf`), never to every agent of that name. `WF_ROOT` is set before the import, since the stores read it as
- * they load.
+ * would run it with (`agentFileOf`), never to every agent of that name.
  *
  * The repository `repo` has the workflow `alpha`, whose `implement` names no agent and whose `review` names `iris`, and `gamma`, whose
  * `plan` names `ada` and whose `stray` names `../agents/ada`; its `agents/` has `iris` and `ada`. The store `home` has `ada` and `zed`, and
@@ -13,9 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import type { Factory, FactoryListing } from '../factory/factory.ts';
-
-process.env.WF_ROOT = scratch('wf-fills-root-');
-const { agentFileOf, factoriesFilling, stepsFilled } = await import('./fills.store.ts');
+import { agentFileOf, factoriesFilling, stepsFilled } from './fills.store.ts';
 
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });

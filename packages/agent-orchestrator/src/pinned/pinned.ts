@@ -9,16 +9,16 @@ import { closeoutHashOf, type Closeout } from '../closeout/index.ts';
 import { outputFields } from '../step/step.ts';
 import type { Pin } from '../revisions/revisions.ts';
 import type { Run, StepRecord } from '../record/record.ts';
-import type { Workflow } from '../workflow.ts';
+import type { StepSpec } from '../workflow.ts';
 
 /** As much of a pass's filing as the two below read: the run's pins, and the steps the run froze. */
-type PinsRead = { run: Pick<Run, 'pinned'>; reads: { steps: readonly Workflow[] } };
+type PinsRead = { run: Pick<Run, 'pinned'>; reads: { steps: readonly StepSpec[] } };
 
 /**
  * The agent and skill pins one step is filed on, off the run's pins: what the step's own record keeps, so a landed step says which
  * revisions it ran on once a refresh has moved the run's own past them. None for a step with no agent.
  */
-export const stepPins = (step: Workflow, pins: readonly Pin[]): Pin[] => {
+export const stepPins = (step: StepSpec, pins: readonly Pin[]): Pin[] => {
   const agent = step.agent;
   if (!agent) return [];
   const names = new Set(agent.skills ?? []);
@@ -30,7 +30,7 @@ export const stepPins = (step: Workflow, pins: readonly Pin[]): Pin[] => {
  * schema it was given (`closeoutHashOf`). Written at every filing, so a step that has landed says which revisions its try ran on even
  * once a refresh has moved the run's own past them. Nothing for a step the steps given do not hold. Pure.
  */
-export const filedOn = (f: PinsRead, step: Workflow | undefined): Pick<StepRecord, 'pinned' | 'closeoutHash' | 'declared'> => {
+export const filedOn = (f: PinsRead, step: StepSpec | undefined): Pick<StepRecord, 'pinned' | 'closeoutHash' | 'declared'> => {
   if (!step) return {};
   const own = stepPins(step, f.run.pinned ?? []);
   return { ...(own.length ? { pinned: own } : {}), closeoutHash: closeoutHashOf(step, f.reads.steps), declared: outputFields(step) };
@@ -59,7 +59,7 @@ export const filedFields: FiledFields = (filed, now, gave) => {
  * A record with no `closeoutHash`, written before this was kept, resumes as it always did: the hash says a schema moved, and an absent one
  * says nothing. Pure.
  */
-export const resumeOn = (session: string | undefined, step: Workflow, f: PinsRead, record: StepRecord | undefined): string | undefined =>
+export const resumeOn = (session: string | undefined, step: StepSpec, f: PinsRead, record: StepRecord | undefined): string | undefined =>
   record?.closeoutHash === undefined || record.closeoutHash === closeoutHashOf(step, f.reads.steps) ? session : undefined;
 
 /**
@@ -86,7 +86,7 @@ export const keptDeclared = <R extends Pick<Run, 'steps' | 'workflow'>>(run: R):
  * schema is one whose schema has moved since it was filed (`keptDeclared` gave the others theirs): it owes those of the fields declared
  * now its closeout gave. A record with neither owes what the step declares now.
  */
-export const filedOwed = (step: Workflow, run: Pick<Run, 'steps'>, said: Closeout | undefined): string[] => {
+export const filedOwed = (step: StepSpec, run: Pick<Run, 'steps'>, said: Closeout | undefined): string[] => {
   const record = run.steps[step.name];
   const declared = record?.declared;
   const moved = declared === undefined && record?.closeoutHash !== undefined;

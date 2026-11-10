@@ -2,7 +2,7 @@
  * `nemia agents` at the terminal, told as a person's story: the two places a `nemia` reads agents from, listed with what each can do,
  * one agent's card printed in A2A's shape — JSON alone on stdout, since a person pipes it, and what it is *not* on stderr — and the
  * person's custom instructions for an agent written, printed, listed and cleared. And a table: each refusal at shipped defaults, by its
- * exit code and what it names. `WF_ROOT` is set before the import, since the module reads it as it loads.
+ * exit code and what it names. The test's store is its own, at `ROOT`, given to `main` as `ENV`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,19 +17,20 @@ import { eachTest } from './placed.ts';
 import { heldUnasked } from './unasked.ts';
 import { Effect, Layer } from 'effect';
 import { anAgent as aDraft } from './agent-walks.ts';
+import { main } from '../src/cli/main.ts';
+import { clearCustomInstructions, writeCustomInstructions } from '../src/custom/custom.store.ts';
+import { Invalid } from '../src/refusal/refusal.ts';
+import { agentsRead } from '../src/roster/roster.store.ts';
+import { AgentDoor } from '../src/agents/agent-door.store.ts';
+import { agentDoorMemory, MEMORY_AGENTS, MEMORY_ROOT } from '../src/agents/agent-memory.store.ts';
+import { skillDoorMemory } from '../src/skills/skill-memory.store.ts';
+import { AgentName } from '../src/agents/agents.model.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-agents-cli-');
-process.env.WF_ROOT = ROOT;
-const { main } = await import('../src/cli/main.ts');
-const { clearCustomInstructions, writeCustomInstructions } = await import('../src/custom/custom.store.ts');
-const { Invalid } = await import('../src/refusal/refusal.ts');
-const { agentsRead } = await import('../src/roster/roster.store.ts');
-const { AgentDoor } = await import('../src/agents/agent-door.store.ts');
-const { agentDoorMemory, MEMORY_AGENTS, MEMORY_ROOT } = await import('../src/agents/agent-memory.store.ts');
-const { skillDoorMemory } = await import('../src/skills/skill-memory.store.ts');
-const { AgentName } = await import('../src/agents/agents.model.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 
-const { engineOf } = await import('../src/runtime-client.ts');
 const engine = eachTest(testEngine);
 heldUnasked(engine);
 
@@ -49,7 +50,7 @@ const printedBy = async (t: Mock, ...argv: string[]): Promise<{ out: string; err
     err.push(args.join(' '));
   });
   try {
-    await main(argv, noEngine());
+    await main(argv, noEngine(), undefined, undefined, ENV);
   } finally {
     log.mock.restore();
     warn.mock.restore();
@@ -247,7 +248,7 @@ test("nemia agents at the terminal: both places listed with what each agent can 
     const wf = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
     const ran = spawnSync(process.execPath, [wf, 'agents', 'custom', 'helper', '--file', '-', '--repo', repo], {
       input: 'Help in French.\n',
-      env: { ...process.env, WF_ROOT: ROOT },
+      env: ENV,
       encoding: 'utf8',
     });
     assert.equal(ran.status, 0, `${ran.stdout}\n${ran.stderr}`);

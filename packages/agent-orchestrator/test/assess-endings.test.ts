@@ -53,7 +53,7 @@ import {
   type TaskPhase,
 } from '../src/run.ts';
 import type { RetryAsk } from '../src/retry/retry-ask.ts';
-import { parseAgent, parseWorkflow, type OutputSchema, type Workflow } from '../src/workflow.ts';
+import { parseAgent, parseWorkflow, type OutputSchema, type StepSpec } from '../src/workflow.ts';
 import { aRead, listing, names, namesFor, phases, run, step, STEPS } from './assessed.ts';
 import type { Closeout } from '../src/closeout/closeout.ts';
 
@@ -69,14 +69,14 @@ const approval = (step: string, n: number, message?: string) => ({
 });
 
 /** `implement → review → ship`, as the dev folders are: the ending step works in the repository's checkout, and is gated. */
-const SHIP: Workflow = {
+const SHIP: StepSpec = {
   name: 'ship',
   after: ['review'],
   workspace: 'base',
   gate: true,
   body: "Ship it: trial merge this run's result branch onto the base branch, run the check, and commit.\n\nAbort on any failure.",
 };
-const ENDS: Workflow[] = [step('implement'), step('review', ['implement']), SHIP];
+const ENDS: StepSpec[] = [step('implement'), step('review', ['implement']), SHIP];
 /** implement and review done on the run's branch, ship never filed. */
 const atEnd = (extra: Partial<RepositoryRun> = {}) =>
   run(
@@ -100,7 +100,7 @@ const OTTO = parseAgent(
 );
 const LANDS = "Land this run's result on the base branch: stage the merge of its branch and sign off with the commit message.";
 /** `implement → review → land`, land an ending led by `otto`, with the note `note` below its frontmatter. */
-const landing = (note: string): Workflow[] => [
+const landing = (note: string): StepSpec[] => [
   step('implement'),
   step('review', ['implement']),
   parseWorkflow(
@@ -137,7 +137,7 @@ const SAY = {
   lastMerge: 'git log --merges -1',
 };
 /** `s`'s brief in `r`, told the git place's words for reading the work. */
-const placed = (s: Workflow, r: Run, steps: readonly Workflow[]): string =>
+const placed = (s: StepSpec, r: Run, steps: readonly StepSpec[]): string =>
   composeBrief(
     s,
     r,
@@ -168,7 +168,7 @@ const said = (outcome: Closeout['outcome']): Closeout => ({
 });
 
 /** `implement → ship`, ship an ending with a check: approved first, in the repository's checkout (`landsOnCheck`). */
-const LANDER: Workflow = { name: 'ship', after: ['implement'], body: 'land it', workspace: 'base', gate: true, check: 'npm test' };
+const LANDER: StepSpec = { name: 'ship', after: ['implement'], body: 'land it', workspace: 'base', gate: true, check: 'npm test' };
 const LANDING_STEPS = [step('implement'), LANDER];
 /** ship filed, signed, its check filed. */
 const atLanding = (rest: Partial<RepositoryRun> = {}, ship: Partial<StepRecord> = {}): Run => ({
@@ -309,7 +309,7 @@ test("a send-back at an ending's gate goes to the work, and a try of the ending 
         undefined,
         'not once the ending is approved and filed: the run has acted, and there is nothing to hold back',
       );
-      const ungated: Workflow[] = [step('implement'), step('review', ['implement']), { ...SHIP, gate: undefined }];
+      const ungated: StepSpec[] = [step('implement'), step('review', ['implement']), { ...SHIP, gate: undefined }];
       assert.equal(
         retryable(review, atEnd(), DONE, signedDone, asked, ungated).sendsBack,
         undefined,
@@ -411,7 +411,7 @@ test("`nemia ls`, `nemia rm` and `nemia cancel` at an ending's gate", async (t) 
         /ship waits at its gate for your approval, and it is filed once it is approved: nemia approve r-1 ship/,
       );
       const ran = atEnd({ steps: { ship: { taskId: 't3', workspace: '/repo', branch: 'main' } }, approvals: [approval('ship', 1)] });
-      const gatedReview: Workflow[] = [ENDS[0], { ...ENDS[1], gate: true }, ENDS[2]];
+      const gatedReview: StepSpec[] = [ENDS[0], { ...ENDS[1], gate: true }, ENDS[2]];
       assert.match(
         String(forgetRefusal(gatedReview, run({ implement: 't1', review: 't2', ship: null }), DONE, [], signedDone, asked)),
         /review waits at its gate for your approval, and what waits on it is filed once it is approved/,
@@ -451,7 +451,7 @@ test("an ending's gate does not hold while the work goes round again or is being
         required: ['again'],
         additionalProperties: false,
       };
-      const looping: Workflow[] = [
+      const looping: StepSpec[] = [
         step('implement'),
         { ...step('review', ['implement']), loop: 'implement', rounds: 3, output: { file: 'review.json', schema: LOOPING } },
         SHIP,
@@ -529,7 +529,7 @@ test("an ending's gate does not hold while the work goes round again or is being
         !gateRefused.includes('What waits on it has been filed'),
         "refused there, and not with what waits on it has been filed: nothing has been, and what the run waits for is a person's word",
       );
-      const plain: Workflow[] = [looping[0], looping[1], step('docs', ['review'])];
+      const plain: StepSpec[] = [looping[0], looping[1], step('docs', ['review'])];
       const withDocs = run({}, { steps: { ...r.steps, docs: { taskId: 't3', workspace: '/wt', branch: 'wf/r-1/implement' } } });
       const handedOn = roundAsk(plain, withDocs, 'review', DONE, said(false), asked);
       assert.deepEqual(Object.keys(handedOn), ['refusal']);
@@ -638,7 +638,7 @@ test("`workspacePlan` and the run's result: an ending works in the repository's 
   await t.test(
     "`workspace: base` is the repository's own checkout, and the run's result is the work the ending step acts on, not its branch",
     () => {
-      const ending: Workflow = { name: 'ship', after: ['review'], body: 'land it', workspace: 'base', gate: true };
+      const ending: StepSpec = { name: 'ship', after: ['review'], body: 'land it', workspace: 'base', gate: true };
       const dev = [step('implement'), step('review', ['implement']), ending];
       assert.deepEqual(workspacePlan(dev, ending), { kind: 'base' }, 'said by the step, not by the shape');
       assert.deepEqual(workspacePlan(dev, dev[1]), { kind: 'inherit', from: 'implement' }, 'and nothing else changes');
@@ -652,7 +652,7 @@ test("`workspacePlan` and the run's result: an ending works in the repository's 
         ['review'],
         'a folder with no ending step is unchanged',
       );
-      const fanIn: Workflow[] = [step('a'), step('b'), { name: 'ship', after: ['a', 'b'], body: 'land it', workspace: 'base' }];
+      const fanIn: StepSpec[] = [step('a'), step('b'), { name: 'ship', after: ['a', 'b'], body: 'land it', workspace: 'base' }];
       assert.deepEqual(
         resultSteps(fanIn).map((s) => s.name),
         ['a', 'b'],
@@ -687,7 +687,7 @@ test("`composeBrief` of a step in the repository's own checkout: where the work 
   await t.test(
     "an ending step is told where the work is — the branches, not the workspace — since the repository's checkout is not where the run worked",
     () => {
-      const ending: Workflow = { name: 'ship', after: ['review'], body: 'Ship it.', workspace: 'base', gate: true };
+      const ending: StepSpec = { name: 'ship', after: ['review'], body: 'Ship it.', workspace: 'base', gate: true };
       const dev = [step('implement'), step('review', ['implement']), ending];
       const r = run(
         { implement: 't1', review: 't2', ship: null },
@@ -712,7 +712,7 @@ test("`composeBrief` of a step in the repository's own checkout: where the work 
   await t.test(
     'an ending step is told the check the work was judged by, one line for each distinct check, and none when no step has one',
     () => {
-      const ending: Workflow = { name: 'ship', after: ['review'], body: 'Ship it.', workspace: 'base', gate: true };
+      const ending: StepSpec = { name: 'ship', after: ['review'], body: 'Ship it.', workspace: 'base', gate: true };
       const r = run(
         { implement: 't1', review: 't2', ship: null },
         {
@@ -757,7 +757,7 @@ test("`composeBrief` of a step in the repository's own checkout: where the work 
   await t.test(
     'a step in the checkout whose run cut no branch — the whole workflow is that step — is told so, and is given no empty fence to read',
     () => {
-      const watcher: Workflow = { name: 'supervise', after: [], body: 'Watch the runs.', workspace: 'base', slot: 'none' };
+      const watcher: StepSpec = { name: 'supervise', after: [], body: 'Watch the runs.', workspace: 'base', slot: 'none' };
       const r = run({ supervise: 't1' }, { steps: { supervise: { taskId: 't1', workspace: '/repo', branch: 'main' } } });
       const brief = composeBrief(watcher, r, [watcher], () => undefined, FILES);
       assert.match(brief, /You are in \/repo, the repository's own checkout, on main — not in a worktree of this run's\./);
@@ -772,7 +772,7 @@ test("`composeBrief` of a step in the repository's own checkout: where the work 
   await t.test(
     'a late try of a step in the checkout is told the base branch by name, never the sha the run froze: a step that does not end is composed again on every answer',
     () => {
-      const watcher: Workflow = { name: 'supervise', after: [], body: 'Watch the runs.', workspace: 'base', slot: 'none' };
+      const watcher: StepSpec = { name: 'supervise', after: [], body: 'Watch the runs.', workspace: 'base', slot: 'none' };
       const r = run(
         { supervise: 't1' },
         {
@@ -809,7 +809,7 @@ test("`composeBrief` of a step in the repository's own checkout: where the work 
   await t.test(
     'a step in the checkout is told the one place its files go: the run hands nothing off there, so nothing it leaves is collected or committed',
     () => {
-      const ending: Workflow = { name: 'ship', after: ['review'], body: 'Ship it.', workspace: 'base', gate: true };
+      const ending: StepSpec = { name: 'ship', after: ['review'], body: 'Ship it.', workspace: 'base', gate: true };
       const dev = [step('implement'), step('review', ['implement']), ending];
       const r = run(
         { implement: 't1', review: 't2', ship: null },
@@ -998,7 +998,7 @@ test("decision: landed is asked of git and never stored, and a finished run is a
           `${why}: git calls a result branch nobody committed to on the base; read as shipped, it hides the failure from nemia decide`,
         );
       }
-      const checked: Workflow[] = [step('implement'), { ...step('review', ['implement']), check: 'npm test' }];
+      const checked: StepSpec[] = [step('implement'), { ...step('review', ['implement']), check: 'npm test' }];
       const refused = decision(
         aRead(
           checked,
@@ -1106,7 +1106,7 @@ test("an ending's gate and git's word: what is to decide, read off where the res
         "the work committed nothing past the run's base: on the base as the no-ending kind reads it, landed once every step finished",
       );
 
-      const accepted: Workflow[] = [step('implement'), { ...step('review', ['implement']), gate: true }];
+      const accepted: StepSpec[] = [step('implement'), { ...step('review', ['implement']), gate: true }];
       const signed = run(
         { implement: 't1', review: 't2' },
         {
@@ -1275,7 +1275,7 @@ test("an ending's gate and git's word: what is to decide, read off where the res
         );
       }
 
-      const accepted: Workflow[] = [step('implement'), { ...step('review', ['implement']), gate: true }];
+      const accepted: StepSpec[] = [step('implement'), { ...step('review', ['implement']), gate: true }];
       const signed = run(
         { implement: 't1', review: 't2' },
         {
@@ -1458,7 +1458,7 @@ test("an ending's gate and git's word: what is to decide, read off where the res
   await t.test(
     "a gate on the last step of a folder that merges nothing: approving accepts what it did, so `says` is its closeout's, not its prose — and the branch is still a person's once approved",
     () => {
-      const gatedLast: Workflow[] = [step('implement'), { ...step('review', ['implement']), gate: true }];
+      const gatedLast: StepSpec[] = [step('implement'), { ...step('review', ['implement']), gate: true }];
       const r = finished();
       assert.equal(merges(gatedLast), false);
       assert.equal(merges(ENDS), true, 'a folder whose ending acts on the base branch answers for its own branch');
@@ -1585,7 +1585,7 @@ test('an ending that lands on its check: who files it, whether it stopped on the
         steps: { implement: { taskId: 't-impl', branch: 'wf/r-1/implement' }, ship: { taskId: 't-ship' } },
       });
       const settled = () => 'succeeded' as TaskPhase;
-      const did = (ending: Workflow, outcome: Closeout['outcome'] = 'blocked', rest: Partial<RepositoryRun> = {}): boolean =>
+      const did = (ending: StepSpec, outcome: Closeout['outcome'] = 'blocked', rest: Partial<RepositoryRun> = {}): boolean =>
         endingStopped(
           ending,
           shipFiledAndSettled(rest),

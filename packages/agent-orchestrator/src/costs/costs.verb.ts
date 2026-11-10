@@ -11,6 +11,7 @@ import { keysOf, type RunFact, type TryFact } from '../stats/index.ts';
 import { factsRead } from '../stats/stats.verb.ts';
 import { viewedOnce } from '../views/views.verb.ts';
 import { costsOf, RECENT_RUNS } from './costs.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /**
  * What the newest finished runs of `run`'s workflow in its factory cost (`costsOf`), `run` itself left out: the store's other runs of the
@@ -18,10 +19,11 @@ import { costsOf, RECENT_RUNS } from './costs.ts';
  * finished. A run that gives nothing — its frozen steps do not read, a journal of it does not read, a read of it fails — is passed over.
  */
 export const costsRead = Effect.fn('costsRead')(function* (e: Engine, run: Run) {
+  const home = yield* StoreRoot;
   const of = keysOf(run);
   const viewed = viewedOnce(e);
-  const candidates = runsAtOnce.runs
-    .list(() => {})
+  const candidates = runsAtOnce(home)
+    .runs.list(() => {})
     .filter((other) => {
       const keys = keysOf(other);
       return other.id !== run.id && keys.factory === of.factory && keys.workflow === of.workflow;

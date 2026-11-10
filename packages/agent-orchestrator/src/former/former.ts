@@ -5,7 +5,7 @@
  * read as `workspace: base` (`baseSpelled`), the fence a step asks for under either key (`modeOf`), an agent's own key renamed and its
  * words (`FORMER_OWN_KEYS`, `harnessPromptNamed`), and a step frozen on a run record under an old name (`asNamed`).
  */
-import { LIST_KEYS, refuse, splitFrontmatter, type StepAgent, type StepKey, type Workflow } from '../step/step.ts';
+import { LIST_KEYS, refuse, splitFrontmatter, type StepAgent, type StepKey, type StepSpec } from '../step/step.ts';
 import {
   flatValue,
   frontmatterOrNull,
@@ -143,7 +143,7 @@ export const formerSandbox = (word: string): string => sandboxNamed(word);
  * The fence a step asks its harness for: the engine's task calls both `permissionMode`, Claude Code's permission mode and Codex's sandbox,
  * and a step has at most one of the two (`wordOf`). What the tick files as `config.permissionMode`. Pure.
  */
-export const modeOf = (step: Pick<Workflow, 'permissionMode' | 'sandbox'>): string | undefined => step.sandbox ?? step.permissionMode;
+export const modeOf = (step: Pick<StepSpec, 'permissionMode' | 'sandbox'>): string | undefined => step.sandbox ?? step.permissionMode;
 
 /** The name a key was written under, for a key read under a former one (`FORMER_KEYS`), by the key it is now. */
 export type Spelled = Partial<Record<string, string>>;
@@ -485,11 +485,11 @@ export const harnessPromptLine = (file: string, word: string): string =>
   `${file}: \`systemPrompt: ${word}\` is read as \`harnessPrompt: ${harnessPromptNamed(word)}\`, what becomes of Claude Code's own prompt. The former line is still read; rename it, or save the file from the board, which writes \`harnessPrompt:\`.`;
 
 /**
- * A step as a record holds it: a `Workflow` whose agent's `keys` may still name a key by its former name (`FORMER_KEYS`), and whose agent
+ * A step as a record holds it: a `StepSpec` whose agent's `keys` may still name a key by its former name (`FORMER_KEYS`), and whose agent
  * may still hold its harness prompt as `systemPrompt` (`FORMER_OWN_KEYS`), in a former word, and whose place may still be `workspace:
  * 'folder'` (`placeSpelled`), and whose ending may still say `workspace: 'main'` (`baseSpelled`).
  */
-export type FrozenStep = Omit<Workflow, 'agent' | 'workspace'> & {
+export type FrozenStep = Omit<StepSpec, 'agent' | 'workspace'> & {
   workspace?: 'main' | 'base' | 'folder';
   agent?: Omit<StepAgent, 'keys'> & { keys: string[]; systemPrompt?: string };
 };
@@ -499,7 +499,7 @@ export type FrozenStep = Omit<Workflow, 'agent' | 'workspace'> & {
  * its agent holds no former `systemPrompt` (`FORMER_OWN_KEYS`); and it says no `workspace: 'folder'` or `workspace: 'main'`, there or
  * in its agent's `given`.
  */
-function isNamed(step: FrozenStep): step is Workflow {
+function isNamed(step: FrozenStep): step is StepSpec {
   if (step.agent && Object.hasOwn(step.agent, 'systemPrompt')) return false;
   if (isFormerWorkspace(step.workspace) || isFormerWorkspace(step.agent?.given?.workspace)) return false;
   return [...Object.keys(step), ...(step.agent?.keys ?? []), ...Object.keys(step.agent?.given ?? {})].every((key) => keyNamed(key) === key);
@@ -544,9 +544,9 @@ function renamedFields(fields: object) {
  * sees a former name, and the next pass that writes the record back writes the new ones alone. A field under both names keeps the new one's
  * value. A step with no former name is returned as it is. Pure.
  */
-export function asNamed(step: FrozenStep): Workflow {
+export function asNamed(step: FrozenStep): StepSpec {
   if (isNamed(step)) return step;
-  const fields = renamedFields(step) as Workflow;
+  const fields = renamedFields(step) as StepSpec;
   if (!step.agent) return fields;
   const { keys, given } = step.agent;
   const agent = {

@@ -6,7 +6,7 @@
 import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
-import type { Workflow } from '../workflow.ts';
+import type { StepSpec } from '../workflow.ts';
 import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';
 import type { BranchStanding } from '../status/status.ts';
 import { runsAtOnce } from '../runs/runs.store.ts';
@@ -22,11 +22,18 @@ const ahead = (standings: readonly BranchStanding[]): string[] => standings.filt
  * Undefined, asking nothing, for a folder run, a run without worktrees, or one with no branch ahead of its base. Fails with a refusal a
  * read threw; dies of anything else (`tried`).
  */
-export const collisionsAt = (run: Run, ending: string, standings: readonly BranchStanding[], git: BranchReader, place: Place) =>
+export const collisionsAt = (
+  home: string,
+  run: Run,
+  ending: string,
+  standings: readonly BranchStanding[],
+  git: BranchReader,
+  place: Place,
+) =>
   Effect.gen(function* () {
     const ours = ahead(standings);
     if (!isRepositoryRun(run) || !run.isolate || !ours.length) return undefined;
-    const others = othersInFlight(run, runsAtOnce.runs.list());
+    const others = othersInFlight(run, runsAtOnce(home).runs.list());
     const steps = new Map(yield* Effect.forEach(others, (other) => Effect.map(stepsOf(other), (s) => [other.id, s] as const)));
     return yield* tried(() => collisionsRead(run, ending, ours, git, place, others, steps));
   });
@@ -39,7 +46,7 @@ function collisionsRead(
   git: BranchReader,
   place: Place,
   others: readonly RepositoryRun[],
-  steps: ReadonlyMap<string, readonly Workflow[]>,
+  steps: ReadonlyMap<string, readonly StepSpec[]>,
 ): Collisions {
   const theirs: Theirs[] = others.flatMap((other) =>
     ahead(standingsOf(other, steps.get(other.id) ?? [], git)).map((branch) => ({ run: other.id, branch })),

@@ -3,7 +3,7 @@
  * target merges the base at the commit asked, the run's base moves there, and the reviewer reads the merge. One of the three walks kept
  * on real git.
  *
- * `WF_ROOT` is set before the runner is imported: the module reads it as it loads.
+ * The store is the file's own, at `ROOT`, given as `ENV`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,18 +17,17 @@ import { TEAM, TEAM_DEV } from './team.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
 import { runGiven, runOver } from './placed.ts';
+import { advanceRun, approveRun, list, mergeRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import { roundOf } from '../src/run.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-ship-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
-process.env.WF_ROOT = ROOT;
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { advanceRun, approveRun, list, mergeRun, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
-const { runRecord } = await import('../src/record/record.store.ts');
-const { roundOf } = await import('../src/run.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
+const runWith = runOver(runEngine, gitPlaceLayer, ENV);
+const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 /**
  * The ending of the tests' team's `dev` (`team.ts`): the file a person reads, its keys and its agent. It names `agent: shipper`, so the
@@ -151,21 +150,21 @@ async function stoppedOnBase(dir = loopingFolder()) {
   const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: dir }));
   const b = board();
   const { e, settle } = b;
-  await runWith(e, advanceRun(runRecord(run.id)));
-  const work = runRecord(run.id).steps.implement;
+  await runWith(e, advanceRun(runRecord(ROOT, run.id)));
+  const work = runRecord(ROOT, run.id).steps.implement;
   fs.appendFileSync(path.join(work.workspace!, 'add.ts'), 'export const sub = (a, b) => a - b;\n');
   git(work.workspace!, 'add', '-A');
   git(work.workspace!, 'commit', '-q', '-m', 'add sub');
   settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  await runWith(e, advanceRun(runRecord(run.id)));
-  if (runRecord(run.id).steps.review) {
+  await runWith(e, advanceRun(runRecord(ROOT, run.id)));
+  if (runRecord(ROOT, run.id).steps.review) {
     settle(`${run.id}-review`, 'succeeded', { ...SIGNED, again: false });
-    await runWith(e, advanceRun(runRecord(run.id)));
+    await runWith(e, advanceRun(runRecord(ROOT, run.id)));
   }
   await runWith(e, approveRun(run.id, 'ship', 'Merge it.'));
-  assert.deepEqual((await runWith(e, advanceRun(runRecord(run.id)))).filed, ['ship']);
+  assert.deepEqual((await runWith(e, advanceRun(runRecord(ROOT, run.id)))).filed, ['ship']);
   settle(`${run.id}-ship`, 'succeeded', STOPPED);
-  await runWith(e, advanceRun(runRecord(run.id)));
+  await runWith(e, advanceRun(runRecord(ROOT, run.id)));
   return { repo, id: run.id, branch: work.branch!, ...b, base: git(repo, 'rev-parse', 'HEAD') };
 }
 
@@ -186,20 +185,20 @@ const mainMoves = (repo: string): string => {
 test("a merge send-back leaves the round count unchanged: the loop's target merges the base at the commit asked, the run's base moves there, and the reviewer reads the merge", async () => {
   const { repo, id, e, tasks, settle } = await stoppedOnBase();
   const sha = mainMoves(repo);
-  const before = roundOf(runRecord(id), 'review');
+  const before = roundOf(runRecord(ROOT, id), 'review');
 
   const { ask } = await runWith(e, mergeRun(id));
   assert.deepEqual(
     [ask.step, ask.round, ask.merge.target, ask.merge.try, ask.merge.onto, ask.merge.sha],
     ['review', before, 'implement', 2, 'main', sha],
   );
-  const sent = await runWith(e, advanceRun(runRecord(id)));
+  const sent = await runWith(e, advanceRun(runRecord(ROOT, id)));
   assert.deepEqual([sent.looped, sent.filed], [['review'], []], sent.notes.join('\n'));
   assert.ok(
     sent.notes.some((n) => n.startsWith('review: merge of main — implement merges')),
     sent.notes.join('\n'),
   );
-  const run = runRecord(id);
+  const run = runRecord(ROOT, id);
   assert.deepEqual(
     run.steps.implement.tries?.map((t) => t.cause),
     ['merge'],
@@ -218,7 +217,7 @@ test("a merge send-back leaves the round count unchanged: the loop's target merg
   assert.doesNotMatch(brief, /## Round \d/);
   assert.ok(brief.includes('You were handed no findings this round.'), 'a merge answers no finding: its replies are an empty list');
   assert.ok(!brief.includes('A closeout without it, or with an empty list, is unsigned.'), brief);
-  const listed = await runWith(e, list(e, runRecord(id)));
+  const listed = await runWith(e, list(e, runRecord(ROOT, id)));
   assert.equal(
     listed.steps.find((s) => s.name === 'implement')!.note,
     'try 2, merged the base, on your word (nemia refresh --base), the round unchanged',
@@ -226,7 +225,7 @@ test("a merge send-back leaves the round count unchanged: the loop's target merg
   );
 
   settle(`${id}-implement-try2`, 'succeeded', SIGNED);
-  await runWith(e, advanceRun(runRecord(id)));
+  await runWith(e, advanceRun(runRecord(ROOT, id)));
   const review = tasks.get(`${id}-review-try2`)!.spec.brief;
   assert.match(review, /\n## A merge of main, /);
   assert.match(
@@ -235,6 +234,10 @@ test("a merge send-back leaves the round count unchanged: the loop's target merg
     'the reviewer is handed its own closeout off the try the merge moved behind',
   );
   settle(`${id}-review-try2`, 'succeeded', { ...SIGNED, again: true });
-  await runWith(e, advanceRun(runRecord(id)));
-  assert.equal(roundOf(runRecord(id), 'review'), before + 1, 'a finding with again: true after the merge is a round, and it is counted');
+  await runWith(e, advanceRun(runRecord(ROOT, id)));
+  assert.equal(
+    roundOf(runRecord(ROOT, id), 'review'),
+    before + 1,
+    'a finding with again: true after the merge is a round, and it is counted',
+  );
 });

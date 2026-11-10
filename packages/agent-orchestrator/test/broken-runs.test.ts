@@ -10,10 +10,9 @@
  * (`TickReport.unreadable`), as `plainEngine` over a journal holding a miswritten entry answers. What the runtime says of the entry
  * itself is the runtime's to test. The folders and the torn record are files, as they are on a store.
  *
- * `WF_ROOT` is set before the runner is imported: it is read as the module loads. `WF_MAX_CONCURRENT` admits sessions enough for every
- * run, and no cap is set on runs but in the checkpoint that counts the slots.
+ * The test's store is its own, at `ROOT`, given as `ENV`. `WF_MAX_CONCURRENT` admits sessions enough for every run, and no cap is set on
+ * runs but in the checkpoint that counts the slots, which sets it on `ENV` for its own scope.
  */
-import { rootNow } from './config-given.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -22,25 +21,28 @@ import { Effect } from 'effect';
 import { JournalError } from 'agent-runtime';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
+import { retryRun, runWith, startRun, tickRun } from '../src/runner.ts';
+import { runRecord, runFile } from '../src/record/record.store.ts';
+import { slotsRead } from '../src/cap/slots-read.verb.ts';
+import { readFeed } from '../src/feed/feed.store.ts';
+import { REMOVED } from '../src/feed/feed.ts';
+import { putPause, resumePause } from '../src/pause/pause.store.ts';
+import { judgedNow } from '../src/summary/summary.verb.ts';
+import { workflowsOf } from '../src/summary/reads.verb.ts';
+import { loadWorkflows } from '../src/workflows/workflows.store.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import { main } from '../src/cli/main.ts';
 
 const ROOT = scratch('wf-broken-runs-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-process.env.WF_ROOT = ROOT;
-process.env.WF_MAX_CONCURRENT = '10';
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_RUNS;
-const { retryRun, runWith, startRun, tickRun } = await import('../src/runner.ts');
-const { runRecord, runFile } = await import('../src/record/record.store.ts');
-const { slotsRead } = await import('../src/cap/slots-read.verb.ts');
-const { readFeed } = await import('../src/feed/feed.store.ts');
-const { REMOVED } = await import('../src/feed/feed.ts');
-const { putPause, resumePause } = await import('../src/pause/pause.store.ts');
-const { judgedNow } = await import('../src/summary/summary.verb.ts');
-const { workflowsOf } = await import('../src/summary/reads.verb.ts');
-const { loadWorkflows } = await import('../src/workflows/workflows.store.ts');
-const { engineOf } = await import('../src/runtime-client.ts');
-const { main } = await import('../src/cli/main.ts');
-const stage = staged({ runWith, main, engineOf });
+const ENV: Record<string, string | undefined> = {
+  ...process.env,
+  WF_ROOT: ROOT,
+  WF_MAX_CONCURRENT: '10',
+  WF_VERIFY_REST: '1',
+  WF_MAX_RUNS: undefined,
+};
+const stage = staged({ runWith, main, engineOf, env: ENV });
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 const PLACED = '---\nplace: git\nharness: codex\n---\nwork it\n';
@@ -93,8 +95,8 @@ const started = (brief: string, dir = FOLDER, more: { after?: string[]; isolate?
 
 /** The run's record as an early tick wrote it: no workflow frozen on it, its steps read off `dir` on every pass. */
 const unfrozen = (id: string, dir: string): void => {
-  const { workflow: _, ...record } = JSON.parse(fs.readFileSync(runFile(id), 'utf8')) as Record<string, unknown>;
-  fs.writeFileSync(runFile(id), `${JSON.stringify({ ...record, workflowDir: dir }, null, 2)}\n`);
+  const { workflow: _, ...record } = JSON.parse(fs.readFileSync(runFile(ROOT, id), 'utf8')) as Record<string, unknown>;
+  fs.writeFileSync(runFile(ROOT, id), `${JSON.stringify({ ...record, workflowDir: dir }, null, 2)}\n`);
 };
 
 const LEFT_OUT = (id: string) => `${id} is not advanced while its workflow folder does not load: run ${id}: it froze no workflow`;
@@ -130,7 +132,7 @@ const unreadableLine = (block: readonly string[]) =>
   block.find((l) => l.startsWith('   → unreadable: '))?.slice('   → unreadable: '.length);
 
 /** Whether the feed says `id` was removed. */
-const saidRemoved = (id: string) => readFeed().lines.some((l) => 'run' in l && l.run === id && l.word === REMOVED);
+const saidRemoved = (id: string) => readFeed(ROOT).lines.some((l) => 'run' in l && l.run === id && l.word === REMOVED);
 
 test('one broken run does not stop the others: each left out and said once, the others filed, and mended, it goes on', async (t) => {
   const s = story(t);
@@ -168,26 +170,26 @@ test('one broken run does not stop the others: each left out and said once, the 
     assert.equal(said.length, 1, JSON.stringify(first.unreadable));
     assert.match(said[0], /work: says no `place:`/);
     assert.match(said[0], new RegExp(`or nemia rm ${runs.unplaced}\\.$`));
-    assert.equal(runRecord(runs.unplaced).steps.work?.taskId ?? null, null, 'nothing of it filed');
+    assert.equal(runRecord(ROOT, runs.unplaced).steps.work?.taskId ?? null, null, 'nothing of it filed');
 
     b.settle(`${runs.checked}-work`, 'succeeded', SIGNED);
     b.settle(`${runs.tried}-work`, 'failed');
     await pass();
     await stage.runWith(e, retryRun(runs.tried, 'work', { mode: 'fresh' }));
     await pass();
-    const check = runRecord(runs.checked).steps.work.check?.taskId;
+    const check = runRecord(ROOT, runs.checked).steps.work.check?.taskId;
     assert.ok(check, 'the checked run filed its check');
-    assert.equal(runRecord(runs.tried).steps.work.tries?.length, 1, 'the retried run holds an earlier try');
+    assert.equal(runRecord(ROOT, runs.tried).steps.work.tries?.length, 1, 'the retried run holds an earlier try');
   });
 
   await s.test(
     'a journal no runtime wrote, a folder gone and a torn record leave their runs out, each said once, while a run beside them files',
     async (c) => {
-      spoil(runRecord(runs.journal).steps.work.taskId!);
-      spoil(runRecord(runs.checked).steps.work.check!.taskId);
-      spoil(runRecord(runs.tried).steps.work.tries![0].taskId);
+      spoil(runRecord(ROOT, runs.journal).steps.work.taskId!);
+      spoil(runRecord(ROOT, runs.checked).steps.work.check!.taskId);
+      spoil(runRecord(ROOT, runs.tried).steps.work.tries![0].taskId);
       unfrozen(runs.gone, path.join(ROOT, 'no-such-folder'));
-      fs.writeFileSync(runFile('torn'), '{ "id": "torn", "repo"');
+      fs.writeFileSync(runFile(ROOT, 'torn'), '{ "id": "torn", "repo"');
       runs.good = (await started('the good one')).id;
 
       const wrote: string[] = [];
@@ -204,7 +206,7 @@ test('one broken run does not stop the others: each left out and said once, the 
           undefined,
           `${id} is not judged`,
         );
-      const journal = spoiled.get(runRecord(runs.journal).steps.work.taskId!)!;
+      const journal = spoiled.get(runRecord(ROOT, runs.journal).steps.work.taskId!)!;
       assert.ok(
         now.unreadable?.some((w) => w.startsWith(`${JOURNAL_OUT(runs.journal)}${journal}`)),
         JSON.stringify(now.unreadable),
@@ -245,8 +247,8 @@ test('one broken run does not stop the others: each left out and said once, the 
     const { out: lines, threw } = await printedBy(c, ['ls'], e);
     assert.equal(threw, undefined);
     for (const [id, task] of [
-      [runs.checked, runRecord(runs.checked).steps.work.check!.taskId],
-      [runs.tried, runRecord(runs.tried).steps.work.tries![0].taskId],
+      [runs.checked, runRecord(ROOT, runs.checked).steps.work.check!.taskId],
+      [runs.tried, runRecord(ROOT, runs.tried).steps.work.tries![0].taskId],
     ]) {
       const block = blockOf(lines, id);
       const said = unreadableLine(block);
@@ -292,7 +294,7 @@ test('one broken run does not stop the others: each left out and said once, the 
   await s.test(
     "the board answers an unfrozen run unjudged and running, in the folder's words alone, its steps off its record",
     async () => {
-      const [one] = await stage.runWith(e, judgedNow(e, ROOT, [runRecord(runs.unplaced)]));
+      const [one] = await stage.runWith(e, judgedNow(e, ROOT, [runRecord(ROOT, runs.unplaced)]));
       assert.equal(one.status, 'running');
       assert.ok(
         one.unreadable?.startsWith(`${runs.unplaced}'s workflow folder does not load, so the board does not judge the run`),
@@ -304,7 +306,7 @@ test('one broken run does not stop the others: each left out and said once, the 
         ['work'],
       );
 
-      const run = runRecord(runs.unplaced);
+      const run = runRecord(ROOT, runs.unplaced);
       const loaded = (() => {
         try {
           loadWorkflows(UNPLACED, { repo: run.repo, home: ROOT });
@@ -323,8 +325,11 @@ test('one broken run does not stop the others: each left out and said once, the 
   );
 
   await s.test('the cap counts a broken run in flight, as the pass does', async (c) => {
-    process.env.WF_MAX_RUNS = '20';
-    c.after(() => delete process.env.WF_MAX_RUNS);
+    ENV.WF_MAX_RUNS = '20';
+    c.after(() => {
+      ENV.WF_MAX_RUNS = undefined;
+    });
+
     await pass();
     const slots = await stage.runWith(e, slotsRead());
     for (const id of [runs.unplaced, runs.journal]) assert.ok(slots.inFlight?.includes(id), `${id}: ${JSON.stringify(slots.inFlight)}`);
@@ -333,8 +338,8 @@ test('one broken run does not stop the others: each left out and said once, the 
   await s.test(
     'under a pause, a pass and `nemia ls` over a run at work whose folder stops loading finish, its finishing tasks read without it',
     async (c) => {
-      putPause(rootNow(), { why: 'a test pauses', by: 'ann' });
-      c.after(() => resumePause(rootNow()));
+      putPause(ROOT, { why: 'a test pauses', by: 'ann' });
+      c.after(() => resumePause(ROOT));
       const paused = await pass();
       assert.ok(paused.pause, 'the pass read the pause');
       assert.ok(
@@ -361,7 +366,7 @@ test('one broken run does not stop the others: each left out and said once, the 
 
   await s.test('mended, each run goes on at the next pass, with nothing remembered', async () => {
     fs.writeFileSync(path.join(UNPLACED, 'work.md'), PLACED);
-    spoiled.delete(runRecord(runs.journal).steps.work.taskId!);
+    spoiled.delete(runRecord(ROOT, runs.journal).steps.work.taskId!);
     const mended = await pass();
     assert.deepEqual(mended.runs.find((a) => a.run.id === runs.unplaced)?.filed, ['work']);
     assert.ok(

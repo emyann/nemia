@@ -18,7 +18,7 @@ import { strayAsk } from '../say/say.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import type { Verdict } from '../check/check.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { mergeAsk, mergeOffer, type MergeAsk, type MergeReads, type Tried } from './merge.ts';
 import type { Decision, Offer } from '../decide/decide.ts';
 import { RunDoor } from '../runs/runs.store.ts';
@@ -31,7 +31,7 @@ export type MergeAsked = { run: Run; ask: MergeAsk; file: string };
  * steps, and each check's verdict.
  */
 function mergeReads(
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined,
@@ -40,9 +40,9 @@ function mergeReads(
   verdictOf: (step: string) => Verdict | undefined,
 ): MergeReads {
   return {
-    standingOf: (step: Workflow) => standing(step, run, phaseOf, closeoutOf, asked, steps, spendOf, verdictOf),
-    stopped: (step: Workflow) => endingStopped(step, run, phaseOf, closeoutOf, asked, steps, spendOf),
-    goesRound: (looping: Workflow) =>
+    standingOf: (step: StepSpec) => standing(step, run, phaseOf, closeoutOf, asked, steps, spendOf, verdictOf),
+    stopped: (step: StepSpec) => endingStopped(step, run, phaseOf, closeoutOf, asked, steps, spendOf),
+    goesRound: (looping: StepSpec) =>
       roundsDue(steps, run, phaseOf, closeoutOf, asked, [], spendOf, verdictOf).some((r) => r.step === looping.name),
   };
 }
@@ -68,7 +68,7 @@ const trialOf =
  */
 export function mergeOffers(
   place: Place,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   run: Run,
   d: Decision,
   rounds: readonly RoundAsk[],
@@ -148,7 +148,7 @@ export const mergeRun = Effect.fn('merge')(function* (id: string, stepName?: str
 export const closeoutsAfterMerge = Effect.fnUntraced(function* (
   e: Engine,
   run: Run,
-  step: Workflow,
+  step: StepSpec,
   signedOff: (step: string) => Closeout | undefined,
 ) {
   const before = step.loop && merged(run.steps[step.name]) ? run.steps[step.name]?.tries?.at(-1) : undefined;

@@ -114,4 +114,5 @@ export function daemonOf(
  * clocks, with the last pass's cost and when it last read where the branches stand; `now` is the wall time its ages are worded at.
  * Throws what the package throws of a file that is there and cannot be read — a store that cannot be read cannot be said to tick or not.
  */
-export const readDaemon = (now = Date.now()): Daemon => daemonOf(daemonStanding(), now, lastPassCost() ?? null, listedStanding());
+export const readDaemon = (home: string, now = Date.now()): Daemon =>
+  daemonOf(daemonStanding(home), now, lastPassCost(home) ?? null, listedStanding(home));

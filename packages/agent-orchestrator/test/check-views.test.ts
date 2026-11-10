@@ -1,5 +1,5 @@
 /**
- * What a pass costs in `check` observes, at shipped defaults: the client's `engine(process.env)` with the shipped `check` harness, a pass
+ * What a pass costs in `check` observes, at shipped defaults: the client's `engine(ENV)` with the shipped `check` harness, a pass
  * through `tick()`, and the views `taskPhases` makes of a run's tasks — every task of every run, each pass — counted on the runtime's
  * meter, the `observed, by harness` lines of `nemia up --stats`.
  *
@@ -7,7 +7,7 @@
  * which lists every run file it ever ran: on a live store of 197 runs, one pass that observed it for each view listed 52976 of them in
  * 799 ms. So the count is one for the pass and one for each check in flight.
  *
- * `WF_ROOT` is set before the runner is imported, which reads it as it loads; `WF_VERIFY_REST` has every run a pass answers from its memo
+ * The test's store is its own, at `ROOT`, given as `ENV`; `WF_VERIFY_REST` has every run a pass answers from its memo
  * of runs at rest judged in full as well, and a difference throws (`verifyRest` in tick.verb.ts).
  */
 import { test } from 'node:test';
@@ -21,18 +21,16 @@ import { until, WAITED, type Waiter } from 'agent-runtime/testing';
 import { Effect } from 'effect';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runOver } from './placed.ts';
+import { engine, tickRun, runWith as runEngine } from '../src/runner.ts';
+import { taskPhasesRead } from '../src/views/views.verb.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-check-views-');
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { engine, tickRun, runWith: runEngine } = await import('../src/runner.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
 const stand = eachTest(testPlace);
-const runWith = runOver(runEngine, () => stand().layer);
-const { taskPhasesRead } = await import('../src/views/views.verb.ts');
+const runWith = runOver(runEngine, () => stand().layer, ENV);
 
-const e = engine(process.env);
+const e = engine(ENV);
 const gates = scratch('wf-check-views-gates-');
 const calls = async () => (await Effect.runPromise(e.io())).observed.check?.calls ?? 0;
 

@@ -9,10 +9,10 @@
  * rules' store refuse, each writing nothing.
  *
  * What admission decides off a state it is handed is the table of `src/admission/admission.test.ts`; what a rule allows,
- * `src/auto/auto.test.ts`; the facts it reads, `src/auto/facts.test.ts`. `WF_ROOT` is set before `src` is imported, which reads it as
- * it loads.
+ * `src/auto/auto.test.ts`; the facts it reads, `src/auto/facts.test.ts`. The test's store is its own, at `ROOT`, given as `ENV`.
+
  */
-import { rootNow, storeGiven } from './config-given.ts';
+import { storeGiven } from './config-given.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -23,30 +23,38 @@ import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
 import { eachTest } from './placed.ts';
 import type { Run } from '../src/record/record.ts';
+import { ADMIT, admitted } from '../src/admission/admit.verb.ts';
+import { TABLE } from '../src/command/commands.verb.ts';
+import { addFactoryAt } from '../src/factory/factory.store.ts';
+import { writeFactoryLevel } from '../src/level/level.store.ts';
+import { writeLevel } from '../src/nemia/level.store.ts';
+import { customInstructionsFile } from '../src/agents/read.store.ts';
+import { DEFAULT_POLICY, ruleWords } from '../src/auto/auto.ts';
+import { BUDGETS_SCHEMA } from '../src/budget/budget.ts';
+import {
+  confirmedFile,
+  confirmRule,
+  digestOf,
+  dropRule,
+  proposedFile,
+  readConfirmed,
+  readProposed,
+  writeProposed,
+} from '../src/auto/auto.store.ts';
+import { POLICY, POLICY_PROPOSE, proposalOf } from '../src/auto/auto.verb.ts';
+import { AgentDoor } from '../src/agents/agent-door.store.ts';
+import { agentDoorMemory } from '../src/agents/agent-memory.store.ts';
+import { AgentName } from '../src/agents/agents.model.ts';
+import { engineOf, runWith } from '../src/runtime-client.ts';
+import { RunDoor } from '../src/runs/runs.store.ts';
+import { runDoorMemory } from '../src/runs/memory.store.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-auto-rules-');
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-const { ADMIT, admitted } = await import('../src/admission/admit.verb.ts');
-const { TABLE } = await import('../src/command/commands.verb.ts');
-const { addFactory } = await import('../testing.ts');
-const { writeFactoryLevel } = await import('../src/level/level.store.ts');
-const { writeLevel } = await import('../src/nemia/level.store.ts');
-const { customInstructionsFile } = await import('../src/agents/read.store.ts');
-const { DEFAULT_POLICY, ruleWords } = await import('../src/auto/auto.ts');
-const { BUDGETS_SCHEMA } = await import('../src/budget/budget.ts');
-const { confirmedFile, confirmRule, digestOf, dropRule, proposedFile, readConfirmed, readProposed, writeProposed } =
-  await import('../src/auto/auto.store.ts');
-const { POLICY, POLICY_PROPOSE, proposalOf } = await import('../src/auto/auto.verb.ts');
-const { AgentDoor } = await import('../src/agents/agent-door.store.ts');
-const { agentDoorMemory } = await import('../src/agents/agent-memory.store.ts');
-const { AgentName } = await import('../src/agents/agents.model.ts');
-const { engineOf, runWith } = await import('../src/runtime-client.ts');
-const { RunDoor } = await import('../src/runs/runs.store.ts');
-const { runDoorMemory } = await import('../src/runs/memory.store.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
 /** The CLI's `main`, loaded only if a checkpoint types a command: these stories call the verbs, and its import is the slowest. */
 const main: Parameters<typeof staged>[0]['main'] = async (...argv) => (await import('../src/cli/main.ts')).main(...argv);
-const stage = staged({ runWith, main, engineOf });
+const stage = staged({ runWith, main, engineOf, env: ENV });
 /** The Run door of the test running now, in memory: every run a story plants, and every admission it asks, reads this one. */
 const door = eachTest(runDoorMemory);
 
@@ -74,7 +82,7 @@ function proposed(): string {
  * door — the files at `home`, or the door `agents` where one is given.
  */
 const shown = (home = ROOT, agents?: Layer.Layer<never>) => {
-  const program = storeGiven(home, process.env)(POLICY.handler({ name: 'nemia' }));
+  const program = storeGiven(home, ENV)(POLICY.handler({ name: 'nemia' }));
   return stage.runWith(stage.board().e, agents === undefined ? program : Effect.provide(program, agents));
 };
 
@@ -118,7 +126,7 @@ const plantRun = (
   );
 
 /** A factory of the store, named `name`, holding a scratch repository. */
-const factory = (name: string) => addFactory({ name, repos: [fs.mkdtempSync(path.join(ROOT, `${name}-`))] });
+const factory = (name: string) => addFactoryAt(ROOT, { name, repos: [fs.mkdtempSync(path.join(ROOT, `${name}-`))] });
 
 /** Puts on the board a task settled as it succeeded, with `closeout` and its exit code. */
 const settled = (id: string, closeout?: unknown, exitCode = 0) => {
@@ -132,7 +140,7 @@ const decided = async (command: string, floor: 'semi-auto' | 'none' = 'semi-auto
     await stage.runWith(
       stage.board().e,
       Effect.provide(
-        admitted(JSON.stringify({ tool: 'Bash', input: { command }, cwd: '/w' }), TABLE, floor === 'none' ? undefined : floor),
+        admitted(ROOT, JSON.stringify({ tool: 'Bash', input: { command }, cwd: '/w' }), TABLE, floor === 'none' ? undefined : floor),
         door(),
       ),
     )
@@ -143,7 +151,7 @@ const decidedAtAuto = async (command: string) =>
   (
     await stage.runWith(
       stage.board().e,
-      Effect.provide(admitted(JSON.stringify({ tool: 'Bash', input: { command }, cwd: '/w' }), TABLE, undefined, 'nemia', ROOT), door()),
+      Effect.provide(admitted(ROOT, JSON.stringify({ tool: 'Bash', input: { command }, cwd: '/w' }), TABLE, undefined, 'nemia'), door()),
     )
   )?.decision;
 
@@ -156,7 +164,10 @@ test('Her floor: a call on a run or a factory left at manual is denied, one rais
       await plantRun('r-pipao', 'pipao');
       await plantRun('r-hkb', 'hkb');
       await plantRun('r-default');
-      writeFactoryLevel('hkb', { since: '2026-10-06T08:00:00.000Z', raise: { level: 'semi-auto', until: '2099-01-01T00:00:00.000Z' } });
+      writeFactoryLevel(ROOT, 'hkb', {
+        since: '2026-10-06T08:00:00.000Z',
+        raise: { level: 'semi-auto', until: '2099-01-01T00:00:00.000Z' },
+      });
       assert.equal(await decided('nemia show r-pipao'), 'deny');
       assert.equal(await decided('nemia start ./brief.md --factory pipao'), 'deny');
       assert.equal(await decided('nemia show r-default'), 'deny', "the default factory follows the store's level, manual where unset");
@@ -166,7 +177,7 @@ test('Her floor: a call on a run or a factory left at manual is denied, one rais
     },
   );
   await s.test("the store's level raised raises the default factory, and every factory without its own", async () => {
-    writeLevel(rootNow(), { level: 'semi-auto', since: '2026-10-06T08:00:00.000Z' });
+    writeLevel(ROOT, { level: 'semi-auto', since: '2026-10-06T08:00:00.000Z' });
     assert.equal(await decided('nemia show r-default'), undefined, "the store's level raises the default factory");
     assert.equal(await decided('nemia show r-pipao'), undefined, 'and every factory without its own');
   });
@@ -212,8 +223,14 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
     'at auto, an approval the default allows is given unasked; at semi-auto, on a refused check, an unread run, or a cap raised, asked',
     async () => {
       for (const name of ['auto', 'semi']) factory(name);
-      writeFactoryLevel('auto', { since: '2026-10-06T08:00:00.000Z', raise: { level: 'auto', until: '2099-01-01T00:00:00.000Z' } });
-      writeFactoryLevel('semi', { since: '2026-10-06T08:00:00.000Z', raise: { level: 'semi-auto', until: '2099-01-01T00:00:00.000Z' } });
+      writeFactoryLevel(ROOT, 'auto', {
+        since: '2026-10-06T08:00:00.000Z',
+        raise: { level: 'auto', until: '2099-01-01T00:00:00.000Z' },
+      });
+      writeFactoryLevel(ROOT, 'semi', {
+        since: '2026-10-06T08:00:00.000Z',
+        raise: { level: 'semi-auto', until: '2099-01-01T00:00:00.000Z' },
+      });
       const GATED = [{ name: 'build', after: [], body: 'Build it.', harness: 'codex', gate: true, check: 'npm test' }];
       for (const [id, at] of [
         ['g-auto', 'auto'],
@@ -309,7 +326,7 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
     );
     assert.equal(fs.existsSync(customInstructionsFile(home, 'nemia')), false, 'her words are on no disk');
     assert.equal((await shown(home, agents)).instruction, WORDS);
-    const propose = storeGiven(home, process.env)(POLICY_PROPOSE.handler({ name: 'nemia', words: PROPOSAL }));
+    const propose = storeGiven(home, ENV)(POLICY_PROPOSE.handler({ name: 'nemia', words: PROPOSAL }));
     const list = await stage.runWith(stage.board().e, Effect.provide(propose, agents));
     assert.equal(readProposed(home, 'nemia')?.digest, digestOf(WORDS), 'the digest is of the words the door holds');
     assert.equal(list.proposed?.stale, false);

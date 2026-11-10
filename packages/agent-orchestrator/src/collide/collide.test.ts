@@ -7,10 +7,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { collisionsDue, collisionsOf, othersInFlight, trialsOf } from './collide.ts';
 import type { RepositoryRun, Run } from '../record/record.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import type { TrialMerge } from '../place/place.ts';
 
-const STEPS: Workflow[] = [
+const STEPS: StepSpec[] = [
   { name: 'implement', after: [], body: 'Build it.' },
   { name: 'ship', after: ['implement'], body: 'Ship it.', workspace: 'base', check: 'npm test' },
 ];
@@ -52,7 +52,7 @@ const refused = (refusedOn: string | undefined, check = true): RepositoryRun =>
 
 test('othersInFlight keeps each other run with worktrees on the same repository and base, a held one among them', () => {
   const ours = run('r-1');
-  const held = run('r-3', { hold: { until: ['r-9'] } } as Partial<RepositoryRun>);
+  const held = run('r-3', { hold: { at: '2026-01-01T00:00:00Z', until: ['r-9'] } });
   assert.deepEqual(
     othersInFlight(ours, [ours, run('r-2'), held, run('r-4', { repo: '/code/app/' })]).map((r) => r.id),
     ['r-2', 'r-3', 'r-4'],

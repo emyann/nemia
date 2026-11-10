@@ -2,21 +2,20 @@
  * A run's workflow folder read after its start (`workflowsOf`), as the start read it: with the run's places and its factory's hires and
  * rules, so a step a factory hires an agent into, whose file adds `skills:` to that agent, reads; and the warning kept for a folder that
  * is gone or truly no longer reads, said once, with one full stop — and, where the factory itself is gone or does not read, naming the
- * factory instead of quoting a loader that was given no hires. `WF_ROOT` is set before the import, since the store reads it as it loads.
+ * factory instead of quoting a loader that was given no hires. On a store of its own at `ROOT`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
+import { workflowsOf } from './reads.verb.ts';
+import { loadWorkflows } from '../workflows/workflows.store.ts';
+import { addFactoryAt, attachWorkflowAt, hireAgentAt, removeFactoryAt } from '../factory/factory.store.ts';
+import type { Run } from '../record/record.ts';
+import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
 
 const ROOT = scratch('wf-reads-verb-');
-process.env.WF_ROOT = ROOT;
-const { workflowsOf } = await import('./reads.verb.ts');
-const { loadWorkflows } = await import('../workflows/workflows.store.ts');
-const { addFactory, attachWorkflow, hireAgent, removeFactory } = await import('../../testing.ts');
-const { DEFAULT_NAMESPACE } = await import('../factory/factory.ts');
-type Run = import('../record/record.ts').Run;
 
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -38,9 +37,9 @@ function repository(): { repo: string; folder: string } {
 
 /** The factory `name` over `repo`, attaching `build` and hiring `seldon` into `build/design`. */
 function hiring(name: string, repo: string): void {
-  addFactory({ name, repos: [repo] });
-  attachWorkflow({ factory: name, workflow: 'build' });
-  hireAgent({ factory: name, agent: 'seldon', step: 'build/design' });
+  addFactoryAt(ROOT, { name, repos: [repo] });
+  attachWorkflowAt(ROOT, { factory: name, workflow: 'build' });
+  hireAgentAt(ROOT, { factory: name, agent: 'seldon', step: 'build/design' });
 }
 
 /** A run of `folder` in `factory`, frozen unless `frozen` is false: all `workflowsOf` reads of a record. */
@@ -134,7 +133,7 @@ test('a folder that is gone is said gone, whatever its factory', () => {
 test('REFUSED: a run of a factory since removed is quiet while its folder reads, and names the factory when it does not', () => {
   const { repo, folder } = repository();
   hiring('removed', repo);
-  removeFactory('removed');
+  removeFactoryAt(ROOT, 'removed');
   const { steps, warning } = workflowsOf(runOf(repo, folder, 'removed'), ROOT);
   assert.equal(steps, null);
   assert.equal(

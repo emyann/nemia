@@ -1,5 +1,5 @@
 /**
- * One step file, read and written: `parseWorkflow` reads its frontmatter into a `Workflow` through each key's reader, and
+ * One step file, read and written: `parseWorkflow` reads its frontmatter into a `StepSpec` through each key's reader, and
  * `renderStep` writes one back, the parser run backwards; `loopOf` and `roundsOf` read the one edge that points backwards.
  */
 import {
@@ -13,7 +13,7 @@ import {
   type StepAgent,
   type StepKey,
   type StepOutput,
-  type Workflow,
+  type StepSpec,
   WorkflowError,
 } from '../step/step.ts';
 import { fenceReach } from 'agent-runtime/vocabulary';
@@ -118,7 +118,7 @@ export function parseWorkflow(
   skills?: SkillsFound,
   hired?: Hire,
   rules?: string,
-): Workflow {
+): StepSpec {
   const { block, body: own } = splitFrontmatter(name, text);
   let {
     meta: { agent: written, ...meta },
@@ -195,7 +195,7 @@ export function parseWorkflow(
  * `disallowedTools:` line and its agent denies anything, its own rules then each of the agent's they do not cover (`deniesWith`), and
  * the agent's apart, which the step's provenance keeps (`StepAgent.agentDenies`). Any other step as it was read, with none apart.
  */
-function withAgentDenies(step: Workflow, own: Partial<Record<StepKey, string>>, agent: Agent): { step: Workflow; agentDenies?: string[] } {
+function withAgentDenies(step: StepSpec, own: Partial<Record<StepKey, string>>, agent: Agent): { step: StepSpec; agentDenies?: string[] } {
   const agentDenies = own.disallowedTools === undefined ? [] : agentDeniesOf(agent);
   if (!agentDenies.length) return { step };
   return { step: { ...step, disallowedTools: deniesWith(step.disallowedTools ?? [], agentDenies) }, agentDenies };
@@ -222,7 +222,7 @@ const agentlessServers = (name: string, line: string): string =>
   `${name}: \`mcp: ${line}\` adds MCP servers to the step's agent's, and this step has none. Name one — \`agent: <name>\` — whose servers these add to, or delete the line.`;
 
 /** The MCP servers a session of `step` loads: those its agent `agent` names, then those the step's own `mcp:` line adds, each once. */
-const sessionServers = (agent: Agent, step: Workflow): string[] => [...new Set([...(agent.mcp ?? []), ...(step.mcp ?? [])])];
+const sessionServers = (agent: Agent, step: StepSpec): string[] => [...new Set([...(agent.mcp ?? []), ...(step.mcp ?? [])])];
 
 /**
  * Refuses step `name`, resolved as `step` from its own lines `own` and its agent `agent`: a fence key that would widen the agent's
@@ -236,7 +236,7 @@ function agentStepRefusal(
   name: string,
   agent: Agent,
   own: Partial<Record<StepKey, string>>,
-  step: Workflow,
+  step: StepSpec,
   skills: SkillsFound | undefined,
 ): void {
   const unoffered = offerRefusal(name, agent, own);
@@ -337,7 +337,7 @@ export function stepFrom(
   read: ((file: string) => string | undefined) | undefined,
   spelled: Spelled = {},
   merged?: StepOutput,
-): Workflow {
+): StepSpec {
   const after = (meta.after ?? '')
     .split(',')
     .map((s) => s.trim())
@@ -430,11 +430,11 @@ export function autoDropped(
 }
 
 /**
- * A step as it is written back: what `renderStep` takes. A `Workflow` is one, and so is a step whose `output:` names its file without the
+ * A step as it is written back: what `renderStep` takes. A `StepSpec` is one, and so is a step whose `output:` names its file without the
  * schema, which is read from beside the step when the file is parsed, never from here — and one whose `agent` is only the agent's name, a
  * step drafted with its own keys and note alone, which the parser resolves.
  */
-export type StepDraft = Omit<Workflow, 'output' | 'agent'> & { output?: Pick<StepOutput, 'file'>; agent?: string | StepAgent | null };
+export type StepDraft = Omit<StepSpec, 'output' | 'agent'> & { output?: Pick<StepOutput, 'file'>; agent?: string | StepAgent | null };
 
 /**
  * The keys whose empty list says what no line says: nothing to wait on, to read, to deny, to add. Not `tools:`, where none reads as every

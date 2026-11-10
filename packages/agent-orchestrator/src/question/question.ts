@@ -7,7 +7,7 @@
  * harness is handed standard JSON Schema only.
  */
 import { envelopeRefusals, type Closeout } from '../closeout/index.ts';
-import { isObject, type Workflow } from '../step/step.ts';
+import { isObject, type StepSpec } from '../step/step.ts';
 import { BUDGETS_SCHEMA, budgetRefusals } from '../budget/budget.ts';
 import { fieldsOf, itemsOf, sameSchema } from '../shape/shape.ts';
 
@@ -131,7 +131,7 @@ export function expandShapes(properties: Record<string, unknown>): { properties:
 const isQuestionsSchema = (schema: unknown): boolean => sameSchema(schema, [QUESTIONS_SCHEMA, ...FORMER_QUESTIONS_SCHEMAS]);
 
 /** The fields a step's `output:` declares whose schema is `QUESTIONS_SCHEMA`, in the schema's order: none for a step without `output:`. */
-export const questionFields = (step: Workflow | undefined): string[] =>
+export const questionFields = (step: StepSpec | undefined): string[] =>
   Object.entries(step?.output?.schema.properties ?? {})
     .filter(([, schema]) => isQuestionsSchema(schema))
     .map(([name]) => name);
@@ -244,7 +244,7 @@ export function questionsOf(value: unknown): Question[] | { error: string } {
  * None for a closeout that is not there or did not read, and none of a field that does not decode: it is drawn as any other field. None
  * at all when two fields ask one title: an answer names its question by title alone, so such a closeout is answered in words.
  */
-export function askedQuestions(step: Workflow | undefined, said: Closeout | { error: string } | undefined): Asked[] {
+export function askedQuestions(step: StepSpec | undefined, said: Closeout | { error: string } | undefined): Asked[] {
   if (!said || 'error' in said) return [];
   const asked = questionFields(step).flatMap((field) => {
     const questions = questionsOf(said.output?.[field]);
@@ -260,7 +260,7 @@ export function askedQuestions(step: Workflow | undefined, said: Closeout | { er
  * a field it did not give, which `declaredOutput` counts as missing. The run refuses such a closeout back to its agent as it refuses an
  * envelope (`envelopeRefusals`), and a reader of one that stands says why the field is drawn as words.
  */
-export function questionRefusals(step: Workflow | undefined, said: Closeout | { error: string } | undefined): string[] {
+export function questionRefusals(step: StepSpec | undefined, said: Closeout | { error: string } | undefined): string[] {
   if (!said || 'error' in said) return [];
   const read: Question[] = [];
   const refused: string[] = [];
@@ -289,7 +289,7 @@ export function questionRefusals(step: Workflow | undefined, said: Closeout | { 
  * question fields (`questionRefusals`) and its budget fields (`budgetRefusals`, which reads the run's `steps` for the steps after it). A
  * closeout with any reads `unsigned`, and the run asks its session once a round to mend it.
  */
-export const closeoutRefusals = (step: Workflow | undefined, said: Closeout, steps: readonly Workflow[]): string[] => [
+export const closeoutRefusals = (step: StepSpec | undefined, said: Closeout, steps: readonly StepSpec[]): string[] => [
   ...envelopeRefusals(said),
   ...questionRefusals(step, said),
   ...budgetRefusals(step, steps, said),

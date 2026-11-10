@@ -5,7 +5,7 @@
  * `retry-refusal.ts`'s.
  */
 import { lackedOf, tryOf, type CloseoutAsked, type Run, type StepRecord } from '../record/record.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import type { RetryMode, TryCause } from 'objects';
 
 /**
@@ -231,7 +231,7 @@ export const signoffDue = (record: StepRecord, asked: CloseoutAsked, refused = f
 export const modeWord = (how: { mode: RetryMode; model?: string }): string => (how.model ? `--model ${how.model}` : `--${how.mode}`);
 
 /** The note that says a try, and on whose word: `retries:`, an ask to sign off, or `nemia retry` and what it was typed with. */
-export const tryWord = (r: Retry, step: Workflow): string =>
+export const tryWord = (r: Retry, step: StepSpec): string =>
   `${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}` : r.by === 'signoff' ? 'an ask to sign off, once a round' : askedWord(r)}`;
 
 /**
@@ -272,7 +272,7 @@ export function nextTry(record: StepRecord, retry: Retry, taskId?: string): Step
  * the same try. What a continuation is filed with, since a model is part of the prompt the session cached: a continue after `--model
  * sonnet` on the step's `opus` would rebuild it. Only a fresh try — `--fresh`, or `--model` — starts a session on another.
  */
-export function sessionModel(step: Workflow, record: StepRecord | undefined): string | undefined {
+export function sessionModel(step: StepSpec, record: StepRecord | undefined): string | undefined {
   for (const t of [...(record?.tries ?? [])].reverse()) {
     if (t.cause === 'recheck') continue;
     if (t.cause === 'fresh') return t.model ?? step.model;
@@ -296,7 +296,7 @@ export const spentAsks = (run: Run, asks: readonly RetryAsk[]): RetryAsk[] => as
  * A try due now, as `nemia ls` and `nemia decide` say it — and, for a step whose session the tick stops first, that it does:
  * `its blocked session` while its harness says so, and `its session` once it works again (`runsOn`).
  */
-export const dueNote = (step: Workflow, run: Run, r: Retry): string => {
+export const dueNote = (step: StepSpec, run: Run, r: Retry): string => {
   if (r.by === 'ask') return askedNote(r);
   if (r.by === 'signoff')
     return `try ${r.try} due — an ask to sign off, once a round: ${lackedOf(run.steps[step.name]).length ? 'its closeout named a file the run does not have' : 'its session ended without its closeout'}`;

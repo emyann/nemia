@@ -9,8 +9,8 @@
  * the plan's order in `src/plan/plan.test.ts`; the sections a root is handed in `src/brief/handed.test.ts`. A parent on another
  * repository whose branch git alone can say is gone is in `after-elsewhere.boundary.test.ts`, on real git.
  *
- * Every story starts its own runs and counts only its own: they share this file's `WF_ROOT`, which is set before the runner is imported,
- * as it is read as the module loads. `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo of runs at rest.
+ * Every story starts its own runs and counts only its own: they share this file's store at `ROOT`, given as `ENV`.
+ * `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo of runs at rest.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,23 +22,20 @@ import type { BranchReader } from '../src/branches/branches.store.ts';
 import { scratch } from 'test-kit/scratch';
 import { staged, story, type Board } from './story.ts';
 import { names, namesFor } from './assessed.ts';
+import { advanceRun, cancelRun, decideRun, list, parentRead, standingLiveOf, startPlan, startRun, runWith } from '../src/runner.ts';
+import { stepsNow as stepsOf } from './steps-now.ts';
+import { UnloadedFolder } from '../src/steps/steps.ts';
+import { isRepositoryRun } from '../src/run.ts';
+import { listRuns, markCancelled, runRecord } from '../src/record/record.store.ts';
+import { passStanding } from '../src/standing/standing.verb.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import { main } from '../src/cli/main.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-waiting-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { advanceRun, cancelRun, decideRun, list, parentRead, standingLiveOf, startPlan, startRun, runWith } =
-  await import('../src/runner.ts');
-const { stepsNow: stepsOf } = await import('./steps-now.ts');
-const { UnloadedFolder } = await import('../src/steps/steps.ts');
-const { isRepositoryRun } = await import('../src/run.ts');
-const { listRuns, markCancelled, runRecord } = await import('../src/record/record.store.ts');
-const { passStanding } = await import('../src/standing/standing.verb.ts');
-const { engineOf } = await import('../src/runtime-client.ts');
-const { main } = await import('../src/cli/main.ts');
-const stage = staged({ runWith, main, engineOf });
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
+const stage = staged({ runWith, main, engineOf, env: ENV });
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 /** `findings`, strict: what a declaring step's closeout carries. */
@@ -63,13 +60,13 @@ const FOUND = [{ file: 'src/flag.ts', line: 12, what: 'the flag is read before i
 const world = () => stage.place().world;
 const board = (): Board => stage.board();
 /** One pass of the tick over the run `id`, on the stage's engine. */
-const tick = (id: string) => stage.runWith(board().e, advanceRun(runRecord(id)));
+const tick = (id: string) => stage.runWith(board().e, advanceRun(runRecord(ROOT, id)));
 /** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `nemia ls` reads. */
-const aPass = () => stage.runWith(board().e, passStanding(listRuns()));
+const aPass = () => stage.runWith(board().e, passStanding(listRuns(ROOT)));
 /** A run as one waiting on it reads it, where its branches stand asked now, as a person's verb asks them (`standingLiveOf`). */
 const parentNow = (id: string) => stage.runWith(board().e, standingLiveOf([id]).pipe(Effect.flatMap((git) => parentRead(id, git))));
 const decided = async (id: string) => (await stage.runWith(board().e, decideRun(id))).decision;
-const statuses = async (id: string) => (await stage.runWith(board().e, list(board().e, runRecord(id)))).steps.map((s) => s.message);
+const statuses = async (id: string) => (await stage.runWith(board().e, list(board().e, runRecord(ROOT, id)))).steps.map((s) => s.message);
 /** The brief the engine was filed with for the task `id`. */
 const briefOf = (id: string): string => board().tasks.get(id)!.spec.brief;
 /** The runs in the store, by their records (a run's own folder beside each): a refused start writes none. */
@@ -116,13 +113,13 @@ const aParent = async (
 ) => {
   const run = await started({ brief, repo, workflowDir: workflowDir ?? oneStep() });
   await tick(run.id);
-  const wt = runRecord(run.id).steps.implement.workspace!;
+  const wt = runRecord(ROOT, run.id).steps.implement.workspace!;
   if (work) {
     fs.writeFileSync(path.join(wt, work), `${work}\n`);
     world().commit(wt, `add ${work}`);
   }
   if (signed) board().settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  return { run, wt, branch: runRecord(run.id).steps.implement.branch! };
+  return { run, wt, branch: runRecord(ROOT, run.id).steps.implement.branch! };
 };
 /** `branch` merged into `repo`'s checkout and committed, as a person merges a result by hand. */
 const mergedByHand = (repo: string, branch: string, message = `Merge ${branch}`): void => {
@@ -205,11 +202,11 @@ test('a diamond plan: a, then b and c after it, then d after both — each files
   const ids: Record<string, string> = {};
   const lines: Record<string, { wt: string; branch: string }> = {};
   const line = (card: string) => {
-    const r = runRecord(ids[card]).steps.implement;
+    const r = runRecord(ROOT, ids[card]).steps.implement;
     lines[card] = { wt: r.workspace!, branch: r.branch! };
     return lines[card];
   };
-  const record = (card: string) => runRecord(ids[card]);
+  const record = (card: string) => runRecord(ROOT, ids[card]);
   const committed = (card: string, file: string) => {
     fs.writeFileSync(path.join(lines[card].wt, file), `${file}\n`);
     world().commit(lines[card].wt, `add ${file}`);
@@ -311,7 +308,7 @@ test('a diamond plan: a, then b and c after it, then d after both — each files
       for (const card of ['b', 'c']) {
         const r = await tick(ids[card]);
         assert.deepEqual([r.filed, r.waiting], [['implement'], []], card);
-        const now = runRecord(ids[card]);
+        const now = runRecord(ROOT, ids[card]);
         assert.notEqual(startedOn, tip);
         assert.equal(now.baseRef, tip, `${card}: the base as it stands now, and not as it stood at \`nemia start <folder>\``);
         line(card);
@@ -381,7 +378,7 @@ test('a diamond plan: a, then b and c after it, then d after both — each files
       mergedByHand(repo, lines.c.branch, 'Merge c');
       const r = await tick(ids.d);
       assert.deepEqual([r.filed, r.waiting], [['implement'], []]);
-      const wt = runRecord(ids.d).steps.implement.workspace!;
+      const wt = runRecord(ROOT, ids.d).steps.implement.workspace!;
       assert.deepEqual(
         ['a.txt', 'b.txt', 'c.txt'].map((f) => fs.existsSync(path.join(wt, f))),
         [true, true, true],
@@ -410,7 +407,7 @@ test('a parent that will not land — cancelled, failed with nothing committed, 
     async () => {
       const p = await aParent(repo, { work: 'parent.txt' });
       const child = await started({ brief: 'the child of a cancelled run', repo, workflowDir: twoSteps(), after: [p.run.id] });
-      const at = markCancelled(p.run.id);
+      const at = markCancelled(ROOT, p.run.id);
       const filings = [...board().filings];
       for (let pass = 0; pass < 2; pass++) {
         const r = await tick(child.id);
@@ -523,13 +520,13 @@ test('a parent that will not land — cancelled, failed with nothing committed, 
       const p = await aParent(repo, { workflowDir: dir, signed: true });
       const readable = await stage.runWith(board().e, parentRead(p.run.id, await stage.runPlaced(standingLiveOf([p.run.id]))));
       assert.equal(readable.landed, true, 'signed off, with its steps readable, it has landed');
-      const record = runRecord(p.run.id);
+      const record = runRecord(ROOT, p.run.id);
       delete record.workflow;
       fs.writeFileSync(path.join(ROOT, 'runs', `${record.id}.json`), JSON.stringify(record, null, 2));
       fs.rmSync(dir, { recursive: true });
       let why: string | undefined;
       assert.throws(
-        () => stepsOf(runRecord(p.run.id)),
+        () => stepsOf(runRecord(ROOT, p.run.id), ROOT),
         (err: unknown) => {
           why = err instanceof UnloadedFolder ? err.why : undefined;
           return err instanceof UnloadedFolder;
@@ -546,7 +543,7 @@ test('a parent that will not land — cancelled, failed with nothing committed, 
         },
       };
       assert.deepStrictEqual(await stage.runWith(board().e, parentRead(p.run.id, git)), {
-        record: runRecord(p.run.id),
+        record: runRecord(ROOT, p.run.id),
         landed: false,
         unread: why,
       });
@@ -569,7 +566,7 @@ test('REFUSED by name at `nemia start --after`, as the store and git stand: a re
   });
   mergedByHand(repo, unseen.branch);
   for (const p of [dropped, unseen]) droppedByHand(repo, p.wt, p.branch);
-  assert.ok(runRecord(dropped.run.id).tips?.[dropped.branch], 'the dropped parent had its tip recorded');
+  assert.ok(runRecord(ROOT, dropped.run.id).tips?.[dropped.branch], 'the dropped parent had its tip recorded');
 
   await t.test('a run after them files nothing, and says `(<branch> gone)` of each', async () => {
     const filings = [...board().filings];
@@ -637,7 +634,7 @@ test('context without a wait: a run handed another with `--from` files at once, 
     async () => {
       source = await aParent(repo, { work: 'source.txt', signed: false });
       const child = await started({ brief: 'Read what the source has', repo, workflowDir: twoSteps(), context: [source.run.id] });
-      assert.deepEqual(runRecord(child.id).context, [source.run.id], 'frozen on the record');
+      assert.deepEqual(runRecord(ROOT, child.id).context, [source.run.id], 'frozen on the record');
       const r = await tick(child.id);
       assert.deepEqual([r.filed, r.waiting], [['implement'], []]);
       const section = sectionOf(briefOf(`${child.id}-implement`), source.run.id);
@@ -790,7 +787,7 @@ test('a `start()` that refuses part-way stops the plan: the runs already started
   );
   assert.equal(runsWritten(), before + 2, 'the runs it started stand');
   assert.deepEqual(
-    stood.map((p) => runRecord(p.runId).after),
+    stood.map((p) => runRecord(ROOT, p.runId).after),
     [undefined, [stood[0].runId]],
   );
   assert.equal(folderOfCard(stopped!.card), flow);
@@ -810,14 +807,14 @@ test('a parent whose script condition answered a route no pass has copied yet ha
   const repo = aRepo();
   const { id } = await stage.runPlaced(startRun({ brief: 'route it', repo, workflowDir: dir }));
   await tick(id);
-  const wt = runRecord(id).steps.implement.workspace!;
+  const wt = runRecord(ROOT, id).steps.implement.workspace!;
   fs.writeFileSync(path.join(wt, 'page.ts'), 'export const page = true;\n');
   world().commit(wt, 'add a page');
   b.settle(`${id}-implement`, 'succeeded', SIGNED);
   await tick(id);
-  world().stage(repo, runRecord(id).steps.implement.branch!);
+  world().stage(repo, runRecord(ROOT, id).steps.implement.branch!);
   world().commit(repo, 'merge');
   b.end(`${id}-pick`, 'succeeded', { exitCode: 0, terminationMessage: '{"route":"web"}' });
-  assert.equal(runRecord(id).steps.pick?.route, undefined, 'no pass has copied the route onto the record');
+  assert.equal(runRecord(ROOT, id).steps.pick?.route, undefined, 'no pass has copied the route onto the record');
   assert.equal((await parentNow(id)).landed, false);
 });

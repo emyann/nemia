@@ -5,7 +5,7 @@
  * A boundary test because a whole pass asks the engine for its own pass (`Engine.tick`) and a tally of it (`Engine.tallied`), which
  * the engine's stand-in does not model: both are given here by hand, as a pass that moved nothing, over the stand-in's tasks.
  *
- * `WF_ROOT` is set before the runner is imported, which reads it as it loads, and `WF_DEFAULT_FACTORY_STARTS` beside it: its runs start
+ * Its store is its own at `ROOT`, given as `ENV` with `WF_DEFAULT_FACTORY_STARTS` beside it: its runs start
  * in scratch repositories no factory holds.
  */
 import { test } from 'node:test';
@@ -19,22 +19,20 @@ import { Effect } from 'effect';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
 import type { EnginePhase } from '../src/views/views-words.ts';
+import { advanceRun, startRun, runWith as runEngine } from '../src/runner.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import { main } from '../src/cli/main.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-tick-line-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
-process.env.WF_ROOT = ROOT;
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-process.env.WF_DEFAULT_FACTORY_STARTS = '1';
-const { advanceRun, startRun, runWith: runEngine } = await import('../src/runner.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined, WF_DEFAULT_FACTORY_STARTS: '1' };
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
-const runWith = runOver(runEngine, () => stand().layer);
-const runPlaced = runGiven(() => stand().layer);
-const { runRecord } = await import('../src/record/record.store.ts');
-const { main } = await import('../src/cli/main.ts');
-const { engineOf } = await import('../src/runtime-client.ts');
+const runWith = runOver(runEngine, () => stand().layer, ENV);
+const runPlaced = runGiven(() => stand().layer, ENV);
 
 const SIGNED = { outcome: 'done', summary: 'the plan: parse the flag, then store it', artifacts: [], needs: null };
 
@@ -53,7 +51,7 @@ test('`nemia tick` prints `awaiting approval` for a run at its gate and `blocked
     const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
     stand().world.repository(repo, {});
     const run = await runPlaced(startRun({ brief: 'plan the flag', repo, workflowDir: planned(), isolate: false, gates }));
-    await runWith(e, advanceRun(runRecord(run.id)));
+    await runWith(e, advanceRun(runRecord(ROOT, run.id)));
     b.settle(`${run.id}-plan`, phase, closeout === undefined ? {} : { closeout });
     return run.id;
   };
@@ -73,7 +71,7 @@ test('`nemia tick` prints `awaiting approval` for a run at its gate and `blocked
     printed.push(args.join(' '));
   });
   try {
-    await main(['tick'], passing, undefined, stand().place);
+    await main(['tick'], passing, undefined, stand().place, ENV);
   } finally {
     log.mock.restore();
   }

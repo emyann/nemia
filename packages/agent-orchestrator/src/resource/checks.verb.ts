@@ -4,7 +4,7 @@ import { attemptVerdict, checkVerdictOf, verdictWord, type CheckVerdict } from '
 import { phaseOfView } from '../views/views-words.ts';
 import type { Views } from '../summary/reads.verb.ts';
 import type { Run } from '../record/record.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { asked, type Engine } from '../runtime-client.ts';
 
 /**
@@ -140,7 +140,7 @@ export function checkIn(command: string, taskId: string | undefined, views: View
 export async function checksOf(
   e: Engine,
   run: Run,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   views: Views,
   stderr: CheckStderr,
 ): Promise<Map<string, StepCheck>> {

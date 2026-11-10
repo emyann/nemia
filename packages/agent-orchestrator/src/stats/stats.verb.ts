@@ -14,7 +14,7 @@ import { EngineService, denialText, over, unreadableJournal, type Engine, type T
 import { refusedCheck, type Run } from '../record/record.ts';
 import { attemptVerdict } from '../check/check.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { timeline } from '../timeline/index.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
@@ -30,6 +30,7 @@ import { frozenOf, type RunFrozen } from './marks.ts';
 import { deniedCallsOf, filesTouchedOf, skillsLoadedOf } from './discipline.ts';
 import { selectedRuns } from '../labels/labels.ts';
 import type { Selectors } from '../watch/selector.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /**
  * How a check's task ended (`CheckVerdict`): passed, refused (its exit code a verdict, `attemptVerdict`, and non-zero, `refusedCheck`), or
@@ -46,18 +47,19 @@ function verdictOf(view: TaskView | undefined): CheckVerdict {
  * What a run froze (`frozenOf`): its steps, and each skill by the version of its rendered copy (`renderedSkillVersions`), where the copy
  * is there.
  */
-const frozenRun = (run: Run, steps: readonly Workflow[]): RunFrozen =>
+const frozenRun = (home: string, run: Run, steps: readonly StepSpec[]): RunFrozen =>
   frozenOf(
     { ...keysOf(run), day: dayOf(run.createdAt), at: run.createdAt, workflowDir: run.workflowDir },
     steps,
-    new Map(steps.map((step) => [step.name, renderedSkillVersions(run, step)])),
+    new Map(steps.map((step) => [step.name, renderedSkillVersions(home, run, step)])),
   );
 
 /**
  * One run's facts (`factsOf`) off its frozen `steps` and the engine's view of every task of every try, and whether every one of those
  * tasks had settled. Rejects with what a view rejected with, a journal that does not read among it.
  */
-const runFacts = Effect.fnUntraced(function* (e: Engine, run: Run, steps: Workflow[]) {
+const runFacts = Effect.fnUntraced(function* (e: Engine, run: Run, steps: StepSpec[]) {
+  const home = yield* StoreRoot;
   const { views } = yield* taskPhasesRead(run).pipe(over(e));
   const everyTry = yield* everyTryOf(e, run, views);
   const settled = [...everyTry.values()].every((v) => Boolean(v.state.settled));
@@ -71,8 +73,8 @@ const runFacts = Effect.fnUntraced(function* (e: Engine, run: Run, steps: Workfl
     deniedOf: (taskId) => deniedCallsOf(everyTry.get(taskId))?.map(denialText) ?? null,
     skillsOf: (taskId, given) => skillsLoadedOf(everyTry.get(taskId), given),
     filesOf: (taskId) => filesTouchedOf(everyTry.get(taskId)),
-    rulesOf: (step) => renderedSkillRules(run, step),
-    appliesOf: (step) => renderedSkillApplies(run, step),
+    rulesOf: (step) => renderedSkillRules(home, run, step),
+    appliesOf: (step) => renderedSkillApplies(home, run, step),
     closeoutOfTask: (taskId) => taskCloseout(everyTry, taskId),
     deadlineOf: (taskId) => everyTry.get(taskId)?.state.deadlineSeconds ?? null,
   });
@@ -115,13 +117,14 @@ const sayOnStderr = (line: string) => process.stderr.write(`${line}\n`);
  * folder does not load gives nothing, and says why on `said`, as a record that does not read is said.
  */
 export const factsRead = Effect.fnUntraced(function* (e: Engine, run: Run, said: (line: string) => void = sayOnStderr) {
+  const home = yield* StoreRoot;
   const frozenSteps = yield* stepsOrWhy(run);
   if ('unloaded' in frozenSteps) {
     said(`left out: run ${run.id}'s workflow does not load: ${frozenSteps.unloaded}`);
     return null;
   }
   const { steps } = frozenSteps;
-  const frozen = frozenRun(run, steps);
+  const frozen = frozenRun(home, run, steps);
   const read = yield* Effect.exit(runFacts(e, run, steps));
   if (Exit.isSuccess(read)) {
     const { tries, runs, settled } = read.value;
@@ -187,6 +190,7 @@ const listReads = Effect.fnUntraced(function* (e: Engine) {
  * stderr. The system's health is read over the days answered (`seriesHealth`).
  */
 const statsOver = Effect.fnUntraced(function* (e: Engine, query: StatsQuery, now: Date, { memo, verify = false, series }: StatsOptions) {
+  const home = yield* StoreRoot;
   const facts: Facts = { tries: [], runs: [], frozen: [] };
   const unreadable: string[] = [];
   for (const read of memo ? yield* memoReads(e, memo, verify) : yield* listReads(e)) {
@@ -197,7 +201,7 @@ const statsOver = Effect.fnUntraced(function* (e: Engine, query: StatsQuery, now
     if (read.unreadable) unreadable.push(read.id);
   }
   const taken = query.selectors?.length ? takenBy(yield* (yield* RunDoor).runs.list(), query.selectors) : undefined;
-  return statsOf(facts, query, now, unreadable, (from, to) => seriesHealth(from, to, series), taken);
+  return statsOf(facts, query, now, unreadable, (from, to) => seriesHealth(home, from, to, series), taken);
 });
 
 /**

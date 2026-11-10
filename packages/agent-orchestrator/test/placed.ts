@@ -17,6 +17,7 @@ import { Effect, type Layer } from 'effect';
 import type { Engine, EngineService } from '../src/runtime-client.ts';
 import type { PlaceService } from '../src/place/place.store.ts';
 import { storeConfigLayer, type StoreRoot } from '../src/config/root.store.ts';
+import type { Env } from '../src/config/config.store.ts';
 import type { StoreConfig } from '../src/config/config.store.ts';
 import type { ProposalsAct } from '../src/apply/act.verb.ts';
 
@@ -40,29 +41,29 @@ const withProposals = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<
   Effect.suspend(() => (load('../src/apply/pass.verb.ts') as typeof import('../src/apply/pass.verb.ts')).withProposalsPass(program));
 
 /**
- * A `runWith` over `given`: `program` run over the engine `e`, given the place `given` holds then, the store's root and settings from the
- * process's own environment — the throwaway `test/ambient.ts` pointed `WF_ROOT` at, which is where a test's store is — and the proposals
- * pass. A program that asks `StoreRoot` and `ProposalsAct` is composed here, as `nemia tick`'s and the daemon's are in `cli/main.ts` and
- * `up`.
+ * A `runWith` over `given`: `program` run over the engine `e`, given the place `given` holds then, the store's root and settings `env`
+ * names — a test's own store (`{ WF_ROOT: ROOT, … }`), or by default the throwaway `test/ambient.ts` pointed the process at — and the
+ * proposals pass. A program that asks `StoreRoot` and `ProposalsAct` is composed here, as `nemia tick`'s and the daemon's are in
+ * `cli/main.ts` and `up`.
  */
 export const runOver =
-  (runWith: RunWith, given: Given) =>
+  (runWith: RunWith, given: Given, env: Env = process.env) =>
   <A, E>(e: Engine, program: Effect.Effect<A, E, EngineService | PlaceService | StoreRoot | StoreConfig | ProposalsAct>): Promise<A> =>
-    runWith(e, withProposals(program).pipe(Effect.provide(layerOf(given)), Effect.provide(storeConfigLayer(process.env))));
+    runWith(e, withProposals(program).pipe(Effect.provide(layerOf(given)), Effect.provide(storeConfigLayer(env))));
 
 /** A runner over `given`: `program`, which asks the place and no engine, run given the place `given` holds then, and the proposals pass. */
 export const runGiven =
-  (given: Given) =>
+  (given: Given, env: Env = process.env) =>
   <A, E>(program: Effect.Effect<A, E, PlaceService | StoreRoot | StoreConfig | ProposalsAct>): Promise<A> =>
-    Effect.runPromise(withProposals(program).pipe(Effect.provide(layerOf(given)), Effect.provide(storeConfigLayer(process.env))));
+    Effect.runPromise(withProposals(program).pipe(Effect.provide(layerOf(given)), Effect.provide(storeConfigLayer(env))));
 
 /** `program` given the place `given` holds now and the proposals pass, and still to be run. */
 export const givenPlace =
-  (given: Given) =>
+  (given: Given, env: Env = process.env) =>
   <A, E, R>(
     program: Effect.Effect<A, E, R>,
   ): Effect.Effect<A, E, Exclude<Exclude<Exclude<R, ProposalsAct>, PlaceService>, StoreRoot | StoreConfig>> =>
-    Effect.provide(Effect.provide(withProposals(program), layerOf(given)), storeConfigLayer(process.env));
+    Effect.provide(Effect.provide(withProposals(program), layerOf(given)), storeConfigLayer(env));
 
 /**
  * What `make` makes, new for each test of the file that calls this at its head: the function answers the one made for the test running

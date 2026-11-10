@@ -5,7 +5,7 @@
 import { gated, hasStarted, holdAdvice, holdNeedsYou, holdWord, waitAdvice, waitWord, type Wait } from '../wait/wait.ts';
 import { slotWord, type RunSlot } from '../cap/cap.ts';
 import { checkoutWord, LANDED_CAP, landedWords, onBaseNote, toDecideWords, unrunEnding, type ToDecide } from '../ending/ending.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import type { AttemptMemory, EnginePhase } from '../views/views-words.ts';
 import { outOfMemory, outOfMemoryWords } from '../out-of-memory/out-of-memory.ts';
 import { DENIED_CAP, DENIED_SHOWN, honoursAsks, oneLine, satisfiesAfter, type Run, type StepStatus } from '../record/record.ts';
@@ -146,7 +146,7 @@ export type ListedPhase = EnginePhase | 'unknown' | 'running';
  */
 export interface ListingInput {
   /** The run's steps as they are shown, as the frozen folder names them, in its order. */
-  readonly steps: readonly Workflow[];
+  readonly steps: readonly StepSpec[];
   /** The run's one read (`AssessRead`): what judges each step, its tries and rounds due, its result and its checkout. */
   readonly read: AssessRead;
   /** `assess` on `read`, where the caller judged it already: each step's standing and what is due. Left out, the listing assesses it. */
@@ -209,7 +209,7 @@ export interface ListingInput {
 type Stood = { status: StepStatus; own: StepStatus };
 
 /** Whether a step carries a routing key a step's word reads: a condition's `routes:`, or a workflow node's `workflow:`. */
-const routes = (step: Workflow): boolean => step.routes !== undefined || step.workflow !== undefined;
+const routes = (step: StepSpec): boolean => step.routes !== undefined || step.workflow !== undefined;
 
 /**
  * `listedSteps`, with the routing's rows laid over the steps it words (`routedRows`): a node `skipped (<condition>: <route>)`, a workflow
@@ -223,7 +223,7 @@ export function listing(input: ListingInput): Listing {
   const { steps, read } = input;
   const { run } = read;
   const assessed = input.assessed ?? assess(read);
-  const stoodOf = (step: Workflow): Stood =>
+  const stoodOf = (step: StepSpec): Stood =>
     assessed.stepWords.get(step.name) ??
     standing(step, run, read.phaseOf, read.signedOff, read.asked, read.steps, read.spendOf, read.verdictOf);
   const statuses = new Map(steps.map((s) => [s.name, stoodOf(s).status]));
@@ -323,7 +323,7 @@ function listedSteps(
     holds,
   }: ListingInput,
   assessed: Assessment,
-  stoodOf: (step: Workflow) => Stood,
+  stoodOf: (step: StepSpec) => Stood,
   routed: ReadonlyMap<string, StepStatus>,
 ): Listing {
   const { run, verdictOf, spendOf, standings, checkout, sessionBlocked } = read;
@@ -377,7 +377,7 @@ function listedSteps(
     return { ...row, ...(note ? { note } : {}), ...roundDue, ...taskRow(run.steps[step.name]?.taskId, ranOnOf, deniedOf), ...cost };
   });
 
-  function lineOf(step: Workflow): Listing['steps'][number] {
+  function lineOf(step: StepSpec): Listing['steps'][number] {
     const { name } = step;
     const taskId = run.steps[name]?.taskId;
     const branch = run.steps[name]?.branch ?? null;
@@ -412,7 +412,7 @@ function listedSteps(
     return { name, ...taskWord(status, taskId, closeoutOf(name), { phaseOf, parkedOf, waitingOf, sessionBlocked }), branch };
   }
 
-  function budgetStatus(step: Workflow, status: StepStatus): string {
+  function budgetStatus(step: StepSpec, status: StepStatus): string {
     const spent = stepSpend(run, step.name, spendOf);
     const cap = budgetOf(step, run);
     const of = cap === undefined ? '' : ` of ${budgetWord(cap)}`;
@@ -441,7 +441,7 @@ function listedSteps(
  * A step not filed: waiting on the steps before it (`Pending`), on the runs it `waits` on (`waitWord`; `Waiting` on `run`), on a run slot
  * the limit `held` it for (`slotWord`; `Waiting` on `limit`), or on nothing yet (`Pending`).
  */
-function unfiled(step: Workflow, waits: readonly Wait[], held: RunSlot | undefined): CodedStep & { message: string } {
+function unfiled(step: StepSpec, waits: readonly Wait[], held: RunSlot | undefined): CodedStep & { message: string } {
   if (step.after.length) return { message: 'pending', ...coded({ reason: 'Pending' }) };
   if (waits.length) return { message: waitWord(waits), ...coded({ reason: 'Waiting', on: 'run' }) };
   return held
@@ -637,7 +637,7 @@ const NEEDS_HUMAN = 'needs-human';
  */
 function asking(
   rows: Listing['steps'],
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   run: Pick<Run, 'cancelledAt' | 'pruned' | 'hold'>,
   waitingOnYou: readonly string[],
   closeoutOf: (step: string) => Closeout | { error: string } | undefined,

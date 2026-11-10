@@ -1,17 +1,15 @@
 /**
- * A run's steps read now, for a test (`stepsOf`, `src/steps/steps.verb.ts`, run at once): at the store's root the process's `WF_ROOT`
- * names, read when it is called, so a file that sets its own root before it imports this reads that one. Throws the refusal itself.
- * Imported with `await import`, after the file sets its environment, as the record's store is.
+ * A run's steps read now, for a test (`stepsOf`, `src/steps/steps.verb.ts`, run at once), at the store's root `root`: the test's own,
+ * or by default the throwaway `test/ambient.ts` names. Throws the refusal itself.
  */
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { StoreRoot } from '../src/config/root.store.ts';
 import { stepsOf } from '../src/steps/steps.verb.ts';
 import type { Run } from '../src/record/record.ts';
-import type { Workflow } from '../src/workflow.ts';
+import type { StepSpec } from '../src/workflow.ts';
 
-export const stepsNow = (run: Run): Workflow[] => {
-  const root = process.env.WF_ROOT;
-  assert.ok(root, 'the test process names its store: set WF_ROOT, as test/ambient.ts does');
+export const stepsNow = (run: Run, root: string | undefined = process.env.WF_ROOT): StepSpec[] => {
+  assert.ok(root, 'the test names its store: hand stepsNow its root, or load test/ambient.ts, which sets WF_ROOT');
   return Effect.runSync(Effect.provideService(stepsOf(run), StoreRoot, root));
 };

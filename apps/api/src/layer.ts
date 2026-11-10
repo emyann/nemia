@@ -3,8 +3,8 @@
  * `served`, which runs a handler on the request's runtime over them. A test gives the api another environment, engine, root, asker or
  * memo by building an app over a layer of its own, and what the app keeps between requests is its own (`ReadMemo`, the askers, the steps
  * followed: `Followings`). The root and the settings are the app's own services, given where the app's layer is composed from its
- * environment (`StoreRoot` and `StoreConfig`, store.ts; `storeConfigLayer` at `app.ts`): what the package still reads off a root of its
- * own as it loads is named in its `test/global-roots.baseline.ts`.
+ * environment (`StoreRoot` and `StoreConfig`, store.ts; `storeConfigLayer` at `app.ts`), the one root every read of the package's is
+ * handed: it keeps none of its own as it loads.
  */
 import { Context, type Duration, Effect, Layer, type ManagedRuntime, Metric, Tracer } from 'effect';
 import type { Context as RequestContext } from 'hono';

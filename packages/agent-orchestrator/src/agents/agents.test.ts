@@ -27,7 +27,7 @@ import {
   WorkflowError,
   type Agent,
   type Agents,
-  type Workflow,
+  type StepSpec,
 } from '../workflow.ts';
 import { FrozenStepSchema, workflowFolder, workflowsIn } from '../folder/folder.store.ts';
 import { loadWorkflows } from '../workflows/workflows.store.ts';
@@ -35,10 +35,9 @@ import { agentsFor, agentVersion, loadAgents } from './read.store.ts';
 import { cardSkills, skillsFor } from '../skills/read.store.ts';
 import { filedConfig } from '../filed/filed.ts';
 import { headedLayers } from '../workflow/index.ts';
+import { writeWorkflow } from '../runner.ts';
 
 const ROOT = scratch('wf-agents-table-');
-process.env.WF_ROOT = ROOT;
-const { writeWorkflow } = await import('../runner.ts');
 
 /** A tree of files under a fresh directory, each written from `files` by its path from it; the directory. */
 function tree(files: Record<string, string>): string {
@@ -639,21 +638,21 @@ const hire = (name: string, step = 'implement') => ({ agent: name, factory: 'acm
 
 /** The scout, with `lines` in its frontmatter, and the step `look` naming it (or no agent) with `step` in its own. */
 const scoutWith = (lines: string) => agent('scout', `---\ndescription: Looks.\n${lines}---\nYou look.\n`);
-const lookOf = (named: Agent | undefined, lines = ''): Workflow =>
+const lookOf = (named: Agent | undefined, lines = ''): StepSpec =>
   parseWorkflow(
     'look',
     `---\nplace: git\n${named ? `agent: ${named.name}\n` : ''}${lines}---\nLook.\n`,
     undefined,
     named && new Map([[named.name, named]]),
   );
-const filed = (step: Workflow) =>
+const filed = (step: StepSpec) =>
   filedConfig(
     step,
     [step],
     { gates: [] },
     { model: undefined, budgetUsd: undefined, runArtifacts: '/runs/r/artifacts', inbox: '/inbox', own: {}, landingDenied: () => [] },
   );
-const fromRecord = (step: Workflow): Workflow => Schema.decodeUnknownSync(FrozenStepSchema)(JSON.parse(JSON.stringify(step))) as Workflow;
+const fromRecord = (step: StepSpec): StepSpec => Schema.decodeUnknownSync(FrozenStepSchema)(JSON.parse(JSON.stringify(step))) as StepSpec;
 
 test("a step resolved with the agent it names: the agent's keys and words, the step's own winning and its own kept", async (t) => {
   const agents = agentsOf({ implementer: IMPLEMENTER });
@@ -894,7 +893,7 @@ test("a step resolved with the agent it names: the agent's keys and words, the s
           assert.ok(Result.isSuccess(read), Result.isFailure(read) ? String(read.failure) : '');
           assert.deepEqual(read.success, frozen);
         }
-        const step = JSON.parse(JSON.stringify(buildOf(told))) as Workflow;
+        const step = JSON.parse(JSON.stringify(buildOf(told))) as StepSpec;
         assert.ok(Result.isFailure(decode({ ...step, agent: { ...step.agent, customInstructions: 7 } })));
         assert.deepEqual(fromRecord(lookOf(scoutWith('mcp: playwright\n'))).agent?.mcp, ['playwright']);
       },
@@ -1264,7 +1263,9 @@ test('the folder of agents: beside the workflows, read whole, a broken one refus
         const before = fs.readFileSync(path.join(folder, 'implementer.md'), 'utf8');
         names(
           refusal(() =>
-            writeWorkflow(folder, [{ name: 'implement', after: [], place: 'git', body: 'Implement it.' }], undefined, { anywhere: true }),
+            writeWorkflow(ROOT, folder, [{ name: 'implement', after: [], place: 'git', body: 'Implement it.' }], undefined, {
+              anywhere: true,
+            }),
           ),
           folder,
           'is agents/',
@@ -1282,12 +1283,12 @@ test('the folder of agents: beside the workflows, read whole, a broken one refus
         });
         const folder = path.join(dir, 'dev');
         const steps = loadWorkflows(folder);
-        const written = writeWorkflow(folder, steps, undefined, { anywhere: true });
+        const written = writeWorkflow(ROOT, folder, steps, undefined, { anywhere: true });
         assert.deepEqual(written.kept, ['build.md'], 'the file with its comment is kept');
         assert.deepEqual(written.steps, steps);
         names(
           refusal(() =>
-            writeWorkflow(folder, [{ name: 'build', after: [], place: 'git', agent: 'builder', body: 'Build it.' }], undefined, {
+            writeWorkflow(ROOT, folder, [{ name: 'build', after: [], place: 'git', agent: 'builder', body: 'Build it.' }], undefined, {
               anywhere: true,
             }),
           ),
@@ -1311,12 +1312,12 @@ test('the folder of agents: beside the workflows, read whole, a broken one refus
         const folder = path.join(dir, 'dev');
         const draft = (keys: object) => [{ name: 'review', after: [], place: 'git' as const, agent: 'reviewer', body: '', ...keys }];
         names(
-          refusal(() => writeWorkflow(folder, draft({ permissionMode: 'read-only' }), undefined, { anywhere: true })),
+          refusal(() => writeWorkflow(ROOT, folder, draft({ permissionMode: 'read-only' }), undefined, { anywhere: true })),
           '`permissionMode: read-only`',
           'the former name of `sandbox:`',
           'Send the sandbox as `sandbox:` instead',
         );
-        const kept = refusal(() => writeWorkflow(folder, draft({ permissionMode: 'dontAsk' }), undefined, { anywhere: true }));
+        const kept = refusal(() => writeWorkflow(ROOT, folder, draft({ permissionMode: 'dontAsk' }), undefined, { anywhere: true }));
         names(
           kept,
           '`permissionMode: dontAsk` on a step that runs on codex',
@@ -1328,7 +1329,7 @@ test('the folder of agents: beside the workflows, read whole, a broken one refus
           `a Claude Code mode is not refused as the sandbox a file would read it as: ${kept}`,
         );
         assert.equal(fs.readFileSync(path.join(folder, 'review.md'), 'utf8'), '---\nplace: git\nagent: reviewer\n---\n', 'nothing written');
-        writeWorkflow(folder, draft({ sandbox: 'read-only' }), undefined, { anywhere: true });
+        writeWorkflow(ROOT, folder, draft({ sandbox: 'read-only' }), undefined, { anywhere: true });
         assert.equal(
           fs.readFileSync(path.join(folder, 'review.md'), 'utf8'),
           '---\nplace: git\nagent: reviewer\ncodex:\n  fence:\n    sandbox: read-only\n---\n\n',

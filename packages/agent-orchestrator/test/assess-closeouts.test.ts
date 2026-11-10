@@ -34,7 +34,7 @@ import {
   placeText,
   type Closeout,
 } from '../src/closeout/closeout.ts';
-import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
+import { CLOSEOUT_FIELDS, type OutputSchema, type StepSpec } from '../src/workflow.ts';
 import { lackedOf } from '../src/record/record.ts';
 import { nextTry } from '../src/retry/index.ts';
 import { roundFiled } from '../src/round/round.ts';
@@ -89,10 +89,10 @@ const FINDINGS: OutputSchema = {
   required: ['findings'],
   additionalProperties: false,
 };
-const REVIEW: Workflow = { ...step('review', ['implement']), output: { file: 'review.schema.json', schema: FINDINGS } };
+const REVIEW: StepSpec = { ...step('review', ['implement']), output: { file: 'review.schema.json', schema: FINDINGS } };
 /** `respond` after `review`: one that reads it, and one that does not. */
-const READS: Workflow = { ...step('respond', ['review']), input: ['review'] };
-const IGNORES: Workflow = step('respond', ['review']);
+const READS: StepSpec = { ...step('respond', ['review']), input: ['review'] };
+const IGNORES: StepSpec = step('respond', ['review']);
 const FOUND = [{ file: 'src/run.ts', line: 183, what: 'a producer with no findings reads as done' }];
 /** How review signed off: the four fields, what it declares, and whatever else it is given. */
 const reviewSaid = (extra: Record<string, unknown> = {}): Closeout => ({
@@ -117,7 +117,7 @@ test('composeBrief of a closeout: what finishing means, and who commits', async 
         'nothing to write into the workspace: a closeout written there travels down the git branch and pre-finishes the next step',
       );
     }
-    const resumed: Workflow = { name: 'respond', after: ['implement'], body: 'answer', resume: 'implement' };
+    const resumed: StepSpec = { name: 'respond', after: ['implement'], body: 'answer', resume: 'implement' };
     assert.match(composeBrief(resumed, run({ implement: 't1', respond: null }), [step('implement'), resumed]), /When you are finished/);
   });
   await t.test('a step is told the run commits for it — being unable to commit is not being blocked', () => {
@@ -331,12 +331,12 @@ test('composeBrief of declared fields: `output:` and `input:`', async (t) => {
     assert.deepEqual(jsonIn(brief.slice(at)), { findings: FOUND }, 'exactly the declared fields');
     assert.doesNotMatch(brief, /SUMMARY-FOR-THE-DECIDER|NEEDS-FOR-A-PERSON|NOTES\.md|EXTRA-FIELD/);
 
-    const resumed: Workflow = { ...READS, after: ['review', 'implement'], resume: 'implement' };
+    const resumed: StepSpec = { ...READS, after: ['review', 'implement'], resume: 'implement' };
     const again = composeBrief(resumed, run({ implement: 't1', review: 't2', respond: null }), [step('implement'), REVIEW, resumed], reads);
     assert.ok(again.startsWith(`${PRECEDENCE}\n\ndo respond\n## From review\n`), again);
     assert.deepEqual(jsonIn(again), { findings: FOUND }, 'resumed, as the shipped respond continues implement, it is handed the same');
     assert.ok(again.indexOf('## From review') < again.indexOf('## When you are finished'));
-    const merged: Workflow = { ...READS, after: ['review', 'docs'] };
+    const merged: StepSpec = { ...READS, after: ['review', 'docs'] };
     const fanIn = composeBrief(
       merged,
       run({ implement: 't1', review: 't2', docs: 't3', respond: null }),
@@ -381,7 +381,7 @@ test('outputLines and placeText: `nemia decide` of a declared output', async (t)
       properties: { ...FINDINGS.properties, verdict: { type: 'string' }, score: { type: 'number' } },
       required: ['findings', 'verdict', 'score'],
     };
-    const more: Workflow = { ...REVIEW, output: { file: 'review.schema.json', schema } };
+    const more: StepSpec = { ...REVIEW, output: { file: 'review.schema.json', schema } };
     assert.deepEqual(
       outputLines(more, reviewSaid({ score: 0.8, verdict: 'ship it\nafter the fix' })),
       [
@@ -462,8 +462,8 @@ test('a declared field named `__proto__`', async (t) => {
     const schema = JSON.parse(
       '{"type":"object","properties":{"__proto__":{"type":"string"}},"required":["__proto__"],"additionalProperties":false}',
     ) as OutputSchema;
-    const producer: Workflow = { ...step('review', ['implement']), output: { file: 'review.schema.json', schema } };
-    const reader: Workflow = { ...step('respond', ['review']), input: ['review'] };
+    const producer: StepSpec = { ...step('review', ['implement']), output: { file: 'review.schema.json', schema } };
+    const reader: StepSpec = { ...step('respond', ['review']), input: ['review'] };
     const said = parseCloseout('{"outcome":"done","summary":"s","artifacts":[],"needs":null,"__proto__":"product"}') as Closeout;
     const silent = parseCloseout('{"outcome":"done","summary":"s","artifacts":[],"needs":null}') as Closeout;
 
@@ -496,7 +496,7 @@ test('a declared field named `__proto__`', async (t) => {
 test("composeBrief of a step's files", async (t) => {
   await t.test('a step is told where its files go, before its closeout — a fresh step, a fan-in and a resumed one alike', () => {
     const fanIn = step('integrate', ['a', 'b']);
-    const resumed: Workflow = { name: 'respond', after: ['implement'], body: 'answer', resume: 'implement', check: 'npm test' };
+    const resumed: StepSpec = { name: 'respond', after: ['implement'], body: 'answer', resume: 'implement', check: 'npm test' };
     const briefs = [
       composeBrief(step('implement'), run({ implement: null }), STEPS, undefined, FILES),
       composeBrief(fanIn, run({ a: 't1', b: 't2', integrate: null }), [step('a'), step('b'), fanIn], undefined, FILES),
@@ -555,7 +555,7 @@ test("inputsLine, inputsNote and composeBrief of a run's inputs", async (t) => {
       const line =
         'The person gave these files with what was asked for (`nemia start --input`). They are part of what was asked, there for you to build your understanding of the task: `mock.png`, a picture; `brief notes.md`, a text file. They are in `/wf/runs/r-1/inputs`.';
       const inputs = ['mock.png', 'brief notes.md'];
-      const brief = (s: Workflow, r: Run, steps: readonly Workflow[], retry?: RetryBriefing, dir: string | undefined = DIR) =>
+      const brief = (s: StepSpec, r: Run, steps: readonly StepSpec[], retry?: RetryBriefing, dir: string | undefined = DIR) =>
         composeBrief(s, r, steps, undefined, undefined, undefined, retry, undefined, undefined, dir);
       const r = run({ implement: null, review: null });
       const plain = composeBrief(step('implement'), r, STEPS);
@@ -610,7 +610,7 @@ test("inputsLine, inputsNote and composeBrief of a run's inputs", async (t) => {
           'after the request, under its heading',
         );
       }
-      const resumed: Workflow = { name: 'respond', after: ['implement'], resume: 'implement', body: 'answer it' };
+      const resumed: StepSpec = { name: 'respond', after: ['implement'], resume: 'implement', body: 'answer it' };
       assert.doesNotMatch(
         brief(resumed, run({ implement: 't1', respond: null }, { inputs }), [step('implement'), resumed]),
         /nemia start --input/,
@@ -682,7 +682,7 @@ test("inputsLine, inputsNote and composeBrief of a run's inputs", async (t) => {
 
 test("what was read of a closeout's files: its own task's, dropped by a new try, a send-back and a round", async (t) => {
   const LACKING: StepRecord = { taskId: 't1', filesRead: { taskId: 't1', lacked: { 'a.md': 'not there' } } };
-  const LOOP = [step('implement'), { ...step('review', ['implement']), loop: 'implement' }] as Workflow[];
+  const LOOP = [step('implement'), { ...step('review', ['implement']), loop: 'implement' }] as StepSpec[];
   await t.test('lackedOf: a mark of another task unsigns nothing', () => {
     assert.deepEqual(lackedOf(LACKING), [{ path: 'a.md', why: 'not there' }]);
     assert.deepEqual(lackedOf({ ...LACKING, taskId: 't2' }), []);

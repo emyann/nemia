@@ -9,9 +9,9 @@ import { fansOut, isFolderTeam, loopSpan, orderSteps, terminalSteps, validate } 
 import { parseWorkflow } from './step-file.ts';
 import { parseFolder } from '../folder/folder.ts';
 import { sessionContext } from '../keys/index.ts';
-import { DEFAULT_ROUNDS, stepPlace, WorkflowError, type Workflow } from '../step/step.ts';
+import { DEFAULT_ROUNDS, stepPlace, WorkflowError, type StepSpec } from '../step/step.ts';
 
-const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: 'do a thing' });
+const step = (name: string, after: string[] = []): StepSpec => ({ name, after, body: 'do a thing' });
 
 /** A strict output schema: `findings`, each a file, a line and what would go wrong. */
 const FINDINGS = {
@@ -35,7 +35,7 @@ const FINDINGS = {
 const LOOPING = { ...FINDINGS, properties: { ...FINDINGS.properties, again: { type: 'boolean' } }, required: ['findings', 'again'] };
 
 /** A step `loop:`-ing back to `target`, declaring `again`, as a folder would load it. */
-const looping = (name: string, after: string[], target: string): Workflow => ({
+const looping = (name: string, after: string[], target: string): StepSpec => ({
   ...step(name, after),
   loop: target,
   rounds: DEFAULT_ROUNDS,
@@ -46,7 +46,7 @@ const looping = (name: string, after: string[], target: string): Workflow => ({
  * A folder read from its text: `implement`, then `review` declaring `output: review.schema.json` with `reviewKeys` beside it, then
  * whatever `files` add or replace — a step by its name and text, a schema by its file and object; `null` leaves a file out.
  */
-const folderOf = (reviewKeys: string | null, files: Record<string, string | object | null> = {}): Workflow[] => {
+const folderOf = (reviewKeys: string | null, files: Record<string, string | object | null> = {}): StepSpec[] => {
   const all: Record<string, string | object | null> = {
     implement: '---\nplace: git\n---\nimplement it\n',
     ...(reviewKeys === null
@@ -69,7 +69,7 @@ const folderOf = (reviewKeys: string | null, files: Record<string, string | obje
 const fileOf = (lines: string) => `---\n${lines}\n---\nDo the work.\n`;
 
 /** A team of steps in a line, each with the place `words` gives it: `base` is the ending's workspace, none is a step frozen before. */
-const team = (...words: Array<'folder' | 'git' | 'base' | undefined>): Workflow[] =>
+const team = (...words: Array<'folder' | 'git' | 'base' | undefined>): StepSpec[] =>
   words.map((word, i) => ({
     name: `s${i}`,
     after: i ? [`s${i - 1}`] : [],
@@ -78,15 +78,15 @@ const team = (...words: Array<'folder' | 'git' | 'base' | undefined>): Workflow[
     ...(word === 'base' ? { workspace: word } : word ? { place: word } : {}),
   }));
 
-const ship = { name: 'ship', after: ['review'], body: 'x', workspace: 'base' } as Workflow;
-const chain: Workflow[] = [step('implement'), step('review', ['implement']), ship];
+const ship = { name: 'ship', after: ['review'], body: 'x', workspace: 'base' } as StepSpec;
+const chain: StepSpec[] = [step('implement'), step('review', ['implement']), ship];
 /** implement → review (looping back when `loop`) → ship, in the base workspace with a check, gated when `gate`. */
-const ending = (loop: boolean, gate: boolean): Workflow[] => [
+const ending = (loop: boolean, gate: boolean): StepSpec[] => [
   step('implement'),
   { ...step('review', ['implement']), ...(loop ? { loop: 'implement' } : {}) },
   { ...ship, check: 'npm test', ...(gate ? { gate: true } : {}) },
 ];
-const watcher = { name: 'supervise', after: [], body: 'x', slot: 'none' } as Workflow;
+const watcher = { name: 'supervise', after: [], body: 'x', slot: 'none' } as StepSpec;
 const replies = { type: 'object', properties: { replies: { type: 'string' } }, required: ['replies'], additionalProperties: false };
 const docs = { docs: '---\nafter: implement\nplace: git\n---\ndocument it\n' };
 /** implement and `respond` continuing its session, `extra` beside them. */
@@ -446,8 +446,8 @@ test('the structure of a workflow: what loads, and what is refused naming the st
 });
 
 test("`orderSteps`: every step after each step its `after` names, and otherwise as given — so an order that already runs forward is kept, and a loop's edge back orders nothing", () => {
-  const names = (steps: readonly Workflow[]) => orderSteps(steps).map((s) => s.name);
-  const byName = (steps: readonly Workflow[]) => [...steps].sort((a, b) => (a.name < b.name ? -1 : 1));
+  const names = (steps: readonly StepSpec[]) => orderSteps(steps).map((s) => s.name);
+  const byName = (steps: readonly StepSpec[]) => [...steps].sort((a, b) => (a.name < b.name ? -1 : 1));
   assert.deepEqual(
     names([step('implement', ['plan']), step('plan'), { ...step('review', ['implement']), loop: 'implement' }]),
     ['plan', 'implement', 'review'],

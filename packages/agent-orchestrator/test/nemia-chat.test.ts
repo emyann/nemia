@@ -12,7 +12,7 @@
  * Each checkpoint that needs a session of its own files one (`filed`), named for it, with a chat folder of its own: what was said,
  * answered or interrupted is read of that task alone. What the chat projects, pages, counts and refuses off fixtures is the table of
  * `src/chat/chat.test.ts`; the chat's files, `src/chat/chat.store.test.ts`; the keeper delivering to her live session,
- * `test/nemia-keeper.test.ts`. `WF_ROOT` is set before `src` is imported, which reads it as it loads.
+ * `test/nemia-keeper.test.ts`. The stories' store is their own, given as `ENV`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,13 +22,18 @@ import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
 import type { EnginePhase } from '../src/views/views-words.ts';
-
-process.env.WF_ROOT = scratch('wf-nemia-chat-');
-process.env.WF_VERIFY_REST = '1';
-const { chatAnswer, chatHistory, chatRead, chatSay, chatStop, followChat } = await import('../src/chat/chat.verb.ts');
-type ChatFollowed = import('../src/chat/chat.verb.ts').ChatFollowed;
-type ChatSent = import('../src/chat/chat.verb.ts').ChatSent;
-const {
+import type { Env } from '../src/config/config.store.ts';
+import {
+  chatAnswer,
+  chatHistory,
+  chatRead,
+  chatSay,
+  chatStop,
+  followChat,
+  type ChatFollowed,
+  type ChatSent,
+} from '../src/chat/chat.verb.ts';
+import {
   appendAnswer,
   appendAsk,
   appendOutbox,
@@ -41,13 +46,15 @@ const {
   readReadMark,
   readStops,
   writeSpeakers,
-} = await import('../src/chat/chat.store.ts');
-const { answeredBefore, askOf, asksWaiting, framedFor, presenceOf, projectChat } = await import('../src/chat/chat.ts');
-const { answersDue, answersOwed, closesOwed, sayOutbox, outboxOwed, recordAsks } = await import('../src/chat/say.verb.ts');
-const { engineOf, runWith } = await import('../src/runtime-client.ts');
+} from '../src/chat/chat.store.ts';
+import { answeredBefore, askOf, asksWaiting, framedFor, presenceOf, projectChat } from '../src/chat/chat.ts';
+import { answersDue, answersOwed, closesOwed, sayOutbox, outboxOwed, recordAsks } from '../src/chat/say.verb.ts';
+import { engineOf, runWith } from '../src/runtime-client.ts';
+
+const ENV: Env = { ...process.env, WF_ROOT: scratch('wf-nemia-chat-'), WF_VERIFY_REST: '1' };
 /** The CLI's `main`, loaded only if a checkpoint types a command: these stories call the verbs, and its import is the slowest. */
 const main: Parameters<typeof staged>[0]['main'] = async (...argv) => (await import('../src/cli/main.ts')).main(...argv);
-const stage = staged({ runWith, main, engineOf });
+const stage = staged({ runWith, main, engineOf, env: ENV });
 
 /** `program` over the board's engine, given the test place. */
 const run = <A, E>(program: Parameters<typeof stage.runWith<A, E>>[1]) => stage.runWith(stage.board().e, program);

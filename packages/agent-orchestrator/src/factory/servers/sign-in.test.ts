@@ -10,14 +10,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { testEngine } from 'agent-runtime/testing';
 import { scratch } from 'test-kit/scratch';
+import { engineOf, runWith } from '../../runtime-client.ts';
+import { serverSignIn, serverSignInState, serverSignOut } from './sign-in.verb.ts';
+import { writeFactoryServers } from './servers.store.ts';
+import { SHIPPED_CLIENT_SECRETS, shippedSecretOf } from './clients.ts';
+import { DEFAULT_NAMESPACE } from '../factory.ts';
 
 const ROOT = scratch('wf-sign-in-');
-process.env.WF_ROOT = ROOT;
-const { engineOf, runWith } = await import('../../runtime-client.ts');
-const { serverSignIn, serverSignInState, serverSignOut } = await import('./sign-in.verb.ts');
-const { writeFactoryServers } = await import('./servers.store.ts');
-const { SHIPPED_CLIENT_SECRETS, shippedSecretOf } = await import('./clients.ts');
-const { DEFAULT_NAMESPACE } = await import('../factory.ts');
 
 const NEMIA = 'Iv23liQBfm9prqhvXkuY';
 const GITHUB = {

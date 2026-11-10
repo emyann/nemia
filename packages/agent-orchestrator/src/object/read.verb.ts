@@ -18,7 +18,7 @@ import { setting } from '../config/config.store.ts';
 import { standingReader, standingSnapshot } from '../standing/standing.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import type { Run } from '../record/record.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { type CheckStderr, checksOf, refusedStderr, type StepCheck } from '../resource/checks.verb.ts';
 import { attemptsIn, closeoutIn, type StepTry, triesOf, unreadableIn } from '../resource/tries.verb.ts';
 
@@ -47,7 +47,7 @@ export type StepsReading = Judgement & {
   /** The workflow folder as it loads now, or why it does not (`workflowsOf`). */
   readonly folder: ReturnType<typeof workflowsOf>;
   /** The steps a page shows the workflow of: the frozen workflow, else the folder (`shownWorkflow`). */
-  readonly source: readonly Workflow[] | null;
+  readonly source: readonly StepSpec[] | null;
   readonly checks: ReadonlyMap<string, StepCheck>;
   readonly stderr: CheckStderr;
   /** The store's real releases folder, which a step's attempt is placed under to say the release it ran on (`realReleasesDir`). */
@@ -61,7 +61,7 @@ export type RunReading = StepsReading & { readonly clock: Timeline };
  * Where what a page shows of a step's workflow is read from: the workflow the run froze at `nemia start`, which the tick
  * files from and `judgedSteps` judges by; the folder only for a record that froze none. Null when neither reads.
  */
-const shownWorkflow = (run: Run, folder: readonly Workflow[] | null): readonly Workflow[] | null => run.workflow ?? folder;
+const shownWorkflow = (run: Run, folder: readonly StepSpec[] | null): readonly StepSpec[] | null => run.workflow ?? folder;
 
 /**
  * The run's steps read once (`StepsReading`): its judgement (`judgedOn`), the informer's where it serves one, else judged off the views of
@@ -127,7 +127,7 @@ export const runReadingOf = (steps: StepsReading): RunReading => ({
  * What a step's raise and status word are read from, off the views already read (`RaiseReads`), as `nemia decide` reads them: the
  * closeouts with the run's `steps`, so a script condition's answer is read as its closeout.
  */
-export const raiseReads = (run: Run, views: Views, steps: readonly Workflow[]): RaiseReads => ({
+export const raiseReads = (run: Run, views: Views, steps: readonly StepSpec[]): RaiseReads => ({
   phaseOf: (taskId) => phaseOfView(views.get(taskId)),
   closeoutOf: closeoutReader(views, run, steps),
   askedCloseout: closeoutAsked(views),
@@ -135,18 +135,18 @@ export const raiseReads = (run: Run, views: Views, steps: readonly Workflow[]): 
 });
 
 /** The step `name`'s current try as judged: its codes and word, its check, its closeout or why it does not read, and its attempts. */
-export const currentOf = ({ run, source, steps, views, judged, checks, releases }: StepsReading, name: string) => {
+export const currentOf = (home: string, { run, source, steps, views, judged, checks, releases }: StepsReading, name: string) => {
   const taskId = run.steps[name]?.taskId ?? null;
   const step = source?.find((s) => s.name === name);
   return {
     ...stepSaid(judged, name),
     check: checks.get(name) ?? null,
-    closeout: closeoutIn(run, name, step ?? bare(name), taskId, views, steps),
+    closeout: closeoutIn(home, run, name, step ?? bare(name), taskId, views, steps),
     unreadable: unreadableIn(taskId, views),
     attempts: attemptsIn(taskId, views, releases),
   };
 };
 
 /** The step `name`'s tries, earliest first, the current one last (`triesOf`), with its current try as judged (`currentOf`). */
-export const triesIn = (at: StepsReading, name: string, current = currentOf(at, name)): StepTry[] =>
-  triesOf(at.run, name, at.steps, at.views, current, at.judged.answers, at.stderr, at.releases);
+export const triesIn = (home: string, at: StepsReading, name: string, current = currentOf(home, at, name)): StepTry[] =>
+  triesOf(home, at.run, name, at.steps, at.views, current, at.judged.answers, at.stderr, at.releases);

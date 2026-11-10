@@ -3,7 +3,7 @@
  * check — run on disk against a board a test settles. What such a step watches is every other run: it asks by signing off `blocked`, and
  * acts on the answer. The package does two things for it: a step answered many times over, each answer a try of the same session, which
  * is here; and a run the cap on runs in flight (`WF_MAX_RUNS`) neither holds nor counts, which is the cap's story in
- * `queue-store.test.ts`. `WF_ROOT` is read as the module loads, so it is set before the import.
+ * `queue-store.test.ts`. Its store is its own at `ROOT`, given as `ENV`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,18 +16,17 @@ import { promised } from './promised.ts';
 import { Effect } from 'effect';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
+import { advanceRun, list, retryRun, startRun, runWith as runEngine } from '../src/runner.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-supervisor-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
-process.env.WF_ROOT = ROOT;
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { advanceRun, list, retryRun, startRun, runWith: runEngine } = await import('../src/runner.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
 const stand = eachTest(testPlace);
-const runWith = runOver(runEngine, () => stand().layer);
-const runPlaced = runGiven(() => stand().layer);
-const { runRecord } = await import('../src/record/record.store.ts');
+const runWith = runOver(runEngine, () => stand().layer, ENV);
+const runPlaced = runGiven(() => stand().layer, ENV);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
@@ -119,7 +118,7 @@ test('a step answered five times over keeps working: each answer a try of the sa
   const { e, tasks, filings, settle } = board();
   const run = await runPlaced(startRun({ brief: 'supervise this repository', repo, workflowDir: FOLDER }));
 
-  await runWith(e, advanceRun(runRecord(run.id)));
+  await runWith(e, advanceRun(runRecord(ROOT, run.id)));
   assert.deepEqual(filings, [`${run.id}-supervise`], "filed once, in the repository's own checkout");
   assert.equal(tasks.get(`${run.id}-supervise`)!.spec.cwd, repo);
   assert.equal(tasks.get(`${run.id}-supervise`)!.spec.config?.claude?.remoteControl, true, 'bridged, as `remote: true` says');
@@ -133,16 +132,16 @@ test('a step answered five times over keeps working: each answer a try of the sa
       artifacts: [],
       needs: `Merge r-${n}, or hold it?`,
     });
-    const quiet = await runWith(e, advanceRun(runRecord(run.id)));
+    const quiet = await runWith(e, advanceRun(runRecord(ROOT, run.id)));
     assert.deepEqual(
       [quiet.filed, quiet.tried],
       [[], []],
       `answer ${n}: the pass that reads the question files nothing until a person answers`,
     );
-    assert.deepEqual((await runWith(e, list(e, runRecord(run.id)))).waitingOnYou, ['supervise'], `answer ${n}: it waits on you`);
+    assert.deepEqual((await runWith(e, list(e, runRecord(ROOT, run.id)))).waitingOnYou, ['supervise'], `answer ${n}: it waits on you`);
 
     await runWith(e, retryRun(run.id, 'supervise', { mode: 'continue', message: `yes, merge r-${n}` }));
-    const filed = await runWith(e, advanceRun(runRecord(run.id)));
+    const filed = await runWith(e, advanceRun(runRecord(ROOT, run.id)));
     const next = `${run.id}-supervise-try${n + 1}`;
     assert.deepEqual(filed.tried, ['supervise'], `answer ${n} files try ${n + 1}`);
     assert.ok(tasks.has(next), `try ${n + 1} is on the board: ${filings.join(', ')}`);
@@ -154,7 +153,7 @@ test('a step answered five times over keeps working: each answer a try of the sa
       `try ${n + 1} continues on the same window: Claude Code's copy of a resumed session keeps only the flags it is given`,
     );
   }
-  assert.equal(runRecord(run.id).steps.supervise?.tries?.length, 5, 'five tries behind the one it is on, and the sixth running');
+  assert.equal(runRecord(ROOT, run.id).steps.supervise?.tries?.length, 5, 'five tries behind the one it is on, and the sixth running');
   assert.equal(filings.length, 6);
 });
 
@@ -162,25 +161,25 @@ test('a pass over a step answered again and again reads what it is working on, n
   const repo = aRepo();
   const { e, reads, settle } = board();
   const run = await runPlaced(startRun({ brief: 'supervise this repository', repo, workflowDir: FOLDER }));
-  await runWith(e, advanceRun(runRecord(run.id)));
+  await runWith(e, advanceRun(runRecord(ROOT, run.id)));
 
   const passReads = async (): Promise<string[]> => {
     reads.length = 0;
-    await runWith(e, advanceRun(runRecord(run.id)));
+    await runWith(e, advanceRun(runRecord(ROOT, run.id)));
     return [...reads];
   };
   const answer = async (n: number) => {
     const taskId = n === 1 ? `${run.id}-supervise` : `${run.id}-supervise-try${n}`;
     settle(taskId, 'succeeded', { outcome: 'blocked', summary: `round ${n}`, artifacts: [], needs: 'Merge it?' });
-    await runWith(e, advanceRun(runRecord(run.id)));
+    await runWith(e, advanceRun(runRecord(ROOT, run.id)));
     await runWith(e, retryRun(run.id, 'supervise', { mode: 'continue', message: `yes (${n})` }));
-    await runWith(e, advanceRun(runRecord(run.id)));
+    await runWith(e, advanceRun(runRecord(ROOT, run.id)));
   };
 
   await answer(1);
   const early = await passReads();
   for (let n = 2; n <= 6; n++) await answer(n);
-  assert.equal(runRecord(run.id).steps.supervise?.tries?.length, 6, 'six answered tries behind the one it is on');
+  assert.equal(runRecord(ROOT, run.id).steps.supervise?.tries?.length, 6, 'six answered tries behind the one it is on');
   const later = await passReads();
   assert.deepEqual(later, [`${run.id}-supervise-try7`], 'the try it is on, and nothing else');
   assert.equal(later.length, early.length, 'a pass costs the same at six answers as at one: it does not grow with them');
@@ -188,19 +187,19 @@ test('a pass over a step answered again and again reads what it is working on, n
   const capped = await runPlaced(
     startRun({ brief: 'do the work', repo, workflowDir: folderOf({ implement: 'harness: claude\nbudget: 1' }), isolate: false }),
   );
-  await runWith(e, advanceRun(runRecord(capped.id)));
+  await runWith(e, advanceRun(runRecord(ROOT, capped.id)));
   settle(`${capped.id}-implement`, 'failed', undefined, undefined, 0.6);
-  await runWith(e, advanceRun(runRecord(capped.id)));
+  await runWith(e, advanceRun(runRecord(ROOT, capped.id)));
   await runWith(e, retryRun(capped.id, 'implement', { mode: 'fresh' }));
-  await runWith(e, advanceRun(runRecord(capped.id)));
+  await runWith(e, advanceRun(runRecord(ROOT, capped.id)));
   settle(`${capped.id}-implement-try2`, 'failed', undefined, undefined, 0.6);
   reads.length = 0;
-  await runWith(e, advanceRun(runRecord(capped.id)));
+  await runWith(e, advanceRun(runRecord(ROOT, capped.id)));
   assert.ok(
     reads.includes(`${capped.id}-implement`),
     `try 1 is read while a cap is in force, the one thing those tries are read for, what they cost together: ${reads.join(', ')}`,
   );
-  const held = await runWith(e, list(e, runRecord(capped.id)));
+  const held = await runWith(e, list(e, runRecord(ROOT, capped.id)));
   assert.deepEqual(
     held.steps.map((st) => st.message),
     ['over budget $1.20 of $1'],

@@ -26,7 +26,7 @@ import {
   type StepRecord,
   tryNote,
 } from '../run.ts';
-import { LOOP_REPLIES, outputFields, type Workflow } from '../workflow.ts';
+import { LOOP_REPLIES, outputFields, type StepSpec } from '../workflow.ts';
 import { closeoutRefusals } from '../question/index.ts';
 import { gateBudgets, type GateBudgets } from '../gate-budgets/gate-budgets.ts';
 import type { SpendOf } from '../status/status.ts';
@@ -187,12 +187,13 @@ const attemptsOn = (state: TaskView['state'] | undefined, turn?: number): TaskVi
  * current try's `missing` are of the fields it was filed with (`filedOwed`): one its step declares since a revision followed is not.
  */
 export function closeoutIn(
+  home: string,
   run: Run,
   name: string,
-  step: Workflow,
+  step: StepSpec,
   taskId: string | null,
   views: Views,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   turn?: number,
 ): StepCloseout | null {
   const said = taskId ? attemptsOn(views.get(taskId)?.state, turn).at(-1)?.closeout : undefined;
@@ -210,7 +211,7 @@ export function closeoutIn(
     summary: c.summary,
     body: c.body ?? null,
     needs: c.needs ?? null,
-    artifacts: c.artifacts.map((file) => artifactOf(run, name, file)),
+    artifacts: c.artifacts.map((file) => artifactOf(home, run, name, file)),
     values: (c.values ?? []).map(valueOf),
     refused: closeoutRefusals(step, c, steps),
     output: given,
@@ -260,9 +261,10 @@ export const turnOfTry = (before: readonly EarlierTry[], at: EarlierTry): number
  * on that try, the tries behind it: `answerOf` reads a step's current try.
  */
 export function triesOf(
+  home: string,
   run: Run,
   name: string,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   views: Views,
   current: Pick<StepTry, 'phase' | 'reason' | 'on' | 'via' | 'message' | 'check' | 'closeout' | 'unreadable' | 'attempts'> & {
     verdict?: unknown;
@@ -296,7 +298,7 @@ export function triesOf(
       ...earlierSaid(t, i),
       attempts: attemptsIn(t.taskId, views, releases, turnAt(t, i)),
       check: step.check ? checkIn(step.check, t.check?.taskId, views, stderr) : null,
-      closeout: closeoutIn(run, name, step, t.taskId, views, steps, turnAt(t, i)),
+      closeout: closeoutIn(home, run, name, step, t.taskId, views, steps, turnAt(t, i)),
       unreadable: unreadableIn(t.taskId, views, turnAt(t, i)),
       answer: answerAt(i + 1),
     })),
@@ -339,7 +341,7 @@ export function attemptsIn(taskId: string | null, views: Views, releases: string
 }
 
 /** How the folder has moved away from the steps the run started with, or null if it has not. */
-export function driftOf(run: Run, workflows: readonly Workflow[]): string | null {
+export function driftOf(run: Run, workflows: readonly StepSpec[]): string | null {
   const inFolder = new Set(workflows.map((s) => s.name));
   const removed = Object.keys(run.steps).filter((name) => !inFolder.has(name));
   const added = workflows.map((s) => s.name).filter((name) => !Object.hasOwn(run.steps, name));
@@ -361,9 +363,9 @@ export function driftOf(run: Run, workflows: readonly Workflow[]): string | null
  */
 export function gateOf(
   run: Run,
-  step: Workflow,
+  step: StepSpec,
   reason: StepReason,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   closeoutOf: (step: string) => Closeout | undefined,
   spendOf: SpendOf,
 ): StepGate | null {

@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { scratch } from 'test-kit/scratch';
+import { SESSION_VARIABLES } from 'agent-orchestrator';
 
 /** This workspace: the folder each template is a folder of. */
 export const TEMPLATES = path.join(import.meta.dirname, '..');
@@ -24,7 +25,7 @@ export const BIN = fileURLToPath(import.meta.resolve('agent-orchestrator/bin'));
 
 /**
  * An environment on its own scratch store and home, with nothing of the test runner's: no telemetry, and none of the daemon's
- * per-session variables (`WF_SESSION_TOKEN`, `WF_MEMORY_LIMIT`, `WF_CGROUP_PARENT`), which CI never sets and a step's session does.
+ * per-session variables (`SESSION_VARIABLES`, the orchestrator's one list), which CI never sets and a step's session does.
  */
 export function storeEnv(root: string): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
@@ -37,7 +38,7 @@ export function storeEnv(root: string): NodeJS.ProcessEnv {
     WF_MAX_RUNS: '2',
   };
   delete env.NODE_TEST_CONTEXT;
-  for (const name of ['OTEL_EXPORTER_OTLP_ENDPOINT', 'WF_SESSION_TOKEN', 'WF_MEMORY_LIMIT', 'WF_CGROUP_PARENT']) delete env[name];
+  for (const name of [...SESSION_VARIABLES, 'OTEL_EXPORTER_OTLP_ENDPOINT']) delete env[name];
   fs.mkdirSync(env.HOME!, { recursive: true });
   return env;
 }

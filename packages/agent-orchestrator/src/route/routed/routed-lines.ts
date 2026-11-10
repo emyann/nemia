@@ -2,7 +2,7 @@
  * What `nemia ls` and `nemia decide` say of a run's routing (`routedRows`): a node off the route `skipped (<condition>: <route>)`, a
  * workflow node `sent → <card>`, a condition never filed its route, and the line that routes it by hand. Pure.
  */
-import type { Workflow } from '../../step/step.ts';
+import type { StepSpec } from '../../step/step.ts';
 import type { Closeout } from '../../closeout/index.ts';
 import type { Run, StepStatus } from '../../record/record.ts';
 import type { AssessRead } from '../../tick/assess.ts';
@@ -14,16 +14,16 @@ import { answeredRoute, personRouted, runWords } from './routed-words.ts';
 export type RoutedRow = (CodedStep & { message: string; note?: string }) | { besides: string };
 
 /** The line a person types to route a condition by hand. */
-export const routeLine = (run: Pick<Run, 'id'>, condition: Workflow): string =>
+export const routeLine = (run: Pick<Run, 'id'>, condition: StepSpec): string =>
   `nemia route ${run.id} ${condition.name} <${(condition.routes ?? []).join('|')}>`;
 
 /** The condition a skipped node is off the route of: its `when:` condition, or a condition before it whose route ends. */
-const conditionBefore = (step: Workflow, steps: readonly Workflow[]): Workflow | undefined =>
+const conditionBefore = (step: StepSpec, steps: readonly StepSpec[]): StepSpec | undefined =>
   steps.find((s) => step.after.includes(s.name) && s.routes !== undefined);
 
 /** What `routedRows` reads of a listing (`ListingInput`): the run, its steps, and each step's closeout as the list is given it. */
 export type RoutedInput = {
-  readonly steps: readonly Workflow[];
+  readonly steps: readonly StepSpec[];
   readonly run: Run;
   readonly closeoutOf: (step: string) => Closeout | { error: string } | undefined;
 };
@@ -55,7 +55,7 @@ export function routedRows(input: RoutedInput, words: ReadonlyMap<string, StepSt
   if (!steps.some((s) => s.routes !== undefined)) return rows;
   const closeoutOf = readableOf(input);
   const wordOf = (name: string): StepStatus => words.get(name) ?? 'pending';
-  const routeOf = (condition: Workflow): string | undefined => {
+  const routeOf = (condition: StepSpec): string | undefined => {
     const said = answeredRoute(condition, run, closeoutOf, wordOf, steps);
     return said?.kind === 'route' ? said.route : undefined;
   };
@@ -69,12 +69,12 @@ export function routedRows(input: RoutedInput, words: ReadonlyMap<string, StepSt
 
 /** What a row reads of the pass beyond a step's word: the route each condition answers, and what a step that signed off blocked needs. */
 type RowReads = {
-  readonly routeOf: (condition: Workflow) => string | undefined;
+  readonly routeOf: (condition: StepSpec) => string | undefined;
   readonly needsOf: (step: string) => string | undefined;
 };
 
 /** One step's routed row, off its word on the pass and the route each condition answers; undefined where its own work says it. */
-function rowOf(step: Workflow, steps: readonly Workflow[], run: Run, word: StepStatus, reads: RowReads): RoutedRow | undefined {
+function rowOf(step: StepSpec, steps: readonly StepSpec[], run: Run, word: StepStatus, reads: RowReads): RoutedRow | undefined {
   const record = run.steps[step.name];
   if (word === 'sent' && record?.sent) return { message: `sent → ${record.sent.card}`, ...codedStep(REASON_OF.sent) };
   if (word === 'skipped') {
@@ -97,7 +97,7 @@ function rowOf(step: Workflow, steps: readonly Workflow[], run: Run, word: StepS
  * A filed condition's row: one that stopped on no route of its own (`blocked`, a script's unsure answer; `unsigned`) says so with the line
  * that routes it by hand while no node after it is filed, and one a person routed says the route; undefined where its own work says it.
  */
-function filedRow(step: Workflow, run: Run, word: StepStatus, reads: RowReads, offer: { note?: string }): RoutedRow | undefined {
+function filedRow(step: StepSpec, run: Run, word: StepStatus, reads: RowReads, offer: { note?: string }): RoutedRow | undefined {
   if (word === 'blocked') {
     const needs = reads.needsOf(step.name);
     return { message: needs ? `blocked: ${needs}` : 'blocked', ...codedStep(REASON_OF.blocked), ...offer };

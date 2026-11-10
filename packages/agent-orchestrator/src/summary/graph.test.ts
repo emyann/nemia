@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_ROUNDS, parseWorkflow, validate, type Workflow } from '../workflow.ts';
+import { DEFAULT_ROUNDS, parseWorkflow, validate, type StepSpec } from '../workflow.ts';
 import path from 'node:path';
 import { loadWorkflows } from '../workflows/workflows.store.ts';
 import { graphOf, inputGraphOf, routedDiagram, runGraph, TRIAGE, typedGraphOf } from './graph.ts';
@@ -9,7 +9,7 @@ import { graphOf, inputGraphOf, routedDiagram, runGraph, TRIAGE, typedGraphOf } 
  * Steps as `nemia start` freezes them, each file given `place: git`: parsed and validated, so the graph is read off what the run is judged
  * by.
  */
-const workflow = (files: Record<string, string>, schemas: Record<string, string> = {}): Workflow[] => {
+const workflow = (files: Record<string, string>, schemas: Record<string, string> = {}): StepSpec[] => {
   const placed = (text: string) => `---\nplace: git\n${text.startsWith('---\n') ? text.slice(4) : `---\n${text}`}`;
   const steps = Object.entries(files).map(([name, text]) => parseWorkflow(name, placed(text), (file) => schemas[file]));
   validate(steps);
@@ -161,7 +161,7 @@ test('an `input` edge per step a step reads the output of, drawn after its `afte
 });
 
 /** The tests' `triage` workflow, as `nemia start` would freeze it. */
-const triage = (): Workflow[] => loadWorkflows(path.join(import.meta.dirname, '..', '..', 'test', 'fixtures', 'team', 'triage'));
+const triage = (): StepSpec[] => loadWorkflows(path.join(import.meta.dirname, '..', '..', 'test', 'fixtures', 'team', 'triage'));
 
 test('a condition: a route edge per route of a `when:` in place of the after edge, and every node with its kind', () => {
   assert.deepEqual(graphOf(triage()), {

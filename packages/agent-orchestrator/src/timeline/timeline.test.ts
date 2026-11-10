@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { durationWord } from '../usage/usage.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { run, step } from '../../test/assessed.ts';
 import { filedAlone, filedViews } from '../../test/filed.ts';
 import { firstFiledAt, runStartedAt, timeline, timelineLines, timelineTotalLines, type TaskClock } from './timeline.ts';
@@ -505,7 +505,7 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
     "REFUSED: a round's total counts only the steps its loop files again — a plan before the loop and a ship after it are in the run's total alone — and two loops total apart, named",
     () => {
       const once = (from: number, to: number) => task([[clock(from), clock(from), clock(to)]], 'succeeded');
-      const steps: Workflow[] = [
+      const steps: StepSpec[] = [
         step('plan'),
         step('implement', ['plan']),
         { ...step('review', ['implement']), loop: 'implement', rounds: 3 },
@@ -559,7 +559,7 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
         'given no steps, as a record with no frozen workflow and no folder: no round is totalled at all, rather than a guess',
       );
 
-      const two: Workflow[] = [
+      const two: StepSpec[] = [
         step('implement'),
         { ...step('review', ['implement']), loop: 'implement', rounds: 3 },
         step('docs', ['review']),

@@ -42,7 +42,7 @@ export const INBOX_COLUMNS: readonly TableColumnDefinition[] = [
  * The cells of the entry `l`, in `INBOX_COLUMNS`' order. A card that names no factory is said to start on a repository only where
  * `unfactoredStarts` lets it (`WF_DEFAULT_FACTORY_STARTS=1`), as its line says it (`triedClause`).
  */
-export const inboxCells = (l: InboxListing, unfactoredStarts = false): readonly unknown[] => [
+export const inboxCells = (l: InboxListing, unfactoredStarts: boolean): readonly unknown[] => [
   l.name,
   l.error ?? l.title ?? '',
   l.workflow ?? '',

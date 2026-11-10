@@ -11,8 +11,8 @@
  * A schedule's `now` is the wall's (`Date.now()`, in `startDue`): a wall decision, which `stage.clock()` — Effect's clock — does not move,
  * so each story steers `Date` with node's mock timers, at the fires' instants written as literals. The engine is a fake made by hand,
  * since the stage's stand-in keeps no tally for the tick (`tallied`): its tasks stay pending once filed, so a run started stays in
- * flight. Each story starts on an empty store (`aStore`), so none leaves a run in flight for the next. `WF_ROOT` is read as the module
- * loads, so it is set before the import; `WF_MAX_RUNS` is read on every pass. `WF_VERIFY_REST=1` judges in full every run a pass answers
+ * flight. Each story starts on an empty store (`aStore`), so none leaves a run in flight for the next. The store is the file's own, at
+ * `ROOT`, given as `ENV`; `WF_MAX_RUNS` is read off it on every pass. `WF_VERIFY_REST=1` judges in full every run a pass answers
  * from its memo, and a difference throws.
  */
 import { test, type TestContext } from 'node:test';
@@ -25,20 +25,24 @@ import { TEAM } from './team.ts';
 import { staged, story } from './story.ts';
 import { promised } from './promised.ts';
 import type { Engine } from '../src/runtime-client.ts';
+import { tickRun, runWith as runEngine } from '../src/runner.ts';
+import { addFactoryAt, attachWorkflowAt, setScheduleAt } from '../src/factory/factory.store.ts';
+import { listRuns, runRecord } from '../src/record/record.store.ts';
+import { main as cli } from '../src/cli/main.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import { filesStoreAt } from '../src/record/files.store.ts';
 
 const ROOT = scratch('wf-schedule-');
-
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_RUNS;
-delete process.env.WF_MAX_CONCURRENT;
-const { tickRun, runWith: runEngine } = await import('../src/runner.ts');
-const { addFactory, attachWorkflow, setSchedule } = await import('../testing.ts');
-const { listRuns, runRecord } = await import('../src/record/record.store.ts');
-const { main: cli } = await import('../src/cli/main.ts');
-const { engineOf } = await import('../src/runtime-client.ts');
-const { filesStore } = await import('../src/record/files.store.ts');
-const stage = staged({ runWith: runEngine, main: cli, engineOf });
+/** The file's store and settings; `aStore` sets the cap on it. */
+const ENV: Record<string, string | undefined> = {
+  ...process.env,
+  WF_ROOT: ROOT,
+  WF_VERIFY_REST: '1',
+  WF_MAX_RUNS: undefined,
+  WF_MAX_CONCURRENT: undefined,
+};
+const filesStore = filesStoreAt(ROOT);
+const stage = staged({ runWith: runEngine, main: cli, engineOf, env: ENV });
 const { runWith } = stage;
 /** `nemia`, as a person types it, its commands given this test's place. */
 const main = (argv: string[], e?: Engine) => stage.main(argv, e);
@@ -90,21 +94,21 @@ const aStore = (t: TestContext, now: string, cap?: string): string => {
   for (const dir of ['runs', 'inbox', 'queue', 'schedules', 'factories', 'nemia', 'cordon', 'tick.json']) {
     fs.rmSync(path.join(ROOT, dir), { recursive: true, force: true });
   }
-  if (cap === undefined) delete process.env.WF_MAX_RUNS;
-  else process.env.WF_MAX_RUNS = cap;
+  ENV.WF_MAX_RUNS = cap;
   t.mock.timers.enable({ apis: ['Date'], now: Date.parse(now) });
   const repo = aTeamRepo();
-  addFactory({ name: 'solo', repos: [repo] });
-  attachWorkflow({ factory: 'solo', workflow: 'dev' });
+  addFactoryAt(ROOT, { name: 'solo', repos: [repo] });
+  attachWorkflowAt(ROOT, { factory: 'solo', workflow: 'dev' });
   return repo;
 };
 
 /** `solo` schedules `dev` at 9 AM, Montreal, each Monday — 13:00Z while daylight saving lasts. */
-const weekly = () => setSchedule({ factory: 'solo', workflow: 'dev', cron: '0 9 * * 1', tz: 'America/Montreal', brief: 'Read the stats' });
+const weekly = () =>
+  setScheduleAt(ROOT, { factory: 'solo', workflow: 'dev', cron: '0 9 * * 1', tz: 'America/Montreal', brief: 'Read the stats' });
 
 /** The runs a schedule started, oldest fire first: the fire each was started for. */
 const scheduledDues = (): string[] =>
-  listRuns()
+  listRuns(ROOT)
     .flatMap((r) => (r.scheduled ? [r.scheduled.due] : []))
     .sort();
 
@@ -126,13 +130,13 @@ test('a weekly schedule over the weeks: one run a due fire, once after downtime,
   await s.test('a pass on the fire itself, to the second, starts one run for it, on the factory, the fire on its record', async () => {
     t.mock.timers.setTime(Date.parse(MONDAY) + 400);
     const first = await runWith(e, tickRun());
-    const [run] = listRuns();
+    const [run] = listRuns(ROOT);
     assert.deepEqual(first.scheduled, { factory: 'solo', workflow: 'dev', due: MONDAY, run: run?.id });
     assert.deepEqual(
       [run?.scheduled, run?.factory, run?.brief, run?.repo, run?.workflowDir],
       [{ factory: 'solo', workflow: 'dev', due: MONDAY }, 'solo', 'Read the stats', repo, path.join(repo, 'workflows', 'dev')],
     );
-    assert.deepEqual(runRecord(run.id).scheduled, { factory: 'solo', workflow: 'dev', due: MONDAY }, 'read back off the record');
+    assert.deepEqual(runRecord(ROOT, run.id).scheduled, { factory: 'solo', workflow: 'dev', due: MONDAY }, 'read back off the record');
   });
 
   await s.test('the next pass starts none', async () => {
@@ -169,14 +173,14 @@ test('a due fire waits behind the run cap and behind the queue, then starts', as
     await runWith(e, tickRun());
     t.mock.timers.setTime(Date.parse(MONDAY) + 30_000);
     const held = await runWith(e, tickRun());
-    assert.deepEqual([held.scheduled, scheduledDues(), listRuns().length], [undefined, [], 1]);
+    assert.deepEqual([held.scheduled, scheduledDues(), listRuns(ROOT).length], [undefined, [], 1]);
   });
 
   await s.test('the cap lifted, it starts on the next pass', async () => {
-    process.env.WF_MAX_RUNS = '2';
+    ENV.WF_MAX_RUNS = '2';
     await runWith(e, tickRun());
     assert.deepEqual(scheduledDues(), [MONDAY]);
-    delete process.env.WF_MAX_RUNS;
+    ENV.WF_MAX_RUNS = undefined;
   });
 
   await s.test('the queue goes first: a queued card and the next due fire on one pass start the card alone', async () => {
@@ -254,7 +258,7 @@ test("at Manual, with no Nemia, a due schedule starts all the same: the schedule
 
 test('across the end of daylight saving in Montreal, 2026-11-01, a daily fire at 1:30 AM is neither skipped nor doubled', async (t) => {
   aStore(t, '2026-10-30T12:00:00Z');
-  setSchedule({ factory: 'solo', workflow: 'dev', cron: '30 1 * * *', tz: 'America/Montreal', brief: 'Read the stats' });
+  setScheduleAt(ROOT, { factory: 'solo', workflow: 'dev', cron: '30 1 * * *', tz: 'America/Montreal', brief: 'Read the stats' });
   const e = runtime();
   for (let at = Date.parse('2026-10-31T00:15:00Z'); at <= Date.parse('2026-11-02T12:15:00Z'); at += 3_600_000) {
     t.mock.timers.setTime(at);

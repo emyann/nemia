@@ -4,8 +4,8 @@
  * given, each process it starts counted once. The test place starts no process, so an equality on what it started would hold of
  * nothing: these keep the git place. The questions a pass asks (`place.calls`), on forty finished runs, are counted in rest-store.test.ts.
  *
- * Walked through the runtime itself, `plainEngine` over an in-memory journal and a harness the test signs by hand. `WF_ROOT` is read as
- * the module loads, so it is set before the import.
+ * Walked through the runtime itself, `plainEngine` over an in-memory journal and a harness the test signs by hand. On a store of its
+ * own at `ROOT`, given as `ENV`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,23 +20,20 @@ import { scratch } from 'test-kit/scratch';
 import { Effect } from 'effect';
 import { plainEngine } from '../../test/promised.ts';
 import { runGiven, runOver } from '../../test/placed.ts';
+import { startRun } from '../runner.ts';
+import { listRuns } from '../record/record.store.ts';
+import { tickRun, freshRestMemo } from './tick.verb.ts';
+import { runWith as runEngine } from '../runtime-client.ts';
+import { gitPlaceLayer, builtinGitPlace } from '../place/builtin.store.ts';
+import { PlaceService, type Place } from '../place/place.store.ts';
+import { addFactoryAt, attachWorkflowAt, hireAgentAt } from '../factory/factory.store.ts';
+import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-pass-processes-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-
-process.env.WF_ROOT = ROOT;
-process.env.WF_MAX_CONCURRENT = '10000';
-delete process.env.WF_MAX_RUNS;
-const { startRun } = await import('../runner.ts');
-const { listRuns } = await import('../record/record.store.ts');
-const { tickRun, freshRestMemo } = await import('./tick.verb.ts');
-const { runWith: runEngine } = await import('../runtime-client.ts');
-const { gitPlaceLayer, builtinGitPlace } = await import('../place/builtin.store.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
-const { PlaceService } = await import('../place/place.store.ts');
-const { addFactory, attachWorkflow, hireAgent } = await import('../../testing.ts');
-type Place = import('../place/place.store.ts').Place;
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_MAX_CONCURRENT: '10000', WF_MAX_RUNS: undefined };
+const runWith = runOver(runEngine, gitPlaceLayer, ENV);
+const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
@@ -165,7 +162,7 @@ const finish = async (blocking: readonly string[] = []): Promise<PassCost> => {
     await verified();
     h.signAll(inFlight, (name) => (blocking.some((id) => name.startsWith(`ae/${id}-`)) ? BLOCKED : undefined));
     const pass = await measured();
-    const finished = listRuns().filter((r) => !inFlight.some((f) => f.id === r.id)).length;
+    const finished = listRuns(ROOT).filter((r) => !inFlight.some((f) => f.id === r.id)).length;
     if (pass.rested === finished) return pass;
   }
   assert.fail('the store did not come to rest in twelve passes');
@@ -232,9 +229,9 @@ test('two factories on two repositories ask one place, the instance the pass is 
     ['left', left],
     ['right', right],
   ] as const) {
-    addFactory({ name, repos: [repo] });
-    attachWorkflow({ factory: name, workflow: 'hired' });
-    hireAgent({ factory: name, agent: 'worker', step: 'hired/work' });
+    addFactoryAt(ROOT, { name, repos: [repo] });
+    attachWorkflowAt(ROOT, { factory: name, workflow: 'hired' });
+    hireAgentAt(ROOT, { factory: name, agent: 'worker', step: 'hired/work' });
   }
   for (const [factory, repo] of [
     ['left', left],

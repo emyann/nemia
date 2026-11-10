@@ -30,10 +30,14 @@ const SESSIONS = 2;
 /** A whole number from 0, or blank for 0, spaces around it allowed. */
 const FROM_ZERO = /^\s*\d*\s*$/;
 
-/** `WF_ROOT`: an absolute path; `~/.agent-workflows` when unset. */
-const root = Config.schema(Schema.String.check(Schema.makeFilter((value: string) => path.isAbsolute(value))), 'WF_ROOT').pipe(
-  Config.withDefault(path.join(os.homedir(), '.agent-workflows')),
-);
+/**
+ * `WF_ROOT`: an absolute path; `~/.agent-workflows` when unset. Made when read, so the home it defaults under is the one of the moment it
+ * is read, never the one this module loaded under.
+ */
+const root = () =>
+  Config.schema(Schema.String.check(Schema.makeFilter((value: string) => path.isAbsolute(value))), 'WF_ROOT').pipe(
+    Config.withDefault(path.join(os.homedir(), '.agent-workflows')),
+  );
 
 /** `WF_MAX_CONCURRENT`: sessions at work per pool at once, a whole number from 1; `SESSIONS` when unset, empty or blank. */
 const concurrent = Config.schema(Schema.String.check(Schema.isPattern(FROM_ONE)), 'WF_MAX_CONCURRENT').pipe(
@@ -109,7 +113,7 @@ function read<T>(config: Config.Config<T>, name: string, env: Env, refusal: (val
  */
 export const wfRoot = (env: Env): string =>
   read(
-    root,
+    root(),
     'WF_ROOT',
     env,
     (value) =>

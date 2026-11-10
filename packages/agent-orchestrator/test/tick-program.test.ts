@@ -6,10 +6,10 @@
  * Walked through the runtime itself, `plainEngine` over an in-memory journal
  * and a harness the test signs by hand, as broken-runs.test.ts does.
  *
- * `WF_ROOT` is set before the runner is imported, which reads it as the module loads. `WF_VERIFY_REST=1` judges in full every run a pass
+ * Its store is its own at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, sessions enough are admitted for the one run, and no cap is set on runs.
  */
-import { settingsOf } from '../src/config/config.store.ts';
+import { settingsOf, type Env } from '../src/config/config.store.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -31,22 +31,22 @@ import type { PlaceService } from '../src/place/place.store.ts';
 import type { StoreRoot } from '../src/config/root.store.ts';
 import type { StoreConfig } from '../src/config/config.store.ts';
 import type { ProposalsAct } from '../src/apply/act.verb.ts';
+import { startRun, runWith as runEngine } from '../src/runner.ts';
+import { tickRun } from '../src/tick/tick.verb.ts';
+import { PHASES, passCost } from '../src/meter/meter.ts';
+import { recentPasses, recordRecentPass } from '../src/daemon/daemon.store.ts';
+import { keepSeries, seriesRead } from '../src/series/series.store.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import { DEFAULT_NAMESPACE } from '../src/factory/factory.ts';
 
 const place = testPlace();
 const stand = () => place;
 const ROOT = scratch('wf-tick-program-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
-process.env.WF_ROOT = ROOT;
-process.env.WF_MAX_CONCURRENT = '10';
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_RUNS;
-const { startRun, runWith: runEngine } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, () => stand().layer);
-const runPlaced = runGiven(() => stand().layer);
-const { tickRun } = await import('../src/tick/tick.verb.ts');
-const { PHASES, passCost } = await import('../src/meter/meter.ts');
-const { recentPasses, recordRecentPass } = await import('../src/daemon/daemon.store.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_MAX_CONCURRENT: '10', WF_VERIFY_REST: '1', WF_MAX_RUNS: undefined };
+const runWith = runOver(runEngine, () => stand().layer, ENV);
+const runPlaced = runGiven(() => stand().layer, ENV);
 
 const REPO = fs.mkdtempSync(path.join(ROOT, 'repo-'));
 stand().world.repository(REPO, {});
@@ -125,6 +125,7 @@ function _tickProgramTypes(e: Engine) {
 test('a pass whose series cannot be written keeps its own cost and says so: the series are lost, never the pass; the quota read rides on it', async (t) => {
   const old = new Date(Date.now() - 3_600_000).toISOString();
   recordRecentPass(
+    ROOT,
     passCost({
       at: old,
       ms: 5,
@@ -153,7 +154,7 @@ test('a pass whose series cannot be written keeps its own cost and says so: the 
     said.some((x) => x.startsWith('nemia: the series were not kept on this pass: ')),
     said.join(''),
   );
-  const last = recentPasses().at(-1)!;
+  const last = recentPasses(ROOT).at(-1)!;
   assert.deepEqual([last.at, last.quota], [pass.cost.at, { h: { w: 12 } }]);
 });
 
@@ -168,7 +169,7 @@ test('a pass handed a reading of the disk keeps it as it is and measures nothing
     ],
   };
   const pass = await runWith(e, tickRun({ repo: ROOT, disk: () => reading }));
-  const kept = recentPasses().at(-1)!;
+  const kept = recentPasses(ROOT).at(-1)!;
   assert.deepEqual([kept.at, kept.disk], [pass.cost!.at, reading], 'read back off the store, typed');
   assert.deepEqual(Object.keys(kept.phases), [...PHASES], 'the pass has the phases it had');
   assert.deepEqual(
@@ -176,7 +177,7 @@ test('a pass handed a reading of the disk keeps it as it is and measures nothing
     [],
   );
   await runWith(e, tickRun({ repo: ROOT, disk: () => undefined }));
-  assert.equal('disk' in recentPasses().at(-1)!, false, 'a pass handed no reading keeps none');
+  assert.equal('disk' in recentPasses(ROOT).at(-1)!, false, 'a pass handed no reading keeps none');
   const imports = importsIn(fs.readFileSync(path.join(import.meta.dirname, '..', 'src', 'tick', 'tick.verb.ts'), 'utf8'));
   assert.ok(
     imports.some((i) => i.spec === '../meter/meter.verb.ts'),
@@ -190,29 +191,26 @@ test('a pass handed a reading of the disk keeps it as it is and measures nothing
 });
 
 test('a check filed by a pass is kept with its labels among the recent passes, and in the series as check.load', async () => {
-  const { keepSeries, seriesRead } = await import('../src/series/series.store.ts');
-  const { runRecord } = await import('../src/record/record.store.ts');
-  const { DEFAULT_NAMESPACE } = await import('../src/factory/factory.ts');
   const folder = fs.mkdtempSync(path.join(ROOT, 'checked-'));
   fs.writeFileSync(path.join(folder, 'work.md'), '---\nplace: git\nharness: codex\ncheck: node -e 0\n---\nwork it\n');
   const run = await runPlaced(startRun({ brief: 'a checked run', repo: REPO, workflowDir: folder }));
-  const before = recentPasses().length;
-  for (let k = 0; k < 8 && !runRecord(run.id).steps.work?.check; k++) {
+  const before = recentPasses(ROOT).length;
+  for (let k = 0; k < 8 && !runRecord(ROOT, run.id).steps.work?.check; k++) {
     await runWith(e, tickRun({ repo: ROOT }));
     signAll();
   }
-  assert.ok(runRecord(run.id).steps.work?.check, 'the pass filed the check');
-  const labels = { factory: DEFAULT_NAMESPACE, workflow: path.basename(runRecord(run.id).workflowDir), step: 'work', agent: '' };
-  const kept = recentPasses().slice(before);
+  assert.ok(runRecord(ROOT, run.id).steps.work?.check, 'the pass filed the check');
+  const labels = { factory: DEFAULT_NAMESPACE, workflow: path.basename(runRecord(ROOT, run.id).workflowDir), step: 'work', agent: '' };
+  const kept = recentPasses(ROOT).slice(before);
   assert.deepEqual(
     kept.flatMap((p) => p.checks ?? []),
     [labels],
     'the pass that filed it carries its labels',
   );
   const later = Date.now() + 120_000;
-  keepSeries(recentPasses(), settingsOf(process.env), later);
+  keepSeries(ROOT, recentPasses(ROOT), settingsOf(ENV), later);
   assert.deepEqual(
-    seriesRead('24h', undefined, later)
+    seriesRead(ROOT, '24h', undefined, later)
       .series.filter((x) => x.s === 'check.load')
       .map((x) => x.l),
     [labels],

@@ -29,6 +29,7 @@ import {
   type DiskRun,
   type TaskKept,
 } from './disk.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /** The sweep's pace, which no caller shortens: the disk moves slowly, and a sweep walks the whole store. */
 export const DISK_EVERY: Duration.Input = '10 minutes';
@@ -155,8 +156,9 @@ const keptAsked = Effect.gen(function* () {
  * @returns The reading, the runs named, and the walk's cost.
  */
 export const diskOnce = Effect.fn('diskOnce')(function* (answers: readonly Answered[], memory: DiskMemory, given?: readonly DiskRoot[]) {
+  const home = yield* StoreRoot;
   const kept = yield* keptAsked;
-  const roots = given ?? (yield* tried(storeRoots));
+  const roots = given ?? (yield* tried(() => storeRoots(home)));
   const factories = new Map(answers.map((a) => [a.run.id, runNamespace(a.run.factory)]));
   const runs = { ids: new Set(factories.keys()), factoryOf: (id: string) => factories.get(id) };
   const walking = roots.flatMap((root, k) => (root.own === undefined ? [{ root, k }] : []));
@@ -178,7 +180,7 @@ export const diskOnce = Effect.fn('diskOnce')(function* (answers: readonly Answe
   }
   const at = new Date().toISOString();
   const tasks = new Map(answers.flatMap((a) => runTasks(a.run).map((taskId) => [taskId, runNamespace(a.run.factory)])));
-  const walkedReading = readingOf(roots, read, runs, yield* tried(storeFree), at);
+  const walkedReading = readingOf(roots, read, runs, yield* tried(() => storeFree(home)), at);
   const reading = { ...walkedReading, entries: withKept(walkedReading.entries, kept, (taskId) => tasks.get(taskId)) };
   const largest = largestOf(roots, read, runs);
   yield* gauged(reading, memory);

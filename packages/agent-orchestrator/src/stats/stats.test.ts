@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Run } from '../record/record.ts';
 import type { EarlierTry } from '../retry/index.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { timeline, type TaskClock } from '../timeline/timeline.ts';
 import { filedViews } from '../../test/filed.ts';
 import { Invalid } from '../refusal/refusal.ts';
@@ -32,7 +32,7 @@ const MIN = 60_000;
 const minus = (at: string, ms: number): string => new Date(Date.parse(at) - ms).toISOString();
 
 /** A step of a fixture workflow, filled by `agent` where one is named. */
-const step = (name: string, after: string[], more: Partial<Workflow> & { by?: string } = {}): Workflow => {
+const step = (name: string, after: string[], more: Partial<StepSpec> & { by?: string } = {}): StepSpec => {
   const { by, ...keys } = more;
   return { name, after, body: '', ...(by ? { agent: { name: by, keys: [], body: '', given: {} } } : {}), ...keys };
 };
@@ -104,7 +104,7 @@ const answeredBy = (view: TaskClock, end: string): TaskClock => {
  * A run's read (`RunRead`) over `steps`, each step's tries as given: a session per try ending at its end, or ten minutes before where it
  * has a check, which ends at the end.
  */
-function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Try[]>, more: Partial<Run> = {}, again = false) {
+function readOf(id: string, steps: readonly StepSpec[], tries: Record<string, Try[]>, more: Partial<Run> = {}, again = false) {
   const views = new Map<string, TaskClock>();
   const filed = new Map<string, string>();
   const verdicts = new Map<string, CheckVerdict>();
@@ -157,8 +157,8 @@ function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Tr
     },
     skillsOf: (taskId: string) => skills.get(taskId) ?? null,
     filesOf: (taskId: string) => files.get(taskId) ?? null,
-    rulesOf: (_step: Workflow): ReadonlyMap<string, readonly SkillRule[]> => new Map(),
-    appliesOf: (_step: Workflow): ReadonlyMap<string, readonly string[]> => new Map(),
+    rulesOf: (_step: StepSpec): ReadonlyMap<string, readonly SkillRule[]> => new Map(),
+    appliesOf: (_step: StepSpec): ReadonlyMap<string, readonly string[]> => new Map(),
     deadlineOf: (taskId: string) => deadlines.get(taskId) ?? null,
     closeoutOfTask: (taskId: string) => {
       const output = closeouts.get(taskId);
@@ -207,7 +207,7 @@ const JOBS_NOW = new Date(`${JOBS_DAY}T20:00:00.000Z`);
 /** `r`, its steps' frozen skills declaring the paths `applies`, by step name and then by skill. */
 const applying = <R extends ReturnType<typeof readOf>>(r: R, applies: Record<string, Record<string, string[]>>): R => ({
   ...r,
-  appliesOf: (s: Workflow) => new Map(Object.entries(applies[s.name] ?? {})),
+  appliesOf: (s: StepSpec) => new Map(Object.entries(applies[s.name] ?? {})),
 });
 
 const readWithRead: SkillRule = { id: 'read-with-read', says: 'Read a file with Read', breaks: ['Bash(cat:*)', 'Bash(head:*)'] };
@@ -216,7 +216,7 @@ const checksBare: SkillRule = { id: 'checks-bare', says: 'Run a check bare', bre
 /** `r`, its steps' frozen skills declaring `declared`, by step name and then by skill. */
 const declaring = <R extends ReturnType<typeof readOf>>(r: R, declared: Record<string, Record<string, SkillRule[]>>): R => ({
   ...r,
-  rulesOf: (s: Workflow) => new Map(Object.entries(declared[s.name] ?? {})),
+  rulesOf: (s: StepSpec) => new Map(Object.entries(declared[s.name] ?? {})),
 });
 
 const DAY_BEFORE = '2026-09-09';
@@ -278,7 +278,7 @@ test('`dayOf`, `dayPlus` and `keysOf`: the UTC day of a time, the day n days off
 });
 
 const renamedLoop = TEAM.map((s) => (s.name === 'review' ? { ...s, name: 'critique' } : s));
-const noLoop = TEAM.map(({ loop: _loop, rounds: _rounds, ...s }) => s as Workflow);
+const noLoop = TEAM.map(({ loop: _loop, rounds: _rounds, ...s }) => s as StepSpec);
 const noEnding = TEAM.filter((s) => s.workspace !== 'base');
 const prose = TEAM.map((s) => (s.workspace === 'base' ? { ...s, check: undefined } : s));
 const plain = [step('implement', []), step('document', ['implement'])];

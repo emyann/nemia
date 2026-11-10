@@ -4,7 +4,7 @@
  * revision. Then one fixture per rule: stale, a run-end proposal and its run, a delegation taken back, an agent's own proposal, a level
  * short of auto, a widening, a confirm past the delegation, a Factory read before its rules, its instruction or its status moved, and
  * the Proposal door's own refusals. Kinds and `_tag`s are asserted, never
- * a sentence. `WF_ROOT` is set before `src` is imported, which reads it as it loads.
+ * a sentence. The store is the file's own, at `ROOT`, given as `ENV`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,32 +16,33 @@ import { scratch } from 'test-kit/scratch';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runOver } from './placed.ts';
 import type { ProposedObject } from 'objects';
+import { runWith as runEngine } from '../src/runner.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import { proposeProgram, undoProgram } from '../src/propose/propose.verb.ts';
+import { approveProgram, declineProgram, proposalGet } from '../src/approval/approve.verb.ts';
+import { applyProgram } from '../src/apply/apply.verb.ts';
+import { proposalsPass } from '../src/apply/pass.verb.ts';
+import { currentOf } from '../src/propose/current.verb.ts';
+import { PERSON } from '../src/caller/caller.ts';
+import { delegationPut, delegationRemove } from '../src/delegation/delegation.verb.ts';
+import { writeFactoryLevel } from '../src/level/level.store.ts';
+import { confirmedFile, writeProposed } from '../src/auto/auto.store.ts';
+import { POLICY_CONFIRM, policyListOf } from '../src/auto/auto.verb.ts';
+import { ruleWords } from '../src/auto/auto.ts';
+import { RunDoor } from '../src/runs/runs.store.ts';
+import { FactoryDoor } from '../src/factory/door/factories.store.ts';
+import { FactoryName } from '../src/factory/factory.model.ts';
+import { FACTORY_INSTRUCT } from '../src/factory/instruction.verb.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-proposals-');
-process.env.WF_ROOT = ROOT;
-const { runWith: runEngine } = await import('../src/runner.ts');
-const { engineOf } = await import('../src/runtime-client.ts');
-const { proposeProgram, undoProgram } = await import('../src/propose/propose.verb.ts');
-const { approveProgram, declineProgram, proposalGet } = await import('../src/approval/approve.verb.ts');
-const { applyProgram } = await import('../src/apply/apply.verb.ts');
-const { proposalsPass } = await import('../src/apply/pass.verb.ts');
-const { currentOf } = await import('../src/propose/current.verb.ts');
-const { PERSON } = await import('../src/caller/caller.ts');
-const { delegationPut, delegationRemove } = await import('../src/delegation/delegation.verb.ts');
-const { writeFactoryLevel } = await import('../src/level/level.store.ts');
-const { confirmedFile, writeProposed } = await import('../src/auto/auto.store.ts');
-const { POLICY_CONFIRM, policyListOf } = await import('../src/auto/auto.verb.ts');
-const { ruleWords } = await import('../src/auto/auto.ts');
-const { RunDoor } = await import('../src/runs/runs.store.ts');
-const { FactoryDoor } = await import('../src/factory/door/factories.store.ts');
-const { FactoryName } = await import('../src/factory/factory.model.ts');
-const { FACTORY_INSTRUCT } = await import('../src/factory/instruction.verb.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 type Caller = import('../src/caller/caller.ts').ProposalCaller;
 type Rule = import('../src/auto/auto.ts').ProposalPolicyRule;
 
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
-const runWith = runOver(runEngine, () => stand().layer);
+const runWith = runOver(runEngine, () => stand().layer, ENV);
 const e = () => engineOf(engine().layer);
 const PLACE = { home: ROOT, repo: ROOT };
 
@@ -76,7 +77,7 @@ function factory(name: string, level: 'manual' | 'semi-auto' | 'auto' = 'manual'
     path.join(tree, 'workflows', 'agents', 'implementer.md'),
     '---\nrole: Architect\nallowedTools: Read\n---\nDesign the change.\n',
   );
-  writeFactoryLevel(name, { level, since: '2026-11-01T00:00:00.000Z' });
+  writeFactoryLevel(ROOT, name, { level, since: '2026-11-01T00:00:00.000Z' });
   return tree;
 }
 

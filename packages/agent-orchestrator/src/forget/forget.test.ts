@@ -22,13 +22,13 @@ import type { RepositoryRun, Run, RoundAsk, StepRecord, TaskPhase } from '../run
 import type { Held } from '../place/place.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import type { EarlierTry, RetryAsk, RetryMode } from '../retry/retry-ask.ts';
-import type { OutputSchema, Workflow } from '../workflow.ts';
+import type { OutputSchema, StepSpec } from '../workflow.ts';
 import { names, phases, run, step, STEPS } from '../../test/assessed.ts';
 
 const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
 const DONE = phases({ t1: 'succeeded', t2: 'succeeded' });
 /** `implement` declares a check; `review` waits on it. */
-const CHECKED: Workflow[] = [{ ...step('implement'), check: 'npm test' }, step('review', ['implement'])];
+const CHECKED: StepSpec[] = [{ ...step('implement'), check: 'npm test' }, step('review', ['implement'])];
 const signedDone = () => ({ outcome: 'done' as const, summary: 's', artifacts: [], needs: undefined });
 /** Every task here was filed asking for a closeout — which is what the runner does. */
 const asked = () => true;
@@ -43,7 +43,7 @@ const withCheck = (checkId: string | null, extra: Partial<RepositoryRun> = {}) =
     },
   );
 /** `implement` checked, with `retries: 2`; `review` waits on it. */
-const RETRIED: Workflow[] = [{ ...step('implement'), check: 'npm test', retries: 2 }, step('review', ['implement'])];
+const RETRIED: StepSpec[] = [{ ...step('implement'), check: 'npm test', retries: 2 }, step('review', ['implement'])];
 /** `implement` on the try after `tries`: its task `t1`, its check `check`. `review` not filed. */
 const onTry = (tries: EarlierTry[] = [], check: string | null = 'c1', extra: Partial<RepositoryRun> = {}) =>
   run(
@@ -80,7 +80,7 @@ const LOOPING: OutputSchema = {
   additionalProperties: false,
 };
 /** implement, checked → review, looping back to it with `rounds: 3` — and ship, after the loop. */
-const LOOP: Workflow[] = [
+const LOOP: StepSpec[] = [
   { ...step('implement'), check: 'npm test' },
   { ...step('review', ['implement']), output: { file: 'review.schema.json', schema: LOOPING }, loop: 'implement', rounds: 3 },
   step('ship', ['review']),
@@ -120,8 +120,8 @@ const saidIn =
         : undefined;
 
 /** `implement → ship`, the ending gated, in the repository's checkout, with a check (`landsOnCheck`). */
-const SHIP: Workflow = { name: 'ship', after: ['review'], workspace: 'base', gate: true, body: 'Ship it.' };
-const LANDER: Workflow = { name: 'ship', after: ['implement'], body: 'land it', workspace: 'base', gate: true, check: 'npm test' };
+const SHIP: StepSpec = { name: 'ship', after: ['review'], workspace: 'base', gate: true, body: 'Ship it.' };
+const LANDER: StepSpec = { name: 'ship', after: ['implement'], body: 'land it', workspace: 'base', gate: true, check: 'npm test' };
 const LANDING_STEPS = [step('implement'), LANDER];
 /** ship filed, signed, its check filed: every phase given, the checkout's state given. */
 const atLanding = (rest: Partial<RepositoryRun> = {}, ship: Partial<StepRecord> = {}): Run => ({
@@ -381,7 +381,7 @@ test('`forgetRefusal` says its reasons in one order — in flight, a merge stage
     );
     inOrder(endings, 'ship and land wait at their gates', 'each is filed', 'nemia approve r-1 ship, nemia approve r-1 land');
     lacks(endings, 'what waits on them');
-    const mixed: Workflow[] = [step('plan'), step('implement'), { ...SHIP, after: ['implement'] }];
+    const mixed: StepSpec[] = [step('plan'), step('implement'), { ...SHIP, after: ['implement'] }];
     inOrder(
       forgetRefusal(mixed, run({ plan: 't1', implement: 't2', ship: null }, { gates: ['plan'] }), signed, [], signedDone, asked),
       'plan and ship wait at their gates',
@@ -426,7 +426,7 @@ test('`forgetRefusal` says its reasons in one order — in flight, a merge stage
 
   const landed = phases({ 't-impl': 'succeeded', 't-ship': 'succeeded', 't-ship-check': 'succeeded', 't-x': 'succeeded' });
   const closeoutOf = (): Closeout => ({ ...signedDone(), output: { message: 'Add a flag' } });
-  const forget = (steps: readonly Workflow[], r: Run, others: readonly Run[], asks: readonly RetryAsk[]) =>
+  const forget = (steps: readonly StepSpec[], r: Run, others: readonly Run[], asks: readonly RetryAsk[]) =>
     forgetRefusal(steps, r, landed, others, closeoutOf, () => false, none, asks, [], none, at, [], 'rm', 'ours');
 
   await t.test('a merge staged and not landed before an ask, a child and a hold, and its fix before theirs', () => {
@@ -445,7 +445,7 @@ test('`forgetRefusal` says its reasons in one order — in flight, a merge stage
   });
 
   await t.test('a merge staged before a gate; a task in flight before a gate; a wait on runs and what is due before an ask', () => {
-    const x: Workflow = { ...step('x', ['implement']), gate: true };
+    const x: StepSpec = { ...step('x', ['implement']), gate: true };
     const r = atLanding({ gates: ['x'] });
     inOrder(
       forget([...LANDING_STEPS, x], { ...r, steps: { ...r.steps, x: { taskId: 't-x' } } }, [], []),

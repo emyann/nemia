@@ -1,5 +1,5 @@
 import { nodeKind, type NodeKind } from '../route/index.ts';
-import { DEFAULT_ROUNDS, type Workflow } from '../step/step.ts';
+import { DEFAULT_ROUNDS, type StepSpec } from '../step/step.ts';
 import type { TypedGraphOf } from '../../contracts/workflow-graph.contract.ts';
 import type { EdgeKind } from 'objects';
 
@@ -32,7 +32,7 @@ export type RunGraph = { roots: string[]; edges: GraphEdge[]; nodes?: GraphNode[
 export type ObjectGraph = { roots: string[]; edges: Array<GraphEdge | InputEdge>; nodes?: GraphNode[] };
 
 /** A step as the graph reads it. */
-export type GraphStep = Pick<Workflow, 'name' | 'after' | 'input' | 'loop' | 'rounds' | 'routes' | 'when' | 'ends' | 'workflow'>;
+export type GraphStep = Pick<StepSpec, 'name' | 'after' | 'input' | 'loop' | 'rounds' | 'routes' | 'when' | 'ends' | 'workflow'>;
 
 const nodeOf = (step: GraphStep): GraphNode => ({
   name: step.name,

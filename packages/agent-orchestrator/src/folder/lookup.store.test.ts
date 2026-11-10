@@ -1,16 +1,13 @@
 /**
  * The workflow folders a place holds (`foldersIn`): each folder directly in it, sorted, but a hidden one, `agents/` and `skills/`; none
- * where the place is not there, and a refusal naming the fix where it cannot be listed. `WF_ROOT` is set before the import, since the
- * store reads it as it loads.
+ * where the place is not there, and a refusal naming the fix where it cannot be listed.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
-
-process.env.WF_ROOT = scratch('wf-lookup-root-');
-const { foldersIn } = await import('./lookup.store.ts');
+import { foldersIn } from './lookup.store.ts';
 
 test('a place that is not there holds no workflow', () => {
   assert.deepEqual(foldersIn(path.join(scratch('wf-lookup-'), 'workflows')), []);

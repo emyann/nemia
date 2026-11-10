@@ -4,7 +4,8 @@
  * git off the `PATH`. The test place models no ignore rule and no link, and starts no process to lose, so these keep the git place; the
  * rest of a step's files is walked in store.test.ts.
  *
- * `WF_ROOT` is set before the runner is imported, since it is read as the module loads.
+ * The test's store is its own, at `ROOT`, given to every program as `ENV`.
+
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,6 +19,19 @@ import { isRepositoryRun } from '../src/run.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
 import { runGiven, runOver } from './placed.ts';
+import {
+  advanceRun,
+  artifactFiles,
+  artifactsDir,
+  missingArtifacts,
+  startRun,
+  runWith as runEngine,
+  gitPlaceLayer,
+  builtinGitPlace,
+} from '../src/runner.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import type { Env } from '../src/config/config.store.ts';
+import { main } from '../src/cli/main.ts';
 
 const ROOT = scratch('wf-artifacts-git-');
 const WORKFLOW = path.join(ROOT, 'workflow');
@@ -26,23 +40,9 @@ fs.mkdirSync(WORKFLOW, { recursive: true });
 fs.writeFileSync(path.join(WORKFLOW, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
 fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
 
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const {
-  advanceRun,
-  artifactFiles,
-  artifactsDir,
-  missingArtifacts,
-  startRun,
-  runWith: runEngine,
-  gitPlaceLayer,
-  builtinGitPlace,
-} = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
-const { runRecord } = await import('../src/record/record.store.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
+const runWith = runOver(runEngine, gitPlaceLayer, ENV);
+const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
@@ -212,8 +212,8 @@ const gitIn = (cwd: string, ...args: string[]) =>
 test("a file `artifacts` names from the workspace root is collected into the step's files directory when the step hands off, before its check is filed — again, only what changed, after a pass that died — and read from there; an absolute path in the directory is read where it is", async () => {
   const run = await started(folder('check: npm test'));
   const b = board();
-  await runWith(b.e, advanceRun(runRecord(run.id)));
-  const files = artifactsDir(run, 'implement');
+  await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+  const files = artifactsDir(ROOT, run, 'implement');
   fs.writeFileSync(path.join(run.repo, '.gitignore'), '.e2e/\n');
   fs.mkdirSync(path.join(run.repo, '.e2e'));
   fs.writeFileSync(path.join(run.repo, '.e2e', 'shot.png'), 'png');
@@ -226,7 +226,7 @@ test("a file `artifacts` names from the workspace root is collected into the ste
     ...b.e,
     file: (spec: Parameters<typeof b.e.file>[0]) => (spec.id?.endsWith('-check') ? Effect.die(new Error('the pass died')) : b.e.file(spec)),
   } as typeof b.e;
-  await assert.rejects(runWith(diesFilingTheCheck, advanceRun(runRecord(run.id))), /the pass died/);
+  await assert.rejects(runWith(diesFilingTheCheck, advanceRun(runRecord(ROOT, run.id))), /the pass died/);
   assert.equal(
     fs.readFileSync(path.join(files, 'RESPONSE.md'), 'utf8'),
     '# response\n',
@@ -235,7 +235,7 @@ test("a file `artifacts` names from the workspace root is collected into the ste
   assert.equal(fs.readFileSync(path.join(files, '.e2e', 'shot.png'), 'utf8'), 'png', 'a file git ignores, which never reaches the branch');
 
   fs.writeFileSync(path.join(run.repo, 'RESPONSE.md'), '# response, amended\n');
-  const pass = await runWith(b.e, advanceRun(runRecord(run.id)));
+  const pass = await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
   assert.deepEqual(
     [pass.checked, pass.notes],
     [['implement'], [`implement: collected RESPONSE.md into ${files}`]],
@@ -243,9 +243,9 @@ test("a file `artifacts` names from the workspace root is collected into the ste
   );
   assert.equal(fs.readFileSync(path.join(files, 'RESPONSE.md'), 'utf8'), '# response, amended\n');
   assert.equal(fs.readFileSync(path.join(files, 'trace.zip'), 'utf8'), 'zip', 'an absolute path in the directory, where it is');
-  assert.deepEqual(missingArtifacts(builtinGitPlace, runRecord(run.id), 'implement', declaring(named)), []);
+  assert.deepEqual(missingArtifacts(ROOT, builtinGitPlace, runRecord(ROOT, run.id), 'implement', declaring(named)), []);
   assert.deepEqual(
-    artifactFiles(run, 'implement')
+    artifactFiles(ROOT, run, 'implement')
       .map((f) => path.relative(files, f.path))
       .sort(),
     ['.e2e/shot.png', 'RESPONSE.md', 'trace.zip'],
@@ -253,7 +253,7 @@ test("a file `artifacts` names from the workspace root is collected into the ste
 
   fs.writeFileSync(path.join(run.repo, 'RESPONSE.md'), '# rewritten while the check ran\n');
   assert.deepEqual(
-    (await runWith(b.e, advanceRun(runRecord(run.id)))).notes,
+    (await runWith(b.e, advanceRun(runRecord(ROOT, run.id)))).notes,
     [],
     "once its check is filed, the workspace is the check's: nothing more is collected",
   );
@@ -263,7 +263,7 @@ test("a file `artifacts` names from the workspace root is collected into the ste
 test('REFUSED as findings on the screen, never silently: a path that climbs out of the workspace is never read, a link that leads out is not followed, and a directory and a file not there are not collected — the closeout that names them is not accepted, and `nemia decide` names each', async (t) => {
   const run = await started(folder());
   const b = board();
-  await runWith(b.e, advanceRun(runRecord(run.id)));
+  await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
   const secret = path.join(path.dirname(run.repo), `secret-${run.id}.txt`);
   fs.writeFileSync(secret, "not a step's to name\n");
   fs.mkdirSync(path.join(run.repo, 'shots'));
@@ -288,7 +288,7 @@ test('REFUSED as findings on the screen, never silently: a path that climbs out 
     spies
       .flatMap((spy) => spy.mock.calls.flatMap((call) => call.arguments.slice(0, 2).filter((a) => typeof a === 'string')))
       .filter((p) => path.resolve(p) === secret);
-  const pass = await runWith(b.e, advanceRun(runRecord(run.id)));
+  const pass = await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
   const named = [climbs, 'never-written.md', 'shots', 'leak.txt'];
   assert.deepEqual(
     [pass.filed, pass.tried, pass.notes],
@@ -302,18 +302,17 @@ test('REFUSED as findings on the screen, never silently: a path that climbs out 
     ],
     'nothing collected, review not filed, and the step asked again',
   );
-  assert.deepEqual(artifactFiles(run, 'implement'), []);
+  assert.deepEqual(artifactFiles(ROOT, run, 'implement'), []);
   assert.deepEqual(looked(), [], 'the file outside the workspace is neither opened, stat-ed nor resolved by the tick');
 
   b.settle(`${run.id}-implement-try2`, 'succeeded', declaring(named));
-  assert.deepEqual((await runWith(b.e, advanceRun(runRecord(run.id)))).tried, [], 'once a round: it waits on a person');
+  assert.deepEqual((await runWith(b.e, advanceRun(runRecord(ROOT, run.id)))).tried, [], 'once a round: it waits on a person');
   const out: string[] = [];
   const log = t.mock.method(console, 'log', (...args: unknown[]) => {
     out.push(args.map(String).join(' '));
   });
-  const { main } = await import('../src/cli/main.ts');
   try {
-    await main(['decide', run.id], b.e);
+    await main(['decide', run.id], b.e, undefined, undefined, ENV);
   } finally {
     log.mock.restore();
   }
@@ -333,8 +332,8 @@ test('REFUSED as findings on the screen, never silently: a path that climbs out 
 test('REFUSED at shipped defaults: a copy is never written through a link a step made in its files directory — on the way to it, or in its place — what the link leads to is left as it was, and `nemia decide` names the file not collected, though it is on the branch', async () => {
   const run = await started(folder('check: npm test'));
   const b = board();
-  await runWith(b.e, advanceRun(runRecord(run.id)));
-  const files = artifactsDir(run, 'implement');
+  await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+  const files = artifactsDir(ROOT, run, 'implement');
   const elsewhere = fs.mkdtempSync(path.join(ROOT, 'elsewhere-'));
   fs.writeFileSync(path.join(elsewhere, 'shot.png'), 'what was there');
   fs.writeFileSync(path.join(elsewhere, 'report.md'), 'what was there');
@@ -346,7 +345,7 @@ test('REFUSED at shipped defaults: a copy is never written through a link a step
   const named = ['shots/shot.png', 'report.md'];
   b.settle(`${run.id}-implement`, 'succeeded', declaring(named));
 
-  const pass = await runWith(b.e, advanceRun(runRecord(run.id)));
+  const pass = await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
   assert.deepEqual([pass.checked, pass.notes], [['implement'], []], 'its check filed, and nothing collected');
   assert.deepEqual(
     Object.fromEntries(fs.readdirSync(elsewhere).map((f) => [f, fs.readFileSync(path.join(elsewhere, f), 'utf8')])),
@@ -362,7 +361,7 @@ test('REFUSED at shipped defaults: a copy is never written through a link a step
     'handed off, the files are on the branch',
   );
   assert.deepEqual(
-    missingArtifacts(builtinGitPlace, runRecord(run.id), 'implement', declaring(named)),
+    missingArtifacts(ROOT, builtinGitPlace, runRecord(ROOT, run.id), 'implement', declaring(named)),
     [
       { path: 'shots/shot.png', why: 'not collected' },
       { path: 'report.md', why: 'not collected' },
@@ -374,8 +373,8 @@ test('REFUSED at shipped defaults: a copy is never written through a link a step
 test('REFUSED before, now read as it was: a run from before collection — its step past hand-off, its worktree still there, its files on the branch and none in its files directory — has nothing missing, and no pass collects it; a file on no branch still reads not collected', async () => {
   const run = await started(folder('check: npm test'));
   const b = board();
-  await runWith(b.e, advanceRun(runRecord(run.id)));
-  const files = artifactsDir(run, 'implement');
+  await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+  const files = artifactsDir(ROOT, run, 'implement');
   fs.writeFileSync(path.join(run.repo, '.gitignore'), '.e2e/\n');
   fs.mkdirSync(path.join(run.repo, '.e2e'));
   fs.writeFileSync(path.join(run.repo, '.e2e', 'shot.png'), 'png');
@@ -383,7 +382,7 @@ test('REFUSED before, now read as it was: a run from before collection — its s
   fs.writeFileSync(path.join(run.repo, 'docs', 'RESPONSE.md'), '# response\n');
   gitIn(run.repo, 'add', '-A');
   gitIn(run.repo, 'commit', '-q', '-m', 'the step, handed off');
-  const record = runRecord(run.id);
+  const record = runRecord(ROOT, run.id);
   record.steps.implement = { ...record.steps.implement, check: { taskId: `${run.id}-implement-check` } };
   fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(record, null, 2));
   b.settle(`${run.id}-implement`, 'succeeded', declaring(['docs/RESPONSE.md', '.e2e/shot.png']));
@@ -396,35 +395,34 @@ test('REFUSED before, now read as it was: a run from before collection — its s
   );
   assert.ok(fs.existsSync(path.join(run.repo, 'docs', 'RESPONSE.md')), 'the worktree is still there');
   assert.deepEqual(
-    missingArtifacts(builtinGitPlace, runRecord(run.id), 'implement', declaring(['docs/RESPONSE.md', '.e2e/shot.png'])),
+    missingArtifacts(ROOT, builtinGitPlace, runRecord(ROOT, run.id), 'implement', declaring(['docs/RESPONSE.md', '.e2e/shot.png'])),
     [{ path: '.e2e/shot.png', why: 'not collected' }],
     'RESPONSE.md is on the branch; an ignored file is on none',
   );
-  assert.deepEqual((await runWith(b.e, advanceRun(runRecord(run.id)))).notes, [], 'past hand-off, so no pass collects it');
-  assert.deepEqual(artifactFiles(run, 'implement'), [], 'the branch is where the run reads it');
+  assert.deepEqual((await runWith(b.e, advanceRun(runRecord(ROOT, run.id)))).notes, [], 'past hand-off, so no pass collects it');
+  assert.deepEqual(artifactFiles(ROOT, run, 'implement'), [], 'the branch is where the run reads it');
 });
 
 test("`nemia decide` of a run whose declared file is only on its branch says nothing is missing — the place says the branch has it — and, where the place's report is not heard, that whether it has it is not known, never that it is not there", async (t) => {
   const run = await started(folder());
   const b = board();
-  await runWith(b.e, advanceRun(runRecord(run.id)));
+  await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
   fs.mkdirSync(path.join(run.repo, 'docs'));
   fs.writeFileSync(path.join(run.repo, 'docs', 'RESPONSE.md'), '# response\n');
   gitIn(run.repo, 'add', '-A');
   gitIn(run.repo, 'commit', '-q', '-m', 'the step, handed off');
   b.settle(`${run.id}-implement`, 'succeeded', declaring(['docs/RESPONSE.md']));
-  await runWith(b.e, advanceRun(runRecord(run.id)));
+  await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
   fs.rmSync(path.join(run.repo, 'docs'), { recursive: true });
-  fs.rmSync(artifactsDir(run, 'implement'), { recursive: true, force: true });
+  fs.rmSync(artifactsDir(ROOT, run, 'implement'), { recursive: true, force: true });
   b.settle(`${run.id}-review`, 'succeeded', { outcome: 'blocked', summary: 'stopped', artifacts: [], needs: 'a person' });
-  const { main } = await import('../src/cli/main.ts');
   const flagged = async (): Promise<string[]> => {
     const out: string[] = [];
     const log = t.mock.method(console, 'log', (...args: unknown[]) => {
       out.push(args.map(String).join(' '));
     });
     try {
-      await main(['decide', run.id], b.e);
+      await main(['decide', run.id], b.e, undefined, undefined, ENV);
     } finally {
       log.mock.restore();
     }

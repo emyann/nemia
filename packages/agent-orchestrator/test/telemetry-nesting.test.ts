@@ -7,7 +7,7 @@
  * Told as one story, its two checkpoints sharing the store and the engine. It stays on the runtime's own engine: the journal it traces
  * into is the runtime's, which the engine's stand-in does not keep.
  *
- * `WF_ROOT` is set before the runner is imported, which reads it as the module loads. `WF_VERIFY_REST=1` judges in full every run a pass
+ * Its store is its own at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, sessions enough are admitted for the one run, and no cap is set on runs.
  */
 import { test } from 'node:test';
@@ -21,21 +21,20 @@ import { asyncOps, asyncStore, type AsyncJournal, type AsyncRunner } from './pro
 import { runGiven } from './placed.ts';
 import { story } from './story.ts';
 import { testPlace } from '../place/memory/index.ts';
+import { startRun } from '../src/runner.ts';
+import { tickRun } from '../src/tick/tick.verb.ts';
+import { EngineService, engineOf } from '../src/runtime-client.ts';
+import { filesStoreAt } from '../src/record/files.store.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const place = testPlace();
 const stand = () => place;
 const ROOT = scratch('wf-telemetry-nesting-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
-process.env.WF_ROOT = ROOT;
-process.env.WF_MAX_CONCURRENT = '10';
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_RUNS;
-const { startRun } = await import('../src/runner.ts');
-const runPlaced = runGiven(() => stand().layer);
-const { tickRun } = await import('../src/tick/tick.verb.ts');
-const { EngineService, engineOf } = await import('../src/runtime-client.ts');
-const { filesStore: runStore } = await import('../src/record/files.store.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_MAX_CONCURRENT: '10', WF_VERIFY_REST: '1', WF_MAX_RUNS: undefined };
+const runPlaced = runGiven(() => stand().layer, ENV);
+const rooted = filesStoreAt(ROOT);
 
 const REPO = fs.mkdtempSync(path.join(ROOT, 'repo-'));
 stand().world.repository(REPO, {});
@@ -160,7 +159,7 @@ test("A pass traced down to the runtime's journal: its filing of a step and a ca
   await s.test("a called-off run's pass says the runtime's stop of its step under the run, though no filing names the step", async () => {
     const run = await runPlaced(startRun({ brief: 'one run called off', repo: REPO, workflowDir: FOLDER }));
     await tickTraced();
-    runStore.runs.cancel(run.id);
+    rooted.runs.cancel(run.id);
     const { logs } = await tickTraced();
     const stopped = logs.find((l) => l.text === 'stop-requested' && l.annotations.task === `${run.id}-work`);
     assert.ok(stopped, `no Debug log of the stop among ${logs.map((l) => l.text).join(', ')}`);

@@ -6,7 +6,7 @@
  */
 import path from 'node:path';
 import { memoryQuantityRefusal } from 'agent-runtime/vocabulary';
-import { CLOSEOUT_FIELDS, COUNTS, isObject, type OutputSchema, refuse, type StepOutput, type Workflow } from '../step/step.ts';
+import { CLOSEOUT_FIELDS, COUNTS, isObject, type OutputSchema, refuse, type StepOutput, type StepSpec } from '../step/step.ts';
 import {
   declarationOf,
   DEFAULT_HARNESS,
@@ -164,15 +164,15 @@ export function contextOf(step: string, context: string | undefined): number | u
  * where the session it continues did not. `validate` refuses a `resume:` step whose own `context:` differs; one without the line inherits.
  */
 export function sessionContext(
-  step: Pick<Workflow, 'name' | 'resume' | 'context'>,
-  steps: readonly Pick<Workflow, 'name' | 'resume' | 'context'>[],
+  step: Pick<StepSpec, 'name' | 'resume' | 'context'>,
+  steps: readonly Pick<StepSpec, 'name' | 'resume' | 'context'>[],
 ): number | undefined {
   const seen = new Set<string>();
-  let at: Pick<Workflow, 'name' | 'resume' | 'context'> | undefined = step;
+  let at: Pick<StepSpec, 'name' | 'resume' | 'context'> | undefined = step;
   while (at?.resume && !seen.has(at.name)) {
     seen.add(at.name);
     const resume: string = at.resume;
-    const next: Pick<Workflow, 'name' | 'resume' | 'context'> | undefined = steps.find((s) => s.name === resume);
+    const next: Pick<StepSpec, 'name' | 'resume' | 'context'> | undefined = steps.find((s) => s.name === resume);
     if (!next) break;
     at = next;
   }
@@ -465,7 +465,7 @@ export function composedRefusal(
   named: string,
   skills: readonly string[] | undefined,
   harnessPrompt: HarnessPrompt | undefined,
-  step: Pick<Workflow, 'harness' | 'tools' | 'disallowedTools' | 'resume'>,
+  step: Pick<StepSpec, 'harness' | 'tools' | 'disallowedTools' | 'resume'>,
 ): string | undefined {
   const listed = skills?.length ? `\`skills: ${skills.join(', ')}\`` : undefined;
   if (step.resume && (listed || (harnessPrompt ?? 'keep') !== 'keep')) {
@@ -502,7 +502,7 @@ export function composedRefusal(
  * a step run by a remote agent, which is filed no configuration and loads what its operator gave it. `named` says whose, as
  * `composedRefusal`'s.
  */
-export function serversRefusal(named: string, mcp: readonly string[] | undefined, step: Pick<Workflow, 'harness'>): string | undefined {
+export function serversRefusal(named: string, mcp: readonly string[] | undefined, step: Pick<StepSpec, 'harness'>): string | undefined {
   if (!mcp?.length || !isRemoteHarness(step.harness)) return undefined;
   return `${named}: \`mcp: ${mcp.join(', ')}\` names servers of the checkout's \`.mcp.json\` for the sessions a run starts here, and \`harness: ${step.harness}\` is a remote A2A agent, which loads the servers its operator configured and none of ours. Delete the line, or run the step on a harness of this machine.`;
 }

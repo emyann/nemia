@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Ceilings } from '../gauges/ceilings.ts';
 import { app } from '../app.ts';
-import { engine, passStanding, runStore } from 'agent-orchestrator';
+import { engine, passStanding, runsAtOnce } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
 import { lsOf, runListOf } from '../../test/run-reads.ts';
 
@@ -108,7 +108,7 @@ writeRun('r-bad', { implement: { taskId: 'r-bad-implement', branch: 'wf/r-bad/im
 
 writeRun('r-child', {}, { after: ['r-bad'] });
 writeRun('r-sibling', {}, { after: ['r-good'] });
-await runWith(engine(process.env), passStanding(runStore.runs.list()));
+await runWith(engine(process.env), passStanding(runsAtOnce(root).runs.list()));
 
 test('a run whose task journal holds an entry no runtime wrote is answered off its record on the list, refused on its page in those words, and counted in flight', async (t) => {
   const s = story(t);

@@ -4,7 +4,7 @@
  * and its bridge, off the engine's record of its task.
  */
 import { handedParts, type HandedPart, type Run, type StepRecord, type ToldLayers, toldLayers } from '../run.ts';
-import { remoteNameOf, type Workflow } from '../workflow.ts';
+import { remoteNameOf, type StepSpec } from '../workflow.ts';
 import { briefNow } from '../tick/told.verb.ts';
 import type { Views } from '../summary/reads.verb.ts';
 import type { PlaceService } from '../place/place.store.ts';
@@ -68,7 +68,7 @@ export type StepFiled = {
 function briefOf(
   run: Run,
   name: string,
-  workflows: readonly Workflow[] | null,
+  workflows: readonly StepSpec[] | null,
   views: Views,
   placeService: PlaceService['Service'],
 ): string | null {
@@ -102,7 +102,7 @@ function taskPartsOf(run: Run, task: string): TaskPart[] {
 export function toldOf(
   run: Run,
   name: string,
-  workflows: readonly Workflow[] | null,
+  workflows: readonly StepSpec[] | null,
   views: Views,
   placeService: PlaceService['Service'],
 ): { told: string | null; layers: ToldLayers | null; taskParts: TaskPart[] | null } {

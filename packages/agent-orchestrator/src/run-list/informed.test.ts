@@ -5,8 +5,8 @@
  * output the engine did not give is not kept; and a kept object that differs from a fresh one is refused under `WF_VERIFY_REST`. Over the
  * stand-ins: the test engine, with a feed the test appends to, and the test place.
  *
- * `WF_ROOT` is set before the package is imported, since the store reads it as it loads; `WF_VERIFY_REST=1`, as every test that ticks a
- * store, and a read that counts what it served turns it off for itself (`unverified`).
+ * On a store of its own at `ROOT`, given as `ENV`, with `WF_VERIFY_REST=1`, as every test that ticks a store, and a read that counts
+ * what it served turns it off for itself (`unverified`).
  */
 import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,31 +17,33 @@ import { testEngine } from 'agent-runtime/testing';
 import { scratch } from 'test-kit/scratch';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
+import { advanceRun, approveRun, cancelRun, startRun, runWith as runEngine } from '../runner.ts';
+import { runList } from './run-list.verb.ts';
+import { informerMemo, keepObject, keptObject, passStarted, type InformerMemo } from '../rest/informer.verb.ts';
+import type { RunList } from 'objects';
+import { runRecord, pruneFile, artifactsDir } from '../record/record.store.ts';
+import { writeLabels } from '../record/files.store.ts';
+import { verifiesRest } from '../config/config.store.ts';
+import { engineOf } from '../runtime-client.ts';
 
 const ROOT = scratch('wf-runlist-informed-');
 const RUNS_DIR = path.join(ROOT, 'runs');
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-process.env.WF_DEFAULT_FACTORY_STARTS = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { advanceRun, approveRun, cancelRun, startRun, runWith: runEngine } = await import('../runner.ts');
-const { runList } = await import('./run-list.verb.ts');
-const { informerMemo, passStarted } = await import('../rest/informer.verb.ts');
-const { runRecord, pruneFile } = await import('../record/record.store.ts');
-const { writeLabels } = await import('../record/files.store.ts');
-const { artifactsDir } = await import('../record/record.store.ts');
-const { verifiesRest } = await import('../config/config.store.ts');
-const { engineOf } = await import('../runtime-client.ts');
-type InformerMemo = import('../rest/informer.verb.ts').InformerMemo;
-type RunList = import('objects').RunList;
+/** The test's store and settings; `unverified` turns `WF_VERIFY_REST` off in it for a read, and the settings are read as they are asked. */
+const ENV: Record<string, string | undefined> = {
+  ...process.env,
+  WF_ROOT: ROOT,
+  WF_VERIFY_REST: '1',
+  WF_DEFAULT_FACTORY_STARTS: '1',
+  WF_MAX_CONCURRENT: undefined,
+  WF_MAX_RUNS: undefined,
+};
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 const AT = '2026-10-14T09:30:00.000Z';
 
 const stand = eachTest(testPlace);
-const runWith = runOver(runEngine, () => stand().layer);
-const runPlaced = runGiven(() => stand().layer);
+const runWith = runOver(runEngine, () => stand().layer, ENV);
+const runPlaced = runGiven(() => stand().layer, ENV);
 const engine = eachTest(testEngine);
 const lines: Array<{ taskId: string; event: { kind: 'settled'; at: string; outcome: 'succeeded' } }> = [];
 const fed = (taskId: string) => lines.push({ taskId, event: { kind: 'settled', at: AT, outcome: 'succeeded' } });
@@ -77,7 +79,7 @@ const started = async (front = 'place: git', gates: string[] = []): Promise<{ id
   const repo = scratch('wf-runlist-repo-');
   stand().world.repository(repo, {});
   const run = await runPlaced(startRun({ brief: 'list me', repo, workflowDir: dir, gates }));
-  await runWith(e(), advanceRun(runRecord(run.id)));
+  await runWith(e(), advanceRun(runRecord(ROOT, run.id)));
   return { id: run.id, dir };
 };
 
@@ -85,7 +87,7 @@ const started = async (front = 'place: git', gates: string[] = []): Promise<{ id
 const signed = async (front?: string, gates: string[] = []) => {
   const run = await started(front, gates);
   engine().settle(`${run.id}-work`, 'succeeded', { closeout: SIGNED, startedAt: AT, spawnedAt: AT });
-  await runWith(e(), advanceRun(runRecord(run.id)));
+  await runWith(e(), advanceRun(runRecord(ROOT, run.id)));
   return run;
 };
 
@@ -101,15 +103,15 @@ const atWork = async () => {
 
 /** The whole RunList through `memo`, verified as `WF_VERIFY_REST` says. */
 const listOf = (memo: InformerMemo, wrap: <A, E, R>(p: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R> = (p) => p) =>
-  runWith(e(), wrap(runList(e(), { home: ROOT, memo, verify: verifiesRest(process.env) }, { memo: { said: new Map() } }, {})));
+  runWith(e(), wrap(runList(e(), { home: ROOT, memo, verify: verifiesRest(ENV) }, { memo: { said: new Map() } }, {})));
 
 /** `f` with `WF_VERIFY_REST` off: what the informer alone answers. */
 async function unverified<T>(f: () => Promise<T>): Promise<T> {
-  process.env.WF_VERIFY_REST = '0';
+  ENV.WF_VERIFY_REST = '0';
   try {
     return await f();
   } finally {
-    process.env.WF_VERIFY_REST = '1';
+    ENV.WF_VERIFY_REST = '1';
   }
 }
 
@@ -154,7 +156,11 @@ const ROWS: Row[] = [
     plant: (run) => runWith(e(), cancelRun(run.id)),
     pass: true,
   },
-  { name: 'the labels file, as nemia label run writes it', make: () => resting(), plant: (run) => writeLabels(run.id, { team: 'core' }) },
+  {
+    name: 'the labels file, as nemia label run writes it',
+    make: () => resting(),
+    plant: (run) => writeLabels(ROOT, run.id, { team: 'core' }),
+  },
   {
     name: 'an ask written by another process, no informer told: the gate approved',
     make: () => signed(undefined, ['work']),
@@ -164,7 +170,7 @@ const ROWS: Row[] = [
     name: 'a prune from the CLI: its marker written, its worktrees removed',
     make: () => resting(),
     plant: (run) => {
-      fs.writeFileSync(pruneFile(run.id), JSON.stringify({ at: AT, worktrees: [] }));
+      fs.writeFileSync(pruneFile(ROOT, run.id), JSON.stringify({ at: AT, worktrees: [] }));
       fs.rmSync(path.join(ROOT, 'worktrees', run.id), { recursive: true, force: true });
     },
   },
@@ -199,16 +205,16 @@ const ROWS: Row[] = [
     name: 'its files folder removed',
     make: async () => {
       const run = await resting();
-      fs.mkdirSync(artifactsDir(runRecord(run.id), 'work'), { recursive: true });
+      fs.mkdirSync(artifactsDir(ROOT, runRecord(ROOT, run.id), 'work'), { recursive: true });
       return run;
     },
-    plant: (run) => fs.rmSync(path.dirname(artifactsDir(runRecord(run.id), '_')), { recursive: true, force: true }),
+    plant: (run) => fs.rmSync(path.dirname(artifactsDir(ROOT, runRecord(ROOT, run.id), '_')), { recursive: true, force: true }),
   },
   {
     name: "a folder run's step folder gaining a file",
     make: () => signed('place: folder'),
     plant: (run) => {
-      const dir = runRecord(run.id).steps.work?.workspace;
+      const dir = runRecord(ROOT, run.id).steps.work?.workspace;
       assert.ok(dir, 'a folder run works in a folder of its own');
       fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(path.join(dir, 'made.txt'), 'made\n');
@@ -247,9 +253,9 @@ test('each input that changes a run object, planted, is served fresh', async (t)
 test('an object built on a check output the engine did not give is not kept: the next read serves the output once it reads', async () => {
   const run = await started('place: git\ncheck: false');
   engine().settle(`${run.id}-work`, 'succeeded', { closeout: SIGNED, startedAt: AT, spawnedAt: AT });
-  await runWith(e(), advanceRun(runRecord(run.id)));
+  await runWith(e(), advanceRun(runRecord(ROOT, run.id)));
   engine().settle(`${run.id}-work-check`, 'failed', { exitCode: 1, startedAt: AT, spawnedAt: AT });
-  await runWith(e(), advanceRun(runRecord(run.id)));
+  await runWith(e(), advanceRun(runRecord(ROOT, run.id)));
   const memo = informerMemo();
   outputRefused = true;
   const first = itemOf(await unverified(() => listOf(memo)), run.id);
@@ -275,7 +281,6 @@ test('REFUSED: a kept object that differs from one built afresh makes a verified
 });
 
 test('an object is kept only on the entry holding the judgement it was built on: one a newer judgement replaced meanwhile is given none', async () => {
-  const { keepObject, keptObject } = await import('../rest/informer.verb.ts');
   const memo = informerMemo<object, string>();
   const [older, newer] = [{ judged: 'older' }, { judged: 'newer' }];
   const entry = { stamp: 's', run: {} as never, tips: {}, atRest: true, pass: undefined };

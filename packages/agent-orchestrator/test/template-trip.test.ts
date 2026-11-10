@@ -8,8 +8,8 @@
  *
  * What export, pack, unpack and lint write and refuse beyond the trip is `src/template/template.store.test.ts`; what apply refuses
  * and what the controller says of a template moved, `src/factory/applied/applied.verb.test.ts`; what a render writes and refuses,
- * `src/factory/applied/render.test.ts`; the system's own tar, `template-tar.boundary.test.ts`. `WF_ROOT` and `CLAUDE_CONFIG_DIR` are set
- * before `src` is imported, which reads them as it loads.
+ * `src/factory/applied/render.test.ts`; the system's own tar, `template-tar.boundary.test.ts`. Its store is its own at `ROOT`, given as
+ * `ENV`, and `CLAUDE_CONFIG_DIR` is set before any test runs.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,29 +20,29 @@ import { parse, stringify } from 'yaml';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { teamCopy } from './team.ts';
+import { templated as programsAt, seededClock } from './templated.ts';
+import { checkedTree, packageSkillNames } from '../src/template/template.store.ts';
+import { readFactoriesAt, readFactoryAt } from '../src/factory/factory.store.ts';
+import { appliedDir, readStatus, statusFile, treeDir } from '../src/factory/applied/applied.store.ts';
+import { reconcileOnce } from '../src/factory/applied/applied.verb.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import { startDue } from '../src/factory/schedule/schedule.verb.ts';
+import { StoreRoot } from '../src/config/root.store.ts';
+import { TemplateDoor } from '../src/template/door/templates.store.ts';
+import { TemplateSource } from '../src/template/door/templates.model.ts';
+import { main } from '../src/cli/main.ts';
+import { engineOf, runWith } from '../src/runtime-client.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-template-trip-');
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
 const CONFIG = scratch('wf-template-trip-harness-');
 process.env.CLAUDE_CONFIG_DIR = CONFIG;
 const FACTORIES = path.join(ROOT, 'factories');
-const { templated: programsAt, seededClock } = await import('./templated.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
 const { exportTemplate, reconciled, reconciledAt } = programsAt(ROOT);
 /** The time the controller's passes here are seeded at: the time each condition of the factory last moved. */
 const AT = '2026-11-01T09:00:00.000Z';
-const { checkedTree, packageSkillNames } = await import('../src/template/template.store.ts');
-const { readFactories, readFactory } = await import('../testing.ts');
-const { appliedDir, readStatus, statusFile, treeDir } = await import('../src/factory/applied/applied.store.ts');
-const { reconcileOnce } = await import('../src/factory/applied/applied.verb.ts');
-const { runRecord } = await import('../src/record/record.store.ts');
-const { startDue } = await import('../src/factory/schedule/schedule.verb.ts');
-const { StoreRoot } = await import('../src/config/root.store.ts');
-const { TemplateDoor } = await import('../src/template/door/templates.store.ts');
-const { TemplateSource } = await import('../src/template/door/templates.model.ts');
-const { main } = await import('../src/cli/main.ts');
-const { engineOf, runWith } = await import('../src/runtime-client.ts');
-const stage = staged({ runWith, main, engineOf });
+const stage = staged({ runWith, main, engineOf, env: ENV });
 
 /** The document `file` of `dir`, its spec changed by `change`. */
 function edit(dir: string, file: string, change: (spec: Record<string, any>) => void): void {
@@ -94,7 +94,7 @@ const readTemplate = (source: string) =>
 
 /** The factory `name`, read as the controller reads it. */
 const factory = (name: string) =>
-  readFactory(name) as ReturnType<typeof readFactory> & { template: NonNullable<ReturnType<typeof readFactory>['template']> };
+  readFactoryAt(ROOT, name) as ReturnType<typeof readFactoryAt> & { template: NonNullable<ReturnType<typeof readFactoryAt>['template']> };
 
 const REVIEW = 'workflows/dev/review.md';
 
@@ -207,9 +207,9 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
       template: { source: archive, version: '0.1.0', params: { budget: 7, model: 'opus' } },
       generation: 1,
     });
-    assert.deepEqual(readFactory('trip').workflows, [], 'a tree not rendered yet offers nothing');
+    assert.deepEqual(readFactoryAt(ROOT, 'trip').workflows, [], 'a tree not rendered yet offers nothing');
     assert.deepEqual(
-      (readFactories().find((f) => f.name === 'trip') as { status?: unknown }).status,
+      (readFactoriesAt(ROOT).find((f) => f.name === 'trip') as { status?: unknown }).status,
       { applied: null, conditions: [] },
       'none is applied before the controller renders it',
     );
@@ -245,42 +245,42 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
     ]);
     assert.equal(status.version, '0.1.0');
     assert.match(status.digest ?? '', /^sha256:[0-9a-f]{64}$/);
-    assert.deepEqual(readStatus('trip'), status);
-    const review = path.join(treeDir('trip'), REVIEW);
+    assert.deepEqual(readStatus(ROOT, 'trip'), status);
+    const review = path.join(treeDir(ROOT, 'trip'), REVIEW);
     assert.match(fs.readFileSync(review, 'utf8'), /^budget: 7$/m);
-    assert.match(fs.readFileSync(path.join(treeDir('trip'), 'workflows/agents/reviewer.md'), 'utf8'), /^model: opus$/m);
-    const script = path.join(treeDir('trip'), 'workflows/skills/review-a-change/look.sh');
+    assert.match(fs.readFileSync(path.join(treeDir(ROOT, 'trip'), 'workflows/agents/reviewer.md'), 'utf8'), /^model: opus$/m);
+    const script = path.join(treeDir(ROOT, 'trip'), 'workflows/skills/review-a-change/look.sh');
     assert.equal(fs.statSync(script).mode & 0o111, 0o111, 'a copied file keeps the mode the archive holds');
-    assert.equal(fs.statSync(path.join(appliedDir('trip'), REVIEW)).mode & 0o222, 0, 'the base is read-only');
+    assert.equal(fs.statSync(path.join(appliedDir(ROOT, 'trip'), REVIEW)).mode & 0o222, 0, 'the base is read-only');
     assert.throws(
-      () => fs.writeFileSync(path.join(appliedDir('trip'), 'factory.json'), '{}'),
+      () => fs.writeFileSync(path.join(appliedDir(ROOT, 'trip'), 'factory.json'), '{}'),
       (err: Error) => /EACCES/.test(err.message),
     );
-    assert.deepEqual(readFactory('trip').workflows, ['dev', 'triage']);
+    assert.deepEqual(readFactoryAt(ROOT, 'trip').workflows, ['dev', 'triage']);
     fs.writeFileSync(review, fs.readFileSync(review, 'utf8').replace('budget: 7', 'budget: 9'));
-    const written = fs.statSync(statusFile('trip')).mtimeMs;
+    const written = fs.statSync(statusFile(ROOT, 'trip')).mtimeMs;
     assert.deepEqual(reconciled(factory('trip')), status, 'a second pass reads the archive to the same base');
     assert.match(fs.readFileSync(review, 'utf8'), /^budget: 9$/m, "the tree, once seeded, is the person's");
-    assert.equal(fs.statSync(statusFile('trip')).mtimeMs, written, 'a status that did not change is not written');
+    assert.equal(fs.statSync(statusFile(ROOT, 'trip')).mtimeMs, written, 'a status that did not change is not written');
   });
 
   await s.test(
     'a restart reads it all again off the disk, a status it cannot read written again, a tree removed seeded again',
     async () => {
-      const status = readStatus('trip')!;
-      const tree = path.join(treeDir('trip'), REVIEW);
+      const status = readStatus(ROOT, 'trip')!;
+      const tree = path.join(treeDir(ROOT, 'trip'), REVIEW);
       const kept = fs.readFileSync(tree, 'utf8');
-      fs.rmSync(statusFile('trip'));
-      fs.rmSync(treeDir('trip'), { recursive: true });
+      fs.rmSync(statusFile(ROOT, 'trip'));
+      fs.rmSync(treeDir(ROOT, 'trip'), { recursive: true });
       await Effect.runPromise(
         reconcileOnce().pipe(Effect.provideService(StoreRoot, ROOT), Effect.provideService(Clock.Clock, seededClock(Date.parse(AT)))),
       );
-      assert.deepEqual(readStatus('trip'), status);
+      assert.deepEqual(readStatus(ROOT, 'trip'), status);
       assert.match(fs.readFileSync(tree, 'utf8'), /^budget: 7$/m, 'a tree removed is seeded again from the base');
-      const onDisk = JSON.parse(fs.readFileSync(statusFile('trip'), 'utf8'));
+      const onDisk = JSON.parse(fs.readFileSync(statusFile(ROOT, 'trip'), 'utf8'));
       const [applied, conflicts] = status.conditions;
-      fs.writeFileSync(statusFile('trip'), JSON.stringify({ ...onDisk, conditions: [{ ...applied, reason: 'Mystery' }, conflicts] }));
-      assert.equal(readStatus('trip'), undefined, 'a condition word outside FactoryConditionReason reads as no status');
+      fs.writeFileSync(statusFile(ROOT, 'trip'), JSON.stringify({ ...onDisk, conditions: [{ ...applied, reason: 'Mystery' }, conflicts] }));
+      assert.equal(readStatus(ROOT, 'trip'), undefined, 'a condition word outside FactoryConditionReason reads as no status');
       assert.deepEqual(reconciledAt(factory('trip'), AT), status, 'and the next pass writes it again');
       fs.writeFileSync(tree, kept);
     },
@@ -288,8 +288,8 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
 
   await s.test("a bare workflow name started is the tree's, and the run is told the tree's step as the person changed it", async (t) => {
     const printed = await printedBy(t, 'start', 'Cache the views', '--factory', 'trip', '--workflows', 'dev');
-    const run = runRecord(printed[0].split(' ')[0]);
-    assert.equal(run.workflowDir, path.join(treeDir('trip'), 'workflows', 'dev'));
+    const run = runRecord(ROOT, printed[0].split(' ')[0]);
+    assert.equal(run.workflowDir, path.join(treeDir(ROOT, 'trip'), 'workflows', 'dev'));
     assert.equal(run.workflow?.find((step) => step.name === 'review')?.budget, 9);
     assert.equal(run.factory, 'trip');
   });
@@ -298,13 +298,13 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
     await printedBy(t, 'factory', 'schedule', 'trip', 'dev', '--cron', '* * * * *', '--brief', 'Cache the views');
     const started = await stage.runWith(stage.board().e, startDue(repo, [], Date.parse('2100-01-01T00:00:00Z')));
     assert.ok(started && 'run' in started, `the due schedule started a run: ${JSON.stringify(started)}`);
-    const run = runRecord(started.run);
-    assert.equal(run.workflowDir, path.join(treeDir('trip'), 'workflows', 'dev'));
+    const run = runRecord(ROOT, started.run);
+    assert.equal(run.workflowDir, path.join(treeDir(ROOT, 'trip'), 'workflows', 'dev'));
     assert.equal(run.workflow?.find((step) => step.name === 'review')?.budget, 9);
   });
 
   await s.test('a new version packed onto the archive is drift, left as it is, and nemia factory diff previews it', async (t) => {
-    const before = readStatus('trip')!;
+    const before = readStatus(ROOT, 'trip')!;
     edit(dir, 'nemia.yaml', (spec) => {
       spec.version = '0.2.0';
     });
@@ -318,12 +318,12 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
     assert.deepEqual(drifted, { type: 'Applied', status: 'False', reason: 'VersionDrift' });
     assert.ok(message.includes('nemia factory diff trip --to 0.2.0'), message);
     assert.equal(status.digest, before.digest);
-    assert.doesNotMatch(fs.readFileSync(path.join(treeDir('trip'), REVIEW), 'utf8'), /^rounds: 5$/m);
+    assert.doesNotMatch(fs.readFileSync(path.join(treeDir(ROOT, 'trip'), REVIEW), 'utf8'), /^rounds: 5$/m);
     const plan = await printedBy(t, 'factory', 'diff', 'trip', '--to', '0.2.0');
     assert.equal(plan[0], 'trip: 0.1.0 → 0.2.0');
     assert.ok(plan.includes(`  ${REVIEW}  from both, merged`), plan.join('\n'));
     assert.ok(plan.includes('conflicts: 0'), plan.join('\n'));
-    assert.deepEqual(readStatus('trip'), status, 'the plan writes nothing');
+    assert.deepEqual(readStatus(ROOT, 'trip'), status, 'the plan writes nothing');
     const board = stage.board();
     assert.deepEqual([board.filings, board.stopped], [[], []], 'no command of the trip filed on the engine');
   });

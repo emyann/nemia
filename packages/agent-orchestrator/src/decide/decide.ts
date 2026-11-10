@@ -2,7 +2,7 @@
  * What is left for a person to do about a run (`decision`), the commands `nemia decide` offers for it (`choicesOf`), and the cost lines it
  * prints (`costLine`, `runCostLines`). Pure.
  */
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { isRepositoryRun, refusedCheck, tryOf, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
 import type { Verdict } from '../check/check.ts';
 import {
@@ -253,7 +253,7 @@ const budgetStopped = (run: Run, name: string, spendOf: SpendOf): boolean => {
  * more than one session, what they have cost together (`stepSpend`) — then the cap in force on it. Pure. `not measured` where nobody
  * measured, never $0, and nothing of what it read where nobody counted that.
  */
-export function costLine(step: Workflow | undefined, run: Run, name: string, used: Consumed | undefined, spendOf: SpendOf): string {
+export function costLine(step: StepSpec | undefined, run: Run, name: string, used: Consumed | undefined, spendOf: SpendOf): string {
   const current = used?.costUsd !== undefined ? dollars(used.costUsd) : 'not measured';
   const read = readWords(used, step?.context);
   const record = run.steps[name];
@@ -324,7 +324,7 @@ const labelOf = (command: string): DecideCommand['label'] => {
  * (`runWords`) — a gated table condition whose table answered.
  */
 function waitingAtGates(
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   run: Run,
   statusOf: ReadonlyMap<string, StepStatus>,
   words: ReadonlyMap<string, StepStatus>,
@@ -338,7 +338,7 @@ function waitingAtGates(
 }
 
 /** For each step waiting at its gate on you (`awaitingApproval`), its approval and a send-back for each step it names (`sendBackTo`). */
-function gateChoices(steps: readonly Workflow[], run: Run, waiting: readonly string[]): DecideCommand[] {
+function gateChoices(steps: readonly StepSpec[], run: Run, waiting: readonly string[]): DecideCommand[] {
   return steps
     .filter((s) => waiting.includes(s.name))
     .flatMap((step): DecideCommand[] => {
@@ -369,7 +369,7 @@ function gateChoices(steps: readonly Workflow[], run: Run, waiting: readonly str
  *
  * Every command is a bare `nemia` or `git -C` line, never a sentence: an offer's is the one it was made with.
  */
-export function choicesOf(steps: readonly Workflow[], run: Run, d: Decision, offers: readonly Offer[]): DecideCommand[] {
+export function choicesOf(steps: readonly StepSpec[], run: Run, d: Decision, offers: readonly Offer[]): DecideCommand[] {
   if (d.kind !== 'awaiting') return [];
   const once = [
     ...offers.map(({ step, command, said }): DecideCommand => ({ label: labelOf(command), command, said, step })),

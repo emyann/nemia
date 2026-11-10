@@ -7,7 +7,7 @@ import { Result, Schema } from 'effect';
 import { attemptVerdict } from '../check/check.ts';
 import { summaryLine, type Closeout } from '../closeout/index.ts';
 import { stepTaskId, tryOf, type Run } from '../record/record.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { scriptRoute, type ScriptAnswer, type ScriptRead } from '../route/index.ts';
 
 /** A task's last attempt, as far as a script condition reads it: its exit and the answer file the runtime kept. */
@@ -20,7 +20,7 @@ export const attemptIn =
     views.get(taskId)?.state.attempts.at(-1);
 
 /** A condition whose eval is a script. */
-export const isScript = (step: Workflow | undefined): step is Workflow & { routes: string[] } =>
+export const isScript = (step: StepSpec | undefined): step is StepSpec & { routes: string[] } =>
   step?.routes !== undefined && step.route?.kind === 'script';
 
 const AnswerSchema = Schema.Struct({
@@ -51,7 +51,7 @@ export function scriptAnswerOf(text: string | undefined): ScriptAnswer | undefin
 }
 
 /** What a script condition's task said, off its last attempt: its exit verdict and its answer file, decoded (`scriptRoute`). */
-export function scriptRead(step: Workflow, run: Run, attemptOf: AttemptOf): ScriptRead | undefined {
+export function scriptRead(step: StepSpec, run: Run, attemptOf: AttemptOf): ScriptRead | undefined {
   const taskId = run.steps[step.name]?.taskId;
   if (!isScript(step) || !taskId || taskId !== stepTaskId(run, step.name, tryOf(run, step.name))) return undefined;
   const attempt = attemptOf(taskId);
@@ -64,7 +64,7 @@ export function scriptRead(step: Workflow, run: Run, attemptOf: AttemptOf): Scri
  * read (no answer, an undeclared route, a failed or stopped script) leaves it none, and its task's phase says the rest.
  */
 export const scriptCloseouts =
-  (steps: readonly Workflow[], attemptOf: AttemptOf, run: Run, closeoutOf: (step: string) => Closeout | undefined) =>
+  (steps: readonly StepSpec[], attemptOf: AttemptOf, run: Run, closeoutOf: (step: string) => Closeout | undefined) =>
   (name: string): Closeout | undefined => {
     const step = steps.find((s) => s.name === name);
     if (!isScript(step)) return closeoutOf(name);

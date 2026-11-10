@@ -5,8 +5,8 @@
  * runlist.verb.ts), and a warm read costs no record of a finished run (the big quiet store of rest-store.test.ts says the same on the
  * runtime itself); a plain list carries none of it, and a selector that is none is refused before any run is judged.
  *
- * `WF_ROOT` is set before the package is imported, since the store reads it as it loads; each test empties the store's runs first, and
- * a test that compares two answers, or orders runs by time, seeds `Date`.
+ * On a store of its own at `ROOT`, given as `ENV`; each test empties the store's runs first, and a test that compares two answers, or
+ * orders runs by time, seeds `Date`.
  */
 import { beforeEach, test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,30 +16,32 @@ import { testEngine } from 'agent-runtime/testing';
 import { scratch } from 'test-kit/scratch';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
+import { runList, type RunQuery } from '../run-list/run-list.verb.ts';
+import type { RunList, RunStatus } from 'objects';
+import { kindOf } from '../run-state/run-state.ts';
+import { judgedNow } from '../summary/summary.verb.ts';
+import { advanceRun, approveRun, startRun, runWith as runEngine } from '../runner.ts';
+import { Invalid } from '../refusal/refusal.ts';
+import { runRecord } from '../record/record.store.ts';
+import { engineOf } from '../runtime-client.ts';
+import { metered } from '../meter/tally.store.ts';
+import { informerMemo, type InformerMemo } from '../rest/informer.verb.ts';
+import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-runlist-');
 const RUNS_DIR = path.join(ROOT, 'runs');
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-process.env.WF_DEFAULT_FACTORY_STARTS = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { runList } = await import('../run-list/run-list.verb.ts');
-const { kindOf } = await import('../run-state/run-state.ts');
-const { judgedNow } = await import('../summary/summary.verb.ts');
-const { advanceRun, approveRun, startRun, runWith: runEngine } = await import('../runner.ts');
-const { Invalid } = await import('../refusal/refusal.ts');
-const { runRecord } = await import('../record/record.store.ts');
-const { engineOf } = await import('../runtime-client.ts');
-const { metered } = await import('../meter/tally.store.ts');
-const { informerMemo } = await import('../rest/informer.verb.ts');
-type RunList = import('objects').RunList;
-type RunStatus = import('objects').RunStatus;
-type RunQuery = import('../run-list/run-list.verb.ts').RunQuery;
+const ENV: Env = {
+  ...process.env,
+  WF_ROOT: ROOT,
+  WF_VERIFY_REST: '1',
+  WF_DEFAULT_FACTORY_STARTS: '1',
+  WF_MAX_CONCURRENT: undefined,
+  WF_MAX_RUNS: undefined,
+};
 
 const stand = eachTest(testPlace);
-const runWith = runOver(runEngine, () => stand().layer);
-const runPlaced = runGiven(() => stand().layer);
+const runWith = runOver(runEngine, () => stand().layer, ENV);
+const runPlaced = runGiven(() => stand().layer, ENV);
 const engine = eachTest(testEngine);
 const e = () => engineOf(engine().layer);
 
@@ -68,12 +70,12 @@ const started = async (steps: Record<string, string | null>, gates: string[] = [
   const repo = scratch('wf-runlist-repo-');
   stand().world.repository(repo, {});
   const run = await runPlaced(startRun({ brief: 'list me', repo, workflowDir: folder(steps), isolate, gates }));
-  await runWith(e(), advanceRun(runRecord(run.id)));
+  await runWith(e(), advanceRun(runRecord(ROOT, run.id)));
   return run.id;
 };
 
 /** One more pass over the run `id`. */
-const advanced = (id: string) => runWith(e(), advanceRun(runRecord(id)));
+const advanced = (id: string) => runWith(e(), advanceRun(runRecord(ROOT, id)));
 
 /** A run of one step that signed off: finished. */
 const aFinished = async () => {
@@ -102,11 +104,11 @@ const aWaiting = async () => {
 const cancelled = (id: string, at: number): void => fs.writeFileSync(path.join(RUNS_DIR, `${id}.cancelled`), new Date(at).toISOString());
 
 /** What a list keeps between requests: the informer; a fresh one for each read where none is given. */
-type Kept = { runs: import('../rest/informer.verb.ts').InformerMemo };
+type Kept = { runs: InformerMemo };
 const cold = (): Kept => ({ runs: informerMemo() });
 
 /** The RunList `query` asks, read through `kept`, verified as `env` says. */
-const list = async (query: RunQuery = {}, kept = cold(), env = process.env): Promise<RunList> =>
+const list = async (query: RunQuery = {}, kept = cold(), env: Env = ENV): Promise<RunList> =>
   await runWith(
     e(),
     runList(e(), { home: ROOT, memo: kept.runs, verify: env.WF_VERIFY_REST === '1' }, { memo: { said: new Map() } }, query),
@@ -158,7 +160,7 @@ test('each selector takes exactly the runs kindOf puts in its state; the counts 
         judgedNow(
           e(),
           ROOT,
-          all.map((id) => runRecord(id)),
+          all.map((id) => runRecord(ROOT, id)),
         ),
       )
     ).map((s) => [s.id, kindOf(s)]),
@@ -345,7 +347,7 @@ test('a run that waits on a run which never lands, held until one that will, wai
   seeded(t);
   const parent = await started({ work: null }, [], true);
   const lands = await anInFlight();
-  const { repo } = runRecord(parent) as { repo: string };
+  const { repo } = runRecord(ROOT, parent) as { repo: string };
   const child = await runPlaced(startRun({ brief: 'after it', repo, workflowDir: folder({ work: null }), after: [parent] }));
   cancelled(parent, T0 + MIN);
   fs.writeFileSync(
@@ -417,7 +419,7 @@ test('a warm read by state costs the records of the runs still moving alone: as 
   await aWaiting();
   await anInFlight();
   const kept = cold();
-  const unverified = { ...process.env, WF_VERIFY_REST: '0' };
+  const unverified = { ...ENV, WF_VERIFY_REST: '0' };
   const asked = { fieldSelector: 'status.state!=finished' };
   const warm = async (): Promise<number | undefined> => {
     await list(asked, kept, unverified);

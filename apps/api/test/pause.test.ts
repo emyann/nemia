@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
-import { engine, runStore } from 'agent-orchestrator';
+import { engine, runsAtOnce } from 'agent-orchestrator';
 import { app, appOf, liveOf } from '../src/app.ts';
 import { Engine } from '../src/store.ts';
 import type { PauseNowRead } from 'objects';
@@ -187,7 +187,7 @@ test('the board pauses the store and lifts it, refused a second of each; then re
       });
       assert.deepEqual({ by: pause.by, why: pause.why, timeoutMs: pause.timeoutMs }, { by: 'ann', why: 'the bill', timeoutMs: 0 });
       assert.deepEqual(stops, [], "a session is not stopped: the sessions' drain cuts its call, and it goes on as the same try");
-      assert.deepEqual(runStore.asks.read(id).asks, [], 'and it is asked no try');
+      assert.deepEqual(runsAtOnce(root).asks.read(id).asks, [], 'and it is asked no try');
       assert.equal((await asked('POST', { why: 'again' }, BOARD, on)).status, 409, 'a plain pause on one that stands');
       const again = await asked('POST', { now: true, why: 'again' }, BOARD, on);
       assert.equal(again.status, 200);

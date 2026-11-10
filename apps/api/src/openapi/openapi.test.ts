@@ -12,7 +12,7 @@ import path from 'node:path';
 import { Effect, JsonSchema, Schema, SchemaRepresentation } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { runObject, runStore } from 'agent-orchestrator';
+import { runObject, runsAtOnce } from 'agent-orchestrator';
 import { OpenApi } from 'effect/http-api';
 import { Api, KINDS } from 'objects';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
@@ -72,7 +72,7 @@ test('the OpenAPI document is 3.1.0, defines `Run`, and imports back into a Sche
   const back = SchemaRepresentation.fromJsonSchemaDocument(
     JsonSchema.fromSchemaOpenApi3_1({ $ref: '#/components/schemas/Run', $defs: doc.components.schemas }),
   ) as Schema.Decoder<unknown>;
-  const object = await runWith(engine(), runObject(runStore.runs.read(R), { memo: { said: new Map() } }));
+  const object = await runWith(engine(), runObject(runsAtOnce(root).runs.read(R), { memo: { said: new Map() } }));
   assert.ok(!('unjudged' in object), 'the run is judged');
   assert.deepEqual(Schema.decodeUnknownSync(back)(object), object, "the imported Schema decodes the package's object of the run");
   assert.ok(

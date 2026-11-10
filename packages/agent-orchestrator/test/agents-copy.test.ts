@@ -5,7 +5,8 @@
  * And a table: each copy the library or its source cannot take, refused by its kind and exit 2 before a byte is written, and a write
  * that fails part-way, which removes what this copy wrote and no other.
  *
- * `WF_ROOT` is set before the runner is imported, since it is read as the module loads.
+ * The test's store is its own, at `ROOT`, given to every program as `ENV`.
+
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,27 +20,26 @@ import { teamCopy } from './team.ts';
 import { names } from './assessed.ts';
 import { staged, story } from './story.ts';
 import { configGiven } from './config-given.ts';
+import { addFactoryAt, attachWorkflowAt, hireAgentAt } from '../src/factory/factory.store.ts';
+import { runWith as runEngine, startRun } from '../src/runner.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import { main } from '../src/cli/main.ts';
+import { AGENTS_COPY } from '../src/sources/copy.verb.ts';
+import { agentsRead as agentsReadAt } from '../src/roster/roster.store.ts';
+import { StoreRoot } from '../src/config/root.store.ts';
+import { agentsLines } from '../src/roster/roster.ts';
+import { agentSources } from '../src/sources/sources.store.ts';
+import { sourcesLines } from '../src/sources/sources.ts';
+import { AgentDoor } from '../src/agents/agent-door.store.ts';
+import { agentDoorMemory } from '../src/agents/agent-memory.store.ts';
+import { SkillDoor } from '../src/skills/skill-door.store.ts';
+import { skillDoorMemory } from '../src/skills/skill-memory.store.ts';
+import { AgentName, SkillName } from '../src/agents/agents.model.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-agents-copy-');
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-const { addFactoryAt } = await import('../src/factory/factory.store.ts');
-const { runWith: runEngine, startRun } = await import('../src/runner.ts');
-const { addFactory, attachWorkflow, hireAgent } = await import('../testing.ts');
-const { engineOf } = await import('../src/runtime-client.ts');
-const { main } = await import('../src/cli/main.ts');
-const { AGENTS_COPY } = await import('../src/sources/copy.verb.ts');
-const { agentsRead: agentsReadAt } = await import('../src/roster/roster.store.ts');
-const { StoreRoot } = await import('../src/config/root.store.ts');
-const { agentsLines } = await import('../src/roster/roster.ts');
-const { agentSources } = await import('../src/sources/sources.store.ts');
-const { sourcesLines } = await import('../src/sources/sources.ts');
-const { AgentDoor } = await import('../src/agents/agent-door.store.ts');
-const { agentDoorMemory } = await import('../src/agents/agent-memory.store.ts');
-const { SkillDoor } = await import('../src/skills/skill-door.store.ts');
-const { skillDoorMemory } = await import('../src/skills/skill-memory.store.ts');
-const { AgentName, SkillName } = await import('../src/agents/agents.model.ts');
-const stage = staged({ runWith: runEngine, main, engineOf });
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
+const stage = staged({ runWith: runEngine, main, engineOf, env: ENV });
 
 /** `nemia agents`' reading of `repo` and the store `home`, through the Agent and Skill doors at that store's root. */
 const agentsRead = (at: { repo: string; home: string }) => Effect.runSync(agentsReadAt(at).pipe(Effect.provideService(StoreRoot, at.home)));
@@ -51,7 +51,7 @@ const FIXTURE = path.join(import.meta.dirname, 'fixtures', 'agents-copy', 'repo'
 
 /** The copy `args` asks for, into the library of the store `home`. */
 const copy = (args: { file: string; as?: string; keep?: readonly string[] }, home: string) =>
-  stage.runWith(stage.board().e, AGENTS_COPY.handler(args).pipe(Effect.provide(configGiven(home, process.env))));
+  stage.runWith(stage.board().e, AGENTS_COPY.handler(args).pipe(Effect.provide(configGiven(home, ENV))));
 
 /** `nemia agents sources`' program over the store `home`, as its handler runs it: what it lists, or the refusal it fails with. */
 const sourcesAt = (ask: { at?: string; home: string }) =>
@@ -143,10 +143,10 @@ test('copy an agent into the library: hired and run under its new name, copied a
     fs.writeFileSync(path.join(repo, 'README.md'), 'x\n');
     stage.place().world.repository(repo, {});
     stage.place().world.commit(repo, 'base');
-    addFactory({ name: 'acme', repos: [repo] });
-    attachWorkflow({ factory: 'acme', workflow: 'build' });
-    hireAgent({ factory: 'acme', agent: 'implementer', step: 'build/implement' });
-    hireAgent({ factory: 'acme', agent: 'critic', step: 'build/review' });
+    addFactoryAt(ROOT, { name: 'acme', repos: [repo] });
+    attachWorkflowAt(ROOT, { factory: 'acme', workflow: 'build' });
+    hireAgentAt(ROOT, { factory: 'acme', agent: 'implementer', step: 'build/implement' });
+    hireAgentAt(ROOT, { factory: 'acme', agent: 'critic', step: 'build/review' });
     const run = await stage.runPlaced(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'acme' }));
     assert.equal(run.workflow?.find((step) => step.name === 'review')?.agent?.name, 'critic');
   });
@@ -325,7 +325,7 @@ test('REFUSED: a copy the library or its source cannot take, by kind and exit 2 
       yield* skills.write(name, theirs, undefined, path.join(team, 'skills'), { anywhere: true });
       const ours = aSkill('review-a-change', { body: 'Our own way.' });
       yield* skills.write(name, ours, undefined, libraryOf(home).skills, { anywhere: true });
-      return yield* AGENTS_COPY.handler({ file: reviewer(team) }).pipe(Effect.provide(configGiven(home, process.env)));
+      return yield* AGENTS_COPY.handler({ file: reviewer(team) }).pipe(Effect.provide(configGiven(home, ENV)));
     }).pipe(Effect.provide(skillDoorMemory()));
     await assert.rejects(
       stage.runWith(stage.board().e, program),

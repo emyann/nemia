@@ -220,7 +220,7 @@ export const engine = (env: Env): Engine => {
     RuntimeEngine.layer({
       root: engineRoot(root),
       harnesses,
-      holder: holderOption(),
+      holder: holderOption(root),
       credentials: credentialsAt(root),
       missingCredential,
       ...storeAdmission(root, config),
@@ -245,12 +245,12 @@ const engineRoot = (root: string): string => path.join(root, 'engine');
  * The names are the runtime's rule and not a literal of ours: filtering `HARNESSES` here would teach this file an eighth harness
  * word, where the count only shrinks (`test/words.test.ts`).
  */
-const holderOption = (): Record<string, () => { card: Record<string, unknown> } | undefined> =>
-  Object.fromEntries(heldHarnessesOf(HARNESSES).map((name) => [name, () => cardOnStore(name)]));
+const holderOption = (root: string): Record<string, () => { card: Record<string, unknown> } | undefined> =>
+  Object.fromEntries(heldHarnessesOf(HARNESSES).map((name) => [name, () => cardOnStore(root, name)]));
 
 /** The card the holder of this store serves for `harness`, as the runtime configures an agent with it, or `undefined`. */
-const cardOnStore = (harness: string): { card: Record<string, unknown> } | undefined => {
-  const card = servesOnStore()?.[harness];
+const cardOnStore = (root: string, harness: string): { card: Record<string, unknown> } | undefined => {
+  const card = servesOnStore(root)?.[harness];
   return card === undefined ? undefined : { card };
 };
 
@@ -417,7 +417,7 @@ export function remoteAgents(root: string): ReadonlyMap<string, RemoteAgent> {
 export const credentialsAt =
   (root: string): Credentials =>
   (scheme, _agentUrl, harness) => {
-    if (scheme === BEARER && servesOnStore()?.[harness] !== undefined) return holderTokenOf(engineRoot(root));
+    if (scheme === BEARER && servesOnStore(root)?.[harness] !== undefined) return holderTokenOf(engineRoot(root));
     const name = remoteNameOf(harness);
     return name === undefined ? undefined : process.env[envNameOf(name, scheme)] || undefined;
   };

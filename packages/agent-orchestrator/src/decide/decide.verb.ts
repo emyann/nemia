@@ -13,7 +13,7 @@ import type { ToDecide } from '../ending/ending.ts';
 import { type Run } from '../record/record.ts';
 import type { SaidTo } from '../say/say.ts';
 import type { BranchStanding, Round, SpendOf } from '../status/status.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { hasStarted, holdsOf, waitedOn, waitsOf, type Wait } from '../wait/wait.ts';
 import { roundOffers } from '../round/round.ts';
 import { deniedWords, harnessWaitLine } from '../list/list.ts';
@@ -49,6 +49,7 @@ import { PlaceService } from '../place/place.store.ts';
 import { readRun } from '../tick/told.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /** A step's current try that a person answered: the try, what they said, and what the try before it needed, when it said. */
 export type Answered = { try: number; message: string; needs?: string };
@@ -57,7 +58,7 @@ export type Answered = { try: number; message: string; needs?: string };
 export type Decided = {
   run: Run;
   /** The run's steps, in the order they run, as the decision read them (`stepsOf`). */
-  steps: Workflow[];
+  steps: StepSpec[];
   decision: Decision;
   closeouts: Record<string, Closeout | { error: string } | undefined>;
   /**
@@ -205,7 +206,7 @@ function saidOf(run: Run, everyTry: ReadonlyMap<string, TaskView>): Record<strin
 }
 
 /** For each step with a try, its `cost` line (`costLine`), off what its current try used. */
-const costsOf = (steps: readonly Workflow[], run: Run, used: Record<string, Usage | undefined>, spendOf: SpendOf): Record<string, string> =>
+const costsOf = (steps: readonly StepSpec[], run: Run, used: Record<string, Usage | undefined>, spendOf: SpendOf): Record<string, string> =>
   Object.fromEntries(
     Object.entries(run.steps)
       .filter(([, record]) => record.taskId || record.tries?.length)
@@ -259,6 +260,7 @@ function deniedLinesOf(run: Run, views: ReadonlyMap<string, TaskView>): Record<s
  * read threw (`Missing`, for a run that is not there); dies of anything else (`tried`).
  */
 export const decideRun = Effect.fn('decide')(function* (id: string, standing?: StandingAsker) {
+  const home = yield* StoreRoot;
   const config = yield* StoreConfig;
   const e = viewedOnce(yield* EngineService);
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
@@ -272,7 +274,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, standing?: S
   );
   const place = yield* PlaceService;
   const memo = statusMemo((r) => headsOver(live.read())(r), place);
-  const checkout = yield* checkoutHold(e, run, steps, { standing: live.standing }, config, memo);
+  const checkout = yield* checkoutHold(home, e, run, steps, { standing: live.standing }, config, memo);
   const withCheckout = { ...base, checkout };
   const unasked = decision(withCheckout, landedOf(run, standingReader(NOTHING_READ)));
   const git = yield* live.when(unasked.kind !== 'running' && unasked.kind !== 'cancelled');
@@ -282,7 +284,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, standing?: S
   const assessed = assess(read);
   const decide = assessed.toDecide;
   const ending = collisionsDue(steps, run, decide);
-  const collisions = ending ? yield* collisionsAt(run, ending, standings, git, place) : undefined;
+  const collisions = ending ? yield* collisionsAt(home, run, ending, standings, git, place) : undefined;
   const answers = yield* answersOf(e, run, views, yield* (yield* RunDoor).asks.answers(RunId.read(id)));
   const everyTry = yield* everyTryOf(e, run, views);
   const said = saidOf(run, everyTry);

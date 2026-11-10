@@ -2,8 +2,7 @@
  * A template's folder on disk, beyond the round trip of `test/template-trip.test.ts`: three tables, what `nemia template export`
  * writes from a repository and a factory, each draft passing `nemia template lint`; what export, pack, unpack and lint refuse, each
  * writing nothing; and each problem of a folder at its file and line. The system's own `tar` and a named pipe, which start a real
- * process, are `test/template-tar.boundary.test.ts`. `WF_ROOT` is set before the import, since the store's modules read it as they
- * load.
+ * process, are `test/template-tar.boundary.test.ts`. On a store of its own at `ROOT`, given as `ENV`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,24 +20,25 @@ import { anAgent } from '../../test/agent-walks.ts';
 import { Cause, Effect, Exit } from 'effect';
 import type { StoreRoot as Root } from '../config/root.store.ts';
 import { packArchive } from '../archive/archive.ts';
+import { checkedTree, packageSkillNames, problemLine } from './template.store.ts';
+import { TemplateDoor } from './door/templates.store.ts';
+import { TemplateSource } from './door/templates.model.ts';
+import { StoreRoot } from '../config/root.store.ts';
+import { addFactoryAt, attachWorkflowAt, hireAgentAt } from '../factory/factory.store.ts';
+import { writeRules } from '../factory/rules/rules.store.ts';
+import { followed } from '../../test/factory-planted.ts';
+import { main } from '../cli/main.ts';
+import { engineOf } from '../runtime-client.ts';
+import { exportedTemplate, packedTemplate, unpackedTemplate } from './template.verb.ts';
+import { AgentDoor } from '../agents/agent-door.store.ts';
+import { agentDoorMemory } from '../agents/agent-memory.store.ts';
+import { AgentName } from '../agents/agents.model.ts';
+import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-template-');
-process.env.WF_ROOT = ROOT;
-const { checkedTree, packageSkillNames, problemLine } = await import('./template.store.ts');
-const { TemplateDoor } = await import('./door/templates.store.ts');
-const { TemplateSource } = await import('./door/templates.model.ts');
-const { StoreRoot } = await import('../config/root.store.ts');
-const { addFactory, attachWorkflow, hireAgent } = await import('../../testing.ts');
-const { writeRules } = await import('../factory/rules/rules.store.ts');
-const { followed } = await import('../../test/factory-planted.ts');
-const { main } = await import('../cli/main.ts');
-const { engineOf } = await import('../runtime-client.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 const engine = eachTest(testEngine);
 heldUnasked(engine);
-const { exportedTemplate, packedTemplate, unpackedTemplate } = await import('./template.verb.ts');
-const { AgentDoor } = await import('../agents/agent-door.store.ts');
-const { agentDoorMemory } = await import('../agents/agent-memory.store.ts');
-const { AgentName } = await import('../agents/agents.model.ts');
 
 /** `program` run at the store's root, as the CLI runs a verb's: what it answers, or the refusal it failed with, thrown. */
 function run<A>(program: Effect.Effect<A, unknown, Root>): A {
@@ -125,9 +125,9 @@ function factoryOnTeam(name: string): string {
   const repo = repoWithTeam();
   fs.mkdirSync(path.join(repo, 'workflows', 'solo'));
   fs.writeFileSync(path.join(repo, 'workflows', 'solo', 'work.md'), '---\nplace: git\n---\nDo the work.\n');
-  addFactory({ name, repos: [repo] });
-  attachWorkflow({ factory: name, workflow: 'solo' });
-  hireAgent({ factory: name, agent: 'implementer', step: 'solo/work' });
+  addFactoryAt(ROOT, { name, repos: [repo] });
+  attachWorkflowAt(ROOT, { factory: name, workflow: 'solo' });
+  hireAgentAt(ROOT, { factory: name, agent: 'implementer', step: 'solo/work' });
   return repo;
 }
 
@@ -318,7 +318,7 @@ test('what export writes from a repository and a factory, read back as it was wr
       const none = target();
       exportTemplate({ dir: none, from: repo, factory: 'ruled' });
       assert.equal(fs.existsSync(path.join(none, 'RULES.md')), false, 'a factory with no rules writes none');
-      const kept = writeRules({ name: 'ruled' }, 'Never push on a Friday.');
+      const kept = writeRules(ROOT, { name: 'ruled' }, 'Never push on a Friday.');
       const dir = target();
       const { from } = exportTemplate({ dir, from: repo, factory: 'ruled' });
       assert.deepEqual(checkTemplateAt(dir), []);
@@ -391,7 +391,7 @@ test('what export, pack, unpack and lint refuse, by kind and exit 2, each writin
     'with --factory: a workflow it attaches that the repository lacks, a step hired and filled by its own agent:, and another repository',
     () => {
       const repo = factoryOnTeam('gaps');
-      attachWorkflow({ factory: 'gaps', workflow: 'ghost' });
+      attachWorkflowAt(ROOT, { factory: 'gaps', workflow: 'ghost' });
       const factoryFile = path.join(ROOT, 'factories', 'gaps.json');
       const record = JSON.parse(fs.readFileSync(factoryFile, 'utf8'));
       fs.writeFileSync(
@@ -422,7 +422,7 @@ test('what export, pack, unpack and lint refuse, by kind and exit 2, each writin
     exportTemplate({ dir, from: repoWithTeam() });
     fs.writeFileSync(path.join(dir, 'nemia.yaml'), fs.readFileSync(path.join(dir, 'nemia.yaml'), 'utf8').replace('v1alpha1', 'v2'));
     await assert.rejects(
-      main(['template', 'lint', dir], engineOf(engine().layer)),
+      main(['template', 'lint', dir], engineOf(engine().layer), undefined, undefined, ENV),
       refusedWith('Invalid', 'with 1 problem', /\nnemia\.yaml:1:\d+: apiVersion /, '"nemia.dev/v2"'),
     );
   });
@@ -493,11 +493,11 @@ test('what export, pack, unpack and lint refuse, by kind and exit 2, each writin
       const archive = path.join(scratch('wf-template-pack-'), 'bad.tgz');
       fs.writeFileSync(archive, packArchive('team', files).archive);
       await assert.rejects(
-        main(['template', 'lint', archive], engineOf(engine().layer)),
+        main(['template', 'lint', archive], engineOf(engine().layer), undefined, undefined, ENV),
         refusedWith('Invalid', 'bad.tgz does not pass', 'with 1 problem', /\nnemia\.yaml:1:\d+: apiVersion /, '"nemia.dev/v2"'),
       );
       await assert.rejects(
-        main(['template', 'lint', path.join(dir, 'none')], engineOf(engine().layer)),
+        main(['template', 'lint', path.join(dir, 'none')], engineOf(engine().layer), undefined, undefined, ENV),
         refusedWith('Missing', 'is neither a folder nor a file', "name a template's folder", 'or an archive'),
       );
     },

@@ -12,7 +12,7 @@ import path from 'node:path';
 import { Result, Schema } from 'effect';
 import { codex, CODEX_SANDBOXES } from 'agent-runtime';
 import { CLAUDE_AUTO_DROPPED } from 'agent-runtime/vocabulary';
-import { asNamed, autoDropped, modeOf, parseAgent, parseWorkflow, WorkflowError, type Agents, type Workflow } from '../src/workflow.ts';
+import { asNamed, autoDropped, modeOf, parseAgent, parseWorkflow, WorkflowError, type Agents, type StepSpec } from '../src/workflow.ts';
 import { FrozenStepSchema } from '../src/folder/folder.store.ts';
 import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { agentsFor, agentVersion } from '../src/agents/read.store.ts';
@@ -34,7 +34,6 @@ import { scratch } from 'test-kit/scratch';
 import { names } from './assessed.ts';
 
 const ROOT = scratch('wf-render-');
-process.env.WF_ROOT = ROOT;
 
 /** A tree of files under a fresh directory, each written from `files` by its path from it; the directory. */
 function tree(files: Record<string, string>): string {
@@ -75,7 +74,7 @@ const team = (agent: string, files: Record<string, string>, step = "---\nagent: 
   );
 
 /** A step as the parser resolves it from a team of one. */
-const resolved = (agent: string, files: Record<string, string> = {}, step?: string): Workflow => loadWorkflows(team(agent, files, step))[0];
+const resolved = (agent: string, files: Record<string, string> = {}, step?: string): StepSpec => loadWorkflows(team(agent, files, step))[0];
 
 /**
  * The heading each layer Nemia composes is told under: its number in the precedence and the owner whose words follow. Written out here,
@@ -98,7 +97,7 @@ const scribeWith = (custom?: string, keys = 'tools: Read'): Agents =>
   ]);
 
 /** The step `build` naming the scribe, its own note in Spanish, with `lines` in its frontmatter, in a factory whose rules are `rules`. */
-const buildWith = (agents: Agents, rules?: string, lines = 'harness: claude'): Workflow =>
+const buildWith = (agents: Agents, rules?: string, lines = 'harness: claude'): StepSpec =>
   parseWorkflow(
     'build',
     `---\nplace: git\nagent: scribe\n${lines}\n---\nReply in Spanish.\n`,
@@ -420,7 +419,7 @@ test("renderedFlags: the prompt appended or in place of Claude Code's, the plugi
 test("enabledSkillsOf: a step's session is given its plugin's copies of its skills and no other, as a closed list", async (t) => {
   const files = { 'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note'), 'workflows/skills/other/SKILL.md': SKILL('other') };
   const step = resolved('---\nskills: write-a-note\n---\nYou build.\n', files);
-  const table: Array<[string, Workflow, string[] | 'default']> = [
+  const table: Array<[string, StepSpec, string[] | 'default']> = [
     [
       "its agent's skill, as its plugin holds it, and neither the one no line names nor the place skill",
       step,
@@ -442,11 +441,11 @@ const AGENTS: Agents = new Map([
 ]);
 
 /** The step `build` written with `lines` as its frontmatter and `note` as its own words, resolved with the agents above. */
-const stepOf = (lines: string, note = 'Build it.', rules?: string): Workflow =>
+const stepOf = (lines: string, note = 'Build it.', rules?: string): StepSpec =>
   parseWorkflow('build', `---\nplace: git\n${lines}\n---\n${note}\n`, undefined, AGENTS, undefined, undefined, rules);
 
 /** A run of `steps`, none filed, asked for `brief`. */
-const runOf = (steps: readonly Workflow[], brief = 'add a flag'): RepositoryRun => ({
+const runOf = (steps: readonly StepSpec[], brief = 'add a flag'): RepositoryRun => ({
   id: 'r-1',
   repo: '/repo',
   workspace: '/wt',
@@ -460,7 +459,7 @@ const runOf = (steps: readonly Workflow[], brief = 'add a flag'): RepositoryRun 
 });
 
 /** What `step` would be told as the first step of a run of it alone. */
-const briefOf = (step: Workflow): string => composeBrief(step, runOf([step]), [step]);
+const briefOf = (step: StepSpec): string => composeBrief(step, runOf([step]), [step]);
 
 const TASK = '## What was asked for\n\nadd a flag';
 

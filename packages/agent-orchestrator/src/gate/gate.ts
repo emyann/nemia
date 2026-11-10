@@ -2,7 +2,7 @@
  * A gate, from a person's side: the words refused with an approval (`approvalWordsRefusal`), why `nemia approve` will not approve a step
  * (`approvalRefusal`), and whether a step's task, held open, waits for a person's word on this pass (`holdsOpen`). Pure.
  */
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { andList, endedForGood, tryOf, type Run, type StepStatus } from '../record/record.ts';
 import { heard, modeWord, retryable } from '../retry/index.ts';
 import { approvalOf, approvedFirst, branchWord, gatesOf, hasGate, notHandedOn, resultOnBase, standing } from '../status/status.ts';
@@ -155,7 +155,7 @@ function gateWord(filed: boolean, word: StepStatus | undefined, stood: () => Ste
  * to do instead. A table condition never filed (`filed` false) says it in a condition's words: its producer not signed off, its table
  * answering no route, off the route taken. Pure.
  */
-function notAtItsGate(step: Workflow, run: Run, filed: boolean, status: StepStatus): string {
+function notAtItsGate(step: StepSpec, run: Run, filed: boolean, status: StepStatus): string {
   const { name } = step;
   if (step.route?.kind === 'table' && !filed) {
     const producer = firstPiece(step.route.from, '.');
@@ -195,7 +195,7 @@ export type ApproveForm = 'gate' | 'loop';
  * a loop is approved at its gate while it waits there, and its loop ended otherwise. Pure.
  */
 export function approveFormOf(
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   run: Pick<Run, 'gates'>,
   name: string | undefined,
   atGate: () => boolean,

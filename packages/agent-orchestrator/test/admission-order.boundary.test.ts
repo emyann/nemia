@@ -3,7 +3,8 @@
  * filed ahead of it, by the priority the orchestrator files it with. Admission is the runtime's, and the engine's stand-in runs no pass,
  * so this keeps the real engine over a journal in memory, and git beside it; what the orchestrator files is walked in store.test.ts.
  *
- * `WF_ROOT` is set before the runner is imported, since it is read as the module loads.
+ * The test's store is its own, at `ROOT`, given to every program as `ENV`.
+
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,6 +21,9 @@ import { promised } from './promised.ts';
 import { Effect } from 'effect';
 import { plainEngine } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
+import { advanceRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-admission-order-');
 const WORKFLOW = path.join(ROOT, 'workflow');
@@ -28,14 +32,9 @@ fs.mkdirSync(WORKFLOW, { recursive: true });
 fs.writeFileSync(path.join(WORKFLOW, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
 fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
 
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { advanceRun, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
-const { runRecord } = await import('../src/record/record.store.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
+const runWith = runOver(runEngine, gitPlaceLayer, ENV);
+const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
@@ -232,11 +231,11 @@ test("REFUSED without the momentum: at a ceiling of one, the runtime admits a ru
   const a = await started(folder());
   const b = await started(folder());
   const filedBy = board();
-  await runWith(filedBy.e, advanceRun(runRecord(a.id)));
-  await runWith(filedBy.e, advanceRun(runRecord(b.id)));
+  await runWith(filedBy.e, advanceRun(runRecord(ROOT, a.id)));
+  await runWith(filedBy.e, advanceRun(runRecord(ROOT, b.id)));
   filedBy.settle(`${a.id}-implement`, 'succeeded', SIGNED);
   assert.deepEqual(
-    (await runWith(filedBy.e, advanceRun(runRecord(a.id)))).filed,
+    (await runWith(filedBy.e, advanceRun(runRecord(ROOT, a.id)))).filed,
     ['review'],
     "run a's implement has ended; run b has filed its implement; a's review is filed after it, a pass later",
   );

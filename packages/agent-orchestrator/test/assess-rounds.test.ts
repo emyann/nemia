@@ -54,7 +54,7 @@ import {
   type TryCause,
 } from '../src/retry/retry-ask.ts';
 import { tryOf } from '../src/record/record.ts';
-import type { OutputSchema, Workflow } from '../src/workflow.ts';
+import type { OutputSchema, StepSpec } from '../src/workflow.ts';
 import { aRead, listing, names, namesFor, phases, run, step, STEPS } from './assessed.ts';
 import { PRECEDENCE } from '../src/brief/index.ts';
 import type { Verdict } from '../src/check/check.ts';
@@ -87,7 +87,7 @@ const LOOPING: OutputSchema = {
   required: ['findings', 'again'],
 };
 /** implement, checked → review, looping back to it with `rounds: 3` as the parser sets it — and ship, after the loop. */
-const LOOP: Workflow[] = [
+const LOOP: StepSpec[] = [
   { ...step('implement'), check: 'npm test' },
   { ...step('review', ['implement']), output: { file: 'review.schema.json', schema: LOOPING }, loop: 'implement', rounds: 3 },
   step('ship', ['review']),
@@ -197,13 +197,13 @@ const spends =
       ? { usd: usd[id] ?? 0, measured: id in usd ? 1 : 0, unmeasured: id in usd ? 0 : 1, budgetEnded: budgetEnded.includes(id) }
       : undefined;
 /** implement checked, with `retries: 2` and a $3 budget, on claude; review after it. */
-const BUDGETED: Workflow[] = [{ ...step('implement'), check: 'npm test', retries: 2, budget: 3 }, step('review', ['implement'])];
+const BUDGETED: StepSpec[] = [{ ...step('implement'), check: 'npm test', retries: 2, budget: 3 }, step('review', ['implement'])];
 /** implement on try 2 — `retries:` filed it — its check refused again. */
 const refusedTwice = () => onTry([{ taskId: 't0', check: { taskId: 'c0' }, cause: 'retries' }], 'c1');
 const REFUSED_TWICE = { t0: 'succeeded', c0: 'failed', t1: 'succeeded', c1: 'failed' } as const;
 /** What the tick and `nemia ls` read beside a step's phases: its verdict, the person's asks and what was spent. */
 type Read = { verdict?: (step: string) => Verdict | undefined; asks?: RetryAsk[]; rounds?: RoundAsk[]; spent?: SpendOf };
-const assessed = (steps: Workflow[], r: Run, p: (id: string) => TaskPhase, saidOf: (name: string) => Closeout | undefined, o: Read = {}) =>
+const assessed = (steps: StepSpec[], r: Run, p: (id: string) => TaskPhase, saidOf: (name: string) => Closeout | undefined, o: Read = {}) =>
   assess(
     aRead(steps, r, {
       phaseOf: p,
@@ -216,7 +216,7 @@ const assessed = (steps: Workflow[], r: Run, p: (id: string) => TaskPhase, saidO
       spendOf: o.spent,
     }),
   );
-const decided = (steps: Workflow[], r: Run, p: (id: string) => TaskPhase, saidOf: (name: string) => Closeout | undefined, o: Read = {}) =>
+const decided = (steps: StepSpec[], r: Run, p: (id: string) => TaskPhase, saidOf: (name: string) => Closeout | undefined, o: Read = {}) =>
   decision(
     aRead(steps, r, {
       phaseOf: p,
@@ -230,7 +230,7 @@ const decided = (steps: Workflow[], r: Run, p: (id: string) => TaskPhase, saidOf
     }),
     nothingShipped,
   );
-const listed = (steps: Workflow[], r: Run, p: (id: string) => ListedPhase, saidOf: (name: string) => Closeout | undefined, o: Read = {}) =>
+const listed = (steps: StepSpec[], r: Run, p: (id: string) => ListedPhase, saidOf: (name: string) => Closeout | undefined, o: Read = {}) =>
   listing({
     steps,
     run: r,
@@ -243,16 +243,16 @@ const listed = (steps: Workflow[], r: Run, p: (id: string) => ListedPhase, saidO
     spendOf: o.spent ?? (() => undefined),
   });
 const OVER = { verdict: () => 1 as const, spent: spends({ t0: 1.75, t1: 2.5 }) };
-const B: Workflow[] = [{ ...step('implement'), budget: 3 }, step('review', ['implement'])];
+const B: StepSpec[] = [{ ...step('implement'), budget: 3 }, step('review', ['implement'])];
 const nothingSaid = () => undefined;
 const loopSpends =
   (usd: Record<string, number>): SpendOf =>
   (id) =>
     id in usd ? { usd: usd[id], measured: 1, unmeasured: 0, budgetEnded: false } : undefined;
 /** implement checked with a $3 budget, in the loop. */
-const BUDGETED_LOOP: Workflow[] = [{ ...IMPLEMENT, budget: 3 }, LOOPING_REVIEW, LOOP[2]];
+const BUDGETED_LOOP: StepSpec[] = [{ ...IMPLEMENT, budget: 3 }, LOOPING_REVIEW, LOOP[2]];
 type LoopRead = { rounds?: RoundAsk[]; spent?: SpendOf; verdict?: () => 0 | undefined };
-const assessedInLoop = (steps: Workflow[], r: Run, saidOf: (name: string) => Closeout | undefined, o: LoopRead = {}) =>
+const assessedInLoop = (steps: StepSpec[], r: Run, saidOf: (name: string) => Closeout | undefined, o: LoopRead = {}) =>
   assess(
     aRead(steps, r, {
       phaseOf: ALL_SUCCEEDED,
@@ -266,7 +266,7 @@ const assessedInLoop = (steps: Workflow[], r: Run, saidOf: (name: string) => Clo
     }),
   );
 const decidedInLoop = (
-  steps: Workflow[],
+  steps: StepSpec[],
   r: Run,
   saidOf: (name: string) => Closeout | undefined,
   o: LoopRead = {},
@@ -285,7 +285,7 @@ const decidedInLoop = (
     }),
     nothingShipped,
   );
-const listedInLoop = (steps: Workflow[], r: Run, saidOf: (name: string) => Closeout | undefined, o: LoopRead = {}) =>
+const listedInLoop = (steps: StepSpec[], r: Run, saidOf: (name: string) => Closeout | undefined, o: LoopRead = {}) =>
   listing({
     steps,
     run: r,
@@ -458,12 +458,12 @@ test("a person's `nemia approve` ends a loop out of rounds on their word, as if 
     assert.deepEqual(roundLines(LOOP, r, d), []);
   });
   await t.test('a gated ending goes to its gate; a gate on the looping step holds once accepted, not while asking', () => {
-    const GATED: Workflow[] = [IMPLEMENT, LOOPING_REVIEW, { ...LOOP[2], gate: true }];
+    const GATED: StepSpec[] = [IMPLEMENT, LOOPING_REVIEW, { ...LOOP[2], gate: true }];
     const filed: Run = { ...r, steps: { ...r.steps, ship: { taskId: 's1' } } };
     const saidShip = (name: string) => (name === 'ship' ? signedDone() : said(name));
     assert.deepEqual(assess(aRead(GATED, r, { phaseOf: ALL_SUCCEEDED, signedOff: said, asked })).ready, ['ship']);
     assert.equal(stepStatus(GATED[2], filed, ALL_SUCCEEDED, saidShip, asked, GATED), 'awaiting approval');
-    const GATED_LOOP: Workflow[] = [IMPLEMENT, { ...LOOPING_REVIEW, gate: true }, LOOP[2]];
+    const GATED_LOOP: StepSpec[] = [IMPLEMENT, { ...LOOPING_REVIEW, gate: true }, LOOP[2]];
     assert.equal(stepStatus(GATED_LOOP[1], r, ALL_SUCCEEDED, said, asked, GATED_LOOP), 'awaiting approval');
     assert.equal(stepStatus(GATED_LOOP[1], inRound(3), ALL_SUCCEEDED, said, asked, GATED_LOOP), 'exhausted');
   });
@@ -475,7 +475,7 @@ test("a person's `nemia approve` ends a loop out of rounds on their word, as if 
 });
 
 test('a round moves the loop: round 2 goes as round 1 went', async (t) => {
-  const chain: Workflow[] = [IMPLEMENT, step('test', ['implement']), { ...LOOPING_REVIEW, after: ['test'] }];
+  const chain: StepSpec[] = [IMPLEMENT, step('test', ['implement']), { ...LOOPING_REVIEW, after: ['test'] }];
   const steps = {
     implement: { taskId: 'r-1-implement', check: { taskId: 'r-1-implement-check' } },
     test: { taskId: 'r-1-test' },
@@ -635,7 +635,7 @@ test("composeBrief of round 1's empty replies: handed to nobody", async (t) => {
     assert.doesNotMatch(second, /"replies"/);
   });
   await t.test("a step that reads implement's output is handed nothing of it", () => {
-    const reader: Workflow = { ...step('ship', ['review']), input: ['implement'] };
+    const reader: StepSpec = { ...step('ship', ['review']), input: ['implement'] };
     assert.doesNotMatch(composeBrief(reader, inRound(1), [LOOP[0], LOOP[1], reader], reads, FILES), /"replies"|IMPLEMENTER-SUMMARY/);
   });
   await t.test("the target's own round-1 brief says to answer `[]`; a step no loop comes back to is told nothing", () => {
@@ -847,7 +847,7 @@ test('REFUSED past its budget, at shipped defaults: a step whose ended tries cos
     });
   }
   await t.test('a step with no `budget:` is never over one, nor one read with nothing spent', () => {
-    const RETRIED: Workflow[] = [{ ...step('implement'), check: 'npm test', retries: 2 }, step('review', ['implement'])];
+    const RETRIED: StepSpec[] = [{ ...step('implement'), check: 'npm test', retries: 2 }, step('review', ['implement'])];
     assert.equal(stepStatus(RETRIED[0], r, p, signedDone, asked, RETRIED, OVER.spent, OVER.verdict), 'failed (check)');
     assert.equal(stepStatus(BUDGETED[0], r, p, signedDone, asked, BUDGETED), 'failed (check)');
   });
@@ -920,7 +920,7 @@ test('REFUSED by name: `nemia retry` of a step over its budget', async (t) => {
     });
   }
   await t.test('`retries:` spent, under its cap: a raise above the cap in force is taken, one not above refused', () => {
-    const spentOut: Workflow[] = [{ ...BUDGETED[0], retries: 1 }, BUDGETED[1]];
+    const spentOut: StepSpec[] = [{ ...BUDGETED[0], retries: 1 }, BUDGETED[1]];
     const out = (how: RetryHow) =>
       retryRefusal(spentOut, r, 'implement', how, p, signedDone, asked, OVER.verdict, [], () => false, spends({ t0: 1, t1: 1 }));
     assert.equal(out({ mode: 'continue', budget: 10 }), null);
@@ -953,7 +953,7 @@ test('REFUSED by name: `nemia retry` of a step over its budget', async (t) => {
 });
 
 test('a step blocked under its cap takes a `--budget` above it, not past its cap', async (t) => {
-  const B20: Workflow[] = [{ ...step('implement'), budget: 20 }, step('review', ['implement'])];
+  const B20: StepSpec[] = [{ ...step('implement'), budget: 20 }, step('review', ['implement'])];
   const r = run({ implement: 't1', review: null });
   const p = phases({ t1: 'succeeded' });
   const blocked = () => ({ outcome: 'blocked' as const, summary: 's', artifacts: [], needs: 'a try with a larger budget, about $15–25' });
@@ -1033,7 +1033,7 @@ test('a step blocked under its cap takes a `--budget` above it, not past its cap
 });
 
 test('a step its harness ended at its budget reads budget exhausted, with the amounts', async (t) => {
-  const CAPPED: Workflow[] = [
+  const CAPPED: StepSpec[] = [
     { ...step('implement'), harness: 'claude', check: 'npm test', retries: 2, budget: 3 },
     step('review', ['implement']),
   ];
@@ -1214,7 +1214,7 @@ test("`nemia ls`' costs: each step's tries' beside its word once measured, and t
 });
 
 test("costLine and runCostLines: a step's cost on `nemia decide`, beside the cap in force, and the run's", async (t) => {
-  const B5: Workflow = { ...step('implement'), budget: 5 };
+  const B5: StepSpec = { ...step('implement'), budget: 5 };
   const one = run({ implement: 't1' });
   const three = onTry(
     [

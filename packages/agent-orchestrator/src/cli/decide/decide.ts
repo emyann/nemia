@@ -51,6 +51,8 @@ import {
   unjudgedOf,
   usedLines,
   verdictWord,
+  type Env,
+  wfRoot,
 } from '../../runner.ts';
 import type { BranchChanges, CheckReport, DecisionRead, DecideCommand, Decided, GateBudgets, RepositoryRun } from '../../runner.ts';
 import type { RunHolding, RunWaiting } from 'objects';
@@ -143,26 +145,27 @@ export function decideHow(argv: string[]): { sensitive?: string[] } {
  * at most. The git commands to land or drop are printed only where no step merges (`merges`), never for a run that worked on its base
  * branch itself (`--no-worktree`), and a folder run is offered `nemia rm` alone.
  */
-export async function decideVerb(rest: string[], e: Engine, place: Place): Promise<void> {
+export async function decideVerb(env: Env, rest: string[], e: Engine, place: Place): Promise<void> {
+  const home = wfRoot(env);
   if (rest.includes('--help')) return console.log(DECIDE_HELP);
   const [runId] = rest;
   if (!runId) return console.log(HELP);
   if (runId.startsWith('--'))
     usage(`nemia decide takes the run first: nemia decide <runId> [--sensitive <globs>] — not ${runId} before it.`);
   const { sensitive } = decideHow(rest.slice(1));
-  const read = await runWith(e, placedIn(place, decisionRead(runId, sensitive ? { sensitive } : {}))).catch(async (err: unknown) => {
-    const unjudged = await runWith(e, placedIn(place, unjudgedOf(e, runsAtOnce.runs.read(runId), err, 'nemia decide')));
+  const read = await runWith(e, placedIn(env, place, decisionRead(runId, sensitive ? { sensitive } : {}))).catch(async (err: unknown) => {
+    const unjudged = await runWith(e, placedIn(env, place, unjudgedOf(e, runsAtOnce(home).runs.read(runId), err, 'nemia decide')));
     throw unjudged ? new Error(unjudged.said) : err;
   });
-  const deciding = await standstill(read, e, place);
+  const deciding = await standstill(env, home, read, e, place);
   if (!deciding) return;
   const { run, decided, decision, out } = deciding;
   const { steps } = decided;
-  console.log(`${headOf(run)}\n`);
-  printRefusals(run, decision);
+  console.log(`${headOf(home, run)}\n`);
+  printRefusals(home, run, decision);
   printStops(decided, decision, out.heldOut);
   printTouched(read.touched, sensitive);
-  for (const name of namesInOrder(run, steps)) printStep(decided, name, steps, place);
+  for (const name of namesInOrder(run, steps)) printStep(home, decided, name, steps, place);
   printTotals(decided);
   printBranches(read.results);
   printStanding(decided, decision, isRepositoryRun(run) ? run : undefined);
@@ -182,15 +185,17 @@ const shown = (print: () => void): undefined => {
 };
 
 async function standstill(
+  env: Env,
+  home: string,
   { run, decision: said, decided }: DecisionRead,
   e: Engine,
   place: Place,
 ): Promise<{ run: Decided['run']; decided: Decided; decision: Awaiting; out: HeldOut } | undefined> {
-  const head = headOf(run);
+  const head = headOf(home, run);
   if ('nothing' in said) return shown(() => console.log(`${head}\n\n  ${said.nothing}`));
   if ('waiting' in said) return shown(() => printWaiting(run, said.waiting, said.holding, head));
   if ('holding' in said && said.holding) {
-    const inFlight = await runWith(e, placedIn(place, decideRun(run.id)));
+    const inFlight = await runWith(e, placedIn(env, place, decideRun(run.id)));
     return shown(() => printHold(inFlight, said.holding, head));
   }
   if (decided === undefined)
@@ -225,8 +230,8 @@ type Closeout = NonNullable<Decided['closeouts'][string]>;
  * The first line of every screen: the run's id and its brief's first line, then its inbox card, its inputs and its pruning, each when it
  * has one.
  */
-function headOf(run: Decided['run']): string {
-  const given = inputsNote(inputsDir(run), run.inputs);
+function headOf(home: string, run: Decided['run']): string {
+  const given = inputsNote(inputsDir(home, run), run.inputs);
   const from = fromNote(run);
   const pruned = run.pruned ? `${prunedWords(run.pruned)}; ${prunedKept(run.pruned)}` : '';
   const end = run.brief.indexOf('\n');
@@ -278,19 +283,19 @@ function printRunning(d: Decided, waiting: string[], head: string, steps: Steps,
  * Under `UNSIGNED`, for a step whose closeout named files the run did not have (`lackedOf`): each file, why, and a near name its files
  * directory holds (`lackLines`), then what answers it. Nothing for a step unsigned for another reason.
  */
-function lackedLines(run: Decided['run'], name: string): string[] {
+function lackedLines(home: string, run: Decided['run'], name: string): string[] {
   const lacked = lackedOf(run.steps[name]);
   if (!lacked.length) return [];
-  const there = artifactFiles(run, name).map((file) => file.path);
+  const there = artifactFiles(home, run, name).map((file) => file.path);
   return [
     `${name}'s closeout named ${lacked.length === 1 ? 'a file' : 'files'} the run does not have:`,
-    ...lackLines(lacked, artifactsDir(run, name), there).map((line) => `  ${line}`),
+    ...lackLines(lacked, artifactsDir(home, run, name), there).map((line) => `  ${line}`),
     `  it writes each where its brief says, or takes the name off: nemia retry ${run.id} ${name}`,
   ];
 }
 
 /** The verdicts on the work: failed and unfinished checks, unsigned steps, unverified ones, and failed ones. */
-function printRefusals(run: Decided['run'], decision: Awaiting): void {
+function printRefusals(home: string, run: Decided['run'], decision: Awaiting): void {
   if (decision.failedCheck.length)
     console.log(
       `  FAILED CHECK: ${decision.failedCheck.join(', ')}  — the run executed its check and it did not exit 0; nothing after it ran`,
@@ -303,7 +308,7 @@ function printRefusals(run: Decided['run'], decision: Awaiting): void {
     console.log(
       `  UNSIGNED: ${decision.unsigned.map((n) => (signoffsSpent(run.steps[n]) ? `${n} (asked to sign off once by the run, and unsigned again)` : n)).join(', ')}  — ended without the closeout it was asked for, or without a field its output: declares, or its closeout named a file the run does not have; nothing after it ran`,
     );
-  for (const line of decision.unsigned.flatMap((name) => lackedLines(run, name))) console.log(`    ${line}`);
+  for (const line of decision.unsigned.flatMap((name) => lackedLines(home, run, name))) console.log(`    ${line}`);
   if (decision.unverified.length)
     console.log(`  UNVERIFIED: ${decision.unverified.join(', ')}  — no check: declared; only its own word says it worked`);
   if (decision.failed.length) console.log(`  FAILED: ${decision.failed.join(', ')}  (nemia logs ${run.id} <step>)`);
@@ -374,7 +379,7 @@ function printTouched(touched: BranchChanges[], sensitive: string[] | undefined)
 }
 
 /** A step's block, for a step with a closeout, a check or a task: its head, its check, its tries and its closeout. */
-function printStep(d: Decided, name: string, steps: Steps, place: Place): void {
+function printStep(home: string, d: Decided, name: string, steps: Steps, place: Place): void {
   const c = d.closeouts[name];
   const check = d.checks[name];
   if (!c && !check && !d.run.steps[name]?.taskId) return;
@@ -382,7 +387,7 @@ function printStep(d: Decided, name: string, steps: Steps, place: Place): void {
   printStepHead(d, name, step, steps);
   if (check) printCheck(check);
   printTries(d, name);
-  if (c) printCloseout(d, name, step, steps, c, place);
+  if (c) printCloseout(home, d, name, step, steps, c, place);
 }
 
 /** A step's name, blocked or not, with its try; then its gate, its acceptance, what its harness waits for and what it was denied. */
@@ -438,6 +443,7 @@ const envelopeLines = (step: Steps[number] | undefined, c: Exclude<Closeout, { e
  * (`questionLines`) — its needs and how to answer them, and its files; or why it does not read.
  */
 function printCloseout(
+  home: string,
   { run, answering }: Decided,
   name: string,
   step: Steps[number] | undefined,
@@ -452,7 +458,12 @@ function printCloseout(
   for (const line of step ? [...outputLines(step, c, fields), ...questionLines(asked)] : []) console.log(`    ${line}`);
   if (c.needs) console.log(`    needs: ${c.needs}`);
   if (answering[name]) console.log(`    ${answering[name]}`);
-  const files = artifactLines(artifactsDir(run, name), missingArtifacts(place, run, name, c), artifactFiles(run, name), run.pruned);
+  const files = artifactLines(
+    artifactsDir(home, run, name),
+    missingArtifacts(home, place, run, name, c),
+    artifactFiles(home, run, name),
+    run.pruned,
+  );
   for (const line of files) console.log(`    ${line}`);
 }
 

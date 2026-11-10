@@ -14,16 +14,16 @@
  * (`feed.verb.ts`) and handed to `feedPass` with the door, keyed on the generation the door's end answers (the file's inode) and on the
  * cursor's refusal, so a feed cut under it is read again from the start.
  *
- * The door's default is rooted (`rootedDoor`): the files at the store's root the program is given (`StoreRoot`). The module spellings
- * (`recordFeed`, `readFeed`, `feedSize`, …) are the same door over the module's root, run where they are called, for the synchronous
- * callers left (`test/feed-door.baseline.ts`). Following the file as it grows (`watchFeed`) is the files' alone.
+ * The door's default is rooted (`rootedDoor`): the files at the store's root the program is given (`StoreRoot`). The synchronous spellings
+ * (`recordFeed`, `readFeed`, `feedSize`, …) are the same door over the files at the root `home` they are handed, run where they are
+ * called, for the synchronous callers left (`test/feed-door.baseline.ts`). Following the file as it grows (`watchFeed`) is the files'
+ * alone.
  *
  * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Context, Effect, Exit, Layer, Schema } from 'effect';
-import { HOME } from '../record/record.store.ts';
 import { countRead, within } from '../meter/tally.store.ts';
 import { brokenBy, doorOf, rootedDoor, type DoorOf } from '../door/door.store.ts';
 import {
@@ -46,11 +46,8 @@ import { Invalid, type Refusal } from '../refusal/refusal.ts';
 /** The feed of the store `root`: beside `runs/`, one for the store. */
 export const feedAt = (root: string): string => path.join(root, 'feed.jsonl');
 
-/** The root the module spellings read: the store's, as the module loaded (`test/global-roots.baseline.ts`). */
-const moduleRoot = (): string => HOME;
-
-/** The workflow layer's feed (`feed.ts`), at the module's root: written by the daemon alone, its tick and `up`'s start. */
-export const feedFile = (): string => feedAt(moduleRoot());
+/** The workflow layer's feed (`feed.ts`) under the store `home`: written by the daemon alone, its tick and `up`'s start. */
+export const feedFile = (home: string): string => feedAt(home);
 
 /**
  * Where the feed ends: the cursor after its last byte, and the generation of the feed it is the end of — the file's inode on the files, the
@@ -298,8 +295,8 @@ export const feedPass = (
     return appended;
   });
 
-/** The door over the module's root, for the module spellings. */
-const moduleDoor = (): FeedDoorShape => feedDoorOver(feedFiles(moduleRoot()));
+/** The door over the files at the root `home`, for the synchronous spellings. */
+const doorAt = (home: string): FeedDoorShape => feedDoorOver(feedFiles(home));
 
 /** `effect` run where it is called: what it succeeds with, or the refusal it failed with thrown, or the defect it died of. */
 function ran<A>(effect: Effect.Effect<A, Refusal>): A {
@@ -314,18 +311,20 @@ function ran<A>(effect: Effect.Effect<A, Refusal>): A {
  * gives none — a caller that keeps none reads the whole feed, and writes what a restarted daemon would.
  */
 export const recordFeed = (
+  home: string,
   now: ReadonlyMap<string, FeedWords>,
   {
     memo = freshMemo(),
     ...pass
   }: { at?: string; memo?: FeedMemo; unjudged?: ReadonlySet<string>; pause?: FeedPause; levels?: FeedLevels } = {},
-): FeedAppended => within('act', () => ran(feedPass(moduleDoor(), memo, now, pass)));
+): FeedAppended => within('act', () => ran(feedPass(doorAt(home), memo, now, pass)));
 
 /**
  * Appends a daemon's line (`startedLine`) to the feed, after a newline where its last line was left unended, as `recordFeed` appends; no
  * fold is moved, since a daemon's line is no run's. Answers where its bytes went (`FeedAppended`).
  */
-export const recordDaemonLine = (line: DaemonLine): FeedAppended => within('act', () => ran(moduleDoor().lines.append([line])));
+export const recordDaemonLine = (home: string, line: DaemonLine): FeedAppended =>
+  within('act', () => ran(doorAt(home).lines.append([line])));
 
 /** A fold of nothing, for a test that plays a restarted daemon. */
 export const freshFeedMemo = freshMemo;
@@ -333,28 +332,28 @@ export const freshFeedMemo = freshMemo;
 /**
  * The feed's lines after `after`, and the cursor to read on from: a cursor inside a line, or past the end, is refused by name (exit 2).
  */
-export const readFeed = (after = 0): { lines: FeedLine[]; cursor: number } => {
-  const { lines, cursor } = ran(moduleDoor().lines.read(after));
+export const readFeed = (home: string, after = 0): { lines: FeedLine[]; cursor: number } => {
+  const { lines, cursor } = ran(doorAt(home).lines.read(after));
   return { lines, cursor };
 };
 
 /** Why `after` cannot be read from — or undefined when it can (`cursorRefusalOf`). */
-export const feedCursorRefusal = (after: number): string | undefined => ran(moduleDoor().lines.cursorRefusal(after));
+export const feedCursorRefusal = (home: string, after: number): string | undefined => ran(doorAt(home).lines.cursorRefusal(after));
 
 /** The feed's size in bytes, 0 for a feed not written yet: what a live reader compares its cursor with before it reads. */
-export const feedSize = (): number => ran(moduleDoor().lines.end())?.cursor ?? 0;
+export const feedSize = (home: string): number => ran(doorAt(home).lines.end())?.cursor ?? 0;
 
 /**
  * The lines after `after`, each with the byte just after it (`ends`), and the cursor to read on from: what a live reader hands on. A
  * cursor that is not the start of a line, or is past the end, is refused by name (exit 2).
  */
-export const readFeedEnds = (after: number): FeedRead => ran(moduleDoor().lines.read(after));
+export const readFeedEnds = (home: string, after: number): FeedRead => ran(doorAt(home).lines.read(after));
 
 /**
  * Follow the feed from `from` until `stop()` (`watchFeedFile`), each line with the cursor just after it: refused before anything is watched
  * when the cursor cannot be read from.
  */
-export const watchFeed = (opts: Parameters<typeof watchFeedFile>[1]): { stop(): void } => watchFeedFile(feedFile(), opts);
+export const watchFeed = (home: string, opts: Parameters<typeof watchFeedFile>[1]): { stop(): void } => watchFeedFile(feedFile(home), opts);
 
 /** What every key a line does not name is kept as, so a line a newer `nemia` wrote keeps it through a read and a write back. */
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;

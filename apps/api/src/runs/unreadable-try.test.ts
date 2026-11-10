@@ -16,7 +16,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from '../app.ts';
-import { engine, passStanding, runStore } from 'agent-orchestrator';
+import { engine, passStanding, runsAtOnce } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
 import { lsOf, runListOf } from '../../test/run-reads.ts';
 
@@ -118,7 +118,7 @@ writeRun('r-try', {
 });
 
 writeRun('r-child', {}, { after: ['r-check'] });
-await runWith(engine(process.env), passStanding(runStore.runs.list()));
+await runWith(engine(process.env), passStanding(runsAtOnce(root).runs.list()));
 
 /** Why the RunList leaves each run unjudged (its `unjudged` entry's `error`), by name, and the names of the runs it judges. */
 const listed = async () => {

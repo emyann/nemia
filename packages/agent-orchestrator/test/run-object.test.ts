@@ -5,49 +5,43 @@
  * step through their entries of the command table — its tries, one try, its closeout (`nemia closeout`) and what it was told — and an
  * unknown step or try refused by its kind, exit 2. And `nemia show`: the object by default, the record with `--raw`.
  *
- * `WF_ROOT` is set before the package is imported, since the store reads it as it loads; each test empties the store's runs first.
+ * The store is the file's own, at `ROOT`, given as `ENV`; each test empties the store's runs first.
  */
 import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Schema } from 'effect';
+import { Effect, Schema } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { scratch } from 'test-kit/scratch';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
+import { howOf } from '../src/summary/how.verb.ts';
+import { runsSummarized, type RunSummary } from '../src/summary/summary.verb.ts';
+import { EngineService as RunsEngine, engineOf } from '../src/runtime-client.ts';
+import { SHOW, TRIES, TRY, CLOSEOUT, TOLD } from '../src/object/commands.verb.ts';
+import { advanceRun, startRun, runWith as runEngine, RunObject, runObject } from '../src/runner.ts';
+import { tryShort } from '../src/object/run.verb.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import { Missing } from '../src/refusal/refusal.ts';
+import { StoreRoot } from '../src/config/root.store.ts';
+import type { StepTry } from '../src/resource/tries.verb.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-run-object-');
 const RUNS_DIR = path.join(ROOT, 'runs');
-process.env.WF_ROOT = ROOT;
-process.env.WF_DEFAULT_FACTORY_STARTS = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { howOf } = await import('../src/summary/how.verb.ts');
-const { runsSummarized } = await import('../src/summary/summary.verb.ts');
-const { EngineService: RunsEngine } = await import('../src/runtime-client.ts');
-const { Effect: RunsEffect } = await import('effect');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_DEFAULT_FACTORY_STARTS: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
 /** Every run's summary, as the whole list judges it (`runsSummarized`), read through the informer and filings `kept` hands. */
 const RUNS = {
   handler: (_args: object, kept?: Parameters<typeof howOf>[0]) =>
-    RunsEffect.gen(function* () {
+    Effect.gen(function* () {
       return yield* runsSummarized(yield* RunsEngine, yield* howOf(kept));
     }),
 };
-const { SHOW, TRIES, TRY, CLOSEOUT, TOLD } = await import('../src/object/commands.verb.ts');
-const { advanceRun, startRun, runWith: runEngine, RunObject, runObject } = await import('../src/runner.ts');
-const { tryShort } = await import('../src/object/run.verb.ts');
-const { runRecord } = await import('../src/record/record.store.ts');
-const { engineOf } = await import('../src/runtime-client.ts');
-const { Missing } = await import('../src/refusal/refusal.ts');
-const { StoreRoot } = await import('../src/config/root.store.ts');
-const { Effect } = await import('effect');
-type RunSummary = import('../src/summary/summary.verb.ts').RunSummary;
-type StepTry = import('../src/resource/tries.verb.ts').StepTry;
 
 const stand = eachTest(testPlace);
-const runWith = runOver(runEngine, () => stand().layer);
-const runPlaced = runGiven(() => stand().layer);
+const runWith = runOver(runEngine, () => stand().layer, ENV);
+const runPlaced = runGiven(() => stand().layer, ENV);
 const engine = eachTest(testEngine);
 const e = () => engineOf(engine().layer);
 
@@ -71,11 +65,11 @@ const started = async (steps: Record<string, string | null>, gates: string[] = [
   const repo = scratch('wf-run-object-repo-');
   stand().world.repository(repo, {});
   const run = await runPlaced(startRun({ brief: 'object me', repo, workflowDir: folder(steps), gates }));
-  await runWith(e(), advanceRun(runRecord(run.id)));
+  await runWith(e(), advanceRun(runRecord(ROOT, run.id)));
   return run.id;
 };
 
-const advanced = (id: string) => runWith(e(), advanceRun(runRecord(id)));
+const advanced = (id: string) => runWith(e(), advanceRun(runRecord(ROOT, id)));
 
 /** Runs in three phases: in flight, finished, and waiting at a gate. */
 const threeRuns = async () => {
@@ -92,10 +86,10 @@ const threeRuns = async () => {
 
 /** The object of the run `id`, given the store's root. */
 const object = async (id: string) =>
-  await runWith(e(), Effect.provideService(runObject(runRecord(id), { memo: { said: new Map() } }), StoreRoot, ROOT));
+  await runWith(e(), Effect.provideService(runObject(runRecord(ROOT, id), { memo: { said: new Map() } }), StoreRoot, ROOT));
 
 const handled = <D>(entry: { handler: (...a: never[]) => unknown }, args: Record<string, string>): Promise<D> =>
-  runWith(e(), (entry.handler as (a: Record<string, string>, env: NodeJS.ProcessEnv, home: string) => never)(args, process.env, ROOT));
+  runWith(e(), (entry.handler as (a: Record<string, string>, env: Env, home: string) => never)(args, ENV, ROOT));
 
 /** What a promise rejects with. */
 const refusal = async (p: Promise<unknown>): Promise<{ exitCode?: number }> => {

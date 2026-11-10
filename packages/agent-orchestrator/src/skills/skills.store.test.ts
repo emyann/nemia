@@ -3,8 +3,7 @@
  * (`skillRead`), and a SKILL.md's text read through a link (`skillText`) — a link the rule lets through read, every other one refused
  * unread. Found: the skill folders of a folder of skills (`skillFolders`), the first of several folders that has a skill
  * (`skillDirIn`), and the skills an agent gives, each read where it was found (`givenSkills`). A skill's text read back, and none where
- * no skill is, are the Skill door's walks (`test/skill-walks.ts`). `WF_ROOT` is set before the import, since the store reads it as it
- * loads.
+ * no skill is, are the Skill door's walks (`test/skill-walks.ts`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,10 +11,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { names } from '../../test/assessed.ts';
-
-process.env.WF_ROOT = scratch('wf-skills-root-');
-const { givenSkills, skillDirIn, skillFolders, skillRead, skillText } = await import('./skills.store.ts');
-const { WorkflowError } = await import('../step/step.ts');
+import { givenSkills, skillDirIn, skillFolders, skillRead, skillText } from './skills.store.ts';
+import { WorkflowError } from '../step/step.ts';
 
 /** A skill `name` written into the folder of skills `root`, its SKILL.md `text`; its folder. */
 function skillAt(root: string, name: string, text: string): string {

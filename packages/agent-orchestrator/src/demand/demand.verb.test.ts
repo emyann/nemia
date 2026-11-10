@@ -4,7 +4,6 @@
  * off; a daemon that ends before it takes the store. Beside it the shipped wait, a Mac's login agent, a spawn that throws and a store
  * taken by another while one starts, each said and none thrown.
  */
-import { rootNow } from '../../test/config-given.ts';
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -14,13 +13,14 @@ import { scratch } from 'test-kit/scratch';
 import { steeredClock } from '../../test/steered.ts';
 import { until, WAITED } from 'agent-runtime/testing';
 import { story } from 'test-kit/checkpoints';
+import { ensureDaemon, liveDemandHost } from './demand.verb.ts';
+import { daemonFile, daemonStanding, releaseStore, takeStore } from '../daemon/daemon.store.ts';
+import { DEMAND_OFF } from './demand.ts';
+import { plistText, unitText } from '../service/service.ts';
+import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-demand-');
-process.env.WF_ROOT = ROOT;
-const { ensureDaemon, liveDemandHost } = await import('./demand.verb.ts');
-const { daemonFile, daemonStanding, releaseStore, takeStore } = await import('../daemon/daemon.store.ts');
-const { DEMAND_OFF } = await import('./demand.ts');
-const { plistText, unitText } = await import('../service/service.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 type DemandHost = import('./demand.verb.ts').DemandHost;
 
 const PACKAGE = path.resolve(import.meta.dirname, '..', '..');
@@ -28,7 +28,7 @@ const FIXTURE = path.join(PACKAGE, 'test', 'fixtures', 'demand', 'daemon.ts');
 const HOME = scratch('wf-demand-home-');
 const CONFIG = path.join(HOME, '.config');
 const NO_SYSTEM = { platform: 'linux', wsl: false, systemd: false };
-const { [DEMAND_OFF]: _off, ...ON } = process.env;
+const { [DEMAND_OFF]: _off, ...ON } = ENV;
 
 const started: number[] = [];
 after(() => {
@@ -46,7 +46,7 @@ function hostOf(over: Partial<DemandHost> = {}): { host: DemandHost; said: strin
   const said: string[] = [];
   const calls: string[] = [];
   const host: DemandHost = {
-    ...liveDemandHost(rootNow()),
+    ...liveDemandHost(ROOT),
     machine: () => NO_SYSTEM,
     dirs: () => ({ home: HOME, configHome: CONFIG }),
     roots: () => ({ root: ROOT, defaultRoot: ROOT }),
@@ -68,7 +68,7 @@ function hostOf(over: Partial<DemandHost> = {}): { host: DemandHost; said: strin
 
 /** Waits, a beat at a time, until the store's lease reads as `done` says. */
 async function leaseUntil(done: (kind: string) => boolean): Promise<void> {
-  while (!done(daemonStanding().kind)) await new Promise((resolve) => setTimeout(resolve, 20));
+  while (!done(daemonStanding(ROOT).kind)) await new Promise((resolve) => setTimeout(resolve, 20));
 }
 
 /** The service named `name` for the store `root`, as `nemia service install` writes it. */
@@ -95,7 +95,7 @@ test('a ticking command starts a daemon on demand: none, one live, a login servi
   t.after(() => fs.rmSync(CONFIG, { recursive: true, force: true }));
   let pid = 0;
   t.after(async () => {
-    if (pid === 0 || daemonStanding().kind !== 'ticking') return;
+    if (pid === 0 || daemonStanding(ROOT).kind !== 'ticking') return;
     process.kill(pid, 'SIGTERM');
     await leaseUntil((kind) => kind !== 'ticking');
   });
@@ -103,10 +103,10 @@ test('a ticking command starts a daemon on demand: none, one live, a login servi
   await s.test(
     'no lease: a daemon is spawned detached, found by its lease, and said with its pid, its log and how to stop it',
     async () => {
-      assert.equal(daemonStanding().kind, 'none');
+      assert.equal(daemonStanding(ROOT).kind, 'none');
       const { host, said } = hostOf({
         spawn: (spec) => {
-          const child = liveDemandHost(rootNow()).spawn(spec);
+          const child = liveDemandHost(ROOT).spawn(spec);
           if (child.pid !== undefined) started.push(child.pid);
           return child;
         },
@@ -114,7 +114,7 @@ test('a ticking command starts a daemon on demand: none, one live, a login servi
       });
       assert.deepEqual(await Effect.runPromise(ensureDaemon(host)), { kind: 'spawn' });
       pid = started[0];
-      const lease = daemonStanding();
+      const lease = daemonStanding(ROOT);
       assert.equal(lease.kind === 'ticking' && lease.file.pid, pid);
       const log = path.join(ROOT, 'daemon.log');
       assert.equal(said.length, 1, said.join('\n'));
@@ -159,8 +159,8 @@ test('a ticking command starts a daemon on demand: none, one live, a login servi
   await s.test(
     'over a lease that does not read, a daemon that ends before it takes the store is said with its exit and its log, unwaited',
     async () => {
-      fs.writeFileSync(daemonFile(), '{');
-      assert.equal(daemonStanding().kind, 'unreadable');
+      fs.writeFileSync(daemonFile(ROOT), '{');
+      assert.equal(daemonStanding(ROOT).kind, 'unreadable');
       const { host, said } = hostOf({
         spawn: () => ({ pid: 77, ended: Promise.resolve({ code: 2, signal: null }) }),
         waitMs: 600_000,
@@ -170,7 +170,7 @@ test('a ticking command starts a daemon on demand: none, one live, a login servi
       assert.match(line, /a daemon \(pid 77\)/);
       assert.match(line, /exit 2/);
       assert.ok(line.includes(`${ROOT}/daemon.log`), line);
-      fs.rmSync(daemonFile());
+      fs.rmSync(daemonFile(ROOT));
     },
   );
 });
@@ -182,7 +182,7 @@ test(
     fs.rmSync(CONFIG, { recursive: true, force: true });
     unitFor('nemia', ROOT);
     t.after(() => fs.rmSync(CONFIG, { recursive: true, force: true }));
-    const live = liveDemandHost(rootNow());
+    const live = liveDemandHost(ROOT);
     let reads = 0;
     const { host, said } = hostOf({
       machine: () => ({ platform: 'linux', wsl: false, systemd: true }),
@@ -241,7 +241,7 @@ test('another daemon that takes the store while this one starts is named as its 
   let held: ReturnType<typeof takeStore>['held'] | undefined;
   const { host, said } = hostOf({
     spawn: () => {
-      held = takeStore({ every: 4000, cwd: PACKAGE, by: 'api' }).held;
+      held = takeStore(ROOT, { every: 4000, cwd: PACKAGE, by: 'api' }).held;
       return { pid: 77, ended: new Promise(() => undefined) };
     },
   });
@@ -249,6 +249,6 @@ test('another daemon that takes the store while this one starts is named as its 
     await Effect.runPromise(ensureDaemon(host));
     assert.match(said.join('\n'), new RegExp(`another daemon, pid ${process.pid}, took ${ROOT} while this command started pid 77`));
   } finally {
-    if (held !== undefined) releaseStore(held);
+    if (held !== undefined) releaseStore(ROOT, held);
   }
 });

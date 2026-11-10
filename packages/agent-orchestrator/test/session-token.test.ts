@@ -4,7 +4,7 @@
  * the try is the live one, `session-ended` once it settled or a later try replaced it, `unknown-token` for one the store never minted,
  * and the person for none. Nemia's session is filed one too, in no factory. Kinds are asserted, never sentences.
  *
- * `WF_ROOT` is set before the runner is imported, which reads it as it loads.
+ * Its store is its own at `ROOT`, given as `ENV`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,22 +13,20 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
+import { advanceRun, startRun, runWith, retryRun } from '../src/runner.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import { SESSION_TOKEN } from '../src/filed/filed.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import { sessionCaller } from '../src/token/caller.verb.ts';
+import { tokenDigest, tokensDir, mintToken } from '../src/token/token.store.ts';
+import { main } from '../src/cli/main.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-session-token-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-process.env.WF_ROOT = ROOT;
-process.env.WF_DEFAULT_FACTORY_STARTS = '1';
 process.env.NEMIA_DAEMON_START = 'off';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { advanceRun, startRun, runWith, retryRun } = await import('../src/runner.ts');
-const { runRecord } = await import('../src/record/record.store.ts');
-const { SESSION_TOKEN } = await import('../src/filed/filed.ts');
-const { engineOf } = await import('../src/runtime-client.ts');
-const { sessionCaller } = await import('../src/token/caller.verb.ts');
-const { tokenDigest, tokensDir, mintToken } = await import('../src/token/token.store.ts');
-const { main } = await import('../src/cli/main.ts');
-const stage = staged({ runWith, main, engineOf });
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_DEFAULT_FACTORY_STARTS: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
+const stage = staged({ runWith, main, engineOf, env: ENV });
 
 /** A repository of the stage's place with one file, so `nemia start` has a base to record. */
 const aRepo = (): string => {
@@ -46,7 +44,7 @@ const folder = (): string => {
 };
 
 /** One pass over the run `id` on the stage's engine. */
-const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(id)));
+const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
 
 /** The token the engine's task `id` was filed in its environment. */
 const tokenOf = (id: string): string | undefined => stage.board().tasks.get(id)?.spec.config?.env?.[SESSION_TOKEN];

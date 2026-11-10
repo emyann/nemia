@@ -6,10 +6,10 @@
  * again. The verb writes no line: the tick reads the levels in force on each pass, as it reads the store's pause.
  *
  * The tick is the store's pass (`tickRun`), on the stage's engine given a pass of its own that does nothing, as `pause.test.ts` gives it.
- * A raise's end is the wall's, so the story steers `Date` with node's mock timers, and passes the hour by moving them. `WF_ROOT` is set
- * before the import, since the module reads it as it loads.
+ * A raise's end is the wall's, so the story steers `Date` with node's mock timers, and passes the hour by moving them. The test's
+ * store is its own, at `ROOT`, given as `ENV`.
+
  */
-import { rootNow } from './config-given.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -17,23 +17,21 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
+import { tickRun, runWith, readFeed } from '../src/runner.ts';
+import { addFactoryAt } from '../src/factory/factory.store.ts';
+import { recordFeed, freshFeedMemo } from '../src/feed/feed.store.ts';
+import { levelsNow } from '../src/level/levels.verb.ts';
+import { readPause } from '../src/pause/pause.store.ts';
+import { parseSelectors, selects } from '../src/watch/selector.ts';
+import { NEMIA_SELECTORS } from '../src/nemia/nemia.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import { main } from '../src/cli/main.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-level-feed-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_RUNS;
-delete process.env.WF_MAX_CONCURRENT;
-const { tickRun, runWith, readFeed } = await import('../src/runner.ts');
-const { addFactory } = await import('../testing.ts');
-const { recordFeed, freshFeedMemo } = await import('../src/feed/feed.store.ts');
-const { levelsNow } = await import('../src/level/levels.verb.ts');
-const { readPause } = await import('../src/pause/pause.store.ts');
-const { parseSelectors, selects } = await import('../src/watch/selector.ts');
-const { NEMIA_SELECTORS } = await import('../src/nemia/nemia.ts');
-const { engineOf } = await import('../src/runtime-client.ts');
-const { main } = await import('../src/cli/main.ts');
-const stage = staged({ runWith, main, engineOf });
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_RUNS: undefined, WF_MAX_CONCURRENT: undefined };
+const stage = staged({ runWith, main, engineOf, env: ENV });
 
 /** What the engine's own pass answers here: nothing admitted, nothing started, no view. */
 const QUIET = { tasks: 0, actions: [], running: {}, views: [] };
@@ -54,7 +52,7 @@ const typed = async (t: TestContext, ...argv: string[]): Promise<void> => {
 
 /** The feed's level lines: the factory each is labelled with, its reason, its source and its note. */
 const levelSaid = () =>
-  readFeed(0)
+  readFeed(ROOT, 0)
     .lines.filter((l) => l.reason === 'LevelChanged')
     .map((l) => [l.labels?.factory, l.involved, l.source, l.note]);
 
@@ -66,7 +64,7 @@ test("a factory's level said on the feed: each change of the level in force is o
   const b = stage.board();
   Object.assign(b.e, { tick: () => Effect.succeed(QUIET), tallied: undefined });
   const pass = () => stage.runWith(b.e, tickRun());
-  for (const name of ['acme', 'quiet']) addFactory({ name, repos: [fs.mkdtempSync(path.join(ROOT, `${name}-`))] });
+  for (const name of ['acme', 'quiet']) addFactoryAt(ROOT, { name, repos: [fs.mkdtempSync(path.join(ROOT, `${name}-`))] });
 
   await s.test('every factory at manual: a pass says no level', async () => {
     await pass();
@@ -76,7 +74,7 @@ test("a factory's level said on the feed: each change of the level in force is o
     await typed(sub, 'level', 'auto', '--factory', 'acme');
     await pass();
     assert.deepEqual(levelSaid(), [['acme', STORE, 'person', 'acme is at auto']]);
-    const [line] = readFeed(0).lines.filter((l) => l.reason === 'LevelChanged');
+    const [line] = readFeed(ROOT, 0).lines.filter((l) => l.reason === 'LevelChanged');
     assert.ok(line !== undefined && line.message?.includes('acme is at auto'), line?.message);
     assert.equal(selects(parseSelectors([...NEMIA_SELECTORS]), line), true, 'her selectors wake her on it');
   });
@@ -123,7 +121,7 @@ test("a factory's level said on the feed: each change of the level in force is o
   });
   await s.test('a daemon restarted, with no fold of its own, writes no level line again', async () => {
     const levels = await stage.runPlaced(levelsNow());
-    assert.deepEqual(recordFeed(new Map(), { memo: freshFeedMemo(), pause: readPause(rootNow()), levels }).lines, []);
+    assert.deepEqual(recordFeed(ROOT, new Map(), { memo: freshFeedMemo(), pause: readPause(ROOT), levels }).lines, []);
   });
   await s.test('a factory left at manual, and the default factory, are never said', async () => {
     assert.deepEqual([...new Set(levelSaid().map((l) => l[0]))], ['acme']);

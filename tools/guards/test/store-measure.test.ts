@@ -228,3 +228,10 @@ test('a report writes a store under the home folder as ~/…, and one elsewhere 
   assert.equal(rootAsWritten(path.join('/u', 'me', '.agent-workflows'), path.join('/u', 'me')), path.join('~', '.agent-workflows'));
   assert.equal(rootAsWritten(path.join('/u', 'mea', 'x'), path.join('/u', 'me')), path.join('/u', 'mea', 'x'));
 });
+
+test('the measure composes the api through its entry (`api/app`), and hands its readers one environment, never writing a WF_ variable', () => {
+  const text = fs.readFileSync(REPORT, 'utf8');
+  assert.match(text, /'api\/app'/);
+  assert.doesNotMatch(text, /api\/src\//);
+  assert.doesNotMatch(text, /process\.env\.WF_\w+\s*=[^=]/);
+});

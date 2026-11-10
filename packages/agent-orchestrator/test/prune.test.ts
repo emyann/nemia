@@ -6,7 +6,7 @@
  * runs, its bound on the place's verbs at once and its order, each on a place that holds a verb until the test lets it go.
  *
  * What git alone does — an ignore rule, a link not followed, a file hardlinked from the repository, a checkout on no branch and a lock —
- * is walked on git in `prune-git.boundary.test.ts`. A file of its own, since `WF_ROOT` is read once, as the package loads; each story
+ * is walked on git in `prune-git.boundary.test.ts`. A file of its own, over its own store at `ROOT`, given as `ENV`; each story
  * reads its own runs, though a prune of every run reads the store's.
  */
 import { test, type TestContext } from 'node:test';
@@ -25,13 +25,7 @@ import { decideScreen } from './screens.ts';
 import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
 import { placeHeld, placeOver, unreadBy } from './place-over.ts';
-
-const ROOT = scratch('wf-prune-');
-process.env.WF_ROOT = ROOT;
-process.env.WF_DEFAULT_FACTORY_STARTS = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const {
+import {
   acceptRun,
   advanceRun,
   approveRun,
@@ -44,15 +38,25 @@ const {
   roundRun,
   sizeOf,
   startRun,
-  runWith: runEngine,
-} = await import('../src/runner.ts');
-const { listRuns, runRecord } = await import('../src/record/record.store.ts');
-const { filesStore: runStore } = await import('../src/record/files.store.ts');
-const { freeing, freeingMany, judging, judgingMany, PRUNE_A_TURN, sized } = await import('../src/forget/prune/prune.verb.ts');
-const { PlaceService } = await import('../src/place/place.store.ts');
-const { engineOf } = await import('../src/runtime-client.ts');
-const { main } = await import('../src/cli/main.ts');
-const stage = staged({ runWith: runEngine, main, engineOf });
+  runWith as runEngine,
+} from '../src/runner.ts';
+import { listRuns, runRecord } from '../src/record/record.store.ts';
+import { filesStoreAt } from '../src/record/files.store.ts';
+import { freeing, freeingMany, judging, judgingMany, PRUNE_A_TURN, sized } from '../src/forget/prune/prune.verb.ts';
+import { PlaceService } from '../src/place/place.store.ts';
+import { StoreRoot } from '../src/config/root.store.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import { main } from '../src/cli/main.ts';
+import type { Env } from '../src/config/config.store.ts';
+
+const ROOT = scratch('wf-prune-');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_DEFAULT_FACTORY_STARTS: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
+const stage = staged({ runWith: runEngine, main, engineOf, env: ENV });
+const files = filesStoreAt(ROOT);
+
+/** `nemia decide`'s screen over this file's store, `ENV` (`decideScreen`). */
+const screenOn = (...[t, e, argv, as, place]: Parameters<typeof decideScreen>): Promise<string[]> =>
+  decideScreen(t, e, argv, as, place, ENV);
 const { runWith, runPlaced } = stage;
 const world = () => stage.place().world;
 /** The test place's own place, as a verb is answered over it. */
@@ -117,15 +121,15 @@ const aFinished = async (
   } = {},
 ) => {
   const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: oneStep(budget) }));
-  await runWith(b.e, advanceRun(runRecord(run.id)));
-  const wt = runRecord(run.id).steps.implement.workspace!;
+  await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+  const wt = runRecord(ROOT, run.id).steps.implement.workspace!;
   fs.writeFileSync(path.join(wt, work), 'export const fixed = true;\n');
   world().commit(wt, `add ${work}`);
   const said = typeof closeout === 'function' ? closeout(run.id) : closeout;
   for (const named of (said as { artifacts?: string[] }).artifacts ?? []) if (path.isAbsolute(named)) aShot(run.id, path.basename(named));
   b.settle(`${run.id}-implement`, 'succeeded', said, costUsd === undefined ? undefined : { costUsd });
-  await runWith(b.e, advanceRun(runRecord(run.id)));
-  const branch = runRecord(run.id).steps.implement.branch!;
+  await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+  const branch = runRecord(ROOT, run.id).steps.implement.branch!;
   if (merged) {
     world().stage(repo, branch);
     world().commit(repo, 'merge');
@@ -175,10 +179,10 @@ const atItsGate = async (b: Board) => {
   fs.writeFileSync(path.join(gated, 'implement.md'), '---\nplace: git\ngate: true\n---\nimplement it\n');
   fs.writeFileSync(path.join(gated, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
   const run = await runPlaced(startRun({ brief: 'at its gate', repo: aRepo(), workflowDir: gated }));
-  await runWith(b.e, advanceRun(runRecord(run.id)));
-  const wt = runRecord(run.id).steps.implement.workspace!;
+  await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+  const wt = runRecord(ROOT, run.id).steps.implement.workspace!;
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  await runWith(b.e, advanceRun(runRecord(run.id)));
+  await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
   return { run, wt };
 };
 
@@ -187,18 +191,18 @@ const aFolderRun = async (b: Board) => {
   const team = fs.mkdtempSync(path.join(ROOT, 'team-'));
   fs.writeFileSync(path.join(team, 'write.md'), '---\nworkspace: folder\npermissionMode: dontAsk\n---\nwrite the note\n');
   const run = await runPlaced(startRun({ brief: 'a note', repo: fs.mkdtempSync(path.join(ROOT, 'not-a-repo-')), workflowDir: team }));
-  await runWith(b.e, advanceRun(runRecord(run.id)));
+  await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
   b.settle(`${run.id}-write`, 'succeeded', SIGNED);
-  await runWith(b.e, advanceRun(runRecord(run.id)));
+  await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
   return run;
 };
 
 /** A run that worked in its repository itself, signed off and handed off. */
 const inPlaceRun = async (b: Board) => {
   const inPlace = await runPlaced(startRun({ brief: 'in place', repo: aRepo(), workflowDir: oneStep(), isolate: false }));
-  await runWith(b.e, advanceRun(runRecord(inPlace.id)));
+  await runWith(b.e, advanceRun(runRecord(ROOT, inPlace.id)));
   b.settle(`${inPlace.id}-implement`, 'succeeded', SIGNED);
-  await runWith(b.e, advanceRun(runRecord(inPlace.id)));
+  await runWith(b.e, advanceRun(runRecord(ROOT, inPlace.id)));
   return inPlace;
 };
 
@@ -243,7 +247,7 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
           under('runs', run.id, 'artifacts', 'implement', 'report.md') &&
           under('runs', `${run.id}.asks`, 'done'),
       );
-      const pruned = runRecord(run.id).pruned!;
+      const pruned = runRecord(ROOT, run.id).pruned!;
       assert.deepEqual(
         pruned.worktrees.map((w) => w.path),
         [wt],
@@ -262,12 +266,12 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
       names(screen.printed.join('\n').split('\n')[1], `pruned at ${pruned.at}`, 'nemia prune', 'its branches, record and files are kept');
 
       const filings = [...b.filings];
-      await runWith(b.e, advanceRun(runRecord(run.id)));
+      await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
       assert.deepEqual(b.filings, filings, 'a tick after it files nothing');
       const again = await runWith(b.e, prune(run.id, { yes: true }));
       assert.equal(again.kind, 'nothing');
       names(again.nothing, pruned.at, 'nemia prune');
-      assert.equal(runRecord(run.id).pruned!.at, pruned.at, 'a prune with nothing to do leaves the marker as it was');
+      assert.equal(runRecord(ROOT, run.id).pruned!.at, pruned.at, 'a prune with nothing to do leaves the marker as it was');
       assert.equal((await runWith(b.e, forgetRun(run.id))).kind, 'forgotten', '`nemia rm` still forgets it');
       assert.ok(!under('runs', `${run.id}.pruned`), 'and the marker goes with it');
     },
@@ -312,7 +316,7 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
       for (const kept of ['inputs', 'agents']) assert.ok(under('runs', id, kept, 'kept.md'), `${kept} is kept`);
       assert.ok(under('runs', `${id}.json`) && under('runs', `${id}.asks`, 'done'), 'the record and the asks are kept');
       assert.ok(hasBranch(run0.repo, run0.branch), 'and the branch');
-      const pruned = runRecord(id).pruned!;
+      const pruned = runRecord(ROOT, id).pruned!;
       assert.equal(pruned.worktrees.length, 1);
       assert.equal(pruned.artifacts?.bytes, measured, 'the marker says what the files freed');
       assert.ok(pruned.artifacts?.at);
@@ -327,7 +331,7 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
       const open = await aFinished(b, { closeout: (id) => ({ ...SIGNED, artifacts: [shotOf(id)] }) });
       const openShot = aShot(open.run.id);
       assert.equal((await runWith(b.e, prune(open.run.id, { artifacts: true, unmerged: true, yes: true }))).kind, 'pruned');
-      const openAt = runRecord(open.run.id).pruned!.artifacts!.at;
+      const openAt = runRecord(ROOT, open.run.id).pruned!.artifacts!.at;
       const read = await typed(t, b.e, 'decide', open.run.id);
       assert.equal(read.error, undefined, 'nemia decide reads it');
       const openText = read.printed.join('\n');
@@ -338,7 +342,7 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
       const again = await runWith(b.e, prune(id, { artifacts: true, yes: true }));
       assert.equal(again.kind, 'nothing');
       names(again.nothing, pruned.at, pruned.artifacts.at, 'nemia prune --artifacts');
-      assert.deepEqual(runRecord(id).pruned, pruned, 'a prune with nothing to do leaves the marker as it was');
+      assert.deepEqual(runRecord(ROOT, id).pruned, pruned, 'a prune with nothing to do leaves the marker as it was');
       await assert.rejects(runWith(b.e, retryRun(id, 'implement', { mode: 'continue' })), (err: Error) => {
         names(err.message, `${id} was pruned at ${pruned.at}`, pruned.artifacts!.at, 'a retry');
         return true;
@@ -352,7 +356,7 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
       const { run } = await aFinished(b, { merged: true });
       aShot(run.id);
       assert.equal((await runWith(b.e, prune(run.id, { yes: true }))).kind, 'pruned');
-      const first = runRecord(run.id).pruned!;
+      const first = runRecord(ROOT, run.id).pruned!;
       assert.ok(under('runs', run.id, 'artifacts', 'implement', 'shot.png'), 'a plain prune keeps the files');
       const files = await runWith(b.e, prune(run.id, { artifacts: true, yes: true }));
       assert.deepEqual([files.kind, files.worktrees, files.left], ['pruned', [], []]);
@@ -361,7 +365,7 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
         pruneLines(files)[0],
         `${run.id}  pruned: removed its files, ${sizeOf(files.artifacts!.bytes)} freed; its record and branches are kept`,
       );
-      const after = runRecord(run.id).pruned!;
+      const after = runRecord(ROOT, run.id).pruned!;
       assert.deepEqual([after.at, after.worktrees], [first.at, first.worktrees], 'when the worktrees went, and which, is as it was');
       assert.ok(after.artifacts && !under('runs', run.id, 'artifacts'));
 
@@ -383,7 +387,7 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
         bare.printed.join('\n'),
       );
       assert.ok(!under('runs', inPlace.id, 'artifacts'), 'its files gone');
-      const marked = runRecord(inPlace.id).pruned!;
+      const marked = runRecord(ROOT, inPlace.id).pruned!;
       assert.deepEqual(marked.worktrees, []);
       assert.equal(marked.at, marked.artifacts!.at, 'pruned once its files go');
       await assert.rejects(runWith(b.e, retryRun(inPlace.id, 'implement', { mode: 'continue' })), (err: Error) => {
@@ -455,7 +459,7 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
     async () => {
       const merged = await aFinished(b, { merged: true });
       const running = await runPlaced(startRun({ brief: 'running', repo: aRepo(), workflowDir: oneStep() }));
-      await runWith(b.e, advanceRun(runRecord(running.id)));
+      await runWith(b.e, advanceRun(runRecord(ROOT, running.id)));
       const inPlace = await inPlaceRun(b);
       const { printed, error } = await typed(t, b.e, 'prune');
       assert.equal(error, undefined, 'a run refused is not an error when none was named');
@@ -464,7 +468,7 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
       assert.match(text, new RegExp(`^\\d+ runs? not over, not pruned: .*${running.id}`, 'm'));
       assert.doesNotMatch(text, new RegExp(`^${inPlace.id} `, 'm'), 'a run that cut no worktree is not a line');
       names(printed.at(-1), 'nothing removed', 'nemia prune --yes');
-      assert.ok(listRuns().some((r) => r.id === merged.run.id) && fs.existsSync(merged.wt));
+      assert.ok(listRuns(ROOT).some((r) => r.id === merged.run.id) && fs.existsSync(merged.wt));
       b.settle(`${running.id}-implement`, 'succeeded', SIGNED);
     },
   );
@@ -475,8 +479,8 @@ test('`nemia prune` refused, then let through: what holds it is named with the f
   const b = board();
   await s.test('REFUSED: a run not over is told to cancel first, exit 2', async () => {
     const run = await runPlaced(startRun({ brief: 'still running', repo: aRepo(), workflowDir: oneStep() }));
-    await runWith(b.e, advanceRun(runRecord(run.id)));
-    const wt = runRecord(run.id).steps.implement.workspace!;
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+    const wt = runRecord(ROOT, run.id).steps.implement.workspace!;
     const { printed, error } = await typed(t, b.e, 'prune', run.id, '--yes', '--unmerged');
     assert.equal(error?.exitCode, 2);
     names(printed[0], `${run.id}  not pruned`, `nemia decide ${run.id}`, `nemia cancel ${run.id}`, `nemia prune ${run.id} --unmerged`);
@@ -526,8 +530,8 @@ test('`nemia prune` refused, then let through: what holds it is named with the f
 
   await s.test('REFUSED: a hand-off still owed — a step settled and no pass since — until a tick has handed it off', async () => {
     const run = await runPlaced(startRun({ brief: 'owed', repo: aRepo(), workflowDir: oneStep() }));
-    await runWith(b.e, advanceRun(runRecord(run.id)));
-    const wt = runRecord(run.id).steps.implement.workspace!;
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+    const wt = runRecord(ROOT, run.id).steps.implement.workspace!;
     b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
     names(
       (await runWith(b.e, prune(run.id, { yes: true, unmerged: true }))).refusal,
@@ -536,7 +540,7 @@ test('`nemia prune` refused, then let through: what holds it is named with the f
       `nemia prune ${run.id} --unmerged`,
     );
     assert.ok(fs.existsSync(wt));
-    await runWith(b.e, advanceRun(runRecord(run.id)));
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     assert.equal((await runWith(b.e, prune(run.id, { yes: true, unmerged: true }))).kind, 'pruned');
   });
 
@@ -593,14 +597,14 @@ test('`nemia prune` refused, then let through: what holds it is named with the f
     async () => {
       const kept = (id: string, shot: string) => assert.ok(fs.existsSync(shot) && !under('runs', `${id}.pruned`), id);
       const running = await runPlaced(startRun({ brief: 'still running', repo: aRepo(), workflowDir: oneStep() }));
-      await runWith(b.e, advanceRun(runRecord(running.id)));
+      await runWith(b.e, advanceRun(runRecord(ROOT, running.id)));
       const runningShot = aShot(running.id);
       const r = await typed(t, b.e, 'prune', running.id, '--artifacts', '--yes', '--unmerged');
       assert.equal(r.error?.exitCode, 2);
       names(r.printed[0], `${running.id}  not pruned`, `nemia cancel ${running.id}`);
       kept(running.id, runningShot);
       b.settle(`${running.id}-implement`, 'succeeded', SIGNED);
-      await runWith(b.e, advanceRun(runRecord(running.id)));
+      await runWith(b.e, advanceRun(runRecord(ROOT, running.id)));
 
       const unmerged = await aFinished(b);
       const unmergedShot = aShot(unmerged.run.id);
@@ -665,7 +669,7 @@ test('after a prune: a retry, a round, an approval and an acceptance are refused
         'and `nemia ls` says it waits on you',
       );
       assert.equal((await runWith(b.e, prune(run.id, { yes: true, unmerged: true }))).kind, 'pruned');
-      const at = runRecord(run.id).pruned!.at;
+      const at = runRecord(ROOT, run.id).pruned!.at;
       const refusedNaming = (verb: string) => (err: Error) => {
         names(err.message, `${run.id} was pruned at ${at}`, 'nemia prune', verb);
         return true;
@@ -682,7 +686,7 @@ test('after a prune: a retry, a round, an approval and an acceptance are refused
       fs.mkdirSync(asks, { recursive: true });
       fs.writeFileSync(path.join(asks, 'retry-implement-2'), JSON.stringify({ mode: 'continue' }));
       const filings = [...b.filings];
-      await runWith(b.e, advanceRun(runRecord(run.id)));
+      await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
       assert.deepEqual(b.filings, filings, 'nothing filed of an ask written by hand: the pass is the guard that holds');
       assert.doesNotMatch((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /asked|due|files it/, 'no try is coming of it');
     },
@@ -706,7 +710,7 @@ test('after a prune: a retry, a round, an approval and an acceptance are refused
         'pruned',
         'nothing about a budget holds a prune under --unmerged',
       );
-      const at = runRecord(run.id).pruned!.at;
+      const at = runRecord(ROOT, run.id).pruned!.at;
 
       const d = await runWith(b.e, decideRun(run.id));
       assert.equal(d.decision.kind, 'awaiting', 'still a run to decide: its branch holds its work');
@@ -724,7 +728,7 @@ test('after a prune: a retry, a round, an approval and an acceptance are refused
       assert.doesNotMatch(screen, /nemia (retry|round|accept|approve) /, 'no verb a pruned run refuses');
       assert.doesNotMatch((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /waiting on you/, 'and `nemia ls` agrees');
 
-      const whole = await decideScreen(tt, b.e, [run.id], { '<id>': run.id, '<root>': ROOT, '<repo>': repo, '<at>': at }, placeNow());
+      const whole = await screenOn(tt, b.e, [run.id], { '<id>': run.id, '<root>': ROOT, '<repo>': repo, '<at>': at }, placeNow());
       const timesCut = whole.map((l) => l.replace(/^( *timeline {2}(?:try 1 {2}filed|run {2}queued) ).*$/, '$1<times>'));
       assert.deepEqual(
         timesCut,
@@ -776,11 +780,11 @@ test('a script condition that answered a route no pass has copied yet: prune rea
   write('docs', ['after: pick', 'when: [docs]']);
   fs.writeFileSync(path.join(dir, 'pick.ts'), "console.log('never run on the test engine');\n");
   const run = await runPlaced(startRun({ brief: 'route it', repo: aRepo(), workflowDir: dir }));
-  await runWith(b.e, advanceRun(runRecord(run.id)));
+  await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  await runWith(b.e, advanceRun(runRecord(run.id)));
+  await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
   stage.board().end(`${run.id}-pick`, 'succeeded', { exitCode: 0, terminationMessage: '{"route":"web"}' });
-  assert.equal(runRecord(run.id).steps.pick?.route, undefined, 'no pass has copied the route onto the record');
+  assert.equal(runRecord(ROOT, run.id).steps.pick?.route, undefined, 'no pass has copied the route onto the record');
   const judged = await runWith(b.e, judging(run.id, { unmerged: true }));
   assert.equal(judged.facts?.decided, 'running', 'web is ready to file');
   assert.ok('pruning' in judged && judged.pruning.kind === 'refused', 'kept, --unmerged or not');
@@ -843,7 +847,7 @@ test('the mark of a run another prune freed since it was judged: a removal on th
   const { run, wt } = await aFinished(b, { merged: true });
   const stale = await readyNow(b, run.id);
   assert.equal((await runWith(b.e, prune(run.id, { yes: true }))).kind, 'pruned');
-  const first = runRecord(run.id).pruned!;
+  const first = runRecord(ROOT, run.id).pruned!;
   assert.deepEqual(
     first.worktrees.map((w) => w.path),
     [wt],
@@ -851,7 +855,7 @@ test('the mark of a run another prune freed since it was judged: a removal on th
   const [late] = await runWith(b.e, freeing([stale]));
   assert.deepEqual(late.worktrees, [], 'the later removal removed nothing');
   assert.equal(late.left.length, 1, 'and says the worktree it found gone');
-  assert.deepEqual(runRecord(run.id).pruned, first, "the mark is the first prune's, whole");
+  assert.deepEqual(runRecord(ROOT, run.id).pruned, first, "the mark is the first prune's, whole");
 });
 
 test('the mark of a run another prune frees while this one asks its removal: the mark that prune wrote stays, though this one removed nothing', async () => {
@@ -863,7 +867,7 @@ test('the mark of a run another prune frees while this one asks its removal: the
       remove: (request) => {
         const theirs = placeNow().askNow('remove', request);
         assert.ok('answer' in theirs && theirs.answer.removed.length === 1, 'the other prune removed the worktree');
-        runStore.runs.prune(run.id, other);
+        files.runs.prune(run.id, other);
         return {
           answer: { ...theirs.answer, removed: [], left: request.workspaces.map((at) => ({ path: at, said: 'is not a working tree' })) },
         };
@@ -873,7 +877,7 @@ test('the mark of a run another prune frees while this one asks its removal: the
   const done = await runWith(b.e, prune(run.id, { yes: true }).pipe(Effect.provide(between)));
   assert.deepEqual([done.worktrees, done.left.length], [[], 1]);
   assert.ok(!fs.existsSync(wt));
-  assert.deepEqual(runRecord(run.id).pruned, other, 'the run reads pruned, by the mark of the prune that removed its worktree');
+  assert.deepEqual(runRecord(ROOT, run.id).pruned, other, 'the run reads pruned, by the mark of the prune that removed its worktree');
 });
 
 test('the mark of a run whose removal was not heard and removed all the same: the run reads pruned, with the worktree that is gone, and its line says the removal unread', async () => {
@@ -893,7 +897,7 @@ test('the mark of a run whose removal was not heard and removed all the same: th
     [[wt, 'the removal was not heard']],
   );
   assert.ok(!fs.existsSync(wt), 'the worktree went');
-  const mark = runRecord(run.id).pruned;
+  const mark = runRecord(ROOT, run.id).pruned;
   assert.deepEqual(
     mark?.worktrees.map((w) => w.path),
     [wt],
@@ -947,7 +951,10 @@ test(
     const b = board();
     const { ids } = await finishedIn(b, [aRepo()], 2 * PRUNE_A_TURN + 1);
     const held = placeHeld(placeNow(), 'inventory');
-    const judged = runEngine(b.e, judgingMany(ids).pipe(Effect.provide(PlaceService.layer(held.place))));
+    const judged = runEngine(
+      b.e,
+      Effect.provideService(judgingMany(ids), StoreRoot, ROOT).pipe(Effect.provide(PlaceService.layer(held.place))),
+    );
     for (let left = ids.length; left > 0; left--) {
       const due = Math.min(PRUNE_A_TURN, left);
       await until(
@@ -984,8 +991,8 @@ test('under --yes a run is judged once, and the ready runs of one repository go 
   const one = await finishedIn(b, [aRepo()], 3);
   const asked: Asked = [];
   const place = PlaceService.layer(counting(placeNow(), asked));
-  const listed = await runEngine(b.e, judgingMany(one.ids).pipe(Effect.provide(place)));
-  const done = await runEngine(b.e, freeingMany(listed, { yes: true }).pipe(Effect.provide(place)));
+  const listed = await runEngine(b.e, Effect.provideService(judgingMany(one.ids), StoreRoot, ROOT).pipe(Effect.provide(place)));
+  const done = await runEngine(b.e, Effect.provideService(freeingMany(listed, { yes: true }), StoreRoot, ROOT).pipe(Effect.provide(place)));
   assert.deepEqual(kindsOf(done), ['pruned', 'pruned', 'pruned']);
   assert.deepEqual(inventoried(asked), one.ids, 'one inventory a run: the listing is the judgement the removal goes on');
   assert.equal(removes(asked).length, 1, 'one remove for the three runs');
@@ -994,16 +1001,20 @@ test('under --yes a run is judged once, and the ready runs of one repository go 
     [one.ids.map((id) => one.wts.get(id)), []],
     'with the worktree of each, and no branch',
   );
-  assert.ok(one.ids.every((id) => !fs.existsSync(one.wts.get(id)!) && runRecord(id).pruned?.worktrees.length === 1));
+  assert.ok(one.ids.every((id) => !fs.existsSync(one.wts.get(id)!) && runRecord(ROOT, id).pruned?.worktrees.length === 1));
 
   const repos = [aRepo(), aRepo()];
   const two = await finishedIn(b, repos, 3);
   asked.length = 0;
   const told: string[][] = [];
-  const mixed = await runEngine(b.e, judgingMany(two.ids).pipe(Effect.provide(place)));
+  const mixed = await runEngine(b.e, Effect.provideService(judgingMany(two.ids), StoreRoot, ROOT).pipe(Effect.provide(place)));
   const freed = await runEngine(
     b.e,
-    freeingMany(mixed, { yes: true }, (turn) => void told.push(turn.map((d) => d.id))).pipe(Effect.provide(place)),
+    Effect.provideService(
+      freeingMany(mixed, { yes: true }, (turn) => void told.push(turn.map((d) => d.id))),
+      StoreRoot,
+      ROOT,
+    ).pipe(Effect.provide(place)),
   );
   assert.deepEqual(
     removes(asked).map((r) => [r.repo, r.workspaces]),
@@ -1026,10 +1037,13 @@ test('after a prompt each run is judged again before its removal: one whose work
   const { ids, wts } = await finishedIn(b, [aRepo()], 2);
   const asked: Asked = [];
   const place = PlaceService.layer(counting(placeNow(), asked));
-  const listed = await runEngine(b.e, judgingMany(ids).pipe(Effect.provide(place)));
+  const listed = await runEngine(b.e, Effect.provideService(judgingMany(ids), StoreRoot, ROOT).pipe(Effect.provide(place)));
   const wt = wts.get(ids[0])!;
   fs.writeFileSync(path.join(wt, 'lost.ts'), 'lost\n');
-  const done = await runEngine(b.e, freeingMany(listed, { yes: false }).pipe(Effect.provide(place)));
+  const done = await runEngine(
+    b.e,
+    Effect.provideService(freeingMany(listed, { yes: false }), StoreRoot, ROOT).pipe(Effect.provide(place)),
+  );
   assert.deepEqual(kindsOf(done), ['refused', 'pruned']);
   names('pruning' in done[0] ? done[0].pruning.refusal : undefined, wt, 'lost.ts');
   assert.ok(fs.existsSync(wt) && !under('runs', `${ids[0]}.pruned`), 'the changed worktree stands, and its run is not marked');
@@ -1046,13 +1060,18 @@ test(
     const b = board();
     const { ids, wts } = await finishedIn(b, [aRepo()], PRUNE_A_TURN + 1);
     const held = placeHeld(placeNow(), 'remove');
-    const listed = await runEngine(b.e, judgingMany(ids).pipe(Effect.provide(PlaceService.layer(held.place))));
+    const listed = await runEngine(
+      b.e,
+      Effect.provideService(judgingMany(ids), StoreRoot, ROOT).pipe(Effect.provide(PlaceService.layer(held.place))),
+    );
     const told: string[][] = [];
     const freed = runEngine(
       b.e,
-      freeingMany(listed, { yes: true }, (turn) => void told.push(turn.map((d) => d.id))).pipe(
-        Effect.provide(PlaceService.layer(held.place)),
-      ),
+      Effect.provideService(
+        freeingMany(listed, { yes: true }, (turn) => void told.push(turn.map((d) => d.id))),
+        StoreRoot,
+        ROOT,
+      ).pipe(Effect.provide(PlaceService.layer(held.place))),
     );
     await until(t, () => held.waiting() >= 1, 'the first remove asked', { bell: held.bell });
     assert.deepEqual(
@@ -1092,7 +1111,10 @@ test(
       }),
     });
     const held = placeHeld(refusing, 'remove');
-    const judged = await runEngine(b.e, judging(run.id).pipe(Effect.provide(PlaceService.layer(held.place))));
+    const judged = await runEngine(
+      b.e,
+      Effect.provideService(judging(run.id), StoreRoot, ROOT).pipe(Effect.provide(PlaceService.layer(held.place))),
+    );
     assert.ok('ready' in judged, 'ready to prune');
     const ready = await runWith(b.e, sized(judged.ready));
     t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
@@ -1116,7 +1138,7 @@ test(
         'neither removed anything',
       );
       assert.ok(fs.existsSync(wt), 'the worktree stands');
-      assert.equal(runRecord(run.id).pruned, undefined, `the ${ends} to ask ended first: the run is not marked`);
+      assert.equal(runRecord(ROOT, run.id).pruned, undefined, `the ${ends} to ask ended first: the run is not marked`);
     }
   },
 );
@@ -1128,7 +1150,10 @@ test('after a prompt, runs freed since the listing say nothing is left, and thei
   const beside = await finishedIn(b, [aRepo()], 3);
   const listed = await runWith(b.e, judgingMany(beside.ids));
   for (const id of beside.ids.slice(0, 2)) assert.equal((await runWith(b.e, prune(id, { yes: true }))).kind, 'pruned');
-  const done = await runEngine(b.e, freeingMany(listed, { yes: false }).pipe(Effect.provide(place)));
+  const done = await runEngine(
+    b.e,
+    Effect.provideService(freeingMany(listed, { yes: false }), StoreRoot, ROOT).pipe(Effect.provide(place)),
+  );
   assert.deepEqual(kindsOf(done), ['nothing', 'nothing', 'pruned']);
   assert.deepEqual(
     removes(asked).map((r) => r.workspaces),
@@ -1140,7 +1165,7 @@ test('after a prompt, runs freed since the listing say nothing is left, and thei
   const gone = await runWith(b.e, judgingMany(alone.ids));
   for (const id of alone.ids) assert.equal((await runWith(b.e, prune(id, { yes: true }))).kind, 'pruned');
   asked.length = 0;
-  const left = await runEngine(b.e, freeingMany(gone, { yes: false }).pipe(Effect.provide(place)));
+  const left = await runEngine(b.e, Effect.provideService(freeingMany(gone, { yes: false }), StoreRoot, ROOT).pipe(Effect.provide(place)));
   assert.deepEqual(kindsOf(left), ['nothing', 'nothing']);
   assert.deepEqual(
     removes(asked).map((r) => r.workspaces),

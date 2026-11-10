@@ -3,7 +3,7 @@
  * and check logs (`runWorktrees`, `heldWorktree`, `branchFates`, `checkLogsOf`), and the line that says what was done (`forgetLine`). Pure:
  * what the run's place reads of its repository is handed in.
  */
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { andList, type CloseoutAsked, type RepositoryRun, type Run, type TaskPhase } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import type { Verdict } from '../check/check.ts';
@@ -107,7 +107,7 @@ export type AskName = { of: 'try' | 'round' | 'base'; step: string; n: number };
  * (`pruneAgain`).
  */
 export function forgetRefusal(
-  steps: readonly Workflow[] | undefined,
+  steps: readonly StepSpec[] | undefined,
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   others: readonly Run[] = [],
@@ -149,7 +149,7 @@ export function forgetRefusal(
 
 /** What `forgetRefusal` was asked: its arguments, the run's id, and the command its fixes name (`again`). */
 type Forgetting = {
-  steps: readonly Workflow[] | undefined;
+  steps: readonly StepSpec[] | undefined;
   run: Run;
   id: string;
   again: string;
@@ -173,7 +173,7 @@ type Forgetting = {
  */
 type Facts = Forgetting & {
   live: string[];
-  unlanded?: Workflow;
+  unlanded?: StepSpec;
   ready: string[];
   waits: boolean;
   atGates: string[];
@@ -247,7 +247,7 @@ function liveTasks(run: Run, phaseOf: (taskId: string) => TaskPhase): string[] {
 }
 
 /** The ending that lands on its check whose merge is not landed (`landingOpen`), with nothing of the run in flight — or undefined. */
-function unlandedEnding(f: Forgetting, live: readonly string[]): Workflow | undefined {
+function unlandedEnding(f: Forgetting, live: readonly string[]): StepSpec | undefined {
   const { steps, run, phaseOf, closeoutOf, askedCloseout, spendOf, merging } = f;
   const ending = steps?.find((s) => landsOnCheck(s, run));
   const unlanded =
@@ -259,9 +259,9 @@ function unlandedEnding(f: Forgetting, live: readonly string[]): Workflow | unde
 }
 
 /** The steps awaiting approval, but an ending whose result git already has and that never ran (`resultOnBase`). */
-function gatesOf(f: Forgetting, steps: readonly Workflow[]): string[] {
+function gatesOf(f: Forgetting, steps: readonly StepSpec[]): string[] {
   const { run, phaseOf, closeoutOf, askedCloseout, spendOf, verdictOf, standings } = f;
-  const takenByHand = (st: Workflow): boolean => resultOnBase(standings) && approvedFirst(st, run) && !run.steps[st.name]?.taskId;
+  const takenByHand = (st: StepSpec): boolean => resultOnBase(standings) && approvedFirst(st, run) && !run.steps[st.name]?.taskId;
   return steps
     .filter(
       (s) =>
@@ -271,7 +271,7 @@ function gatesOf(f: Forgetting, steps: readonly Workflow[]): string[] {
 }
 
 /** On whose word a try is due, as `dueOf` says it: `retries:`, the run's sign-off ask, `nemia pause --now`, or `nemia retry`. */
-const dueBy = (r: Retry, step: Workflow | undefined): string => {
+const dueBy = (r: Retry, step: StepSpec | undefined): string => {
   if (r.by === 'retries') return `retries: ${step?.retries}`;
   if (r.by === 'signoff') return 'an ask to sign off';
   return r.by === 'pause' ? 'nemia pause --now' : `nemia retry ${modeWord(r)}`;
@@ -281,7 +281,7 @@ const dueBy = (r: Retry, step: Workflow | undefined): string => {
 const askedFor = (r: Retry): boolean => r.by === 'ask' || r.by === 'pause';
 
 /** What a pass would file now, each said: the steps ready, unless the run waits on runs (`waits`), the checks, tries and rounds due. */
-function dueOf(a: Assessment, steps: readonly Workflow[], waits: boolean): string[] {
+function dueOf(a: Assessment, steps: readonly StepSpec[], waits: boolean): string[] {
   const due: string[] = [];
   if (!waits && a.ready.length) due.push(`${andList(a.ready)} ${a.ready.length > 1 ? 'are' : 'is'} ready to be filed`);
   for (const name of a.check) due.push(`${name}'s check is due`);

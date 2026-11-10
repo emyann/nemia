@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { readStanding, standingFile } from './standing.store.ts';
+import { STORE } from '../../test/ambient.ts';
 
 /** `standing.json` holding one read of `repo` whose answer's tips are under `key`. */
 const kept = (key: 'heads' | 'tips') => ({
@@ -27,9 +28,9 @@ const kept = (key: 'heads' | 'tips') => ({
 
 /** What `readStanding` reads of `file`, written as the store's own. */
 const readOf = (file: object) => {
-  fs.mkdirSync(path.dirname(standingFile()), { recursive: true });
-  fs.writeFileSync(standingFile(), JSON.stringify(file));
-  return readStanding();
+  fs.mkdirSync(path.dirname(standingFile(STORE)), { recursive: true });
+  fs.writeFileSync(standingFile(STORE), JSON.stringify(file));
+  return readStanding(STORE);
 };
 
 test("a kept answer written with a former nemia's `heads` reads as its `tips`, the same as one written `tips`", () => {

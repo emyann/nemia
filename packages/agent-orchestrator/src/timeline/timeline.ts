@@ -10,7 +10,7 @@ import { roundIn } from '../status/status.ts';
 import { dollars } from '../money/money.ts';
 import { durationWord, rebuiltCache, sumUsage, usedLines, type Consumed } from '../usage/usage.ts';
 import { hasStarted } from '../wait/wait.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import { loopSpan } from '../workflow/index.ts';
 import { turnOf, turnSpanOf, type TurnSpan, type TurnTry } from './turns.ts';
 import type { AttemptEnd, EngineOutcome, SpanAt } from 'objects';
@@ -184,7 +184,7 @@ export type Timeline = { steps: Record<string, TimelineTry[]>; rounds: TimelineT
  * go by loop, in the workflow's order, then by round: the rounds of two loops are not the same rounds. A session a recheck's try shares is
  * counted once, on the try that ran it.
  */
-export function timeline(run: Run, views: ReadonlyMap<string, TaskClock>, steps: readonly Workflow[] = run.workflow ?? []): Timeline {
+export function timeline(run: Run, views: ReadonlyMap<string, TaskClock>, steps: readonly StepSpec[] = run.workflow ?? []): Timeline {
   const loops = steps.filter((s) => s.loop);
   const loopOf = new Map(loops.flatMap((looping) => loopSpan(steps, looping).map((name) => [name, looping.name] as const)));
   const byStep: Record<string, TimelineTry[]> = {};

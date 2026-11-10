@@ -15,7 +15,7 @@ import path from 'node:path';
 import { Context, Layer, Result, Schema } from 'effect';
 import { doorOf, rootedDoor, type DoorOf } from '../door/door.store.ts';
 import type { Run } from '../record/record.ts';
-import type { Workflow } from '../workflow.ts';
+import type { StepSpec } from '../workflow.ts';
 import type { TokenRecord } from './token.ts';
 
 /**
@@ -114,7 +114,7 @@ export const tokenDoorFiles = (root: string): Layer.Layer<never> => Layer.succee
 export const stepToken = (
   home: string,
   run: Pick<Run, 'id' | 'factory'>,
-  step: Pick<Workflow, 'name' | 'agent'>,
+  step: Pick<StepSpec, 'name' | 'agent'>,
   task: string,
   attempt: number,
 ): { sessionToken: string } => ({

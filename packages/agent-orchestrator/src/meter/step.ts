@@ -20,7 +20,7 @@ import { attemptVerdict } from '../check/check.ts';
 import { stepTaskId, type Run } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import type { StepStatus } from '../record/record.ts';
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import type { SpendOf } from '../status/status.ts';
 import { hasGate } from '../status/status.ts';
 import {
@@ -67,14 +67,14 @@ export const runKeys = (run: Pick<Run, 'factory' | 'workflowDir'>): Pick<StepKey
  * The labels of `step` in `run`, the one source of both its metrics' attributes and its sessions' labels: the run's factory or the
  * default, its workflow's folder, the step, and its agent or `none`.
  */
-export const stepKeys = (run: Pick<Run, 'factory' | 'workflowDir'>, step: Workflow): StepKeys => ({
+export const stepKeys = (run: Pick<Run, 'factory' | 'workflowDir'>, step: StepSpec): StepKeys => ({
   ...runKeys(run),
   step: step.name,
   agent: step.agent?.name ?? 'none',
 });
 
 /** The attributes of `step`'s metric in `run`, for `outcome`: its labels (`stepKeys`) and the outcome. */
-export const stepAttributes = (run: Pick<Run, 'factory' | 'workflowDir'>, step: Workflow, outcome: string): Record<string, string> =>
+export const stepAttributes = (run: Pick<Run, 'factory' | 'workflowDir'>, step: StepSpec, outcome: string): Record<string, string> =>
   boundedAttributes({ ...stepKeys(run, step), outcome });
 
 /**
@@ -120,7 +120,7 @@ export type FactReads = {
   views: ReadonlyMap<string, FactView>;
   spendOf: SpendOf;
   signedOff: (step: string) => Closeout | undefined;
-  statusOf: (step: Workflow) => StepStatus;
+  statusOf: (step: StepSpec) => StepStatus;
 };
 
 /**
@@ -157,7 +157,7 @@ export function checkOutcome(view: FactView): string {
  * writes, uncached) where every attempt measured it (`sumUsage`), never 0 in its place, and `task` on the
  * step's first try (`stepTaskId`), the one settle a step of a run is counted by as a task, whatever tries and rounds follow it.
  */
-function tryFact(run: Run, step: Workflow, taskId: string, view: FactView, reads: FactReads): StepFact {
+function tryFact(run: Run, step: StepSpec, taskId: string, view: FactView, reads: FactReads): StepFact {
   const record = run.steps[step.name];
   const outcome = tryOutcome(view, record?.taskId === taskId, reads.signedOff(step.name));
   const spend = reads.spendOf(taskId);
@@ -181,7 +181,7 @@ function tryFact(run: Run, step: Workflow, taskId: string, view: FactView, reads
  * check, and a round `exhausted` for each step one of them leaves out of rounds. A task of another run, or one the pass has no view of,
  * is no fact.
  */
-export function settledFacts(run: Run, steps: readonly Workflow[], settled: ReadonlySet<string>, reads: FactReads): StepFact[] {
+export function settledFacts(run: Run, steps: readonly StepSpec[], settled: ReadonlySet<string>, reads: FactReads): StepFact[] {
   if (!settled.size) return [];
   return steps.flatMap((step) => {
     const record = run.steps[step.name];
@@ -204,7 +204,7 @@ export function settledFacts(run: Run, steps: readonly Workflow[], settled: Read
  * that settled while no daemon read is due on the first pass that reads it. A task the pass has no view of is not due, nor any
  * task of a record with no mark, written before the tick kept one.
  */
-export function settlesDue(run: Run, steps: readonly Workflow[], views: ReadonlyMap<string, FactView>): Set<string> {
+export function settlesDue(run: Run, steps: readonly StepSpec[], views: ReadonlyMap<string, FactView>): Set<string> {
   const counted = run.settlesCounted;
   if (!counted) return new Set();
   const tasks = steps.flatMap((step) => {
@@ -221,7 +221,7 @@ export function settlesDue(run: Run, steps: readonly Workflow[], views: Readonly
  */
 export function settledOnce(
   run: Run,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   reads: FactReads,
 ): { facts: StepFact[]; marks: Pick<Run, 'settlesCounted'> } {
   const due = settlesDue(run, steps, reads.views);
@@ -230,7 +230,7 @@ export function settledOnce(
 }
 
 /** A round `granted` for each looping step whose loop the pass took round again (`looped`). */
-export const roundsGranted = (run: Run, steps: readonly Workflow[], looped: readonly string[]): StepFact[] =>
+export const roundsGranted = (run: Run, steps: readonly StepSpec[], looped: readonly string[]): StepFact[] =>
   steps.filter((s) => looped.includes(s.name)).map((step) => ({ metric: 'round', attributes: stepAttributes(run, step, 'granted') }));
 
 /** The three waits a step is timed by outside its sessions. */
@@ -284,7 +284,7 @@ function triesOf(record: Run['steps'][string]): Array<{ taskId: string; try: num
  * The queue of each session and the run of each check of `run` that settled (`settled`), off what the pass read of them before it filed
  * anything over them. A task of another run, one the pass has no view of, and one never spawned are no fact.
  */
-export function settledWaits(run: Run, steps: readonly Workflow[], settled: ReadonlySet<string>, reads: FactReads): WaitFact[] {
+export function settledWaits(run: Run, steps: readonly StepSpec[], settled: ReadonlySet<string>, reads: FactReads): WaitFact[] {
   if (!settled.size) return [];
   return steps.flatMap((step) => {
     const record = run.steps[step.name];
@@ -313,7 +313,7 @@ const answeredLate = (run: Pick<Run, 'runTimed'>, t: TimelineTry): boolean => Bo
  * wait read off the turn of a try that answered an earlier try's session (`answeredLate`) on a run whose timeline is not still to hand
  * over (`runTimed` other than `false`): such a gate of a run already handed over, or started before the mark, is never timed late.
  */
-export function gateWaits(run: Run, steps: readonly Workflow[], views: ReadonlyMap<string, TaskClock>): WaitFact[] {
+export function gateWaits(run: Run, steps: readonly StepSpec[], views: ReadonlyMap<string, TaskClock>): WaitFact[] {
   const timed = run.gatesTimed;
   if (!timed || !run.approvals?.length) return [];
   const tl = timeline(run, views, steps);
@@ -338,7 +338,7 @@ export function gateWaits(run: Run, steps: readonly Workflow[], views: ReadonlyM
  */
 export function onceFacts(
   run: Run,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   views: ReadonlyMap<string, FactView>,
   callOf: (denial: DeniedCall) => string,
 ): { facts: StepFact[]; marks: Pick<Run, 'gatesTimed' | 'deniedCounted'> } {
@@ -383,7 +383,7 @@ export type DeniedFact = {
  */
 export function deniedCalls(
   run: Run,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   views: ReadonlyMap<string, FactView>,
   callOf: (denial: DeniedCall) => string,
 ): DeniedFact[] {
@@ -438,7 +438,7 @@ export type TimelineFact = {
  */
 export function timelineFacts(
   run: Run,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   views: ReadonlyMap<string, FactView>,
   outcome: string,
 ): TimelineFact[] | null {

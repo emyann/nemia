@@ -25,11 +25,11 @@ import {
 } from '../run.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import type { RetryAsk } from '../retry/retry-ask.ts';
-import type { Workflow } from '../workflow.ts';
+import type { StepSpec } from '../workflow.ts';
 import { names, phases, run, step } from '../../test/assessed.ts';
 
 /** `plan → implement → review`, as dev-planned is. */
-const PLANNED: Workflow[] = [step('plan'), step('implement', ['plan']), step('review', ['implement'])];
+const PLANNED: StepSpec[] = [step('plan'), step('implement', ['plan']), step('review', ['implement'])];
 /** Plan signed off done, implement and review not filed; gated at plan by `--gate plan` unless told otherwise. */
 const atPlan = (extra: Partial<RepositoryRun> = {}) => run({ plan: 't1', implement: null, review: null }, { gates: ['plan'], ...extra });
 const PLAN_DONE = phases({ t1: 'succeeded' });
@@ -56,7 +56,7 @@ const onTry2 = (approvals: ReturnType<typeof approval>[]) =>
   });
 
 test('gatesOf, hasGate', async (t) => {
-  const steps: Workflow[] = [step('plan'), step('implement', ['plan']), { ...step('review', ['implement']), gate: true }];
+  const steps: StepSpec[] = [step('plan'), step('implement', ['plan']), { ...step('review', ['implement']), gate: true }];
   await t.test("a step is gated by its own `gate: true` or by the run's --gate", () => {
     assert.deepEqual(gatesOf(steps, { gates: ['plan'] }), ['plan', 'review']);
   });
@@ -96,7 +96,7 @@ const said = (outcome: Closeout['outcome']): Closeout => ({
 });
 
 /** Each standing `holdsOpen` reads: the step, its run, its phase, its closeout, its check's phase, and whether it holds. */
-const HOLDS: Array<[string, Workflow, Run, TaskPhase, Closeout | undefined, TaskPhase | undefined, boolean]> = [
+const HOLDS: Array<[string, StepSpec, Run, TaskPhase, Closeout | undefined, TaskPhase | undefined, boolean]> = [
   ['signed off blocked', PLAN, at(), 'succeeded', said('blocked'), undefined, true],
   ['at its gate', PLAN, at({ gates: ['plan'] }), 'succeeded', signedDone(), undefined, true],
   [
@@ -280,7 +280,7 @@ test('approvalRefusal: a step that has not signed off, each in its own words', a
   ] as Array<[string, Run, (id: string) => TaskPhase, (s: string) => Closeout | undefined, string[]]>) {
     await t.test(`REFUSED ${row}`, () => names(refused(r, 'plan', p, closeoutOf), ...facts));
   }
-  const checked: Workflow[] = [{ ...step('plan'), check: 'test -f PLAN.md' }, ...PLANNED.slice(1)];
+  const checked: StepSpec[] = [{ ...step('plan'), check: 'test -f PLAN.md' }, ...PLANNED.slice(1)];
   const withPlanCheck = (phase: TaskPhase) =>
     approvalRefusal(
       checked,
@@ -319,7 +319,7 @@ test('approvalRefusal: approved already, and a send-back asked', async (t) => {
     assert.ok(sendBack?.startsWith('plan signed off done'), sendBack ?? '');
   });
   await t.test('REFUSED approved, and nothing waits on it: its run goes on without it', () => {
-    const one: Workflow[] = [step('implement')];
+    const one: StepSpec[] = [step('implement')];
     const r = run({ implement: 't1' }, { gates: ['implement'], approvals: [approval('implement', 1)] });
     const refusal = approvalRefusal(one, r, 'implement', undefined, phases({ t1: 'succeeded' }), signedDone, asked);
     names(refusal, 'try 1 of implement is already approved', 'nothing waits on it', 'nemia ls r-1');
@@ -353,7 +353,7 @@ test('approvalRefusal: approved already, and a send-back asked', async (t) => {
 });
 
 /** `plan → triage ─ web → build-web | backend → build-backend`: triage a table condition over plan's `surface`, never filed. */
-const ROUTED: Workflow[] = [
+const ROUTED: StepSpec[] = [
   step('plan'),
   {
     ...step('triage', ['plan']),

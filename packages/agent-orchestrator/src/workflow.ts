@@ -53,7 +53,7 @@ export {
   stepPlace,
   WorkflowError,
 } from './step/step.ts';
-export type { OutputSchema, StepAgent, StepKey, StepOutput, Workflow } from './step/step.ts';
+export type { OutputSchema, StepAgent, StepKey, StepOutput, StepSpec } from './step/step.ts';
 export {
   commentTails,
   flatValue,

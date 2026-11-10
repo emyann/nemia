@@ -1,11 +1,11 @@
 /**
  * A run's steps, read as a program (`stepsOf`): the workflow the record froze, with no door and no root, or for a record that froze none,
- * its folder read through the Workflow door the program is given, at the store's root it is given (`StoreRoot`) — never the disk at the
- * module's root. Read again on every call, never kept between passes. A controller, since the door reaches `record.store.ts`, which no
- * store beneath it may close a cycle over (`test/boundary.test.ts`); the refusal and the frozen read are pure (`steps.ts`).
+ * its folder read through the Workflow door the program is given, at the store's root it is given (`StoreRoot`). Read again on every
+ * call, never kept between passes. A controller, since the door reaches `record.store.ts`, which no store beneath it may close a cycle over
+ * (`test/boundary.test.ts`); the refusal and the frozen read are pure (`steps.ts`).
  */
 import { Cause, Effect, Exit, Option } from 'effect';
-import type { Workflow } from '../workflow.ts';
+import type { StepSpec } from '../workflow.ts';
 import { orderSteps } from '../workflow.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
@@ -27,7 +27,7 @@ import type { ParentRun } from '../wait/wait.ts';
  * given (`StoreRoot`), with no hires, since such a record names no factory. Given no root, it fails `Invalid` naming how to give one; a
  * folder that does not load — any failure or defect of the read but an interruption — fails `UnloadedFolder`.
  */
-export const stepsOf = (run: Run): Effect.Effect<Workflow[], Refusal> => {
+export const stepsOf = (run: Run): Effect.Effect<StepSpec[], Refusal> => {
   const frozen = frozenStepsOf(run);
   if (frozen !== undefined) return Effect.succeed(frozen);
   return Effect.gen(function* () {
@@ -69,7 +69,7 @@ export const unloadedOf = (run: Run): Effect.Effect<string | undefined, Refusal>
  * The run's steps (`stepsOf`), or why its unfrozen folder does not load (`unloaded`, `UnloadedFolder`'s own words): for a reader that
  * goes on without the steps and says why. Fails any other refusal, so a read given no store root is refused, never read as no steps.
  */
-export const stepsOrWhy = (run: Run): Effect.Effect<{ steps: Workflow[] } | { unloaded: string }, Refusal> =>
+export const stepsOrWhy = (run: Run): Effect.Effect<{ steps: StepSpec[] } | { unloaded: string }, Refusal> =>
   stepsOf(run).pipe(
     Effect.map((steps) => ({ steps })),
     Effect.catchIf(
@@ -82,7 +82,7 @@ export const stepsOrWhy = (run: Run): Effect.Effect<{ steps: Workflow[] } | { un
  * The run's steps (`stepsOf`), or none for a run whose folder does not load (`UnloadedFolder`): for a read that judges nothing of the
  * run, as a pause's finishing tasks and held checks are. Fails any other refusal.
  */
-export const stepsOrNone = (run: Run): Effect.Effect<Workflow[], Refusal> =>
+export const stepsOrNone = (run: Run): Effect.Effect<StepSpec[], Refusal> =>
   stepsOf(run).pipe(
     Effect.catchIf(
       (err) => err instanceof UnloadedFolder,
@@ -94,7 +94,7 @@ export const stepsOrNone = (run: Run): Effect.Effect<Workflow[], Refusal> =>
  * Each run's steps (`stepsOrNone`), read once, by its id: for the synchronous reads of a pass or a list, which are handed a lookup
  * (`(run) => among.get(run.id) ?? []`) rather than reading the folder once per helper.
  */
-export const stepsAmong = (runs: readonly Run[]): Effect.Effect<ReadonlyMap<string, readonly Workflow[]>, Refusal> =>
+export const stepsAmong = (runs: readonly Run[]): Effect.Effect<ReadonlyMap<string, readonly StepSpec[]>, Refusal> =>
   Effect.map(
     Effect.forEach(runs, (run) => Effect.map(stepsOrNone(run), (steps) => [run.id, steps] as const)),
     (pairs) => new Map(pairs),

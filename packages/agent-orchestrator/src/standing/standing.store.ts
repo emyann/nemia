@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Result, Schema } from 'effect';
-import { firstRefusal, HOME } from '../record/record.store.ts';
+import { firstRefusal } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { StandingSchema } from '../place/place.store.ts';
 import type { Standing } from '../place/place.ts';
@@ -27,7 +27,7 @@ export type StoodRead = { readonly repo: string; readonly base: string; readonly
 export type StandingFile = { readonly v: 1; readonly at: string; readonly places: readonly StoodRead[] };
 
 /** `$WF_ROOT/standing.json`, where the tick keeps what its last pass read of where the branches stand. */
-export const standingFile = (): string => path.join(HOME, 'standing.json');
+export const standingFile = (home: string): string => path.join(home, 'standing.json');
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 
@@ -53,10 +53,10 @@ const REWRITTEN =
  * the file and its first wrong field, where it does not decode as `StandingFileSchema`: a file half written is never one, since it is
  * written whole and renamed.
  */
-export function readStanding(): StandingFile | undefined {
+export function readStanding(home: string): StandingFile | undefined {
   let text: string;
   try {
-    text = fs.readFileSync(standingFile(), 'utf8');
+    text = fs.readFileSync(standingFile(home), 'utf8');
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw err;
@@ -65,20 +65,20 @@ export function readStanding(): StandingFile | undefined {
   try {
     json = JSON.parse(text);
   } catch {
-    throw new Invalid({ message: `${standingFile()} is not JSON: ${REWRITTEN}` });
+    throw new Invalid({ message: `${standingFile(home)} is not JSON: ${REWRITTEN}` });
   }
   const decoded = Schema.decodeUnknownResult(StandingFileSchema)(json);
   if (Result.isSuccess(decoded)) return decoded.success;
   const { path: at, words } = firstRefusal(json, decoded.failure);
-  throw new Invalid({ message: `${standingFile()}: ${at.length ? `its ${at.join('.')} ` : ''}${words}: ${REWRITTEN}` });
+  throw new Invalid({ message: `${standingFile(home)}: ${at.length ? `its ${at.join('.')} ` : ''}${words}: ${REWRITTEN}` });
 }
 
 /**
  * When the tick's last pass read where the branches stand (`at`, `readStanding`'s), or that no pass has (`none`): what `nemia ls` words
  * how old what it shows of them is by (`standingLine`). Refused as `readStanding` refuses a file that does not read.
  */
-export const listedStanding = (): { at: string } | { none: true } => {
-  const file = readStanding();
+export const listedStanding = (home: string): { at: string } | { none: true } => {
+  const file = readStanding(home);
   return file ? { at: file.at } : { none: true };
 };
 
@@ -86,8 +86,8 @@ export const listedStanding = (): { at: string } | { none: true } => {
  * What a pass read of where the branches stand written down, through a hidden file renamed over the last, so a reader never reads half of
  * it. Throws node's error where the store cannot be written.
  */
-export function writeStanding(at: string, places: readonly StoodRead[]): void {
+export function writeStanding(home: string, at: string, places: readonly StoodRead[]): void {
   const file: StandingFile = { v: 1, at, places };
-  fs.mkdirSync(HOME, { recursive: true });
-  writeWhole(standingFile(), JSON.stringify(file));
+  fs.mkdirSync(home, { recursive: true });
+  writeWhole(standingFile(home), JSON.stringify(file));
 }

@@ -8,8 +8,8 @@
  * the merge read it.
  *
  * What upgrade and resolve refuse beyond this, a clean upgrade, the rules carried and a status lost are
- * `src/factory/upgrade/upgrade.verb.test.ts`; the three-way merge itself, `src/factory/upgrade/merge.test.ts`. `WF_ROOT` is set before
- * `src` is imported, which reads it as it loads.
+ * `src/factory/upgrade/upgrade.verb.test.ts`; the three-way merge itself, `src/factory/upgrade/merge.test.ts`. Its store is its own at
+ * `ROOT`, given as `ENV`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,20 +19,29 @@ import { parse, stringify } from 'yaml';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { teamCopy } from './team.ts';
+import { templated as programsAt } from './templated.ts';
+import { readFactoryAt } from '../src/factory/factory.store.ts';
+import {
+  appliedDir,
+  digestOf,
+  entriesIn,
+  readStatus,
+  replaceBase,
+  resolutionsFile,
+  statusFile,
+  swapTree,
+  treeDir,
+} from '../src/factory/applied/applied.store.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import { main } from '../src/cli/main.ts';
+import { engineOf, runWith } from '../src/runtime-client.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-upgrade-conflict-');
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
 const FACTORIES = path.join(ROOT, 'factories');
-const { templated: programsAt } = await import('./templated.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
 const { exportTemplate, reconciled, reconciledAt } = programsAt(ROOT);
-const { readFactory } = await import('../testing.ts');
-const { appliedDir, digestOf, entriesIn, readStatus, replaceBase, resolutionsFile, statusFile, swapTree, treeDir } =
-  await import('../src/factory/applied/applied.store.ts');
-const { runRecord } = await import('../src/record/record.store.ts');
-const { main } = await import('../src/cli/main.ts');
-const { engineOf, runWith } = await import('../src/runtime-client.ts');
-const stage = staged({ runWith, main, engineOf });
+const stage = staged({ runWith, main, engineOf, env: ENV });
 
 /** The document `file` of `dir`, its spec changed by `change`. */
 function edit(dir: string, file: string, change: (spec: Record<string, any>) => void): void {
@@ -80,7 +89,7 @@ const refusedWith =
 
 /** The factory `name`, read as the controller reads it. */
 const factory = (name: string) =>
-  readFactory(name) as ReturnType<typeof readFactory> & { template: NonNullable<ReturnType<typeof readFactory>['template']> };
+  readFactoryAt(ROOT, name) as ReturnType<typeof readFactoryAt> & { template: NonNullable<ReturnType<typeof readFactoryAt>['template']> };
 
 const REVIEW = 'workflows/dev/review.md';
 const RULES = 'RULES.md';
@@ -90,7 +99,7 @@ const LINE = `${RULES}:1-1`;
 test('an upgrade with a conflict: previewed, filed, waited on with the status alone, resolved, then merged', async (t) => {
   const s = story(t);
   const dir = path.join(scratch('wf-upgrade-conflict-template-'), 'team');
-  const tree = () => treeDir('crew');
+  const tree = () => treeDir(ROOT, 'crew');
   let run = '';
   let waitingTree: Record<string, string> = {};
   let waitingBase: Record<string, string> = {};
@@ -111,7 +120,7 @@ test('an upgrade with a conflict: previewed, filed, waited on with the status al
     await printedBy(t, 'factory', 'apply', 'crew', '--template', dir, '--repo', repo, '--set', 'budget=7');
     assert.equal(reconciled(factory('crew')).conditions[0].reason, 'Rendered');
     run = (await printedBy(t, 'start', 'Cache the views', '--factory', 'crew', '--workflows', 'dev'))[0].split(' ')[0];
-    assert.equal(runRecord(run).workflow?.find((step) => step.name === 'review')?.rounds, 3);
+    assert.equal(runRecord(ROOT, run).workflow?.find((step) => step.name === 'review')?.rounds, 3);
     rewrite(tree(), REVIEW, 'rounds: 3', 'rounds: 4');
     rewrite(tree(), REVIEW, 'budget: 7', 'budget: 9');
     rewrite(tree(), RULES, 'on a Friday', 'on a Friday, nor on a Monday');
@@ -172,10 +181,10 @@ test('an upgrade with a conflict: previewed, filed, waited on with the status al
 
   await s.test('while the conflicts wait the controller writes only its status: the tree and the base are left as they are', () => {
     waitingTree = bytesUnder(tree());
-    waitingBase = bytesUnder(appliedDir('crew'));
+    waitingBase = bytesUnder(appliedDir(ROOT, 'crew'));
     const waiting = reconciled(factory('crew'));
     assert.deepEqual(bytesUnder(tree()), waitingTree, 'the tree is left as it is while a conflict waits');
-    assert.deepEqual(bytesUnder(appliedDir('crew')), waitingBase, 'and the base');
+    assert.deepEqual(bytesUnder(appliedDir(ROOT, 'crew')), waitingBase, 'and the base');
     assert.equal(waiting.version, '0.1.0');
     assert.deepEqual(
       waiting.conditions.map((c) => [c.type, c.status, c.reason]),
@@ -198,7 +207,7 @@ test('an upgrade with a conflict: previewed, filed, waited on with the status al
         { at: ROUNDS, base: 'rounds: 3\n', ours: 'rounds: 4\n', theirs: 'rounds: 5\n' },
       ],
     });
-    assert.deepEqual(readStatus('crew'), waiting);
+    assert.deepEqual(readStatus(ROOT, 'crew'), waiting);
   });
 
   await s.test('resolve refuses what is no conflict or not one choice, writing nothing, and writes each choice it is given', async (t) => {
@@ -207,7 +216,7 @@ test('an upgrade with a conflict: previewed, filed, waited on with the status al
     await assert.rejects(resolve(ROUNDS), refusedWith('Invalid', /takes one choice/));
     await assert.rejects(resolve(ROUNDS, '--ours', '--theirs'), refusedWith('Invalid', /takes one choice/));
     await assert.rejects(resolve(ROUNDS, '--file', path.join(dir, 'gone.md')), refusedWith('Invalid', /no file at/));
-    assert.ok(!fs.existsSync(resolutionsFile('crew')), 'a refused resolve writes nothing');
+    assert.ok(!fs.existsSync(resolutionsFile(ROOT, 'crew')), 'a refused resolve writes nothing');
     assert.match((await printedBy(t, 'factory', 'resolve', 'crew', ROUNDS, '--theirs'))[1], /^1 conflict still wait/);
     assert.deepEqual(
       reconciled(factory('crew')).upgrade?.conflicts.map((c) => c.at),
@@ -220,17 +229,17 @@ test('an upgrade with a conflict: previewed, filed, waited on with the status al
       (await printedBy(t, 'factory', 'resolve', 'crew', LINE, '--file', mine))[1],
       'every conflict has a choice: the daemon merges on its next pass (nemia up)',
     );
-    assert.deepEqual(JSON.parse(fs.readFileSync(resolutionsFile('crew'), 'utf8')), {
+    assert.deepEqual(JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'crew'), 'utf8')), {
       to: '0.2.0',
       template: 'team',
-      base: digestOf(entriesIn(appliedDir('crew'))),
+      base: digestOf(entriesIn(appliedDir(ROOT, 'crew'))),
       choices: { [ROUNDS]: 'theirs', [LINE]: { text: 'Never push on a Friday, nor on a weekend.\n' } },
     });
   });
 
   await s.test('once each conflict has a choice the controller merges: the tree takes every choice, the base the template', async () => {
-    const oldBase = entriesIn(appliedDir('crew'));
-    const oldStatus = fs.readFileSync(statusFile('crew'));
+    const oldBase = entriesIn(appliedDir(ROOT, 'crew'));
+    const oldStatus = fs.readFileSync(statusFile(ROOT, 'crew'));
     const at = '2026-11-01T09:00:00.000Z';
     const merged = reconciledAt(factory('crew'), at);
     assert.equal(merged.version, '0.2.0');
@@ -238,14 +247,14 @@ test('an upgrade with a conflict: previewed, filed, waited on with the status al
     assert.equal(merged.upgrade, undefined, 'no conflict is said once merged');
     assert.match(textIn(tree(), REVIEW), /^budget: 9\nloop: implement\nrounds: 5$/m, "the template's rounds and the person's budget");
     assert.equal(textIn(tree(), RULES), 'Never push on a Friday, nor on a weekend.\n\nWrite the tests first, always.\n');
-    assert.equal(textIn(appliedDir('crew'), RULES), 'Never push on a weekend.\n\nWrite the tests first, always.\n');
-    assert.equal(fs.statSync(path.join(appliedDir('crew'), REVIEW)).mode & 0o222, 0, 'the base is read-only again');
+    assert.equal(textIn(appliedDir(ROOT, 'crew'), RULES), 'Never push on a weekend.\n\nWrite the tests first, always.\n');
+    assert.equal(fs.statSync(path.join(appliedDir(ROOT, 'crew'), REVIEW)).mode & 0o222, 0, 'the base is read-only again');
     const mergedTree = bytesUnder(tree());
-    replaceBase('crew', oldBase);
-    fs.writeFileSync(statusFile('crew'), oldStatus);
+    replaceBase(ROOT, 'crew', oldBase);
+    fs.writeFileSync(statusFile(ROOT, 'crew'), oldStatus);
     assert.deepEqual(reconciledAt(factory('crew'), at), merged, 'stopped after the tree was swapped, the next pass ends it');
     assert.deepEqual(bytesUnder(tree()), mergedTree, 'composing the same tree');
-    fs.writeFileSync(statusFile('crew'), oldStatus);
+    fs.writeFileSync(statusFile(ROOT, 'crew'), oldStatus);
     const after = reconciled(factory('crew'));
     assert.deepEqual([after.version, after.conditions[0].status], ['0.2.0', 'True'], 'stopped after the base: the version is the render');
     assert.deepEqual(bytesUnder(tree()), mergedTree);
@@ -256,17 +265,17 @@ test('an upgrade with a conflict: previewed, filed, waited on with the status al
   });
 
   await s.test('the run in flight keeps the steps frozen on its record', () => {
-    assert.equal(runRecord(run).workflow?.find((step) => step.name === 'review')?.rounds, 3, 'its review step as it started');
+    assert.equal(runRecord(ROOT, run).workflow?.find((step) => step.name === 'review')?.rounds, 3, 'its review step as it started');
   });
 
   await s.test('the tree is swapped only where no one wrote it since the merge read it', () => {
     const read = digestOf(entriesIn(tree()));
     rewrite(tree(), REVIEW, 'budget: 9', 'budget: 8');
     const written = bytesUnder(tree());
-    const merge = entriesIn(appliedDir('crew'));
-    assert.equal(swapTree('crew', merge, read), false, 'a write since the read: refused');
+    const merge = entriesIn(appliedDir(ROOT, 'crew'));
+    assert.equal(swapTree(ROOT, 'crew', merge, read), false, 'a write since the read: refused');
     assert.deepEqual(bytesUnder(tree()), written);
-    assert.equal(swapTree('crew', merge, digestOf(entriesIn(tree()))), true);
+    assert.equal(swapTree(ROOT, 'crew', merge, digestOf(entriesIn(tree()))), true);
     assert.match(textIn(tree(), REVIEW), /^budget: 7$/m);
     const staged = fs
       .readdirSync(path.join(FACTORIES, 'crew'))

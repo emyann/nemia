@@ -1,15 +1,10 @@
 /**
  * `nemia closeout` as an entry of the table: how it prints what it read. What `nemia show`, `nemia logs` and `nemia closeout` refuse of a
  * command line before anything is read are rows of `REFUSALS` (`command.test.ts`).
- *
- * `WF_ROOT` is set before the import, since the store's modules read it as they load.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { scratch } from 'test-kit/scratch';
-
-process.env.WF_ROOT = scratch('wf-reads-');
-const { CLOSEOUT } = await import('./commands.verb.ts');
+import { CLOSEOUT } from './commands.verb.ts';
 
 test('nemia closeout prints the whole closeout a person reads: its question, its files and values, and the fields its workflow asked for', () => {
   const closeout = {

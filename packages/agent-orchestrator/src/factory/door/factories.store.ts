@@ -45,7 +45,7 @@ import {
 } from '../factory.store.ts';
 import { levelDiffers } from './generation.ts';
 import type { FactoryLevelFile } from '../../level/level.ts';
-import { readFactoryLevelAt, writeFactoryLevelAt } from '../../level/level.store.ts';
+import { readFactoryLevel, writeFactoryLevel } from '../../level/level.store.ts';
 import { readRules, rulesAtHome, rulesCleared, rulesWritten, type RulesRead } from '../rules/rules.store.ts';
 import type { FactoryServers } from '../servers/index.ts';
 import { factoryServers, writeFactoryServers } from '../servers/servers.store.ts';
@@ -233,7 +233,9 @@ const levelHeld = (read: () => FactoryLevelFile | undefined): FactoryLevelFile |
 export function factoryFiles(home: string): FactoryLayer {
   const rulesOf = (name: string, notDone: string) => rulesAtHome(home, readFactoryAt(home, name, notDone));
   const instructionOf = (name: string, notDone: string): FactoryInstruction =>
-    instructionRead(readFactoryAt(home, name, notDone), instructionFileAt(home, name), readInstructionAt, (file) => storeKeeps(name, file));
+    instructionRead(readFactoryAt(home, name, notDone), instructionFileAt(home, name), readInstructionAt, (file) =>
+      storeKeeps(home, name, file),
+    );
   const storeKept = (name: string, notDone: string): FactoryInstruction => {
     const before = instructionOf(name, notDone);
     if (!before.store) throw folderKeptRefusal(name, before.file);
@@ -249,10 +251,10 @@ export function factoryFiles(home: string): FactoryLayer {
       remove: (name) => removeFactoryAt(home, name).file,
     },
     level: {
-      read: (name) => readFactoryLevelAt(home, name),
+      read: (name) => readFactoryLevel(home, name),
       write: (name, level) => {
-        const was = levelHeld(() => readFactoryLevelAt(home, name));
-        writeFactoryLevelAt(home, name, level);
+        const was = levelHeld(() => readFactoryLevel(home, name));
+        writeFactoryLevel(home, name, level);
         if (levelDiffers(was, level) && factoryNamesAt(home).includes(name))
           rewriteFactoryAt(home, readFactoryAt(home, name), 'Nothing was written.', true);
       },
@@ -271,8 +273,8 @@ export function factoryFiles(home: string): FactoryLayer {
     instruction: {
       read: (name) => instructionOf(name, 'There is no instruction to read.'),
       write: (name, words) =>
-        writeInstructionText(name, words, storeKept(name, 'Nothing was written.').file, instructionFileAt(home, name)),
-      clear: (name) => clearInstructionText(name, storeKept(name, 'Nothing was removed.').file),
+        writeInstructionText(home, name, words, storeKept(name, 'Nothing was written.').file, instructionFileAt(home, name)),
+      clear: (name) => clearInstructionText(home, name, storeKept(name, 'Nothing was removed.').file),
     },
     servers: {
       read: (name) => factoryServers(home, name),

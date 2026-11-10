@@ -80,7 +80,7 @@ export const versions = Effect.fn('versions')(function* (home: string) {
   return yield* tried((): Versions => {
     const running = runningRelease();
     const current = currentRelease(home);
-    const lease = daemonStanding();
+    const lease = daemonStanding(home);
     const daemon = lease.kind === 'ticking' ? { pid: lease.file.pid, release: lease.file.release ?? null } : null;
     const lines = versionLines(PACKAGE_VERSION, running, current, lease, sessions);
     return { version: PACKAGE_VERSION, running, current, daemon, sessions, lines };

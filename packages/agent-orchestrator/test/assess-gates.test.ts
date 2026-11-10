@@ -34,12 +34,12 @@ import {
 } from '../src/run.ts';
 import { PRECEDENCE } from '../src/brief/index.ts';
 import type { Closeout } from '../src/closeout/closeout.ts';
-import type { OutputSchema, Workflow } from '../src/workflow.ts';
+import type { OutputSchema, StepSpec } from '../src/workflow.ts';
 import { aRead, listing, names, phases, run, step, STEPS } from './assessed.ts';
 import type { RetryAsk, RetryHow } from '../src/retry/retry-ask.ts';
 
 /** `plan → implement → review`, as dev-planned is. */
-const PLANNED: Workflow[] = [step('plan'), step('implement', ['plan']), step('review', ['implement'])];
+const PLANNED: StepSpec[] = [step('plan'), step('implement', ['plan']), step('review', ['implement'])];
 /** Plan signed off done, implement and review not filed; gated at plan by `--gate plan` unless told otherwise. */
 const atPlan = (extra: Partial<RepositoryRun> = {}) => run({ plan: 't1', implement: null, review: null }, { gates: ['plan'], ...extra });
 const PLAN_DONE = phases({ t1: 'succeeded' });
@@ -79,7 +79,7 @@ const finished = (extra: Partial<RepositoryRun> = {}) =>
   );
 const DONE = phases({ t1: 'succeeded', t2: 'succeeded' });
 /** `implement` checked, `review` after it; its check filed under `checkId`, if given. */
-const CHECKED: Workflow[] = [{ ...step('implement'), check: 'npm test' }, step('review', ['implement'])];
+const CHECKED: StepSpec[] = [{ ...step('implement'), check: 'npm test' }, step('review', ['implement'])];
 const withCheck = (checkId: string | null, extra: Partial<RepositoryRun> = {}) =>
   run(
     {},
@@ -162,7 +162,7 @@ test('assess: the gate holds what follows until the try it is on is approved', a
 });
 
 test('assess: a gated step with a check is verified first, then held', async (t) => {
-  const gated: Workflow[] = [{ ...step('implement'), check: 'npm test' }, step('review', ['implement'])];
+  const gated: StepSpec[] = [{ ...step('implement'), check: 'npm test' }, step('review', ['implement'])];
   const at = (checkId: string | null, extra: Partial<RepositoryRun> = {}) => withCheck(checkId, { gates: ['implement'], ...extra });
   const passed = phases({ t1: 'succeeded', c1: 'succeeded' });
   await t.test('its check is filed first', () => {
@@ -192,7 +192,7 @@ test('assess: a gated step with a check is verified first, then held', async (t)
       'unsigned',
     );
   });
-  const looped: Workflow[] = [
+  const looped: StepSpec[] = [
     step('implement'),
     { ...step('review', ['implement']), loop: 'implement', rounds: 3, output: { file: 'review.json', schema: LOOPING }, gate: true },
     step('ship', ['review']),
@@ -307,8 +307,8 @@ test('slotNeed at a gate', async (t) => {
 });
 
 /** `implement → review → ship`: the ending step works in the repository's checkout, and is gated. */
-const SHIP: Workflow = { name: 'ship', after: ['review'], workspace: 'base', gate: true, body: 'Ship it.' };
-const ENDS: Workflow[] = [step('implement'), step('review', ['implement']), SHIP];
+const SHIP: StepSpec = { name: 'ship', after: ['review'], workspace: 'base', gate: true, body: 'Ship it.' };
+const ENDS: StepSpec[] = [step('implement'), step('review', ['implement']), SHIP];
 /** implement and review done on the run's branch, ship never filed. */
 const atEnd = (extra: Partial<RepositoryRun> = {}) =>
   run(
@@ -374,7 +374,7 @@ test('cancelPlan and forgetRefusal at a gate', async (t) => {
     );
   });
   await t.test('REFUSED forgetting a run at a gate that ran and one that never did: each, or what waits on it, is filed', () => {
-    const mixed: Workflow[] = [step('plan'), step('implement'), { ...SHIP, after: ['implement'] }];
+    const mixed: StepSpec[] = [step('plan'), step('implement'), { ...SHIP, after: ['implement'] }];
     names(
       forgetRefusal(mixed, run({ plan: 't1', implement: 't2', ship: null }, { gates: ['plan'] }), DONE, [], signedDone, asked),
       'plan and ship wait at their gates',
@@ -435,7 +435,7 @@ test('composeBrief after an approved gate', async (t) => {
     );
   });
   await t.test("a step that continues another's session is handed the approval too: it is new to it", () => {
-    const resumed: Workflow[] = [step('plan'), { ...step('implement', ['plan']), resume: 'plan' }];
+    const resumed: StepSpec[] = [step('plan'), { ...step('implement', ['plan']), resume: 'plan' }];
     assert.ok(composeBrief(resumed[1], approved, resumed).startsWith(`${PRECEDENCE}\n\ndo implement\n## Approved\n`));
   });
 });
@@ -500,7 +500,7 @@ test('retryable and retryRefusal: sending back from a gate is `nemia retry --mes
       'nothing to try again',
     );
   });
-  const terminal: Workflow[] = [{ ...step('implement'), check: 'npm test' }];
+  const terminal: StepSpec[] = [{ ...step('implement'), check: 'npm test' }];
   const last = run(
     {},
     { gates: ['implement'], steps: { implement: { taskId: 't1', check: { taskId: 'c1' } } }, approvals: [approval('implement', 1)] },
@@ -627,7 +627,7 @@ test("roundAsk at a gate: a round of a loop at its gate is a person's word, not 
     required: ['again'],
     additionalProperties: false,
   };
-  const looped: Workflow[] = [
+  const looped: StepSpec[] = [
     step('implement'),
     { ...step('review', ['implement']), loop: 'implement', rounds: 1, output: { file: 'review.json', schema: LOOPING } },
     step('ship', ['review']),

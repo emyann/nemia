@@ -6,7 +6,7 @@
 import type { Verdict } from '../../check/check.ts';
 import type { Closeout } from '../../closeout/index.ts';
 import { satisfiesAfter, tryOf, type CloseoutAsked, type Run, type StepStatus, type TaskPhase } from '../../record/record.ts';
-import type { RouteEval, Workflow } from '../../step/step.ts';
+import type { RouteEval, StepSpec } from '../../step/step.ts';
 import { approvalOf, hasGate, standing, type SpendOf } from '../../status/status.ts';
 import { conditionOf, nodeFate, nodeKind, tableRoute } from '../route.ts';
 
@@ -14,7 +14,7 @@ import { conditionOf, nodeFate, nodeKind, tableRoute } from '../route.ts';
  * Whether a condition's route is settled for the run: a node after it has been filed, or sent its card. Until then a table's copy on the
  * record yields to its producer's closeout, read afresh, so a producer tried again proposes its route anew.
  */
-export const routeSettled = (condition: Workflow, run: Run, steps: readonly Workflow[]): boolean =>
+export const routeSettled = (condition: StepSpec, run: Run, steps: readonly StepSpec[]): boolean =>
   steps.some((s) => s.after.includes(condition.name) && Boolean(run.steps[s.name]?.taskId || run.steps[s.name]?.sent));
 
 /** What a table answers off its producer's signed closeout, read afresh; undefined until the producer has signed off on its work. */
@@ -39,11 +39,11 @@ function tableRead(
  * @param wordOf The word each step reads on this pass: a producer is read only once it signed off on its work.
  */
 export function answeredRoute(
-  condition: Workflow,
+  condition: StepSpec,
   run: Run,
   closeoutOf: (step: string) => Closeout | undefined,
   wordOf: (step: string) => StepStatus,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
 ): { kind: 'route'; route: string } | { kind: 'unsigned' } | undefined {
   const routes = condition.routes ?? [];
   const kept = run.steps[condition.name]?.route;
@@ -74,7 +74,7 @@ export function answeredRoute(
  * A workflow with none of the routing keys reads exactly as `standing` read it.
  */
 export function routedWords(
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   run: Run,
   stood: ReadonlyMap<string, StepStatus>,
   closeoutOf: (step: string) => Closeout | undefined,
@@ -90,8 +90,8 @@ export function routedWords(
 
 /** One node's routing word, off the words of the nodes before it, or `undefined` where its own standing says it. */
 function routedWord(
-  step: Workflow,
-  steps: readonly Workflow[],
+  step: StepSpec,
+  steps: readonly StepSpec[],
   run: Run,
   closeoutOf: (step: string) => Closeout | undefined,
   wordOf: (step: string) => StepStatus,
@@ -108,7 +108,7 @@ function routedWord(
 }
 
 /** Whether a person routed the condition for the try it is on (`nemia route`, laid on its record by `runRecord`) with a route it has. */
-export const personRouted = (step: Workflow, run: Run): boolean => {
+export const personRouted = (step: StepSpec, run: Run): boolean => {
   const kept = run.steps[step.name]?.route;
   return kept?.by === 'person' && kept.try === tryOf(run, step.name) && (step.routes ?? []).includes(kept.route);
 };
@@ -120,7 +120,7 @@ export const personRouted = (step: Workflow, run: Run): boolean => {
  * A filed step that is no condition reads its standing's.
  */
 function filedWord(
-  step: Workflow,
+  step: StepSpec,
   run: Run,
   closeoutOf: (step: string) => Closeout | undefined,
   wordOf: (step: string) => StepStatus,
@@ -133,7 +133,7 @@ function filedWord(
 
 /** Every step's word on this pass: where it stands (`standing`), with its routing laid over it (`routedWords`). Pure. */
 export function runWords(
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
@@ -150,8 +150,8 @@ export function runWords(
 
 /** Whether a node never filed is off the route taken: off its condition's `when:`, after a route its condition ends on, or after skips. */
 function offRoute(
-  step: Workflow,
-  steps: readonly Workflow[],
+  step: StepSpec,
+  steps: readonly StepSpec[],
   run: Run,
   closeoutOf: (step: string) => Closeout | undefined,
   wordOf: (step: string) => StepStatus,

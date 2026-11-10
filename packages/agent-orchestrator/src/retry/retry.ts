@@ -3,7 +3,7 @@
  * `nemia decide` say of them (`tryNote`, `retryLines`, `answerLines`, `deniedOffer`, `overBudgetLine`). Pure; the ask itself, and the
  * record of a try, are `retry-ask.ts`'s, and what `nemia retry` refuses (`retryRefusal`) is `retry-refusal.ts`'s.
  */
-import type { Workflow } from '../step/step.ts';
+import type { StepSpec } from '../step/step.ts';
 import {
   DENIED_SHOWN,
   oneLine,
@@ -114,18 +114,18 @@ export function retryable(...args: Parameters<typeof triedOn>): ReturnType<typeo
 }
 
 /** Whether a condition's route is settled for the run: one of the nodes after it has been filed, or sent its card. */
-const routeSettled = (step: Workflow, run: Run, steps: readonly Workflow[]): boolean =>
+const routeSettled = (step: StepSpec, run: Run, steps: readonly StepSpec[]): boolean =>
   step.routes !== undefined &&
   steps.some((s) => s.after.includes(step.name) && Boolean(run.steps[s.name]?.taskId || run.steps[s.name]?.sent));
 
 /** `retryable` but for a condition's settled route: the ways a try of the step may be taken, off its own word. */
 function triedOn(
-  step: Workflow,
+  step: StepSpec,
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
-  steps: readonly Workflow[] = [],
+  steps: readonly StepSpec[] = [],
   harnessBlocked: (taskId: string) => boolean = () => false,
   spendOf: SpendOf = () => undefined,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
@@ -171,7 +171,7 @@ function triedOn(
  * pass, or never ran on a session cut off at its budget, but on an ending whose merge the run aborted; a session alone from any other end,
  * or where its harness asks or its gate sends it back (`other`).
  */
-const modesOf = (step: Workflow, run: Run, tried: StepStatus, settled: boolean, other: boolean): RetryMode[] => {
+const modesOf = (step: StepSpec, run: Run, tried: StepStatus, settled: boolean, other: boolean): RetryMode[] => {
   if (tried === 'budget exhausted')
     return settled && step.check && !landingAborted(step, run) ? ['continue', 'fresh', 'recheck'] : ['continue', 'fresh'];
   if (tried === 'failed (check)') return landsOnCheck(step, run) ? ['continue', 'fresh'] : ['continue', 'fresh', 'recheck'];
@@ -180,7 +180,7 @@ const modesOf = (step: Workflow, run: Run, tried: StepStatus, settled: boolean, 
 };
 
 /** Whether the run took back the merge an ending that lands on its check staged (`landingDue`): nothing is staged for a check to judge. */
-const landingAborted = (step: Workflow, run: Run): boolean => {
+const landingAborted = (step: StepSpec, run: Run): boolean => {
   const landed = run.steps[step.name]?.landed;
   return landsOnCheck(step, run) && landed !== undefined && 'aborted' in landed;
 };
@@ -239,7 +239,7 @@ export type StepRaise = { by: RaiseBy; above: number; said: string; modes: Retry
 export type RaiseGrounds = { raise: StepRaise | null; retry: Raise | undefined; round: ReturnType<typeof loopOver> };
 
 /** The steps of a looping step's loop over their cap (`loopOver`), which hold its round; none for a step that does not loop. Pure. */
-export const roundOver = (steps: readonly Workflow[], step: Workflow, run: Run, spendOf: SpendOf): ReturnType<typeof loopOver> =>
+export const roundOver = (steps: readonly StepSpec[], step: StepSpec, run: Run, spendOf: SpendOf): ReturnType<typeof loopOver> =>
   step.loop ? loopOver(steps, step, run, spendOf) : [];
 
 /**
@@ -249,9 +249,9 @@ export const roundOver = (steps: readonly Workflow[], step: Workflow, run: Run, 
  * @param tried What `retryable` says of the step, read with `reads`: given where a caller has read it already.
  */
 export function raiseGrounds(
-  step: Workflow,
+  step: StepSpec,
   run: Run,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   reads: RaiseReads,
   spendOf: SpendOf,
   tried: ReturnType<typeof retryable> = retryable(
@@ -290,7 +290,7 @@ export function raiseGrounds(
  * A step's raise of its cap (`StepRaise`), or null: the one the run page's `raise` shows and `nemia decide`'s offers word (`raiseGrounds`).
  * Pure.
  */
-export const stepRaise = (step: Workflow, run: Run, steps: readonly Workflow[], reads: RaiseReads, spendOf: SpendOf): StepRaise | null =>
+export const stepRaise = (step: StepSpec, run: Run, steps: readonly StepSpec[], reads: RaiseReads, spendOf: SpendOf): StepRaise | null =>
   raiseGrounds(step, run, steps, reads, spendOf).raise;
 
 /** A standing's codes: a session its harness asks the person through is `AwaitingAnswer` via `session`, else its status's reason. */
@@ -341,7 +341,7 @@ const pauseAskDue = (run: Run, a: RetryAsk, phaseOf: (taskId: string) => TaskPha
  * @param spendOf What each task's sessions cost (`taskSpend`): what holds a step over its budget.
  */
 export function pauseAskVoid(
-  step: Workflow,
+  step: StepSpec,
   run: Run,
   a: RetryAsk,
   phaseOf: (taskId: string) => TaskPhase,
@@ -359,7 +359,7 @@ export function pauseAskVoid(
  * The asks among `asks` that `nemia pause --now` wrote and that are void on this pass (`pauseAskVoid`), each of a step of `steps`. Pure.
  */
 export const pauseAsksVoid = (
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   run: Run,
   asks: readonly RetryAsk[],
   phaseOf: (taskId: string) => TaskPhase,
@@ -417,7 +417,7 @@ export const pauseAsksVoid = (
  * @param spendOf What each task's sessions cost (`taskSpend`): what holds a step over its budget.
  */
 export function retriesDue(
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
@@ -483,7 +483,7 @@ export function retriesDue(
 }
 
 /** Whether the run refuses a closeout's envelope or its questions (`closeoutRefusals`): a closeout not given is not. */
-const refusedOf = (step: Workflow, said: Closeout | undefined, steps: readonly Workflow[]): boolean =>
+const refusedOf = (step: StepSpec, said: Closeout | undefined, steps: readonly StepSpec[]): boolean =>
   Boolean(said && closeoutRefusals(step, said, steps).length);
 
 /** Who asked for a try by its ask: `nemia pause --now`, where the ask names the task it stopped, else a person. */
@@ -501,7 +501,7 @@ const STOPPED_FIRST: readonly RetryMode[] = ['continue', 'fresh'];
  * reading of the ask files (`answerOf`), since the record keeps no message. A cap a person raised is said beside the try it was raised
  * for: `budget $5`.
  */
-export function tryNote(step: Workflow, record: StepRecord | undefined, steps: readonly Workflow[] = [], answered = false): string {
+export function tryNote(step: StepSpec, record: StepRecord | undefined, steps: readonly StepSpec[] = [], answered = false): string {
   const tries = record?.tries ?? [];
   const last = tries.at(-1);
   if (!last) return '';
@@ -518,7 +518,7 @@ export function tryNote(step: Workflow, record: StepRecord | undefined, steps: r
  * How a try was asked for, as `tryNote` says it: by `retries:`, the run's sign-off ask, the pause, or a person's word — its mode, or a
  * merge of the base.
  */
-function howOf(step: Workflow, last: EarlierTry): string {
+function howOf(step: StepSpec, last: EarlierTry): string {
   if (last.cause === 'retries') return `by retries: ${step.retries ?? 0}`;
   if (last.cause === 'signoff') return 'asked to sign off by the run';
   if (last.paused) return `${last.cause === 'recheck' ? 'rechecked' : 'continued'} after nemia pause --now`;
@@ -611,7 +611,7 @@ const abortedWords = (
  *   is said to be the step's own fence at work, and offered no rule.
  */
 export function retryOffers(
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   run: Run,
   d: Decision,
   phaseOf: (taskId: string) => TaskPhase,
@@ -704,7 +704,7 @@ const RULE_CAP = 240;
  * allow nothing, and the offer says which of its rules is at work instead. Each rule one line (`oneLine`), since the harness's words are
  * free text; at most `DENIED_SHOWN`, then how many more, as `deniedWords` names the calls themselves. Pure.
  */
-export function deniedOffer(denied: readonly string[], step: Pick<Workflow, 'disallowedTools'> = {}, at: DeniedAt = {}): string {
+export function deniedOffer(denied: readonly string[], step: Pick<StepSpec, 'disallowedTools'> = {}, at: DeniedAt = {}): string {
   const calls = [...new Set(denied)];
   const fenced = calls.flatMap((call) => {
     const rule = disallowedBy(call, step.disallowedTools ?? [], at);
@@ -736,7 +736,7 @@ function shownList(words: readonly string[]): string {
  * waits on nobody for it. On a held run it waits on nobody either: the raise is refused while the hold stands (`heldRefusal`), and asked
  * for once it lifts.
  */
-export function overBudgetLine(steps: readonly Workflow[], run: Run, d: Decision, spendOf: SpendOf): string | undefined {
+export function overBudgetLine(steps: readonly StepSpec[], run: Run, d: Decision, spendOf: SpendOf): string | undefined {
   if (d.kind !== 'awaiting' || !d.overBudget.length) return undefined;
   const why = d.overBudget.map((name) => {
     const step = steps.find((s) => s.name === name);
@@ -764,7 +764,7 @@ export function overBudgetLine(steps: readonly Workflow[], run: Run, d: Decision
  * @param spendOf What each task's sessions cost (`taskSpend`): a blocked step over its budget is answered with `--budget` too.
  */
 export function answerLines(
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   run: Run,
   d: Decision,
   phaseOf: (taskId: string) => TaskPhase,

@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { isReadme, WorkflowError, type Workflow } from '../step/step.ts';
+import { isReadme, WorkflowError, type StepSpec } from '../step/step.ts';
 import { codexModeWritten } from '../former/former.ts';
 import { fenceKeyOf } from '../harness/harness.ts';
 import { agentDeniesOf, parseWorkflow, renderStep, type StepDraft } from '../workflow/index.ts';
@@ -27,14 +27,14 @@ import {
 import type { Agents } from '../agents/agents.ts';
 import type { Places } from '../skills/read.store.ts';
 import type { Fills, Found } from './folder.ts';
-import { HOME, isDirectory } from '../record/record.store.ts';
+import { isDirectory } from '../record/record.store.ts';
 import { doorAtOnce } from '../factory/door/factories.store.ts';
 
 /**
  * What `writeWorkflow` did: the folder, its steps as they now read, and its files by name — written, left as they were because they already
  * read so, and removed.
  */
-export type WorkflowWritten = { dir: string; steps: Workflow[]; written: string[]; kept: string[]; removed: string[] };
+export type WorkflowWritten = { dir: string; steps: StepSpec[]; written: string[]; kept: string[]; removed: string[] };
 
 /**
  * A workflow folder written from its steps: what the board's builder saves, and the inverse of `loadWorkflows`.
@@ -286,15 +286,5 @@ export function placesAroundAt(home: string, workflowDir: string): Places {
   return { ...(knownReposAt(home).has(repo) || factoryTrees(home).has(repo) ? { repo } : {}), home };
 }
 
-/**
- * A function taking the store's root first, as the old spelling that takes none: `at` the module's root, `HOME`. The one line of this
- * file that reads a root of its own (`test/global-roots.baseline.ts`), and so where `writeWorkflow` (`workflows.store.ts`) takes its
- * root too.
- */
-export const atHome =
-  <A extends unknown[], R>(at: (home: string, ...args: A) => R) =>
-  (...args: A): R =>
-    at(HOME, ...args);
-
-/** `removeWorkflowAt` the module's root. */
-export const removeWorkflow = atHome(removeWorkflowAt);
+/** `removeWorkflowAt`, under the name the package exports: the store's root first. */
+export const removeWorkflow = removeWorkflowAt;

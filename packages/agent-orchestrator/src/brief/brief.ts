@@ -2,7 +2,7 @@
  * What a step is told: its brief (`composeBrief`) or, on a remote A2A agent, its remote brief (`remoteBrief`), with what the runs it waited
  * on or was handed as context concluded (`ParentCloseout`). Pure; the sections a brief is made of are `brief-sections.ts`'s.
  */
-import { endsOnBase, type Workflow } from '../step/step.ts';
+import { endsOnBase, type StepSpec } from '../step/step.ts';
 import { fenced, isRepositoryRun, placeOf, type RepositoryRun, type Run } from '../record/record.ts';
 import type { FiledFolders } from '../filed/filed.ts';
 import { closeoutContract, isLoopTarget, type Closeout } from '../closeout/index.ts';
@@ -51,7 +51,7 @@ export type BriefPlace = { readonly words?: LandingWords; readonly say?: PlaceSa
  * since its brief is composed before the record moves the try behind — else owed past round 1 (`owesReplies`), none for any other try of
  * a loop's target, and nothing for a step that closes no loop.
  */
-const repliesOf = (step: Workflow, run: Run, steps: readonly Workflow[], round?: RoundBriefing): 'owed' | 'none' | false => {
+const repliesOf = (step: StepSpec, run: Run, steps: readonly StepSpec[], round?: RoundBriefing): 'owed' | 'none' | false => {
   if (round) return round.merge ? 'none' : 'owed';
   if (owesReplies(steps, run, step.name)) return 'owed';
   return isLoopTarget(steps, step.name) ? 'none' : false;
@@ -83,9 +83,9 @@ export const PRECEDENCE =
  * files go (`artifactsContract`), and the closeout, last (`closeoutContract`).
  */
 const contractsOf = (
-  step: Workflow,
+  step: StepSpec,
   run: Run,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   at: { artifactsDir?: string; round?: RoundBriefing; words?: LandingWords; inFolder: boolean },
 ): string =>
   [
@@ -96,7 +96,7 @@ const contractsOf = (
 
 /** What the brief opens with: the precedence (`PRECEDENCE`), then the layers the step is told in its brief (`briefBody`), where it has
  * any. */
-const opened = (step: Workflow): string => [PRECEDENCE, briefBody(step)].filter(Boolean).join('\n\n');
+const opened = (step: StepSpec): string => [PRECEDENCE, briefBody(step)].filter(Boolean).join('\n\n');
 
 /**
  * What a step is told. THE decision about what one step knows of another.
@@ -177,9 +177,9 @@ const opened = (step: Workflow): string => [PRECEDENCE, briefBody(step)].filter(
  *   steps this one comes after are handed on under `## Answered` (`answeredSection`). Absent, and nothing is said of them.
  */
 export function composeBrief(
-  step: Workflow,
+  step: StepSpec,
   run: Run,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   artifactsDir?: string,
   deps?: Provisioned,
@@ -287,9 +287,9 @@ function laterLook(run: RepositoryRun, say: PlaceSay | undefined): string[] {
  * workflow's checks, unless it has its own; and that the checkout is the person's.
  */
 function endingLook(
-  step: Workflow,
+  step: StepSpec,
   run: RepositoryRun,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   earlier: readonly string[],
   say: PlaceSay | undefined,
 ): string[] {
@@ -326,9 +326,9 @@ function endingLook(
  * nothing.
  */
 function handedOf(
-  step: Workflow,
+  step: StepSpec,
   run: Run,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   closeoutOf: (step: string) => Closeout | undefined,
   parents: readonly ParentCloseout[] = [],
   costs?: WorkflowCosts,
@@ -347,9 +347,9 @@ function handedOf(
 
 /** What a step filed again is told of why: its try's section (`retrySection`), its merge's (`mergeSection`) or its round's, or nothing. */
 function againSection(
-  step: Workflow,
+  step: StepSpec,
   run: Run,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   closeoutOf: (step: string) => Closeout | undefined,
   inFolder: boolean,
   say: PlaceSay | undefined,
@@ -366,9 +366,9 @@ function againSection(
  * (`## From <step>`), what each checked step it follows was told by its check (`## What <step>'s check said`), and its loop's findings.
  */
 function givenSections(
-  step: Workflow,
+  step: StepSpec,
   run: Run,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   closeoutOf: (step: string) => Closeout | undefined,
   checked: readonly CheckHanded[] = [],
   say?: PlaceSay,
@@ -396,9 +396,9 @@ function givenSections(
  * first try is, and then which try it is.
  */
 export function remoteBrief(
-  step: Workflow,
+  step: StepSpec,
   run: Run,
-  steps: readonly Workflow[],
+  steps: readonly StepSpec[],
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   retry?: RetryBriefing,
   parents?: readonly ParentCloseout[],
@@ -433,7 +433,7 @@ export function remoteBrief(
 /**
  * `## Try <n>` of a step on a remote A2A agent: who asked for it, how the last try ended, and what a person said with it, fenced as data.
  */
-function remoteTrySection(step: Workflow, r: RetryBriefing): string {
+function remoteTrySection(step: StepSpec, r: RetryBriefing): string {
   const who =
     r.by === 'retries'
       ? `The run filed this try itself: this step declares \`retries: ${step.retries ?? 0}\`.`
@@ -476,7 +476,7 @@ export type ToldLayers = {
  * order of `FENCE_KEYS`: none for a step with no agent, whose fence is no layer over another's. Its `disallowedTools:` is its own rules
  * alone (`ownDenies`), which add to its agent's, and none where it only repeated them.
  */
-function fenceLines(step: Workflow): ToldLayers['fence'] {
+function fenceLines(step: StepSpec): ToldLayers['fence'] {
   const own = step.agent?.keys ?? [];
   return FENCE_KEYS.flatMap((key) => {
     const value = key === 'disallowedTools' && step[key] !== undefined ? ownDenies(step) : step[key];
@@ -493,7 +493,7 @@ function fenceLines(step: Workflow): ToldLayers['fence'] {
  * written opens with the same layers plainly joined, and cuts on them too. A brief that opens with none of them, then a blank line — a
  * resumed try's, or one of a record frozen without its instructions — is the task whole, never cut at a guess; a null brief is no task.
  */
-export function toldLayers(step: Workflow, brief: string | null): ToldLayers {
+export function toldLayers(step: StepSpec, brief: string | null): ToldLayers {
   const agent = step.agent;
   const policy = ownNote(step);
   const instructions = agent?.instructions ?? null;
@@ -524,7 +524,7 @@ export function toldLayers(step: Workflow, brief: string | null): ToldLayers {
  *
  * @param policy The step's own note (`ownNote`), the opening of a rendered step's brief, whose layers above went into its prompt.
  */
-function openingOf(step: Workflow, policy: string, brief: string): { via: ToldLayers['via']; head: string } | undefined {
+function openingOf(step: StepSpec, policy: string, brief: string): { via: ToldLayers['via']; head: string } | undefined {
   const agent = step.agent;
   const layers: ReadonlyArray<readonly [ComposedLayer, string | undefined]> = [
     ['instructions', agent?.instructions],

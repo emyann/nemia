@@ -1,8 +1,8 @@
 /**
  * A run that waits on a run (`nemia start --after`), as the board reads it: `after` as the record froze it, and `waiting` — the runs its
  * roots wait on, in the package's words — on the list, the detail and the decision, each held to what `nemia ls` and `nemia decide` say.
- * Off a real repository, where a parent lands by its branch being merged, and in a scratch store, `WF_ROOT` set before the orchestrator is
- * imported, as it locates its store when it loads.
+ * Off a real repository, where a parent lands by its branch being merged, in the harness's scratch store (`root`), the api and the
+ * package's programs given this file's environment (`ENV`).
  *
  * The runs: `a-landed`, the diamond's top, its step signed off and its result branch merged into main; `b-running`, started after it and
  * still working, its branch not merged; `c-cancelled`, called off before anything of it was filed; `x-gone`, signed off on a branch deleted
@@ -20,16 +20,37 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { RunDecision } from 'objects';
-import { app } from '../src/app.ts';
-import { decideRun, engine, list, passStanding, runStore, waitAdvice, waitWord } from 'agent-orchestrator';
-import { runWith } from './builtin-place.ts';
+import { appOf, liveOf } from '../src/app.ts';
+import {
+  decideRun,
+  engine,
+  list,
+  passStanding,
+  runsAtOnce,
+  waitAdvice,
+  waitWord,
+  builtin,
+  type EngineService,
+  type PlaceService,
+  runWith as runEngine,
+  storeConfigLayer,
+  type StoreConfig,
+  type StoreRoot,
+} from 'agent-orchestrator';
+import { Effect } from 'effect';
 import { listedRuns as runList, objectOf } from './run-reads.ts';
 import type { Run } from 'objects';
 
 type Wait = import('agent-orchestrator').Wait;
 
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
+/** The environment this file's api and programs read: the harness's, at shipped defaults, with neither of the daemon's two ceilings set. */
+const ENV: NodeJS.ProcessEnv = { ...process.env, WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
+const { app } = appOf(liveOf(ENV));
+/** `program` run over the engine `e`, given the package's git place and the store and settings `ENV` names. */
+const runWith = <A, E>(
+  e: Parameters<typeof runEngine>[0],
+  program: Effect.Effect<A, E, EngineService | PlaceService | StoreRoot | StoreConfig>,
+): Promise<A> => runEngine(e, builtin(program.pipe(Effect.provide(storeConfigLayer(ENV)))));
 const git = (...args: string[]) =>
   execFileSync(
     'git',
@@ -133,7 +154,7 @@ writeRun('g-parents-landed', { after: ['a-landed'] });
 writeRun('h-gone-parent', { after: ['x-gone'] });
 working('t-i', filedI);
 writeRun('i-started', { after: ['b-running'], steps: { implement: { taskId: 't-i', workspace: repo, branch: 'wf/i-started/implement' } } });
-await runWith(engine(process.env), passStanding(runStore.runs.list()));
+await runWith(engine(ENV), passStanding(runsAtOnce(root).runs.list()));
 
 /** A run as the RunList (`GET /api/runs`) has it: its `status`, with the runs it froze to wait on and when it was made. */
 type Listed = Run['status'] & { after: readonly string[]; createdAt: string };
@@ -207,7 +228,7 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
     "the list's words and waits are `list`'s, run by run — and `advice` is `waitAdvice` over them, `word` `waitWord`",
     async () => {
       const runs = await listedRuns();
-      const e = engine(process.env);
+      const e = engine(ENV);
       for (const id of [
         'd-waits',
         'e-cancelled-parent',
@@ -220,7 +241,7 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
         'c-cancelled',
       ]) {
         const api = runs.get(id)!;
-        const cli = await runWith(e, list(e, runStore.runs.read(id)));
+        const cli = await runWith(e, list(e, runsAtOnce(root).runs.read(id)));
         assert.deepEqual(asWaits(api.waiting), cli.waiting, id);
         assert.deepEqual(
           api.steps.map((s) => s.message),
@@ -229,10 +250,10 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
         );
         if (cli.waiting.length) {
           assert.equal(api.waiting?.word, waitWord(cli.waiting), id);
-          assert.equal(api.waiting?.advice, waitAdvice(runStore.runs.read(id), cli.waiting), id);
+          assert.equal(api.waiting?.advice, waitAdvice(runsAtOnce(root).runs.read(id), cli.waiting), id);
           assert.equal(
             api.waiting?.waitingOnYou,
-            !waitAdvice(runStore.runs.read(id), cli.waiting).startsWith(`nothing of ${id} is filed until `),
+            !waitAdvice(runsAtOnce(root).runs.read(id), cli.waiting).startsWith(`nothing of ${id} is filed until `),
             `${id}: on you exactly when waitAdvice does not say "nothing of <run> is filed until …", which it says while every run waited on may still land`,
           );
         }
@@ -299,7 +320,7 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
   );
   await s.test('the decision of a run waiting on runs is `waiting`, and nothing else: what `nemia decide` prints for it', async () => {
     const runs = await listedRuns();
-    const e = engine(process.env);
+    const e = engine(ENV);
     for (const id of ['d-waits', 'e-cancelled-parent', 'h-gone-parent']) {
       const res = await app.request(`/api/runs/${id}/decision`);
       assert.equal(res.status, 200);

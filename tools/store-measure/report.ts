@@ -4,10 +4,10 @@
  *
  * It copies the workflows' store (`--from`, `WF_ROOT` or `~/.agent-workflows`, its runtime's journals under `engine/` with it) and the
  * runtime's own (`--engine`, `AE_ROOT` or `~/.agent-engine`) into a fresh temp folder, leaving out what no read opens and what would tie
- * the copy to the live machine (`LEFT_OUT` in `fence.ts`), and refusing a temp folder inside either store; points `WF_ROOT` and `AE_ROOT`
- * at the copy before the orchestrator loads (it pins its root as it loads); and times nine reads there, each cold — the first call over
- * memos that hold nothing — and warm — called again with what the memos kept — as the median over `--repeat` calls and the heap each
- * left held after a collection:
+ * the copy to the live machine (`LEFT_OUT` in `fence.ts`), and refusing a temp folder inside either store; hands every reader one
+ * environment whose `WF_ROOT` and `AE_ROOT` are the copy's (`copyEnvOf`), this process's left as it is; and times nine reads there, each
+ * cold — the first call over memos that hold nothing — and warm — called again with what the memos kept — as the median over `--repeat`
+ * calls and the heap each left held after a collection:
  *
  * - `tickPass`: a pass of the tick (`tickRun`, `WF_VERIFY_REST` off), over an engine built afresh for each cold pass (the tick's memo of
  *   runs at rest is kept per engine) and kept for the warm ones. The runtime's own pass is not run: the engine's `tick` answers a report
@@ -180,29 +180,39 @@ function lineStarts(file: string): number[] {
 const FINISHED = new Set(['succeeded', 'failed', 'cancelled']);
 
 type Orchestrator = typeof import('agent-orchestrator');
-type Api = typeof import('api/src/app.ts');
+type Api = typeof import('api/app');
 type Built = ReturnType<Api['appOf']>;
 type App = Built['app'];
 type Place = Parameters<Orchestrator['PlaceService']['layer']>[0];
 
 /**
- * The environment the copy at `root` is read under, set before the orchestrator loads: both roots on the copy, the memo's verification
- * off, worktrees kept, no daemon started and no collector. Answers the workflows' store of the copy.
+ * The environment the copy at `root` is read under, one record handed to every reader (`liveOf`, `storeConfigLayer`, `engine`) and never
+ * written into this process's: both roots on the copy, the memo's verification off, worktrees kept, no daemon started and no collector.
  */
-function pointAtCopy(root: string): string {
+type CopyEnv = Readonly<Record<string, string | undefined>>;
+
+/** The environment of the copy at `root` (`CopyEnv`), and the workflows' store of the copy. */
+function copyEnvOf(root: string): { wf: string; env: CopyEnv } {
   const wf = path.join(root, 'wf');
-  process.env.WF_ROOT = wf;
-  process.env.AE_ROOT = path.join(root, 'ae');
-  process.env.WF_VERIFY_REST = '0';
-  process.env.WF_KEEP_WORKTREES = '1';
-  process.env.NEMIA_DAEMON_START = 'off';
-  for (const key of Object.keys(process.env)) if (key.startsWith('OTEL_')) delete process.env[key];
-  return wf;
+  const env: Record<string, string | undefined> = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !key.startsWith('OTEL_')),
+  );
+  Object.assign(env, {
+    WF_ROOT: wf,
+    AE_ROOT: path.join(root, 'ae'),
+    WF_VERIFY_REST: '0',
+    WF_KEEP_WORKTREES: '1',
+    NEMIA_DAEMON_START: 'off',
+  });
+  return { wf, env };
 }
 
-/** An api app over the copy, its runtime built and every memo of it empty, reading through `place`, saying no line. */
-const appOver = async (api: Api, orch: Orchestrator, place: Place): Promise<Built> => {
-  const built = api.appOf(Layer.mergeAll(api.liveOf(process.env), orch.PlaceService.layer(place), Logger.layer([])));
+/**
+ * An api app over the copy whose environment is `env`, its runtime built and every memo of it empty, reading through `place`, saying no
+ * line.
+ */
+const appOver = async (api: Api, orch: Orchestrator, place: Place, env: CopyEnv): Promise<Built> => {
+  const built = api.appOf(Layer.mergeAll(api.liveOf(env), orch.PlaceService.layer(place), Logger.layer([])));
   await built.runtime.runPromise(Effect.void);
   return built;
 };
@@ -296,10 +306,10 @@ async function feedStreamed(app: App, feed: FeedRead): Promise<void> {
  * at rest per engine), then warm over one engine kept, after a first pass that is not counted; each pass with the fence armed for a
  * pass. Answers the measure and the last pass.
  */
-async function tickMeasured(orch: Orchestrator, place: Place, fence: Fence, wf: string, repeat: number, informed = false) {
+async function tickMeasured(orch: Orchestrator, place: Place, fence: Fence, env: CopyEnv, wf: string, repeat: number, informed = false) {
   const base = orch
     .withProposalsPass(orch.tickRun({ repo: wf, verifyRest: false }))
-    .pipe(Effect.provide(Layer.merge(orch.PlaceService.layer(place), orch.storeConfigLayer(process.env))));
+    .pipe(Effect.provide(Layer.merge(orch.PlaceService.layer(place), orch.storeConfigLayer(env))));
   let informer = orch.informerMemo();
   const program = Effect.suspend(() => (informed ? base.pipe(Effect.provideService(orch.Informer, informer)) : base));
   let pass: Pass | undefined;
@@ -313,11 +323,11 @@ async function tickMeasured(orch: Orchestrator, place: Place, fence: Fence, wf: 
   };
   const cold: Timed[] = [];
   for (let i = 0; i < repeat; i++) {
-    const e = passEngine(orch.engine(process.env), fence);
+    const e = passEngine(orch.engine(env), fence);
     informer = orch.informerMemo();
     cold.push(await timed(() => passOf(e)));
   }
-  const kept = passEngine(orch.engine(process.env), fence);
+  const kept = passEngine(orch.engine(env), fence);
   informer = orch.informerMemo();
   await passOf(kept);
   const warm: Timed[] = [];
@@ -330,18 +340,18 @@ async function tickMeasured(orch: Orchestrator, place: Place, fence: Fence, wf: 
  * `overApps` reads `runListAfterPass`, `openRunAfterPass` and `inboxAfterPass` over, so the pass is not timed and the read is, the warm
  * calls within it.
  */
-const passedOver = (orch: Orchestrator, place: Place, fence: Fence, wf: string, fresh: () => Promise<Built>) => async () => {
+const passedOver = (orch: Orchestrator, place: Place, fence: Fence, env: CopyEnv, wf: string, fresh: () => Promise<Built>) => async () => {
   const built = await fresh();
   const informer = await built.runtime.runPromise(Effect.service(orch.Informer));
   const program = orch
     .withProposalsPass(orch.tickRun({ repo: wf, verifyRest: false }))
     .pipe(
-      Effect.provide(Layer.merge(orch.PlaceService.layer(place), orch.storeConfigLayer(process.env))),
+      Effect.provide(Layer.merge(orch.PlaceService.layer(place), orch.storeConfigLayer(env))),
       Effect.provideService(orch.Informer, informer),
     );
   fence.arm('pass');
   try {
-    await orch.runWith(passEngine(orch.engine(process.env), fence), program);
+    await orch.runWith(passEngine(orch.engine(env), fence), program);
   } finally {
     fence.arm('read');
   }
@@ -372,11 +382,11 @@ const chatFold = <R>(rest: Stream.Stream<unknown, never, R>) =>
  * Her chat measured on the copy at the place its level file names: the history, the old beat (`followChat`'s `first` from the history's
  * cursor) and the fold of one moment (`chatFold`), each cold over an engine and reads built afresh per call and warm over one kept.
  */
-async function chatMeasured(orch: Orchestrator, place: Place, fence: Fence, repeat: number) {
-  const placed = Layer.merge(orch.PlaceService.layer(place), orch.storeConfigLayer(process.env));
-  const root = orch.wfRoot(process.env);
+async function chatMeasured(orch: Orchestrator, place: Place, fence: Fence, env: CopyEnv, repeat: number) {
+  const placed = Layer.merge(orch.PlaceService.layer(place), orch.storeConfigLayer(env));
+  const root = orch.wfRoot(env);
   const fresh = (): ChatOver => ({
-    e: passEngine(orch.engine(process.env), fence),
+    e: passEngine(orch.engine(env), fence),
     reads: { runs: orch.informerMemo() },
   });
   const history = (at: ChatOver) =>
@@ -463,12 +473,12 @@ const newestOf = (listing: readonly Listed[], finished: boolean): string | null 
 
 /** The measure on the copy at `root`: `wf`, the workflows' store, and `ae`, the runtime's. */
 async function measure(asked: Asked, root: string, fence: Fence) {
-  const wf = pointAtCopy(root);
+  const { wf, env } = copyEnvOf(root);
   fence.arm('read');
   const orch = await import('agent-orchestrator');
-  const api = await import('api/src/app.ts');
+  const api = await import('api/app');
   const place = readOnlyPlace(orch.builtinGitPlace);
-  const fresh = () => appOver(api, orch, place);
+  const fresh = () => appOver(api, orch, place, env);
   const { repeat } = asked;
   const first = await fresh();
   const { runs: listing, unjudged } = listedOf(await getJson(first.app, '/api/runs'));
@@ -482,7 +492,7 @@ async function measure(asked: Asked, root: string, fence: Fence) {
   const ofFactory = (url: (name: string) => string) =>
     factory === undefined ? null : overApps(fresh, (app) => getJson(app, url(encodeURIComponent(factory))), repeat);
   const feed = feedOf(wf);
-  const passed = passedOver(orch, place, fence, wf, fresh);
+  const passed = passedOver(orch, place, fence, env, wf, fresh);
   const objectOf = (id: string | null, over = fresh) =>
     id === null ? null : overApps(over, (app) => getJson(app, `/api/runs/${encodeURIComponent(id)}`), repeat);
   const measures: Record<MeasureKey, Measured | null> = {
@@ -511,11 +521,11 @@ async function measure(asked: Asked, root: string, fence: Fence) {
     ceilings: await overApps(fresh, (app) => getJson(app, '/api/ceilings'), repeat),
     ceilingsAfterPass: await overApps(passed, (app) => getJson(app, '/api/ceilings'), repeat),
   };
-  const chat = await chatMeasured(orch, place, fence, repeat);
+  const chat = await chatMeasured(orch, place, fence, env, repeat);
   Object.assign(measures, chat.measures);
-  const { measured, pass } = await tickMeasured(orch, place, fence, wf, repeat);
+  const { measured, pass } = await tickMeasured(orch, place, fence, env, wf, repeat);
   measures.tickPass = measured;
-  measures.tickPassInformed = (await tickMeasured(orch, place, fence, wf, repeat, true)).measured;
+  measures.tickPassInformed = (await tickMeasured(orch, place, fence, env, wf, repeat, true)).measured;
   fence.disarm();
   const tasks = filesOf(path.join(wf, 'engine', 'tasks'), '.jsonl');
   return {

@@ -55,7 +55,7 @@ export function schedulesRead(home: string, runs: readonly ScheduleRun[], now: n
             workflow,
             schedule,
             fires: firesOf(schedule, now),
-            kept: readScheduleTry(factory.name, workflow),
+            kept: readScheduleTry(home, factory.name, workflow),
             last: lastRun(runs, factory.name, workflow),
           };
         }),

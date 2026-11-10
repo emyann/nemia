@@ -11,12 +11,10 @@ import { testEngine } from 'agent-runtime/testing';
 import { scratch } from 'test-kit/scratch';
 import { eachTest } from '../../test/placed.ts';
 import { story } from 'test-kit/checkpoints';
+import { runWith, engineOf } from '../runtime-client.ts';
+import { retainOnce, freshRetainMemory } from './retention.verb.ts';
+import { releaseDir, releasesDir, realReleasesDir, switchCurrent, writeReleaseFile } from '../release/release.store.ts';
 
-const ROOT = scratch('wf-retain-');
-process.env.WF_ROOT = ROOT;
-const { runWith, engineOf } = await import('../runtime-client.ts');
-const { retainOnce, freshRetainMemory } = await import('./retention.verb.ts');
-const { releaseDir, releasesDir, realReleasesDir, switchCurrent, writeReleaseFile } = await import('../release/release.store.ts');
 const engine = eachTest(testEngine);
 
 /** A pid no process has: past the highest Linux allows (2^22) and macOS's. */

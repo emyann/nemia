@@ -4,7 +4,7 @@
  */
 import { Cause, Deferred, Effect, Exit, Result } from 'effect';
 import { asked, over, unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
-import type { Workflow } from '../workflow.ts';
+import type { StepSpec } from '../workflow.ts';
 import type { Refusal } from '../refusal/refusal.ts';
 import { admissionOrder, heldRuns, slotNeed, type RunSlot } from './cap.ts';
 import { runTasks, type Run } from '../record/record.ts';
@@ -19,6 +19,7 @@ import { parentsRead, passParents, type Parents } from '../views/views.verb.ts';
 import { standingReader, type PassStanding } from '../standing/standing.verb.ts';
 import type { PassRevisions } from '../revisions/pin.verb.ts';
 import { readRun } from '../tick/told.verb.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /** A run a task of which does not read (`unreadableJournal`), as a pass counts it: in flight, and asking the cap for nothing more. */
 const UNJUDGED = { inFlight: true, wants: false } as const;
@@ -46,7 +47,7 @@ const needOf = Effect.fnUntraced(function* (
   seen: Engine,
   listed: ReadonlyMap<string, TaskView>,
   run: Run,
-  steps: Workflow[],
+  steps: StepSpec[],
   parents: Parents,
 ) {
   const { read } = yield* readRun(seen, run, { steps, views: new Map(listed) });
@@ -83,12 +84,14 @@ const leftOutRightly = (id: string, need: { inFlight: boolean; wants: boolean })
  */
 export const slotsOf = Effect.fn('slotsOf')(function* (
   e: Engine,
-  runs: readonly Run[] = storeRunsGiven(),
+  given: readonly Run[] | undefined,
   config: Settings,
   parents: Parents,
   settled: ReadonlySet<string> = new Set(),
 ) {
-  const cap = lastCeilings()?.runs ?? config.maxRuns;
+  const home = yield* StoreRoot;
+  const runs = given ?? storeRunsGiven(home);
+  const cap = lastCeilings(home)?.runs ?? config.maxRuns;
   if (cap <= 0) return { cap: 0, inFlight: null, held: new Map() } satisfies Slots;
   const read = yield* asked('list', e.list(runs.flatMap(runTasks)));
   const listed = new Map(read.views.map((view) => [view.id, view]));
@@ -101,7 +104,7 @@ export const slotsOf = Effect.fn('slotsOf')(function* (
       if (unloadedFolder(read.failure) !== undefined) needs.push({ id: run.id, createdAt: run.createdAt, ...UNJUDGED });
       continue;
     }
-    const steps: Workflow[] = read.success;
+    const steps: StepSpec[] = read.success;
     let need: { inFlight: boolean; wants: boolean } = UNJUDGED;
     if (!runTasks(run).some((taskId) => unreadable.has(taskId))) {
       const judged = yield* Effect.exit(needOf(seen, listed, run, steps, parents));
@@ -115,7 +118,8 @@ export const slotsOf = Effect.fn('slotsOf')(function* (
 });
 
 /** Every run in the store, a run `given` names answered by the record it holds rather than read again: `slotsRead`'s listing. */
-export const storeRunsGiven = (given?: (id: string) => Run | undefined): Run[] => runsAtOnce.runs.list(undefined, given);
+export const storeRunsGiven = (home: string, given?: (id: string) => Run | undefined): Run[] =>
+  runsAtOnce(home).runs.list(undefined, given);
 
 /**
  * The runs the cap on runs in flight holds now, each with the count it is held at (`slotsOf`'s `held`). None, and nothing read, with no cap
@@ -123,7 +127,8 @@ export const storeRunsGiven = (given?: (id: string) => Run | undefined): Run[] =
  * the runs wait on are read through `parents`, as `slotsOf` reads them.
  */
 export const runSlots = Effect.fn('runSlots')(function* (e: Engine, runs: readonly Run[], config: Settings, parents: Parents) {
-  const cap = lastCeilings()?.runs ?? config.maxRuns;
+  const home = yield* StoreRoot;
+  const cap = lastCeilings(home)?.runs ?? config.maxRuns;
   if (cap <= 0 || !runs.some((r) => !hasStarted(r) && !r.cancelledAt)) return new Map<string, RunSlot>();
   return (yield* slotsOf(e, runs, config, parents)).held;
 });
@@ -145,10 +150,18 @@ export type PassRead = {
 };
 
 /**
- * What one pass reads once (`PassRead`), over `e` and the pass's listing `runs`, the cap read from `config` as `runSlots` reads it, and the
- * runs others wait on read off `standing`, and what resolving each run's kinds reads, which the caller made for the pass (`passRevisions`).
+ * What one pass reads once (`PassRead`) of the store at `home`, over `e` and the pass's listing `runs`, the cap read from `config` as
+ * `runSlots` reads it, and the runs others wait on read off `standing`, and what resolving each run's kinds reads, which the caller made
+ * for the pass (`passRevisions`).
  */
-export const passRead = (e: Engine, runs: readonly Run[], config: Settings, standing: PassStanding, revisions: PassRevisions): PassRead => {
+export const passRead = (
+  home: string,
+  e: Engine,
+  runs: readonly Run[],
+  config: Settings,
+  standing: PassStanding,
+  revisions: PassRevisions,
+): PassRead => {
   const parents = passParents(standingReader(standing));
   type Held = Deferred.Deferred<Map<string, RunSlot>, Refusal>;
   let held: Held | undefined;
@@ -157,6 +170,7 @@ export const passRead = (e: Engine, runs: readonly Run[], config: Settings, stan
     const pending: Held = Deferred.makeUnsafe();
     held = pending;
     return runSlots(e, runs, config, parents).pipe(
+      Effect.provideService(StoreRoot, home),
       Effect.onExit((exit) => {
         if (Exit.isFailure(exit) && held === pending) held = undefined;
         return Deferred.done(pending, exit);

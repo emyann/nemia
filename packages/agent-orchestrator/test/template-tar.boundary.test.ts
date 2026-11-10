@@ -1,7 +1,7 @@
 /**
  * A template against the system's own tools: the system's `tar` opens an archive `nemia template pack` wrote into the same files and
  * modes as `unpack` writes, and a named pipe `mkfifo` made in a folder is refused by name, never read. Both start a real process, so
- * they stand here and not beside the store. `WF_ROOT` is set before the import, since the store's modules read it as they load.
+ * they stand here and not beside the store. Its store is its own at `ROOT`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,14 +12,13 @@ import { Cause, Effect, Exit } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { teamCopy } from './team.ts';
 import type { StoreRoot as Root } from '../src/config/root.store.ts';
+import { checkedTree, packageSkillNames } from '../src/template/template.store.ts';
+import { TemplateDoor } from '../src/template/door/templates.store.ts';
+import { TemplateSource } from '../src/template/door/templates.model.ts';
+import { StoreRoot } from '../src/config/root.store.ts';
+import { exportedTemplate, packedTemplate } from '../src/template/template.verb.ts';
 
 const ROOT = scratch('wf-template-tar-');
-process.env.WF_ROOT = ROOT;
-const { checkedTree, packageSkillNames } = await import('../src/template/template.store.ts');
-const { TemplateDoor } = await import('../src/template/door/templates.store.ts');
-const { TemplateSource } = await import('../src/template/door/templates.model.ts');
-const { StoreRoot } = await import('../src/config/root.store.ts');
-const { exportedTemplate, packedTemplate } = await import('../src/template/template.verb.ts');
 
 /** `program` run at the store's root: what it answers, or the refusal it failed with, thrown. */
 function run<A>(program: Effect.Effect<A, unknown, Root>): A {

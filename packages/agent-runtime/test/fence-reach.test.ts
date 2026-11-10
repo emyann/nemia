@@ -17,10 +17,10 @@ const CLAUDES = ['claude'];
 const after = (args: readonly string[], flag: string): string | undefined => args[args.indexOf(flag) + 1];
 
 test('Claude Code drops auto on a listed model, named or with a suffix, and on no other; codex drops nothing', () => {
-  for (const model of ['haiku', 'claude-haiku-4-5', 'claude-haiku-4-5-20251001', 'claude-sonnet-4-5']) {
+  for (const model of ['claude-haiku-4-5', 'claude-haiku-4-5-20251001', 'claude-sonnet-4-5']) {
     for (const harness of CLAUDES) assert.deepEqual(fenceReach(harness, model)!.dropped, ['auto'], `${harness} ${model}`);
   }
-  for (const model of ['opus', 'sonnet', 'claude-haiku-4-50', 'xhaiku', undefined]) {
+  for (const model of ['haiku', 'opus', 'sonnet', 'claude-haiku-4-50', 'xhaiku', undefined]) {
     assert.deepEqual(fenceReach('claude', model)!.dropped, [], String(model));
   }
   assert.deepEqual(fenceReach('codex', 'haiku')!.dropped, []);

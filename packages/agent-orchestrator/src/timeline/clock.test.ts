@@ -9,6 +9,7 @@ import type { RepositoryRun } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import { clockOf, waitingSinceOf, type RunClock } from './clock.ts';
 import type { AttemptClock, TaskClock } from './timeline.ts';
+import { filedViews } from '../../test/filed.ts';
 
 const MIN = 60_000;
 
@@ -87,7 +88,7 @@ test("`clockOf` and `waitingSinceOf`: a run's wall in five parts that add up to 
     "a clock's parts add up to its wall, each instant in the first part that covers it, on a run with a gate, a queue, a hold and a wait on a run",
     () => {
       const { run: r, views } = approved(ran(at(11, 42), null));
-      const clock = clockOf(r, views, FILED, STEPS, [], UNTIL);
+      const clock = clockOf(r, filedViews(views, FILED), STEPS, [], UNTIL);
       assert.deepEqual(clock, {
         wallMs: 120 * MIN,
         sessionsMs: 56 * MIN,
@@ -104,7 +105,7 @@ test("`clockOf` and `waitingSinceOf`: a run's wall in five parts that add up to 
   await t.test(
     'a wait still open on a person runs to the instant the clock is read at; with no step waiting, the same time is the rest',
     () => {
-      const open = clockOf(run(), VIEWS, FILED, STEPS, ['plan'], UNTIL);
+      const open = clockOf(run(), filedViews(VIEWS, FILED), STEPS, ['plan'], UNTIL);
       assert.deepEqual(open, {
         wallMs: 120 * MIN,
         sessionsMs: 38 * MIN,
@@ -113,7 +114,7 @@ test("`clockOf` and `waitingSinceOf`: a run's wall in five parts that add up to 
         slotMs: 13 * MIN,
         restMs: 10 * MIN,
       });
-      const nobody = clockOf(run(), VIEWS, FILED, STEPS, [], UNTIL);
+      const nobody = clockOf(run(), filedViews(VIEWS, FILED), STEPS, [], UNTIL);
       assert.equal(nobody.personMs, 0);
       assert.equal(nobody.slotMs, 18 * MIN, 'the slot wait of side, 10:45 → 10:50, is no longer under a wait on a person');
       assert.equal(nobody.restMs, 60 * MIN);
@@ -124,7 +125,7 @@ test("`clockOf` and `waitingSinceOf`: a run's wall in five parts that add up to 
     'a task filed and not spawned waits for a slot until the clock is read; one whose filing is not known waits for none',
     () => {
       const { run: r, views } = approved(QUEUED);
-      const clock = clockOf(r, views, FILED, STEPS, [], UNTIL);
+      const clock = clockOf(r, filedViews(views, FILED), STEPS, [], UNTIL);
       assert.deepEqual(clock, {
         wallMs: 120 * MIN,
         sessionsMs: 38 * MIN,
@@ -133,13 +134,13 @@ test("`clockOf` and `waitingSinceOf`: a run's wall in five parts that add up to 
         slotMs: 33 * MIN,
         restMs: 20 * MIN,
       });
-      const unfiled = clockOf(r, views, new Map([...FILED].filter(([id]) => id !== 'b')), STEPS, [], UNTIL);
+      const unfiled = clockOf(r, filedViews(views, new Map([...FILED].filter(([id]) => id !== 'b'))), STEPS, [], UNTIL);
       assert.equal(unfiled.slotMs, 13 * MIN);
       assert.equal(unfiled.restMs, 40 * MIN);
     },
   );
   await t.test('a step held at its gate before it is filed waits on a person from the end of the steps it comes after', () => {
-    const clock = clockOf(run(), VIEWS, FILED, STEPS, ['build'], UNTIL);
+    const clock = clockOf(run(), filedViews(VIEWS, FILED), STEPS, ['build'], UNTIL);
     assert.equal(clock.personMs, 55 * MIN, 'from the end of the check of plan, 10:45, less the session that ran meanwhile');
   });
   await t.test('a blocked sign-off waits on a person until the turn that answers it spawns', () => {
@@ -175,11 +176,11 @@ test("`clockOf` and `waitingSinceOf`: a run's wall in five parts that add up to 
         ],
       },
     };
-    const clock = clockOf(asked, new Map([['c', view]]), new Map([['c', at(10)]]), STEPS, [], Date.parse(at(11)));
+    const clock = clockOf(asked, filedViews(new Map([['c', view]]), new Map([['c', at(10)]])), STEPS, [], Date.parse(at(11)));
     assert.deepEqual(clock, { wallMs: 60 * MIN, sessionsMs: 15 * MIN, checksMs: 0, personMs: 25 * MIN, slotMs: 0, restMs: 20 * MIN });
   });
   await t.test('a clock read before the run was created is empty, never negative', () => {
-    assert.deepEqual(clockOf(run(), VIEWS, FILED, STEPS, ['plan'], Date.parse(at(9))), {
+    assert.deepEqual(clockOf(run(), filedViews(VIEWS, FILED), STEPS, ['plan'], Date.parse(at(9))), {
       wallMs: 0,
       sessionsMs: 0,
       checksMs: 0,
@@ -190,22 +191,26 @@ test("`clockOf` and `waitingSinceOf`: a run's wall in five parts that add up to 
   });
   await t.test('a run at its second gate has waited since the second gate was reached, while its clock sums both waits', () => {
     const { run: r, views } = approved(ran(at(11, 42), at(11, 50)));
-    assert.equal(waitingSinceOf(r, views, FILED, STEPS, ['build'], null), at(11, 50));
-    assert.equal(clockOf(r, views, FILED, STEPS, ['build'], UNTIL).personMs, 35 * MIN, '25 at the first gate, 10 open at the second');
+    assert.equal(waitingSinceOf(r, filedViews(views, FILED), STEPS, ['build'], null), at(11, 50));
+    assert.equal(
+      clockOf(r, filedViews(views, FILED), STEPS, ['build'], UNTIL).personMs,
+      35 * MIN,
+      '25 at the first gate, 10 open at the second',
+    );
   });
   await t.test('a step held at its gate before it is filed has waited since the end of the steps it comes after', () => {
-    assert.equal(waitingSinceOf(run(), VIEWS, FILED, STEPS, ['build'], null), at(10, 45));
+    assert.equal(waitingSinceOf(run(), filedViews(VIEWS, FILED), STEPS, ['build'], null), at(10, 45));
   });
   await t.test('with several waits open, the present wait began at the earliest, in whichever order they are named', () => {
-    assert.equal(waitingSinceOf(run(), VIEWS, FILED, STEPS, ['plan', 'side'], null), at(10, 45));
-    assert.equal(waitingSinceOf(run(), VIEWS, FILED, STEPS, ['side', 'plan'], null), at(10, 45));
+    assert.equal(waitingSinceOf(run(), filedViews(VIEWS, FILED), STEPS, ['plan', 'side'], null), at(10, 45));
+    assert.equal(waitingSinceOf(run(), filedViews(VIEWS, FILED), STEPS, ['side', 'plan'], null), at(10, 45));
   });
   await t.test('a hold only a person lifts dates the wait from its placing, and an earlier step that waits dates it before', () => {
-    assert.equal(waitingSinceOf(run(), VIEWS, FILED, STEPS, [], at(11, 30)), at(11, 30));
-    assert.equal(waitingSinceOf(run(), VIEWS, FILED, STEPS, ['side'], at(11, 30)), at(11, 10));
+    assert.equal(waitingSinceOf(run(), filedViews(VIEWS, FILED), STEPS, [], at(11, 30)), at(11, 30));
+    assert.equal(waitingSinceOf(run(), filedViews(VIEWS, FILED), STEPS, ['side'], at(11, 30)), at(11, 10));
   });
   await t.test('a wait the record does not date began at no instant: nothing waits, or the waiting step has no try that ended', () => {
-    assert.equal(waitingSinceOf(run(), VIEWS, FILED, STEPS, [], null), null);
-    assert.equal(waitingSinceOf(run(), new Map(), FILED, STEPS, ['side'], null), null);
+    assert.equal(waitingSinceOf(run(), filedViews(VIEWS, FILED), STEPS, [], null), null);
+    assert.equal(waitingSinceOf(run(), filedViews(new Map(), FILED), STEPS, ['side'], null), null);
   });
 });

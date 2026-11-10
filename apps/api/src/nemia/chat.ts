@@ -79,10 +79,7 @@ export type ChatReadAnswer = Effect.Success<ReturnType<typeof readThrough>>;
 type Frame = typeof ChatStreamEvent.Type;
 
 /** How her chat reads the runs that wait on the person: as the board's list does, off the app's informer. */
-const readsOf = ({ memo, informer }: Served): ChatReads => ({
-  ...(informer ? { runs: informer } : {}),
-  filings: memo.filings,
-});
+const readsOf = ({ informer }: Served): ChatReads => (informer ? { runs: informer } : {});
 
 /**
  * One read's changes as frames, and the presence shown after them: the presence where it changed since `shown`, then each event, the

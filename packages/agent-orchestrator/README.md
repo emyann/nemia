@@ -261,13 +261,13 @@ wf stats --json                            # what GET /api/stats answers
   an older task is judged by its own. A check refused or unfinished, a round's check, and one at half
   its deadline or less say nothing. `--line` ends with how many of the last 14 days there were, where
   any.
-- **A refused call counts where the harness records it**: every call each ended attempt of a try's
-  own session was denied, one per call, on a step that runs as a job on `claude`. `denied` is their mean per measured try (`0.5/try`); a step's row sums them,
+- **A refused call counts where each ended attempt's record says them**: every call each ended attempt of a try's
+  own session was denied, one per call, where the runtime wrote `denials` on the end (`[]` for none denied); one end
+  without it leaves the try unmeasured (`deniedCallsOf`). `denied` is their mean per measured try (`0.5/try`); a step's row sums them,
   says how many of its tries were measured where not all (`3 (2 of 4)`), and names each call with its
-  count. A try on codex, on a remote agent or of a run frozen with the retired `background: true` records none, and a recheck's try
-  ran no session: none is measured, so a day of only those reads `—`. Nor is a session filed before
-  2026-09-23 19:04:31 UTC (`JOBS_SINCE`), when `claude` steps began to run as jobs: until then each ran
-  as `claude --bg`, which records no denial, and its journal does not say which it was.
+  count. A try on codex or on a remote agent, whose harness cannot say, and a recheck's try, which
+  ran no session, are not measured, so a day of only those reads `—`. Nor is an end from before 2026-09-30 that said no skills:
+  the runtime reads an end that says its skills and no denials as denied none, and one that says neither as not measured.
 - **A skill load counts where every end of the try's own session says what it loaded**: the runtime
   writes `skills` on an attempt's end where its harness can say (a `claude` job), `[]` for none, one
   entry per load. A try is measured when each ended attempt of its own session carries the key; one end
@@ -2319,7 +2319,7 @@ kept nowhere:
 - **timeline** is where the step's time went (`timeline` in `src/timeline/timeline.ts`, pure): a row for each try's
   session and each try's check, in UTC — filed, spawned, ended; *queued*, filed → spawned, which is the wait
   for a slot behind other runs; *ran*, spawned → ended; beside a session, what it used, and what it cost where that was measured. The spawn and the end are the engine's attempts; the
-  filing is on the engine's feed, since a task's view carries no filing time, and a queue the feed cannot
+  filing is the one the task's view carries (`State.filedAt`), and a queue no view can
   time says `not known`, never `0s`. A try still running says `no end yet`, and a try a recheck reached says
   whose session it checked again. After the steps, a total for each round of a loop that went round — the
   steps that round files again, and none before or after the loop; named by its looping step when two loops
@@ -3577,7 +3577,7 @@ up — every 4000ms, ^C to stop
   there. Only before any pass has written it do they read their own `WF_MAX_RUNS`.
 - **The wait is on the timeline.** A run the cap held counts `createdAt` → its first filing as queued — from the pass that first held it, on a
   run that waited on runs — on a `run slot` row of its own, and in the run's `queued`: `still waiting` while nothing is filed, `not known`
-  where the engine's feed does not say when its first task was filed. A run the cap never held has no such row.
+  where no view of its tasks says when its first one was filed. A run the cap never held has no such row.
 
 ### Cards that start themselves: `wf inbox queue`
 
@@ -4338,7 +4338,7 @@ holding a concurrency slot forever.
 | `src/factory/factory.store.ts` | the factories on disk (`factoriesDirAt`): read, a file that does not decode listed with why (`readFactoriesAt`), one read for a start (`readFactoryAt`), filed through a hidden file linked onto its name (`addFactoryAt`), given workflows and relieved of them, hired into and fired from, the file rewritten whole (`attachWorkflowAt`, `hireAgentAt`, `fireAgentAt`), removed (`removeFactoryAt`), each taking the store's root first, called by the Factory door alone |
 | `src/factory/rules/rules.ts`, `rules.store.ts`, `rules.verb.ts` | a factory's rules — the file's name and where it is kept (`FACTORY_RULES_FILE`, `rulesFile`) and what it may not open with (`factoryRulesRefusal`), pure; read without throwing, written whole and removed (`readRules`, `writeRules`, `clearRules`), store; and `nemia factory rules` (`FACTORY_RULES`, `factoryRules`), controller |
 | `src/runtime-client.ts` | the runtime client, the one file that imports agent-runtime: the engine (`engine`, over the runtime's `Engine` service as a layer; `engineOf` over any such layer, as `testEngine` of `agent-runtime/testing` gives one to a test), which files every task `queued` and is built with no ceiling, the harnesses it runs (`HARNESSES`), `nameFor`, the lifecycle as data the board draws (`lifecycleGraph`), and the runtime's types, passed through |
-| `src/views/views.verb.ts` | the programs `taskPhasesRead`, `checkReportsRead`, `refusalRead`, `parentRead`, `parentsRead` and `filingsRead`; what the engine's views of a run's tasks say: whether its closeout was asked and signed (`closeoutAsked`), its check's exit (`exitVerdicts`), what it consumed (`consumption`), its closeout (`closeoutOf`), a parent run (`parentRead`), and when each task was filed (`filingsRead`) — what a consumer that words a step as `wf ls` does uses off the views it already has, with no `logs` call |
+| `src/views/views.verb.ts` | the programs `taskPhasesRead`, `checkReportsRead`, `refusalRead`, `parentRead` and `parentsRead`; what the engine's views of a run's tasks say: whether its closeout was asked and signed (`closeoutAsked`), its check's exit (`exitVerdicts`), what it consumed (`consumption`), its closeout (`closeoutOf`), and a parent run (`parentRead`) — what a consumer that words a step as `wf ls` does uses off the views it already has, with no `logs` call |
 | `src/views/views-words.ts` | a step's phase off its view (`phaseOfView`), and the words `wf ls` and `wf decide` say of how its session ended (`endWords`, `wordOfView`) — pure |
 | `src/start/start.verb.ts` | a run started (`wf start`), refused before a byte is written: the program `startRun` |
 | `src/plan/plan.verb.ts` | a plan's cards started (`startPlan`) |

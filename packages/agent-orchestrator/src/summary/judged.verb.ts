@@ -358,7 +358,7 @@ const toDecideBranches = (run: Run, steps: readonly Workflow[], status: RunStatu
  *
  * A branch merged into the base does not come off it again short of a history rewrite, and it is the answer that says there is nothing
  * left to decide: remembering it can only forget a decision, never invent one, which is the safe direction of the level-triggered rule
- * (the dangerous answer, `ahead`, is asked every time). A read's cache, as the feed's filing times are: a fresh process reads again.
+ * (the dangerous answer, `ahead`, is asked every time). A read's cache: a fresh process reads again.
  * It spares the store's long tail — finished runs whose branches are already on the base — a reading a branch on every poll of the list.
  *
  * The work is what the answer is remembered against, because the other way a branch grows is a person trying a finished run's step again:

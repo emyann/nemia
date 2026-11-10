@@ -29,23 +29,24 @@ import { overNow, type RunFile } from './run-file.ts';
  * version is read again from its capture. Goes up with every change to what a reader reads, as `SAID_DIGEST` does.
  * Exported only for the tests that import it.
  */
-export const SAID_VERSION = 10;
+export const SAID_VERSION = 11;
 
 /**
  * The former versions whose kept output the shipped readers would read the same but for the fields they have added since:
  * taken as it is, with the capture's key, and its log not read again — the added fields absent, which is the truth of a
  * capture read before they were. A version leaves this list the moment a reader changes what one of its fields says, or
- * stops saying one: the digest pin catches a reader that reads otherwise, never a version wrongly left here.
+ * stops saying one: the digest pin catches a reader that reads otherwise, never a version wrongly left here. None now: every
+ * former version kept no denials where the readers say `[]`, measured and none denied.
  * Exported only for the tests that import it.
  */
-export const SAID_EXTENDED: readonly number[] = [1, 2, 3, 4, 6];
+export const SAID_EXTENDED: readonly number[] = [];
 
 /**
  * The digest of what the shipped readers read of the streams in `test/reader-streams.ts`: a reader that reads otherwise fails
  * `test/said.test.ts` until this is recorded again, beside a `SAID_VERSION` gone up with it.
  * Exported only for the tests that import it.
  */
-export const SAID_DIGEST = '8c1b17b6907a4e77e79c0bc33e19c51abb44eb213a1d383e699519e36a971298';
+export const SAID_DIGEST = '2fedd886db3b3c8488f3349021c1eabe373bdc7749c13eb719b64966eda38066';
 
 /** What a capture is known by: its size and mtime, as `fs.statSync` gives them. */
 export type SaidKey = { size: number; mtimeMs: number };
@@ -69,6 +70,7 @@ const KeptSchema = Schema.Struct({
     denials: Schema.optional(Schema.Array(Schema.Struct({ tool: Schema.String, what: Schema.optional(Schema.String) }))),
     skills: Schema.optional(Schema.Array(Schema.String)),
     files: Schema.optional(Schema.Array(Schema.String)),
+    ranIn: Schema.optional(Schema.String),
   }),
 });
 

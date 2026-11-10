@@ -1149,23 +1149,17 @@ async function _viewProgramTypes() {
     v.refusalRead('x', 'y') satisfies EffectOf<CheckRefusal, Refusal, EngineService>,
     v.parentRead('x', v.nothingRead()) satisfies EffectOf<ParentRun, Refusal, EngineService>,
     v.parentsRead(run, v.nothingRead()) satisfies EffectOf<(id: string) => ParentRun, Refusal, EngineService>,
-    v.filingsRead() satisfies EffectOf<{ filed: Map<string, string>; cursor: number }, Refusal, EngineService>,
   ] satisfies Array<EffectOf<unknown, Refusal, EngineService>>);
   void [
     // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
     v.parentRead('x', v.nothingRead()) satisfies EffectOf<ParentRun, never, EngineService>,
   ];
-  void [
-    v.taskPhasesRead(run) satisfies EffectOf<unknown, never, EngineService>,
-    v.filingsRead() satisfies EffectOf<unknown, never, EngineService>,
-  ];
+  void [v.taskPhasesRead(run) satisfies EffectOf<unknown, never, EngineService>];
   void [
     // @ts-expect-error -- taskPhasesRead requires EngineService, and runPromise takes no requirement
     v.Effect.runPromise(v.taskPhasesRead(run)),
     // @ts-expect-error -- parentRead requires EngineService, and runPromise takes no requirement
     v.Effect.runPromise(v.parentRead('x')),
-    // @ts-expect-error -- filingsRead requires EngineService, and runPromise takes no requirement
-    v.Effect.runPromise(v.filingsRead()),
   ];
 }
 

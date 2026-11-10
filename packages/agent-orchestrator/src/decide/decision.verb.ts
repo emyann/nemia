@@ -24,7 +24,7 @@ import { branchStandings, type BranchReader } from '../branches/branches.store.t
 import { changesOf, type BranchChanges } from '../branches/changes.store.ts';
 import { mergesRead } from '../branches/merges.verb.ts';
 import type { Collisions } from '../collide/collide.ts';
-import { totalOf, usedOf } from '../resource/usage.ts';
+import { totalOf, usedOf } from '../resource/index.ts';
 import { decideRun, type Decided } from './decide.verb.ts';
 import { holdsOf, waitsOf } from '../wait/wait.ts';
 

@@ -153,7 +153,7 @@ version, and the version above must be the pin. An upgrade re-measures the table
   `Refusal` and dying of anything else. Its caller runs it with `runWith(e, program)` over the engine it built once — the CLI, the
   daemon, the api's handlers and the tests — and the Promise rejects with the refusal or the defect as it was thrown: `decideRun`,
   `forgetRun`, the verbs a person asks of a run (`roundRun`, `acceptRun`, `retryRun`, `approveRun`, `sayRun`, `cancelRun`, `hold`), the
-  views' reads (`taskPhasesRead`, `checkReportsRead`, `refusalRead`, `parentRead`, `parentsRead`, `filingsRead`), and the tick
+  views' reads (`taskPhasesRead`, `checkReportsRead`, `refusalRead`, `parentRead`, `parentsRead`), and the tick
   (`tickRun`), whose pass is metered through `meteredPass` over the module-global meter. A command's `handler` is a program too. An
   engine refusal a controller answers itself is read off the raw verb: `toldBy` in `say.verb.ts` turns the runtime's refusal into a
   `Conflict`, and a journal that does not read is told by `unreadableJournal`.

@@ -2,8 +2,8 @@
  * The board's frame of a run, as a RunList asked by state (`?fieldSelector=status.state…`) lays it on each run's status
  * (`framePartsOf`): its state in the list, its wall time and where it went (`clock`), what each step of a waiting run cost and when its
  * present wait on a person began, and when a finished run's work stopped and how it ended — each off the run's judgement (`Judgement`),
- * the one its object is built on, and the feed's filing times, so no record or journal is read again for it. And the state of a run left
- * unjudged, off its record, as the whole list summarizes it (`unjudgedFields`).
+ * the one its object is built on, whose views say when each task was filed, so no record or journal is read again for it. And the state
+ * of a run left unjudged, off its record, as the whole list summarizes it (`unjudgedFields`).
  */
 import type { Run as RunObject, RunState, RunStatus } from 'objects';
 import type { Run } from '../record/record.ts';
@@ -26,9 +26,9 @@ type Summarized = Omit<RunSummary, 'startedAt'>;
  * to it; for a waiting run, what each of its steps cost in the summary's order, every try's session together, and when its present wait
  * on a person began (`waitingSinceOf`): the end of the waiting step's last try or the placing of a hold only a person lifts, the earliest
  * where several are open, null where the record does not date it; for a finished run, when its work stopped (`finishedAtOf`) and how it
- * ended (`outcomeOf`). Off `judgement`'s own run, views and steps, and the feed's filing times `filed`.
+ * ended (`outcomeOf`). Off `judgement`'s own run, views and steps.
  */
-export function framePartsOf(summary: Summarized, judgement: Judgement, filed: ReadonlyMap<string, string>, now: number): FrameParts {
+export function framePartsOf(summary: Summarized, judgement: Judgement, now: number): FrameParts {
   const { run, views, steps } = judgement;
   const state = kindOf(summary);
   const held = summary.holding?.waitingOnYou ? summary.holding.at : null;
@@ -37,11 +37,11 @@ export function framePartsOf(summary: Summarized, judgement: Judgement, filed: R
   return {
     state,
     wallMs: wallMsOf(summary, now),
-    clock: clockOf(run, views, filed, steps, summary.waitingOnYou, clockUntilOf(summary, now)),
+    clock: clockOf(run, views, steps, summary.waitingOnYou, clockUntilOf(summary, now)),
     stepCosts: waiting
       ? summary.steps.map(({ name }) => ({ step: name, cost: spentOf(stepSpend(run, name, (id) => taskSpend(views.get(id)))) }))
       : null,
-    waitingSince: waiting ? waitingSinceOf(run, views, filed, steps, summary.waitingOnYou, held) : null,
+    waitingSince: waiting ? waitingSinceOf(run, views, steps, summary.waitingOnYou, held) : null,
     finishedAt: finished ? finishedAtOf(summary) : null,
     outcome: finished ? outcomeOf(summary) : null,
   };

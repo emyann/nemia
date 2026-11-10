@@ -318,8 +318,8 @@ and gh's are denied; a writer running `auto`, or a spelling the shell rejoins, i
   and harness, `HARNESS_CHOICES` from the same door, which the root entry re-exports for the api;
 
 **In the orchestrator, moved down from the api**: the judgement of a run's steps (`packages/agent-orchestrator/src/resource/`: a
-step's tries, closeouts, checks, told layers, files and usage, and `runsInOf` reading a harness's argv for a mode), and the run as one
-object (`RunObject.Run`, an Effect Schema of `objects`, `packages/objects/src/run.ts`, re-exported by `src/object/run.model.ts`, built by
+step's tries, closeouts, checks, told layers, files and usage, and `runsInOf` reading the mode the runtime recorded on an attempt
+(`ranIn`)), and the run as one object (`RunObject.Run`, an Effect Schema of `objects`, `packages/objects/src/run.ts`, re-exported by `src/object/run.model.ts`, built by
 `runObject` in `src/object/run.verb.ts` off one read of
 the run, from the list's judged fields, `judgedFields`, and the one raise, `stepRaise`). The object carries all the board shows but
 each step's tries whole and what it was told, which are its sub-resources, each answered by a Schema of its own (`StepTries`,

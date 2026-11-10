@@ -1591,6 +1591,11 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     'the mode the session runs in, as its harness decides it: Claude Code\'s `auto` for a task filed with none, never "the harness\'s own", which reads as its prompting default',
   );
   assert.equal(
+    rowsOf(unset, { ...bare, fence: 'auto', runsIn: { mode: 'default', by: 'harness' } })['permission mode'],
+    'default · by harness',
+    'a Claude Code session filed `auto` that its harness ran in another mode: the mode it ran in, marked as its harness',
+  );
+  assert.equal(
     rowsOf(unset, { ...bare, runsIn: { mode: 'workspace-write', by: 'default' } })['permission mode'],
     'workspace-write · default',
     "Codex's `workspace-write`",
@@ -1600,15 +1605,15 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     ...bare,
     fence: 'workspace-write',
     tools: ['Read', 'Grep'],
-    runsIn: { mode: 'read-only', by: 'tools' },
+    runsIn: { mode: 'read-only', by: 'harness' },
   };
   assert.equal(
     rowsOf(reviewer, narrowed).sandbox,
-    'read-only · by tools',
-    "a codex step's fence is its `sandbox:`, which the engine's task files as its permission mode, as its tools narrowed it whatever was named",
+    'read-only · by harness',
+    "a codex step's fence is its `sandbox:`, which the engine's task files as its permission mode, as its harness ran it whatever was named",
   );
   assert.equal(rowsOf(reviewer, narrowed)['permission mode'], undefined, 'and no row is called `permission mode`');
-  assert.equal(rowsOf({ ...reviewer, sandbox: null }, { ...narrowed, fence: null }).sandbox, 'read-only · by tools');
+  assert.equal(rowsOf({ ...reviewer, sandbox: null }, { ...narrowed, fence: null }).sandbox, 'read-only · by harness');
   const readOnly: StepSpec = { ...unset, harness: 'codex', sandbox: 'read-only' };
   assert.equal(
     rowsOf(readOnly, { ...bare, fence: 'read-only', runsIn: { mode: 'read-only', by: 'filed' } }).sandbox,

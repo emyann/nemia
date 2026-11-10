@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { durationWord } from '../usage/usage.ts';
 import type { Workflow } from '../step/step.ts';
 import { run, step } from '../../test/assessed.ts';
+import { filedAlone, filedViews } from '../../test/filed.ts';
 import { firstFiledAt, runStartedAt, timeline, timelineLines, timelineTotalLines, type TaskClock } from './timeline.ts';
 
 /** An instant `m` minutes and `s` seconds after 08:00 on the fixtures' day. */
@@ -78,7 +79,7 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
     "the timeline of a step with two tries and two checks: each filed, spawned and ended, queued filed → spawned and ran spawned → ended, off the engine and the run's tries",
     () => {
       const { r, views, filed } = B4();
-      const t = timeline(r, views, filed);
+      const t = timeline(r, filedViews(views, filed));
       const [first, second] = t.steps.implement;
       assert.deepEqual([first.try, first.round, first.sessionOf, second.try, second.round], [1, 1, null, 2, 1]);
       const times = (s: typeof first.session) =>
@@ -161,7 +162,7 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
       };
       views.set('t3', task([[clock(30, 2), clock(30, 5), null]], null));
       filed.set('t3', clock(30));
-      const t = timeline(r, views, filed);
+      const t = timeline(r, filedViews(views, filed));
       const running = t.steps.implement.at(-1)!;
       assert.deepEqual(
         {
@@ -182,13 +183,15 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
 
       views.set('t3', { state: { brief: 'filed', settled: null, attempts: [] } });
       assert.deepEqual(
-        (({ at, queued, ran, queuedMs }) => ({ at, queued, ran, queuedMs }))(timeline(r, views, filed).steps.implement.at(-1)!.session!),
+        (({ at, queued, ran, queuedMs }) => ({ at, queued, ran, queuedMs }))(
+          timeline(r, filedViews(views, filed)).steps.implement.at(-1)!.session!,
+        ),
         { at: 'queued', queued: 'waiting for a slot', ran: '—', queuedMs: null },
         'filed and waiting for a slot: no queue time yet, and not 0',
       );
       views.set('t3', task([[clock(30, 2), null, null]], null));
       assert.deepEqual(
-        (({ at, queued, queuedMs }) => ({ at, queued, queuedMs }))(timeline(r, views, filed).steps.implement.at(-1)!.session!),
+        (({ at, queued, queuedMs }) => ({ at, queued, queuedMs }))(timeline(r, filedViews(views, filed)).steps.implement.at(-1)!.session!),
         { at: 'starting', queued: 'not spawned yet', queuedMs: null },
         'a slot taken and not spawned: no queue time yet, and not 0',
       );
@@ -196,7 +199,10 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
   );
   await t.test("a run with one step and no check: one try, no check, and the run's total is that session", () => {
     const r = run({ implement: 't1' });
-    const t = timeline(r, new Map([['t1', task([[clock(0, 1), clock(0, 4), clock(9, 4)]], 'succeeded')]]), new Map([['t1', clock(0)]]));
+    const t = timeline(
+      r,
+      filedViews(new Map([['t1', task([[clock(0, 1), clock(0, 4), clock(9, 4)]], 'succeeded')]]), new Map([['t1', clock(0)]])),
+    );
     assert.equal(t.steps.implement.length, 1);
     assert.deepEqual(
       [t.steps.implement[0].check, t.steps.implement[0].session!.queued, t.steps.implement[0].session!.ran],
@@ -229,7 +235,7 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
         ['waiting', held('input-required')],
         ['closed', held('between-attempts', { closed: true })],
       ] as const) {
-        const t = timeline(r, new Map([['t1', view]]), filed);
+        const t = timeline(r, filedViews(new Map([['t1', view]]), filed));
         const session = t.steps.implement[0].session!;
         assert.deepEqual(
           [session.at, session.endedAt, session.ran],
@@ -239,7 +245,7 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
         assert.deepEqual([t.run.inFlight, t.run.ran, t.run.wall], [0, '9m00s', '9m04s'], `${said}: nothing of the run in flight`);
       }
       assert.equal(
-        timeline(r, new Map([['t1', held('between-attempts')]]), filed).steps.implement[0].session!.at,
+        timeline(r, filedViews(new Map([['t1', held('between-attempts')]]), filed)).steps.implement[0].session!.at,
         'running',
         'signed and not held open, between-attempts: the engine starts another, so it is still running',
       );
@@ -255,16 +261,18 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
       };
       const answered = timeline(
         r,
-        new Map([
-          [
-            't1',
-            {
-              ...held('succeeded', {}, [signedTurn, secondTurn]),
-              state: { brief: 'filed', settled: 'succeeded', attempts: [signedTurn, secondTurn] },
-            },
-          ],
-        ]),
-        filed,
+        filedViews(
+          new Map([
+            [
+              't1',
+              {
+                ...held('succeeded', {}, [signedTurn, secondTurn]),
+                state: { brief: 'filed', settled: 'succeeded', attempts: [signedTurn, secondTurn] },
+              },
+            ],
+          ]),
+          filed,
+        ),
       );
       assert.deepEqual(
         [answered.steps.implement[0].session!.ranMs, answered.run.ran, answered.run.wall],
@@ -273,8 +281,7 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
       );
       const running = timeline(
         r,
-        new Map([['t1', held('working', {}, [signedTurn, { ...secondTurn, endedAt: null, ended: null }])]]),
-        filed,
+        filedViews(new Map([['t1', held('working', {}, [signedTurn, { ...secondTurn, endedAt: null, ended: null }])]]), filed),
       );
       assert.deepEqual(
         [running.steps.implement[0].session!.at, running.run.inFlight],
@@ -284,7 +291,7 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
     },
   );
   await t.test(
-    'REFUSED: a queue time the feed cannot give is `not known`, never 0 — and a task the engine has no record of is said, not timed',
+    'REFUSED: a queue time with no filing on its view is `not known`, never 0 — and a task the engine has no record of is said, not timed',
     () => {
       const { r, views } = B4();
       const t = timeline(r, views);
@@ -298,16 +305,16 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
       assert.ok(!timelineTotalLines(t).some((line) => /queued 0s/.test(line)), timelineTotalLines(t).join('\n'));
 
       views.delete('c2');
-      const lost = timeline(r, views, B4().filed).steps.implement[1].check!;
+      const lost = timeline(r, filedViews(views, B4().filed)).steps.implement[1].check!;
       assert.deepEqual([lost.at, lost.queued, lost.ran], ['unknown', 'not on the record', 'not on the record']);
       assert.equal(
-        timelineLines(timeline(r, views, B4().filed).steps.implement).at(-1),
+        timelineLines(timeline(r, filedViews(views, B4().filed)).steps.implement).at(-1),
         '          try 2 check  the engine has no record of c2',
       );
     },
   );
   await t.test(
-    'a run the cap on runs in flight held counts its wait as queued — `createdAt` to its first filing, or from the pass that held it on a run that waited on runs — and says `still waiting`, or `not known` where the feed does not say; a run the cap never held has no such wait',
+    'a run the cap on runs in flight held counts its wait as queued — `createdAt` to its first filing, or from the pass that held it on a run that waited on runs — and says `still waiting`, or `not known` where no view says the filing; a run the cap never held has no such wait',
     () => {
       const { r, views, filed } = B4();
       const held = {
@@ -315,7 +322,7 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
         createdAt: new Date(Date.UTC(2026, 8, 13, 7, 48)).toISOString(),
         slotHeldAt: new Date(Date.UTC(2026, 8, 13, 7, 48, 3)).toISOString(),
       };
-      const t = timeline(held, views, filed);
+      const t = timeline(held, filedViews(views, filed));
       assert.deepEqual(
         t.slot,
         { from: held.createdAt, filedAt: clock(0), ms: 720_000, queued: '12m00s' },
@@ -331,7 +338,7 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
         '          run       queued 12m16s  ran 27m12s  wall 27m37s',
       ]);
       assert.deepEqual(
-        timeline({ ...held, after: ['a-1x2y'] }, views, filed).slot,
+        timeline({ ...held, after: ['a-1x2y'] }, filedViews(views, filed)).slot,
         { from: held.slotHeldAt, filedAt: clock(0), ms: 717_000, queued: '11m57s' },
         'the wait before it for runs it waited on is not a wait for a slot: counted from when the cap first held it',
       );
@@ -340,13 +347,13 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
       assert.deepEqual(
         [unknown.slot, unknown.run.queued],
         [{ from: held.createdAt, filedAt: null, ms: null, queued: 'not known' }, 'not known'],
-        'no filing on the feed: not known, never 0',
+        'no filing on the view: not known, never 0',
       );
       assert.equal(timelineTotalLines(unknown)[0], 'timeline  run slot  queued not known');
       const waiting = timeline({ ...run({ implement: null }), slotHeldAt: held.slotHeldAt }, new Map());
       assert.deepEqual([waiting.slot?.queued, waiting.run.queued], ['still waiting', '1 waiting']);
 
-      const never = timeline(r, views, filed);
+      const never = timeline(r, filedViews(views, filed));
       assert.equal(never.slot, null);
       assert.deepEqual(
         [never.run.queued, timelineTotalLines(never)],
@@ -356,7 +363,7 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
     },
   );
   await t.test(
-    "a run's start is its first filing — of any try, check or step, whatever order the record and the steps name them in — and not its `createdAt`; `createdAt` only for a run started with its filings off the feed",
+    "a run's start is its first filing — of any try, check or step, whatever order the record and the steps name them in — and not its `createdAt`; `createdAt` only for a run started none of whose views says its filing",
     () => {
       const r = run(
         {},
@@ -376,31 +383,39 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
         ['t1', clock(4, 30)],
       ]);
       assert.equal(
-        firstFiledAt(r, filed),
+        firstFiledAt(r, filedAlone(filed)),
         clock(4, 30),
         "review, named first on the record, was filed last; implement's try 1 before its try 2, and try 1's check before try 2's session",
       );
       assert.equal(
-        runStartedAt(r, filed),
+        runStartedAt(r, filedAlone(filed)),
         clock(4, 30),
         'four and a half minutes after it was created: the wait before it is not time at work',
       );
       assert.equal(
-        firstFiledAt(r, new Map([...filed, ['c1', clock(2)]])),
+        firstFiledAt(r, filedAlone(new Map([...filed, ['c1', clock(2)]]))),
         clock(2),
         "a check filed before any session, a recheck say, is still the run's first filing",
       );
 
-      assert.equal(firstFiledAt(r, new Map([['other', clock(1)]])), null, 'started, and none of its tasks on the feed: no filing');
+      assert.equal(
+        firstFiledAt(r, filedAlone(new Map([['other', clock(1)]]))),
+        null,
+        'started, and no view of its tasks says a filing: no filing',
+      );
       assert.equal(runStartedAt(r, new Map()), clock(0), 'and the start is the only time the record has');
       const waiting = run({ implement: null }, { createdAt: clock(0) });
       assert.deepEqual(
-        [firstFiledAt(waiting, filed), runStartedAt(waiting, filed)],
+        [firstFiledAt(waiting, filedAlone(filed)), runStartedAt(waiting, filedAlone(filed))],
         [null, null],
-        'nothing filed, waiting on runs or held for a slot: no start, whatever the feed holds for other runs',
+        'nothing filed, waiting on runs or held for a slot: no start, whatever the views hold for other runs',
       );
       const asked = { ...waiting, steps: { implement: { taskId: null, tries: [{ taskId: 't1', cause: 'retries' as const }] } } };
-      assert.equal(runStartedAt(asked, filed), clock(4, 30), 'a try whose retry is asked and not filed yet has started all the same');
+      assert.equal(
+        runStartedAt(asked, filedAlone(filed)),
+        clock(4, 30),
+        'a try whose retry is asked and not filed yet has started all the same',
+      );
     },
   );
   await t.test(
@@ -414,7 +429,7 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
       };
       views.set('c3', task([[clock(40, 1), clock(40, 1), clock(41)]], 'succeeded'));
       filed.set('c3', clock(40));
-      const t = timeline(r, views, filed);
+      const t = timeline(r, filedViews(views, filed));
       const rechecked = t.steps.implement.at(-1)!;
       assert.deepEqual(
         [rechecked.try, rechecked.session, rechecked.sessionOf, rechecked.check!.ran, rechecked.used],
@@ -445,7 +460,7 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
         ['i2', clock(16)],
         ['v2', clock(21)],
       ]);
-      const lt = timeline(looped, loopViews, loopFiled, [
+      const lt = timeline(looped, filedViews(loopViews, loopFiled), [
         step('implement'),
         { ...step('review', ['implement']), loop: 'implement', rounds: 3 },
       ]);
@@ -523,7 +538,7 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
         ['v2', clock(31)],
         ['s', clock(40)],
       ]);
-      const t = timeline(r, views, filed, steps);
+      const t = timeline(r, filedViews(views, filed), steps);
       assert.deepEqual(
         t.rounds.map((x) => [x.loop, x.round, x.tasks, x.ran, x.wall]),
         [
@@ -539,7 +554,7 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
         '          run      queued 0s  ran 1h31m  wall 1h40m',
       ]);
       assert.deepEqual(
-        timeline(r, views, filed, []).rounds,
+        timeline(r, filedViews(views, filed), []).rounds,
         [],
         'given no steps, as a record with no frozen workflow and no folder: no round is totalled at all, rather than a guess',
       );
@@ -568,8 +583,7 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
       );
       const bt = timeline(
         both,
-        bothViews,
-        new Map([...bothViews.keys()].map((id) => [id, bothViews.get(id)!.state.attempts[0].startedAt])),
+        filedViews(bothViews, new Map([...bothViews.keys()].map((id) => [id, bothViews.get(id)!.state.attempts[0].startedAt]))),
         two,
       );
       assert.deepEqual(
@@ -594,7 +608,7 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
     const views = new Map([
       ['t1', task([[clock(0, 5), clock(0, 12), clock(19, 54)]], 'succeeded', { responses: 54, costUsd: 3.012, apiMs: 486_000 })],
     ]);
-    assert.deepEqual(timelineLines(timeline(r, views, new Map([['t1', clock(0)]])).steps.implement), [
+    assert.deepEqual(timelineLines(timeline(r, filedViews(views, new Map([['t1', clock(0)]]))).steps.implement), [
       'timeline  try 1  filed 08:00:00Z  spawned 08:00:12Z  ended 08:19:54Z  queued 12s  ran 19m42s  used 54 responses · tool calls not measured · tokens in not measured · tokens out not measured · api 8m06s · tools not measured  cost $3.01',
     ]);
   });

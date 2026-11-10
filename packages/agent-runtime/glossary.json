@@ -266,6 +266,11 @@
       ]
     },
     {
+      "term": "Ran in",
+      "meaning": "the permission mode or sandbox a session ran in, as its harness said it (Claude Code's `init` line's `permissionMode`, the last one) or the runtime's spawn gave it (Codex's `-s`); absent where nothing said one. Recorded on the attempt while it works and at its end (`ranIn`), carried and never read by `decide`.",
+      "type": "Attempt"
+    },
+    {
       "term": "Reconcile",
       "meaning": "one task's decide-and-act within a tick.",
       "retired": [

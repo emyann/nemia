@@ -55,11 +55,10 @@ import { decisionHandler } from '../decide/decide.ts';
 export const informed = <A, E, R>({ informer }: Served, program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
   Effect.provideService(program, Informer, informer);
 
-/** How a list of the runs judges each: off the app's informer and its feed's filing times, verified as the env says. */
+/** How a list of the runs judges each: off the app's informer, verified as the env says. */
 const howOf = (s: Served): SummaryHow => ({
   home: s.home,
   memo: s.informer ?? informerMemo(),
-  filings: s.memo.filings,
   verify: verifiesRest(s.env),
 });
 

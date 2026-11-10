@@ -7,15 +7,14 @@ import { informerMemo } from '../rest/informer.verb.ts';
 import type { SummaryHow } from './summary.verb.ts';
 
 /**
- * How a read of the list reads, as the inbox's do: the store the program is given, the informer and the feed's filing times its caller
- * keeps, verified as the program's settings say (`WF_VERIFY_REST`); a caller that keeps neither judges every run.
+ * How a read of the list reads, as the inbox's do: the store the program is given, the informer its caller keeps, verified as the
+ * program's settings say (`WF_VERIFY_REST`); a caller that keeps none judges every run.
  */
 export const howOf = (kept?: Kept) =>
   Effect.gen(function* () {
     return {
       home: yield* StoreRoot,
       memo: kept?.runs ?? informerMemo(),
-      filings: kept?.filings ?? { filed: new Map(), cursor: 0 },
       verify: yield* setting('verifyRest'),
     } satisfies SummaryHow;
   });

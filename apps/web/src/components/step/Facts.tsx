@@ -97,8 +97,8 @@ export function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]>
 /**
  * A step's frontmatter, as rows for `Facts` — and, given what the engine filed its current try with, what it runs with. A field
  * its workflow leaves unset reads as the value the engine filed the task with, marked `default`: `1 · default`, `no limit ·
- * default`. The permission mode reads as the session runs in it, its harness's choice where none was filed: `auto · default`,
- * `read-only · by tools`. One the try was filed with other than the workflow's word — the CLI's `retry --model` — reads as the try's,
+ * default`. The permission mode reads as the session ran in it, its harness's choice where none was filed: `auto · default`,
+ * `read-only · by harness`. One the try was filed with other than the workflow's word — the CLI's `retry --model` — reads as the try's,
  * marked `this try`. For a step not filed, what the workflow says, or a dash. A step on a remote A2A agent (`remoteRows`) reads otherwise.
  *
  * The context is the session's window as the step writes it — `200k` — and the model's whole window where neither the step nor the try has
@@ -217,18 +217,21 @@ function modelRow(workflow: string | null, filed: StepFiledView | null): ReactNo
 }
 
 /**
- * The permission mode, as the session runs in it (`runsIn`): its harness's choice where none was filed, marked `default` — `auto` for
- * Claude Code, not the prompting mode Claude Code has of its own — and a Codex sandbox the step's tools narrowed, marked `by tools`.
- * Where the api could not ask the harness, as `ranWith` reads it.
+ * The permission mode, as the session ran in it by its attempt's record (`runsIn`): its harness's choice where none was filed, marked
+ * `default`, and another mode than the one filed, which its harness put it in — Claude Code dropping `auto` on a model, a Codex sandbox
+ * narrowed — marked `by harness`. Where no session has said its mode yet, as `ranWith` reads it.
  */
 function modeRow(workflow: string | null, filed: StepFiledView | null): ReactNode {
   const runs = filed?.runsIn;
   const asFiled = filed && filedFence(filed.fence, workflow);
   if (!filed || !runs) return ranWith(workflow, filed, (f) => filedFence(f.fence, workflow));
-  if (runs.by === 'tools') {
-    const named = workflow === null ? '' : `, though the workflow says ${workflow}`;
+  if (runs.by === 'harness') {
     return (
-      <Marked value={runs.mode} mark="by tools" title={`Its tools have none that writes, so its harness runs it ${runs.mode}${named}.`} />
+      <Marked
+        value={runs.mode}
+        mark="by harness"
+        title={`Its harness ran it in ${runs.mode}, though it was filed with ${filed.fence ?? 'none'}.`}
+      />
     );
   }
   if (workflow === null) return <Marked value={runs.mode} mark="default" />;

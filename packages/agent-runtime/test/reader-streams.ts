@@ -204,6 +204,15 @@ export const VERSIONED_STREAM = [
   resultLine({}),
 ].join('\n');
 
+/**
+ * A session whose `init` lines name the mode it runs in, a second turn's on another: a model that drops `auto` runs the next turn in
+ * `default`, and its last is the mode it ran in.
+ */
+export const MODE_STREAM = [
+  ...['auto', 'default'].map((permissionMode) => JSON.stringify({ ...JSON.parse(stream.init), permissionMode })),
+  resultLine({}),
+].join('\n');
+
 const LONE = [stream.init, stream.denied('toolu_b', 'Bash')].join('\n');
 
 const STREAMS = [
@@ -231,6 +240,7 @@ const STREAMS = [
   [stream.init, stream.calls(['toolu_b', 'Bash', { command: 'ls' }]).replace('"toolu_b"', '5'), resultLine({})].join('\n'),
   [JSON.stringify({ ...JSON.parse(stream.init), cwd: 5 }), resultLine({})].join('\n'),
   VERSIONED_STREAM,
+  MODE_STREAM,
 ];
 
 const CODEX = [

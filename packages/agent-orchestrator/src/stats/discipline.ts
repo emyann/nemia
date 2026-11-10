@@ -1,7 +1,7 @@
 /**
- * The calls a try was refused, as the stats count them: which steps' tries are measured at all (`deniesRecorded`), which sessions ran as
- * jobs that record them (`ranAsJob`), and every call each ended attempt of a session was denied, one per call (`deniedCallsOf`), read by
- * the stats (`stats.verb.ts`) and by the step meter (`src/meter/step.ts`); nothing reads a running attempt's denials. And the skills a try
+ * The calls a try was refused, as the stats count them: every call each ended attempt of a session was denied, one per call, measured
+ * where each ended attempt says its denials (`deniedCallsOf`), read by the stats (`stats.verb.ts`); nothing reads a running attempt's
+ * denials. And the skills a try
  * loaded: every skill each ended attempt of a session loaded, one per load, where each ended attempt says (`skillsLoadedOf`).
  * And the skills a try was due to load: those whose `applies:` names a file its sessions read or wrote (`filesTouchedOf`, `skillsDueOf`).
  * And the rules those skills declare (`SkillRule`): on each try whose denials were measured, a rule is broken when a call the try was
@@ -9,46 +9,20 @@
  * matched", not "followed" (`rulesOfTry`, `ruleRowsOf`). Pure: `stats.verb.ts` hands the views and each step's frozen skills' rules here,
  * and words each call with the runtime's `denialText`.
  */
-import { declarationOf } from '../harness/harness.ts';
+import type { DeniedCallsOf } from '../../contracts/denials-measured.contract.ts';
 import { bareSkillOf, disallowedBy } from '../keys/index.ts';
 import { appliesMatch, type SkillRule } from '../skills/skills.ts';
-import type { Workflow } from '../step/step.ts';
-import type { TaskSpan } from '../timeline/index.ts';
-
-/**
- * Whether a step's sessions record what they were denied, read off its frozen `harness:` (`DEFAULT_HARNESS` where it names none): true
- * where its declaration says a job of it records them (`recordsDenials`), as `claude`'s, a job on the Agent SDK. False on `codex`,
- * whose sandbox refuses a call nowhere the run reads, and on a remote agent (`a2a:<name>`), which reports none — the harnesses
- * `denialsOf` refuses `denials: fail` on. False too for a step a run froze with `background: true`, a key no step has now, which a
- * record keeps (`FrozenStepSchema`): its sessions ran as Claude Code background sessions, which recorded none.
- */
-export const deniesRecorded = (step: Pick<Workflow, 'harness'> & { readonly background?: unknown }): boolean =>
-  declarationOf(step.harness)?.recordsDenials === true && step.background !== true;
-
-/**
- * The moment a `claude` step's sessions began to run as jobs, which record what they were denied: a session filed before it ran as a
- * Claude Code background session, which recorded none, and its journal says nothing that tells the two apart.
- */
-export const JOBS_SINCE = '2026-09-23T19:04:31.000Z';
-
-/**
- * Whether a session ran as a job that records its denials: filed at `JOBS_SINCE` or after, read off its filing, else its first spawn.
- * False for a session filed before, and for one whose filing and spawn are both unknown.
- */
-export const ranAsJob = (session: Pick<TaskSpan, 'filedAt' | 'spawnedAt'>): boolean => {
-  const since = session.filedAt ?? session.spawnedAt;
-  return since !== null && Date.parse(since) >= Date.parse(JOBS_SINCE);
-};
-
-/** What `deniedCallsOf` reads of a task's view: its attempts, whether each ended, and what each was denied. */
-export type DeniedClock<D> = { state: { attempts: ReadonlyArray<{ ended: unknown; denials?: readonly D[] }> } };
 
 /**
  * Every call a task's sessions were denied: each denial of each attempt that ended, in the order of the attempts, one per call — a call
- * denied twice is two. Empty for a task with no view, and for one denied nothing.
+ * denied twice is two; `[]` where every ended attempt says it was denied nothing. Null, not measured, for a task with no view, with no
+ * attempt ended, or with an ended attempt whose end does not say its denials (its harness could not say). Typed by its contract.
  */
-export const deniedCallsOf = <D>(view: DeniedClock<D> | undefined): D[] =>
-  (view?.state.attempts ?? []).flatMap((a) => (a.ended === null || a.ended === undefined ? [] : [...(a.denials ?? [])]));
+export const deniedCallsOf: DeniedCallsOf = (view) => {
+  const ends = (view?.state.attempts ?? []).filter((a) => a.ended !== null);
+  if (!ends.length || !ends.every((a) => a.denials !== undefined)) return null;
+  return ends.flatMap((a) => [...(a.denials ?? [])]);
+};
 
 /** What `skillsLoadedOf` reads of a task's view: its attempts, whether each ended, and the skills each loaded, where its end says. */
 export type SkillsClock = { state: { attempts: ReadonlyArray<{ ended: unknown; skills?: readonly string[] }> } };

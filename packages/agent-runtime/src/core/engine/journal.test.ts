@@ -515,6 +515,32 @@ test("upgrade: a journal an older runtime wrote, or a consumer's own store holds
       );
     },
   );
+
+  await t.test(
+    'an end that says the skills its session loaded and no denials read as denied nothing, `[]`: the stream that says skills measured denials; one that says neither is left as it is, and no byte on disk changes',
+    async () => {
+      const end = { kind: 'ended', at: '2026-09-24T00:00:03Z', attempt: 1, sessionId: 's-1', observed: 'succeeded', reason: 'harness' };
+      const journal = (more: object) => [
+        TODAY,
+        { kind: 'starting', at: '2026-09-24T00:00:01Z', attempt: 1 },
+        { kind: 'spawned', at: '2026-09-24T00:00:02Z', attempt: 1 },
+        { ...end, ...more },
+      ];
+      const dir = legacyStore({
+        skilled: journal({ skills: ['look'] }),
+        unskilled: journal({}),
+        denied: journal({ skills: [], denials: [{ tool: 'Bash', what: 'ls' }] }),
+      });
+      const before = bytesOf(dir);
+      const endOf = async (id: string) => (await run(dir, readOf(id)))[3] as { denials?: unknown };
+      assert.deepEqual((await endOf('skilled')).denials, [], 'skills said: denials were measured, and none came');
+      assert.equal(Object.hasOwn(await endOf('unskilled'), 'denials'), false, 'neither said: not measured, left so');
+      assert.deepEqual((await endOf('denied')).denials, [{ tool: 'Bash', what: 'ls' }], 'denials said: kept');
+      assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
+      const { state } = await Effect.runPromise((await engineOver(dir)).view('skilled'));
+      assert.deepEqual(state.attempts[0]?.denials, []);
+    },
+  );
 });
 
 /**

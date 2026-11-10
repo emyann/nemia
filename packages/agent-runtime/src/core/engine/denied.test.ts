@@ -75,7 +75,9 @@ test("deniedFacts: what the harness denied an attempt in flight, journalled once
 
   await t.test('DENIED: nothing is written off a sighting with no denials, or no sighting', () => {
     const state = fold(TASK, inFlight());
-    assert.deepEqual(deniedFacts(state, seen(), at(20)), [], 'none denied');
+    assert.deepEqual(deniedFacts(state, seen(), at(20)), [], 'none said');
+    assert.deepEqual(deniedFacts(state, seen([]), at(20)), [], 'measured, none denied: no entry');
+    assert.deepEqual(deniedFacts(fold(TASK, inFlight(denied(LS))), seen([]), at(20)), [], 'and none past what the record holds');
     assert.deepEqual(deniedFacts(state, undefined, at(20)), [], 'not seen');
   });
 
@@ -96,6 +98,13 @@ test('fold: an attempt denials grown by each denied entry, and replaced by an en
   });
   await t.test('FOLD: an end that names none keeps what was seen', () => {
     assert.deepEqual(fold(TASK, [...live, ended()]).attempts[0]?.denials, [LS, GLOB]);
+  });
+  await t.test('FOLD: an end that says none were denied is kept as `[]`, measured, and one that cannot say leaves none', () => {
+    assert.deepEqual(fold(TASK, inFlight(ended([]))).attempts[0]?.denials, []);
+    assert.equal(fold(TASK, inFlight(ended())).attempts[0]?.denials, undefined);
+  });
+  await t.test('FOLD: an end that says `[]` after denials were seen keeps them: a denial seen is never taken away', () => {
+    assert.deepEqual(fold(TASK, [...live, ended([])]).attempts[0]?.denials, [LS, GLOB]);
   });
   await t.test('FOLD: a denial of another attempt is not this one', () => {
     assert.equal(fold(TASK, inFlight(denied(WRITE, 2))).attempts[0]?.denials, undefined);

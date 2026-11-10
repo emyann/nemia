@@ -250,6 +250,7 @@ const endFacts = (state: State, n: number, seen: Sighting | undefined) => ({
   skills: seen?.skills,
   files: seen?.files,
   ranOn: seen?.ranOn,
+  ranIn: seen?.ranIn,
   limit: seen?.limit,
   ...parkedEnd(state, n, seen),
 });

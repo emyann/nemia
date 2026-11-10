@@ -6,12 +6,12 @@
 import { handedParts, type HandedPart, type Run, type StepRecord, type ToldLayers, toldLayers } from '../run.ts';
 import { remoteNameOf, type Workflow } from '../workflow.ts';
 import { briefNow } from '../tick/told.verb.ts';
-import type { TaskView, Views } from '../summary/reads.verb.ts';
+import type { Views } from '../summary/reads.verb.ts';
 import type { PlaceService } from '../place/place.store.ts';
 import { type Bridge, bridgeOf } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
-import { fenceReach } from 'agent-runtime/vocabulary';
-import { HARNESSES, remoteAgents } from '../runtime-client.ts';
+import { remoteAgents } from '../runtime-client.ts';
+import { runsInOf } from './runs-in.ts';
 import type { HandedHow, RunsInBy } from 'objects';
 
 /**
@@ -35,9 +35,10 @@ export type StepFiled = {
    */
   permissionMode: string | null;
   /**
-   * The permission mode the session runs in, which the engine files as given and its harness decides (`runsInOf`): the mode filed
-   * (`filed`); the harness's choice when none was — `auto` for Claude Code, `workspace-write` for Codex (`default`); or, for Codex,
-   * `read-only` because `tools` has none that writes, whatever was named (`tools`). Null for a harness the api cannot ask.
+   * The permission mode the session runs in, off its last attempt's `ranIn`, which the runtime measured (`runsInOf`): the mode filed
+   * (`filed`); the harness's choice when none was (`default`); or another its harness ran it in than the one filed (`harness`), as Claude
+   * Code dropping `auto` on a model or Codex narrowing its sandbox. Null where the runtime measured none: no attempt yet, a session that
+   * has not said its mode, or a harness that cannot say one.
    */
   runsIn: { mode: string; by: RunsInBy } | null;
   /**
@@ -127,7 +128,7 @@ export function filedOf(record: StepRecord | undefined, views: Views, home: stri
     effort: effort ?? null,
     contextTokens: contextTokens ?? null,
     permissionMode: permissionMode ?? null,
-    runsIn: runsInOf(view.state),
+    runsIn: runsInOf(permissionMode, view.state.attempts.at(-1)?.ranIn),
     remote: remoteOf(view.state.harness, home),
     bridge: bridgeOf(views)(view.id),
     tools: tools ?? null,
@@ -165,48 +166,4 @@ function remoteOf(harness: string | undefined, home: string): StepFiled['remote'
   if (typeof given !== 'string' || !URL.canParse(given)) return { name, address: null };
   const url = new URL(given);
   return { name, address: `${url.origin}${url.pathname === '/' ? '' : url.pathname}` };
-}
-
-/** The flags a harness's command gives its session's permission mode by: Claude Code's mode, and Codex's sandbox. */
-const MODE_FLAGS: readonly string[] = ['--permission-mode', '-s', '--sandbox'];
-
-/**
- * The permission mode a task's session runs in (`StepFiled.runsIn`), as its harness decides it from what the engine was filed with.
- *
- * A harness the run brings as a spec — `codex` — is asked with its own `command`, a pure function of the request: the mode it would
- * spawn the session with, and again without `tools`, which tells a sandbox the tools narrowed from one the task named. So a rule the
- * engine changes is the rule read here. `claude` is the engine's own harness, every session of it a job on the Agent SDK (or a
- * long-lived session, `restartPolicy: 'Always'`), whose spawn is no function it exports: it takes the mode filed, or the word its fence
- * gives a task naming none (`fenceReach`'s `given`, `auto`; `attachedOptions` in agent-runtime), which the api test holds to the argv
- * the engine's job hands Claude Code. A task filed with no harness ran on the engine's first (`fallback` in its facade). Null for a
- * harness the api cannot ask, or one whose command names no mode.
- */
-function runsInOf(state: TaskView['state']): StepFiled['runsIn'] {
-  const name = state.harness ?? Object.keys(HARNESSES)[0];
-  if (name === undefined || !Object.hasOwn(HARNESSES, name)) return null;
-  const harness = HARNESSES[name];
-  const { permissionMode, tools: filedTools } = state.config ?? {};
-  const by = permissionMode === undefined ? 'default' : 'filed';
-  if (typeof harness === 'string') {
-    const given = fenceReach(name)?.given;
-    return given === undefined ? null : { mode: permissionMode ?? given, by };
-  }
-  if (typeof harness !== 'object' || !('command' in harness)) return null;
-  const modeOf = (tools: string[] | undefined): string | undefined => {
-    try {
-      const { args } = harness.command({
-        name: `${state.taskId}/mode`,
-        brief: '',
-        cwd: state.cwd || '/',
-        config: { permissionMode, tools },
-      });
-      const at = args.findIndex((arg) => MODE_FLAGS.includes(arg));
-      return at < 0 ? undefined : args[at + 1];
-    } catch {
-      return undefined;
-    }
-  };
-  const mode = modeOf(filedTools);
-  if (mode === undefined) return null;
-  return { mode, by: filedTools && modeOf(undefined) !== mode ? 'tools' : by };
 }

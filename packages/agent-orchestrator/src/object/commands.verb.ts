@@ -14,7 +14,7 @@ import { runObject, stepCloseout, stepTold, stepTries, stepTry, type TryCloseout
 import { runsAtOnce } from '../runs/runs.store.ts';
 import type { Run } from '../record/record.ts';
 import type { Args } from '../command/command.ts';
-import type { Command, Kept } from '../command/entry.verb.ts';
+import type { Command } from '../command/entry.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -52,15 +52,14 @@ export const SHOW: Command<Readonly<Record<string, unknown>>, typeof ShowInput.T
   writes: false,
   class: 'read',
   input: ShowInput,
-  handler: (args, kept?: Kept) =>
+  handler: (args) =>
     Effect.flatMap(
       tried(() => runsAtOnce.runs.read(args.runId)),
       (run): Effect.Effect<Readonly<Record<string, unknown>>, Refusal, EngineService | PlaceService | StoreRoot | StoreConfig> =>
         args.raw === true
           ? Effect.succeed(rawOf(run))
-          : Effect.map(
-              runObject(run, { memo: { filings: kept?.filings ?? { filed: new Map(), cursor: 0 }, said: new Map() } }),
-              (object) => ('unjudged' in object ? object : Schema.encodeSync(RunObject)(object)),
+          : Effect.map(runObject(run, { memo: { said: new Map() } }), (object) =>
+              'unjudged' in object ? object : Schema.encodeSync(RunObject)(object),
             ),
     ),
   print: (data) => [JSON.stringify(data, null, 2)],

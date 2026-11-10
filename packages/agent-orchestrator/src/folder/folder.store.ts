@@ -400,8 +400,8 @@ const formerStepFields = { disallow: frozenStepFields.disallowedTools, allow: fr
 
 /**
  * A field of each key a step no longer has, still read off a run frozen with it, as it was typed: `background`, which ran a step's sessions
- * as background sessions before every session ran on the Agent SDK. Kept, and read only by the stats (`deniesRecorded`), which count no
- * denial of such a session: the step is filed as a job.
+ * as background sessions before every session ran on the Agent SDK. Kept decoded and read by nothing: the step is filed as a job, and
+ * the ends of its sessions said no denials, which the stats read as not measured.
  */
 const retiredStepFields = { background: Schema.optionalKey(Schema.Boolean) };
 

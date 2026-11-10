@@ -345,7 +345,6 @@ export {
   harnessBlocked,
   parentRead,
   parentsRead,
-  filingsRead,
   taskPhasesRead,
   spendReader,
   viewedOnce,
@@ -467,7 +466,6 @@ export { listedStanding } from './standing/standing.store.ts';
 export { graphOf, runGraph, typedGraphOf, type GraphEdge, type RunGraph } from './summary/graph.ts';
 export {
   bare,
-  filedTimes,
   judgedSteps,
   judgedUnlessUnreadable,
   seenBy,
@@ -477,7 +475,7 @@ export {
   viewsOf,
   workflowsOf,
 } from './summary/reads.verb.ts';
-export type { Filings, TaskView, Unreadable, Views } from './summary/reads.verb.ts';
+export type { TaskView, Unreadable, Views } from './summary/reads.verb.ts';
 export { judge, needsOf, spentOf, stepSaid, wordOf } from './summary/judged.verb.ts';
 export { atHarness } from './summary/judged.verb.ts';
 export type { RunHolding, RunStatus, RunToDecide, RunWaiting, Spent, StepNeeds } from './summary/judged.verb.ts';
@@ -495,7 +493,7 @@ export { judgedNow, runsSummarized, type RunSummary, type SummaryHow } from './s
 export { turnOfTry, type StepAcceptance, type StepApproval, type StepAttempts, type StepCloseout } from './resource/tries.verb.ts';
 export type { StepGate, StepReply, StepTry, StepUnreadable } from './resource/tries.verb.ts';
 export type { StepFiled, TaskPart } from './resource/told.verb.ts';
-export { totalOf, usedOf, type RunRead, type StepUsed, type Usage } from './resource/usage.ts';
+export { totalOf, usedOf, type RunRead, type StepUsed, type Usage } from './resource/index.ts';
 export { tailOf, type LastSaid, type StepCheck, type StepLog } from './resource/checks.verb.ts';
 export { refusedName, typeOf, type StepArtifact, type StepValue } from './resource/files.store.ts';
 export { kindsDrift, revisionNow, REVISION_KINDS, stepsDrift, type Drift } from './revisions/revisions.ts';

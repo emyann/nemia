@@ -115,6 +115,11 @@ the orchestrator's code holds a fact today, it is named beside it.
   at each bump and never carried. Measured again on **SDK 0.3.316, Claude Code 2.1.316, 2026-11-01**: still `claude-opus-5-5`, alike
   on the `init` line of `bin/ae-claude-job.ts` run on the bundled Claude Code (`live-sdk.boundary.test.ts`, which keeps that line as
   `sdk-0.3.316-init.json`), on the attempt the engine recorded (`ranOn`), and on the owner's own `claude -p --model opus` at 2.1.316.
+- **The mode a session ran in is its `init` line's `permissionMode`** (`sdk.d.ts:6259`), and the runtime reads it as the attempt's
+  `ranIn` (`harness/detached/output.ts`): what was asked is the task's `permissionMode`, what ran is what Claude Code printed. The SDK
+  prints one `init` per turn, so the last one is read, as `claude_code_version` is, and the capture keeps a later `init` that names
+  another mode (`initKept`): on a model that drops `auto` the mode can change from one turn to the next (`auto` on haiku ran as
+  `default` on 2.1.280, and as `auto` on 2.1.316, above), and only that line says which one a turn ran in.
 - **A job's bin prints the SDK's `command_lifecycle` lines for the queued prompt ahead of `system`/`init`** (SDK 0.3.308 and 0.3.316,
   2026-11-01): `queued`, then `started`, each with the `session_id`, then `init`; and a `result` line does not open with its `type`.
   The worker passes over every line before the start event (`HarnessSpec.start`, `bin/ae-worker.ts`), so it reads the id all the same.

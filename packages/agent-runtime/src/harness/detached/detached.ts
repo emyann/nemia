@@ -51,9 +51,11 @@ export type HarnessSpec = {
   name: string;
   /**
    * The command that runs a brief to completion. Exit 0 is success; anything else is failure. `env`, when given, is laid over
-   * the worker's own environment for this process alone: the engine's, less its telemetry (`withoutTelemetry`).
+   * the worker's own environment for this process alone: the engine's, less its telemetry (`withoutTelemetry`). `ranIn`, when
+   * given, is the permission mode or sandbox the command runs the session in, for a harness whose output does not say it (Codex's
+   * `-s`): written into the run file at the spawn, and the run's `Sighting.ranIn` where its output says none.
    */
-  command: (r: SpawnRequest, io?: HarnessIO) => { cmd: string; args: string[]; env?: Record<string, string> };
+  command: (r: SpawnRequest, io?: HarnessIO) => { cmd: string; args: string[]; env?: Record<string, string>; ranIn?: string };
   /**
    * What this harness needs to know about the machine before it runs — read from disk, from git —
    * kept out of `command` so that stays a pure function of what it is given. Merged into the `io`
@@ -190,7 +192,7 @@ export type HarnessOutput = {
   ownTokens?: Usage;
   /** A limit its configuration set that the harness says it ended the session at — `budget`, its spend cap. */
   limit?: string;
-  /** The tool calls the harness denied the session, in the order it first did. Absent when none, or when it does not say. */
+  /** The tool calls the harness denied the session, in the order it first did: `[]` when it denied none. Absent when it does not say. */
   denials?: Denial[];
   /** Each skill the session loaded, one per call: `[]` when it loaded none. Absent when the harness cannot say. */
   skills?: string[];
@@ -206,6 +208,11 @@ export type HarnessOutput = {
    * does not say.
    */
   harnessVersion?: string;
+  /**
+   * The permission mode the session ran in, as its own start line said it (the mode Claude Code's last `init` line names), or as the
+   * runtime's spawn gave it (`HarnessSpec.command`'s `ranIn`). Absent when neither says.
+   */
+  ranIn?: string;
 };
 
 export { WORKER } from './start-worker.ts';
@@ -222,7 +229,8 @@ export type RunInput = { first: string; inbox: string; from: number; closesOn: {
  * (`statement`), else what its output says, with no time: the spawn cleared both before it launched the run, so either was written by
  * the run's own process, and the engine keeps it whatever the clock says; its exit code once it has one, never the worker's -1; and
  * what its output says it used, reached and was denied, and the skills it loaded and the files it touched: an empty list kept, since it
- * says they were counted; the harness's version its output says, and the code its spawn wrote it runs (`image`).
+ * says they were counted; the harness's version its output says, and the code its spawn wrote it runs (`image`); the mode it ran in,
+ * its output's, else the one its spawn wrote (`ranIn`).
  */
 const sightingOf = (
   name: string,
@@ -243,6 +251,7 @@ const sightingOf = (
   ...(usage ? { usage } : {}),
   ...(output ? sightedOf(output.read) : {}),
   ...(run.image ? { image: run.image } : {}),
+  ...(!output?.read.ranIn && run.ranIn ? { ranIn: run.ranIn } : {}),
 });
 
 /** The file a command's worker reads once at its exit, for a spec that runs a task's command and a task that names one. */
@@ -773,7 +782,7 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
             stop: stopFile(r.name),
             streams,
           });
-          const { cmd, args, env } = spec.command(r, io);
+          const { cmd, args, env, ranIn } = spec.command(r, io);
           const input = spawnInput(spec, r, inboxFile(r.name));
           const plan = {
             name: r.name,
@@ -790,7 +799,7 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
               : {}),
             ...(input ? { input } : {}),
           };
-          fs.writeFileSync(runFile(r.name), firstRunFile({ ...plan, ...terminationOf(spec, r), ...bounds, ...limit }));
+          fs.writeFileSync(runFile(r.name), firstRunFile({ ...plan, ...terminationOf(spec, r), ...bounds, ...limit, ranIn }));
 
           startWorker(runFile(r.name), r.cwd, argv);
         },

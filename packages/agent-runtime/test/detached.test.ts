@@ -69,6 +69,7 @@ import {
   SESSION,
   SKILLS_STREAM,
   stream,
+  MODE_STREAM,
   VERSIONED_STREAM,
 } from './reader-streams.ts';
 import { IMAGE } from '../src/harness/image.ts';
@@ -1301,8 +1302,10 @@ test('a claude job whose output has stderr before its result and a line torn mid
   assert.deepEqual(claudeStreamOutput(['a warning on stderr', ...lines].join('\n')), {
     closeout: { payload: { outcome: 'done' } },
     usage: { costUsd: 0.2 },
+    denials: [],
     skills: [],
     ranOn: MODEL,
+    ranIn: 'default',
   });
   const { value, warnings } = await warned(detachedOps(claudeJob, dir).observe);
   assert.deepEqual(warnings, [], 'nothing refused: stderr and a torn line are no lines Claude Code printed whole');
@@ -1421,8 +1424,9 @@ test('codex: the sandbox a task runs in, from its mode and its tools — never w
   ];
   for (const row of rows)
     await t.test(row.name, () => {
-      const args = codex.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', config: row.config }).args;
+      const { args, ranIn } = codex.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', config: row.config });
       assert.equal(args[args.indexOf('-s') + 1], row.sandbox);
+      assert.equal(ranIn, row.sandbox, 'the command says the sandbox it gave, as the mode the session runs in');
     });
 });
 
@@ -1639,6 +1643,14 @@ test(
       detachedOps({ name, can: [], readOutput: () => read, command: () => ({ cmd: 'sh', args: ['-c', 'echo out'] }) }, dir);
     const denied = says('denied', { denials });
     const none = says('nodenial', { denials: [] });
+    const unsaid = says('unsaid', {});
+    const sandboxed = (name: string, read: HarnessOutput) =>
+      detachedOps(
+        { name, can: [], readOutput: () => read, command: () => ({ cmd: 'sh', args: ['-c', 'echo out'], ranIn: 'read-only' }) },
+        dir,
+      );
+    const spawnSaid = sandboxed('spawnsaid', {});
+    const outputSaid = sandboxed('outputsaid', { ranIn: 'plan' });
     const quiet = detachedOps({ name: 'quiet', can: [], command: () => ({ cmd: 'sh', args: ['-c', 'sleep 2'] }) }, dir);
     const quietPrints = detachedOps(
       { name: 'quietp', can: [], readOutput: claudeResultOutput, command: () => ({ cmd: 'sh', args: ['-c', 'sleep 2'] }) },
@@ -1669,6 +1681,9 @@ test(
         await Effect.runPromise(prints.spawn({ name: 'ae/t20/1', brief: 'x', cwd: workspace, closeoutSchema: { type: 'object' } }));
         await Effect.runPromise(denied.spawn(req('ae/t23/1', dir)));
         await Effect.runPromise(none.spawn(req('ae/t24/1', dir)));
+        await Effect.runPromise(unsaid.spawn(req('ae/t26/1', dir)));
+        await Effect.runPromise(spawnSaid.spawn(req('ae/t27/1', dir)));
+        await Effect.runPromise(outputSaid.spawn(req('ae/t28/1', dir)));
         const seen = await settle(sub, answers, 'ae/t9/1', 'completed');
         assert.deepEqual(seen.closeout?.payload, { outcome: 'done' });
         assert.equal(
@@ -1694,10 +1709,22 @@ test(
     });
 
     await s.test(
-      "what a harness's output says it denied the session is on the session's sighting, as the spec read it — and nothing when it denied nothing",
+      "what a harness's output says it denied the session is on the session's sighting, as the spec read it — `[]` when it denied nothing",
       async (sub) => {
         assert.deepEqual((await settle(sub, denied, 'ae/t23/1', 'completed')).denials, denials);
-        assert.equal('denials' in (await settle(sub, none, 'ae/t24/1', 'completed')), false, 'an empty list is no key');
+        assert.deepEqual((await settle(sub, none, 'ae/t24/1', 'completed')).denials, [], 'an empty list is kept: measured, none denied');
+        assert.equal('denials' in (await settle(sub, unsaid, 'ae/t26/1', 'completed')), false, 'an output that cannot say: no key');
+      },
+    );
+
+    await s.test(
+      "the mode a session ran in is on its sighting: the one its spec's command gave at the spawn, else none — and its output's, where it says one",
+      async (sub) => {
+        const plan = JSON.parse(fs.readFileSync(runFileOf(dir, 'spawnsaid', 'ae/t27/1'), 'utf8')) as { ranIn?: string };
+        assert.equal(plan.ranIn, 'read-only', 'written into the run file at the spawn, as its image is');
+        assert.equal((await settle(sub, spawnSaid, 'ae/t27/1', 'completed')).ranIn, 'read-only');
+        assert.equal((await settle(sub, outputSaid, 'ae/t28/1', 'completed')).ranIn, 'plan', 'what the harness said wins');
+        assert.equal('ranIn' in (await settle(sub, unsaid, 'ae/t26/1', 'completed')), false, 'neither said one: none');
       },
     );
   },
@@ -2049,11 +2076,12 @@ test("claudeResultOutput: what claude -p's result line says — its answer, its 
       claudeResultOutput(['a warning on stderr', resultLine({ structured_output: { outcome: 'done' } }), ''].join('\n')),
       {
         closeout: { payload: { outcome: 'done' } },
+        denials: [],
       },
       '`-p --output-format json --json-schema` prints one line, a result whose structured_output holds the answer',
     );
-    assert.deepEqual(claudeResultOutput(resultLine({})), {}, 'a result without it: no schema was given, or none was answered');
-    assert.deepEqual(claudeResultOutput(resultLine({ structured_output: null })), {}, 'null is no answer');
+    assert.deepEqual(claudeResultOutput(resultLine({})), { denials: [] }, 'a result without it: no schema was given, or none was answered');
+    assert.deepEqual(claudeResultOutput(resultLine({ structured_output: null })), { denials: [] }, 'null is no answer');
     assert.deepEqual(
       claudeResultOutput(JSON.stringify({ type: 'assistant', result: 'x', structured_output: { outcome: 'done' } })),
       {},
@@ -2077,7 +2105,7 @@ test("claudeResultOutput: what claude -p's result line says — its answer, its 
       });
       assert.deepEqual(
         claudeResultOutput(spent),
-        { usage: { costUsd: 0.01804, apiMs: 718 }, limit: 'budget' },
+        { usage: { costUsd: 0.01804, apiMs: 718 }, limit: 'budget', denials: [] },
         '`claude -p` at its `--max-budget-usd` exits 1 with this result (keys trimmed)',
       );
       assert.equal(
@@ -2138,12 +2166,12 @@ test("claudeResultOutput: what claude -p's result line says — its answer, its 
   await t.test("what claude -p cost is its result's total_cost_usd, and its API time duration_api_ms — measured or absent, never 0", () => {
     assert.deepEqual(
       claudeResultOutput(resultLine({ total_cost_usd: 0.01804, duration_api_ms: 718, usage: { input_tokens: 0, output_tokens: 0 } })),
-      { usage: { costUsd: 0.01804, apiMs: 718 } },
+      { usage: { costUsd: 0.01804, apiMs: 718 }, denials: [] },
       'a result carries both, beside a usage whose token counts can read 0 where modelUsage counts thousands',
     );
     assert.deepEqual(
       claudeResultOutput(resultLine({ structured_output: { outcome: 'done' }, total_cost_usd: 0.2 })),
-      { closeout: { payload: { outcome: 'done' } }, usage: { costUsd: 0.2 } },
+      { closeout: { payload: { outcome: 'done' } }, usage: { costUsd: 0.2 }, denials: [] },
       'beside the answer, and a count it does not give is not given',
     );
     assert.deepEqual(claudeResultOutput(JSON.stringify({ type: 'assistant', total_cost_usd: 1 })), {}, 'only a result says it');
@@ -2187,7 +2215,8 @@ test("claudeResultOutput: what claude -p's result line says — its answer, its 
         ],
         'a denial with no id is a call of its own',
       );
-      assert.equal('denials' in claudeResultOutput(resultLine({ permission_denials: [] })), false, 'none denied: no key');
+      assert.deepEqual(claudeResultOutput(resultLine({ permission_denials: [] })).denials, [], 'a result measured: none denied is `[]`');
+      assert.deepEqual(claudeResultOutput(resultLine({})).denials, [], 'a result with no `permission_denials` denied nothing');
       assert.equal(
         refusedWith(() =>
           claudeResultOutput(
@@ -2250,7 +2279,7 @@ test('REFUSED: a line a reader reads that does not decode refuses the output, na
       );
       assert.deepEqual(
         claudeResultOutput([badInit, resultLine({ total_cost_usd: 0.2 })].join('\n')),
-        { usage: { costUsd: 0.2 } },
+        { usage: { costUsd: 0.2 }, denials: [] },
         'json reads results alone',
       );
       const passing = [
@@ -2262,7 +2291,7 @@ test('REFUSED: a line a reader reads that does not decode refuses the output, na
       ];
       assert.deepEqual(
         claudeStreamOutput(passing.join('\n')),
-        { skills: [], ranOn: MODEL },
+        { denials: [], skills: [], ranOn: MODEL, ranIn: 'default' },
         'another subtype, another type, and a line with no call',
       );
     },
@@ -2303,6 +2332,7 @@ test("claudeStreamOutput: what claude -p's stream says as it happens — its den
           denials: [{ tool: 'Write', what: '/tmp/outside/x.txt' }, { tool: 'WebFetch' }],
           skills: ['look'],
           ranOn: MODEL,
+          ranIn: 'default',
         },
         'a call allowed (uname, the skill) is not a denial, and each denied one is named once, not once per line that names it',
       );
@@ -2310,7 +2340,12 @@ test("claudeStreamOutput: what claude -p's stream says as it happens — its den
       const killed = log.split('\n').slice(0, -1).join('\n');
       assert.deepEqual(
         claudeStreamOutput(killed),
-        { denials: [{ tool: 'Write', what: '/tmp/outside/x.txt' }, { tool: 'WebFetch' }], skills: ['look'], ranOn: MODEL },
+        {
+          denials: [{ tool: 'Write', what: '/tmp/outside/x.txt' }, { tool: 'WebFetch' }],
+          skills: ['look'],
+          ranOn: MODEL,
+          ranIn: 'default',
+        },
         'killed before its result, by a stop or a signal, the events are all it says: every denial is still read',
       );
       assert.equal('denials' in claudeResultOutput(killed), false, '--output-format json has no events: it says nothing until its result');
@@ -2319,10 +2354,10 @@ test("claudeStreamOutput: what claude -p's stream says as it happens — its den
 
   await t.test('a denial event whose call is not in the stream is the tool alone — and takes what its result says of it', () => {
     const lone = [stream.init, stream.denied('toolu_b', 'Bash')].join('\n');
-    assert.deepEqual(claudeStreamOutput(lone), { denials: [{ tool: 'Bash' }], skills: [], ranOn: MODEL });
+    assert.deepEqual(claudeStreamOutput(lone), { denials: [{ tool: 'Bash' }], skills: [], ranOn: MODEL, ranIn: 'default' });
     assert.deepEqual(
       claudeStreamOutput([lone, stream.denied('toolu_b', 'Bash'), 'not json "permission_denied"'].join('\n')),
-      { denials: [{ tool: 'Bash' }], skills: [], ranOn: MODEL },
+      { denials: [{ tool: 'Bash' }], skills: [], ranOn: MODEL, ranIn: 'default' },
       'named twice, once; a line that is not an event is skipped',
     );
     const withResult = [
@@ -2347,8 +2382,8 @@ test("claudeStreamOutput: what claude -p's stream says as it happens — its den
       claudeStreamOutput(
         [stream.init, stream.calls(['toolu_q', 'Bash', { command: 'ls' }]), stream.toolResult('toolu_q'), resultLine({})].join('\n'),
       ),
-      { skills: [], ranOn: MODEL },
-      'a stream that denied nothing says nothing of it',
+      { denials: [], skills: [], ranOn: MODEL, ranIn: 'default' },
+      'a stream that denied nothing says so: `[]`',
     );
   });
 
@@ -2420,10 +2455,44 @@ test("claudeStreamOutput: what claude -p's stream says as it happens — its den
   );
 
   await t.test(
+    "claude -p's stream says the mode its session ran in off its last `init` line's `permissionMode`; a line naming none, or none at all, says none",
+    () => {
+      assert.equal(
+        claudeStreamOutput(MODE_STREAM).ranIn,
+        'default',
+        'the last init line: a model that dropped `auto` ran its turn in `default`',
+      );
+      assert.equal(claudeStreamOutput([MODE_STREAM.split('\n')[0], resultLine({})].join('\n')).ranIn, 'auto', 'one turn, as it began');
+      const nameless = JSON.parse(stream.init) as Record<string, unknown>;
+      delete nameless.permissionMode;
+      assert.equal('ranIn' in claudeStreamOutput([JSON.stringify(nameless), resultLine({})].join('\n')), false, 'an init line naming none');
+      assert.equal(
+        claudeStreamOutput([MODE_STREAM.split('\n')[0], JSON.stringify(nameless), resultLine({})].join('\n')).ranIn,
+        'auto',
+        'a later line naming none takes nothing away',
+      );
+      assert.equal('ranIn' in claudeStreamOutput(resultLine({})), false, 'no init line: nothing said');
+      assert.equal('ranIn' in claudeResultOutput(MODE_STREAM), false, 'json output has no events');
+      assert.equal(claudeStreamOutput(claudeStreamKept(MODE_STREAM)).ranIn, 'default', 'a kept capture reads the same');
+    },
+  );
+
+  await t.test(
+    'a stream that started, or ended in its result, says what it was denied even when that is nothing; one with neither cannot say',
+    () => {
+      const ls = stream.calls(['toolu_q', 'Bash', { command: 'ls' }]);
+      assert.deepEqual(claudeStreamOutput([stream.init, ls].join('\n')).denials, [], 'an init line: measured, none denied');
+      assert.deepEqual(claudeStreamOutput([ls, resultLine({})].join('\n')).denials, [], 'a result: measured, none denied');
+      assert.equal('denials' in claudeStreamOutput(ls), false, 'neither: no session known to have started, nothing measured');
+      assert.equal('denials' in claudeStreamOutput(''), false, 'an empty capture says nothing');
+    },
+  );
+
+  await t.test(
     'a stream that started says the skills its session loaded even when it loaded none; one with no init line cannot say',
     () => {
       const none = [stream.init, stream.calls(['toolu_q', 'Bash', { command: 'ls' }]), resultLine({})].join('\n');
-      assert.deepEqual(claudeStreamOutput(none), { skills: [], ranOn: MODEL }, 'measured: none loaded');
+      assert.deepEqual(claudeStreamOutput(none), { denials: [], skills: [], ranOn: MODEL, ranIn: 'default' }, 'measured: none loaded');
       const unstarted = SKILLS_STREAM.split('\n').slice(1).join('\n');
       assert.equal('skills' in claudeStreamOutput(unstarted), false, 'no init line: no session known to have started, nothing measured');
       assert.equal('skills' in claudeResultOutput(SKILLS_STREAM), false, '--output-format json has no events: it cannot say');

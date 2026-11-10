@@ -33,7 +33,7 @@ import { stepRaise } from '../retry/index.ts';
 import { stepStatus } from '../status/status.ts';
 import { budgetWord } from '../money/money.ts';
 import { runInputGraph } from '../summary/graph.ts';
-import { bare, type Filings, tryOf } from '../summary/reads.verb.ts';
+import { bare, tryOf } from '../summary/reads.verb.ts';
 import { atHarness, needsOf, spentOf, stepSaid } from '../summary/judged.verb.ts';
 import { judgedFields } from '../summary/summary.verb.ts';
 import type { UnjudgedStep } from '../summary/judgement.verb.ts';
@@ -48,7 +48,7 @@ import { driftOf, gateOf, type StepTry } from '../resource/tries.verb.ts';
 import { filedOf, type StepFiled, toldOf } from '../resource/told.verb.ts';
 import { folderFiles, workFolderOf } from '../resource/files.store.ts';
 import { type LastSaid, lastLineOf } from '../resource/checks.verb.ts';
-import { readOf, totalOf, usedOf } from '../resource/usage.ts';
+import { readOf, totalOf, usedOf } from '../resource/index.ts';
 import type { Run as RunObject, RunSpec, RunStatus, RunStepStatus, StepTold, TryCloseout, TryShort } from './run.model.ts';
 import { runNamespace } from '../run-list/index.ts';
 import { prunedWords } from '../record/record.ts';
@@ -56,14 +56,14 @@ import { prunedKept } from '../forget/prune/prune.ts';
 import { currentOf, raiseReads, runReading, type RunReading, stepsReading, triesIn } from './read.verb.ts';
 
 /**
- * What `runObject` is handed beside its services: what a caller's reads keep between requests (`filings`, the feed's
- * filing times; `said`, where each blocked session's conversation was last read), and `inRequest`, which runs the drift's program
+ * What `runObject` is handed beside its services: what a caller's reads keep between requests (`said`, where each blocked session's
+ * conversation was last read), and `inRequest`, which runs the drift's program
  * (`driftNow`) over a request's own services, so it reads the doors the api was given; without it the drift runs over the program's own.
  * `listed` judges the run as a list says it, which a board polls: no harness asked for a blocked session's last line, and no drift
  * read through the doors, so each step's `lastLine` is null and `kinds` empty there, and the run read alone says them.
  */
 export type RunReads = {
-  readonly memo: { readonly filings: Filings; readonly said: LastSaid };
+  readonly memo: { readonly said: LastSaid };
   readonly inRequest?: (program: ReturnType<typeof driftNow>) => Promise<readonly Drift[]>;
   readonly listed?: boolean;
 };
@@ -297,9 +297,9 @@ const resultOf = (run: Run, steps: readonly Workflow[]): Pick<RunStatus, 'result
  * lines a person types, which are the command table's (`runLines`, lines.verb.ts), not the run's.
  */
 const restOf = (run: Run, at: RunReading, kinds: readonly Drift[]) => {
-  const { steps, judged, filed } = at;
+  const { steps, judged, views } = at;
   return {
-    startedAt: runStartedAt(run, filed),
+    startedAt: runStartedAt(run, views),
     cancelledAt: run.cancelledAt ?? null,
     pruned: prunedOf(run),
     onDisk: { worktrees: false, files: false },
@@ -325,7 +325,7 @@ const restOf = (run: Run, at: RunReading, kinds: readonly Drift[]) => {
  * doors, over `inRequest`'s services where given. A program over the engine, the place and the store's root.
  */
 export const runObject = Effect.fn('runObject')(function* (run: Run, { memo, inRequest, listed = false }: RunReads) {
-  const at = yield* runReading(run, memo.filings);
+  const at = yield* runReading(run);
   if ('unjudged' in at) return { unjudged: at.unjudged, steps: at.steps } satisfies RunObjectAnswer;
   return yield* runObjectOf(run, at, { said: memo.said, listed, ...(inRequest ? { inRequest } : {}) });
 });

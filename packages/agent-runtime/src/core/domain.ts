@@ -128,8 +128,8 @@ export type Sighting = {
   limit?: string;
   /**
    * Every tool call the harness denied the session, as the harness recorded it, in the order it first did: a session
-   * with no approval surface carries on past a denial, and this is the only trace of it. Absent when the harness denied
-   * nothing, or cannot say. **Carried, never judged**:
+   * with no approval surface carries on past a denial, and this is the only trace of it. `[]` when the harness measured and
+   * denied nothing; absent when it cannot say. **Carried, never judged**:
    * `decide` does not read it; a person, and the upper layer, do.
    */
   denials?: Denial[];
@@ -150,6 +150,11 @@ export type Sighting = {
    * harness argument that asked for it, which the core may not so much as spell (`test/core-reads.test.ts`).
    */
   ranOn?: string;
+  /**
+   * The permission mode or sandbox the session ran in, as its harness said it (Claude Code's `init`, the last one it printed) or the
+   * runtime's spawn gave it (Codex's `-s`). Absent where nothing said one. **Carried, never judged**: `decide` does not read it.
+   */
+  ranIn?: string;
   /**
    * The code the session's process runs, as that process reports it: the real folder of the runtime package that spawned or holds
    * it — a Pod's container image (`containerStatuses[].image`). A job keeps the one it was spawned with; a long-lived session
@@ -376,7 +381,7 @@ export type EndReason = 'harness' | 'lost' | 'unstartable' | 'operator' | 'deadl
  *   failed without the harness vouching that nothing started: whether a session exists is then the grace window's to
  *   find out.
  * - `ended`: an attempt reached a terminal state, as observed — never as assumed. `usage`, `exitCode`, `terminationMessage`,
- *   `denials`, `skills`, `files`, `ranOn` and `limit` come from the same sighting, when its runner measured them; `decide` reads
+ *   `denials`, `skills`, `files`, `ranOn`, `ranIn` and `limit` come from the same sighting, when its runner measured them; `decide` reads
  *   none of them. `parked`, from the same sighting, says the job ended itself under a sessions' drain (`Parked`): `decide` reads
  *   it, and continues the job.
  *   `closedOut`, on an end read off a sighting of a task that asked for a closing statement: whether one came. A fact, never a
@@ -394,9 +399,9 @@ export type EndReason = 'harness' | 'lost' | 'unstartable' | 'operator' | 'deadl
  *   off a working sighting, once per denial past those the attempt holds (`deniedFacts`). Joins the attempt's `denials`; an
  *   end that names its own replaces them. `decide` never reads it.
  * - `image`: the code an attempt in flight runs on (`image`) and its harness's version (`harnessVersion`), as its sighting said
- *   them: written by the engine off a sighting of an unended attempt whenever either differs from what the attempt holds
- *   (`imageFacts`), so a new holder or a resumed process on another version writes again. The latest of each wins. `decide`
- *   never reads it.
+ *   them, and the mode it runs in (`ranIn`), which rides here rather than on an event of its own: written by the engine off a
+ *   sighting of an unended attempt whenever one differs from what the attempt holds (`imageFacts`), so a new holder, a resumed
+ *   process on another version or a turn in another mode writes again. The latest of each wins. `decide` never reads it.
  * - `stop-requested`: the operator asked for it to stop.
  * - `said`: a person's words, handed to the session of the attempt in flight through its harness (`say`). Written once
  *   the harness took them, so it means they were handed over — not that the session read them, or did what they asked.
@@ -506,6 +511,7 @@ export type Event =
       skills?: string[];
       files?: string[];
       ranOn?: string;
+      ranIn?: string;
       limit?: string;
       parked?: Parked;
       error?: string;
@@ -514,7 +520,7 @@ export type Event =
   | { kind: 'measured'; at: string; attempt: number; usage: Usage }
   | { kind: 'counted'; at: string; attempt: number; usage: Usage }
   | ({ kind: 'denied'; at: string; attempt: number } & Denial)
-  | { kind: 'image'; at: string; attempt: number; image?: string; harnessVersion?: string }
+  | { kind: 'image'; at: string; attempt: number; image?: string; harnessVersion?: string; ranIn?: string }
   | { kind: 'gap'; at: string; attempt: number; mono?: Monotonic }
   | { kind: 'process'; at: string; attempt: number; pid?: number }
   | { kind: 'held'; at: string; attempt: number; mono?: Monotonic }
@@ -591,7 +597,10 @@ export type Attempt = {
    * process of it at the limit. Absent where it ran under none, or its runner read nothing. Carried, never read.
    */
   memory?: MemoryUse;
-  /** The tool calls its harness denied, when it denied any and said so. Carried, never read. */
+  /**
+   * The tool calls its harness denied, `[]` for none, when its harness measured them; absent where it could not say. Carried, never
+   * read.
+   */
   denials?: Denial[];
   /** The skills its session loaded, `[]` for none, when its harness said. Carried, never read. */
   skills?: string[];
@@ -602,6 +611,11 @@ export type Attempt = {
    * attempt an older runtime recorded, and from one whose harness cannot say. Carried, never read.
    */
   ranOn?: string;
+  /**
+   * The permission mode or sandbox its session ran in, the latest its sightings said (see `Sighting.ranIn`). Absent where nothing
+   * said one. Carried, never read.
+   */
+  ranIn?: string;
   /**
    * The code its session's process ran on, the latest its sightings said (see `Sighting.image`). Absent from an attempt an older
    * runtime recorded, and from one whose runner cannot say. Carried, never read.
@@ -683,8 +697,9 @@ export type State = {
 };
 
 /**
- * Ends the attempt `a` as the `ended` event `e` says: an empty list of skills or files kept, an empty one of denials not, and an end with
- * no usage keeping what was counted while it ran (`counted`).
+ * Ends the attempt `a` as the `ended` event `e` says: an empty list of skills, files or denials kept — measured, none — though an empty
+ * one of denials never takes away a denial seen while it ran (`denied`), and an end with no usage keeping what was counted while it ran
+ * (`counted`).
  */
 function endAttempt(a: Attempt, e: Extract<Event, { kind: 'ended' }>): void {
   a.ended = e.observed;
@@ -699,10 +714,11 @@ function endAttempt(a: Attempt, e: Extract<Event, { kind: 'ended' }>): void {
   a.exitCode = e.exitCode ?? null;
   if (e.terminationMessage !== undefined) a.terminationMessage = e.terminationMessage;
   if (e.memory !== undefined) a.memory = e.memory;
-  if (e.denials?.length) a.denials = e.denials;
+  if (e.denials) a.denials = e.denials.length ? e.denials : (a.denials ?? []);
   if (e.skills) a.skills = e.skills;
   if (e.files) a.files = e.files;
   if (e.ranOn) a.ranOn = e.ranOn;
+  if (e.ranIn) a.ranIn = e.ranIn;
   if (e.limit) a.limit = e.limit;
   if (e.parked) a.parked = e.parked;
   a.error = e.error ?? a.error;

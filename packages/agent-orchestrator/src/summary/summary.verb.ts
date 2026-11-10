@@ -33,7 +33,7 @@ import {
   type WaitOn,
 } from '../feed/index.ts';
 import type { CheckVerdict } from '../check/check.ts';
-import { filedTimes, type Filings, judgedSteps, stepNames, tryOf, type Unreadable, type Views, workflowsOf } from './reads.verb.ts';
+import { judgedSteps, stepNames, tryOf, type Unreadable, type Views, workflowsOf } from './reads.verb.ts';
 import {
   needsOf,
   type RunHolding,
@@ -68,9 +68,9 @@ export type RunSummary = {
   try: { agent: string } | null;
   createdAt: string;
   /**
-   * When the run started (`runStartedAt`): its first task's filing, off the engine's feed — for a run started `--after` runs, or held for a
-   * run slot, well after `createdAt`. `createdAt` for a run started whose filings the feed does not have; null while nothing of it is
-   * filed.
+   * When the run started (`runStartedAt`): its first task's filing, as the views of its judgement say it (`State.filedAt`) — for a run
+   * started `--after` runs, or held for a run slot, well after `createdAt`. `createdAt` for a run started that is not judged, or none of
+   * whose views says a filing; null while nothing of it is filed.
    */
   startedAt: string | null;
   cancelledAt: string | null;
@@ -400,14 +400,13 @@ export const judgedNow = Effect.fn('judgedNow')(function* (e: Engine, home: stri
 
 /**
  * How the list reads: `home`, the store a person's files are read from; `memo`, the informer it answers from and keeps in (a fresh one
- * for a caller that keeps none, which judges every run); `filings`, the feed's filing times it reads on from; and `verify`, whether each
- * answer from memory is judged afresh too (`WF_VERIFY_REST`); and `selectors`, the runs it lists, those whose whole map one of them
- * takes (`selectedRuns`), every run where none is given.
+ * for a caller that keeps none, which judges every run); `verify`, whether each answer from memory is judged afresh too
+ * (`WF_VERIFY_REST`); and `selectors`, the runs it lists, those whose whole map one of them takes (`selectedRuns`), every run where none
+ * is given.
  */
 export type SummaryHow = {
   home: string;
   memo: InformerMemo;
-  filings: Filings;
   verify: boolean;
   selectors?: Selectors;
 };
@@ -436,22 +435,28 @@ export const storeRunsListed = Effect.fn('storeRunsListed')(function* (e: Engine
 /**
  * Every run's summary, in the store's order, as the board's list answers it: through `e`, each run's judgement read through the informer
  * `how.memo` (`informedJudgements`) — the one the daemon's pass fills and the run's object reads — and summarized off it (`summaryOf`),
- * verified as `how.verify` says. Dies where a verified answer differs from the informer's (`answered`).
+ * verified as `how.verify` says, each run's start off the views of its judgement (`runStartedAt`). Dies where a verified answer differs
+ * from the informer's (`answered`).
  *
  * The store is listed through the informer (`given`): a run whose files stamp as they did is listed as the run it kept, its record not
  * read, so a warm read costs the stamp walk and the records of the runs still moving alone. A verified read is given nothing and reads
  * every record afresh.
  */
-export const runsSummarized = Effect.fn('runsSummarized')(function* (e: Engine, { home, memo, filings, verify, selectors }: SummaryHow) {
+export const runsSummarized = Effect.fn('runsSummarized')(function* (e: Engine, { home, memo, verify, selectors }: SummaryHow) {
   const { git, read, all } = yield* listedThrough(e, memo, verify);
-  const filed = yield* filedTimes(e, filings);
   const runs = selectedRuns(all, selectors);
-  const summaries = summariesOf(runs, yield* informedJudgements(e, home, runs, read, git, () => all), home);
+  const judged = yield* informedJudgements(e, home, runs, read, git, () => all);
+  const summaries = summariesOf(runs, judged, home);
   return runs.flatMap((run): RunSummary[] => {
     const summary = summaries.get(run.id);
-    return summary ? [{ ...summary, startedAt: runStartedAt(run, filed) }] : [];
+    const one = judged.runs.get(run.id);
+    const views = one !== undefined && 'judgement' in one ? one.judgement.views : NO_VIEWS;
+    return summary ? [{ ...summary, startedAt: runStartedAt(run, views) }] : [];
   });
 });
+
+/** The views of a run left unjudged: none, so its start is its `createdAt` once it has started (`runStartedAt`). */
+const NO_VIEWS: Views = new Map();
 
 /**
  * Each run a card was started from (`from.inbox`), with its phase as the list judges it, read through the informer `how.memo` as

@@ -1,6 +1,6 @@
 /**
  * `nemia rm` on the runtime itself, for what only the runtime says: what it removed of a run's tasks — their journals and their lines in
- * the feed, counted, and the feed's filings read after with the lines forgotten counted — and its own words for a task that ran on a
+ * the feed, counted, and the feed read after with the lines forgotten counted — and its own words for a task that ran on a
  * harness the engine does not have, which it refuses by name, the marker kept and each pass on that engine warning of it. Everything
  * else of `nemia rm` and the engine is told on the engine's stand-in in `forget.test.ts`.
  *
@@ -37,7 +37,6 @@ const { runRecord } = await import('../src/record/record.store.ts');
 const { runTasks } = await import('../src/record/record.ts');
 const { filesStore: runStore } = await import('../src/record/files.store.ts');
 const { tickRun } = await import('../src/tick/tick.verb.ts');
-const { filingsRead } = await import('../src/views/views.verb.ts');
 const { main } = await import('../src/cli/main.ts');
 
 /** A repository with one commit, so `nemia start` has a base to record. */
@@ -179,7 +178,7 @@ const typedOn = async (t: TestContext, engine: Engine, ...args: string[]) => {
   }
 };
 
-test("`nemia rm` of a repository run that is over forgets every task of it on the engine, its earlier try and its check among them, says so, and leaves no marker; the feed's filings then read with the lines forgotten counted", async () => {
+test("`nemia rm` of a repository run that is over forgets every task of it on the engine, its earlier try and its check among them, says so, and leaves no marker; the feed then read with the lines forgotten counted, the kept run's filings on it", async () => {
   const { run, tasks } = await finished();
   const kept = await signed(oneStep('harness: codex'), SIGNED);
   const before = forgets.length;
@@ -199,9 +198,13 @@ test("`nemia rm` of a repository run that is over forgets every task of it on th
   assert.ok(left.includes(`${kept.id}-implement`), "another run's task is the engine's still");
   assert.ok(!fs.existsSync(markerOf(run.id)), 'no marker is left');
 
-  const read = await runWith(e, filingsRead(0));
-  assert.ok(read.forgotten > 0, `the lines forgotten are counted (${read.forgotten})`);
-  assert.ok(read.filed.has(`${kept.id}-implement`) && !tasks.some((id) => read.filed.has(id)), "the kept run's filings, and none of its");
+  const read = await Effect.runPromise(e.feed(0));
+  const filed = new Set(read.entries.flatMap(({ taskId, event }) => (event.kind === 'filed' ? [taskId] : [])));
+  assert.ok((read.forgotten ?? 0) > 0, `the lines forgotten are counted (${read.forgotten})`);
+  assert.ok(
+    filed.has(`${kept.id}-implement`) && !tasks.some((id) => filed.has(id)),
+    "the feed keeps the kept run's filings, and none of its",
+  );
 });
 
 test("an engine without the harness a task ran on refuses it by name: `nemia rm` says it refused, in the runtime's words, the marker kept; each pass on that engine warns of it with how a person removes the marker", async (t) => {

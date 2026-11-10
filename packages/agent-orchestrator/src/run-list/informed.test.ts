@@ -101,17 +101,7 @@ const atWork = async () => {
 
 /** The whole RunList through `memo`, verified as `WF_VERIFY_REST` says. */
 const listOf = (memo: InformerMemo, wrap: <A, E, R>(p: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R> = (p) => p) =>
-  runWith(
-    e(),
-    wrap(
-      runList(
-        e(),
-        { home: ROOT, memo, filings: { filed: new Map(), cursor: 0 }, verify: verifiesRest(process.env) },
-        { memo: { filings: { filed: new Map(), cursor: 0 }, said: new Map() } },
-        {},
-      ),
-    ),
-  );
+  runWith(e(), wrap(runList(e(), { home: ROOT, memo, verify: verifiesRest(process.env) }, { memo: { said: new Map() } }, {})));
 
 /** `f` with `WF_VERIFY_REST` off: what the informer alone answers. */
 async function unverified<T>(f: () => Promise<T>): Promise<T> {

@@ -286,7 +286,6 @@ export const decideRun = Effect.fn('decide')(function* (id: string, standing?: S
   const answers = yield* answersOf(e, run, views, yield* (yield* RunDoor).asks.answers(RunId.read(id)));
   const everyTry = yield* everyTryOf(e, run, views);
   const said = saidOf(run, everyTry);
-  const filed = new Map([...everyTry].flatMap(([taskId, v]) => (v.state.filedAt ? [[taskId, v.state.filedAt] as const] : [])));
   const used = consumption(views, run);
   const costs = costsOf(steps, run, used, spendOf);
   const waitingOn = waitingOnOf(id, run, views);
@@ -324,7 +323,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, standing?: S
     waiting: waitsOf(run, parent),
     holding: run.cancelledAt ? [] : holdsOf(run, parent),
     said,
-    timeline: timeline(run, everyTry, filed, steps),
+    timeline: timeline(run, everyTry, steps),
     ...(held ? { held } : {}),
     standings,
     ...(checkout ? { checkout } : {}),

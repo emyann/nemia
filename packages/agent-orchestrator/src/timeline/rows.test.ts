@@ -9,6 +9,7 @@ import type { Workflow } from '../step/step.ts';
 import { timeline, type TaskClock } from './timeline.ts';
 import { gateWaitOf } from './took.ts';
 import { TIMELINE_OF, TIMELINE_PARTS, timelineRows, type TimelineRow } from './rows.ts';
+import { filedViews } from '../../test/filed.ts';
 
 const MIN = 60_000;
 
@@ -100,7 +101,7 @@ const HELD: TaskClock = {
 
 test("`timelineRows`: a run's timeline as rows, each the timeline's own field, sorted into the workflow's order, and a number nobody measured no row", async (t) => {
   await t.test("each row's number is the timeline's own field: a try's, its check's, a step's tries, a round's wall and the run's", () => {
-    const tl = timeline(RUN, VIEWS, FILED, STEPS);
+    const tl = timeline(RUN, filedViews(VIEWS, FILED), STEPS);
     const rows = timelineRows(RUN, tl, STEPS);
     for (const r of rows) {
       assert.ok(TIMELINE_OF.includes(r.of), r.of);
@@ -164,7 +165,7 @@ test("`timelineRows`: a run's timeline as rows, each the timeline's own field, s
     } as unknown as Run;
     const views = new Map(names.flatMap((name) => [name, `${name}-check`]).map((id) => [id, task('10:01', '10:02')]));
     const filed = new Map([...views.keys()].map((id) => [id, at('10:00')]));
-    const rows = timelineRows(run, timeline(run, views, filed, steps), steps).filter((r) => r.of !== 'run');
+    const rows = timelineRows(run, timeline(run, filedViews(views, filed), steps), steps).filter((r) => r.of !== 'run');
     const sorted = [...new Set(rows.map((r) => r.row))].sort();
     assert.deepEqual(
       sorted,
@@ -177,7 +178,7 @@ test("`timelineRows`: a run's timeline as rows, each the timeline's own field, s
     'REFUSED: a session still running gives no ran row and no 0, and a run whose wall is not known gives no run row at all',
     () => {
       const views = new Map([...VIEWS, ['review-2', task('11:31', null)]]);
-      const tl = timeline(RUN, views, FILED, STEPS);
+      const tl = timeline(RUN, filedViews(views, FILED), STEPS);
       assert.equal(tl.steps.review[1].session!.ranMs, null);
       assert.equal(tl.run.wallMs, null);
       const rows = timelineRows(RUN, tl, STEPS);
@@ -200,7 +201,7 @@ test("`timelineRows`: a run's timeline as rows, each the timeline's own field, s
   );
   await t.test('a run that never left its first step has rows for that step alone, and none for a step not filed', () => {
     const run = { ...RUN, steps: { plan: { taskId: 'plan' } }, approvals: [] } as unknown as Run;
-    const rows = timelineRows(run, timeline(run, VIEWS, FILED, STEPS), STEPS);
+    const rows = timelineRows(run, timeline(run, filedViews(VIEWS, FILED), STEPS), STEPS);
     assert.deepEqual([...new Set(rows.map((r) => r.row))], ['01 plan', 'run']);
     assert.equal(valueOf(rows, 'run', 'gate'), 0, 'no approval, no time at a gate');
     assert.equal(valueOf(rows, 'run', 'check'), 0, 'no check, no time in one');
@@ -209,7 +210,7 @@ test("`timelineRows`: a run's timeline as rows, each the timeline's own field, s
   await t.test(
     "a run answered then approved: its wait on the answer and its wait at the gate are two parts, and its session's rows are one",
     () => {
-      const tl = timeline(ANSWERED, new Map([['ask', HELD]]), new Map([['ask', at('10:00')]]), [ASK]);
+      const tl = timeline(ANSWERED, filedViews(new Map([['ask', HELD]]), new Map([['ask', at('10:00')]])), [ASK]);
       const rows = timelineRows(ANSWERED, tl, [ASK]);
       assert.deepEqual(
         rows.map((r) => [r.of, r.try, r.part, r.value]),
@@ -232,9 +233,11 @@ test("`timelineRows`: a run's timeline as rows, each the timeline's own field, s
         'what ran, queued and waited is the wall',
       );
       const signedDone: TaskClock = { ...HELD, state: { ...HELD.state, attempts: [turn(0, '10:01', '10:05'), turn(1, '10:11', '10:20')] } };
-      const back = timelineRows(ANSWERED, timeline(ANSWERED, new Map([['ask', signedDone]]), new Map([['ask', at('10:00')]]), [ASK]), [
-        ASK,
-      ]);
+      const back = timelineRows(
+        ANSWERED,
+        timeline(ANSWERED, filedViews(new Map([['ask', signedDone]]), new Map([['ask', at('10:00')]])), [ASK]),
+        [ASK],
+      );
       assert.equal(valueOf(back, 'run', 'answer'), 0, 'REFUSED: the same record after a done sign-off is work sent back from its gate');
       assert.equal(valueOf(back, 'run', 'gate'), 9 * MIN);
     },

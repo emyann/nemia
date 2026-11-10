@@ -503,6 +503,11 @@ test(
       );
     });
 
+    await s.test('its sighting says the mode its init line said it ran in, read off its capture as a job’s stream is', () => {
+      const [argv] = lines(dir, 'argv.jsonl') as string[][];
+      assert.equal(seen?.ranIn, sdkArgValue(argv, '--permission-mode'));
+    });
+
     await s.test("resuming another, it reports its own cost, its parent's left out", () => {
       assert.ok(Math.abs((seen?.usage?.costUsd ?? 0) - 0.15) < 1e-9, `its own cost, not ${seen?.usage?.costUsd}`);
     });

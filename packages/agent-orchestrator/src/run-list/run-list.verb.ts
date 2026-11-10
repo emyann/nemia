@@ -30,7 +30,7 @@ export { runNamespace };
 import { diskPartsOf, type RunObjectAnswer, runObjectCore, type RunReads, withDiskParts } from '../object/run.verb.ts';
 import { readFailed, runReadingOf, stepsReadingOf } from '../object/read.verb.ts';
 import { informedJudgements, keepObject, keptObject } from '../rest/informer.verb.ts';
-import { filedTimes, folderReader } from '../summary/reads.verb.ts';
+import { folderReader } from '../summary/reads.verb.ts';
 import type { Judgement, Judgements, JudgedOrWhy } from '../summary/judgement.verb.ts';
 
 /**
@@ -109,7 +109,7 @@ export const runListOf = Effect.fn('runListOf')(function* <R extends Listed, E, 
 
 /**
  * A page of the store's runs (`runListOf`), listed once through the informer `how.memo` (`storeRunsListed`), the page judged through that
- * one read in one batch (`informedJudgements`) and the feed's filing times read once, then each run of the page answered as a list says
+ * one read in one batch (`informedJudgements`), then each run of the page answered as a list says
  * it (`listed`: no harness asked, no drift read). A run's object built on the judgement the informer holds is kept beside it
  * (`keepObject`) and served while that judgement is (`keptObject`), its disk parts read now (`diskPartsOf`), each workflow folder loaded
  * once a request (`folderReader`). An object built on a read that failed (`readFailed`) is not kept. Under `how.verify`, an object
@@ -123,15 +123,14 @@ export const runList = Effect.fn('runList')(function* (e: Engine, how: SummaryHo
   const judging = (some: readonly Run[]) => informedJudgements(e, home, some, read, git, () => all);
   const { home } = how;
   const objectOf = objectsOf(e, how, reads, read.verify);
-  if (field !== undefined) return yield* byState(all, query, field, { home, judging, filed: filedTimes(e, reads.memo.filings), objectOf });
+  if (field !== undefined) return yield* byState(all, query, field, { home, judging, objectOf });
   return yield* runListOf(all, query, (page) =>
     Effect.gen(function* () {
       const judged = yield* judging(page);
-      const filed = yield* filedTimes(e, reads.memo.filings);
       return yield* Effect.forEach(page, (run) =>
         Effect.gen(function* () {
           const one = judged.runs.get(run.id) ?? (yield* notJudged(run));
-          return 'unjudged' in one ? one : yield* objectOf(run, one.judgement, filed);
+          return 'unjudged' in one ? one : yield* objectOf(run, one.judgement);
         }),
       );
     }),
@@ -142,28 +141,28 @@ export const runList = Effect.fn('runList')(function* (e: Engine, how: SummaryHo
 const notJudged = (run: Pick<Run, 'id'>) => Effect.die(new Error(`Run ${run.id} was handed to its judgement and not judged.`));
 
 /**
- * How a run's listed object is answered (`listed`: no harness asked, no drift read) off its `judgement` and the feed's filing times: the
+ * How a run's listed object is answered (`listed`: no harness asked, no drift read) off its `judgement`: the
  * object kept beside that judgement (`keptObject`), before its disk parts (`runObjectCore`), with them read now and laid over
  * (`withDiskParts`), or one built and its core kept (`keepObject`) where none is and its read did not fail (`readFailed`). Under `verify`,
  * one served from memory is built afresh too, and one that differs dies. Each workflow folder is loaded once a request (`folderReader`).
  */
 const objectsOf = (e: Engine, { home, memo }: SummaryHow, reads: RunReads, verify: boolean) => {
   const folders = folderReader(home);
-  const built = (run: Run, one: JudgedOrWhy, filed: ReadonlyMap<string, string>) =>
+  const built = (run: Run, one: JudgedOrWhy) =>
     Effect.gen(function* () {
       const steps = yield* stepsReadingOf(e, home, run, one, folders(run));
       if ('unjudged' in steps) return { core: undefined, answer: steps, failed: false };
-      const core = yield* runObjectCore(run, runReadingOf(steps, filed), { said: reads.memo.said, listed: true });
+      const core = yield* runObjectCore(run, runReadingOf(steps), { said: reads.memo.said, listed: true });
       return { core, answer: withDiskParts(core, diskPartsOf(run, home, folders(run))), failed: readFailed(steps) };
     });
-  return (run: Run, judgement: Judgement, filed: ReadonlyMap<string, string>) =>
+  return (run: Run, judgement: Judgement) =>
     Effect.gen(function* () {
       const kept = keptObject(memo, run.id, judgement);
       if (kept !== undefined) {
         memo.objectHits++;
         const parts = diskPartsOf(run, home, folders(run));
         if (verify) {
-          const fresh = yield* built(run, { judgement }, filed);
+          const fresh = yield* built(run, { judgement });
           if (!isDeepStrictEqual(withDiskParts(kept, parts), fresh.answer))
             return yield* Effect.die(
               new Error(
@@ -173,18 +172,17 @@ const objectsOf = (e: Engine, { home, memo }: SummaryHow, reads: RunReads, verif
         }
         return withDiskParts(kept, parts);
       }
-      const { core, answer, failed } = yield* built(run, { judgement }, filed);
+      const { core, answer, failed } = yield* built(run, { judgement });
       if (!failed && run.workflow !== undefined && core !== undefined) keepObject(memo, run.id, judgement, core);
       return answer;
     });
 };
 
-/** What a list asked by state reads through: the store's root, its judgement of many runs at once, the feed's filing times, the objects. */
+/** What a list asked by state reads through: the store's root, its judgement of many runs at once, the objects. */
 type ByStateReads<E, R, O = R> = {
   readonly home: string;
   readonly judging: (some: readonly Run[]) => Effect.Effect<Judgements, E, R>;
-  readonly filed: Effect.Effect<ReadonlyMap<string, string>, E, R>;
-  readonly objectOf: (run: Run, judgement: Judgement, filed: ReadonlyMap<string, string>) => Effect.Effect<RunObjectAnswer, E, O>;
+  readonly objectOf: (run: Run, judgement: Judgement) => Effect.Effect<RunObjectAnswer, E, O>;
 };
 
 /** A run a list asked by state keeps: its record, its judgement or why it has none, its state, and when it finished for a finished one. */
@@ -246,7 +244,6 @@ const byState = Effect.fnUntraced(function* <E, R, O>(
   const kept = keptOf(all, query);
   if (kept instanceof Invalid) return yield* Effect.fail(kept);
   const judged = yield* reads.judging(kept);
-  const filed = yield* reads.filed;
   const now = Date.now();
   const stated: Stated[] = [];
   for (const run of kept) stated.push(statedOf(run, judged.runs.get(run.id) ?? (yield* notJudged(run)), reads.home));
@@ -259,9 +256,9 @@ const byState = Effect.fnUntraced(function* <E, R, O>(
   const items: RunObject[] = [];
   const unjudged: RunUnjudged[] = [];
   for (const one of page.items) {
-    const answer = 'judgement' in one.one ? yield* reads.objectOf(one.run, one.one.judgement, filed) : one.one;
+    const answer = 'judgement' in one.one ? yield* reads.objectOf(one.run, one.one.judgement) : one.one;
     if ('unjudged' in answer || one.summary === undefined || !('judgement' in one.one)) unjudged.push(unjudgedOf(one, answer));
-    else items.push(framed(answer, framePartsOf(one.summary, one.one.judgement, filed, now)));
+    else items.push(framed(answer, framePartsOf(one.summary, one.one.judgement, now)));
   }
   return framedList(page, items, unjudged, { counts, asOf: new Date(now).toISOString() });
 });

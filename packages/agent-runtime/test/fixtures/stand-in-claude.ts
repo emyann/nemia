@@ -90,6 +90,9 @@ const plan = JSON.parse(process.env.STANDIN_PLAN ?? '{}') as Plan;
 const argv = process.argv.slice(2);
 const resumed = argv.find((a) => a.startsWith('--resume='))?.slice('--resume='.length);
 const sessionId = resumed ?? plan.id ?? 'stand-in-session';
+/** The mode its argv asked for, which its `init` line names as Claude Code's does (`permissionMode`): absent when none was asked. */
+const mode = argv.find((a) => a.startsWith('--permission-mode='))?.slice('--permission-mode='.length) ??
+  (argv.includes('--permission-mode') ? argv[argv.indexOf('--permission-mode') + 1] : undefined);
 const note = (file: string, value: unknown) => fs.appendFileSync(path.join(dir, file), `${JSON.stringify(value)}\n`);
 note('argv.jsonl', argv);
 fs.writeFileSync(path.join(dir, 'pid'), String(process.pid));
@@ -206,7 +209,7 @@ let mine: string[] = [];
  * subtype is not `success`, and throws as it reads the stream without them.
  */
 const work = async () => {
-  print({ type: 'system', subtype: 'init', session_id: sessionId, cwd: process.cwd(), tools: [], model: 'stand-in' });
+  print({ type: 'system', subtype: 'init', session_id: sessionId, cwd: process.cwd(), tools: [], model: 'stand-in', ...(mode ? { permissionMode: mode } : {}) });
   spent += plan.cost ?? 0.01;
   if (plan.deny) print({ type: 'system', subtype: 'permission_denied', tool_name: plan.deny, tool_use_id: 'denied-1', session_id: sessionId });
   if (plan.ask) {

@@ -316,7 +316,7 @@ const answeredLate = (run: Pick<Run, 'runTimed'>, t: TimelineTry): boolean => Bo
 export function gateWaits(run: Run, steps: readonly Workflow[], views: ReadonlyMap<string, TaskClock>): WaitFact[] {
   const timed = run.gatesTimed;
   if (!timed || !run.approvals?.length) return [];
-  const tl = timeline(run, views, new Map(), steps);
+  const tl = timeline(run, views, steps);
   return run.approvals.flatMap((a): WaitFact[] => {
     const step = steps.find((s) => s.name === a.step);
     if (!step || !hasGate(step, run) || timed.some((g) => g.step === a.step && g.try === a.try)) return [];
@@ -442,8 +442,7 @@ export function timelineFacts(
   views: ReadonlyMap<string, FactView>,
   outcome: string,
 ): TimelineFact[] | null {
-  const filed = new Map([...views].flatMap(([taskId, v]) => (v.state.filedAt ? [[taskId, v.state.filedAt] as const] : [])));
-  const tl = timeline(run, views, filed, steps);
+  const tl = timeline(run, views, steps);
   if (tl.run.inFlight > 0) return null;
   return timelineRows(run, tl, steps).map((r): TimelineFact => {
     const step = steps.find((s) => s.name === r.step);

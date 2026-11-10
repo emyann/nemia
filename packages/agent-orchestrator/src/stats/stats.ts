@@ -23,8 +23,6 @@ import { healthOf, type Health } from '../series/series.ts';
 import { marksOf, type Mark, type RunFrozen } from './marks.ts';
 import type { Selectors } from '../watch/selector.ts';
 import {
-  deniesRecorded,
-  ranAsJob,
   ruleRowsOf,
   rulesOfTry,
   skillRowsOf,
@@ -62,16 +60,16 @@ export type RunKeys = { run: string; factory: string; workflow: string; repo: st
  * what its session cost, `check` its check's verdict, null with no check, and `gateWaitMs` the wait for a person's approval of this try:
  * each null where not measured. A try that answered an earlier try's session is a fact of its own, ended when its turn did, with no run
  * time and no cost of its own, as a recheck's try has none: the session's are on the try that filed it.
- * `denied` names each call its session was refused, one per call; null for a try that ran no session of its own (a recheck's), on a step
- * whose harness records no denial (`deniesRecorded`), and for a session filed before steps ran as jobs (`ranAsJob`). `skills` names each
- * skill its session loaded, one per load, `[]` for none; null for a try with no session of its own, and for a session an end of which does
- * not say what it loaded (`skillsLoadedOf`). `due` holds each of the step's frozen skills that declares paths (`applies:`), and whether
- * a file the session read or wrote is one of them (`skillsDueOf`); null for a try with no session of its own, and where an end of it does
- * not say its files. `rules` holds each rule the step's frozen skills declare, kept or broken by `denied`
- * (`rulesOfTry`), `[]` with none declared; null where `denied` is. `tallies` holds each count the frozen step declares (`tally:`), valued
- * off its session's own closeout (`tallyIn`): `[]` with none declared, and each value null for a try with no session of its own or whose
- * closeout does not hold it. `landingDeadlineMs` is the deadline its check's task was filed with, where that check lands the run
- * (`landsOnCheck`); null for any other check, a try with none, and a task filed with no deadline.
+ * `denied` names each call its session was refused, one per call; null for a try that ran no session of its own (a recheck's), and for a
+ * session an end of which does not say its denials (`deniedCallsOf`: a harness that cannot say, an older journal). `skills` names
+ * each skill its session loaded, one per load, `[]` for none; null for a try with no session of its own, and for a session an end of which
+ * does not say what it loaded (`skillsLoadedOf`). `due` holds each of the step's frozen skills that declares paths (`applies:`), and
+ * whether a file the session read or wrote is one of them (`skillsDueOf`); null for a try with no session of its own, and where an end of
+ * it does not say its files. `rules` holds each rule the step's frozen skills declare, kept or broken by `denied` (`rulesOfTry`), `[]` with
+ * none declared; null where `denied` is. `tallies` holds each count the frozen step declares (`tally:`), valued off its session's own
+ * closeout (`tallyIn`): `[]` with none declared, and each value null for a try with no session of its own or whose closeout does not hold
+ * it. `landingDeadlineMs` is the deadline its check's task was filed with, where that check lands the run (`landsOnCheck`); null for any
+ * other check, a try with none, and a task filed with no deadline.
  */
 export type TryFact = RunKeys & {
   day: string;
@@ -127,7 +125,7 @@ export type RunRead = {
   succeeded: (taskId: string) => boolean;
   verdictOf: (checkTaskId: string) => CheckVerdict | null;
   closeoutOf: (step: string) => Closeout | undefined;
-  deniedOf: (taskId: string) => string[];
+  deniedOf: (taskId: string) => string[] | null;
   skillsOf: (taskId: string, given: readonly string[]) => string[] | null;
   filesOf: (taskId: string) => string[] | null;
   rulesOf: (step: Workflow) => ReadonlyMap<string, readonly SkillRule[]>;
@@ -167,7 +165,7 @@ function tryFactsOf(r: RunRead): TryFact[] {
     (r.timeline.steps[step.name] ?? []).flatMap((t): TryFact[] => {
       const end = tryEndOf(t);
       if (!end) return [];
-      const denied = t.session && deniesRecorded(step) && ranAsJob(t.session) ? r.deniedOf(t.session.taskId) : null;
+      const denied = t.session ? r.deniedOf(t.session.taskId) : null;
       return [
         {
           ...keys,

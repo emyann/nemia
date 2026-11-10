@@ -742,7 +742,7 @@
     {
       "files": ["packages/agent-orchestrator/src/timeline/timeline.ts"],
       "rules": {
-        "complexity": ["error", { "max": 30 }],
+        "complexity": ["error", { "max": 28 }],
         "sonarjs/cognitive-complexity": ["error", 46]
       }
     },

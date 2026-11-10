@@ -877,7 +877,7 @@ test("runClock and clockCounts: a card's and a row's clock, and what its hover s
       assert.deepEqual(
         [atOnce.words, atOnce.title],
         ['6h 14m since it started', `Started ${instantWhole(new Date(createdAt))}.`],
-        'started at once, or with its filings off the feed where the api gives createdAt: no wait to speak of',
+        'started at once, or with no filing on its views where the api gives createdAt: no wait to speak of',
       );
     },
   );

@@ -180,19 +180,27 @@ test('a capture that changes while compact reads it is left whole, and named', (
 });
 
 /** An `init` line as the SDK prints one each turn: every tool and command listed beside what a reader reads. */
-const initOf = (version: string) =>
+const initOf = (version: string, permissionMode = 'default') =>
   JSON.stringify({
     ...JSON.parse(stream.init),
     cwd: '/w',
     claude_code_version: version,
+    permissionMode,
     tools: Array.from({ length: 40 }, (_, i) => `Tool${i}`),
     slash_commands: Array.from({ length: 60 }, (_, i) => `command-${i}`),
     mcp_servers: [{ name: 'a', status: 'connected' }],
   });
 
 /** What a kept `init` line says: the fields a reader reads, and no other. */
-const keptInit = (version: string) =>
-  JSON.stringify({ type: 'system', subtype: 'init', cwd: '/w', model: JSON.parse(stream.init).model, claude_code_version: version });
+const keptInit = (version: string, permissionMode = 'default') =>
+  JSON.stringify({
+    type: 'system',
+    subtype: 'init',
+    cwd: '/w',
+    model: JSON.parse(stream.init).model,
+    claude_code_version: version,
+    permissionMode,
+  });
 
 test('claudeStreamKept keeps no line twice, and each line it keeps as its reader reads it', async (t) => {
   const turns = (n: number, version: string) =>
@@ -214,6 +222,15 @@ test('claudeStreamKept keeps no line twice, and each line it keeps as its reader
         assert.deepEqual(
           kept.split('\n').filter((l) => l.includes('"init"')),
           [keptInit('2.1.315'), keptInit('2.1.316')],
+        ),
+    ],
+    [
+      'a later init naming another mode is kept, and one naming it again is not: a model that drops `auto` runs a turn in another',
+      [initOf('2.1.316', 'auto'), initOf('2.1.316', 'default'), initOf('2.1.316', 'default')].join('\n'),
+      (kept) =>
+        assert.deepEqual(
+          kept.split('\n').filter((l) => l.includes('"init"')),
+          [keptInit('2.1.316', 'auto'), keptInit('2.1.316', 'default')],
         ),
     ],
     [

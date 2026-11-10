@@ -105,9 +105,9 @@ export const FAKE = {
   /** One per `after` between its steps: implement → review, review → respond, implement → respond, tokens → theme. */
   edges: 4,
   /**
-   * Where its time went, off the engine's attempts and the filings on its feed (`seedFeed`): each step that signed off was spawned a minute
-   * after it was filed — `[queued, ran]` — and theme's check at once. review's task has no journal, so the run's totals leave it out and
-   * say so.
+   * Where its time went, off the engine's attempts and the filing each task's journal opens with (`State.filedAt`): each step that signed
+   * off was spawned a minute after it was filed — `[queued, ran]` — and theme's check at once. review's task has no journal, so the run's
+   * totals leave it out and say so.
    */
   timeline: {
     sessions: { implement: ['1m00s', '29m00s'], tokens: ['1m00s', '9m00s'], theme: ['1m00s', '19m00s'] },
@@ -591,6 +591,11 @@ export const DIAMOND = {
    * version.
    */
   ranOn: { tag: 'v1.2.0', harnessVersion: '2.1.316' },
+  /**
+   * The mode `running`'s session was filed with, and the one its harness says it runs in: another, as Claude Code drops `auto` on a
+   * model that has none. The board marks it `by harness`.
+   */
+  ranIn: { filed: 'auto', measured: 'default' },
   /**
    * What `landed`'s implement session recorded of its memory as it ended: the kernel killed one process at its 4Gi limit. Its step
    * names no `memory:`, so its note names `WF_MEMORY_LIMIT`.
@@ -1108,7 +1113,7 @@ export function seedDiamond(repo: string, root: string, now = Date.now()): void 
   write(
     path.join(root, 'engine', 'tasks', `${task(running)}.jsonl`),
     lines([
-      filed(running, 1.2),
+      { ...filed(running, 1.2), permissionMode: DIAMOND.ranIn.filed },
       { kind: 'starting', at: ago(1.1), attempt: 1 },
       { kind: 'spawned', at: ago(1.1), attempt: 1 },
       {
@@ -1117,6 +1122,7 @@ export function seedDiamond(repo: string, root: string, now = Date.now()): void 
         attempt: 1,
         image: path.join(root, 'releases', DIAMOND.ranOn.tag, 'packages', 'agent-runtime'),
         harnessVersion: DIAMOND.ranOn.harnessVersion,
+        ranIn: DIAMOND.ranIn.measured,
       },
     ]),
   );
@@ -2139,8 +2145,9 @@ export const lines = (events: object[]): string => events.map((event) => `${JSON
 
 /**
  * The engine's feed, as its journal keeps one beside the tasks: every event of every task's journal in the store, in the order they
- * happened, sorted stably so a journal's events that share an instant keep their order. The seed writes each journal by hand, and the api
- * reads when a task was filed off the feed alone (`readFilings`), so this is written last, over them all.
+ * happened, sorted stably so a journal's events that share an instant keep their order. The seed writes each journal by hand, its `filed`
+ * entry at the time the pages read as the task's filing (each view's `State.filedAt`), and the feed is written last, over them all, so
+ * what follows it (the events' stream, a page's watch) reads the same events.
  */
 export function seedFeed(root: string): void {
   const tasks = path.join(root, 'engine', 'tasks');
@@ -2343,6 +2350,7 @@ export function seed(root: string, now = Date.now()): void {
     usage?: object,
     denials?: readonly object[],
     skills?: readonly string[],
+    ranIn?: string,
   ): void =>
     write(
       path.join(root, 'engine', 'tasks', `${task}.jsonl`),
@@ -2362,12 +2370,26 @@ export function seed(root: string, now = Date.now()): void {
           ...(usage ? { usage } : {}),
           ...(denials ? { denials } : {}),
           ...(skills ? { skills } : {}),
+          ...(ranIn ? { ranIn } : {}),
         },
         { kind: 'settled', at: ago(ended), outcome: 'succeeded' },
       ]),
     );
 
-  signedOff(`${id}-implement`, 'claude', workspace, SESSION.prompt, 42, 12, SESSION.closeout, SESSION.sessionId);
+  signedOff(
+    `${id}-implement`,
+    'claude',
+    workspace,
+    SESSION.prompt,
+    42,
+    12,
+    SESSION.closeout,
+    SESSION.sessionId,
+    undefined,
+    undefined,
+    undefined,
+    'auto',
+  );
   write(path.join(root, 'claude', 'projects', '-code-hkb-v2', `${SESSION.sessionId}.jsonl`), lines(conversation(SESSION, ago)));
   const files = path.join(root, 'runs', id, 'artifacts', FAKE.unverified);
   write(path.join(files, FAKE.artifacts.image), palette());
@@ -2385,12 +2407,20 @@ export function seed(root: string, now = Date.now()): void {
       FAKE.envelope.value,
     ],
   };
-  signedOff(`${id}-tokens`, 'codex', lane, 'Pick the colour tokens.', 40, 30, tokensCloseout, undefined, {
-    responses: 14,
-    toolCalls: 31,
-    inputTokens: 112_000,
-    outputTokens: 6_350,
-  });
+  signedOff(
+    `${id}-tokens`,
+    'codex',
+    lane,
+    'Pick the colour tokens.',
+    40,
+    30,
+    tokensCloseout,
+    undefined,
+    { responses: 14, toolCalls: 31, inputTokens: 112_000, outputTokens: 6_350 },
+    undefined,
+    undefined,
+    'workspace-write',
+  );
   signedOff(
     `${id}-theme`,
     'claude',

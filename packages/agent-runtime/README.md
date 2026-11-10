@@ -748,6 +748,9 @@ was denied and the session carried on. Each denial is a `permission_denied` line
 and `decide` never reads them. A job's denials are journalled while its attempt runs: each a `denied` entry, written once
 off the sighting of the working job, before its end (M14, 2.1.289: the line reached the capture about 4 s in, the result about
 50 s in); `ae feed` prints it and `ae show` names a running attempt's denials so far. The end's list stands in their place.
+`denials: []` says the harness measured and denied nothing — a Claude Code stream with its `init` line or its result — and no
+`denials` says it could not; an end an older runtime wrote with `skills` and no `denials` is read as `[]`, since the stream that
+says skills is the one denials are read from (`upgrade`).
 Codex and a remote agent report none while they work, so their attempts learn them at the
 end or never. `auto` on haiku ran as `default` — its `init` line said so — while sonnet kept `auto`. The attempt also carries `skills`: each skill its session loaded,
 one per call — a subagent's included — by its name without its plugin's (`write-a-spec`, not `nemia-seldon:write-a-spec`), a
@@ -764,7 +767,10 @@ Both are journalled while the attempt runs, an `image` entry written off its sig
 (`imageFacts`), so a long-lived session a new holder takes up on other code is recorded again, and a job first seen already over still
 is, before its end. A spawn writes its `image` on the job's run file, and each holder on the session's as it writes itself its owner.
 Carried, never judged: which release that code is, is the layer above's to say. Absent from an attempt an older runtime recorded,
-and `harnessVersion` from a harness that says none (Codex).
+and `harnessVersion` from a harness that says none (Codex). It carries `ranIn` too, the permission mode or sandbox the session ran
+in: Claude Code's last `init` line's `permissionMode`, which can change from one turn to the next, or the sandbox Codex's spawn gave
+it (`-s`, its `command`'s `ranIn`, written on the run file), since Codex's output says none. Written in flight on the same `image`
+entry and on the end, beside `ranOn`; absent where nothing said one, and never read by `decide`.
 
 The lists are exported, from `agent-runtime` and from the pure door `agent-runtime/vocabulary` (no Effect, no I/O):
 `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS` and `CLAUDE_CONTEXT_TOKENS`, `CODEX_SANDBOXES` and `CODEX_EFFORTS`, with
@@ -2133,7 +2139,7 @@ of pure code sits beside it.
 | `src/harness/detached/spawn-files.ts` | the files a spawn clears and writes beside a run before the worker is launched, and what they say to the harness (`spawnFiles`, `HarnessIO`): the closeout's schema, the MCP config, what the spec prepares, and the spawn request a spec that reads one is given (`needsRequest`); and the stdin the worker writes (`spawnInput`) |
 | `src/harness/detached/run-file.ts` | a detached run's file as the worker and the spawn write it: its schema (`RunFileSchema`), its read (`runFileIn`), the first one a spawn writes, and its state as a sighting says it, its heartbeat's lease (`STALE_MS`) included |
 | `src/harness/detached/said.ts` | what was read of a finished run's output, kept beside its log keyed by the log's size and mtime and the readers' version — or a former one they only added fields to (`SAID_EXTENDED`) — so each process reads a log once per change of it; and an ended run's capture rewritten there to what its spec keeps (`keepOutput`, `keepCapture`), only when it reads the same |
-| `src/harness/detached/sighted.ts` | the facts a detached sighting takes from what its output said — a limit, denials, skills, files, the model and the harness version — each only when said (`sightedOf`) |
+| `src/harness/detached/sighted.ts` | the facts a detached sighting takes from what its output said — a limit, denials, skills, files, the model, the mode and the harness version — each only when said, an empty list kept (`sightedOf`) |
 | `src/harness/detached/compact.ts` | the captures already on disk rewritten once to what their readers read (`compactRuns`), a detached runner's `compact`: a run whose worker ended, one capture at a time, each left whole and named where it is at work, has no run file, or does not read the same |
 | `src/harness/declaration.ts` | what a harness declares it can do (`Capability`, `HarnessDeclaration`, `HARNESS_DECLARATIONS`, `DEFAULT_HARNESS`), and the checks that read it: `misplacedOf`, `takersOf`, `verbHarnessOf` (laws in `contracts/capability.contract.ts`), `ownArgsOf` |
 | `src/harness/command/vocabulary.ts` | the command harness's declaration, `COMMAND_DECLARATION`, pure |

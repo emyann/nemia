@@ -10,11 +10,10 @@ import type { Served } from '../../layer.ts';
 import { defaultRepo, factoryNamed, queryOf } from './parts.ts';
 import { answered } from '../../objects/refused.ts';
 
-/** How a read of the volumes judges a run that mounts one: off the app's informer and its feed's filing times. */
+/** How a read of the volumes judges a run that mounts one: off the app's informer. */
 const howOf = (s: Served): SummaryHow => ({
   home: s.home,
   memo: s.informer ?? informerMemo(),
-  filings: s.memo.filings,
   verify: verifiesRest(s.env),
 });
 

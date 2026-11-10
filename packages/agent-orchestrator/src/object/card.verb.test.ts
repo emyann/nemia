@@ -6,7 +6,8 @@
  */
 import type { StoreRoot } from '../config/root.store.ts';
 import type { StoreConfig } from '../config/config.store.ts';
-import { configGiven, rootNow } from '../../test/config-given.ts';
+import { configGiven } from '../../test/config-given.ts';
+import { STORE } from '../../test/ambient.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Exit } from 'effect';
@@ -45,7 +46,7 @@ const over = <A, E>(cards: Readonly<Record<string, string>>, program: Effect.Eff
       Effect.provide(cardDoorMemory()),
       Effect.provide(factoryDoorMemory()),
       Effect.provide(stand().layer),
-      Effect.provide(configGiven(rootNow())),
+      Effect.provide(configGiven(STORE)),
     ),
   );
 
@@ -182,7 +183,7 @@ test('a label selector keeps the cards it takes, over their labels, workflow and
 
 test("cardList and cardObject read the inbox as nemia inbox reads it now, through the engine's informer", () => {
   const e = engineOf(engine().layer);
-  const how = Effect.runSync(howOf().pipe(Effect.provide(configGiven(rootNow()))));
+  const how = Effect.runSync(howOf().pipe(Effect.provide(configGiven(STORE))));
   const page = valueOf(over(five, cardList(e, how, { namespace: 'default', limit: 2 })));
   assert.deepEqual(
     page.items.map((c) => [c.metadata.name, c.status.state]),
@@ -198,7 +199,7 @@ test("cardList and cardObject read the inbox as nemia inbox reads it now, throug
 
 test("cardTable says the repository a card naming no factory was tried on only where the store's StoreConfig lets it start", () => {
   const e = engineOf(engine().layer);
-  const how = Effect.runSync(howOf().pipe(Effect.provide(configGiven(rootNow()))));
+  const how = Effect.runSync(howOf().pipe(Effect.provide(configGiven(STORE))));
   const text = aCard('Echo', { workflow: 'build', queued: '2026-11-01T00:00:00.000Z' });
   const tried = (env: Readonly<Record<string, string>>) =>
     valueOf(
@@ -213,7 +214,7 @@ test("cardTable says the repository a card naming no factory was tried on only w
             why: 'refused',
             refused: true,
           });
-          return yield* cardTable(e, how, {}).pipe(Effect.provide(configGiven(rootNow(), env)));
+          return yield* cardTable(e, how, {}).pipe(Effect.provide(configGiven(STORE, env)));
         }),
       ),
     ).rows.map((row) => String(row.cells[7]));

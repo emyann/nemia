@@ -257,8 +257,6 @@ export { acceptFile, approvalFile, artifactsDir, askFile, inputsDir, roundAskFil
 export { stepsOf } from './steps/steps.verb.ts';
 export { inboxDir, keptRuns } from './record/files.store.ts';
 export { runsAtOnce } from './runs/runs.store.ts';
-/** The entry's former name of the Run door's synchronous face, kept for the e2e's world (apps/web) until it reads `runsAtOnce`. */
-export { runsAtOnce as runStore } from './runs/runs.store.ts';
 export { type RunStore, lackedOf } from './record/record.ts';
 export { alive } from './process/alive.store.ts';
 export {

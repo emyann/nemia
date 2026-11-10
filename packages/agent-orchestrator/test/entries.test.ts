@@ -430,7 +430,6 @@ const PINNED: Record<string, string[]> = {
     'listedStanding',
     'runSlots',
     'runsForgetting',
-    'runStore',
     'runsAtOnce',
     'runStartedAt',
     'runTokens',

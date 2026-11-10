@@ -2,7 +2,8 @@
  * The queue's tick ignores what it cannot tidy, and says so: a stale try that cannot be removed is left for a later pass, and the
  * failure is logged at the unhandled level before it is ignored (`dropStaleTries`, `startQueued`).
  */
-import { configGiven, rootNow } from '../../test/config-given.ts';
+import { configGiven } from '../../test/config-given.ts';
+import { STORE } from '../../test/ambient.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Cause, Effect, Layer, Logger } from 'effect';
@@ -47,9 +48,7 @@ test('a stale try that cannot be removed is ignored, and logged first', async ()
   const keeper = Logger.make(({ logLevel, message, cause }) => void logged.push({ level: logLevel, message, cause: Cause.pretty(cause) }));
   const started = await Effect.runPromise(
     startQueued('/repo').pipe(
-      Effect.provide(
-        Layer.mergeAll(stand().layer, stuckTries(), runDoorMemory(), Logger.layer([keeper]), configGiven(rootNow(), process.env)),
-      ),
+      Effect.provide(Layer.mergeAll(stand().layer, stuckTries(), runDoorMemory(), Logger.layer([keeper]), configGiven(STORE, process.env))),
     ),
   );
   assert.equal(started, undefined, 'no card queued, so none is started, and the failure stops nothing');

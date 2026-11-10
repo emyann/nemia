@@ -55,7 +55,8 @@ const stage = staged({ runWith: runEngine, main, engineOf, env: ENV });
 const files = filesStoreAt(ROOT);
 
 /** `nemia decide`'s screen over this file's store, `ENV` (`decideScreen`). */
-const screenOn = (...[t, e, argv, as, place]: Parameters<typeof decideScreen>): Promise<string[]> => decideScreen(t, e, argv, as, place, ENV);
+const screenOn = (...[t, e, argv, as, place]: Parameters<typeof decideScreen>): Promise<string[]> =>
+  decideScreen(t, e, argv, as, place, ENV);
 const { runWith, runPlaced } = stage;
 const world = () => stage.place().world;
 /** The test place's own place, as a verb is answered over it. */

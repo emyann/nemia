@@ -378,7 +378,8 @@ type PlaceOutcome<V extends import('../src/place/place.ts').PlaceVerb> = import(
 
 const world = () => stage.place().world;
 /** `nemia decide`'s screen over this file's store, `ENV` (`decideScreen`). */
-const decideAt = (...[t, e, argv, as, place]: Parameters<typeof decideScreen>): Promise<string[]> => decideScreen(t, e, argv, as, place, ENV);
+const decideAt = (...[t, e, argv, as, place]: Parameters<typeof decideScreen>): Promise<string[]> =>
+  decideScreen(t, e, argv, as, place, ENV);
 /** A screen with each time of day the engine's stand-in stamped put back as `<t>`: it files and settles on the wall clock. */
 const timeless = (lines: string[]): string[] => lines.map((l) => l.replace(/\b\d\d:\d\d:\d\dZ\b/g, '<t>'));
 const listed = (id: string) => stage.runWith(stage.board().e, list(stage.board().e, runRecord(ROOT, id)));

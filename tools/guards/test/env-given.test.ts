@@ -3,14 +3,15 @@
  * by the orchestrator's one list, `SESSION_VARIABLES`, imported, never a copy of its names in an array of its own; the four seats are
  * held to it here. `moduleEnvWrites`: each line that writes a `WF_` variable into the process's environment as a module loads (an
  * assignment, a `delete` or an `Object.assign(process.env, …)` at column 0), which every test that runs in that process then reads:
- * a test builds the environment it means and hands it on instead. Each is proven on planted texts; the sweep of every workspace's
- * tests by `moduleEnvWrites` is still to come.
+ * a test builds the environment it means and hands it on instead. Each is proven on planted texts, then swept: the four seats by
+ * `seatLists`, and every test file of every workspace by `moduleEnvWrites`, with no baseline, the two seats that point the process at its
+ * throwaway store (`ENV_SEATS`) excepted.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { REPO } from 'test-kit/repo';
+import { files, ours, REPO } from 'test-kit/repo';
 
 /** The four test seats: what each workspace's tests are given of the environment before, or as, they run. */
 export const SEATS = [
@@ -19,6 +20,12 @@ export const SEATS = [
   'apps/cli/test/ambient.ts',
   'packages/templates/test/template.ts',
 ] as const;
+
+/** The two seats that set the throwaway store in the process's own environment, which every test of their workspace then reads. */
+export const ENV_SEATS = ['packages/agent-orchestrator/test/ambient.ts', 'apps/api/test/harness.ts'] as const;
+
+/** Whether `file`, a path from the root, is a test's: under a `test/` folder, or a `.test.ts` beside its source. */
+const isTestFile = (file: string): boolean => /\.tsx?$/.test(file) && (/(^|\/)test\//.test(file) || /\.test\.tsx?$/.test(file));
 
 /** `text` with its comments blanked, line for line, so a name in prose is not read as code. */
 const codeOf = (text: string): string =>
@@ -135,4 +142,15 @@ test('a write inside a test, a copy of the environment, a comparison and a name 
     '*/',
   ].join('\n');
   assert.deepEqual(moduleEnvWrites(text), []);
+});
+
+test('no test file of any workspace writes a WF_ variable into the environment as it loads, the two seats excepted', () => {
+  const seats = new Set<string>(ENV_SEATS);
+  const tests = files().filter((file) => isTestFile(file) && ours(file) && !seats.has(file));
+  assert.ok(tests.length > 500, `the sweep reads every workspace's tests: ${tests.length} found`);
+  const written = tests.flatMap((file) => {
+    const text = fs.existsSync(path.join(REPO, file)) ? fs.readFileSync(path.join(REPO, file), 'utf8') : '';
+    return moduleEnvWrites(text).map((line) => `${file}:${line}: build the environment the test means and hand it on`);
+  });
+  assert.deepEqual(written, []);
 });

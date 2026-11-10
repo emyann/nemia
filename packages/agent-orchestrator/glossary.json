@@ -883,7 +883,7 @@
           "kept": [
             {
               "path": "packages/agent-orchestrator/src/runner.ts",
-              "why": "`runStore` is an entry alias of `runsAtOnce` until the api's tests and the board's e2e world read `runsAtOnce`; `RunStore` is the store's interface, exported beside it"
+              "why": "`RunStore`, the store's interface, exported by the entry: matched in any case, it is another word"
             },
             {
               "path": "packages/agent-orchestrator/src/record/record.ts",

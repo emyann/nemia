@@ -15,7 +15,7 @@ import type { RepositoryRun } from '../record/record.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
 import type { Place } from '../place/place.store.ts';
 import type { BranchStanding } from '../status/status.ts';
-import { rootNow } from '../../test/config-given.ts';
+import { STORE } from '../../test/ambient.ts';
 
 const repo = scratch('collisions-repo');
 
@@ -40,15 +40,15 @@ const ours = aRun(`ours-${process.pid}`, {
 });
 /** In flight beside ours, froze no steps, and its folder is gone: its steps fail `UnloadedFolder` when read. */
 const theirs = aRun(`theirs-${process.pid}`);
-writeRun(rootNow(), ours);
-writeRun(rootNow(), theirs);
+writeRun(STORE, ours);
+writeRun(STORE, theirs);
 
 /** Never asked: a read of either fails the test. */
 const git = new Proxy({}, { get: () => assert.fail('git was read') }) as BranchReader;
 const place = new Proxy({}, { get: () => assert.fail('the place was asked') }) as Place;
 
 const at = (standings: readonly BranchStanding[]) =>
-  Effect.runSyncExit(Effect.provideService(collisionsAt(rootNow(), ours, 'implement', standings, git, place), StoreRoot, rootNow()));
+  Effect.runSyncExit(Effect.provideService(collisionsAt(STORE, ours, 'implement', standings, git, place), StoreRoot, STORE));
 
 test("a run with no branch ahead reads no other run's steps, and asks nothing", () => {
   const exit = at([{ branch: 'wf/ours/implement', where: 'on' }]);
@@ -57,7 +57,7 @@ test("a run with no branch ahead reads no other run's steps, and asks nothing", 
 });
 
 test("a run with a branch ahead reads the others' steps: one whose folder does not load still fails", () => {
-  const ahead = collisionsAt(rootNow(), ours, 'implement', [{ branch: 'wf/ours/implement', where: 'ahead', commits: 1 }], git, place);
-  const refused = Effect.runSync(Effect.flip(Effect.provideService(ahead, StoreRoot, rootNow())));
+  const ahead = collisionsAt(STORE, ours, 'implement', [{ branch: 'wf/ours/implement', where: 'ahead', commits: 1 }], git, place);
+  const refused = Effect.runSync(Effect.flip(Effect.provideService(ahead, StoreRoot, STORE)));
   assert.ok(refused instanceof UnloadedFolder, 'the read is moved, not dropped');
 });

@@ -72,7 +72,8 @@ const stage = staged({ runWith: runEngine, main: cli, engineOf, env: ENV });
 const { runWith, runPlaced } = stage;
 
 /** `nemia decide`'s screen over this file's store, `ENV` (`decideScreen`). */
-const screenOn = (...[t, e, argv, as, place]: Parameters<typeof decideScreen>): Promise<string[]> => decideScreen(t, e, argv, as, place, ENV);
+const screenOn = (...[t, e, argv, as, place]: Parameters<typeof decideScreen>): Promise<string[]> =>
+  decideScreen(t, e, argv, as, place, ENV);
 /** The runs waited on as a read with no standing reads them: none of their branches asked. */
 const noParents = () => passParents(standingReader(NOTHING_READ));
 

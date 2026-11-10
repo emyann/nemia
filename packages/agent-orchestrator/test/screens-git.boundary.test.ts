@@ -51,7 +51,8 @@ const runWith = runOver(runEngine, gitPlaceLayer, ENV);
 const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 /** `nemia decide`'s screen over this file's store, `ENV` (`decideScreen`). */
-const screenOn = (...[t, e, argv, as, place]: Parameters<typeof decideScreen>): Promise<string[]> => decideScreen(t, e, argv, as, place, ENV);
+const screenOn = (...[t, e, argv, as, place]: Parameters<typeof decideScreen>): Promise<string[]> =>
+  decideScreen(t, e, argv, as, place, ENV);
 
 /**
  * A repository with one commit, so `nemia start` has a base to record. The screens below quote its branch by name, so the fixture

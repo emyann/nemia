@@ -316,6 +316,7 @@ const ended = (root: string, live: Map<string, Live>): Effect.Effect<void> =>
  * the lease — can be set above one number. `purse` is the caller's so a test can read what each wait was given (`Purse.given`) and
  * show they add up to no more than the budget; `callsShare` is the share of it the calls in flight may take, `LET_GO_CALLS_SHARE` unless
  * the holder was given another.
+ * Exported only for the tests that import it.
  */
 export const letGoOf = (
   root: string,

@@ -7,7 +7,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 /** How a file is replaced, beyond its text: each absent leaves it to the plain write. */
-export type ReplaceOptions = {
+type ReplaceOptions = {
   /** Flush the new file to disk before it is renamed over the old, so a crash leaves one of the two whole on disk too. */
   readonly fsync?: boolean;
   /** The new file's mode, as a write gives it (the process's umask applies). */

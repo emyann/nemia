@@ -40,6 +40,7 @@ const turnBefore = (state: State, attempt: number): { cap: number | undefined; b
  *
  * An attempt is a continuation exactly when the one before it, of the same turn, ended parked: so an attempt not yet started is
  * answered as the next one of the current turn would be.
+ * Exported only for the tests that import it.
  */
 export const parkedCapLeft = (state: State, attempt: number): number | undefined => {
   const { cap, before } = turnBefore(state, attempt);

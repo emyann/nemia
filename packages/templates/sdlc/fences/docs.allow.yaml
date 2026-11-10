@@ -1,0 +1,7 @@
+# A search of the web, and a fetch of Claude Code's and Anthropic's documentation alone, by host: what an agent that writes a spec
+# or reviews one reads of how the harness it fences behaves.
+- WebSearch
+- WebFetch(domain:code.claude.com)
+- WebFetch(domain:docs.claude.com)
+- WebFetch(domain:platform.claude.com)
+- WebFetch(domain:docs.anthropic.com)

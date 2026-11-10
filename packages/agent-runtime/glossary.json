@@ -53,7 +53,17 @@
       "retired": [
         {
           "spelling": "stated",
-          "card": "the runtime's journalled words take their new names, and old journals read back (decision 11 of the language work)"
+          "card": "the runtime's journalled words take their new names, and old journals read back (decision 11 of the language work)",
+          "kept": [
+            {
+              "path": "packages/agent-runtime/src/core/engine/journal.ts",
+              "why": "a key or literal an older runtime's journal holds, read by `upgrade`, the stored schema and `RENAMED_ARGS`, while a journal on disk may hold it"
+            },
+            {
+              "path": "packages/agent-runtime/src/core/event-schema.ts",
+              "why": "a key or literal an older runtime's journal holds, read by `upgrade`, the stored schema and `RENAMED_ARGS`, while a journal on disk may hold it"
+            }
+          ]
         }
       ]
     },
@@ -80,7 +90,17 @@
       "retired": [
         {
           "spelling": "unsigned",
-          "card": "the runtime's journalled words take their new names, and old journals read back (decision 11 of the language work)"
+          "card": "the runtime's journalled words take their new names, and old journals read back (decision 11 of the language work)",
+          "kept": [
+            {
+              "path": "packages/agent-runtime/src/core/engine/journal.ts",
+              "why": "a key or literal an older runtime's journal holds, read by `upgrade`, the stored schema and `RENAMED_ARGS`, while a journal on disk may hold it"
+            },
+            {
+              "path": "packages/agent-runtime/src/core/event-schema.ts",
+              "why": "a key or literal an older runtime's journal holds, read by `upgrade`, the stored schema and `RENAMED_ARGS`, while a journal on disk may hold it"
+            }
+          ]
         }
       ]
     },
@@ -103,11 +123,23 @@
       "retired": [
         {
           "spelling": "claude-detached",
-          "card": "every Claude Code session runs on the Agent SDK: `claude -p` and `claude --bg` removed"
+          "card": "every Claude Code session runs on the Agent SDK: `claude -p` and `claude --bg` removed",
+          "kept": [
+            {
+              "path": "packages/agent-runtime/src/service/harness-refusal.ts",
+              "why": "the refusal that names the fix to a task or an engine still giving the former harness"
+            }
+          ]
         },
         {
           "spelling": "claude-bg",
-          "card": "every Claude Code session runs on the Agent SDK: `claude -p` and `claude --bg` removed"
+          "card": "every Claude Code session runs on the Agent SDK: `claude -p` and `claude --bg` removed",
+          "kept": [
+            {
+              "path": "packages/agent-runtime/src/service/options.ts",
+              "why": "the refusal that names the fix to a task or an engine still giving the former harness"
+            }
+          ]
         }
       ],
       "see": {
@@ -215,7 +247,21 @@
       "retired": [
         {
           "spelling": "checkoutMcp",
-          "card": "the runtime's journalled words take their new names, and old journals read back (decision 11 of the language work)"
+          "card": "the runtime's journalled words take their new names, and old journals read back (decision 11 of the language work)",
+          "kept": [
+            {
+              "path": "packages/agent-runtime/src/core/engine/journal.ts",
+              "why": "a key or literal an older runtime's journal holds, read by `upgrade`, the stored schema and `RENAMED_ARGS`, while a journal on disk may hold it"
+            },
+            {
+              "path": "packages/agent-runtime/src/core/event-schema.ts",
+              "why": "a key or literal an older runtime's journal holds, read by `upgrade`, the stored schema and `RENAMED_ARGS`, while a journal on disk may hold it"
+            },
+            {
+              "path": "packages/agent-runtime/src/harness/args.ts",
+              "why": "a key or literal an older runtime's journal holds, read by `upgrade`, the stored schema and `RENAMED_ARGS`, while a journal on disk may hold it"
+            }
+          ]
         }
       ]
     },

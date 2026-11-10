@@ -69,6 +69,7 @@ import { TaskId } from '../core/model.ts';
  * A `Transport` that calls a request handler in this process. Each call gets a fresh server context, as a request that
  * arrived by HTTP would. The transport's names and the handler's differ in three places — the extended card, the
  * push-config listing, a resubscribe — and are mapped here. The runtime extension's methods are forwarded as they are.
+ * Exported only for the tests that import it.
  */
 export class InProcessTransport implements Transport {
   private readonly handler: A2ARequestHandler & SessionMethods;
@@ -183,7 +184,10 @@ const seamOf = (harness: string, ops: RunnerOps, events: (taskId: string) => Pro
   return { card, transport, client: new Client(transport, card, { polling: true }) };
 };
 
-/** A client of one harness, over its handler in this process. `polling`: a send answers once the session starts. */
+/**
+ * A client of one harness, over its handler in this process. `polling`: a send answers once the session starts.
+ * Exported only for the tests that import it.
+ */
 export const clientOf = (harness: string, ops: RunnerOps, events: (taskId: string) => Promise<readonly Event[]>): Client =>
   seamOf(harness, ops, events).client;
 

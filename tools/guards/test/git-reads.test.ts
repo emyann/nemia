@@ -1,47 +1,35 @@
 /**
  * The git `.claude/settings.json` allows every session in this checkout — a person's own among them: git's read-only verbs, and nothing
- * that writes, runs a program or moves a ref: `READS`.
+ * that writes, runs a program or moves a ref.
  *
- * An allow rule matches by prefix, so the fence is the list itself: a `Bash(git …)` allow that is not on `READS` fails, and `READS` is held
- * against the verbs that write, run a program or reach past the step's own directory, so the list cannot grow one either.
+ * An allow rule matches by prefix, so the fence is the list itself: a `Bash(git …)` allow that is not a line of the read set sdlc's
+ * read-only agents allow themselves (`READS`, read from the template's fence file, where each line's reason is written) fails, and a
+ * verb that writes, runs a program or reaches past the step's own directory (`NEVER`) is refused even there.
  *
- * This is no longer the whole of the git a `dontAsk` step may run, and has not been since the team's read-only agents took the read set
- * onto their own `allowedTools:` so that they travel to a factory that is not this checkout: that set is wider than this one — `grep`,
- * `cat-file`, `diff-tree`, `show-ref`, `rev-list`, `name-rev`, `for-each-ref`, `check-ignore`, `branch --contains` and `worktree list`
- * besides — and it is judged where it is written, by `agent-fences.test.ts`. `grep` stays off this list all the same, for the reason
- * `NEVER` gives: an allow here reaches every session in the checkout, including a person's own in a shell they did not fence, and this
- * list has no deny beside it. The agents allow it and deny the pager option in every spelling git takes, which is why they may.
+ * The agents' set is wider than the settings may be: `grep` stays off the settings for the reason `NEVER` gives — an allow here reaches
+ * every session in the checkout, including a person's own in a shell they did not fence, and this list has no deny beside it. The
+ * agents allow it and deny the pager option in every spelling git takes, which is why they may.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import yaml from 'js-yaml';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
 const SETTINGS = path.join(REPO, '.claude', 'settings.json');
 
 /**
- * Every git allow the settings may hold, word for word. `git merge-tree --write-tree` writes tree objects into the object store and
- * moves no ref, index or file.
+ * The read set sdlc's read-only agents allow themselves, as its fence file writes it: every git allow the settings may hold is one of
+ * its lines, word for word, or one's command alone (`Bash(git status)` beside `Bash(git status:*)`), so the settings name no read the
+ * agents' own set does not. `git merge-tree --write-tree` writes tree objects into the object store and moves no ref, index or file.
  */
-const READS = [
-  'Bash(git diff:*)',
-  'Bash(git log:*)',
-  'Bash(git show:*)',
-  'Bash(git status)',
-  'Bash(git status:*)',
-  'Bash(git branch)',
-  'Bash(git branch --list:*)',
-  'Bash(git merge-tree:*)',
-  'Bash(git merge-base:*)',
-  'Bash(git ls-tree:*)',
-  'Bash(git ls-files:*)',
-  'Bash(git rev-parse:*)',
-  'Bash(git rev-list:*)',
-  'Bash(git blame:*)',
-  'Bash(git shortlog:*)',
-  'Bash(git describe:*)',
-];
+const READS = (
+  yaml.load(fs.readFileSync(path.join(REPO, 'packages', 'templates', 'sdlc', 'fences', 'read-only.allow.yaml'), 'utf8')) as string[]
+).filter((rule) => rule.startsWith('Bash(git'));
+
+/** Whether `rule` is a line of the read set, or the command alone of one that also takes what follows it. */
+const onTheReadSet = (rule: string): boolean => READS.includes(rule) || READS.includes(rule.replace(/\)$/, ':*)'));
 
 /**
  * What no allow may name: every verb that writes a file, the index, a ref or the config, or goes to the network; `grep`, whose
@@ -97,7 +85,7 @@ function refusalOf(rule: string): string | undefined {
   if (NEVER.includes(verb)) return `${rule}: git ${verb} writes, runs a program or moves a ref`;
   if (verb === 'branch' && !(rest.length === 0 || (rest.length === 1 && rest[0] === '--list')))
     return `${rule}: git branch other than --list moves refs`;
-  if (!READS.includes(rule)) return `${rule}: not on the named list of git reads`;
+  if (!onTheReadSet(rule)) return `${rule}: not on the read set of sdlc's read-only agents`;
   return undefined;
 }
 
@@ -107,7 +95,12 @@ const shipped = () => (JSON.parse(fs.readFileSync(SETTINGS, 'utf8')) as { permis
 test('every git allow in the shipped settings is a read on the named list, and the list names no verb that writes', () => {
   const { allow } = shipped();
   assert.deepEqual(refusals(allow), []);
-  assert.deepEqual(refusals(READS), [], 'the list itself: no write, program or ref moved');
+  const unheld = READS.filter((rule) => refusalOf(rule) !== undefined);
+  assert.deepEqual(
+    unheld,
+    ['Bash(git grep:*)', 'Bash(git branch --contains:*)', 'Bash(git worktree list:*)'],
+    "the read set's lines the settings may not hold: each answered on the agents by its denies or by its narrow form",
+  );
   for (const rule of ['Bash(git merge-tree:*)', 'Bash(git merge-base:*)', 'Bash(git ls-tree:*)'])
     assert.ok(
       allow.includes(rule),
@@ -145,6 +138,7 @@ test('REFUSED: a git allow for -C, grep, fetch, a verb that writes, a bare git, 
   } finally {
     READS.splice(-2);
   }
-  assert.match(refusalOf('Bash(git cat-file:*)')!, /not on the named list/, 'a read off the list too: it is named, not inferred');
+  assert.notEqual(refusalOf('Bash(git count-objects:*)'), undefined, 'a read off the set too: it is named, not inferred');
+  assert.equal(refusalOf('Bash(git status)'), undefined, 'a command alone, whose rule with what follows is on the set');
   assert.equal(refusalOf('Bash(npm test)'), undefined, 'not a git rule');
 });

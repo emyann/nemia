@@ -5,7 +5,7 @@
  * The default factory holds everything that names no factory. It is no file: it is listed first, and never added, removed or hired into.
  */
 import path from 'node:path';
-import { AGENTS_FOLDER, SKILLS_FOLDER, type Workflow } from '../step/step.ts';
+import { AGENTS_FOLDER, CARRIED_FOLDER, SKILLS_FOLDER, type Workflow } from '../step/step.ts';
 import { stepNameRefusal } from '../folder/folder.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import type { Mount } from '../record/record.ts';
@@ -268,13 +268,15 @@ export const defaultFactoryRefusal = (verb: FactoryWrite): string =>
 
 /**
  * Why `workflow` cannot name a workflow, or undefined: a workflow is named by its folder, which is not empty, not hidden, holds no slash,
- * and is neither the agents' nor the skills' folder. Whether it exists is the start's to judge.
+ * and is none of the agents', the skills' and the carried files' folders. Whether it exists is the start's to judge.
  */
 export function workflowNameRefusal(workflow: string): string | undefined {
   if (!workflow || workflow.startsWith('.') || /[\\/]/.test(workflow))
     return `\`${workflow}\` is not a workflow's name: a workflow is named by its folder, not hidden, with no slash — build, say.`;
   if (workflow === AGENTS_FOLDER || workflow === SKILLS_FOLDER)
     return `${workflow}/ holds the agents or the skills beside the workflows, and no workflow has its name. Name the workflow's folder.`;
+  if (workflow === CARRIED_FOLDER)
+    return `${workflow}/ holds the files the workflows beside it share, and no workflow has its name. Name the workflow's folder.`;
   return undefined;
 }
 

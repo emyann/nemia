@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
 import { checkTemplate } from './check.ts';
+import { sharedLinesOf } from './template.store.ts';
 import type { Refusal } from './layout.ts';
 
 /** A document of `kind` named `name`, holding `spec`. */
@@ -118,6 +119,7 @@ function refusalsOf(
     { name: 'software-team', files: [...Object.keys(docs), ...files([...OTHER_FILES])].sort(), documents: new Map(Object.entries(docs)) },
     packageSkills,
     (file) => texts[file] ?? '',
+    (file) => sharedLinesOf(texts[file] ?? ''),
   );
 }
 
@@ -588,6 +590,51 @@ test('the check of a template folder: the whole folder passes, and each rule bro
     assertRefused(instructions('agents/implementer/notes.md'), AGENT, ['spec', 'instructions'], 'is not in the template');
     assertRefused(instructions('../secrets.md'), AGENT, ['spec', 'instructions'], 'never through ..');
   });
+
+  await t.test('carried/ holds any file at any depth, and a folder the layout does not know is outside it', () => {
+    assert.deepEqual(
+      refusalsOf(undefined, (others) => [...others, 'carried/a/b.ts', 'carried/notes.md', 'carried/x.yaml']),
+      [],
+    );
+    assertRefused(
+      refusalsOf(undefined, (others) => [...others, 'stray/x.ts']),
+      'stray/x.ts',
+      [],
+      'outside the template',
+    );
+  });
+
+  await t.test(
+    "a { path } item of an agent's fence list passes for a YAML list of strings, and is refused missing, outside, or not a list",
+    () => {
+      const FENCES = 'fences/read.yaml';
+      const fenced = (path: string, text: string | undefined, files: (f: string[]) => string[] = (f) => [...f, FENCES]) =>
+        refusalsOf(
+          (d) => (d[AGENT].spec.claude.fence.disallowedTools = ['Bash(git push:*)', { path }]),
+          files,
+          ['git'],
+          text === undefined ? {} : { [path]: text },
+        );
+      const at = ['spec', 'claude', 'fence', 'disallowedTools', 1];
+      assert.deepEqual(fenced(FENCES, '# Each line is a rule.\n- Bash(rm:*)  # why it is refused\n- Edit\n'), []);
+      assertRefused(
+        fenced(FENCES, undefined, (f) => f),
+        AGENT,
+        at,
+        'is not in the template',
+      );
+      assertRefused(fenced('../fences.yaml', '- Edit\n'), AGENT, at, 'never through ..');
+      assertRefused(fenced(FENCES, 'Edit: refused\n'), FENCES, [], 'a YAML list of strings');
+      assertRefused(fenced(FENCES, '- Edit\n- { a: 1 }\n'), FENCES, [], 'a YAML list of strings');
+      assertRefused(fenced(FENCES, '- [unclosed\n'), FENCES, [], 'a YAML list of strings');
+      assertRefused(
+        refusalsOf((d) => (d[AGENT].spec.claude.fence.disallowedTools = ['Edit', { file: FENCES }])),
+        AGENT,
+        at.slice(0, -1),
+        'a list of strings',
+      );
+    },
+  );
 
   await t.test('every refusal comes back at once, sorted by file', () => {
     const refusals = refusalsOf((d) => {

@@ -50,7 +50,10 @@ import { endOf, type Outcome } from './session.ts';
 import type { Action, EndReason, Event, Sighting } from './domain.ts';
 import type { FormerReason } from './event-schema.ts';
 
-/** Where a task stands, read off its journal alone (`lifecycleOf` in `domain.ts`). */
+/**
+ * Where a task stands, read off its journal alone (`lifecycleOf` in `domain.ts`).
+ * Exported only for the tests that import it.
+ */
 export const STATES = [
   'submitted',
   'starting',
@@ -67,6 +70,7 @@ export type LifecycleState = (typeof STATES)[number];
 /**
  * A verb written to a task from outside the lifecycle, by a person: the entry it journals, the states it is taken from, the
  * state the next pass reads once it is journalled, and the guard its refusal asks, by the name `VERB_GUARDS` keys it by.
+ * Exported only for the tests that import it.
  */
 export type Verb = {
   verb: string;
@@ -164,12 +168,12 @@ export type LifecycleEvent =
   | { type: 'RESTART_DUE'; attempt: number; resumeFrom?: string; nudge?: string }
   | { type: 'SETTLED'; outcome: Outcome };
 
-export type EventType = LifecycleEvent['type'];
+type EventType = LifecycleEvent['type'];
 
 /** A move the machine has no edge for: the state it was read in and the event it was handed. */
 export type Refusal = { state: LifecycleState; event: EventType };
 
-export type Moved = { to: LifecycleState; action: Action } | { refused: Refusal };
+type Moved = { to: LifecycleState; action: Action } | { refused: Refusal };
 
 /** One pass's move: from a state, on an event, to the next state and the one action that takes it there. */
 export type Move = (from: LifecycleState, event: LifecycleEvent) => Moved;
@@ -512,6 +516,7 @@ type Config = { id: string; initial: string; states: Record<string, { type?: 'fi
 const machineOf = (config: Config) =>
   setup({ types: { events: {} as LifecycleEvent }, guards: GUARDS, actions: ACTIONS }).createMachine(config as any);
 
+/** Exported only for the tests that import it. */
 export const MACHINE = machineOf(CONFIG);
 
 /**
@@ -534,7 +539,10 @@ const moveOn =
 /** The shipped lifecycle's move: the one state and action an event leads to, or a refusal when the state has no edge for it. */
 export const transition: Move = moveOn(MACHINE);
 
-/** The machine with one state's edges for one event taken away. Never shipped: what a test plants a refusal with. */
+/**
+ * The machine with one state's edges for one event taken away. Never shipped: what a test plants a refusal with.
+ * Exported only for the tests that import it.
+ */
 export const machineWithout = (from: LifecycleState, event: EventType) => {
   const states = Object.fromEntries(
     Object.entries((CONFIG as unknown as Config).states).map(([name, node]) => [
@@ -545,22 +553,29 @@ export const machineWithout = (from: LifecycleState, event: EventType) => {
   return machineOf({ ...(CONFIG as unknown as Config), states });
 };
 
-/** The lifecycle with one edge taken away — the refusal a test plants, to prove a stalled task is reported. Never shipped. */
+/**
+ * The lifecycle with one edge taken away — the refusal a test plants, to prove a stalled task is reported. Never shipped.
+ * Exported only for the tests that import it.
+ */
 export const withoutEdge = (from: LifecycleState, event: EventType): Move => moveOn(machineWithout(from, event));
 
 /** One edge of the machine, as its table says it: where it leaves from, on what, under which guard, to where, doing what. */
-export type Edge = { from: LifecycleState; event: EventType; guard?: string; to: LifecycleState; action: string };
+type Edge = { from: LifecycleState; event: EventType; guard?: string; to: LifecycleState; action: string };
 
 /** Each state of a machine, as XState's public graph of it (`toDirectedGraph`) gives it: its name, its kind, its edges. */
 const nodesOf = (machine: ReturnType<typeof machineOf>) => toDirectedGraph(machine).children;
 
-/** The states of a machine, in the order its table names them. */
+/**
+ * The states of a machine, in the order its table names them.
+ * Exported only for the tests that import it.
+ */
 export const statesOf = (machine = MACHINE): LifecycleState[] => nodesOf(machine).map((n) => n.stateNode.key as LifecycleState);
 
 /**
  * Every edge of a machine, read off XState's public graph of it (`toDirectedGraph`), so the list is the machine and not a
  * copy of it. An edge with no target is drawn back to its source. A guard named in the table is kept as its name; one
  * given as an object, by its type.
+ * Exported only for the tests that import it.
  */
 export const edgesOf = (machine = MACHINE): Edge[] =>
   nodesOf(machine).flatMap((node) =>
@@ -573,7 +588,10 @@ export const edgesOf = (machine = MACHINE): Edge[] =>
     })),
   );
 
-/** The final states: a task settled, whose record takes no event. */
+/**
+ * The final states: a task settled, whose record takes no event.
+ * Exported only for the tests that import it.
+ */
 export const FINAL: ReadonlySet<LifecycleState> = new Set(
   nodesOf(MACHINE)
     .filter((n) => n.stateNode.type === 'final')
@@ -585,6 +603,7 @@ export const FINAL: ReadonlySet<LifecycleState> = new Set(
  * from, labelled with its guard and who writes it and no action, since no pass takes it: the README's diagram is this text,
  * between its `diagram:lifecycle` markers, and the repository's diagram test fails when the two differ. Mermaid takes no `-`
  * in a state's id, so `input-required` is drawn under its own name, by an id without one.
+ * Exported only for the tests that import it.
  */
 export const diagram = (machine = MACHINE, verbs: readonly Verb[] = VERBS): string => {
   const id = (s: string) => s.replace(/-/g, '_');

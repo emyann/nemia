@@ -26,7 +26,7 @@
  *   (`docs/harness.md`). What it read is said as diagnostics; what the let-go rests on is asserted.
  * - `say`: a job told to wait for a message naming a file is told a name on its stdin, and writes that file and closes with its
  *   name; an identical job never told writes nothing.
- * - A budget: a job stops at its cap after its first response or two.
+ * - A budget: a job given a cap below one response's cost stops at it, after its first response.
  * - Claude Code as a job (M1, M2, M3, M5, M7, M11, M12 and M14, docs/open-issues.md, *Claude Code as a job*): every Claude Code
  *   session runs on the Agent SDK, a step as a job; these keep what that rests on measurable on each Claude Code. A resume's result
  *   prints the whole session's cost, and the job takes its parent's off. The bridge a job or a long-lived session opens at init
@@ -58,6 +58,7 @@ import { codexRolloutFile } from '../src/harness/codex/transcript.ts';
 import { claudeTranscriptFile } from '../src/harness/claude/transcript.ts';
 import { detachedOps } from '../src/harness/detached/detached.ts';
 import { attachedSessions } from '../src/harness/claude/attached.ts';
+import { attachedOptions } from '../src/harness/claude/session-options.ts';
 import { filesOf, readRun } from '../src/harness/claude/attached-file.ts';
 import { claudeStreamOutput } from '../src/harness/detached/output.ts';
 import { until as waitUntil } from '../src/waits/index.ts';
@@ -426,8 +427,16 @@ const notesIn = (label: string) => {
   return dir;
 };
 
+/**
+ * A cap no response comes in under. A budget guarantees that a session which has spent its cap is stopped, after the turn that
+ * crossed it: it does not guarantee how far a session gets for a given sum. On 2.1.280 a session crossed $0.01 before it finished
+ * (M9 ended at $0.029); on 2.1.316 haiku read all of NOTES.txt for $0.0099 and finished under it. A hundred-thousandth of a dollar
+ * is spent by the first response alone ($0.00013 on 2.1.316), so the session crosses it on its first turn.
+ */
+const BELOW_ONE_RESPONSE = 0.00001;
+
 test(
-  'a job given a $0.01 budget stops at it: the attempt ends failed at the limit `budget`, with what it cost — and its task settles failed, with no attempt 2',
+  'a job given a budget below what one response costs stops at it: the attempt ends failed at the limit `budget`, with what it cost — and its task settles failed, with no attempt 2',
   {
     skip,
     timeout: 12 * 60_000,
@@ -440,7 +449,7 @@ test(
           brief: LOOP_BRIEF,
           cwd: notesIn('budget-p'),
           harness: 'claude',
-          config: { model: 'haiku', tools: ['Read'], budgetUsd: 0.01 },
+          config: { model: 'haiku', tools: ['Read'], budgetUsd: BELOW_ONE_RESPONSE },
           deadlineSeconds: 480,
         }),
       ),
@@ -457,7 +466,7 @@ test(
         ['failed', 'harness', 'budget', 1],
         'it ended at its cap, as the harness printed it',
       );
-      assert.ok((first?.usage?.costUsd ?? 0) >= 0.01, `and cost at least its cap: ${first?.usage?.costUsd}`);
+      assert.ok((first?.usage?.costUsd ?? 0) >= BELOW_ONE_RESPONSE, `and cost at least its cap: ${first?.usage?.costUsd}`);
       assert.equal(state.attempts.length, 1, 'a budget spent is spent: no attempt 2');
     });
   },
@@ -470,6 +479,14 @@ const DENIED_BRIEF = (outside: string) =>
     '2) Run the Bash command: curl -s -o /dev/null https://example.com',
     '3) Use WebFetch to fetch https://example.com and say its title.',
   ].join(' ');
+/**
+ * The mode a job is denied in by asking: `default`, where each of DENIED_BRIEF's calls would prompt, and a job, which nobody
+ * answers, is denied it at once. On 2.1.280 a job at shipped defaults (`auto`) on haiku ran as `default` and was denied all three
+ * (docs/open-issues.md, M1). On 2.1.316 haiku runs `auto` as `auto` (its transcript says `permissionMode: auto`),
+ * and auto mode's classifier allowed the write outside the folder, the `curl` and the fetch: no denial, and the file written.
+ * So the denied job names the mode M1 measured rather than leaning on what `auto` becomes for a model.
+ */
+const DENIED_CONFIG = { model: 'haiku', permissionMode: 'default' };
 const FINISHED_CLOSEOUT = {
   type: 'object',
   properties: { finished: { type: 'boolean' } },
@@ -478,7 +495,7 @@ const FINISHED_CLOSEOUT = {
 };
 
 test(
-  'M1 under the engine: a job on claude at shipped defaults settles on its own and its attempt carries what it was denied; a job asked for nothing it may not do carries no denials',
+  'M1 under the engine: a job on claude in `default` settles on its own and its attempt carries what it was denied; a job at shipped defaults asked for nothing it may not do carries no denials',
   {
     skip,
     timeout: 15 * 60_000,
@@ -493,7 +510,7 @@ test(
           cwd: tmp('m1-denied'),
           closeoutSchema: FINISHED_CLOSEOUT,
           deadlineSeconds: 480,
-          config: { model: 'haiku' },
+          config: DENIED_CONFIG,
         }),
       ),
       control: await Effect.runPromise(
@@ -656,7 +673,7 @@ test(
   async (t) => {
     const engine = builtEngine(EngineService.layer({ root: tmp('m7-board') }));
     const probe = tmp('m7');
-    const common = { cwd: tmp('m7-work'), deadlineSeconds: 480, closeoutSchema: FINISHED_CLOSEOUT, config: { model: 'haiku' } };
+    const common = { cwd: tmp('m7-work'), deadlineSeconds: 480, closeoutSchema: FINISHED_CLOSEOUT, config: DENIED_CONFIG };
     const settled = async (id: string) => {
       const end = Date.now() + 10 * 60_000;
       while (Date.now() < end) {
@@ -832,11 +849,13 @@ test(
     assert.equal(answered.phase, 'input-required', 'signed again, it waits again');
     assert.equal(second?.resumeFrom, first?.nativeId, 'the turn resumed the session that signed');
     assert.deepEqual(second?.closeout, { word: secret }, 'and it remembered what only that session was told');
-    const args = fs.readFileSync(
-      path.join(root, 'runs', 'claude', `${nameFor(id, 2).replaceAll('/', '_').replaceAll('-', '_')}.json`),
-      'utf8',
+    const { request } = JSON.parse(
+      fs.readFileSync(
+        path.join(root, 'runs', 'claude', `${nameFor(id, 2).replaceAll('/', '_').replaceAll('-', '_')}.request.json`),
+        'utf8',
+      ),
     );
-    assert.match(args, /"--max-budget-usd","0\.3"/, "under the answer's cap");
+    assert.equal(attachedOptions(request).maxBudgetUsd, 0.3, "under the answer's cap");
 
     await Effect.runPromise(engine.close(id));
     await Effect.runPromise(engine.tick());

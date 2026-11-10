@@ -54,7 +54,7 @@ const upgraded = (e: Entry): Entry => {
 };
 
 /** The file of the session `name`'s entry in the registry folder `under`. */
-export const entryFileOf = (under: string, name: string): string => path.join(under, `${encodeURIComponent(name)}.json`);
+const entryFileOf = (under: string, name: string): string => path.join(under, `${encodeURIComponent(name)}.json`);
 
 /** The entry in `file`, read as this code reads it (`upgraded`); `undefined` when there is none. */
 export const readEntry = (file: string): Entry | undefined => {
@@ -76,7 +76,7 @@ const entryFilesOf = (dir: string, name: string): [open: string, done: string] =
  * The remote harness `harness`'s `forget`, its registry in `dir`: the session's entry, open or let go of, removed or with `dry`
  * listed, and the Task the agent made of it named as left, since the remote party keeps it.
  */
-export const forgetEntryOf =
+const forgetEntryOf =
   (harness: string, dir: string): NonNullable<RunnerOps['forget']> =>
   (session, options) => {
     const files = entryFilesOf(dir, session.name);
@@ -91,7 +91,7 @@ export const forgetEntryOf =
  * The remote harness `harness`'s `kept`, its registry in `dir`: each session's entry, open or let go of. It names no record: the
  * Task the agent made of a session is the remote party's, and on no disk of ours.
  */
-export const keptEntryOf =
+const keptEntryOf =
   (harness: string, dir: string): NonNullable<RunnerOps['kept']> =>
   (sessions) =>
     keptOf(harness, sessions, ({ name }) => ({ files: entryFilesOf(dir, name), records: [] }));

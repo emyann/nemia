@@ -16,7 +16,7 @@ import { ignoredRepoLine } from '../inbox/index.ts';
 import { startFromInbox } from '../inbox/inbox.verb.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { inputsDir } from '../record/record.store.ts';
-import { workflowFilesDir } from '../frozen/frozen.store.ts';
+import { carriedFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
 import { frozenStepsOf } from '../steps/steps.ts';
 import type { Workflow } from '../workflow.ts';
 import { approvedFirst, gatesOf } from '../status/status.ts';
@@ -279,6 +279,7 @@ function startedLines(started: Started): string[] {
     `workspace: ${run.workspace}${isRepositoryRun(run) ? '' : ' — a folder per step, made as each is filed, with no git repository'}`,
     ...(run.inputs?.length ? [`inputs: ${run.inputs.join(', ')} — copied into ${inputsDir(run)}`] : []),
     ...(run.workflowFiles === undefined ? [] : [`workflow files: copied into ${workflowFilesDir(run, run.workflowFiles)}`]),
+    ...(run.carriedFiles === undefined ? [] : [`carried files: copied into ${carriedFilesDir(run, run.carriedFiles)}`]),
     ...(run.after?.length
       ? [`waits on: ${run.after.join(', ')} — nothing is filed until nemia decide says each has landed on ${run.branch}`]
       : []),

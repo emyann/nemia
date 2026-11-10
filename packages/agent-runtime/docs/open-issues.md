@@ -727,6 +727,15 @@ measured of Claude Code.
   carries the total its parent saved on exit, and `test/live.test.ts` (*an attached session's cost*, `AE_LIVE=1`) holds it
   through `attachedSessions`, across a resume and a let-go's cut. What it rests on is that the parent saved one, which a
   process killed does not (*A Claude Code killed outright loses what its process spent*, at the end).
+- **The live tests run again** (the card *runtime: the live tests pass on main again*, 2026-11-09). Run first by the factory's
+  implement check, four failed on main at `18ff01d`, the harness declaration commit, as on its run's branch; none for a change of
+  that commit's. On the Agent SDK's Claude Code 2.1.316, haiku (`claude-haiku-5-5`): M1's and M7's denied jobs, at shipped
+  defaults, ran `auto` as `auto` and its classifier allowed all three calls (*`auto` on haiku runs as `default`*, issue 28), so
+  both are filed in `default` and were denied `Write`, `Bash(curl)` and `WebFetch`. M12 looked for `--max-budget-usd` in the
+  run file's argv, which a job on the SDK's `query()` has none of: it reads `Options.maxBudgetUsd` off the attempt's spawn
+  request. The $0.01 budget test raced the price: haiku read all 2000 lines for $0.0099 and succeeded. It caps at $0.00001,
+  which the first response crosses ($0.00013), and ended `failed`, limit `budget`, exit 1, no attempt 2. Then
+  `AE_LIVE=1 node --test test/live.test.ts test/live-sdk.boundary.test.ts`, three passes in a row.
 
 ## Verified by tests, not by a live run
 
@@ -1267,6 +1276,11 @@ the end).
 - **`auto` on haiku runs as `default`.** Its `init` line said `permissionMode: default` in both `auto` runs on haiku; on
   sonnet it said `auto`, and denied nothing the same brief asked. So a haiku step filed in `auto` is fenced as `default`.
   Nothing refuses it: the mode is Claude Code's to choose per model.
+  No longer so on the Agent SDK's Claude Code **2.1.316**, 2026-11-09: `haiku` is `claude-haiku-5-5`, its transcript says
+  `permissionMode: auto`, and auto mode's classifier allowed M1's write outside the folder, its `curl` and its fetch, none denied
+  and the file written. So M1's and M7's denied jobs are filed in `default`, the mode this record measured them in, and
+  `CLAUDE_AUTO_DROPPED` no longer lists the `haiku` alias (2026-11-09): measured on 2.1.316 by the `init` line's `permissionMode`,
+  `haiku` keeps `auto`, while `claude-haiku-4-5` and `claude-sonnet-4-5` still say `default`, and stay listed.
 - **M2: a resume's cost and API time are its session's.** Issue 4, narrowed.
 - **M3: `claude -p --resume` continues a `--bg` session**, under the same id, and remembered what it was told (a session
   stopped first). So a job may continue a background session, and the new attempt's mode is the job's.

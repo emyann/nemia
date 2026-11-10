@@ -76,7 +76,7 @@ const ModelTokensSchema = Schema.Struct({
  * The lines of a session's stream the runtime reads, by kind — a `type`, and its `subtype` for a `system` line — in what it reads
  * of each; every other key is not checked. A field the runtime starts reading is added here.
  */
-export const PRINTED = {
+const PRINTED = {
   result: Schema.Struct({
     type: Schema.Literal('result'),
     subtype: Schema.optional(Schema.String),

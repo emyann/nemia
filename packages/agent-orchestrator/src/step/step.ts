@@ -593,3 +593,10 @@ export const AGENTS_FOLDER = 'agents';
  * its name either (`agentsFolderRefusal`).
  */
 export const SKILLS_FOLDER = 'skills';
+
+/**
+ * The folder of carried files, beside the workflows that share them: `carried/`, what a template's own `carried/` is rendered into, copied
+ * byte for byte. A run freezes it beside its workflow's copy and tells its checks and sessions where as `WF_CARRIED_FILES`, so no workflow
+ * has its name either (`agentsFolderRefusal`).
+ */
+export const CARRIED_FOLDER = 'carried';

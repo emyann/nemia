@@ -314,6 +314,7 @@ jobs:
       # Writes apps/web/theme/, which is generated from DESIGN.md and never edited (the kit's generator, recorded in apps/web/package.json).
       - run: npm run theme:generate --workspace web
       - name: Refuse a stale generated file
+        id: stale
         # Run, not read: ci-build.boundary.test.ts runs this very script in a scratch repository, since a git diff that forgets to fail
         # reads like one that does and differs exactly where a stale file would report green. The paths are GENERATED in ci-workflow.ts.
         #
@@ -363,6 +364,7 @@ jobs:
           tar -xzf gitleaks.tar.gz gitleaks
           ./gitleaks version
       - name: Prove the allowlist allows the stubs and nothing wider
+        id: allowlist
         # The one thing .gitleaks.toml's own text cannot say. A top-level [[allowlists]] with a paths entry skips the whole file
         # whatever its condition, so the file's comment can claim a scope the file does not have - which is how the first draft of this
         # card shipped an allowlist that allowed every secret in remote-agent.test.ts, planted tokens included. Only the binary knows,
@@ -467,6 +469,7 @@ jobs:
           fi
           echo "ci: the allowlist allows the stub shapes in their one file, and nothing wider."
       - name: Scan this push's new commits
+        id: scan
         # The shas come through env and are never interpolated into the command line: on a pull request they are a fork's to name.
         # --redact, because this repository is public and a finding's log is too: the scan says which commit and line, never the secret.
         # --exit-code 2, because gitleaks exits 1 both for a leak and for a failure to scan, and a job that calls a range it could not

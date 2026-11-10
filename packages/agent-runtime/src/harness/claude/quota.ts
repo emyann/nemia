@@ -100,7 +100,7 @@ const heldInput = (): { prompt: AsyncIterable<SDKUserMessage>; release: () => vo
  * asked what it is handed, and closed with its input. `claudeQuota` asks `skipBehaviors: true`: the plan's limits need none of the scan
  * of local transcripts the answer's behaviours section would cost.
  */
-export const sdkUsageAsk: OpenUsage = (command) => {
+const sdkUsageAsk: OpenUsage = (command) => {
   const input = heldInput();
   const q = query({ prompt: input.prompt, options: usageOptions(command) });
   return {

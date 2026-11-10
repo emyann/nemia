@@ -30,7 +30,7 @@
  * cycle can form (`test/boundary.test.ts`).
  */
 export { attemptVerdict, CHECK_RESULTS, checkVerdictOf, verdictWord, type CheckResult, type CheckVerdict } from './check/check.ts';
-export { VERSION } from './version/version.ts';
+export { VERSION } from './version/version.store.ts';
 export { leaseRelease, trialRefusal, checkoutPromiseLine, type Running } from './release/release.ts';
 export type { SessionHarness, SessionRelease } from './release/release.ts';
 export { currentRelease } from './release/release.store.ts';

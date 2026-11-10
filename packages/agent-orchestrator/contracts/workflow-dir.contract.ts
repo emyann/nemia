@@ -1,10 +1,11 @@
 /**
  * The folder a workflow is (agent-orchestrator, src/folder/folder.ts): why a path cannot be a `WorkflowDir`, the id the Workflow door is
  * addressed by (`workflowDirRefusal`). A workflow's folder is named as `workflowFolder` resolves it: absolute, normalized, not the root,
- * and neither the folder of agents nor of skills beside the workflows. The words are nobody's law, only that a refusal is one.
+ * and neither the folder of agents, of skills nor of carried files beside the workflows. The words are nobody's law, only that a refusal
+ * is one.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import { AGENTS_FOLDER, SKILLS_FOLDER } from '../src/step/step.ts';
+import { AGENTS_FOLDER, CARRIED_FOLDER, SKILLS_FOLDER } from '../src/step/step.ts';
 
 /** Whether the folder's own name, the path's last segment, is `name`. */
 const namedAs = (dir: string, name: string): boolean => dir === name || dir.endsWith('/' + name);
@@ -40,14 +41,19 @@ const workflowDirRefusalSpec = spec<(dir: string) => string | null>({
       description: 'The folder of skills beside the workflows is refused',
       condition: ({ input: [dir], output }) => !namedAs(dir, SKILLS_FOLDER) || output !== null,
     },
+    carriedFolderRefused: {
+      description: 'The folder of carried files beside the workflows is refused',
+      condition: ({ input: [dir], output }) => !namedAs(dir, CARRIED_FOLDER) || output !== null,
+    },
     resolvedFolderGoes: {
-      description: 'An absolute, normalized folder that is not the root and neither agents nor skills is taken',
+      description: 'An absolute, normalized folder that is not the root and neither agents, skills nor carried files is taken',
       condition: ({ input: [dir], output }) =>
         !dir.startsWith('/') ||
         unnormalized(dir) ||
         dir === '/' ||
         namedAs(dir, AGENTS_FOLDER) ||
         namedAs(dir, SKILLS_FOLDER) ||
+        namedAs(dir, CARRIED_FOLDER) ||
         output === null,
     },
   },

@@ -4,9 +4,7 @@
  * type then refuses. A sentence a person reads is a `message`.
  *
  * `openStates` (`closed-state.ts`) reads each door's exported types through the TypeScript checker and finds each such field whose type,
- * null and undefined taken off, is `string` or a union with a `string` member. What still is is held in `closed-state.baseline.ts`, by
- * its key, with the card that closes it, and the baseline only shrinks: refused are a field it does not hold, an entry no longer open
- * (closed, renamed or gone), and an entry with no card.
+ * null and undefined taken off, is `string` or a union with a `string` member, and refuses every one: the rule has no exception.
  *
  * The test reads files outside this package; the api's source is among `guards#test`'s inputs in `turbo.json`, and the packages' reach
  * it through its dependency on `agent-orchestrator`.
@@ -15,44 +13,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { OPEN_STATE } from './closed-state.baseline.ts';
 import { openStates, repositoryHits } from './closed-state.ts';
 import { REPO } from 'test-kit/repo';
 import { scratch } from 'test-kit/scratch';
 
-type Baseline = Readonly<Record<string, { readonly card: string }>>;
+const FIX = 'type it as a closed union of its words, named in its context’s glossary.json, and carry a sentence as `message`';
 
-/** Where the open fields are held, as a refusal names it. */
-const BASELINE = 'tools/guards/test/closed-state.baseline.ts';
-
-const FIX =
-  'type it as a closed union of its words, named in its context’s glossary.json, and carry a sentence as `message`; never add it to';
-
-/**
- * What `hits`, today's measure, and `baseline` disagree on, each a sentence naming the fix, by the key it is about: a field the baseline
- * does not hold, an entry no longer open, and one with no card.
- */
-export const breaks = (hits: ReadonlyArray<{ key: string }>, baseline: Baseline): Array<{ key: string; why: string }> => {
-  const out: Array<{ key: string; why: string }> = [];
-  const open = new Set(hits.map(({ key }) => key));
-  for (const key of open)
-    if (baseline[key] === undefined) out.push({ key, why: `${key} says a state or a kind as a string: ${FIX} ${BASELINE}` });
-  for (const [key, held] of Object.entries(baseline)) {
-    if (!held.card.trim()) out.push({ key, why: `${key} has no card in ${BASELINE}: name the card that closes it` });
-    if (!open.has(key))
-      out.push({
-        key,
-        why: `${key} is closed, renamed or gone: take its entry off ${BASELINE}, or move it to its new key in the same commit`,
-      });
-  }
-  return out;
-};
-
-/** The keys `breaks` refuses, sorted. */
-const refused = (hits: ReadonlyArray<{ key: string }>, baseline: Baseline = {}): string[] =>
-  breaks(hits, baseline)
-    .map(({ key }) => key)
-    .sort();
+/** Each field of `hits` refused, as a sentence naming the fix. */
+export const breaks = (hits: ReadonlyArray<{ key: string }>): string[] =>
+  hits.map(({ key }) => `${key} says a state or a kind as a string: ${FIX}`);
 
 /** A scratch root holding `files`, an ES module package; `effect` linked in for a fixture that imports it. */
 const fixture = (files: Record<string, string>): string => {
@@ -73,8 +42,6 @@ const openIn = (files: Record<string, string>): string[] =>
     .hits.map(({ key }) => key)
     .sort();
 
-const CARD = 'a card';
-
 test('a closed union, a nullable one, a template literal and a branded string are let through', () => {
   const door = [
     "export type Door = { phase: 'a' | 'b'; status?: 'x' | null; kind: `k-${string}`; type: string & { readonly brand: 'Id' } };",
@@ -94,7 +61,7 @@ test('REFUSED: a field named for a state or a kind, typed string', () => {
     'door.ts#Door.status',
     'door.ts#Door.type',
   ]);
-  assert.deepEqual(refused(hits.map((key) => ({ key }))), hits);
+  assert.equal(breaks(hits.map((key) => ({ key }))).length, hits.length, 'each open field is refused');
 });
 
 test('REFUSED: a nullable string, and a union with a string member', () => {
@@ -164,18 +131,6 @@ test('a type no door reaches, one under node_modules, and a function’s paramet
   assert.deepEqual(openIn(files), []);
 });
 
-test('a field the baseline holds, with its card, is let through', () => {
-  assert.deepEqual(refused([{ key: 'a.ts#A.status' }], { 'a.ts#A.status': { card: CARD } }), []);
-});
-
-test('REFUSED: a baseline entry no longer open — closed, renamed or gone', () => {
-  assert.deepEqual(refused([], { 'a.ts#A.status': { card: CARD } }), ['a.ts#A.status']);
-});
-
-test('REFUSED: a baseline entry with no card', () => {
-  assert.deepEqual(refused([{ key: 'a.ts#A.status' }], { 'a.ts#A.status': { card: ' ' } }), ['a.ts#A.status']);
-});
-
 /** The repository's measure, read once for the tests below: one Program over every door. */
 const repository = repositoryHits();
 
@@ -190,9 +145,6 @@ test('the walk reads the doors: the runtime’s, the orchestrator’s and the ap
     );
 });
 
-test('the repository: no door says a state or a kind as a string but where the baseline holds it, the baseline only shrinking', () => {
-  assert.deepEqual(
-    breaks(repository.hits, OPEN_STATE).map(({ why }) => why),
-    [],
-  );
+test('the repository: no door says a state or a kind as a string', () => {
+  assert.deepEqual(breaks(repository.hits), []);
 });

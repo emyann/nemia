@@ -195,7 +195,7 @@ const cutWhileHeld = (signal: AbortSignal, ends: AbortSignal | undefined): Promi
   });
 
 /** The tool a session calls to ask a person a question, as Claude Code names it. */
-export const ASK_TOOL = 'AskUserQuestion';
+const ASK_TOOL = 'AskUserQuestion';
 
 /** How often a held ask reads whether the person's answer has been written, in milliseconds. */
 const ASK_EVERY_MS = 250;
@@ -203,7 +203,10 @@ const ASK_EVERY_MS = 250;
 /** What a call that would ask a person is told where no answer reached it, declared beside the permission's own words. */
 export { ASK_CUT };
 
-/** What the hook says of a call it let through: the person answered it, and their answer is in the call's own input. */
+/**
+ * What the hook says of a call it let through: the person answered it, and their answer is in the call's own input.
+ * Exported only for the tests that import it.
+ */
 export const ASK_ANSWERED = 'The person answered this question where it was shown, and their answer is in the call.';
 
 /** One choice of a question, as the call's input gave it: nothing where it names no label. */
@@ -292,6 +295,7 @@ const askedOf = async (
  * What a `PreToolUse` hook answers a question's call with: let through (`allow`) with the person's answers in its input where they
  * answered, so the call's own result carries their answer to the session; denied, naming what happens instead (`ASK_CUT`), where none
  * came — the holder let the session go, or the turn was ended, and the answer is owed to the session as words.
+ * Exported only for the tests that import it.
  */
 export const askHookOutput = (given: { questions: AskQuestion[]; answers: Record<string, string> } | undefined) => ({
   hookSpecificOutput: {
@@ -306,7 +310,10 @@ export const askHookOutput = (given: { questions: AskQuestion[]; answers: Record
   },
 });
 
-/** What a denied call is told: no person is there to ask, and what the fence allows is all it gets. */
+/**
+ * What a denied call is told: no person is there to ask, and what the fence allows is all it gets.
+ * Exported only for the tests that import it.
+ */
 export const DENIED_HERE =
   'No person is here to approve this call, so it is denied. Do what you can with the tools you are allowed, and say in your answer what you were denied.';
 

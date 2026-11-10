@@ -47,6 +47,7 @@ import { continuedCap, parkedEnd } from '../cap.ts';
 /**
  * The lifecycle `reconcile` moves a task by: the shipped one (`lifecycle.ts`) unless a test provides another, which is how a
  * refused edge is planted to prove the pass reports it. Exported by neither entry, as the machine is not.
+ * Exported only for the tests that import it.
  */
 export const Lifecycle = Context.Reference<Move>('engine/Lifecycle', { defaultValue: () => transition });
 
@@ -57,7 +58,7 @@ export const Lifecycle = Context.Reference<Move>('engine/Lifecycle', { defaultVa
 export const Admission = Context.Reference<AdmissionRule>('engine/Admission', { defaultValue: () => ({ poolOf: ownPool }) });
 
 /** Whether the sessions' drain holds a task of the harness named (`undefined`: the default harness), as one pass read it. */
-export type DrainedOn = (harness: string | undefined) => boolean;
+type DrainedOn = (harness: string | undefined) => boolean;
 
 /**
  * The store's sessions' drain, read off its file once per pass, then asked per task (`Now.drained`): it holds a task whose harness
@@ -91,6 +92,7 @@ const nowFor = ({ unread, drained }: World, state: State): Now => {
 /**
  * A live session is one the engine is still waiting on: at work or waiting on a person. `completed`, `failed`, `rejected` and `canceled`
  * are not.
+ * Exported only for the tests that import it.
  */
 export const LIVE: ReadonlySet<SessionState> = new Set(['submitted', 'working', 'input-required', 'auth-required']);
 
@@ -872,7 +874,7 @@ const carriedOf = (sighting: Sighting | undefined, phase: TaskView['phase']) => 
  * there is none; else no link, and why, by whether the task is `settled`. Never `undefined` for a task that asked: an absent link is
  * not "not bridged".
  */
-export const bridgeOfTask = (asked: boolean, settled: boolean, seen: Bridge | undefined): Bridge | undefined => {
+const bridgeOfTask = (asked: boolean, settled: boolean, seen: Bridge | undefined): Bridge | undefined => {
   if (!asked) return undefined;
   if (seen) return seen;
   return {

@@ -1,15 +1,26 @@
 # templates — the factory templates Nemia ships
 
 Each folder here but `test/` is a template in the template layout (`nemia.yaml`, `RULES.md`, `agents/<a>/`, `workflows/<w>/`,
-`skills/<s>/`), which `nemia template lint <folder>` reads and `nemia factory apply <name> --template <folder>` renders. Only what the
+`skills/<s>/`, `carried/`, and a file a `{ path }` item names), which `nemia template lint <folder>` reads and `nemia factory apply <name> --template <folder>` renders. Only what the
 layout gives a place sits inside a template's folder: the workspace's own files (this one, `package.json`, `tsconfig.json`,
 `released.json`, `test/`) sit beside it, since a render would carry anything inside.
 
 - `sdlc/` — the team that builds Nemia, with this repository's words taken out: six agents and four workflows, the role skills they
-  name, and the scripts their checks run (`landing.ts`, `parts.ts`, `pull-request.ts`, `ci-log.ts`, which `pull-request.ts` and
-  `landing.ts` import, and `probe.ts` in `build/` and `quick/`, held equal byte for byte; `change.ts` in `quick/`; `cards.ts` in
-  `janitor/`). What the repository a factory is applied to decides is a parameter of `nemia.yaml`, written in text as `${{ parameters.<name> }}`; a carried
+  name, and the scripts their checks run, kept once in `carried/` (`landing.ts`, `parts.ts`, `probe.ts`, `pull-request.ts`, with
+  `ci-log.ts` and `exec.ts`, which `landing.ts` and `pull-request.ts` import), read by a check as `$WF_CARRIED_FILES/<script>.ts`;
+  `change.ts` in `quick/` and `cards.ts` in `janitor/`, read as `$WF_WORKFLOW_FILES/<script>.ts`. quick's land step is told build's
+  `land.md` (`instruction: { path }`). What the repository a factory is applied to decides is a parameter of `nemia.yaml`, written in text as `${{ parameters.<name> }}`; a carried
   script is never rendered, so a script takes what it needs as a flag (`--check <name>`).
+- `sdlc/fences/` — the fence lines several of sdlc's agents share, each a YAML list of strings with each rule's reason beside it, named
+  by an agent's list as `- { path: fences/<file>.yaml }` and written out whole by the render: the read-only four take
+  `read-only.allow.yaml` and `read-only.deny.yaml`, the writers `writers.deny.yaml`, the browser's users `browser.*.yaml` and
+  `run-code.deny.yaml`. A rule many agents keep goes in a file there, never copied into each; `test/fences.test.ts` reads them and
+  proves on the rendered fences what each runs. A line holding a `${{ parameters.… }}` stays on the agent: a shared file's lines are not
+  rendered with the parameters.
+- **Two copies kept on purpose.** The `github` parameter is spelt in each note that differs by it (`### true`/`### false` headings and
+  the check lines): a note is read by an agent whole, and one note per way of landing would copy everything the two share. And every
+  change to sdlc's content bumps its version in `nemia.yaml` and `released.json`, so two runs that change sdlc side by side meet there:
+  the version is what a factory pins and upgrades by, and a digest no version names would let a change ship unnoticed.
 
 ## Traps
 

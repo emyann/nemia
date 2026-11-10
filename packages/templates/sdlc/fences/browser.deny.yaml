@@ -1,0 +1,8 @@
+# The browser's tools that write their answer to a file when given one, which a read-only agent must not: each by its `filename`
+# parameter, so the same tool answering in the session stays open.
+- mcp__playwright__browser_console_messages(filename:*)
+- mcp__playwright__browser_evaluate(filename:*)
+- mcp__playwright__browser_network_request(filename:*)
+- mcp__playwright__browser_network_requests(filename:*)
+- mcp__playwright__browser_snapshot(filename:*)
+- mcp__playwright__browser_take_screenshot(filename:*)

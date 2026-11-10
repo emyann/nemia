@@ -12,7 +12,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
-import { AGENTS_FOLDER, isReadme, SKILLS_FOLDER, STEP_KEYS, WorkflowError, type StepKey, type Workflow } from '../step/step.ts';
+import {
+  AGENTS_FOLDER,
+  CARRIED_FOLDER,
+  isReadme,
+  SKILLS_FOLDER,
+  STEP_KEYS,
+  WorkflowError,
+  type StepKey,
+  type Workflow,
+} from '../step/step.ts';
 import { PLACES } from '../keys/index.ts';
 import {
   codexModeLine,
@@ -181,7 +190,9 @@ function noStepsBecause(dir: string, entries: readonly string[]): string {
 /** The folders in `dir` that hold steps, sorted: the workflows a folder of workflows has. None for a folder that is not there. */
 export function workflowsIn(dir: string, entries?: readonly string[]): string[] {
   return (entries ?? entriesOf(dir))
-    .filter((name) => name !== AGENTS_FOLDER && name !== SKILLS_FOLDER && stepFiles(entriesOf(path.join(dir, name))).length > 0)
+    .filter(
+      (name) => ![AGENTS_FOLDER, SKILLS_FOLDER, CARRIED_FOLDER].includes(name) && stepFiles(entriesOf(path.join(dir, name))).length > 0,
+    )
     .sort();
 }
 

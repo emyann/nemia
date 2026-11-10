@@ -17,6 +17,7 @@ import {
   HARNESS_FENCE_KEYS,
   isMap,
   isParam,
+  isPathItem,
   layoutRefusals,
   PROFILE_KEYS,
   spelled,
@@ -403,13 +404,55 @@ function textRefusals(folder: ReadFolder, held: Held, text: (file: string) => st
   });
 }
 
+/** The harness blocks of `holder`, an agent's spec or a step's overrides: each key a harness's name, whose value is a map. */
+const blocksIn = (holder: Record<string, unknown>): Array<Record<string, unknown>> =>
+  Object.keys(HARNESS_KNOBS).flatMap((name) => {
+    const block = holder[name];
+    return isMap(block) ? [block] : [];
+  });
+
+/** The files the `{ path }` items of every harness block's fence lists name, an agent's and a step's overrides', each once. */
+function sharedFiles(held: Held): string[] {
+  const holders = [
+    ...held.agents.values(),
+    ...[...held.workflows.values()].flatMap(({ steps }) => steps.map((step) => (isMap(step.overrides) ? step.overrides : {}))),
+  ];
+  const named = holders
+    .flatMap(blocksIn)
+    .flatMap((block) =>
+      Object.values(isMap(block.fence) ? block.fence : {}).flatMap((list) =>
+        Array.isArray(list) ? list.flatMap((item) => (isPathItem(item) ? [item.path] : [])) : [],
+      ),
+    );
+  return [...new Set(named)];
+}
+
+/**
+ * Each file a fence list's `{ path }` names that is not a YAML list of strings, refused at the file: the render writes its lines into
+ * every list that names it (`withSharedLines`). A file the folder lacks, or a path that leaves it, is `refRefusals`'.
+ */
+const sharedFileRefusals = (folder: ReadFolder, held: Held, lines: (file: string) => readonly string[] | undefined): Refusal[] =>
+  sharedFiles(held)
+    .filter((file) => folder.files.includes(file) && lines(file) === undefined)
+    .map((file) => ({
+      file,
+      at: [],
+      message: `${file} is named by a fence list's {path:}, and its lines are a YAML list of strings, one rule each, with a comment saying why: write it so.`,
+    }));
+
 /**
  * Every problem of the template `folder`, by file in order: the layout's and each document's (`layout.ts`), a hire, skill, sibling step,
  * parameter or file named that the folder lacks, a step's words, each harness's block against the runtime's knobs for it, and an
  * undeclared parameter's expression in a text the render writes, at its line. `packageSkills`: Nemia's place and builtin skills, each a
- * skill the folder need not carry; `text`, the words of one of its files, by its path. None for a template that passes.
+ * skill the folder need not carry; `text`, the words of one of its files, by its path; `lines`, the lines of a file of shared lines, or
+ * undefined where it is no YAML list of strings. None for a template that passes.
  */
-export function checkTemplate(folder: ReadFolder, packageSkills: readonly string[], text: (file: string) => string): Refusal[] {
+export function checkTemplate(
+  folder: ReadFolder,
+  packageSkills: readonly string[],
+  text: (file: string) => string,
+  lines: (file: string) => readonly string[] | undefined,
+): Refusal[] {
   const held = heldOf(folder, packageSkills);
   const documents = [...folder.documents].flatMap(([file, doc]) =>
     documentFile(file, folder.name) ? documentRefusals(file, doc, folder.name) : [],
@@ -422,6 +465,7 @@ export function checkTemplate(folder: ReadFolder, packageSkills: readonly string
     ...stepRefusals(held),
     ...stepFileRefusals(folder, held),
     ...refRefusals(folder, held),
+    ...sharedFileRefusals(folder, held, lines),
     ...textRefusals(folder, held, text),
   ];
   return all.sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));

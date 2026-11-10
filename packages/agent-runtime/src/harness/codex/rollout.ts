@@ -78,7 +78,7 @@ const eventMsg = <P extends Schema.Top>(payload: P) =>
  * The records of a Codex rollout the runtime reads, by kind — the record's `type` and its payload's `type` — in what it reads of
  * each; every other key is not checked. A field the runtime starts reading is added here.
  */
-export const ROLLOUT = {
+const ROLLOUT = {
   'event_msg task_complete': eventMsg(
     Schema.Struct({
       type: Schema.Literal('task_complete'),
@@ -90,10 +90,10 @@ export const ROLLOUT = {
 };
 
 /** A kind of record the runtime reads: a key of `ROLLOUT`. */
-export type RolloutKind = keyof typeof ROLLOUT;
+type RolloutKind = keyof typeof ROLLOUT;
 
 /** A record of a kind the runtime reads, as its schema in `ROLLOUT` decodes it, with its kind. */
-export type RolloutRecord = { [K in RolloutKind]: { kind: K; record: (typeof ROLLOUT)[K]['Type'] } }[RolloutKind];
+type RolloutRecord = { [K in RolloutKind]: { kind: K; record: (typeof ROLLOUT)[K]['Type'] } }[RolloutKind];
 
 const KINDS = Object.keys(ROLLOUT) as RolloutKind[];
 

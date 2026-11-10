@@ -1,0 +1,3 @@
+# The browser's one tool that runs a script of the session's own in the page's process, outside every fence: refused to every
+# agent that may reach the browser, reader and writer alike.
+- mcp__playwright__browser_run_code_unsafe

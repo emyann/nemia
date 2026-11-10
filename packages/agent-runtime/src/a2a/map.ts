@@ -40,7 +40,7 @@ export const RUNTIME_EXTENSION = 'urn:agent-runtime:session:v1';
  * `sessionKept` names where the harness keeps what it has of many sessions at once, and removes nothing. `compactSessions` rewrites
  * the captures of every ended session to what their readers read, or, dry, counts them.
  */
-export const SESSION_METHODS = [
+const SESSION_METHODS = [
   'findSession',
   'interruptSession',
   'sessionLogs',
@@ -231,6 +231,7 @@ export const spawnOf = (m: Message): SpawnRequest => {
  * What the workload said when it finished, as the Task's Artifact: named `closeout`, one part — the payload as `data`, or
  * as `text/plain` when it is a string, as Codex's prose arrives — and, when the harness said when it was given, `at`
  * (milliseconds) in its metadata. A resumed session can carry its parent's statement; `at` is how a reader tells.
+ * Exported only for the tests that import it.
  */
 export const closeoutArtifact = (payload: unknown, at?: number): Artifact => ({
   artifactId: 'closeout',
@@ -245,7 +246,10 @@ export const closeoutArtifact = (payload: unknown, at?: number): Artifact => ({
   extensions: [],
 });
 
-/** What a closeout Artifact carries, or `undefined` for a Task with none. The payload as it was given, string or not. */
+/**
+ * What a closeout Artifact carries, or `undefined` for a Task with none. The payload as it was given, string or not.
+ * Exported only for the tests that import it.
+ */
 export const closeoutOf = (t: Task): unknown => {
   const content = t.artifacts.find((a) => a.artifactId === 'closeout')?.parts[0]?.content;
   return content?.$case === 'text' || content?.$case === 'data' ? content.value : undefined;

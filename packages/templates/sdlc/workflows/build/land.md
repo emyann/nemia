@@ -5,10 +5,10 @@ and only it.
 
 Land this run's result: merge its own pull request on GitHub, with a merge commit whose message you write, and fast-forward the base
 branch in this checkout. Both acts are the one frozen script this step's check also reads, so your fence can refuse every `gh` call and
-every `git push`. Run it from the run's frozen workflow files (`$WF_WORKFLOW_FILES`):
+every `git push`. Run it from the run's frozen carried files (`$WF_CARRIED_FILES`):
 
 ```
-node "$WF_WORKFLOW_FILES/landing.ts" merge --run "<this run's id>" --subject "<the subject line>" --body-file "$WF_STEP_FILES/merge-message.md" --check "${{ parameters.ciCheck }}"
+node "$WF_CARRIED_FILES/landing.ts" merge --run "<this run's id>" --subject "<the subject line>" --body-file "$WF_STEP_FILES/merge-message.md" --check "${{ parameters.ciCheck }}"
 ```
 
 Write that body first, in a file of your files directory: what landed and why, read off `git log` and `git diff --stat` of the result

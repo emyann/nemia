@@ -16,7 +16,7 @@ import { MOMENTUM, stepStatus, type SpendOf } from '../status/status.ts';
 import { answeredRoute, routeSettled } from '../route/routed/index.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { artifactsDir } from '../record/record.store.ts';
-import { workflowFilesDir } from '../frozen/frozen.store.ts';
+import { carriedFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
 import { attemptIn, isScript, scriptRead } from './script.store.ts';
 
 /** The files a script condition is handed in its artifacts folder: the request it reads, and the answer it writes. */
@@ -115,7 +115,13 @@ const fileScript = Effect.fnUntraced(function* (f: ScriptFiling, step: Workflow 
     const workflowFiles = workflowFilesDir(run, run.workflowFiles);
     const command = ['node', path.join(workflowFiles, script)];
     const env = {
-      ...checkEnvOf(run, step, { workspace, files, closeout: undefined, workflowFiles }),
+      ...checkEnvOf(run, step, {
+        workspace,
+        files,
+        closeout: undefined,
+        workflowFiles,
+        ...(run.carriedFiles === undefined ? {} : { carriedFiles: carriedFilesDir(run, run.carriedFiles) }),
+      }),
       WF_REQUEST: request,
       WF_ANSWER: answer,
     };

@@ -195,7 +195,7 @@ export function assess(read: AssessRead): Assessment {
       ? stoppedOnWord(steps.flatMap((s) => wordsOf(status.get(s.name), stood.get(s.name))))
       : 'running';
 
-  if (run.hold) return { ...nothing, unreachable, status: 'running', holdUntil: run.hold.until };
+  if (run.hold) return { ...nothing, unreachable, status: 'running', holdUntil: [...run.hold.until] };
   const decide = toDecide(steps, run, overall, (name) => status.get(name) ?? 'pending', standings);
   const assessed: Assessment = {
     ready,

@@ -32,6 +32,10 @@
               "why": "the record's names for what a loop's end writes, as the files on disk are named"
             },
             {
+              "path": "packages/agent-orchestrator/src/record/record.model.ts",
+              "why": "the doc of the run's `acceptances` names the file a loop's end writes, `accept-<step>-<try>`, as it is named on disk"
+            },
+            {
               "path": "packages/agent-orchestrator/src/round/round.ts",
               "why": "the file a loop's end writes, and the word's own sense: a person accepts the work as it stands"
             },

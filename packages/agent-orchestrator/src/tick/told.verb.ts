@@ -48,7 +48,7 @@ import { landingWords, placeSay } from '../place/landing.store.ts';
 import type { Place } from '../place/place.store.ts';
 import type { PlaceSay } from '../place/place.ts';
 import { composeBrief } from '../brief/index.ts';
-import { artifactsDir, inputsDir, isDirectory, runsDir } from '../record/record.store.ts';
+import { artifactsDir, inputsDir, isDirectory } from '../record/record.store.ts';
 import { carriedFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
 import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
 import { doorAtOnce } from '../factory/door/factories.store.ts';
@@ -219,18 +219,14 @@ export const filedFoldersAt = (
   ...(run.carriedFiles === undefined ? {} : { carriedFiles: carriedFilesDir(home, run, run.carriedFiles) }),
 });
 
-/** The folder `folder` of the run `id` in the store `home`: `runs/<id>/artifacts` or `runs/<id>/inputs` (`inputsDir`). */
-const handedFolderAt = (home: string, id: string, folder: 'artifacts' | 'inputs'): string =>
-  folder === 'inputs' ? inputsDir(home, { id }) : path.join(runsDir(home), id, folder);
-
 /**
  * The folders of each run in `ids` (the runs a run is handed, its `context`) as they are on disk now, read on every filing: its
  * `artifacts/` and its `inputs/` in the store `home`, each only where it is a directory, so a run forgotten since is mounted nothing.
  */
 const handedRunsAt = (home: string, ids: readonly string[]): HandedRunFolders[] =>
   [...new Set(ids)].map((id) => {
-    const artifacts = handedFolderAt(home, id, 'artifacts');
-    const inputs = handedFolderAt(home, id, 'inputs');
+    const artifacts = path.dirname(artifactsDir(home, { id }, 'step'));
+    const inputs = inputsDir(home, { id });
     return {
       run: id,
       ...(isDirectory(artifacts) ? { artifacts } : {}),

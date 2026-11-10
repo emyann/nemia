@@ -40,7 +40,7 @@ const {
 } = await import('../src/runner.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 const { WORKFLOWS_STEP } = await import('../src/workflows/workflows.verb.ts');
 const { clearRules, readRules, rulesAt, writeRules } = await import('../src/factory/rules/rules.store.ts');
@@ -77,7 +77,7 @@ const started = (here: { repo: string; dev: string }, brief: string, factory?: s
   runPlaced(startRun({ brief, repo: here.repo, workflowDir: here.dev, ...(factory !== undefined && { factory }) }));
 
 /** The steps a run froze at its start. */
-const frozen = (id: string): Workflow[] => readRun(id).workflow ?? [];
+const frozen = (id: string): Workflow[] => runRecord(id).workflow ?? [];
 
 /** The prompt rendered for a step of a run at its start. */
 const promptOf = (run: Parameters<typeof agentFilesDir>[0], step: string): string =>

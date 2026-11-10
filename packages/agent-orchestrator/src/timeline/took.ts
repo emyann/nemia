@@ -6,7 +6,8 @@
  * cost, and the board adds the time since a task still running started, which only it can count second by second.
  */
 import { runTasks, type Run } from '../record/record.ts';
-import { count, sessionTasks, type Consumed } from '../status/status.ts';
+import { sessionTasks } from '../status/status.ts';
+import { count, type Consumed } from '../usage/usage.ts';
 import type { Workflow } from '../step/step.ts';
 import { signedAndHeld, taskUsage, type AttemptClock, type TaskClock, type Timeline, type TimelineTry } from './timeline.ts';
 

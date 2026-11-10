@@ -190,7 +190,7 @@ export const budgetArgs = (budgets: readonly StepBudget[]): string[] => budgets.
 /**
  * The cap the approvals in force set for a step, as a list of none or one: of each approval of a try its step is still on (`approvalOf`'s
  * rule: one of an earlier try was spent by the try after it) that names the step among its `budgets`, the last given (`at`, a later file
- * winning a tie). Read from the person's files as `readRun` composes them, on every pass. Pure: it changes nothing it is given.
+ * winning a tie). Read from the person's files as `runRecord` composes them, on every pass. Pure: it changes nothing it is given.
  */
 export const approvedCapsOf = (run: Run, step: string): number[] => {
   let last: { at: string; usd: number } | undefined;

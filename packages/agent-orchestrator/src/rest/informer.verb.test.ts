@@ -29,7 +29,7 @@ const { advanceRun, approveRun, startRun, tickRun, runWith: runEngine } = await 
 const { runObject } = await import('../object/run.verb.ts');
 const { runsSummarized } = await import('../summary/summary.verb.ts');
 const { Informer, informerMemo, passStarted } = await import('./informer.verb.ts');
-const { readRun } = await import('../record/record.store.ts');
+const { runRecord } = await import('../record/record.store.ts');
 const { engineOf } = await import('../runtime-client.ts');
 type InformerMemo = import('./informer.verb.ts').InformerMemo;
 
@@ -64,7 +64,7 @@ const started = async (gates: string[] = []): Promise<string> => {
   const repo = scratch('wf-informer-repo-');
   stand().world.repository(repo, {});
   const run = await runPlaced(startRun({ brief: 'inform me', repo, workflowDir: dir, gates }));
-  await runWith(e(), advanceRun(readRun(run.id)));
+  await runWith(e(), advanceRun(runRecord(run.id)));
   return run.id;
 };
 
@@ -72,7 +72,7 @@ const started = async (gates: string[] = []): Promise<string> => {
 const atItsGate = async (): Promise<string> => {
   const id = await started(['work']);
   engine().settle(`${id}-work`, 'succeeded', { closeout: SIGNED, startedAt: AT, spawnedAt: AT });
-  await runWith(e(), advanceRun(readRun(id)));
+  await runWith(e(), advanceRun(runRecord(id)));
   return id;
 };
 
@@ -106,7 +106,7 @@ const asIs: Wrap = (program) => program;
 
 /** The run `id` as one object, through `informer`. */
 const objectOf = (id: string, informer: InformerMemo | undefined, wrap: Wrap = asIs) =>
-  runWith(e(), wrap(informed(runObject(readRun(id), { memo: { filings: { filed: new Map(), cursor: 0 }, said: new Map() } }), informer)));
+  runWith(e(), wrap(informed(runObject(runRecord(id), { memo: { filings: { filed: new Map(), cursor: 0 }, said: new Map() } }), informer)));
 
 /** Every run's row, through `informer`. */
 const listOf = (informer: InformerMemo, wrap: Wrap = asIs) =>

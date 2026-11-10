@@ -10,7 +10,7 @@ import { Effect } from 'effect';
 import { EngineService, tried } from '../runtime-client.ts';
 import { informerMemo } from '../rest/informer.verb.ts';
 import { runsSummarized } from '../summary/summary.verb.ts';
-import { inFactory, kindOf } from '../runlist/runlist.ts';
+import { runInFactory, kindOf } from '../run-state/run-state.ts';
 import { leftOut, type Args, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { Conflict, Invalid } from '../refusal/refusal.ts';
@@ -120,7 +120,7 @@ export const adoptPreview = Effect.fn('adoptPreview')(function* (args: Args) {
     filings: { filed: new Map(), cursor: 0 },
     verify: false,
   });
-  const open = summaries.filter((r) => inFactory(factory.name)(r) && kindOf(r) !== 'finished').map((r) => r.id);
+  const open = summaries.filter((r) => runInFactory(factory.name)(r) && kindOf(r) !== 'finished').map((r) => r.id);
   const plan = adoptPlan(factory, read.adoption, open, read.rules);
   return { kind: 'adopt', plan, digest, line: adoptLine(factory.name, source, sets, digest) } satisfies AdoptPreview;
 });

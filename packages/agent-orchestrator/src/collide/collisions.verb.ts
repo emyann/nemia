@@ -9,7 +9,7 @@ import { stepsOf } from '../steps/steps.verb.ts';
 import type { Workflow } from '../workflow.ts';
 import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';
 import type { BranchStanding } from '../status/status.ts';
-import { runStore } from '../record/files.store.ts';
+import { runsAtOnce } from '../runs/runs.store.ts';
 import { standingsOf, type BranchReader } from '../branches/branches.store.ts';
 import { trialMerges, type Place } from '../place/place.store.ts';
 import { collisionsOf, othersInFlight, trialsOf, type Collisions, type Theirs } from './collide.ts';
@@ -26,7 +26,7 @@ export const collisionsAt = (run: Run, ending: string, standings: readonly Branc
   Effect.gen(function* () {
     const ours = ahead(standings);
     if (!isRepositoryRun(run) || !run.isolate || !ours.length) return undefined;
-    const others = othersInFlight(run, runStore.runs.list());
+    const others = othersInFlight(run, runsAtOnce.runs.list());
     const steps = new Map(yield* Effect.forEach(others, (other) => Effect.map(stepsOf(other), (s) => [other.id, s] as const)));
     return yield* tried(() => collisionsRead(run, ending, ours, git, place, others, steps));
   });

@@ -21,7 +21,7 @@ export type EngineAnswer = { tasks: TaskForgotten[]; waiting: TaskKept[]; refuse
  * What the engine forgot of one run's tasks, or would (`forgettingOf`): the tasks forgotten; those that wait, not settled, with the
  * runtime's words for why (`why`, each once); those the engine refused by name, with its words (`refusedWhy`, each once); what their
  * harness keeps that the runtime leaves (`left`); the engine's refusal of the whole call; the journals' bytes and feed lines of the tasks
- * forgotten; and, while something is left, where the run's marker keeps their ids (`marker`, `runStore.forgetting`).
+ * forgotten; and, while something is left, where the run's marker keeps their ids (`marker`, the Run door's `forgetting`).
  */
 export type EngineForgetting = {
   forgotten: string[];

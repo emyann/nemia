@@ -40,7 +40,7 @@ const place = testPlace();
 const stand = () => place;
 const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { rewriteRun } = await import('../src/record/record.store.ts');
 
 /** The engine's journals, one file a task, where `engine()` keeps them (`$WF_ROOT/engine`); `scratch` reaps what is left after the file. */
@@ -129,7 +129,7 @@ const runNaming = async (record: { taskId: string; tries?: Array<{ taskId: strin
   const repo = scratch('wf-restart-repo-');
   stand().world.repository(repo, {});
   const run = await runPlaced(startRun({ brief: 'restart', repo, workflowDir: solo, isolate: false }));
-  assert.ok(rewriteRun({ ...readRun(run.id), steps: { solo: record } }));
+  assert.ok(rewriteRun({ ...runRecord(run.id), steps: { solo: record } }));
   return run.id;
 };
 /** An earlier try, failed: what a try's task was filed after. */

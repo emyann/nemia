@@ -31,7 +31,7 @@ delete process.env.WF_MAX_RUNS;
 const { advanceRun, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { LINE_NAME } = await import('../src/run.ts');
 
 /** A run record over `/repo`, without worktrees: a test of the record, not of git. */
@@ -241,11 +241,11 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
   const repo = anIgnoringRepo();
   const b = board();
   const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: folder() }));
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  const wt = readRun(run.id).steps.implement.workspace!;
+  await runWith(b.e, advanceRun(runRecord(run.id)));
+  const wt = runRecord(run.id).steps.implement.workspace!;
   assert.equal(wt, path.join(ROOT, 'worktrees', run.id, LINE_NAME));
   b.settle(`${run.id}-implement`, 'failed');
-  await runWith(b.e, advanceRun(readRun(run.id)));
+  await runWith(b.e, advanceRun(runRecord(run.id)));
 
   fs.writeFileSync(path.join(wt, 'fix.ts'), 'export const fixed = true;\n');
   const outside = fs.mkdtempSync(path.join(ROOT, 'outside-'));
@@ -295,7 +295,7 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
     "the engine is asked to forget the run's task, once, and stops or files nothing",
   );
   assert.throws(
-    () => readRun(run.id),
+    () => runRecord(run.id),
     (err: Error) => err.message.startsWith('no such run: '),
   );
 

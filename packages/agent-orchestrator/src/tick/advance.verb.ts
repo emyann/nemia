@@ -27,7 +27,7 @@ import { assess, type Assessment } from './assess.ts';
 import type { FeedWords } from '../feed/index.ts';
 import { pauseAsksVoid } from '../retry/index.ts';
 import { runsDir } from '../record/record.store.ts';
-import { runStore } from '../record/files.store.ts';
+import { runsAtOnce } from '../runs/runs.store.ts';
 import { collectArtifacts, filesLacked, handCloseout } from '../artifacts/artifacts.store.ts';
 import {
   headsFor,
@@ -198,7 +198,7 @@ export const advancePass = Effect.fn('advancePass')(
     const parents = pass?.parents ?? passParents(readsOthers(run) ? yield* standingLive([run]) : standingReader(NOTHING_READ));
     const from = pass
       ? { read: pass, slot }
-      : { standing: standingNow(runStore.runs.list()).pipe(Effect.provideService(PlaceService, place)) };
+      : { standing: standingNow(runsAtOnce.runs.list()).pipe(Effect.provideService(PlaceService, place)) };
     const checkout = yield* checkoutHold(e, run, steps, from, process.env, memo, phaseOf);
     const lift = yield* liftHold(e, run, parents);
     const assessed = assess(withStandings({ ...reads, checkout }, yield* standingOf(pass)));
@@ -327,7 +327,7 @@ const marksOf = Effect.fnUntraced(function* (e: Engine, run: Run, r: RunRead, st
  */
 export const mayFileOf = (run: Run): (() => boolean) => {
   let calledOff = false;
-  return () => !(calledOff ||= !runStore.runs.exists(run.id) || runStore.runs.calledOff(run.id));
+  return () => !(calledOff ||= !runsAtOnce.runs.exists(run.id) || runsAtOnce.runs.calledOff(run.id));
 };
 
 /**
@@ -351,7 +351,7 @@ const handOffAll = Effect.fnUntraced(function* (run: Run, r: RunRead, place: Pla
   let marked = false;
   const collected: string[] = [];
   for (const name of handOffOwed(r.steps, run, r.phaseOf)) {
-    if (!runStore.runs.exists(run.id)) continue;
+    if (!runsAtOnce.runs.exists(run.id)) continue;
     const record = run.steps[name];
     if (!record?.taskId || !record.workspace) continue;
     const unhanded = isRepositoryRun(run) ? yield* handedOffBy(place, record.workspace, name) : folderPlace(runsDir()).handOff(run, name);
@@ -408,7 +408,7 @@ const liftHold = Effect.fnUntraced(function* (e: Engine, run: Run, parents: Pare
   if (!run.hold || run.cancelledAt || !run.hold.until.length) return nothing;
   let landed = true;
   for (const id of run.hold.until) if (!(landed = (yield* keptParent(id, parents.git, parents.read).pipe(over(e))).landed)) break;
-  if (!landed || !runStore.holds.lift(run.id, run.hold.at)) return nothing;
+  if (!landed || !runsAtOnce.holds.lift(run.id, run.hold.at)) return nothing;
   const { until, at } = run.hold;
   delete run.hold;
   return {

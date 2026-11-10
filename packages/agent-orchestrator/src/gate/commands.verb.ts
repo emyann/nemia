@@ -12,12 +12,12 @@ import { acceptRun } from '../round/round.verb.ts';
 import { approveForm } from './form.verb.ts';
 import { checked, type Command } from '../command/entry.verb.ts';
 import { ANSWER_HELP, answerFlag, givenAnswers, typedAnswers } from '../question/asked.verb.ts';
-import { runStore } from '../record/files.store.ts';
+import { runsAtOnce } from '../runs/runs.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { approvalWordsRefusal } from './gate.ts';
 import { approveRun } from './gate.verb.ts';
 import { dollarsOf } from '../keys/index.ts';
-import { dollars } from '../status/status.ts';
+import { dollars } from '../money/money.ts';
 import { budgetArgs, type StepBudget } from '../budget/budget.ts';
 
 /**
@@ -158,10 +158,10 @@ export const APPROVE: Command<
     const { runId, step } = input;
     const words = input.message;
     if ((yield* approveForm(runId, step)) === 'loop') {
-      const refused = runStore.runs.exists(runId) ? (budgetsLoopRefusal(input) ?? loopRefusal(input)) : null;
+      const refused = runsAtOnce.runs.exists(runId) ? (budgetsLoopRefusal(input) ?? loopRefusal(input)) : null;
       if (refused) return yield* Effect.fail(new Invalid({ message: refused }));
       const { acceptance, file } = yield* acceptRun(runId, step, words);
-      const waited = (yield* stepsOf(runStore.runs.read(runId))).some((s) => s.after.includes(acceptance.step));
+      const waited = (yield* stepsOf(runsAtOnce.runs.read(runId))).some((s) => s.after.includes(acceptance.step));
       const { step: looping, try: tryNo, at, message } = acceptance;
       return { step: looping, try: tryNo, at, message, file, next: waited ? 'waiting' : 'nothing', loop: true, caps: [] };
     }
@@ -176,7 +176,7 @@ export const APPROVE: Command<
           ? yield* typedAnswers(runId, gated, typed, { note: words, approval: true })
           : words;
     const { approval, file, caps, above } = yield* approveRun(runId, gated, message, given);
-    const after = runStore.runs.read(runId);
+    const after = runsAtOnce.runs.read(runId);
     const ceilings = yield* stepsOf(after);
     const next: Next = !after.steps[gated]?.taskId
       ? 'step'

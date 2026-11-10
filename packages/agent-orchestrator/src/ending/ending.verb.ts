@@ -18,8 +18,9 @@ import { landsOnCheck, ownStatus, type SpendOf } from '../status/status.ts';
 import { runReady } from '../wait/wait.ts';
 import { assess } from '../tick/assess.ts';
 import type { Closeout } from '../closeout/index.ts';
-import { runStore } from '../record/files.store.ts';
-import { stepsOf } from '../steps/steps.verb.ts';
+import { RunDoor, runsAtOnce } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
+import { stepsOrWhy } from '../steps/steps.verb.ts';
 import { checkoutStatus, landThrough, stagedHere, type StatusMemo } from '../place/landing.store.ts';
 import { dropLandedPictures, LANDED_PICTURES } from '../artifacts/artifacts.store.ts';
 import { closeoutAsked, closeoutReader, parentsRead, spendReader, taskPhasesRead, type Parents } from '../views/views.verb.ts';
@@ -44,7 +45,8 @@ const inFlightPhase = (phase: TaskPhase): boolean => phase === 'pending' || phas
  * already. A run is in the checkout while the engine holds its `workspace: base` task in flight, as `inFlight` counts one, so a
  * step filed earlier in this very pass is read as being in it. One waiting to be filed counts only if the pass would in fact file it: a
  * send-back of the work un-holds its gate, and an ending that will not be filed must not hold another run's for ever. The cap on runs in
- * flight is read once for the pass (`runSlots`): a run it holds files nothing, so its ending claims nothing (`mainClaim`).
+ * flight is read once for the pass (`runSlots`): a run it holds files nothing, so its ending claims nothing (`mainClaim`). Its plain
+ * guards are asked first, untraced: a listing asks this of every run, and most claim no checkout.
  *
  * @param from The pass that asks (`PassRead`), and the slot it gave this run (`advanceRun`'s): the runs whose claims are read are the
  *   pass's own listing, the very runs it advances, so a step it filed is read on the run it filed it on; the runs the cap holds are read
@@ -66,9 +68,8 @@ export const checkoutHold = (
   memo: StatusMemo,
   phaseOf?: (taskId: string) => TaskPhase,
 ) => {
-  // The plain guards first, untraced: a listing asks this of every run, and most claim no checkout.
   const ending = steps.find((s) => endsOnBase(s));
-  if (!ending || run.cancelledAt || endingClaimedAt(run, ending, runStore.asks.read(run.id).asks) === undefined)
+  if (!ending || run.cancelledAt || endingClaimedAt(run, ending, runsAtOnce.asks.read(run.id).asks) === undefined)
     return Effect.succeed(undefined);
   const taskId = run.steps[ending.name]?.taskId;
   if (taskId && phaseOf && inFlightPhase(phaseOf(taskId))) return Effect.succeed(undefined);
@@ -83,7 +84,8 @@ const claimsRead = Effect.fn('checkoutHold')(function* (
   env: NodeJS.ProcessEnv,
   memo: StatusMemo,
 ) {
-  const read = 'read' in from ? from.read : passRead(e, runStore.runs.list(), env, yield* from.standing, yield* passRevisions());
+  const read =
+    'read' in from ? from.read : passRead(e, yield* (yield* RunDoor).runs.list(), env, yield* from.standing, yield* passRevisions());
   const slotOf = (id: string) => read.slots.pipe(Effect.map((slots) => slots.get(id)));
   const mine = yield* mainClaim(e, run, 'read' in from ? Effect.succeed(from.slot) : slotOf(run.id), read.parents, memo);
   if (!mine || mine.holds) return undefined;
@@ -130,8 +132,12 @@ const mainClaim = Effect.fnUntraced(function* (
   parents: Parents,
   memo: StatusMemo,
 ) {
-  const steps = yield* Effect.orElseSucceed(stepsOf(run), () => undefined);
-  if (steps === undefined) return undefined;
+  const frozen = yield* stepsOrWhy(run);
+  if ('unloaded' in frozen) {
+    yield* Effect.logDebug(`run ${run.id} claims no checkout: its workflow does not load: ${frozen.unloaded}`);
+    return undefined;
+  }
+  const { steps } = frozen;
   const ending = steps.find((s) => endsOnBase(s));
   if (!ending || !isRepositoryRun(run)) return undefined;
   const repo = path.resolve(run.repo);
@@ -149,7 +155,7 @@ const mainClaim = Effect.fnUntraced(function* (
     if (landingOpen(ending, run, own, phaseOf, merging)) return { id: run.id, repo, step: ending.name, holds: true };
   }
   if (run.cancelledAt) return undefined;
-  const { asks } = runStore.asks.read(run.id);
+  const { asks } = yield* (yield* RunDoor).asks.read(RunId.read(run.id));
   const at = endingClaimedAt(run, ending, asks);
   if (at === undefined) return undefined;
   const { read } = yield* readRun(e, run, { steps: [...steps] });
@@ -192,7 +198,7 @@ export function landEnding(
 ): { notes: string[]; landed: boolean } {
   const ending = steps.find((s) => landsOnCheck(s, run));
   const record = ending && run.steps[ending.name];
-  if (!ending || !record?.taskId || record.landed || !isRepositoryRun(run) || !runStore.runs.exists(run.id))
+  if (!ending || !record?.taskId || record.landed || !isRepositoryRun(run) || !runsAtOnce.runs.exists(run.id))
     return { notes: [], landed: false };
   const own = ownStatus(ending, run, phaseOf, signedOff, asked, steps, spendOf);
   const said = signedOff(ending.name)?.output?.message;

@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { RepositoryRun } from '../record/record.ts';
-import type { Consumed } from '../status/status.ts';
+import type { Consumed } from '../usage/usage.ts';
 import type { Workflow } from '../step/step.ts';
 import { timeline, type AttemptClock, type TaskClock } from './timeline.ts';
 import { atWork, gateWaitOf, ranMs, runTokens, tryEndOf, unionMs } from './took.ts';

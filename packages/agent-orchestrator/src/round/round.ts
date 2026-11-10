@@ -41,9 +41,8 @@ import {
   type RoundAsk,
   type Spend,
   type SpendOf,
-  budgetWord,
-  dollars,
 } from '../status/status.ts';
+import { budgetWord, dollars } from '../money/money.ts';
 import { loopSpan } from '../workflow/index.ts';
 import type { EarlierTry, TryCause } from '../retry/index.ts';
 import { heldRefusal, prunedRefusal } from '../forget/prune/prune.ts';

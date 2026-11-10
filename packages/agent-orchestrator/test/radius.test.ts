@@ -28,7 +28,8 @@ import {
   workspacesIn,
   type Change,
 } from '../src/branches/branches.ts';
-import { count, sumUsage, usedLines, budgetWord, dollars, peakMark, readWords, rebuiltCache } from '../src/status/status.ts';
+import { count, sumUsage, usedLines, peakMark, readWords, rebuiltCache } from '../src/usage/usage.ts';
+import { budgetWord, dollars } from '../src/money/money.ts';
 
 const WORKSPACES = ['packages/*', 'apps/*'];
 /**

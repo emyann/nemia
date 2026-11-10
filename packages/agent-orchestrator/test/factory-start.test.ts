@@ -42,7 +42,7 @@ const {
   startFromInbox,
   runWith: runEngine,
 } = await import('../src/runner.ts');
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { detached } = await import('./factory-planted.ts');
 const { main: cli } = await import('../src/cli/main.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
@@ -182,7 +182,7 @@ function aPlanOf(build: string): string {
 const plannedRuns = (before: readonly string[]) =>
   runsWritten()
     .filter((f) => f.endsWith('.json') && !before.includes(f))
-    .map((f) => readRun(f.slice(0, -'.json'.length)));
+    .map((f) => runRecord(f.slice(0, -'.json'.length)));
 
 /** A card filed in the inbox as `<name>.md`, with `text` whole: its path. */
 function aCard(name: string, text: string): string {
@@ -311,16 +311,16 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     fs.mkdirSync(deep, { recursive: true });
     const out = await typedFrom(deep, ['start', 'build it', '--workflows', build, '--no-worktree']);
     run = startedId(out);
-    assert.deepEqual([readRun(run).factory, readRun(run).repo], ['pipao', a]);
+    assert.deepEqual([runRecord(run).factory, runRecord(run).repo], ['pipao', a]);
     assert.ok(out.includes(`factory: pipao, on ${a}`), out.join('\n'));
-    const named = readRun(startedId(await typedFrom(ROOT, ['start', 'again', '--workflows', build, '--repo', deep, '--no-worktree'])));
+    const named = runRecord(startedId(await typedFrom(ROOT, ['start', 'again', '--workflows', build, '--repo', deep, '--no-worktree'])));
     assert.deepEqual([named.factory, named.repo], ['pipao', a], '--repo is the folder the factory is found from');
   });
 
   await s.test('the run names its factory on its record, and runs each step as its hire, frozen as started', () => {
     const record = JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${run}.json`), 'utf8'));
     assert.equal(record.factory, 'pipao');
-    const steps = Object.fromEntries((readRun(run).workflow ?? []).map((st) => [st.name, st]));
+    const steps = Object.fromEntries((runRecord(run).workflow ?? []).map((st) => [st.name, st]));
     assert.equal(steps.implement.agent?.name, 'implementer');
     assert.match(
       steps.implement.body,
@@ -337,7 +337,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     hireAgent({ factory: 'pipao', agent: 'shipper', step: 'build/implement' });
     fireAgent({ factory: 'pipao', step: 'build/review' });
     assert.equal(fs.readFileSync(path.join(ROOT, 'runs', `${run}.json`), 'utf8'), before);
-    assert.equal(readRun(run).workflow?.[0].agent?.name, 'implementer');
+    assert.equal(runRecord(run).workflow?.[0].agent?.name, 'implementer');
     hired();
   });
 
@@ -380,7 +380,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
       const volumes = (readFactory(f).volumes ?? []).map(({ path: at, readOnly }) => ({ path: at, readOnly }));
       const out = await typedFrom(b, ['start', 'x', '--workflows', build, '--factory', f, '--no-worktree']);
       const id = startedId(out);
-      assert.deepEqual(readRun(id).volumes, volumes);
+      assert.deepEqual(runRecord(id).volumes, volumes);
       const writable = volumes.find((v) => !v.readOnly);
       assert.ok(writable);
       assert.ok(
@@ -435,13 +435,13 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
       const f = path.basename(file, '.json');
       const out = await typedFrom(b, ['start', 'x', '--workflows', build, '--factory', f, '--no-worktree']);
       const id = startedId(out);
-      assert.deepEqual(readRun(id).harnessSettings, { claude: { attribution: { commit: '', pr: '' } } });
+      assert.deepEqual(runRecord(id).harnessSettings, { claude: { attribution: { commit: '', pr: '' } } });
       assert.ok(
         out.some((l) => l.startsWith('harness settings: claude.attribution')),
         out.join('\n'),
       );
-      await stage.runWith(stage.board().e, advanceRun(readRun(id)));
-      const filed = stage.board().specs.filter((spec) => Object.values(readRun(id).steps).some((st) => st.taskId === spec.id));
+      await stage.runWith(stage.board().e, advanceRun(runRecord(id)));
+      const filed = stage.board().specs.filter((spec) => Object.values(runRecord(id).steps).some((st) => st.taskId === spec.id));
       assert.ok(filed.length, 'a step was filed');
       for (const spec of filed) {
         const settings = spec.config?.claude?.settings;
@@ -473,9 +473,9 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
 
   await s.test('of two repositories: the one named, else the one it is typed in; REFUSED elsewhere, naming both', async () => {
     const inside = await typedFrom(b, ['start', 'x', '--workflows', build, '--factory', 'pipao', '--no-worktree']);
-    assert.equal(readRun(startedId(inside)).repo, b);
+    assert.equal(runRecord(startedId(inside)).repo, b);
     const named = await typedFrom(ROOT, ['start', 'x', '--workflows', build, '--factory', 'pipao', '--repo', b, '--no-worktree']);
-    assert.equal(readRun(startedId(named)).repo, b);
+    assert.equal(runRecord(startedId(named)).repo, b);
     await startRefused(
       () => typedFrom(ROOT, ['start', 'x', '--workflows', build, '--factory', 'pipao', '--no-worktree']),
       'Invalid',
@@ -494,7 +494,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     assert.equal(repoFor('mono', '/elsewhere', ROOT), '/elsewhere', 'a repository named is kept, for the start to judge');
     assert.equal(repoFor(undefined, undefined, ROOT), ROOT);
     const out = await typedFrom(ROOT, ['start', 'build it', '--workflows', build, '--factory', 'mono', '--no-worktree']);
-    assert.deepEqual([readRun(startedId(out)).repo, readRun(startedId(out)).factory], [c, 'mono']);
+    assert.deepEqual([runRecord(startedId(out)).repo, runRecord(startedId(out)).factory], [c, 'mono']);
     assert.ok(out.includes(`factory: mono, on ${c}`), out.join('\n'));
     assert.deepEqual(
       (await typedFrom(ROOT, ['factory', 'ls'])).slice(0, 2),
@@ -508,7 +508,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     fs.mkdirSync(notes);
     fs.writeFileSync(path.join(notes, 'write.md'), '---\nworkspace: folder\nagent: implementer\n---\nWrite it.\n');
     const folder = await runPlaced(startRun({ brief: 'a note', repo: ROOT, workflowDir: notes, factory: 'pipao' }));
-    assert.deepEqual([folder.place?.kind, folder.factory, readRun(folder.id).repo], ['folder', 'pipao', undefined]);
+    assert.deepEqual([folder.place?.kind, folder.factory, runRecord(folder.id).repo], ['folder', 'pipao', undefined]);
   });
 
   await s.test(
@@ -523,9 +523,9 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
         const steps = Object.fromEntries((started.workflow ?? []).map((st) => [st.name, st]));
         assert.deepEqual([steps.implement.agent, steps.review.agent], [undefined, undefined], String(factory));
         assert.equal(steps.implement.body, 'Build what was asked.');
-        assert.deepEqual(['factory' in started, started.repo, 'factory' in readRun(started.id)], [false, loose, false]);
+        assert.deepEqual(['factory' in started, started.repo, 'factory' in runRecord(started.id)], [false, loose, false]);
       }
-      const typed = readRun(startedId(await typedFrom(loose, ['start', 'build it', '--workflows', build, '--no-worktree'])));
+      const typed = runRecord(startedId(await typedFrom(loose, ['start', 'build it', '--workflows', build, '--no-worktree'])));
       assert.deepEqual(['factory' in typed, typed.repo], [false, loose]);
       fs.rmSync(path.join(FACTORIES, 'default.json'));
     },
@@ -704,7 +704,7 @@ test('a start in a factory refused step by step, each naming its fix, until it s
         '--factory a, or --factory b',
       );
       assert.equal(worktrees(shared), trees, 'no worktree made');
-      const run = readRun(
+      const run = runRecord(
         startedId(await typedFrom(shared, ['start', 'build it', '--workflows', build, '--factory', 'b', '--no-worktree'])),
       );
       assert.equal(run.factory, 'b', '--factory picks one');
@@ -794,7 +794,7 @@ test('an inbox card started in its factory, or refused with the card kept', asyn
     async () => {
       const card = aCard('build-it', 'Build it.\n');
       const out = await typedFrom(ROOT, ['start', card, '--workflows', build, '--factory', 'pipao', '--no-worktree']);
-      const run = readRun(startedId(out));
+      const run = runRecord(startedId(out));
       assert.deepEqual([run.factory, run.repo, run.from], ['pipao', repo, { inbox: 'build-it' }]);
       assert.ok(out.includes(`factory: pipao, on ${repo}`), out.join('\n'));
       assert.ok(fs.existsSync(card), 'the card is kept');
@@ -803,13 +803,13 @@ test('an inbox card started in its factory, or refused with the card kept', asyn
 
   await s.test("a card's factory: starts it there, its workflow: found in the factory's repository; --factory is over it", async () => {
     aCard('in-pipao', '---\nworkflow: build\nfactory: pipao\n---\nBuild it.\n');
-    const run = readRun(startedId(await typedFrom(ROOT, ['start', path.join(inboxDir(), 'in-pipao.md'), '--no-worktree'])));
+    const run = runRecord(startedId(await typedFrom(ROOT, ['start', path.join(inboxDir(), 'in-pipao.md'), '--no-worktree'])));
     assert.deepEqual([run.factory, run.repo, run.workflowDir], ['pipao', repo, path.join(repo, 'workflows', 'build')]);
     const other = aRepo();
     filed('other', other);
     aCard('over', '---\nfactory: pipao\n---\nBuild it.\n');
     const over = await runPlaced(startFromInbox({ name: 'over', workflow: build, callerRepo: ROOT, isolate: false, factory: 'other' }));
-    assert.deepEqual([over.run.factory, readRun(over.run.id).repo], ['other', other]);
+    assert.deepEqual([over.run.factory, runRecord(over.run.id).repo], ['other', other]);
   });
 
   await s.test(
@@ -818,18 +818,18 @@ test('an inbox card started in its factory, or refused with the card kept', asyn
       const before = await runPlaced(startRun({ brief: 'read first', repo, workflowDir: build, isolate: false, factory: 'pipao' }));
       const card = aCard('by-its-name', `---\nworkflow: build\nfactory: pipao\nfrom: ${before.id}\n---\nBuild it by name.\n`);
       const elsewhere = fs.mkdtempSync(path.join(ROOT, 'typed-'));
-      const run = readRun(startedId(await typedFrom(elsewhere, ['start', 'by-its-name', '--no-worktree'])));
+      const run = runRecord(startedId(await typedFrom(elsewhere, ['start', 'by-its-name', '--no-worktree'])));
       assert.deepEqual(
         [run.brief, run.factory, run.workflowDir, run.context, run.from],
         ['Build it by name.', 'pipao', path.join(repo, 'workflows', 'build'), [before.id], { inbox: 'by-its-name' }],
       );
       assert.ok(fs.existsSync(card), 'the card is kept');
       const flags = ['--factory', 'pipao', '--workflows', build, '--no-worktree'];
-      const text = readRun(startedId(await typedFrom(elsewhere, ['start', 'no-such-card', ...flags])));
+      const text = runRecord(startedId(await typedFrom(elsewhere, ['start', 'no-such-card', ...flags])));
       assert.deepEqual([text.brief, 'from' in text], ['no-such-card', false], 'a name no card has stays a text brief');
       const shadowed = aCard('shadowed', 'From the card.\n');
       fs.writeFileSync(path.join(elsewhere, 'shadowed'), 'From the file.\n');
-      const file = readRun(startedId(await typedFrom(elsewhere, ['start', 'shadowed', ...flags])));
+      const file = runRecord(startedId(await typedFrom(elsewhere, ['start', 'shadowed', ...flags])));
       assert.equal(file.brief, 'From the file.', 'a file of that name where it is typed is the brief');
       assert.ok(fs.existsSync(shadowed), 'the card of that name stays in the inbox');
     },
@@ -842,7 +842,7 @@ test('an inbox card started in its factory, or refused with the card kept', asyn
       filed('duo', first, second);
       aCard('in-duo', '---\nfactory: duo\n---\nBuild it.\n');
       const inside = await runPlaced(startFromInbox({ name: 'in-duo', workflow: build, callerRepo: first, isolate: false }));
-      assert.deepEqual([readRun(inside.run.id).repo, inside.run.factory], [first, 'duo']);
+      assert.deepEqual([runRecord(inside.run.id).repo, inside.run.factory], [first, 'duo']);
       const card = aCard('outside-duo', '---\nfactory: duo\n---\nBuild it.\n');
       await startRefused(
         () => runPlaced(startFromInbox({ name: 'outside-duo', workflow: build, callerRepo: ROOT, isolate: false })),
@@ -881,7 +881,7 @@ test('an inbox card started in its factory, or refused with the card kept', asyn
     const other = aRepo();
     aCard('no-key', 'Build it.\n');
     const { run } = await runPlaced(startFromInbox({ name: 'no-key', workflow: build, callerRepo: other, isolate: false }));
-    assert.deepEqual(['factory' in readRun(run.id), readRun(run.id).repo], [false, other]);
+    assert.deepEqual(['factory' in runRecord(run.id), runRecord(run.id).repo], [false, other]);
   });
 
   await s.test(
@@ -933,12 +933,12 @@ test('an inbox card started in its factory, or refused with the card kept', asyn
         '--factory <name>',
       );
       assert.ok(fs.existsSync(card), 'the card stays in the inbox');
-      const flagged = readRun(
+      const flagged = runRecord(
         startedId(await typedFrom(repo, ['start', card, '--workflows', build, '--factory', 'pipao', '--no-worktree'])),
       );
       assert.equal(flagged.factory, 'pipao');
       const own = aCard('own', '---\nfactory: pipao\n---\nBuild it.\n');
-      assert.equal(readRun(startedId(await typedFrom(ROOT, ['start', own, '--workflows', build, '--no-worktree']))).factory, 'pipao');
+      assert.equal(runRecord(startedId(await typedFrom(ROOT, ['start', own, '--workflows', build, '--no-worktree']))).factory, 'pipao');
     },
   );
 });

@@ -157,7 +157,7 @@ const sendBack = (work: string, n: number, taskId: string, ending: string): Move
     };
   },
 ];
-/** A person names a condition's route for a try (`nemia route`), as `readRun` composes their file onto its record. */
+/** A person names a condition's route for a try (`nemia route`), as `runRecord` composes their file onto its record. */
 const routeNamed = (name: string, route: string, n: number): Move => [
   `${name} routed ${route} by a person, try ${n}`,
   (w) => withRecord(w, name, { ...recordOf(w, name), route: { route, try: n, by: 'person' } }),

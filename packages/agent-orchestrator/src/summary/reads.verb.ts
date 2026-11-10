@@ -1,7 +1,7 @@
 /**
  * The store as the board's reading of a run stands on it: the engine's views of a run's tasks, read once for a request, the workflow a run
  * is judged by and the steps it shows, the feed's filing times read on from where the last read stopped, and whether a run is an agent's
- * try. A controller: it reads the engine through the client (`runtime-client.ts`), the runs through `runStore`, and a workflow folder off
+ * try. A controller: it reads the engine through the client (`runtime-client.ts`), the runs through the Run door, and a workflow folder off
  * disk, and writes nothing.
  */
 import fs from 'node:fs';
@@ -17,7 +17,7 @@ import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { isRefusal, Missing } from '../refusal/refusal.ts';
 import { factoryFills } from '../factory/rules/rules.store.ts';
-import { runStore } from '../record/files.store.ts';
+import { runsAtOnce } from '../runs/runs.store.ts';
 import { type Run, runTasks, unjudgedWords, unloadedWords } from '../record/record.ts';
 import { unloadedOf } from '../steps/steps.verb.ts';
 import { triesDir } from '../try/try.store.ts';
@@ -96,7 +96,7 @@ export const judgedUnlessUnreadable = Effect.fnUntraced(function* <T, E, R>(
 export const viewsFor = Effect.fn('viewsFor')(function* (
   e: Engine,
   runs: readonly Run[],
-  store: () => readonly Run[] = () => runStore.runs.list(),
+  store: () => readonly Run[] = () => runsAtOnce.runs.list(),
 ) {
   const parents = new Set(runs.flatMap((run) => [...(run.after ?? []), ...(run.hold && !run.cancelledAt ? run.hold.until : [])]));
   const read = parents.size ? [...runs, ...store().filter((run) => parents.has(run.id))] : runs;

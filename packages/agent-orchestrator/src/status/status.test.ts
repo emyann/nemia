@@ -132,7 +132,7 @@ const schemaOf = (...fields: string[]): OutputSchema => ({
 const GROWN: Workflow[] = [{ ...step('implement'), output: { file: 'implement.schema.json', schema: schemaOf('goal', 'why') } }];
 /** The same step as it was filed: `goal` alone. */
 const FILED: Workflow[] = [{ ...step('implement'), output: { file: 'implement.schema.json', schema: schemaOf('goal') } }];
-/** A run on `GROWN` whose `implement` try's record says `record` of its filing, as `readRun` reads it (`keptDeclared`). */
+/** A run on `GROWN` whose `implement` try's record says `record` of its filing, as `runRecord` reads it (`keptDeclared`). */
 const filedAs = (record: { declared?: string[]; closeoutHash?: string }): Run =>
   keptDeclared(run({ implement: 'i1' }, { steps: { implement: { taskId: 'i1', ...record } }, workflow: GROWN }));
 

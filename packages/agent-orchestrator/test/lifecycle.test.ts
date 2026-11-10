@@ -29,7 +29,7 @@ delete process.env.WF_MAX_RUNS;
 process.env.WF_DEFAULT_FACTORY_STARTS = '1';
 const { advanceRun, cancelRun, decideRun, list, startRun, runWith } = await import('../src/runner.ts');
 const { stepsNow: stepsOf } = await import('./steps-now.ts');
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { RunDoor } = await import('../src/runs/runs.store.ts');
 const { runDoorMemory } = await import('../src/runs/memory.store.ts');
 const { LINE_NAME } = await import('../src/run.ts');
@@ -41,7 +41,7 @@ const stage = staged({ runWith, main, engineOf });
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 const world = () => stage.place().world;
 /** One pass of the tick over the run `id`, on the stage's engine. */
-const tick = (id: string) => stage.runWith(stage.board().e, advanceRun(readRun(id)));
+const tick = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(id)));
 /** The brief the engine was filed with for the task `id`. */
 const briefOf = (id: string): string => stage.board().tasks.get(id)!.spec.brief;
 /** A repository with one commit, so `nemia start` has a base to record. */
@@ -114,13 +114,13 @@ test('a chain runs to success: plan → implement → review, on one line of wor
     const [started, said] = printed[0].split('  ');
     id = started;
     assert.equal(said, '3 step(s): plan → implement → review');
-    const run = readRun(id);
+    const run = runRecord(id);
     assert.deepEqual([Object.keys(run.steps), run.workflow?.map((x) => x.name)], [ORDER, ORDER]);
   });
   await s.test("the first pass files only the root, cut under the run's own name, told its prose and the request", async () => {
     const pass = await tick(id);
     assert.deepEqual([pass.filed, pass.status], [['plan'], 'running']);
-    const plan = readRun(id).steps.plan;
+    const plan = runRecord(id).steps.plan;
     line = path.join(ROOT, 'worktrees', id, LINE_NAME);
     assert.equal(plan.workspace, line, 'one worktree per card, named for the run');
     assert.equal(plan.branch, `wf/${id}/${LINE_NAME}`, 'and one branch, which is what a pull request on GitHub reads');
@@ -140,7 +140,7 @@ test('a chain runs to success: plan → implement → review, on one line of wor
     assert.deepEqual((await tick(id)).filed, ['implement'], 'filed once the step before it SUCCEEDED');
     assert.match(subjects(line)[0], /^plan: hand off/);
     assert.equal(uncommitted(line), '');
-    const implement = readRun(id).steps.implement;
+    const implement = runRecord(id).steps.implement;
     assert.deepEqual([implement.workspace, implement.branch], [line, `wf/${id}/${LINE_NAME}`], 'the line, inherited');
     const brief = briefOf(`${id}-implement`);
     assert.match(brief, /Where to look/);
@@ -189,7 +189,7 @@ test('a chain runs to success: plan → implement → review, on one line of wor
     "a record keyed in the folder's order, its workflow frozen so or not at all, reads, lists and decides in the steps' order",
     async () => {
       const folderOrder = ['implement', 'plan', 'review'];
-      const run = readRun(id);
+      const run = runRecord(id);
       for (const frozen of [true, false]) {
         const legacyId = `${id}-${frozen ? 'frozen' : 'unfrozen'}`;
         const { workflow, steps, ...rest } = run;
@@ -202,7 +202,7 @@ test('a chain runs to success: plan → implement → review, on one line of wor
             steps: Object.fromEntries(folderOrder.map((name) => [name, steps[name]])),
           }),
         );
-        const legacy = readRun(legacyId);
+        const legacy = runRecord(legacyId);
         assert.deepEqual([Object.keys(legacy.steps), legacy.workflow?.map((x) => x.name)], [folderOrder, frozen ? folderOrder : undefined]);
         assert.deepEqual(
           stepsOf(legacy).map((x) => x.name),
@@ -228,7 +228,7 @@ test('a diamond fans out and in: two roots side by side, and a step after both t
     const dir = folderOf({ a: [], b: [], join: ['after: a, b'] });
     id = (await stage.runPlaced(startRun({ brief: 'split the work', repo: aRepo(), workflowDir: dir }))).id;
     assert.deepEqual([...(await tick(id)).filed].sort(), ['a', 'b'], 'a DAG, not a queue');
-    const { a, b } = readRun(id).steps;
+    const { a, b } = runRecord(id).steps;
     assert.deepEqual(
       [a.workspace, a.branch, b.workspace, b.branch],
       [path.join(ROOT, 'worktrees', id, LINE_NAME), `wf/${id}/${LINE_NAME}`, path.join(ROOT, 'worktrees', id, 'b'), `wf/${id}/b`],
@@ -236,7 +236,7 @@ test('a diamond fans out and in: two roots side by side, and a step after both t
     );
   });
   await s.test('the fan-in waits while one root still works', async () => {
-    const { a, b } = readRun(id).steps;
+    const { a, b } = runRecord(id).steps;
     fs.writeFileSync(path.join(a.workspace!, 'shared.txt'), 'from a\n');
     fs.writeFileSync(path.join(b.workspace!, 'shared.txt'), 'from b\n');
     fs.writeFileSync(path.join(b.workspace!, 'only-b.txt'), 'b alone\n');
@@ -249,7 +249,7 @@ test('a diamond fans out and in: two roots side by side, and a step after both t
     async () => {
       stage.board().settle(`${id}-b`, 'succeeded', SIGNED);
       assert.deepEqual((await tick(id)).filed, ['join']);
-      const join = readRun(id).steps.join;
+      const join = runRecord(id).steps.join;
       assert.deepEqual([join.workspace, join.branch], [path.join(ROOT, 'worktrees', id, 'join'), `wf/${id}/join`]);
       assert.match(subjects(join.workspace!)[0], /^a: hand off/, 'cut from a, the first of its `after` in order');
       assert.equal(world().staged(join.workspace!), world().tip(join.workspace!, `wf/${id}/b`), "b's work merged into it, left staged");
@@ -266,15 +266,15 @@ test('a diamond fans out and in: two roots side by side, and a step after both t
     const place = placeAnswering('make', { answer: { workspace: elsewhere, branch: 'b', conflicts: [], notes: [] } });
     const at = path.join(ROOT, 'worktrees', run.id, LINE_NAME);
     for (const pass of [1, 2]) {
-      const ticked = await stage.runWith(stage.board().e, advanceRun(readRun(run.id)).pipe(Effect.provide(place.layer)));
+      const ticked = await stage.runWith(stage.board().e, advanceRun(runRecord(run.id)).pipe(Effect.provide(place.layer)));
       assert.equal(ticked.notes.length, 1);
       namesFor(`pass ${pass}`, ticked.notes[0], 'a: not cut', elsewhere, at, 'asked again on the next pass');
       assert.deepEqual(ticked.filed, [], `pass ${pass}: nothing filed`);
-      assert.ok(!('workspace' in readRun(run.id).steps.a), `pass ${pass}: the record holds no workspace, not even undefined`);
+      assert.ok(!('workspace' in runRecord(run.id).steps.a), `pass ${pass}: the record holds no workspace, not even undefined`);
       assert.equal(place.asked(), pass, `pass ${pass}: the place was asked again`);
     }
     assert.deepEqual((await tick(run.id)).filed, ['a'], 'a place that answers where it was asked files the step');
-    assert.equal(readRun(run.id).steps.a.workspace, at);
+    assert.equal(runRecord(run.id).steps.a.workspace, at);
   });
   await s.test(
     'REFUSED by the place: a make it refuses, or that is not heard, files nothing and leaves no workspace or branch on the record',
@@ -287,11 +287,11 @@ test('a diamond fans out and in: two roots side by side, and a step after both t
       for (const [outcome, said] of outcomes) {
         const ticked = await stage.runWith(
           stage.board().e,
-          advanceRun(readRun(run.id)).pipe(Effect.provide(placeAnswering('make', outcome).layer)),
+          advanceRun(runRecord(run.id)).pipe(Effect.provide(placeAnswering('make', outcome).layer)),
         );
         assert.deepEqual([ticked.notes.length, ticked.filed], [1, []]);
         namesFor(said[0], ticked.notes[0], 'a: not cut', ...said);
-        const a = readRun(run.id).steps.a;
+        const a = runRecord(run.id).steps.a;
         assert.ok(!('workspace' in a) && !('branch' in a), JSON.stringify(a));
       }
       assert.ok(!stage.board().filings.includes(`${run.id}-a`), 'nothing filed');
@@ -317,10 +317,10 @@ test('a failed step, then a cancelled run', async (t) => {
     async () => {
       const place = placeAnswering('handoff', { refused: 'a hook said no' });
       for (const pass of [1, 2]) {
-        const ticked = await stage.runWith(stage.board().e, advanceRun(readRun(failed)).pipe(Effect.provide(place.layer)));
+        const ticked = await stage.runWith(stage.board().e, advanceRun(runRecord(failed)).pipe(Effect.provide(place.layer)));
         assert.equal(ticked.notes.length, 1);
         namesFor(`pass ${pass}`, ticked.notes[0], 'implement: not handed off', 'a hook said no', 'asked again on the next pass');
-        assert.equal(readRun(failed).steps.implement.handedOff, undefined, `pass ${pass}: not marked`);
+        assert.equal(runRecord(failed).steps.implement.handedOff, undefined, `pass ${pass}: not marked`);
         assert.equal(place.asked(), pass, `pass ${pass}: the place was asked`);
       }
       assert.match(uncommitted(workspace), /half-done\.txt/, 'the work is where the step left it');
@@ -329,7 +329,7 @@ test('a failed step, then a cancelled run', async (t) => {
   await s.test('the failed step is handed off, and blocks what waits on it: the run failed, and `nemia decide` names it', async () => {
     const pass = await tick(failed);
     assert.deepEqual([pass.filed, pass.status], [[], 'failed']);
-    assert.equal(readRun(failed).steps.implement.handedOff, `${failed}-implement`);
+    assert.equal(runRecord(failed).steps.implement.handedOff, `${failed}-implement`);
     assert.equal(uncommitted(workspace), '');
     assert.match(subjects(workspace)[0], /^implement: hand off/);
     const { decision: d } = await stage.runWith(stage.board().e, decideRun(failed));
@@ -338,7 +338,7 @@ test('a failed step, then a cancelled run', async (t) => {
   await s.test('cancelling the failed run is no error, and does not relabel it', async () => {
     const { plan } = await stage.runWith(stage.board().e, cancelRun(failed));
     assert.deepEqual(plan, { kind: 'finished', status: 'failed' });
-    assert.equal(readRun(failed).cancelledAt, undefined, 'nothing is written');
+    assert.equal(runRecord(failed).cancelledAt, undefined, 'nothing is written');
   });
 
   let id = '';
@@ -365,7 +365,7 @@ test('a failed step, then a cancelled run', async (t) => {
     });
     assert.deepEqual(stage.board().stopped, [check, `${id}-b`]);
     fs.writeFileSync(file, before);
-    assert.ok(readRun(id).cancelledAt, 'the daemon wrote back the copy it read before the cancel, and the mark is in its own file');
+    assert.ok(runRecord(id).cancelledAt, 'the daemon wrote back the copy it read before the cancel, and the mark is in its own file');
   });
   await s.test('the next pass files nothing, and asks the engine to stop nothing it was asked to stop already', async () => {
     const pass = await tick(id);
@@ -373,7 +373,7 @@ test('a failed step, then a cancelled run', async (t) => {
     assert.deepEqual(stage.board().stopped, [check, `${id}-b`], "the engine's record says the stop request is already on each task");
   });
   await s.test('cancelling again keeps the first time, and asks the engine nothing again', async () => {
-    const first = readRun(id).cancelledAt;
+    const first = runRecord(id).cancelledAt;
     const { plan } = await stage.runWith(stage.board().e, cancelRun(id));
     assert.deepEqual(plan, {
       kind: 'already-cancelled',
@@ -383,12 +383,12 @@ test('a failed step, then a cancelled run', async (t) => {
         { name: 'b', taskId: `${id}-b` },
       ],
     });
-    assert.equal(readRun(id).cancelledAt, first);
+    assert.equal(runRecord(id).cancelledAt, first);
     assert.deepEqual(stage.board().stopped, [check, `${id}-b`], 'the engine would refuse the second ask');
   });
   await s.test('a step whose task the engine no longer has is unknown, not queued: cancelling stops nobody', async () => {
     const amnesia: Run = {
-      ...readRun(failed),
+      ...runRecord(failed),
       id: `${failed}-amnesia`,
       steps: { implement: { taskId: `${failed}-amnesia-implement` }, review: { taskId: null } },
     };

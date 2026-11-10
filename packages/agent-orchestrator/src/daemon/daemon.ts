@@ -10,7 +10,7 @@
  * (`ticking`); anything else — no file, a file that does not read, a holder that stopped, is gone or has been silent for a long while — is
  * free, and the next daemon takes it over.
  */
-import { durationWord } from '../status/status.ts';
+import { durationWord } from '../usage/usage.ts';
 
 /**
  * A reading of the machine's monotonic clock, in whole milliseconds, under the id of the boot it was taken in: shared by every process of

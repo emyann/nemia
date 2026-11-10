@@ -55,7 +55,7 @@ import { keysOf } from '../stats/index.ts';
 import type { WorkflowCosts } from '../costs/index.ts';
 import { costsRead } from '../costs/costs.verb.ts';
 import { serversFiling, unsignedStep } from '../factory/servers/servers.verb.ts';
-import { DEFAULT_FACTORY } from '../factory/factory.ts';
+import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
 import { answerHeld, stopAsked } from './held.verb.ts';
 import { forStep } from '../telemetry/telemetry.store.ts';
 import { stepLabels } from '../telemetry/telemetry.ts';
@@ -524,7 +524,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, 
   const scripts: string[] = yield* fileScripts(f, ready);
   const filed: string[] = [...(yield* sendCards(f, due.send)), ...scripts];
   const placed = yield* PlaceService;
-  const servers = yield* serversFiling(run.factory ?? DEFAULT_FACTORY, f.home, ready, f.notes);
+  const servers = yield* serversFiling(run.factory ?? DEFAULT_NAMESPACE, f.home, ready, f.notes);
   for (const name of ready.filter((n) => !scripts.includes(n))) {
     if (!f.mayFile()) break;
     const step = stepNamed(f, name);

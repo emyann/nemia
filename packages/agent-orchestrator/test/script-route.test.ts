@@ -17,7 +17,7 @@ delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 process.env.WF_DEFAULT_FACTORY_STARTS = '1';
 const { advanceRun, startRun, runWith: runEngine } = await import('../src/runner.ts');
-const { readRun, rewriteRun } = await import('../src/record/record.store.ts');
+const { runRecord, rewriteRun } = await import('../src/record/record.store.ts');
 const { main: cli } = await import('../src/cli/main.ts');
 const { engineOf, over } = await import('../src/runtime-client.ts');
 const { closeoutReader, taskPhasesRead } = await import('../src/views/views.verb.ts');
@@ -48,7 +48,7 @@ async function atTheCondition() {
   stage.place().world.repository(repo, {});
   const b = stage.board();
   const { id } = await stage.runPlaced(startRun({ brief: 'route it', repo, workflowDir: folder() }));
-  const tick = () => stage.runWith(b.e, advanceRun(readRun(id)));
+  const tick = () => stage.runWith(b.e, advanceRun(runRecord(id)));
   await tick();
   b.settle(`${id}-plan`, 'succeeded', SIGNED);
   await tick();
@@ -57,7 +57,7 @@ async function atTheCondition() {
 
 /** Each step's word on a pass now, as the tick reads it (`runWords`, over the closeouts the pass reads). */
 const wordsOf = async (b: Board, id: string): Promise<Record<string, string>> => {
-  const run = readRun(id);
+  const run = runRecord(id);
   const steps = run.workflow ?? [];
   const { views, phaseOf } = await stage.runWith(b.e, taskPhasesRead(run).pipe(over(b.e)));
   return Object.fromEntries(runWords(steps, run, phaseOf, closeoutReader(views, run, steps)));
@@ -68,7 +68,7 @@ test("a script condition is filed as a command task from the frozen workflow fil
   const spec = b.specs.find((s) => s.id === `${id}-pick`);
   assert.ok(spec, 'the condition is filed under the id its step would get');
   assert.equal(spec.harness, 'command');
-  const run = readRun(id);
+  const run = runRecord(id);
   const config = spec.config as { command: string[]; env: Record<string, string>; terminationMessagePath: string };
   assert.equal(config.command[0], 'node');
   assert.ok(run.workflowFiles && config.command[1]?.endsWith(path.join(run.workflowFiles, 'pick.ts')), config.command[1]);
@@ -87,12 +87,12 @@ test('exit 0 with an answer naming a declared route takes it: the route is copie
   const { id, b, tick } = await atTheCondition();
   b.end(`${id}-pick`, 'succeeded', { exitCode: 0, terminationMessage: '{"route":"web","why":"a page"}' });
   await tick();
-  assert.deepEqual(readRun(id).steps.pick?.route, { route: 'web', try: 1, by: 'script' });
+  assert.deepEqual(runRecord(id).steps.pick?.route, { route: 'web', try: 1, by: 'script' });
   assert.ok(b.filings.includes(`${id}-web`), 'the route taken is filed');
   assert.ok(!b.filings.includes(`${id}-docs`), 'the other is not');
-  const kept = readRun(id).steps.pick?.route;
+  const kept = runRecord(id).steps.pick?.route;
   await tick();
-  assert.deepEqual(readRun(id).steps.pick?.route, kept, 'written once for the try');
+  assert.deepEqual(runRecord(id).steps.pick?.route, kept, 'written once for the try');
   const words = await wordsOf(b, id);
   assert.deepEqual([words.pick, words.docs], ['unverified', 'skipped']);
 });
@@ -110,14 +110,14 @@ for (const [name, end, word] of ENDS)
     const { id, b, tick } = await atTheCondition();
     b.end(`${id}-pick`, end.exitCode === 0 ? 'succeeded' : 'failed', end);
     await tick();
-    assert.equal(readRun(id).steps.pick?.route, undefined, 'no route on the record');
+    assert.equal(runRecord(id).steps.pick?.route, undefined, 'no route on the record');
     assert.ok(!b.filings.some((f) => f === `${id}-web` || f === `${id}-docs`));
     assert.equal((await wordsOf(b, id)).pick, word);
   });
 
 /** The routed row of each step on a pass now, as `nemia ls` lays it, over the closeouts the tick reads. */
 const rowsOf = async (b: Board, id: string) => {
-  const run = readRun(id);
+  const run = runRecord(id);
   const steps = run.workflow ?? [];
   const { views, phaseOf } = await stage.runWith(b.e, taskPhasesRead(run).pipe(over(b.e)));
   const signedOff = closeoutReader(views, run, steps);
@@ -148,17 +148,17 @@ test('a script that never exited (stopped) reads stopped, and routes nothing', a
   const { id, b, tick } = await atTheCondition();
   b.end(`${id}-pick`, 'stopped', { terminationMessage: '{"route":"web"}' });
   await tick();
-  assert.equal(readRun(id).steps.pick?.route, undefined);
+  assert.equal(runRecord(id).steps.pick?.route, undefined);
   assert.equal((await wordsOf(b, id)).pick, 'stopped');
 });
 
 test('a restart adopts the task a pass filed and never recorded, by its id, and files it no second time', async () => {
   const { id, b, tick } = await atTheCondition();
-  const run = readRun(id);
+  const run = runRecord(id);
   delete run.steps.pick;
   rewriteRun(run);
-  assert.equal(readRun(id).steps.pick?.taskId, undefined, 'the pass died between the filing and the record');
+  assert.equal(runRecord(id).steps.pick?.taskId, undefined, 'the pass died between the filing and the record');
   await tick();
-  assert.equal(readRun(id).steps.pick?.taskId, `${id}-pick`);
+  assert.equal(runRecord(id).steps.pick?.taskId, `${id}-pick`);
   assert.equal(b.filings.filter((f) => f === `${id}-pick`).length, 1);
 });

@@ -7,40 +7,14 @@
  */
 import { Context, Effect, Exit, Metric, Option } from 'effect';
 import type { Engine } from '../runtime-client.ts';
+import { verbOf } from '../engine-verbs/engine-verbs.verb.ts';
 import { addRuntime, asideEffect, withinEffect, type Tallies } from './tally.store.ts';
 import { PASS_BOUNDS, passCost, READ_BOUNDS, PHASES, type HarnessCost, type PassCost, type Phase } from './meter.ts';
 import { exportedNow, seriesBorn } from '../telemetry/telemetry.store.ts';
 import { boundedAttributes, type DeniedFact, type StepFact, type TimelineFact, type Wait, type WaitFact } from './step.ts';
 
-/**
- * The phase each of the engine's verbs is counted in: its pass is the runtime's, a read of a journal is `journals`, a verb that changes a
- * task is `act`.
- */
-const ENGINE_PHASES: Readonly<Record<string, Phase>> = {
-  tick: 'runtime',
-  mcpState: 'runtime',
-  mcpSignIn: 'runtime',
-  mcpSignInState: 'runtime',
-  mcpSignOut: 'runtime',
-  view: 'journals',
-  list: 'journals',
-  feed: 'journals',
-  sweep: 'journals',
-  kept: 'journals',
-  logs: 'journals',
-  output: 'journals',
-  transcript: 'journals',
-  file: 'act',
-  admit: 'act',
-  stop: 'act',
-  close: 'act',
-  answer: 'act',
-  say: 'act',
-  removeBody: 'act',
-  forget: 'act',
-  drain: 'act',
-  drainSessions: 'act',
-};
+/** The phase each of the engine's verbs is counted in, where the meter counts it (`ENGINE_VERBS`). */
+const phaseOf = (key: string): Phase | undefined => verbOf(key)?.phase;
 
 type EngineIo = Effect.Success<ReturnType<Engine['io']>>;
 
@@ -111,7 +85,7 @@ export const meteredEngine = (e: Engine): Engine =>
   new Proxy(e, {
     get(target, key, receiver) {
       const value = Reflect.get(target, key, receiver) as unknown;
-      const phase = typeof key === 'string' ? ENGINE_PHASES[key] : undefined;
+      const phase = typeof key === 'string' ? phaseOf(key) : undefined;
       if (!phase || typeof value !== 'function') return value;
       return (...args: unknown[]) =>
         engineCall(

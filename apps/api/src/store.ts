@@ -12,7 +12,7 @@ import {
   COMMANDS,
   engine,
   engineOf,
-  runStore,
+  runsAtOnce,
   runWith,
   PlaceService,
   type EngineService,
@@ -48,7 +48,7 @@ export class Engine extends Context.Service<Engine, ReturnType<typeof engine>>()
  * (`storeRootLayer`, `app.ts`), with no default, so an app given none does not compile. A test that gives another root moves where the
  * api looks for yours.
  *
- * What the package still reads off a root of its own, as its modules load — the runs (`runStore`, `findRun`), the inbox and the queue,
+ * What the package still reads off a root of its own, as its modules load — the runs (`runsAtOnce`, `findRun`), the inbox and the queue,
  * the daemon's file — is named in `packages/agent-orchestrator/test/global-roots.baseline.ts`, and is owed its own threading; a test that
  * means to move those sets `WF_ROOT` before it imports the package, as `test/harness.ts` does.
  */
@@ -92,7 +92,7 @@ export function commandNamed(name: string): Command {
 }
 
 /** Found among the ids the store lists (`runs.find`), not read by path, so no id can name a file outside it. */
-export const findRun = (id: string): Run | undefined => runStore.runs.find(id);
+export const findRun = (id: string): Run | undefined => runsAtOnce.runs.find(id);
 
 export const noSuchRun = (id: string) =>
   `No run '${id}' in this store. GET /api/runs (or \`nemia ls\`) lists the runs it has; check WF_ROOT if you expected it here.`;

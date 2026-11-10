@@ -33,7 +33,7 @@ const RUNS = {
     }),
 };
 const { advanceRun, startRun, runWith: runEngine } = await import('../runner.ts');
-const { readRun } = await import('../record/record.store.ts');
+const { runRecord } = await import('../record/record.store.ts');
 const { engineOf } = await import('../runtime-client.ts');
 type RunSummary = import('./summary.verb.ts').RunSummary;
 
@@ -69,7 +69,7 @@ const started = async (card?: string): Promise<string> => {
   stand().world.repository(repo, {});
   const from = card === undefined ? {} : { from: { inbox: card } };
   const run = await runPlaced(startRun({ brief: 'sum me', repo, workflowDir: team(), isolate: true, ...from }));
-  await runWith(e(), advanceRun(readRun(run.id)));
+  await runWith(e(), advanceRun(runRecord(run.id)));
   return run.id;
 };
 
@@ -92,7 +92,7 @@ test('a step at work says its agent and when its own task started; one given no 
   assert.equal((await stepOf(id, 'notes')).agent, null, 'a step given no agent');
 
   engine().settle(`${id}-build`, 'succeeded', { closeout: SIGNED, startedAt: AT, spawnedAt: AT });
-  await runWith(e(), advanceRun(readRun(id)));
+  await runWith(e(), advanceRun(runRecord(id)));
   const done = await stepOf(id, 'build');
   assert.deepEqual([done.agent, done.since], ['ada', null], 'a settled step keeps its agent and is at work since nothing');
 });
@@ -100,7 +100,7 @@ test('a step at work says its agent and when its own task started; one given no 
 test("a run's judged fields: the judgement's run-level words, its time at work and tokens off the views, and the same keys left unjudged", async () => {
   const { judgedFields, unjudgedFields } = await import('./summary.verb.ts');
   const id = await started();
-  const run = readRun(id);
+  const run = runRecord(id);
   const judged = {
     status: 'running',
     phase: 'running',
@@ -140,7 +140,7 @@ test('`cardRuns`: each run started from a card with its phase as the list judges
 
   for (const step of ['build', 'notes'])
     engine().settle(`${fromCard}-${step}`, 'succeeded', { closeout: SIGNED, startedAt: AT, spawnedAt: AT });
-  await runWith(e(), advanceRun(readRun(fromCard)));
+  await runWith(e(), advanceRun(runRecord(fromCard)));
   passStarted(memo);
   assert.deepEqual(
     (await runWith(e(), cardRuns(e(), how))).map((r) => r.phase),

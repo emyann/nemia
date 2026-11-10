@@ -10,7 +10,7 @@ import type { Run } from '../record/record.ts';
 import { resultSteps, routedResult } from '../branches/index.ts';
 import { artifactsDir } from '../record/record.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
-import { runStore } from '../record/files.store.ts';
+import { runsAtOnce } from '../runs/runs.store.ts';
 import { closeoutOf, parentRead } from '../views/views.verb.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
 import { phaseOfView } from '../views/views-words.ts';
@@ -65,7 +65,7 @@ export const parentCloseouts = Effect.fn('parentCloseouts')(function* (
   for (const id of new Set(ids)) {
     let record: Run;
     try {
-      record = runStore.runs.read(id);
+      record = runsAtOnce.runs.read(id);
     } catch (err) {
       out.push({ run: id, unreadable: `its record cannot be read: ${(err as Error).message}`, how, landed: false });
       continue;

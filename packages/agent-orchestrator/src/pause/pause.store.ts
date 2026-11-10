@@ -5,7 +5,7 @@
  * A take-over's pause also names the process that holds it (`heldBy`, `PauseHolder`), kept in the file and off the `Pause` the store
  * serves: once the process table says that process is gone, the next pass lifts the pause (`liftLapsedPause`), so a take-over's pause
  * never outlives its command, however the command ended. A person's names none, and stands until `nemia resume`.
- * Every pass reads it, as `runStore` composes it onto each run it reads, so a pause put or lifted between two passes is honoured by the
+ * Every pass reads it, as the Run door composes it onto each run it reads, so a pause put or lifted between two passes is honoured by the
  * next. The file keeps the name it had before the verbs were renamed, so a pause put then still stands and `nemia resume` lifts it.
  *
  * Beneath the controllers, beside `files.store.ts`, which imports it: it imports no store of runs.

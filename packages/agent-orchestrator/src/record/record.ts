@@ -182,7 +182,7 @@ type RunBase = {
   harnessSettings?: HarnessSettings;
   /**
    * What people approved at a gate (`nemia approve`), each in a file of its own beside the retry asks —
-   * `runs/<id>.asks/approve-<step>-<try>` — composed on read, as `cancelledAt` is (`readRun` in record.store.ts), and never written into
+   * `runs/<id>.asks/approve-<step>-<try>` — composed on read, as `cancelledAt` is (`runRecord` in record.store.ts), and never written into
    * the record: the tick owns the record, a person owns their word. An approval opens a gate for the try it names (`approvalOf`), and one
    * for an earlier try is spent. Absent when there are none.
    */
@@ -242,7 +242,7 @@ type RunBase = {
   cancelledAt?: string;
   /**
    * When `nemia prune` removed the run's worktrees, and which, with what each held on disk — composed on read from a file of its own,
-   * `runs/<id>.pruned`, as `cancelledAt` is (`readRun` in record.store.ts), and never written into the record. A pruned run is read as it
+   * `runs/<id>.pruned`, as `cancelledAt` is (`runRecord` in record.store.ts), and never written into the record. A pruned run is read as it
    * was, off its record, its branches and its files directory, and nothing more of it is filed: every verb that would work in a worktree
    * refuses it (`prunedRefusal`), and so does every pass (`advance`). Absent on a run nobody pruned.
    */
@@ -692,10 +692,10 @@ export type AskWritten = { written: true; where: string } | { written: false; wh
 /**
  * The run store, as a plain value of synchronous methods: a run's record, and the files a person keeps beside it, by run id and never by
  * path. The tick writes the record; a person's verbs write their own files; no method lets one writer write the other's, but the tick's one
- * touch on a person's file, a hold lifted. Its implementation is `filesStore` (`files.store.ts`), bound as `runStore` there. What the
- * tick's pass and a person's verbs read and write of the store, grouped as `runs`, `asks`, `holds`, `labels`, `refresh` and
- * `forgetting`, the tasks `nemia rm` has yet to see the engine forget; and the inbox, `inbox`: a person's cards, which their verbs write,
- * and the tick's tries of a queued card's start, which the tick alone writes.
+ * touch on a person's file, a hold lifted. Its implementation is `filesStore` (`files.store.ts`), read by the Run door alone (`RunDoor`,
+ * `src/runs/runs.store.ts`). What the tick's pass and a person's verbs read and write of the store, grouped as `runs`, `asks`, `holds`,
+ * `labels`, `refresh` and `forgetting`, the tasks `nemia rm` has yet to see the engine forget; and the inbox, `inbox`: a person's cards,
+ * which their verbs write, and the tick's tries of a queued card's start, which the tick alone writes.
  */
 export type RunStore = {
   readonly runs: {

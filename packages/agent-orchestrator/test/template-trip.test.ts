@@ -35,7 +35,7 @@ const { checkedTree, packageSkillNames } = await import('../src/template/templat
 const { readFactories, readFactory } = await import('../src/runner.ts');
 const { appliedDir, readStatus, statusFile, treeDir } = await import('../src/factory/applied/applied.store.ts');
 const { reconcileOnce } = await import('../src/factory/applied/applied.verb.ts');
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { startDue } = await import('../src/factory/schedule/schedule.verb.ts');
 const { StoreRoot } = await import('../src/config/root.store.ts');
 const { TemplateDoor } = await import('../src/template/door/templates.store.ts');
@@ -288,7 +288,7 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
 
   await s.test("a bare workflow name started is the tree's, and the run is told the tree's step as the person changed it", async (t) => {
     const printed = await printedBy(t, 'start', 'Cache the views', '--factory', 'trip', '--workflows', 'dev');
-    const run = readRun(printed[0].split(' ')[0]);
+    const run = runRecord(printed[0].split(' ')[0]);
     assert.equal(run.workflowDir, path.join(treeDir('trip'), 'workflows', 'dev'));
     assert.equal(run.workflow?.find((step) => step.name === 'review')?.budget, 9);
     assert.equal(run.factory, 'trip');
@@ -298,7 +298,7 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
     await printedBy(t, 'factory', 'schedule', 'trip', 'dev', '--cron', '* * * * *', '--brief', 'Cache the views');
     const started = await stage.runWith(stage.board().e, startDue(repo, [], Date.parse('2100-01-01T00:00:00Z')));
     assert.ok(started && 'run' in started, `the due schedule started a run: ${JSON.stringify(started)}`);
-    const run = readRun(started.run);
+    const run = runRecord(started.run);
     assert.equal(run.workflowDir, path.join(treeDir('trip'), 'workflows', 'dev'));
     assert.equal(run.workflow?.find((step) => step.name === 'review')?.budget, 9);
   });

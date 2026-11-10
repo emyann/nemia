@@ -6,7 +6,9 @@
  * hands them here, `cli/main.ts` prints the lines `nemia decide` shows, and nothing here reads a disk or calls the engine.
  */
 import type { Run } from '../record/record.ts';
-import { roundIn, dollars, durationWord, rebuiltCache, sumUsage, usedLines, type Consumed } from '../status/status.ts';
+import { roundIn } from '../status/status.ts';
+import { dollars } from '../money/money.ts';
+import { durationWord, rebuiltCache, sumUsage, usedLines, type Consumed } from '../usage/usage.ts';
 import { hasStarted } from '../wait/wait.ts';
 import type { Workflow } from '../step/step.ts';
 import { loopSpan } from '../workflow/index.ts';

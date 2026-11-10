@@ -42,7 +42,7 @@ const versionOf = (dir: string, places: Parameters<typeof workflowVersion>[1]): 
   Effect.runSync(workflowVersion(dir, places).pipe(Effect.provideService(StoreRoot, ROOT)));
 const { skillsFor, skillVersion } = await import('../src/skills/read.store.ts');
 const { agentFilesDir, renderedSkillVersions, writeAgentFiles } = await import('../src/agents/agents.store.ts');
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { toldOf } = await import('../src/tick/told.verb.ts');
 const { SkillDoor } = await import('../src/skills/skill-door.store.ts');
 const { MEMORY_ROOT, skillDoorMemory } = await import('../src/skills/skill-memory.store.ts');
@@ -163,7 +163,7 @@ test('a step given skills from four places: frozen as files under bare names, na
   });
 
   await s.test('the record says each skill as its line writes it, at the version of the folder it was read from', () => {
-    record = readRun(run.id).workflow ?? [];
+    record = runRecord(run.id).workflow ?? [];
     const implement = stepNamed(record, 'implement');
     assert.deepEqual(implement.skills, ['review-a-change', 'app:y', 'x']);
     assert.deepEqual(implement.agent?.skills, ['implement-a-change', 'apps/web:z', 'review-a-change', 'app:y', 'x']);
@@ -224,7 +224,7 @@ test('a step given skills from four places: frozen as files under bare names, na
 
   await s.test('a step whose rendered folder is gone is told every skill whole in its brief, under the name its line writes', () => {
     const found = skillsFor(dev, { repo });
-    const gone = { ...readRun(run.id), id: 'told-gone-files' };
+    const gone = { ...runRecord(run.id), id: 'told-gone-files' };
     for (const step of record.filter((s) => s.agent?.skills?.length)) {
       assert.equal(fs.existsSync(agentFilesDir(gone, step.name)), false, `${step.name}: its rendered folder is not there`);
       const told = Effect.runSync(toldOf(gone, step).pipe(Effect.provideService(StoreRoot, ROOT)));
@@ -244,7 +244,7 @@ test('a step given skills from four places: frozen as files under bare names, na
   await s.test("the tick tells a step whose rendered folder is gone its skills as the Skill door holds them, not the disk's", () => {
     const implement = stepNamed(record, 'implement');
     const step = { ...implement, agent: { ...implement.agent!, skills: ['tidy-notes'] } };
-    const gone = { ...readRun(run.id), id: 'told-gone', workflowDir: `${MEMORY_ROOT}/workflows/dev` };
+    const gone = { ...runRecord(run.id), id: 'told-gone', workflowDir: `${MEMORY_ROOT}/workflows/dev` };
     assert.equal(fs.existsSync(agentFilesDir(gone, 'implement')), false, 'its rendered folder is not there');
     const told = Effect.runSync(
       Effect.gen(function* () {
@@ -276,7 +276,7 @@ test('a step given skills from four places: frozen as files under bare names, na
 
   await s.test('a later edit of the step and of its skills changes nothing the run froze', () => {
     fs.writeFileSync(path.join(dev, 'implement.md'), '---\nplace: git\nagent: implementer\n---\n');
-    assert.deepEqual(readRun(run.id).workflow, record);
+    assert.deepEqual(runRecord(run.id).workflow, record);
     assert.deepEqual(entriesOf(agentFilesDir(run, 'implement')), files);
   });
 });

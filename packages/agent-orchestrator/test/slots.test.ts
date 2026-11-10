@@ -23,13 +23,13 @@ import { testPlace } from '../place/memory/index.ts';
 const ROOT = scratch('wf-slots-');
 process.env.WF_ROOT = ROOT;
 const { runWith, runSlots, slotsOf } = await import('../src/runner.ts');
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { passParents } = await import('../src/views/views.verb.ts');
 const { NOTHING_READ, standingReader } = await import('../src/standing/standing.verb.ts');
 const { slotsRead } = await import('../src/cap/slots-read.verb.ts');
 const { Informer, informerMemo, informerRead, informedJudgements, passStarted } = await import('../src/rest/informer.verb.ts');
 const { sameJudgement } = await import('../src/summary/judgement.verb.ts');
-const { runStore } = await import('../src/record/files.store.ts');
+const { filesStore: runStore } = await import('../src/record/files.store.ts');
 /** The runs waited on as a read with no standing reads them: none of their branches asked. */
 const noParents = () => passParents(standingReader(NOTHING_READ));
 
@@ -121,7 +121,7 @@ tasks.get('r-bad-implement')!.push({ kind: 'measured', at: at(0), attempt: 1, us
 writeRun('r-bad', 1, { implement: { taskId: 'r-bad-implement' } });
 writeRun('r-new', 4, {});
 writeRun('r-old', 3, {});
-const RUNS = () => ['r-a', 'r-bad', 'r-new', 'r-old'].map(readRun);
+const RUNS = () => ['r-a', 'r-bad', 'r-new', 'r-old'].map(runRecord);
 
 test('`slotsOf` and `runSlots`: what the cap counts and holds between passes, off one look at the harnesses or none', async (t) => {
   await t.test(

@@ -28,7 +28,7 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 const { advanceRun, approveRun, retryRun, startRun, runWith } = await import('../src/runner.ts');
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { RECENT_RUNS } = await import('../src/costs/index.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');
@@ -57,9 +57,9 @@ const tapped = () => {
 };
 
 /** The engine's pass is the stand-in's to make; the run's, as the daemon makes it, over the tapped engine. */
-const tick = (id: string) => stage.runWith(tapped(), advanceRun(readRun(id)));
+const tick = (id: string) => stage.runWith(tapped(), advanceRun(runRecord(id)));
 /** The task the record names for `step` now. */
-const taskOf = (id: string, step: string): string => readRun(id).steps[step].taskId!;
+const taskOf = (id: string, step: string): string => runRecord(id).steps[step].taskId!;
 /** The brief the task `taskId` was filed with. */
 const briefOf = (taskId: string): string => stage.board().tasks.get(taskId)!.spec.brief;
 /** The tasks viewed since the mark that belong to no run but `id`. */

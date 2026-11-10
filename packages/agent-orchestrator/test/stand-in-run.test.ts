@@ -32,7 +32,7 @@ process.env.PATH = PLANTED.env.PATH;
 
 const { advanceRun, approveRun, decideRun, startRun, runWith: runEngine } = await import('../src/runner.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
@@ -63,24 +63,24 @@ test('a run from start to landed on the test place: the merge committed after th
   const e = engineOf(b.layer);
 
   const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: folder() }));
-  assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).filed, ['implement']);
-  const work = readRun(run.id).steps.implement;
+  assert.deepEqual((await runWith(e, advanceRun(runRecord(run.id)))).filed, ['implement']);
+  const work = runRecord(run.id).steps.implement;
   assert.equal(fs.readFileSync(path.join(work.workspace!, 'add.ts'), 'utf8'), 'export const add = (a, b) => a + b;\n', 'a real folder');
   fs.appendFileSync(path.join(work.workspace!, 'add.ts'), 'export const sub = (a, b) => a - b;\n');
   const tip = world.commit(work.workspace!, 'add sub');
   b.settle(`${run.id}-implement`, 'succeeded', { closeout: SIGNED });
-  await runWith(e, advanceRun(readRun(run.id)));
+  await runWith(e, advanceRun(runRecord(run.id)));
   assert.deepEqual(b.filings, [`${run.id}-implement`], 'the ending waits at its gate');
 
   await runWith(e, approveRun(run.id, 'ship', 'Merge it.'));
-  assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).filed, ['ship']);
+  assert.deepEqual((await runWith(e, advanceRun(runRecord(run.id)))).filed, ['ship']);
   world.stage(repo, work.branch!);
   b.settle(`${run.id}-ship`, 'succeeded', { closeout: { ...SIGNED, message: MESSAGE } });
-  assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).checked, ['ship']);
+  assert.deepEqual((await runWith(e, advanceRun(runRecord(run.id)))).checked, ['ship']);
   assert.equal(world.head(repo), base, 'nothing lands while the check runs');
 
   b.settle(`${run.id}-ship-check`, 'succeeded', { exitCode: 0 });
-  const landed = await runWith(e, advanceRun(readRun(run.id)));
+  const landed = await runWith(e, advanceRun(runRecord(run.id)));
   const head = world.head(repo);
   assert.notEqual(head, base, 'the base branch has moved');
   assert.deepEqual(world.read(repo, head), { parents: [base, tip], message: MESSAGE.trim() }, 'a merge of the base and the result');
@@ -89,7 +89,7 @@ test('a run from start to landed on the test place: the merge committed after th
     'export const add = (a, b) => a + b;\nexport const sub = (a, b) => a - b;\n',
     'the checkout holds the merged file',
   );
-  assert.deepEqual(readRun(run.id).steps.ship.landed, { commit: head });
+  assert.deepEqual(runRecord(run.id).steps.ship.landed, { commit: head });
   assert.equal(landed.status, 'succeeded');
   assert.equal((await runWith(e, decideRun(run.id))).decision.kind, 'landed');
   assert.deepEqual(PLANTED.said(), [], 'no git was asked anything');

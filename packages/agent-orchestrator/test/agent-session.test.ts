@@ -21,7 +21,7 @@ process.env.WF_VERIFY_REST = '1';
 const { advanceRun, runWith: runEngine, startRun } = await import('../src/runner.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 const { loadWorkflows } = await import('../src/workflows/workflows.store.ts');
 const { noCodingStyle, pluginOf } = await import('../src/agents/agents.ts');
@@ -75,13 +75,14 @@ function customFor(agent: string, text: string): void {
 
 /** The run `id`'s pass on the stage's engine, and the spec each task it filed was filed with, by its step. */
 async function tick(id: string): Promise<{ filed: string[]; spec: (step: string) => ReturnType<typeof specOf> }> {
-  const { filed } = await stage.runWith(stage.board().e, advanceRun(readRun(id)));
+  const { filed } = await stage.runWith(stage.board().e, advanceRun(runRecord(id)));
   return { filed, spec: (step) => specOf(`${id}-${step}`) };
 }
 const specOf = (id: string) => stage.board().specs.find((s) => s.id === id) ?? assert.fail(`${id} was never filed`);
 
 /** The run `id`'s step `name` as its start froze it. */
-const frozen = (id: string, name: string) => (readRun(id).workflow ?? []).find((s) => s.name === name) ?? assert.fail(`${name} not frozen`);
+const frozen = (id: string, name: string) =>
+  (runRecord(id).workflow ?? []).find((s) => s.name === name) ?? assert.fail(`${name} not frozen`);
 
 test('hire an agent and render its session: frozen at the start, rendered for Claude Code, filed with its flags, an edit reaching only a later run', async (t) => {
   const s = story(t);
@@ -148,7 +149,7 @@ test('hire an agent and render its session: frozen at the start, rendered for Cl
   await s.test(
     "Claude Code's prompt is rendered under runs/<id>/agents/<step>/: instructions, custom instructions, skills by name, a preload whole",
     () => {
-      at = agentFilesDir(readRun(id), 'write');
+      at = agentFilesDir(runRecord(id), 'write');
       prompt = fs.readFileSync(path.join(at, 'prompt.md'), 'utf8');
       assert.equal(
         prompt,
@@ -168,7 +169,7 @@ test('hire an agent and render its session: frozen at the start, rendered for Cl
     assert.ok(fs.existsSync(path.join(at, 'nemia-scribe', 'skills', 'mind-the-tone', 'SKILL.md')), "the repository's skill, copied");
     assert.equal(JSON.parse(fs.readFileSync(path.join(at, 'nemia-scribe', '.claude-plugin', 'plugin.json'), 'utf8')).name, 'nemia-scribe');
     assert.equal(fs.readFileSync(path.join(at, 'nemia-scribe', 'output-styles', 'no-coding.md'), 'utf8'), noCodingStyle('scribe'));
-    assert.equal(fs.existsSync(agentFilesDir(readRun(id), 'code')), false);
+    assert.equal(fs.existsSync(agentFilesDir(runRecord(id), 'code')), false);
   });
 
   await s.test(

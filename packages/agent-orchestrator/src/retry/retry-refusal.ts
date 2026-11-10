@@ -18,7 +18,6 @@ import {
   aboveWord,
   approvalOf,
   budgetRefusal,
-  budgetWord,
   capOf,
   endingStopped,
   gateWords,
@@ -33,6 +32,7 @@ import {
   type Raise,
   type SpendOf,
 } from '../status/status.ts';
+import { budgetWord } from '../money/money.ts';
 import type { Verdict } from '../check/check.ts';
 import { messageRefusal, modeWord, retriesSpent, type RetryAsk, type RetryHow } from './retry-ask.ts';
 import { carries, heard, pauseAskVoid, retriesDue, retryable } from './retry.ts';

@@ -73,7 +73,7 @@ const asksOf = (st: State, id: string): Map<string, Held> => st.asks.get(id) ?? 
 const waiting = (st: State, id: string, of: AskOf) =>
   [...asksOf(st, id).values()].filter((h) => !h.done && h.person.of === of).map((h) => structuredClone(h.person.ask));
 
-/** The run `id`, its person's files composed onto it as `readRun` composes them. */
+/** The run `id`, its person's files composed onto it as `runRecord` composes them. */
 function readOf(st: State, id: string): Run {
   const record = st.records.get(id);
   if (!record) throw new Missing({ message: `no such run: ${id}  (try 'nemia ls')` });

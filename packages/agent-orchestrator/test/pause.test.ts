@@ -40,7 +40,7 @@ process.env.WF_MAX_RUNS = '100';
 process.env.WF_DEFAULT_FACTORY_STARTS = '1';
 delete process.env.WF_MAX_CONCURRENT;
 const { addFactory, approveRun, attachWorkflow, setSchedule, startRun, tickRun, runWith } = await import('../src/runner.ts');
-const { askFile, asksDir, listRuns, markCancelled, readRun } = await import('../src/record/record.store.ts');
+const { askFile, asksDir, listRuns, markCancelled, runRecord } = await import('../src/record/record.store.ts');
 const { pauseFile, readPause } = await import('../src/pause/pause.store.ts');
 const { nowRead } = await import('../src/pause/pause.verb.ts');
 const { pausedRead } = await import('../src/list/list.verb.ts');
@@ -128,14 +128,14 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
   const begun = (workflowDir: string, more: Partial<Parameters<typeof startRun>[0]> = {}) =>
     stage.runPlaced(startRun({ brief: 'paused', repo, workflowDir, isolate: false, ...more }));
   const runs: Record<'session' | 'checking' | 'asked' | 'ended' | 'landing' | 'called', Run> = {} as never;
-  const task = (name: keyof typeof runs, step = 'work') => readRun(runs[name].id).steps[step].taskId!;
-  const checkOf = (name: keyof typeof runs) => readRun(runs[name].id).steps.work.check!.taskId;
+  const task = (name: keyof typeof runs, step = 'work') => runRecord(runs[name].id).steps[step].taskId!;
+  const checkOf = (name: keyof typeof runs) => runRecord(runs[name].id).steps.work.check!.taskId;
   const stops: { taskId: string; askOnDisk: boolean }[] = [];
   const stopping = {
     ...b.e,
     stop: (taskId: string) =>
       Effect.suspend(() => {
-        const run = Object.values(runs).find((r) => JSON.stringify(readRun(r.id).steps).includes(`"${taskId}"`));
+        const run = Object.values(runs).find((r) => JSON.stringify(runRecord(r.id).steps).includes(`"${taskId}"`));
         stops.push({
           taskId,
           askOnDisk:
@@ -196,7 +196,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
     await pass();
     for (const name of ['session', 'asked', 'ended', 'landing', 'called'] as const) b.settle(task(name), 'working');
     b.settle(task('checking'), 'succeeded', SIGNED);
-    fs.writeFileSync(path.join(readRun(runs.landing.id).steps.work.workspace!, 'work.txt'), 'work\n');
+    fs.writeFileSync(path.join(runRecord(runs.landing.id).steps.work.workspace!, 'work.txt'), 'work\n');
     b.settle(task('landing'), 'succeeded', SIGNED);
     await pass();
     b.settle(checkOf('checking'), 'working');
@@ -387,13 +387,13 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       assert.equal(b.sessionDrains.at(-1), null, "the sessions' drain lifted by the resume");
       parked.clear();
       await pass();
-      const resumed = readRun(runs.session.id).steps.work;
+      const resumed = runRecord(runs.session.id).steps.work;
       assert.deepEqual([resumed.taskId, resumed.tries], [before, undefined], 'the session goes on as the same try: none is filed');
       const checked = stops.find((x) => x.taskId.startsWith(`${runs.checking.id}-`))!.taskId;
-      const rechecked = readRun(runs.checking.id).steps.work;
+      const rechecked = runRecord(runs.checking.id).steps.work;
       assert.notEqual(rechecked.check?.taskId, checked, 'its check filed again');
       assert.deepEqual(rechecked.tries?.at(-1), { taskId: rechecked.taskId, check: { taskId: checked }, cause: 'recheck', paused: true });
-      assert.equal(readRun(runs.ended.id).steps.work?.tries, undefined, 'no other session is tried either');
+      assert.equal(runRecord(runs.ended.id).steps.work?.tries, undefined, 'no other session is tried either');
       assert.deepEqual(scheduledDues(), [MONDAY], 'the fire held by the pause starts on the pass after the resume');
       const feed = await printedBy(sub, () => stage.main(['watch', '--once']));
       assert.equal(

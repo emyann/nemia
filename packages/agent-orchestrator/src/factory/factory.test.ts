@@ -11,7 +11,7 @@ import type { ScheduleListed } from './schedule/schedule.ts';
 import { names } from '../../test/assessed.ts';
 import {
   ambiguousFactoryRefusal,
-  DEFAULT_FACTORY,
+  DEFAULT_NAMESPACE,
   defaultFactoryRefusal,
   defaultStartRefusal,
   factoriesHolding,
@@ -79,10 +79,10 @@ test('hireRefusalOf: refused for the default factory first, then a workflow not 
     assert.equal(hireRefusalOf(undefined, 'build', null), defaultFactoryRefusal('hire')),
   );
   await t.test('REFUSED: the default named', () =>
-    assert.equal(hireRefusalOf({ name: DEFAULT_FACTORY, workflows: ['build'] }, 'build', null), defaultFactoryRefusal('hire')),
+    assert.equal(hireRefusalOf({ name: DEFAULT_NAMESPACE, workflows: ['build'] }, 'build', null), defaultFactoryRefusal('hire')),
   );
   await t.test('REFUSED: the default first, whatever else', () =>
-    assert.equal(hireRefusalOf({ name: DEFAULT_FACTORY, workflows: [] }, 'build', 'ada'), defaultFactoryRefusal('hire')),
+    assert.equal(hireRefusalOf({ name: DEFAULT_NAMESPACE, workflows: [] }, 'build', 'ada'), defaultFactoryRefusal('hire')),
   );
   await t.test('REFUSED: a workflow it does not offer, naming the attach', () => {
     assert.equal(hireRefusalOf(pipao, 'intake', null), unattachedHireRefusal('pipao', 'intake'));

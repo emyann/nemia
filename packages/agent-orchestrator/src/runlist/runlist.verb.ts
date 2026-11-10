@@ -12,7 +12,7 @@ import { spentOf } from '../summary/judged.verb.ts';
 import type { Judgement } from '../summary/judgement.verb.ts';
 import { type RunSummary, unjudgedFields } from '../summary/summary.verb.ts';
 import { clockOf, waitingSinceOf } from '../timeline/index.ts';
-import { clockUntilOf, finishedAtOf, kindOf, outcomeOf, wallMsOf } from './runlist.ts';
+import { clockUntilOf, finishedAtOf, kindOf, outcomeOf, wallMsOf } from '../run-state/run-state.ts';
 
 /** The frame's parts of a run's status: all seven keys, null where a part is not of the run's state. */
 export type FrameParts = Required<Pick<RunStatus, 'state' | 'wallMs' | 'clock' | 'stepCosts' | 'waitingSince' | 'finishedAt' | 'outcome'>>;

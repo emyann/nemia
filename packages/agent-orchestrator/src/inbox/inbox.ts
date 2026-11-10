@@ -173,6 +173,19 @@ function fromRuns(file: string, from: string): string[] {
   return runs;
 }
 
+/**
+ * One inbox card as `parseInboxCard` reads it, or why it does not read (`why`, the refusal's words, which name the file and the fix): what
+ * the inbox's listing shows a card it cannot read with. A failure that is no refusal is no reason a card gives, and is thrown.
+ */
+export function cardOrWhy(file: string, text: string, isDirectory: (at: string) => boolean): { card: InboxCard } | { why: string } {
+  try {
+    return { card: parseInboxCard(file, text, isDirectory) };
+  } catch (err) {
+    if (err instanceof WorkflowError) return { why: err.message };
+    throw err;
+  }
+}
+
 /** A card's `from:` line's value, written as `parseInboxCard` reads it back. */
 export const fromLine = (runs: readonly string[] | undefined): string | undefined => (runs?.length ? runs.join(', ') : undefined);
 
@@ -425,8 +438,9 @@ export function cardsListed(
       }
       const name = file.slice(0, -'.md'.length);
       const startedAs = runs.filter((r) => r.from?.inbox === name).map((r) => r.id);
-      try {
-        const card = parseInboxCard(file, text, isDirectory);
+      const read = cardOrWhy(file, text, isDirectory);
+      if ('card' in read) {
+        const { card } = read;
         return {
           name,
           file,
@@ -442,28 +456,25 @@ export function cardsListed(
           error: null,
           ...(card.queued !== undefined ? { queued: { at: card.queued, place: null }, ...triedOf(name, text) } : {}),
         };
-      } catch (err) {
-        let lenient: InboxCard | undefined;
-        try {
-          lenient = parseInboxCard(file, text, () => true);
-        } catch {}
-        const queued = lenient?.queued;
-        const { workflow, repo, factory } = queuedKeys(lenient);
-        return {
-          name,
-          file,
-          title: null,
-          workflow,
-          repo,
-          factory,
-          from: [],
-          startedAs,
-          labels: {},
-          factoryRepo: factoryRepoOf({ repo, factory }, factories),
-          error: (err as Error).message,
-          ...(queued !== undefined ? { queued: { at: queued, place: null }, ...triedOf(name, text) } : {}),
-        };
       }
+      const loose = cardOrWhy(file, text, () => true);
+      const lenient = 'card' in loose ? loose.card : undefined;
+      const queued = lenient?.queued;
+      const { workflow, repo, factory } = queuedKeys(lenient);
+      return {
+        name,
+        file,
+        title: null,
+        workflow,
+        repo,
+        factory,
+        from: [],
+        startedAs,
+        labels: {},
+        factoryRepo: factoryRepoOf({ repo, factory }, factories),
+        error: read.why,
+        ...(queued !== undefined ? { queued: { at: queued, place: null }, ...triedOf(name, text) } : {}),
+      };
     });
   queueOrder(listed).forEach((l, i) => {
     if (l.queued) l.queued.place = i + 1;
@@ -651,6 +662,19 @@ const definedOf = (given: Partial<Record<FlatKey, string | undefined>>): Partial
   Object.fromEntries(Object.entries(given).flatMap(([key, value]) => (value === undefined ? [] : [[key, value.trim()]])));
 
 /**
+ * An idea's text split at its frontmatter (`splitFrontmatter`), or undefined for a text that opens a rule it never closes: such a text is
+ * prose, filed whole. Any other failure is no idea's, and is thrown.
+ */
+function splitOrProse(from: string, text: string): { block: string | null; body: string } | undefined {
+  try {
+    return splitFrontmatter(from, text);
+  } catch (err) {
+    if (err instanceof WorkflowError) return undefined;
+    throw err;
+  }
+}
+
+/**
  * The file `nemia inbox add` writes for an idea, and its body — refused, naming `from`, as the card it writes would be refused
  * (`parseInboxCard`).
  *
@@ -690,10 +714,7 @@ export function ideaCard(
     .replace(/^\uFEFF/, '')
     .replace(/\r\n/g, '\n')
     .trim();
-  let split: { block: string | null; body: string } | undefined;
-  try {
-    split = splitFrontmatter(from, text);
-  } catch {}
+  const split = splitOrProse(from, text);
   const block = split?.block ?? null;
   const entries = (block === null ? null : frontmatterOrNull(block))?.entries ?? [];
   const isCardKey = (key: string) => ([...INBOX_KEYS, 'after'] as string[]).includes(key);

@@ -4,6 +4,7 @@
  * (`judgedFields`), so the object and the list say a run alike. The board reads the object, and a step's tries and told layers at their
  * sub-resources, each its own read.
  */
+import type { InputsWatchedBy } from '../rest/index.ts';
 import { valueVersion } from '../digest/digest.ts';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -28,7 +29,8 @@ import { loopSpan, type Workflow } from '../workflow.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import type { Retry } from '../retry/index.ts';
 import { stepRaise } from '../retry/index.ts';
-import { budgetWord, stepStatus } from '../status/status.ts';
+import { stepStatus } from '../status/status.ts';
+import { budgetWord } from '../money/money.ts';
 import { runInputGraph } from '../summary/graph.ts';
 import { bare, type Filings, tryOf } from '../summary/reads.verb.ts';
 import { atHarness, needsOf, spentOf, stepSaid } from '../summary/judged.verb.ts';
@@ -374,6 +376,12 @@ export type RunDiskParts = {
   readonly warning: RunStatus['warning'];
   readonly files: (step: string) => Pick<RunStepStatus, 'files' | 'filesError'>;
 };
+
+/** Whether two types are one. */
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+
+/** The parts read on every request are exactly the inputs `RUN_INPUTS` says a request watches: one added there fails the typecheck here. */
+export const diskPartsHeld: Same<keyof RunDiskParts, InputsWatchedBy<'request'>> = true;
 
 /** The disk parts of `run` (`RunDiskParts`), off the store's root `home` and its workflow `folder` as it loads now (`workflowsOf`). */
 export const diskPartsOf = (run: Run, home: string, folder: RunReading['folder']): RunDiskParts => ({

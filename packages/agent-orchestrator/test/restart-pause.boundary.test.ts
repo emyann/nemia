@@ -31,7 +31,7 @@ process.env.WF_VERIFY_REST = '1';
 process.env.WF_MAX_RUNS = '100';
 delete process.env.WF_MAX_CONCURRENT;
 const { approveRun, startRun, tickRun, runWith, readFeed } = await import('../src/runner.ts');
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { readPause, readPauseFile } = await import('../src/pause/pause.store.ts');
 const { liveHost } = await import('../src/service/service.verb.ts');
 const { takeOver } = await import('../src/service/takeover.verb.ts');
@@ -106,12 +106,12 @@ test("a restart with only a landing's check running restarts at once, and the ch
   fs.writeFileSync(path.join(dir, 'work.md'), '---\nplace: git\n---\nwork it\n');
   fs.writeFileSync(path.join(dir, 'ship.md'), '---\nplace: git\nafter: work\ngate: true\nworkspace: base\ncheck: "true"\n---\nship it\n');
   let id = '';
-  const shipOf = () => readRun(id).steps.ship;
+  const shipOf = () => runRecord(id).steps.ship;
 
   await s.test("a run's ending signed off, its landing check filed and running", async () => {
     id = (await stage.runPlaced(startRun({ brief: 'restart', repo, workflowDir: dir, isolate: true }))).id;
     await pass();
-    const work = readRun(id).steps.work;
+    const work = runRecord(id).steps.work;
     fs.writeFileSync(path.join(work.workspace!, 'work.txt'), 'work\n');
     b.settle(work.taskId!, 'succeeded', SIGNED);
     await pass();

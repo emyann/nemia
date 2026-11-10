@@ -50,13 +50,13 @@ const {
 } = await import('../src/runner.ts');
 const { recordFeed } = await import('../src/feed/feed.store.ts');
 const { isRunLine } = await import('../src/feed/feed.ts');
-const { readRun, rewriteRun } = await import('../src/record/record.store.ts');
-const { runStore } = await import('../src/record/files.store.ts');
+const { runRecord, rewriteRun } = await import('../src/record/record.store.ts');
+const { filesStore: runStore } = await import('../src/record/files.store.ts');
 const { stepsNow: stepsOf } = await import('./steps-now.ts');
 const { tryOf } = await import('../src/record/record.ts');
 const { freshRestMemo } = await import('../src/tick/tick.verb.ts');
 const { runLabels, stepLabels } = await import('../src/telemetry/telemetry.ts');
-const { DEFAULT_FACTORY } = await import('../src/factory/factory.ts');
+const { DEFAULT_NAMESPACE } = await import('../src/factory/factory.ts');
 const { followed } = await import('./factory-planted.ts');
 const { main, watchPrinted } = await import('../src/cli/main.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
@@ -565,7 +565,7 @@ test("a person's acts and the runtime's faults on a run, each said once off the 
   await s.test("the hold a person put is read off the record's own composed fact, once, as the person's deed", async () => {
     await stage.runWith(stage.board().e, hold(run.id, [other.id], { why: 'it waits on the other run', by: 'operator' }));
     await ticks(3);
-    put = readRun(run.id).hold!.at;
+    put = runRecord(run.id).hold!.at;
     assert.deepEqual(
       said(run.id, 'HoldPut').map((l) => [l.word, l.note, l.source]),
       [['hold put', `since ${put}`, 'person']],
@@ -589,7 +589,7 @@ test("a person's acts and the runtime's faults on a run, each said once off the 
       await ticks(3);
       await stage.runWith(stage.board().e, approveRun(run.id, 'plan'));
       await ticks(3);
-      const approval = readRun(run.id).approvals![0];
+      const approval = runRecord(run.id).approvals![0];
       assert.deepEqual(
         said(run.id, 'Approved').map((l) => [l.step, l.word, l.note, l.try, l.source]),
         [['plan', 'approved', `try ${approval.try} · at ${approval.at}`, approval.try, 'person']],
@@ -601,7 +601,7 @@ test("a person's acts and the runtime's faults on a run, each said once off the 
     await ticks(3);
     assert.deepEqual(
       said(run.id, 'CancelAsked').map((l) => [l.word, l.note, l.source]),
-      [['cancel asked', `at ${readRun(run.id).cancelledAt}`, 'person']],
+      [['cancel asked', `at ${runRecord(run.id).cancelledAt}`, 'person']],
     );
     assert.deepEqual(
       words(run.id).filter((w) => w === 'cancelled'),
@@ -617,7 +617,7 @@ test("a person's acts and the runtime's faults on a run, each said once off the 
   await s.test("a pruned run's word says so, once: `nemia prune`'s marker is a person's fact, and the run's line gains it", async () => {
     fs.writeFileSync(path.join(RUNS, `${other.id}.pruned`), JSON.stringify({ at: '2026-09-22T10:00:00.000Z', worktrees: [] }));
     await ticks(3);
-    assert.equal(readRun(other.id).pruned !== undefined, true);
+    assert.equal(runRecord(other.id).pruned !== undefined, true);
     assert.deepEqual(
       words(other.id).filter((w) => w.endsWith('(pruned)')),
       ['running (pruned)'],
@@ -754,11 +754,11 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
     settle(task(run, 'plan'), 'working');
     deny(task(run, 'plan'), [{ tool: 'Bash', what: 'git push' }]);
     await tick();
-    const record = readRun(run.id);
+    const record = runRecord(run.id);
     const plan = stepsOf(record).find((st) => st.name === 'plan')!;
     assert.deepEqual(stepLabels(record, plan), {
       run: run.id,
-      factory: DEFAULT_FACTORY,
+      factory: DEFAULT_NAMESPACE,
       workflow: path.basename(record.workflowDir),
       step: 'plan',
       agent: 'none',
@@ -782,7 +782,7 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
       await tick();
       settle(task(run, 'plan'), 'working');
       await tick();
-      const record = readRun(run.id);
+      const record = runRecord(run.id);
       const plan = stepsOf(record).find((st) => st.name === 'plan')!;
       const before = lines().filter((l) => l.run === run.id);
       const ofPlan = before.filter((l) => l.step === 'plan');
@@ -819,10 +819,10 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
       [[1, 'try 1']],
       'the denial was written once, on the try its task was filed for',
     );
-    const before = readRun(run.id);
+    const before = runRecord(run.id);
     const plan = before.steps.plan;
     rewriteRun({ ...before, steps: { ...before.steps, plan: { ...plan, tries: [{ taskId: plan.taskId!, cause: 'recheck' }] } } });
-    assert.equal(tryOf(readRun(run.id), 'plan'), 2, 'the step is on a second try, on the task it was already on');
+    assert.equal(tryOf(runRecord(run.id), 'plan'), 2, 'the step is on a second try, on the task it was already on');
     await ticks(3);
     assert.deepEqual(
       denied(run).map((l) => [l.try, l.note]),
@@ -924,7 +924,7 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
         'each run finished, and the feed said so',
       );
     for (const r of runs) deny(task(r, 'plan'), [{ tool: 'Bash', what: 'git push' }]);
-    for (const r of runs) rewriteRun({ ...readRun(r.id), deniedCounted: [{ task: task(r, 'plan'), attempts: 1 }] });
+    for (const r of runs) rewriteRun({ ...runRecord(r.id), deniedCounted: [{ task: task(r, 'plan'), attempts: 1 }] });
     const quiet = lines().filter((l) => l.reason !== 'ToolDenied').length;
     for (let i = 0; i < 2; i++) {
       const pass = await tick({ memo: freshRestMemo() });
@@ -992,7 +992,7 @@ test("a step's closeout read is a one-shot `closed out` of its step and try, sai
     settle(task(run, 'plan'), 'succeeded', SAID);
     await ticks(3);
     assert.deepEqual(closed(run), [['plan', 'closed out', 'try 1', 1, 'Normal']]);
-    const record = readRun(run.id);
+    const record = runRecord(run.id);
     const line = lines().find((l) => l.run === run.id && l.reason === 'ClosedOut')!;
     assert.deepEqual(
       line.labels,
@@ -1019,10 +1019,10 @@ test("a step's closeout read is a one-shot `closed out` of its step and try, sai
     );
   });
   await s.test('REFUSED: a recheck says no closeout again — its turn, and its closeout, are the try before it', async () => {
-    const before = readRun(run.id);
+    const before = runRecord(run.id);
     const plan = before.steps.plan;
     rewriteRun({ ...before, steps: { ...before.steps, plan: { ...plan, tries: [{ taskId: plan.taskId!, cause: 'recheck' }] } } });
-    assert.equal(tryOf(readRun(run.id), 'plan'), 2, 'the step is on a second try, on the task it was already on');
+    assert.equal(tryOf(runRecord(run.id), 'plan'), 2, 'the step is on a second try, on the task it was already on');
     await ticks(3);
     assert.deepEqual(closed(run), [['plan', 'closed out', 'try 1', 1, 'Normal']]);
   });
@@ -1051,7 +1051,7 @@ test('a run waiting on a person says what it waits on, never failed: an ending a
     const repo = aRepo();
     const run = await stage.runPlaced(startRun({ brief: 'the ship gate', repo, workflowDir: ENDING }));
     await tick();
-    const branch = readRun(run.id).steps.implement.branch!;
+    const branch = runRecord(run.id).steps.implement.branch!;
     stage.place().world.branch(repo, branch, { 'work.txt': 'the work\n' });
     settle(task(run, 'implement'), 'succeeded', SIGNED);
     await ticks(3);

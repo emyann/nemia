@@ -22,7 +22,7 @@ process.env.NEMIA_DAEMON_START = 'off';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 const { advanceRun, startRun, runWith, retryRun } = await import('../src/runner.ts');
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { SESSION_TOKEN } = await import('../src/filed/filed.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { sessionCaller } = await import('../src/token/caller.verb.ts');
@@ -46,7 +46,7 @@ const folder = (): string => {
 };
 
 /** One pass over the run `id` on the stage's engine. */
-const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(readRun(id)));
+const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(id)));
 
 /** The token the engine's task `id` was filed in its environment. */
 const tokenOf = (id: string): string | undefined => stage.board().tasks.get(id)?.spec.config?.env?.[SESSION_TOKEN];

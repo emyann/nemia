@@ -20,7 +20,7 @@ process.env.WF_ROOT = ROOT;
 const { advanceRun, forgetRun, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { LINE_NAME } = await import('../src/run.ts');
 
 const git = (cwd: string, ...args: string[]) =>
@@ -60,8 +60,8 @@ test("REFUSED before, now forgotten: a store under a link — git lists each wor
   });
 
   const run = await runPlaced(startRun({ brief: 'under a link', repo, workflowDir: folder }));
-  await runWith(e, advanceRun(readRun(run.id)));
-  const wt = readRun(run.id).steps.implement.workspace!;
+  await runWith(e, advanceRun(runRecord(run.id)));
+  const wt = runRecord(run.id).steps.implement.workspace!;
   assert.ok(wt.startsWith(ROOT), 'the record names it through the link');
   assert.match(
     git(repo, 'worktree', 'list', '--porcelain'),

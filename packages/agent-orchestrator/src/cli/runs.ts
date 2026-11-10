@@ -19,7 +19,7 @@ import {
   pruneLines,
   pruningBytes,
   RM,
-  runStore,
+  runsAtOnce,
   runsForgetting,
   runWith,
   type Place,
@@ -185,7 +185,7 @@ export async function pruneVerb(args: Args, e: Engine, place: Place): Promise<vo
   const artifacts = args.artifacts === true;
   const named = ids.length > 0;
   const tally: PruneTally = { notPruned: [], failed: false };
-  const listed = await judged(e, place, named ? ids : runStore.runs.list().map((r) => r.id), { unmerged, artifacts }, tally);
+  const listed = await judged(e, place, named ? ids : runsAtOnce.runs.list().map((r) => r.id), { unmerged, artifacts }, tally);
   const found = await withEngine(
     e,
     place,

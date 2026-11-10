@@ -40,7 +40,7 @@ for (const name of ['claude', 'codex'])
 process.env.PATH = `${BIN}${path.delimiter}${process.env.PATH}`;
 const { EngineService, engine, feedHubLayer, followStep, retryRun, tickRun, runWith, withProposalsPass } = await import('../src/runner.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { storeRootLayer } = await import('../src/config/root.store.ts');
 const { main: cli } = await import('../src/cli/main.ts');
 const stage = staged({ runWith, main: cli, engineOf });
@@ -248,7 +248,7 @@ test(
 
         const view = await Effect.runPromise(e.view(`${id}-ask`));
         assert.equal(view.phase, 'succeeded');
-        assert.ok(readRun(id).steps.ask?.taskId, 'filed');
+        assert.ok(runRecord(id).steps.ask?.taskId, 'filed');
         assert.ok(decided.join('\n').includes('ask'), decided.join('\n'));
         assert.match(listed.join('\n'), /^\s+ask\s+unverified\s*$/m, listed.join('\n'));
         const everything = (dir: string): string[] =>
@@ -534,7 +534,7 @@ test(
             }
             const ticked = await own(['tick']);
             if (why !== undefined) assert.match(ticked.err, why);
-            assert.ok(readRun(local).steps.work, `the local step was filed: ${JSON.stringify(readRun(local).steps)}`);
+            assert.ok(runRecord(local).steps.work, `the local step was filed: ${JSON.stringify(runRecord(local).steps)}`);
             const runs = fs.readdirSync(path.join(ROOT, 'runs')).length;
             await assert.rejects(
               start(REMOTE),

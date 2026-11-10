@@ -2,12 +2,12 @@
  * The engine's tasks of a run forgotten through the runtime's `forget`: by `nemia rm` once the run is removed (`forgetTasks`), by the
  * tick for what had not settled then (`finishForgetting`), and asked without removing anything (`engineForgetting` with `yes: false`).
  * A controller, reaching the runtime through the client (`runtime-client.ts`): Effect programs that require the engine as a service
- * (`EngineService`). What `nemia rm` has yet to see forgotten is written down beside the store's runs (`runStore.forgetting`), so a
+ * (`EngineService`). What `nemia rm` has yet to see forgotten is written down beside the store's runs (the Run door's `forgetting`), so a
  * pass reads it again until nothing of it is left: nothing is carried between passes.
  */
 import { Cause, Effect, Result } from 'effect';
 import { EngineService, ForgetRefused, type ForgetReport } from '../../runtime-client.ts';
-import { runStore } from '../../record/files.store.ts';
+import { runsAtOnce } from '../../runs/runs.store.ts';
 import {
   engineWords,
   forgettingDone,
@@ -66,7 +66,7 @@ export const engineForgetting = Effect.fn('engineForgetting')(function* (ids: re
  */
 export const forgetTasks = Effect.fn('forgetTasks')(function* (id: string, taskIds: readonly string[]) {
   const forgetting = forgettingOf(yield* engineForgetting(taskIds, { yes: true }), taskIds);
-  if (!forgettingDone(forgetting)) return { ...forgetting, marker: runStore.forgetting.where(id) };
+  if (!forgettingDone(forgetting)) return { ...forgetting, marker: runsAtOnce.forgetting.where(id) };
   yield* (yield* RunDoor).forgetting.lift(RunId.read(id));
   return forgetting;
 });
@@ -85,7 +85,7 @@ export const finishForgetting = (): Effect.Effect<ForgettingLine[], never, Engin
     const said: ForgettingLine[] = [];
     for (const id of yield* (yield* RunDoor).forgetting.list()) {
       if (yield* (yield* RunDoor).runs.exists(RunId.read(id))) continue;
-      const marker = runStore.forgetting.where(id);
+      const marker = runsAtOnce.forgetting.where(id);
       const taskIds = yield* (yield* RunDoor).forgetting.read(RunId.read(id));
       if (!taskIds) {
         said.push({

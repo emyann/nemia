@@ -33,7 +33,7 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
 const { addFactory, attachWorkflow, setSchedule, tickRun, runWith: runEngine } = await import('../src/runner.ts');
-const { listRuns, readRun } = await import('../src/record/record.store.ts');
+const { listRuns, runRecord } = await import('../src/record/record.store.ts');
 const { main: cli } = await import('../src/cli/main.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { filesStore } = await import('../src/record/files.store.ts');
@@ -131,7 +131,7 @@ test('a weekly schedule over the weeks: one run a due fire, once after downtime,
       [run?.scheduled, run?.factory, run?.brief, run?.repo, run?.workflowDir],
       [{ factory: 'solo', workflow: 'dev', due: MONDAY }, 'solo', 'Read the stats', repo, path.join(repo, 'workflows', 'dev')],
     );
-    assert.deepEqual(readRun(run.id).scheduled, { factory: 'solo', workflow: 'dev', due: MONDAY }, 'read back off the record');
+    assert.deepEqual(runRecord(run.id).scheduled, { factory: 'solo', workflow: 'dev', due: MONDAY }, 'read back off the record');
   });
 
   await s.test('the next pass starts none', async () => {

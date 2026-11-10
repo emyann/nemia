@@ -14,7 +14,7 @@ import { scratch } from 'test-kit/scratch';
 
 const ROOT = scratch('wf-files-store-');
 process.env.WF_ROOT = ROOT;
-const { runStore, keptRuns, labelsFile, writeLabels } = await import('./files.store.ts');
+const { filesStore: runStore, keptRuns, labelsFile, writeLabels } = await import('./files.store.ts');
 const { runsDir, runFile, restStamps } = await import('./record.store.ts');
 const { recordMemo } = await import('../rest/index.ts');
 const { metered } = await import('../meter/tally.store.ts');

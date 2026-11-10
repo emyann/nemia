@@ -2,7 +2,7 @@
  * When a factory's schedule of a workflow is due, and the words its starts and its listing say: pure, over instants in milliseconds the
  * caller read off the cron (`schedule.store.ts`), the factory's file, the run records and the tick's kept try.
  */
-import { durationWord } from '../../status/status.ts';
+import { durationWord } from '../../usage/usage.ts';
 
 /**
  * What the tick keeps of a schedule's last try (`schedules/<factory>/<workflow>.json`): the fire it was for (`due`), when (`at`), and the

@@ -37,7 +37,7 @@ const RUNS = {
 const { SHOW, TRIES, TRY, CLOSEOUT, TOLD } = await import('../src/object/commands.verb.ts');
 const { advanceRun, startRun, runWith: runEngine, RunObject, runObject } = await import('../src/runner.ts');
 const { tryShort } = await import('../src/object/run.verb.ts');
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { Missing } = await import('../src/refusal/refusal.ts');
 const { StoreRoot } = await import('../src/config/root.store.ts');
@@ -71,11 +71,11 @@ const started = async (steps: Record<string, string | null>, gates: string[] = [
   const repo = scratch('wf-run-object-repo-');
   stand().world.repository(repo, {});
   const run = await runPlaced(startRun({ brief: 'object me', repo, workflowDir: folder(steps), gates }));
-  await runWith(e(), advanceRun(readRun(run.id)));
+  await runWith(e(), advanceRun(runRecord(run.id)));
   return run.id;
 };
 
-const advanced = (id: string) => runWith(e(), advanceRun(readRun(id)));
+const advanced = (id: string) => runWith(e(), advanceRun(runRecord(id)));
 
 /** Runs in three phases: in flight, finished, and waiting at a gate. */
 const threeRuns = async () => {
@@ -94,7 +94,11 @@ const threeRuns = async () => {
 const object = async (id: string) =>
   await runWith(
     e(),
-    Effect.provideService(runObject(readRun(id), { memo: { filings: { filed: new Map(), cursor: 0 }, said: new Map() } }), StoreRoot, ROOT),
+    Effect.provideService(
+      runObject(runRecord(id), { memo: { filings: { filed: new Map(), cursor: 0 }, said: new Map() } }),
+      StoreRoot,
+      ROOT,
+    ),
   );
 
 const handled = <D>(entry: { handler: (...a: never[]) => unknown }, args: Record<string, string>): Promise<D> =>

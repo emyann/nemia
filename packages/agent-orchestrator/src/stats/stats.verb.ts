@@ -9,15 +9,15 @@
  * calls but in the memo a caller hands it (`StatsMemo`): each finished run's facts, while its inputs stand.
  */
 import { isDeepStrictEqual } from 'node:util';
-import { Cause, Effect, Exit } from 'effect';
+import { Cause, Effect, Exit, Result } from 'effect';
 import { EngineService, denialText, over, unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
 import { refusedCheck, type Run } from '../record/record.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import type { Workflow } from '../step/step.ts';
 import { timeline } from '../timeline/index.ts';
-import { runStore } from '../record/files.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
-import { stepsOf } from '../steps/steps.verb.ts';
+import { RunId } from '../record/record.model.ts';
+import { stepsOrWhy } from '../steps/steps.verb.ts';
 import { closeoutReader, everyTryOf, taskCloseout, taskPhasesRead, viewedOnce } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { renderedSkillApplies, renderedSkillRules, renderedSkillVersions } from '../agents/agents.store.ts';
@@ -27,7 +27,7 @@ import { seriesHealth } from '../series/series.store.ts';
 import { dayOf, factsOf, keysOf, statsOf, type CheckVerdict, type Facts, type RunFact, type StatsQuery, type TryFact } from './stats.ts';
 import { frozenOf, type RunFrozen } from './marks.ts';
 import { deniedCallsOf, filesTouchedOf, skillsLoadedOf } from './discipline.ts';
-import { selectedRuns } from '../runlist/runlist.ts';
+import { selectedRuns } from '../labels/labels.ts';
 import type { Selectors } from '../watch/selector.ts';
 
 /** How a check's task ended (`CheckVerdict`): passed, refused (it ran to its end and exited non-zero, `refusedCheck`), or unfinished. */
@@ -38,9 +38,6 @@ function verdictOf(view: TaskView | undefined): CheckVerdict {
   const code = typeof last?.exitCode === 'number' && last.reason !== 'deadline' && last.reason !== 'operator' ? last.exitCode : undefined;
   return refusedCheck(phase, code) ? 'refused' : 'unfinished';
 }
-
-/** A run's frozen steps (`stepsOf`), or null where they do not read. */
-const stepsRead = (run: Run): Effect.Effect<Workflow[] | null> => Effect.orElseSucceed(stepsOf(run), () => null);
 
 /**
  * What a run froze (`frozenOf`): its steps, and each skill by the version of its rendered copy (`renderedSkillVersions`), where the copy
@@ -92,9 +89,9 @@ type RunRead = { id: string; facts: RunFacts; unreadable: boolean; keeps: boolea
 
 /**
  * What a process keeps of each run's facts between calls of `stats`, in memory and nowhere else: for each run, what it gave (`RunRead`)
- * and the stamp of its files in the store it was read under (`runStore.runs.stamps`); and `cursor`, where on the engine's feed the memo
- * has read to, since a task's journal appending takes its run out (`followedFeed`). A cache of a pure function, never a source of truth:
- * a fresh process starts with none and reads every run.
+ * and the stamp of its files in the store it was read under (the Run door's `runs.stamps`); and `cursor`, where on the engine's feed the
+ * memo has read to, since a task's journal appending takes its run out (`followedFeed`). A cache of a pure function, never a source of
+ * truth: a fresh process starts with none and reads every run.
  */
 export type StatsMemo = { cursor?: number; runs: Map<string, { stamp: string; read: RunRead }> };
 
@@ -108,10 +105,20 @@ export const freshStatsMemo = (): StatsMemo => ({ runs: new Map() });
  */
 export type StatsOptions = { memo?: StatsMemo; verify?: boolean; series?: SeriesMemo };
 
-/** What `run` gives the stats (`RunRead`). Fails with what a read of it failed with but a journal that does not read. */
-export const factsRead = Effect.fnUntraced(function* (e: Engine, run: Run) {
-  const steps = yield* stepsRead(run);
-  if (!steps) return null;
+/** A line said on the process's stderr. */
+const sayOnStderr = (line: string) => process.stderr.write(`${line}\n`);
+
+/**
+ * What `run` gives the stats (`RunRead`). Fails with what a read of it failed with but a journal that does not read. A run whose unfrozen
+ * folder does not load gives nothing, and says why on `said`, as a record that does not read is said.
+ */
+export const factsRead = Effect.fnUntraced(function* (e: Engine, run: Run, said: (line: string) => void = sayOnStderr) {
+  const frozenSteps = yield* stepsOrWhy(run);
+  if ('unloaded' in frozenSteps) {
+    said(`left out: run ${run.id}'s workflow does not load: ${frozenSteps.unloaded}`);
+    return null;
+  }
+  const { steps } = frozenSteps;
   const frozen = frozenRun(run, steps);
   const read = yield* Effect.exit(runFacts(e, run, steps));
   if (Exit.isSuccess(read)) {
@@ -127,18 +134,12 @@ export const factsRead = Effect.fnUntraced(function* (e: Engine, run: Run) {
  * list says it.
  */
 const runRead = Effect.fnUntraced(function* (e: Engine, id: string, said: (line: string) => void) {
-  let run: Run;
-  try {
-    run = runStore.runs.read(id);
-  } catch (err) {
-    if (err instanceof Invalid) said(`left out: ${err.message}`);
-    else if (!(err instanceof Missing)) throw err;
-    return null;
-  }
-  return yield* factsRead(e, run);
+  const read = yield* Effect.result((yield* RunDoor).runs.read(RunId.read(id)));
+  if (Result.isSuccess(read)) return yield* factsRead(e, read.success, said);
+  if (read.failure instanceof Invalid) said(`left out: ${read.failure.message}`);
+  else if (!(read.failure instanceof Missing)) return yield* Effect.fail(read.failure);
+  return null;
 });
-
-const sayOnStderr = (line: string) => process.stderr.write(`${line}\n`);
 
 /**
  * Every run of the store as it gives the stats, read through `memo`: the memo brought up to the engine's feed and the store stamped
@@ -151,7 +152,7 @@ const memoReads = Effect.fnUntraced(function* (e: Engine, memo: StatsMemo, verif
   const fed = typeof e.feed === 'function' && (yield* followedFeed(e, memo));
   if (!fed) memo.runs.clear();
   const readTo = memo.cursor;
-  const stamps = runStore.runs.stamps();
+  const stamps = yield* (yield* RunDoor).runs.stamps();
   for (const id of memo.runs.keys()) if (!stamps.has(id)) memo.runs.delete(id);
   const reads: RunRead[] = [];
   for (const [id, stamp] of [...stamps].sort(([a], [b]) => a.localeCompare(b))) {
@@ -173,7 +174,7 @@ const memoReads = Effect.fnUntraced(function* (e: Engine, memo: StatsMemo, verif
 /** Every run in the store as the store lists it, each as it gives the stats (`factsRead`), read afresh. */
 const listReads = Effect.fnUntraced(function* (e: Engine) {
   const reads: RunRead[] = [];
-  for (const run of runStore.runs.list()) reads.push(yield* factsRead(e, run));
+  for (const run of yield* (yield* RunDoor).runs.list()) reads.push(yield* factsRead(e, run));
   return reads;
 });
 

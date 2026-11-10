@@ -33,7 +33,7 @@ import { standingLive } from '../standing/standing.verb.ts';
 import { contextLines } from './context.ts';
 import { contextSection } from '../brief/index.ts';
 import { parentCloseouts } from '../brief/handed.verb.ts';
-import { runStore } from '../record/files.store.ts';
+import { runsAtOnce } from '../runs/runs.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { idRefusal } from '../forget/forget.ts';
 import { RunDoor } from '../runs/runs.store.ts';
@@ -469,7 +469,7 @@ export const CONCLUDED: Command<Concluded, typeof ConcludedInput.Type> = {
     const id = args.runId;
     const notId = idRefusal(id, 'read', 'nemia concluded');
     if (notId) throw new Invalid({ message: notId });
-    if (!runStore.runs.exists(id))
+    if (!runsAtOnce.runs.exists(id))
       throw new Missing({ message: `nemia concluded ${id}: the store has no run ${id}. It takes a run by its id — nemia ls lists them.` });
     const git = yield* standingLive([yield* (yield* RunDoor).runs.read(RunId.read(id))]);
     const [parent] = yield* parentCloseouts(yield* EngineService, [id], 'read', git);

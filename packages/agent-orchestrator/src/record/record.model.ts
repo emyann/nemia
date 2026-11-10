@@ -5,7 +5,7 @@
 import { Schema } from 'effect';
 import { foreignId, brandedCount, brandedId, type Count, type Id } from '../model/brand.model.ts';
 import type { ErModel } from '../model/er.model.ts';
-import { stepTaskId } from './record.ts';
+import { stepTaskId, type Run as HandRun, type RouteBy, type StepRecord } from './record.ts';
 import { idRefusal } from '../forget/forget.ts';
 import { FrozenWorkflowStep, StepName, WorkflowDir, WorkflowName } from '../folder/folder.model.ts';
 import { TRY_CAUSES, upgradeTries } from '../retry/index.ts';
@@ -80,8 +80,21 @@ export type Landing = typeof Landing.Type;
  * One step on a run's record (`StepRecord`): its current try's task — `null` while nothing of it is filed — and check, where it
  * works, the tries behind it, and what the run did with it. Its name is its key in the run's `steps`.
  */
+/** A revision a run is behind the files on, read loosely: its kinds are the revisions' own (`Pin`, revisions/revisions.ts). */
+const Pin = Schema.Struct({ kind: Schema.String, name: Schema.String, n: Schema.Number, hash: Schema.String });
+
+/** The route a condition's try took, as the tick copied it once (`RouteRecord`, record.ts). */
+const RouteRecord = Schema.Struct({
+  route: Schema.String,
+  try: Schema.Number,
+  by: Schema.Literals(['table', 'script', 'judge', 'person'] as const satisfies readonly RouteBy[]),
+});
+
 export const Step = Schema.Struct({
   taskId: Schema.NullOr(TaskId.OnRead),
+  route: Schema.optional(RouteRecord),
+  sent: Schema.optional(Schema.Struct({ card: Schema.String, at: Schema.String })),
+  pinned: Schema.optional(Schema.Array(Pin)),
   workspace: Schema.optional(Schema.String),
   branch: Schema.optional(Schema.String),
   check: Schema.optional(CheckTask),
@@ -149,15 +162,50 @@ const afterOthers = Schema.makeFilter(
     `run ${run.id} waits on itself in its after, and would never be filed: take ${run.id} out of its after`,
 );
 
+/** What people approved at a gate, composed on read (`Approval`, record.ts). */
+const Approval = Schema.Struct({
+  step: Schema.String,
+  try: Schema.Number,
+  at: Schema.String,
+  message: Schema.optional(Schema.String),
+  budgets: Schema.optional(Schema.Record(Schema.String, Schema.Number)),
+});
+
+/** A loop a person ended, composed on read (`Acceptance`, record.ts). */
+const Acceptance = Schema.Struct({ step: Schema.String, try: Schema.Number, at: Schema.String, message: Schema.String });
+
+/** A person's hold on a run, composed on read (`Hold`, record.ts). */
+const Hold = Schema.Struct({
+  at: Schema.String,
+  until: Schema.Array(Schema.String),
+  why: Schema.optional(Schema.String),
+  by: Schema.optional(Schema.String),
+});
+
+/** What `nemia prune` removed of a run, composed on read (`Pruned`, record.ts). */
+const Pruned = Schema.Struct({
+  at: Schema.String,
+  worktrees: Schema.Array(Schema.Struct({ path: Schema.String, bytes: Schema.Number })),
+  artifacts: Schema.optional(Schema.Struct({ at: Schema.String, bytes: Schema.Number })),
+});
+
+/** The store's pause, composed onto every run read (`Pause`, pause/pause.ts). */
+const Pause = Schema.Struct({
+  at: Schema.String,
+  by: Schema.String,
+  why: Schema.optional(Schema.String),
+  timeoutMs: Schema.optional(Schema.Number),
+});
+
 /**
  * A run's record (`Run`, record.ts:37), the aggregate: what it was started on and with, frozen at start, its steps by name, and what
  * the tick wrote down of it. A repository run names its repository, base, branch and worktrees; a folder run, `place: { kind:
  * 'folder' }` and none of them. It names the workflow's folder it started on (`workflowDir`, read nominally, so no stored record is
- * refused) and the steps it froze at start (`workflow`, read loosely, `FrozenWorkflowStep`). Left out, as no relation of the model: the
- * revisions pinned (the revisions' own, S5), the counters the tick keeps for the metrics (`gatesTimed`, `deniedCounted`,
- * `settlesCounted`, `runTimed`, `slotHeldAt`), and what `readRun` composes on read and never writes (`approvals`, `acceptances`,
- * `pruned`, `hold`, `pause`), but a person's labels (`labels`, a key to its value), whose shape a run written back is held to. Read as
- * the store's reader reads it: a key it does not name is kept on the record, and ignored here.
+ * refused) and the steps it froze at start (`workflow`, read loosely, `FrozenWorkflowStep`); the counters the tick keeps for the metrics
+ * (`gatesTimed`, `deniedCounted`, `settlesCounted`, `runTimed`, `slotHeldAt`); the revisions it is behind (`pinned`, read loosely, the
+ * revisions' own); and what `runRecord` composes on read and the store's write drops (`approvals`, `acceptances`, `pruned`, `hold`,
+ * `pause`, and a person's `labels`), whose shapes a run written back is held to. Every field of the run's type in record.ts is here
+ * (`runFieldsHeld`). Read as the store's reader reads it: a key it does not name is kept on the record, and ignored here.
  */
 export const Run = Schema.Struct({
   id: RunId.OnRead,
@@ -187,12 +235,35 @@ export const Run = Schema.Struct({
   tips: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   cancelledAt: Schema.optional(Schema.String),
   labels: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  slotHeldAt: Schema.optional(Schema.String),
+  gatesTimed: Schema.optional(Schema.Array(Schema.Struct({ step: Schema.String, try: Schema.Number }))),
+  deniedCounted: Schema.optional(Schema.Array(Schema.Struct({ task: Schema.String, attempts: Schema.Number }))),
+  settlesCounted: Schema.optional(Schema.Array(Schema.String)),
+  runTimed: Schema.optional(Schema.Boolean),
+  approvals: Schema.optional(Schema.Array(Approval)),
+  acceptances: Schema.optional(Schema.Array(Acceptance)),
+  pruned: Schema.optional(Pruned),
+  hold: Schema.optional(Hold),
+  pause: Schema.optional(Pause),
+  pinned: Schema.optional(Schema.Array(Pin)),
   steps: Schema.Record(StepName.OnRead, Step),
   createdAt: Schema.String,
 })
   .check(triesNamed, afterOthers)
   .annotate({ identifier: 'Run' });
 export type Run = typeof Run.Type;
+
+/** Every key of any member of `U`. */
+type KeysOf<U> = U extends unknown ? keyof U : never;
+
+/** Whether two types are one. */
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+
+/** The model's run names every field the run's type in record.ts has, and no other: a field added to either fails the typecheck here. */
+export const runFieldsHeld: Same<KeysOf<HandRun>, keyof Run> = true;
+
+/** And a step's record every field of `StepRecord` in record.ts, and no other. */
+export const stepFieldsHeld: Same<keyof StepRecord, keyof Step> = true;
 
 /** Run-core's part of the orchestrator's diagram (`model/diagram.model.ts`): its entities, and the ids it owns. */
 export const recordModel = {

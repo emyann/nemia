@@ -32,7 +32,7 @@ const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 
@@ -53,7 +53,7 @@ test('`nemia tick` prints `awaiting approval` for a run at its gate and `blocked
     const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
     stand().world.repository(repo, {});
     const run = await runPlaced(startRun({ brief: 'plan the flag', repo, workflowDir: planned(), isolate: false, gates }));
-    await runWith(e, advanceRun(readRun(run.id)));
+    await runWith(e, advanceRun(runRecord(run.id)));
     b.settle(`${run.id}-plan`, phase, closeout === undefined ? {} : { closeout });
     return run.id;
   };

@@ -283,7 +283,7 @@ const lookOf = (spec: HarnessSpec, name: string, run: RunFile, now: Instant, tol
  * Why the run under `name` is not read: its spec refused its output, `log`, in its reader's words (`wrong`). Names the run, the
  * file, the reader's words, what the run is read as, and what to do.
  */
-export const outputRefusalOf = (spec: HarnessSpec, name: string, log: string, wrong: string): string =>
+const outputRefusalOf = (spec: HarnessSpec, name: string, log: string, wrong: string): string =>
   `${spec.name}: \`${name}\`'s output, ${log}, cannot be read: ${wrong.replace(/\.?\s*$/, '.')} It is unread while its process runs,` +
   ` and read as failed once it has ended; the other sessions of ${spec.name} are read. Once its task has settled, \`ae forget\`` +
   ` lets this session go.`;
@@ -292,7 +292,7 @@ export const outputRefusalOf = (spec: HarnessSpec, name: string, log: string, wr
  * Why the run under `name` has no session id: its harness printed its start event with no id this runtime reads (`startRefused`).
  * Names the run, the line of its stdout, the event, the field and what was there, quoted, what the run is read as, and what to do.
  */
-export const startRefusalOf = (spec: HarnessSpec, name: string, refused: NonNullable<RunFile['startRefused']>): string => {
+const startRefusalOf = (spec: HarnessSpec, name: string, refused: NonNullable<RunFile['startRefused']>): string => {
   const event = Object.values(spec.start?.event ?? {}).join('`/`');
   return (
     `${spec.name}: \`${name}\` has no session id: line ${refused.line} of its stdout is its \`${event}\` start event, and its \`${refused.field}\`` +
@@ -426,7 +426,7 @@ const observeErrorOf = (spec: HarnessSpec) => (cause: unknown) =>
   new RunnerError({ verb: 'observe', message: `${spec.name}: ${cause instanceof Error ? cause.message : String(cause)}` });
 
 /** One of a process's two output streams, by the name its file and `output` give it. */
-export type StreamName = 'stdout' | 'stderr';
+type StreamName = 'stdout' | 'stderr';
 
 /**
  * What `file` holds, or its last `lastBytes` bytes, as text; `undefined` when there is no such file. A cut that falls inside a

@@ -5,7 +5,7 @@
 import { elapsedMs, type Instant, type Monotonic } from '../core/clock.ts';
 
 /** What the lease reads of a registry entry: when it was sent, its Task once answered, and the send's monotonic stamp. */
-export type Leased = { sentAt: string; taskId?: string; sending?: { mono?: Monotonic } };
+type Leased = { sentAt: string; taskId?: string; sending?: { mono?: Monotonic } };
 
 /**
  * Whether the send of `e` still holds its lease at `now`: under way, with no Task yet, and sent less than `sendMs` ago —

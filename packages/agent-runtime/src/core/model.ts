@@ -43,7 +43,10 @@ export const taskIdRefusal = (value: string): string | undefined => {
 export const TaskId = brandedId('TaskId', taskIdRefusal);
 export type TaskId = Id<'TaskId'>;
 
-/** An attempt's number within its task, from 1 (`attempts.length + 1`, `domain.ts`). */
+/**
+ * An attempt's number within its task, from 1 (`attempts.length + 1`, `domain.ts`).
+ * Exported only for the tests that import it.
+ */
 export const AttemptNumber = brandedCount('AttemptNumber', 1);
 export type AttemptNumber = Count<'AttemptNumber'>;
 
@@ -65,6 +68,7 @@ export type ExecutionPlace = typeof ExecutionPlace.Type;
 /**
  * One folder a session may reach beyond its `cwd`, as a Pod's container is given a volume mount: its absolute path, and whether the
  * session may only read it. The harness's `Mount` (`harness/mounts.ts`) in the model; `model.test.ts` holds the two to one shape.
+ * Exported only for the tests that import it.
  */
 export const Mount = Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean }).annotate({ identifier: 'Mount' });
 export type Mount = typeof Mount.Type;
@@ -83,7 +87,10 @@ const EndReason = Schema.Literals(['harness', 'lost', 'unstartable', 'operator',
 const Monotonic = Schema.Struct({ boot: Schema.String, ms: Schema.Number });
 const Strings = Schema.Array(Schema.String);
 
-/** One start of a task's session, as the fold holds it (`Attempt`, `domain.ts`): whatever ends it settles the task. */
+/**
+ * One start of a task's session, as the fold holds it (`Attempt`, `domain.ts`): whatever ends it settles the task.
+ * Exported only for the tests that import it.
+ */
 export const Attempt = Schema.Struct({
   n: AttemptNumber.OnRead,
   startedAt: Schema.String,
@@ -146,6 +153,7 @@ const attemptsGap = (attempts: ReadonlyArray<{ readonly n: number }>): string | 
  *
  * Its invariant: its attempts number from 1 with no gap, each started at `attempts.length + 1` (`domain.ts:988`, a turn's start, and
  * `domain.ts:1099`, a restart), which `engine.ts:323` journals as the `starting` entry the fold pushes.
+ * Exported only for the tests that import it.
  */
 export const Task = Schema.Struct({
   taskId: TaskId.OnRead,
@@ -176,7 +184,10 @@ export const Task = Schema.Struct({
   .annotate({ identifier: 'Task' });
 export type Task = typeof Task.Type;
 
-/** One entry of a task's journal: the task it belongs to and the event, in any shape a runtime has written (`StoredEventSchema`). */
+/**
+ * One entry of a task's journal: the task it belongs to and the event, in any shape a runtime has written (`StoredEventSchema`).
+ * Exported only for the tests that import it.
+ */
 export const JournalEntry = Schema.Struct({
   taskId: TaskId.OnRead,
   event: StoredEventSchema.annotate({ identifier: 'Event' }),
@@ -187,10 +198,13 @@ export type JournalEntry = typeof JournalEntry.Type;
 const PlaceNode = Schema.Struct({ place: ExecutionPlace }).annotate({ identifier: 'ExecutionPlace' });
 
 /** The runtime's model, as the printer reads it. */
-export const runtimeModel = {
+const runtimeModel = {
   entities: [Task, Attempt, Session, JournalEntry, HarnessArgs, Mount, PlaceNode],
   ids: { TaskId: 'Task', SessionId: 'Session' },
 } satisfies ErModel;
 
-/** The runtime's entity-relation diagram, as `docs/model.md` holds it between its `diagram:runtime-model` markers. */
+/**
+ * The runtime's entity-relation diagram, as `docs/model.md` holds it between its `diagram:runtime-model` markers.
+ * Exported only for the tests that import it.
+ */
 export const runtimeModelDiagram = (): string => erDiagram(runtimeModel);

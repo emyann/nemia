@@ -14,10 +14,16 @@ import path from 'node:path';
 /** How many random bytes a token is made of: 32, base64url, as a bearer token of no structure. */
 const TOKEN_BYTES = 32;
 
-/** The folder the holder's token is kept in, under the runtime's store `root`. */
+/**
+ * The folder the holder's token is kept in, under the runtime's store `root`.
+ * Exported only for the tests that import it.
+ */
 export const tokenFolderOf = (root: string): string => path.join(root, 'a2a');
 
-/** The file the holder's token is kept in. */
+/**
+ * The file the holder's token is kept in.
+ * Exported only for the tests that import it.
+ */
 export const tokenFileOf = (root: string): string => path.join(tokenFolderOf(root), 'holder-token');
 
 /** A token no one can guess: 32 random bytes, base64url. */

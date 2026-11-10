@@ -107,7 +107,7 @@ export const UsageSchema = Schema.StructWithRest(
  * A body kept once in the store's body store, by the sha256 of its UTF-8 in lowercase hex: what an entry holds in place of a long
  * text (`core/engine/bodies.ts`), and `Journal.layer` reads back.
  */
-export const BodyRefSchema = Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/));
+const BodyRefSchema = Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/));
 
 /** A brief in parts as a store holds it: each part its text, or a body named by its reference. */
 const BriefPartsSchema = Schema.mutable(Schema.Array(Schema.Union([Schema.String, Schema.Struct({ body: BodyRefSchema })])));
@@ -258,7 +258,7 @@ export const StoredEventSchema = Schema.Union([
 export type StoredEvent = typeof StoredEventSchema.Type;
 
 /** The kinds of event a runtime has written. */
-export const EVENT_KINDS: readonly string[] = StoredEventSchema.members.map((m) => m.schema.fields.kind.literal);
+const EVENT_KINDS: readonly string[] = StoredEventSchema.members.map((m) => m.schema.fields.kind.literal);
 
 /** A task's journal as a store holds it: its events, in order. */
 export const StoredEventsSchema = Schema.Array(StoredEventSchema);

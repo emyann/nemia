@@ -29,15 +29,15 @@
  *   (`bridgeStateOf`), so the runner's look reads the bridge off the file (`claudeCodeOps`), never off this process's memory. The
  *   request is awaited before the next message is printed: a job's one turn ends after its bridge is up, as measured on Agent SDK
  *   0.3.308 (`docs/harness.md`, *The claude.ai bridge*). No bridge never fails the job: the session runs on, and the file says why.
- * - Where the runner names a hold file and the store's sessions' drain (`io.holdFile`, `io.drainFile`), the job is held by that drain as
- *   an attached session is by its holder's (`holdOf`, through what the two share in `job-hold.ts`): a call in flight when it is put
- *   finishes, and the next call of the main thread waits at its `PreToolUse` hook (the SDK's `HookCallbackMatcher`, its timeout
- *   `HOOK_HOLD_S`) until it is lifted; a sub-agent's call is never held. The drain is read off its file on every poll (`io.holdPollMs`)
- *   and at every new call, and the hold file says what the job is doing about it (`calling`, `draining`, `heldBack`). Past the drain's
- *   grace with a call in flight, or past its `at` plus `io.holdMs`, the job parks: `parked` on its hold file, with the call it cut,
- *   then the SDK's `Query.interrupt()` and the end of its prompt (`inputOf`'s `close`), so Claude Code prints the turn it cut as a
- *   result and saves its running total as it exits, which a resume carries on — never a kill, which saves nothing. Absent either
- *   file, the job has no hooks and is never held. Parked or not, it leaves as its last result says: a cut turn's is an error.
+ * - Where the runner names a hold file and the store's sessions' drain (`io.holdFile`, `io.drainFile`), the job is held by that drain as an
+ *   attached session is by its holder's (`jobHoldOf`, `src/harness/claude/job-hooks.ts`, through what the two share in `job-hold.ts`): a
+ *   call in flight when it is put finishes, and the next call of the main thread waits at its `PreToolUse` hook (the SDK's
+ *   `HookCallbackMatcher`, its timeout `HOOK_HOLD_S`) until it is lifted; a sub-agent's call is never held. The drain is read off its file
+ *   on every poll (`io.holdPollMs`) and at every new call, and the hold file says what the job is doing about it (`calling`, `draining`,
+ *   `heldBack`). Past the drain's grace with a call in flight, or past its `at` plus `io.holdMs`, the job parks: `parked` on its hold file,
+ *   with the call it cut, then the SDK's `Query.interrupt()` and the end of its prompt (`inputOf`'s `close`), so Claude Code prints the
+ *   turn it cut as a result and saves its running total as it exits, which a resume carries on — never a kill, which saves nothing. Absent
+ *   either file, the job has no hooks and is never held. Parked or not, it leaves as its last result says: a cut turn's is an error.
  *
  * Leaves 0 when the session's last result is no error, and 1 — with the reason on stderr, which the worker tees into the run's log
  * — when it is one, when the messages end with no result at all, when the request cannot be read, and when the options cannot be
@@ -49,26 +49,13 @@
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import readline from 'node:readline';
-import { query, type HookCallbackMatcher, type HookEvent, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
+import { query, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { attachedOptions } from '../src/harness/claude/session-options.ts';
 import { bridgeDue, bridgeStateOf, enableBridge, type AttachedBridge } from '../src/harness/claude/session-bridge.ts';
 import { bridgeAsked } from '../src/harness/claude/vocabulary.ts';
-import { heldAtHook, type HookHold } from '../src/harness/claude/attached-session.ts';
-import {
-  firstCall,
-  HOOK_HOLD_S,
-  inside,
-  JOB_HOLD_MS,
-  JOB_HOLD_POLL_MS,
-  writeJobHold,
-  type Call,
-  type CallsInFlight,
-  type JobHold,
-} from '../src/harness/claude/job-hold.ts';
-import { elapsedMs } from '../src/core/clock.ts';
-import { sessionDrainOf } from '../src/core/engine/drain.ts';
+import { JOB_HOLD_MS, JOB_HOLD_POLL_MS } from '../src/harness/claude/job-hold.ts';
+import { jobHoldOf, type HoldIO } from '../src/harness/claude/job-hooks.ts';
 import { replaceFile } from '../src/core/replace.ts';
-import { instantNow } from '../src/core/engine/now.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
 
 /** Why the session cannot go on, thrown so that whatever is printed is flushed before the process leaves. */
@@ -129,9 +116,6 @@ const inputOf = () => {
   };
 };
 
-/** The files and bounds a job is held by (`HarnessIO`): its hold file, the store's sessions' drain, its hold's bound and its poll. */
-type HoldIO = { holdFile: string; drainFile: string; holdMs: number; holdPollMs: number };
-
 /** What the runner wrote for this job at its spawn: the request whole, and the files it named for it (`HarnessIO`). */
 type Requested = { request: SpawnRequest; io: { bridgeFile?: string; hold?: HoldIO } };
 
@@ -164,98 +148,6 @@ const requestAt = (at: string | undefined): Requested => {
   } catch (e) {
     throw new Refused(`${at} is not a spawn request this runtime reads (${(e as Error).message}).`);
   }
-};
-
-/**
- * The job's hold: its calls in flight, kept by its hooks, and the sessions' drain, read off its file on every poll and at every new call.
- *
- * - A new call of the main thread waits at its `PreToolUse` hook while the drain stands and none of the session's calls is in flight
- *   (the attached sessions' rule, `attached.ts`), reading the drain again every `holdPollMs`, through the one hold at a hook a held
- *   session keeps too (`heldAtHook`); a call that belongs to a call in flight — a sub-agent's (`inside`) — is never held, or the call it
- *   belongs to could never end, and a main-thread call that comes or waited as the job parks is answered nothing once its signal aborts.
- *   Its hook's timeout is `HOOK_HOLD_S`, over the job's own bound, so Claude Code never answers for it first.
- * - Every `holdPollMs`, the drain read: past its `at` plus its `graceMs` with a call in flight, the call is cut; past its `at` plus
- *   `holdMs`, the job gives up its hold. Either way it parks (`park`): `parked` written on the hold file, with the call it cut as its
- *   `calling`, and `ended` told to end the session.
- * - The hold file says, as it changes: the earliest call in flight (`calling`), the drain read standing (`draining`, since this process
- *   first read it), a call waiting at its hook (`heldBack`, since the first of them began to wait, and `after`, the main-thread call
- *   that ended last, kept by its `PostToolUse` or `PostToolUseFailure` hook); the last two gone once the drain is read lifted. Once
- *   parked it says `parked`, and nothing after.
- */
-const holdOf = (io: HoldIO, ended: () => void) => {
-  const calls: CallsInFlight = new Map();
-  const waiting: string[] = [];
-  let draining: string | undefined;
-  let after: { tool: string } | undefined;
-  let parked: JobHold['parked'];
-  let written: string | undefined;
-  const write = (): void => {
-    const first = firstCall(calls);
-    const hold: JobHold = {
-      ...(first && !parked ? { calling: first } : {}),
-      ...(draining ? { draining: { since: draining } } : {}),
-      ...(waiting[0] && !parked ? { heldBack: { since: waiting[0], ...(after ? { after } : {}) } } : {}),
-      ...(parked ? { parked } : {}),
-    };
-    const text = JSON.stringify(hold);
-    if (text === written) return;
-    writeJobHold(io.holdFile, hold);
-    written = text;
-  };
-  const drain = () => {
-    const read = sessionDrainOf(io.drainFile);
-    draining = read === null ? undefined : (draining ?? new Date().toISOString());
-    return read;
-  };
-  const park = (calling: Call | undefined): void => {
-    parked = { at: new Date().toISOString(), ...(calling ? { calling } : {}) };
-    write();
-    ended();
-  };
-  const look = (): void => {
-    if (parked) return;
-    const read = drain();
-    if (read !== null) {
-      const since = elapsedMs({ at: Date.parse(read.at) }, instantNow());
-      if (calls.size > 0 && since >= read.graceMs) return park(firstCall(calls));
-      if (since >= io.holdMs) return park(firstCall(calls));
-    }
-    write();
-  };
-  const held = (): boolean => !parked && drain() !== null && calls.size === 0;
-  const over = async (input: unknown, id: string | undefined) => {
-    const ended = id === undefined ? undefined : calls.get(id);
-    if (ended && !inside(input)) after = { tool: ended.tool };
-    if (id && calls.delete(id) && !parked) write();
-    return {};
-  };
-  const hold: HookHold = {
-    held,
-    over: () => parked !== undefined,
-    waits: (since) => void waiting.push(since),
-    waited: (since) => void waiting.splice(waiting.indexOf(since), 1),
-    polled: write,
-    pollMs: io.holdPollMs,
-    calls,
-  };
-  const hooks: Partial<Record<HookEvent, HookCallbackMatcher[]>> = {
-    PreToolUse: [
-      {
-        timeout: HOOK_HOLD_S,
-        hooks: [
-          async (input, id, { signal }) => {
-            const cut = await heldAtHook(hold, input, id, signal);
-            if (cut) return cut;
-            write();
-            return {};
-          },
-        ],
-      },
-    ],
-    PostToolUse: [{ hooks: [over] }],
-    PostToolUseFailure: [{ hooks: [over] }],
-  };
-  return { hooks, look };
 };
 
 /** Writes `bridge` whole on `file`, through a file beside it renamed over it (`replaceFile`), so a look never reads half of it. */
@@ -301,7 +193,7 @@ const ran = async ({ request, io }: Requested): Promise<boolean> => {
   }
   const input = inputOf();
   let ends: () => void = () => {};
-  const hold = io.hold === undefined ? undefined : holdOf(io.hold, () => ends());
+  const hold = io.hold === undefined ? undefined : jobHoldOf(io.hold, () => ends());
   const session = query({
     prompt: input,
     options: {

@@ -47,7 +47,10 @@ const VERSION = '1.0';
 /** The three methods the port serves; every other method of the SDK's handler is refused. */
 type Served = 'getAgentCard' | 'getTask' | 'resubscribe';
 
-/** Why each method the port does not serve is refused, by its name on the SDK's handler. */
+/**
+ * Why each method the port does not serve is refused, by its name on the SDK's handler.
+ * Exported only for the tests that import it.
+ */
 export const REFUSED: Readonly<Record<Exclude<keyof A2ARequestHandler, Served>, string>> = {
   sendMessage: 'no session is started over this port',
   sendMessageStream: 'no session is started over this port',

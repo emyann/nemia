@@ -68,7 +68,10 @@ export const REQUEST_MS = 10_000;
 /** How long a send is waited on, off the pass, before it is read as not answered: a Task in doubt, never sent twice. */
 export const SEND_MS = 15 * 60_000;
 
-/** How long a spawn waits, in the pass, for its send's answer before it leaves the send to go on without it. */
+/**
+ * How long a spawn waits, in the pass, for its send's answer before it leaves the send to go on without it.
+ * Exported only for the tests that import it.
+ */
 export const SPAWN_WAIT_MS = 1_000;
 
 /** Why a task cannot be filed on a remote agent, or `undefined`: a remote agent takes no harness arguments. */
@@ -86,7 +89,10 @@ type Answer = { task: Task } | { message: Message } | { refused: string } | { fa
 
 const TERMINAL: ReadonlySet<SessionState> = new Set(['completed', 'failed', 'canceled', 'rejected']);
 
-/** The bounds of a send and of a subscription, and the words for a secret not given: each has its shipped default. */
+/**
+ * The bounds of a send and of a subscription, and the words for a secret not given: each has its shipped default.
+ * Exported only for the tests that import it.
+ */
 export type RemoteOptions = {
   sendMs?: number;
   spawnWaitMs?: number;

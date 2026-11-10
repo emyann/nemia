@@ -43,13 +43,14 @@ export const claudeTrusts = (dir: string, file: string = claudeConfigFile()): bo
 };
 
 /** What `claudeTrustText` answers: the key is already set, the text that sets it, or why the text given cannot be rewritten. */
-export type TrustText = { readonly trusted: true } | { readonly text: string } | { readonly unread: string };
+type TrustText = { readonly trusted: true } | { readonly text: string } | { readonly unread: string };
 
 /**
  * The text of a `.claude.json` with `projects[key].hasTrustDialogAccepted` set to true and nothing else changed in what it holds:
  * `projects` and the entry made where absent, the entry's other keys kept, written with two spaces and the last line break the text
  * had. Answers `trusted` where the key is already true, and `unread` for a text that is no JSON object, or whose `projects` or entry
  * for `key` is no object. Pure.
+ * Exported only for the tests that import it.
  */
 export function claudeTrustText(text: string, key: string): TrustText {
   let parsed: unknown;
@@ -70,7 +71,7 @@ export function claudeTrustText(text: string, key: string): TrustText {
 }
 
 /** What `claudeTrust` answers: whether it wrote the key, and why it could not where it neither wrote it nor found it set. */
-export type TrustWritten = { readonly wrote: boolean; readonly refused: string | null };
+type TrustWritten = { readonly wrote: boolean; readonly refused: string | null };
 
 /** The bytes of `file`, or null where there is none. */
 const bytesOf = (file: string): Buffer | null => {

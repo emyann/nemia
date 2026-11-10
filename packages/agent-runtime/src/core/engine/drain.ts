@@ -20,7 +20,10 @@ export const SESSION_DRAIN_FILE = 'sessions-drain.json';
 /** The folder of the store at `root` both drains are kept in: the attached sessions' folder, beside their run files. */
 export const drainFolder = (root: string): string => path.join(root, 'runs', 'attached');
 
-/** The holder's drain file of the store at `root`. */
+/**
+ * The holder's drain file of the store at `root`.
+ * Exported only for the tests that import it.
+ */
 export const holderDrainFile = (root: string): string => path.join(drainFolder(root), DRAIN_FILE);
 
 /** The sessions' drain file of the store at `root`, apart from the holder's. */
@@ -34,7 +37,7 @@ const SessionDrainSchema = Schema.Struct({
 });
 
 /** The sessions' drain, as its file holds it. */
-export type SessionDrain = typeof SessionDrainSchema.Type;
+type SessionDrain = typeof SessionDrainSchema.Type;
 
 /** A process, as a drain names it: its pid, and when it started where that could be read, so a pid taken since is not it. */
 const ProcessSchema = Schema.Struct({ pid: Schema.Finite, start: Schema.optional(Schema.String) });

@@ -37,7 +37,7 @@ import { cardJsonOf, servedCardOf, ServedHandler } from './served.ts';
 const HOST = '127.0.0.1';
 
 /** The most a request body may hold: a JSON-RPC call of this surface is a few hundred bytes. */
-export const MOST_BYTES = 64 * 1024;
+const MOST_BYTES = 64 * 1024;
 
 /** Where a harness's card is served beneath its own path. */
 const CARD_PATH = '/.well-known/agent-card.json';

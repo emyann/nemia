@@ -88,6 +88,7 @@ const compactOne = (
  * pid `alive` does not find; what was read of a log is kept anew under its kept key (`.said`). Left whole, and named: a capture
  * whose worker is at work, or has no pid yet; one no run file names; one its reader refuses, or reads otherwise once kept; one that
  * changed while it was read. A spec with no `keepOutput` keeps every capture whole, and finds none.
+ * Exported only for the tests that import it.
  */
 export const compactRuns = (
   spec: HarnessSpec,

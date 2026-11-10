@@ -15,7 +15,7 @@
  * A permission rule as Claude Code reads one: the tool, and what its parentheses scope — null for a rule naming the tool whole, as `Bash`
  * and `Bash(*)` both do. Null for a rule that names no built-in tool so, an MCP server's (`mcp__<server>__<tool>`) among them.
  */
-export function ruleOf(rule: string): { tool: string; scope: string | null } | null {
+function ruleOf(rule: string): { tool: string; scope: string | null } | null {
   const [, tool, scope] = /^([A-Za-z][A-Za-z0-9]*)(?:\(([\s\S]*)\))?$/.exec(rule) ?? [];
   if (tool === undefined) return null;
   return { tool, scope: scope === undefined || scope === '*' ? null : scope };
@@ -46,6 +46,7 @@ function bashMatches(pattern: string, command: string): boolean {
  * `git diff:*`, `npm run build`). Read off `inner`'s text with each `*` of it taken as written: `outer`'s own characters are never a `*`,
  * so where `outer` matches that text, each `*` of `inner` falls inside a wildcard of `outer`, which matches whatever it stands for. And the
  * bare command a trailing ` *` of `inner` matches, `outer` must match too.
+ * Exported only for the tests that import it.
  */
 export function bashCovers(outer: string, inner: string): boolean {
   const [o, i] = [bashPattern(outer), bashPattern(inner)];
@@ -65,6 +66,7 @@ function mcpRuleOf(rule: string): { server: string; tool: string | null } | null
 /**
  * The rule in `deny` that refuses the tool `mcp__<server>__<tool>`, if one does: one naming the tool, the whole
  * server (`mcp__<server>`), or every tool of it (`mcp__<server>__*`). A rule naming a prefix of either refuses nothing.
+ * Exported only for the tests that import it.
  */
 export function denyingRule(deny: readonly string[], server: string, tool: string): string | null {
   const prefix = `mcp__${server}`;
@@ -77,6 +79,7 @@ export function denyingRule(deny: readonly string[], server: string, tool: strin
  * call the allow does: one of the same words; one naming the allow's tool whole; a Bash deny that covers the allow's commands
  * (`bashCovers`); a deny of the whole of an MCP server, over an allow of one of its tools or of all of them — a server's tool read as
  * `denyingRule` reads it, so a tool's row and the allow rules say the same.
+ * Exported only for the tests that import it.
  */
 export function takenBackBy<R extends { readonly rule: string }>(allow: string, over: readonly R[]): R | undefined {
   const server = mcpRuleOf(allow);
@@ -98,6 +101,7 @@ export function takenBackBy<R extends { readonly rule: string }>(allow: string, 
  * The deny rules of `over` narrower than an allow that stands, which still refuse some of what it allows — or, given the ask rules, those
  * that still make some of it ask: a Bash deny among a Bash allow's commands (`bashCovers`), and a deny of one tool of a server an allow
  * names whole.
+ * Exported only for the tests that import it.
  */
 export function narrowerRules(allow: string, over: readonly { readonly rule: string }[]): string[] {
   const server = mcpRuleOf(allow);
@@ -118,11 +122,12 @@ export function narrowerRules(allow: string, over: readonly { readonly rule: str
  * The modes a job was measured in on Claude Code 2.1.280, each denying what would ask and carrying on (docs/open-issues.md, "Claude
  * Code as a job") — none given being the engine's `auto`. `bypassPermissions` was not measured, so nothing is claimed of a job in it.
  */
-export const JOB_MEASURED: ReadonlySet<string | null> = new Set([null, 'auto', 'dontAsk', 'default', 'acceptEdits']);
+const JOB_MEASURED: ReadonlySet<string | null> = new Set([null, 'auto', 'dontAsk', 'default', 'acceptEdits']);
 
 /**
  * Whether a job of Claude Code — every session of it run on the Agent SDK, which answers a call that would ask by denying it, as no
  * person is there — was measured denying what asks in `permissionMode` (`JOB_MEASURED`), none given being null.
+ * Exported only for the tests that import it.
  */
 export const jobDeniesAsksIn = (permissionMode: string | null): boolean => JOB_MEASURED.has(permissionMode);
 
@@ -137,6 +142,7 @@ export type Dated = { harness: string; version: string; measuredAt: string; sour
  * (`2.1.272`), a day that is on the calendar, written `YYYY-MM-DD` — not the 30th of February — and where it is recorded. A list without
  * them reads as a claim about today, which nothing here can check: a reader says which day and which version, and those are all that
  * hold it to what was measured.
+ * Exported only for the tests that import it.
  */
 export function dated<T extends Dated>(name: string, measurement: T): T {
   const { harness, version, measuredAt, source } = measurement as Partial<Dated>;
@@ -163,6 +169,7 @@ export function dated<T extends Dated>(name: string, measurement: T): T {
 /**
  * The read-only commands as `dated` holds a measurement, and more: `measured` and `documented` each a list of commands, one word each, with
  * none listed twice and none both measured and documented, and `docs` saying when the docs were read.
+ * Exported only for the tests that import it.
  */
 export function readOnlyCommands<T extends Dated & { measured: readonly string[]; documented: readonly string[]; docs: string }>(
   name: string,
@@ -204,6 +211,7 @@ const EDITS_WITH = 'Not named by any measurement. A session given no `tools:` ch
  * test refuses a name the ledger's bullet does not write as a tool of its own. `inferred` are tools such a session is taken to have that
  * no unfenced measurement names, each with why, which a reader marks as inferred and never as measured. `lacks` are the ones the
  * measurement found absent. MCP tools are in neither: a session's servers reach it whatever its `tools:`, and each lists its own.
+ * Exported only for the tests that import it.
  */
 export const MEASURED_TOOLS = dated('MEASURED_TOOLS', {
   harness: 'Claude Code',
@@ -246,6 +254,7 @@ export const MEASURED_TOOLS = dated('MEASURED_TOOLS', {
  * from it. So nothing checks the list against the settings; `readOnlyCommands` holds its shape and its date. `documented` are the rest of
  * what Claude Code's docs name, which say the set includes them, not that it is all of it; `git` is its read-only forms, which they do
  * not list.
+ * Exported only for the tests that import it.
  */
 export const READ_ONLY_COMMANDS = readOnlyCommands('READ_ONLY_COMMANDS', {
   harness: 'Claude Code',

@@ -13,28 +13,18 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { McpServerConfigForProcessTransport, Options } from '@anthropic-ai/claude-agent-sdk';
-import type { LocalMcpServer, RemoteMcpServer, SpawnRequest } from '../seam.ts';
+import type { Options } from '@anthropic-ai/claude-agent-sdk';
+import type { SpawnRequest } from '../seam.ts';
 import { CLAUDE_DEFAULT_MODE, claudeAllows, claudeDenies, claudeFlagName, worktreeName, type ClaudeFlags } from './vocabulary.ts';
 import { admittedFlags } from './admission.ts';
 import { memorylessSettings } from './memory.ts';
 import { claudeTelemetryEnv } from './telemetry.ts';
 import { CLAUDE_JOB_ENV } from './job-env.ts';
-import { everyMcpServer, type McpTransport } from '../mcp.ts';
+import { everyMcpServer } from '../mcp.ts';
 import { withoutTelemetry } from '../telemetry.ts';
 
-type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
-
-/**
- * The transports of `MCP_TRANSPORTS` (`../mcp.ts`) are the Agent SDK's for a server a file declares (`McpServerConfigForProcessTransport`,
- * `sdk.d.ts:1264`, its in-process `sdk` aside), and the ones the seam's servers carry: an SDK that names another fails this typecheck until
- * `MCP_TRANSPORTS` names it too, while a `.mcp.json` that already says it reads as `unknown`.
- */
-export const mcpTransportsHeld: Same<McpTransport, Exclude<NonNullable<McpServerConfigForProcessTransport['type']>, 'sdk'>> = true;
-export const seamTransportsHeld: Same<McpTransport, NonNullable<LocalMcpServer['type']> | RemoteMcpServer['type']> = true;
-
 /** The options of `Options` this file sets: what `query()` is given, beside its prompt and the runner's own callbacks. */
-export type AttachedOptions = Pick<
+type AttachedOptions = Pick<
   Options,
   | 'cwd'
   | 'tools'
@@ -147,7 +137,7 @@ const extraOf = (
  * server's tools sent whole on every request instead — Playwright's 23 were 4.1k tokens of a design session's first request, on
  * Claude Code 2.1.308 — so it is added to a closed list wherever the session has a server (`fenceOf`). A deny of it still wins.
  */
-export const TOOL_SEARCH = 'ToolSearch';
+const TOOL_SEARCH = 'ToolSearch';
 
 /**
  * The fence: the tools, the denies and allows (`claudeDenies`, `claudeAllows`), the mounts as added folders, and the skills when the task

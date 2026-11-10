@@ -43,7 +43,10 @@ export type McpServersRead =
   | { readonly read: true; readonly servers: readonly McpServerState[] }
   | { readonly read: false; readonly why: string };
 
-/** How long a whole read may take before the look is called failed and the session ended: six servers at the SDK's 5 s connect each. */
+/**
+ * How long a whole read may take before the look is called failed and the session ended: six servers at the SDK's 5 s connect each.
+ * Exported only for the tests that import it.
+ */
 export const MCP_STATE_MS = 45_000;
 
 /**
@@ -73,7 +76,7 @@ export type McpStatusAsk = (
  * `end` is the session's end — the held prompt released and the SDK's own controller aborted, so the child goes — and it is safe to
  * call twice: it runs on the caller's `stop` and again when the ask returns, whichever comes first.
  */
-export const claudeMcpStatus: McpStatusAsk = async (servers, cwd, executable, stop) => {
+const claudeMcpStatus: McpStatusAsk = async (servers, cwd, executable, stop) => {
   const abort = new AbortController();
   let close = () => {};
   const held: AsyncIterable<never> = {

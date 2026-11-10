@@ -260,8 +260,6 @@ export const handleOf = (events: readonly Event[], attempt: number): string | un
 export const isSpec = (h: HarnessConfig): h is HarnessSpec => typeof h === 'object' && 'command' in h;
 /** A remote A2A agent: an object that is neither a spec (`command`) nor a runner (`spawn`). */
 export const isRemote = (h: HarnessConfig): h is RemoteAgent => typeof h === 'object' && h !== null && !('command' in h) && !('spawn' in h);
-/** Claude Code as the engine runs it itself. */
-export const isClaude = (h: HarnessConfig): h is 'claude' => h === 'claude';
 
 /**
  * `task` with the engine's default limits written on where it was filed with no `resources` of its own, as a LimitRange's default is
@@ -293,7 +291,7 @@ export const declarationOf = (h: HarnessConfig): HarnessDeclaration | undefined 
         : undefined;
 
 /** What `runnersOf` builds each harness with, beside the harnesses themselves: each read by the harnesses that need it. */
-export type RunnersGiven = {
+type RunnersGiven = {
   /** The store's root, under which each harness keeps its registry. */
   root: string;
   /** A remote agent's secrets, and the words for one not given (`EngineOptions`). */

@@ -7,7 +7,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Usage } from '../../core/index.ts';
-import type { SDKMessageOrigin } from '@anthropic-ai/claude-agent-sdk';
 import { originOf, type TranscriptEvent, type TranscriptOriginKind } from '../seam.ts';
 import { isoTime } from '../transcript.ts';
 import { type ContentBlock, decodeLine, type Line, lineOf, writtenAt } from './lines.ts';
@@ -17,7 +16,7 @@ const PROJECTS = path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir
 const transcripts = new Map<string, string>();
 
 /** Where a Claude Code session's transcript is, found once and remembered — or `undefined` while no project folder holds it. */
-export const transcriptFile = (sessionId: string): string | undefined => {
+const transcriptFile = (sessionId: string): string | undefined => {
   const known = transcripts.get(sessionId);
   if (known && fs.existsSync(known)) return known;
   let dirs: string[];
@@ -41,7 +40,7 @@ export const transcriptFile = (sessionId: string): string | undefined => {
  * where it keeps one. Found in one pass over the project folders, each listed once, whatever the count of ids; an id no folder
  * holds has no key, and a record under an id not asked is never named.
  */
-export const transcriptRecords = (sessionIds: readonly string[]): Map<string, string[]> => {
+const transcriptRecords = (sessionIds: readonly string[]): Map<string, string[]> => {
   const asked = new Set(sessionIds);
   const found = new Map<string, string[]>();
   if (!asked.size) return found;
@@ -70,6 +69,7 @@ export const transcriptRecords = (sessionIds: readonly string[]): Map<string, st
  * When a Claude Code session's transcript was last written: its file's mtime in whole milliseconds, as the Agent SDK's
  * getSessionInfo gives it, read by a stat that reads none of its bytes; `undefined` while no project folder holds it, or when the
  * stat fails.
+ * Exported only for the tests that import it.
  */
 export const transcriptWrittenAt = async (sessionId: string): Promise<number | undefined> => {
   const file = transcriptFile(sessionId);
@@ -146,14 +146,6 @@ const blockEvents = (
   }
   return [said(`[${block.type}]`)];
 };
-
-type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
-
-/**
- * The seam's origin words are the Agent SDK's (`SDKMessageOrigin`, `sdk.d.ts:5609`) and `unknown`: an SDK that names another kind fails
- * this typecheck until `ORIGIN_KINDS` (`../seam.ts`) names it too, while a line that already says it reads as `unknown`.
- */
-export const originKindsHeld: Same<TranscriptOriginKind, SDKMessageOrigin['kind'] | 'unknown'> = true;
 
 /** A `queued_command` attachment as events: words sent in by a peer as `system`, the session's own user's as `user`, anything else none. */
 const queuedEvents = (line: Line<'attachment'>, id: string, at: string): TranscriptEvent[] => {
@@ -358,6 +350,7 @@ const costOf = ({ before, after, begunAt }: Pick<Attempt, 'before' | 'after' | '
  * A line that is not JSON is skipped. Each line read here of a kind `lines.ts` decodes — a `cost-state`, an `agent-name`, a
  * `compact_boundary`, an attempt's `assistant` line, and the `timestamp` of a line before the attempt begins — is decoded, and one
  * that does not decode throws an `Error` naming the line, in `file` when it is given, its field and the fix: never read as nothing.
+ * Exported only for the tests that import it.
  */
 export const transcriptUsage = (jsonl: string, since: number, file?: string): Usage => {
   const attempt = attemptIn(jsonl, since, file);

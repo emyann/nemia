@@ -43,7 +43,7 @@ const laterOf = (from: Instant | undefined, to: Instant | undefined): Instant | 
  * attempts' release from a hold, and the start of an attempt that continues a parked one (`Attempt.parked`). None for a turn with no
  * attempt.
  */
-export const deadlineFrom = (state: State): Instant | undefined => {
+const deadlineFrom = (state: State): Instant | undefined => {
   let from: Instant | undefined;
   let continues = true;
   for (const a of turnOf(state).attempts) {

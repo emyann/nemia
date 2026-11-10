@@ -55,6 +55,7 @@ type DeniedEntry = { tool_name: string; tool_use_id?: string; tool_input?: unkno
  * Read as `denialOf` words it, one per call, in the order given.
  *
  * Throws an `Error` naming the line, its field and the fix when a `result` line does not decode (`printedLinesOf`).
+ * Exported only for the tests that import it.
  */
 export const claudeResultOutput = (output: string): HarnessOutput => {
   const results = decoded(output, ['result']).flatMap((l) => (l.kind === 'result' ? [l.line] : []));
@@ -131,6 +132,7 @@ const FILE_KEYS: Readonly<Record<string, string>> = {
 /**
  * The one key of each tool's input a reader reads: a command (`denialOf` reads its first word), a skill, and each file tool's path
  * (`FILE_KEYS`). Every other key of a call's input, and every key of another tool's, is read by none.
+ * Exported only for the tests that import it.
  */
 export const READ_INPUT_KEYS: Readonly<Record<string, string>> = { Bash: 'command', Skill: 'skill', ...FILE_KEYS };
 
@@ -145,7 +147,7 @@ const firstWord = (command: string): string => firstPiece(command.trim(), /\s+/)
  * (`Bash(pytest)`), a skill by its name (`Skill(look)`), a file tool by its path. Any other tool, or an input that says
  * none of these, is the tool alone — never a guess at what the rest of its input meant.
  */
-export const denialOf = (tool: string, input: unknown): Denial => {
+const denialOf = (tool: string, input: unknown): Denial => {
   const key = readKeyOf(tool);
   const v = key === undefined ? undefined : (input as Record<string, unknown> | null | undefined)?.[key];
   const given = typeof v === 'string' && v.trim() ? v.trim() : undefined;
@@ -172,7 +174,10 @@ const deniedCalls = (entries: readonly DeniedEntry[], inputs: ReadonlyMap<string
   return [...seen.values()].map((d) => d.denial);
 };
 
-/** The kinds of line a stream is read for. */
+/**
+ * The kinds of line a stream is read for.
+ * Exported only for the tests that import it.
+ */
 export const STREAM_KINDS: readonly PrintedKind[] = ['result', 'system permission_denied', 'system init', 'assistant'];
 
 /** A call an assistant's line makes, as its `tool_use` block decodes. */

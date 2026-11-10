@@ -28,9 +28,12 @@ import { withoutTelemetry } from './telemetry.ts';
 export const SIGN_IN_MS = 300_000;
 
 /** How often a held sign-in reads its server's state while it waits for `connected`. */
-export const SIGN_IN_POLL_MS = 1_000;
+const SIGN_IN_POLL_MS = 1_000;
 
-/** What a `claude mcp` child said: its exit code, and its output and error output together. */
+/**
+ * What a `claude mcp` child said: its exit code, and its output and error output together.
+ * Exported only for the tests that import it.
+ */
 export type CliRun = { readonly code: number | null; readonly out: string };
 
 /**
@@ -79,6 +82,7 @@ const withoutSecret = (text: string, secret: string): string => (secret ? text.s
  * order the key is computed over — with `--client-secret` given no value: the CLI reads it from `MCP_CLIENT_SECRET`. The headers come
  * before the other options, never last: `--header` takes many values, and would read the name as one more header (measured). With
  * `secret` false, `--client-secret` is left out: the add a sign-out makes stores no secret.
+ * Exported only for the tests that import it.
  */
 export const mcpAddArgs = (name: string, server: RemoteMcpServer, secret = true): string[] => {
   const s = mcpServerOf(server);
@@ -131,7 +135,10 @@ export const clearSignIn = async (cli: McpCli, name: string, server: RemoteMcpSe
   return `\`claude mcp remove\` did not clear the sign-in of \`${name}\` (exit ${removed.code}): ${removed.out.trim()}. Read its words, then sign out again.`;
 };
 
-/** How a held sign-in ended: the server read `connected`, or `failed` with why. */
+/**
+ * How a held sign-in ended: the server read `connected`, or `failed` with why.
+ * Exported only for the tests that import it.
+ */
 export type SignInSettled = { readonly connected: true } | { readonly connected: false; readonly why: string };
 
 /** A sign-in's session, held: the address the person opens, what it settles on, and its end, safe to call twice. */

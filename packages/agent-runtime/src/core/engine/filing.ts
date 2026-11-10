@@ -53,13 +53,13 @@ export class FileRefused extends Schema.TaggedError<FileRefused>()('FileRefused'
  * since a key taken and then dropped is a promise nobody keeps. The words say where trying again goes. `ae`'s brief
  * refuses the same keys in the same words (`RETIRED_BRIEF_KEYS` and `retiredKeyRefusal`, in `cli/main.ts`).
  */
-export const RETIRED_KEYS: Record<'maxAttempts' | 'resume', string> = {
+const RETIRED_KEYS: Record<'maxAttempts' | 'resume', string> = {
   maxAttempts: "the runtime makes one attempt per start, and trying again is the caller's",
   resume: 'the runtime makes one attempt per start, so there is no later attempt for a policy to continue or not',
 };
 
 /** What to do instead of a retired key: file the task again, a new task that continues its session or one that starts clean. */
-export const RETIRED_INSTEAD =
+const RETIRED_INSTEAD =
   'To run the task again, file it again: with `resumeFrom: <session id>` to continue its session, or without it to start clean.';
 
 /** Why a key a task no longer takes is refused, and what to do instead. */
@@ -87,7 +87,7 @@ const priorityRefusalOf = (priority: unknown): string | undefined =>
  * of `memory` alone, and a `memory` that is no quantity `memoryBytesOf` reads (`memoryQuantityRefusal`'s words). A container's
  * `requests` and its other limits (`cpu`) are refused rather than dropped: a limit taken and never held is a promise nobody keeps.
  */
-export const resourcesRefusalOf = (resources: unknown): string | undefined => {
+const resourcesRefusalOf = (resources: unknown): string | undefined => {
   if (resources === undefined) return undefined;
   const shown = (v: unknown) => (typeof v === 'number' ? String(v) : JSON.stringify(v));
   const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -247,7 +247,7 @@ export class AdmitRefused extends Schema.TaggedError<AdmitRefused>()('AdmitRefus
 }) {}
 
 /** Why `admit` would not take this task, or `undefined`: one it has no record of, or one that has settled. Off the record alone. */
-export const admitRefusalOf = (taskId: string, state: State | undefined): string | undefined => {
+const admitRefusalOf = (taskId: string, state: State | undefined): string | undefined => {
   if (!state) return unknownTask(taskId);
   if (state.settled)
     return `\`${taskId}\` has settled (${state.settled}): there is nothing left to start. File a task that continues its session (\`resumeFrom\`) to go on.`;
@@ -351,7 +351,10 @@ export const answerRefusalOf = (taskId: string, state: State | undefined, text: 
   return turnArgsRefusalOf(config) ?? waitRefusalOf('answer', taskId, state);
 };
 
-/** Why `close` would not journal a close, or `undefined`. */
+/**
+ * Why `close` would not journal a close, or `undefined`.
+ * Exported only for the tests that import it.
+ */
 export const closeRefusalOf = (taskId: string, state: State | undefined): string | undefined => waitRefusalOf('close', taskId, state);
 
 /**

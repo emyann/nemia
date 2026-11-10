@@ -143,8 +143,6 @@ export const attemptRefusal = (attempts: readonly { readonly n: number }[], atte
   return `\`attempt: ${JSON.stringify(attempt)}\` is no attempt of this task: ${has}. Name one of them, or none to read the latest.`;
 };
 
-/** The cursor a transcript read from the start is handed, and whether a cursor is one a read of the engine's readers could give. */
-export const TRANSCRIPT_START: TranscriptCursor = noTranscript().cursor;
 /** The real reader's cursor and its check, for the engine's stand-in, which reads no transcript of its own. */
 export { cursorOf, isTranscriptCursor };
 

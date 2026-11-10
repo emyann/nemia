@@ -71,7 +71,7 @@ const artifactUpdate = (
 });
 
 /** One moment of a followed session as what `SubscribeToTask` answers of the Task `taskId`. */
-export const responseOf = (taskId: string, m: Followed): StreamResponse => {
+const responseOf = (taskId: string, m: Followed): StreamResponse => {
   if (m.kind === 'state')
     return {
       payload: {

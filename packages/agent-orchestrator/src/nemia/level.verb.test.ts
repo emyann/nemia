@@ -1,10 +1,8 @@
 /**
  * How `nemia level` says a person reaches her session, off her task's view as the runtime answers it: the attach line, then her web link
  * where its bridge is up, why not where it was asked and is not, nothing more where it was not asked; and nothing at all once her task is
- * settled. Read through `bridgeOf`, which every task's view answers the same. A store of its own, since `WF_ROOT` is read as the module
- * loads.
+ * settled. Read through `bridgeOf`, which every task's view answers the same. On a store of its own at `ROOT`, given as `ENV`.
  */
-import { rootNow } from '../../test/config-given.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
@@ -13,15 +11,17 @@ import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
+import type { Env } from '../config/config.store.ts';
+import { LEVEL } from './level.verb.ts';
+import { writeLevel } from './level.store.ts';
+import { bridgeOf } from '../views/views.verb.ts';
+import { DEFAULT_HARNESS } from '../harness/harness.ts';
+import { engineOf, runWith as runEngine } from '../runtime-client.ts';
 
-process.env.WF_ROOT = scratch('wf-nemia-reach-');
-const { LEVEL } = await import('./level.verb.ts');
-const { writeLevel } = await import('./level.store.ts');
-const { bridgeOf } = await import('../views/views.verb.ts');
-const { DEFAULT_HARNESS } = await import('../harness/harness.ts');
-const { engineOf, runWith: runEngine } = await import('../runtime-client.ts');
+const ROOT = scratch('wf-nemia-reach-');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 const stand = eachTest(testPlace);
-const runWith = runOver(runEngine, () => stand().layer);
+const runWith = runOver(runEngine, () => stand().layer, ENV);
 
 const TASK = 'nemia-20261006T080000Z';
 const LINK = 'https://example.test/code/session_0123';
@@ -44,7 +44,7 @@ const engineWith = (bridge: TaskView['bridge'], settled: string | null = null) =
 const levelOver = (bridge: TaskView['bridge'], settled: string | null = null) => runWith(engineWith(bridge, settled), LEVEL.handler({}));
 
 test("`nemia level`'s reach: the attach line, then her web link off her task's view, or why not, and nothing once she is settled", async (t) => {
-  writeLevel(rootNow(), { level: 'semi-auto', since: '2026-10-06T08:00:00.000Z', task: TASK });
+  writeLevel(ROOT, { level: 'semi-auto', since: '2026-10-06T08:00:00.000Z', task: TASK });
   await t.test('her bridge up: the attach line first, then the link, printed under "reach her:"', async () => {
     const up = await levelOver({ url: LINK });
     assert.deepEqual(up.reach, [ATTACH, LINK], 'the attach line first, then the link');

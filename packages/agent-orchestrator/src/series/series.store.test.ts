@@ -7,9 +7,9 @@
  * (`keepSeries`, `seriesRead`, `seriesHealth`). And the last line read off a bounded tail of the latest day (`lastLine`), measured in
  * bytes. Each row starts from tiers with no file (`fresh`). The math beneath them is `series.test.ts`'s.
  *
- * A store of its own: `WF_ROOT` is read as the module loads, so it is set before the import.
+ * A store of its own at `ROOT`, given as `ENV`.
  */
-import { settingsOf } from '../config/config.store.ts';
+import { type Env, settingsOf } from '../config/config.store.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -17,21 +17,33 @@ import { testEngine } from 'agent-runtime/testing';
 import { eachTest } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
 import { scratch } from 'test-kit/scratch';
-import { rootNow } from '../../test/config-given.ts';
+import { main } from '../cli/main.ts';
+import { PHASES, type RecentPass } from '../meter/meter.ts';
+import { metered } from '../meter/tally.store.ts';
+import {
+  appendLines,
+  dayFile,
+  days,
+  dropDay,
+  keepSeries,
+  lastLine,
+  rangeOf,
+  readDay,
+  seriesHealth,
+  seriesRead,
+  tierDir,
+} from './series.store.ts';
+import { RANGES, seriesMemo, type RollupLine } from './series.ts';
+import { engineOf } from '../runtime-client.ts';
 
-process.env.WF_ROOT = scratch('wf-series-store-');
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_METRICS_MINUTE_DAYS;
-delete process.env.WF_METRICS_HOUR_DAYS;
-const { main } = await import('../cli/main.ts');
-const { PHASES } = await import('../meter/meter.ts');
-const { metered } = await import('../meter/tally.store.ts');
-const { appendLines, dayFile, days, dropDay, keepSeries, lastLine, rangeOf, readDay, seriesHealth, seriesRead, tierDir } =
-  await import('./series.store.ts');
-const { RANGES, seriesMemo } = await import('./series.ts');
-const { engineOf } = await import('../runtime-client.ts');
-type RecentPass = import('../meter/meter.ts').RecentPass;
-type RollupLine = import('./series.ts').RollupLine;
+const ROOT = scratch('wf-series-store-');
+const ENV: Env = {
+  ...process.env,
+  WF_ROOT: ROOT,
+  WF_VERIFY_REST: '1',
+  WF_METRICS_MINUTE_DAYS: undefined,
+  WF_METRICS_HOUR_DAYS: undefined,
+};
 
 const engine = eachTest(testEngine);
 heldUnasked(engine);
@@ -41,7 +53,7 @@ const noEngine = () => engineOf(engine().layer);
 
 /** Both tiers with no file, as a store that never kept a series. */
 const fresh = () => {
-  for (const tier of ['minute', 'hour'] as const) fs.rmSync(tierDir(rootNow(), tier), { recursive: true, force: true });
+  for (const tier of ['minute', 'hour'] as const) fs.rmSync(tierDir(ROOT, tier), { recursive: true, force: true });
 };
 
 /** A `store.runs` line at `t` of one sample `v`, labelled `l`. */
@@ -75,14 +87,14 @@ const at = (hhmmss: string) => Date.parse(`2026-10-05T${hhmmss}Z`);
 
 /** The `pass.ms` lines of the day the passes are in, in `tier`: each line's minute, count and sum. */
 const passMs = (tier: 'minute' | 'hour') =>
-  readDay(rootNow(), tier, '2026-10-05')
+  readDay(ROOT, tier, '2026-10-05')
     .filter((x) => x.s === 'pass.ms')
     .map((x) => [x.t.slice(11, 16), x.n, x.sum]);
 
 /** Each day file of both tiers with the time it last changed. */
 const filesNow = () =>
   (['minute', 'hour'] as const).flatMap((tier) =>
-    days(rootNow(), tier).map((d) => `${tier}/${d}:${fs.statSync(dayFile(rootNow(), tier, d)).mtimeMs}`),
+    days(ROOT, tier).map((d) => `${tier}/${d}:${fs.statSync(dayFile(ROOT, tier, d)).mtimeMs}`),
   );
 
 /** What `nemia argv` printed on stdout, line by line. */
@@ -92,7 +104,7 @@ const typed = async (t: TestContext, argv: string[]) => {
     printed.push(args.map(String).join(' '));
   });
   try {
-    await main(argv, noEngine());
+    await main(argv, noEngine(), undefined, undefined, ENV);
   } finally {
     log.mock.restore();
   }
@@ -111,11 +123,11 @@ const refusedAs =
 /** Four passes rolled into the minutes 13:57 to 14:00, and those of 13:00 into its hour, by three passes of the tick. */
 const fourMinutes = () => {
   const ring = [pass('2026-10-05T13:57:10Z', 10), pass('2026-10-05T13:58:05Z', 20)];
-  keepSeries(rootNow(), ring, settingsOf(process.env), at('13:58:30'));
+  keepSeries(ROOT, ring, settingsOf(ENV), at('13:58:30'));
   ring.push(pass('2026-10-05T13:59:10Z', 30), pass('2026-10-05T14:00:05Z', 40));
-  keepSeries(rootNow(), ring, settingsOf(process.env), at('14:00:30'));
+  keepSeries(ROOT, ring, settingsOf(ENV), at('14:00:30'));
   ring.push(pass('2026-10-05T14:01:05Z', 50));
-  keepSeries(rootNow(), ring, settingsOf(process.env), at('14:01:30'));
+  keepSeries(ROOT, ring, settingsOf(ENV), at('14:01:30'));
 };
 
 const FILES: { name: string; check: (t: TestContext) => void | Promise<void> }[] = [
@@ -124,39 +136,39 @@ const FILES: { name: string; check: (t: TestContext) => void | Promise<void> }[]
     check: () => {
       assert.throws(
         () =>
-          appendLines(rootNow(), 'hour', [
+          appendLines(ROOT, 'hour', [
             line('2026-10-05T10:00:00.000Z', 1),
             line('2026-10-05T11:00:00.000Z', 2, { factory: 'f', run: 'r-1' }),
           ]),
         refusedAs('Invalid'),
       );
-      assert.deepEqual(days(rootNow(), 'hour'), []);
+      assert.deepEqual(days(ROOT, 'hour'), []);
     },
   },
   {
     name: 'lines go to the file of their UTC day, and a line that does not read is left out, its file said once',
     check: (t) => {
-      appendLines(rootNow(), 'minute', [line('2026-10-04T23:59:00.000Z', 1), line('2026-10-05T00:00:00.000Z', 2)]);
-      assert.deepEqual(days(rootNow(), 'minute'), ['2026-10-04', '2026-10-05']);
-      fs.appendFileSync(dayFile(rootNow(), 'minute', '2026-10-05'), '{"t":"x"}\nnot json\n');
-      appendLines(rootNow(), 'minute', [line('2026-10-05T00:01:00.000Z', 3)]);
+      appendLines(ROOT, 'minute', [line('2026-10-04T23:59:00.000Z', 1), line('2026-10-05T00:00:00.000Z', 2)]);
+      assert.deepEqual(days(ROOT, 'minute'), ['2026-10-04', '2026-10-05']);
+      fs.appendFileSync(dayFile(ROOT, 'minute', '2026-10-05'), '{"t":"x"}\nnot json\n');
+      appendLines(ROOT, 'minute', [line('2026-10-05T00:01:00.000Z', 3)]);
       const said: string[] = [];
       t.mock.method(process.stderr, 'write', (text: string) => said.push(text) > 0);
       assert.deepEqual(
-        readDay(rootNow(), 'minute', '2026-10-05').map((x) => x.sum),
+        readDay(ROOT, 'minute', '2026-10-05').map((x) => x.sum),
         [2, 3],
       );
       assert.equal(said.length, 1, said.join(''));
-      assert.ok(said[0].startsWith(`${dayFile(rootNow(), 'minute', '2026-10-05')}: 2 `), said[0]);
+      assert.ok(said[0].startsWith(`${dayFile(ROOT, 'minute', '2026-10-05')}: 2 `), said[0]);
     },
   },
   {
     name: "a label's word is read in its closed set: a phase stored under its former word reads as today's, and a word of no set is left out",
     check: (t) => {
       const stored = (v: number, l: Record<string, string>) => `${JSON.stringify(line(`2026-10-06T0${v}:00:00.000Z`, v, l))}\n`;
-      fs.mkdirSync(tierDir(rootNow(), 'hour'), { recursive: true });
+      fs.mkdirSync(tierDir(ROOT, 'hour'), { recursive: true });
       fs.writeFileSync(
-        dayFile(rootNow(), 'hour', '2026-10-06'),
+        dayFile(ROOT, 'hour', '2026-10-06'),
         [
           stored(1, { phase: 'git' }),
           stored(2, { phase: 'nope' }),
@@ -168,7 +180,7 @@ const FILES: { name: string; check: (t: TestContext) => void | Promise<void> }[]
       const said: string[] = [];
       t.mock.method(process.stderr, 'write', (text: string) => said.push(text) > 0);
       assert.deepEqual(
-        readDay(rootNow(), 'hour', '2026-10-06').map((x) => [x.sum, x.l]),
+        readDay(ROOT, 'hour', '2026-10-06').map((x) => [x.sum, x.l]),
         [
           [1, { phase: 'place' }],
           [5, { part: 'runs', kind: 'records' }],
@@ -177,8 +189,8 @@ const FILES: { name: string; check: (t: TestContext) => void | Promise<void> }[]
       assert.equal(said.length, 1, 'the three lines of no set are said once, with their file');
     },
   },
-  { name: 'no file, no lines', check: () => assert.deepEqual(readDay(rootNow(), 'minute', '2026-01-01'), []) },
-  { name: 'no last line before any is written', check: () => assert.equal(lastLine(rootNow(), 'hour'), undefined) },
+  { name: 'no file, no lines', check: () => assert.deepEqual(readDay(ROOT, 'minute', '2026-01-01'), []) },
+  { name: 'no last line before any is written', check: () => assert.equal(lastLine(ROOT, 'hour'), undefined) },
   {
     name: 'a --range given none reads 24h, and each range it takes reads itself',
     check: () => {
@@ -188,7 +200,7 @@ const FILES: { name: string; check: (t: TestContext) => void | Promise<void> }[]
   },
   {
     name: 'REFUSED: `nemia series --range 2w`, a range it does not take, as Invalid with exit 2',
-    check: () => assert.rejects(main(['series', '--range', '2w'], noEngine()), refusedAs('Invalid')),
+    check: () => assert.rejects(main(['series', '--range', '2w'], noEngine(), undefined, undefined, ENV), refusedAs('Invalid')),
   },
 ];
 
@@ -205,10 +217,10 @@ const KEPT: { name: string; check: (t: TestContext) => void | Promise<void> }[] 
     name: 'passes roll into the minutes done, the minutes into the hour once it is done, and a restart rolls nothing twice',
     check: () => {
       const ring = [pass('2026-10-05T13:57:10Z', 10), pass('2026-10-05T13:58:05Z', 20)];
-      keepSeries(rootNow(), ring, settingsOf(process.env), at('13:58:30'));
+      keepSeries(ROOT, ring, settingsOf(ENV), at('13:58:30'));
       assert.deepEqual(passMs('minute'), [['13:57', 1, 10]], 'the minute now is in is not done');
       ring.push(pass('2026-10-05T13:59:10Z', 30), pass('2026-10-05T14:00:05Z', 40));
-      keepSeries(rootNow(), ring, settingsOf(process.env), at('14:00:30'));
+      keepSeries(ROOT, ring, settingsOf(ENV), at('14:00:30'));
       assert.deepEqual(passMs('minute'), [
         ['13:57', 1, 10],
         ['13:58', 1, 20],
@@ -216,8 +228,8 @@ const KEPT: { name: string; check: (t: TestContext) => void | Promise<void> }[] 
       ]);
       assert.deepEqual(passMs('hour'), [['13:00', 3, 60]]);
       ring.push(pass('2026-10-05T14:01:05Z', 50));
-      keepSeries(rootNow(), ring, settingsOf(process.env), at('14:01:30'));
-      keepSeries(rootNow(), ring, settingsOf(process.env), at('14:01:40'));
+      keepSeries(ROOT, ring, settingsOf(ENV), at('14:01:30'));
+      keepSeries(ROOT, ring, settingsOf(ENV), at('14:01:40'));
       assert.deepEqual(passMs('minute').at(-1), ['14:00', 1, 40]);
       assert.equal(passMs('minute').length, 4, 'once each');
       assert.deepEqual(passMs('hour'), [['13:00', 3, 60]], 'the hour now is in waits');
@@ -225,20 +237,18 @@ const KEPT: { name: string; check: (t: TestContext) => void | Promise<void> }[] 
   },
   {
     name: 'the days past their retention go: minutes after 30 days by default, hours kept until WF_METRICS_HOUR_DAYS says',
-    check: (t) => {
-      appendLines(rootNow(), 'minute', [
+    check: () => {
+      appendLines(ROOT, 'minute', [
         line('2026-09-04T10:00:00.000Z', 1),
         line('2026-09-05T10:00:00.000Z', 1),
         line('2026-10-05T10:00:00.000Z', 1),
       ]);
-      appendLines(rootNow(), 'hour', [line('2020-01-01T10:00:00.000Z', 1), line('2026-10-05T10:00:00.000Z', 1)]);
-      keepSeries(rootNow(), [], settingsOf(process.env), at('14:02:00'));
-      assert.deepEqual(days(rootNow(), 'minute'), ['2026-09-05', '2026-10-05']);
-      assert.deepEqual(days(rootNow(), 'hour'), ['2020-01-01', '2026-10-05']);
-      process.env.WF_METRICS_HOUR_DAYS = '30';
-      t.after(() => delete process.env.WF_METRICS_HOUR_DAYS);
-      keepSeries(rootNow(), [], settingsOf(process.env), at('14:02:00'));
-      assert.deepEqual(days(rootNow(), 'hour'), ['2026-10-05']);
+      appendLines(ROOT, 'hour', [line('2020-01-01T10:00:00.000Z', 1), line('2026-10-05T10:00:00.000Z', 1)]);
+      keepSeries(ROOT, [], settingsOf(ENV), at('14:02:00'));
+      assert.deepEqual(days(ROOT, 'minute'), ['2026-09-05', '2026-10-05']);
+      assert.deepEqual(days(ROOT, 'hour'), ['2020-01-01', '2026-10-05']);
+      keepSeries(ROOT, [], settingsOf({ ...ENV, WF_METRICS_HOUR_DAYS: '30' }), at('14:02:00'));
+      assert.deepEqual(days(ROOT, 'hour'), ['2026-10-05']);
     },
   },
   {
@@ -247,7 +257,7 @@ const KEPT: { name: string; check: (t: TestContext) => void | Promise<void> }[] 
       fourMinutes();
       const before = filesNow();
       const memo = seriesMemo();
-      const read = seriesRead(rootNow(), '24h', memo, at('14:05:00'));
+      const read = seriesRead(ROOT, '24h', memo, at('14:05:00'));
       assert.deepEqual(filesNow(), before, 'nothing written');
       assert.equal(read.span, 'minute');
       assert.deepEqual(
@@ -257,55 +267,51 @@ const KEPT: { name: string; check: (t: TestContext) => void | Promise<void> }[] 
       const held = memo.get('minute/2026-10-05')!;
       memo.set('minute/2026-10-05', { ...held, lines: held.lines.filter((x) => x.s !== 'pass.ms') });
       assert.equal(
-        seriesRead(rootNow(), '24h', memo, at('14:05:00')).series.find((x) => x.s === 'pass.ms'),
+        seriesRead(ROOT, '24h', memo, at('14:05:00')).series.find((x) => x.s === 'pass.ms'),
         undefined,
         'from the memo',
       );
-      keepSeries(rootNow(), [pass('2026-10-05T14:03:10Z', 70)], settingsOf(process.env), at('14:04:00'));
-      assert.equal(
-        seriesRead(rootNow(), '24h', memo, at('14:05:00')).series.find((x) => x.s === 'pass.ms')!.points.length,
-        5,
-        'read again',
-      );
-      assert.equal(seriesHealth(rootNow(), '2026-10-05', '2026-10-05').runs, 40);
-      assert.equal(seriesHealth(rootNow(), '2026-10-06', '2026-10-07').runs, null);
+      keepSeries(ROOT, [pass('2026-10-05T14:03:10Z', 70)], settingsOf(ENV), at('14:04:00'));
+      assert.equal(seriesRead(ROOT, '24h', memo, at('14:05:00')).series.find((x) => x.s === 'pass.ms')!.points.length, 5, 'read again');
+      assert.equal(seriesHealth(ROOT, '2026-10-05', '2026-10-05').runs, 40);
+      assert.equal(seriesHealth(ROOT, '2026-10-06', '2026-10-07').runs, null);
     },
   },
   {
     name: '`nemia series --json` is the answer the api serves',
     check: async (t) => {
-      appendLines(rootNow(), 'hour', [line('2026-01-02T03:00:00.000Z', 7)]);
+      appendLines(ROOT, 'hour', [line('2026-01-02T03:00:00.000Z', 7)]);
       const answer = JSON.parse((await typed(t, ['series', '--range', 'all', '--json'])).join('\n'));
       assert.ok(
         answer.series.some((x: { s: string }) => x.s === 'store.runs'),
         'the line kept is in the answer',
       );
-      assert.deepEqual(answer.series, JSON.parse(JSON.stringify(seriesRead(rootNow(), 'all').series)));
+      assert.deepEqual(answer.series, JSON.parse(JSON.stringify(seriesRead(ROOT, 'all').series)));
     },
   },
   {
     name: "a memo keeps every day its tier's reads reach, whichever read came last: two readers alternate and neither reads again a day the other kept",
     check: () => {
-      appendLines(rootNow(), 'minute', [line('2026-10-05T10:00:00.000Z', 2), line('2026-10-06T10:00:00.000Z', 2)]);
-      appendLines(rootNow(), 'hour', [
+      appendLines(ROOT, 'minute', [line('2026-10-05T10:00:00.000Z', 2), line('2026-10-06T10:00:00.000Z', 2)]);
+      appendLines(ROOT, 'hour', [
         line('2026-08-01T10:00:00.000Z', 2),
         line('2026-10-04T10:00:00.000Z', 2),
         line('2026-10-05T10:00:00.000Z', 2),
       ]);
       const memo = seriesMemo();
-      seriesHealth(rootNow(), null, '2026-10-05', memo, at('14:05:00'));
+      seriesHealth(ROOT, null, '2026-10-05', memo, at('14:05:00'));
       const old = memo.get('hour/2026-08-01');
       assert.ok(old, 'health from the first day holds the old day');
-      seriesRead(rootNow(), '7d', memo, at('14:05:00'));
+      seriesRead(ROOT, '7d', memo, at('14:05:00'));
       const recent = memo.get('hour/2026-10-05');
       assert.ok(recent, 'a 7d read holds the day it read');
-      seriesHealth(rootNow(), null, '2026-10-05', memo, at('14:05:00'));
-      seriesRead(rootNow(), '7d', memo, at('14:05:00'));
+      seriesHealth(ROOT, null, '2026-10-05', memo, at('14:05:00'));
+      seriesRead(ROOT, '7d', memo, at('14:05:00'));
       assert.equal(memo.get('hour/2026-08-01'), old, 'the 7d read left the day only health reads, and health did not read it again');
       assert.equal(memo.get('hour/2026-10-05'), recent, 'and neither read the day both read again');
-      seriesRead(rootNow(), '24h', memo, at('14:05:00'));
+      seriesRead(ROOT, '24h', memo, at('14:05:00'));
       assert.ok(memo.has('minute/2026-10-05'));
-      seriesRead(rootNow(), '24h', memo, Date.parse('2026-10-07T09:00:00Z'));
+      seriesRead(ROOT, '24h', memo, Date.parse('2026-10-07T09:00:00Z'));
       assert.deepEqual(
         [...memo.keys()].filter((k) => k.startsWith('minute/')),
         ['minute/2026-10-06'],
@@ -313,11 +319,11 @@ const KEPT: { name: string; check: (t: TestContext) => void | Promise<void> }[] 
       );
       assert.deepEqual(
         [...memo.keys()].filter((k) => k.startsWith('hour/')).sort(),
-        days(rootNow(), 'hour').map((d) => `hour/${d}`),
+        days(ROOT, 'hour').map((d) => `hour/${d}`),
         'every hour day stays',
       );
-      dropDay(rootNow(), 'hour', '2026-08-01');
-      seriesRead(rootNow(), '7d', memo, at('14:05:00'));
+      dropDay(ROOT, 'hour', '2026-08-01');
+      seriesRead(ROOT, '7d', memo, at('14:05:00'));
       assert.equal(memo.has('hour/2026-08-01'), false, 'a day whose file is deleted is gone');
     },
   },
@@ -333,14 +339,14 @@ test('`keepSeries`, `seriesRead` and `seriesHealth`: the series kept on a pass, 
 
 test("the last line is read off the latest day's tail alone, however long the day", async () => {
   fresh();
-  appendLines(rootNow(), 'minute', [line('2026-10-04T10:00:00.000Z', 1)]);
+  appendLines(ROOT, 'minute', [line('2026-10-04T10:00:00.000Z', 1)]);
   appendLines(
-    rootNow(),
+    ROOT,
     'minute',
     Array.from({ length: 2000 }, (_, k) => line(new Date(Date.UTC(2026, 9, 5, 0, 0, k)).toISOString(), k)),
   );
-  assert.ok(fs.statSync(dayFile(rootNow(), 'minute', '2026-10-05')).size > 100_000);
-  const { value, tallies } = await metered(async () => lastLine(rootNow(), 'minute'));
+  assert.ok(fs.statSync(dayFile(ROOT, 'minute', '2026-10-05')).size > 100_000);
+  const { value, tallies } = await metered(async () => lastLine(ROOT, 'minute'));
   assert.equal(value?.sum, 1999);
   const bytes = Object.values(tallies!.kinds).reduce((sum, k) => sum + k.bytes, 0);
   assert.equal(bytes, 16_384, 'the tail, not the day');

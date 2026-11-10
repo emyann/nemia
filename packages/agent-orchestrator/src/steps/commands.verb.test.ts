@@ -1,6 +1,6 @@
 /**
  * The board's reads of a run's steps as entries of the table, served on the api alone: a step's file, read off the run the store lists,
- * and none for an id it does not have. `WF_ROOT` is set before the import, since the store reads it as it loads.
+ * and none for an id it does not have. On a store of its own at `ROOT`, given as `ENV`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,16 +11,17 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
+import { STEP_ARTIFACT, STEP_FILE } from './commands.verb.ts';
+import { startRun, runWith as runEngine } from '../runner.ts';
+import { engineOf } from '../runtime-client.ts';
+import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-pages-');
-process.env.WF_ROOT = ROOT;
-const { STEP_ARTIFACT, STEP_FILE } = await import('./commands.verb.ts');
-const { startRun, runWith: runEngine } = await import('../runner.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 const stand = eachTest(testPlace);
-const runWith = runOver(runEngine, () => stand().layer);
-const runPlaced = runGiven(() => stand().layer);
+const runWith = runOver(runEngine, () => stand().layer, ENV);
+const runPlaced = runGiven(() => stand().layer, ENV);
 
-const { engineOf } = await import('../runtime-client.ts');
 const engine = eachTest(testEngine);
 heldUnasked(engine);
 

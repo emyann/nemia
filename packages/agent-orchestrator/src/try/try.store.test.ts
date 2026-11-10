@@ -1,16 +1,13 @@
 /**
  * An agent's try folder written in the store (`writeTryFolder`): its step file written when it says otherwise, left alone when it says the
- * same, and every link on its way refused before anything is written. `WF_ROOT` is set before the import, since the stores read it as
- * they load.
+ * same, and every link on its way refused before anything is written.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
-
-process.env.WF_ROOT = scratch('wf-try-root-');
-const { TRY_STEP, triesDir, tryDir, writeTryFolder } = await import('./try.store.ts');
+import { TRY_STEP, triesDir, tryDir, writeTryFolder } from './try.store.ts';
 
 /** What `fn` was refused with, by its message; empty when it was not. */
 function refusal(fn: () => unknown): string {

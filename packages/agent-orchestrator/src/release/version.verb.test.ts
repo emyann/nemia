@@ -9,12 +9,11 @@ import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { scratch } from 'test-kit/scratch';
 import { eachTest } from '../../test/placed.ts';
+import { runWith, engineOf } from '../runtime-client.ts';
+import { versions } from './version.verb.ts';
+import { realReleasesDir } from './release.store.ts';
 
 const ROOT = scratch('wf-version-');
-process.env.WF_ROOT = ROOT;
-const { runWith, engineOf } = await import('../runtime-client.ts');
-const { versions } = await import('./version.verb.ts');
-const { realReleasesDir } = await import('./release.store.ts');
 const engine = eachTest(testEngine);
 
 test('nemia version counts the sessions at work by the release and Claude Code version their attempts recorded, and no other', async () => {

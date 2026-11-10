@@ -7,8 +7,8 @@
  * nothing here asks a registry. Each test is a refusal: it fails against a worktree whose `node_modules`
  * is one link to main's whole tree.
  *
- * `WF_ROOT` is set before the runner is imported, which reads it as it loads: nothing here files a run,
- * and nothing here touches the operator's store.
+ * Nothing here files a run, and nothing here touches the operator's store: what it writes is under its
+ * own scratch folder, `ROOT`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,10 +21,10 @@ import { composeBrief } from '../brief/index.ts';
 import type { StepSpec } from '../step/step.ts';
 import { scratch } from 'test-kit/scratch';
 import { importsIn } from 'test-kit/imports';
+import { provisionDeps } from '../runner.ts';
+import { checkoutParts, lockfileParts } from './worktree.store.ts';
 
 const ROOT = scratch('wf-deps-');
-process.env.WF_ROOT = ROOT;
-const { provisionDeps } = await import('../runner.ts');
 
 test("workspace.ts reads no disk and spawns nothing: of node's modules it imports path alone, and no store or verb of the package", () => {
   const specs = importsIn(fs.readFileSync(path.join(import.meta.dirname, 'workspace.ts'), 'utf8')).map((i) => i.spec);
@@ -574,7 +574,6 @@ test('an npm ci that fails is reported, not hidden, and tried again on the next 
 });
 
 test("the checkout against the merge staged in it: a package nested in a workspace is read where it is installed, and parts only when it is not the lockfile's", async () => {
-  const { checkoutParts, lockfileParts } = await import('./worktree.store.ts');
   const repo = fs.mkdtempSync(path.join(ROOT, 'checkout-'));
   const lock = (nested: string) => ({
     name: 'fixture',
@@ -644,7 +643,6 @@ test("a package nested in a workspace's node_modules at the version main has is 
 });
 
 test('a package nested in a workspace parts when main has another version of it, or none', async () => {
-  const { lockfileParts } = await import('./worktree.store.ts');
   for (const version of ['2.0.0', null]) {
     const { main, wt } = aNestedCheckout(version);
     assert.equal(lockfileParts(main, wt), 'apps/app/node_modules/nested', `main has ${version ?? 'none'}: provisionDeps runs npm ci`);

@@ -3,7 +3,7 @@
  * answers it (`RUNS`), on a run started and advanced over the stand-ins: the agent off the workflow it is judged by, `since` off the step's
  * own task alone, null once it has settled.
  *
- * `WF_ROOT` is set before the package is imported, since the store reads it as it loads; each test empties the store's runs first.
+ * On a store of its own at `ROOT`, given as `ENV`; each test empties the store's runs first.
  */
 import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,19 +13,27 @@ import { testEngine } from 'agent-runtime/testing';
 import { scratch } from 'test-kit/scratch';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
-import { rootNow } from '../../test/config-given.ts';
+import { howOf } from '../summary/how.verb.ts';
+import { cardRuns, judgedFields, runsSummarized, unjudgedFields, type RunSummary } from '../summary/summary.verb.ts';
+import { informerMemo, passStarted } from '../rest/informer.verb.ts';
+import type { Env } from '../config/config.store.ts';
+import { Effect as RunsEffect } from 'effect';
+import { advanceRun, startRun, runWith as runEngine } from '../runner.ts';
+import { rewriteRun, runRecord } from '../record/record.store.ts';
+import { runObject } from '../object/run.verb.ts';
+import { StoreRoot } from '../config/root.store.ts';
+import { EngineService as RunsEngine, engineOf } from '../runtime-client.ts';
 
 const ROOT = scratch('wf-summary-');
 const RUNS_DIR = path.join(ROOT, 'runs');
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-process.env.WF_DEFAULT_FACTORY_STARTS = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { howOf } = await import('../summary/how.verb.ts');
-const { runsSummarized } = await import('../summary/summary.verb.ts');
-const { EngineService: RunsEngine } = await import('../runtime-client.ts');
-const { Effect: RunsEffect } = await import('effect');
+const ENV: Env = {
+  ...process.env,
+  WF_ROOT: ROOT,
+  WF_VERIFY_REST: '1',
+  WF_DEFAULT_FACTORY_STARTS: '1',
+  WF_MAX_CONCURRENT: undefined,
+  WF_MAX_RUNS: undefined,
+};
 /** Every run's summary, as the whole list judges it (`runsSummarized`), read through the informer and filings `kept` hands. */
 const RUNS = {
   handler: (_args: object, kept?: Parameters<typeof howOf>[0]) =>
@@ -33,14 +41,10 @@ const RUNS = {
       return yield* runsSummarized(yield* RunsEngine, yield* howOf(kept));
     }),
 };
-const { advanceRun, startRun, runWith: runEngine } = await import('../runner.ts');
-const { runRecord } = await import('../record/record.store.ts');
-const { engineOf } = await import('../runtime-client.ts');
-type RunSummary = import('./summary.verb.ts').RunSummary;
 
 const stand = eachTest(testPlace);
-const runWith = runOver(runEngine, () => stand().layer);
-const runPlaced = runGiven(() => stand().layer);
+const runWith = runOver(runEngine, () => stand().layer, ENV);
+const runPlaced = runGiven(() => stand().layer, ENV);
 const engine = eachTest(testEngine);
 const e = () => engineOf(engine().layer);
 
@@ -70,7 +74,7 @@ const started = async (card?: string): Promise<string> => {
   stand().world.repository(repo, {});
   const from = card === undefined ? {} : { from: { inbox: card } };
   const run = await runPlaced(startRun({ brief: 'sum me', repo, workflowDir: team(), isolate: true, ...from }));
-  await runWith(e(), advanceRun(runRecord(rootNow(), run.id)));
+  await runWith(e(), advanceRun(runRecord(ROOT, run.id)));
   return run.id;
 };
 
@@ -93,15 +97,14 @@ test('a step at work says its agent and when its own task started; one given no 
   assert.equal((await stepOf(id, 'notes')).agent, null, 'a step given no agent');
 
   engine().settle(`${id}-build`, 'succeeded', { closeout: SIGNED, startedAt: AT, spawnedAt: AT });
-  await runWith(e(), advanceRun(runRecord(rootNow(), id)));
+  await runWith(e(), advanceRun(runRecord(ROOT, id)));
   const done = await stepOf(id, 'build');
   assert.deepEqual([done.agent, done.since], ['ada', null], 'a settled step keeps its agent and is at work since nothing');
 });
 
 test("a run's judged fields: the judgement's run-level words, its time at work and tokens off the views, and the same keys left unjudged", async () => {
-  const { judgedFields, unjudgedFields } = await import('./summary.verb.ts');
   const id = await started();
-  const run = runRecord(rootNow(), id);
+  const run = runRecord(ROOT, id);
   const judged = {
     status: 'running',
     phase: 'running',
@@ -126,8 +129,6 @@ test("a run's judged fields: the judgement's run-level words, its time at work a
 });
 
 test('`cardRuns`: each run started from a card with its phase as the list judges it, read now; a run from no card is not answered, and stays in the informer', async () => {
-  const { cardRuns } = await import('./summary.verb.ts');
-  const { informerMemo, passStarted } = await import('../rest/informer.verb.ts');
   const fromCard = await started('cache-the-views-k2q9');
   const loose = await started();
   const memo = informerMemo();
@@ -141,7 +142,7 @@ test('`cardRuns`: each run started from a card with its phase as the list judges
 
   for (const step of ['build', 'notes'])
     engine().settle(`${fromCard}-${step}`, 'succeeded', { closeout: SIGNED, startedAt: AT, spawnedAt: AT });
-  await runWith(e(), advanceRun(runRecord(rootNow(), fromCard)));
+  await runWith(e(), advanceRun(runRecord(ROOT, fromCard)));
   passStarted(memo);
   assert.deepEqual(
     (await runWith(e(), cardRuns(e(), how))).map((r) => r.phase),
@@ -151,11 +152,8 @@ test('`cardRuns`: each run started from a card with its phase as the list judges
 });
 
 test("a run's start and its queue time are each task's filing as its view says it (`State.filedAt`), on an engine whose feed holds no filing", async () => {
-  const { rewriteRun } = await import('../record/record.store.ts');
-  const { runObject } = await import('../object/run.verb.ts');
-  const { StoreRoot } = await import('../config/root.store.ts');
   const id = await started();
-  rewriteRun(rootNow(), { ...runRecord(rootNow(), id), createdAt: '2026-10-14T08:00:00.000Z' });
+  rewriteRun(ROOT, { ...runRecord(ROOT, id), createdAt: '2026-10-14T08:00:00.000Z' });
   const filedAt = async (step: string): Promise<string> => {
     const at = (await RunsEffect.runPromise(e().view(`${id}-${step}`))).state.filedAt;
     assert.ok(at, `the stand-in filed ${step}, and its view says when`);
@@ -170,7 +168,7 @@ test("a run's start and its queue time are each task's filing as its view says i
   assert.equal(list.find((r) => r.id === id)?.startedAt, [build, notes].sort()[0], "the list's start is the first filing, not `createdAt`");
   const object = await runWith(
     e(),
-    RunsEffect.provideService(runObject(runRecord(rootNow(), id), { memo: { said: new Map() } }), StoreRoot, ROOT),
+    RunsEffect.provideService(runObject(runRecord(ROOT, id), { memo: { said: new Map() } }), StoreRoot, ROOT),
   );
   assert.ok(!('unjudged' in object), 'the run is judged');
   assert.equal(object.status.startedAt, [build, notes].sort()[0], "the object's start is the first filing");

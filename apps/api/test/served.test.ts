@@ -19,8 +19,6 @@ const META = ['GET /openapi/v3/nemia/v1', 'GET /openapi', 'GET /openapi/scalar.j
 /**
  * The routes still served by Hono and not yet declared on the `Api`, each a line of app.ts before the mount. Transitional: each later part
  * of the change that moves a route onto the `Api` deletes its row here and its line there; the list ends empty, and goes with this note.
- * `GET /api/runs/:runId` is the runs' own route for `?raw=` and `?view=` alone, which hands the run object on to the mount (`next()`) until
- * the record moves to `GET /api/runs/:name/record`.
  */
 const NOT_YET_IN_API = [
   'GET /api/health',
@@ -32,12 +30,7 @@ const NOT_YET_IN_API = [
   'GET /api/store',
   'GET /api/agents/sources',
   'GET /api/custom-instructions/:name',
-  'GET /api/runs/:runId',
-  'GET /api/runs/:runId/lines',
   'GET /api/runs/:runId/decision',
-  'GET /api/runs/:runId/concluded',
-  'GET /api/listing',
-  'GET /api/listing/:runId',
   'GET /api/stats',
   'GET /api/ceilings',
   'GET /api/passes',

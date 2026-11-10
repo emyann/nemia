@@ -120,15 +120,20 @@ const refusedWith = async (res: Response, status: number, said: string): Promise
 test('POST …/say: what it refuses — JSON that is not the words, words the package will not hand on, a run or step not there — nothing said, nothing written', async (t) => {
   const before = written();
 
-  await t.test('REFUSED at shipped defaults: JSON that is not the words is a 400, naming `text`', async () => {
-    const bodies: Array<[unknown, RegExp]> = [
-      ['Widen the scope to apps/api too.', /^POST …\/say takes a JSON body: `\{ "text": "<words>" \}`\.$/],
-      [['Widen the scope'], /^POST …\/say takes a JSON object: /],
-      [{}, /^`text`[^]*was left out/],
-      [{ text: 42 }, /^`text`[^]*was 42/],
-      [{ message: 'Widen the scope' }, /^`text`[^]*was left out/],
+  await t.test('REFUSED at shipped defaults: a body `RunSay` does not read is a 400, naming `text`', async () => {
+    const bodies: Array<[unknown, string]> = [
+      ['Widen the scope to apps/api too.', 'payload'],
+      [['Widen the scope'], 'payload'],
+      [{}, 'payload.text'],
+      [{ text: 42 }, 'payload.text'],
+      [{ message: 'Widen the scope' }, 'payload.text'],
     ];
-    for (const [sent, fact] of bodies) assert.match(await refusedWith(await sayTo('implement', sent), 400, JSON.stringify(sent)), fact);
+    for (const [body, field] of bodies) {
+      const res = await sayTo('implement', body);
+      assert.equal(res.status, 400, JSON.stringify(body));
+      const said = (await res.json()) as { field?: string };
+      assert.ok(said.field?.startsWith(field), `${JSON.stringify(body)} names ${field}: ${JSON.stringify(said)}`);
+    }
     assert.deepEqual(written(), before, 'nothing written');
   });
 

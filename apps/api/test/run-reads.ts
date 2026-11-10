@@ -14,7 +14,7 @@
  */
 import type { RunObject, RunsListed } from 'agent-orchestrator';
 import type { Run, RunList } from 'objects';
-import type { RunAnswer, RunLinesAnswer } from '../src/runs/runs.ts';
+import type { Run as RunAnswer, RunLines as RunLinesAnswer } from 'objects';
 
 /** What a test reads through: the app, or anything that answers a request as it does. */
 export type Asked = { request: (url: string) => Response | Promise<Response> };

@@ -239,13 +239,6 @@ export const routeList = (command: Pick<CommandSpec, 'route'>): readonly Route[]
   command.route === undefined ? [] : Array.isArray(command.route) ? command.route : [command.route as Route];
 
 /** A route the table generates on the api: a write the api serves by no hand of its own. */
-/**
- * Why a run's named action is served by hand: a handler of `objects`' Api serves it in the run's namespace
- * (`/api/namespaces/<factory>/runs/<name>/…`), its body a Schema of that package, through the pipeline a generated route runs.
- */
-export const NAMED_ACTION =
-  "a named action of the run: a handler of objects' Api serves it in the run's namespace, through the pipeline a generated route runs";
-
 export const generated = (route: Route): boolean => route.method !== 'GET' && route.hand === undefined;
 
 /** The dollars under `key`, or undefined where none were given. */

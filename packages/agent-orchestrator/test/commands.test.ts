@@ -45,18 +45,18 @@ test('every shipped command is classed once, and no class breaks its rules', () 
 /** A route as the pins say it: a route the api writes by hand (`hand`) marked so, its why left to the entry. */
 const pinned = (r: Route) => (r.hand === undefined ? r : { ...r, hand: true });
 
-test("each command is served on the api where it was before the table, the lift of a hold, a removal and a prune where their routes were, a run's named actions in its namespace", () => {
+test("each command is served on the api where it was before the table, a run's named actions and its start by objects' Api alone", () => {
   assert.deepEqual(
     TABLE.map((c) => [c.name, Array.isArray(c.route) ? c.route.map(pinned) : c.route ? pinned(c.route as Route) : c.only?.side]),
     [
-      ['start', { method: 'POST', path: '/api/namespaces/:namespace/runs', status: 201, hand: true }],
+      ['start', 'cli'],
       ['concluded', { method: 'GET', path: '/api/runs/:runId/concluded', status: 200 }],
       ['inbox', 'cli'],
       ['inbox add', 'cli'],
       ['inbox queue', 'cli'],
       ['inbox from', 'cli'],
       ['inbox rm', 'cli'],
-      ['label run', { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/labels', status: 200, hand: true }],
+      ['label run', 'cli'],
       ['label inbox', 'cli'],
       ['factory', 'cli'],
       ['factory ls', 'cli'],
@@ -89,11 +89,11 @@ test("each command is served on the api where it was before the table, the lift 
       ['template export', 'cli'],
       ['template pack', 'cli'],
       ['template unpack', 'cli'],
-      ['retry', { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/steps/:step/retry', status: 202, hand: true }],
-      ['approve', { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/steps/:step/approve', status: 202, hand: true }],
+      ['retry', 'cli'],
+      ['approve', 'cli'],
       ['route', 'cli'],
-      ['refresh', { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/refresh', status: 202, hand: true }],
-      ['say', { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/steps/:step/say', status: 202, hand: true }],
+      ['refresh', 'cli'],
+      ['say', 'cli'],
       [
         'ls',
         [
@@ -137,15 +137,9 @@ test("each command is served on the api where it was before the table, the lift 
       ['skills show', 'api'],
       ['skills write', 'cli'],
       ['cancel', 'cli'],
-      [
-        'hold',
-        [
-          { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/hold', status: 200, sets: { off: false }, hand: true },
-          { method: 'DELETE', path: '/api/namespaces/:namespace/runs/:runId/hold', status: 200, sets: { off: true }, hand: true },
-        ],
-      ],
-      ['rm', { method: 'DELETE', path: '/api/namespaces/:namespace/runs/:runId', status: 200, hand: true }],
-      ['prune', { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/prune', status: 200, sets: { yes: true }, hand: true }],
+      ['hold', 'cli'],
+      ['rm', 'cli'],
+      ['prune', 'cli'],
       ['pause', { method: 'POST', path: '/api/pause', status: 200, sets: { yes: true } }],
       ['pause-timeout', 'cli'],
       ['resume', { method: 'DELETE', path: '/api/pause', status: 200 }],
@@ -247,7 +241,7 @@ test('every command the api posts or deletes on writes, and the api guards it; t
   );
 });
 
-test("show is the run's one entry on both sides: its --raw, the record, too, which the api answers on ?raw=true for nemia", () => {
+test("show is the run's one entry on both sides: its --raw, the record, too, which the api answers on GET /api/runs/:name/record for nemia", () => {
   const show = TABLE.find((c) => c.name === 'show');
   assert.equal(show?.only, undefined);
   assert.equal(show?.spec?.flags.find((f) => f.flag === '--raw')?.only, undefined);

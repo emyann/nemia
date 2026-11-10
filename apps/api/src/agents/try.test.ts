@@ -345,7 +345,7 @@ test('what a try refuses, and what it is fenced to: the default factory, rules o
       const res = await remove(run.id);
       const body = (await res.json()) as { error: string };
       assert.equal(res.status, 409, "the board removes only a try: another run is `nemia rm`'s, which says what it leaves");
-      assert.match(body.error, /removes only a try/);
+      assert.match(body.error, /only a try/);
       assert.match(body.error, new RegExp(`nemia rm ${run.id}`));
       assert.ok(fs.existsSync(path.join(RUNS, `${run.id}.json`)), 'and it is still there');
     } finally {

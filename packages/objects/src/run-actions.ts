@@ -2,12 +2,13 @@
  * The run's named actions, as the api is sent them and answers them: a run started (`RunStart`, `RunStarted`), a step tried again or a
  * loop sent round (`RunRetry`, `RunAsked`), a step approved at its gate (`RunApprove`, `RunApproved`), words said to a step's session
  * (`RunSay`, `RunSaid`), the run pinned to new revisions or its loop sent to merge its base (`RunRefresh`, `RunRefreshed`), a hold put
- * and lifted (`RunHold`, `RunHeld`), a try's run removed (`RunRemoved`) and a finished run pruned (`RunPrune`, `RunPruned`). Each body
- * holds the keys the orchestrator's command takes on the api, held equal to them by the api's parity test
- * (`apps/api/src/objects/run-actions.test.ts`); each answer the keys the command answers there. A run's labels are edited with the
- * card's `LabelEdit`, answered `Labelled` (run.ts).
+ * and lifted (`RunHold`, `RunHeld`), a try's run removed (`RunRemoved`) and a finished run pruned (`RunPrune`, `RunPruned`). Each body is
+ * what its endpoint decodes (run-api.ts), a 400 naming the key it refuses, and what the orchestrator's typed entry takes beside the
+ * path's names (`RetryInput`, `ApproveInput`, …); each answer the keys the entry answers. A run's labels are edited with the card's
+ * `LabelEdit`, answered `Labelled` (labels.ts).
  *
- * Plain Schemas of JSON, as every object of this package is: a body is checked by its command, in the command's words, never here.
+ * Plain Schemas of JSON, as every object of this package is: a body's shape is checked here, what it asks of a run by the entry, in its
+ * words.
  */
 import { Schema } from 'effect';
 import { RunDrift } from './run.ts';
@@ -15,6 +16,9 @@ import { RETRY_MODES, SAID_AFTER } from './words.ts';
 
 /** Strings, given many times. */
 const Strings = Schema.Array(Schema.String);
+
+/** A text that is not blank: a name, an id, a label's edit. */
+const NotBlank = Schema.String.check(Schema.makeFilter((text: string) => text.trim() !== ''));
 
 /** A person's answers to the questions a step's closeout asks: the question, the options chosen, and their own words. */
 const Answers = Schema.Array(Schema.Struct({ question: Schema.String, chose: Strings, own: Schema.optionalKey(Schema.String) }));
@@ -25,12 +29,12 @@ const Answers = Schema.Array(Schema.Struct({ question: Schema.String, chose: Str
  * An inbox card is started at its own path (`CardStart`).
  */
 export const RunStart = Schema.Struct({
-  workflow: Schema.String,
+  workflow: NotBlank,
   from: Schema.optionalKey(Schema.Literals(['repo', 'yours'])),
-  after: Schema.optionalKey(Strings),
-  context: Schema.optionalKey(Strings),
+  after: Schema.optionalKey(Schema.Array(NotBlank)),
+  context: Schema.optionalKey(Schema.Array(NotBlank)),
   brief: Schema.optionalKey(Schema.String),
-  label: Schema.optionalKey(Strings),
+  label: Schema.optionalKey(Schema.Array(NotBlank)),
 }).annotate({ identifier: 'RunStart' });
 export type RunStart = typeof RunStart.Type;
 

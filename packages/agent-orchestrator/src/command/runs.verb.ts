@@ -34,10 +34,15 @@ import {
   type Paused,
   type PausedNow,
 } from '../pause/pause.ts';
-import { Effect } from 'effect';
+import { Effect, Schema } from 'effect';
+import { RunHold, RunPrune } from 'objects';
+import { tryOf } from '../summary/reads.verb.ts';
+import { runStore } from '../record/files.store.ts';
+import { HOME } from '../record/record.store.ts';
 import { pausedRead } from '../list/list.verb.ts';
 import { sessionsDrained, tried } from '../runtime-client.ts';
-import { type Args, NAMED_ACTION } from './command.ts';
+import { type Args } from './command.ts';
+import { checked } from './checked.verb.ts';
 import type { Command, Ran } from './entry.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
@@ -159,11 +164,18 @@ function holdArgsRefusal(args: Args): string | null {
 }
 
 /**
+ * What `nemia hold` takes: the run, the hold as the api is sent it (`objects`' `RunHold`: `until`, `why`, `by`), and `off`, its lift — the
+ * api's `DELETE …/hold`, never its `POST`.
+ */
+export const HoldInput = Schema.Struct({ runId: Schema.String, ...RunHold.fields, off: Schema.optionalKey(Schema.Boolean) });
+export type HoldInput = typeof HoldInput.Type;
+
+/**
  * `nemia hold`: a run held until other runs land, or, naming none, until a person lifts it, or with `--off` its hold lifted now. The api
  * serves both: it puts a hold on `POST /api/runs/:runId/hold`, whose route fixes `off` false so no body lifts through it, and lifts one on
  * `DELETE /api/runs/:runId/hold`.
  */
-export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }> = {
+export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }, HoldInput> = {
   name: 'hold',
   usage: '<runId> [--until <runId> ...] [--why "<words>"] [--by <name>]',
   help: [
@@ -196,17 +208,16 @@ export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }> = {
   check: holdArgsRefusal,
   writes: true,
   class: 'act',
-  route: [
-    { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/hold', status: 200, sets: { off: false }, hand: NAMED_ACTION },
-    { method: 'DELETE', path: '/api/namespaces/:namespace/runs/:runId/hold', status: 200, sets: { off: true }, hand: NAMED_ACTION },
-  ],
-  handler: Effect.fnUntraced(function* (args: Args) {
-    const runId = textOf(args, 'runId') ?? '';
-    if (args.off === true) {
+  only: { side: 'cli', why: "the api serves it as the Run's `hold` and `unhold` of `objects`' Api, calling this handler" },
+  input: HoldInput,
+  handler: Effect.fnUntraced(function* (input: HoldInput) {
+    yield* checked(holdArgsRefusal(input));
+    const { runId } = input;
+    if (input.off === true) {
       const { run, hold: lifted } = yield* unhold(runId);
       return { id: run.id, lifted: true, hold: lifted };
     }
-    const { run, hold: put } = yield* hold(runId, [...listOf(args, 'until')], { why: saidOf(args, 'why'), by: saidOf(args, 'by') });
+    const { run, hold: put } = yield* hold(runId, [...(input.until ?? [])], { why: saidOf(input, 'why'), by: saidOf(input, 'by') });
     return { id: run.id, lifted: false, hold: put };
   }),
   print: ({ id, lifted, hold: put }) => [
@@ -235,11 +246,47 @@ function rmRefusal(args: Args): string | null {
 }
 
 /**
- * `nemia rm`: one run forgotten, judged on its own (`forget`), and what was done with it (`forgot`), a refusal included, and with its
- * tasks on the engine (`engine`, null where nothing was removed). The api removes a
- * run only once it is gone: what `forget` refused, or held, is a 409 in its words, and a run gone since the route read it a 404.
+ * What `nemia rm` takes of one run: the run, its two switches, and the two the api sets: `onlyTry`, removing a try alone — a run started
+ * from an agent's page (`tryOf`) — and `refuses`, failing with what removed nothing (`forgetRefusal`) where the command line says it as
+ * a line.
  */
-export const RM: Command<{ id: string; removed: boolean; engine: EngineForgetting | null; forgot: Forgot }> = {
+export const RmInput = Schema.Struct({
+  runId: Schema.String,
+  deleteBranches: Schema.optionalKey(Schema.Boolean),
+  forceUnmerged: Schema.optionalKey(Schema.Boolean),
+  onlyTry: Schema.optionalKey(Schema.Boolean),
+  refuses: Schema.optionalKey(Schema.Boolean),
+});
+export type RmInput = typeof RmInput.Type;
+
+/**
+ * Refused of a removal of a try alone (`onlyTry`) for any other run: a repository run's worktrees and branches are a person's to read
+ * before they go, and `nemia rm` says what it hands off and what it leaves.
+ */
+const tryAlone = Effect.fnUntraced(function* (runId: string, home: string | undefined) {
+  if (!runStore.runs.exists(runId)) return;
+  const run = runStore.runs.read(runId);
+  if (tryOf(run, home ?? HOME)) return;
+  return yield* Effect.fail(
+    new Conflict({
+      message: `${run.id} is a run of ${run.workflowDir}, and only a try — a run started from an agent's page — is removed here. Remove it with \`nemia rm ${run.id}\`, which says what it hands off and what it leaves.`,
+    }),
+  );
+});
+
+/** What removed nothing, as a refusal: refused or held, a `Conflict` in `forget`'s words; a record gone since, `Missing`; else none. */
+export const forgetRefusal = (forgot: Forgot): Conflict | Missing | null => {
+  if (forgot.kind === 'refused') return new Conflict({ message: forgot.refusal ?? forgetLine(forgot) });
+  if (forgot.kind === 'held') return new Conflict({ message: forgetLine(forgot) });
+  return forgot.kind === 'missing' ? new Missing({ message: forgetLine(forgot) }) : null;
+};
+
+/**
+ * `nemia rm`: one run forgotten, judged on its own (`forget`), and what was done with it (`forgot`), a refusal included, and with its
+ * tasks on the engine (`engine`, null where nothing was removed). The api removes a try alone (`onlyTry`), and a run only once it is gone
+ * (`refuses`): what `forget` refused, or held, is a `Conflict` in its words, and a run gone since a `Missing`.
+ */
+export const RM: Command<{ id: string; removed: boolean; engine: EngineForgetting | null; forgot: Forgot }, RmInput> = {
   name: 'rm',
   usage: '<runId> [<runId> ...] [--delete-branches [--force-unmerged]]',
   help: [
@@ -265,36 +312,57 @@ export const RM: Command<{ id: string; removed: boolean; engine: EngineForgettin
   check: rmRefusal,
   writes: true,
   class: 'ask',
-  route: { method: 'DELETE', path: '/api/namespaces/:namespace/runs/:runId', status: 200, hand: NAMED_ACTION },
-  handler: Effect.fnUntraced(function* (args: Args) {
-    const forgot = yield* forgetRun(textOf(args, 'runId') ?? '', {
-      deleteBranches: args.deleteBranches === true,
-      forceUnmerged: args.forceUnmerged === true,
+  only: { side: 'cli', why: "the api serves it as the Run's `delete` of `objects`' Api, calling this handler, a try alone" },
+  input: RmInput,
+  handler: Effect.fnUntraced(function* (input: RmInput, _env, home) {
+    yield* checked(rmRefusal(input));
+    const { runId } = input;
+    if (input.onlyTry === true) yield* tryAlone(runId, home);
+    const forgot = yield* forgetRun(runId, {
+      deleteBranches: input.deleteBranches === true,
+      forceUnmerged: input.forceUnmerged === true,
     });
+    const refused = input.refuses === true ? forgetRefusal(forgot) : null;
+    if (refused) return yield* Effect.fail(refused);
     return { id: forgot.id, removed: forgot.kind === 'forgotten', engine: forgot.engine ?? null, forgot };
   }),
   print: ({ forgot }) => [forgetLine(forgot)],
-  apiKeys: ['id', 'removed', 'engine'],
-  apiRefusal: ({ forgot }) => {
-    if (forgot.kind === 'refused') return new Conflict({ message: forgot.refusal ?? forgetLine(forgot) });
-    if (forgot.kind === 'held') return new Conflict({ message: forgetLine(forgot) });
-    return forgot.kind === 'missing' ? new Missing({ message: forgetLine(forgot) }) : null;
-  },
+};
+
+/**
+ * What `nemia prune` takes of one run: the run, the prune as the api is sent it (`objects`' `RunPrune`: `unmerged`, `artifacts`), `yes`,
+ * which removes, and `refuses`, the api's, failing with what pruned nothing (`pruneRefusal`) where the command line says it as lines.
+ */
+export const PruneInput = Schema.Struct({
+  runId: Schema.String,
+  ...RunPrune.fields,
+  yes: Schema.optionalKey(Schema.Boolean),
+  refuses: Schema.optionalKey(Schema.Boolean),
+});
+export type PruneInput = typeof PruneInput.Type;
+
+/** What pruned nothing, as a refusal: refused, or nothing to prune, a `Conflict` in `nemia prune`'s words; else none. */
+export const pruneRefusal = (pruning: Pruning): Conflict | null => {
+  if (pruning.kind === 'refused') return new Conflict({ message: pruning.refusal ?? pruneLines(pruning).join('\n') });
+  return pruning.kind === 'nothing' ? new Conflict({ message: `Nothing to prune: ${pruning.nothing}.` }) : null;
 };
 
 /**
  * `nemia prune`: one run judged for what it holds that a prune frees (`prune`), and removed on `yes`; the api always prunes as `--yes`
- * does, its route fixing `yes`. What `prune` refused, or found nothing to prune of, is a 409 on the api, in its words.
+ * does, with `refuses`: what `prune` refused, or found nothing to prune of, is a `Conflict` there, in its words.
  */
-export const PRUNE: Command<{
-  id: string;
-  pruned: boolean;
-  lines: readonly string[];
-  worktrees: Pruning['worktrees'];
-  artifacts: NonNullable<Pruning['artifacts']> | null;
-  left: Pruning['left'];
-  pruning: Pruning;
-}> = {
+export const PRUNE: Command<
+  {
+    id: string;
+    pruned: boolean;
+    lines: readonly string[];
+    worktrees: Pruning['worktrees'];
+    artifacts: NonNullable<Pruning['artifacts']> | null;
+    left: Pruning['left'];
+    pruning: Pruning;
+  },
+  PruneInput
+> = {
   name: 'prune',
   usage: '[<runId> ...] [--unmerged] [--artifacts] [--yes]',
   help: [
@@ -323,22 +391,20 @@ export const PRUNE: Command<{
   },
   writes: true,
   class: 'ask',
-  route: { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/prune', status: 200, sets: { yes: true }, hand: NAMED_ACTION },
-  handler: Effect.fnUntraced(function* (args: Args) {
-    const p: Pruning = yield* prune(textOf(args, 'runId') ?? '', {
-      unmerged: args.unmerged === true,
-      artifacts: args.artifacts === true,
-      yes: args.yes === true,
+  only: { side: 'cli', why: "the api serves it as the Run's `prune` of `objects`' Api, calling this handler" },
+  input: PruneInput,
+  handler: Effect.fnUntraced(function* (input: PruneInput) {
+    const p: Pruning = yield* prune(input.runId, {
+      unmerged: input.unmerged === true,
+      artifacts: input.artifacts === true,
+      yes: input.yes === true,
     });
+    const refused = input.refuses === true ? pruneRefusal(p) : null;
+    if (refused) return yield* Effect.fail(refused);
     const { id, worktrees, left } = p;
     return { id, pruned: p.kind === 'pruned', lines: pruneLines(p), worktrees, artifacts: p.artifacts ?? null, left, pruning: p };
   }),
   print: ({ pruning }) => pruneLines(pruning),
-  apiKeys: ['id', 'pruned', 'lines', 'worktrees', 'artifacts', 'left'],
-  apiRefusal: ({ pruning }) => {
-    if (pruning.kind === 'refused') return new Conflict({ message: pruning.refusal ?? pruneLines(pruning).join('\n') });
-    return pruning.kind === 'nothing' ? new Conflict({ message: `Nothing to prune: ${pruning.nothing}.` }) : null;
-  },
 };
 
 /** `nemia pause`'s form, as each of its refusals ends on it. */

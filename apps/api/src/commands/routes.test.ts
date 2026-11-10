@@ -1,26 +1,22 @@
 /**
- * The routes generated from the package's command table: a command asked on its route writes what the same entry writes asked as `nemia`
- * parses it, every route that writes is guarded, a key another command takes on the api alone is refused, and the table asks the api for
- * nothing it lacks — words for each routed command, and an extension for each key a command takes on the api alone — and serves each route,
- * on a route of Hono's before the mount or an endpoint of objects' `Api` the mount serves, the table's `:runId` the `Api`'s `:name`.
+ * The routes generated from the package's command table: every route that writes is guarded, and the table asks the api for nothing it
+ * lacks — words for each routed command — and serves each route, on a route of Hono's before the mount or an endpoint of objects' `Api`
+ * the mount serves, the table's `:runId` the `Api`'s `:name`. The run's named actions are no route of the table: runs/actions.test.ts
+ * holds them on their endpoints.
  *
- * Three tables and the walk: a command on its route answers what its `nemia` entry answers; what a route refuses or ignores of its
- * body, and the removals the board will not do; and the table asking the api for nothing it lacks. The walk over every writing route is
- * the one place the guard's three refusals are proven route by route.
+ * The walk over every writing route is the one place the guard's three refusals are proven route by route; then the table asking the api
+ * for nothing it lacks.
  *
  * At shipped defaults: the api's own engine over the harness's scratch store (`root`), which this file seeds.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Api } from 'objects';
 import { app } from '../app.ts';
-import { approvalFile, COMMANDS, engine, parseArgv, routeList, triesDir } from 'agent-orchestrator';
-import { runWith } from '../../test/builtin-place.ts';
-import { extensionBreaks } from './extend.ts';
+import { COMMANDS, routeList } from 'agent-orchestrator';
 import { wordBreaks } from './routes.ts';
 
 const T0 = Date.parse('2026-10-02T09:00:00.000Z');
@@ -45,7 +41,6 @@ const signedOff = (taskId: string, closeout: object) =>
   );
 
 const DONE = { outcome: 'done', summary: 'Done.', needs: null, artifacts: [] };
-const AGAIN = { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false };
 
 /** A run's record, with what every run here shares. */
 const runRecord = (id: string, workflow: object[], steps: object, more: object = {}) =>
@@ -81,32 +76,6 @@ const gatedRun = (id: string) => {
   signedOff(`${id}-plan`, DONE);
 };
 
-/** A run of `implement ⇄ review`, `rounds: 1`, whose review asked for another round: its loop is out of rounds. */
-const loopingRun = (id: string) => {
-  runRecord(
-    id,
-    [
-      { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
-      {
-        name: 'review',
-        after: ['implement'],
-        body: 'Review it.',
-        harness: 'codex',
-        loop: 'implement',
-        rounds: 1,
-        output: { file: 'review.json', schema: AGAIN },
-      },
-    ],
-    {
-      implement: { taskId: `${id}-implement-1`, branch: `wf/${id}/implement` },
-      review: { taskId: `${id}-review-1`, branch: `wf/${id}/implement` },
-    },
-  );
-  signedOff(`${id}-implement-1`, DONE);
-  signedOff(`${id}-review-1`, { ...DONE, again: true });
-};
-
-/** What the board sends, through vite's proxy: JSON, same-origin, and Host rewritten to the api's. */
 const BOARD = {
   'content-type': 'application/json',
   'sec-fetch-site': 'same-origin',
@@ -114,223 +83,11 @@ const BOARD = {
   host: '127.0.0.1:8787',
 };
 
-const post = (url: string, body: unknown, headers: Record<string, string> = BOARD) =>
-  app.request(url, { method: 'POST', headers, body: JSON.stringify(body) });
-
-/** The entry of the table named `name`. */
-const entry = (name: string) => COMMANDS.find((c) => c.name === name)!;
-
-/** What the entry `name` answers asked as `nemia` parses `argv`: its check passed, its handler's data. */
-async function asTyped(name: string, argv: string[]) {
-  const command = entry(name);
-  const args = parseArgv(command.spec, argv);
-  assert.ok(args, `nemia ${name} ${argv.join(' ')} is given enough`);
-  assert.equal(command.check?.(args) ?? null, null, `nemia ${name} ${argv.join(' ')} passes its check`);
-  return runWith(engine(), command.handler(args));
-}
-
 /** Every file under a run's asks directory, waiting or consumed. */
 const asked = (run: string): string[] => {
   const dir = path.join(root, 'runs', `${run}.asks`);
   return fs.existsSync(dir) ? (fs.readdirSync(dir, { recursive: true }) as string[]).sort() : [];
 };
-
-/** A file the run wrote, its words but when. */
-const written = (file: string): unknown => {
-  const { at: _when, ...rest } = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
-  return rest;
-};
-
-/** A removal on the board, as its run page sends it. */
-const remove = (id: string) => app.request(`/api/namespaces/default/runs/${id}`, { method: 'DELETE', headers: BOARD, body: '{}' });
-
-/** A git repository at `repo` with one commit on `main`; git with a fixed identity and no hook or signing, in it. */
-function aGitRepo(repo: string) {
-  const git = (...args: string[]) =>
-    execFileSync(
-      'git',
-      ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args],
-      { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
-    ).trim();
-  git('init', '-q', '-b', 'main');
-  fs.writeFileSync(path.join(repo, 'README.md'), '# app\n');
-  git('add', '-A');
-  git('commit', '-q', '-m', 'base');
-  return git;
-}
-
-/** A try of one step, `implement`, signed off and handed off, on `repo`: with its clean worktree on its branch when `repo` is git's. */
-function aGitTry(id: string, repo: string, git?: ReturnType<typeof aGitRepo>): string {
-  const worktree = path.join(root, 'worktrees', id, 'implement');
-  if (git) git('worktree', 'add', '-q', '-b', `wf/${id}/implement`, worktree);
-  signedOff(`${id}-implement`, DONE);
-  runRecord(
-    id,
-    [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }],
-    { implement: { taskId: `${id}-implement`, workspace: worktree, branch: `wf/${id}/implement`, handedOff: `${id}-implement` } },
-    { repo, workspace: repo, baseRef: git ? git('rev-parse', 'HEAD') : 'abc123', workflowDir: path.join(triesDir(root), 'scribe') },
-  );
-  return worktree;
-}
-
-/** What `nemia rm <id>` answers for one run, as the CLI asks the entry once for each run it is given. */
-function rmTyped(id: string) {
-  const command = entry('rm');
-  const args = parseArgv(command.spec, [id]);
-  assert.ok(args && command.check?.(args) == null, `nemia rm ${id} passes its check`);
-  return runWith(engine(), command.handler({ ...args, runId: id }));
-}
-
-test('a command on its route answers what its `nemia` entry answers: the same file and words written, the same refusal, the same removal', async (t) => {
-  await t.test(
-    'an approval on its route writes what `nemia approve` writes: the same try, file and words, and answers what the board reads',
-    async () => {
-      gatedRun('r-cli-gate');
-      gatedRun('r-api-gate');
-      const typed = await asTyped('approve', ['r-cli-gate', 'plan', '--message', 'Go.']);
-      const res = await post('/api/namespaces/default/runs/r-api-gate/steps/plan/approve', { message: 'Go.' });
-      assert.equal(res.status, 202);
-      const answered = (await res.json()) as { try: number; at: string; message: string; file: string };
-      assert.deepEqual(Object.keys(answered).sort(), ['at', 'file', 'message', 'step', 'try']);
-      assert.equal(answered.try, typed.try);
-      assert.equal(answered.file, approvalFile('r-api-gate', 'plan', 1));
-      assert.equal(typed.file, approvalFile('r-cli-gate', 'plan', 1));
-      assert.deepEqual(written(answered.file), written(String(typed.file)));
-      assert.deepEqual(asked('r-api-gate'), asked('r-cli-gate'));
-    },
-  );
-
-  await t.test(
-    'a round, `POST …/steps/:step/retry` with `"round": true`, writes what `nemia retry --round` writes: the same step, round and file',
-    async () => {
-      loopingRun('r-cli-loop');
-      loopingRun('r-api-loop');
-      const typed = await asTyped('retry', ['r-cli-loop', '--round']);
-      const res = await post('/api/namespaces/default/runs/r-api-loop/steps/review/retry', { mode: 'continue', round: true });
-      assert.equal(res.status, 202);
-      const answered = (await res.json()) as { step: string; round: number; file: string };
-      assert.deepEqual(Object.keys(answered).sort(), ['file', 'round', 'step']);
-      assert.deepEqual([answered.step, answered.round], [typed.step, typed.round]);
-      assert.equal(answered.file, String(typed.file).replace('r-cli-loop', 'r-api-loop'));
-      assert.deepEqual(written(answered.file), written(String(typed.file)));
-      assert.deepEqual(asked('r-api-loop'), asked('r-cli-loop'));
-    },
-  );
-
-  await t.test(
-    'an acceptance, `POST …/steps/:step/approve` of a loop out of rounds, writes what `nemia approve` of a loop writes: the same step, try, words and file',
-    async () => {
-      loopingRun('r-cli-enough');
-      loopingRun('r-api-enough');
-      const typed = await asTyped('approve', ['r-cli-enough', 'review', '--message', 'Good enough.']);
-      const res = await post('/api/namespaces/default/runs/r-api-enough/steps/review/approve', { message: 'Good enough.' });
-      assert.equal(res.status, 202);
-      const answered = (await res.json()) as { step: string; try: number; message: string; file: string };
-      assert.deepEqual([answered.step, answered.try, answered.message], [typed.step, typed.try, typed.message]);
-      assert.equal(answered.file, String(typed.file).replace('r-cli-enough', 'r-api-enough'));
-      assert.deepEqual(written(answered.file), written(String(typed.file)));
-      assert.deepEqual(asked('r-api-enough'), asked('r-cli-enough'));
-    },
-  );
-
-  await t.test(
-    'a merge, `POST …/refresh` with `"base": true`, writes what `nemia refresh --base` writes: the same step, target, base commit and file',
-    async () => {
-      const repo = fs.mkdtempSync(path.join(root, 'repo-'));
-      const git = aGitRepo(repo);
-      const base = git('rev-parse', 'HEAD');
-      for (const id of ['r-cli-base', 'r-api-base']) {
-        git('checkout', '-q', '-b', `wf/${id}/implement`, base);
-        fs.writeFileSync(path.join(repo, 'README.md'), `# app, as ${id} has it\n`);
-        git('commit', '-q', '-am', id);
-      }
-      git('checkout', '-q', 'main');
-      fs.writeFileSync(path.join(repo, 'README.md'), '# app, as main has it\n');
-      git('commit', '-q', '-am', 'main moved');
-      for (const id of ['r-cli-base', 'r-api-base']) {
-        loopingRun(id);
-        signedOff(`${id}-review-1`, { ...DONE, again: false });
-        const record = JSON.parse(fs.readFileSync(path.join(root, 'runs', `${id}.json`), 'utf8')) as object;
-        write(path.join(root, 'runs', `${id}.json`), JSON.stringify({ ...record, repo, workspace: repo, baseRef: base }));
-      }
-      const typed = await asTyped('refresh', ['r-cli-base', '--base']);
-      const res = await post('/api/namespaces/default/runs/r-api-base/refresh', { base: true });
-      assert.equal(res.status, 202, JSON.stringify(await res.clone().json()));
-      const answered = (await res.json()) as Record<string, unknown>;
-      for (const key of ['step', 'target', 'onto', 'sha', 'round']) assert.deepEqual(answered[key], typed[key], key);
-      assert.equal(answered.file, String(typed.file).replace('r-cli-base', 'r-api-base'));
-      assert.deepEqual([answered.target, answered.onto, answered.sha], ['implement', 'main', git('rev-parse', 'main')]);
-      assert.deepEqual(written(String(answered.file)), written(String(typed.file)));
-      assert.deepEqual(asked('r-api-base'), asked('r-cli-base'));
-    },
-  );
-
-  await t.test(
-    'REFUSED on its route: a merge of a run whose result step closes no loop — a 409 naming `nemia retry`, as `nemia refresh --base` says it, and no ask',
-    async () => {
-      gatedRun('r-cli-noloop');
-      gatedRun('r-api-noloop');
-      const typed = await asTyped('refresh', ['r-cli-noloop', '--base']).then(
-        () => assert.fail('nemia refresh --base is refused'),
-        (err: Error) => err.message,
-      );
-      const res = await post('/api/namespaces/default/runs/r-api-noloop/refresh', { base: true });
-      assert.equal(res.status, 409);
-      const said = ((await res.json()) as { error: string }).error;
-      assert.equal(said, typed.replaceAll('r-cli-noloop', 'r-api-noloop'));
-      assert.match(said, /implement closes no loop[^]*nemia retry r-api-noloop implement --message/);
-      assert.deepEqual([asked('r-api-noloop'), asked('r-cli-noloop')], [[], []]);
-    },
-  );
-
-  await t.test(
-    'a try removed on its route answers what `nemia rm` answers: removed, its worktree gone through its place, its branch kept, and what the engine forgot',
-    async () => {
-      const repo = fs.mkdtempSync(path.join(root, 'repo-'));
-      const git = aGitRepo(repo);
-      const cli = aGitTry('r-cli-rm', repo, git);
-      const api = aGitTry('r-api-rm', repo, git);
-      const typed = await rmTyped('r-cli-rm');
-      const res = await remove('r-api-rm');
-      assert.equal(res.status, 200, JSON.stringify(await res.clone().json()));
-      const answered = (await res.json()) as Record<string, unknown>;
-      assert.deepEqual(
-        answered,
-        JSON.parse(JSON.stringify({ id: typed.id, removed: typed.removed, engine: typed.engine }).replaceAll('r-cli-rm', 'r-api-rm')),
-      );
-      assert.equal(answered.removed, true);
-      assert.ok(!fs.existsSync(cli) && !fs.existsSync(api), 'both worktrees are gone');
-      assert.equal(
-        git('branch', '--list', 'wf/r-*-rm/implement', '--format=%(refname:short)'),
-        'wf/r-api-rm/implement\nwf/r-cli-rm/implement',
-      );
-      assert.ok(!fs.existsSync(path.join(root, 'runs', 'r-api-rm.json')) && !fs.existsSync(path.join(root, 'runs', 'r-cli-rm.json')));
-    },
-  );
-
-  await t.test(
-    "REFUSED at shipped defaults: a try whose repository its place cannot read — no git repository — is a 409 in `nemia rm`'s words, never removed as one with nothing left, and its record kept",
-    async () => {
-      const plain = fs.mkdtempSync(path.join(root, 'plain-'));
-      aGitTry('r-cli-unread', plain);
-      aGitTry('r-api-unread', plain);
-      const typed = await rmTyped('r-cli-unread');
-      const res = await remove('r-api-unread');
-      assert.equal(res.status, 409);
-      const said = ((await res.json()) as { error: string }).error;
-      assert.equal(said, String((typed.forgot as { refusal?: string }).refusal).replaceAll('r-cli-unread', 'r-api-unread'));
-      assert.ok(
-        said.startsWith(`its place's inventory of what it left in ${plain} was not heard — `) && /not a git repository/.test(said),
-        said,
-      );
-      assert.ok(
-        said.endsWith('nothing was touched, as nothing says what is there: nemia rm r-api-unread again once the place reads it'),
-        said,
-      );
-      assert.ok(fs.existsSync(path.join(root, 'runs', 'r-api-unread.json')) && fs.existsSync(path.join(root, 'runs', 'r-cli-unread.json')));
-    },
-  );
-});
 
 /**
  * The three branches the write guard refuses a write on (`writeRefused`, src/guard.ts), each a header the board would never send: the
@@ -379,112 +136,10 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
   );
 });
 
-test('what a route refuses or ignores of its body, and the removals the board will not do — each refusal its status and the facts it names, nothing written', async (t) => {
-  await t.test(
-    'a lift on its route reads no body: what its route fixes lifts the hold, whatever the body says, and the hold file is gone',
-    async () => {
-      for (const [id, body] of [
-        ['r-lift-off', JSON.stringify({ off: false, until: ['r-other'] })],
-        ['r-lift-bare', 'not json'],
-      ]) {
-        gatedRun(id);
-        const held = path.join(root, 'runs', `${id}.hold`);
-        write(held, JSON.stringify({ at: at(0), until: ['r-other'] }));
-        const res = await app.request(`/api/namespaces/default/runs/${id}/hold`, { method: 'DELETE', headers: BOARD, body });
-        assert.equal(res.status, 200, `${id}: ${await res.clone().text()}`);
-        assert.deepEqual(await res.json(), { id, lifted: true, hold: { at: at(0), until: ['r-other'] } });
-        assert.equal(fs.existsSync(held), false, id);
-      }
-    },
-  );
-
-  await t.test(
-    'REFUSED at shipped defaults: `answers` sent to a merge of the base, which takes none on the api — 422 naming the key and the routes that take it, nothing written',
-    async () => {
-      loopingRun('r-foreign');
-      const res = await post('/api/namespaces/default/runs/r-foreign/refresh', {
-        base: true,
-        answers: [{ question: 'Which?', chose: ['A'] }],
-      });
-      assert.equal(res.status, 422);
-      const said = ((await res.json()) as { error: string }).error;
-      assert.ok(said.startsWith('`answers` is not a key POST …/refresh takes'), said);
-      assert.ok(said.includes('POST …/retry, POST …/approve take it'), said);
-      assert.deepEqual(asked('r-foreign'), [], 'nothing written');
-    },
-  );
-
-  await t.test(
-    'REFUSED: the retired paths `POST …/round`, `POST …/steps/:step/accept` and `POST …/merge` are served no more — 404, nothing written',
-    async () => {
-      loopingRun('r-retired');
-      for (const [route, body] of [
-        ['/api/runs/r-retired/round', {}],
-        ['/api/runs/r-retired/steps/review/accept', { message: 'Good enough.' }],
-        ['/api/runs/r-retired/merge', {}],
-      ] as const)
-        assert.equal((await post(route, body)).status, 404, route);
-      assert.deepEqual(asked('r-retired'), [], 'nothing written');
-    },
-  );
-
-  await t.test(
-    "REFUSED at shipped defaults: a key the route fixes is none of the body's — `yes` sent to a prune is a 400 naming it, and nothing is touched",
-    async () => {
-      gatedRun('r-prune-yes');
-      const before = fs.readdirSync(path.join(root, 'runs')).sort();
-      const res = await post('/api/namespaces/default/runs/r-prune-yes/prune', { yes: true });
-      assert.equal(res.status, 400);
-      const said = ((await res.json()) as { error: string }).error;
-      assert.ok(said.startsWith('POST …/prune does not take `yes`'), said);
-      for (const fact of ['`{ "artifacts"?: boolean, "unmerged"?: boolean }`', '--artifacts and --unmerged'])
-        assert.ok(said.includes(fact), `${fact} in ${said}`);
-      assert.deepEqual(fs.readdirSync(path.join(root, 'runs')).sort(), before);
-    },
-  );
-
-  await t.test(
-    'REFUSED at shipped defaults: a run that is no try, removed on the board — a 409 naming `nemia rm`, and the record kept',
-    async () => {
-      gatedRun('r-no-try');
-      const res = await remove('r-no-try');
-      assert.equal(res.status, 409);
-      const said = ((await res.json()) as { error: string }).error;
-      assert.ok(said.startsWith('DELETE /api/namespaces/default/runs/r-no-try: '), said);
-      for (const fact of ['only a try', `a run of ${path.join(root, 'no-such-workflow')}`, '`nemia rm r-no-try`'])
-        assert.ok(said.includes(fact), `${fact} in ${said}`);
-      assert.ok(fs.existsSync(path.join(root, 'runs', 'r-no-try.json')), 'the record is kept');
-    },
-  );
-
-  await t.test(
-    'REFUSED at shipped defaults: a try whose worktree its place will not remove — held — is a 409 naming the worktree, how to let it go and `nemia rm`, and its record kept',
-    async () => {
-      const id = 'r-held-try';
-      const repo = fs.mkdtempSync(path.join(root, 'repo-'));
-      const git = aGitRepo(repo);
-      const worktree = aGitTry(id, repo, git);
-      git('worktree', 'lock', '--reason', 'a person holds it', worktree);
-      const res = await remove(id);
-      assert.equal(res.status, 409);
-      const said = ((await res.json()) as { error: string }).error;
-      assert.ok(said.startsWith(`${id}  not forgotten: ${worktree} is held (a person holds it)`), said);
-      for (const fact of [`git -C ${repo} worktree unlock ${worktree}`, `nemia rm ${id} again`])
-        assert.ok(said.includes(fact), `${fact} in ${said}`);
-      assert.ok(fs.existsSync(path.join(root, 'runs', `${id}.json`)), 'the record is kept');
-      assert.ok(fs.existsSync(worktree), 'and the worktree');
-    },
-  );
-});
-
 test('the command table asks the api for nothing it lacks, and the api serves every route it generates', async (t) => {
-  await t.test(
-    'the table asks the api for nothing it lacks: words for each routed command, an extension for each key taken on the api alone',
-    () => {
-      assert.deepEqual(wordBreaks(COMMANDS), []);
-      assert.deepEqual(extensionBreaks(COMMANDS), []);
-    },
-  );
+  await t.test('the table asks the api for nothing it lacks: words for each routed command', () => {
+    assert.deepEqual(wordBreaks(COMMANDS), []);
+  });
 
   await t.test(
     'every command the table routes is served by the api on its method and path: the posts the table generates, and the reads the api answers',
@@ -505,7 +160,7 @@ test('the command table asks the api for nothing it lacks, and the api serves ev
     },
   );
 
-  await t.test('REFUSED: a routed command the api has no words for, and a key taken on the api alone that no extension folds', () => {
+  await t.test('REFUSED: a routed command the api has no words for', () => {
     const route = { method: 'POST', path: '/api/runs/:runId/sing', status: 202 } as const;
     assert.deepEqual(wordBreaks([{ name: 'sing', route }]), [
       'sing is routed on the api, and words.ts has no words for it: give it its shape and its refusals there',
@@ -514,11 +169,5 @@ test('the command table asks the api for nothing it lacks, and the api serves ev
       'hush is routed on the api, and words.ts has no words for it: give it its shape and its refusals there',
     ]);
     assert.deepEqual(wordBreaks([{ name: 'sing' }]), [], 'a command served on the command line alone needs no words');
-    assert.deepEqual(extensionBreaks([{ name: 'accept', apiTakes: ['answers'] }]), [
-      'accept takes `answers` on the api, and extend.ts folds none: give accept an extension that takes it, or drop it',
-    ]);
-    assert.deepEqual(extensionBreaks([{ name: 'retry', apiTakes: ['notes'] }]), [
-      'retry takes `notes` on the api, and extend.ts folds none: give retry an extension that takes it, or drop it',
-    ]);
   });
 });

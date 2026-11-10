@@ -1,5 +1,5 @@
 /**
- * GET /api/workflows and POST /api/namespaces/<namespace>/runs (workflows.ts's `runStart`): a story of a repository's workflows listed and
+ * GET /api/workflows and POST /api/namespaces/<namespace>/runs (runs/start.ts's `runStart`): a story of a repository's workflows listed and
  * a step's page read, a story of runs of one started, and one table of what a start refuses — in a scratch store and a scratch repository.
  *
  * Beside the scratch repository's workflows lie folders and files that are not one: `NOTES.txt`, not a folder; `.vscode` and `.draft`,
@@ -675,9 +675,12 @@ const sentWith = (headers: Record<string, string>) =>
     body: JSON.stringify({ workflow: 'good', from: 'repo', brief: 'Push main to a new remote.' }),
   });
 
+/** The key a 400 of `RunStart`'s decode names, `payload.<key>…`. */
+const fieldOf = async (res: Response): Promise<string> => ((await res.json()) as { field?: string }).field ?? '';
+
 test('POST /api/namespaces/default/runs: what a start refuses, writing nothing, and the name two places have', async (t) => {
   await t.test(
-    'an unknown workflow (404, naming the ones there are), a missing or blank brief (422), a body of the wrong shape (400) — and nothing is written',
+    'an unknown workflow (404, naming the ones there are), a missing or blank brief (422), a body `RunStart` does not read (400, naming the key) — and nothing is written',
     async () => {
       const before = runFiles();
 
@@ -693,20 +696,23 @@ test('POST /api/namespaces/default/runs: what a start refuses, writing nothing, 
           `${workflow}: found among the folders, never joined onto a path — \`..\` names none of them, nor does a hidden folder, one with a step in it included, nor \`agents/\`, whose files read as steps`,
         );
 
-      for (const brief of [undefined, '', '  \n', 42]) {
+      for (const brief of [undefined, '', '  \n']) {
         const res = await post({ workflow: 'good', brief });
         assert.equal(res.status, 422, String(brief));
         assert.ok(((await res.json()) as { error: string }).error.startsWith('A run needs a brief'), String(brief));
       }
 
-      for (const body of ['not json', [], { brief: 'Do it.' }, { workflow: 'good', brief: 'Do it.', from: 'elsewhere' }]) {
+      for (const [body, field] of [
+        ['not json', 'payload'],
+        [[], 'payload'],
+        [{ workflow: 'good', brief: 42 }, 'payload.brief'],
+        [{ brief: 'Do it.' }, 'payload.workflow'],
+        [{ workflow: 'good', brief: 'Do it.', from: 'elsewhere' }, 'payload.from'],
+      ] as const) {
         const res = await post(body);
         assert.equal(res.status, 400, JSON.stringify(body));
-        assert.match(
-          ((await res.json()) as { error: string }).error,
-          /POST \/api\/namespaces\/<namespace>\/runs|`from`/,
-          JSON.stringify(body),
-        );
+        const said = await fieldOf(res);
+        assert.ok(said.startsWith(field), `${JSON.stringify(body)}: ${said}`);
       }
 
       assert.deepEqual(runFiles(), before);
@@ -718,28 +724,18 @@ test('POST /api/namespaces/default/runs: what a start refuses, writing nothing, 
     "a start's `workflow` that is not a name, and a `from` that is neither place, are 400s naming the key — and nothing is written",
     async () => {
       const before = runFiles();
-      const bodyKeys = ['`{ "workflow": "<name>", "brief": "<what to do>" }`', '`"from": "repo"`', '`"after": ["<runId>", …]`'];
-      bodyKeys.push('`"context": ["<runId>", …]`', '`"label": ["<key>=<value>", "<key>-", …]`');
-      const notNamed = new Set<string>();
-      for (const workflow of ['', 7, null]) {
+      for (const workflow of ['', '  ', 7, null]) {
         const res = await post({ workflow, brief: 'Do it.' });
         assert.equal(res.status, 400, JSON.stringify(workflow));
-        const said = ((await res.json()) as { error: string }).error;
-        assert.ok(said.startsWith('POST /api/namespaces/<namespace>/runs names the workflow to start in `workflow`'), said);
-        for (const key of bodyKeys) assert.ok(said.includes(key), `${key}: ${said}`);
-        notNamed.add(said);
+        const said = await fieldOf(res);
+        assert.ok(said.startsWith('payload.workflow'), `${JSON.stringify(workflow)}: ${said}`);
       }
-      assert.equal(notNamed.size, 1, 'each wrong `workflow` is told the same');
-      const notPlaced = new Set<string>();
       for (const from of ['elsewhere', 7, null]) {
         const res = await post({ workflow: 'good', brief: 'Do it.', from });
         assert.equal(res.status, 400, JSON.stringify(from));
-        const said = ((await res.json()) as { error: string }).error;
-        assert.ok(said.startsWith('`from` is where the workflow is read from'), said);
-        for (const fact of ['"repo" or "yours"', "'good'"]) assert.ok(said.includes(fact), `${fact}: ${said}`);
-        notPlaced.add(said);
+        const said = await fieldOf(res);
+        assert.ok(said.startsWith('payload.from'), `${JSON.stringify(from)}: ${said}`);
       }
-      assert.equal(notPlaced.size, 1, 'each wrong `from` is told the same');
       assert.deepEqual(runFiles(), before);
       assert.deepEqual(filedTasks(), []);
     },
@@ -774,23 +770,25 @@ test('POST /api/namespaces/default/runs: what a start refuses, writing nothing, 
     },
   );
 
-  await t.test('`after` that is not a list of run ids is a 400, before the workflow is looked for — and nothing is written', async () => {
-    const before = runFiles();
-    for (const after of ['p-running', {}, null, 42, [1], [null], ['p-running', 7], [''], ['  ']]) {
-      const res = await post({ workflow: 'good', from: 'repo', brief: 'Do it.', after });
-      assert.equal(res.status, 400, JSON.stringify(after));
-      const { error } = (await res.json()) as { error: string };
-      assert.ok(error.startsWith('`after` is the runs this one waits on, by id') && error.includes('`nemia start --after <runId>`'), error);
-      assert.ok(error.includes(`This request's was ${JSON.stringify(after)}.`), error);
-    }
-    assert.equal(
-      (await post({ workflow: 'nope', brief: 'Do it.', after: 'p-running' })).status,
-      400,
-      'shaped before the folder is read: a workflow nobody has is not what it is told first',
-    );
-    assert.deepEqual(runFiles(), before);
-    assert.deepEqual(filedTasks(), []);
-  });
+  await t.test(
+    '`after` that is not a list of run ids is a 400 naming it, before the workflow is looked for — and nothing is written',
+    async () => {
+      const before = runFiles();
+      for (const after of ['p-running', {}, null, 42, [1], [null], ['p-running', 7], [''], ['  ']]) {
+        const res = await post({ workflow: 'good', from: 'repo', brief: 'Do it.', after });
+        assert.equal(res.status, 400, JSON.stringify(after));
+        const said = await fieldOf(res);
+        assert.ok(said.startsWith('payload.after'), `${JSON.stringify(after)}: ${said}`);
+      }
+      assert.equal(
+        (await post({ workflow: 'nope', brief: 'Do it.', after: 'p-running' })).status,
+        400,
+        'shaped before the folder is read: a workflow nobody has is not what it is told first',
+      );
+      assert.deepEqual(runFiles(), before);
+      assert.deepEqual(filedTasks(), []);
+    },
+  );
 
   await t.test(
     'a run `nemia start --after` will not wait on is a 422 naming it — no such run, a cancelled one, one given twice — and nothing is written',
@@ -815,18 +813,15 @@ test('POST /api/namespaces/default/runs: what a start refuses, writing nothing, 
   );
 
   await t.test(
-    '`context` with a blank run id is a 422 naming the key, and one the store does not have a 404 in `nemia start --from` words — and nothing is written',
+    '`context` with a blank run id is a 400 naming the key, and one the store does not have a 404 in `nemia start --from` words — and nothing is written',
     async () => {
       parents();
       const before = runFiles();
       for (const context of [[''], ['p-running', '  ']]) {
         const res = await post({ workflow: 'good', from: 'repo', brief: 'Read it.', context });
-        assert.equal(res.status, 422, JSON.stringify(context));
-        const { error } = (await res.json()) as { error: string };
-        assert.ok(
-          error.startsWith('`context` is the runs this one is handed as context') && error.includes('`nemia start --from <runId>`'),
-          error,
-        );
+        assert.equal(res.status, 400, JSON.stringify(context));
+        const said = await fieldOf(res);
+        assert.ok(said.startsWith('payload.context'), `${JSON.stringify(context)}: ${said}`);
       }
       const missing = await post({ workflow: 'good', from: 'repo', brief: 'Read it.', context: ['no-such-run'] });
       assert.equal(missing.status, 404);

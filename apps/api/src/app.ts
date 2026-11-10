@@ -24,7 +24,7 @@ import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Service
 import { nemia, nemiaChat } from './nemia/index.ts';
 import { bodyOf, MOUNT, mount, noRoute, refusedAs, statusOf } from './objects/index.ts';
 import { writeGuard } from './guard.ts';
-import { runs } from './runs/runs.ts';
+import { runs } from './runs/index.ts';
 import { openapi, REFERENCE_BUNDLE, referenceOf } from './openapi/index.ts';
 import { saidRequest } from './request/request.ts';
 import { stats } from './stats/stats.ts';
@@ -122,7 +122,7 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  * - inbox/inbox.ts — what a card filed through the Card's verb files, and the inbox listed with each card's body. The Card's verbs —
  *   listed, read alone with its file as written, written whole, filed, dropped, started, queued, labelled — are the objects'
  *   (objects/cards.ts).
- * - runs/runs.ts — the runs listed, one run in full, and what `nemia decide` shows of it.
+ * - runs/runs.ts — what `nemia decide` shows of a run; the runs themselves are the objects' (objects/runs.ts).
  * - stats/stats.ts — the flow numbers of every run in the store, as `nemia stats --json` prints them.
  * - `GET /api/ceilings` — the cap on runs in flight the daemon's last pass ran with, and the runs it counts and holds: what the Factory
  *   says over its floor. 422 for a `WF_MAX_RUNS` in the api's environment that is not a count, before any pass wrote the daemon's
@@ -153,9 +153,7 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  * - `GET /api/quota` — the subscription's quota, as the engine's `quota` answers it for the `claude` harness (Claude Code's get_usage
  *   request), asked at most once a keep however many boards read (`QuotaAsker`, gauges/quota.ts): what the Factory says over its floor.
  *   Every case is a 200 with a sentence, the harness's failures and the engine's refusals included.
- * - commands/routes.ts — the pipeline every command of the package's table is served through: the run's named actions, a try (with answers
- *   to its questions, commands/extend.ts and asks/answers.ts), a round, words for a running session, an approval and an acceptance, served
- *   in the run's namespace by the objects' handlers (objects/runs.ts); and the routes it generates: the store's pause put and lifted,
+ * - commands/routes.ts — the routes the package's table generates, each through one pipeline: the store's pause put and lifted,
  *   `nemia pause` and `nemia resume`'s routes; an agent's custom instructions
  *   written and cleared; and a factory's instruction put where it is kept, and written and cleared.
  * - steps/steps.ts — a step's own reads: its output, its files, and its conversation, once or followed.

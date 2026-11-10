@@ -410,12 +410,13 @@ async function commanded(command: Command | Ran, rest: string[], e: Engine, dema
 
 /**
  * The arguments `command`'s handler takes: the parsed `args` as they are, or decoded through its `input` where it says one, a key its
- * handler takes that the parse left out or gave another type refused, exit 2, before anything is read.
+ * handler takes that the parse left out or gave another type refused, exit 2, before anything is read. The decoded value is what the
+ * typed entry takes, its input erased as the table holds it (`tableEntry`).
  */
 function inputOf(command: Command, args: Args): Args {
   if (command.input === undefined) return args;
   const decoded = Schema.decodeUnknownExit(command.input)(args);
-  if (decoded._tag === 'Success') return decoded.value;
+  if (decoded._tag === 'Success') return decoded.value as Args;
   return usage(`nemia ${command.name} was given arguments its handler does not take: nemia ${command.name} ${command.usage}.`);
 }
 

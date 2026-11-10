@@ -40,8 +40,9 @@ const idsOf = (args: Args): readonly string[] => (Array.isArray(args.runId) ? ar
  */
 async function rmOne(e: Engine, place: Place, id: string, args: Args): Promise<{ kept: boolean; failed: boolean }> {
   try {
-    const data = await runWith(e, placedIn(place, RM.handler({ ...args, runId: id })));
-    for (const line of RM.print(data, args)) console.log(line);
+    const input = { runId: id, deleteBranches: args.deleteBranches === true, forceUnmerged: args.forceUnmerged === true };
+    const data = await runWith(e, placedIn(place, RM.handler(input)));
+    for (const line of RM.print(data, input)) console.log(line);
     return { kept: data.forgot.kind === 'refused' || data.forgot.kind === 'held', failed: false };
   } catch (err) {
     console.log(`${id}  not forgotten: ${(err as Error).message}`);

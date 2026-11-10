@@ -276,11 +276,21 @@ test('aborting a watch lets its feed reader go', async (t) => {
   await waitFor(t, () => followers() === before, 'followers() === before');
 });
 
-/** Every GET of a collection the `Api` serves, its params filled: a namespace `default`, a template the store builds in (`sdlc`). */
+/**
+ * Every GET of a collection the `Api` serves, its params filled: a namespace `default`, a template the store builds in (`sdlc`). Not a
+ * run's reads under its name (`lines`, `concluded`, `record`) nor `nemia ls`'s listing, which are no list of a kind.
+ */
 const collections = Object.values(Api.groups)
   .flatMap((group) => Object.values(group.endpoints))
-  .filter((e) => e.method === 'GET' && e.path !== '/api' && !/\/:[A-Za-z]+$/.test(e.path) && !e.path.includes('/runs/:runId/'))
-  .filter((e) => !/\/(rules|instruction|commands|card|files|sign-in|told)$/.test(e.path))
+  .filter(
+    (e) =>
+      e.method === 'GET' &&
+      e.path !== '/api' &&
+      !/\/:[A-Za-z]+$/.test(e.path) &&
+      !e.path.includes('/runs/:runId/') &&
+      !e.path.startsWith('/api/runs/:name/'),
+  )
+  .filter((e) => !/\/(rules|instruction|commands|card|files|sign-in|told|listing)$/.test(e.path))
   .map((e) => e.path.replace(':namespace', 'default').replace(':name', 'sdlc'));
 
 test('every list the Api serves answers ?watch=true with its objects ADDED, then a BOOKMARK of its kind', async (t) => {

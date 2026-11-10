@@ -17,10 +17,12 @@
  * table (`TABLE`) adds the commands the CLI serves alone and runs itself, with no handler: `nemia tick`, `nemia up` and `nemia watch`
  * (`RAN`).
  */
-import { Effect } from 'effect';
+import { Effect, Schema } from 'effect';
+import { RunRefresh, RunRetry, RunSay, type SaidAfter } from 'objects';
+import { checked } from './checked.verb.ts';
 import { APPROVE } from '../gate/commands.verb.ts';
 import { ROUTE } from '../gate/route.verb.ts';
-import { ANSWER_HELP, answerFlag, recheckAnswerRefusal, typedAnswers, typedOf } from '../question/asked.verb.ts';
+import { ANSWER_HELP, answerFlag, givenAnswers, recheckAnswerRefusal, typedAnswers, typedOf } from '../question/asked.verb.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { messageRefusal, modeWord, type RetryHow } from '../retry/index.ts';
 import { retryRun } from '../retry/retry.verb.ts';
@@ -30,6 +32,7 @@ import { roundRun } from '../round/round.verb.ts';
 import { saidLines } from '../say/say.ts';
 import { sayRun } from '../say/say.verb.ts';
 import { budgetRefusal, budgetWord } from '../status/status.ts';
+import { roundBudgetRefusal } from '../round/round.ts';
 import { decideRun, type Decided } from '../decide/decide.verb.ts';
 import { slotsRead, type Slots } from '../cap/slots-read.verb.ts';
 import { runsListed } from '../list/list.verb.ts';
@@ -39,8 +42,8 @@ import { pausedLines } from '../pause/pause.ts';
 import { agentCardRead, agentsRead } from '../roster/roster.store.ts';
 import { agentsLines, cardNote, type AgentsRead, type CardRead } from '../roster/roster.ts';
 import { AGENTS_SOURCES } from '../sources/sources.verb.ts';
-import { amountIn, commandLine, NAMED_ACTION, type Args, type CommandSpec, type Flag } from './command.ts';
-import type { Command, Ran } from './entry.verb.ts';
+import { amountIn, commandLine, renamedValues, type Args, type CommandSpec, type Flag } from './command.ts';
+import { type Command, type Ran, tableEntry } from './entry.verb.ts';
 import { READS, SERIES } from './reads.verb.ts';
 import { AGENTS_CUSTOM } from '../custom/custom.verb.ts';
 import { LIBRARY_ENTRIES } from '../agents/library.verb.ts';
@@ -76,17 +79,16 @@ import { driftWords, type Drift } from '../revisions/revisions.ts';
 /** The run's id and the step's name, as every route and command line names them. */
 const named = (args: Args): { runId: string; step: string } => ({ runId: textOf(args, 'runId') ?? '', step: textOf(args, 'step') ?? '' });
 
+/** What `nemia retry`'s how is read off: its parsed flags, or its typed input. */
+type HowGiven = { readonly mode?: unknown; readonly model?: unknown; readonly message?: unknown; readonly budget?: unknown };
+
 /** `nemia retry`'s how, off its arguments: its way, the model a fresh session runs on, the answer and the cap. */
-function howOf(args: Args): RetryHow {
-  const mode = textOf(args, 'mode');
-  const model = textOf(args, 'model');
-  const message = textOf(args, 'message');
-  const budget = amountIn(args, 'budget');
+function howOf({ mode, model, message, budget }: HowGiven): RetryHow {
   return {
     mode: mode === 'fresh' || mode === 'recheck' ? mode : 'continue',
-    ...(model !== undefined ? { model } : {}),
-    ...(message !== undefined ? { message } : {}),
-    ...(budget !== undefined ? { budget } : {}),
+    ...(typeof model === 'string' ? { model } : {}),
+    ...(typeof message === 'string' ? { message } : {}),
+    ...(typeof budget === 'number' ? { budget } : {}),
   };
 }
 
@@ -118,17 +120,61 @@ function stepRefusal(args: Args): string | null {
 }
 
 /**
- * `nemia retry`: another try of a step asked for, the next tick files it once, and the file the ask is written to; or, with `--round`,
- * another round of a loop out of rounds (what `nemia round` was, decision 7), its cap raised with `--budget`.
+ * What `nemia retry` takes: the run and the step (none for a run's only loop, with `round`), and the ask as the api is sent it
+ * (`objects`' `RunRetry`) — its way, a fresh session's model, the words, a raise of its cap, a person's `answers` by title and label, or
+ * `round` — with `answer`, the `--answer`s typed at the command line by number and letter.
  */
-const RETRY: Command<{
-  try?: number;
-  file: string;
-  stopFirst?: boolean;
-  step?: string;
-  round?: number;
-  budget?: number;
-}> = {
+export const RetryInput = Schema.Struct({
+  runId: Schema.String,
+  step: Schema.optionalKey(Schema.String),
+  ...RunRetry.fields,
+  answer: Schema.optionalKey(Schema.Array(Schema.String)),
+});
+export type RetryInput = typeof RetryInput.Type;
+
+/** The refusal of `nemia retry`'s arguments, before anything is read (`RETRY.check`). */
+const retryRefusal = (args: Args): string | null =>
+  args.round === true
+    ? roundRefusal(args)
+    : (stepRefusal(args) ??
+      messageRefusal(howOf(args), commandLine(RETRY, args)) ??
+      recheckAnswerRefusal(args, commandLine(RETRY, args)) ??
+      budgetRefusal(howOf(args), commandLine(RETRY, args)));
+
+/**
+ * What a typed ask carries that the command line cannot say, refused before anything is read: a blank `model`, which `--model` refuses as
+ * no name, a `model` beside a way that is not fresh (`--model` sets it), and a person's `answers` on a recheck, which files no session to
+ * read them.
+ */
+function askRefusal({ mode, model, answers }: RetryInput): string | null {
+  const how = howOf({ mode });
+  if (model !== undefined && !model.trim())
+    return '`model` is blank, and names no model to run the new session on. Name one, as `nemia retry --model <m>` does — "model": "<m>" — or leave it out for the model the step runs on.';
+  if (model !== undefined && how.mode !== 'fresh')
+    return `\`model\` names the model a new session runs on, as \`nemia retry --model <m>\` does, so it goes with "mode": "fresh" — "continue" continues a session on the model it has, and a recheck files no session. This ask said "${how.mode}".`;
+  if (answers !== undefined && how.mode === 'recheck')
+    return '`answers` are carried into the step\'s next try, as `nemia retry --message` carries an answer, and a recheck files no session to read them. Send them with "mode": "continue" or "fresh".';
+  return null;
+}
+
+/**
+ * `nemia retry`: another try of a step asked for, the next tick files it once, and the file the ask is written to; or, with `--round`,
+ * another round of a loop out of rounds (what `nemia round` was, decision 7), its cap raised with `--budget`. A person's `answers` are
+ * checked against the questions the step's current closeout asks and written as the try's message (`givenAnswers`), as `--answer`s are
+ * (`typedAnswers`); a former spelling of the way is taken as the one it now is, and `hint` names the one to send.
+ */
+export const RETRY: Command<
+  {
+    try?: number;
+    file: string;
+    stopFirst?: boolean;
+    step?: string;
+    round?: number;
+    budget?: number;
+    hint?: string;
+  },
+  RetryInput
+> = {
   name: 'retry',
   usage:
     '<runId> [<step>] [--continue | --fresh | --model <m> | --recheck | --round] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]',
@@ -189,51 +235,76 @@ const RETRY: Command<{
     apart: (flag) =>
       `--message takes what to tell the step, and ${flag} is one of nemia retry's own flags, so the answer was left out: nemia retry <runId> <step> --message "<answer>". If ${flag} is the whole answer, give it as --message=${flag}.`,
   },
-  check: (args) =>
-    args.round === true
-      ? roundRefusal(args)
-      : (stepRefusal(args) ??
-        messageRefusal(howOf(args), commandLine(RETRY, args)) ??
-        recheckAnswerRefusal(args, commandLine(RETRY, args)) ??
-        budgetRefusal(howOf(args), commandLine(RETRY, args))),
+  check: retryRefusal,
   writes: true,
   ticks: true,
   class: 'answer',
-  route: { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/steps/:step/retry', status: 202, hand: NAMED_ACTION },
-  apiTakes: ['answers'],
-  apiKeys: ['try', 'file', 'stopFirst', 'step', 'round'],
-  handler: Effect.fnUntraced(function* (args: Args, _env, home) {
-    const { runId, step } = named(args);
-    if (args.round === true) {
-      const { ask, file } = yield* roundRun(runId, textOf(args, 'step'), amountIn(args, 'budget'));
-      return { step: ask.step, round: ask.round, file, ...(ask.budget !== undefined ? { budget: ask.budget } : {}) };
+  only: { side: 'cli', why: "the api serves it as the Run's `retry` of `objects`' Api, calling this handler" },
+  input: RetryInput,
+  handler: Effect.fnUntraced(function* (input: RetryInput, _env, home) {
+    const { answers, ...flags } = input;
+    yield* checked(retryRefusal(flags) ?? askRefusal(input));
+    const { runId, step } = input;
+    const { hint } = renamedValues('retry', input);
+    const hinted = hint === undefined ? {} : { hint };
+    if (input.round === true) {
+      yield* checked(roundBudgetRefusal(runId, input.budget));
+      const { ask, file } = yield* roundRun(runId, step, input.budget);
+      return { step: ask.step, round: ask.round, file, ...(ask.budget !== undefined ? { budget: ask.budget } : {}), ...hinted };
     }
-    const how = howOf(args);
-    const typed = typedOf(args);
-    const message = typed.length ? { message: yield* typedAnswers(runId, step, typed, { note: how.message }) } : {};
-    const { ask, file, stopFirst } = yield* retryRun(runId, step, { ...how, ...message }, { stopBlocked: true }).pipe(
+    const at = step ?? '';
+    const how = howOf(input);
+    const typed = input.answer ?? [];
+    const message =
+      answers !== undefined
+        ? { message: yield* givenAnswers(runId, at, answers, { note: how.message, home }) }
+        : typed.length
+          ? { message: yield* typedAnswers(runId, at, typed, { note: how.message }) }
+          : {};
+    const { ask, file, stopFirst } = yield* retryRun(runId, at, { ...how, ...message }, { stopBlocked: true }).pipe(
       Effect.provideService(StoreRoot, rootGiven(home, 'retry')),
     );
-    return { try: ask.try, file, stopFirst };
+    return { try: ask.try, file, stopFirst, ...hinted };
   }),
-  print({ try: tryNo, file, stopFirst, step: looping, round: n, budget }, args) {
-    const { runId, step } = named(args);
-    if (args.round === true)
+  print({ try: tryNo, file, stopFirst, step: looping, round: n, budget }, input) {
+    const { runId, step } = input;
+    if (input.round === true)
       return [
         `${runId}  asked: round ${n} of ${looping}'s loop${budget !== undefined ? `, its cap raised to ${budgetWord(budget)}` : ''} — the next tick files it, once`,
         `   ${file}`,
       ];
-    const ask = howOf(args);
+    const ask = howOf(input);
     const how = `${modeWord(ask)}${ask.budget !== undefined ? `, --budget ${ask.budget}` : ''}`;
     const then = stopFirst
       ? 'its harness blocked its session: the next tick stops it, and files the try once it has stopped'
       : 'the next tick files it, once';
+    const answered = input.answer?.length || input.answers?.length;
     return [
-      `${runId}  asked: try ${tryNo} of ${step} (${how})${typedOf(args).length ? ', with your answers' : ask.message !== undefined ? ', with your answer' : ''} — ${then}`,
+      `${runId}  asked: try ${tryNo} of ${step ?? ''} (${how})${answered ? ', with your answers' : ask.message !== undefined ? ', with your answer' : ''} — ${then}`,
       `   ${file}`,
     ];
   },
 };
+
+/** What `nemia refresh` takes: the run, and the ask as the api is sent it (`objects`' `RunRefresh`): `base`, and its looping step. */
+export const RefreshInput = Schema.Struct({ runId: Schema.String, ...RunRefresh.fields });
+export type RefreshInput = typeof RefreshInput.Type;
+
+/** The refusal of a step named without `--base`, which alone takes one. */
+function refreshRefusal({
+  runId,
+  step,
+  base,
+}: {
+  readonly runId?: unknown;
+  readonly step?: unknown;
+  readonly base?: unknown;
+}): string | null {
+  const id = typeof runId === 'string' ? runId : '<runId>';
+  return base !== true && typeof step === 'string'
+    ? `nemia refresh takes a step only with --base, which merges the base into the work of the loop it closes: nemia refresh ${id} ${step} --base. The new revisions are the whole run's: nemia refresh ${id}.`
+    : null;
+}
 
 /**
  * `nemia refresh`: a run asked to take the new revisions of the kinds it resolved, and the drift it was asked on; or, with `--base`, a
@@ -242,16 +313,19 @@ const RETRY: Command<{
  * It takes, it does not reload: the next pass re-pins the run and renders its steps' agent files again, so every filing after it — a new
  * step, a retry, a round — is filed on the revisions the world holds now. Nothing already filed is re-run.
  */
-const REFRESH: Command<{
-  drift?: readonly Drift[];
-  step?: string;
-  target?: string;
-  onto?: string;
-  sha?: string;
-  round?: number;
-  file?: string;
-  said?: string;
-}> = {
+export const REFRESH: Command<
+  {
+    drift?: readonly Drift[];
+    step?: string;
+    target?: string;
+    onto?: string;
+    sha?: string;
+    round?: number;
+    file?: string;
+    said?: string;
+  },
+  RefreshInput
+> = {
   name: 'refresh',
   usage: '<runId> [<step>] [--base]',
   help: [
@@ -276,46 +350,51 @@ const REFRESH: Command<{
       `nemia refresh takes one run's id, and with --base the step that closes the loop whose work merges: not ${arg}. nemia refresh <runId>, or nemia refresh <runId> [<step>] --base.`,
     missing: 'nemia refresh takes the run to pin to the new revisions: nemia refresh <runId>.',
   },
-  check: (args) =>
-    args.base !== true && textOf(args, 'step') !== undefined
-      ? `nemia refresh takes a step only with --base, which merges the base into the work of the loop it closes: nemia refresh ${textOf(args, 'runId') ?? '<runId>'} ${textOf(args, 'step')} --base. The new revisions are the whole run's: nemia refresh ${textOf(args, 'runId') ?? '<runId>'}.`
-      : null,
+  check: (args) => refreshRefusal(args),
   writes: true,
   ticks: true,
   class: 'act',
-  route: { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/refresh', status: 202, hand: NAMED_ACTION },
-  apiKeys: ['drift', 'step', 'target', 'onto', 'sha', 'round', 'file'],
-  handler: Effect.fnUntraced(function* (args: Args, _env?: NodeJS.ProcessEnv, home?: string) {
-    const { runId } = named(args);
-    if (args.base !== true) return { drift: yield* rooted(home, 'refresh', refreshRun(runId)) };
-    const { run, ask, file } = yield* mergeRun(runId, textOf(args, 'step'));
+  only: { side: 'cli', why: "the api serves it as the Run's `refresh` of `objects`' Api, calling this handler" },
+  input: RefreshInput,
+  handler: Effect.fnUntraced(function* (input: RefreshInput, _env?: NodeJS.ProcessEnv, home?: string) {
+    yield* checked(refreshRefusal(input));
+    const { runId } = input;
+    if (input.base !== true) return { drift: yield* rooted(home, 'refresh', refreshRun(runId)) };
+    const { run, ask, file } = yield* mergeRun(runId, input.step);
     const looping = (yield* stepsOf(run)).find((s) => s.name === ask.step);
     if (looping === undefined)
       throw new Error(`run ${run.id} has no step ${ask.step}, which its merge asks: report it as a defect of nemia refresh --base`);
     const { target, onto, sha } = ask.merge;
     return { step: ask.step, target, onto, sha, round: ask.round, file, said: mergeAskedLine(ask, looping) };
   }),
-  print: ({ drift, said, file }, args) =>
-    args.base === true
-      ? [`${named(args).runId}  ${said ?? ''}`, `   ${file ?? ''}`]
+  print: ({ drift, said, file }, { runId, base }) =>
+    base === true
+      ? [`${runId}  ${said ?? ''}`, `   ${file ?? ''}`]
       : [
-          `${named(args).runId}  asked: the new revisions — the next tick takes them, and every filing after it is on them`,
+          `${runId}  asked: the new revisions — the next tick takes them, and every filing after it is on them`,
           ...(drift ?? []).map((d) => `   ${driftWords(d)}`),
         ],
 };
+
+/** What `nemia say` takes: the run, the step, and the words as the api is sent them (`objects`' `RunSay`). */
+export const SayInput = Schema.Struct({ runId: Schema.String, step: Schema.String, ...RunSay.fields });
+export type SayInput = typeof SayInput.Type;
 
 /**
  * `nemia say`: words to a step's session, journalled on its task, and printed as `nemia decide` prints them. It takes every word after the
  * step as one message, so an unquoted sentence is one; empty words are the engine's to refuse.
  */
-const SAY: Command<{
-  at: string;
-  attempt: number;
-  text: string;
-  after: { kind: string; id: string } | null;
-  try: number;
-  taskId: string;
-}> = {
+export const SAY: Command<
+  {
+    at: string;
+    attempt: number;
+    text: string;
+    after: { kind: SaidAfter; id: string } | null;
+    try: number;
+    taskId: string;
+  },
+  SayInput
+> = {
   name: 'say',
   usage: '<runId> <step> "<words>"',
   help: [
@@ -331,16 +410,14 @@ const SAY: Command<{
   },
   writes: true,
   class: 'act',
-  route: { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/steps/:step/say', status: 202, hand: NAMED_ACTION },
-  apiKeys: ['at', 'attempt', 'text', 'after'],
-  handler: Effect.fnUntraced(function* (args: Args) {
-    const { runId, step } = named(args);
-    const told = yield* sayRun(runId, step, textOf(args, 'text') ?? '');
+  only: { side: 'cli', why: "the api serves it as the Run's `say` of `objects`' Api, calling this handler" },
+  input: SayInput,
+  handler: Effect.fnUntraced(function* ({ runId, step, text: words }: SayInput) {
+    const told = yield* sayRun(runId, step, words);
     const { at, attempt, text, after } = told.said;
     return { at, attempt, text, after: after ?? null, try: told.try, taskId: told.taskId };
   }),
-  print({ at, attempt, text, try: tryNo, taskId }, args) {
-    const { runId, step } = named(args);
+  print({ at, attempt, text, try: tryNo, taskId }, { runId, step }) {
     return [
       `${runId}  said to ${step}, try ${tryNo}${attempt > 1 ? `, attempt ${attempt}` : ''}, at ${at} — journalled on ${taskId}: nemia decide ${runId} prints it under the step`,
       ...saidLines([{ at, attempt, text, try: tryNo }])
@@ -356,7 +433,7 @@ const SAY: Command<{
  * (`runList`), judged off the same judgement of each (`informedJudgements`), at `GET /api/runs`. The api serves this answer
  * whole on `GET /api/listing` and `GET /api/listing/:runId`, which `nemia` reads and prints with this entry's lines, as a client of it.
  */
-const LS: Command<RunsListed> = {
+export const LS: Command<RunsListed> = {
   name: 'ls',
   usage: '[<runId>] [-l <selector>] [--show-labels] [-L <key>]',
   help: [
@@ -530,11 +607,11 @@ export const COMMANDS: readonly Command[] = [
   ...LABELS,
   ...FACTORIES,
   ...TEMPLATES,
-  RETRY,
-  APPROVE,
+  tableEntry(RETRY),
+  tableEntry(APPROVE),
   ROUTE,
-  REFRESH,
-  SAY,
+  tableEntry(REFRESH),
+  tableEntry(SAY),
   LS,
   ...READS,
   ...PAGES,

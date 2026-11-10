@@ -2,7 +2,7 @@
 import { Hono } from 'hono';
 import { STATS, statsQueryOf, type QueryKey, type Stats } from 'agent-orchestrator';
 import { type ApiEnv, served } from '../layer.ts';
-import { selectorOf } from '../labels/index.ts';
+import { selectorOf } from '../labels/selector.ts';
 import { runPlaced } from '../store.ts';
 
 export type { Stats };

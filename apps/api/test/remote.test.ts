@@ -23,7 +23,7 @@ const app = eachTest(() => appOver(standIn(), stand()));
 
 type TaskView = import('agent-orchestrator').TaskView;
 type Run = import('agent-orchestrator/run').Run;
-type RunAnswer = import('../src/runs/runs.ts').RunAnswer;
+type RunAnswer = import('objects').Run;
 
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });

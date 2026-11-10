@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { RunDecision } from '../src/decide/decision.ts';
-import type { RunAnswer } from '../src/runs/runs.ts';
+import type { Run as RunAnswer } from 'objects';
 import { app } from '../src/app.ts';
 import { decideRun, engine, hold, holdAdvice, holdWord, list, passStanding, runStore, type RunHolding, unhold } from 'agent-orchestrator';
 import { runWith } from './builtin-place.ts';
@@ -757,24 +757,19 @@ test('POST /api/namespaces/:namespace/runs/:runId/hold refuses, writing nothing:
     },
   );
   await t.test(
-    'REFUSED at shipped defaults: a hold whose body says `off`, or a key `nemia hold` does not take, is a 400 naming each and pointing `off` at the lift, and nothing is written',
+    'REFUSED at shipped defaults: a hold whose body `RunHold` does not read is a 400 naming the key — `until` not a list, `why` not text — and nothing is written; a key it does not hold, `off` among them, is no part of it (run-actions.test.ts)',
     async () => {
-      const cases: Array<[unknown, RegExp]> = [
-        [
-          { until: ['p-live'], off: true },
-          /does not take `off`: .* A hold is lifted with `DELETE \/api\/namespaces\/default\/runs\/h-put\/hold`/,
-        ],
-        [{ until: ['p-live'], off: false, step: 'review' }, /does not take `off`, `step`: /],
-        [{ until: 'p-live' }, /takes `until` as a list of run ids/],
-        [{ until: ['p-live'], why: 3 }, /takes `why` as text/],
+      const cases: Array<[unknown, string]> = [
+        [{ until: 'p-live' }, 'payload.until'],
+        [{ until: ['p-live'], why: 3 }, 'payload.why'],
       ];
-      for (const [body, words] of cases) {
+      for (const [body, field] of cases) {
         const before = filesOf(PUT);
         const res = await put(PUT, body);
         assert.equal(res.status, 400, JSON.stringify(body));
-        const { error } = (await res.json()) as { error: string };
-        assert.match(error, words);
-        assert.match(error, /^POST \/api\/namespaces\/default\/runs\/h-put\/hold /);
+        const said = (await res.json()) as { error: string; field: string };
+        assert.ok(said.field.startsWith(field), `${field}: ${JSON.stringify(said)}`);
+        assert.match(said.error, /^POST \/api\/namespaces\/default\/runs\/h-put\/hold /);
         assert.deepEqual(filesOf(PUT), before, JSON.stringify(body));
       }
     },

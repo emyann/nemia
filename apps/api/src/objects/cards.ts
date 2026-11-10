@@ -26,7 +26,7 @@ import { Api, DEFAULT_NAMESPACE, type LabelEdit } from 'objects';
 import { filingOf } from '../inbox/inbox.ts';
 import type { Served } from '../layer.ts';
 import { commandNamed, runPlaced } from '../store.ts';
-import { cardStart } from '../workflows/workflows.ts';
+import { cardStart } from '../runs/index.ts';
 import { answered, locatedAt, orFailed, readerRefused } from './refused.ts';
 
 /** The entries the verbs write through. */

@@ -12,7 +12,7 @@ import { HOME } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { judgedSteps, workflowsOf } from '../summary/reads.verb.ts';
 import { closeoutOf } from '../views/views.verb.ts';
-import { answerRefusal, answerText, approvedAnswerText, askedQuestions, numberedAnswers } from './index.ts';
+import { answerRefusal, answerText, approvedAnswerText, askedQuestions, numberedAnswers, type Answer } from './index.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 
@@ -55,6 +55,25 @@ export const typedAnswers = Effect.fn('typedAnswers')(function* (
   return approval
     ? approvedAnswerText(step, questions, answers, note, AT_THE_TERMINAL)
     : answerText(questions, answers, note, AT_THE_TERMINAL);
+});
+
+/**
+ * The words `answers`, a person's answers to the questions `step` of run `runId` asks now as the board sends them (by title and label),
+ * become, `note` their note: the try's message (`answerText`), or with `approval` the approval's words (`approvedAnswerText`). Fails
+ * `Invalid` where they do not fit the questions the step's current closeout asks (`answerRefusal`) — a step that asks none now among them,
+ * as one whose closeout moved on since the page was read. The step is read from its workflow folder under `home` where the run froze none.
+ */
+export const givenAnswers = Effect.fn('givenAnswers')(function* (
+  runId: string,
+  step: string,
+  answers: readonly Answer[],
+  { note, approval = false, home }: { note?: string | undefined; approval?: boolean; home?: string | undefined } = {},
+) {
+  const run = yield* (yield* RunDoor).runs.read(RunId.read(runId));
+  const questions = (yield* askedNow(run, step, home)).flatMap((a) => a.questions);
+  const wrong = answerRefusal(questions, answers);
+  if (wrong !== null) return yield* Effect.fail(new Invalid({ message: wrong }));
+  return approval ? approvedAnswerText(step, questions, answers, note) : answerText(questions, answers, note);
 });
 
 /** What `nemia retry`'s and `nemia approve`'s help say of `--answer`. */

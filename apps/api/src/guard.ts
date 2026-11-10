@@ -103,8 +103,8 @@ export type Refusal = { status: 400 | 403 | 404 | 409 | 415 | 422; error: string
 
 /**
  * A write as the guard's refusals once worded it, route by route. No longer read: the guard is `writeGuard`'s, with no words of a route's.
- * Kept only for the words the run's start and the builder still spell (workflows/workflows.ts `startGuarded`, workflows/builder.ts
- * `buildGuard`) and the label edit's (labels/words.ts), each removed by the part that moves its route onto the `Api`.
+ * Kept only for the words the builder still spells (workflows/builder.ts `buildGuard`), removed by the part that moves its route onto the
+ * `Api`.
  */
 export type Guarded = {
   route: string;

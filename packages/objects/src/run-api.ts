@@ -1,11 +1,14 @@
 /**
- * The Run's group of the `Api` (`RunsGroup`): the run object, listed across namespaces and in one, read in its namespace and across all by
- * its id, its four sub-resources, and its named actions in its namespace alone. Served by the api's runs handlers
- * (`apps/api/src/objects/runs.ts`).
+ * The Run's group of the `Api` (`RunsGroup`): the run object, listed across namespaces and in one — as a `RunList`, or as a `Table` asked
+ * for — read in its namespace and across all by its name, what is read beside it (its lines, what it concludes, its record, `nemia ls`'s
+ * listing), its four sub-resources, and its named actions in its namespace alone, each body a Schema that decodes. Served by the api's
+ * runs handlers (`apps/api/src/objects/runs.ts`).
  */
 import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';
 import { BadRequest, Conflict, Invalid, listQuery, Missing, Unjudged, WriteFailed } from './api-errors.ts';
+import { Table } from './table.ts';
+import { Concluded, RunLines, RunRecord, RunsListed } from './run-reads.ts';
 import { LabelEdit, Labelled } from './labels.ts';
 import { Run, RunList, StepTries, StepTry, TryCloseout } from './run.ts';
 import { StepTold } from './run-told.ts';
@@ -33,6 +36,18 @@ import {
  * wrong one is refused in the package's words, a 422. A list asked by it carries the frame's parts (`RunStatus`, `RunListMeta`).
  */
 const runListQuery = { ...listQuery, fieldSelector: Schema.optionalKey(Schema.String) };
+
+/** What a list of runs answers: the `RunList`, or, asked with `TABLE_ACCEPT`, the `Table` of its page (never on a watch). */
+const runListed = Schema.Union([RunList, Table]);
+
+/** A run, by its name. */
+const nameParams = { name: Schema.String };
+
+/**
+ * The label selectors of `nemia ls`'s listing, one each time it is given, as `-l` is (OR): a list's two spellings of them, the retired one
+ * among them, which `nemia ls` sends; the listing is one answer, with no page and no watch.
+ */
+const { limit: _limit, continue: _continue, watch: _watch, ...listingQuery } = listQuery;
 
 /** A namespace, for a list in it. */
 const namespaceParams = { namespace: Schema.String };
@@ -62,17 +77,18 @@ const runStepParams = { ...runParams, step: Schema.String };
 const takenLater = <S extends Schema.Top>(answer: S) => answer.pipe(Schema.annotate({ httpApiStatus: 202 }));
 
 /**
- * The run object, listed across namespaces (`/api/runs`) and in one, read in one and across all by its id (`/api/runs/:runId`), and its
- * sub-resources; and its named actions, each in its namespace alone: started, removed, refreshed, pruned, its labels edited, held and its
- * hold lifted, and a step of it tried again, approved and said words to. A run's namespace is its factory, `default` for one that names
- * none: a run addressed under another is `Missing`.
+ * The run object, listed across namespaces (`/api/runs`) and in one, read in one and across all by its name (`/api/runs/:name`), what is
+ * read beside it, and its sub-resources; and its named actions, each in its namespace alone: started, removed — a try alone, a run started
+ * from an agent's page, any other being `nemia rm`'s — refreshed, pruned, its labels edited, held and its hold lifted, and a step of it
+ * tried again, approved and said words to. A run's namespace is its factory, `default` for one that names none: a run addressed under
+ * another is `Missing`. A start is placed on the repository `?repo=` names, else the api's own.
  */
 export class RunsGroup extends HttpApiGroup.make('runs').add(
-  HttpApiEndpoint.get('listAll', '/api/runs', { query: runListQuery, success: RunList, error: runReadErrors }),
+  HttpApiEndpoint.get('listAll', '/api/runs', { query: runListQuery, success: runListed, error: runReadErrors }),
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/runs', {
     params: namespaceParams,
     query: runListQuery,
-    success: RunList,
+    success: runListed,
     error: runReadErrors,
   }),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/runs/:name', { params: runParams, success: Run, error: runReadErrors }),
@@ -135,7 +151,21 @@ export class RunsGroup extends HttpApiGroup.make('runs').add(
     success: takenLater(RunSaid),
     error: runActionErrors,
   }),
-  HttpApiEndpoint.get('show', '/api/runs/:runId', { params: { runId: Schema.String }, success: Run, error: runReadErrors }),
+  HttpApiEndpoint.get('show', '/api/runs/:name', { params: nameParams, success: Run, error: runReadErrors }),
+  HttpApiEndpoint.get('lines', '/api/runs/:name/lines', { params: nameParams, success: RunLines, error: [Missing] }),
+  HttpApiEndpoint.get('concluded', '/api/runs/:name/concluded', {
+    params: nameParams,
+    success: Concluded,
+    error: [Missing, Invalid],
+  }),
+  HttpApiEndpoint.get('record', '/api/runs/:name/record', { params: nameParams, success: RunRecord, error: [Missing, Invalid] }),
+  HttpApiEndpoint.get('listing', '/api/listing', { query: listingQuery, success: RunsListed, error: [Missing, Invalid] }),
+  HttpApiEndpoint.get('listingOne', '/api/listing/:name', {
+    params: nameParams,
+    query: listingQuery,
+    success: RunsListed,
+    error: [Missing, Invalid],
+  }),
   HttpApiEndpoint.get('tries', '/api/runs/:runId/steps/:step/tries', {
     params: stepParams,
     success: StepTries,

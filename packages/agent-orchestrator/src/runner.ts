@@ -242,7 +242,7 @@ export {
   selectsLabels,
 } from './watch/selector.ts';
 export { labelsText, metadataLabels, type Labels } from './labels/labels.ts';
-export { LABEL_CARD, LABEL_RUN } from './labels/commands.verb.ts';
+export { LABEL_CARD, LABEL_RUN, LabelRunInput } from './labels/commands.verb.ts';
 export type { Clause, Selectors } from './watch/selector.ts';
 export type { Watched } from './subscription/index.ts';
 export {
@@ -452,12 +452,13 @@ export { retryRun, type Asked } from './retry/retry.verb.ts';
 export { sayRun, type Told } from './say/say.verb.ts';
 export { COMMANDS, TABLE } from './command/commands.verb.ts';
 export { admitted } from './admission/admit.verb.ts';
-export { PRUNE, RM } from './command/runs.verb.ts';
-export { CLOSEOUT, LOGS, STATS, TOLD, TRIES, TRY } from './command/reads.verb.ts';
+export { HOLD, HoldInput, PRUNE, PruneInput, RM, RmInput } from './command/runs.verb.ts';
+export { CLOSEOUT, LOGS, SHOW, STATS, TOLD, TRIES, TRY } from './command/reads.verb.ts';
 export { runObject, type RunObjectAnswer, type TryCloseout } from './object/run.verb.ts';
 export { runLines, type RunLines, type StepCommands } from './object/lines.verb.ts';
 export { cardList, cardObject, cardWriteRefusal, replaceCard, type CardQuery, type CardReplaced } from './object/card.verb.ts';
 export { runIn, runList, runNamespace, type RunQuery } from './run-list/run-list.verb.ts';
+export { RUN_COLUMNS, runCells, runTable } from './run-list/table.ts';
 export { continueToken, continuedAfter, listPage, pageOf, type PageAsked, type Paged } from './object/page.ts';
 export { watchChanges, type Versioned } from './list-watch/list-watch.ts';
 export { measuredToNow, runWatchVersion } from './runlist/runlist.ts';
@@ -470,7 +471,7 @@ export { volumeList, volumeObject } from './factory/object/volume.verb.ts';
 export { eventKept, eventList, eventObject, type EventQuery } from './event-object/event.verb.ts';
 export { subscriptionList, subscriptionObject } from './subscription-object/subscription.verb.ts';
 export { templateList, templateObject, templateTree, TemplateRenders, type TemplateTreeRendered } from './template/object/template.verb.ts';
-export { folderRefusal, START } from './start/commands.verb.ts';
+export { CONCLUDED, folderRefusal, START, StartInput } from './start/commands.verb.ts';
 export { INBOX, INBOX_ADD, INBOX_QUEUE } from './inbox/commands.verb.ts';
 export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction, type FactoryInstruction } from './factory/instruction.verb.ts';
 export { FACTORY_RULES, factoryRules, type FactoryRules } from './factory/rules/rules.verb.ts';
@@ -488,6 +489,8 @@ export type { Command, InputOf, Ran } from './command/entry.verb.ts';
  * The table's entries the api calls by type, each with its `input` (`Command<D, I>`): `factory hire` and `factory fire`, the Hire's writes.
  */
 export { FACTORY_FIRE, FACTORY_HIRE } from './factory/factory.verb.ts';
+export { LS, REFRESH, RefreshInput, RETRY, RetryInput, SAY, SayInput } from './command/commands.verb.ts';
+export { APPROVE, ApproveInput } from './gate/commands.verb.ts';
 export { CLI, CLI_VERBS, commandBreaks, commandLine, generated, helpOf, leftOut, parseArgv, routeList } from './command/command.ts';
 export { renamedIn, renamedValues } from './command/command.ts';
 export type { Args, CommandSpec, Flag, Positional, Route, Spec } from './command/command.ts';

@@ -40,9 +40,10 @@ export type KeptRecords = {
  * What an entry's handler takes: where it is the CLI's parsed `Args` themselves, an entry may say nothing of it (`input` left out); where
  * it is a shape of its own (`I`), the entry carries `input`, the effect Schema of exactly the keys its handler takes, which the CLI decodes
  * its parsed `Args` through before it calls the handler, and the api calls the handler with the keys typed: a key renamed or reshaped is a
- * type error at the api's call, never a request that fails.
+ * type error at the api's call, never a request that fails. An entry read as the table's (`Command` with `Args`) may carry any `input`, so
+ * a typed entry joins the table as it is.
  */
-export type InputOf<I> = [Args] extends [I] ? { readonly input?: Schema.Decoder<I> } : { readonly input: Schema.Decoder<I> };
+export type InputOf<I> = [Args] extends [I] ? { readonly input?: Schema.Decoder<unknown> } : { readonly input: Schema.Decoder<I> };
 
 /**
  * A command whole: its spec, `input`, the keys its handler takes where they are its own (`InputOf`), `handler`, which is the Effect of
@@ -69,3 +70,10 @@ export type Command<D extends object = Readonly<Record<string, unknown>>, I = Ar
  * `Command` too, where the CLI's form spans more than the one call its handler makes: many runs, a person's yes.
  */
 export type Ran = CommandSpec & { readonly only: { readonly side: 'cli'; readonly why: string }; readonly handler?: undefined };
+
+/**
+ * A typed entry (`Command<D, I>`) as the table holds it, beside the entries that take the CLI's `Args`: its input erased, as the table's
+ * callers never hand it what it does not take — the CLI decodes its parsed `Args` through the entry's `input` first (`inputOf`), and the
+ * api calls the typed entry itself, by its exported name.
+ */
+export const tableEntry = <D extends object, I>(command: Command<D, I>): Command => command as unknown as Command;

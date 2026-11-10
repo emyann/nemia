@@ -15,17 +15,23 @@ const endpoints = Object.values(Api.groups).flatMap((group) =>
 /** The object Schema `name` exports, as a struct of fields. */
 const schemaOf = (name: string) => (objects as unknown as Record<string, { fields?: Record<string, { literal?: unknown }> }>)[name];
 
-/** The literal the `kind` key of a struct's AST says, read off the AST since an annotated struct keeps no `fields`. */
-type StructAst = { propertySignatures?: ReadonlyArray<{ name: PropertyKey; type: { literal?: unknown } }> };
-const kindOf = (schema: { ast: unknown }): unknown =>
-  (schema.ast as StructAst).propertySignatures?.find((p) => p.name === 'kind')?.type.literal;
+/**
+ * The literals the `kind` key of a struct's AST says, read off the AST since an annotated struct keeps no `fields`: one for a struct, one
+ * for each member of a union — a list's `<Kind>List`, or its `Table` where one is asked.
+ */
+type StructAst = {
+  propertySignatures?: ReadonlyArray<{ name: PropertyKey; type: { literal?: unknown } }>;
+  types?: readonly StructAst[];
+};
+const kindsOf = (ast: StructAst): unknown[] =>
+  ast.types ? ast.types.flatMap(kindsOf) : [ast.propertySignatures?.find((p) => p.name === 'kind')?.type.literal];
 
 /** Each endpoint of the Api, by its method, its path and the kinds its answers say. */
 const answers = Object.values(Api.groups).flatMap((group) =>
   Object.values(group.endpoints).map((endpoint) => ({
     method: endpoint.method,
     path: endpoint.path,
-    kinds: [...endpoint.success].map(kindOf),
+    kinds: [...endpoint.success].flatMap((schema) => kindsOf(schema.ast as StructAst)),
   })),
 );
 
@@ -106,11 +112,16 @@ test('a Card is read across namespaces by its name, and written whole by PUT in 
   assert.ok(endpoints.some((e) => e.method === 'PUT' && e.path === '/api/namespaces/:namespace/cards/:name'));
 });
 
-test('the Run is listed across namespaces and in one, read in one and across all by its id, and its named actions are served in its namespace', () => {
+test('the Run is listed across namespaces and in one, read in one and across all by its name with its reads beside it, and its named actions are served in its namespace', () => {
   for (const [method, path] of [
     ['GET', '/api/runs'],
     ['GET', '/api/namespaces/:namespace/runs'],
-    ['GET', '/api/runs/:runId'],
+    ['GET', '/api/runs/:name'],
+    ['GET', '/api/runs/:name/lines'],
+    ['GET', '/api/runs/:name/concluded'],
+    ['GET', '/api/runs/:name/record'],
+    ['GET', '/api/listing'],
+    ['GET', '/api/listing/:name'],
     ['POST', '/api/namespaces/:namespace/runs'],
     ['DELETE', '/api/namespaces/:namespace/runs/:name'],
     ['POST', '/api/namespaces/:namespace/runs/:name/refresh'],
@@ -127,6 +138,10 @@ test('the Run is listed across namespaces and in one, read in one and across all
       `${method} ${path} is an endpoint of the Api`,
     );
   assert.ok(answers.some((e) => e.method === 'GET' && e.path === '/api/runs' && e.kinds.includes('RunList')));
+  assert.ok(
+    answers.some((e) => e.method === 'GET' && e.path === '/api/runs' && e.kinds.includes('Table')),
+    'or its Table',
+  );
   assert.ok(
     !endpoints.some((e) => e.method !== 'GET' && e.path.startsWith('/api/runs')),
     'no action of a run is served under /api/runs: each is in its namespace',

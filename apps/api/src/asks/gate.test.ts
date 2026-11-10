@@ -209,9 +209,9 @@ const askingRun = (id: string) => {
   signedOff(`${id}-design`, { ...PLAN, open: [cut, where] });
 };
 
-/** What a request answered when it was refused with 400, and that it wrote nothing beside the run. */
-const refused400 = async (res: Response, id: string): Promise<string> => {
-  assert.equal(res.status, 400, await res.clone().text());
+/** What a request answered when its answers were refused (`Invalid`, a 422), and that it wrote nothing beside the run. */
+const refused422 = async (res: Response, id: string): Promise<string> => {
+  assert.equal(res.status, 422, await res.clone().text());
   assert.deepEqual(asked(id), [], 'nothing written');
   return ((await res.json()) as { error: string }).error;
 };
@@ -223,15 +223,20 @@ const refusedWith = async (res: Response, status: number, said: string): Promise
 };
 
 test('POST …/approve: what it refuses — a body, a run or step not there, empty words, a step the package will not approve, answers that do not fit — and nothing written', async (t) => {
-  await t.test('a body that is not an approval is a 400, naming what it takes', async () => {
-    const bodies: Array<[unknown, RegExp]> = [
-      ['not json', /^POST …\/approve takes a JSON body/],
-      [['Ship it.'], /^POST …\/approve takes a JSON object/],
-      [null, /^POST …\/approve takes a JSON object/],
-      [{ message: 42 }, /^`message`[^]*was 42/],
-      [{ message: null }, /^`message`[^]*was null/],
+  await t.test('a body `RunApprove` does not read is a 400, naming the key it refused', async () => {
+    const bodies: Array<[unknown, string]> = [
+      ['not json', 'payload'],
+      [['Ship it.'], 'payload'],
+      [null, 'payload'],
+      [{ message: 42 }, 'payload.message'],
+      [{ message: null }, 'payload.message'],
     ];
-    for (const [body, words] of bodies) assert.match(await refusedWith(await approveOver('plan', body), 400, JSON.stringify(body)), words);
+    for (const [body, field] of bodies) {
+      const res = await approveOver('plan', body);
+      assert.equal(res.status, 400, JSON.stringify(body));
+      const said = (await res.json()) as { field?: string };
+      assert.ok(said.field?.startsWith(field), `${JSON.stringify(body)} names ${field}: ${JSON.stringify(said)}`);
+    }
     nothingWritten('a body that is not an approval');
   });
 
@@ -269,7 +274,7 @@ test('POST …/approve: what it refuses — a body, a run or step not there, emp
   );
 
   await t.test(
-    "REFUSED at shipped defaults: an approval's answers that do not fit the questions the gated step asks now, and answers to a step that asks none, are 400s in `answerRefusal`'s words — and no approval is written",
+    "REFUSED at shipped defaults: an approval's answers that do not fit the questions the gated step asks now, and answers to a step that asks none, are 422s in `answerRefusal`'s words, answers that are no list a 400 — and no approval is written",
     async () => {
       const id = 'r-gate-asks-refused';
       askingRun(id);
@@ -277,21 +282,24 @@ test('POST …/approve: what it refuses — a body, a run or step not there, emp
         { question: cut.title, chose: ['c'] },
         { question: where.title, chose: ['gate'] },
       ];
-      const misfitSaid = await refused400(await approveOver('design', { answers: misfit }, BOARD, id), id);
+      const misfitSaid = await refused422(await approveOver('design', { answers: misfit }, BOARD, id), id);
       assert.match(misfitSaid, /^"How is the card cut\?" offers no "c"/, 'the question that misfits, by its title');
       assert.match(misfitSaid, /its options are "a", "b"/);
       assert.match(
-        await refused400(await approveOver('design', { answers: [{ question: cut.title, chose: ['a'] }] }, BOARD, id), id),
+        await refused422(await approveOver('design', { answers: [{ question: cut.title, chose: ['a'] }] }, BOARD, id), id),
         /^"Where do the answers go\?" is not answered/,
       );
       assert.ok(!fs.existsSync(approvalFile(id, 'design', 1)), 'no approval file');
-      assert.match(await refused400(await approveOver('design', { answers: 'a' }, BOARD, id), id), /^`answers` are/);
+      const noList = await approveOver('design', { answers: 'a' }, BOARD, id);
+      assert.equal(noList.status, 400, 'answers that are no list `RunApprove` reads');
+      assert.ok(((await noList.json()) as { field?: string }).field?.startsWith('payload.answers'));
+      assert.deepEqual(asked(id), [], 'nothing written');
 
       const none = 'r-gate-asks-none';
       gatedRun(none);
       for (const answers of [[], [{ question: cut.title, chose: ['a'] }]]) {
         assert.match(
-          await refused400(await approveOver('plan', { message: 'Go.', answers }, BOARD, none), none),
+          await refused422(await approveOver('plan', { message: 'Go.', answers }, BOARD, none), none),
           /^The step asks no questions now/,
           JSON.stringify(answers),
         );
@@ -539,12 +547,12 @@ test('a person sends a step back from its gate: refused without words, asked wit
   });
 
   await s.test(
-    "a send-back from a gate that asks carries the answers as its try's message, in `answerText`'s words, its objection their note; answers that do not fit are a 400 and nothing is written",
+    "a send-back from a gate that asks carries the answers as its try's message, in `answerText`'s words, its objection their note; answers that do not fit are a 422 and nothing is written",
     async () => {
       const asks = 'r-gate-asks-back';
       askingRun(asks);
       assert.match(
-        await refused400(await ask('design', { mode: 'continue', answers: [{ question: cut.title, chose: ['a'] }] }, asks), asks),
+        await refused422(await ask('design', { mode: 'continue', answers: [{ question: cut.title, chose: ['a'] }] }, asks), asks),
         /^"Where do the answers go\?" is not answered/,
       );
       const answers = [

@@ -377,28 +377,8 @@ type PlaceRequests = import('../src/place/place.ts').PlaceRequests;
 type PlaceOutcome<V extends import('../src/place/place.ts').PlaceVerb> = import('../src/place/place.ts').PlaceOutcome<V>;
 
 const world = () => stage.place().world;
-/**
- * `nemia decide`'s whole screen over this file's store (`decideScreen`): `screens.ts` hands `main` no environment, so the process's
- * `WF_` settings are the file's for the call, and put back after it.
- */
-const decideAt = async (...args: Parameters<typeof decideScreen>): Promise<string[]> => {
-  const was = Object.fromEntries(
-    Object.keys(ENV)
-      .filter((k) => k.startsWith('WF_'))
-      .map((k) => [k, process.env[k]]),
-  );
-  const put = (vars: Record<string, string | undefined>) => {
-    for (const [k, v] of Object.entries(vars))
-      if (v === undefined) delete process.env[k];
-      else process.env[k] = v;
-  };
-  put(Object.fromEntries(Object.keys(was).map((k) => [k, ENV[k]])));
-  try {
-    return await decideScreen(...args);
-  } finally {
-    put(was);
-  }
-};
+/** `nemia decide`'s screen over this file's store, `ENV` (`decideScreen`). */
+const decideAt = (...[t, e, argv, as, place]: Parameters<typeof decideScreen>): Promise<string[]> => decideScreen(t, e, argv, as, place, ENV);
 /** A screen with each time of day the engine's stand-in stamped put back as `<t>`: it files and settles on the wall clock. */
 const timeless = (lines: string[]): string[] => lines.map((l) => l.replace(/\b\d\d:\d\d:\d\dZ\b/g, '<t>'));
 const listed = (id: string) => stage.runWith(stage.board().e, list(stage.board().e, runRecord(ROOT, id)));

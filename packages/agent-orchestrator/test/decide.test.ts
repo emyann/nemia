@@ -50,25 +50,8 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
 
-/**
- * `nemia decide`'s screen (`test/screens.ts`) at this test's store: that helper hands `main` no environment, so `main` reads the
- * process's, and each `WF_` setting of `ENV` is set on it for the call alone, then put back.
- */
-const decideScreen = async (...args: Parameters<typeof screenOf>): Promise<string[]> => {
-  const settings = Object.keys(ENV).filter((name) => name.startsWith('WF_'));
-  const was = Object.fromEntries(settings.map((name) => [name, process.env[name]]));
-  const put = (from: Env) => {
-    for (const name of settings)
-      if (from[name] === undefined) delete process.env[name];
-      else process.env[name] = from[name];
-  };
-  put(ENV);
-  try {
-    return await screenOf(...args);
-  } finally {
-    put(was);
-  }
-};
+/** `nemia decide`'s screen over this file's store, `ENV` (`decideScreen`). */
+const decideScreen = (...[t, e, argv, as, place]: Parameters<typeof screenOf>): Promise<string[]> => screenOf(t, e, argv, as, place, ENV);
 const stage = staged({ runWith, main, engineOf, env: ENV });
 
 /** One pass of the tick over the run `id`, on the stage's engine. */

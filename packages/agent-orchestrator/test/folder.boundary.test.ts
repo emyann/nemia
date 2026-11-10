@@ -106,25 +106,8 @@ const gitAsked = (): string[] => (fs.existsSync(GIT_ASKED) ? fs.readFileSync(GIT
 
 const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 
-/**
- * `nemia decide`'s screen (`test/screens.ts`) at this test's store: that helper hands `main` no environment, so `main` reads the
- * process's, and each `WF_` setting of `ENV` is set on it for the call alone, then put back.
- */
-const decideScreen = async (...args: Parameters<typeof screenOf>): Promise<string[]> => {
-  const settings = Object.keys(ENV).filter((name) => name.startsWith('WF_'));
-  const was = Object.fromEntries(settings.map((name) => [name, process.env[name]]));
-  const put = (from: Env) => {
-    for (const name of settings)
-      if (from[name] === undefined) delete process.env[name];
-      else process.env[name] = from[name];
-  };
-  put(ENV);
-  try {
-    return await screenOf(...args);
-  } finally {
-    put(was);
-  }
-};
+/** `nemia decide`'s screen over this file's store, `ENV` (`decideScreen`). */
+const decideScreen = (...[t, e, argv, as, place]: Parameters<typeof screenOf>): Promise<string[]> => screenOf(t, e, argv, as, place, ENV);
 /** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
 const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot | StoreConfig>): A => Effect.runSync(storeGiven(ROOT, ENV)(program));
 const addToInbox = (opts: Parameters<typeof verbs.addToInbox>[0]) => atRoot(verbs.addToInbox(opts));

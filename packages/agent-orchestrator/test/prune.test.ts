@@ -54,24 +54,8 @@ const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_DEFAULT_FACTORY_STARTS: '1'
 const stage = staged({ runWith: runEngine, main, engineOf, env: ENV });
 const files = filesStoreAt(ROOT);
 
-/**
- * `decideScreen` on this file's store: `screens.ts` runs `main` on the process's environment, so the store's `WF_` settings are put on
- * it for the call alone, and put back.
- */
-const screenOn = async (...args: Parameters<typeof decideScreen>): Promise<string[]> => {
-  const keys = Object.keys(ENV).filter((key) => key.startsWith('WF_'));
-  const was = keys.map((key) => [key, process.env[key]] as const);
-  const put = (key: string, value: string | undefined) => {
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
-  };
-  for (const key of keys) put(key, ENV[key]);
-  try {
-    return await decideScreen(...args);
-  } finally {
-    for (const [key, value] of was) put(key, value);
-  }
-};
+/** `nemia decide`'s screen over this file's store, `ENV` (`decideScreen`). */
+const screenOn = (...[t, e, argv, as, place]: Parameters<typeof decideScreen>): Promise<string[]> => decideScreen(t, e, argv, as, place, ENV);
 const { runWith, runPlaced } = stage;
 const world = () => stage.place().world;
 /** The test place's own place, as a verb is answered over it. */

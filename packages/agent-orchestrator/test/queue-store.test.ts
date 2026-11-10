@@ -71,24 +71,8 @@ const readInbox = () => atRoot(readInboxVerb());
 const stage = staged({ runWith: runEngine, main: cli, engineOf, env: ENV });
 const { runWith, runPlaced } = stage;
 
-/**
- * `decideScreen` on this file's store: `screens.ts` runs `main` on the process's environment, so the store's `WF_` settings are put on
- * it for the call alone, and put back.
- */
-const screenOn = async (...args: Parameters<typeof decideScreen>): Promise<string[]> => {
-  const keys = Object.keys(ENV).filter((key) => key.startsWith('WF_'));
-  const was = keys.map((key) => [key, process.env[key]] as const);
-  const put = (key: string, value: string | undefined) => {
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
-  };
-  for (const key of keys) put(key, ENV[key]);
-  try {
-    return await decideScreen(...args);
-  } finally {
-    for (const [key, value] of was) put(key, value);
-  }
-};
+/** `nemia decide`'s screen over this file's store, `ENV` (`decideScreen`). */
+const screenOn = (...[t, e, argv, as, place]: Parameters<typeof decideScreen>): Promise<string[]> => decideScreen(t, e, argv, as, place, ENV);
 /** The runs waited on as a read with no standing reads them: none of their branches asked. */
 const noParents = () => passParents(standingReader(NOTHING_READ));
 

@@ -43,8 +43,8 @@ const withProposals = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<
 /**
  * A `runWith` over `given`: `program` run over the engine `e`, given the place `given` holds then, the store's root and settings `env`
  * names — a test's own store (`{ WF_ROOT: ROOT, … }`), or by default the throwaway `test/ambient.ts` pointed the process at — and the
- * proposals pass. A program that asks `StoreRoot` and `ProposalsAct` is composed here, as `nemia tick`'s and the daemon's are in `cli/main.ts` and
- * `up`.
+ * proposals pass. A program that asks `StoreRoot` and `ProposalsAct` is composed here, as `nemia tick`'s and the daemon's are in
+ * `cli/main.ts` and `up`.
  */
 export const runOver =
   (runWith: RunWith, given: Given, env: Env = process.env) =>

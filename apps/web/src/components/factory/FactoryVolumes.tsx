@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { Separator } from '@/components/ui/separator';
-import type { Factory, FactoryVolume } from '@/lib/api';
+import type { Factory, FactoryVolume } from '@/lib/api/factories';
 import { ink } from '@/lib/meaning';
 import { cn } from '@/lib/utils';
 import { CommandText } from './FactorySchedules';

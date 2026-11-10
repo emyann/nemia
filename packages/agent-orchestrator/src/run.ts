@@ -19,20 +19,10 @@ export { declaredOutput, envelopeRefusals, parseCloseout } from './closeout/inde
  * subpath.
  */
 export { answerRefusal, answerText, approvedAnswerText, askedQuestions, questionsOf } from './question/index.ts';
-export type { Answer, Asked, Question, QuestionOption } from './question/index.ts';
+export type { Answer, Asked, Question } from './question/index.ts';
 /** Re-exported for apps/api, which reads them from the `agent-orchestrator/run` subpath. */
 export { answerOf, messageRefusal, type EarlierTry } from './retry/index.ts';
-export {
-  answerLines,
-  deniedOffer,
-  overBudgetLine,
-  retriesDue,
-  retryable,
-  retryLines,
-  retryOffers,
-  retryRefusal,
-  tryNote,
-} from './retry/index.ts';
+export { answerLines, deniedOffer, overBudgetLine, retriesDue, retryable, retryLines, retryRefusal, tryNote } from './retry/index.ts';
 export {
   BY_CAP,
   checkTaskId,
@@ -47,22 +37,16 @@ export {
   runTasks,
   satisfiesAfter,
   stepTaskId,
-  stepTasks,
-  stopsFollowers,
-  unjudgedWords,
   WHY_CAP,
 } from './record/record.ts';
 export type {
   Acceptance,
   Approval,
   CloseoutAsked,
-  FolderRun,
   RepositoryRun,
   Hold,
-  LandingRecord,
   PlaceKind,
   Pruned,
-  PrunedFiles,
   Run,
   StepRecord,
   StepStatus,
@@ -77,34 +61,24 @@ export {
   askingTry,
   branchWord,
   budgetOf,
-  budgetRefusal,
   budgetUsdFor,
   capOf,
   endingStopped,
   gatesOf,
   hasGate,
-  waitsOnCheckout,
   holdsOpenOn,
   landsOnCheck,
-  loopOf,
-  loopOver,
-  MOMENTUM,
   overBudget,
   owedFields,
   owesReplies,
   ownStatus,
-  resultOnBase,
   roundIn,
   roundOf,
   roundSpans,
-  runSpend,
   sendBackTo,
   sentBack,
-  sessionTasks,
   spentAcceptances,
   spentApprovals,
-  spentWord,
-  stepMomentum,
   stepSpend,
   stepStatus,
   taskSpend,
@@ -128,24 +102,13 @@ export {
   waitWord,
 } from './wait/wait.ts';
 export type { ParentRun, Wait } from './wait/wait.ts';
-export type { Interrupt, Parked, Pause, Paused, PausedNow, PauseHeld, PauseStaged } from './pause/pause.ts';
+export type { Interrupt, Parked, Pause, Paused, PauseHeld, PauseStaged } from './pause/pause.ts';
 export { artifactLines, artifactPlace, artifactsContract, HANDED_CLOSEOUT, sizeOf } from './artifacts/artifacts.ts';
-export type { ArtifactFile, ArtifactPlace, MissingArtifact } from './artifacts/artifacts.ts';
-export {
-  heldRefusal,
-  pruneAgain,
-  prunedBytes,
-  prunedKept,
-  prunedRefusal,
-  pruneLines,
-  pruneRefusal,
-  pruningBytes,
-} from './forget/prune/prune.ts';
-export type { PruneFacts, Pruning } from './forget/prune/prune.ts';
+export { heldRefusal, prunedBytes, prunedKept, prunedRefusal, pruneLines, pruneRefusal, pruningBytes } from './forget/prune/prune.ts';
+export type { Pruning } from './forget/prune/prune.ts';
 export {
   checkoutLine,
   checkoutWord,
-  endingAsked,
   endingSteps,
   filedDenies,
   gateRefusal,
@@ -157,45 +120,22 @@ export {
   toDecide,
   toDecideWords,
 } from './ending/ending.ts';
-export type { Landing, ToDecide } from './ending/ending.ts';
+export type { Landing } from './ending/ending.ts';
 export type { MergeState } from './place/place.ts';
 export { approvalRefusal, approvalWordsRefusal, holdsOpen } from './gate/gate.ts';
-export {
-  admissionOrder,
-  ceilingLines,
-  heldCheckouts,
-  heldRuns,
-  inFlight,
-  runAdmitted,
-  slotFree,
-  slotNeed,
-  slotWord,
-  takesNoSlot,
-} from './cap/cap.ts';
-export type { CheckoutHold, InFlight, MainClaim, RunSlot } from './cap/cap.ts';
+export { admissionOrder, ceilingLines, heldCheckouts, heldRuns, inFlight, runAdmitted, slotNeed, slotWord } from './cap/cap.ts';
+export type { MainClaim, RunSlot } from './cap/cap.ts';
 export { resultSteps, tipBranches, tipsSeen, workChecks } from './branches/index.ts';
 export { cutName, GIVEN, givenPlan, handOffDue, LINE_NAME, workspacePlan } from './workspace/workspace.ts';
-export type { Given, GivenFrom, WorkspacePlan } from './workspace/workspace.ts';
+export type { Given } from './workspace/workspace.ts';
 export { saidLines, saidWord, sayRefusal } from './say/say.ts';
-export type { Said, SaidTo } from './say/say.ts';
+export type { Said } from './say/say.ts';
 export { assess } from './tick/assess.ts';
 export type { Assessment } from './tick/assess.ts';
-export {
-  acceptAsk,
-  acceptWordsRefusal,
-  roundAsk,
-  roundBudgetRefusal,
-  roundDueNote,
-  roundFiled,
-  roundLines,
-  roundOffers,
-  roundsDue,
-  spentRoundAsks,
-} from './round/round.ts';
+export { acceptAsk, roundAsk, roundBudgetRefusal, roundDueNote, roundFiled, roundLines, roundsDue, spentRoundAsks } from './round/round.ts';
 export { cancelPlan } from './cancel/cancel.ts';
-export type { CancelPlan } from './cancel/cancel.ts';
 export { branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, runWorktrees } from './forget/forget.ts';
-export type { AskName, BranchFate, ForgetHow, Forgot } from './forget/forget.ts';
+export type { AskName, ForgetHow, Forgot } from './forget/forget.ts';
 export { fromNote, inputRefusal, inputsLine, inputsNote } from './start/index.ts';
 export type { InputFile } from './start/index.ts';
 export { choicesOf, costLine, decision, runCostLines } from './decide/decide.ts';
@@ -203,21 +143,19 @@ export type { DecideCommand, Decision, Offer, Landed } from './decide/decide.ts'
 export { answerIn, deniedWords, harnessWaitLine, listing, onYouWords, shownNote, shownStatus, waitingWords } from './list/list.ts';
 export type { ListedPhase, Listing } from './list/list.ts';
 export { feedPhase, feedWords } from './feed/index.ts';
-export type { FeedSaid, FeedWords } from './feed/index.ts';
+export type { FeedWords } from './feed/index.ts';
 export {
   acceptedLines,
   briefParts,
   composeBrief,
   gateLines,
   handedParts,
-  loopSection,
   PRECEDENCE,
   remoteBrief,
   retrySection,
-  roundSection,
   SIGNOFF,
   toldLayers,
 } from './brief/index.ts';
-export type { EndingStopped, HandedPart, ParentCloseout, ParentStep, RetryBriefing, RoundBriefing, ToldLayers } from './brief/index.ts';
+export type { HandedPart, ParentCloseout, RetryBriefing, ToldLayers } from './brief/index.ts';
 export type { StepBudget } from './budget/budget.ts';
-export type { GateBudget, GateBudgets, GateBudgetsFrom } from './gate-budgets/gate-budgets.ts';
+export type { GateBudgets } from './gate-budgets/gate-budgets.ts';

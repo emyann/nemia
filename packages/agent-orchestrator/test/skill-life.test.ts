@@ -100,7 +100,7 @@ test("a library skill's life: written as Nemia ships one, given, switched, mende
   await s.test(
     "a skill written from the board's form is written as Nemia ships its own, and read back by the card reader and YAML",
     async () => {
-      const made = await stage.runWith(e, SKILLS_WRITE.handler({ from: 'yours', change: JSON.stringify(DRAFT) }, undefined, ROOT));
+      const made = await stage.runWith(e, SKILLS_WRITE.handler({ from: 'yours', change: DRAFT }, undefined, ROOT));
       assert.ok('version' in made, JSON.stringify(made));
       version = made.version;
       const text = read('tidy-notes');
@@ -132,7 +132,7 @@ test("a library skill's life: written as Nemia ships one, given, switched, mende
   await s.test(
     'it reads back for its page and in the list, at the version its write answered; a read given no root is refused',
     async () => {
-      const page = await stage.runWith(e, SKILLS_READ.handler({ from: 'yours', name: 'tidy-notes', dir }, undefined, ROOT));
+      const page = await stage.runWith(e, SKILLS_READ.handler({ name: 'tidy-notes', dir }, undefined, ROOT));
       assert.equal(page.version, version);
       assert.match(page.text, /one fact a line\./);
       assert.equal(page.entry?.id, 'tidy-notes');

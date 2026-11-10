@@ -45,13 +45,13 @@ const { renderToStaticMarkup } = await import('react-dom/server');
 const { Chips, DecideSection, DiffFileView, GroupBar, LessonChip, TouchedBranch } = await import('../src/components/gate/Decide.tsx');
 const { OFFERS } = await import('../src/lib/words.ts');
 const { instantWhole } = await import('../src/lib/instant.ts');
-type RunView = import('../src/lib/runView.ts').RunView;
-type Decidable = import('../src/lib/api.ts').Decidable;
+type RunDetail = import('../src/lib/runView.ts').RunDetail;
+type Decidable = import('../src/lib/api/decision.ts').Decidable;
 const { TryCloseouts } = await import('../src/components/step/Closeout.tsx');
 const facts = await import('../src/components/step/Facts.tsx');
-type StepCloseout = import('../src/lib/api.ts').StepCloseout;
+type StepCloseout = import('../src/lib/api/tries.ts').StepCloseout;
 const { RecommendButton } = await import('../src/components/gate/Questions.tsx');
-type Question = import('../src/lib/api.ts').Question;
+type Question = import('../src/lib/api/tries.ts').Question;
 const Answering = await import('../src/components/gate/Decide.tsx');
 const { NeedsBanner, ToDecideBanner } = await import('../src/components/gate/Needs.tsx');
 const { container, hairline, ringed } = await import('../src/lib/meaning.ts');
@@ -546,7 +546,7 @@ test('a loop out of rounds is approved as it stands from the Answer section, wit
 });
 
 /** The banner, rendered inside the query client its Continue asks with. */
-const bannerMarkup = (run: RunView) =>
+const bannerMarkup = (run: RunDetail) =>
   renderToStaticMarkup(createElement(QueryClientProvider, { client: new QueryClient() }, createElement(NeedsBanner, { run })));
 
 test("the banner continues a session the harness blocked: Continue, and a box for anything to tell it, where the commands to copy were — and once asked, the step's note in `wf ls`'s words", () => {
@@ -560,7 +560,7 @@ test("the banner continues a session the harness blocked: Continue, and a box fo
     waitingFor: null,
     lastLine: null,
   };
-  const run: RunView = { ...base, waitingOnYou: ['implement'], waitingOnYouWords: ['implement'], steps: [asks, base.steps[0]] };
+  const run: RunDetail = { ...base, waitingOnYou: ['implement'], waitingOnYouWords: ['implement'], steps: [asks, base.steps[0]] };
   const html = bannerMarkup(run);
 
   assert.match(html, /^<section aria-label="Waiting on you"/);
@@ -807,7 +807,7 @@ const decidedAs = (standings: unknown[]) => ({
 /**
  * A component rendered with the run's decision already read, as the Decide section on the same page has read it for this state of the run.
  */
-function withDecision(run: RunView, decision: unknown, element: ReturnType<typeof createElement>): string {
+function withDecision(run: RunDetail, decision: unknown, element: ReturnType<typeof createElement>): string {
   const client = new QueryClient();
   client.setQueryData(['runs', run.id, 'decision', decisionStamp(run)], decision);
   return renderToStaticMarkup(createElement(QueryClientProvider, { client }, element));

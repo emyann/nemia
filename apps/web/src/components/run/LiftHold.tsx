@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button as AriaButton, Dialog, DialogTrigger, Heading, Popover } from 'react-aria-components';
 import { Button } from '@/components/ui/button';
-import { liftHold } from '../../lib/api';
+import { liftHold } from '../../lib/api/runs.ts';
 import { cn } from '../../lib/utils';
 import { Refusal } from '../gate/Ask';
 import { runsMoved } from '@/lib/runWrites';

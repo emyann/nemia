@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { createWorkflow, workflowsQuery } from '../../lib/api';
-import type { WorkflowStepSpec } from '../../lib/api';
+import { createWorkflow, workflowsQuery } from '../../lib/api/workflows.ts';
+import type { WorkflowStepSpec } from '../../lib/api/library.ts';
 import { firstStep, listedWith } from '../../lib/builder';
 import { rereadWorkflows } from '../../lib/placed';
 

@@ -76,7 +76,11 @@ export const freshLevel = (level: Level): Level => (level === 'manual' ? 'semi-a
 export const raisesOver = (level: Level): readonly Level[] =>
   level === 'manual' ? ['semi-auto', 'auto'] : level === 'semi-auto' ? ['auto'] : [];
 
-/** What her sessions cost, as her level's own line says it: each counted as it ends, her open one not yet. */
+/**
+ * What her sessions cost, as her level's own line says it (`status.ts` in the orchestrator): each counted as it ends, her open one not yet.
+ * A copy that stays: `GET /api/level` answers the spend's facts (`objects`' `NemiaLevel.spend`), not the line, and the board says the
+ * dollars in its own money words (`dollars`).
+ */
 export const spendWords = ({ usd, measured, unmeasured }: Spend): string =>
   `Spent ${dollars(usd)} over ${measured} session${measured === 1 ? '' : 's'} ended${unmeasured ? `, ${unmeasured} not measured` : ''}; her open one counts once it ends.`;
 

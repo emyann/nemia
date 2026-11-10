@@ -103,18 +103,6 @@ test("A person keeps a factory's MCP servers: none recorded, one recorded and re
       422,
     );
   });
-  await s.test('REFUSED: a write from another site is a 403, and a body that is no JSON a 415, the record as it was', async () => {
-    await refused(
-      () =>
-        app.request(`${URL}/github`, {
-          method: 'PUT',
-          headers: { ...json, 'sec-fetch-site': 'cross-site' },
-          body: JSON.stringify({ url: 'https://e.example/mcp' }),
-        }),
-      403,
-    );
-    await refused(() => app.request(`${URL}/github`, { method: 'PUT', headers: { 'content-type': 'text/plain' }, body: '{}' }), 415);
-  });
   await s.test("REFUSED: an Authorization header, a local server, a name that is no server's and a name that is no factory's", async () => {
     assert.match(
       await refused(

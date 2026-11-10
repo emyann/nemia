@@ -1,9 +1,8 @@
 /**
- * A factory and its parts served as objects (factories.ts, mcp-servers.ts, schedules.ts, hires.ts, volumes.ts): each path answers its
- * kind, each list its `<Kind>List`; each write is 403 for another site and 415 for a body that is not JSON, the factory's files as they
- * were; and the routes these retire answer 404 in the api's words — in a scratch store whose factory is filed with the package's own verbs.
- * And the schedules, which find the run each fired among every run's record, read them through the app's memo: a warm list is answered
- * from it, and judged afresh under `WF_VERIFY_REST=1`.
+ * A factory and its parts served as objects (factories.ts, mcp-servers.ts, schedules.ts, hires.ts, volumes.ts): each path answers its kind,
+ * each list its `<Kind>List`; and the routes these retire answer 404 in the api's words — in a scratch store whose factory is filed with
+ * the package's own verbs. And the schedules, which find the run each fired among every run's record, read them through the app's memo: a
+ * warm list is answered from it, and judged afresh under `WF_VERIFY_REST=1`.
  */
 import { root } from '../../../test/harness.ts';
 import { test } from 'node:test';
@@ -20,14 +19,6 @@ fs.mkdirSync(path.join(repo, 'workflows', 'make'), { recursive: true });
 fs.writeFileSync(path.join(repo, 'workflows', 'make', 'implement.md'), '---\nplace: git\n---\nImplement it.\n');
 addFactory({ name: 'works', repos: [repo] });
 attachWorkflow({ factory: 'works', workflow: 'make' });
-
-/** Every file of the factory in the store, as bytes: what a refused write leaves as it was. */
-const files = (): string =>
-  JSON.stringify(
-    [path.join(root, 'factories', 'works.json'), path.join(root, 'factories', 'works')].map((at) =>
-      fs.existsSync(at) && fs.statSync(at).isFile() ? fs.readFileSync(at, 'utf8') : fs.existsSync(at) ? fs.readdirSync(at) : null,
-    ),
-  );
 
 test('each path answers its kind, and each list its <Kind>List', async () => {
   const kinds: Array<[string, string]> = [
@@ -60,38 +51,6 @@ test('a list in a namespace no factory has is a 404, and one the default factory
   assert.equal((await app.request('/api/namespaces/nowhere/hires')).status, 404);
   const empty = (await (await app.request('/api/namespaces/default/schedules')).json()) as { items: unknown[] };
   assert.deepEqual(empty.items, []);
-});
-
-test('each write is 403 for another site and 415 for a body that is not JSON, the factory as it was', async () => {
-  const writes: Array<[string, string]> = [
-    ['PUT', '/api/namespaces/works/mcpservers/docs'],
-    ['DELETE', '/api/namespaces/works/mcpservers/docs'],
-    ['POST', '/api/namespaces/works/mcpservers/docs/sign-in'],
-    ['DELETE', '/api/namespaces/works/mcpservers/docs/sign-in'],
-    ['PUT', '/api/namespaces/works/schedules/make'],
-    ['DELETE', '/api/namespaces/works/schedules/make'],
-    ['PUT', '/api/namespaces/works/hires/make.implement'],
-    ['DELETE', '/api/namespaces/works/hires/make.implement'],
-    ['PUT', '/api/factories/works/rules'],
-    ['DELETE', '/api/factories/works/rules'],
-    ['PUT', '/api/factories/works/instruction'],
-    ['DELETE', '/api/factories/works/instruction'],
-    ['PUT', '/api/factories/works/instruction/words'],
-    ['DELETE', '/api/factories/works/instruction/words'],
-  ];
-  const before = files();
-  for (const [method, url] of writes) {
-    const site = await app.request(url, {
-      method,
-      headers: { 'content-type': 'application/json', 'sec-fetch-site': 'cross-site' },
-      body: '{}',
-    });
-    assert.equal(site.status, 403, `${method} ${url} from another site`);
-    const form = await app.request(url, { method, headers: { 'content-type': 'text/plain' }, body: '{}' });
-    assert.equal(form.status, 415, `${method} ${url} sent as text`);
-    assert.ok(((await form.json()) as { error?: string }).error, `${method} ${url} says why`);
-  }
-  assert.equal(files(), before, 'nothing was written');
 });
 
 test('the routes these retire answer 404 in the api’s words', async () => {

@@ -20,7 +20,8 @@ import {
   waitsAtGate,
   waitsOnPerson,
 } from '../src/lib/status.ts';
-import { type StepCodes, type StepPhase, type StepReason } from '../src/lib/api/reasons.ts';
+import type { StepPhase, StepReason } from 'objects';
+import type { StepCodes } from '../src/lib/status.ts';
 import { container, meaningOf } from '../src/lib/meaning.ts';
 import { HELD_TO_COME, PAUSED, PERSON, stateWordsOf } from '../src/lib/words.ts';
 import { isLive, movingInto } from '../src/lib/canvas.ts';

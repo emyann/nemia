@@ -25,7 +25,7 @@ export default {
     const file = page.locator('section[aria-label="The file"]');
     const body = file.locator('[data-markdown]').first();
     await expectRendered(body, good.review);
-    await expectKeys(page, file, `/api/workflows/repo/${good.name}/review`, good.review.keys);
+    await expectKeys(page, file, `/api/namespaces/default/workflows/${good.name}/steps/review?origin=repo`, good.review.keys);
     await expectSource(file, body, path.join(folder, 'review.md'));
     if (JSON.stringify(filesIn(folder)) !== JSON.stringify(before))
       throw new Refused(`a step's page writes nothing — ${folder} changed while it was open`);

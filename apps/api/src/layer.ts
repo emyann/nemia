@@ -8,7 +8,6 @@
  */
 import { Context, type Duration, Effect, Layer, type ManagedRuntime, Metric, Tracer } from 'effect';
 import type { Context as RequestContext } from 'hono';
-import { routePath } from 'hono/route';
 import {
   freshStatsMemo,
   seriesMemo,
@@ -25,10 +24,12 @@ import {
   type ScheduleRuns,
   PlaceService,
   type ProposalCaller,
+  EngineService,
+  type LastSaid,
 } from 'agent-orchestrator';
 import { McpAsker } from './capabilities/capabilities.ts';
-import type { LastSaid } from './steps/logs.ts';
-import { placeFor } from './factory/place.ts';
+import { routeOf } from './request/request.ts';
+import { type Place, placeFor } from './factory/place.ts';
 import { QuotaAsker } from './gauges/quota.ts';
 import { Followings } from './steps/following.ts';
 import { Engine, type RequestTrace, StoreRoot } from './store.ts';
@@ -155,11 +156,19 @@ export type Served = {
   /** The trace the request's programs join (`runPlaced`, store.ts): the app's tracer and the request's server span; none outside one. */
   trace: RequestTrace | undefined;
   /**
-   * `program` run over the request's own services, its answer or its rejection with the failure itself, as `served` rejects: how a
-   * handler reads a door of the package (`AgentDoor`, `SkillDoor`). A door's default reads the files at the app's `StoreRoot`, and a door a
-   * test merged into the app's layer (`Layer.merge(liveOf(), agentDoorMemory())`) is the one the program reads.
+   * `program` run over the request's own services — the app's, the orchestrator's engine (`EngineService`, the request's `e`), its place
+   * and its store's root among them — under the request's server span: its answer, or its rejection with the failure itself, as `served`
+   * rejects. The one way a handler runs a program of the package's: a verb, a command entry's handler, a door (`AgentDoor`, `SkillDoor`).
+   * A door's default reads the files at the app's `StoreRoot`, and a door a test merged into the app's layer (`Layer.merge(liveOf(),
+   * agentDoorMemory())`) is the one the program reads.
    */
-  inRequest: <A, E>(program: Effect.Effect<A, E, Services>) => Promise<A>;
+  inRequest: <A, E>(program: Effect.Effect<A, E, Services | EngineService>) => Promise<A>;
+  /**
+   * Where the request is answered for a kind in `namespace`: the factory the namespace names (`default` the api's own) and the repository
+   * the request's `?repo=` names, resolved and refused as `placeFor` resolves and refuses them (factory/place.ts). What a handler of a
+   * namespaced kind is placed by (`answeredIn`, objects/refused.ts), never a route of its own.
+   */
+  placedIn: (namespace: string) => Place;
 };
 
 /** The upper bounds of a request's reads, the files the runtime read for it, one past the last for more. */
@@ -167,7 +176,8 @@ const READ_BOUNDS: readonly number[] = [0, 1, 2, 5, 10, 25, 50, 100, 250, 500, 1
 
 /**
  * The files the runtime read for each request, its journals and every other file it reads (the engine's `io`), by the route it was
- * served on (`route`, the route's pattern, never its path), in the registry of the app's runtime: the process's own unless its layer
+ * served on (`route`, the route's pattern, never its path: a request the mount served under its endpoint's path, `routeOf`), in the
+ * registry of the app's runtime: the process's own unless its layer
  * gives another. A read is one of bytes: a journal is counted when the engine reads what was appended to it since it last read it, and a
  * journal it finds as it left it costs a `stat` and is not counted. Counted off the engine's running totals before and after the handler,
  * so about: a pass or another request reading at the same time is counted here too.
@@ -196,11 +206,14 @@ export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | 
       Effect.gen(function* () {
         const { env, running } = yield* ApiConfig;
         const context = yield* Effect.context<Services>();
-        const inRequest = <A, E>(program: Effect.Effect<A, E, Services>): Promise<A> => Effect.runPromiseWith(context)(program);
+        const e = yield* Engine;
+        const inRequest = <A, E>(program: Effect.Effect<A, E, Services | EngineService>): Promise<A> =>
+          Effect.runPromiseWith(context)(underRequest(c, Effect.provideService(program, EngineService, e)));
+        const placedIn = (namespace: string): Place => placeFor({ factory: namespace, repo: c.req.query('repo') }, env, running);
         const services = {
           env,
           running,
-          e: yield* Engine,
+          e,
           placeService: yield* PlaceService,
           home: yield* StoreRoot,
           mcp: yield* McpAsker,
@@ -212,6 +225,7 @@ export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | 
           caller: c.var.caller,
           trace: yield* traceOf(c),
           inRequest,
+          placedIn,
         };
         const before = yield* readsOf(services.e);
         return yield* Effect.promise(async () =>
@@ -221,7 +235,7 @@ export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | 
             Effect.flatMap(readsOf(services.e), (after) =>
               before === undefined || after === undefined
                 ? Effect.void
-                : Metric.update(Metric.withAttributes(POLL_READS, { route: routePath(c) }), after - before),
+                : Metric.update(Metric.withAttributes(POLL_READS, { route: routeOf(c) ?? '/*' }), after - before),
             ),
           ),
         );

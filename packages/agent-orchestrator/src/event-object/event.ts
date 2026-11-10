@@ -58,6 +58,12 @@ const labelsOf = (line: FeedLine): Record<string, string> | undefined => {
   return Object.keys(out).length > 0 ? out : undefined;
 };
 
+/**
+ * An event's `resourceVersion`: a position, not a digest — the byte of the feed just after its line, where a read from it goes on, which
+ * only grows as the feed is written.
+ */
+export const feedPosition = (end: number): string => String(end);
+
 /** The line `line`, which starts at byte `start` of the feed and ends just before `end`, as an Event. */
 export const eventOf = (line: FeedLine, start: number, end: number): Event => {
   const labels = labelsOf(line);
@@ -73,7 +79,7 @@ export const eventOf = (line: FeedLine, start: number, end: number): Event => {
       ...(namespace !== undefined ? { namespace } : {}),
       ...(labels !== undefined ? { labels } : {}),
       creationTimestamp: line.at,
-      resourceVersion: String(end),
+      resourceVersion: feedPosition(end),
     },
     involved: { kind, name: nameOf(line) },
     reason,

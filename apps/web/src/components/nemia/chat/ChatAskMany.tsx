@@ -14,7 +14,7 @@ import { useState } from 'react';
 import { CheckIcon } from 'lucide-react';
 import { Radio, RadioGroup } from 'react-aria-components';
 import { Button } from '@/components/ui/button';
-import type { AskPick, AskQuestion } from '@/lib/api';
+import type { AskPick, AskQuestion } from '@/lib/api/chat';
 import { askAnswered, askLeft, type ChatAsk as Ask } from '@/lib/chatFollowing';
 import { AskChose, AskHead, AskOption } from './ChatAsk';
 

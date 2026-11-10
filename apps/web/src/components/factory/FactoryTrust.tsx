@@ -5,7 +5,7 @@
  */
 import { ShieldAlert } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import type { Factory } from '@/lib/api';
+import type { Factory } from '@/lib/api/factories';
 import { edged, ink } from '@/lib/meaning';
 import { CopyButton } from '../command/CopyButton';
 

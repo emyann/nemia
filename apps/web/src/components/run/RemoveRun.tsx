@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
-import { removeRun } from '../../lib/api';
+import { removeRun } from '../../lib/api/runs.ts';
 import { runsMoved } from '@/lib/runWrites';
 import { useRunNamespace } from '@/lib/runNamespace';
 

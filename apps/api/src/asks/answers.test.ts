@@ -1,8 +1,9 @@
 /**
  * The questions a closeout asks, on a run's detail (`StepCloseout.questions`), and a person's answers to them on POST …/retry
- * (`answeredHow`): checked against the questions the step's current closeout asks, written as the words the package gives them
- * (`answerText`), and refused (400) when they do not fit or ride on a recheck. A closeout that asks in free text is answered as before;
- * one whose question fields do not read says why (`refused`), and the run asks its session to mend them before a person's word.
+ * (`givenAnswers`, the package's): checked against the questions the step's current closeout asks, written as the words the package
+ * gives them (`answerText`), and refused (422) when they do not fit or ride on a recheck, and (400) when they are no list `RunRetry`
+ * reads. A closeout that asks in free text is answered as before; one whose question fields do not read says why (`refused`), and the
+ * run asks its session to mend them before a person's word.
  *
  * One table of what the route refuses, then the story of a person reading the questions and answering them.
  *
@@ -117,12 +118,12 @@ const ask = (step: string, body: unknown) =>
   app().request(`/api/namespaces/default/runs/${R}/steps/${step}/retry`, { method: 'POST', headers: BOARD, body: JSON.stringify(body) });
 const asksDir = path.join(root, 'runs', `${R}.asks`);
 const asked = (): string[] => (fs.existsSync(asksDir) ? (fs.readdirSync(asksDir, { recursive: true }) as string[]).sort() : []);
-const refused = async (res: Response): Promise<string> => {
-  assert.equal(res.status, 400, await res.clone().text());
-  return ((await res.json()) as { error: string }).error;
+const refused = async (res: Response, status: number): Promise<{ error: string; field?: string }> => {
+  assert.equal(res.status, status, await res.clone().text());
+  return (await res.json()) as { error: string; field?: string };
 };
 
-test('POST …/retry with answers: what it refuses — answers that do not fit the questions the step asks now, answers on a recheck, answers that are no list — 400s, and nothing written', async (t) => {
+test('POST …/retry with answers: what it refuses — answers that do not fit the questions the step asks now, answers on a recheck (422s), answers that are no list (a 400) — and nothing written', async (t) => {
   const rows: Array<[string, string, object, RegExp | RegExp[]]> = [
     [
       'an option the question does not offer',
@@ -161,14 +162,18 @@ test('POST …/retry with answers: what it refuses — answers that do not fit t
       /asks no questions now/,
     ],
     ['answers on a recheck', 'design', { mode: 'recheck', answers: [{ question: cut.title, chose: ['a'] }] }, /a recheck files no session/],
-    ['answers that are no list', 'design', { mode: 'continue', answers: 'a' }, /^`answers` are/],
   ];
   for (const [name, step, body, facts] of rows)
     await t.test(name, async () => {
-      const said = await refused(await ask(step, body));
-      for (const fact of [facts].flat()) assert.match(said, fact);
+      const { error } = await refused(await ask(step, body), 422);
+      for (const fact of [facts].flat()) assert.match(error, fact);
       assert.deepEqual(asked(), []);
     });
+  await t.test('answers that are no list', async () => {
+    const { field } = await refused(await ask('design', { mode: 'continue', answers: 'a' }), 400);
+    assert.ok(field?.startsWith('payload.answers'), field);
+    assert.deepEqual(asked(), []);
+  });
 });
 
 test('a person reads the questions a closeout asks on the run’s detail and answers them on the try: the answers are its message, in the package’s words', async (t) => {

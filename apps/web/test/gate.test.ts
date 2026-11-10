@@ -17,10 +17,11 @@ import {
   readLink,
   takenLine,
 } from '../src/lib/gate.ts';
-import type { Collision, Collisions, Decidable, RunSummary } from '../src/lib/api.ts';
-import type { RunView } from '../src/lib/runView.ts';
+import type { Collision, Collisions, Decidable } from '../src/lib/api/decision.ts';
+import type { RunView } from '../src/lib/api/judged.ts';
+import type { RunDetail } from '../src/lib/runView.ts';
 
-type Step = RunView['steps'][number];
+type Step = RunDetail['steps'][number];
 
 const step = (name: string, over: Partial<Step> = {}): Step =>
   ({
@@ -48,15 +49,15 @@ const ENDING_DECIDE = {
   onto: 'main',
   said: 'Merge this run onto the base branch, or abort on any failure.',
   command: 'wf approve r ship',
-} as unknown as NonNullable<RunSummary['toDecide']>;
+} as unknown as NonNullable<RunView['toDecide']>;
 
-const summary = (over: Partial<RunSummary> = {}) =>
+const summary = (over: Partial<RunView> = {}) =>
   ({ cancelledAt: null, waitingOnYou: [], steps: [], toDecide: null, ...over }) as Pick<
-    RunSummary,
+    RunView,
     'cancelledAt' | 'waitingOnYou' | 'steps' | 'toDecide'
   >;
 
-const detail = (steps: Step[], over: Partial<RunView> = {}) =>
+const detail = (steps: Step[], over: Partial<RunDetail> = {}) =>
   ({
     cancelledAt: null,
     waitingOnYou: ['ship'],
@@ -71,7 +72,7 @@ const detail = (steps: Step[], over: Partial<RunView> = {}) =>
     },
     steps,
     ...over,
-  }) as unknown as RunView;
+  }) as unknown as RunDetail;
 
 const tried = (round: number, n = 1) => ({ try: n, round }) as Step['tries'][number];
 
@@ -104,7 +105,7 @@ test("gateOfSummary, readLink: the card's gate, what it approves and sends back,
   await t.test(
     'a to-decide gate whose send-back names the step itself is not an ending: it ran, and approving files what waits on it',
     () => {
-      const decide = { ...ENDING_DECIDE, step: 'plan', back: ['plan'] } as NonNullable<RunSummary['toDecide']>;
+      const decide = { ...ENDING_DECIDE, step: 'plan', back: ['plan'] } as NonNullable<RunView['toDecide']>;
       const gate = gateOfSummary(summary({ toDecide: decide }));
       assert.equal(gate?.ends, false, 'the step is where a send-back goes: it has a task, so it ran');
       assert.equal(gateCardLine(gate), 'approve what plan handed on, or send it back');
@@ -115,7 +116,7 @@ test("gateOfSummary, readLink: the card's gate, what it approves and sends back,
   await t.test(
     "a step waiting at its gate on you is the card's gate when no to-decide names one; a run called off, or a gate not waiting on you, has none",
     () => {
-      const steps = [step('plan', { approve: 'approve plan' }), step('implement')] as unknown as RunSummary['steps'];
+      const steps = [step('plan', { approve: 'approve plan' }), step('implement')] as unknown as RunView['steps'];
       assert.deepEqual(gateOfSummary(summary({ steps, waitingOnYou: ['plan'] })), {
         step: 'plan',
         ends: false,
@@ -125,7 +126,7 @@ test("gateOfSummary, readLink: the card's gate, what it approves and sends back,
       assert.equal(gateOfSummary(summary({ steps, waitingOnYou: [] })), null, 'approved already: not waiting on you');
       assert.equal(gateOfSummary(summary({ steps, waitingOnYou: ['plan'], cancelledAt: '2026-09-19T07:00:00.000Z' })), null);
       assert.equal(gateOfSummary(summary({ toDecide: ENDING_DECIDE, cancelledAt: '2026-09-19T07:00:00.000Z' })), null);
-      const asks = [step('implement', { needs: 'Which database?' })] as unknown as RunSummary['steps'];
+      const asks = [step('implement', { needs: 'Which database?' })] as unknown as RunView['steps'];
       assert.equal(
         gateOfSummary(summary({ steps: asks, waitingOnYou: ['implement'] })),
         null,
@@ -134,7 +135,7 @@ test("gateOfSummary, readLink: the card's gate, what it approves and sends back,
     },
   );
   await t.test('an ending that waits on nothing has nobody to send back, and says so rather than offering it', () => {
-    const decide = { ...ENDING_DECIDE, back: [] } as unknown as NonNullable<RunSummary['toDecide']>;
+    const decide = { ...ENDING_DECIDE, back: [] } as unknown as NonNullable<RunView['toDecide']>;
     const gate = gateOfSummary(summary({ toDecide: decide }))!;
     assert.equal(gate.ends, true);
     assert.equal(gateCardLine(gate), 'approve to run ship on main: it waits on no step to send back');
@@ -150,7 +151,7 @@ test("gateOfSummary, readLink: the card's gate, what it approves and sends back,
         advice: 'wf hold r --off',
         waitingOnYou: false,
       };
-      const steps = [step('plan', { approve: 'approve plan' })] as unknown as RunSummary['steps'];
+      const steps = [step('plan', { approve: 'approve plan' })] as unknown as RunView['steps'];
       assert.notEqual(gateOfSummary(summary({ toDecide: ENDING_DECIDE })), null);
       assert.equal(gateOfSummary({ ...summary({ toDecide: ENDING_DECIDE }), holding }), null);
       assert.notEqual(gateOfSummary(summary({ steps, waitingOnYou: ['plan'] })), null);

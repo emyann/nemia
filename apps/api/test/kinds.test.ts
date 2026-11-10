@@ -62,11 +62,6 @@ const MOVES: Readonly<Record<string, Entry>> = {
     move: "the quota asker's default environment, read off the process",
     to: 'the environment `served` gives each handler (src/layer.ts), passed to the asker by its route',
   },
-  'src/inbox/inbox.ts': {
-    reaches: ['node:fs'],
-    move: "reading the inbox's files",
-    to: "packages/agent-orchestrator's runStore inbox, read through its entry",
-  },
   'src/workflows/builder.ts': { reaches: ['node:fs'], ...FOLDER_STORE },
   'src/workflows/workflows.ts': { reaches: ['node:fs'], ...FOLDER_STORE },
 };

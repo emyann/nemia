@@ -1,6 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import type { FactoryCondition, FactoryTemplate } from '@/lib/api';
+import type { FactoryCondition, FactoryTemplate } from '@/lib/api/factories';
 import { conditionAmiss } from '@/lib/factories';
 
 /** A condition the daemon wrote of a factory's template: a badge of its type and state, why, and what it says. */

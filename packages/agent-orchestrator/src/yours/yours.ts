@@ -146,9 +146,6 @@ export const cliPath = (command: string, key: string, takes: string, why: string
   only: { side: 'cli', why },
 });
 
-/** A key the api alone hands, as its body gives it, and why the command line has no flag of it. */
-export const apiKey = (key: string, why: string): Flag => ({ flag: `--${key}`, kind: 'text', key, only: { side: 'api', why } });
-
 /** The spec of a writer named `command`, used as `usage` says: its positionals and flags; any other argument refused in its words. */
 export const writerSpec = (command: string, usage: string, positionals: readonly Positional[], flags: readonly Flag[]): Spec => ({
   positionals,

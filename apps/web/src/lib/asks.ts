@@ -6,14 +6,16 @@
  * engine's. The words that join the first two to a step, `asks` and `blocked by the harness`, are the board's: the package has none for
  * them.
  */
-import type { Question, RunSummary, RunToDecide, StepCloseout } from './api';
-import type { RunView, StepView } from './runView';
+import type { Question, StepCloseout } from './api/tries.ts';
+import type { RunView } from './api/judged.ts';
+import type { RunToDecide } from './api/judged.ts';
+import type { RunDetail, StepView } from './runView';
 import { stepState } from './status.ts';
 import { decidableRun } from './decide.ts';
 import type { Frozen } from './frozen.ts';
 
 /** A step as the list gives it, or as a run's detail does, with what a session the harness blocked said last. */
-type NeedsStep = Pick<RunSummary['steps'][number], 'name' | 'needs' | 'reason' | 'via' | 'waitingFor' | 'approve'> & {
+type NeedsStep = Pick<RunView['steps'][number], 'name' | 'needs' | 'reason' | 'via' | 'waitingFor' | 'approve'> & {
   lastLine?: string | null;
 };
 
@@ -56,7 +58,7 @@ export function needOf(step: NeedsStep, waitingOnYou: boolean, runCancelled: boo
  * (cli/main.ts): that line names the step and the command that approves it, and the same step is not asked for twice.
  */
 export const needsOf = (
-  run: Frozen<Pick<RunSummary, 'cancelledAt' | 'waitingOnYou'> & { steps: readonly NeedsStep[]; toDecide?: RunToDecide | null }>,
+  run: Frozen<Pick<RunView, 'cancelledAt' | 'waitingOnYou'> & { steps: readonly NeedsStep[]; toDecide?: RunToDecide | null }>,
 ): Need[] => {
   const decided = run.toDecide?.kind === 'approve' ? run.toDecide.step : null;
   return run.steps.flatMap((step) => {
@@ -167,7 +169,7 @@ export type OfferCase = Offer['case'];
 export type Answer = Exclude<Offer, { case: 'continue' }>;
 
 /** A run that can be offered anything: called off or held by a person, it is offered nothing. */
-type Offerable = Pick<RunView, 'cancelledAt' | 'waitingOnYou' | 'steps'> & { holding?: RunView['holding'] };
+type Offerable = Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | 'steps'> & { holding?: RunDetail['holding'] };
 
 /**
  * The offers of a run's page, in the run's order: one per step waiting on you that a try or an approval can answer, and one per session
@@ -221,7 +223,7 @@ export function askedOf(run: Offerable, step: string): { try: number; note: stri
  * try a person asked for, which the section notes until the tick files it (`askedOf`) — a run that runs again once its step is answered
  * waits on nobody, and its note would else go with the section the moment the run is read again.
  */
-export const decideDrawn = (run: Offerable & Pick<RunView, 'status'>): boolean =>
+export const decideDrawn = (run: Offerable & Pick<RunDetail, 'status'>): boolean =>
   decidableRun(run) || answersOf(run).length > 0 || run.steps.some((step) => askedOf(run, step.name) !== null);
 
 /**

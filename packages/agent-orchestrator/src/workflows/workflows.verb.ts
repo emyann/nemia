@@ -7,12 +7,12 @@
  * around what each answers.
  */
 import path from 'node:path';
-import { Cause, Effect, Exit } from 'effect';
+import { Cause, Effect, Exit, Schema } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { rooted } from '../factory/wiring/wire.verb.ts';
 import { WorkflowDoor, type CarriedFile } from './workflows.store.ts';
 import type { WorkflowDir } from '../folder/folder.model.ts';
-import type { Args, Flag, Positional, Spec } from '../command/command.ts';
+import type { Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { cliPath, factoryFlag, FROM, versionFlag, writerSpec, yoursOrRefused } from '../yours/yours.ts';
 import { workflowNameRefusal } from '../factory/factory.ts';
@@ -30,11 +30,8 @@ import { workflowDirAt } from '../folder/folder.store.ts';
 import type { Places } from '../skills/read.store.ts';
 import type { WorkflowRemoved, WorkflowWritten } from '../folder/write.store.ts';
 
-/** The text under `key`, or undefined where none was given. */
-const textOf = (args: Args, key: string): string | undefined => {
-  const value = args[key];
-  return typeof value === 'string' ? value : undefined;
-};
+/** Where a writer or a read names a folder: its place (`from`), its name, the repository it is judged on, and the factory it is in. */
+type Where = { from?: string; name: string; repo?: string; factory?: string };
 
 /** A text flag under `key`, as the api hands it. */
 const keyed = (key: string): Flag => ({ flag: `--${key}`, kind: 'text', key });
@@ -47,15 +44,14 @@ const apiSpec = (positionals: readonly Positional[], keys: readonly string[]): S
 });
 
 /** Where a folder's agents and skills are looked for, as a start on `repo` looks, with `home` yours. */
-const placesOf = (args: Args, home: string | undefined): Places => ({
-  ...(textOf(args, 'repo') !== undefined && { repo: textOf(args, 'repo') }),
+const placesOf = ({ repo }: Pick<Where, 'repo'>, home: string | undefined): Places => ({
+  ...(repo !== undefined && { repo }),
   ...(home !== undefined && { home }),
 });
 
 /** The factory the arguments name, read once from the store; none where they name none. */
-function factoryIn(args: Args): Factory | undefined {
-  const name = textOf(args, 'factory');
-  return name === undefined ? undefined : readFactory(name);
+function factoryIn({ factory }: Pick<Where, 'factory'>): Factory | undefined {
+  return factory === undefined ? undefined : readFactory(factory);
 }
 
 /**
@@ -81,12 +77,10 @@ export function factoryDraftOf(home: string, name: string, workflow: string): { 
 }
 
 /** Where a write's folder looks for its agents and skills, and the hires it is filled with: for the place `factory`, `factoryWriteOf`. */
-const writeJudgedOf = (args: Args, home: string): { places: Places; fills?: Fills } => {
-  const factory = textOf(args, 'factory');
-  return textOf(args, 'from') === 'factory' && factory !== undefined
-    ? factoryWriteOf(home, factory, textOf(args, 'name') ?? '')
-    : { places: placesOf(args, home) };
-};
+const writeJudgedOf = (where: Where, home: string): { places: Places; fills?: Fills } =>
+  where.from === 'factory' && where.factory !== undefined
+    ? factoryWriteOf(home, where.factory, where.name)
+    : { places: placesOf(where, home) };
 
 /**
  * The folder of yours a writer (`who`) names, `<home>/workflows/<name>`, or of a factory's tree, `<tree>/workflows/<name>`, as the
@@ -94,10 +88,9 @@ const writeJudgedOf = (args: Args, home: string): { places: Places; fills?: Fill
  * (`workflowNameRefusal`), and for a folder that is no workflow's (`workflowDirAt`). Minted here, where a writer's folder is resolved,
  * rather than in `yoursOrRefused`, which resolves the holders of agents and skills too.
  */
-function yoursWorkflowDir(who: string, args: Args, home: string): WorkflowDir {
-  const name = textOf(args, 'name') ?? '';
-  const yours = yoursOrRefused(who, 'workflows', textOf(args, 'from') ?? '', name, textOf(args, 'repo') ?? '', home, {
-    factory: textOf(args, 'factory'),
+function yoursWorkflowDir(who: string, { from = '', name, repo = '', factory }: Where, home: string): WorkflowDir {
+  const yours = yoursOrRefused(who, 'workflows', from, name, repo, home, {
+    factory,
     treeOf: (factory) => templatedTree(factory, who),
   });
   const badName = workflowNameRefusal(name);
@@ -105,21 +98,48 @@ function yoursWorkflowDir(who: string, args: Args, home: string): WorkflowDir {
   return workflowDirAt(path.resolve(yours, name));
 }
 
+/** The steps of a draft as the writer hands them, read by the command line off its draft folder and drafted by the builder. */
+const StepDrafts = Schema.declare((u: unknown): u is StepDraft[] => Array.isArray(u));
+
 /**
- * The files a draft carries, from `files`, the JSON text the command line reads off `--folder`: none where it is not given, each a
- * name and its text, or refused `Invalid` naming what to send.
+ * What `nemia workflows write`'s handler takes: the place it writes (`from`, `yours` or `factory`, and the `factory` whose tree), the
+ * folder's `name`, the repository it is judged on, the `version` it was read at, its steps (`draft`), its README, and the other files the
+ * draft folder carries (`files`, a script, a schema), each by its path and with its text.
  */
-function carriedArg(text: string | undefined): CarriedFile[] | undefined {
-  if (text === undefined) return undefined;
-  const files: unknown = JSON.parse(text);
-  const isFile = (f: unknown): f is CarriedFile =>
-    typeof f === 'object' && f !== null && typeof (f as CarriedFile).path === 'string' && typeof (f as CarriedFile).text === 'string';
-  if (!Array.isArray(files) || !files.every(isFile))
-    throw new Invalid({
-      message: 'files is a JSON array of { "path", "text" }, one per file a draft carries: send it so, or leave it out.',
-    });
-  return files;
-}
+export const WorkflowWriteInput = Schema.Struct({
+  from: Schema.String,
+  name: Schema.String,
+  factory: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
+  version: Schema.optionalKey(Schema.String),
+  draft: StepDrafts,
+  readme: Schema.optionalKey(Schema.String),
+  files: Schema.optionalKey(Schema.Array(Schema.Struct({ path: Schema.String, text: Schema.String }))),
+});
+export type WorkflowWriteInput = typeof WorkflowWriteInput.Type;
+
+/** What `nemia workflows rm`'s handler takes: the place (`yours`), the folder's name, the `version` it was read at, and the repository. */
+export const WorkflowRemoveInput = Schema.Struct({
+  from: Schema.String,
+  name: Schema.String,
+  version: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
+  factory: Schema.optionalKey(Schema.String),
+});
+export type WorkflowRemoveInput = typeof WorkflowRemoveInput.Type;
+
+/**
+ * What `workflows step`'s handler takes: the workflow's name and folder (`dir`, as the api resolved it), the step, the repository its
+ * agents and skills are looked for on, and the factory whose hires fill it.
+ */
+export const WorkflowStepInput = Schema.Struct({
+  name: Schema.String,
+  step: Schema.String,
+  dir: Schema.String,
+  repo: Schema.optionalKey(Schema.String),
+  factory: Schema.optionalKey(Schema.String),
+});
+export type WorkflowStepInput = typeof WorkflowStepInput.Type;
 
 /**
  * A folder of yours, `<home>/workflows/<name>`, or of the tree of the factory `--factory` names (the place `factory`), written from its
@@ -129,7 +149,7 @@ function carriedArg(text: string | undefined): CarriedFile[] | undefined {
  * `--folder` too, and a file the folder holds that the draft does not carry is left. Answers what was written, and the version the folder
  * is at now.
  */
-export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }> = {
+export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }, WorkflowWriteInput> = {
   name: 'workflows write',
   usage: '(yours | factory) <name> --folder <draft> [--factory <name>] [--version <v>]',
   help: [
@@ -158,21 +178,20 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }> = {
     side: 'cli',
     why: "the api serves it as the Workflow's `create` and `replace` verb of `objects`' Api (`/api/namespaces/:namespace/workflows`), which calls this entry's handler: no route of its own",
   },
-  handler: (args, _env, home = HOME) =>
+  input: WorkflowWriteInput,
+  handler: ({ draft: steps, readme, files, version, ...where }, _env, home = HOME) =>
     rooted(
       home,
       'nemia workflows write',
       Effect.gen(function* () {
-        const dir = yield* tried(() => yoursWorkflowDir('nemia workflows write', args, home));
-        const steps = yield* tried(() => JSON.parse(textOf(args, 'draft') ?? '[]') as StepDraft[]);
-        const { places, fills } = yield* tried(() => writeJudgedOf(args, home));
-        const readme = textOf(args, 'readme');
-        const files = yield* tried(() => carriedArg(textOf(args, 'files')));
+        const dir = yield* tried(() => yoursWorkflowDir('nemia workflows write', where, home));
+        const { places, fills } = yield* tried(() => writeJudgedOf(where, home));
+        const carried: CarriedFile[] | undefined = files && files.map((f) => ({ ...f }));
         const door = yield* WorkflowDoor;
         return yield* door.workflows.write(
           dir,
-          { steps, ...(readme !== undefined && { readme }), ...(files !== undefined && { files }) },
-          textOf(args, 'version'),
+          { steps, ...(readme !== undefined && { readme }), ...(carried !== undefined && { files: carried }) },
+          version,
           places,
           fills,
         );
@@ -213,7 +232,7 @@ const usersOf = Effect.fn('usersOf')(function* (dir: string) {
  * (`workflowVersionRefusal`). Refused, with nothing removed, while a run, a queued card or a factory still needs it (`usersOf`), each
  * named with the command that frees it.
  */
-export const WORKFLOWS_REMOVE: Command<WorkflowRemoved> = {
+export const WORKFLOWS_REMOVE: Command<WorkflowRemoved, WorkflowRemoveInput> = {
   name: 'workflows rm',
   usage: 'yours <name> --version <v>',
   help: ['a workflow folder of yours removed, at the --version it was read at'],
@@ -229,16 +248,17 @@ export const WORKFLOWS_REMOVE: Command<WorkflowRemoved> = {
     side: 'cli',
     why: "the api serves it as the Workflow's `delete` verb of `objects`' Api (`/api/namespaces/:namespace/workflows`), which calls this entry's handler: no route of its own",
   },
-  handler: (args, _env, home = HOME) =>
+  input: WorkflowRemoveInput,
+  handler: ({ version, ...where }, _env, home = HOME) =>
     rooted(
       home,
       'nemia workflows rm',
       Effect.gen(function* () {
-        const dir = yield* tried(() => yoursWorkflowDir('nemia workflows rm', args, home));
+        const dir = yield* tried(() => yoursWorkflowDir('nemia workflows rm', where, home));
         const users = yield* usersOf(dir);
-        const { places } = yield* tried(() => writeJudgedOf(args, home));
+        const { places } = yield* tried(() => writeJudgedOf(where, home));
         const door = yield* WorkflowDoor;
-        return yield* door.workflows.remove(dir, textOf(args, 'version'), users, places);
+        return yield* door.workflows.remove(dir, version, users, places);
       }),
     ),
   print: ({ dir, removed }) => [`removed ${dir}: ${removed.join(', ')}`],
@@ -277,7 +297,7 @@ export const foldersLoaded = Effect.fn('foldersLoaded')(function* (
  * One step of the folder `dir`, the workflow `name`, loaded as a start would load it, in the factory named with its hires: the step, or
  * null where the folder has none of that name, and the names of the steps it has.
  */
-export const WORKFLOWS_STEP: Command<{ step: Workflow | null; steps: string[] }> = {
+export const WORKFLOWS_STEP: Command<{ step: Workflow | null; steps: string[] }, WorkflowStepInput> = {
   name: 'workflows step',
   usage: '<from> <name> <step>',
   help: ['one step of a workflow folder, loaded'],
@@ -291,25 +311,24 @@ export const WORKFLOWS_STEP: Command<{ step: Workflow | null; steps: string[] }>
   ),
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/workflows/:from/:name/:step', status: 200 },
   only: {
     side: 'api',
-    why: "the board's page of a step reads it as the builder shows it; at the command line a person reads the step's file",
+    why: "the board's page of a step reads it as the builder shows it, through the Workflow's `step` verb of `objects`' Api; at the command line a person reads the step's file",
   },
-  handler: (args, _env, home) =>
+  input: WorkflowStepInput,
+  handler: (where, _env, home) =>
     rooted(
       home,
       'workflows step',
       Effect.gen(function* () {
-        const name = textOf(args, 'name') ?? '';
-        const dir = yield* tried(() => workflowDirAt(path.resolve(textOf(args, 'dir') ?? '')));
+        const dir = yield* tried(() => workflowDirAt(path.resolve(where.dir)));
         const fills = yield* tried(() => {
-          const factory = factoryIn(args);
-          return factory && factoryFills(factory, name).fills;
+          const factory = factoryIn(where);
+          return factory && factoryFills(factory, where.name).fills;
         });
         const door = yield* WorkflowDoor;
-        const steps = yield* door.workflows.read(dir, placesOf(args, home), fills);
-        return { step: steps.find((s) => s.name === textOf(args, 'step')) ?? null, steps: steps.map((s) => s.name) };
+        const steps = yield* door.workflows.read(dir, placesOf(where, home), fills);
+        return { step: steps.find((s) => s.name === where.step) ?? null, steps: steps.map((s) => s.name) };
       }),
     ),
   print: () => [],

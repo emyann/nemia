@@ -19,7 +19,7 @@ import { at, routedWith, runWith, textsOf, withClient } from './markup-fixtures.
 
 const { createElement } = await import('react');
 const { renderToStaticMarkup } = await import('react-dom/server');
-type RunView = import('../src/lib/runView.ts').RunView;
+type RunDetail = import('../src/lib/runView.ts').RunDetail;
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
 
 test("an agent's form shows its card read-only, generated from its skills: an entry each, no field to edit it, and the package's refusal where none can be made", async () => {
@@ -372,7 +372,7 @@ const tried = (id: string, fields: Record<string, unknown> = {}) => ({
 });
 
 /** A try's run as its page reads it: one step, `try`, filed, with what it spent of its dollar and the files its folder holds. */
-function tryDetail(fields: Record<string, unknown> = {}): RunView {
+function tryDetail(fields: Record<string, unknown> = {}): RunDetail {
   const run = runWith(null);
   return {
     ...run,

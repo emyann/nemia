@@ -4,7 +4,7 @@
  * (`judgedFields`), so the object and the list say a run alike. The board reads the object, and a step's tries and told layers at their
  * sub-resources, each its own read.
  */
-import { createHash } from 'node:crypto';
+import { valueVersion } from '../digest/digest.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
@@ -323,11 +323,8 @@ export const runObjectOf = Effect.fnUntraced(function* (
   return withDiskParts(yield* runObjectCore(run, at, reads), diskPartsOf(run, at.home, at.folder));
 });
 
-/**
- * A digest of `value`, its JSON's sha256 cut to 16 hex characters, as every other kind's `resourceVersion` is taken: the same value, the
- * same word, across a restart too.
- */
-const runVersion = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 16);
+/** A digest of `value`, as every other kind's `resourceVersion` is taken (`valueVersion`). */
+const runVersion = valueVersion;
 
 /**
  * The run's object before its disk parts (`withDiskParts`), built off its reading in hand (`RunReading`): what the RunList builds a run of

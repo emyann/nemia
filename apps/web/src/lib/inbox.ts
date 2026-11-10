@@ -1,4 +1,7 @@
-import type { CardState, Ceilings, Factory, InboxEntry, WorkflowListing } from './api';
+import type { CardState, InboxEntry } from './api/inbox.ts';
+import type { Ceilings } from './api/ceilings.ts';
+import type { Factory } from './api/factories.ts';
+import type { WorkflowListing } from './api/workflows.ts';
 import { DEFAULT_NAME, shownIn, startRepo } from './factories.ts';
 
 /**

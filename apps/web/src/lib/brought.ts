@@ -6,7 +6,7 @@
 import type { BroughtFacts, BroughtPart, BroughtPartOf } from '../../contracts/brought.contract.ts';
 import { askedOf, offersOf } from './asks.ts';
 import { gateOfStep } from './gate.ts';
-import type { RunView } from './runView';
+import type { RunDetail } from './runView';
 
 export type { BroughtPart } from '../../contracts/brought.contract.ts';
 
@@ -24,7 +24,7 @@ export const broughtPart: BroughtPartOf = (facts: BroughtFacts): BroughtPart => 
 };
 
 /** What the run's page reads of the step `step` of `run`, each fact its own read: `gateOfStep`, `offersOf`'s case for it, `askedOf`. */
-export function broughtFacts(run: RunView, step: string): BroughtFacts {
+export function broughtFacts(run: RunDetail, step: string): BroughtFacts {
   const found = run.steps.find((s) => s.name === step);
   if (!found) return { found: false, atGate: false, offer: null, asked: false };
   return {

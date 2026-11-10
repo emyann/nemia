@@ -1,10 +1,10 @@
 /** A run's and a card's labels: the two writes that edit them (apps/api's label routes), and what the label page reads. */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
-import { get } from './read.ts';
-import { selectorKey, withSelector } from './selector.ts';
-import { Labelled } from 'objects';
-import { cards, namespaceOf, runs } from './objects.ts';
+import { decoded } from './read.ts';
+import { selectorKey } from './selector.ts';
+import { Labelled, Stats } from 'objects';
+import { call, cards, namespaceOf, read, runs } from './objects.ts';
 
 /** A label map: a key, its value. */
 export type Labels = Record<string, string>;
@@ -34,6 +34,10 @@ export type LabelStats = {
   };
 };
 
+/**
+ * The part of the stats the label page reads. A copy that stays: `objects`' `Stats` carries `all` as JSON (the orchestrator's stats as
+ * they print), so the board decodes the totals it shows from it.
+ */
 const LabelStatsSchema = Schema.Struct({
   all: Schema.Struct({
     total: Schema.Struct({ runs: Schema.Number, landed: Schema.NullOr(Schema.Number), costPerLanded: Schema.NullOr(Schema.Number) }),
@@ -51,7 +55,10 @@ export const spentOf = (stats: LabelStats): number | null => {
 export const labelStatsQuery = (selector: string) =>
   queryOptions({
     queryKey: ['stats', ...selectorKey(selector)],
-    queryFn: (): Promise<LabelStats> => get(withSelector('/api/stats', selector), LabelStatsSchema),
+    queryFn: (): Promise<LabelStats> =>
+      call((c) => c.server.stats({ query: {} }), read(Stats, selector.trim() === '' ? undefined : { selector: selector.trim() })).then(
+        (stats) => decoded('GET /api/stats', LabelStatsSchema, stats),
+      ),
   });
 
 /** The address' label filter, `?l=<selector>`, kept where it says something. */

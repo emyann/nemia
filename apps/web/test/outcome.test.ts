@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { foldsAtGate, imagePaths, MACHINE_WORDS, MARKDOWN_AT, outcomeOf, outcomeWord, outputKind } from '../src/lib/outcome.ts';
-import type { StepAttempts, StepCloseout } from '../src/lib/api.ts';
+import type { StepAttempts, StepCloseout } from '../src/lib/api/tries.ts';
 import type { AttemptEnd, AttemptOutcome } from '../src/lib/api/tries.ts';
 
 const none = new Set<string>();

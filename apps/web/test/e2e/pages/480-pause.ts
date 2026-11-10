@@ -1,8 +1,9 @@
+import type * as RunObject from 'objects';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import type { Paused } from '../../../src/lib/api/pause.ts';
-import type { RunObject } from '../../../src/lib/api.ts';
+
 import { finishingSentence } from '../../../src/lib/pause.ts';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';

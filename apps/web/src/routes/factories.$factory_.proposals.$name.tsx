@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { ProposalCard } from '@/components/gate/ProposalCard';
 import { routeLink } from '@/components/nav/routeLink';
 import { LinkButton } from '@/components/ui/button';
-import { proposalQuery } from '@/lib/api';
+import { proposalQuery } from '@/lib/api/proposals';
 
 /**
  * A factory's proposal, at /factories/$factory/proposals/$name: `$factory_` draws it on its own, not inside the floor, which has no outlet

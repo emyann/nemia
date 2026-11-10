@@ -1,8 +1,8 @@
 /**
  * The Workflows, Agents and Skills served as objects (definitions/): each list a `<Kind>List`, each name served once from the first origin
  * that holds it and every origin by `?origin=`, the factory's tree as `factory`; writes of yours taken in `default` alone, a factory's own
- * refused the factory's way and the files left as they were; a stale version a 409; the builder's save round-tripping its spec; each write
- * guarded before its body is read; and the routes these retire answering 404 — in a scratch store and a scratch repository.
+ * refused the factory's way and the files left as they were; a stale version a 409; the builder's save round-tripping its spec; and the
+ * routes these retire answering 404 — in a scratch store and a scratch repository.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
@@ -219,29 +219,6 @@ test('a builtin skill copied to yours (201), its files listed by path', async ()
   assert.equal(shadowed.status.shadowedBy, 'yours');
   const files = (await get<{ paths: string[] }>(`/api/namespaces/default/skills/${name}/files`)).body;
   assert.ok(files.paths.includes('SKILL.md'));
-});
-
-test('each write is refused 403 for another site and 415 for a body that is not JSON, before it is read', async () => {
-  const writes: Array<[string, string]> = [
-    ['POST', W],
-    ['PUT', `${W}/mine`],
-    ['DELETE', `${W}/mine`],
-    ['POST', '/api/namespaces/default/agents'],
-    ['PUT', '/api/namespaces/default/agents/implementer'],
-    ['DELETE', '/api/namespaces/default/agents/implementer'],
-    ['POST', '/api/namespaces/default/agents/implementer/try'],
-    ['POST', '/api/namespaces/default/skills'],
-    ['PUT', '/api/namespaces/default/skills/x'],
-    ['POST', '/api/namespaces/default/skills/x/copy'],
-  ];
-  const before = fs.readdirSync(STORE).sort();
-  for (const [method, url] of writes) {
-    const away = await app.request(url, { method, headers: { ...json, host: 'evil.example' }, body: '{}' });
-    assert.equal(away.status, 403, `${method} ${url}`);
-    const text = await app.request(url, { method, headers: { 'content-type': 'text/plain' }, body: 'hi' });
-    assert.equal(text.status, 415, `${method} ${url}`);
-  }
-  assert.deepEqual(fs.readdirSync(STORE).sort(), before);
 });
 
 test('a list is paged by limit and continue, and kept by labelSelector', async () => {

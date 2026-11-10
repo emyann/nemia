@@ -3,8 +3,12 @@
  * its current tool call's end, or are Paused once nothing does, as the package says it (`pausedWords`), read off `GET /api/pause` on each
  * poll and never kept. Pure: the time is handed in. The board neither shows nor sets a pause's timeout: it pauses with the store's, and
  * says only when what finishes is cut.
+ *
+ * The sentences copy the package's (`pausedWords`, `pausingWords`, its pause's three effects in agent-orchestrator's `pause/pause.ts`): a
+ * copy that stays, since `GET /api/pause` answers the pause's facts (`objects`' `Paused`) and none of its sentences, and the board says
+ * them with its own clock (`clockWord`) and the time handed in. Served sentences would be an addition to `Paused` first.
  */
-import type { Finishing, Interrupt, Parked, Pause, Paused, PauseHeld, PauseStaged } from './api';
+import type { Finishing, Interrupt, Parked, Pause, Paused, PauseHeld, PauseStaged } from './api/pause.ts';
 import { durationWords } from './duration.ts';
 import { clockWord } from './quota.ts';
 

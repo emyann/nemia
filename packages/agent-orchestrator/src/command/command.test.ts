@@ -5,6 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { Schema } from 'effect';
 import { commandBreaks, commandLine, helpOf, leftOut, parseArgv, renamedIn, renamedValues, type Spec } from './command.ts';
 import { COMMANDS, TABLE } from './commands.verb.ts';
 
@@ -162,12 +163,12 @@ test('an empty text where a spec says its refusal is given to the handler, which
   assert.equal(parseArgv({ ...idea, missing: undefined }, ['']), undefined);
 });
 
-test("a text flag's value left out — empty, or a word starting -- — is refused in its own takes; one the api alone takes is not looked at", () => {
-  const spec: Spec = { ...SPEC, flags: [...SPEC.flags, { flag: '--words', kind: 'text', key: 'words', only: { side: 'api', why: 'w' } }] };
+test("a text flag's value left out — empty, or a word starting -- — is refused in its own takes", () => {
+  const spec = SPEC;
   assert.equal(leftOut(spec, { runId: 'r-1', note: '' }), 'NOTE TAKES');
   assert.equal(leftOut(spec, { runId: 'r-1', note: '--slow' }), 'NOTE TAKES');
   assert.equal(leftOut(spec, { runId: 'r-1', note: ['hi', '--x'] }), 'NOTE TAKES');
-  assert.equal(leftOut(spec, { runId: 'r-1', note: 'hi -- there', words: '' }), null);
+  assert.equal(leftOut(spec, { runId: 'r-1', note: 'hi -- there' }), null);
   assert.equal(leftOut(spec, { runId: 'r-1', who: '' }), null, 'a name flag is refused by the reader, not here');
 });
 
@@ -815,89 +816,66 @@ test('the help prints no command the CLI does not serve', () => {
   );
 });
 
-/** A spec that takes a card's `name`, and the words a person or the api alone gives. */
+/** A spec that takes a card's `name`, and a file the CLI alone reads. */
 const CARD: Spec = {
   positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
-  flags: [
-    { flag: '--file', kind: 'text', key: 'file', only: { side: 'cli', why: 'the api is sent the words' } },
-    { flag: '--words', kind: 'text', key: 'words', only: { side: 'api', why: 'a command line names a file', required: true } },
-  ],
+  flags: [{ flag: '--file', kind: 'text', key: 'file', only: { side: 'cli', why: 'the api is sent the words' } }],
   unknown: (arg) => `UNKNOWN ${arg}`,
 };
 
 type Table = Parameters<typeof commandBreaks>[0];
 
-const POST = { method: 'POST', path: '/api/x', status: 202 } as const;
-const GET = { method: 'GET', path: '/api/x', status: 200 } as const;
-const PUT = { method: 'PUT', path: '/api/cards/:name', status: 200 } as const;
-const BY_HAND = { method: 'POST', path: '/api/x', status: 201, hand: 'it answers a Location' } as const;
-const SETS = { method: 'DELETE', path: '/api/x', status: 200, sets: { off: true, mode: 'fast' } } as const;
-const ROUTES = [
-  { method: 'POST', path: '/api/x', status: 200 },
-  { method: 'DELETE', path: '/api/x', status: 200, sets: { off: true } },
-] as const;
+/** An entry's typed keys, which the api calls it by. */
+const input = Schema.Struct({ name: Schema.String });
 const API = { side: 'api', why: 'w' } as const;
 const CLI_ALONE = { side: 'cli', why: 'w' } as const;
-const SAID_NOTHING = { ...CARD, flags: [{ ...CARD.flags[0], only: { side: 'cli', why: '' } } as const, CARD.flags[1]] };
+const SAID_NOTHING: Spec = { ...CARD, flags: [{ flag: '--file', kind: 'text', key: 'file', only: { side: 'cli', why: '' } }] };
 
 /**
  * Each table `commandBreaks` reads, the CLI's verbs and runners beside it, and what it breaks: one list of fragments per break, in
  * order, each naming the entry and the fix; none for a table that keeps its rules.
  */
 const BREAKS: ReadonlyArray<readonly [string, Table, readonly string[], readonly string[], ReadonlyArray<readonly string[]>]> = [
-  ['an entry that ticks and writes', [{ name: 'x', route: POST, handler, writes: true, ticks: true }], [], [], []],
+  ['an entry that ticks and writes', [{ name: 'x', input, handler, writes: true, ticks: true }], [], [], []],
   [
     'REFUSED: an entry that ticks and writes nothing, since nothing it does waits on a pass',
-    [{ name: 'x', route: POST, handler, writes: false, ticks: true }],
+    [{ name: 'x', input, handler, writes: false, ticks: true }],
     [],
     [],
     [['x ticks and writes nothing', 'writes: true']],
   ],
-  ['an entry routed, beside a verb of another name', [{ name: 'a', route: POST, handler }], ['b'], [], []],
+  ['an entry served on both sides, typed, beside a verb of another name', [{ name: 'a', input, handler }], ['b'], [], []],
   ['an entry the CLI alone serves', [{ name: 'a', only: CLI_ALONE, handler }], [], [], []],
+  ['an entry the api alone serves', [{ name: 'a', only: API, handler }], [], [], []],
   [
     'a name twice',
     [
-      { name: 'a', route: POST, handler },
-      { name: 'a', route: { ...POST, path: '/api/y' }, handler },
+      { name: 'a', input, handler },
+      { name: 'a', only: CLI_ALONE, handler },
     ],
     [],
     [],
     [['a is defined twice']],
   ],
-  ['an entry served nowhere', [{ name: 'a', handler }], [], [], [['a has no route and no only', 'which side alone serves it']]],
-  ['a command that is also a verb of the CLI', [{ name: 'a', route: POST, handler }], ['a'], [], [['a is a command', 'out of VERBS']]],
   [
-    'one path, another method',
-    [
-      { name: 'a', route: GET, handler },
-      { name: 'b', route: POST, handler },
-    ],
+    'REFUSED: an entry served on both sides with no input, which the api has no keys to call it by',
+    [{ name: 'a', handler }],
     [],
     [],
-    [],
+    [['a has no input and no only', 'give it its input', 'which side alone serves it']],
   ],
-  [
-    'two entries routed on one method and path, of which the api serves the first alone',
-    [
-      { name: 'a', route: GET, only: API, handler },
-      { name: 'b', route: GET, only: API, handler },
-    ],
-    [],
-    [],
-    [['b is routed on GET /api/x, as a is', 'a path of its own']],
-  ],
+  ['a command that is also a verb of the CLI', [{ name: 'a', input, handler }], ['a'], [], [['a is a command', 'out of VERBS']]],
   [
     'an entry named by a former spelling, which the line it names would never reach',
-    [{ name: 'agents remove', route: POST, handler }],
+    [{ name: 'agents remove', input, handler }],
     [],
     [],
     [['agents remove', 'RENAMED']],
   ],
-  ['a verb of the CLI beside an entry the api alone serves', [{ name: 'decide', route: GET, only: API, handler }], ['decide'], [], []],
+  ['a verb of the CLI beside an entry the api alone serves', [{ name: 'decide', only: API, handler }], ['decide'], [], []],
   [
     'a verb of the CLI beside an entry the CLI serves',
-    [{ name: 'decide', route: GET, only: CLI_ALONE, handler }],
+    [{ name: 'decide', only: CLI_ALONE, handler }],
     ['decide'],
     [],
     [['decide is', 'take it out of VERBS']],
@@ -905,7 +883,7 @@ const BREAKS: ReadonlyArray<readonly [string, Table, readonly string[], readonly
   ['an entry the CLI alone serves with a runner and no handler', [{ name: 'a', only: CLI_ALONE }], [], ['a'], []],
   [
     'an entry the api serves with no handler',
-    [{ name: 'a', route: POST }],
+    [{ name: 'a', input }],
     [],
     ['a'],
     [['a has no handler and is served on the api', 'give it a handler']],
@@ -919,7 +897,7 @@ const BREAKS: ReadonlyArray<readonly [string, Table, readonly string[], readonly
   ],
   [
     'a runner of the CLI that runs no entry the CLI serves',
-    [{ name: 'a', route: GET, only: API, handler }],
+    [{ name: 'a', only: API, handler }],
     [],
     ['a', 'b'],
     [
@@ -927,37 +905,7 @@ const BREAKS: ReadonlyArray<readonly [string, Table, readonly string[], readonly
       ['b has a runner', 'its entry in the table', 'take it out of RUNS'],
     ],
   ],
-  [
-    'the keys a route sets, each filled by a flag',
-    [{ name: 'a', route: SETS, spec: { ...HOLDING, flags: [...HOLDING.flags, ...SPEC.flags] }, handler }],
-    [],
-    [],
-    [],
-  ],
-  [
-    'a key a route sets that no flag fills: off',
-    [{ name: 'a', route: SETS, spec: SPEC, handler }],
-    [],
-    [],
-    [["a's route sets off", 'name a key']],
-  ],
-  ['a key a route sets that no flag fills: mode', [{ name: 'a', route: SETS, spec: HOLDING, handler }], [], [], [["a's route sets mode"]]],
-  ["a name in a route's path its spec takes", [{ name: 'a', route: PUT, spec: CARD, handler }], [], [], []],
-  [
-    "a name in a route's path that no argument of its spec takes",
-    [{ name: 'a', route: { ...PUT, path: '/api/cards/:card' }, spec: CARD, handler }],
-    [],
-    [],
-    [['names :card', 'key a positional card']],
-  ],
-  ['a route served by hand, saying why', [{ name: 'a', route: BY_HAND, handler }], [], [], []],
-  [
-    'a why left empty, of a route served by hand',
-    [{ name: 'a', route: { ...BY_HAND, hand: ' ' }, handler }],
-    [],
-    [],
-    [['served by hand and says no why']],
-  ],
+  ['a flag the CLI alone takes, saying why', [{ name: 'a', input, spec: CARD, handler }], [], [], []],
   [
     'a why left empty, of a side alone',
     [{ name: 'a', only: { side: 'cli', why: '' }, handler }],
@@ -966,50 +914,11 @@ const BREAKS: ReadonlyArray<readonly [string, Table, readonly string[], readonly
     [['served on the cli alone and says no why']],
   ],
   [
-    'a why left empty, of a flag one side alone takes',
-    [{ name: 'a', route: PUT, spec: SAID_NOTHING, handler }],
+    'a why left empty, of a flag the CLI alone takes',
+    [{ name: 'a', input, spec: SAID_NOTHING, handler }],
     [],
     [],
     [["a's --file is taken on the cli alone", 'says no why']],
-  ],
-  [
-    'a flag the api alone takes, handed by a route served by hand',
-    [{ name: 'a', route: { ...PUT, hand: 'by hand' }, spec: CARD, handler }],
-    [],
-    [],
-    [],
-  ],
-  [
-    'a flag the api alone takes on an entry with no route that hands it',
-    [{ name: 'a', route: { ...PUT, method: 'GET' }, spec: CARD, handler }],
-    [],
-    [],
-    [["a's --words is taken on the api alone", 'route it, or take the flag out']],
-  ],
-  [
-    'a flag the api alone takes on an entry the CLI alone serves',
-    [{ name: 'a', only: { side: 'cli', why: 'a file' }, spec: CARD, handler }],
-    [],
-    [],
-    [["a's --words is taken on the api alone"]],
-  ],
-  ["an entry's routes, each keeping the rules", [{ name: 'a', route: ROUTES, spec: HOLDING, handler }], [], [], []],
-  [
-    "one of an entry's routes routed on another's path",
-    [
-      { name: 'a', route: ROUTES, spec: HOLDING, handler },
-      { name: 'b', route: { method: 'DELETE', path: '/api/x', status: 200 }, handler },
-    ],
-    [],
-    [],
-    [['b is routed on DELETE /api/x, as a is']],
-  ],
-  [
-    "a key one of an entry's routes sets that no flag fills",
-    [{ name: 'a', route: ROUTES, spec: SPEC, handler }],
-    [],
-    [],
-    [["a's route sets off"]],
   ],
 ];
 
@@ -1254,7 +1163,7 @@ test('REFUSED at shipped defaults: what each command refuses of its command line
   });
 });
 
-test('a command line refuses a flag the api alone takes, as one the command does not take, and reads one the CLI alone takes', () => {
+test('a command line refuses a flag its spec does not have, as one the command does not take, and reads one the CLI alone takes', () => {
   assert.equal(refusalOf(['x', '--words', 'hi'], CARD), 'UNKNOWN --words');
   assert.equal(refusalOf(['x', '--words=hi'], CARD), 'UNKNOWN --words=hi');
   assert.deepEqual(parseArgv(CARD, ['x', '--file', 'f.md']), { name: 'x', file: 'f.md' });

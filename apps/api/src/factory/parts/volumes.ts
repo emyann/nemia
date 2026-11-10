@@ -7,7 +7,6 @@ import { HttpApiBuilder } from 'effect/http-api';
 import { informerMemo, type SummaryHow, verifiesRest, volumeList, volumeObject } from 'agent-orchestrator';
 import { Api } from 'objects';
 import type { Served } from '../../layer.ts';
-import { runPlaced } from '../../store.ts';
 import { defaultRepo, factoryNamed, queryOf } from './parts.ts';
 import { answered } from '../../objects/refused.ts';
 
@@ -24,13 +23,13 @@ export const volumesHandlers = HttpApiBuilder.group(Api, 'volumes', (handlers) =
     .handle('list', ({ params: { namespace }, query }) =>
       answered((s) => {
         factoryNamed(`GET /api/namespaces/${namespace}/volumes`, namespace);
-        return runPlaced(s, s.e, volumeList(s.e, howOf(s), defaultRepo(s), namespace, queryOf(query)));
+        return s.inRequest(volumeList(s.e, howOf(s), defaultRepo(s), namespace, queryOf(query)));
       }),
     )
     .handle('get', ({ params: { namespace, name } }) =>
       answered((s) => {
         factoryNamed(`GET /api/namespaces/${namespace}/volumes/${name}`, namespace);
-        return runPlaced(s, s.e, volumeObject(s.e, howOf(s), defaultRepo(s), namespace, name));
+        return s.inRequest(volumeObject(s.e, howOf(s), defaultRepo(s), namespace, name));
       }),
     ),
 );

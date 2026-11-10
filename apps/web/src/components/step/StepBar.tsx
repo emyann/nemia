@@ -2,8 +2,8 @@
  * The frame's floating bar for one step of a run: the step's tabs (`StepTabs`), read from the run's record, which a read again keeps
  * current.
  */
-import { readGone } from '@/lib/api';
-import { useRunRead, type RunView } from '@/lib/runView';
+import { readGone } from '@/lib/api/gone';
+import { useRunRead, type RunDetail } from '@/lib/runView';
 import { titleOf } from '@/lib/factory';
 import { FloatingBar } from '../frame/FloatingBar';
 import { RunGone } from '../run/RunGone';
@@ -24,7 +24,7 @@ export function StepBar({ run: id, step: name }: { run: string; step: string }) 
 }
 
 /** What the step bar holds for the step `name` of the run `id`, as `run` was last read and `error` its read's failure, if any. */
-function StepBody({ id, name, run, error }: { id: string; name: string; run: RunView | undefined; error: unknown }) {
+function StepBody({ id, name, run, error }: { id: string; name: string; run: RunDetail | undefined; error: unknown }) {
   if (run && readGone(error)) return <RunGone run={run} />;
   if (!run) return <Unread id={id} error={error} />;
   const step = run.steps.find((s) => s.name === name);

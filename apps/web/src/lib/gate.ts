@@ -6,8 +6,9 @@
  * sentences joining them are the board's, so a person reads what approving does without knowing the package: the CLI's `ls` prints the
  * command.
  */
-import type { Collision, Collisions, Decidable, RunSummary } from './api';
-import type { RunView, StepView } from './runView';
+import type { Collision, Collisions, Decidable } from './api/decision.ts';
+import type { RunView } from './api/judged.ts';
+import type { RunDetail, StepView } from './runView';
 import { askedSaid, needsOf, stepAnchor, type Need } from './asks.ts';
 import { touchedSummary } from './decide.ts';
 import { verdictWords } from './words.ts';
@@ -32,7 +33,7 @@ export type GateAsk = { step: string; ends: boolean; back: readonly string[]; on
  * goes, which the package would refuse for an ending, in its words.
  */
 export function gateOfSummary(
-  run: Pick<RunSummary, 'cancelledAt' | 'waitingOnYou' | 'steps' | 'toDecide'> & { holding?: RunSummary['holding'] },
+  run: Pick<RunView, 'cancelledAt' | 'waitingOnYou' | 'steps' | 'toDecide'> & { holding?: RunView['holding'] },
 ): GateAsk | null {
   if (run.cancelledAt !== null || run.holding != null) return null;
   const decide = run.toDecide;
@@ -50,7 +51,7 @@ export function gateOfSummary(
  * edges for an ending that has no task yet.
  */
 export function gateOfStep(
-  run: Pick<RunView, 'cancelledAt' | 'waitingOnYou' | 'branch' | 'graph'>,
+  run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | 'branch' | 'graph'>,
   step: Pick<DetailStep, 'name' | 'approve' | 'spec' | 'taskId'>,
 ): GateAsk | null {
   if (run.cancelledAt !== null || !step.approve || !run.waitingOnYou.includes(step.name)) return null;
@@ -142,7 +143,7 @@ export const takenLine = (
 export type GateFact = { label: string; said: string; state?: 'good' | 'bad'; step?: string };
 
 /** What a person's approval of a loop out of rounds adds to its last review's fact — its words, and the findings left open — or null. */
-function acceptedWords(looping: Pick<RunView['steps'][number], 'gate'>, findings: number | null): string | null {
+function acceptedWords(looping: Pick<RunDetail['steps'][number], 'gate'>, findings: number | null): string | null {
   const approval = looping.gate?.approval;
   if (!approval) return null;
   return `; a person accepted the work as it stands, with ${findings === 1 ? 'it' : 'them'} open${approval.message ? `: ${approval.message}` : ''}`;
@@ -158,7 +159,7 @@ function acceptedWords(looping: Pick<RunView['steps'][number], 'gate'>, findings
  * loop, its gate's approval) is said accepted as it stands, with their words, not as asking another round, though its closeout still says
  * `again: true` (`acceptedWords`).
  */
-export function gateFacts(run: Pick<RunView, 'steps' | 'cost'>, decision: Decidable | null): GateFact[] {
+export function gateFacts(run: Pick<RunDetail, 'steps' | 'cost'>, decision: Decidable | null): GateFact[] {
   const facts: GateFact[] = [];
   const loops = run.steps.filter((s) => s.spec?.loop);
   const round = Math.max(1, ...run.steps.flatMap((s) => s.tries.map((t) => t.round)));

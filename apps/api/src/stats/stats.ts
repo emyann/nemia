@@ -1,9 +1,11 @@
 /** The flow numbers of every run in the store, for the board: what `nemia stats --json` prints. */
-import { Hono } from 'hono';
 import { STATS, statsQueryOf, type QueryKey, type Stats } from 'agent-orchestrator';
-import { type ApiEnv, served } from '../layer.ts';
-import { selectorOf } from '../labels/index.ts';
-import { runPlaced } from '../store.ts';
+import type { StatsQuery } from 'objects';
+import type { Served } from '../layer.ts';
+
+/** `GET /api/stats`' query, as objects' `StatsQuery` declares it. */
+/** The query `StatsQuery` declares, and the label queries the api read off the request (`selectorsOf`, server/server.ts). */
+type StatsAsked = { readonly [K in keyof typeof StatsQuery]?: (typeof StatsQuery)[K]['Type'] } & { readonly selector?: readonly string[] };
 
 export type { Stats };
 
@@ -11,7 +13,7 @@ export type { Stats };
  * The query keys `GET /api/stats` reads, by the key of the package's query each sets. The factory and the repository to keep are read
  * off `ofFactory` and `ofRepo`, since `factory` and `repo` name the place every route is answered in (`served`).
  */
-const QUERY_KEYS: Record<QueryKey, string> = {
+const QUERY_KEYS: Record<QueryKey, keyof StatsAsked> = {
   from: 'from',
   to: 'to',
   by: 'by',
@@ -44,21 +46,16 @@ const QUERY_KEYS: Record<QueryKey, string> = {
  *   `nemia stats -l` keeps them (OR across repeats, the run's whole map read as `GET /api/runs` reads it); a selector the package's
  *   grammar refuses is a 422 naming the key or the clause.
  */
-export const stats = new Hono<ApiEnv>().get('/api/stats', (c) =>
-  served(c, async ({ e, placeService, env, home, memo, trace }) => {
-    const given = Object.fromEntries(
-      Object.entries(QUERY_KEYS).flatMap(([key, name]) => {
-        const value = c.req.query(name);
-        return value === undefined ? [] : [[key, value]];
-      }),
-    );
-    statsQueryOf(given, (key) => `?${QUERY_KEYS[key]}=`);
-    return c.json(
-      await runPlaced(
-        { placeService, home, trace },
-        e,
-        STATS.handler({ ...given, ...selectorOf(c) }, env, home, { stats: memo.stats, series: memo.series }),
-      ),
-    );
-  }),
-);
+export async function statsOf(query: StatsAsked, { env, home, memo, inRequest }: Served): Promise<Stats> {
+  const given = Object.fromEntries(
+    (Object.entries(QUERY_KEYS) as [QueryKey, keyof StatsAsked][]).flatMap(([key, name]) => {
+      const value = query[name];
+      return typeof value === 'string' ? [[key, value]] : [];
+    }),
+  );
+  statsQueryOf(given, (key) => `?${QUERY_KEYS[key]}=`);
+  const selector = query.selector === undefined ? undefined : [...query.selector];
+  return inRequest(
+    STATS.handler({ ...given, ...(selector?.length ? { selector } : {}) }, env, home, { stats: memo.stats, series: memo.series }),
+  );
+}

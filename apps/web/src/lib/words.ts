@@ -7,7 +7,10 @@
 import type { ProposalPhase } from 'objects';
 import type { CardState } from './api/inbox.ts';
 import type { RunOutcome } from './api/runs.ts';
-import type { CheckVerdict, WaitOn } from './api/reasons.ts';
+import type { StepCheck, WaitOn } from 'objects';
+
+/** A check's verdict: its result, and the code it exited with. */
+type CheckVerdict = NonNullable<StepCheck['verdict']>;
 import type { OfferCase } from './asks.ts';
 import type { Hue } from './meaning.ts';
 import type { StepState } from './status.ts';

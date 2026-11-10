@@ -6,8 +6,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { RunSummary } from '../src/lib/api.ts';
-import { coded, type Word } from './run-fixtures.ts';
+import type { RunView } from '../src/lib/api/judged.ts';
+import { listedStep, summary, type Word } from './run-fixtures.ts';
 import {
   byAge,
   clockCounts,
@@ -49,56 +49,13 @@ import type { Point } from '../src/lib/layout.ts';
  * A run with one step per status, filed unless it is still waiting, and `status` and `moving` as the api put them; its `waitingOnYouWords`,
  * `wf ls`'s words for who it waits on, is the steps `waitingOnYou` names unless `extra` gives it.
  */
-const run = (statuses: readonly Word[], extra: Partial<RunSummary> = {}): RunSummary => ({
-  labels: {},
-  id: 'r-1',
-  repo: '/code/app',
-  factory: null,
-  place: 'git',
-  work: null,
-  brief: 'Do the thing',
-  workflowDir: '/code/app/workflows/dev',
-  try: null,
-  createdAt: '2026-09-13T00:00:00.000Z',
-  startedAt: null,
-  cancelledAt: null,
-  pruned: null,
-  status: 'running',
-  phase: 'running',
-  reason: 'Running',
-  on: null,
-  via: null,
-  moving: false,
-  cost: null,
-  atWork: null,
-  tokens: null,
-  steps: statuses.map((status, i) => ({
-    name: `step-${i}`,
-    taskId: status === 'waiting' ? null : `t-${i}`,
-    branch: null,
-    ...coded(status),
-    note: null,
-    roundDue: false,
-    agent: null,
-    since: null,
-    needs: null,
-    waitingFor: null,
-    approve: null,
-    denied: null,
-    sessionUnread: null,
-  })),
-  graph: { roots: [], edges: [] },
-  waitingOnYou: [],
-  waitingOnYouWords: extra.waitingOnYou ?? [],
-  after: [],
-  waiting: null,
-  context: [],
-  holdUntil: [],
-  holding: null,
-  toDecide: null,
-  unreadable: null,
-  ...extra,
-});
+const run = (statuses: readonly Word[], extra: Partial<RunView> = {}): RunView =>
+  summary([], {
+    moving: false,
+    steps: statuses.map((status, i) => listedStep(`step-${i}`, status, i, { taskId: status === 'waiting' ? null : `t-${i}` })),
+    waitingOnYouWords: extra.waitingOnYou ?? [],
+    ...extra,
+  });
 
 const cancelledAt = '2026-09-13T01:00:00.000Z';
 
@@ -602,7 +559,7 @@ test("placeRuns: an open run's graph moves the cards it covers, and never one a 
 });
 
 /** What the api says a run waiting on `p` waits on: a run that may still land, or one that was cancelled and never will. */
-const waitingOn = (onYou: boolean): RunSummary['waiting'] => ({
+const waitingOn = (onYou: boolean): RunView['waiting'] => ({
   runs: [{ run: 'p', missing: false, cancelledAt: onYou ? cancelledAt : null, gone: [] }],
   word: onYou ? 'waiting on p (cancelled)' : 'waiting on p',
   advice: onYou
@@ -614,7 +571,7 @@ const waitingOn = (onYou: boolean): RunSummary['waiting'] => ({
 const at = (minutes: number) => new Date(Date.UTC(2026, 8, 14, 0, minutes)).toISOString();
 
 /** What the api says of a card that still waits on `runs` before anything of it is filed (`RunWaiting`). */
-const waitsOn = (...runs: string[]): RunSummary['waiting'] => ({
+const waitsOn = (...runs: string[]): RunView['waiting'] => ({
   runs: runs.map((run) => ({ run, missing: false, cancelledAt: null, gone: [] })),
   word: `waiting on ${runs.join(', ')}`,
   advice: '',
@@ -622,7 +579,7 @@ const waitsOn = (...runs: string[]): RunSummary['waiting'] => ({
 });
 
 /** What a person has to decide, as the api words it (`RunToDecide`): an ending step's gate, or a branch nobody merged. */
-const approve = (id: string, step: string): RunSummary['toDecide'] => ({
+const approve = (id: string, step: string): RunView['toDecide'] => ({
   kind: 'approve',
   step,
   says: 'Merge it onto the base branch.',
@@ -632,7 +589,7 @@ const approve = (id: string, step: string): RunSummary['toDecide'] => ({
   said: `Merge it onto the base branch. — wf approve ${id} ${step}`,
   command: `wf approve ${id} ${step}`,
 });
-const merge = (id: string, branch: string): RunSummary['toDecide'] => ({
+const merge = (id: string, branch: string): RunView['toDecide'] => ({
   kind: 'result',
   branches: [branch],
   said: `${branch} is ahead of main, and nothing has merged it — wf decide ${id}`,
@@ -1037,7 +994,7 @@ test("runClock and clockCounts: a card's and a row's clock, and what its hover s
 });
 
 /** What the api says of a run a person holds until `p` lands (`wf hold`): a hold that lifts on its own, or one only a person lifts. */
-const holdingOn = (onYou: boolean): NonNullable<RunSummary['holding']> => ({
+const holdingOn = (onYou: boolean): NonNullable<RunView['holding']> => ({
   at: '2026-09-13T00:30:00.000Z',
   runs: [{ run: 'p', missing: false, cancelledAt: onYou ? cancelledAt : null, gone: [], landed: false }],
   word: 'held until p lands',
@@ -1049,7 +1006,7 @@ const holdingOn = (onYou: boolean): NonNullable<RunSummary['holding']> => ({
 
 test('inFlight, standingOf, waitsOnYou and onYouOf: where a run stands, and who it waits on', async (t) => {
   await t.test('a run is in flight, and on the Factory by default, while the api says it is running', () => {
-    const shown: Array<[string, RunSummary]> = [
+    const shown: Array<[string, RunView]> = [
       ['started, nothing filed yet', run(['waiting', 'waiting'], { moving: true })],
       ['a session at work', run(['running (working)', 'waiting'], { moving: true })],
       ['its check still running', run(['verified ✓', 'checking'], { moving: true })],
@@ -1058,7 +1015,7 @@ test('inFlight, standingOf, waitsOnYou and onYouOf: where a run stands, and who 
     for (const [why, r] of shown) assert.equal(inFlight(r), true, why);
   });
   await t.test('a run the api calls failed or cancelled stays in flight while it still moves', () => {
-    const shown: Array<[string, RunSummary]> = [
+    const shown: Array<[string, RunView]> = [
       [
         'a check refused while a sibling session still runs, in a fan-out `assess` calls failed once one step is final',
         run(['failed ✗ check (exit 1)', 'running (working)', 'waiting'], { status: 'failed', moving: true, waitingOnYou: ['step-0'] }),
@@ -1075,7 +1032,7 @@ test('inFlight, standingOf, waitsOnYou and onYouOf: where a run stands, and who 
     for (const [why, r] of shown) assert.equal(inFlight(r), true, why);
   });
   await t.test('a run is finished, and hidden by default, once it has stopped moving without running', () => {
-    const hidden: Array<[string, RunSummary]> = [
+    const hidden: Array<[string, RunView]> = [
       ['verified, and done on its own word', run(['verified ✓', 'unverified · done'], { status: 'succeeded' })],
       [
         'stopped at a refused check, its follower waiting for ever',
@@ -1334,7 +1291,7 @@ test('waitsOnRuns and floorRuns: which runs are on the floor, ghosts and finishe
       floorRuns(runs, true).map((r) => r.id),
       ['ends', 'ahead', 'landed'],
     );
-    const old = [{ ...runs[1], toDecide: undefined as unknown as RunSummary['toDecide'] }];
+    const old = [{ ...runs[1], toDecide: undefined as unknown as RunView['toDecide'] }];
     assert.deepEqual(
       floorRuns(old, false).map((r) => r.id),
       [],
@@ -1521,7 +1478,7 @@ test('runEdges and contextEdges: the edges drawn between cards', async (t) => {
   await t.test(
     'an edge from each run a card is held until that has not landed, both on the floor, drawn as an `after` edge — and none where an `after` edge already joins the two',
     () => {
-      const held = (...runs: string[]): RunSummary['holding'] => ({
+      const held = (...runs: string[]): RunView['holding'] => ({
         ...holdingOn(false),
         runs: runs.map((run) => ({ run, missing: false, cancelledAt: null, gone: [], landed: false })),
       });

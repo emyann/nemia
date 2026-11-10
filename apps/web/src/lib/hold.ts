@@ -1,11 +1,11 @@
-import type { RunSummary } from './api/runs.ts';
+import type { RunView } from './api/judged.ts';
 import type { Frozen } from './frozen.ts';
 
-type Holdable = Frozen<Pick<RunSummary, 'id' | 'cancelledAt' | 'holding' | 'holdUntil' | 'status'>> & {
+type Holdable = Frozen<Pick<RunView, 'id' | 'cancelledAt' | 'holding' | 'holdUntil' | 'status'>> & {
   pruned: object | null;
 };
 
-type Candidate = Pick<RunSummary, 'id' | 'place' | 'repo' | 'cancelledAt' | 'pruned' | 'status' | 'toDecide'>;
+type Candidate = Pick<RunView, 'id' | 'place' | 'repo' | 'cancelledAt' | 'pruned' | 'status' | 'toDecide'>;
 
 /**
  * Whether the run's page offers a hold, by what the run says of itself: not called off, not pruned, nobody holding it, and running or
@@ -26,7 +26,7 @@ export const holdable = (run: Holdable): boolean =>
  * that has not finished with nothing left to decide — a run succeeded and merged has landed, and one succeeded with branches nothing
  * merges has not. In the order `runs` gives them.
  */
-export const holdCandidates = <R extends Candidate>(run: Pick<RunSummary, 'id' | 'repo'>, runs: readonly R[]): R[] =>
+export const holdCandidates = <R extends Candidate>(run: Pick<RunView, 'id' | 'repo'>, runs: readonly R[]): R[] =>
   runs.filter(
     (r) =>
       r.id !== run.id &&

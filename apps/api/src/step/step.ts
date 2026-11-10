@@ -1,16 +1,16 @@
 /**
- * A workflow step's page, for the board (`GET /api/workflows/:from/:name/:step`): the step as written and as the loader read it, and what a
- * run of it would be told now, by layer, with where each layer lives — the agent the request's factory hires into it, the factories that
- * hire into it, where each of its skills is found, and its recent runs. And the address of a run's workflow page (`workflowPageOf`),
- * which a run's page links back to: the board builds no address from a store path.
+ * A workflow step's page, for the board (`stepPage`, served as the Workflow's `step` verb, workflows/handlers.ts): the step as
+ * written and as the loader read it, and what a run of it would be told now, by layer, with where each layer lives — the agent the
+ * request's factory hires into it, the factories that hire into it, where each of its skills is found, and its recent runs. And the
+ * address of a run's workflow page (`workflowPageOf`), which a run's page links back to: the board builds no address from a store path.
  *
  * Everything here is read now, from the files: a run freezes its workflow and its hires as it starts, and what a run was told is its
  * step's own sub-resource (`GET /api/runs/:runId/steps/:step/told`, the package's `toldOf`).
  */
 import path from 'node:path';
 import { Effect } from 'effect';
-import { Hono } from 'hono';
 import {
+  AGENTS,
   AgentDoor,
   DEFAULT_FACTORY,
   fillsOf,
@@ -19,15 +19,15 @@ import {
   Missing,
   readFactories,
   SkillDoor,
-  unattachedRefusal,
+  WORKFLOWS_STEP,
 } from 'agent-orchestrator';
-import type { AgentReading, AgentsRead, Factory, FactoryListing } from 'agent-orchestrator';
+import type { AgentReading, Factory, FactoryListing } from 'agent-orchestrator';
 import { toldLayers, type Run, type ToldLayers } from 'agent-orchestrator/run';
-import type { AgentSkill, SkillsFound, Workflow } from 'agent-orchestrator/workflow';
-import { foundInOf, sourceOf, type SkillSource } from '../agents/skills.ts';
-import { type ApiEnv, served } from '../layer.ts';
-import { agentSkillsOf, folderOf, keyRows, placesOf, stepSourceOf, type KeyRow, type WorkflowSource } from '../workflows/workflows.ts';
-import { commandNamed, runPlaced } from '../store.ts';
+import type { SkillsFound, Workflow } from 'agent-orchestrator/workflow';
+import type { WorkflowStepPage } from 'objects';
+import { foundInOf, sourceOf, type SkillSource } from '../skills/skills.ts';
+import type { Served } from '../layer.ts';
+import { agentSkillsOf, keyRows, placesOf, stepSourceOf, type WorkflowSource } from '../workflows/workflows.ts';
 
 /** How many of a step's runs its page lists, newest first. */
 export const RECENT_RUNS = 5;
@@ -59,35 +59,6 @@ export type Hiring = { refused: string | null; agents: HireableAgent[] };
 
 /** One of a step's recent runs: its id, its brief, when it was made, its factory (null for the default), and whether the step was filed. */
 export type RecentRun = { id: string; brief: string; createdAt: string; factory: string | null; filed: boolean };
-
-/**
- * What a step's page shows: which workflow and step, its body, the file as written — frontmatter and all — and every key a step may set, in
- * the package's order, with its value as the loader read it. Read so, `after` names the step `resume:` implies too, and a loop's `rounds`
- * is the default where the file sets none: the file as written says which. `agentSkills` is what the agent attached to the step says it can
- * do, generated from its skills and shown here read-only, as on the agent's page; null on a step with no agent, or one with no card.
- *
- * Read now, in the request's factory (`factory`, null for the default): `layers`, what a run of it would be told, by layer, with no task
- * (`toldLayers`); `hired`, the agent the factory hires into it, which `layers.agent` then names; `hiredIn`, with no factory named, the
- * factories that hire into it (`hiredInOf`); `hiring`, whether one can be hired into it, and which (`hiringOf`); `skillsFrom`, where each
- * skill of its layers is found; and `recentRuns`, its newest runs (`recentRunsOf`).
- */
-export type WorkflowStepPage = {
-  workflow: string;
-  from: WorkflowSource;
-  dir: string;
-  step: string;
-  body: string;
-  source: string;
-  keys: KeyRow[];
-  agentSkills: AgentSkill[] | null;
-  factory: string | null;
-  layers: ToldLayers;
-  hired: string | null;
-  hiredIn: HiredIn[];
-  hiring: Hiring;
-  skillsFrom: SkillFrom[];
-  recentRuns: RecentRun[];
-};
 
 /** The factory a record or a summary names, null for the default factory, whether it names `default` or none. */
 const factoryNamed = (factory: string | null | undefined): string | null => (factory && factory !== DEFAULT_FACTORY ? factory : null);
@@ -208,79 +179,55 @@ export function skillsFromOf(layers: ToldLayers, found: SkillsFound, repo: strin
   });
 }
 
-/** The table's entry a step's page is read through, served on the api alone. */
-const STEP = commandNamed('workflows step');
-
-/** The package's listing of the agents (`nemia agents`), which a step's hire is chosen from. */
-const AGENTS = commandNamed('agents');
-
 /**
- * A step's page.
+ * A step's page (objects' `WorkflowStepPage`, `GET /api/namespaces/<namespace>/workflows/<name>/steps/<step>`): the step `asked` of the
+ * folder `dir` of the workflow `name`, read from `from`, as the loader reads it in the request's factory with its hires
+ * (`WORKFLOWS_STEP`) — found among the steps the loader read, never joined from what was sent, so no name in the path reaches a file
+ * outside the folder; a step the folder does not have is a 404 naming those it has (`Missing`), and the loader's refusal of the folder
+ * its 422, word for word (`Invalid`).
  *
- * - `GET /api/workflows/:from/:name/:step` — one step of one folder, for its page (`WorkflowStepPage`): found among the folders the sources
- *   have and the steps the loader read, never joined from what was sent — so no name in the path reaches a file outside the folder — or
- *   why not, in the words a start would use. 400 for a `from` that is neither `repo` nor `yours`; 404 or 409 as `folderOf` says; 422 for
- *   the loader's refusal, word for word (an `Invalid`, answered by `app.onError`), with which the folder is listed and has no step to show;
- *   404 for a step the folder does not have. In a factory, the step is read with its hires, and a workflow the factory has not attached
- *   is a 404 in the package's words (`unattachedRefusal`, a `Missing`).
- *   The step's resolved agent carries its keys and words, not what its card says it can do: `agentSkills` is generated from the agent's
- *   skills, found where the load found them (`cardSkills`) — the card's A2A skills, one for each skill its `skills:` gives a
- *   session, or one made from its description — and null for a card the package refuses, whose words the agent's page shows.
- *   What a run would be told is read now, never frozen: `layers` as a start would tell them with no task, the agent the factory hires into
- *   the step (`hired`), with no factory the factories that hire into it (`hiredIn`), where each skill is found (`skillsFrom`), and the
- *   newest runs of the folder that hold the step, in the factory where one is named (`recentRuns`), and whether an agent can be hired
- *   into it, with those it can (`hiring`).
+ * The step's resolved agent carries its keys and words, not what its card says it can do: `agentSkills` is generated from the agent's
+ * skills, found where the load found them (`cardSkills`) — the card's A2A skills, one for each skill its `skills:` gives a session, or one
+ * made from its description — and null for a card the package refuses, whose words the agent's page shows. What a run would be told is
+ * read now, never frozen: `layers` as a start would tell them with no task, the agent the factory hires into the step (`hired`), with no
+ * factory the factories that hire into it (`hiredIn`), where each skill is found (`skillsFrom`), the newest runs of the folder that hold
+ * the step, in the factory where one is named (`recentRuns`), and whether an agent can be hired into it, with those it can (`hiring`, the
+ * agents listed through `nemia agents`' entry, `AGENTS`).
  */
-export const step = new Hono<ApiEnv>().get('/api/workflows/:from/:name/:step', (c) =>
-  served(c, async ({ e, placeService, env, repo, home, factory, memo, inRequest, trace }) => {
-    const { from, name, step: asked } = c.req.param();
-    if (from !== 'repo' && from !== 'yours') {
-      return c.json(
-        {
-          error: `A step's page names where its workflow is read from: \`repo\` or \`yours\`, as GET /api/namespaces/default/workflows/${name} says it in the Workflow's \`status.origin\` — /api/workflows/repo/${name}/${asked}, say. This request's was '${from}'.`,
-        },
-        400,
-      );
-    }
-    const unattached = factory && unattachedRefusal(factory, name);
-    if (unattached) throw new Missing({ message: unattached });
-    const folder = folderOf(name, from, repo, home, factory?.tree);
-    if ('status' in folder) return c.json({ error: folder.error }, folder.status);
-    const args = { from, name, step: asked, dir: folder.dir, repo, ...(factory && { factory: factory.name }) };
-    const { step: found, steps } = (await runPlaced({ placeService, home, trace }, e, STEP.handler(args, undefined, home))) as {
-      step: Workflow | null;
-      steps: string[];
-    };
-    if (!found) {
-      return c.json({ error: `No step '${asked}' in workflow ${name} (${folder.dir}). Its steps are: ${steps.join(', ')}.` }, 404);
-    }
-    const places = placesOf(repo, home);
-    const defs = await inRequest(
-      Effect.all({
-        agents: Effect.flatMap(AgentDoor, (door) => door.agents.found({ dir: folder.dir, places })),
-        skills: Effect.flatMap(SkillDoor, (door) => door.skills.found({ dir: folder.dir, places })),
-      }),
-    );
-    const layers = toldLayers(found, null);
-    const hired = factory ? (fillsOf(factory.hires, name)[found.name] ?? null) : null;
-    const agents = async () =>
-      ((await runPlaced({ placeService, home, trace }, e, AGENTS.handler({ repo }, env, home))) as AgentsRead).agents;
-    return c.json({
-      workflow: name,
-      from,
-      dir: folder.dir,
-      step: found.name,
-      body: found.body,
-      source: stepSourceOf(folder.dir, found.name),
-      keys: keyRows(found),
-      agentSkills: agentSkillsOf(found, defs),
-      factory: factory?.name ?? null,
-      layers,
-      hired,
-      hiredIn: factory ? [] : hiredInOf(readFactories(), name, found.name, from, repo),
-      hiring: await hiringOf(factory, name, found, hired, from, agents),
-      skillsFrom: skillsFromOf(layers, defs.skills, repo, home),
-      recentRuns: recentRunsOf(keptRuns(memo.records.step, stepRun), folder.dir, found.name, factory?.name ?? null),
-    } satisfies WorkflowStepPage);
-  }),
-);
+export async function stepPage(
+  s: Served,
+  { name, from, dir }: { name: string; from: WorkflowSource; dir: string },
+  asked: string,
+): Promise<WorkflowStepPage> {
+  const { repo, home, factory, memo } = s;
+  const input = { name, step: asked, dir, repo, ...(factory && { factory: factory.name }) };
+  const { step: found, steps } = await s.inRequest(WORKFLOWS_STEP.handler(input, undefined, home));
+  if (!found) throw new Missing({ message: `No step '${asked}' in workflow ${name} (${dir}). Its steps are: ${steps.join(', ')}.` });
+  const places = placesOf(repo, home);
+  const defs = await s.inRequest(
+    Effect.all({
+      agents: Effect.flatMap(AgentDoor, (door) => door.agents.found({ dir, places })),
+      skills: Effect.flatMap(SkillDoor, (door) => door.skills.found({ dir, places })),
+    }),
+  );
+  const layers = toldLayers(found, null);
+  const hired = factory ? (fillsOf(factory.hires, name)[found.name] ?? null) : null;
+  const agents = async () => (await s.inRequest(AGENTS.handler({ repo }, s.env, home))).agents;
+  return {
+    workflow: name,
+    from,
+    dir,
+    step: found.name,
+    body: found.body,
+    source: stepSourceOf(dir, found.name),
+    keys: keyRows(found),
+    agentSkills: agentSkillsOf(found, defs),
+    factory: factory?.name ?? null,
+    layers,
+    hired,
+    hiredIn: factory ? [] : hiredInOf(readFactories(), name, found.name, from, repo),
+    hiring: await hiringOf(factory, name, found, hired, from, agents),
+    skillsFrom: skillsFromOf(layers, defs.skills, repo, home),
+    recentRuns: recentRunsOf(keptRuns(memo.records.step, stepRun), dir, found.name, factory?.name ?? null),
+  };
+}

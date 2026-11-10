@@ -2,7 +2,7 @@
  * What a run or a step cost, as the board says it: the api's words — the package's — put side by side, and never a sum worked out here.
  * Pure.
  */
-import type { Spent } from './api';
+import type { Spent } from './api/judged.ts';
 import type { StepView } from './runView';
 
 type Priced = Pick<StepView, 'spent' | 'budget'>;

@@ -22,7 +22,6 @@ import {
   queuedText,
   queueRefusal,
   type InboxCard,
-  type InboxListing,
 } from './inbox.ts';
 import { queueFactoryRefusal } from './queue-factory.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
@@ -280,19 +279,3 @@ export const dropFromInbox = Effect.fn('dropFromInbox')(function* (name: string)
 export const inboxNameAt = (home: string, given: string): string | null =>
   cardNameAt(home, given) ??
   (inboxNameRefusal(given) === undefined && !fs.existsSync(given) && fs.existsSync(path.join(inboxAt(home), `${given}.md`)) ? given : null);
-
-/**
- * What the board shows of each entry `cards` lists beside the listing: when its card was filed and its text, read through the Card door —
- * or neither, for an entry that is no card, one that does not read (`error`), and one dropped since the listing read it.
- */
-export const inboxEntries = Effect.fn('inboxEntries')(function* (cards: readonly InboxListing[]) {
-  const door = yield* CardDoor;
-  return yield* Effect.forEach(cards, (entry) => {
-    if (!entry.file.endsWith('.md')) return Effect.succeed({ filedAt: null, text: null });
-    const name = CardName.read(entry.file.slice(0, -'.md'.length));
-    return Effect.all({
-      filedAt: door.cards.filedAt(name),
-      text: entry.error === null ? door.cards.read(name) : Effect.succeed(null),
-    }).pipe(Effect.catchCause(() => Effect.succeed({ filedAt: null, text: null })));
-  });
-});

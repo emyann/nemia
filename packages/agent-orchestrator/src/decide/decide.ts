@@ -30,7 +30,7 @@ import { assess } from '../tick/assess.ts';
 import { resultSteps } from '../branches/index.ts';
 import { runWords } from '../route/routed/index.ts';
 import { merges } from '../ending/ending.ts';
-import type { RunStatusWord } from 'objects';
+import type { DecideLabel, RunStatusWord } from 'objects';
 
 /**
  * What is left for a person to do about this run.
@@ -305,12 +305,19 @@ export function costLine(step: Workflow | undefined, run: Run, name: string, use
  * on them — or `not measured`. Pure. None before any session has ended.
  */
 export function runCostLines(run: Run, spendOf: SpendOf): string[] {
+  const said = runCostWords(run, spendOf);
+  return said === null ? [] : [`cost  ${said}`];
+}
+
+/**
+ * What the run has cost, in `runCostLines`' words without their label: `run $12.40`, with how many ended attempts had no cost on them, or
+ * `run not measured`; null before any attempt has ended.
+ */
+export function runCostWords(run: Run, spendOf: SpendOf): string | null {
   const spent = runSpend(run, spendOf);
-  if (!spent.measured && !spent.unmeasured) return [];
-  if (!spent.measured) return ['cost  run not measured'];
-  return [
-    `cost  run ${dollars(spent.usd)}${spent.unmeasured ? ` measured · ${spent.unmeasured} session${spent.unmeasured > 1 ? 's' : ''} not measured` : ''}`,
-  ];
+  if (!spent.measured && !spent.unmeasured) return null;
+  if (!spent.measured) return 'run not measured';
+  return `run ${dollars(spent.usd)}${spent.unmeasured ? ` measured · ${spent.unmeasured} session${spent.unmeasured > 1 ? 's' : ''} not measured` : ''}`;
 }
 
 /**
@@ -329,7 +336,7 @@ export type Offer = { step: string; command: string; said: string };
  * the whole run.
  */
 export type DecideCommand = {
-  label: 'land it' | 'drop it' | 'read it' | 'once more' | 'refresh' | 'approve' | 'send back' | 'forget it';
+  label: DecideLabel;
   command: string;
   said: string | null;
   step: string | null;

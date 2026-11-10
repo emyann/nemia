@@ -18,6 +18,7 @@ import { conditionOf } from '../route/index.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { Landed } from '../decide/decide.ts';
 import type { BranchStood } from '../place/place.ts';
+import type { LessonState } from 'objects';
 
 /**
  * The steps whose branch is the run's result: the steps nothing waits on (`terminalSteps`) — and, where one of those works in the
@@ -410,14 +411,18 @@ export function inFullLines(t: Touched, globs: readonly string[] | undefined, di
 }
 
 /**
- * The lesson line, for the whole run: whether its branches changed a file the next agent reads. A
- * branch that could not be read is not a branch that wrote nothing, and the line says it does not know.
+ * The lesson, for the whole run: whether its branches changed a file the next agent reads, in words without the screen's label, and which
+ * of its three it is. A branch that could not be read is not a branch that wrote nothing, and it says it does not know.
  */
-export function lessonLine(touched: readonly Touched[]): string {
+export function lessonOf(touched: readonly Touched[]): { said: string; state: LessonState } {
   const unread = touched.filter((t) => 'error' in t.radius).map((t) => t.branch);
-  if (unread.length) return `lesson  not known — ${unread.join(', ')} could not be read`;
+  if (unread.length) return { said: `not known — ${unread.join(', ')} could not be read`, state: 'unknown' };
   const written = touched.flatMap(({ branch, radius: r }) =>
     (r as Radius).lessons.map((c) => `${nameOf(c)} ${linesOf(c)}${touched.length > 1 ? ` (${branch})` : ''}`),
   );
-  return `lesson  ${written.length ? written.join(' · ') : 'nothing written where the next agent reads'}`;
+  if (!written.length) return { said: 'nothing written where the next agent reads', state: 'nothing' };
+  return { said: written.join(' · '), state: 'written' };
 }
+
+/** The lesson line `nemia decide` prints (`lessonOf`), under its label. */
+export const lessonLine = (touched: readonly Touched[]): string => `lesson  ${lessonOf(touched).said}`;

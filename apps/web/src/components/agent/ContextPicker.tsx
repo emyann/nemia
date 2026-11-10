@@ -1,7 +1,8 @@
 import { useId } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
-import { concludedQuery, runsQuery, type RunSummary } from '../../lib/api';
+import { concludedQuery, runsQuery } from '../../lib/api/runs.ts';
+import { judged, type RunRow, type RunView } from '../../lib/api/judged.ts';
 import { standingOf, titleOf } from '../../lib/factory';
 import { Markdown } from '../markdown/Markdown';
 
@@ -53,12 +54,12 @@ export function ContextPicker({
                   onChange={(event) => onChange(event.target.checked ? [...selected, run.id] : selected.filter((id) => id !== run.id))}
                   className="translate-y-0.5 self-start"
                 />
-                <span data-run-title className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]" title={titleOf(run)}>
-                  {titleOf(run)}
+                <span data-run-title className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]" title={run.title}>
+                  {run.title}
                 </span>
                 <span className="hidden shrink-0 font-mono text-body-small text-muted-foreground sm:inline">{run.id}</span>
-                <span data-standing className="shrink-0 text-body-small text-muted-foreground" title={run.waiting?.advice}>
-                  {standingOf(run)}
+                <span data-standing className="shrink-0 text-body-small text-muted-foreground" title={run.advice}>
+                  {run.standing}
                 </span>
               </label>
             </li>
@@ -103,5 +104,20 @@ export function ConcludedPreview({ run }: { run: string }) {
   );
 }
 
-const newestFirst = (runs: readonly RunSummary[]): RunSummary[] =>
-  [...runs].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
+/** A run to read as the list draws it: its id, its title, where it stands in a word, and what to do about its wait on hover. */
+type Listed = { id: string; title: string; standing: string; advice: string | undefined };
+
+/**
+ * Every run to read, newest first, then each run the list could not judge, by its id, in flight as the tick counts it: a run whose
+ * record reads hands what it concluded all the same.
+ */
+const newestFirst = (runs: readonly RunRow[]): Listed[] => [
+  ...runs
+    .filter(judged)
+    .sort((a: RunView, b: RunView) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
+    .map((run) => ({ id: run.id, title: titleOf(run), standing: standingOf(run), advice: run.waiting?.advice })),
+  ...runs
+    .filter((run) => !judged(run))
+    .sort((a, b) => b.id.localeCompare(a.id))
+    .map((run) => ({ id: run.id, title: run.id, standing: 'in flight', advice: undefined })),
+];

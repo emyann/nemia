@@ -52,7 +52,7 @@ const {
   runWith,
 } = await import('../src/runner.ts');
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
-const { howOf } = await import('../src/command/pages.verb.ts');
+const { howOf } = await import('../src/summary/how.verb.ts');
 const { runsSummarized } = await import('../src/summary/summary.verb.ts');
 const { EngineService: RunsEngine } = await import('../src/runtime-client.ts');
 const { Effect: RunsEffect } = await import('effect');

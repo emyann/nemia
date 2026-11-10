@@ -3,7 +3,7 @@
  * handed in, the browser's own on the page.
  */
 import { format, isSameDay } from 'date-fns';
-import type { Quota, QuotaWindow } from './api';
+import type { Quota, QuotaWindow } from './api/quota.ts';
 import { durationWords } from './duration.ts';
 import { agoWords } from './runWords.ts';
 import { timeOfDay, unreadable, UNREADABLE, zoneOf } from './timeOfDay.ts';

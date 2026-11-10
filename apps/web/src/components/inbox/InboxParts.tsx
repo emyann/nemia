@@ -5,7 +5,8 @@
 import { LabelTags } from '../field/Labels';
 import type { ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
-import { workflowNameOf, type CardState, type InboxEntry } from '../../lib/api';
+import { workflowNameOf } from '../../lib/api/workflows.ts';
+import { type CardState, type InboxEntry } from '../../lib/api/inbox.ts';
 import { hasPage, queueable, queueNeedsFactory, triedLine, unassigned, type CardRefusal } from '../../lib/inbox';
 import { instantWords } from '../../lib/instant';
 import { container } from '../../lib/meaning';

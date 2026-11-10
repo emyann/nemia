@@ -5,10 +5,10 @@
  * (`cli/writers.ts`), the board sends its form — and one agent read for its page (`AGENTS_READ`, `agentRead`), on the api alone. The api
  * guards each write and words the board's answer around what each entry answers.
  */
-import { Effect } from 'effect';
+import { Effect, Schema } from 'effect';
 import { tried } from '../runtime-client.ts';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
-import { cliPath, factoryFlag, FROM, versionFlag, writerSpec, writerText, yoursOrRefused } from '../yours/yours.ts';
+import { cliPath, factoryFlag, FROM, versionFlag, writerSpec, yoursOrRefused } from '../yours/yours.ts';
 import { templatedTree } from '../factory/factory.store.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { HOME } from '../record/record.store.ts';
@@ -46,6 +46,60 @@ const PLACE_AND_NAME: readonly Positional[] = [
   { key: 'name', takes: 'required', kind: 'name' },
 ];
 
+/** What `nemia agents`' handler takes: the repository whose agents it lists beside yours, `.` where none is named. */
+export const AgentsInput = Schema.Struct({ repo: Schema.optionalKey(Schema.String) });
+export type AgentsInput = typeof AgentsInput.Type;
+
+/** What `nemia agents card`'s handler takes: the agent's name, the repository it is looked for in, and the place it is read from. */
+export const AgentCardInput = Schema.Struct({
+  name: Schema.String,
+  repo: Schema.optionalKey(Schema.String),
+  from: Schema.optionalKey(Schema.Literals(['repo', 'yours'])),
+});
+export type AgentCardInput = typeof AgentCardInput.Type;
+
+/** An agent's draft as the writer hands it, read by the command line off its file and built by the api from the Agent's spec. */
+const AgentDraftValue = Schema.declare(
+  (u: unknown): u is AgentDraft => typeof u === 'object' && u !== null && typeof (u as { name?: unknown }).name === 'string',
+);
+
+/**
+ * What `nemia agents write`'s handler takes: the place it writes (`from`, `yours` or `factory`, and the `factory` whose tree), the agent's
+ * name on the path where it changes or renames one (`name`), the repository it is judged on (`repo`), the `version` it was read at, its
+ * `draft`, and the result schema its `output:` names (`schema`, null for none).
+ */
+export const AgentWriteInput = Schema.Struct({
+  from: Schema.String,
+  name: Schema.optionalKey(Schema.String),
+  factory: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
+  version: Schema.optionalKey(Schema.String),
+  draft: AgentDraftValue,
+  schema: Schema.optionalKey(Schema.NullOr(Schema.Struct({ file: Schema.String, text: Schema.String }))),
+});
+export type AgentWriteInput = typeof AgentWriteInput.Type;
+
+/** What `nemia agents rm`'s handler takes: the place (`yours`), the agent's name, the `version` it was read at, and the repository. */
+export const AgentRemoveInput = Schema.Struct({
+  from: Schema.String,
+  name: Schema.String,
+  version: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
+});
+export type AgentRemoveInput = typeof AgentRemoveInput.Type;
+
+/**
+ * What `nemia agents run`'s handler takes: the place (`yours`), the agent's name, its brief — none left for `tryAgent` to refuse in its
+ * words — and the repository it is tried on.
+ */
+export const AgentTryInput = Schema.Struct({
+  from: Schema.String,
+  name: Schema.String,
+  brief: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
+});
+export type AgentTryInput = typeof AgentTryInput.Type;
+
 /** The words a written agent is said in: each file written and removed, and the version it is at now, which a change of it gives. */
 const writtenLines = ({ dir, agent, version, written, removed }: AgentWritten): string[] => [
   `${agent.name} written in ${dir}, at version ${version}: ${written.join(', ')}`,
@@ -59,7 +113,7 @@ const writtenLines = ({ dir, agent, version, written, removed }: AgentWritten): 
  * renamed from — none given for the agent of the draft's own name with no version, a new one. Written to the tree of the factory
  * `--factory` names for the place `factory`. Refused, as `Invalid`, for a place but those two (`yoursOrRefused`).
  */
-export const AGENTS_WRITE: Command<AgentWritten> = {
+export const AGENTS_WRITE: Command<AgentWritten, AgentWriteInput> = {
   name: 'agents write',
   usage: '(yours | factory) [<name>] --file <name>.md [--factory <name>] [--version <v>]',
   help: [
@@ -88,25 +142,21 @@ export const AGENTS_WRITE: Command<AgentWritten> = {
     side: 'cli',
     why: "the api serves it as the Agent's `create` and `replace` verb of `objects`' Api (`/api/namespaces/:namespace/agents`), which calls this entry's handler: no route of its own",
   },
-  handler: (args, _env, home) =>
+  input: AgentWriteInput,
+  handler: ({ from, name, factory, version, draft, schema, ...given }, _env, home) =>
     rooted(
       home,
       'nemia agents write',
       Effect.gen(function* () {
         const root = yield* StoreRoot;
-        const name = writerText(args, 'name');
-        const from = writerText(args, 'from') ?? '';
-        const factory = writerText(args, 'factory');
         const tree = (named: string) => templatedTree(named, 'nemia agents write');
-        const repo = yield* tried(() => (from === 'factory' && factory !== undefined ? tree(factory) : writerText(args, 'repo')));
+        const repo = yield* tried(() => (from === 'factory' && factory !== undefined ? tree(factory) : given.repo));
         const dir = yield* tried(() =>
           yoursOrRefused('nemia agents write', 'agents', from, name ?? null, repo ?? '', root, { factory, treeOf: tree }),
         );
-        const draft = yield* tried(() => JSON.parse(writerText(args, 'draft') ?? '{}') as AgentDraft);
-        const schema = writerText(args, 'schema');
-        const sidecar = yield* tried(() => (schema === undefined ? undefined : (JSON.parse(schema) as AgentSidecar | null)));
+        const sidecar: AgentSidecar | null | undefined = schema;
         const door = yield* AgentDoor;
-        return yield* door.agents.write(AgentName.read(name ?? draft?.name), draft, writerText(args, 'version'), {
+        return yield* door.agents.write(AgentName.read(name ?? draft.name), draft, version, {
           dir,
           ...(sidecar !== undefined && { schema: sidecar }),
           ...(repo !== undefined && { repo }),
@@ -117,7 +167,7 @@ export const AGENTS_WRITE: Command<AgentWritten> = {
 };
 
 /** An agent of yours removed through the Agent door, against the `version` it was read at, which a removal without it names. */
-export const AGENTS_REMOVE: Command<AgentRemoved> = {
+export const AGENTS_REMOVE: Command<AgentRemoved, AgentRemoveInput> = {
   name: 'agents rm',
   usage: 'yours <name> --version <v>',
   help: ['an agent of yours removed, at the --version it was read at'],
@@ -128,17 +178,16 @@ export const AGENTS_REMOVE: Command<AgentRemoved> = {
     side: 'cli',
     why: "the api serves it as the Agent's `delete` verb of `objects`' Api (`/api/namespaces/:namespace/agents`), which calls this entry's handler: no route of its own",
   },
-  handler: (args, _env, home) =>
+  input: AgentRemoveInput,
+  handler: ({ from, name, version, repo }, _env, home) =>
     rooted(
       home,
       'nemia agents rm',
       Effect.gen(function* () {
         const root = yield* StoreRoot;
-        const name = writerText(args, 'name') ?? '';
-        const repo = writerText(args, 'repo');
-        const dir = yield* tried(() => yoursOrRefused('nemia agents rm', 'agents', writerText(args, 'from') ?? '', name, repo ?? '', root));
+        const dir = yield* tried(() => yoursOrRefused('nemia agents rm', 'agents', from, name, repo ?? '', root));
         const door = yield* AgentDoor;
-        return yield* door.agents.remove(AgentName.read(name), writerText(args, 'version'), { dir, ...(repo !== undefined && { repo }) });
+        return yield* door.agents.remove(AgentName.read(name), version, { dir, ...(repo !== undefined && { repo }) });
       }),
     ),
   print: ({ dir, removed }) => [`removed from ${dir}: ${removed.join(', ')}`],
@@ -148,7 +197,7 @@ export const AGENTS_REMOVE: Command<AgentRemoved> = {
  * An agent of yours tried on a short brief (`tryAgent`): its try's folder written and a run of it started with no repository, as any
  * folder team's is; a tick files it. Refused before anything is written, as `tryAgent` says.
  */
-export const AGENTS_TRY: Command<{ id: string }> = {
+export const AGENTS_TRY: Command<{ id: string }, AgentTryInput> = {
   name: 'agents run',
   usage: 'yours <name> --brief <words>',
   help: ['an agent of yours tried on a short brief, in a folder of its own,', `capped at $${TRY_BUDGET}`],
@@ -168,16 +217,10 @@ export const AGENTS_TRY: Command<{ id: string }> = {
     why: "the api serves it as the Agent's `try` verb of `objects`' Api (`/api/namespaces/:namespace/agents`), which calls this entry's handler: no route of its own",
   },
   ticks: true,
-  handler: (args, _env, home = HOME) =>
-    tryAgent({
-      who: 'nemia agents run',
-      from: writerText(args, 'from') ?? '',
-      name: writerText(args, 'name') ?? '',
-      brief: writerText(args, 'brief') ?? '',
-      repo: writerText(args, 'repo') ?? '',
-      home,
-    }),
-  print: ({ id }, args) => [`${id}  a try of ${String(args.name)} started: nemia ls shows how it goes, and its page on the board`],
+  input: AgentTryInput,
+  handler: ({ from, name, brief = '', repo = '' }, _env, home = HOME) =>
+    tryAgent({ who: 'nemia agents run', from, name, brief, repo, home }),
+  print: ({ id }, { name }) => [`${id}  a try of ${name} started: nemia ls shows how it goes, and its page on the board`],
 };
 
 /**

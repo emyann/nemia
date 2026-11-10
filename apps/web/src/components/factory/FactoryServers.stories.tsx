@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import type { FactoryServer, BuiltinServer } from '@/lib/api';
+import type { FactoryServer, BuiltinServer } from '@/lib/api/factories';
 import { ServerForm, ServerRow, ServerState } from './FactoryServers';
 import { SignInView } from './ServerSignIn';
 

@@ -181,13 +181,14 @@ test("a server's headers are served masked, and a mask sent back keeps the value
   const { FACTORY_SERVER_ADD, listedOf } = await import('./servers.verb.ts');
   const root = scratch('wf-servers-mask-');
   const add = async (server: string, ...headers: string[]) => {
+    const sent = Object.fromEntries(headers.map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
     const program = FACTORY_SERVER_ADD.handler(
-      { factory: DEFAULT_FACTORY, server, url: 'https://docs.example/mcp', header: headers },
+      { factory: DEFAULT_FACTORY, server, url: 'https://docs.example/mcp', headers: sent },
       process.env,
       root,
-    ) as unknown as import('effect').Effect.Effect<unknown, { _tag?: string }>;
+    ) as unknown as import('effect').Effect.Effect<{ server: { headers?: Record<string, string> } }, { _tag?: string }>;
     return Effect.runPromise(program).then(
-      (answer) => answer as { server: { headers?: Record<string, string> } },
+      (answer) => answer,
       (err: { _tag?: string }) => ({ refused: err._tag }),
     );
   };

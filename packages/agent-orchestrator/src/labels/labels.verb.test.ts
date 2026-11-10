@@ -68,7 +68,7 @@ test('`nemia label run`: set, change refused without --overwrite and taken with 
   assert.deepEqual(stored.removed.labels, {});
   assert.equal(stored.labels, undefined, 'the map emptied leaves the run with none');
 
-  const lines = LABEL_RUN.print(stored.removed, { labels: ['team-', 'x-'] });
+  const lines = LABEL_RUN.print(stored.removed, { runId: 'r-1', labels: ['team-', 'x-'] });
   assert.ok(
     lines.some((line) => line.includes('team removed') && line.includes('infra')),
     lines.join('\n'),

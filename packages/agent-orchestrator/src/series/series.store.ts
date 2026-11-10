@@ -1,7 +1,7 @@
 /**
  * The series' files: a tier's lines by UTC day, `$WF_ROOT/metrics/<tier>/<YYYY-MM-DD>.jsonl`, a line of JSON a series over a span
  * (`RollupLine`), appended by the ticking daemon's pass alone and deleted by date as their retention passes (`keepSeries`); read over a
- * range by `nemia series` and `GET /api/series` (`seriesRead`, the command `SERIES` in `command/reads.verb.ts`), and over a period's days
+ * range by `nemia series` and `GET /api/series` (`seriesRead`, the command `SERIES` in `series/commands.verb.ts`), and over a period's days
  * by `nemia stats` (`seriesHealth`). What is due is read off the files on every pass, so a restart rolls nothing twice and loses nothing
  * the ring still holds. Beneath the controllers: it imports the store's root, its retention and the pass's meter, and no controller.
  */

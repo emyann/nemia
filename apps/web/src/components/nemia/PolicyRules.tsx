@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { policyQuery, confirmRule, dropRule, type PolicyList } from '../../lib/api';
+import { policyQuery, confirmRule, dropRule, type PolicyList } from '../../lib/api/policy.ts';
 import { clockWord } from '../../lib/quota';
 import { useNow } from '../../lib/useNow';
 import { CustomInstructions, SESSION } from '../step/CustomInstructions';

@@ -1,53 +1,7 @@
-/**
- * What a step is told, by layer, as the api answers it on a step's told (what its run froze) and on a workflow's listing (what a run of it
- * would be told): the type a step's view reads them as, and the schema `workflows.ts` decodes with.
- */
-import { Schema } from 'effect';
-import { TOLD_VIA, type HandedHow, type ToldVia } from 'objects';
-import { decodes } from './decodes.ts';
+/** What a step is told, layer by layer, and the parts of its task, as `objects` says them (`StepLayers`, `StepTold`). */
+import type { StepTold } from 'objects';
 
-/**
- * Mirrors `ToldLayers` (agent-orchestrator/run), the api's `layers`: what a step was told, by layer — its agent, the agent's
- * instructions and own skills, the person's custom instructions for it, the rules of the factory its run was started in (`factory`, null
- * where the factory keeps none or the step is told none), the step's own note, the skills its line adds and the fence lines it tightens
- * the agent's with, and the task, its brief after them. `via` says where the agent's words, the person's and the factory's went: the
- * session's system prompt (`prompt`), or the head of its brief (`brief`). `folderFiles` says whether the session reads the files of the
- * folder it works in, the third layer, which Nemia composes nothing of.
- */
-export type StepLayers = {
-  agent: string | null;
-  instructions: string | null;
-  custom: string | null;
-  factory: string | null;
-  agentSkills: string[];
-  policy: string;
-  addedSkills: string[];
-  fence: Array<{ key: string; value: string }>;
-  folderFiles: boolean;
-  task: string | null;
-  via: ToldVia;
-};
+export type { StepLayers } from 'objects';
 
-/** Decodes a `StepLayers`. */
-export const StepLayersSchema = decodes<StepLayers>()(
-  Schema.Struct({
-    agent: Schema.NullOr(Schema.String),
-    instructions: Schema.NullOr(Schema.String),
-    custom: Schema.NullOr(Schema.String),
-    factory: Schema.NullOr(Schema.String),
-    agentSkills: Schema.mutable(Schema.Array(Schema.String)),
-    policy: Schema.String,
-    addedSkills: Schema.mutable(Schema.Array(Schema.String)),
-    fence: Schema.mutable(Schema.Array(Schema.Struct({ key: Schema.String, value: Schema.String }))),
-    folderFiles: Schema.Boolean,
-    task: Schema.NullOr(Schema.String),
-    via: Schema.Literals(TOLD_VIA),
-  }),
-);
-
-/**
- * Mirrors `TaskPart` in apps/api/src/runs/runs.ts: a part of a step's task — its own text, or a run it was handed, by its id, the first
- * line that run was asked (empty where its section could not read it), the section's body, and how it was handed: waited on until it
- * landed (`--after`), or read as context (`--from`); absent where the record names it as neither.
- */
-export type TaskPart = { kind: 'from'; run: string; asked: string; body: string; how?: HandedHow } | { kind: 'text'; text: string };
+/** A part of a step's task: its own text, or a run's section, with how the run was handed. */
+export type TaskPart = NonNullable<StepTold['taskParts']>[number];

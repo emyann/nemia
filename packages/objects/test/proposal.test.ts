@@ -1,11 +1,13 @@
 /**
- * The Proposal and the Delegation (`src/proposal.ts`, `src/delegation.ts`): each and a page of each decoded from JSON and encoded back
- * equal, one missing every optional key read; and a phase, a verb or a kind outside their closed words refused at decode.
+ * The Proposal and the Delegation (`src/proposal.ts`, `src/delegation.ts`): each and a page of each as the Api's endpoints answer them,
+ * every key kept, one missing every optional key read, and their writes as the Api takes them; and a phase, a verb or a kind outside
+ * their closed words refused at decode.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import { API_VERSION, Delegation, DelegationList, DelegationWrite, Proposal, ProposalCreate, ProposalList } from 'objects';
+import { API_VERSION, Delegation, Proposal } from 'objects';
+import { answered, taken } from './served.ts';
 
 const meta = { name: 'p-7f3a', namespace: 'mill', creationTimestamp: '2026-11-05T00:00:00.000Z', resourceVersion: 'r1' };
 
@@ -57,16 +59,15 @@ const delegation = {
   spec: { rules: [{ resources: ['workflows'], resourceNames: [], verbs: ['update'] }] },
 } as const;
 
-const roundTrip = <S extends Schema.Top>(schema: S, value: unknown) => {
-  const decoded = Schema.decodeUnknownSync(schema as never)(value);
-  assert.deepEqual(Schema.encodeSync(schema as never)(decoded), value);
-};
-
-test('a proposal and a page of them decode from JSON and encode back equal, one missing every optional key read', () => {
-  roundTrip(Proposal, applied);
-  roundTrip(Proposal, waiting);
-  roundTrip(ProposalList, { apiVersion: API_VERSION, kind: 'ProposalList', metadata: {}, items: [applied, waiting] });
-  roundTrip(ProposalCreate, applied.spec);
+test("the Api's get answers a proposal, its list a page of them, its create takes the spec; another kind refused", () => {
+  assert.deepEqual(answered('proposals', 'get', applied), applied);
+  assert.deepEqual(answered('proposals', 'get', waiting), waiting);
+  const page = { apiVersion: API_VERSION, kind: 'ProposalList', metadata: {}, items: [applied, waiting] };
+  assert.deepEqual(answered('proposals', 'list', page), page);
+  assert.deepEqual(taken('proposals', 'create', applied.spec), applied.spec);
+  assert.equal(answered('proposals', 'get', delegation), undefined);
+  assert.equal(answered('proposals', 'list', { ...page, kind: 'DelegationList' }), undefined);
+  assert.equal(taken('proposals', 'create', delegation.spec), undefined);
 });
 
 test('a phase, a verb or a kind outside their closed words is refused at decode', () => {
@@ -76,10 +77,13 @@ test('a phase, a verb or a kind outside their closed words is refused at decode'
   assert.throws(() => decode({ ...applied, spec: { objects: [{ kind: 'Volume', metadata: { name: 'v' } }] } }));
 });
 
-test('a delegation, a page of them and its write decode and encode back equal; a verb outside the closed words is refused', () => {
-  roundTrip(Delegation, delegation);
-  roundTrip(DelegationList, { apiVersion: API_VERSION, kind: 'DelegationList', metadata: {}, items: [delegation] });
-  roundTrip(DelegationWrite, delegation.spec);
+test("the Api's get answers a delegation, its list a page of them, its put takes the write; a verb outside the closed words is refused", () => {
+  assert.deepEqual(answered('delegations', 'get', delegation), delegation);
+  const page = { apiVersion: API_VERSION, kind: 'DelegationList', metadata: {}, items: [delegation] };
+  assert.deepEqual(answered('delegations', 'list', page), page);
+  assert.deepEqual(taken('delegations', 'put', delegation.spec), delegation.spec);
+  assert.equal(answered('delegations', 'get', applied), undefined);
+  assert.equal(taken('delegations', 'put', applied.spec), undefined);
   assert.throws(() =>
     Schema.decodeUnknownSync(Delegation)({ ...delegation, spec: { rules: [{ resources: [], resourceNames: [], verbs: ['get'] }] } }),
   );

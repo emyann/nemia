@@ -283,6 +283,53 @@ export const LEVELS = ['manual', 'semi-auto', 'auto'] as const;
 /** One of `LEVELS`. */
 export type Level = (typeof LEVELS)[number];
 
+/**
+ * The runtime's task phases, as Nemia's level says her session's (`NemiaLevel.phase`): the closed set a task's view stands in, held
+ * equal to the runtime's `TaskPhase` by the orchestrator's typecheck (`runtime-client.ts`).
+ */
+export const ENGINE_PHASES = [
+  'pending',
+  'starting',
+  'working',
+  'quiescent',
+  'needs-human',
+  'input-required',
+  'idle',
+  'restarting',
+  'between-attempts',
+  'ending',
+  'succeeded',
+  'failed',
+  'stopped',
+] as const;
+
+/** One of `ENGINE_PHASES`. */
+export type EnginePhase = (typeof ENGINE_PHASES)[number];
+
+/** The answers a rule at a gate may give unasked: a step approved at its gate, and a step tried again. */
+export const RULE_ANSWERS = ['approve', 'retry'] as const;
+
+/** One of `RULE_ANSWERS`. */
+export type RuleAnswer = (typeof RULE_ANSWERS)[number];
+
+/** Where a rule for auto came from: the builtin default, or an agent's proposal the person confirmed. */
+export const RULE_ORIGINS = ['default', 'proposed'] as const;
+
+/** One of `RULE_ORIGINS`. */
+export type RuleOrigin = (typeof RULE_ORIGINS)[number];
+
+/** Who a message of a chat is from: the task's agent, the person, the keeper's quiet marker, or another agent the person allowed. */
+export const CHAT_FROM = ['agent', 'person', 'keeper', 'peer'] as const;
+
+/** One of `CHAT_FROM`. */
+export type ChatFrom = (typeof CHAT_FROM)[number];
+
+/** Where a tool call of a chat stands: done, at work, failed, not begun, or waiting on the person. */
+export const CALL_STATES = ['done', 'running', 'error', 'pending', 'waits'] as const;
+
+/** One of `CALL_STATES`. */
+export type CallState = (typeof CALL_STATES)[number];
+
 /** Whether a factory's runs follow the revisions merged since they started (`follow`) or keep those they started on (`pinned`). */
 export const REVISIONS_POLICIES = ['follow', 'pinned'] as const;
 
@@ -316,6 +363,12 @@ export const DEFINITION_ORIGINS = ['factory', 'repo', 'yours', 'builtin'] as con
 
 /** One of `DEFINITION_ORIGINS`. */
 export type DefinitionOrigin = (typeof DEFINITION_ORIGINS)[number];
+
+/** Where an agent file the store knows of was found: a repository a factory names, your library, or the folder `?path=` names. */
+export const AGENT_SOURCE_PLACES = ['repository', 'library', 'path'] as const;
+
+/** One of `AGENT_SOURCE_PLACES`. */
+export type AgentSourcePlace = (typeof AGENT_SOURCE_PLACES)[number];
 
 /** What a node of a workflow's graph is: a step, a condition that routes, or a node that files a card for another workflow. */
 export const NODE_KINDS = ['step', 'condition', 'workflow'] as const;
@@ -495,6 +548,24 @@ export const PROPOSAL_REFUSALS = [
 /** One of `PROPOSAL_REFUSALS`. */
 export type ProposalRefusal = (typeof PROPOSAL_REFUSALS)[number];
 
+/**
+ * Why the api's write guard refuses a write before its body is read (a 403, `Forbidden`'s `reason`): addressed to a name that is not this
+ * machine (`host`), or made by a page on another site (`site`). A body not sent as JSON is the 415's, which needs no word.
+ */
+export const GUARD_REFUSALS = ['host', 'site'] as const;
+
+/** One of `GUARD_REFUSALS`. */
+export type GuardRefusal = (typeof GUARD_REFUSALS)[number];
+
+/**
+ * The types a `Table`'s column says its cells are, as Kubernetes' server-side printing names them (`meta.k8s.io/v1`
+ * `TableColumnDefinition.type`, the OpenAPI types).
+ */
+export const TABLE_COLUMN_TYPES = ['string', 'integer', 'number', 'boolean', 'date'] as const;
+
+/** One of `TABLE_COLUMN_TYPES`. */
+export type TableColumnType = (typeof TABLE_COLUMN_TYPES)[number];
+
 /** Why a presented session token is refused (a 401): the store never minted it, or its session's try is no longer live. */
 export const TOKEN_REFUSALS = ['unknown-token', 'session-ended'] as const;
 
@@ -520,3 +591,112 @@ export const KINDS = [
   'Delegation',
 ] as const;
 export type Kind = (typeof KINDS)[number];
+
+/**
+ * The states of a task's lifecycle, the runtime's (`STATES`, agent-runtime's lifecycle.ts), in its table's order: what a step's path says
+ * a task was in at each entry of its journal. Held equal to the runtime's by the api's step reads' test.
+ */
+export const LIFECYCLE_STATES = [
+  'submitted',
+  'starting',
+  'working',
+  'input-required',
+  'stopping',
+  'ending',
+  'completed',
+  'failed',
+  'canceled',
+] as const;
+
+/** One of `LIFECYCLE_STATES`. */
+export type LifecycleState = (typeof LIFECYCLE_STATES)[number];
+
+/** Who said an event of a session's conversation (`TranscriptEvent['role']`, agent-runtime's seam.ts): a tool's result is `user`. */
+export const TRANSCRIPT_ROLES = ['assistant', 'user', 'system'] as const;
+
+/** One of `TRANSCRIPT_ROLES`. */
+export type TranscriptRole = (typeof TRANSCRIPT_ROLES)[number];
+
+/**
+ * Where a `user` event's words came from, as the harness said it: the runtime's `ORIGIN_KINDS` (agent-runtime's seam.ts, the Agent SDK's
+ * words) and `unknown`, which the runtime reads a word it has not named as (`originOf`).
+ */
+export const TRANSCRIPT_ORIGINS = [
+  'human',
+  'channel',
+  'peer',
+  'task-notification',
+  'coordinator',
+  'unclassified',
+  'observer',
+  'auto-continuation',
+  'observer-activity',
+  'unknown',
+] as const;
+
+/** One of `TRANSCRIPT_ORIGINS`. */
+export type TranscriptOrigin = (typeof TRANSCRIPT_ORIGINS)[number];
+
+/**
+ * The label of a command `nemia decide` offers on a run awaiting a person (`DecideCommand`, decide.ts): land it, drop it, read it, once
+ * more, refresh, approve, send back, forget it.
+ */
+export const DECIDE_LABELS = ['land it', 'drop it', 'read it', 'once more', 'refresh', 'approve', 'send back', 'forget it'] as const;
+export type DecideLabel = (typeof DECIDE_LABELS)[number];
+
+/** Which of its three the lesson line of a decision is (`Lesson`, decide.ts): written where the next agent reads, nothing, or not known. */
+export const LESSON_STATES = ['written', 'nothing', 'unknown'] as const;
+export type LessonState = (typeof LESSON_STATES)[number];
+
+/** What still finishes under a pause: a step's session, its check, or a landing. */
+export const FINISHING_KINDS = ['session', 'check', 'landing'] as const;
+export type FinishingKind = (typeof FINISHING_KINDS)[number];
+
+/** What a pause at once cuts: a step's session or its check, never a landing. */
+export const INTERRUPT_KINDS = ['session', 'check'] as const;
+export type InterruptKind = (typeof INTERRUPT_KINDS)[number];
+
+/** The kind of a metric of the process, in Effect's own words for it. */
+export const METRIC_TYPES = ['Counter', 'Frequency', 'Gauge', 'Histogram', 'Summary'] as const;
+export type MetricType = (typeof METRIC_TYPES)[number];
+
+/** Where the store's daemon stands: none, a file that does not read, stopped, gone, stalled, or `ticking`, the one moving the runs. */
+export const DAEMON_KINDS = ['none', 'unreadable', 'stopped', 'gone', 'stalled', 'ticking'] as const;
+export type DaemonKind = (typeof DAEMON_KINDS)[number];
+
+/** What the api's process table says of the daemon's pid: the same process, another, not known, or gone. */
+export const DAEMON_IDENTITIES = ['same', 'other', 'unknown', 'gone'] as const;
+export type DaemonIdentity = (typeof DAEMON_IDENTITIES)[number];
+
+/** Where the subscription's quota stands as the board is given it, each said in `Quota`'s note. */
+export const QUOTA_STATES = ['fresh', 'asking', 'no-plan', 'unanswered', 'no-claude', 'timeout', 'failed', 'unknown'] as const;
+export type QuotaState = (typeof QUOTA_STATES)[number];
+
+/** The ranges the system's series are read over, and the span of a point in each. */
+export const SERIES_RANGES = ['24h', '7d', '30d', 'all'] as const;
+export type SeriesRange = (typeof SERIES_RANGES)[number];
+export const SERIES_SPANS = ['minute', 'hour', 'day'] as const;
+export type SeriesSpan = (typeof SERIES_SPANS)[number];
+
+/** What the flow numbers' rows go by. */
+export const STATS_BY = ['agent', 'step', 'factory', 'workflow', 'repo'] as const;
+export type StatsBy = (typeof STATS_BY)[number];
+
+/**
+ * The events of the feed's stream: `opened`, the first, sent the moment it opens so a proxy hands its head on, which every reader skips; a
+ * line's, by what it is about (`store`, `daemon`, `step`, `removed`, `run`); where it has read to (`bookmark`); a label query's hint
+ * (`hint`); and a read that failed and the read after it (`unreadable`, `readable`).
+ */
+export const FEED_STREAM_EVENTS = [
+  'opened',
+  'store',
+  'daemon',
+  'step',
+  'removed',
+  'run',
+  'bookmark',
+  'hint',
+  'unreadable',
+  'readable',
+] as const;
+export type FeedStreamEventName = (typeof FEED_STREAM_EVENTS)[number];

@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Daemon } from '../src/lib/api.ts';
+import type { Daemon } from '../src/lib/api/daemon.ts';
 import { daemonSentence, daemonWords } from '../src/lib/daemon.ts';
 
 const NOW = new Date('2026-09-22T10:00:00.000Z');

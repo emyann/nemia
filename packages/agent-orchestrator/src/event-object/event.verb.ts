@@ -7,11 +7,11 @@
  * line nobody can read lies between two, the one after it is named by where the unreadable one starts, and read from there all the same.
  */
 import { Effect } from 'effect';
-import { API_VERSION, type Event, type EventList } from 'objects';
+import type { Event, EventList } from 'objects';
 import { FeedDoor } from '../feed/feed.store.ts';
-import type { ObjectQuery } from '../object/listed.verb.ts';
+import { listOf, selectorsRefused, type ObjectQuery } from '../object/listed.verb.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
-import { parseSelectors, selectorsRefusal, selects } from '../watch/selector.ts';
+import { parseSelectors, selects } from '../watch/selector.ts';
 import type { FeedLine } from '../feed/index.ts';
 import { eventOf } from './event.ts';
 import { continuedAfter, continueToken, listPage } from '../object/page.ts';
@@ -49,12 +49,8 @@ export const eventKept = (query: Pick<EventQuery, 'namespace' | 'labelSelector'>
 
 /** A page of the feed's events (`EventList`); `Invalid` for a selector, a limit or a token that is not one, or a cursor refused. */
 export const eventList = Effect.fn('eventList')(function* (query: EventQuery) {
-  const asked = query.labelSelector ?? [];
-  const refusal = selectorsRefusal(asked);
-  if (refusal !== undefined)
-    return yield* Effect.fail(
-      new Invalid({ message: `labelSelector: ${refusal}. Correct it, or leave labelSelector out to list every event` }),
-    );
+  const refused = selectorsRefused(query.labelSelector ?? [], 'event');
+  if (refused !== undefined) return yield* Effect.fail(refused);
   const kept = eventKept(query);
   let cursor = 0;
   if (query.continue !== undefined) {
@@ -83,15 +79,14 @@ export const eventList = Effect.fn('eventList')(function* (query: EventQuery) {
     );
   const items = events.slice(cut.from, cut.to);
   const last = items.at(-1);
-  const list: EventList = {
-    apiVersion: API_VERSION,
-    kind: 'EventList',
-    metadata: {
+  const list: EventList = listOf(
+    'Event',
+    {
       remainingItemCount: cut.remainingItemCount,
       ...(cut.more && last !== undefined ? { continue: continueToken(last.metadata.resourceVersion) } : {}),
     },
     items,
-  };
+  );
   return list;
 });
 

@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { NemiaSettings } from '@/components/nemia/NemiaSettings';
-import { policyQuery, levelQuery, nemiaMemoryQuery } from '@/lib/api';
+import { policyQuery } from '@/lib/api/policy';
+import { levelQuery, nemiaMemoryQuery } from '@/lib/api/nemia';
 
 /**
  * The frame's Settings, at /settings: what is set for the whole store, across factories. Its loader reads Nemia's level, her rules at

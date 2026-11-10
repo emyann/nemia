@@ -52,12 +52,15 @@ too, which holds parity with this one until the in-process reads retire.
 
 ## Keys, agents and folders
 
-- **A key added to `STEP_KEYS` has four sites outside the package**: `KINDS` in `apps/api/src/workflows/words.ts`, `WorkflowStepSpec` and
-  `specOf` in `apps/api/src/workflows/workflows.ts`, the web's mirror with `UNSET` (`apps/web/src/lib/builder.ts`), and its schemas with
-  `StepKeySchema` (`apps/web/src/lib/api/library.ts`), which refuses a key it does not list. A template places it too, or its export
+- **A key is added to objects' `STEP_KEYS` first** (`packages/objects/src/workflow.ts`), with its Schema in `StepKeys` and its form in
+  `STEP_KEY_FORM`, each typed so that one left out does not compile; then to `STEP_KEYS` in `src/step/step.ts`, the parser's copy, typed
+  `typeof` objects' list, and the tables typed by its `StepKey` (`STEP_KEY_MEANINGS`, `frozenStepFields`, `COUNTS` for a count). The api
+  reads objects' (`WorkflowStepSpec`, `specOf` and the builder's form in `apps/api/src/workflows/`); the board's mirror with `UNSET`
+  (`apps/web/src/lib/builder.ts`) and its schemas with `StepKeySchema` (`apps/web/src/lib/api/library.ts`) are lists still to go, counted
+  in `tools/guards/test/step-keys.test.ts`, which refuses any other list of the keys. A template places it too, or its export
   refuses it by name: `PLACED` and `stepOf` (`template/draft.ts`), `OVERRIDES` (`template/layout.ts`), `stepFile` (`factory/applied/render.ts`).
-- **A key renamed in `STEP_KEYS` is still read under its old name**: `FORMER_KEYS` (`former/former.ts`), `formerStepFields` and the agent's
-  `keys` in `FrozenStepSchema` (`folder/folder.store.ts`), `asNamed` in `readRun`, `keysWritten` in `src/roster/roster.ts`,
+- **A key renamed in `STEP_KEYS` is still read under its old name**: `FORMER_KEYS` (`former/former.ts`), which the agent's `keys` in
+  `FrozenStepSchema` read, `formerStepFields` (`folder/folder.store.ts`), `asNamed` in `readRun`, `keysWritten` in `src/roster/roster.ts`,
   `formerKeyWritten` in the renders, `formerKeyLines` at `wf start`.
 - **An agent's own key renamed is read through `FORMER_OWN_KEYS`, and its words through `harnessPromptNamed`** (`former/former.ts`):
   in `parseAgent`, `asNamed`, `unreadReading` (`src/roster/roster.ts`) and `formerKeyLines`; `FORMER_KEYS` is typed
@@ -85,8 +88,9 @@ too, which holds parity with this one until the in-process reads retire.
 
 ## Refusals
 
-- **A new refusal chooses its kind, never a status**: the api reads the kind off `agent-orchestrator` and answers it from one
-  table (`REFUSAL_STATUS` in `apps/api/src/app.ts`); a plain `Error` there is a 500.
+- **A new refusal chooses its kind, never a status**: the api reads the kind off `agent-orchestrator` and answers it by one
+  map (`refusedAs` and `statusOf` in `apps/api/src/objects/refused.ts`), its status the one its `objects` error class declares; a
+  plain `Error` there is a 500.
 
 ## Runs, phases and asks
 

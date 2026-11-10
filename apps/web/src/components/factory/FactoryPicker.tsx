@@ -6,7 +6,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import type { Key } from 'react';
 import { Select, SelectItem } from '@/components/ui/ds/components/Select';
-import { factoriesQuery, openRunsQuery, type Factory, type OpenRuns } from '@/lib/api';
+import { factoriesQuery, type Factory } from '@/lib/api/factories';
+import { openRunsQuery, type OpenRuns } from '@/lib/api/runs';
 import { DEFAULT_NAME, factoriesShown } from '@/lib/factories';
 import { pickTo } from '../nav/nav';
 

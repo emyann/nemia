@@ -17,7 +17,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
-import type { RunDecision } from './decision.ts';
+import type { RunDecision } from 'objects';
 import { listedOf as listed, objectOf, specOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
 import { engine, passStanding, runStore } from 'agent-orchestrator';

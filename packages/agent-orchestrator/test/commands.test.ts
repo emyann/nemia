@@ -1,10 +1,10 @@
 /**
- * The shipped command table: no rule of the table broken against the CLI's own verbs and runners, and each command on the api's path,
- * method and status of today, or on the CLI alone.
+ * The shipped command table: no rule of the table broken against the CLI's own verbs and runners, and each command on the CLI alone, on
+ * the api alone, or on both and typed.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TABLE, commandBreaks, routeList, type Route } from '../src/runner.ts';
+import { TABLE, commandBreaks } from '../src/runner.ts';
 import { classBreaks } from '../src/admission/index.ts';
 import { RUNS, VERBS } from '../src/cli/main.ts';
 
@@ -42,21 +42,18 @@ test('every shipped command is classed once, and no class breaks its rules', () 
   assert.deepEqual(classBreaks(TABLE), []);
 });
 
-/** A route as the pins say it: a route the api writes by hand (`hand`) marked so, its why left to the entry. */
-const pinned = (r: Route) => (r.hand === undefined ? r : { ...r, hand: true });
-
-test("each command is served on the api where it was before the table, the lift of a hold, a removal and a prune where their routes were, a run's named actions in its namespace", () => {
+test("each command is served on the CLI alone, on the api alone, or on both and typed (`input`), which the api calls it by from objects' Api", () => {
   assert.deepEqual(
-    TABLE.map((c) => [c.name, Array.isArray(c.route) ? c.route.map(pinned) : c.route ? pinned(c.route as Route) : c.only?.side]),
+    TABLE.map((c) => [c.name, c.only?.side ?? ('input' in c && c.input !== undefined ? 'typed' : undefined)]),
     [
-      ['start', { method: 'POST', path: '/api/namespaces/:namespace/runs', status: 201, hand: true }],
-      ['concluded', { method: 'GET', path: '/api/runs/:runId/concluded', status: 200 }],
+      ['start', 'cli'],
+      ['concluded', 'typed'],
       ['inbox', 'cli'],
       ['inbox add', 'cli'],
       ['inbox queue', 'cli'],
       ['inbox from', 'cli'],
       ['inbox rm', 'cli'],
-      ['label run', { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/labels', status: 200, hand: true }],
+      ['label run', 'cli'],
       ['label inbox', 'cli'],
       ['factory', 'cli'],
       ['factory ls', 'cli'],
@@ -89,47 +86,32 @@ test("each command is served on the api where it was before the table, the lift 
       ['template export', 'cli'],
       ['template pack', 'cli'],
       ['template unpack', 'cli'],
-      ['retry', { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/steps/:step/retry', status: 202, hand: true }],
-      ['approve', { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/steps/:step/approve', status: 202, hand: true }],
+      ['retry', 'cli'],
+      ['approve', 'cli'],
       ['route', 'cli'],
-      ['refresh', { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/refresh', status: 202, hand: true }],
-      ['say', { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/steps/:step/say', status: 202, hand: true }],
-      [
-        'ls',
-        [
-          { method: 'GET', path: '/api/listing', status: 200 },
-          { method: 'GET', path: '/api/listing/:runId', status: 200 },
-        ],
-      ],
-      ['show', { method: 'GET', path: '/api/runs/:runId', status: 200 }],
-      ['closeout', { method: 'GET', path: '/api/runs/:runId/steps/:step/tries/:try/closeout', status: 200 }],
-      ['tries', { method: 'GET', path: '/api/runs/:runId/steps/:step/tries', status: 200 }],
-      ['try', { method: 'GET', path: '/api/runs/:runId/steps/:step/tries/:try', status: 200 }],
-      ['told', { method: 'GET', path: '/api/runs/:runId/steps/:step/told', status: 200 }],
-      ['logs', { method: 'GET', path: '/api/runs/:runId/steps/:step/log', status: 200 }],
-      ['stats', { method: 'GET', path: '/api/stats', status: 200 }],
-      ['step artifact', { method: 'GET', path: '/api/runs/:runId/steps/:step/artifacts/:name', status: 200 }],
-      ['step file', { method: 'GET', path: '/api/runs/:runId/steps/:step/files/:name', status: 200 }],
-      ['step path', { method: 'GET', path: '/api/runs/:runId/steps/:step/path', status: 200 }],
-      ['step transcript', { method: 'GET', path: '/api/runs/:runId/steps/:step/transcript', status: 200 }],
-      ['decide', { method: 'GET', path: '/api/runs/:runId/decision', status: 200 }],
-      ['merges', 'api'],
-      ['ceilings', { method: 'GET', path: '/api/ceilings', status: 200 }],
-      ['passes', { method: 'GET', path: '/api/passes', status: 200 }],
-      ['series', { method: 'GET', path: '/api/series', status: 200 }],
+      ['refresh', 'cli'],
+      ['say', 'cli'],
+      ['ls', 'typed'],
+      ['show', 'typed'],
+      ['closeout', 'cli'],
+      ['tries', 'api'],
+      ['try', 'api'],
+      ['told', 'api'],
+      ['logs', 'cli'],
+      ['stats', 'typed'],
+      ['step artifact', 'api'],
+      ['step file', 'api'],
+      ['step path', 'api'],
+      ['step transcript', 'api'],
+      ['ceilings', 'api'],
+      ['passes', 'typed'],
+      ['series', 'typed'],
       ['agents', 'cli'],
       ['agents card', 'cli'],
-      ['agents sources', { method: 'GET', path: '/api/agents/sources', status: 200, hand: true }],
-      [
-        'agents custom',
-        [
-          { method: 'GET', path: '/api/custom-instructions/:name', status: 200, hand: true },
-          { method: 'PUT', path: '/api/custom-instructions/:name', status: 200, sets: { clear: false } },
-          { method: 'DELETE', path: '/api/custom-instructions/:name', status: 200, sets: { clear: true } },
-        ],
-      ],
+      ['agents sources', 'cli'],
+      ['agents custom', 'cli'],
       ['agents write', 'cli'],
-      ['agents copy', { method: 'POST', path: '/api/agents/yours/copy', status: 200 }],
+      ['agents copy', 'cli'],
       ['agents rm', 'cli'],
       ['agents run', 'cli'],
       ['agents read', 'api'],
@@ -137,40 +119,22 @@ test("each command is served on the api where it was before the table, the lift 
       ['skills show', 'api'],
       ['skills write', 'cli'],
       ['cancel', 'cli'],
-      [
-        'hold',
-        [
-          { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/hold', status: 200, sets: { off: false }, hand: true },
-          { method: 'DELETE', path: '/api/namespaces/:namespace/runs/:runId/hold', status: 200, sets: { off: true }, hand: true },
-        ],
-      ],
-      ['rm', { method: 'DELETE', path: '/api/namespaces/:namespace/runs/:runId', status: 200, hand: true }],
-      ['prune', { method: 'POST', path: '/api/namespaces/:namespace/runs/:runId/prune', status: 200, sets: { yes: true }, hand: true }],
-      ['pause', { method: 'POST', path: '/api/pause', status: 200, sets: { yes: true } }],
+      ['hold', 'cli'],
+      ['rm', 'cli'],
+      ['prune', 'cli'],
+      ['pause', 'typed'],
       ['pause-timeout', 'cli'],
-      ['resume', { method: 'DELETE', path: '/api/pause', status: 200 }],
-      ['paused', { method: 'GET', path: '/api/pause', status: 200 }],
-      ['pause now', { method: 'GET', path: '/api/pause/now', status: 200 }],
-      ['subscribe', { method: 'POST', path: '/api/subscriptions/:name', status: 201 }],
-      ['unsubscribe', { method: 'DELETE', path: '/api/subscriptions/:name', status: 200 }],
-      [
-        'level',
-        [
-          { method: 'GET', path: '/api/level', status: 200, hand: true },
-          { method: 'PUT', path: '/api/level', status: 200 },
-        ],
-      ],
-      [
-        'memory',
-        [
-          { method: 'GET', path: '/api/nemia/memory', status: 200 },
-          { method: 'GET', path: '/api/nemia/memory/:fact', status: 200 },
-        ],
-      ],
-      ['policy', { method: 'GET', path: '/api/policy/:name', status: 200 }],
+      ['resume', 'typed'],
+      ['paused', 'api'],
+      ['pause now', 'api'],
+      ['subscribe', 'typed'],
+      ['unsubscribe', 'typed'],
+      ['level', 'cli'],
+      ['memory', 'cli'],
+      ['policy', 'cli'],
       ['policy propose', 'cli'],
-      ['policy confirm', { method: 'PUT', path: '/api/policy/:name/rules/:id', status: 200 }],
-      ['policy rm', { method: 'DELETE', path: '/api/policy/:name/rules/:id', status: 200 }],
+      ['policy confirm', 'cli'],
+      ['policy rm', 'cli'],
       ['policy reach', 'cli'],
       ['chat speakers', 'cli'],
       ['chat allow', 'cli'],
@@ -185,7 +149,7 @@ test("each command is served on the api where it was before the table, the lift 
       ['frontmatter rewrite', 'cli'],
       ['workflows write', 'cli'],
       ['workflows rm', 'cli'],
-      ['workflows step', { method: 'GET', path: '/api/workflows/:from/:name/:step', status: 200 }],
+      ['workflows step', 'api'],
       ['tick', 'cli'],
       ['up', 'cli'],
       ['watch', 'cli'],
@@ -217,8 +181,6 @@ test('every command the api posts or deletes on writes, and the api guards it; t
       'step file',
       'step path',
       'step transcript',
-      'decide',
-      'merges',
       'ceilings',
       'passes',
       'series',
@@ -241,13 +203,9 @@ test('every command the api posts or deletes on writes, and the api guards it; t
       'admit',
     ],
   );
-  assert.deepEqual(
-    TABLE.filter((c) => routeList(c).some((r) => r.hand === undefined && c.writes !== (r.method !== 'GET'))).map((c) => c.name),
-    [],
-  );
 });
 
-test("show is the run's one entry on both sides: its --raw, the record, too, which the api answers on ?raw=true for nemia", () => {
+test("show is the run's one entry on both sides: its --raw, the record, too, which the api answers on GET /api/runs/:name/record for nemia", () => {
   const show = TABLE.find((c) => c.name === 'show');
   assert.equal(show?.only, undefined);
   assert.equal(show?.spec?.flags.find((f) => f.flag === '--raw')?.only, undefined);

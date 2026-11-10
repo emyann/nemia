@@ -1,11 +1,13 @@
 /**
  * The Template (`src/template.ts`): a template whose manifest gives every key, one that gives the least and says its problems, and a
- * page of them, decoded from JSON and encoded back equal; a parameter whose type is none of its words refused.
+ * page of them, as the Api's endpoints answer them, every key kept; a parameter whose type is none of its words, and another kind,
+ * refused.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import { API_VERSION, Template, TemplateList } from 'objects';
+import { API_VERSION, Template } from 'objects';
+import { answered } from './served.ts';
 
 const full = {
   apiVersion: API_VERSION,
@@ -40,14 +42,13 @@ const broken = {
   status: { source: '/builtin/broken', workflows: [], agents: [], skills: [], problems: ['nemia.yaml:1:1: does not parse'] },
 } as const;
 
-const roundTrip = <S extends Schema.Codec<unknown, unknown>>(schema: S, value: unknown): unknown =>
-  JSON.parse(JSON.stringify(Schema.encodeSync(schema)(Schema.decodeUnknownSync(schema)(JSON.parse(JSON.stringify(value))))));
-
-test('a template and a page of them decode from JSON and encode back the same, absent keys left absent', () => {
-  assert.deepEqual(roundTrip(Template, full), full);
-  assert.deepEqual(roundTrip(Template, broken), broken);
+test("the Api's get answers a template and its list a page of them, every key kept, absent keys left absent", () => {
+  assert.deepEqual(answered('templates', 'get', full), full);
+  assert.deepEqual(answered('templates', 'get', broken), broken);
   const page = { apiVersion: API_VERSION, kind: 'TemplateList', metadata: {}, items: [full, broken] };
-  assert.deepEqual(roundTrip(TemplateList, page), page);
+  assert.deepEqual(answered('templates', 'listAll', page), page);
+  assert.equal(answered('templates', 'get', { ...full, kind: 'Factory' }), undefined);
+  assert.equal(answered('templates', 'listAll', { ...page, kind: 'FactoryList' }), undefined);
 });
 
 test('REFUSED: a parameter whose type is none of its words', () => {

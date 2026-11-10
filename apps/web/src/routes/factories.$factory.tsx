@@ -6,7 +6,11 @@ import { TemplateCard } from '@/components/factory/TemplateCard';
 import { LinkButton } from '@/components/ui/button';
 import { routeLink } from '@/components/nav/routeLink';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { factoriesQuery, inboxQuery, proposalsQuery, runsQuery, storeQuery } from '@/lib/api';
+import { factoriesQuery } from '@/lib/api/factories';
+import { inboxQuery } from '@/lib/api/inbox';
+import { proposalsQuery } from '@/lib/api/proposals';
+import { runsQuery } from '@/lib/api/runs';
+import { storeQuery } from '@/lib/api/store';
 import { runsIn } from '@/lib/factories';
 
 export const Route = createFileRoute('/factories/$factory')({

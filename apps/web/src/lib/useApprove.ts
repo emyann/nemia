@@ -2,7 +2,7 @@
  * The board's one approval of a step, wherever a person approves one: the run page's gate, the Factory's card and a loop out of rounds.
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { approveStep, type QuestionAnswer } from './api';
+import { approveStep, type QuestionAnswer } from './api/asks.ts';
 import { useRunNamespace } from './runNamespace';
 import { runsMoved } from './runWrites';
 

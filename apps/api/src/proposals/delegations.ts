@@ -10,23 +10,20 @@ import { delegationGet, delegationPut, delegationRemove, delegationsList } from 
 import { Api } from 'objects';
 import { queryOf } from '../factory/parts/index.ts';
 import { listed } from '../definitions/served.ts';
-import { runPlaced } from '../store.ts';
-import { proposalAnswered } from './proposals.ts';
+import { answeredWriteIn } from '../objects/refused.ts';
 
 export const delegationsHandlers = HttpApiBuilder.group(Api, 'delegations', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
-      proposalAnswered(async (s) => listed('Delegation', await runPlaced(s, s.e, delegationsList(namespace)), queryOf(query))),
+      answeredWriteIn(namespace, async (s) => listed('Delegation', await s.inRequest(delegationsList(namespace)), queryOf(query))),
     )
-    .handle('get', ({ params: { namespace, name } }) => proposalAnswered((s) => runPlaced(s, s.e, delegationGet(namespace, name))))
+    .handle('get', ({ params: { namespace, name } }) => answeredWriteIn(namespace, (s) => s.inRequest(delegationGet(namespace, name))))
     .handle('put', ({ params: { namespace, name }, payload }) =>
-      proposalAnswered((s) => runPlaced(s, s.e, delegationPut(s.caller, namespace, name, payload))),
+      answeredWriteIn(namespace, (s) => s.inRequest(delegationPut(s.caller, namespace, name, payload))),
     )
     .handle('delete', ({ params: { namespace, name } }) =>
-      proposalAnswered((s) =>
-        runPlaced(
-          s,
-          s.e,
+      answeredWriteIn(namespace, (s) =>
+        s.inRequest(
           Effect.gen(function* () {
             const was = yield* Effect.result(delegationGet(namespace, name));
             yield* delegationRemove(s.caller, namespace, name);

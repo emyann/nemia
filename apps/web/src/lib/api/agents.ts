@@ -4,10 +4,17 @@
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Option, Schema } from 'effect';
-import type { Agent, AgentSpec, DefinitionOrigin } from 'objects';
-import { decodes } from './decodes.ts';
-import { get, send } from './read.ts';
-import { agents as served, type Refuse } from './objects.ts';
+import {
+  AgentInstructions as AgentInstructionsAnswer,
+  AgentInstructionsCleared as AgentInstructionsClearedAnswer,
+  DEFAULT_NAMESPACE,
+  type Agent,
+  type AgentInstructions,
+  type AgentInstructionsCleared,
+  type AgentSpec,
+  type DefinitionOrigin,
+} from 'objects';
+import { agents as served, call, read, write, type Refuse } from './objects.ts';
 import { cardEntryOf, originWord, type AgentSkill, type GivenSkill, type SchemaFile } from './library.ts';
 import type { PagePlace } from './workflows.ts';
 
@@ -180,7 +187,7 @@ const specOfDraft = (draft: AgentDraft): AgentSpec => ({
 });
 
 /** An agent written: the agent as it now reads. */
-export type AgentSaved = { agent: AgentListing };
+type AgentSaved = { agent: AgentListing };
 
 /**
  * A write of an agent the api refused: the package's sentence, the nodes that still name the agent when that is why, and the api's status —
@@ -224,7 +231,7 @@ export const removeAgent = async (name: string, version: string): Promise<AgentL
   agentViewOf(await served.delete(DEFAULT, name, version, refused));
 
 /** The run a try started, which its page follows. */
-export type AgentTried = { id: string };
+type AgentTried = { id: string };
 
 /**
  * Try an agent of yours on a short brief: a one-step folder run of it, fenced to its folder with a dollar to spend. Rejects with an
@@ -234,43 +241,27 @@ export const tryAgent = async (name: string, brief: string): Promise<AgentTried>
   id: (await served.try(DEFAULT, name, brief, refused)).id,
 });
 
+/** A person's custom instructions for an agent: the file they are kept in, their words (null for none), and why they do not read. */
+export type CustomInstructions = AgentInstructions;
+
+/** The file a clear looked at, and whether it removed words. */
+type CustomInstructionsCleared = AgentInstructionsCleared;
+
+/** Nemia's own name: her custom instructions are hers (`/api/nemia/instructions`), every other agent's its name's. */
+const NEMIA = 'nemia';
+
 /**
- * Mirrors `CustomInstructionsAnswer` in apps/api/src/custom/custom.ts: a person's custom instructions for the agent `name`, the file in
- * your store they are kept in, the words (null for none), and the package's refusal of a file there that does not read (null when it
- * reads).
+ * A person's custom instructions for the agent `name`, read from the store on each request: Nemia's (`GET /api/nemia/instructions`), or
+ * the record of an agent's name, read in `default` (`GET /api/namespaces/default/agents/:name/instructions`).
  */
-export type CustomInstructions = { name: string; file: string; words: string | null; error: string | null };
-
-/** Decodes a `CustomInstructions`. */
-const CustomInstructionsSchema = decodes<CustomInstructions>()(
-  Schema.Struct({
-    name: Schema.String,
-    file: Schema.String,
-    words: Schema.NullOr(Schema.String),
-    error: Schema.NullOr(Schema.String),
-  }),
-);
-
-/** Mirrors `CustomInstructionsCleared` in apps/api/src/custom/custom.ts: the file a clear looked at, and whether it removed words. */
-export type CustomInstructionsCleared = { name: string; file: string; removed: boolean };
-
-/** Decodes a `CustomInstructionsCleared`. */
-const CustomInstructionsClearedSchema = decodes<CustomInstructionsCleared>()(
-  Schema.Struct({
-    name: Schema.String,
-    file: Schema.String,
-    removed: Schema.Boolean,
-  }),
-);
-
-/** The route of an agent's custom instructions, by its name. */
-const customRoute = (name: string): string => `/api/custom-instructions/${encodeURIComponent(name)}`;
-
-/** A person's custom instructions for the agent `name`, read from the store on each request. */
 export const customInstructionsQuery = (name: string) =>
   queryOptions({
     queryKey: ['custom-instructions', name],
-    queryFn: () => get(customRoute(name), CustomInstructionsSchema),
+    queryFn: () =>
+      call(
+        (c) => (name === NEMIA ? c.nemia.instructions() : c.agents.instructions({ params: { namespace: DEFAULT_NAMESPACE, name } })),
+        read(AgentInstructionsAnswer),
+      ),
   });
 
 /** What a write of custom instructions may have done, and what to look at before writing them again. */
@@ -281,8 +272,17 @@ const CUSTOM_WRITTEN = "The words may be written: read the agent's page again be
  * package's words: a name no place has (404), blank words or a frontmatter block (422).
  */
 export const writeCustomInstructions = (name: string, words: string): Promise<CustomInstructions> =>
-  send('PUT', customRoute(name), CustomInstructionsSchema, { body: { words }, may: CUSTOM_WRITTEN });
+  call(
+    (c) =>
+      name === NEMIA
+        ? c.nemia.writeInstructions({ payload: { words } })
+        : c.agents.putInstructions({ params: { namespace: DEFAULT_NAMESPACE, name }, payload: { words } }),
+    write(AgentInstructionsAnswer, CUSTOM_WRITTEN),
+  );
 
 /** Remove the custom instructions for the agent `name`: whether there were any. Rejects with a `WriteRefusal` for a name no place has. */
 export const clearCustomInstructions = (name: string): Promise<CustomInstructionsCleared> =>
-  send('DELETE', customRoute(name), CustomInstructionsClearedSchema, { body: {}, may: CUSTOM_WRITTEN });
+  call(
+    (c) => (name === NEMIA ? c.nemia.clearInstructions() : c.agents.deleteInstructions({ params: { namespace: DEFAULT_NAMESPACE, name } })),
+    write(AgentInstructionsClearedAnswer, CUSTOM_WRITTEN),
+  );

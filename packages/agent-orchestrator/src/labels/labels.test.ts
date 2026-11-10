@@ -15,12 +15,12 @@ import {
   labelsText,
   metadataLabels,
   parseLabelEdits,
-  type LabelEdit,
+  type LabelChange,
   type ParentLabels,
 } from './labels.ts';
 
 /** The edits `texts` spell, which the test means to be taken. */
-const edits = (...texts: string[]): readonly LabelEdit[] => {
+const edits = (...texts: string[]): readonly LabelChange[] => {
   const parsed = parseLabelEdits(texts);
   assert.ok('edits' in parsed, `${texts.join(' ')} is taken`);
   return parsed.edits;
@@ -82,7 +82,7 @@ test('parseLabelEdits: key=value sets, key- removes, and anything else, or one k
 
 test('labelEdits: the map after the edits, every key no edit names kept', async (t) => {
   const current = { team: 'core', tier: 'one', constructor: 'c' };
-  const cases: ReadonlyArray<{ law: string; edits: readonly LabelEdit[]; overwrite: boolean; labels: Record<string, string> }> = [
+  const cases: ReadonlyArray<{ law: string; edits: readonly LabelChange[]; overwrite: boolean; labels: Record<string, string> }> = [
     { law: 'setHolds: a new key is set', edits: edits('owner=kim'), overwrite: false, labels: { ...current, owner: 'kim' } },
     { law: 'setHolds: the same value is no change', edits: edits('team=core'), overwrite: false, labels: current },
     { law: 'setHolds: --overwrite changes a value', edits: edits('team=web'), overwrite: true, labels: { ...current, team: 'web' } },

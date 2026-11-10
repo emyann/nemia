@@ -12,7 +12,18 @@
  * (`stateWordsOf`). A step at work, asking through its harness (`asks-in-session`), checking, or settled keeps its state too: what is in
  * flight runs on, and a verdict is a verdict.
  */
-import type { StepCodes, StepReason } from './api/reasons.ts';
+import type { AnswerVia, StepPhase, StepReason, WaitOn } from 'objects';
+
+/**
+ * A step's codes: its phase, its reason, what a `Waiting` waits on (`on`) and where an `AwaitingAnswer` is asked (`via`), each null on
+ * any other reason. What the board reads a step's state from (`stepState`).
+ */
+export interface StepCodes {
+  readonly phase: StepPhase;
+  readonly reason: StepReason;
+  readonly on: WaitOn | null;
+  readonly via: AnswerVia | null;
+}
 import { container, dashed, filled, hairline, meaningOf, paint, ringed, type Hue } from './meaning.ts';
 
 export type StepState =

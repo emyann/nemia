@@ -63,16 +63,19 @@ test('the library’s writers are listed by who answers for them: a write or a r
   assert.ok(lists(sectionOf(text, 'Yours'), 'agents run'), 'agents run is hers to run unasked');
 });
 
-test('the CLI’s own verbs are said once, each with the entry that classes it', () => {
+test('the CLI’s own verbs are said once, each with its class, and none is an entry of the table too', () => {
+  assert.deepEqual(
+    CLI_VERBS.map((v) => [v.name, v.class]),
+    [['decide', 'read']],
+  );
   assert.deepEqual(
     CLI_VERBS.map((v) => v.name),
     [...VERBS.keys()],
   );
-  for (const verb of CLI_VERBS)
-    assert.ok(
-      TABLE.some((c) => c.name === verb.name),
-      `${verb.name} has an entry of the table`,
-    );
+  assert.deepEqual(
+    CLI_VERBS.filter((verb) => TABLE.some((c) => c.name === verb.name)).map((v) => v.name),
+    [],
+  );
 });
 
 test('a command that reads bare is listed as a read, with the words that make it prompt the person', () => {

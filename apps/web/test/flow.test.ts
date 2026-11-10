@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { GraphEdge, RunGraph } from '../src/lib/api.ts';
+import type { GraphEdge, RunGraph } from '../src/lib/api/graph.ts';
 import type { EdgeStep } from '../src/lib/canvas.ts';
 import { railOf, RAIL_WIDTH, tilesOf, TILE, UNGRAPHED, windowOf, type Flow } from '../src/lib/flow.ts';
 import { CHAR_WIDTH } from '../src/lib/machine.ts';

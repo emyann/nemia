@@ -2,7 +2,7 @@
  * The run page's reads decode the api's answers where they enter (`get`): a run's object (`runObjectQuery`), a step's tries
  * (`stepTriesQuery`), its decision (`decisionQuery`), a step's conversation (`readTranscript`) and its try's path (`stepPathQuery`). Each
  * reads back what the api gave, every union in its shapes; a key the api leaves out stays out and one the board does not know is dropped.
- * Which keys each answer has is `test/wire.test.ts`'s, and the objects' Schemas' (`objects`).
+ * Which keys each answer has is the objects' Schemas' (`objects`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,7 +11,7 @@ import { readGone, runObjectQuery, stepTriesQuery } from '../src/lib/api/run.ts'
 import type { Run, StepTry } from 'objects';
 import { decisionQuery, type RunDecision } from '../src/lib/api/decision.ts';
 import { readTranscript, stepPathQuery, type StepPath } from '../src/lib/api/steps.ts';
-import { decidable, detail, step, stepPath, transcript } from './run-fixtures.ts';
+import { decidable, detail, step, machine, stepPath, transcript } from './run-fixtures.ts';
 
 /** Every read answering `body` as JSON, with `status`, for the length of the test. */
 function answering(t: { after: (fn: () => void) => void }, body: unknown, status = 200) {
@@ -32,6 +32,24 @@ const tries = () => {
   const [first, current] = step().tries;
   return [first, { ...current, closeout: step().closeout }];
 };
+
+/** A try's path through the runtime's lifecycle, in its own states: one edge under a guard and one without. */
+const LIFECYCLE_PATH = stepPath({
+  path: [
+    { state: 'submitted', event: 'filed', at: '2026-09-30T05:01:00.000Z' },
+    { state: 'working', event: 'spawned', at: '2026-09-30T05:02:00.000Z' },
+  ],
+  lifecycle: machine({
+    initial: 'submitted',
+    states: ['submitted', 'working', 'completed'],
+    final: ['completed'],
+    edges: [
+      { from: 'submitted', event: 'start', guard: 'hasSlot', to: 'working', action: 'spawn' },
+      { from: 'working', event: 'exit', to: 'completed', action: 'record' },
+    ],
+    verbs: [{ verb: 'close', entry: 'closed', by: 'person', from: ['working'], to: 'completed', guard: 'awaitsWord' }],
+  }),
+});
 
 test("get, the run page's reads: each decodes what the api gives, keeps out what it leaves out, drops what the board does not know, and keeps a 404 the api's", async (t) => {
   await t.test("a step's tries decode as the api gave them, each union in its every shape", async (t) => {
@@ -105,8 +123,8 @@ test("get, the run page's reads: each decodes what the api gives, keeps out what
     const read = await readTranscript('r-1', 'implement');
     assert.deepEqual(read, transcript());
     assert.equal(Object.hasOwn(read.events[0], 'tool') || Object.hasOwn(read.events[0], 'result'), false);
-    answering(t, stepPath());
-    assert.deepEqual(await readPath(), stepPath());
+    answering(t, LIFECYCLE_PATH);
+    assert.deepEqual(await readPath(), LIFECYCLE_PATH);
     const [, unguarded] = (await readPath()).lifecycle.edges;
     assert.equal(Object.hasOwn(unguarded, 'guard'), false, 'an edge under no guard is read without one');
   });

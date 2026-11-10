@@ -5,7 +5,7 @@
  * `Told` labels it.
  */
 import type { ReactNode } from 'react';
-import type { StepLayers } from '../../lib/api';
+import type { StepLayers } from '../../lib/api/layers.ts';
 import { AgentLink } from '../agent/AgentParts';
 import {
   CUSTOM_INSTRUCTIONS,

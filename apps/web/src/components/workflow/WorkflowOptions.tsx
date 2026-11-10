@@ -1,4 +1,4 @@
-import type { WorkflowListing } from '../../lib/api';
+import type { WorkflowListing } from '../../lib/api/workflows.ts';
 import { unreadWorkflows, workflowKey } from '../../lib/inbox';
 
 /** The workflows a card can name, as a select's options: those that read, in the order listed, yours marked, each by `workflowKey`. */

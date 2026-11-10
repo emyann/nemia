@@ -6,11 +6,11 @@
  * Her words above it are hers; nothing here is a copy of what the step asks.
  */
 import type { ReactNode } from 'react';
-import { readGone } from '@/lib/api';
+import { readGone } from '@/lib/api/gone';
 import { offersOf, askedOf, type Answer } from '@/lib/asks';
 import { broughtFacts, broughtPart, type BroughtPart } from '@/lib/brought';
 import { titleOf } from '@/lib/factory';
-import { useRunRead, type RunView, type StepView } from '@/lib/runView';
+import { useRunRead, type RunDetail, type StepView } from '@/lib/runView';
 import { AnswerRow, Continue } from '@/components/gate/Decide';
 import { Approved, endsTheRun } from '@/components/gate/Gate';
 import { GateBrief } from '@/components/gate/GateBrief';
@@ -55,7 +55,7 @@ function Frame({ part, run, step, children }: { part: BroughtPart | 'reading'; r
 }
 
 /** The run's page's part `part` for `step` of `run`. */
-function Part({ part, run, step }: { part: BroughtPart; run: RunView; step: StepView }) {
+function Part({ part, run, step }: { part: BroughtPart; run: RunDetail; step: StepView }) {
   if (part === 'gate') return <GateBrief run={run} step={step} />;
   if (part === 'continue') return <Continue runId={run.id} step={step.name} line={step.commands.retry} />;
   if (part === 'answer') {
@@ -82,7 +82,7 @@ function Part({ part, run, step }: { part: BroughtPart; run: RunView; step: Step
 }
 
 /** A step that waits on nobody: its state and note as the inspector says them, and its approval where it was approved. */
-function Settled({ run, step }: { run: RunView; step: StepView }) {
+function Settled({ run, step }: { run: RunDetail; step: StepView }) {
   return (
     <div className="space-y-2 rounded border border-outline-variant bg-card p-3 text-body-medium">
       <p className="break-words">

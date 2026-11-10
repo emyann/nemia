@@ -5,7 +5,8 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import { useSearch } from '@tanstack/react-router';
-import { factoriesQuery, fromMatches, workflowsInQuery, type WorkflowListing } from '@/lib/api';
+import { factoriesQuery } from '@/lib/api/factories';
+import { fromMatches, workflowsInQuery, type WorkflowListing } from '@/lib/api/workflows';
 import { fromWord, listPlace, pagePlaceOf, type ListPlace } from '@/lib/factories';
 import { FloatingBar } from '../frame/FloatingBar';
 import { runsOn, specLines } from './StepNode';

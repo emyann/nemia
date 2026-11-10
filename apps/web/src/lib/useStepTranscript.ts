@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { readTranscript, transcriptPath } from './api';
+import { readTranscript, transcriptPath } from './api/steps.ts';
 import { animationFrames } from './follow.ts';
 import { followedFrom, followStep, unread, type Following } from './following.ts';
 import { mergeEvents } from './transcript';

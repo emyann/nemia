@@ -1,4 +1,4 @@
-import type { DecideCommand } from '../../lib/api';
+import type { DecideCommand } from '../../lib/api/decision.ts';
 import { CopyButton } from './CopyButton';
 
 /** A command's words, then its label, the command and the button that copies it. */

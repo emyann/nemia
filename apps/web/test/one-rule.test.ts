@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Factory } from '../src/lib/api.ts';
+import type { Factory } from '../src/lib/api/factories.ts';
 import { bellRows } from '../src/lib/bell.ts';
 import { openBlockOf } from '../src/lib/factories.ts';
 import { inFlight, openRows } from '../src/lib/factory.ts';

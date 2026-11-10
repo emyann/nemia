@@ -1,5 +1,5 @@
 /**
- * The removal of a Workflow of yours (`DELETE /api/namespaces/default/workflows/<name>?resourceVersion=`, definitions/workflows.ts),
+ * The removal of a Workflow of yours (`DELETE /api/namespaces/default/workflows/<name>?resourceVersion=`, workflows/handlers.ts),
  * told as one story: a folder of yours refused while it is stale, unsaid, still needed by a queued card or
  * the repository's, then removed whole at the version the board read it at — in a scratch store and a scratch repository. Every refusal
  * leaves the folder as it was; the removal is read back from disk and from the listing.

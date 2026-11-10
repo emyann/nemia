@@ -40,10 +40,10 @@ import { digestDue, digestOf, readDelivered, resumedAt, type Delivery, type Subs
 import { parseSelectors, type Selectors } from '../watch/selector.ts';
 
 /** The wake lines said to subscribers. */
-export const SUBSCRIPTION_WAKES = Metric.counter('subscription.wakes', { description: 'the wake lines of the feed said to a subscriber' });
+const SUBSCRIPTION_WAKES = Metric.counter('subscription.wakes', { description: 'the wake lines of the feed said to a subscriber' });
 
 /** The digests said alone, with no wake to ride. */
-export const SUBSCRIPTION_DIGESTS = Metric.counter('subscription.digests', {
+const SUBSCRIPTION_DIGESTS = Metric.counter('subscription.digests', {
   description: "the digests of the feed's routine lines said to a subscriber with no wake to ride",
 });
 
@@ -53,7 +53,7 @@ export const SUBSCRIPTION_DIGEST_CHECKS = Metric.counter('subscription.digest.ch
 });
 
 /** Each `say` to a subscriber that failed, said again after its backoff. */
-export const SUBSCRIPTION_SAY_FAILURES = Metric.counter('subscription.say.failures', {
+const SUBSCRIPTION_SAY_FAILURES = Metric.counter('subscription.say.failures', {
   description: 'the says to a subscriber that failed, each said again after a backoff',
 });
 
@@ -70,7 +70,7 @@ export type DeliverOptions = {
 };
 
 /** The deliverer's pace when it is given none. */
-export const DELIVER_DEFAULTS: DeliverOptions = {
+const DELIVER_DEFAULTS: DeliverOptions = {
   every: '5 seconds',
   beat: '1 second',
   digestCheck: '30 seconds',
@@ -79,7 +79,7 @@ export const DELIVER_DEFAULTS: DeliverOptions = {
 };
 
 /** The pace a failed `say` is said again at: after `retry`, doubling each time, and never longer than `retryCap`. */
-export const sayBackoff = (o: Pick<DeliverOptions, 'retry' | 'retryCap'>) =>
+const sayBackoff = (o: Pick<DeliverOptions, 'retry' | 'retryCap'>) =>
   Schedule.min([Schedule.exponential(o.retry), Schedule.spaced(o.retryCap)]);
 
 /** `text` said to the subscription `name`'s task, said again on its backoff until the engine takes it, each failure a warning. */

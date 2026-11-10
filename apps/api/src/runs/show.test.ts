@@ -1,7 +1,7 @@
 /**
- * `GET /api/runs/:runId` answers the run as one object (`nemia show`'s, the package's `Run`), the run's one entry served on both sides;
- * any `view`, the page's `?view=page` among them, is refused. `?raw=true` answers the record as `nemia show --raw` prints it, and
- * `GET /api/listing[/:runId]` what `nemia ls` lists, the two reads `nemia` prints from as a client of the api.
+ * `GET /api/runs/:name` answers the run as one object (`nemia show`'s, the package's `Run`), the run's one entry served on both sides,
+ * and takes no view. `GET /api/runs/:name/record` answers the record as `nemia show --raw` prints it, and `GET /api/listing[/:name]` what
+ * `nemia ls` lists, the two reads `nemia` prints from as a client of the api.
  *
  * On the stand-ins: the runtime's test engine, its task filed and settled by hand, and the test place, under the records this file seeds.
  */
@@ -14,7 +14,7 @@ import { Effect, Schema } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { COMMANDS, RunObject } from 'agent-orchestrator';
-import type { RunAnswer } from './runs.ts';
+import type { Run as RunAnswer } from 'objects';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 
 const stand = eachTest(testPlace);
@@ -64,30 +64,27 @@ test("the run's route answers the run object, nemia/v1's Run, as nemia show prin
   assert.deepEqual(body, JSON.parse(JSON.stringify(shown)), 'one judgement serves both sides: the api answers what nemia show prints');
 });
 
-test('REFUSED: no such run, or a path made of an id, is a 404; a view the route does not take is a 422', async () => {
+test('REFUSED: no such run, or a path made of an id, is a 404', async () => {
   assert.equal((await app().request('/api/runs/r-nowhere')).status, 404, 'no such run');
   assert.equal((await app().request(`/api/runs/..%2Fruns%2F${R}`)).status, 404, 'a path is no id');
-  assert.equal((await app().request(`/api/runs/${R}?view=frob`)).status, 422, 'the route takes no view');
 });
 
-test('REFUSED: ?view=page is gone, a 422 like any view: the route answers the object, and the board reads its sub-resources and lines', async () => {
-  const res = await app().request(`/api/runs/${R}?view=page`);
-  assert.equal(res.status, 422, 'the page is no view the route takes');
-  const body = (await res.json()) as { error?: unknown };
-  assert.equal(typeof body.error, 'string', 'a refusal, in words');
+test('the run takes no view: `?view=` and `?raw=` are no query of its endpoint, which answers the object whatever they say', async () => {
+  for (const query of ['view=page', 'view=frob', 'raw=true']) {
+    const res = await app().request(`/api/runs/${R}?${query}`);
+    assert.equal(res.status, 200, query);
+    assert.equal(((await res.json()) as RunAnswer).kind, 'Run', `${query}: the object`);
+  }
 });
 
-test("?raw=true answers the run's record as nemia show --raw prints it; raw=false the object; any other raw a 422", async () => {
-  const res = await app().request(`/api/runs/${R}?raw=true`);
+test("GET /api/runs/:name/record answers the run's record as nemia show --raw prints it; no such run a 404", async () => {
+  const res = await app().request(`/api/runs/${R}/record`);
   assert.equal(res.status, 200);
   const handler = SHOW?.handler?.bind(SHOW);
   assert.ok(handler, 'show has a handler');
   const printed = await runWith(engine(), handler({ runId: R, raw: true }, process.env, root));
   assert.deepEqual(await res.json(), JSON.parse(JSON.stringify(printed)), 'the record nemia show --raw prints');
-  const object = (await (await app().request(`/api/runs/${R}?raw=false`)).json()) as RunAnswer;
-  assert.equal(object.kind, 'Run', 'raw=false is the object');
-  assert.equal((await app().request(`/api/runs/${R}?raw=yes`)).status, 422, 'raw takes true or false');
-  assert.equal((await app().request('/api/runs/r-nowhere?raw=true')).status, 404, 'no such run');
+  assert.equal((await app().request('/api/runs/r-nowhere/record')).status, 404, 'no such run');
 });
 
 test("GET /api/listing answers nemia ls's whole answer, every run or the one named; a run the store does not have is a 404", async (t) => {

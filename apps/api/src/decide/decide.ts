@@ -1,0 +1,28 @@
+/**
+ * `GET /api/runs/:runId/decision`, the runs group's `decision` endpoint: a run's decision as the orchestrator's read model gives it
+ * (`runDecision`), objects' `RunDecision`. `Missing` for a run the store does not have, `Unjudged` for one whose workflow folder or task
+ * journal does not read, in the words the board says it with.
+ */
+import { Effect } from 'effect';
+import { Unjudged } from 'objects';
+import { runDecision } from 'agent-orchestrator';
+import { answered } from '../objects/refused.ts';
+
+/** The globs `?sensitive=` names, comma-separated, each trimmed and none empty; none asked where it is not given. */
+const globsOf = (sensitive: string | undefined): { sensitive?: string[] } => {
+  const globs = (sensitive ?? '')
+    .split(',')
+    .map((glob) => glob.trim())
+    .filter((glob) => glob !== '');
+  return globs.length ? { sensitive: globs } : {};
+};
+
+/**
+ * The handler of the runs group's `decision` endpoint, the run `runId`'s decision read over the request's services; `sensitive`, the
+ * query's comma-separated globs, names the files shown in full in place of the defaults.
+ */
+export const decisionHandler = (runId: string, sensitive?: string) =>
+  Effect.flatMap(
+    answered((s) => s.inRequest(runDecision(runId, s.env, globsOf(sensitive)))),
+    (read) => ('unjudged' in read ? Effect.fail(new Unjudged({ error: read.unjudged })) : Effect.succeed(read.decision)),
+  );

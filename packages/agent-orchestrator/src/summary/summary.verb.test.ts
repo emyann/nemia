@@ -21,7 +21,7 @@ process.env.WF_VERIFY_REST = '1';
 process.env.WF_DEFAULT_FACTORY_STARTS = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { howOf } = await import('../command/pages.verb.ts');
+const { howOf } = await import('../summary/how.verb.ts');
 const { runsSummarized } = await import('../summary/summary.verb.ts');
 const { EngineService: RunsEngine } = await import('../runtime-client.ts');
 const { Effect: RunsEffect } = await import('effect');

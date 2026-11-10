@@ -38,7 +38,8 @@ import { CHAT_OUTBOX_KEY, editKept, forgetKept, keepUnsent, parseKept, readKept,
 import { anyAbove, composerButton, composerWords } from '../src/lib/nemia.ts';
 import { cuesOf, faceOf, UP, type Presence } from '../src/lib/presence.ts';
 import type { StreamLike } from '../src/lib/follow.ts';
-import type { AskQuestion, ChatEvent, ChatPresence, FactoryLevel, PermissionFacts } from '../src/lib/api.ts';
+import type { AskQuestion, ChatEvent, ChatPresence, PermissionFacts } from '../src/lib/api/chat.ts';
+import type { FactoryLevel } from '../src/lib/api/nemia.ts';
 
 const at = (second: number): string => new Date(Date.UTC(2026, 9, 15, 17, 40, second)).toISOString();
 

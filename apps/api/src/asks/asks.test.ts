@@ -191,27 +191,38 @@ test('POST …/retry: what it refuses — a message it will not carry, a step no
     },
   );
 
-  await t.test('REFUSED: a body that is not an ask (400), naming the key, and a run or a step that does not exist (404)', async () => {
-    const bodies: Array<[unknown, RegExp]> = [
-      ['not json', /^POST …\/retry takes a JSON body/],
-      [['continue'], /^POST …\/retry takes a JSON object/],
-      [{}, /^`mode`[^]*was left out/],
-      [{ mode: 'again' }, /^`mode`[^]*was "again"/],
-      [{ mode: 'continue', model: 'opus' }, /^`model`[^]*goes with "mode": "fresh"/],
-      [{ mode: 'fresh', model: '' }, /^`model`[^]*was ""/],
-      [{ mode: 'continue', message: 42 }, /^`message`[^]*was 42/],
-      [{ mode: 'fresh', model: 3 }, /^`model`[^]*`nemia retry --model <m>`[^]*was 3\.$/],
-      [{ mode: 'fresh', model: '  ' }, /^`model`[^]*was "  "\.$/],
-      [{ mode: 'continue', budget: 'five' }, /^`budget`[^]*`nemia retry --budget <amount>`[^]*was "five": `/],
-    ];
-    for (const [body, fact] of bodies) assert.match(await refusedWith(await ask('implement', body), 400, JSON.stringify(body)), fact);
-    assert.match(await refusedWith(await ask('implement', { mode: 'continue' }, BOARD, 'r-nope'), 404, 'no run'), /^No run 'r-nope'/);
-    assert.match(
-      await refusedWith(await ask('deploy', { mode: 'continue' }), 404, 'no step'),
-      new RegExp(`^Run '${R}' has no step 'deploy'`),
-    );
-    nothingWritten('a body that is not an ask');
-  });
+  await t.test(
+    'REFUSED: a body `RunRetry` does not read (400, naming the key), one it reads and the entry refuses (422, naming the key), and a run or a step that does not exist (404)',
+    async () => {
+      const unread: Array<[unknown, string]> = [
+        ['not json', 'payload'],
+        [['continue'], 'payload'],
+        [{}, 'payload.mode'],
+        [{ mode: 'again' }, 'payload.mode'],
+        [{ mode: 'continue', message: 42 }, 'payload.message'],
+        [{ mode: 'fresh', model: 3 }, 'payload.model'],
+        [{ mode: 'continue', budget: 'five' }, 'payload.budget'],
+      ];
+      for (const [body, field] of unread) {
+        const res = await ask('implement', body);
+        assert.equal(res.status, 400, JSON.stringify(body));
+        const said = (await res.json()) as { field?: string };
+        assert.ok(said.field?.startsWith(field), `${JSON.stringify(body)} names ${field}: ${JSON.stringify(said)}`);
+      }
+      const refused: Array<[unknown, RegExp]> = [
+        [{ mode: 'continue', model: 'opus' }, /^`model`[^]*goes with "mode": "fresh"/],
+        [{ mode: 'fresh', model: '' }, /^`model` is blank/],
+        [{ mode: 'fresh', model: '  ' }, /^`model` is blank/],
+      ];
+      for (const [body, fact] of refused) assert.match(await refusedWith(await ask('implement', body), 422, JSON.stringify(body)), fact);
+      assert.match(await refusedWith(await ask('implement', { mode: 'continue' }, BOARD, 'r-nope'), 404, 'no run'), /^No run 'r-nope'/);
+      assert.match(
+        await refusedWith(await ask('deploy', { mode: 'continue' }), 404, 'no step'),
+        new RegExp(`^Run '${R}' has no step 'deploy'`),
+      );
+      nothingWritten('a body that is not an ask');
+    },
+  );
 });
 
 /** One event of a session's transcript, as the engine's `transcript` answers it. */

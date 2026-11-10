@@ -1,4 +1,4 @@
-import type { WorkflowPageAddress } from '../../lib/api';
+import type { WorkflowPageAddress } from '../../lib/api/address.ts';
 import { AgentLink } from '../agent/AgentParts';
 import { WorkflowLink } from '../workflow/WorkflowLink';
 

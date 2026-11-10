@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Effect } from 'effect';
+import { Effect, Schema } from 'effect';
 import type { TaskView } from 'agent-runtime';
 import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
@@ -34,13 +34,20 @@ const e = {
   view: (id: string) => Effect.succeed({ id, phase: 'pending', state: { settled: null, ...TASKS[id] } } as unknown as TaskView),
 };
 
-/** The command line `argv` read as `spec` reads it, refused as the CLI refuses it, then handed to its handler over `e`. */
+/**
+ * The command line `argv` read as `spec` reads it, refused as the CLI refuses it, decoded through the entry's `input` as the CLI decodes
+ * it, then handed to its handler over `e`.
+ */
 const typed = async <D extends object>(command: typeof SUBSCRIBE | typeof UNSUBSCRIBE, argv: string[]): Promise<D> => {
   const args = parseArgv(command.spec, argv);
   assert.ok(args, `${argv.join(' ')} reads`);
   const refused = command.check?.(args);
   if (refused) throw Object.assign(new Error(refused), { exitCode: 2 });
-  return (await runWith(e, command.handler(args, process.env, ROOT) as never)) as D;
+  const handled =
+    command === SUBSCRIBE
+      ? SUBSCRIBE.handler(Schema.decodeUnknownSync(SUBSCRIBE.input)(args), process.env, ROOT)
+      : UNSUBSCRIBE.handler(Schema.decodeUnknownSync(UNSUBSCRIBE.input)(args), process.env, ROOT);
+  return (await runWith(e, handled as never)) as D;
 };
 
 /** The message `f` refuses with, at exit 2. */
@@ -83,7 +90,7 @@ test("nemia subscribe and unsubscribe: a long-lived task subscribed from the fee
         digestEvery: 15,
         from: fs.statSync(feed).size,
       });
-      assert.deepEqual(SUBSCRIBE.print(asked as never, {}), [
+      assert.deepEqual(SUBSCRIBE.print(asked as never, { name: 'watch', task: 'nemia' }), [
         'subscribed watch: nemia is told at once of a line taken by waits=person, and of the rest in a digest every 60 minutes with no wake.',
       ]);
       await typed(UNSUBSCRIBE, ['watch']);

@@ -7,7 +7,7 @@
 import { Button } from '@/components/ui/button';
 import { container } from '@/lib/meaning';
 import { levelWord } from '@/lib/nemia';
-import type { NemiaLevel } from '@/lib/api';
+import type { NemiaLevel } from '@/lib/api/nemia';
 import type { Presence } from '@/lib/presence';
 import { NemiaFace } from '../NemiaFace';
 

@@ -1,62 +1,84 @@
 /**
- * Nemia, the store's own agent, read by the board: where she is, and what she keeps. Her level is set on the route the table generates
- * from `nemia level` (`PUT /api/level`, commands/routes.ts).
+ * Nemia, the store's own agent, on the api: the nemia group of `objects`' Api (`NemiaGroup`), each endpoint's handler calling the
+ * orchestrator by type — her level read and set (`LEVEL`), the facts she keeps (`MEMORY`), an agent's rules for auto (`POLICY`,
+ * `POLICY_CONFIRM`, `POLICY_DROP`), her custom instructions (`AGENTS_CUSTOM` for her name), and her chat (chat.ts). What each takes,
+ * answers and refuses is the group's to say (packages/objects/src/nemia-api.ts); a refusal of the orchestrator's is answered by its kind
+ * (`answered`, objects/refused.ts).
  */
-import { Hono } from 'hono';
-import { type ApiEnv, served } from '../layer.ts';
-import { commandNamed, runPlaced } from '../store.ts';
-import type { POLICY_PROPOSE, Command } from 'agent-orchestrator';
-
-/** What `GET /api/policy/:name` and its writes answer: an agent's rules for auto, as the package's table types them. */
-export type PolicyAnswer = typeof POLICY_PROPOSE extends Command<infer T> ? T : never;
-
-/** `nemia level`'s entry of the package's table, whose bare read the api serves by hand. */
-const LEVEL = commandNamed('level');
-
-/** `nemia memory`'s entry of the package's table. */
-const MEMORY = commandNamed('memory');
-
-/** `nemia policy`'s entry of the package's table. */
-const POLICY = commandNamed('policy');
+import { HttpApiBuilder } from 'effect/http-api';
+import {
+  AGENTS_CUSTOM,
+  customInstructionsFile,
+  LEVEL,
+  MEMORY,
+  POLICY,
+  POLICY_CONFIRM,
+  POLICY_DROP,
+  type Command,
+  type POLICY_PROPOSE,
+} from 'agent-orchestrator';
+import { WorkflowError } from 'agent-orchestrator/workflow';
+import { Api } from 'objects';
+import type { Served } from '../layer.ts';
+import { answered, answeredWrite } from '../objects/refused.ts';
+import { chatAnswer, chatPage, chatRead, chatSend, chatStop, chatStream } from './chat.ts';
 
 /**
- * - `GET /api/level` — where Nemia is, as `nemia level --json` prints it:
- *   `{ level, since, task, phase, sessionId, reach, bridge, stopped, spend, allows, factories, trust }`, the store's level `manual`
- *   where none was ever set, `reach` the command that attaches to her session once it runs, then her web link or why it is not up,
- *   `bridge` that link as `{ url, why }` (null where her session is not bridged), `spend` what her ended sessions cost, `allows` what a
- *   person allowed her at a prompt beyond what is built in, and `factories` each factory's level, the default factory first:
- *   `{ factory, level, default, own, raise }`, `raise` `{ level, until }` while one is in force; `trust` the command a person runs once
- *   to trust her folder, her session waiting for it, null where it is trusted. 422 for a level file that does not read, naming it. Its
- *   write, `PUT /api/level`, takes `{ level?, factory?, for?, end? }`, and is never refused for her folder's trust.
- * - `GET /api/nemia/memory` — the facts she keeps, `{ dir, facts, fact: null }`, by name.
- * - `GET /api/nemia/memory/:fact` — one fact's words, `{ dir, facts, fact: { name, text } }`; 404 for a fact she does not keep, naming
- *   those she does.
- * - `GET /api/policy/:name` — an agent's rules for auto: `{ agent, file, isDefault, rules, proposed, instruction }`, each rule with its
- *   words, `proposed` null where it proposed none, else `{ file, at, rules, guidance, stale }`; 400 for a name that is no agent's, 422 for
- *   a file of rules that does not read. Its writes, `PUT` and `DELETE /api/policy/:name/rules/:id`, confirm a rule and drop one.
- * - `/api/auto/…`, the routes' former spelling, as `nemia auto` was the commands': a 308 to the same path under `/api/policy/`, which
- *   keeps the method and the body, its `Location` naming the route to call now.
+ * What `GET /api/policy/:name` and its writes answer, as the package types it: read by the board's wire test until it reads `objects`'
+ * `PolicyList`.
  */
-export const nemia = new Hono<ApiEnv>()
-  .get('/api/level', (c) =>
-    served(c, async ({ e, placeService, home, trace }) => c.json(await runPlaced({ placeService, home, trace }, e, LEVEL.handler({})))),
-  )
-  .get('/api/nemia/memory', (c) =>
-    served(c, async ({ e, placeService, home, trace }) => c.json(await runPlaced({ placeService, home, trace }, e, MEMORY.handler({})))),
-  )
-  .get('/api/nemia/memory/:fact', (c) =>
-    served(c, async ({ e, placeService, home, trace }) =>
-      c.json(await runPlaced({ placeService, home, trace }, e, MEMORY.handler({ fact: c.req.param('fact') }))),
+export type PolicyAnswer = typeof POLICY_PROPOSE extends Command<infer T> ? T : never;
+
+/** The store's own agent's name, whose custom instructions are hers (`STORE_AGENT` in the package's custom.store.ts). */
+const NEMIA = 'nemia';
+
+/**
+ * Her custom instructions, through `nemia agents custom`'s entry for her name on the repository the request is served on: read bare,
+ * written from `words`, cleared with `clear`. A read and a write answer the words; a clear what it removed.
+ */
+const custom = (s: Served, args: { words?: string; clear?: true }) =>
+  s.inRequest(AGENTS_CUSTOM.handler({ name: NEMIA, repo: s.repo, ...args }, undefined, s.home));
+
+/** Her custom instructions as a read or a write answers them; a clear's answer here is a fault of the entry's. */
+const wordsOf = async (s: Served, args: { words?: string }) => {
+  const read = await custom(s, args);
+  if ('removed' in read) throw new Error('nemia agents custom answered a clear to a read: it clears with `clear` alone.');
+  return read;
+};
+
+export const nemiaHandlers = HttpApiBuilder.group(Api, 'nemia', (handlers) =>
+  handlers
+    .handle('level', () => answered((s) => s.inRequest(LEVEL.handler({}, s.env, s.home))))
+    .handle('setLevel', ({ payload }) => answeredWrite((s) => s.inRequest(LEVEL.handler(payload, s.env, s.home))))
+    .handle('memory', () => answered((s) => s.inRequest(MEMORY.handler({}, s.env, s.home))))
+    .handle('fact', ({ params: { fact } }) => answered((s) => s.inRequest(MEMORY.handler({ fact }, s.env, s.home))))
+    .handle('policy', ({ params: { name } }) => answered((s) => s.inRequest(POLICY.handler({ name }, s.env, s.home))))
+    .handle('confirmRule', ({ params: { name, id }, payload: { words } }) =>
+      answeredWrite((s) => s.inRequest(POLICY_CONFIRM.handler({ name, id, words }, s.env, s.home))),
+    )
+    .handle('dropRule', ({ params: { name, id } }) => answeredWrite((s) => s.inRequest(POLICY_DROP.handler({ name, id }, s.env, s.home))))
+    .handle('chat', ({ query }) => chatPage(query))
+    .handle('chatStream', ({ query, headers }) => chatStream(headers['last-event-id'] || query.after || undefined))
+    .handle('chatSend', ({ payload }) => chatSend(payload))
+    .handle('chatStop', () => chatStop())
+    .handle('chatAnswer', ({ payload }) => chatAnswer(payload))
+    .handle('chatRead', ({ payload: { through } }) => chatRead(through))
+    .handle('instructions', () =>
+      answered(async (s) => {
+        try {
+          return await wordsOf(s, {});
+        } catch (err) {
+          if (!(err instanceof WorkflowError)) throw err;
+          return { name: NEMIA, file: customInstructionsFile(s.home, NEMIA), words: null, error: err.message };
+        }
+      }),
+    )
+    .handle('writeInstructions', ({ payload: { words } }) => answeredWrite((s) => wordsOf(s, { words })))
+    .handle('clearInstructions', () =>
+      answeredWrite(async (s) => {
+        const cleared = await custom(s, { clear: true });
+        if (!('removed' in cleared)) throw new Error('nemia agents custom answered a read to a clear: it clears with `clear`.');
+        return cleared;
+      }),
     ),
-  )
-  .get('/api/policy/:name', (c) =>
-    served(c, async ({ e, placeService, home, trace }) => {
-      const wrong = POLICY.check?.({ name: c.req.param('name') });
-      if (wrong) return c.json({ error: wrong }, 400);
-      return c.json(await runPlaced({ placeService, home, trace }, e, POLICY.handler({ name: c.req.param('name') }, undefined, home)));
-    }),
-  )
-  .all('/api/auto/*', (c) => {
-    const url = new URL(c.req.url);
-    return c.redirect(`${url.pathname.replace(/^\/api\/auto\//, '/api/policy/')}${url.search}`, 308);
-  });
+);

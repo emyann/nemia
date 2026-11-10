@@ -2,7 +2,7 @@
  * The words the Factory says over its floor when nothing ticks the store (`DaemonLine`), from what the api judged of `daemon.json`
  * (`Daemon`). Pure: the time is handed in, the browser's own on the page, so an age moves between reads.
  */
-import type { Daemon } from './api';
+import type { Daemon } from './api/daemon.ts';
 import { agoWords } from './runWords.ts';
 
 /**

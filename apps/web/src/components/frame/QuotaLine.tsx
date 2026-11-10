@@ -1,5 +1,5 @@
 import { TriangleAlert } from 'lucide-react';
-import type { Quota } from '@/lib/api';
+import type { Quota } from '@/lib/api/quota';
 import { lastWords, quotaTitle, type WindowWords, windowWords } from '@/lib/quota';
 import { agoWords } from '@/lib/runWords';
 import { useNow } from '@/lib/useNow';

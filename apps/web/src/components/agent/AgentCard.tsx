@@ -1,4 +1,4 @@
-import type { AgentListing, AgentRoleKey } from '../../lib/api';
+import type { AgentListing, AgentRoleKey } from '../../lib/api/agents.ts';
 import { AgentFace, FromBadge, personOf, RouteLink, Skills, UsedBy } from './AgentParts';
 import { FactoryTags } from '../factory/FactoryTag';
 

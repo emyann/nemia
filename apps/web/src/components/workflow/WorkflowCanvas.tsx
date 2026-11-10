@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Background, BackgroundVariant, type Edge, Position, ReactFlow, ReactFlowProvider, useReactFlow } from '@xyflow/react';
-import type { PagePlace, WorkflowListing } from '../../lib/api';
+import type { PagePlace, WorkflowListing } from '../../lib/api/workflows.ts';
 import { specStep, stepPage } from '../../lib/bar';
 import { extentOf, layout, stepsOf } from '../../lib/layout';
 import { useBarOver } from '../../lib/useBarOver';

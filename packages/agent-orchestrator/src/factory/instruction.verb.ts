@@ -1,9 +1,11 @@
 /**
  * A factory's instruction, what Nemia is to know of the factory and no step is told (its agents are told its rules, `nemia factory rules`),
  * its two verbs each an entry of the command table: `nemia factory instruction`, where it is kept — read bare, and set or cleared in the
- * factory's file — and `nemia factory instruct`, the text the store keeps, written or cleared. The api serves the writes on the routes
- * the table generates, and the read by a route of its own, which calls the same handler (`factoryInstruction`).
+ * factory's file — and `nemia factory instruct`, the text the store keeps, written or cleared. The api's Factory `instruction` and
+ * `…InstructionWords` verbs (`objects`' Api) call their handlers by their `input`.
  */
+import { Schema } from 'effect';
+import { FactoryInstructionWords } from 'objects';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { DEFAULT_FACTORY, defaultFactoryRefusal, instructionAt, type FactoryWrite, type InstructionAt } from './factory.ts';
@@ -78,12 +80,34 @@ const INSTRUCTION_SPEC: Spec = {
   missing: "nemia factory instruction takes the factory's name: nemia factory instruction <name> [--path <path> | --store | --clear].",
 };
 
-/** Where `args` say to keep the instruction: a path, the store, or none, the key cleared; nothing where they say none of them. */
-function placeAsked(args: Args): { at: InstructionAt | undefined } | undefined {
-  if (args.clear === true) return { at: undefined };
-  if (args.store === true) return { at: { store: true } };
-  const p = textOf(args, 'path');
-  return p === undefined ? undefined : { at: { path: p } };
+/**
+ * What `nemia factory instruction` takes: the factory, and where to keep its instruction — a path in its first folder, the store, or
+ * `clear` — or none of them, a read.
+ */
+export const InstructionInput = Schema.Struct({
+  factory: Schema.String,
+  path: Schema.optionalKey(Schema.String),
+  store: Schema.optionalKey(Schema.Boolean),
+  clear: Schema.optionalKey(Schema.Boolean),
+});
+export type InstructionInput = typeof InstructionInput.Type;
+
+/**
+ * What `nemia factory instruct` takes: the factory, and the words the store keeps (`objects`' `FactoryInstructionWords`, read by the
+ * command line's runner from `--file`) or `clear`.
+ */
+export const InstructInput = Schema.Struct({
+  factory: Schema.String,
+  words: Schema.optionalKey(FactoryInstructionWords.fields.words),
+  clear: Schema.optionalKey(Schema.Boolean),
+});
+export type InstructInput = typeof InstructInput.Type;
+
+/** Where `asked` says to keep the instruction: a path, the store, or none, the key cleared; nothing where it says none of them. */
+function placeAsked({ clear, store, path }: InstructionInput): { at: InstructionAt | undefined } | undefined {
+  if (clear === true) return { at: undefined };
+  if (store === true) return { at: { store: true } };
+  return path === undefined ? undefined : { at: { path } };
 }
 
 /**
@@ -121,8 +145,8 @@ function readLines(data: FactoryInstruction): string[] {
  * The instruction of the factory `args` name, after its place is set as they ask (`placeAsked`), if they ask one, in its file
  * (`setInstruction`). Refused, writing nothing: as `FACTORY_INSTRUCTION` says.
  */
-function placed(args: Args): FactoryInstruction {
-  const name = textOf(args, 'factory') ?? '';
+function placed(args: InstructionInput): FactoryInstruction {
+  const name = args.factory;
   refuseDefault(name, 'instruction');
   const asked = placeAsked(args);
   if (asked !== undefined) setInstruction({ factory: name, at: asked.at });
@@ -135,7 +159,7 @@ function placed(args: Args): FactoryInstruction {
  * and the instruction read there after. Refused, writing nothing: the default factory, two places at once, a path that is not one, and a
  * factory that is not there or does not read.
  */
-export const FACTORY_INSTRUCTION: Command<FactoryInstruction> = {
+export const FACTORY_INSTRUCTION: Command<FactoryInstruction, InstructionInput> = {
   name: 'factory instruction',
   usage: '<name> [--path <path> | --store | --clear]',
   help: [
@@ -151,8 +175,9 @@ export const FACTORY_INSTRUCTION: Command<FactoryInstruction> = {
   class: { bare: 'read', sets: 'ask', setsBy: ['--path', '--store', '--clear'] },
   only: {
     side: 'cli',
-    why: "the api serves it as the Factory's `instruction`, `putInstruction` and `deleteInstruction` of `objects`' Api, calling this handler",
+    why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Factory's `instruction`, `putInstruction` and `deleteInstruction`, whose handlers call this one by its `input`",
   },
+  input: InstructionInput,
   handler: (args) => tried(() => placed(args)),
   print(data, args) {
     const asked = placeAsked(args);
@@ -190,7 +215,7 @@ type Instructed = FactoryInstruction & { removed?: boolean };
  * instruction read after. Refused, writing nothing: the default factory and the factory as `factoryInstruction` refuses it; an instruction
  * its file keeps in its first folder (`Conflict`, naming the file and the move to the store), and blank words (`Invalid`).
  */
-export const FACTORY_INSTRUCT: Command<Instructed> = {
+export const FACTORY_INSTRUCT: Command<Instructed, InstructInput> = {
   name: 'factory instruct',
   usage: '<name> --file <path>|- | --clear',
   help: [
@@ -209,8 +234,9 @@ export const FACTORY_INSTRUCT: Command<Instructed> = {
   class: 'ask',
   only: {
     side: 'cli',
-    why: "the api serves it as the Factory's `putInstructionWords` and `deleteInstructionWords` of `objects`' Api, calling this handler",
+    why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Factory's `putInstructionWords` and `deleteInstructionWords`, whose handlers call this one by its `input`",
   },
+  input: InstructInput,
   handler: (args) => tried(() => instructed(args)),
   print(data) {
     if (data.removed !== undefined)
@@ -223,18 +249,17 @@ export const FACTORY_INSTRUCT: Command<Instructed> = {
  * The instruction of the factory `args` name, after its text in the store is written from their words or removed with `clear`. Refused,
  * writing nothing: as `FACTORY_INSTRUCT` says.
  */
-function instructed(args: Args): Instructed {
-  const name = textOf(args, 'factory') ?? '';
+function instructed({ factory: name, words, clear }: InstructInput): Instructed {
   refuseDefault(name, 'instruct');
   const before = factoryInstruction(name);
   if (!before.store)
     throw new Conflict({
       message: `${name}'s instruction is read from ${before.file}, in the factory's first folder, and the store writes no file there: edit it in the folder, or keep it in the store first — nemia factory instruction ${name} --store. Nothing was written.`,
     });
-  if (args.clear === true) {
+  if (clear === true) {
     const removed = clearInstructionText(name, before.file);
     return { ...factoryInstruction(name), removed };
   }
-  writeInstructionText(name, textOf(args, 'words') ?? '', before.file);
+  writeInstructionText(name, words ?? '', before.file);
   return factoryInstruction(name);
 }

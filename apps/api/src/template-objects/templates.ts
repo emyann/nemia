@@ -14,10 +14,10 @@ import { HttpApiBuilder } from 'effect/http-api';
 import { templateList, templateObject, templateTree, type Factory } from 'agent-orchestrator';
 import { Api } from 'objects';
 import type { Served } from '../layer.ts';
-import { agentObjectsOf, treeAgentsHeld } from '../definitions/agents.ts';
+import { agentObjectsOf, treeAgentsHeld } from '../agents/index.ts';
 import { listed, servedNamed, servedOf } from '../definitions/served.ts';
-import { skillObjectsOf, treeSkillsHeld } from '../definitions/skills.ts';
-import { treeWorkflowsHeld, workflowObjectsOf } from '../definitions/workflows.ts';
+import { skillObjectsOf, treeSkillsHeld } from '../skills/index.ts';
+import { treeWorkflowsHeld, workflowObjectsOf } from '../workflows/index.ts';
 import { queryOf } from '../factory/parts/parts.ts';
 import { answered, answeredWrite } from '../objects/refused.ts';
 

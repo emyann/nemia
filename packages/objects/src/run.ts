@@ -230,8 +230,12 @@ const TimelineTotal = Schema.Struct({
   cost: Schema.NullOr(Spent),
 });
 
-/** A check's stream as a person reads it: its last lines, and whether there were more (`StepLog`, checks.verb.ts). */
-const StepLog = Schema.Struct({ lines: Strings, truncated: Schema.Boolean });
+/**
+ * A stream as a person reads it — a check's, a step's session output: its last lines, and whether there were more (`StepLog`,
+ * checks.verb.ts).
+ */
+export const StepLog = Schema.Struct({ lines: Strings, truncated: Schema.Boolean });
+export type StepLog = typeof StepLog.Type;
 
 /** A step's check: its command, its task, its verdict and, refused, what it said (`StepCheck`, checks.verb.ts). */
 export const StepCheck = Schema.Struct({
@@ -243,7 +247,7 @@ export const StepCheck = Schema.Struct({
 export type StepCheck = typeof StepCheck.Type;
 
 /** The release a session ran on (`SessionRelease`, release.ts): an install's tag, or a checkout's folder. */
-const SessionReleaseSchema = Schema.Union([
+export const SessionReleaseSchema = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('install'), tag: Schema.String }),
   Schema.Struct({ kind: Schema.Literal('checkout'), root: Schema.String }),
 ]).annotate({ identifier: 'SessionRelease' });
@@ -388,6 +392,25 @@ export type RunStepStatus = typeof RunStepStatus.Type;
 /** The runs a run waits on or is held until, each that has not landed and why it never will on its own (`RunWaiting`, `RunHolding`). */
 const waitedRun = { run: Schema.String, missing: Schema.Boolean, cancelledAt: NullString, gone: Strings };
 
+/** The runs a run's roots wait on that have not landed (`RunWaiting`, judged.verb.ts), in the package's words. */
+export const RunWaiting = Schema.Struct({
+  runs: List(Schema.Struct(waitedRun)),
+  word: Schema.String,
+  advice: Schema.String,
+  waitingOnYou: Schema.Boolean,
+}).annotate({ identifier: 'RunWaiting' });
+export type RunWaiting = typeof RunWaiting.Type;
+
+/** A person's hold on a run (`RunHolding`, judged.verb.ts), in the package's words. */
+export const RunHolding = Schema.Struct({
+  at: Schema.String,
+  runs: List(Schema.Struct({ ...waitedRun, landed: Schema.Boolean })),
+  word: Schema.String,
+  advice: Schema.String,
+  waitingOnYou: Schema.Boolean,
+}).annotate({ identifier: 'RunHolding' });
+export type RunHolding = typeof RunHolding.Type;
+
 /** What a person has to decide (`RunToDecide`, judged.verb.ts): an approval at a gate, or the result branches. */
 const RunToDecide = Schema.Union([
   Schema.Struct({
@@ -446,23 +469,8 @@ export const RunStatus = Schema.Struct({
       split: Schema.String,
     }),
   ),
-  waiting: Schema.NullOr(
-    Schema.Struct({
-      runs: List(Schema.Struct(waitedRun)),
-      word: Schema.String,
-      advice: Schema.String,
-      waitingOnYou: Schema.Boolean,
-    }),
-  ),
-  holding: Schema.NullOr(
-    Schema.Struct({
-      at: Schema.String,
-      runs: List(Schema.Struct({ ...waitedRun, landed: Schema.Boolean })),
-      word: Schema.String,
-      advice: Schema.String,
-      waitingOnYou: Schema.Boolean,
-    }),
-  ),
+  waiting: Schema.NullOr(RunWaiting),
+  holding: Schema.NullOr(RunHolding),
   toDecide: Schema.NullOr(RunToDecide),
   graph: ObjectGraph,
   timeline: Schema.Struct({

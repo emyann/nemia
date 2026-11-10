@@ -1,41 +1,19 @@
-/** The cap on runs in flight and what the daemon's last pass cost (`GET /api/ceilings`, apps/api/src/gauges/ceilings.ts). */
+/**
+ * The cap on runs in flight and what the daemon's last pass cost (`GET /api/ceilings`), read through the objects' client as `objects`
+ * says it (`Ceilings`, `PassCost`).
+ */
 import { queryOptions } from '@tanstack/react-query';
-import { pace } from '../feed.ts';
 import { Schema } from 'effect';
-import { decodes } from './decodes.ts';
-import { get } from './read.ts';
+import { Ceilings as CeilingsAnswer, type PassCost as PassCostAnswer } from 'objects';
+import { pace } from '../feed.ts';
+import { call, read } from './objects.ts';
+import { decoded } from './read.ts';
 
 /** The phases of a pass (`PHASES` in agent-orchestrator's meter.ts; `PASS_PHASES` in lib/pass.ts keeps their order). */
 export type PassPhase = 'records' | 'asks' | 'journals' | 'revisions' | 'observe' | 'runtime' | 'place' | 'assess' | 'act';
 
-/**
- * Mirrors the package's `PassCost`: what the last pass cost — its time, and each phase's time, calls, bytes read and processes started;
- * each harness's observes (at once in a pass, so their times overlap); the run records read, the totals, what measuring it took, and the
- * runs at rest it answered from memory; and what it saw — the runs in the store, the tasks not settled, the sessions queued and admitted,
- * the oldest queued one's wait and the machine's load — absent from a pass an older tick wrote; and why it could not read a harness
- * (`unobserved`, with each harness's `unread`), written only when it could not.
- */
-export type PassCost = {
-  at: string;
-  ms: number;
-  phases: Record<PassPhase, { ms: number; calls: number; bytes: number; reads: number; spawned: number }>;
-  harnesses: Record<string, { calls: number; ms: number; listed: number; spawned: number; unread?: number }>;
-  records: number;
-  bytes: number;
-  spawned: number;
-  overheadMs: number;
-  rested: number;
-  runs?: number;
-  tasks?: number;
-  queued?: number;
-  admitted?: number;
-  waitMs?: number;
-  load?: number;
-  unobserved?: readonly string[];
-};
-
-/** Decodes one phase's cost. */
-const PhaseCostSchema = Schema.Struct({
+/** One phase's cost. */
+const PhaseCost = Schema.Struct({
   ms: Schema.Number,
   calls: Schema.Number,
   bytes: Schema.Number,
@@ -43,76 +21,50 @@ const PhaseCostSchema = Schema.Struct({
   spawned: Schema.Number,
 });
 
-/** Decodes a `PassCost`: every phase a key of its own, so a pass that leaves one out is refused at it. */
-const PassCostSchema = decodes<PassCost>()(
-  Schema.Struct({
-    at: Schema.String,
-    ms: Schema.Number,
-    phases: Schema.Struct({
-      records: PhaseCostSchema,
-      asks: PhaseCostSchema,
-      journals: PhaseCostSchema,
-      revisions: PhaseCostSchema,
-      observe: PhaseCostSchema,
-      runtime: PhaseCostSchema,
-      place: PhaseCostSchema,
-      assess: PhaseCostSchema,
-      act: PhaseCostSchema,
-    }),
-    harnesses: Schema.Record(
-      Schema.String,
-      Schema.Struct({
-        calls: Schema.Number,
-        ms: Schema.Number,
-        listed: Schema.Number,
-        spawned: Schema.Number,
-        unread: Schema.optionalKey(Schema.Number),
-      }),
-    ),
-    records: Schema.Number,
-    bytes: Schema.Number,
-    spawned: Schema.Number,
-    overheadMs: Schema.Number,
-    rested: Schema.Number,
-    runs: Schema.optionalKey(Schema.Number),
-    tasks: Schema.optionalKey(Schema.Number),
-    queued: Schema.optionalKey(Schema.Number),
-    admitted: Schema.optionalKey(Schema.Number),
-    waitMs: Schema.optionalKey(Schema.Number),
-    load: Schema.optionalKey(Schema.Number),
-    unobserved: Schema.optionalKey(Schema.Array(Schema.String)),
-  }),
-);
+/** One harness's observes in a pass, `unread` where it could not read it. */
+const HarnessCost = Schema.Struct({
+  calls: Schema.Number,
+  ms: Schema.Number,
+  listed: Schema.Number,
+  spawned: Schema.Number,
+  unread: Schema.optionalKey(Schema.Number),
+});
 
 /**
- * Mirrors `Ceilings` in apps/api/src/gauges/ceilings.ts: the cap on runs in flight the daemon's last pass ran with (`last`, null before
- * any pass wrote it), the cap a run is judged by (0 for none), the runs that count against it — null with no cap, when the api reads none —
- * the runs it holds, and what the last pass cost (`pass`, null before any pass wrote it).
+ * A pass's phases and harnesses, by the keys the board draws. A copy that stays: `objects`' `PassCost` carries both as JSON by any key
+ * (the pass writes them; its readers each read their own), and the board's Factory strip reads every phase by its name, so it decodes
+ * them here — a pass that leaves a phase out is refused at it.
  */
-export type Ceilings = {
-  last: { sessions: number; runs: number } | null;
-  cap: number;
-  inFlight: string[] | null;
-  held: Array<{ run: string; inFlight: number; cap: number; word: string }>;
-  pass: PassCost | null;
-};
-
-/** Decodes `Ceilings`. */
-const CeilingsSchema = decodes<Ceilings>()(
-  Schema.Struct({
-    last: Schema.NullOr(Schema.Struct({ sessions: Schema.Number, runs: Schema.Number })),
-    cap: Schema.Number,
-    inFlight: Schema.NullOr(Schema.mutable(Schema.Array(Schema.String))),
-    held: Schema.mutable(
-      Schema.Array(Schema.Struct({ run: Schema.String, inFlight: Schema.Number, cap: Schema.Number, word: Schema.String })),
-    ),
-    pass: Schema.NullOr(PassCostSchema),
+const PassParts = Schema.Struct({
+  phases: Schema.Struct({
+    records: PhaseCost,
+    asks: PhaseCost,
+    journals: PhaseCost,
+    revisions: PhaseCost,
+    observe: PhaseCost,
+    runtime: PhaseCost,
+    place: PhaseCost,
+    assess: PhaseCost,
+    act: PhaseCost,
   }),
-);
+  harnesses: Schema.Record(Schema.String, HarnessCost),
+});
 
-/** The cap on runs in flight, read again as the runs are, on a run's event: what the Factory says over its floor. */
+/** What the last pass cost: `objects`' `PassCost`, its phases and harnesses read by their keys (`PassParts`). */
+export type PassCost = Omit<PassCostAnswer, 'phases' | 'harnesses'> & typeof PassParts.Type;
+
+/** The cap and the daemon's last pass (`objects`' `Ceilings`), the pass's parts read by their keys. */
+export type Ceilings = Omit<CeilingsAnswer, 'pass'> & { pass: PassCost | null };
+
+/** `answer` with its pass's parts read by their keys. */
+const ceilingsOf = (answer: CeilingsAnswer): Ceilings =>
+  answer.pass === null
+    ? { ...answer, pass: null }
+    : { ...answer, pass: { ...answer.pass, ...decoded('GET /api/ceilings', PassParts, answer.pass) } };
+
+/** The cap and the last pass: polled at `pace`, since the feed carries no pass of the daemon. */
 export const ceilingsQuery = queryOptions({
   queryKey: ['ceilings'],
-  queryFn: () => get('/api/ceilings', CeilingsSchema),
+  queryFn: () => call((c) => c.server.ceilings(), read(CeilingsAnswer)).then(ceilingsOf),
   refetchInterval: () => pace(5_000),
 });

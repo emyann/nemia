@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
-import type { Args } from '../../command/command.ts';
+import type { RulesInput } from './rules.verb.ts';
 import { scratch } from 'test-kit/scratch';
 import { done, doorFrom } from '../../../test/door-walks.ts';
 import { aFactory } from '../../../test/factory-walks.ts';
@@ -35,10 +35,10 @@ const door = doorFrom(FactoryDoor, memory);
 done(door.factories.create(aFactory('acme')));
 
 /** The command run with `args`, as the CLI and the api run it, over the memory door. */
-const run = (args: Args) => runWith(engineOf(engine().layer), Effect.provide(FACTORY_RULES.handler(args, undefined, ROOT), memory));
+const run = (args: RulesInput) => runWith(engineOf(engine().layer), Effect.provide(FACTORY_RULES.handler(args, undefined, ROOT), memory));
 
 test('REFUSED: `nemia factory rules`, nothing written', async (t) => {
-  const rows: Array<[string, Args, 'Conflict' | 'Missing' | 'Invalid', string[]]> = [
+  const rows: Array<[string, RulesInput, 'Conflict' | 'Missing' | 'Invalid', string[]]> = [
     ['the default factory, read', { factory: 'default' }, 'Conflict', ['`default`', 'nemia factory rules']],
     ['the default factory, written', { factory: 'default', words: 'Be kind.' }, 'Conflict', ['`default`', 'nemia factory rules']],
     ['the default factory, cleared', { factory: 'default', clear: true }, 'Conflict', ['`default`', 'nemia factory rules']],

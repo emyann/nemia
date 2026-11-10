@@ -1,26 +1,20 @@
 /**
- * Which way a command goes, pure: the api for a moved read and for the client's own verbs (`get`, `apply`, `explain`, `propose`,
- * `proposals`, whatever else is typed), the orchestrator's own CLI for the rest (`contracts/route.contract.ts`).
+ * Which way a command goes, pure: the api for a moved read (`READ_VERBS`) and for the client's own verbs (`CLIENT_VERBS`, whatever
+ * else is typed), the orchestrator's own CLI for the rest (`contracts/route.contract.ts`). Each list is spelled once, in the contract,
+ * and read here.
  */
-import type { RouteOf } from '../contracts/route.contract.ts';
+import { CLIENT_VERBS, READ_VERBS, type RouteOf } from '../contracts/route.contract.ts';
 
 export { CLIENT_VERBS, type ClientVerb, READ_VERBS, type ReadVerb, type Route, type Routed } from '../contracts/route.contract.ts';
 
+const clients: readonly string[] = CLIENT_VERBS;
+const reads: readonly string[] = READ_VERBS;
+
 export const routeOf: RouteOf = ({ name, local, help }) =>
-  name === 'get' || name === 'apply' || name === 'explain' || name === 'propose' || name === 'proposals'
-    ? 'api'
-    : !local && !help && (name === 'show' || name === 'closeout' || name === 'ls' || name === 'inbox' || name === 'watch')
-      ? 'api'
-      : 'process';
+  clients.includes(name) ? 'api' : !local && !help && reads.includes(name) ? 'api' : 'process';
 
 /**
- * The name `argv` opens with as the route reads it: its first word, or its first two where the first heads commands of two words and a
- * second word follows (`inbox add`, which is not the moved `inbox`).
+ * The name `argv` opens with as the route reads it: its first word. A moved read typed with words it does not read (`inbox add`, a command
+ * of its own on the old path) hands them to the old path itself, before it asks the api anything.
  */
-export const nameOf = (argv: readonly string[]): string => {
-  const [first = '', second] = argv;
-  return second !== undefined && !second.startsWith('-') && TWO_WORDS.has(first) ? `${first} ${second}` : first;
-};
-
-/** The moved reads that head commands of two words in the orchestrator's table. */
-const TWO_WORDS: ReadonlySet<string> = new Set(['inbox']);
+export const nameOf = (argv: readonly string[]): string => argv[0] ?? '';

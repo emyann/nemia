@@ -3,7 +3,11 @@
  * the quota in short; the pause says its own (`pauseWords`). Each short form fits one line, and its whole sentence is its `title`. Pure:
  * the time is handed in, the browser's own on the page.
  */
-import type { Daemon, OpenRuns, Quota, Version } from './api';
+import type { Daemon } from './api/daemon.ts';
+import type { OpenRuns } from './api/runs.ts';
+import { judged } from './api/judged.ts';
+import type { Quota } from './api/quota.ts';
+import type { Version } from './api/version.ts';
 import { daemonSentence, daemonWords } from './daemon.ts';
 import { openRows } from './factory.ts';
 import type { FeedStatus } from './feed.ts';
@@ -18,12 +22,12 @@ type AtWork = { runs: number; sessions: number };
  * a run that waits on a person among the waiting alone, as the rail's Runs count does; and the steps of every run of it not called off
  * whose state is `working` or `checking` — a session at work, or the run's check of one — a waiting run's among them. A step that asks a
  * person (`asks-in-session`) waits on them, and is not counted. A held run's step keeps its state (`stepState`), so a session a hold did
- * not stop counts.
+ * not stop counts. A run the list could not judge has no step to count.
  */
 export function atWork(open: Pick<OpenRuns, 'counts' | 'waiting' | 'inFlight'>): AtWork {
   let sessions = 0;
   for (const run of openRows(open)) {
-    if (run.cancelledAt) continue;
+    if (!judged(run) || run.cancelledAt) continue;
     for (const step of run.steps) {
       const state = stepState(step, false, run.holding != null);
       if (state === 'working' || state === 'checking') sessions += 1;

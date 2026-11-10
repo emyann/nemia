@@ -30,7 +30,7 @@ export const TEAM_NAMES: Baseline = {
   'apps/api/src/agents/fills.test.ts': { count: 28, ...TEAM_MOVES.fixtures },
   'apps/api/src/runs/hired-folder.test.ts': { count: 3, ...TEAM_MOVES.fixtures },
   'apps/api/src/factory/factories.test.ts': { count: 18, ...TEAM_MOVES.fixtures },
-  'apps/api/src/factory/hires.test.ts': { count: 7, ...TEAM_MOVES.fixtures },
+  'apps/api/src/factory/parts/hires.test.ts': { count: 7, ...TEAM_MOVES.fixtures },
   'apps/api/src/runs/unreadable.test.ts': { count: 4, ...TEAM_MOVES.fixtures },
   'apps/api/src/stats/stats.test.ts': { count: 4, ...TEAM_MOVES.fixtures },
   'apps/api/src/step/step.test.ts': { count: 21, ...TEAM_MOVES.fixtures },

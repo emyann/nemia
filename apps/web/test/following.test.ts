@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { StreamLike } from '../src/lib/follow.ts';
 import { followedFrom, followStep, unread, type Following } from '../src/lib/following.ts';
-import type { TranscriptEvent } from '../src/lib/api.ts';
+import type { TranscriptEvent } from '../src/lib/api/steps.ts';
 
 /** An EventSource as far as `followStep` uses it: its state, its events, and `close`. */
 class Stream implements StreamLike {

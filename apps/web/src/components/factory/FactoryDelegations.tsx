@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { delegableAgentsQuery, delegationsKey, delegationsQuery, putDelegation, removeDelegation } from '@/lib/api';
+import { delegableAgentsQuery, delegationsKey, delegationsQuery, putDelegation, removeDelegation } from '@/lib/api/proposals';
 import { DELEGABLE } from '@/lib/proposals';
 
 /** One grant as the form holds it: resources and verbs picked, and the names typed, comma-separated. */

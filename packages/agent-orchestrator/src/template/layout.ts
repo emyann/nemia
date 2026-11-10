@@ -11,8 +11,8 @@ import { REVISIONS_POLICIES, type RevisionsPolicy } from '../factory/factory.ts'
 import type { TemplateParameterType } from 'objects';
 import type { InLayout } from '../../contracts/template-layout.contract.ts';
 
-/** The schema every document of a template is written in. */
-export const API_VERSION = 'nemia.dev/v1alpha1';
+/** The version of the template layout, the schema every document of a template is written in: no `apiVersion` objects serve. */
+export const TEMPLATE_LAYOUT_VERSION = 'nemia.dev/v1alpha1';
 
 /**
  * A problem of a template: the file, the keys and indexes leading to the value in its document (none for the file), the line and column
@@ -57,7 +57,7 @@ export type Profile = {
 export type Metadata = { name: string; description?: string };
 
 /** Every YAML file of a template but its lock: one document. */
-export type Document<K extends string, S> = { apiVersion: typeof API_VERSION; kind: K; metadata: Metadata; spec: S };
+export type Document<K extends string, S> = { apiVersion: typeof TEMPLATE_LAYOUT_VERSION; kind: K; metadata: Metadata; spec: S };
 
 /**
  * The manifest's spec: the content's version, the factory's instruction and its rules, its parameters, who fills each
@@ -480,8 +480,12 @@ function shapeRefusals(file: string, shape: Shape, value: unknown, at: ReadonlyA
 /** What the envelope of `doc`, a document of `kind` in `file`, breaks: its apiVersion, its kind, and its name, its folder's. */
 function envelopeRefusals(file: string, expected: DocumentFile, doc: Record<string, unknown>): Refusal[] {
   const refusals: Refusal[] = [];
-  if (doc.apiVersion !== API_VERSION)
-    refusals.push({ file, at: ['apiVersion'], message: `apiVersion is ${JSON.stringify(doc.apiVersion)}: write ${API_VERSION}.` });
+  if (doc.apiVersion !== TEMPLATE_LAYOUT_VERSION)
+    refusals.push({
+      file,
+      at: ['apiVersion'],
+      message: `apiVersion is ${JSON.stringify(doc.apiVersion)}: write ${TEMPLATE_LAYOUT_VERSION}.`,
+    });
   if (doc.kind !== expected.kind)
     refusals.push({
       file,

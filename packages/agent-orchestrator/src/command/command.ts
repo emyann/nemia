@@ -1,13 +1,14 @@
 /**
  * A command of the orchestrator, said once as data: its name, the arguments it takes and how a command line spells them, the refusals of
- * its arguments in its own words, its help, its route on the api and the side it is served on alone. Pure: the table that holds every
- * command, with the handler each calls and what it prints, is `commands.verb.ts`; the CLI parses, refuses and helps from a spec here, and
- * the api derives its body from the same spec.
+ * its arguments in its own words, its help, and the side it is served on alone. Pure: the table that lists every command is
+ * `commands.verb.ts`, each entry, with the handler it calls and what it prints, in its feature's folder; the CLI parses, refuses and
+ * helps from a spec here, and the api calls an entry by its exported name, its body the endpoint's own Schema in objects' `Api`.
  */
 import { dollarsOf } from '../keys/index.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import type { CommandClass } from '../admission/index.ts';
 import { FORMER_MODES } from '../retry/index.ts';
+import { oneLine } from '../record/record.ts';
 
 /** The CLI's name, as every command line the package writes says it. */
 export const CLI = 'nemia';
@@ -166,11 +167,8 @@ export type Flag = {
   readonly twice?: string;
   /** A text flag given once for each value, its values collected in the order given, never refused as given twice. */
   readonly many?: boolean;
-  /**
-   * The side that takes it alone, and why: one the CLI alone takes is no key of a body; one the api alone takes is no flag of a command
-   * line, which refuses it as one it does not take, and a key of a body — required there where it says so.
-   */
-  readonly only?: { readonly side: 'cli' | 'api'; readonly why: string; readonly required?: true };
+  /** That the CLI alone takes it, and why: no key of the entry's `input`, which the api calls it by. */
+  readonly only?: { readonly side: 'cli'; readonly why: string };
 };
 
 /**
@@ -192,31 +190,14 @@ export type Spec = {
   readonly flagFirst?: true;
 };
 
-/** The arguments a write's route fixes, as its path fixes the run: a body never carries them. */
-type Fixed = Readonly<Record<string, string | boolean>>;
-
-/**
- * Where the api serves a command: a write posted and accepted (202), done (200) or made (201), a write putting what it names in place,
- * done (200), a write deleting what it names, done (200), or a read got and answered. `sets`: the arguments a write's route fixes
- * (`Fixed`), so the api serves the one way of the command it routes. `hand`: why the api serves the route by a hand of its own, which
- * calls the command's handler, in place of the route the table would generate.
- */
-export type Route =
-  | { readonly method: 'POST'; readonly path: string; readonly status: 202 | 200 | 201; readonly sets?: Fixed; readonly hand?: string }
-  | { readonly method: 'PUT'; readonly path: string; readonly status: 200; readonly sets?: Fixed; readonly hand?: string }
-  | { readonly method: 'DELETE'; readonly path: string; readonly status: 200; readonly sets?: Fixed; readonly hand?: string }
-  | { readonly method: 'GET'; readonly path: string; readonly status: 200; readonly hand?: string };
-
 /**
  * A command, as data: its `name`, its `usage` after the name and its `help` lines, as `nemia`'s help prints them; its `spec`; `check`, the
  * refusal of its arguments before anything is read, the same on both sides, or null; `writes`, a write the api guards; `class`, who
- * answers for it when an agent calls it (`CommandClass`); its `route` on the
- * api — a write is posted and accepted (202), a read is got (200), and one command may be served on more than one — or `only`, the side
- * it is served on alone and why; and `apiTakes`, the keys of a body the api folds into its arguments, which the command line has no flag
- * for; `manual`, the long help `nemia <name> --help` prints in place of running it, where it has one; `ticks`, that what it files waits on
- * the daemon's next pass, so the command line starts the daemon where none ticks the store (`ensureDaemon`); `asksAlways`, that an agent's
- * call of it is asked of the person every time, whatever its session was allowed at a prompt or by a rule (`admissionOf`), on a command
- * classed `ask` alone (`classBreaks`).
+ * answers for it when an agent calls it (`CommandClass`); `only`, the side it is served on alone and why — an entry with none is served
+ * on both, the api calling it by its exported name with its typed `input`; `manual`, the long help `nemia <name> --help` prints in place
+ * of running it, where it has one; `ticks`, that what it files waits on the daemon's next pass, so the command line starts the daemon
+ * where none ticks the store (`ensureDaemon`); `asksAlways`, that an agent's call of it is asked of the person every time, whatever its
+ * session was allowed at a prompt or by a rule (`admissionOf`), on a command classed `ask` alone (`classBreaks`).
  */
 export type CommandSpec = {
   readonly name: string;
@@ -226,27 +207,11 @@ export type CommandSpec = {
   readonly check?: (args: Args) => string | null;
   readonly writes: boolean;
   readonly class: CommandClass;
-  readonly route?: Route | readonly Route[];
   readonly only?: { readonly side: 'cli' | 'api'; readonly why: string };
-  readonly apiTakes?: readonly string[];
   readonly manual?: string;
   readonly ticks?: true;
   readonly asksAlways?: true;
 };
-
-/** Every route the api serves a command on: none, its one, or each of its many. */
-export const routeList = (command: Pick<CommandSpec, 'route'>): readonly Route[] =>
-  command.route === undefined ? [] : Array.isArray(command.route) ? command.route : [command.route as Route];
-
-/** A route the table generates on the api: a write the api serves by no hand of its own. */
-/**
- * Why a run's named action is served by hand: a handler of `objects`' Api serves it in the run's namespace
- * (`/api/namespaces/<factory>/runs/<name>/…`), its body a Schema of that package, through the pipeline a generated route runs.
- */
-export const NAMED_ACTION =
-  "a named action of the run: a handler of objects' Api serves it in the run's namespace, through the pipeline a generated route runs";
-
-export const generated = (route: Route): boolean => route.method !== 'GET' && route.hand === undefined;
 
 /** The dollars under `key`, or undefined where none were given. */
 export const amountIn = (args: Args, key: string): number | undefined => {
@@ -254,12 +219,65 @@ export const amountIn = (args: Args, key: string): number | undefined => {
   return typeof value === 'number' ? value : undefined;
 };
 
+/** `--why` or `--by`: the flag, the key it fills, what it takes as its refusals say it, and the longest it may be. */
+export type Said = { readonly flag: '--why' | '--by'; readonly key: 'why' | 'by'; readonly takes: string; readonly cap: number };
+
+/** Each of `said`'s refusals of a value left out, saying what it takes, ending on the command's forms. */
+export const takesOf = (said: readonly Said[], shape: string): Readonly<Record<string, string>> =>
+  Object.fromEntries(said.map(({ flag, takes }) => [flag, `${flag} takes ${takes}: ${shape}.`]));
+
+/**
+ * The refusal of `flag`'s value left out, in `refusals`, which holds one for each text flag of its command (`takesOf`): a flag it holds
+ * none for is thrown, naming it.
+ */
+export const takesFor = (refusals: Readonly<Record<string, string>>, flag: string): string => {
+  const takes = refusals[flag];
+  if (takes === undefined) throw new Error(`${flag} has no refusal of its value left out: add it to its command's table of them`);
+  return takes;
+};
+
+/** `--why` or `--by`'s value as one line: every run of whitespace, a newline included, one space. */
+export const saidOf = (args: Args, key: 'why' | 'by'): string | undefined => {
+  const value = args[key];
+  return typeof value === 'string' ? oneLine(value, Number.POSITIVE_INFINITY) : undefined;
+};
+
+/**
+ * Refused of `--why` or `--by`: a value starting `--`, which reads as the value left out (its refusal in `takes`), blank, or longer than
+ * its cap.
+ */
+export function saidRefusal(args: Args, { flag, key, takes, cap }: Said, refusals: Readonly<Record<string, string>>): string | null {
+  const value = args[key];
+  if (typeof value !== 'string') return null;
+  if (value.startsWith('--')) return takesFor(refusals, flag);
+  const line = saidOf(args, key) ?? '';
+  if (!line) return `${flag} takes ${takes}, and was given only blanks: give it words, or leave ${flag} out.`;
+  if (line.length > cap) return `${flag} takes at most ${cap} characters, and was given ${line.length}: say it shorter.`;
+  return null;
+}
+
+/** `--why` and `--by` as `command` takes them, for what it puts (`a hold`): each a text flag given once, refused in `refusals`' words. */
+export const saidFlags = (
+  said: readonly Said[],
+  command: string,
+  puts: string,
+  refusals: Readonly<Record<string, string>>,
+  shape: string,
+) =>
+  said.map(({ flag, key }) => ({
+    flag,
+    kind: 'text' as const,
+    key,
+    takes: refusals[flag],
+    twice: `${command} takes ${flag} once: ${puts} says one ${key}. ${shape}.`,
+  }));
+
 /**
  * The refusal of a text flag's value left out on the command line — empty, or starting `--`, which reads as the value left out — in the
- * flag's own `takes`, or null. A flag the api alone takes is not looked at: its value is whatever a body sends.
+ * flag's own `takes`, or null.
  */
 export function leftOut(spec: Spec, args: Args): string | null {
-  for (const flag of spec.flags.filter((f) => f.kind === 'text' && f.key !== undefined && f.only?.side !== 'api')) {
+  for (const flag of spec.flags.filter((f) => f.kind === 'text' && f.key !== undefined)) {
     if (flag.key === undefined) continue;
     const value = args[flag.key];
     const values = Array.isArray(value) ? value : typeof value === 'string' ? [value] : [];
@@ -414,8 +432,7 @@ const strayFlag = (spec: Spec, arg: string): boolean =>
  * is short and the spec says it, but for `flagFirst`), one the api alone takes (`Flag.only`), and a positional past those it takes — a
  * value flag with no value, given twice, or with one of the command's own flags for its value, and two ways.
  */
-export function parseArgv(typed: Spec, argv: readonly string[]): Args | undefined {
-  const spec: Spec = { ...typed, flags: typed.flags.filter((f) => f.only?.side !== 'api') };
+export function parseArgv(spec: Spec, argv: readonly string[]): Args | undefined {
   const rest = spec.positionals.find((p) => p.takes === 'rest');
   if (rest) return parseRest(spec, rest, argv);
   const required = spec.positionals.filter((p) => p.takes === 'required');
@@ -476,13 +493,15 @@ export function commandLine(command: Pick<CommandSpec, 'name' | 'spec'>, args: A
 
 /**
  * The verbs the CLI runs by a hand of its own, outside the table (`VERBS` in `cli/main.ts`), each with its usage and help as `nemia`'s
- * help prints them; who answers for one is its table entry's of the same name, served on the api alone.
+ * help prints them, and its class: `nemia decide`, a read, whose screen is printed off the run's decision (`decisionRead`), which the api
+ * serves as data.
  */
-export const CLI_VERBS: readonly Pick<CommandSpec, 'name' | 'usage' | 'help'>[] = [
+export const CLI_VERBS: readonly Pick<CommandSpec, 'name' | 'usage' | 'help' | 'class'>[] = [
   {
     name: 'decide',
     usage: '<runId> [--sensitive <globs>]',
     help: ['what the run produced, and the choice it leaves you (nemia decide --help)'],
+    class: 'read',
   },
 ];
 
@@ -496,17 +515,18 @@ export const helpOf = (table: readonly Pick<CommandSpec, 'name' | 'usage' | 'hel
     .flatMap((c) => [`  ${CLI} ${[c.name, c.usage].filter(Boolean).join(' ')}`, ...c.help.map((line) => `${HELP_INDENT}${line}`)])
     .join('\n');
 
-/** An entry of a table as `commandBreaks` reads it: whether it has a handler, and its spec for what its route fixes. */
-type Entry = Pick<CommandSpec, 'name' | 'route' | 'only' | 'ticks'> & {
+/** An entry of a table as `commandBreaks` reads it: whether it has a handler and an `input`, and its spec. */
+type Entry = Pick<CommandSpec, 'name' | 'only' | 'ticks'> & {
   readonly spec?: Spec;
   readonly handler?: unknown;
   readonly writes?: boolean;
+  readonly input?: unknown;
 };
 
 /**
  * Where one entry breaks the rules of how it runs: an entry with no handler that is not served on the CLI alone, which the api could not
- * run; one served on the CLI alone with neither a handler nor a runner of the CLI (`runners`); a key its route fixes that no flag of
- * its spec fills, which the command would never read; and one that ticks and writes nothing, whose next pass would have nothing to do.
+ * run; one served on the CLI alone with neither a handler nor a runner of the CLI (`runners`); and one that ticks and writes nothing,
+ * whose next pass would have nothing to do.
  */
 function runBreaks(c: Entry, runners: readonly string[]): string[] {
   const breaks: string[] = [];
@@ -519,74 +539,40 @@ function runBreaks(c: Entry, runners: readonly string[]): string[] {
     breaks.push(`${c.name} has no handler and is served on the api: give it a handler, or serve it on the CLI alone and run it there`);
   if (c.handler === undefined && cliOnly && !runners.includes(c.name))
     breaks.push(`${c.name} has no handler and no runner: give it a handler, or a runner in the CLI's RUNS`);
-  const filled = (key: string) => c.spec?.flags.some((f) => f.key === key || (f.sets !== undefined && key in f.sets)) === true;
-  const fixed = routeList(c).flatMap((r) => ('sets' in r && r.sets ? Object.keys(r.sets) : []));
-  for (const key of [...new Set(fixed)].filter((k) => !filled(k)))
-    breaks.push(`${c.name}'s route sets ${key}, which no flag of its spec fills: name a key the command reads`);
   return breaks;
 }
 
 /**
- * The name of a path's namespace (`/api/namespaces/:namespace/…`): no argument of a command, since the api finds the object first and
- * refuses one in another namespace (`runIn`) before the command reads its arguments.
- */
-const NAMESPACE_PARAM = 'namespace';
-
-/**
- * Where an entry's words for its sides break the rules: a name in a route's path that no argument of its spec takes, but its namespace,
- * which the command would never read; a why left empty, of a route served by hand, of the side that serves it alone, or of a flag one
- * side alone takes; and a flag the api alone takes on an entry with no route that hands it — one the table generates, or one served by
- * hand — which nothing would ever hand it.
+ * Where an entry's words for its sides break the rules: a why left empty, of the side that serves it alone or of a flag the CLI alone
+ * takes.
  */
 function sideBreaks(c: Entry): string[] {
   const breaks: string[] = [];
-  const takes = (key: string) =>
-    key === NAMESPACE_PARAM || c.spec?.positionals.some((p) => p.key === key) === true || c.spec?.flags.some((f) => f.key === key) === true;
-  for (const r of routeList(c)) {
-    for (const key of [...r.path.matchAll(/:(\w+)/g)].flatMap(([, k]) => (k === undefined ? [] : [k])).filter((k) => !takes(k)))
-      breaks.push(`${c.name}'s route ${r.method} ${r.path} names :${key}, which no argument of its spec takes: key a positional ${key}`);
-    if (r.hand !== undefined && !r.hand.trim())
-      breaks.push(`${c.name}'s route ${r.method} ${r.path} is served by hand and says no why: say why the table does not generate it`);
-  }
   if (c.only !== undefined && !c.only.why.trim()) breaks.push(`${c.name} is served on the ${c.only.side} alone and says no why: say why`);
-  for (const f of c.spec?.flags ?? []) {
+  for (const f of c.spec?.flags ?? [])
     if (f.only !== undefined && !f.only.why.trim())
       breaks.push(`${c.name}'s ${f.flag} is taken on the ${f.only.side} alone and says no why: say why`);
-    if (f.only?.side === 'api' && !routeList(c).some((r) => generated(r) || r.hand !== undefined))
-      breaks.push(`${c.name}'s ${f.flag} is taken on the api alone, and no route of the entry hands it: route it, or take the flag out`);
-  }
-  return breaks;
-}
-
-/** Each route of `c` on a method and path an entry before it is routed on (`routed`, which takes the rest of them). */
-function routedTwice(c: Entry, routed: Map<string, string>): string[] {
-  const breaks: string[] = [];
-  for (const at of routeList(c).map((r) => `${r.method} ${r.path}`)) {
-    const first = routed.get(at);
-    if (first) breaks.push(`${c.name} is routed on ${at}, as ${first} is: give it a path of its own`);
-    else routed.set(at, c.name);
-  }
   return breaks;
 }
 
 /**
- * Where a table of commands breaks its rules, a sentence each: a name defined twice; two entries routed on one method and path, of which
- * the api would serve the first alone; an entry served nowhere — neither routed on the api nor said to be served on one side alone (`only`)
- * — so a gap between the CLI and the api is never left unsaid; a name that is a former one (`RENAMED`), which no line reaches; a name that
- * is both a command the CLI serves and one of the CLI's own verbs (`verbs`), which the CLI would run twice over — an entry served on the
- * api alone shares a verb's name freely; how an entry runs (`runBreaks`); its words for its sides (`sideBreaks`); and a runner of the CLI
- * (`runners`) that runs no entry the CLI serves.
+ * Where a table of commands breaks its rules, a sentence each: a name defined twice; an entry served on both sides — said to be served
+ * on neither alone (`only`) — that is not typed (`input`), which the api would have no keys to call it by, so a gap between the CLI and
+ * the api is never left unsaid; a name that is a former one (`RENAMED`), which no line reaches; a name that is both a command the CLI
+ * serves and one of the CLI's own verbs (`verbs`), which the CLI would run twice over — an entry served on the api alone shares a verb's
+ * name freely; how an entry runs (`runBreaks`); its words for its sides (`sideBreaks`); and a runner of the CLI (`runners`) that runs
+ * no entry the CLI serves.
  */
 export function commandBreaks(table: readonly Entry[], verbs: readonly string[], runners: readonly string[] = []): string[] {
   const breaks: string[] = [];
   const seen = new Set<string>();
-  const routed = new Map<string, string>();
   for (const c of table) {
     if (seen.has(c.name)) breaks.push(`${c.name} is defined twice: a command is one entry of the table`);
     seen.add(c.name);
-    breaks.push(...routedTwice(c, routed));
-    if (!routeList(c).length && !c.only)
-      breaks.push(`${c.name} has no route and no only: give it its route on the api, or say which side alone serves it, and why`);
+    if (!c.only && c.input === undefined)
+      breaks.push(
+        `${c.name} has no input and no only: give it its input, which the api calls it by, or say which side alone serves it, and why`,
+      );
     const renamed = RENAMED.get(c.name);
     if (renamed) breaks.push(`${c.name} is a former name in RENAMED, which runs a line that says it as ${renamed.to}: name the entry anew`);
     if (c.only?.side !== 'api' && verbs.includes(c.name))

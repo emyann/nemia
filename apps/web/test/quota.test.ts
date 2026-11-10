@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Quota, QuotaWindow } from '../src/lib/api.ts';
+import type { Quota, QuotaWindow } from '../src/lib/api/quota.ts';
 import { clockWord, lastWords, quotaTitle, windowWords } from '../src/lib/quota.ts';
 
 const NOW = new Date('2026-09-19T10:00:00.000Z');

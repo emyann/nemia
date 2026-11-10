@@ -4,7 +4,7 @@
  * run's page at its gate. They are the whole machine's, not a page's, so the bar has no Open (`barOpens`).
  */
 import { useQuery } from '@tanstack/react-query';
-import { openRunsQuery } from '@/lib/api';
+import { openRunsQuery } from '@/lib/api/runs';
 import { bellHash, bellRows, type BellRow } from '@/lib/bell';
 import { RouteLink } from '../agent/AgentParts';
 import { FactoryTag } from '../factory/FactoryTag';

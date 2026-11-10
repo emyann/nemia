@@ -14,7 +14,9 @@
  * (`lib/conversation.ts`), as `chatItems` is hers: a file of its own, since the two together pass the 500 lines a file is
  * held to.
  */
-import type { Said, StepTry, TranscriptEvent } from './api';
+import type { Said } from './api/asks.ts';
+import type { StepTry } from './api/tries.ts';
+import type { TranscriptEvent } from './api/steps.ts';
 import type { StepView } from './runView';
 
 /**
@@ -200,7 +202,7 @@ const arrivalOf = (event: TranscriptEvent, said: Said): boolean => {
  * before the words were handed over), the first when it has none, and none — the length of `events` — while the mark is not among them.
  */
 const firstAfter = (events: readonly TranscriptEvent[], said: Said): number => {
-  if (said.after === null) return 0;
+  if (!said.after) return 0;
   const { kind, id } = said.after;
   const mark = events.findIndex((event) => event.kind === kind && event.id === id);
   return mark === -1 ? events.length : mark + 1;

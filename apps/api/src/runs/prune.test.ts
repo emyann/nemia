@@ -367,25 +367,22 @@ test('POST /api/namespaces/:namespace/runs/:runId/prune refuses, touching nothin
     },
   );
   await t.test(
-    "REFUSED at shipped defaults: a body that is not `nemia prune`'s two switches is a 400, before the run is read, and nothing is touched",
+    'REFUSED at shipped defaults: a body `RunPrune` does not read is a 400 naming the key, before the run is read, and nothing is touched',
     async () => {
       repositoryRun('p-body', { merge: true });
-      const cases: Array<[unknown, RegExp]> = [
-        ['not json', /^POST …\/prune takes a JSON body: `\{ "artifacts"\?: boolean, "unmerged"\?: boolean \}`\.$/],
-        [[], /^POST …\/prune takes a JSON object/],
-        ['null', /^POST …\/prune takes a JSON object/],
-        [
-          { artifacts: 'yes' },
-          /^POST …\/prune takes `artifacts` as true or false — `nemia prune`'s --artifacts — and this request sent "yes"\.$/,
-        ],
-        [{ unmerged: 1 }, /^POST …\/prune takes `unmerged` as true or false — `nemia prune`'s --unmerged — and this request sent 1\.$/],
-        [{ yes: true, force: true }, /^POST …\/prune does not take `yes`, `force`/],
+      const cases: Array<[unknown, string]> = [
+        ['not json', 'payload'],
+        [[], 'payload'],
+        ['null', 'payload'],
+        [{ artifacts: 'yes' }, 'payload.artifacts'],
+        [{ unmerged: 1 }, 'payload.unmerged'],
       ];
-      for (const [body, words] of cases) {
+      for (const [body, field] of cases) {
         const before = stateOf('p-body');
         const res = await pruneOn('p-body', body);
         assert.equal(res.status, 400, JSON.stringify(body));
-        assert.match(((await res.json()) as { error: string }).error, words);
+        const said = (await res.json()) as { field?: string };
+        assert.ok(said.field?.startsWith(field), `${JSON.stringify(body)} names ${field}: ${JSON.stringify(said)}`);
         assert.deepEqual(stateOf('p-body'), before, JSON.stringify(body));
       }
       assert.equal(

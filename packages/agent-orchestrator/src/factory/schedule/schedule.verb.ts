@@ -4,7 +4,8 @@
  * `/api/namespaces/:namespace/schedules/:name`. No level is read here: a schedule is the daemon's, and starts at every level.
  */
 import path from 'node:path';
-import { Cause, Effect, Exit } from 'effect';
+import { Cause, Effect, Exit, Schema } from 'effect';
+import { ScheduleWrite } from 'objects';
 import { leftOut, type Args, type Flag, type Spec } from '../../command/command.ts';
 import type { Command } from '../../command/entry.verb.ts';
 import type { Run } from '../../record/record.ts';
@@ -121,8 +122,16 @@ function scheduleCheck(args: Args): string | null {
 /** What `nemia factory schedule` answers: the file written, the schedule, and the one it replaced, or null. */
 type Scheduled = { file: string; schedule: Schedule; replaced: Schedule | null };
 
+/** What `nemia factory schedule` takes: the factory, the workflow, and the Schedule's write (`objects`' `ScheduleWrite`). */
+export const ScheduleInput = Schema.Struct({ ...ScheduleWrite.fields, factory: Schema.String, workflow: Schema.String });
+export type ScheduleInput = typeof ScheduleInput.Type;
+
+/** What `nemia factory unschedule` takes: the factory, and the workflow whose schedule is taken back. */
+export const UnscheduleInput = Schema.Struct({ factory: Schema.String, workflow: Schema.String });
+export type UnscheduleInput = typeof UnscheduleInput.Type;
+
 /** `nemia factory schedule`: a workflow the factory has attached, started by the daemon at each fire of its cron. */
-export const FACTORY_SCHEDULE: Command<Scheduled> = {
+export const FACTORY_SCHEDULE: Command<Scheduled, ScheduleInput> = {
   name: 'factory schedule',
   usage: USAGE,
   help: ['start a run of an attached workflow at each fire of a cron, by the', 'daemon, at every level; a second replaces the first'],
@@ -130,24 +139,25 @@ export const FACTORY_SCHEDULE: Command<Scheduled> = {
   check: scheduleCheck,
   writes: true,
   class: 'ask',
-  only: { side: 'cli', why: "the api serves it as the Schedule's `put` of `objects`' Api, calling this handler" },
-  handler: (args, _env, home) => {
-    const repo = textOf(args, 'repo');
-    const tz = textOf(args, 'tz');
-    const workflow = textOf(args, 'workflow');
-    const opts = { workflow, cron: textOf(args, 'cron'), brief: textOf(args, 'brief'), ...(repo ? { repo } : {}), ...(tz ? { tz } : {}) };
+  only: {
+    side: 'cli',
+    why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Schedule's `put`, whose handler calls this one by its `input`",
+  },
+  input: ScheduleInput,
+  handler: ({ factory, workflow, cron, brief, repo, tz }, _env, home) => {
+    const opts = { workflow, cron, brief, ...(repo ? { repo } : {}), ...(tz ? { tz } : {}) };
     const schedule = scheduleOf(opts);
     return rooted(
       home,
       'factory schedule',
       Effect.map(
-        wire(textOf(args, 'factory'), { verb: 'schedule', workflow, schedule }, (factory) => scheduleRefused(factory, opts)),
+        wire(factory, { verb: 'schedule', workflow, schedule }, (named) => scheduleRefused(named, opts)),
         ({ was, file }) => ({ file, schedule, replaced: was.schedules[workflow] ?? null }),
       ),
     );
   },
-  print: ({ file, schedule, replaced }, args) => [
-    `${textOf(args, 'factory')}  ${textOf(args, 'workflow')} at ${schedule.cron}${schedule.tz ? ` (${schedule.tz})` : ''}${replaced ? ` (was ${replaced.cron})` : ''}`,
+  print: ({ file, schedule, replaced }, { factory, workflow }) => [
+    `${factory}  ${workflow} at ${schedule.cron}${schedule.tz ? ` (${schedule.tz})` : ''}${replaced ? ` (was ${replaced.cron})` : ''}`,
     `scheduled: ${file} — its first run starts at its next fire`,
   ],
 };
@@ -155,7 +165,7 @@ export const FACTORY_SCHEDULE: Command<Scheduled> = {
 const UNSCHEDULE_USAGE = '<factory> <workflow>';
 
 /** `nemia factory unschedule`: a workflow's schedule taken back. */
-export const FACTORY_UNSCHEDULE: Command<{ file: string; cleared: Schedule }> = {
+export const FACTORY_UNSCHEDULE: Command<{ file: string; cleared: Schedule }, UnscheduleInput> = {
   name: 'factory unschedule',
   usage: UNSCHEDULE_USAGE,
   help: ["take a workflow's schedule back: the daemon starts it no more"],
@@ -171,10 +181,12 @@ export const FACTORY_UNSCHEDULE: Command<{ file: string; cleared: Schedule }> = 
   },
   writes: true,
   class: 'ask',
-  only: { side: 'cli', why: "the api serves it as the Schedule's `delete` of `objects`' Api, calling this handler" },
-  handler: (args, _env, home) => {
-    const factory = textOf(args, 'factory');
-    const workflow = textOf(args, 'workflow');
+  only: {
+    side: 'cli',
+    why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Schedule's `delete`, whose handler calls this one by its `input`",
+  },
+  input: UnscheduleInput,
+  handler: ({ factory, workflow }, _env, home) => {
     return rooted(
       home,
       'factory unschedule',
@@ -187,10 +199,7 @@ export const FACTORY_UNSCHEDULE: Command<{ file: string; cleared: Schedule }> = 
       }),
     );
   },
-  print: ({ file, cleared }, args) => [
-    `${textOf(args, 'factory')}  ${textOf(args, 'workflow')} no longer at ${cleared.cron}`,
-    `unscheduled: ${file}`,
-  ],
+  print: ({ file, cleared }, { factory, workflow }) => [`${factory}  ${workflow} no longer at ${cleared.cron}`, `unscheduled: ${file}`],
 };
 
 /** `nemia factory schedule` and `unschedule`'s entries, in the order `nemia`'s help lists them. */

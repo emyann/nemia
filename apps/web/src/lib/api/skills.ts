@@ -30,13 +30,13 @@ export type SkillRow = {
 export type SkillPlace = { from: SkillSource; dir: string | null; skills: SkillRow[] };
 
 /** A builtin skill copied: the copy as it now reads in your library. */
-export type SkillAdded = { skill: SkillRow };
+type SkillAdded = { skill: SkillRow };
 
 /** The folder a skill's folder is in: its place's. */
 const parentOf = (dir: string): string => dir.replace(/[\\/]+$/, '').replace(/[\\/][^\\/]*$/, '');
 
 /** A Skill, as the picker lists it (`SkillRow`). */
-export const skillRowOf = (skill: Skill): SkillRow => ({
+const skillRowOf = (skill: Skill): SkillRow => ({
   name: skill.metadata.name,
   from: skill.status.origin,
   dir: skill.status.dir,
@@ -52,14 +52,14 @@ export const skillRowOf = (skill: Skill): SkillRow => ({
  * The places a namespace's skills are listed by, in the order an agent of yours finds a name: your library, the repository's and Nemia's;
  * in a factory, its own tree first.
  */
-export const skillOrigins = (namespace: string): DefinitionOrigin[] =>
+const skillOrigins = (namespace: string): DefinitionOrigin[] =>
   namespace === DEFAULT ? ['yours', 'repo', 'builtin'] : ['factory', 'yours', 'repo', 'builtin'];
 
 /**
  * Every skill of `namespace`'s places, a list each read by its origin (`?origin=`), shadowed or not, read from disk on each request; keyed
  * `['skills']` in the default namespace, the key every write of a skill reads again by.
  */
-export const skillsInQuery = (namespace: string) =>
+const skillsInQuery = (namespace: string) =>
   queryOptions({
     queryKey: namespace === DEFAULT ? ['skills'] : ['skills', namespace],
     queryFn: (): Promise<SkillPlace[]> =>
@@ -143,7 +143,7 @@ const draftOf = (skill: Skill): SkillDraft | null => {
 };
 
 /** A Skill, as its page reads it (`SkillDetail`). */
-export const skillDetailOf = (skill: Skill): SkillDetail => ({
+const skillDetailOf = (skill: Skill): SkillDetail => ({
   skill: skillRowOf(skill),
   version: skill.metadata.resourceVersion,
   draft: draftOf(skill),

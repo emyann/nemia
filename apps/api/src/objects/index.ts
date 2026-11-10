@@ -1,8 +1,9 @@
 /**
- * The objects the api serves through the `Api` of `objects` (`objectsRoutes`, mounted by app.ts): the run object and its sub-resources,
- * the inbox's cards, the factories, the templates, the subscriptions and the feed's events; the handlers of each group (`runs.ts`,
- * `cards.ts`, the factories' and their parts' in factory/, the
- * templates' in template-objects/, the subscriptions' and the events' in feed-objects/), the package's refusals
- * as the `Api`'s errors (`refused.ts`) and the web handler and the Hono routes that hand it its paths, guarded (`serve.ts`).
+ * The objects the api serves through the `Api` of `objects`: the mount that hands every request under `/api/` no Hono route answered to
+ * the `Api`'s one web handler (`mount`, serve.ts, mounted by app.ts), and its 404 (`noRoute`); the handlers of the run object and the
+ * inbox's cards (`runs.ts`, `cards.ts`; the other groups' in their folders); and every refusal as the `Api`'s error, at its class's
+ * status (`refusedAs`, `statusOf`, refused.ts).
  */
-export { objectsHandler, objectsRoutes } from './serve.ts';
+export { MOUNT } from './endpoints.ts';
+export { listAt, mount, noRoute, objectsHandler } from './serve.ts';
+export { bodyOf, refusedAs, statusOf } from './refused.ts';

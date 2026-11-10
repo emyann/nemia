@@ -2,10 +2,11 @@
  * `nemia level`: the person's switch for Nemia, an entry of the command table. Bare, where she is: the store's level and each factory's,
  * her session's phase, how to reach it, and what a person allowed her at a prompt beyond what is built in. Given `auto`, `semi-auto` or
  * `manual`, the store's level, or with `--factory` a factory's default, a raise of it for a stretch (`--for`) or the raise ended
- * (`--end`), written for the keeper (`keep.verb.ts`) to act on at its next beat. The api serves the write on the route the table
- * generates, and the read by a route of its own, which calls the same handler.
+ * (`--end`), written for the keeper (`keep.verb.ts`) to act on at its next beat. The api serves the read and the write as the nemia group's
+ * `level` and `setLevel` (`objects`' Api), each calling its handler by type (`LevelInput`).
  */
 import { Effect } from 'effect';
+import { NemiaLevelSet } from 'objects';
 import type { Args } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
@@ -139,30 +140,37 @@ function factoryFileAsked(ask: FactoryAsk, store: Level, at: Date): FactoryLevel
   return asked.file;
 }
 
+/** What `nemia level` takes: the store's level, or a factory's, raised for a stretch or its raise ended (`objects`' `NemiaLevelSet`). */
+export type LevelInput = typeof NemiaLevelSet.Type;
+
 /** The factory write `args` asks for, or undefined where they ask the store's level or nothing. */
-const factoryAskOf = (args: Args): FactoryAsk | undefined =>
-  typeof args.factory !== 'string' || (args.level === undefined && args.end !== true)
+const factoryAskOf = (args: LevelInput): FactoryAsk | undefined =>
+  args.factory === undefined || (args.level === undefined && args.end !== true)
     ? undefined
     : {
         factory: args.factory,
-        ...(typeof args.level === 'string' ? { level: args.level as Level } : {}),
-        ...(typeof args.for === 'string' ? { forMs: durationOf(args.for) } : {}),
+        ...(args.level === undefined ? {} : { level: args.level }),
+        ...(args.for === undefined ? {} : { forMs: durationOf(args.for) }),
         ...(args.end === true ? { end: true } : {}),
       };
 
 /**
- * `nemia level`'s handler: where she is, after the level asked is written, where one is. Her task is named in the store's file first, then
+ * `nemia level`'s handler: where she is, after the level asked is written, where one is; refused (`Invalid`) as `factoryArgsRefusal`
+ * refuses, so a caller that runs no `check` is refused the same. Her task is named in the store's file first, then
  * the factory's file written: a failure between them leaves a task named and nothing above `manual`, which the keeper leaves alone.
  */
-const levelBy = (args: Args, home?: string) =>
+const levelBy = (args: LevelInput, home?: string) =>
   Effect.gen(function* () {
+    const wrong = factoryArgsRefusal(args);
+    if (wrong !== null) return yield* Effect.fail(new Invalid({ message: wrong }));
     const e = yield* EngineService;
     const now = yield* levelNow(e);
     const factory = factoryAskOf(args);
-    const storeSet = factory === undefined && typeof args.level === 'string';
+    const asked = factory === undefined ? args.level : undefined;
+    const storeSet = asked !== undefined;
     if (factory === undefined && !storeSet) return now;
     const at = new Date();
-    const store = storeSet ? (args.level as Level) : now.level;
+    const store = asked ?? now.level;
     const file = factory === undefined ? undefined : yield* tried(() => factoryFileAsked(factory, now.level, at));
     const changed = factory === undefined || file === undefined ? undefined : { factory: factory.factory, file };
     const above = levelsAfter(now.factories, store, changed, at.getTime(), DEFAULT_FACTORY).some((row) => row.level !== 'manual');
@@ -236,7 +244,7 @@ function factoryArgsRefusal(args: Args): string | null {
  * (`Invalid`); an end with no raise in force (`Conflict`); a level file that does not read (`Invalid`). Never refused for her folder's
  * trust: her session waits for it, and `trust` names the command that gives it.
  */
-export const LEVEL: Command<NemiaLevel> = {
+export const LEVEL: Command<NemiaLevel, LevelInput> = {
   name: 'level',
   usage: '[manual|semi-auto|auto] [--factory <name> [--for <duration> | --end]]',
   help: [
@@ -265,15 +273,8 @@ export const LEVEL: Command<NemiaLevel> = {
   check: (args) => (typeof args.level === 'string' ? levelRefusal(args.level) : undefined) ?? factoryArgsRefusal(args),
   writes: true,
   class: { bare: 'read', sets: 'ask', setsBy: [...LEVELS, '--factory', '--for', '--end'] },
-  route: [
-    {
-      method: 'GET',
-      path: '/api/level',
-      status: 200,
-      hand: 'a read of a command that writes: the api serves it by a route of its own, which calls the same handler',
-    },
-    { method: 'PUT', path: '/api/level', status: 200 },
-  ],
+  only: { side: 'cli', why: "the api serves it as the nemia group's `level` and `setLevel` of `objects`' Api, calling this handler" },
+  input: NemiaLevelSet,
   handler: (args, _env, home) => levelBy(args, home),
   print: levelLines,
 };

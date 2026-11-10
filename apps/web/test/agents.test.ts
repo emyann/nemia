@@ -5,7 +5,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { story } from 'test-kit/checkpoints';
-import type { AgentListing, KeyForm } from '../src/lib/api.ts';
+import type { AgentListing } from '../src/lib/api/agents.ts';
+import type { KeyForm } from '../src/lib/api/builder.ts';
 import {
   choicesOf,
   deniedWithoutSkill,

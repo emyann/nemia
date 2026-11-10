@@ -300,7 +300,7 @@ export function runCodes(status: RunStatus, holding: readonly unknown[] | null, 
 }
 
 /** What a run says of who it waits on: the steps a person has to act on, the runs its roots wait on, and the hold on it. */
-export type OnYou = {
+export type WaitFacts = {
   readonly cancelledAt: string | null | undefined;
   readonly waitingOnYou: readonly string[];
   readonly waiting: { readonly waitingOnYou: boolean } | null;
@@ -311,5 +311,5 @@ export type OnYou = {
  * Whether a run waits on a person — the one decider of it: nobody called it off, and a step of it waits on one, or a run it waits on never
  * lands without one, or a hold on it only a person lifts. What the list's state reads (`kindOf` in run-state.ts). Pure.
  */
-export const waitsOnYou = (run: OnYou): boolean =>
+export const waitsOnYou = (run: WaitFacts): boolean =>
   !run.cancelledAt && (run.waitingOnYou.length > 0 || Boolean(run.waiting?.waitingOnYou) || Boolean(run.holding?.waitingOnYou));

@@ -190,14 +190,15 @@ test("each action answers its status on the run's namespaced path, and refuses a
     },
   );
   await t.test(
-    'REFUSED: a start of a workflow the store lacks is a 404 — a `card` beside it no key of `RunStart`, so no card is started',
+    'REFUSED: a start of a workflow the store lacks is a 404 — a `card` beside it a 400 naming it, refused before the workflow is looked for',
     async () => {
       const briefless = await answered(await send('POST', '/api/namespaces/default/runs', { workflow: 'no-such-workflow' }));
       assert.ok([404, 422].includes(briefless.status), JSON.stringify(briefless.body));
       const carded = await answered(
         await send('POST', '/api/namespaces/default/runs', { workflow: 'no-such-workflow', card: 'c', brief: 'b' }),
       );
-      assert.equal(carded.status, 404, JSON.stringify(carded.body));
+      assert.equal(carded.status, 400, JSON.stringify(carded.body));
+      assert.equal((carded.body as { field?: string }).field, 'payload.card', "the key refused: a card is started at the Card's own path");
     },
   );
 });

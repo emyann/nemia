@@ -4,8 +4,7 @@
  * route serves (`noRoute`) and other than a 500 with no words — a stream it opens (`text/event-stream`) is served, and let go unread — so
  * an endpoint the `Api` gains with no handler, or one a Hono route before the mount shadows, is refused here with nothing to list. The
  * routes Hono serves itself are exactly the three of the OpenAPI document (`META`, kept outside the `Api` as Kubernetes keeps
- * `/openapi/v3` out of its own) and the routes not moved onto the `Api` yet (`NOT_YET_IN_API`), each part of the change that moves one
- * deleting its row, until the list is empty and goes.
+ * `/openapi/v3` out of its own).
  */
 import './harness.ts';
 import { test } from 'node:test';
@@ -17,21 +16,15 @@ import { app } from '../src/app.ts';
 /** The OpenAPI document, its page and the page's script: served by Hono beside the mount, outside the `Api` they describe. */
 const META = ['GET /openapi/v3/nemia/v1', 'GET /openapi', 'GET /openapi/scalar.js'] as const;
 
-/**
- * The routes still served by Hono and not yet declared on the `Api`, each a line of app.ts before the mount. Transitional: each later part
- * of the change that moves a route onto the `Api` deletes its row here and its line there; the list ends empty, and goes with this note.
- */
-const NOT_YET_IN_API = [] as const;
-
 /** Each route Hono serves as `METHOD path`, once, but middleware and the mount (`ALL`), which serve no route of their own. */
 const routesOf = (routes: readonly { method: string; path: string }[]): string[] => [
   ...new Set(routes.filter((r) => r.method !== 'ALL').map((r) => `${r.method} ${r.path}`)),
 ];
 
-/** Where the routes Hono serves and the two lists disagree, a sentence each naming the fix. */
-function outsideBreaks(routes: readonly { method: string; path: string }[], notYet: readonly string[]): string[] {
+/** Where the routes Hono serves and those `listed` (`META`) disagree, a sentence each naming the fix. */
+function outsideBreaks(routes: readonly { method: string; path: string }[], listed: readonly string[] = META): string[] {
   const served = routesOf(routes);
-  const named = new Set<string>([...META, ...notYet]);
+  const named = new Set<string>(listed);
   return [
     ...served
       .filter((r) => !named.has(r))
@@ -41,7 +34,7 @@ function outsideBreaks(routes: readonly { method: string; path: string }[], notY
       ),
     ...[...named]
       .filter((r) => !served.includes(r))
-      .map((r) => `${r} is listed, and Hono serves no such route: take it off NOT_YET_IN_API, its route moved.`),
+      .map((r) => `${r} is listed, and Hono serves no such route: serve it, or take it off META.`),
   ];
 }
 
@@ -76,20 +69,20 @@ test('every endpoint of the Api is served by the mount: neither the 404 for no r
   assert.deepEqual(unserved, []);
 });
 
-test('the routes Hono serves outside the Api are the three of the OpenAPI document and the ones not moved yet, and no other', () => {
-  assert.deepEqual(outsideBreaks(app.routes, NOT_YET_IN_API), []);
+test('the routes Hono serves outside the Api are the three of the OpenAPI document, and no other', () => {
+  assert.deepEqual(outsideBreaks(app.routes), []);
 });
 
 test('REFUSED: a route Hono serves that no list names, and a listed route Hono does not serve', () => {
   const extra = new Hono().get('/api/x', (c) => c.text('x'));
   const more = new Hono().route('/', app).route('/', extra).route('/', extra);
   assert.deepEqual(
-    outsideBreaks(more.routes, NOT_YET_IN_API).map((b) => b.split(' is ')[0]),
+    outsideBreaks(more.routes).map((b) => b.split(' is ')[0]),
     ['GET /api/x'],
     'one break, the route no list names, however often it is mounted',
   );
   assert.deepEqual(
-    outsideBreaks(app.routes, [...NOT_YET_IN_API, 'GET /api/gone']).map((b) => b.split(' is ')[0]),
+    outsideBreaks(app.routes, [...META, 'GET /api/gone']).map((b) => b.split(' is ')[0]),
     ['GET /api/gone'],
   );
 });

@@ -67,8 +67,9 @@ import {
   type DemandHost,
   renamedIn,
   PAUSE,
+  pauseNowPreview,
+  pauseNowPreviewLines,
 } from '../runner.ts';
-import { pauseNowPreview, pauseNowPreviewLines } from '../command/runs.verb.ts';
 import { HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
 import {
@@ -384,6 +385,9 @@ async function pauseRun(args: Args, e: Engine, place: Place): Promise<void> {
 /** Each verb `nemia` takes, by its name on the command line: a `Map`, so a name every object has is no verb. */
 export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([['decide', decideVerb]]);
 
+/** A runner of the CLI: the parsed line, the engine, the place, and the store's root the command line read where it was composed. */
+type Runner = (args: Args, e: Engine, place: Place, home: string) => void | Promise<void>;
+
 /**
  * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`); `nemia rm` and `nemia prune`,
  * whose runners walk the many runs a command line names through their handlers; and `nemia start`, `nemia inbox add`, `nemia inbox queue`,
@@ -392,7 +396,7 @@ export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([['decide'
  * add`, whose runner maps its flags to the write its handler takes; and `nemia admit`, whose runner reads the call on stdin: handed its
  * arguments once read and checked.
  */
-export const RUNS: ReadonlyMap<string, (args: Args, e: Engine, place: Place) => void | Promise<void>> = new Map([
+export const RUNS: ReadonlyMap<string, Runner> = new Map<string, Runner>([
   ['tick', tickVerb],
   ['up', upVerb],
   ['watch', watchVerb],
@@ -427,7 +431,7 @@ async function commanded(command: Command | Ran, rest: string[], e: Engine, dema
   if (wrong) usage(wrong);
   if (command.ticks === true) await Effect.runPromise(ensureDaemon(demand()));
   const runner = RUNS.get(command.name);
-  if (runner) return runner(args, e, place);
+  if (runner) return runner(args, e, place, wfRoot(process.env));
   if (command.handler === undefined)
     throw new Error(`${command.name} has neither a runner nor a handler: give it one in RUNS or its entry`);
   const given = inputOf(command, args);

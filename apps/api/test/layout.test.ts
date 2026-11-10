@@ -169,7 +169,7 @@ test('REFUSED: a stray file at the root, a folder of two without a face, a face 
 
 test('the root of src holds its files, and each folder has a face where it has two', () => {
   const files = sourceFiles();
-  assert.ok(files.includes('src/runs/runs.ts') && files.includes('src/app.ts'), 'the scan reads the folders');
+  assert.ok(files.includes('src/runs/start.ts') && files.includes('src/app.ts'), 'the scan reads the folders');
   assert.deepEqual(layoutBreaches(files), []);
 });
 

@@ -78,11 +78,14 @@ export function noRoute(c: RequestContext<ApiEnv>): Response {
 /** Each issue of a refused decode, as Standard Schema says it: its path within the request's part. */
 const issuesOf = SchemaIssue.makeFormatterStandardSchemaV1();
 
-/** The key a refused decode names, from the request's part it is in: `payload.spec.steps`, `query.limit`, `params.name`. */
-const fieldOf = (error: HttpApiError.HttpApiSchemaError): string => {
+/**
+ * The key a refused decode names, from the request's part it is in (`payload.spec.steps`, `query.limit`, `params.name`), and what its
+ * Schema says of it: the message it was declared with, where it says what to send instead, or the decoder's own.
+ */
+const refusedOf = (error: HttpApiError.HttpApiSchemaError): { field: string; said: string | undefined } => {
   const first = issuesOf(error.cause.issue).issues[0];
   const path = (first?.path ?? []).map((segment) => String(typeof segment === 'object' ? segment.key : segment));
-  return [error.kind.toLowerCase(), ...path].join('.');
+  return { field: [error.kind.toLowerCase(), ...path].join('.'), said: first?.message };
 };
 
 /**
@@ -97,10 +100,10 @@ const decodeRefused = HttpRouter.middleware(
         return Effect.die(defect);
       return Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest;
-        const field = fieldOf(defect);
+        const { field, said } = refusedOf(defect);
         return HttpServerResponse.jsonUnsafe(
           {
-            error: `${request.method} ${new URL(request.url, 'http://api').pathname} does not read as its route takes it: \`${field}\` is not what it takes. Send it in that shape: ${DOCUMENT} says each key and value.`,
+            error: `${request.method} ${new URL(request.url, 'http://api').pathname} does not read as its route takes it: \`${field}\` is not what it takes${said ? ` (${said})` : ''}. Send it in that shape: ${DOCUMENT} says each key and value.`,
             field,
           },
           { status: 400 },

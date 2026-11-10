@@ -6,12 +6,11 @@
 import { Effect, Schema } from 'effect';
 import { RunApprove } from 'objects';
 import { commandLine, type Args } from '../command/command.ts';
-import { checked } from '../command/checked.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { acceptWordsRefusal } from '../round/round.ts';
 import { acceptRun } from '../round/round.verb.ts';
 import { approveForm } from './form.verb.ts';
-import type { Command } from '../command/entry.verb.ts';
+import { checked, type Command } from '../command/entry.verb.ts';
 import { ANSWER_HELP, answerFlag, givenAnswers, typedAnswers } from '../question/asked.verb.ts';
 import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';

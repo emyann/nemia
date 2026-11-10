@@ -24,8 +24,6 @@ export const GLOBAL_ROOTS: Readonly<Record<string, number>> = {
   'src/chat/chat.verb.ts': 1,
   'src/check/check.store.ts': 1,
   'src/cli/main.ts': 3,
-  'src/cli/runs.ts': 4,
-  'src/cli/writers.ts': 2,
   'src/command/pages.verb.ts': 1,
   'src/daemon/daemon.store.ts': 11,
   'src/daemon/up.verb.ts': 1,

@@ -26,7 +26,7 @@ const Answers = Schema.Array(Schema.Struct({ question: Schema.String, chose: Str
 /**
  * A run started, as `nemia start` starts one: the workflow, where it is read from when both the repository and your library have it,
  * the runs it waits on (`after`) and is handed as context (`context`), its brief, and the labels it is started with (`key=value`).
- * An inbox card is started at its own path (`CardStart`).
+ * An inbox card is started at its own path (`CardStart`): a `card` sent here is refused, its message naming that path.
  */
 export const RunStart = Schema.Struct({
   workflow: NotBlank,
@@ -35,6 +35,11 @@ export const RunStart = Schema.Struct({
   context: Schema.optionalKey(Schema.Array(NotBlank)),
   brief: Schema.optionalKey(Schema.String),
   label: Schema.optionalKey(Schema.Array(NotBlank)),
+  card: Schema.optionalKey(
+    Schema.Never.annotate({
+      message: 'a card is started at its own path, POST /api/namespaces/:namespace/cards/:name/start, with the workflow and the brief',
+    }),
+  ),
 }).annotate({ identifier: 'RunStart' });
 export type RunStart = typeof RunStart.Type;
 

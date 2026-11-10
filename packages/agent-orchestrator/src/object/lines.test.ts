@@ -34,7 +34,7 @@ test("runLines answers each frozen step's approve, retry and say, and the run's 
       say: commandLine(entry('say'), { runId: 'r-lines', step }),
     });
   }
-  assert.equal(lines.decide, commandLine(entry('decide'), { runId: 'r-lines' }));
+  assert.equal(lines.decide, 'nemia decide r-lines', "decide is the CLI's own verb, its line the run alone");
   assert.equal(lines.decide, decideLine('r-lines'));
   assert.equal(lines.refresh, refreshLine('r-lines'));
   assert.match(lines.refresh, /refresh r-lines$/);

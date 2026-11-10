@@ -43,7 +43,7 @@ import { Api, Missing, type RunApprove, type RunPrune, type RunRefresh, type Run
 import type { Served } from '../layer.ts';
 import { workflowPageOf } from '../step/step.ts';
 import { findRun, noSuchRun, taskOfStep } from '../store.ts';
-import { runStart } from '../runs/index.ts';
+import { runStart } from '../runs/start.ts';
 import { answered, answeredIn, locatedAt, refusedAs, ServedNow } from './refused.ts';
 import { wantsTable } from './table.ts';
 import { decisionHandler } from '../decide/decide.ts';

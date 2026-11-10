@@ -10,7 +10,8 @@ import { EngineService, asked, tried, type Engine } from '../runtime-client.ts';
 import type { Args, Flag, Positional, Spec } from './command.ts';
 import type { Command, Kept } from './entry.verb.ts';
 import { artifactFile, fileIn } from '../artifacts/artifacts.store.ts';
-import { runStore } from '../record/files.store.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { verifiesRest } from '../config/config.store.ts';
 import { informerMemo } from '../rest/informer.verb.ts';
@@ -125,11 +126,10 @@ export const STEP_ARTIFACT: Command<{ file: Buffer | null }, StepFileInput> = {
   class: 'read',
   only: { side: 'api', why: "the board links each file a step's closeout named; at the command line a person opens the file" },
   input: StepFileInput,
-  handler: ({ runId, step, name }) =>
-    tried(() => {
-      const run = runStore.runs.find(runId);
-      return { file: run ? artifactFile(run, step, name) : null };
-    }),
+  handler: Effect.fnUntraced(function* ({ runId, step, name }: StepFileInput) {
+    const run = yield* (yield* RunDoor).runs.find(RunId.read(runId), () => {});
+    return yield* tried(() => ({ file: run ? artifactFile(run, step, name) : null }));
+  }),
   print: () => [],
 };
 
@@ -146,12 +146,11 @@ export const STEP_FILE: Command<{ folder: string | null; file: Buffer | null }, 
   class: 'read',
   only: { side: 'api', why: "the board links each file a folder step's folder holds; at the command line a person opens the folder" },
   input: StepFileInput,
-  handler: ({ runId, step, name }) =>
-    tried(() => {
-      const run = runStore.runs.find(runId);
-      const folder = run && !isRepositoryRun(run) ? (run.steps[step]?.workspace ?? null) : null;
-      return { folder, file: folder === null ? null : fileIn(folder, name) };
-    }),
+  handler: Effect.fnUntraced(function* ({ runId, step, name }: StepFileInput) {
+    const run = yield* (yield* RunDoor).runs.find(RunId.read(runId), () => {});
+    const folder = run && !isRepositoryRun(run) ? (run.steps[step]?.workspace ?? null) : null;
+    return yield* tried(() => ({ folder, file: folder === null ? null : fileIn(folder, name) }));
+  }),
   print: () => [],
 };
 

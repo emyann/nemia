@@ -100,18 +100,3 @@ export const writeGuard: MiddlewareHandler = async (c, next) => {
  * request to the package. Kept here until the parts that move those readers onto the `Api`'s Schemas remove it.
  */
 export type Refusal = { status: 400 | 403 | 404 | 409 | 415 | 422; error: string };
-
-/**
- * A write as the guard's refusals once worded it, route by route. No longer read: the guard is `writeGuard`'s, with no words of a route's.
- * Kept only for the words the builder still spells (workflows/builder.ts `buildGuard`), removed by the part that moves its route onto the
- * `Api`.
- */
-export type Guarded = {
-  route: string;
-  does: string;
-  forAnother: string;
-  why: string;
-  reach: string;
-  instead: string;
-  shape: string;
-};

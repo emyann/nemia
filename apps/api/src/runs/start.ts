@@ -51,7 +51,7 @@ export type Asked =
  * `startRun`'s to say (`afterRefusal`, `contextRefusal`, `parseLabelEdits`), in its words. With a `card` the brief is what the person made
  * of its body, and may be left out, for the body as it is; a blank one is the package's to refuse, as `nemia start <card> --brief ""` is.
  */
-function startOf(body: RunStart & { card?: string }, repo: string, home: string, tree?: string): Asked | Refusal {
+function startOf(body: Omit<RunStart, 'card'> & { card?: string }, repo: string, home: string, tree?: string): Asked | Refusal {
   const { workflow, brief, from, after, context, card, label } = body;
   const folder = folderOf(workflow, from, repo, home, tree);
   if ('status' in folder) return folder;

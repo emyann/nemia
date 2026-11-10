@@ -37,13 +37,13 @@ import {
 import { Effect, Schema } from 'effect';
 import { PauseWrite, RunHold, RunPrune } from 'objects';
 import { tryOf } from '../summary/reads.verb.ts';
-import { runStore } from '../record/files.store.ts';
-import { HOME } from '../record/record.store.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
+import { rootGiven } from '../config/root.store.ts';
 import { pausedRead } from '../list/list.verb.ts';
 import { sessionsDrained, tried } from '../runtime-client.ts';
 import { type Args } from './command.ts';
-import { checked } from './checked.verb.ts';
-import type { Command, Ran } from './entry.verb.ts';
+import { checked, type Command, type Ran } from './entry.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -264,9 +264,9 @@ export type RmInput = typeof RmInput.Type;
  * before they go, and `nemia rm` says what it hands off and what it leaves.
  */
 const tryAlone = Effect.fnUntraced(function* (runId: string, home: string | undefined) {
-  if (!runStore.runs.exists(runId)) return;
-  const run = runStore.runs.read(runId);
-  if (tryOf(run, home ?? HOME)) return;
+  const run = yield* (yield* RunDoor).runs.find(RunId.read(runId), () => {});
+  if (run === undefined) return;
+  if (tryOf(run, rootGiven(home, 'rm'))) return;
   return yield* Effect.fail(
     new Conflict({
       message: `${run.id} is a run of ${run.workflowDir}, and only a try — a run started from an agent's page — is removed here. Remove it with \`nemia rm ${run.id}\`, which says what it hands off and what it leaves.`,

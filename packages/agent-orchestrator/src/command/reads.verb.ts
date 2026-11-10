@@ -21,7 +21,7 @@ import { RANGE_TAKES, seriesRead } from '../series/series.store.ts';
 import { seriesLines, type SeriesRead } from '../series/series.ts';
 import type { Args } from './command.ts';
 import { selectorCheck, selectorFlag, selectorsIn } from './pages.verb.ts';
-import type { Command, Kept } from './entry.verb.ts';
+import { tableEntry, type Command, type Kept } from './entry.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -44,7 +44,10 @@ const rawOf = (run: Run) => {
  * run's record as it printed before, its brief cut at 120 characters and each frozen step's body at 60. The api serves the object on
  * `GET /api/runs/:runId`, by hand, handed the app's memo, as one judgement for both sides, and the record on `?raw=true`, for `nemia`.
  */
-export const SHOW: Command = {
+/** What `nemia show` takes, and the api's record read calls it with: the run, by its id, and `raw` for its record. */
+const ShowInput = Schema.Struct({ runId: Schema.String, raw: Schema.optionalKey(Schema.Boolean) });
+
+export const SHOW: Command<Readonly<Record<string, unknown>>, typeof ShowInput.Type> = {
   name: 'show',
   usage: '<runId> [--raw]',
   help: ['the run as one object (nemia/v1 Run); --raw: its record, and', 'what each step was told'],
@@ -55,10 +58,10 @@ export const SHOW: Command = {
   },
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/runs/:runId', status: 200 },
+  input: ShowInput,
   handler: (args, _env, home, kept?: Kept) =>
     Effect.flatMap(
-      tried(() => runStore.runs.read(textOf(args, 'runId') ?? '')),
+      tried(() => runStore.runs.read(args.runId)),
       (run): Effect.Effect<Readonly<Record<string, unknown>>, Refusal, EngineService | PlaceService> =>
         args.raw === true
           ? Effect.succeed(rawOf(run))
@@ -378,4 +381,4 @@ export const SERIES: Command<SeriesRead, SeriesInput> = {
 };
 
 /** The reads, in the order `nemia`'s help lists them. */
-export const READS: readonly Command[] = [SHOW, CLOSEOUT, TRIES, TRY, TOLD, LOGS, STATS];
+export const READS: readonly Command[] = [tableEntry(SHOW), CLOSEOUT, TRIES, TRY, TOLD, LOGS, STATS];

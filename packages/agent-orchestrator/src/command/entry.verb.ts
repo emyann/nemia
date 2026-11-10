@@ -2,10 +2,10 @@
  * The two shapes of an entry of the command table: a command whole, which a handler serves on either side (`Command`), and one the CLI
  * serves alone and runs itself, with no handler (`Ran`).
  */
-import type { Effect, Schema } from 'effect';
+import { Effect, type Schema } from 'effect';
 import type { PlaceService } from '../place/place.store.ts';
 import type { EngineService } from '../runtime-client.ts';
-import type { Conflict, Missing, Refusal } from '../refusal/refusal.ts';
+import { Invalid, type Refusal } from '../refusal/refusal.ts';
 import type { StatsMemo } from '../stats/stats.verb.ts';
 import type { InformerMemo } from '../rest/informer.verb.ts';
 import type { ScheduleRuns } from '../factory/schedule/listed.store.ts';
@@ -48,9 +48,8 @@ export type InputOf<I> = [Args] extends [I] ? { readonly input?: Schema.Decoder<
 /**
  * A command whole: its spec, `input`, the keys its handler takes where they are its own (`InputOf`), `handler`, which is the Effect of
  * calling one package verb with the arguments, answering data — never printed lines — and requiring the engine as a service
- * (`EngineService`), run by a caller with `runWith`, and `print`, the lines the CLI prints of that data. The api answers the data as JSON,
- * or only its `apiKeys` where the CLI prints more of it than the api answers; or, where `apiRefusal` makes one of the data, throws that
- * refusal in its place: a verb that answers what it would not do as data, a line on the CLI, is refused by its kind on the api. A handler
+ * (`EngineService`), run by a caller with `runWith`, and `print`, the lines the CLI prints of that data. The api answers the data in the
+ * shape its endpoint's success Schema says. A handler
  * reads its settings (`WF_MAX_RUNS`) from `env`, and a person's own files from the store `home`: the process's own at the command line, the
  * app's on the api; and what a caller that lives long keeps between its calls from `kept` — the api's memos of the stats and of the runs at
  * rest, and the feed's filing times it read — which the command line, calling once, hands none of. `note` is what the CLI says of the data
@@ -61,8 +60,6 @@ export type Command<D extends object = Readonly<Record<string, unknown>>, I = Ar
     handler(args: I, env?: NodeJS.ProcessEnv, home?: string, kept?: Kept): Effect.Effect<D, Refusal, EngineService | PlaceService>;
     print(data: D, args: I): readonly string[];
     note?(data: D, args: I): readonly string[];
-    readonly apiKeys?: readonly (keyof D & string)[];
-    apiRefusal?(data: D, args: I): Missing | Conflict | null;
   };
 
 /**
@@ -77,3 +74,11 @@ export type Ran = CommandSpec & { readonly only: { readonly side: 'cli'; readonl
  * api calls the typed entry itself, by its exported name.
  */
 export const tableEntry = <D extends object, I>(command: Command<D, I>): Command => command as unknown as Command;
+
+/**
+ * A typed entry's own check of what it was handed: the refusal its spec's `check` words, said before anything is read — nothing where
+ * `wrong` is none, else `Invalid` in its words. The CLI runs the `check` on what it parsed first; the api hands the entry's `input`
+ * straight to its handler, which runs the same words through this, so a request is refused as the command line is.
+ */
+export const checked = (wrong: string | null | undefined): Effect.Effect<void, Invalid> =>
+  wrong ? Effect.fail(new Invalid({ message: wrong })) : Effect.void;

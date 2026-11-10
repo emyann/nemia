@@ -33,7 +33,7 @@ import {
 import { Api, type CardList, DEFAULT_NAMESPACE, type Table } from 'objects';
 import { filingOf } from '../inbox/inbox.ts';
 import type { Served } from '../layer.ts';
-import { cardStart } from '../runs/index.ts';
+import { cardStart } from '../runs/start.ts';
 import { answered, locatedAt, orFailed, readerRefused } from './refused.ts';
 import { wantsTable } from './table.ts';
 

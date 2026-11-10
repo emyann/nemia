@@ -20,7 +20,8 @@ import { type Context as RequestContext } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
 import { Data, type Duration, Effect, Schema, Stream } from 'effect';
 import { BOOKMARK_EVERY, feedSize, followFeed, watchChanges, type Versioned } from 'agent-orchestrator';
-import { API_VERSION, AnyObjectList, type WatchedObject, watchEventOf } from 'objects';
+import { API_VERSION, AnyObjectList, TABLE_ACCEPT, type WatchedObject, watchEventOf } from 'objects';
+import { acceptsTable } from '../objects/table.ts';
 import { type ApiEnv, Beats } from '../layer.ts';
 
 /** The least time between two reads again of a watched list, however many feed lines arrive. */
@@ -40,11 +41,17 @@ const WATCH_TAKES =
   '`?watch=true` follows the list as server-sent events, with `labelSelector` if you like; `limit` and `continue` page a list and are left out of a watch';
 
 /** Why `c`'s query cannot be watched, or null where it asks a watch rightly. */
-const refusalOf = (c: RequestContext<ApiEnv>): string | null => {
+const refusalOf = (c: RequestContext<ApiEnv>): { readonly status: 400 | 406; readonly error: string } | null => {
   const watch = c.req.queries('watch') ?? [];
-  if (watch.length !== 1 || watch[0] !== 'true') return `watch=${watch.join(',')} is not a watch this list takes: ${WATCH_TAKES}.`;
+  if (watch.length !== 1 || watch[0] !== 'true')
+    return { status: 400, error: `watch=${watch.join(',')} is not a watch this list takes: ${WATCH_TAKES}.` };
   if (c.req.query('limit') !== undefined || c.req.query('continue') !== undefined)
-    return `a watch is sent the whole list, so it takes no page: ${WATCH_TAKES}. Send it again without them.`;
+    return { status: 400, error: `a watch is sent the whole list, so it takes no page: ${WATCH_TAKES}. Send it again without them.` };
+  if (acceptsTable(c.req.header('accept')))
+    return {
+      status: 406,
+      error: `a watch streams the list's objects, never a Table: send it again without Accept: ${TABLE_ACCEPT}, or ask the Table without watch=true.`,
+    };
   return null;
 };
 
@@ -109,7 +116,7 @@ export const watchable =
     const asked = c.req.query('watch');
     if (asked === undefined || asked === 'false') return list(c);
     const refused = refusalOf(c);
-    if (refused !== null) return c.json({ error: refused }, 400);
+    if (refused !== null) return c.json({ error: refused.error }, refused.status);
     const url = new URL(c.req.url);
     url.searchParams.delete('watch');
     const request = () => new Request(url, { headers: c.req.raw.headers });

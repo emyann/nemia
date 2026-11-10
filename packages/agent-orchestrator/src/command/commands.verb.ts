@@ -18,7 +18,6 @@
  */
 import { Effect, Schema } from 'effect';
 import { RunRefresh, RunRetry, RunSay, type SaidAfter } from 'objects';
-import { checked } from './checked.verb.ts';
 import { APPROVE } from '../gate/commands.verb.ts';
 import { ROUTE } from '../gate/route.verb.ts';
 import { ANSWER_HELP, answerFlag, givenAnswers, recheckAnswerRefusal, typedAnswers, typedOf } from '../question/asked.verb.ts';
@@ -41,7 +40,7 @@ import { agentCardRead, agentsRead } from '../roster/roster.store.ts';
 import { agentsLines, cardNote, type AgentsRead, type CardRead } from '../roster/roster.ts';
 import { AGENTS_SOURCES } from '../sources/sources.verb.ts';
 import { amountIn, commandLine, renamedValues, type Args, type CommandSpec, type Flag } from './command.ts';
-import { type Command, type Ran, tableEntry } from './entry.verb.ts';
+import { checked, type Command, type Ran, tableEntry } from './entry.verb.ts';
 import { READS, SERIES } from './reads.verb.ts';
 import { AGENTS_CUSTOM } from '../custom/custom.verb.ts';
 import { AgentCardInput, AgentsInput, LIBRARY_ENTRIES } from '../agents/library.verb.ts';
@@ -427,7 +426,15 @@ export const SAY: Command<
  * (`runList`), judged off the same judgement of each (`informedJudgements`), at `GET /api/runs`. The api serves this answer
  * whole on `GET /api/listing` and `GET /api/listing/:runId`, which `nemia` reads and prints with this entry's lines, as a client of it.
  */
-export const LS: Command<RunsListed> = {
+/** What `nemia ls` takes, and the api's listing calls it with: a run's id or none, its selectors, and the labels shown. */
+const LsInput = Schema.Struct({
+  runId: Schema.optionalKey(Schema.String),
+  selector: Schema.optionalKey(Schema.Array(Schema.String)),
+  showLabels: Schema.optionalKey(Schema.Boolean),
+  labelColumns: Schema.optionalKey(Schema.Array(Schema.String)),
+});
+
+export const LS: Command<RunsListed, typeof LsInput.Type> = {
   name: 'ls',
   usage: '[<runId>] [-l <selector>] [--show-labels] [-L <key>]',
   help: [
@@ -451,11 +458,8 @@ export const LS: Command<RunsListed> = {
   check: selectorCheck,
   writes: false,
   class: 'read',
-  route: [
-    { method: 'GET', path: '/api/listing', status: 200 },
-    { method: 'GET', path: '/api/listing/:runId', status: 200 },
-  ],
-  handler: (args, _env, home) => Effect.flatMap(selectorsIn(args), (s) => runsListed(textOf(args, 'runId'), s, rootGiven(home, 'ls'))),
+  input: LsInput,
+  handler: (args, _env, home) => Effect.flatMap(selectorsIn(args), (s) => runsListed(args.runId, s, rootGiven(home, 'ls'))),
   print: (listed, args) => [...(listed.paused ? pausedLines(listed.paused) : []), ...lsLines(listed, Date.now(), runsShown(args))],
 };
 
@@ -573,7 +577,7 @@ export const AGENT_CARD: Command<CardRead, AgentCardInput> = {
 /** Every command with a handler defined once, in the order `nemia`'s help lists them: what the api may serve. */
 export const COMMANDS: readonly Command[] = [
   START,
-  CONCLUDED,
+  tableEntry(CONCLUDED),
   ...INBOXES,
   ...LABELS,
   ...FACTORIES,
@@ -583,7 +587,7 @@ export const COMMANDS: readonly Command[] = [
   ROUTE,
   tableEntry(REFRESH),
   tableEntry(SAY),
-  LS,
+  tableEntry(LS),
   ...READS,
   ...PAGES,
   CEILINGS,

@@ -1,10 +1,10 @@
 /**
- * The shipped command table: no rule of the table broken against the CLI's own verbs and runners, and each command on the api's path,
- * method and status of today, or on the CLI alone.
+ * The shipped command table: no rule of the table broken against the CLI's own verbs and runners, and each command on the CLI alone, on
+ * the api alone, or on both and typed.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TABLE, commandBreaks, routeList, type Route } from '../src/runner.ts';
+import { TABLE, commandBreaks } from '../src/runner.ts';
 import { classBreaks } from '../src/admission/index.ts';
 import { RUNS, VERBS } from '../src/cli/main.ts';
 
@@ -42,22 +42,12 @@ test('every shipped command is classed once, and no class breaks its rules', () 
   assert.deepEqual(classBreaks(TABLE), []);
 });
 
-/** A route as the pins say it: a route the api writes by hand (`hand`) marked so, its why left to the entry. */
-const pinned = (r: Route) => (r.hand === undefined ? r : { ...r, hand: true });
-
-test("each command is served on the api where it was before the table — or typed (`input`), which the api calls it by from objects' Api — the lift of a hold, a removal and a prune where their routes were, a run's named actions in its namespace", () => {
+test("each command is served on the CLI alone, on the api alone, or on both and typed (`input`), which the api calls it by from objects' Api", () => {
   assert.deepEqual(
-    TABLE.map((c) => [
-      c.name,
-      Array.isArray(c.route)
-        ? c.route.map(pinned)
-        : c.route
-          ? pinned(c.route as Route)
-          : (c.only?.side ?? ('input' in c && c.input !== undefined ? 'typed' : undefined)),
-    ]),
+    TABLE.map((c) => [c.name, c.only?.side ?? ('input' in c && c.input !== undefined ? 'typed' : undefined)]),
     [
       ['start', 'cli'],
-      ['concluded', { method: 'GET', path: '/api/runs/:runId/concluded', status: 200 }],
+      ['concluded', 'typed'],
       ['inbox', 'cli'],
       ['inbox add', 'cli'],
       ['inbox queue', 'cli'],
@@ -101,14 +91,8 @@ test("each command is served on the api where it was before the table — or typ
       ['route', 'cli'],
       ['refresh', 'cli'],
       ['say', 'cli'],
-      [
-        'ls',
-        [
-          { method: 'GET', path: '/api/listing', status: 200 },
-          { method: 'GET', path: '/api/listing/:runId', status: 200 },
-        ],
-      ],
-      ['show', { method: 'GET', path: '/api/runs/:runId', status: 200 }],
+      ['ls', 'typed'],
+      ['show', 'typed'],
       ['closeout', 'cli'],
       ['tries', 'api'],
       ['try', 'api'],
@@ -218,10 +202,6 @@ test('every command the api posts or deletes on writes, and the api guards it; t
       'watch',
       'admit',
     ],
-  );
-  assert.deepEqual(
-    TABLE.filter((c) => routeList(c).some((r) => r.hand === undefined && c.writes !== (r.method !== 'GET'))).map((c) => c.name),
-    [],
   );
 });
 

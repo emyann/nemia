@@ -335,8 +335,8 @@ own `continue` token. The
 board reads the object, each step's tries and told at `…/steps/:step/tries` and `…/steps/:step/told`, keyed by the step's stamp so a step
 reads again only when it moved, and the lines once at `GET /api/runs/:runId/lines` (`RunLinesAnswer`, mirrored by hand); the api's tests
 read the same. The run's named actions — its start (`POST /api/namespaces/<factory>/runs`), removal, refresh, prune, labels and hold,
-and a step's retry, approval and words — are endpoints of the same `Api` on the namespaced path alone, each served through the pipeline a
-route the command table generates runs (`commandAnswered`, `apps/api/src/commands/routes.ts`). The api serves the object, its list, its
+and a step's retry, approval and words — are endpoints of the same `Api` on the namespaced path alone, each handler calling the
+orchestrator's entry by its exported name with its typed `input` (`apps/api/src/objects/runs.ts`). The api serves the object, its list, its
 sub-resources and its actions through the `Api` of `objects` (`apps/api/src/objects/`, off the command table's entries and the app's one
 informer), and its OpenAPI 3.1 document is `OpenApi.fromApi(Api)` (`apps/api/src/openapi/`, printed by its `print.ts`), and `GET /openapi` serves a page to browse it (Scalar's
 reference, its script served by the api from the installed package, reading the document at its route). The board reads the Run and

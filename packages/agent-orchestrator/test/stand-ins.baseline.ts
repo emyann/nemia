@@ -8,10 +8,9 @@ import type { Baseline } from './stand-ins.ts';
 /** Each listed test file and the kinds it reaches. */
 export const REAL_REACH: Baseline = {
   'apps/api/src/agents/agents.test.ts': ['git', 'process', 'place', 'engine'],
+  'apps/api/src/agents/writers.test.ts': ['process'],
   'apps/api/src/agents/copy.test.ts': ['git', 'process'],
   'apps/api/src/agents/instructions.test.ts': ['git', 'process'],
-  'apps/api/src/commands/routes.test.ts': ['git', 'process', 'place', 'engine'],
-  'apps/api/src/commands/writers.test.ts': ['process'],
   'apps/api/src/decide/decision.test.ts': ['git', 'process'],
   'apps/api/src/decide/to-decide.test.ts': ['git', 'process', 'place', 'engine'],
   'apps/api/src/factory/factories.test.ts': ['git', 'process'],
@@ -19,6 +18,7 @@ export const REAL_REACH: Baseline = {
   'apps/api/src/factory/parts/hires.test.ts': ['git', 'process'],
   'apps/api/src/inbox/inbox.test.ts': ['git', 'process', 'place', 'engine'],
   'apps/api/src/inbox/queue.test.ts': ['git', 'process', 'place', 'engine'],
+  'apps/api/src/runs/actions.test.ts': ['git', 'process', 'place', 'engine'],
   'apps/api/src/runs/prune.test.ts': ['git', 'process', 'place', 'engine'],
   'apps/api/src/runs/resting.test.ts': ['git', 'process', 'place', 'engine'],
   'apps/api/src/runs/unreadable-try.test.ts': ['git', 'process', 'place', 'engine'],

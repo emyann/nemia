@@ -65,12 +65,6 @@ each other, a file that is not .md, a folder with no card, and a card whose work
 The folder says what --after, --workflows and --no-worktree would, and nemia start <folder> refuses them. A nemia start that
 refuses part-way stops the plan: the runs it started stand, and it prints a nemia start for each card left.`;
 
-/** The text under `key`, or undefined where none was given. */
-const textOf = (args: Args, key: string): string | undefined => {
-  const value = args[key];
-  return typeof value === 'string' ? value : undefined;
-};
-
 /** Why a value flag of `nemia start` is taken once, as its refusal says it. */
 const ONCE: Readonly<Record<string, string>> = {
   '--workflows': 'works on one workflow',
@@ -454,7 +448,10 @@ type Concluded = { run: string; landed: boolean; section: string };
  * reads it now. The board's preview of a run picked as context. Refused with `Invalid` for an id that is not a run's (`idRefusal`), before
  * the store is read, and with `Missing` for a run the store does not have.
  */
-export const CONCLUDED: Command<Concluded> = {
+/** What `nemia concluded` takes, and the api's `GET /api/runs/:name/concluded` calls it with: the run, by its id. */
+const ConcludedInput = Schema.Struct({ runId: Schema.String });
+
+export const CONCLUDED: Command<Concluded, typeof ConcludedInput.Type> = {
   name: 'concluded',
   usage: '<runId>',
   help: ['what a run started with --from <runId> would be handed of it, now'],
@@ -466,9 +463,9 @@ export const CONCLUDED: Command<Concluded> = {
   },
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/runs/:runId/concluded', status: 200 },
-  handler: Effect.fnUntraced(function* (args: Args) {
-    const id = textOf(args, 'runId') ?? '';
+  input: ConcludedInput,
+  handler: Effect.fnUntraced(function* (args: typeof ConcludedInput.Type) {
+    const id = args.runId;
     const notId = idRefusal(id, 'read', 'nemia concluded');
     if (notId) throw new Invalid({ message: notId });
     if (!runStore.runs.exists(id))

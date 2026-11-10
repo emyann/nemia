@@ -26,13 +26,7 @@ import type {
  * objects' `DEFAULT_NAMESPACE`, the default factory's name, its type that constant's: spelled here, as a pure file the package's light
  * entries reach loads no Schema (`PINNED_MODULES`, `test/refusal.test.ts`), and the type refuses any other word.
  */
-const DEFAULT_NAMESPACE: typeof OBJECTS_DEFAULT = 'default';
-
-/**
- * The default factory's name under its old spelling: kept only so the run core's files compile until they move onto `DEFAULT_NAMESPACE`
- * too, and deleted then.
- */
-export const DEFAULT_FACTORY = DEFAULT_NAMESPACE;
+export const DEFAULT_NAMESPACE: typeof OBJECTS_DEFAULT = 'default';
 
 /** A factory's name: a lowercase slug of 1 to 40 characters, since it names a file in the store and, later, a record's field. */
 export const FACTORY_NAME = /^[a-z0-9][a-z0-9-]{0,39}$/;

@@ -5,7 +5,8 @@
  */
 import type { Closeout } from '../closeout/index.ts';
 import type { Run } from '../record/record.ts';
-import { approvalOf, budgetOf, dollars, hasGate, runSpend, spentWord, stepSpend, type SpendOf } from '../status/status.ts';
+import { approvalOf, budgetOf, hasGate, runSpend, spentWord, stepSpend, type SpendOf } from '../status/status.ts';
+import { dollars } from '../money/money.ts';
 import type { Workflow } from '../step/step.ts';
 import { aboveTheWorkflow, budgetRefusals, ceilingsOf, proposedBudgets } from '../budget/budget.ts';
 import type { GateBudgetsFrom } from 'objects';

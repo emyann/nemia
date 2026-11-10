@@ -7,7 +7,17 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { branchFates, forgetLine, forgetRefusal, heldWorktree, idRefusal, runWorktrees, type AskName, type Forgot } from './forget.ts';
+import {
+  branchFates,
+  forgetLine,
+  forgetRefusal,
+  heldWorktree,
+  idRefusal,
+  leftWhy,
+  runWorktrees,
+  type AskName,
+  type Forgot,
+} from './forget.ts';
 import type { RepositoryRun, Run, RoundAsk, StepRecord, TaskPhase } from '../run.ts';
 import type { Held } from '../place/place.ts';
 import type { Closeout } from '../closeout/closeout.ts';
@@ -790,4 +800,14 @@ test('`forgetLine` says in one line what happened to each run: forgotten, with w
       'git worktree list, and git worktree remove each',
     );
   });
+});
+
+test('leftWhy: a path gone or not empty is expected and says nothing; any other failure keeps its reason, naming the path', () => {
+  const err = (code: string): NodeJS.ErrnoException => Object.assign(new Error(`${code}: what the system said`), { code });
+  assert.equal(leftWhy('/store/checks', err('ENOENT'), ['ENOENT']), null);
+  assert.equal(leftWhy('/store/worktrees/r-1', err('ENOTEMPTY'), ['ENOENT', 'ENOTEMPTY']), null);
+  const why = leftWhy('/store/checks', err('EACCES'), ['ENOENT']);
+  assert.ok(why?.includes('/store/checks'), why ?? '');
+  assert.ok(why?.includes('EACCES: what the system said'), why ?? '');
+  assert.ok(leftWhy('/store/checks', 'not an error', ['ENOENT'])?.includes('not an error'));
 });

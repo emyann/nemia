@@ -23,7 +23,7 @@ process.env.WF_DEFAULT_FACTORY_STARTS = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 const { advanceRun, prune, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { freeingMany, judgingMany } = await import('../src/forget/prune/prune.verb.ts');
 const { PlaceService } = await import('../src/place/place.store.ts');
 const { builtinGitPlace } = await import('../src/place/builtin.store.ts');
@@ -65,8 +65,8 @@ const ONE_STEP = (() => {
 const aFinished = async (repo = aRepo(), work = 'fix.ts') => {
   const e = engineOf(engine().layer);
   const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: ONE_STEP }));
-  await runWith(e, advanceRun(readRun(run.id)));
-  const wt = readRun(run.id).steps.implement.workspace!;
+  await runWith(e, advanceRun(runRecord(run.id)));
+  const wt = runRecord(run.id).steps.implement.workspace!;
   fs.writeFileSync(path.join(wt, work), 'export const fixed = true;\n');
   git(wt, 'add', '-A');
   git(wt, 'commit', '-q', '-m', `add ${work}`);
@@ -81,8 +81,8 @@ const aFinished = async (repo = aRepo(), work = 'fix.ts') => {
   if (!fs.existsSync(path.join(wt, 'node_modules', 'big', 'index.js')))
     fs.linkSync(path.join(repo, 'node_modules', 'big', 'index.js'), path.join(wt, 'node_modules', 'big', 'index.js'));
   engine().settle(`${run.id}-implement`, 'succeeded', { closeout: { outcome: 'done', summary: 'did it', artifacts: [], needs: null } });
-  await runWith(e, advanceRun(readRun(run.id)));
-  git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', readRun(run.id).steps.implement.branch!);
+  await runWith(e, advanceRun(runRecord(run.id)));
+  git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', runRecord(run.id).steps.implement.branch!);
   return { e, run, repo, wt, outside };
 };
 

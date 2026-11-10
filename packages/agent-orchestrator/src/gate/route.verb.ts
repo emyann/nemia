@@ -14,7 +14,7 @@ import { RunId } from '../record/record.model.ts';
 import { asksDir } from '../record/record.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
-import { routeAsk } from '../status/status.ts';
+import { routeAsk } from '../route/index.ts';
 import { writerText as textOf } from '../yours/yours.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
 

@@ -16,7 +16,8 @@ import { Effect } from 'effect';
 import { type Run as RunObject, type RunList, type RunState, type RunUnjudged } from 'objects';
 import type { Run } from '../run.ts';
 import type { Engine } from '../runtime-client.ts';
-import { finishedAtOf, kindOf, selectedRuns } from '../runlist/runlist.ts';
+import { finishedAtOf, kindOf } from '../run-state/run-state.ts';
+import { selectedRuns } from '../labels/labels.ts';
 import { framed, framePartsOf, unjudgedStateOf } from '../runlist/runlist.verb.ts';
 import { storeRunsListed, summaryOf, type SummaryHow } from '../summary/summary.verb.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
@@ -165,7 +166,7 @@ const objectsOf = (e: Engine, { home, memo }: SummaryHow, reads: RunReads, verif
           if (!isDeepStrictEqual(withDiskParts(kept, parts), fresh.answer))
             return yield* Effect.die(
               new Error(
-                `The informer served ${run.id}'s listed object differently from one built afresh (WF_VERIFY_REST): something it was built on is not watched — put it into what the informer checks, or into the parts read on every request (diskPartsOf).`,
+                `The informer served ${run.id}'s listed object differently from one built afresh (WF_VERIFY_REST): something it was built on is not watched — name it in RUN_INPUTS (src/rest/rest.ts) with what watches it, and give it to that watch.`,
               ),
             );
         }

@@ -5,7 +5,7 @@
  *
  * The root test below types `factory servers default`, and the factory is `default` on purpose. A `factory servers` read is two reads:
  * the factory's own existence (`factoryThere`), and its record. The record is read under the root the handler is given (`rootGiven`,
- * which is what that test pins); the existence check returns early for `DEFAULT_FACTORY` and otherwise calls `readFactories()`, whose
+ * which is what that test pins); the existence check returns early for `DEFAULT_NAMESPACE` and otherwise calls `readFactories()`, whose
  * `factoriesDir()` still reads the module-level root `factory.store.ts` pinned as it loaded. So any other name would fail there and not
  * at the read — `factory.store.ts` is unconverted, carries the most lines of `test/global-roots.baseline.ts` and is the next card's
  * work, the baseline only shrinking. `default` is the one name where the two roots cannot differ, so it isolates the read.
@@ -26,7 +26,7 @@ const stand = eachTest(testPlace);
 const { advanceRun, CLI, TABLE, startRun, runWith: runEngine } = await import('../runner.ts');
 const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
-const { readRun } = await import('../record/record.store.ts');
+const { runRecord } = await import('../record/record.store.ts');
 const { aliased, main, VERBS } = await import('./main.ts');
 const { HELP, WF_HINT } = await import('./flags.ts');
 const { offLine } = await import('../demand/demand.ts');
@@ -220,21 +220,21 @@ test('nemia cancel: a run with a step in flight, the same run again, and a run a
   const b = board();
   const repo = aRepo();
   const run = await runPlaced(startRun({ brief: 'still going', repo, workflowDir: oneStep() }));
-  await runWith(b.e, advanceRun(readRun(run.id)));
+  await runWith(b.e, advanceRun(runRecord(run.id)));
   assert.deepEqual(await typed(t, b.e, 'cancel', run.id), {
     out: [`${run.id}  cancelled`, `   asked to stop: implement  (the engine stops it on its next tick)`],
     err: [offLine(ROOT)],
   });
-  const at = readRun(run.id).cancelledAt;
+  const at = runRecord(run.id).cancelledAt;
   assert.deepEqual(await typed(t, b.e, 'cancel', run.id), {
     out: [`${run.id}  already cancelled at ${at}`, `   asked to stop: implement  (the engine stops it on its next tick)`],
     err: [offLine(ROOT)],
   });
 
   const done = await runPlaced(startRun({ brief: 'done', repo, workflowDir: oneStep() }));
-  await runWith(b.e, advanceRun(readRun(done.id)));
+  await runWith(b.e, advanceRun(runRecord(done.id)));
   b.settle(`${done.id}-implement`, 'succeeded', SIGNED);
-  await runWith(b.e, advanceRun(readRun(done.id)));
+  await runWith(b.e, advanceRun(runRecord(done.id)));
   assert.deepEqual(await typed(t, b.e, 'cancel', done.id), {
     out: [`${done.id}  already succeeded — nothing to stop`],
     err: [offLine(ROOT)],
@@ -257,7 +257,7 @@ test('nemia show --raw prints the record as JSON, the brief and each step body c
   const { out, err } = await typed(t, b.e, 'show', run.id, '--raw');
   assert.deepEqual(err, []);
   assert.equal(out.length, 1);
-  const record = readRun(run.id);
+  const record = runRecord(run.id);
   const workflow = record.workflow?.map(({ body, ...keys }) => ({ ...keys, body: `${body.slice(0, 60)}…` }));
   assert.equal(out[0], JSON.stringify({ ...record, brief: `${brief.slice(0, 120)}…`, workflow }, null, 2));
   assert.equal((JSON.parse(out[0]) as { workflow: { body: string }[] }).workflow[0].body, 'implement it…');
@@ -267,7 +267,7 @@ test('nemia logs: a step that has not run, and the output of one that has, from 
   const b = board();
   const run = await runPlaced(startRun({ brief: 'go', repo: aRepo(), workflowDir: oneStep() }));
   assert.deepEqual(await typed(t, b.e, 'logs', run.id, 'implement'), { out: ['implement has not run yet'], err: [] });
-  await runWith(b.e, advanceRun(readRun(run.id)));
+  await runWith(b.e, advanceRun(runRecord(run.id)));
   assert.deepEqual(await typed(t, b.e, 'logs', run.id, 'implement'), { out: [`the output of ${run.id}-implement`], err: [] });
   assert.deepEqual(
     await typed(t, b.e, 'logs', run.id, 'deploy'),
@@ -305,7 +305,7 @@ test('REFUSED at shipped defaults, through main: a word or a flag where a verb t
         return true;
       }),
     );
-  await t.test('nothing cancelled', () => assert.equal(readRun(run.id).cancelledAt, undefined));
+  await t.test('nothing cancelled', () => assert.equal(runRecord(run.id).cancelledAt, undefined));
 });
 
 test('nemia inbox --help, nemia factory --help and nemia start --help print their own help', async (t) => {
@@ -321,15 +321,15 @@ test('nemia inbox --help, nemia factory --help and nemia start --help print thei
 test('nemia approve of a loop out of rounds: what it accepted, and the file it wrote', async (t) => {
   const b = board();
   const loop = await runPlaced(startRun({ brief: 'a loop', repo: aRepo(), workflowDir: looping() }));
-  await runWith(b.e, advanceRun(readRun(loop.id)));
+  await runWith(b.e, advanceRun(runRecord(loop.id)));
   b.settle(`${loop.id}-implement`, 'succeeded', SIGNED);
-  await runWith(b.e, advanceRun(readRun(loop.id)));
+  await runWith(b.e, advanceRun(runRecord(loop.id)));
   b.settle(`${loop.id}-review`, 'succeeded', { ...SIGNED, again: true });
-  await runWith(b.e, advanceRun(readRun(loop.id)));
-  b.settle(readRun(loop.id).steps.implement.taskId!, 'succeeded', SIGNED);
-  await runWith(b.e, advanceRun(readRun(loop.id)));
-  b.settle(readRun(loop.id).steps.review.taskId!, 'succeeded', { ...SIGNED, again: true });
-  await runWith(b.e, advanceRun(readRun(loop.id)));
+  await runWith(b.e, advanceRun(runRecord(loop.id)));
+  b.settle(runRecord(loop.id).steps.implement.taskId!, 'succeeded', SIGNED);
+  await runWith(b.e, advanceRun(runRecord(loop.id)));
+  b.settle(runRecord(loop.id).steps.review.taskId!, 'succeeded', { ...SIGNED, again: true });
+  await runWith(b.e, advanceRun(runRecord(loop.id)));
   const { out, err } = await typed(t, b.e, 'approve', loop.id, '--message', 'as it stands');
   assert.deepEqual(err, [offLine(ROOT)]);
   assert.equal(out.length, 2, out.join('\n'));

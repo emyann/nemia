@@ -10,7 +10,7 @@ import { admissionOrder, heldRuns, slotNeed, type RunSlot } from './cap.ts';
 import { runTasks, type Run } from '../record/record.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { assess } from '../tick/assess.ts';
-import { runStore } from '../record/files.store.ts';
+import { runsAtOnce } from '../runs/runs.store.ts';
 import { unloadedFolder } from '../steps/steps.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { lastCeilings } from '../daemon/daemon.store.ts';
@@ -115,7 +115,7 @@ export const slotsOf = Effect.fn('slotsOf')(function* (
 });
 
 /** Every run in the store, a run `given` names answered by the record it holds rather than read again: `slotsRead`'s listing. */
-export const storeRunsGiven = (given?: (id: string) => Run | undefined): Run[] => runStore.runs.list(undefined, given);
+export const storeRunsGiven = (given?: (id: string) => Run | undefined): Run[] => runsAtOnce.runs.list(undefined, given);
 
 /**
  * The runs the cap on runs in flight holds now, each with the count it is held at (`slotsOf`'s `held`). None, and nothing read, with no

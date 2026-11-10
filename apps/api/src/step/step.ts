@@ -9,22 +9,11 @@
  */
 import path from 'node:path';
 import { Effect } from 'effect';
-import {
-  AGENTS,
-  AgentDoor,
-  DEFAULT_FACTORY,
-  fillsOf,
-  hireRefusalOf,
-  keptRuns,
-  Missing,
-  readFactories,
-  SkillDoor,
-  WORKFLOWS_STEP,
-} from 'agent-orchestrator';
+import { AGENTS, AgentDoor, fillsOf, hireRefusalOf, keptRuns, Missing, readFactories, SkillDoor, WORKFLOWS_STEP } from 'agent-orchestrator';
 import type { AgentReading, Factory, FactoryListing } from 'agent-orchestrator';
 import { toldLayers, type Run, type ToldLayers } from 'agent-orchestrator/run';
 import type { SkillsFound, Workflow } from 'agent-orchestrator/workflow';
-import type { WorkflowStepPage } from 'objects';
+import { DEFAULT_NAMESPACE, type WorkflowStepPage } from 'objects';
 import { foundInOf, sourceOf, type SkillSource } from '../skills/skills.ts';
 import type { Served } from '../layer.ts';
 import { agentSkillsOf, keyRows, placesOf, stepSourceOf, type WorkflowSource } from '../workflows/workflows.ts';
@@ -61,7 +50,7 @@ export type Hiring = { refused: string | null; agents: HireableAgent[] };
 export type RecentRun = { id: string; brief: string; createdAt: string; factory: string | null; filed: boolean };
 
 /** The factory a record or a summary names, null for the default factory, whether it names `default` or none. */
-const factoryNamed = (factory: string | null | undefined): string | null => (factory && factory !== DEFAULT_FACTORY ? factory : null);
+const factoryNamed = (factory: string | null | undefined): string | null => (factory && factory !== DEFAULT_NAMESPACE ? factory : null);
 
 /**
  * The address of the page of the workflow `run` was started from, on the api serving `served` with the store at `home`, or null where the

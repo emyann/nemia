@@ -6,7 +6,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { durationWord } from '../status/status.ts';
+import { durationWord } from '../usage/usage.ts';
 import type { Workflow } from '../step/step.ts';
 import { run, step } from '../../test/assessed.ts';
 import { firstFiledAt, runStartedAt, timeline, timelineLines, timelineTotalLines, type TaskClock } from './timeline.ts';

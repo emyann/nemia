@@ -30,7 +30,7 @@ const ROOT = scratch('wf-a2a-agents-');
 process.env.WF_ROOT = ROOT;
 const { advanceRun, remoteAgents, startRun, runWith: runEngine } = await import('../runner.ts');
 const { engineOf } = await import('../runtime-client.ts');
-const { readRun } = await import('../record/record.store.ts');
+const { runRecord } = await import('../record/record.store.ts');
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, () => stand().layer);
@@ -527,12 +527,12 @@ test('the tick files a remote step with no harness arguments, schema, hold or se
     fs.writeFileSync(input, 'hour,height\n');
     const run = await runPlaced(startRun({ brief: 'a note on tides', repo: HERE, workflowDir: dir, inputs: [input] }));
     const { e, tasks, settle } = board();
-    await runWith(e, advanceRun(readRun(run.id)));
+    await runWith(e, advanceRun(runRecord(run.id)));
     const draft = tasks.get(`${run.id}-draft`)!.spec;
     assert.ok('config' in draft && 'closeoutSchema' in draft, 'a local step is filed as it always was');
 
     settle(`${run.id}-draft`, 'succeeded', { outcome: 'done', summary: 'drafted', artifacts: [], needs: null });
-    await runWith(e, advanceRun(readRun(run.id)));
+    await runWith(e, advanceRun(runRecord(run.id)));
     const ask = tasks.get(`${run.id}-ask`)?.spec;
     assert.ok(ask, `signed off, the draft lets the remote step be filed: ${[...tasks.keys()].join(', ')}`);
     assert.equal(ask.harness, 'a2a:reviewer');

@@ -27,9 +27,9 @@ import {
   spentWord,
   standing,
   stepSpend,
-  budgetWord,
-  durationWord,
 } from '../status/status.ts';
+import { budgetWord } from '../money/money.ts';
+import { durationWord } from '../usage/usage.ts';
 import { acceptedNote, exhaustedNote, heldLater, heldNote, roundDueNote } from '../round/round.ts';
 import { saidWord } from '../say/say.ts';
 import { askedQuestions } from '../question/index.ts';

@@ -32,7 +32,7 @@ function tableRead(
 /**
  * The route a condition answered on the try it is on, and who said it — or `unsigned`, a table with no row for its producer's fact, or
  * `undefined` while nothing has answered. A person's word first (`nemia route`, its file composed onto the record as `by: 'person'` by
- * `readRun`), then what the record holds for the try (`StepRecord.route`, which the tick copies once), then, for a table, the producer's
+ * `runRecord`), then what the record holds for the try (`StepRecord.route`, which the tick copies once), then, for a table, the producer's
  * signed closeout looked up in it (`tableRoute`), and for a judge or a script its own signed closeout's `route` (a script's answer file is
  * read as its closeout, `scriptCloseouts` in route.store.ts). Pure.
  *
@@ -107,7 +107,7 @@ function routedWord(
   return hasGate(step, run) && !approvalOf(run, step.name) ? 'awaiting approval' : 'unverified';
 }
 
-/** Whether a person routed the condition for the try it is on (`nemia route`, laid on its record by `readRun`) with a route it has. */
+/** Whether a person routed the condition for the try it is on (`nemia route`, laid on its record by `runRecord`) with a route it has. */
 export const personRouted = (step: Workflow, run: Run): boolean => {
   const kept = run.steps[step.name]?.route;
   return kept?.by === 'person' && kept.try === tryOf(run, step.name) && (step.routes ?? []).includes(kept.route);

@@ -17,7 +17,7 @@ delete process.env.WF_MAX_RUNS;
 const BIN = scratch('wf-tally-start-bin-');
 for (const name of ['claude', 'codex']) fs.writeFileSync(path.join(BIN, name), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
 process.env.PATH = `${BIN}${path.delimiter}${process.env.PATH}`;
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
 
 /** A folder of one step `triage`, closing out the issues it sorted, that declares `tally`. */
@@ -83,6 +83,6 @@ test('nemia start of a step that declares a tally: refused where its closeout ca
 
   await t.test('a tally its closeout holds is frozen with the step on the run record', async () => {
     const id = await started(triage('held', 'issues, issues.open'));
-    assert.deepEqual(readRun(id).workflow?.find((s) => s.name === 'triage')?.tally, ['issues', 'issues.open']);
+    assert.deepEqual(runRecord(id).workflow?.find((s) => s.name === 'triage')?.tally, ['issues', 'issues.open']);
   });
 });

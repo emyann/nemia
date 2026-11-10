@@ -30,7 +30,7 @@ export type Cancelled = { run: Run; plan: CancelPlan };
  * refuses is the next pass's to make again.
  *
  * Never writes the run's json: a tick may be halfway through a pass over the same run. The cancellation goes in a file only this verb
- * writes (`runStore.runs.cancel`), and `advanceRun` enforces it on every pass, which also covers a step filed after the stop list was
+ * writes (the Run door's `runs.cancel`), and `advanceRun` enforces it on every pass, which also covers a step filed after the stop list was
  * taken. A task the engine's record says was asked to stop is not asked again, and a stop it refuses — the task settled, or was asked to
  * stop, since the read — is nothing left to do (`stopAsked`). Fails with a refusal a read threw; dies of anything else, any other failure
  * of the engine included (`tried`, `awaited`).

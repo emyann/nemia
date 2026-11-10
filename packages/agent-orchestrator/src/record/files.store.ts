@@ -1,8 +1,8 @@
 /**
  * The run store on files under `WF_ROOT`: `filesStore`, the only implementation of `RunStore`, made of the functions of
  * `record.store.ts` and of a person's writes beside them here, and the path of the inbox (`inboxDir`), whose cards are the Card door's
- * (`src/cards/cards.store.ts`); the claims of the cards started (`claimCard`); and `runStore`, the one binding every controller reads it
- * through, where another implementation would be swapped in.
+ * (`src/cards/cards.store.ts`); and the claims of the cards started (`claimCard`). The Run door (`src/runs/runs.store.ts`) is the one
+ * file of src that reads and writes a run through `filesStore`: every other reads the door (`test/run-store.test.ts`).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -38,7 +38,7 @@ import {
   readPruned,
   readAs,
   readAsks,
-  readRun,
+  runRecord,
   removeHold,
   restStamps,
   rewriteRun,
@@ -270,7 +270,7 @@ export function writeLabels(id: string, labels: Labels): void {
   writeWhole(labelsFile(id), JSON.stringify(labels, null, 2));
 }
 
-/** The run as its record reads (`readRun`), with its labels composed onto it, and whatever the record carried under `labels` dropped. */
+/** The run as its record reads (`runRecord`), with its labels composed onto it, and whatever the record carried under `labels` dropped. */
 function labelled(run: Run): Run {
   const labels = readLabels(run.id);
   const { labels: _, ...bare } = run;
@@ -411,7 +411,7 @@ function paused(run: Run, pause: Pause | null = readPause()): Run {
  */
 function runListed(id: string, said: (line: string) => void, pause: Pause | null): Run | undefined {
   try {
-    return paused(labelled(readRun(id)), pause);
+    return paused(labelled(runRecord(id)), pause);
   } catch (err) {
     if (err instanceof UnreadableRecord) said(`left out: ${err.message}`);
     else if (fs.existsSync(runFile(id))) throw err;
@@ -490,7 +490,7 @@ export function claimCard(card: string, id: string): { taken: true } | { by: str
  */
 export const filesStore: RunStore = {
   runs: {
-    read: (id) => paused(labelled(readRun(id))),
+    read: (id) => paused(labelled(runRecord(id))),
     find: findRun,
     list: (said, kept) => {
       const pause = readPause();
@@ -525,9 +525,6 @@ export const filesStore: RunStore = {
   },
 };
 
-/** The run store every controller reads and writes through. */
-export const runStore: RunStore = filesStore;
-
 /**
  * Every run of the store as `project` reads it, off `memo` where one is handed in (`keptRecords`): the store stamped before any record
  * is read, each run whose stamp stands answered from memory, and each other read by id. With no memo — the command line's reads, and a
@@ -541,5 +538,5 @@ export const keptRuns = <P>(memo: RecordMemo<P> | undefined, project: (run: Run)
   const listed = new Set(runIds());
   const pause = readPause();
   const find = (id: string) => (listed.has(id) ? runListed(id, sayOnce, pause) : undefined);
-  return keptRecords(memo, { stamps: runStore.runs.stamps(), find, verify: verifiesRest(env) }, project);
+  return keptRecords(memo, { stamps: filesStore.runs.stamps(), find, verify: verifiesRest(env) }, project);
 };

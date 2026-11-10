@@ -14,17 +14,17 @@
  * beneath the rest — so no cycle forms among them (`test/boundary.test.ts`).
  *
  * What of the I/O never names the engine sits beneath the controllers, and this file re-exports what it exported of them:
- * `record.store.ts` (a run's id, its files' names, a step's check stderr, artifacts and inputs), `files.store.ts` (the run store a run's
- * record and a person's files beside it are read and written through, `runStore`, and the inbox's folder, `inboxDir`),
- * `daemon.store.ts` (`tick.json` and who ticks the store), `feed.store.ts` (the feed's file), `worktree.store.ts` (git, a step's worktree,
- * its `node_modules`, the hand-off commit), `branches.store.ts` (what git says of a run's result branches), `artifacts.store.ts` (the
- * files a step hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written), `agents/read.store.ts` and
- * `skills/read.store.ts` (the agents and the skills a folder's steps may name, read), `lookup.store.ts` (the workflow folders a place
- * holds), `agents.store.ts`, `roster.store.ts`, `fills.store.ts`, `try.store.ts`, `custom.store.ts` and `skills.store.ts` (an agent, the
- * agents of both places read, the steps each fills, an agent's try folder written, a person's custom instructions for one, and a skill
- * read and written), `place.store.ts` (a place skill's verbs run and heard), `plan.store.ts` (a plan folder read), `inbox.store.ts` (the
- * inbox's cards filed, queued and dropped), `factory.store.ts` (the factories, `factoriesDir`), `config.store.ts` (the `WF_`
- * environment) and `root.store.ts` (the store's root as the service a program is given, `StoreRoot`)
+ * `record.store.ts` (a run's id, its files' names, a step's check stderr, artifacts and inputs), `files.store.ts` (the inbox's folder,
+ * `inboxDir`), the Run door's synchronous face (`runsAtOnce`, `runs.store.ts`), which a run's record and a person's files beside it are
+ * read and written through, `daemon.store.ts` (`tick.json` and who ticks the store), `feed.store.ts` (the feed's file), `worktree.store.ts`
+ * (git, a step's worktree, its `node_modules`, the hand-off commit), `branches.store.ts` (what git says of a run's result branches),
+ * `artifacts.store.ts` (the files a step hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written),
+ * `agents/read.store.ts` and `skills/read.store.ts` (the agents and the skills a folder's steps may name, read), `lookup.store.ts` (the
+ * workflow folders a place holds), `agents.store.ts`, `roster.store.ts`, `fills.store.ts`, `try.store.ts`, `custom.store.ts` and
+ * `skills.store.ts` (an agent, the agents of both places read, the steps each fills, an agent's try folder written, a person's custom
+ * instructions for one, and a skill read and written), `place.store.ts` (a place skill's verbs run and heard), `plan.store.ts` (a plan
+ * folder read), `inbox.store.ts` (the inbox's cards filed, queued and dropped), `factory.store.ts` (the factories, `factoriesDir`),
+ * `config.store.ts` (the `WF_` environment) and `root.store.ts` (the store's root as the service a program is given, `StoreRoot`)
  * and `telemetry.store.ts` (what a daemon's process logs and exports, `telemetryLayer`). They import neither the runtime nor a controller,
  * and load as a tree: the bottom, beneath `record.store.ts`, beneath `worktree.store.ts` and `write.store.ts`, beneath the rest, so no
  * cycle can form (`test/boundary.test.ts`).
@@ -49,7 +49,8 @@ export {
   parseGlobs,
   touchedLines,
 } from './branches/index.ts';
-export { budgetWord, dollars, peakMark, readWords, rebuiltCache, sumUsage, usedLines } from './status/status.ts';
+export { budgetWord, dollars } from './money/money.ts';
+export { peakMark, readWords, rebuiltCache, sumUsage, usedLines } from './usage/usage.ts';
 export { answerIn, deniedWords, harnessWaitLine, isRepositoryRun, placeOf, waitingWords } from './run.ts';
 /**
  * The name the engine gives a task's session, which is the name `claude agents` lists it under: what a person is told to look for when
@@ -177,7 +178,6 @@ export {
 } from './inbox/index.ts';
 export type { CardRun, CardState, InboxListing, QueueStarted, MissedStart } from './inbox/index.ts';
 export {
-  DEFAULT_FACTORY,
   factoryLines,
   factoryNameRefusal,
   factoryRepo,
@@ -244,7 +244,10 @@ export {
 export type { DaemonFile, DaemonStanding, Identity, Liveness } from './daemon/daemon.ts';
 export { HOME, acceptFile, approvalFile, artifactsDir, askFile, inputsDir, roundAskFile, runId } from './record/record.store.ts';
 export { stepsOf } from './steps/steps.verb.ts';
-export { inboxDir, keptRuns, runStore } from './record/files.store.ts';
+export { inboxDir, keptRuns } from './record/files.store.ts';
+export { runsAtOnce } from './runs/runs.store.ts';
+/** The entry's former name of the Run door's synchronous face, kept for the e2e's world (apps/web) until it reads `runsAtOnce`. */
+export { runsAtOnce as runStore } from './runs/runs.store.ts';
 export { type RunStore, lackedOf } from './record/record.ts';
 export { alive } from './process/alive.store.ts';
 export {

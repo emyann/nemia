@@ -66,6 +66,19 @@ export const unloadedOf = (run: Run): Effect.Effect<string | undefined, Refusal>
   );
 
 /**
+ * The run's steps (`stepsOf`), or why its unfrozen folder does not load (`unloaded`, `UnloadedFolder`'s own words): for a reader that
+ * goes on without the steps and says why. Fails any other refusal, so a read given no store root is refused, never read as no steps.
+ */
+export const stepsOrWhy = (run: Run): Effect.Effect<{ steps: Workflow[] } | { unloaded: string }, Refusal> =>
+  stepsOf(run).pipe(
+    Effect.map((steps) => ({ steps })),
+    Effect.catchIf(
+      (err) => err instanceof UnloadedFolder,
+      (err) => Effect.succeed({ unloaded: err.why }),
+    ),
+  );
+
+/**
  * The run's steps (`stepsOf`), or none for a run whose folder does not load (`UnloadedFolder`): for a read that judges nothing of the
  * run, as a pause's finishing tasks and held checks are. Fails any other refusal.
  */

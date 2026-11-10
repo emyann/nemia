@@ -35,7 +35,7 @@ const { startRun } = await import('../src/runner.ts');
 const runPlaced = runGiven(() => stand().layer);
 const { tickRun } = await import('../src/tick/tick.verb.ts');
 const { EngineService, engineOf } = await import('../src/runtime-client.ts');
-const { runStore } = await import('../src/record/files.store.ts');
+const { filesStore: runStore } = await import('../src/record/files.store.ts');
 
 const REPO = fs.mkdtempSync(path.join(ROOT, 'repo-'));
 stand().world.repository(REPO, {});

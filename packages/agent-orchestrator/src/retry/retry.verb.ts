@@ -15,7 +15,7 @@ import { filedAt, toldOf, type StepTold } from '../tick/told.verb.ts';
 import type { Workflow } from '../workflow.ts';
 import { retryable, retryRefusal, type RetryAsk, type RetryHow } from './index.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
-import { runStore } from '../record/files.store.ts';
+import { runsAtOnce } from '../runs/runs.store.ts';
 import { strayAsk } from '../say/say.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { Conflict, Invalid } from '../refusal/refusal.ts';
@@ -99,7 +99,7 @@ export const retryRun = Effect.fn('retry')(function* (
     const { stray } = written;
     const why = yield* tried(
       () =>
-        refusal(runStore.asks.read(id).asks) ??
+        refusal(runsAtOnce.asks.read(id).asks) ??
         strayAsk(file, stray, `try ${ask.try} of ${stepName}`, `nemia retry ${id} ${stepName}`) ??
         `try ${ask.try} of ${stepName} is already asked for. Wait for it: nemia ls ${id}.`,
     );

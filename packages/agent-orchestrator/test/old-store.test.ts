@@ -1,6 +1,6 @@
 /**
  * The oldest store still read, as one story on the stage (`story.ts`): `test/fixtures/old-store/` is a store as earlier ticks left it, its
- * runs in the oldest shapes `readRun` still reads. The story copies it into a scratch store, `@ROOT@` and `@BASE@` in its records made
+ * runs in the oldest shapes `runRecord` still reads. The story copies it into a scratch store, `@ROOT@` and `@BASE@` in its records made
  * that store's root and its repository's first commit, and never writes the fixture; then it walks the copy through a pass, `nemia ls`,
  * `nemia decide` and `nemia rm`, and reads each record back under the names its keys have now.
  *
@@ -33,7 +33,7 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 const { runWith, tickRun } = await import('../src/runner.ts');
-const { listRuns, readRun, rewriteRun, runFile } = await import('../src/record/record.store.ts');
+const { listRuns, runRecord, rewriteRun, runFile } = await import('../src/record/record.store.ts');
 const { ownDenies } = await import('../src/workflow/index.ts');
 const { stepPlace } = await import('../src/workflow.ts');
 const { renderedFlags } = await import('../src/agents/agents.ts');
@@ -91,7 +91,7 @@ test('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `nemi
     fs.mkdirSync(path.join(ROOT, 'desk'), { recursive: true });
     copied(stage.place().world.repository(repo, {}));
 
-    const [implement, review, ship] = readRun('tides').workflow!;
+    const [implement, review, ship] = runRecord('tides').workflow!;
     assert.deepEqual(
       [implement.disallowedTools, implement.allowedTools, implement.agent?.keys],
       [
@@ -125,7 +125,7 @@ test('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `nemi
       '`workspace: main` reads as `base`; `background:` still decodes',
     );
 
-    const notes = readRun('notes');
+    const notes = runRecord('notes');
     assert.equal(notes.workflow, undefined, 'a record with no frozen workflow reads');
     const tries = notes.steps.implement.tries!;
     assert.deepEqual(
@@ -138,7 +138,7 @@ test('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `nemi
       ['notes-implement-try2-check', 'fed789'],
     );
 
-    const [write] = readRun('drafts').workflow!;
+    const [write] = runRecord('drafts').workflow!;
     assert.deepEqual(
       [write.place, write.workspace, write.agent?.keys, write.disallowedTools, write.agent?.given],
       ['folder', undefined, ['place', 'disallowedTools'], ['SendMessage'], { disallowedTools: 'SendMessage' }],
@@ -158,7 +158,7 @@ test('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `nemi
 
     const listed = listRuns(() => assert.fail('the old store lists every run'));
     for (const id of ['tides', 'notes', 'drafts'])
-      assert.deepEqual(listed.find((r) => r.id === id)?.workflow, readRun(id).workflow, `${id} is listed as the tick reads it`);
+      assert.deepEqual(listed.find((r) => r.id === id)?.workflow, runRecord(id).workflow, `${id} is listed as the tick reads it`);
   });
 
   await s.test('a pass judges every run and files what is due, each step with its rules under the names they have now', async () => {
@@ -219,7 +219,7 @@ test('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `nemi
     assert.deepEqual([write.place, holdsAny(write, 'workspace', 'disallow')], ['folder', false]);
     assert.deepEqual([drafts.fromANewerNemia, write.aNewStepKey], [{ kept: true }, 3], 'a key the tick does not name survives its write');
 
-    assert.ok(rewriteRun(readRun('notes')), 'the run that froze no workflow, read and written back');
+    assert.ok(rewriteRun(runRecord('notes')), 'the run that froze no workflow, read and written back');
     const [first, second] = (written('notes').steps as { implement: { tries: object[] } }).implement.tries;
     assert.deepEqual([Reflect.get(first, 'cause'), holdsAny(first, 'then'), Reflect.get(second, 'cause')], ['retries', false, 'continue']);
     assert.equal(fs.readFileSync(path.join(FIXTURE, 'runs', 'tides.json'), 'utf8'), fixtureBytes, 'the fixture is not written');
@@ -251,12 +251,12 @@ test('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `nemi
     async (c) => {
       const dir = path.join(ROOT, 'workflows', 'renamed');
       const said = await printed(c, ['start', 'write it', '--workflows', dir, '--repo', path.join(ROOT, 'repo'), '--no-worktree']);
-      const write = readRun(said[0].split(' ')[0]).workflow!.find((step) => step.name === 'write')!;
+      const write = runRecord(said[0].split(' ')[0]).workflow!.find((step) => step.name === 'write')!;
       assert.deepEqual([write.disallowedTools, write.allowedTools], [['SendMessage'], ['Edit(**)']], 'the run started, its lists read');
       const text = said.join('\n');
       assert.ok(text.includes(`${path.join(dir, 'write.md')}: \`disallow:\` is read as \`disallowedTools:\``), text);
       assert.ok(text.includes(`${path.join(ROOT, 'workflows', 'agents', 'writer.md')}: \`allow:\` is read as \`allowedTools:\``), text);
-      const run = readRun(said[0].split(' ')[0]);
+      const run = runRecord(said[0].split(' ')[0]);
       assert.equal(holdsAny(written(run.id).workflow[0], 'disallow', 'allow'), false, '`nemia start` writes no former name');
       await stage.runWith(b.e, tickRun({ repo: ROOT }));
       assert.equal(holdsAny(written(run.id).workflow[0], 'disallow', 'allow'), false, 'nor does the pass after it');

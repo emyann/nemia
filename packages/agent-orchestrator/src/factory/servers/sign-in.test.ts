@@ -17,7 +17,7 @@ const { engineOf, runWith } = await import('../../runtime-client.ts');
 const { serverSignIn, serverSignInState, serverSignOut } = await import('./sign-in.verb.ts');
 const { writeFactoryServers } = await import('./servers.store.ts');
 const { SHIPPED_CLIENT_SECRETS, shippedSecretOf } = await import('./clients.ts');
-const { DEFAULT_FACTORY } = await import('../factory.ts');
+const { DEFAULT_NAMESPACE } = await import('../factory.ts');
 
 const NEMIA = 'Iv23liQBfm9prqhvXkuY';
 const GITHUB = {
@@ -44,35 +44,35 @@ test("Nemia's own client is shipped with a secret, and a client Nemia does not s
 
 test('a sign-in to the shipped server hands the engine its secret; the same server under a foreign client hands none', async () => {
   const engine = testEngine();
-  writeFactoryServers(ROOT, DEFAULT_FACTORY, {
+  writeFactoryServers(ROOT, DEFAULT_NAMESPACE, {
     github: GITHUB,
     other: { ...GITHUB, oauth: { clientId: 'Iv23liForeign', callbackPort: 8792 } },
   });
-  const started = await runWith(engineOf(engine.layer), serverSignIn(DEFAULT_FACTORY, 'github', ROOT));
+  const started = await runWith(engineOf(engine.layer), serverSignIn(DEFAULT_NAMESPACE, 'github', ROOT));
   assert.match(started.authUrl, /client_id=Iv23liQBfm9prqhvXkuY/);
-  await runWith(engineOf(engine.layer), serverSignIn(DEFAULT_FACTORY, 'other', ROOT));
+  await runWith(engineOf(engine.layer), serverSignIn(DEFAULT_NAMESPACE, 'other', ROOT));
   assert.deepEqual(engine.signIns, [
     { name: 'github', secret: true },
     { name: 'other', secret: false },
   ]);
   assert.equal(JSON.stringify(started).includes(SHIPPED_CLIENT_SECRETS[NEMIA]), false, 'no answer carries the secret');
-  const state = await runWith(engineOf(engine.layer), serverSignInState(DEFAULT_FACTORY, 'github', ROOT));
+  const state = await runWith(engineOf(engine.layer), serverSignInState(DEFAULT_NAMESPACE, 'github', ROOT));
   assert.equal(state.state, 'waiting');
 });
 
 test('REFUSED: a server the record does not hold is Missing, and a port another sign-in waits on is a Conflict', async () => {
   const engine = testEngine();
-  writeFactoryServers(ROOT, DEFAULT_FACTORY, { github: GITHUB, twin: { ...GITHUB, url: 'https://twin.example/mcp' } });
-  const missing = await refusal(runWith(engineOf(engine.layer), serverSignIn(DEFAULT_FACTORY, 'gitlab', ROOT)));
+  writeFactoryServers(ROOT, DEFAULT_NAMESPACE, { github: GITHUB, twin: { ...GITHUB, url: 'https://twin.example/mcp' } });
+  const missing = await refusal(runWith(engineOf(engine.layer), serverSignIn(DEFAULT_NAMESPACE, 'gitlab', ROOT)));
   assert.equal(missing._tag, 'Missing');
   assert.match(missing.message, /records no server `gitlab`.*nemia factory server add/);
-  await runWith(engineOf(engine.layer), serverSignIn(DEFAULT_FACTORY, 'github', ROOT));
-  const held = await refusal(runWith(engineOf(engine.layer), serverSignIn(DEFAULT_FACTORY, 'twin', ROOT)));
+  await runWith(engineOf(engine.layer), serverSignIn(DEFAULT_NAMESPACE, 'github', ROOT));
+  const held = await refusal(runWith(engineOf(engine.layer), serverSignIn(DEFAULT_NAMESPACE, 'twin', ROOT)));
   assert.equal(held._tag, 'Conflict');
   const noClient = await refusal(
     (async () => {
-      writeFactoryServers(ROOT, DEFAULT_FACTORY, { docs: { type: 'http', url: 'https://docs.example/mcp' } });
-      return runWith(engineOf(engine.layer), serverSignIn(DEFAULT_FACTORY, 'docs', ROOT));
+      writeFactoryServers(ROOT, DEFAULT_NAMESPACE, { docs: { type: 'http', url: 'https://docs.example/mcp' } });
+      return runWith(engineOf(engine.layer), serverSignIn(DEFAULT_NAMESPACE, 'docs', ROOT));
     })(),
   );
   assert.equal(noClient._tag, 'Invalid', 'a server with no OAuth client signs in to nothing');
@@ -80,11 +80,11 @@ test('REFUSED: a server the record does not hold is Missing, and a port another 
 
 test('a sign-out asks the engine to clear the server, and is refused while its sign-in waits', async () => {
   const engine = testEngine();
-  writeFactoryServers(ROOT, DEFAULT_FACTORY, { github: GITHUB });
-  await runWith(engineOf(engine.layer), serverSignIn(DEFAULT_FACTORY, 'github', ROOT));
-  const waiting = await refusal(runWith(engineOf(engine.layer), serverSignOut(DEFAULT_FACTORY, 'github', ROOT)));
+  writeFactoryServers(ROOT, DEFAULT_NAMESPACE, { github: GITHUB });
+  await runWith(engineOf(engine.layer), serverSignIn(DEFAULT_NAMESPACE, 'github', ROOT));
+  const waiting = await refusal(runWith(engineOf(engine.layer), serverSignOut(DEFAULT_NAMESPACE, 'github', ROOT)));
   assert.equal(waiting._tag, 'Conflict');
   engine.settleSignIn('github', { state: 'connected' });
-  assert.deepEqual(await runWith(engineOf(engine.layer), serverSignOut(DEFAULT_FACTORY, 'github', ROOT)), { signedOut: true });
+  assert.deepEqual(await runWith(engineOf(engine.layer), serverSignOut(DEFAULT_NAMESPACE, 'github', ROOT)), { signedOut: true });
   assert.deepEqual(engine.signOuts, ['github']);
 });

@@ -25,7 +25,7 @@ delete process.env.WF_MAX_RUNS;
 const { advanceRun, prune, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { LINE_NAME } = await import('../src/run.ts');
 const { main } = await import('../src/cli/main.ts');
 
@@ -98,21 +98,21 @@ const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null 
 /** A run of `oneStep` in `repo`, its step filed, `fix.ts` committed on its branch and signed off: merged into main with `merged`. */
 const aDone = async (b: ReturnType<typeof board>, repo: string, { merged = false } = {}) => {
   const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: oneStep() }));
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  const wt = readRun(run.id).steps.implement.workspace!;
+  await runWith(b.e, advanceRun(runRecord(run.id)));
+  const wt = runRecord(run.id).steps.implement.workspace!;
   fs.writeFileSync(path.join(wt, `fix-${run.id}.ts`), 'export const fixed = true;\n');
   git(wt, 'add', '-A');
   git(wt, 'commit', '-q', '-m', 'add fix');
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  if (merged) git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', readRun(run.id).steps.implement.branch!);
+  await runWith(b.e, advanceRun(runRecord(run.id)));
+  if (merged) git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', runRecord(run.id).steps.implement.branch!);
   return run;
 };
 
 /** A run of `oneStep` in `repo`, its step filed and still running. */
 const aRunning = async (b: ReturnType<typeof board>, repo: string) => {
   const run = await runPlaced(startRun({ brief: 'still going', repo, workflowDir: oneStep() }));
-  await runWith(b.e, advanceRun(readRun(run.id)));
+  await runWith(b.e, advanceRun(runRecord(run.id)));
   return run;
 };
 
@@ -199,7 +199,7 @@ test('REFUSED at shipped defaults: a hold on a pruned run and on a folder run, a
   );
 
   const dropped = await aDone(b, repo);
-  git(repo, 'worktree', 'remove', '--force', readRun(dropped.id).steps.implement.workspace!);
+  git(repo, 'worktree', 'remove', '--force', runRecord(dropped.id).steps.implement.workspace!);
   git(repo, 'branch', '-q', '-D', `wf/${dropped.id}/${LINE_NAME}`);
   await refused(
     t,

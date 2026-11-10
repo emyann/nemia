@@ -97,8 +97,8 @@ function osUser(): string | undefined {
 /**
  * Lift a person's hold by hand — `nemia hold <run> --off`: the run goes on at the next tick, and what its steps asked while it was held is
  * asked again. Fails, before anything is written: an id that is not a run's (`Invalid`), a run not there (`Missing`), a run nobody holds,
- * and a hold lifted and put again since it was read, which is a person's newer word and stays (`runStore.holds.lift` takes only the hold
- * read, by its `at`) — each a `Conflict`; dies of anything else the store throws. Reads no engine, so it requires nothing.
+ * and a hold lifted and put again since it was read, which is a person's newer word and stays (the Run door's `holds.lift` takes only the
+ * hold read, by its `at`) — each a `Conflict`; dies of anything else the store throws. Reads no engine, so it requires nothing.
  */
 export const unhold = Effect.fn('unhold')(function* (id: string) {
   const bad = idRefusal(id, 'hold');

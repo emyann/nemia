@@ -31,7 +31,7 @@ delete process.env.WF_MAX_RUNS;
 const { advanceRun, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
-const { markCancelled, readRun } = await import('../src/record/record.store.ts');
+const { markCancelled, runRecord } = await import('../src/record/record.store.ts');
 
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
@@ -221,8 +221,8 @@ const aParent = async (
   }: { work?: string; signed?: boolean; workflowDir?: string; brief?: string } = {},
 ) => {
   const run = repositoryRunOf(await runPlaced(startRun({ brief, repo, workflowDir: workflowDir ?? oneStep() })));
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  const wt = readRun(run.id).steps.implement.workspace!;
+  await runWith(b.e, advanceRun(runRecord(run.id)));
+  const wt = runRecord(run.id).steps.implement.workspace!;
   if (work) {
     fs.writeFileSync(path.join(wt, work), `${work}\n`);
     gitIn(wt, 'add', '-A');
@@ -301,7 +301,7 @@ test("REFUSED at `nemia start`, before a run is written: --after an unknown run,
   const second = await aParent(repo, b, { work: 'second.txt' });
   await typed('--after', p.run.id, `--after=${second.run.id}`);
   const id = printed[0].split(' ')[0];
-  assert.deepEqual(readRun(id).after, [p.run.id, second.run.id], '--after is allowed as often as there are runs to wait on');
+  assert.deepEqual(runRecord(id).after, [p.run.id, second.run.id], '--after is allowed as often as there are runs to wait on');
   assert.match(
     printed.join('\n'),
     new RegExp(

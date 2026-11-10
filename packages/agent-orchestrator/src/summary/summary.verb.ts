@@ -12,10 +12,10 @@ import type { Engine } from '../runtime-client.ts';
 import { type AtWork, atWork, runStartedAt, type RunTokens, runTokens } from '../timeline/index.ts';
 import { UNREADABLE, unjudgedWord, type UnjudgedWord } from '../views/views.verb.ts';
 import { isRepositoryRun, type PlaceKind, placeOf, prunedWords, type Run } from '../record/record.ts';
-import { runStore } from '../record/files.store.ts';
+import { runsAtOnce } from '../runs/runs.store.ts';
 import type { Labels } from '../labels/labels.ts';
 import type { Selectors } from '../watch/selector.ts';
-import { runLabelMap, selectedRuns } from '../runlist/runlist.ts';
+import { runLabelMap, selectedRuns } from '../labels/labels.ts';
 import { prunedKept } from '../forget/prune/prune.ts';
 import { standingReader, standingSnapshot } from '../standing/standing.verb.ts';
 import { informedJudgements, type InformerMemo, informerRead } from '../rest/informer.verb.ts';
@@ -419,7 +419,7 @@ export type SummaryHow = {
 const listedThrough = Effect.fnUntraced(function* (e: Engine, memo: InformerMemo, verify: boolean) {
   const git = standingReader(yield* standingSnapshot());
   const read = yield* informerRead(e, memo, verify, git, sameJudgement);
-  const all = runStore.runs.list(undefined, read.given);
+  const all = runsAtOnce.runs.list(undefined, read.given);
   read.only(all.map((run) => run.id));
   return { git, read, all };
 });

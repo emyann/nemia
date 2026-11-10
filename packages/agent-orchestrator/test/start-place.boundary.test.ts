@@ -22,7 +22,7 @@ const { StoreRoot } = await import('../src/config/root.store.ts');
 const { PlaceService } = await import('../src/place/place.store.ts');
 const { gitPlaceLayer, builtinGitPlace } = await import('../src/place/builtin.store.ts');
 const { runFile } = await import('../src/record/record.store.ts');
-const { runStore } = await import('../src/record/files.store.ts');
+const { filesStore: runStore } = await import('../src/record/files.store.ts');
 const { Invalid } = await import('../src/refusal/refusal.ts');
 
 const BIN = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');

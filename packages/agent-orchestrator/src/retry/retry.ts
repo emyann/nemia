@@ -41,9 +41,8 @@ import {
   waitsAtGate,
   type Raise,
   type SpendOf,
-  budgetWord,
-  dollars,
 } from '../status/status.ts';
+import { budgetWord, dollars } from '../money/money.ts';
 import type { Verdict } from '../check/check.ts';
 import { retriesSpent, signoffDue, type EarlierTry, type Retry, type RetryAsk, type RetryMode } from './retry-ask.ts';
 import { isRemoteHarness } from '../harness/harness.ts';

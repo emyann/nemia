@@ -1,11 +1,14 @@
 /**
  * What makes a run at rest (`atRest`), and which runs the engine's feed takes out of the tick's memo (`evictedBy`): pure, so each guard is
  * made to refuse on data. What the memo saves a pass, and that every input moves it, is
- * proven on a store in rest-store.test.ts.
+ * proven on a store in rest-store.test.ts. And the one list of a run's inputs (`RUN_INPUTS`): every file the store names for a run is a
+ * stamped input of it (`STAMPED_FILES`), and every stamped input a file the store names.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { atRest, evictedBy, restBlockers, type RestFacts } from './rest.ts';
+import fs from 'node:fs';
+import path from 'node:path';
+import { atRest, evictedBy, restBlockers, RUN_INPUTS, STAMPED_FILES, type RestFacts } from './rest.ts';
 
 /** A run at rest: succeeded, frozen, every task settled, nothing due, nothing done, nothing said, nothing of another run read. */
 const RESTING: RestFacts = {
@@ -85,4 +88,42 @@ test('a task on the feed takes out the run whose id and a dash begin it — a st
     "an id that only begins with the run's letters, or is the run's own, is none of its tasks",
   );
   assert.deepEqual([...evictedBy([], ids)], []);
+});
+
+/** The stores that name a run's files in `runs/`, by their path from this folder. */
+const STORES = ['../record/record.store.ts', '../record/files.store.ts'];
+
+/** Each suffix a store names a run's file by, `runsDir()` joined with `${id}.<suffix>`, across `texts`. */
+const namedSuffixes = (texts: readonly string[]): string[] =>
+  [...new Set(texts.flatMap((text) => [...text.matchAll(/runsDir\(\),\s*`\$\{id\}\.(\w+)`/g)].map((m) => m[1] ?? '')))].sort();
+
+/** What breaks the list against `texts`: a file the stores name that is no stamped input, and a stamped input no store names. */
+const listBreaks = (texts: readonly string[]): string[] => {
+  const named = namedSuffixes(texts);
+  const declared = Object.values(STAMPED_FILES).sort();
+  return [
+    ...named.filter((s) => !declared.includes(s)).map((s) => `runs/<id>.${s} is read and is not in RUN_INPUTS: name it there`),
+    ...declared.filter((s) => !named.includes(s)).map((s) => `RUN_INPUTS stamps runs/<id>.${s}, which no store names: take it out`),
+  ];
+};
+
+const storeTexts = (): string[] => STORES.map((file) => fs.readFileSync(path.join(import.meta.dirname, file), 'utf8'));
+
+test('every file the store names for a run is a stamped input of RUN_INPUTS, and every stamped input a file it names', () => {
+  assert.deepEqual(listBreaks(storeTexts()), []);
+  for (const input of Object.keys(STAMPED_FILES)) assert.equal(RUN_INPUTS[input as keyof typeof RUN_INPUTS], 'stamp', input);
+});
+
+test('REFUSED: a marker a store names that the list does not, and a stamped input no store names', () => {
+  const texts = storeTexts();
+  const planted = [...texts, 'export const laterFile = (id: string) => path.join(runsDir(), `${id}.later`);'];
+  assert.deepEqual(
+    listBreaks(planted).map((b) => b.split(' ')[0]),
+    ['runs/<id>.later'],
+  );
+  const without = texts.map((t) => t.replace('`${id}.hold`', '`${id}-hold`'));
+  assert.deepEqual(
+    listBreaks(without).map((b) => b.split(' ')[2]),
+    ['runs/<id>.hold,'],
+  );
 });

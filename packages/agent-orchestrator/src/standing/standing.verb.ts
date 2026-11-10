@@ -16,7 +16,7 @@ import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.
 import { hasStarted, waitedOn } from '../wait/wait.ts';
 import { resultBranches, type BranchReader } from '../branches/branches.store.ts';
 import { landedOver } from '../branches/index.ts';
-import { runStore } from '../record/files.store.ts';
+import { runsAtOnce } from '../runs/runs.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import type { Workflow } from '../workflow.ts';
 import { readStanding, writeStanding, type StandingFile, type StoodRead } from './standing.store.ts';
@@ -239,9 +239,9 @@ export const standingSnapshot = Effect.fn('standingSnapshot')(function* () {
 /** The records of `ids` the store has, none of `runs`: a run named that is not there is left out. */
 const recordsOf = (ids: Iterable<string>, runs: readonly Run[]): Run[] =>
   [...new Set(ids)].flatMap((id) => {
-    if (runs.some((r) => r.id === id) || !runStore.runs.exists(id)) return [];
+    if (runs.some((r) => r.id === id) || !runsAtOnce.runs.exists(id)) return [];
     try {
-      return [runStore.runs.read(id)];
+      return [runsAtOnce.runs.read(id)];
     } catch {
       return [];
     }

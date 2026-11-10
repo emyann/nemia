@@ -323,7 +323,7 @@ type Judged = {
   holding: RunHolding | null;
   /** The tries people asked for that the next tick files, by step: `assess`'s, off their ask files. */
   asked: ReadonlyMap<string, Retry>;
-  /** Every ask that carried a message, waiting or consumed (`runStore`): what says a try was answered (`answerOf`). */
+  /** Every ask that carried a message, waiting or consumed (the Run door): what says a try was answered (`answerOf`). */
   answers: readonly RetryAsk[];
   /** What each task's sessions cost, off the views read (`spendReader`): what holds a step to its `budget:`. */
   spendOf: SpendOf;

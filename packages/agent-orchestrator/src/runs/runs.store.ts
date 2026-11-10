@@ -13,7 +13,7 @@
  * the files hold it across processes by the card's claim, `claimCard`). The walks of `test/run-walks.ts` hold both layers to one table.
  */
 import { Context, Effect, Layer } from 'effect';
-import { doorOf, checked, type DoorOf } from '../door/door.store.ts';
+import { atOnce, doorOf, checked, type DoorOf } from '../door/door.store.ts';
 import { Conflict } from '../refusal/refusal.ts';
 import { claimCard, filesStore } from '../record/files.store.ts';
 import { Run as RunModel, RunId } from '../record/record.model.ts';
@@ -96,3 +96,10 @@ export const RunDoor = Context.Reference<RunDoorShape>('agent-orchestrator/RunDo
 
 /** The Run door over the store's files, as a layer: what the default already gives, for a program that names it. */
 export const runDoorFiles: Layer.Layer<never> = Layer.succeed(RunDoor)(runDoorOver(filesRuns));
+
+/**
+ * The Run door over the store's files, each method run at once (`atOnce`): what a plain synchronous function reads and writes a run
+ * through — a page's, a refusal's words, the command line's — until a program yields `RunDoor` in its place. Never the files store
+ * itself: a run written here is checked as the door checks it.
+ */
+export const runsAtOnce: RunsLayer = atOnce<RunsLayer, RunId>(runDoorOver(filesRuns));

@@ -28,7 +28,7 @@ delete process.env.WF_MAX_RUNS;
 const { advanceRun, approveRun, cancelRun, startRun, runWith: runEngine } = await import('../runner.ts');
 const { runList } = await import('./run-list.verb.ts');
 const { informerMemo, passStarted } = await import('../rest/informer.verb.ts');
-const { readRun, pruneFile } = await import('../record/record.store.ts');
+const { runRecord, pruneFile } = await import('../record/record.store.ts');
 const { writeLabels } = await import('../record/files.store.ts');
 const { artifactsDir } = await import('../record/record.store.ts');
 const { verifiesRest } = await import('../config/config.store.ts');
@@ -77,7 +77,7 @@ const started = async (front = 'place: git', gates: string[] = []): Promise<{ id
   const repo = scratch('wf-runlist-repo-');
   stand().world.repository(repo, {});
   const run = await runPlaced(startRun({ brief: 'list me', repo, workflowDir: dir, gates }));
-  await runWith(e(), advanceRun(readRun(run.id)));
+  await runWith(e(), advanceRun(runRecord(run.id)));
   return { id: run.id, dir };
 };
 
@@ -85,7 +85,7 @@ const started = async (front = 'place: git', gates: string[] = []): Promise<{ id
 const signed = async (front?: string, gates: string[] = []) => {
   const run = await started(front, gates);
   engine().settle(`${run.id}-work`, 'succeeded', { closeout: SIGNED, startedAt: AT, spawnedAt: AT });
-  await runWith(e(), advanceRun(readRun(run.id)));
+  await runWith(e(), advanceRun(runRecord(run.id)));
   return run;
 };
 
@@ -209,16 +209,16 @@ const ROWS: Row[] = [
     name: 'its files folder removed',
     make: async () => {
       const run = await resting();
-      fs.mkdirSync(artifactsDir(readRun(run.id), 'work'), { recursive: true });
+      fs.mkdirSync(artifactsDir(runRecord(run.id), 'work'), { recursive: true });
       return run;
     },
-    plant: (run) => fs.rmSync(path.dirname(artifactsDir(readRun(run.id), '_')), { recursive: true, force: true }),
+    plant: (run) => fs.rmSync(path.dirname(artifactsDir(runRecord(run.id), '_')), { recursive: true, force: true }),
   },
   {
     name: "a folder run's step folder gaining a file",
     make: () => signed('place: folder'),
     plant: (run) => {
-      const dir = readRun(run.id).steps.work?.workspace;
+      const dir = runRecord(run.id).steps.work?.workspace;
       assert.ok(dir, 'a folder run works in a folder of its own');
       fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(path.join(dir, 'made.txt'), 'made\n');
@@ -257,9 +257,9 @@ test('each input that changes a run object, planted, is served fresh', async (t)
 test('an object built on a check output the engine did not give is not kept: the next read serves the output once it reads', async () => {
   const run = await started('place: git\ncheck: false');
   engine().settle(`${run.id}-work`, 'succeeded', { closeout: SIGNED, startedAt: AT, spawnedAt: AT });
-  await runWith(e(), advanceRun(readRun(run.id)));
+  await runWith(e(), advanceRun(runRecord(run.id)));
   engine().settle(`${run.id}-work-check`, 'failed', { exitCode: 1, startedAt: AT, spawnedAt: AT });
-  await runWith(e(), advanceRun(readRun(run.id)));
+  await runWith(e(), advanceRun(runRecord(run.id)));
   const memo = informerMemo();
   outputRefused = true;
   const first = itemOf(await unverified(() => listOf(memo)), run.id);

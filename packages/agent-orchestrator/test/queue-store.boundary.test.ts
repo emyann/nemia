@@ -34,7 +34,7 @@ const atRoot = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.
 const readInbox = () => atRoot(verbs.readInbox());
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
-const { listRuns, readRun } = await import('../src/record/record.store.ts');
+const { listRuns, runRecord } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -170,7 +170,7 @@ const started = async (
   );
   const file = path.join(RUNS, `${run.id}.json`);
   fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), createdAt }, null, 2));
-  return readRun(run.id);
+  return runRecord(run.id);
 };
 const at = (minute: number) => `2026-09-16T09:${String(minute).padStart(2, '0')}:00.000Z`;
 

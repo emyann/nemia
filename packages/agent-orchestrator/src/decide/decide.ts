@@ -14,12 +14,10 @@ import {
   spentWord,
   stepSpend,
   type SpendOf,
-  budgetWord,
-  dollars,
-  readWords,
   sendBackTo,
-  type Consumed,
 } from '../status/status.ts';
+import { budgetWord, dollars } from '../money/money.ts';
+import { readWords, type Consumed } from '../usage/usage.ts';
 import { assess, type Assessment, type AssessRead } from '../tick/assess.ts';
 import { resultSteps } from '../branches/index.ts';
 import { runWords } from '../route/routed/index.ts';

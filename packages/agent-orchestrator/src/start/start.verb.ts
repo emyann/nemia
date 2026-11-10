@@ -32,7 +32,8 @@ import { settingsAt } from '../harness-settings/harness-settings.verb.ts';
 import { afterRefusal } from '../wait/wait.ts';
 import { contextRefusal } from './context.ts';
 import { inputRefusal, type InputFile } from './inputs.ts';
-import { inboxDir, runStore } from '../record/files.store.ts';
+import { inboxDir } from '../record/files.store.ts';
+import { runsAtOnce } from '../runs/runs.store.ts';
 import { storeRootRefusal } from './store-root.ts';
 import { HOME, artifactsDir, inputsDir, runId, runsDir } from '../record/record.store.ts';
 import { writeAgentFiles } from '../agents/agents.store.ts';
@@ -539,7 +540,7 @@ function copyInputs(run: Run, inputs: readonly InputFile[]): void {
     fs.mkdirSync(dir, { recursive: true });
     for (const f of inputs) fs.copyFileSync(f.resolved, path.join(dir, path.basename(f.resolved)), fs.constants.COPYFILE_EXCL);
   } catch (err) {
-    runStore.runs.forget(run.id);
+    runsAtOnce.runs.forget(run.id);
     throw Object.assign(
       new Error(
         `--input: the run's files could not be copied into ${dir} — ${(err as Error).message}. Nothing was started: start it again once that directory can be written.`,
@@ -566,7 +567,7 @@ function renderAgents(run: Run, steps: readonly Workflow[], found: SkillsFound):
     const carriedFiles = freezeCarriedFiles(run, run.workflowDir);
     return carriedFiles === undefined ? { workflowFiles } : { workflowFiles, carriedFiles };
   } catch (err) {
-    runStore.runs.forget(run.id);
+    runsAtOnce.runs.forget(run.id);
     throw Object.assign(
       new Error(`${what} — ${(err as Error).message}. Nothing was started: start it again once that directory can be written.`),
       { exitCode: 1 },
@@ -688,8 +689,8 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   yield* tried(() => workflowFilesOf(opts.workflowDir));
   yield* tried(() => carriedFilesOf(opts.workflowDir));
   let id = runId(opts.brief);
-  while (runStore.runs.taken(id)) id = runId(opts.brief);
-  const refusedContext = contextRefusal(opts.context ?? [], opts.after ?? [], runStore.runs.exists, id);
+  while (runsAtOnce.runs.taken(id)) id = runId(opts.brief);
+  const refusedContext = contextRefusal(opts.context ?? [], opts.after ?? [], runsAtOnce.runs.exists, id);
   if (refusedContext) return yield* Effect.fail(refusedContext);
   const inherited = yield* inheritedOf(opts, edits);
   const mounts = mountsAt(factory, folder ? undefined : opts.repo);

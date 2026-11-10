@@ -32,7 +32,7 @@ const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
 const { EngineService } = await import('../runtime-client.ts');
 const { recentFile, recentPasses } = await import('../daemon/daemon.store.ts');
-const { listRuns, readRun } = await import('../record/record.store.ts');
+const { listRuns, runRecord } = await import('../record/record.store.ts');
 const { metered, meteredPass, metering, within } = await import('./tally.store.ts');
 const { Effect, Fiber, Metric } = await import('effect');
 const { Invalid } = await import('../refusal/refusal.ts');
@@ -334,9 +334,9 @@ whose('outside a pass the readers count nothing, and a pass inside a metered cal
   const [run] = await started(1);
   const outside = await metered(async () => 'none');
   assert.equal(outside.tallies!.records, 0);
-  readRun(run.id);
+  runRecord(run.id);
   const outer = await metered(async () => {
-    readRun(run.id);
+    runRecord(run.id);
     within('act', () => busy(2));
     const inner = await runWith(fake(), tickRun());
     assert.equal(inner.cost, undefined, "a pass inside another's meter carries no cost of its own");
@@ -367,7 +367,7 @@ whose(
     const alone = await Effect.runPromise(
       meteredPass(
         Effect.sync(() => {
-          readRun(run.id);
+          runRecord(run.id);
           within('act', () => busy(2));
           return 'read';
         }),
@@ -379,7 +379,7 @@ whose(
     assert.ok(alone.tallies.kinds.act.ms >= 2 && alone.ms >= alone.tallies.kinds.act.ms, 'act charged, within the pass');
     assert.equal(metering(), false, 'the meter closed with the pass');
     const outer = await metered(async () => {
-      const inner = await Effect.runPromise(meteredPass(Effect.sync(() => readRun(run.id))));
+      const inner = await Effect.runPromise(meteredPass(Effect.sync(() => runRecord(run.id))));
       assert.equal(inner.tallies, undefined, "a program inside another's meter carries no counts of its own");
       assert.equal(metering(), true, 'and leaves the outer meter open');
       return 'done';
@@ -415,7 +415,7 @@ whose(
     const [run] = await started(1);
     let go!: () => void;
     const waiting = new Promise<void>((resolve) => (go = resolve));
-    const own = Effect.sync(() => readRun(run.id));
+    const own = Effect.sync(() => runRecord(run.id));
     const pass = Effect.runPromise(
       meteredPass(
         Effect.andThen(
@@ -426,10 +426,10 @@ whose(
     );
     const promised = metered(async () => {
       await waiting;
-      readRun(run.id);
+      runRecord(run.id);
     });
-    await Effect.runPromise(Effect.sync(() => readRun(run.id)));
-    readRun(run.id);
+    await Effect.runPromise(Effect.sync(() => runRecord(run.id)));
+    runRecord(run.id);
     assert.equal(metering(), false, 'no pass is open to a caller beside them');
     go();
     assert.deepEqual([(await pass).tallies?.records, (await promised).tallies?.records], [1, 1], 'each pass its own read alone');

@@ -1,5 +1,6 @@
 /** What sessions consumed, in `nemia decide`'s words: a step's, several steps' together, and what a run's sessions read. */
-import { type Consumed, dollars, peakMark, readWords, sumUsage, usedLines } from '../status/status.ts';
+import { type Consumed, peakMark, readWords, sumUsage, usedLines } from '../usage/usage.ts';
+import { dollars } from '../money/money.ts';
 import type { Workflow } from '../workflow.ts';
 import type { PeakMark } from 'objects';
 

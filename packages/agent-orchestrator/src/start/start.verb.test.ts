@@ -17,7 +17,7 @@ process.env.WF_ROOT = ROOT;
 const RUNS_DIR = path.join(ROOT, 'runs');
 const { startRun } = await import('./start.verb.ts');
 const { START } = await import('./commands.verb.ts');
-const { runStore } = await import('../record/files.store.ts');
+const { filesStore: runStore } = await import('../record/files.store.ts');
 
 const stand = eachTest(testPlace);
 const runPlaced = runGiven(() => stand().layer);

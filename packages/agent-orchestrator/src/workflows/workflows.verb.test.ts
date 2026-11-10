@@ -23,7 +23,7 @@ const { engineOf } = await import('../runtime-client.ts');
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, () => stand().layer);
-const { runStore } = await import('../record/files.store.ts');
+const { filesStore: runStore } = await import('../record/files.store.ts');
 const { workflowVersion } = await import('../folder/version.store.ts');
 const { removeWorkflowAt } = await import('../folder/write.store.ts');
 const verbs = await import('../inbox/inbox.store.ts');

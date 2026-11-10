@@ -39,7 +39,7 @@ import {
   questionLines,
   closeoutRefusals,
   prunedWords,
-  runStore,
+  runsAtOnce,
   roundDueNote,
   saidLines,
   signoffsSpent,
@@ -152,7 +152,7 @@ export async function decideVerb(rest: string[], e: Engine, place: Place): Promi
   const { sensitive } = decideHow(rest.slice(1));
   const read = await runWith(e, placedIn(place, decisionRead(runId, process.env, sensitive ? { sensitive } : {}))).catch(
     async (err: unknown) => {
-      const unjudged = await runWith(e, placedIn(place, unjudgedOf(e, runStore.runs.read(runId), err, 'nemia decide')));
+      const unjudged = await runWith(e, placedIn(place, unjudgedOf(e, runsAtOnce.runs.read(runId), err, 'nemia decide')));
       throw unjudged ? new Error(unjudged.said) : err;
     },
   );

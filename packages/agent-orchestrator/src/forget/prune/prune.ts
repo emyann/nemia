@@ -58,6 +58,8 @@ export type PruneFacts = {
   worktrees: ReadonlyArray<{ path: string; heldBy?: string; offBranch?: string; changes?: readonly string[]; fix?: string }>;
   /** Whether this prune would remove the run's files directory (`--artifacts`, and one is there). */
   files?: boolean;
+  /** Why the run's unfrozen workflow folder does not load, where it does not: the run was judged without its steps. */
+  unfrozen?: string;
 };
 
 /**

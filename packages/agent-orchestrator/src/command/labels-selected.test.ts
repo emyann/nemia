@@ -20,8 +20,8 @@ delete process.env.WF_MAX_CONCURRENT;
 const { COMMANDS } = await import('./commands.verb.ts');
 const { parseArgv } = await import('./command.ts');
 const { advanceRun, startRun, runWith: runEngine } = await import('../runner.ts');
-const { readRun } = await import('../record/record.store.ts');
-const { runStore } = await import('../record/files.store.ts');
+const { runRecord } = await import('../record/record.store.ts');
+const { filesStore: runStore } = await import('../record/files.store.ts');
 const { Invalid } = await import('../refusal/refusal.ts');
 const { engineOf } = await import('../runtime-client.ts');
 const stand = eachTest(testPlace);
@@ -101,9 +101,9 @@ test('nemia stats -l sums the facts of the runs the selector takes alone', async
   fs.rmSync(path.join(ROOT, 'runs'), { recursive: true, force: true });
   const ended = async (brief: string) => {
     const run = await started(brief);
-    await runWith(noEngine(), advanceRun(readRun(run.id)));
+    await runWith(noEngine(), advanceRun(runRecord(run.id)));
     engine().settle(`${run.id}-implement`, 'succeeded', { closeout: { outcome: 'done', summary: 'did it', artifacts: [], needs: null } });
-    await runWith(noEngine(), advanceRun(readRun(run.id)));
+    await runWith(noEngine(), advanceRun(runRecord(run.id)));
     return run;
   };
   const core = await ended('the core one');

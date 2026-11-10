@@ -649,7 +649,7 @@ const verified = Effect.fn('verified')(function* (
     return yield* Effect.die(
       new Error(
         `the tick answered ${run.id} from its memo of runs at rest, and its record reads otherwise than the memo's run: ` +
-          `an input of the run changed that its stamp does not watch (restStamps), or the memo's run was changed in memory`,
+          `an input of the run changed that its stamp does not watch — name it in RUN_INPUTS (src/rest/rest.ts) with what watches it — or the memo's run was changed in memory`,
       ),
     );
   const {

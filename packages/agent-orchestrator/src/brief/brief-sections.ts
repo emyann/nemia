@@ -22,8 +22,8 @@ import {
   type Round,
   type RoundAsk,
   type SpendOf,
-  budgetWord,
 } from '../status/status.ts';
+import { budgetWord } from '../money/money.ts';
 import { modeWord, retriesDue, type Retry, type RetryAsk, type RetryMode } from '../retry/index.ts';
 import { refusalSection, type CheckRefusal, type LandingSaid, type Verdict } from '../check/check.ts';
 import type { Said } from '../say/say.ts';

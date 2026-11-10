@@ -1071,6 +1071,9 @@ test(`the runtime is reached through one client: only ${CLIENT} imports agent-ru
   assert.deepEqual(clientBreaks(packageSources()), []);
 });
 
+/** The engine's verbs, a controller the views and the meter both read, which reaches the client itself. */
+const ENGINE_VERBS_FILE = 'src/engine-verbs/engine-verbs.verb.ts';
+
 test('REFUSED: a type imported from the runtime by a controller, a store file, a pure file or the CLI, a client that imports none, a controller that goes round it, and a client above a controller', () => {
   assert.deepEqual(clientBreaks(adding('src/tick/tick.verb.ts', 'agent-runtime')), [
     'src/tick/tick.verb.ts imports agent-runtime, and only src/runtime-client.ts may',
@@ -1107,14 +1110,21 @@ test('REFUSED: a type imported from the runtime by a controller, a store file, a
     'src/runtime-client.ts imports no agent-runtime: CLIENT names the wrong file',
   ]);
   assert.deepEqual(
-    clientBreaks(planted('src/views/views.verb.ts', (imports) => imports.filter((m) => m !== CLIENT && m !== 'src/steps/steps.verb.ts'))),
+    clientBreaks(
+      planted('src/views/views.verb.ts', (imports) =>
+        imports.filter((m) => m !== CLIENT && m !== 'src/steps/steps.verb.ts' && m !== ENGINE_VERBS_FILE),
+      ),
+    ),
     [
       'src/views/views.verb.ts is a controller and reaches src/runtime-client.ts through none of its imports: the controllers reach the runtime through the client',
     ],
   );
-  assert.deepEqual(clientBreaks(planted('src/meter/meter.verb.ts', (imports) => imports.filter((m) => m !== CLIENT))), [
-    'src/meter/meter.verb.ts is a controller and reaches src/runtime-client.ts through none of its imports: the controllers reach the runtime through the client',
-  ]);
+  assert.deepEqual(
+    clientBreaks(planted('src/meter/meter.verb.ts', (imports) => imports.filter((m) => m !== CLIENT && m !== ENGINE_VERBS_FILE))),
+    [
+      'src/meter/meter.verb.ts is a controller and reaches src/runtime-client.ts through none of its imports: the controllers reach the runtime through the client',
+    ],
+  );
   assert.deepEqual(clientBreaks(adding(CLIENT, 'src/tick/tick.verb.ts')), [
     'src/runtime-client.ts imports src/tick/tick.verb.ts, a controller: the client is beneath every controller',
   ]);

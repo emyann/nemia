@@ -20,7 +20,8 @@ import { FactoryDoor, factoryOrNone, templatedAtOnce, templatedTreeOf } from '..
 import { factoryFills } from '../factory/rules/rules.store.ts';
 import type { Factory } from '../factory/factory.ts';
 import { readInbox } from '../inbox/inbox.store.ts';
-import { inboxDir, runStore } from '../record/files.store.ts';
+import { inboxDir } from '../record/files.store.ts';
+import { runsAtOnce } from '../runs/runs.store.ts';
 import { HOME, isDirectory } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import type { Workflow } from '../step/step.ts';
@@ -205,7 +206,7 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }, Wor
  */
 const usersOf = Effect.fn('usersOf')(function* (dir: string) {
   const name = path.basename(dir);
-  const runs = runStore.runs
+  const runs = runsAtOnce.runs
     .list(() => {})
     .filter((run) => run.workflow === undefined && path.resolve(run.workflowDir) === dir)
     .map((run) => stillNeeded.run(run.id, dir));

@@ -35,7 +35,7 @@ delete process.env.WF_MAX_RUNS;
 const { advanceRun, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
@@ -232,11 +232,11 @@ test("REFUSED without the momentum: at a ceiling of one, the runtime admits a ru
   const a = await started(folder());
   const b = await started(folder());
   const filedBy = board();
-  await runWith(filedBy.e, advanceRun(readRun(a.id)));
-  await runWith(filedBy.e, advanceRun(readRun(b.id)));
+  await runWith(filedBy.e, advanceRun(runRecord(a.id)));
+  await runWith(filedBy.e, advanceRun(runRecord(b.id)));
   filedBy.settle(`${a.id}-implement`, 'succeeded', SIGNED);
   assert.deepEqual(
-    (await runWith(filedBy.e, advanceRun(readRun(a.id)))).filed,
+    (await runWith(filedBy.e, advanceRun(runRecord(a.id)))).filed,
     ['review'],
     "run a's implement has ended; run b has filed its implement; a's review is filed after it, a pass later",
   );

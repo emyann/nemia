@@ -5,17 +5,9 @@
  * A request that names neither is answered in the default factory, on the api's own repository (`repoOf`), as it was before a factory was
  * one to name. A factory is read from the store (`readFactory`), never written: `nemia factory` is the one writer of its file.
  */
+import { DEFAULT_NAMESPACE } from 'objects';
 import path from 'node:path';
-import {
-  DEFAULT_FACTORY,
-  factoryRepo,
-  Invalid,
-  outsideRefusal,
-  readFactories,
-  readFactory,
-  type Factory,
-  type Running,
-} from 'agent-orchestrator';
+import { factoryRepo, Invalid, outsideRefusal, readFactories, readFactory, type Factory, type Running } from 'agent-orchestrator';
 import { repoOf } from '../capabilities/capabilities.ts';
 
 /** What a request is answered in: its repository, and its factory, none for the default factory. */
@@ -63,7 +55,7 @@ const outsideRepo = (factory: Factory, repo: string): Invalid => {
  */
 export function placeFor(query: PlaceQuery, env: NodeJS.ProcessEnv, running?: Running): Place {
   const named = query.repo === undefined ? undefined : path.resolve(query.repo);
-  if (query.factory === undefined || query.factory === DEFAULT_FACTORY) {
+  if (query.factory === undefined || query.factory === DEFAULT_NAMESPACE) {
     if (named === undefined) return { repo: repoOf(env, running), factory: undefined };
     const known = knownRepos(env, running);
     if (!known.includes(named)) throw unknownRepo(named, known);

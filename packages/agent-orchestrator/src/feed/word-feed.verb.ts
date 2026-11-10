@@ -80,7 +80,7 @@ export function wordFeed(
  * which is what tells one occurrence from another — the line's own `at` is the pass's, as a denial's is.
  *
  * Each fact is already on the record as the pass read it, composed on read from the person's own file and never written into the record
- * (`readRun`): so the feed keeps its one writer, the daemon, and no verb is touched. The hold is not here — it is answered by its put and
+ * (`runRecord`): so the feed keeps its one writer, the daemon, and no verb is touched. The hold is not here — it is answered by its put and
  * its lift together (`holdOnce`), off `FeedWords.held`, since `nemia hold --off` leaves only an absence to read.
  *
  * It is the whole of what a person has done, not what is new: the feed's own lines say which have been written already (`oncePast`), so

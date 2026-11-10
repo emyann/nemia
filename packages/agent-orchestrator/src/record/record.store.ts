@@ -10,7 +10,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Result, Schema, SchemaIssue } from 'effect';
 import { BY_CAP, oneLine, WHY_CAP, type Acceptance, type Approval, type Hold, type Pruned, type Run } from './record.ts';
-import { personRoutes, spentAcceptances, spentApprovals, unrouted, withRoutes, type RoundAsk } from '../status/status.ts';
+import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
+import { personRoutes, unrouted, withRoutes } from '../route/index.ts';
 import { spentRoundAsks } from '../round/round.ts';
 import { RETRY_MODES, spentAsks, TRY_CAUSES, upgradeAsk, upgradeTries, type RetryAsk } from '../retry/index.ts';
 import { asNamed } from '../workflow.ts';
@@ -145,7 +146,7 @@ function recordRefusal(raw: unknown): string {
 }
 
 /**
- * A run record that is there and does not read as one: a person's or a program's edit, or a newer `nemia`'s. Said by `readRun` with the
+ * A run record that is there and does not read as one: a person's or a program's edit, or a newer `nemia`'s. Said by `runRecord` with the
  * fix, and left out of `listRuns`, so one record nobody can read stops no other run.
  */
 export class UnreadableRecord extends Invalid {
@@ -196,7 +197,7 @@ export const runFile = (id: string) => path.join(runsDir(), `${id}.json`);
  * Re-reading before writing only narrows that window; it does not close it.
  *
  * So the two writers are given two files and never touch each other's. The tick owns the run's
- * steps, a person owns the cancellation, and `readRun` composes them. No lock, and nothing to get
+ * steps, a person owns the cancellation, and `runRecord` composes them. No lock, and nothing to get
  * wrong under a crash: the file exists or it does not.
  */
 export const cancelFile = (id: string) => path.join(runsDir(), `${id}.cancelled`);
@@ -205,7 +206,7 @@ export const cancelFile = (id: string) => path.join(runsDir(), `${id}.cancelled`
  * That `nemia prune` removed the run's worktrees: when, and each it removed with what it held on disk, and, under `--artifacts`, when its
  * files directory went and what that freed — a person's fact, in a file of its own
  * for the reason `cancelFile` is. Written by `prune` alone, before it removes anything, so a pass that reads the run while the worktrees
- * go files nothing more (`advance`), and composed onto the run on read (`readRun`) as `pruned`. `nemia rm` removes it with the run.
+ * go files nothing more (`advance`), and composed onto the run on read (`runRecord`) as `pruned`. `nemia rm` removes it with the run.
  */
 export const pruneFile = (id: string) => path.join(runsDir(), `${id}.pruned`);
 
@@ -282,8 +283,8 @@ export const removeHold = (id: string, at: string): boolean => {
  * A run: its record, with what people own beside it composed on read — the cancellation (`cancelFile`), its pruning (`pruneFile`), its
  * hold (`holdFile`), each approval at a gate (`readApprovals`), and each loop a person ended as it stands (`readAcceptances`), off one
  * listing of its asks directory. None of them is ever written into the record (`rewriteRun`), and whatever the record carries under their
- * keys is dropped, the store's pause's and the run's labels (`pause`, `labels`, which `runStore` composes) with them. Counted as one record
- * read (`countRecord`) under `records` while a pass is metered.
+ * keys is dropped, the store's pause's and the run's labels (`pause`, `labels`, which the Run door composes) with them. Counted as one
+ * record read (`countRecord`) under `records` while a pass is metered.
  *
  * The frozen steps are read under the names their keys have now (`asNamed`), and written back under them (`recordText`), in their place
  * among the record's keys, so a record read and written back moves no line; a try's former `then` is read as its `cause`
@@ -291,7 +292,7 @@ export const removeHold = (id: string, at: string): boolean => {
  * Refused: an id with no record, as `no such run` naming
  * `nemia ls` (`Missing`), for every verb that takes one; and a record that does not read as a run (`UnreadableRecord`).
  */
-export const readRun = (id: string): Run => within('records', () => readRecord(id));
+export const runRecord = (id: string): Run => within('records', () => readRecord(id));
 
 const readRecord = (id: string): Run => {
   if (!fs.existsSync(runFile(id))) throw new Missing({ message: `no such run: ${id}  (try 'nemia ls')` });
@@ -354,7 +355,7 @@ export const markCancelled = (id: string): string => {
  * and `nemia refresh --base`, in `merge-<step>-<n>`, read and consumed beside the rest (`readMergeAsks`, `consumeMergeAsks`).
  *
  * `nemia approve` too, in `approve-<step>-<n>`: the gated step, and the try it approves. It is never consumed while it opens the gate — the
- * record holds no approval, and every pass reads the file (`readRun`) — only once a later try of the step spent it (`spentApprovals`).
+ * record holds no approval, and every pass reads the file (`runRecord`) — only once a later try of the step spent it (`spentApprovals`).
  *
  * And `nemia approve`, in `accept-<step>-<n>`: the looping step whose loop a person ended as it stands, and the try they accepted. Read and
  * spent exactly as an approval is (`readAcceptances`, `spentAcceptances`) — every pass reads the file, so the loop stays ended after a
@@ -664,7 +665,7 @@ export const listRuns = (said: (line: string) => void = sayOnce, kept?: (id: str
           .flatMap((f) => {
             const id = path.basename(f, '.json');
             try {
-              return [kept?.(id) ?? readRun(id)];
+              return [kept?.(id) ?? runRecord(id)];
             } catch (err) {
               if (err instanceof UnreadableRecord) said(`left out: ${err.message}`);
               else if (fs.existsSync(runFile(id))) throw err;
@@ -681,7 +682,8 @@ export const listRuns = (said: (line: string) => void = sayOnce, kept?: (id: str
  * record, `.cancelled`, `.pruned`, `.hold`, `.labels`, and any other marker, as every name of that form is stamped — and of every
  * entry of a directory so named and of the directories in it: the asks, with the approvals and acceptances among them, and `done/`, where
  * each goes once it is spent. Its inode, size and modification time to the nanosecond, so a file written in place, moved, or removed and
- * made again moves its run's stamp. The run's own directory (`<id>/`: its files and inputs) is no input of a pass, and is left out.
+ * made again moves its run's stamp. The run's own directory (`<id>/`: its files and inputs) is no input of a pass, and is left out. The
+ * files so named that a run's judgement reads are the stamped inputs of `RUN_INPUTS` (`STAMPED_FILES`, rest/rest.ts).
  *
  * A stamp is taken before the pass reads the records: a file changed between the two is read as changed by the next pass, never missed.
  * While a run's stamp holds, a pass does not read its record again: the memo hands its run to `listRuns`.
@@ -739,8 +741,8 @@ export const writeRun = ({ pause: _, labels: __, ...run }: Run) => {
  * opened `r+`, which never makes a file. Its existence is read at the moment of writing, and nothing is carried to decide it; a record
  * removed after it is opened takes the write with it.
  *
- * Without the approvals, acceptances, pruning, hold and a person's routes `readRun` composed onto it (`unrouted`), nor the pause and labels
- * `runStore` did: they are a person's files, and a copy in the record would outlive the file it was read from.
+ * Without the approvals, acceptances, pruning, hold and a person's routes `runRecord` composed onto it (`unrouted`), nor the pause and
+ * labels the run store did: they are a person's files, and a copy in the record would outlive the file it was read from.
  */
 export const rewriteRun = (run: Run): boolean => within('act', () => rewriteNow(run));
 

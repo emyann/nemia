@@ -2,7 +2,7 @@
 import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { isRepositoryRun } from '../record/record.ts';
-import { runStore } from '../record/files.store.ts';
+import { runsAtOnce } from '../runs/runs.store.ts';
 import { PlaceService, trialMerges, type Place } from '../place/place.store.ts';
 import { mergeWord, mergeWordOf, type StandingMerge } from './merges.ts';
 
@@ -12,7 +12,7 @@ import { mergeWord, mergeWordOf, type StandingMerge } from './merges.ts';
  * store does not have.
  */
 export function mergesOf(place: Place, runId: string, branches: readonly string[]): Record<string, StandingMerge> {
-  const run = runStore.runs.read(runId);
+  const run = runsAtOnce.runs.read(runId);
   if (!isRepositoryRun(run)) return {};
   const { trials } = trialMerges(
     run.repo,

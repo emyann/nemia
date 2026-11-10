@@ -29,7 +29,7 @@ const { exportTemplate, reconciled, reconciledAt } = programsAt(ROOT);
 const { readFactory } = await import('../src/runner.ts');
 const { appliedDir, digestOf, entriesIn, readStatus, replaceBase, resolutionsFile, statusFile, swapTree, treeDir } =
   await import('../src/factory/applied/applied.store.ts');
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
 const { engineOf, runWith } = await import('../src/runtime-client.ts');
 const stage = staged({ runWith, main, engineOf });
@@ -111,7 +111,7 @@ test('an upgrade with a conflict: previewed, filed, waited on with the status al
     await printedBy(t, 'factory', 'apply', 'crew', '--template', dir, '--repo', repo, '--set', 'budget=7');
     assert.equal(reconciled(factory('crew')).conditions[0].reason, 'Rendered');
     run = (await printedBy(t, 'start', 'Cache the views', '--factory', 'crew', '--workflows', 'dev'))[0].split(' ')[0];
-    assert.equal(readRun(run).workflow?.find((step) => step.name === 'review')?.rounds, 3);
+    assert.equal(runRecord(run).workflow?.find((step) => step.name === 'review')?.rounds, 3);
     rewrite(tree(), REVIEW, 'rounds: 3', 'rounds: 4');
     rewrite(tree(), REVIEW, 'budget: 7', 'budget: 9');
     rewrite(tree(), RULES, 'on a Friday', 'on a Friday, nor on a Monday');
@@ -256,7 +256,7 @@ test('an upgrade with a conflict: previewed, filed, waited on with the status al
   });
 
   await s.test('the run in flight keeps the steps frozen on its record', () => {
-    assert.equal(readRun(run).workflow?.find((step) => step.name === 'review')?.rounds, 3, 'its review step as it started');
+    assert.equal(runRecord(run).workflow?.find((step) => step.name === 'review')?.rounds, 3, 'its review step as it started');
   });
 
   await s.test('the tree is swapped only where no one wrote it since the merge read it', () => {

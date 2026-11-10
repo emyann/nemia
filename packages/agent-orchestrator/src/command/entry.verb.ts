@@ -16,7 +16,7 @@ import type { Filings } from '../summary/reads.verb.ts';
 import type { Args, CommandSpec, Flag } from './command.ts';
 import type { Run } from '../record/record.ts';
 import type { Labels } from '../labels/labels.ts';
-import { labelSegments, runLabelMap } from '../runlist/runlist.ts';
+import { labelSegments, runLabelMap } from '../labels/labels.ts';
 import { parseSelectors, selectorsRefusal, SELECTOR_FORM, type Selectors } from '../watch/selector.ts';
 
 /**

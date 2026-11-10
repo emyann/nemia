@@ -33,7 +33,7 @@ import { factoryFills, rulesVersion } from '../factory/rules/rules.store.ts';
 import { revisionsOf, type Factory } from '../factory/factory.ts';
 import { factoryOrNone } from '../factory/door/factories.store.ts';
 import { runNamespace } from '../run-list/index.ts';
-import { runStore } from '../record/files.store.ts';
+import { runsAtOnce } from '../runs/runs.store.ts';
 import { within, withinEffect } from '../meter/tally.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { hasStarted } from '../wait/wait.ts';
@@ -428,7 +428,7 @@ export const pinPass = Effect.fn('pinPass')(function* (run: Run, at: string, giv
   const filed = hasStarted(run);
   const read = yield* readOr(given);
   return yield* (filed ? refreshDue(run, at, read) : firstResolve(run, at, read)).pipe(
-    Effect.catchCause((cause) => Effect.sync(() => unread(Cause.squash(cause), filed && runStore.refresh.stands(run.id)))),
+    Effect.catchCause((cause) => Effect.sync(() => unread(Cause.squash(cause), filed && runsAtOnce.refresh.stands(run.id)))),
   );
 });
 
@@ -476,14 +476,14 @@ const follows = (run: Run, read: PassRevisions): Effect.Effect<boolean> =>
 
 /**
  * The run's steps and pins taken again on a person's ask (`nemia refresh`), for a run that has filed: the ask is spent either way. The ask
- * is read off its own file every pass (`runStore.refresh.stands`), never off the record, which never holds it. A filed run nobody asked
- * resolves nothing here: a resolve is every `.md` of the folder and a digest of every agent and skill file it names, which a pass may not
- * pay per run for a number nothing files on. A run whose factory follows revisions is resolved by `followPass`, once the pass knows it
+ * is read off its own file every pass (the Run door's `refresh.stands`), never off the record, which never holds it. A filed run nobody
+ * asked resolves nothing here: a resolve is every `.md` of the folder and a digest of every agent and skill file it names, which a pass may
+ * not pay per run for a number nothing files on. A run whose factory follows revisions is resolved by `followPass`, once the pass knows it
  * has something to file. So a pinned run's edit after a filing is numbered when something resolves that content — another run's filing,
  * or this run's `nemia refresh`, which resolves to answer.
  */
 const refreshDue = Effect.fnUntraced(function* (run: Run, at: string, read: PassRevisions) {
-  if (!runStore.refresh.stands(run.id)) return NOTHING;
+  if (!runsAtOnce.refresh.stands(run.id)) return NOTHING;
   const resolved = yield* refreshedNow(run, at, read);
   if (!resolved)
     return {

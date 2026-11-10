@@ -27,7 +27,7 @@ import { verifiesRest } from '../config/config.store.ts';
 import { HOME } from '../record/record.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { informerMemo, type InformerMemo } from '../rest/informer.verb.ts';
-import { kindOf } from '../runlist/runlist.ts';
+import { kindOf } from '../run-state/run-state.ts';
 import type { Filings } from '../summary/reads.verb.ts';
 import { runsSummarized } from '../summary/summary.verb.ts';
 import {

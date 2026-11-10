@@ -29,7 +29,7 @@ process.env.CLAUDE_CONFIG_DIR = scratch('wf-agents-calls-config-');
 const { engine, startRun, tickRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { freshRestMemo } = await import('../src/tick/tick.verb.ts');
 
 const git = (repo: string, ...args: string[]) =>
@@ -86,7 +86,7 @@ let memo = freshRestMemo();
 const pass = () => runWith(e, tickRun({ repo: ROOT, memo }));
 
 /** The task a run's one step is filed as. */
-const taskOf = (runId: string) => readRun(runId).steps.work.taskId!;
+const taskOf = (runId: string) => runRecord(runId).steps.work.taskId!;
 
 /** Passes in test `t`, every 50ms, until the run's step is at work, as its harness lists it; answers its task. */
 const atWork = (t: Waiter, runId: string) =>
@@ -94,7 +94,7 @@ const atWork = (t: Waiter, runId: string) =>
     t,
     async () => {
       await pass();
-      const taskId = readRun(runId).steps.work?.taskId;
+      const taskId = runRecord(runId).steps.work?.taskId;
       if (!taskId) return undefined;
       return (await Effect.runPromise(e.view(taskId))).phase === 'working' && taskId;
     },

@@ -5,8 +5,8 @@
  * engine's feed — or, for a run still moving, the next pass begins. A process given none judges on demand, and a cold informer answers as
  * a warm one does. Over the stand-ins: the test engine and the test place.
  *
- * `WF_ROOT` is set before the package is imported, since the store reads it as it loads; `WF_VERIFY_REST=1`, as every test that ticks a
- * store, and a read that counts what it judged turns it off for itself (`unverified`), since a verified read judges each answer afresh.
+ * On a store of its own at `ROOT`, given as `ENV`, with `WF_VERIFY_REST=1`, as every test that ticks a store, and a read that counts
+ * what it judged turns it off for itself (`unverified`), since a verified read judges each answer afresh.
  */
 import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,29 +17,31 @@ import { testEngine } from 'agent-runtime/testing';
 import { scratch } from 'test-kit/scratch';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
-import { rootNow } from '../../test/config-given.ts';
+import { advanceRun, approveRun, startRun, tickRun, runWith as runEngine } from '../runner.ts';
+import { runObject } from '../object/run.verb.ts';
+import { runsSummarized } from '../summary/summary.verb.ts';
+import { Informer, informerMemo, passStarted, type InformerMemo } from './informer.verb.ts';
+import { runRecord } from '../record/record.store.ts';
+import { engineOf } from '../runtime-client.ts';
 
 const ROOT = scratch('wf-informer-');
 const RUNS_DIR = path.join(ROOT, 'runs');
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-process.env.WF_DEFAULT_FACTORY_STARTS = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { advanceRun, approveRun, startRun, tickRun, runWith: runEngine } = await import('../runner.ts');
-const { runObject } = await import('../object/run.verb.ts');
-const { runsSummarized } = await import('../summary/summary.verb.ts');
-const { Informer, informerMemo, passStarted } = await import('./informer.verb.ts');
-const { runRecord } = await import('../record/record.store.ts');
-const { engineOf } = await import('../runtime-client.ts');
-type InformerMemo = import('./informer.verb.ts').InformerMemo;
+/** The test's store and settings; `unverified` turns `WF_VERIFY_REST` off in it for a read, and the settings are read as they are asked. */
+const ENV: Record<string, string | undefined> = {
+  ...process.env,
+  WF_ROOT: ROOT,
+  WF_VERIFY_REST: '1',
+  WF_DEFAULT_FACTORY_STARTS: '1',
+  WF_MAX_CONCURRENT: undefined,
+  WF_MAX_RUNS: undefined,
+};
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 const AT = '2026-10-14T09:30:00.000Z';
 
 const stand = eachTest(testPlace);
-const runWith = runOver(runEngine, () => stand().layer);
-const runPlaced = runGiven(() => stand().layer);
+const runWith = runOver(runEngine, () => stand().layer, ENV);
+const runPlaced = runGiven(() => stand().layer, ENV);
 const engine = eachTest(testEngine);
 /**
  * The engine's feed, which the stand-in keeps none of: each line a test appends with `fed`, as every append to a task's journal writes
@@ -65,7 +67,7 @@ const started = async (gates: string[] = []): Promise<string> => {
   const repo = scratch('wf-informer-repo-');
   stand().world.repository(repo, {});
   const run = await runPlaced(startRun({ brief: 'inform me', repo, workflowDir: dir, gates }));
-  await runWith(e(), advanceRun(runRecord(rootNow(), run.id)));
+  await runWith(e(), advanceRun(runRecord(ROOT, run.id)));
   return run.id;
 };
 
@@ -73,7 +75,7 @@ const started = async (gates: string[] = []): Promise<string> => {
 const atItsGate = async (): Promise<string> => {
   const id = await started(['work']);
   engine().settle(`${id}-work`, 'succeeded', { closeout: SIGNED, startedAt: AT, spawnedAt: AT });
-  await runWith(e(), advanceRun(runRecord(rootNow(), id)));
+  await runWith(e(), advanceRun(runRecord(ROOT, id)));
   return id;
 };
 
@@ -107,7 +109,7 @@ const asIs: Wrap = (program) => program;
 
 /** The run `id` as one object, through `informer`. */
 const objectOf = (id: string, informer: InformerMemo | undefined, wrap: Wrap = asIs) =>
-  runWith(e(), wrap(informed(runObject(runRecord(rootNow(), id), { memo: { said: new Map() } }), informer)));
+  runWith(e(), wrap(informed(runObject(runRecord(ROOT, id), { memo: { said: new Map() } }), informer)));
 
 /** Every run's row, through `informer`. */
 const listOf = (informer: InformerMemo, wrap: Wrap = asIs) =>
@@ -115,11 +117,11 @@ const listOf = (informer: InformerMemo, wrap: Wrap = asIs) =>
 
 /** `f` with `WF_VERIFY_REST` off: what the informer alone answers, no answer judged afresh beside it. */
 async function unverified<T>(f: () => Promise<T>): Promise<T> {
-  process.env.WF_VERIFY_REST = '0';
+  ENV.WF_VERIFY_REST = '0';
   try {
     return await f();
   } finally {
-    process.env.WF_VERIFY_REST = '1';
+    ENV.WF_VERIFY_REST = '1';
   }
 }
 

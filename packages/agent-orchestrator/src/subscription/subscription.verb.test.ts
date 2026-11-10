@@ -2,9 +2,9 @@
  * `nemia subscribe` and `nemia unsubscribe` over an engine of the test's: a long-lived task given a subscription from the feed's end, its
  * command line read, and each refusal — a task never filed, one not long-lived, one settled, a name taken, a name that is none, a selector
  * the feed's grammar refuses, a flag retired with the wake words, minutes not above zero, and Nemia's own name given or taken away by
- * hand. A store of its own, since `WF_ROOT` is read as the module loads.
+ * hand. A store of its own at `ROOT`, given as `ENV`.
  */
-import { rootNow, storeGiven } from '../../test/config-given.ts';
+import { storeGiven } from '../../test/config-given.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -13,14 +13,15 @@ import { Effect, Schema } from 'effect';
 import type { TaskView } from 'agent-runtime';
 import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
+import { SUBSCRIBE, UNSUBSCRIBE } from './subscription.verb.ts';
+import { dropSubscription, listSubscriptions, putSubscription, readDelivery, writeDelivery } from './subscription.store.ts';
+import { DEFAULT_SELECTORS } from './subscription.ts';
+import { parseArgv } from '../command/command.ts';
+import { engineOf, runWith } from '../runtime-client.ts';
+import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-subscribe-');
-process.env.WF_ROOT = ROOT;
-const { SUBSCRIBE, UNSUBSCRIBE } = await import('./subscription.verb.ts');
-const { dropSubscription, listSubscriptions, putSubscription, readDelivery, writeDelivery } = await import('./subscription.store.ts');
-const { DEFAULT_SELECTORS } = await import('./subscription.ts');
-const { parseArgv } = await import('../command/command.ts');
-const { engineOf, runWith } = await import('../runtime-client.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 
 /** The tasks the engine has filed, each by its state as the runtime folds it. */
 const TASKS: Record<string, Partial<TaskView['state']>> = {
@@ -48,7 +49,7 @@ const typed = async <D extends object>(command: typeof SUBSCRIBE | typeof UNSUBS
     command === SUBSCRIBE
       ? SUBSCRIBE.handler(Schema.decodeUnknownSync(SUBSCRIBE.input)(args))
       : UNSUBSCRIBE.handler(Schema.decodeUnknownSync(UNSUBSCRIBE.input)(args));
-  return (await runWith(e, storeGiven(ROOT, process.env)(handled) as never)) as D;
+  return (await runWith(e, storeGiven(ROOT, ENV)(handled) as never)) as D;
 };
 
 /** The message `f` refuses with, at exit 2. */
@@ -71,7 +72,7 @@ const feed = path.join(ROOT, 'feed.jsonl');
 const handed = async <D extends object>(args: Record<string, unknown>): Promise<D> => {
   const refused = SUBSCRIBE.check?.(args as never);
   if (refused) throw Object.assign(new Error(refused), { exitCode: 2 });
-  return (await runWith(e, storeGiven(ROOT, process.env)(SUBSCRIBE.handler(args as never)) as never)) as D;
+  return (await runWith(e, storeGiven(ROOT, ENV)(SUBSCRIBE.handler(args as never)) as never)) as D;
 };
 
 test("nemia subscribe and unsubscribe: a long-lived task subscribed from the feed's end, by the default or its own selectors, a floor, and taken away", async (t) => {
@@ -85,7 +86,7 @@ test("nemia subscribe and unsubscribe: a long-lived task subscribed from the fee
         subscription: { task: 'nemia', selectors: [...DEFAULT_SELECTORS], digestEvery: 60, from: fs.statSync(feed).size },
       });
       await typed(SUBSCRIBE, ['own', 'nemia', '-l', 'reason=CheckPassed', '-l', 'agent=ada,type=Warning', '--digest-every', '15']);
-      assert.deepEqual(listSubscriptions(rootNow()).find((s) => s.name === 'own')?.subscription, {
+      assert.deepEqual(listSubscriptions(ROOT).find((s) => s.name === 'own')?.subscription, {
         task: 'nemia',
         selectors: ['reason=CheckPassed', 'agent=ada,type=Warning'],
         digestEvery: 15,
@@ -108,7 +109,7 @@ test("nemia subscribe and unsubscribe: a long-lived task subscribed from the fee
         'the api takes a list sent empty, and this is the door against it',
       );
       assert.deepEqual(
-        listSubscriptions(rootNow()).find((s) => s.name === 'blank')?.subscription.selectors,
+        listSubscriptions(ROOT).find((s) => s.name === 'blank')?.subscription.selectors,
         [...DEFAULT_SELECTORS],
         'and the file holds the default, not []',
       );
@@ -117,19 +118,19 @@ test("nemia subscribe and unsubscribe: a long-lived task subscribed from the fee
   );
   await t.test('a subscription given a floor is scoped by it; REFUSED: a floor that is no level, before anything is put', async () => {
     await typed(SUBSCRIBE, ['floored', 'nemia', '--at-least', 'semi-auto']);
-    assert.deepEqual(listSubscriptions(rootNow()).find((s) => s.name === 'floored')?.subscription.scope, { atLeast: 'semi-auto' });
+    assert.deepEqual(listSubscriptions(ROOT).find((s) => s.name === 'floored')?.subscription.scope, { atLeast: 'semi-auto' });
     await typed(UNSUBSCRIBE, ['floored']);
     assert.match(await refusal(() => typed(SUBSCRIBE, ['n', 'nemia', '--at-least', 'on'])), /^--at-least takes a level/);
-    assert.deepEqual(listSubscriptions(rootNow()), [], 'nothing put');
+    assert.deepEqual(listSubscriptions(ROOT), [], 'nothing put');
   });
   await t.test(
     "an unsubscribe removes the subscription, not its deliverer's file; a name with none is refused, naming nemia subscribe",
     async () => {
       await typed(SUBSCRIBE, ['gone', 'nemia']);
-      writeDelivery(rootNow(), 'gone', { of: { task: 'nemia', from: 0 }, cursor: 0, digest: [] });
+      writeDelivery(ROOT, 'gone', { of: { task: 'nemia', from: 0 }, cursor: 0, digest: [] });
       assert.deepEqual(await typed(UNSUBSCRIBE, ['gone']), { name: 'gone' });
-      assert.equal(readDelivery(rootNow(), 'gone')?.cursor, 0, "the deliverer's file is its own to drop");
-      assert.deepEqual(listSubscriptions(rootNow()), []);
+      assert.equal(readDelivery(ROOT, 'gone')?.cursor, 0, "the deliverer's file is its own to drop");
+      assert.deepEqual(listSubscriptions(ROOT), []);
       assert.match(await refusal(() => typed(UNSUBSCRIBE, ['gone'])), /^no subscription is named gone: nemia subscribe gone <task>/);
     },
   );
@@ -142,7 +143,7 @@ test('REFUSED: nemia subscribe and unsubscribe refuse what they cannot put, by n
     assert.match(nowhere, /file it long-lived/);
     assert.match(await refusal(() => typed(SUBSCRIBE, ['a', 'job'])), /^the task job is not long-lived.*restartPolicy: Always/);
     assert.match(await refusal(() => typed(SUBSCRIBE, ['a', 'ended'])), /^the task ended has settled \(stopped\)/);
-    assert.deepEqual(listSubscriptions(rootNow()), [], 'nothing put');
+    assert.deepEqual(listSubscriptions(ROOT), [], 'nothing put');
   });
   await t.test(
     'REFUSED: a name taken, a name that is none, a selector the feed has no key for and minutes not above zero, before anything is put',
@@ -166,14 +167,14 @@ test('REFUSED: nemia subscribe and unsubscribe refuse what they cannot put, by n
     assert.match(given, /^the subscription nemia is Nemia's own/);
     assert.match(given, /nemia level semi-auto/);
 
-    assert.deepEqual(listSubscriptions(rootNow()), [], 'nothing put');
-    putSubscription(rootNow(), 'nemia', { task: 'nemia', selectors: [...DEFAULT_SELECTORS], digestEvery: 1440, from: 0 });
+    assert.deepEqual(listSubscriptions(ROOT), [], 'nothing put');
+    putSubscription(ROOT, 'nemia', { task: 'nemia', selectors: [...DEFAULT_SELECTORS], digestEvery: 1440, from: 0 });
     assert.match(await refusal(() => typed(UNSUBSCRIBE, ['nemia'])), /^the subscription nemia is Nemia's own.*nemia level manual/);
     assert.deepEqual(
-      listSubscriptions(rootNow()).map((s) => s.name),
+      listSubscriptions(ROOT).map((s) => s.name),
       ['nemia'],
     );
-    dropSubscription(rootNow(), 'nemia');
+    dropSubscription(ROOT, 'nemia');
   });
   await t.test('REFUSED: each flag retired with the wake words, by name, naming the selector to type', async () => {
     for (const argv of [
@@ -185,6 +186,6 @@ test('REFUSED: nemia subscribe and unsubscribe refuse what they cannot put, by n
       assert.match(said, /^nemia subscribe no longer takes --wake/, argv.join(' '));
       assert.match(said, /-l waits=person/);
     }
-    assert.deepEqual(listSubscriptions(rootNow()), [], 'nothing put');
+    assert.deepEqual(listSubscriptions(ROOT), [], 'nothing put');
   });
 });

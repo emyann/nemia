@@ -8,8 +8,8 @@
  * on the feed takes out.
  *
  * Walked through the runtime itself, `plainEngine` over an in-memory journal whose feed every append reaches, as the runtime's own
- * journal does, and the engine's `view` counted by task id. A file of its own, since `stats` reads every run under `WF_ROOT`, read as the
- * store loads, so it is set before the import.
+ * journal does, and the engine's `view` counted by task id. A file of its own, since `stats` reads every run of its
+ * store, at `ROOT`.
  */
 import { test } from 'node:test';
 import { story } from 'test-kit/checkpoints';
@@ -21,13 +21,12 @@ import { Engine } from 'agent-runtime';
 import { scratch } from 'test-kit/scratch';
 import { Effect } from 'effect';
 import { plainEngine } from '../../test/promised.ts';
+import { freshStatsMemo, statsRun } from './stats.verb.ts';
+import { runWith } from '../runtime-client.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 const ROOT = scratch('wf-stats-memo-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-process.env.WF_ROOT = ROOT;
-const { freshStatsMemo, statsRun } = await import('./stats.verb.ts');
-const { runWith } = await import('../runtime-client.ts');
-const { StoreRoot } = await import('../config/root.store.ts');
 
 type Event = Parameters<AsyncJournal['append']>[1];
 

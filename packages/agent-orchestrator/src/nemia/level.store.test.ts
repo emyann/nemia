@@ -3,7 +3,7 @@
  * its workspace links, a global prefix's — and passes over one of another tree; `readNemia` refuses a hand
  * list of her rules, which her fence derives, as
  * `test/agent-fences.test.ts` refuses her a mode but `auto`. Focused on the real disk: npm's links are real symbolic links, and the
- * checkout's own is read. A store of its own, since `WF_ROOT` is read as the module loads.
+ * checkout's own is read.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,9 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { names } from '../../test/assessed.ts';
-
-process.env.WF_ROOT = scratch('wf-nemia-store-');
-const { nemiaDefinition, ownBin, readNemia } = await import('./level.store.ts');
+import { nemiaDefinition, ownBin, readNemia } from './level.store.ts';
 
 /** A package at `dir` whose `package.json` says its `nemia` is `bin/nemia.ts`, as the client in `apps/cli` does. */
 const pkg = (dir: string): string => {

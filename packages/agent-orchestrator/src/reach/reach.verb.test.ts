@@ -14,24 +14,23 @@ import { staged } from '../../test/story.ts';
 import { eachTest } from '../../test/placed.ts';
 import { TEAM } from '../../test/team.ts';
 import type { Run } from '../record/record.ts';
-import type { WordedRule } from './reach.verb.ts';
-import { rootNow } from '../../test/config-given.ts';
+import { POLICY_REACH, type WordedRule } from './reach.verb.ts';
+import { TABLE } from '../command/commands.verb.ts';
+import { nemiaFence } from '../admission/fence.ts';
+import { attachWorkflowAt, createFactoryAt } from '../factory/factory.store.ts';
+import { writeFactoryLevel } from '../level/level.store.ts';
+import { confirmRule, readProposed, writeProposed } from '../auto/auto.store.ts';
+import { POLICY_PROPOSE } from '../auto/auto.verb.ts';
+import { ruleWords } from '../auto/auto.ts';
+import { engineOf, runWith } from '../runtime-client.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { runDoorMemory } from '../runs/memory.store.ts';
+import { main } from '../cli/main.ts';
+import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-policy-reach-');
-process.env.WF_ROOT = ROOT;
-const { POLICY_REACH } = await import('./reach.verb.ts');
-const { TABLE } = await import('../command/commands.verb.ts');
-const { nemiaFence } = await import('../admission/fence.ts');
-const { attachWorkflowAt, createFactoryAt } = await import('../factory/factory.store.ts');
-const { writeFactoryLevel } = await import('../level/level.store.ts');
-const { confirmRule, readProposed, writeProposed } = await import('../auto/auto.store.ts');
-const { POLICY_PROPOSE } = await import('../auto/auto.verb.ts');
-const { ruleWords } = await import('../auto/auto.ts');
-const { engineOf, runWith } = await import('../runtime-client.ts');
-const { RunDoor } = await import('../runs/runs.store.ts');
-const { runDoorMemory } = await import('../runs/memory.store.ts');
-const main: Parameters<typeof staged>[0]['main'] = async (...argv) => (await import('../cli/main.ts')).main(...argv);
-const stage = staged({ runWith, main, engineOf });
+const ENV: Env = { ...process.env, WF_ROOT: ROOT };
+const stage = staged({ runWith, main, engineOf, env: ENV });
 const door = eachTest(runDoorMemory);
 
 /** A repository whose `workflows/` holds the tests' team and `plain`, one gated step with no check. */
@@ -62,7 +61,7 @@ test('`nemia policy reach`: which steps at their gate her rules can approve in a
   const repo = repoWithWorkflows();
   createFactoryAt(ROOT, { name: 'f', repos: [repo], workflows: [], hires: {}, schedules: {} });
   for (const workflow of ['dev', 'plain']) attachWorkflowAt(ROOT, { factory: 'f', workflow });
-  writeFactoryLevel(rootNow(), 'f', { level: 'auto', since: '2026-11-05T00:00:00.000Z' });
+  writeFactoryLevel(ROOT, 'f', { level: 'auto', since: '2026-11-05T00:00:00.000Z' });
 
   let suggested: WordedRule[] = [];
   await t.test('nothing confirmed: the default reaches neither step, each said why, and a rule suggested for each', async () => {

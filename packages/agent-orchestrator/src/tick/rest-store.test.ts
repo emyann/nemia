@@ -9,14 +9,14 @@
  *
  * Walked through the runtime itself, `plainEngine` over its own journal on disk, whose reads it counts, and a harness the test signs by
  * hand, which takes what it is said and lets a session go. On one test place for the file; the git processes a pass's place starts are
- * counted on git in pass-processes.boundary.test.ts. A file of its own, since `tick` reads every run under `WF_ROOT`, read as the module
- * loads, so it is set before the import; no cap on runs in flight, and sessions enough that every task filed is admitted on the pass
+ * counted on git in pass-processes.boundary.test.ts. A file of its own, since `tick` reads every run of its store (at `ROOT`, given as
+ * `ENV`); no cap on runs in flight, and sessions enough that every task filed is admitted on the pass
  * after, so a store of forty runs is built in a few passes. Every pass that is not a measurement judges the runs the memo answered
  * in full as well (`verifyRest`), and throws where the two differ.
  */
-import { rootNow, storeGiven } from '../../test/config-given.ts';
+import { storeGiven } from '../../test/config-given.ts';
 import type { StoreRoot } from '../config/root.store.ts';
-import type { StoreConfig } from '../config/config.store.ts';
+import { type Env, type StoreConfig, verifiesRest } from '../config/config.store.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -31,41 +31,49 @@ import { runGiven, runOver } from '../../test/placed.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { placeOver, unreadBy } from '../../test/place-over.ts';
 import { story } from '../../test/story.ts';
+import * as verbs from '../runner.ts';
+import { approveRun, forgetRun, isRepositoryRun, prune, retryRun, startRun } from '../runner.ts';
+import {
+  acceptFile,
+  approvalFile,
+  asksDir,
+  holdFile,
+  listRuns,
+  markCancelled,
+  pruneFile,
+  restStamps,
+  runFile,
+  runRecord,
+  runsDir,
+  writeAsk,
+} from '../record/record.store.ts';
+import { resumePause, putPause } from '../pause/pause.store.ts';
+import { tickRun, freshRestMemo } from './tick.verb.ts';
+import { feedFile } from '../feed/feed.store.ts';
+import { runWith as runEngine, EngineService } from '../runtime-client.ts';
+import { PlaceService } from '../place/place.store.ts';
+import { meteredPlace } from '../place/builtin.store.ts';
+import { runList } from '../run-list/run-list.verb.ts';
+import { metered } from '../meter/tally.store.ts';
+import { informerMemo, informerRead, type InformerMemo } from '../rest/informer.verb.ts';
+import { NOTHING_READ, standingReader } from '../standing/standing.verb.ts';
 
 const ROOT = scratch('wf-rest-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-process.env.WF_MAX_CONCURRENT = '10000';
-delete process.env.WF_MAX_RUNS;
-const { approveRun, forgetRun, isRepositoryRun, prune, retryRun, startRun, ...verbs } = await import('../runner.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: '10000', WF_MAX_RUNS: undefined };
 /** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
-const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot | StoreConfig>): A => Effect.runSync(storeGiven(ROOT, process.env)(program));
+const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot | StoreConfig>): A => Effect.runSync(storeGiven(ROOT, ENV)(program));
 const addToInbox = (opts: Parameters<typeof verbs.addToInbox>[0]) => atRoot(verbs.addToInbox(opts));
 const queueInInbox = (...args: Parameters<typeof verbs.queueInInbox>) => atRoot(verbs.queueInInbox(...args));
 const readInbox = () => atRoot(verbs.readInbox());
-const { listRuns, runRecord } = await import('../record/record.store.ts');
-const { resumePause, putPause } = await import('../pause/pause.store.ts');
-const { tickRun, freshRestMemo } = await import('./tick.verb.ts');
-const { acceptFile, approvalFile, asksDir, holdFile, markCancelled, pruneFile, restStamps, runFile, runsDir, writeAsk } =
-  await import('../record/record.store.ts');
-const { feedFile } = await import('../feed/feed.store.ts');
-const { runWith: runEngine, EngineService } = await import('../runtime-client.ts');
-const { PlaceService } = await import('../place/place.store.ts');
-const { meteredPlace } = await import('../place/builtin.store.ts');
-const { runList } = await import('../run-list/run-list.verb.ts');
-const { verifiesRest } = await import('../config/config.store.ts');
-const { metered } = await import('../meter/tally.store.ts');
-const { informerMemo, informerRead } = await import('../rest/informer.verb.ts');
-const { NOTHING_READ, standingReader } = await import('../standing/standing.verb.ts');
 const made = testPlace();
 /** The file's test place, each question of it counted as the pass's `place` phase, as the shipped place counts its own. */
 const place = { ...made, place: meteredPlace(made.place), layer: PlaceService.layer(meteredPlace(made.place)) };
 const stand = () => place;
 const world = () => stand().world;
-const runWith = runOver(runEngine, () => stand().layer);
-const runPlaced = runGiven(() => stand().layer);
+const runWith = runOver(runEngine, () => stand().layer, ENV);
+const runPlaced = runGiven(() => stand().layer, ENV);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
@@ -174,8 +182,8 @@ const places = (c: PassCost) => c.phases.place.calls;
  * that it rests again after; the first of them reads `read` records more than a steady pass: the run's own, unless no file of it moved.
  */
 const storeOf = () => {
-  fs.rmSync(runsDir(rootNow()), { recursive: true, force: true });
-  fs.mkdirSync(runsDir(rootNow()), { recursive: true });
+  fs.rmSync(runsDir(ROOT), { recursive: true, force: true });
+  fs.mkdirSync(runsDir(ROOT), { recursive: true });
   const h = engine();
   const memo = freshRestMemo();
   const inFlight: Run[] = [];
@@ -186,7 +194,7 @@ const storeOf = () => {
       await verified();
       await h.signAll(inFlight, (name) => (blocking.some((id) => name.startsWith(`ae/${id}-`)) ? BLOCKED : undefined));
       const pass = await measured();
-      const finished = listRuns(rootNow()).filter((r) => !inFlight.some((f) => f.id === r.id)).length;
+      const finished = listRuns(ROOT).filter((r) => !inFlight.some((f) => f.id === r.id)).length;
       if (pass.rested === finished) return pass;
     }
     assert.fail('the store did not come to rest in twelve passes');
@@ -204,7 +212,7 @@ const storeOf = () => {
   const answered = async (id: string) => (await verified()).runs.find((a) => a.run.id === id)!;
   const touched = new Set<string>();
   const aResting = (isolate = false): RepositoryRun => {
-    const run = listRuns(rootNow()).find(
+    const run = listRuns(ROOT).find(
       (r) => Boolean(r.isolate) === isolate && !touched.has(r.id) && !inFlight.some((f) => f.id === r.id) && memo.runs.has(r.id),
     );
     assert.ok(run, 'a run at rest is left to touch');
@@ -262,11 +270,11 @@ const reads = (c: PassCost) => ({
 /** The names of `spans`, sorted: what a pass traced, whatever order its fibers ended in. */
 const namesOf = (spans: readonly Tracer.NativeSpan[]): string[] => spans.map((s) => s.name).sort();
 /** What a RunList keeps between requests: the informer. */
-type Kept = { runs: import('../rest/informer.verb.ts').InformerMemo };
+type Kept = { runs: InformerMemo };
 /** A fresh memo, as a cold read has it. */
 const cold = (): Kept => ({ runs: informerMemo() });
 /** The RunList asked by `fieldSelector`, read through `kept`, verified as `env` says. */
-const byState = (e: Parameters<typeof runWith>[0], fieldSelector: string, kept = cold(), env = process.env, more = {}) =>
+const byState = (e: Parameters<typeof runWith>[0], fieldSelector: string, kept = cold(), env: Env = ENV, more = {}) =>
   runWith(
     e,
     runList(e, { home: ROOT, memo: kept.runs, verify: verifiesRest(env) }, { memo: { said: new Map() } }, { fieldSelector, ...more }),
@@ -315,7 +323,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
     return { cost: pass.cost!, spans };
   };
   const saidToInFlight = async (e = h.e) => {
-    for (const run of listRuns(rootNow()).filter((r) => inFlight.some((f) => f.id === r.id)))
+    for (const run of listRuns(ROOT).filter((r) => inFlight.some((f) => f.id === r.id)))
       await Effect.runPromise(e.say(run.steps.work.taskId!, 'Keep going.'));
   };
   const quiet = async () => {
@@ -323,7 +331,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
     await saidToInFlight();
     return traced(false);
   };
-  const unverified = { ...process.env, WF_VERIFY_REST: '0' };
+  const unverified = { ...ENV, WF_VERIFY_REST: '0' };
   const kept = cold();
   const warm = async (): Promise<number | undefined> => {
     await byState(h.e, 'status.state!=finished', kept, unverified);
@@ -441,7 +449,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
     async () => {
       await s.measured();
       const second = await s.measured();
-      const listed = listRuns(rootNow()).length;
+      const listed = listRuns(ROOT).length;
       assert.equal(second.rested, FINISHED, 'every finished run answered from memory');
       assert.equal(second.records, listed - second.rested, `only the records of the runs in flight read (${second.records} of ${listed})`);
       const fresh = await s.measured(freshRestMemo());
@@ -469,11 +477,11 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
     'the same store paused: once the pass after the pause has read every run with it, every finished run is answered from memory',
     async () => {
       const [none] = sizes.map((z) => z.cost) as [PassCost];
-      putPause(rootNow(), { why: 'merging by hand', by: 'ann' });
+      putPause(ROOT, { why: 'merging by hand', by: 'ann' });
       try {
         await s.measured();
         const paused = await s.measured();
-        const listed = listRuns(rootNow()).length;
+        const listed = listRuns(ROOT).length;
         assert.equal(paused.rested, FINISHED, 'every finished run answered from memory while the pause stands');
         assert.equal(
           paused.records,
@@ -482,7 +490,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
         );
         assert.equal(journals(paused), journals(none), 'no journal read more than the runs in flight make');
       } finally {
-        resumePause(rootNow());
+        resumePause(ROOT);
       }
       await s.measured();
       assert.equal((await s.measured()).rested, FINISHED, 'and once it is lifted, as before');
@@ -554,7 +562,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
       await held.waiting;
       const io0 = Effect.runSync(e.io());
       await Effect.runPromise(e.feed(0));
-      for (const run of listRuns(rootNow()).filter((r) => inFlight.some((f) => f.id === r.id)))
+      for (const run of listRuns(ROOT).filter((r) => inFlight.some((f) => f.id === r.id)))
         await Effect.runPromise(e.view(run.steps.work.taskId!));
       const io1 = Effect.runSync(e.io());
       held.go();
@@ -576,7 +584,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
     }
     assert.deepEqual(
       released,
-      [runRecord(rootNow(), run.id).steps.work.taskId],
+      [runRecord(ROOT, run.id).steps.work.taskId],
       "the release of the run's session is traced, on the pass that let it go",
     );
     assert.equal(
@@ -591,10 +599,10 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
     'a run called off before anything of it was filed rests like a finished one: answered from memory, and judged the same in full',
     async () => {
       const [run] = await s.started(1);
-      markCancelled(rootNow(), run.id);
+      markCancelled(ROOT, run.id);
       s.touched.add(run.id);
       const before = await s.rested();
-      assert.equal(runRecord(rootNow(), run.id).steps.work?.taskId ?? null, null, 'nothing of it filed');
+      assert.equal(runRecord(ROOT, run.id).steps.work?.taskId ?? null, null, 'nothing of it filed');
       assert.ok(s.memo.runs.has(run.id), 'at rest after the pass that judged it');
       assert.equal(await s.rested(), before + 1, 'answered from memory on the next, and judged the same in full (verifyRest)');
       assert.equal((await s.answered(run.id)).status, 'cancelled');
@@ -603,7 +611,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
   );
 
   const worktreesGone = (run: Run) => {
-    const record = JSON.parse(fs.readFileSync(runFile(rootNow(), run.id), 'utf8')) as {
+    const record = JSON.parse(fs.readFileSync(runFile(ROOT, run.id), 'utf8')) as {
       steps: Record<string, { workspace?: string; handedOff?: string }>;
     };
     for (const step of Object.values(record.steps)) {
@@ -615,7 +623,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
       );
       fs.rmSync(step.workspace, { recursive: true, force: true });
     }
-    fs.writeFileSync(runFile(rootNow(), run.id), JSON.stringify(record, null, 2));
+    fs.writeFileSync(runFile(ROOT, run.id), JSON.stringify(record, null, 2));
   };
 
   await st.test(
@@ -624,13 +632,13 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
       const [ok, broke, off] = await s.started(3, TWO, ISOLATED_REPOS[0], true);
       for (const run of [ok, broke, off]) s.touched.add(run.id);
       await s.finish([broke.id]);
-      markCancelled(rootNow(), off.id);
+      markCancelled(ROOT, off.id);
       await s.finish();
       const before = await s.measured();
       for (const run of [ok, broke, off]) assert.ok(s.memo.runs.has(run.id), `${run.id} at rest with its worktrees there`);
       for (const run of [ok, broke, off]) await s.evicts(`${run.id}: its worktrees gone`, worktreesGone, run);
       assert.deepEqual(
-        [ok, broke, off].map((r) => runRecord(rootNow(), r.id).steps.plan?.handedOff ?? null),
+        [ok, broke, off].map((r) => runRecord(ROOT, r.id).steps.plan?.handedOff ?? null),
         [null, null, null],
         'no hand-off written down: none was made',
       );
@@ -659,7 +667,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
       const run = await runPlaced(startRun({ brief: 'two roots', repo: ISOLATED_REPOS[1], workflowDir: dir, isolate: true }));
       s.touched.add(run.id);
       for (let k = 0; k < 12 && (await s.answered(run.id)).status !== 'succeeded'; k++) await h.signAll(inFlight);
-      const record = JSON.parse(fs.readFileSync(runFile(rootNow(), run.id), 'utf8')) as {
+      const record = JSON.parse(fs.readFileSync(runFile(ROOT, run.id), 'utf8')) as {
         steps: Record<string, { workspace: string; handedOff?: string }>;
       };
       assert.notEqual(
@@ -669,7 +677,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
       );
       delete record.steps.right.handedOff;
       fs.rmSync(record.steps.right.workspace, { recursive: true, force: true });
-      fs.writeFileSync(runFile(rootNow(), run.id), JSON.stringify(record, null, 2));
+      fs.writeFileSync(runFile(ROOT, run.id), JSON.stringify(record, null, 2));
       const pruning = await runWith(h.e, prune(run.id, { unmerged: true }));
       assert.equal(pruning.kind, 'prunable', "the worktree left is prunable, not refused as right's hand-off still owed");
     },
@@ -689,7 +697,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
       for (let k = 0; k < 8 && ![first, second].every((r) => s.memo.runs.has(r.id)); k++) {
         await s.verified();
         for (const run of [first, second]) {
-          const workspace = runRecord(rootNow(), run.id).steps.implement?.workspace;
+          const workspace = runRecord(ROOT, run.id).steps.implement?.workspace;
           if (workspace) fs.writeFileSync(path.join(workspace, `${run.id}.ts`), 'export const done = true;\n');
         }
         await h.signAll(inFlight);
@@ -697,7 +705,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
       assert.ok(s.memo.runs.has(first.id) && s.memo.runs.has(second.id), 'both runs at rest at the gate of their ending');
       await runWith(h.e, approveRun(first.id, 'ship', 'Merge it.'));
       await s.verified();
-      assert.ok(runRecord(rootNow(), first.id).steps.ship?.taskId, "the first run's ending filed in the checkout");
+      assert.ok(runRecord(ROOT, first.id).steps.ship?.taskId, "the first run's ending filed in the checkout");
       inFlight.push(first);
       await runWith(h.e, approveRun(second.id, 'ship', 'Merge it too.'));
 
@@ -711,7 +719,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
       await s.verified();
       const pass = await runWith(h.e, tickRun({ repo: ROOT, memo: s.memo, verifyRest: false }));
       const cost = pass.cost!;
-      const listed = listRuns(rootNow()).length;
+      const listed = listRuns(ROOT).length;
       assert.ok(cost.rested >= FINISHED, `the finished runs answered from memory (${cost.rested})`);
       assert.equal(
         cost.records,
@@ -719,7 +727,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
         `only the records of the runs in flight read (${cost.records} of ${listed}): the checkout's claims and the queue are read off the pass's own listing`,
       );
       const waiting = pass.runs.find((a) => a.run.id === second.id)!;
-      assert.equal(runRecord(rootNow(), second.id).steps.ship?.taskId ?? null, null, "the second run's ending is not filed");
+      assert.equal(runRecord(ROOT, second.id).steps.ship?.taskId ?? null, null, "the second run's ending is not filed");
       assert.equal(
         waiting.feed.steps.find((step) => step.name === 'ship')?.word,
         `waiting on the checkout (${first.id}'s ship has it)`,
@@ -736,7 +744,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
 const measuredEvent = (usage: object): Event => ({ kind: 'measured', at: new Date().toISOString(), attempt: 1, usage });
 /** A marker of `.pruned`, as `nemia prune` writes it. */
 const pruned = (run: Run) =>
-  fs.writeFileSync(pruneFile(rootNow(), run.id), `${JSON.stringify({ at: new Date().toISOString(), worktrees: [] })}\n`);
+  fs.writeFileSync(pruneFile(ROOT, run.id), `${JSON.stringify({ at: new Date().toISOString(), worktrees: [] })}\n`);
 
 /**
  * The informer (`informerRead`, informer.verb.ts), which the board's reads keep: an answer kept for a run at rest is given back while its
@@ -766,7 +774,7 @@ const listMemo = () => {
       place: { kind: 'folder' },
       steps: { work: { status: 'done', taskId: `${id}-work-1` } },
     } as unknown as Run;
-    fs.writeFileSync(runFile(rootNow(), id), JSON.stringify(run));
+    fs.writeFileSync(runFile(ROOT, id), JSON.stringify(run));
     return run;
   };
   const read = (memo: ReturnType<typeof informerMemo<{ said: string }>>, verify = false) =>
@@ -791,7 +799,7 @@ const listMemo = () => {
  */
 const withAsks = async (s: Awaited<ReturnType<typeof small>>) => {
   const run = s.aResting();
-  fs.mkdirSync(asksDir(rootNow(), run.id), { recursive: true });
+  fs.mkdirSync(asksDir(ROOT, run.id), { recursive: true });
   await s.rested();
   await s.rested();
   return run;
@@ -801,15 +809,15 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
   await t.test('its record written again, word for word', async () => {
     const s = await small();
     await s.evicts('the record', (run) => {
-      const text = fs.readFileSync(runFile(rootNow(), run.id));
-      fs.writeFileSync(`${runFile(rootNow(), run.id)}.new`, text);
-      fs.renameSync(`${runFile(rootNow(), run.id)}.new`, runFile(rootNow(), run.id));
+      const text = fs.readFileSync(runFile(ROOT, run.id));
+      fs.writeFileSync(`${runFile(ROOT, run.id)}.new`, text);
+      fs.renameSync(`${runFile(ROOT, run.id)}.new`, runFile(ROOT, run.id));
     });
   });
 
   await t.test("a person's .cancelled beside the record, and the pass that reads it says so", async () => {
     const s = await small();
-    const run = await s.evicts('.cancelled', (r) => markCancelled(rootNow(), r.id));
+    const run = await s.evicts('.cancelled', (r) => markCancelled(ROOT, r.id));
     assert.equal((await s.answered(run.id)).status, 'cancelled');
   });
 
@@ -824,17 +832,17 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
     const run = s.aResting();
     const before = await s.rested();
     const steadily = await s.measured();
-    fs.writeFileSync(holdFile(rootNow(), run.id), `${JSON.stringify({ at: new Date().toISOString(), until: [] })}\n`);
+    fs.writeFileSync(holdFile(ROOT, run.id), `${JSON.stringify({ at: new Date().toISOString(), until: [] })}\n`);
     const held = await s.measured();
     assert.deepEqual(
       [held.rested, held.records],
       [before - 1, steadily.records + 1],
       'held on no run, the held run is judged afresh, and no other',
     );
-    fs.writeFileSync(holdFile(rootNow(), run.id), `${JSON.stringify({ at: new Date().toISOString(), until: [s.inFlight[0].id] })}\n`);
+    fs.writeFileSync(holdFile(ROOT, run.id), `${JSON.stringify({ at: new Date().toISOString(), until: [s.inFlight[0].id] })}\n`);
     assert.equal(await s.rested(), before - 1);
     assert.equal(await s.rested(), before - 1, 'held, it is judged afresh on every pass');
-    fs.rmSync(holdFile(rootNow(), run.id));
+    fs.rmSync(holdFile(ROOT, run.id));
     assert.equal(await s.rested(), before - 1, 'the hold lifted, the pass that reads it judges afresh');
     assert.equal(await s.rested(), before);
   });
@@ -848,7 +856,7 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
     await runWith(s.h.e, retryRun(run.id, 'work', { mode: 'fresh' }));
     assert.equal(await s.rested(), before - 1, 'the ask read');
     assert.equal((await s.finish()).rested, before, 'the try filed, signed, settled, and the run at rest again');
-    assert.equal(runRecord(rootNow(), run.id).steps.work.taskId, `${run.id}-work-try2`, 'on its second try');
+    assert.equal(runRecord(ROOT, run.id).steps.work.taskId, `${run.id}-work-try2`, 'on its second try');
   });
 
   await t.test('an approval at a gate, a file in the asks, and the step it lets go filed', async () => {
@@ -860,12 +868,12 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
       await s.h.signAll();
     }
     assert.ok(s.memo.runs.has(gated.id), 'a run waiting at a gate, its task settled, is at rest');
-    assert.equal(runRecord(rootNow(), gated.id).steps.work?.taskId ?? null, null, 'work waits on the gate');
+    assert.equal(runRecord(ROOT, gated.id).steps.work?.taskId ?? null, null, 'work waits on the gate');
     const waiting = await s.rested();
     await runWith(s.h.e, approveRun(gated.id, 'plan'));
-    assert.ok(fs.existsSync(approvalFile(rootNow(), gated.id, 'plan', 1)), 'the approval is a file in the asks');
+    assert.ok(fs.existsSync(approvalFile(ROOT, gated.id, 'plan', 1)), 'the approval is a file in the asks');
     assert.equal(await s.rested(), waiting - 1, 'the approval read');
-    assert.ok(runRecord(rootNow(), gated.id).steps.work?.taskId, 'and work filed on it');
+    assert.ok(runRecord(ROOT, gated.id).steps.work?.taskId, 'and work filed on it');
     assert.equal((await s.finish()).rested, waiting, 'the run finished, and at rest again');
   });
 
@@ -874,7 +882,7 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
     const run = await s.evicts(
       'an acceptance',
       (r) =>
-        writeAsk(acceptFile(rootNow(), r.id, 'work', 1), {
+        writeAsk(acceptFile(ROOT, r.id, 'work', 1), {
           step: 'work',
           try: 1,
           at: new Date().toISOString(),
@@ -883,7 +891,7 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
       await withAsks(s),
     );
     assert.ok(
-      fs.existsSync(acceptFile(rootNow(), run.id, 'work', 1)),
+      fs.existsSync(acceptFile(ROOT, run.id, 'work', 1)),
       'an acceptance of a step that loops nowhere ends nothing and stays where it is, so the run rests again with it there',
     );
   });
@@ -891,16 +899,16 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
   await t.test('an ask moved into done/', async () => {
     const s = await small();
     const run = await withAsks(s);
-    fs.mkdirSync(path.join(asksDir(rootNow(), run.id), 'done'));
+    fs.mkdirSync(path.join(asksDir(ROOT, run.id), 'done'));
     await s.rested();
-    await s.evicts('done/', () => fs.writeFileSync(path.join(asksDir(rootNow(), run.id), 'done', 'retry-work-9'), '{}\n'), run);
+    await s.evicts('done/', () => fs.writeFileSync(path.join(asksDir(ROOT, run.id), 'done', 'retry-work-9'), '{}\n'), run);
   });
 
   await t.test('REFUSED: a file in the asks that no reader reads: the stamp reads the asks, not only the record', async () => {
     const s = await small();
     await s.evicts(
       'an unread file in the asks',
-      (run) => fs.writeFileSync(path.join(asksDir(rootNow(), run.id), 'later'), 'nothing any reader reads\n'),
+      (run) => fs.writeFileSync(path.join(asksDir(ROOT, run.id), 'later'), 'nothing any reader reads\n'),
       await withAsks(s),
     );
   });
@@ -916,14 +924,14 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
   await t.test('a result branch moved, its tip written; one deleted, and a commit on the base branch, move nothing', async () => {
     const s = await small({ isolated: 2 });
     const run = s.aResting(true);
-    const [branch, tip] = Object.entries(runRecord(rootNow(), run.id).tips ?? {})[0] ?? [];
+    const [branch, tip] = Object.entries(runRecord(ROOT, run.id).tips ?? {})[0] ?? [];
     assert.ok(branch && tip, 'the run has a tip on its record');
     let moved = tip;
     await s.evicts('a branch moved', () => (moved = world().branch(run.repo, branch, {})), run, 2, 0);
-    assert.equal(runRecord(rootNow(), run.id).tips![branch], moved, 'the tip the pass saw is on the record');
+    assert.equal(runRecord(ROOT, run.id).tips![branch], moved, 'the tip the pass saw is on the record');
 
     const before = await s.rested();
-    const lanes = Object.values(runRecord(rootNow(), run.id).steps).flatMap((step) =>
+    const lanes = Object.values(runRecord(ROOT, run.id).steps).flatMap((step) =>
       step.branch === branch && step.workspace ? [step.workspace] : [],
     );
     const dropped = stand().place.askNow('remove', { repo: run.repo, workspaces: lanes, branches: [branch] });
@@ -931,7 +939,7 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
     assert.equal(await s.rested(), before, 'a branch git no longer has keeps the tip last seen: nothing to judge again');
     world().commit(run.repo, 'later on the base branch');
     assert.equal(await s.rested(), before, 'the base branch is none of the key');
-    assert.equal(runRecord(rootNow(), run.id).tips![branch], moved);
+    assert.equal(runRecord(ROOT, run.id).tips![branch], moved);
   });
 
   await t.test(
@@ -939,7 +947,7 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
     async () => {
       const s = await small({ isolated: 2 });
       const run = s.aResting(true);
-      const [branch, tip] = Object.entries(runRecord(rootNow(), run.id).tips ?? {})[0] ?? [];
+      const [branch, tip] = Object.entries(runRecord(ROOT, run.id).tips ?? {})[0] ?? [];
       assert.ok(branch && tip, 'the run has a tip on its record');
       const tippedThere = [...s.memo.runs.values()].filter((k) => k.run.repo === run.repo && k.tipped.length > 0).length;
       assert.ok(tippedThere > 1, 'runs of its repository rest on their tips');
@@ -955,9 +963,9 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
       );
       const pass = await runWith(s.h.e, tickRun({ repo: ROOT, memo: s.memo, verifyRest: true }).pipe(Effect.provide(unread)));
       assert.equal(pass.cost!.rested, before - tippedThere, 'every run of it whose tips the memo holds is judged in full, and no other');
-      assert.equal(runRecord(rootNow(), run.id).tips![branch], tip, 'and the tip the record holds is kept: the pass read no head');
+      assert.equal(runRecord(ROOT, run.id).tips![branch], tip, 'and the tip the record holds is kept: the pass read no head');
       assert.equal(await s.rested(), before - 1, 'its standing read again, the run whose branch moved is judged afresh');
-      assert.equal(runRecord(rootNow(), run.id).tips![branch], moved, 'and its tip written');
+      assert.equal(runRecord(ROOT, run.id).tips![branch], moved, 'and its tip written');
       await s.rested();
       assert.equal(await s.rested(), before, 'and at rest again');
     },
@@ -967,10 +975,10 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
     const s = await small();
     const run = s.aResting();
     await s.rested();
-    const size = fs.statSync(feedFile(rootNow())).size;
+    const size = fs.statSync(feedFile(ROOT)).size;
     await s.rested();
     await s.rested();
-    assert.equal(fs.statSync(feedFile(rootNow())).size, size, 'nothing moved, nothing said');
+    assert.equal(fs.statSync(feedFile(ROOT)).size, size, 'nothing moved, nothing said');
     await runWith(s.h.e, forgetRun(run.id));
     await s.rested();
     assert.equal(s.memo.runs.has(run.id), false, 'gone from the memo with its record');
@@ -987,7 +995,7 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
       assert.equal(pass.cost?.rested, 0, 'no run answered from memory');
       assert.deepEqual(
         pass.runs.map((a) => a.run.id),
-        listRuns(rootNow()).map((r) => r.id),
+        listRuns(ROOT).map((r) => r.id),
         'every run judged, in the store order',
       );
       assert.deepEqual([s.memo.runs.size, s.memo.cursor], [0, undefined], 'the memo emptied, and its place on the feed forgotten');
@@ -1002,17 +1010,17 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
     async () => {
       const s = await small();
       const run = s.aResting();
-      const stamp = () => restStamps(rootNow()).get(run.id);
+      const stamp = () => restStamps(ROOT).get(run.id);
       const was = stamp();
       assert.ok(was?.includes(`${run.id}.json=`), 'the record is stamped');
-      fs.mkdirSync(path.join(runsDir(rootNow()), run.id, 'inputs'), { recursive: true });
-      fs.writeFileSync(path.join(runsDir(rootNow()), run.id, 'inputs', 'brief.md'), 'what the run was given\n');
+      fs.mkdirSync(path.join(runsDir(ROOT), run.id, 'inputs'), { recursive: true });
+      fs.writeFileSync(path.join(runsDir(ROOT), run.id, 'inputs', 'brief.md'), 'what the run was given\n');
       assert.equal(stamp(), was, 'its directory — its files and inputs — is no input of a pass');
-      fs.writeFileSync(path.join(runsDir(rootNow()), `${run.id}.later`), 'a marker a later version writes\n');
+      fs.writeFileSync(path.join(runsDir(ROOT), `${run.id}.later`), 'a marker a later version writes\n');
       assert.notEqual(stamp(), was, 'a file named for the run is stamped, whatever it is called');
-      fs.rmSync(path.join(runsDir(rootNow()), `${run.id}.later`));
+      fs.rmSync(path.join(runsDir(ROOT), `${run.id}.later`));
       assert.equal(stamp(), was, 'and, gone, the stamp is as it was');
-      assert.equal(restStamps(rootNow()).has(`${run.id}-other`), false, 'a run with no files has no stamp');
+      assert.equal(restStamps(ROOT).has(`${run.id}-other`), false, 'a run with no files has no stamp');
     },
   );
 
@@ -1047,8 +1055,8 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
       const s = await small({ inFlight: 1 });
       const id = s.inFlight[0].id;
       const { run: _, ...advanced } = await s.answered(id);
-      const run = runRecord(rootNow(), id);
-      s.memo.runs.set(id, { stamp: restStamps(rootNow()).get(id)!, run, tipped: [], advanced });
+      const run = runRecord(ROOT, id);
+      s.memo.runs.set(id, { stamp: restStamps(ROOT).get(id)!, run, tipped: [], advanced });
       await assert.rejects(
         s.verified(),
         (err: Error) => err.message.includes(id) && /not at rest/.test(err.message) && /\(status, settled, inFlight\)/.test(err.message),
@@ -1077,7 +1085,7 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
     const l = listMemo();
     const run = l.stored('written');
     const memo = await l.memoOf(run, 'done');
-    fs.writeFileSync(path.join(runsDir(rootNow()), 'written.cancelled'), '2026-10-04T11:00:00.000Z');
+    fs.writeFileSync(path.join(runsDir(ROOT), 'written.cancelled'), '2026-10-04T11:00:00.000Z');
     assert.equal((await l.read(memo)).kept(run), undefined, 'a file beside its record');
   });
 
@@ -1086,7 +1094,7 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
     const run = l.stored('read');
     const memo = await l.memoOf(run, 'done');
     assert.equal((await l.read(memo)).kept({ ...run, brief: 'Do it again.' }), undefined, 'a run that is not the one it kept');
-    fs.writeFileSync(runFile(rootNow(), 'read'), JSON.stringify({ ...run, brief: 'Do it again.' }));
+    fs.writeFileSync(runFile(ROOT, 'read'), JSON.stringify({ ...run, brief: 'Do it again.' }));
     const rewritten = await l.read(memo);
     assert.equal(rewritten.given('read'), undefined, 'its record rewritten: the store is handed nothing and reads it');
     assert.equal(rewritten.kept(run), undefined, 'and the run the memo kept is answered no more');

@@ -2350,6 +2350,7 @@ export function seed(root: string, now = Date.now()): void {
     usage?: object,
     denials?: readonly object[],
     skills?: readonly string[],
+    ranIn?: string,
   ): void =>
     write(
       path.join(root, 'engine', 'tasks', `${task}.jsonl`),
@@ -2369,12 +2370,26 @@ export function seed(root: string, now = Date.now()): void {
           ...(usage ? { usage } : {}),
           ...(denials ? { denials } : {}),
           ...(skills ? { skills } : {}),
+          ...(ranIn ? { ranIn } : {}),
         },
         { kind: 'settled', at: ago(ended), outcome: 'succeeded' },
       ]),
     );
 
-  signedOff(`${id}-implement`, 'claude', workspace, SESSION.prompt, 42, 12, SESSION.closeout, SESSION.sessionId);
+  signedOff(
+    `${id}-implement`,
+    'claude',
+    workspace,
+    SESSION.prompt,
+    42,
+    12,
+    SESSION.closeout,
+    SESSION.sessionId,
+    undefined,
+    undefined,
+    undefined,
+    'auto',
+  );
   write(path.join(root, 'claude', 'projects', '-code-hkb-v2', `${SESSION.sessionId}.jsonl`), lines(conversation(SESSION, ago)));
   const files = path.join(root, 'runs', id, 'artifacts', FAKE.unverified);
   write(path.join(files, FAKE.artifacts.image), palette());
@@ -2392,12 +2407,20 @@ export function seed(root: string, now = Date.now()): void {
       FAKE.envelope.value,
     ],
   };
-  signedOff(`${id}-tokens`, 'codex', lane, 'Pick the colour tokens.', 40, 30, tokensCloseout, undefined, {
-    responses: 14,
-    toolCalls: 31,
-    inputTokens: 112_000,
-    outputTokens: 6_350,
-  });
+  signedOff(
+    `${id}-tokens`,
+    'codex',
+    lane,
+    'Pick the colour tokens.',
+    40,
+    30,
+    tokensCloseout,
+    undefined,
+    { responses: 14, toolCalls: 31, inputTokens: 112_000, outputTokens: 6_350 },
+    undefined,
+    undefined,
+    'workspace-write',
+  );
   signedOff(
     `${id}-theme`,
     'claude',

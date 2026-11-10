@@ -22,7 +22,7 @@
 import { Context, Effect, Layer } from 'effect';
 import { checked, doorOf, rootedDoor, type DoorOf } from '../../door/door.store.ts';
 import { DEFAULT_NAMESPACE } from 'objects';
-import { Conflict, type Refusal } from '../../refusal/refusal.ts';
+import { Conflict, Missing, type Refusal } from '../../refusal/refusal.ts';
 import {
   defaultFactoryRefusal,
   defaultWriteRefusal,
@@ -296,7 +296,14 @@ export const FactoryDoor = Context.Reference<FactoryDoorShape>('agent-orchestrat
  */
 export const filedFactory = (name: string, verb: FactoryWrite): Effect.Effect<Factory, Refusal> =>
   Effect.gen(function* () {
-    const record = yield* (yield* FactoryDoor).factories.read(FactoryName.read(name));
+    const record = yield* (yield* FactoryDoor).factories
+      .read(FactoryName.read(name))
+      // A write was asked, so its miss says what a write's does: nothing was changed.
+      .pipe(
+        Effect.catchTag('Missing', (miss) =>
+          Effect.fail(new Missing({ message: miss.message.replace(/Nothing was read\.$/, 'Nothing was changed.') })),
+        ),
+      );
     return isDefaultFactory(record) ? yield* Effect.fail(new Conflict({ message: defaultFactoryRefusal(verb) })) : record;
   });
 

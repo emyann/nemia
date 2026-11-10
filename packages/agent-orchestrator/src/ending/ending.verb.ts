@@ -57,7 +57,7 @@ const inFlightPhase = (phase: TaskPhase): boolean => phase === 'pending' || phas
  *   checkout already, so nothing holds it and no task is viewed again — a long-lived `workspace: base` step, filed and never landed, claims
  *   as of the run's creation, and is read on each pass. Left out, the ending's task is viewed (`mainClaim`).
  */
-export const checkoutHold = Effect.fn('checkoutHold')(function* (
+export const checkoutHold = (
   e: Engine,
   run: Run,
   steps: readonly Workflow[],
@@ -65,11 +65,24 @@ export const checkoutHold = Effect.fn('checkoutHold')(function* (
   env: NodeJS.ProcessEnv,
   memo: StatusMemo,
   phaseOf?: (taskId: string) => TaskPhase,
-) {
+) => {
+  // The plain guards first, untraced: a listing asks this of every run, and most claim no checkout.
   const ending = steps.find((s) => endsOnBase(s));
-  if (!ending || run.cancelledAt || endingClaimedAt(run, ending, runStore.asks.read(run.id).asks) === undefined) return undefined;
+  if (!ending || run.cancelledAt || endingClaimedAt(run, ending, runStore.asks.read(run.id).asks) === undefined)
+    return Effect.succeed(undefined);
   const taskId = run.steps[ending.name]?.taskId;
-  if (taskId && phaseOf && inFlightPhase(phaseOf(taskId))) return undefined;
+  if (taskId && phaseOf && inFlightPhase(phaseOf(taskId))) return Effect.succeed(undefined);
+  return claimsRead(e, run, from, env, memo);
+};
+
+/** The claims on the run's repository's checkout, read once the run's ending claims it (`checkoutHold`). */
+const claimsRead = Effect.fn('checkoutHold')(function* (
+  e: Engine,
+  run: Run,
+  from: { read: PassRead; slot: RunSlot | undefined } | { standing: Effect.Effect<PassStanding, Refusal> },
+  env: NodeJS.ProcessEnv,
+  memo: StatusMemo,
+) {
   const read = 'read' in from ? from.read : passRead(e, runStore.runs.list(), env, yield* from.standing, yield* passRevisions());
   const slotOf = (id: string) => read.slots.pipe(Effect.map((slots) => slots.get(id)));
   const mine = yield* mainClaim(e, run, 'read' in from ? Effect.succeed(from.slot) : slotOf(run.id), read.parents, memo);

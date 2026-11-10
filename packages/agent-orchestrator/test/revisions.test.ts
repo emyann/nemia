@@ -1235,7 +1235,7 @@ test('a held run is read and pinned as one that files again once the hold lifts;
   const factory = `held-${t.name}`;
   addFactory({ name: factory, repos: [repo] });
   attachWorkflow({ factory, workflow: t.name });
-  setRevisions({ factory, revisions: 'follow' });
+  followed(ROOT, factory, 'follow');
   const run = await started(t.dir, repo, { factory });
   const b = board();
   await runWith(b.e, advanceRun(readRun(run.id)));

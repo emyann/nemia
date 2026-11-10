@@ -27,7 +27,7 @@ import {
 import type { Agents } from '../agents/agents.ts';
 import type { Places } from '../skills/read.store.ts';
 import type { Fills, Found } from './folder.ts';
-import { HOME, isDirectory } from '../record/record.store.ts';
+import { isDirectory } from '../record/record.store.ts';
 import { doorAtOnce } from '../factory/door/factories.store.ts';
 
 /**
@@ -286,15 +286,5 @@ export function placesAroundAt(home: string, workflowDir: string): Places {
   return { ...(knownReposAt(home).has(repo) || factoryTrees(home).has(repo) ? { repo } : {}), home };
 }
 
-/**
- * A function taking the store's root first, as the old spelling that takes none: `at` the module's root, `HOME`. The one line of this
- * file that reads a root of its own (`test/global-roots.baseline.ts`), and so where `writeWorkflow` (`workflows.store.ts`) takes its
- * root too.
- */
-export const atHome =
-  <A extends unknown[], R>(at: (home: string, ...args: A) => R) =>
-  (...args: A): R =>
-    at(HOME, ...args);
-
-/** `removeWorkflowAt` the module's root. */
-export const removeWorkflow = atHome(removeWorkflowAt);
+/** `removeWorkflowAt`, under the name the package exports: the store's root first. */
+export const removeWorkflow = removeWorkflowAt;

@@ -47,9 +47,8 @@ export class Engine extends Context.Service<Engine, ReturnType<typeof engine>>()
  * (`storeConfigLayer`, `app.ts`, which gives the store's settings too, `StoreConfig`), with no default, so an app given none does not
  * compile. A test that gives another root moves where the api looks for yours.
  *
- * What the package still reads off a root of its own, as its modules load — the runs (`runsAtOnce`, `findRun`), the inbox and the queue,
- * the daemon's file — is named in `packages/agent-orchestrator/test/global-roots.baseline.ts`, and is owed its own threading; a test that
- * means to move those sets `WF_ROOT` before it imports the package, as `test/harness.ts` does.
+ * The package reads off no root of its own as it loads: the runs (`runsAtOnce(home)`, `findRun`), the inbox and the daemon's file are
+ * each read at the root a caller hands it, which the api reads off `StoreRoot` (`Served.home`).
  */
 export { StoreConfig, StoreRoot } from 'agent-orchestrator';
 import { StoreConfig, StoreRoot } from 'agent-orchestrator';
@@ -80,8 +79,8 @@ export async function everyView(e: Reader): Promise<{ views: Views; unreadable: 
   };
 }
 
-/** Found among the ids the store lists (`runs.find`), not read by path, so no id can name a file outside it. */
-export const findRun = (id: string): Run | undefined => runsAtOnce.runs.find(id);
+/** Found among the ids the store at `home` lists (`runs.find`), not read by path, so no id can name a file outside it. */
+export const findRun = (home: string, id: string): Run | undefined => runsAtOnce(home).runs.find(id);
 
 export const noSuchRun = (id: string) =>
   `No run '${id}' in this store. GET /api/runs (or \`nemia ls\`) lists the runs it has; check WF_ROOT if you expected it here.`;
@@ -91,7 +90,7 @@ export const noSuchRun = (id: string) =>
  * that id, or no step by that name on the run's page, which shows those on the record and any the folder has gained (`stepNames`).
  */
 export function taskOfStep(id: string, step: string, home: string): { run: Run; taskId: string | null } | { error: string } {
-  const run = findRun(id);
+  const run = findRun(home, id);
   if (!run) return { error: noSuchRun(id) };
   if (!stepNames(run, workflowsOf(run, home).steps).includes(step)) {
     return { error: `Run '${id}' has no step '${step}'. GET /api/runs/${id} lists the steps it has.` };

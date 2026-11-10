@@ -27,7 +27,7 @@ delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 const { advanceRun, cancelRun, decideRun, list, retryRun, runObject, startRun, runWith } = await import('../src/runner.ts');
 const { listRuns, runRecord } = await import('../src/record/record.store.ts');
-const { filesStore: runStore } = await import('../src/record/files.store.ts');
+const runStore = (await import('../src/record/files.store.ts')).filesStoreAt(rootNow());
 /** The run `id` as a reader is given it, the store's pause composed onto it (`runs.read`). */
 const theRun = (id: string) => runStore.runs.read(id);
 const { passStanding, standingSnapshot } = await import('../src/standing/standing.verb.ts');
@@ -48,9 +48,9 @@ const { main } = await import('../src/cli/main.ts');
 const stage = staged({ runWith, main, engineOf });
 
 /** One pass of the tick over the run `id`, on the stage's engine. */
-const tick = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(id)));
+const tick = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(rootNow(), id)));
 /** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `nemia ls` reads. */
-const aPass = () => stage.runWith(stage.board().e, passStanding(listRuns()));
+const aPass = () => stage.runWith(stage.board().e, passStanding(listRuns(rootNow())));
 
 /**
  * The run as the tick's pass reads and assesses it: its one read (`readRun`), then the pass's own assessment (`passAssessment`, which

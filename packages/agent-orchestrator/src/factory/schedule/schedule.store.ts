@@ -5,16 +5,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Cron, Result, Schema } from 'effect';
-import { HOME } from '../../record/record.store.ts';
 import type { Schedule } from '../factory.ts';
 import type { ScheduleTry } from './schedule.ts';
 import { writeWhole } from '../../whole-file/whole-file.store.ts';
 
 /** Where the tick keeps its tries of the factories' schedules: `$WF_ROOT/schedules`, a folder per factory. */
-export const schedulesDir = (): string => path.join(HOME, 'schedules');
+export const schedulesDir = (home: string): string => path.join(home, 'schedules');
 
 /** The try file of the schedule of `workflow` in `factory`. */
-const tryFile = (factory: string, workflow: string): string => path.join(schedulesDir(), factory, `${workflow}.json`);
+const tryFile = (home: string, factory: string, workflow: string): string => path.join(schedulesDir(home), factory, `${workflow}.json`);
 
 /** A try as the tick writes it, every key it holds kept. */
 const ScheduleTrySchema = Schema.StructWithRest(
@@ -29,9 +28,9 @@ const ScheduleTrySchema = Schema.StructWithRest(
 );
 
 /** The tick's kept try of the schedule of `workflow` in `factory`; none when there is no file, or it does not read as one. */
-export function readScheduleTry(factory: string, workflow: string): ScheduleTry | undefined {
+export function readScheduleTry(home: string, factory: string, workflow: string): ScheduleTry | undefined {
   try {
-    const decoded = Schema.decodeUnknownResult(ScheduleTrySchema)(JSON.parse(fs.readFileSync(tryFile(factory, workflow), 'utf8')));
+    const decoded = Schema.decodeUnknownResult(ScheduleTrySchema)(JSON.parse(fs.readFileSync(tryFile(home, factory, workflow), 'utf8')));
     return Result.isSuccess(decoded) ? decoded.success : undefined;
   } catch {
     return undefined;
@@ -39,8 +38,8 @@ export function readScheduleTry(factory: string, workflow: string): ScheduleTry 
 }
 
 /** The tick's try of the schedule of `workflow` in `factory`, written whole: a hidden file renamed over it. */
-export function putScheduleTry(factory: string, workflow: string, tried: ScheduleTry): void {
-  const file = tryFile(factory, workflow);
+export function putScheduleTry(home: string, factory: string, workflow: string, tried: ScheduleTry): void {
+  const file = tryFile(home, factory, workflow);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   writeWhole(file, `${JSON.stringify(tried, null, 2)}\n`);
 }

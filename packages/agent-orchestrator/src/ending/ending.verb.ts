@@ -30,6 +30,7 @@ import { readRun } from '../tick/told.verb.ts';
 import { passRead, type PassRead } from '../cap/cap.verb.ts';
 import { passRevisions } from '../revisions/pin.verb.ts';
 import type { PassStanding } from '../standing/standing.verb.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /** A task the engine holds in flight, as `inFlight` counts one: its step is in the checkout now. Pure. */
 const inFlightPhase = (phase: TaskPhase): boolean => phase === 'pending' || phase === 'running';
@@ -61,16 +62,17 @@ const inFlightPhase = (phase: TaskPhase): boolean => phase === 'pending' || phas
  *   as of the run's creation, and is read on each pass. Left out, the ending's task is viewed (`mainClaim`).
  */
 export const checkoutHold = (
+  home: string,
   e: Engine,
   run: Run,
   steps: readonly StepSpec[],
-  from: { read: PassRead; slot: RunSlot | undefined } | { standing: Effect.Effect<PassStanding, Refusal> },
+  from: { read: PassRead; slot: RunSlot | undefined } | { standing: Effect.Effect<PassStanding, Refusal, StoreRoot> },
   config: Settings,
   memo: StatusMemo,
   phaseOf?: (taskId: string) => TaskPhase,
 ) => {
   const ending = steps.find((s) => endsOnBase(s));
-  if (!ending || run.cancelledAt || endingClaimedAt(run, ending, runsAtOnce.asks.read(run.id).asks) === undefined)
+  if (!ending || run.cancelledAt || endingClaimedAt(run, ending, runsAtOnce(home).asks.read(run.id).asks) === undefined)
     return Effect.succeed(undefined);
   const taskId = run.steps[ending.name]?.taskId;
   if (taskId && phaseOf && inFlightPhase(phaseOf(taskId))) return Effect.succeed(undefined);
@@ -81,12 +83,15 @@ export const checkoutHold = (
 const claimsRead = Effect.fn('checkoutHold')(function* (
   e: Engine,
   run: Run,
-  from: { read: PassRead; slot: RunSlot | undefined } | { standing: Effect.Effect<PassStanding, Refusal> },
+  from: { read: PassRead; slot: RunSlot | undefined } | { standing: Effect.Effect<PassStanding, Refusal, StoreRoot> },
   config: Settings,
   memo: StatusMemo,
 ) {
+  const home = yield* StoreRoot;
   const read =
-    'read' in from ? from.read : passRead(e, yield* (yield* RunDoor).runs.list(), config, yield* from.standing, yield* passRevisions());
+    'read' in from
+      ? from.read
+      : passRead(home, e, yield* (yield* RunDoor).runs.list(), config, yield* from.standing, yield* passRevisions());
   const slotOf = (id: string) => read.slots.pipe(Effect.map((slots) => slots.get(id)));
   const mine = yield* mainClaim(e, run, 'read' in from ? Effect.succeed(from.slot) : slotOf(run.id), read.parents, memo);
   if (!mine || mine.holds) return undefined;
@@ -188,6 +193,7 @@ const mainClaim = Effect.fnUntraced(function* (
  *   place of the run's own, where it names one.
  */
 export function landEnding(
+  home: string,
   run: Run,
   steps: readonly StepSpec[],
   phaseOf: (taskId: string) => TaskPhase,
@@ -199,7 +205,7 @@ export function landEnding(
 ): { notes: string[]; landed: boolean } {
   const ending = steps.find((s) => landsOnCheck(s, run));
   const record = ending && run.steps[ending.name];
-  if (!ending || !record?.taskId || record.landed || !isRepositoryRun(run) || !runsAtOnce.runs.exists(run.id))
+  if (!ending || !record?.taskId || record.landed || !isRepositoryRun(run) || !runsAtOnce(home).runs.exists(run.id))
     return { notes: [], landed: false };
   const own = ownStatus(ending, run, phaseOf, signedOff, asked, steps, spendOf);
   const said = signedOff(ending.name)?.output?.message;
@@ -218,7 +224,7 @@ export function landEnding(
   const write = (landed: LandingRecord, note: string) => {
     const dropped =
       'commit' in landed
-        ? dropLandedPictures(run, name, signedOff(name), { commit: landed.commit, checkTaskId: record.check?.taskId })
+        ? dropLandedPictures(home, run, name, signedOff(name), { commit: landed.commit, checkTaskId: record.check?.taskId })
         : undefined;
     run.steps[name] = { ...record, landed };
     const freed = dropped?.removed.length

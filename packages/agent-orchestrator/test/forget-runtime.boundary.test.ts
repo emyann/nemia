@@ -22,6 +22,7 @@ import { asyncOps, plainEngine, type AsyncRunner } from './promised.ts';
 import type { Engine } from '../src/runtime-client.ts';
 import { scratch } from 'test-kit/scratch';
 import { runGiven, runOver } from './placed.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-forget-runtime-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -35,7 +36,7 @@ const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
 const { runRecord } = await import('../src/record/record.store.ts');
 const { runTasks } = await import('../src/record/record.ts');
-const { filesStore: runStore } = await import('../src/record/files.store.ts');
+const runStore = (await import('../src/record/files.store.ts')).filesStoreAt(rootNow());
 const { tickRun } = await import('../src/tick/tick.verb.ts');
 const { main } = await import('../src/cli/main.ts');
 
@@ -119,7 +120,7 @@ const sign = (taskId: string, n: number, closeout: object) => {
 /** What the daemon does: the engine's tick, then the run's pass. */
 const pass = async (id: string) => {
   await Effect.runPromise(e.tick());
-  return runWith(e, advanceRun(runRecord(id)));
+  return runWith(e, advanceRun(runRecord(rootNow(), id)));
 };
 
 /** The ids of the tasks the engine has a record of. */
@@ -151,7 +152,7 @@ const finished = async () => {
   sessions.set(check, { ...sessions.get(check)!, state: 'completed', busy: false, exitCode: 0 });
   await pass(run.id);
   assert.equal((await pass(run.id)).status, 'succeeded');
-  const tasks = runTasks(runRecord(run.id));
+  const tasks = runTasks(runRecord(rootNow(), run.id));
   assert.deepEqual(
     [...tasks].sort(),
     [`${run.id}-implement`, `${run.id}-implement-try2`, `${run.id}-implement-try2-check`],

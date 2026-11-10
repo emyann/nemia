@@ -119,6 +119,7 @@ const VERSION = /^\d+\.\d+\.\d+$/;
  * the status. Refused: one made from no template, one not rendered.
  */
 function rendered(
+  home: string,
   factory: Factory,
   verb: string,
   notDone: string,
@@ -128,12 +129,12 @@ function rendered(
     throw new Invalid({
       message: `${verb}: ${name} is not made from a template, so it has none to upgrade; to put one onto it in place, nemia factory diff ${name} --template <name|folder|archive> previews the takeover, then nemia factory adopt. ${notDone}`,
     });
-  const base = entriesIn(appliedDir(name));
+  const base = entriesIn(appliedDir(home, name));
   if (!base.length)
     throw new Conflict({
       message: `${verb}: ${name} is not rendered yet, so there is no base to merge with: start the daemon, nemia up, and try again once nemia factory ls shows it applied. ${notDone}`,
     });
-  const status = readStatus(name);
+  const status = readStatus(home, name);
   return { factory: factory as Templated, from: status?.version ?? undefined, base, status };
 }
 
@@ -191,8 +192,9 @@ const judgedTo = Effect.fn('judgedTo')(function* (
  * base holds, any `--to` is taken: the controller checks it against the base.
  */
 const upgradeAsked = Effect.fn('upgradeAsked')(function* (args: Args, verb: string, notDone: string, downgrades = true) {
+  const home = yield* StoreRoot;
   const filed = yield* filedFactory(textOf(args, 'factory') ?? '', 'upgrade');
-  const { factory, from, base, status } = yield* tried(() => rendered(filed, verb, notDone));
+  const { factory, from, base, status } = yield* tried(() => rendered(home, filed, verb, notDone));
   const to = textOf(args, 'to');
   if (to === undefined || !VERSION.test(to))
     return yield* Effect.fail(
@@ -310,10 +312,10 @@ function planHeld(home: string, asked: Asked, args: Args, verb: string, notDone:
 }
 
 /** The merge of the factory's tree with its base and `render`, three ways; or, for a switch, with `render` alone, with no common base. */
-const mergeOf = (name: string, base: readonly Entry[], render: RenderedAt, switched: Switched | undefined): TreeMerge =>
+const mergeOf = (home: string, name: string, base: readonly Entry[], render: RenderedAt, switched: Switched | undefined): TreeMerge =>
   switched === undefined
-    ? mergeTrees(base, entriesIn(treeDir(name)), render.entries)
-    : switchTrees(entriesIn(treeDir(name)), render.entries);
+    ? mergeTrees(base, entriesIn(treeDir(home, name)), render.entries)
+    : switchTrees(entriesIn(treeDir(home, name)), render.entries);
 
 /** The flags plan and upgrade take: `--to`, and `--template` where the template is at another place than the one the factory names. */
 const TO: Flag = {
@@ -397,7 +399,7 @@ export const FACTORY_PLAN: Command<Planned | AdoptPreview> = {
       const home = yield* StoreRoot;
       const asked = yield* upgradeAsked(args, verb, notDone, false);
       const { factory, from, to, render, base, switched } = asked;
-      const merge = yield* tried(() => mergeOf(factory.name, base, render, switched));
+      const merge = yield* tried(() => mergeOf(home, factory.name, base, render, switched));
       const next = yield* tried(() => nextOf(home, asked, args));
       return { kind: 'upgrade', name: factory.name, from, to, merge, next, ...(switched ? { switched } : {}) } satisfies Planned;
     }),
@@ -468,7 +470,7 @@ export const FACTORY_UPGRADE: Command<Upgraded> = {
       const home = yield* StoreRoot;
       const asked = yield* upgradeAsked(args, verb, notDone);
       const { factory, from, to, source, render, base, switched } = yield* tried(() => planHeld(home, asked, args, verb, notDone));
-      const conflicts = yield* tried(() => mergeOf(factory.name, base, render, switched).conflicts.length);
+      const conflicts = yield* tried(() => mergeOf(home, factory.name, base, render, switched).conflicts.length);
       const door = yield* FactoryDoor;
       const now = yield* filedFactory(factory.name, 'upgrade');
       const template = now.template ?? factory.template;
@@ -532,10 +534,11 @@ type Resolved = { name: string; at: string; to: string; file: string; left: stri
  * an address that is no conflict of the merge (`Missing`, naming those there are); and a `--file` that is not there (`Invalid`).
  */
 const resolved = Effect.fn('resolved')(function* (args: Args) {
+  const home = yield* StoreRoot;
   const verb = 'nemia factory resolve';
   const notDone = 'Nothing was resolved.';
   const filed = yield* filedFactory(textOf(args, 'factory') ?? '', 'upgrade');
-  const { factory, from, base, status } = yield* tried(() => rendered(filed, verb, notDone));
+  const { factory, from, base, status } = yield* tried(() => rendered(home, filed, verb, notDone));
   const to = factory.template.version;
   if (from === undefined)
     return yield* Effect.fail(
@@ -563,14 +566,14 @@ const resolved = Effect.fn('resolved')(function* (args: Args) {
       }),
     );
   const merging = { from, to, template: render.name, base: digestOf(base) };
-  return yield* tried(() => resolvedWith(args, factory, merging, mergeOf(factory.name, base, render, switched)));
+  return yield* tried(() => resolvedWith(home, args, factory, merging, mergeOf(home, factory.name, base, render, switched)));
 });
 
 /**
  * The choice `args` give for one conflict of `merge`, the upgrade of `factory` named by `merging` — its versions, its template and the
  * digest of its base — written (`resolved`), beside the choices already made for that merge (`choicesFor`).
  */
-function resolvedWith(args: Args, factory: Templated, merging: MergeAt, merge: TreeMerge): Resolved {
+function resolvedWith(home: string, args: Args, factory: Templated, merging: MergeAt, merge: TreeMerge): Resolved {
   const { to } = merging;
   const verb = 'nemia factory resolve';
   const notDone = 'Nothing was resolved.';
@@ -580,11 +583,17 @@ function resolvedWith(args: Args, factory: Templated, merging: MergeAt, merge: T
       message: `${verb}: ${at} is no conflict of ${factory.name}'s upgrade to ${to}; ${merge.conflicts.length ? `its conflicts: ${merge.conflicts.map((c) => c.at).join(', ')}` : 'it has none'} (nemia factory diff ${factory.name} --to ${to}). ${notDone}`,
     });
   const choice = choiceOf(args);
-  const kept = readResolutions(factory.name);
+  const kept = readResolutions(home, factory.name);
   const choices = { ...choicesFor(kept, merging), [at]: choice };
-  writeResolutions(factory.name, { ...kept, to, template: merging.template, base: merging.base, choices });
+  writeResolutions(home, factory.name, { ...kept, to, template: merging.template, base: merging.base, choices });
   const left = compose(merge, choices);
-  return { name: factory.name, at, to, file: resolutionsFile(factory.name), left: 'pending' in left ? left.pending.map((c) => c.at) : [] };
+  return {
+    name: factory.name,
+    at,
+    to,
+    file: resolutionsFile(home, factory.name),
+    left: 'pending' in left ? left.pending.map((c) => c.at) : [],
+  };
 }
 
 /** `nemia factory resolve`: the person's choice for one conflict of an upgrade; the daemon merges once each has one. */

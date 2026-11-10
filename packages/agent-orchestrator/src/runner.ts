@@ -37,6 +37,7 @@ export { currentRelease } from './release/release.store.ts';
 export { runningRelease } from './release/version.verb.ts';
 export { Conflict, Forbidden, Invalid, isRefusal, Missing, type Refusal } from './refusal/refusal.ts';
 export {
+  type Env,
   maxConcurrent,
   maxRuns,
   SESSION_VARIABLES,
@@ -252,7 +253,7 @@ export {
   takeoverLine,
 } from './daemon/daemon.ts';
 export type { DaemonFile, DaemonStanding, Identity, Liveness } from './daemon/daemon.ts';
-export { HOME, acceptFile, approvalFile, artifactsDir, askFile, inputsDir, roundAskFile, runId } from './record/record.store.ts';
+export { acceptFile, approvalFile, artifactsDir, askFile, inputsDir, roundAskFile, runId } from './record/record.store.ts';
 export { stepsOf } from './steps/steps.verb.ts';
 export { inboxDir, keptRuns } from './record/files.store.ts';
 export { runsAtOnce } from './runs/runs.store.ts';

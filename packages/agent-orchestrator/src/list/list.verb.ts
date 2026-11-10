@@ -108,13 +108,14 @@ export type ListReading = Listing & {
  * Untraced: a list runs it once per run, and a span each would bury the list's trace under hundreds.
  */
 export const listReading = Effect.fnUntraced(function* (e: Engine, run: Run, how: ListReadingHow) {
+  const home = yield* StoreRoot;
   const { git } = how;
   const given = { ...(how.steps ? { steps: [...how.steps] } : {}), ...(how.views ? { views: new Map(how.views) } : {}) };
   const { read: base } = yield* readRun(e, run, given);
   const { steps, views, phaseOf, answers, spendOf } = base;
   const memo = statusMemo(headsOver(git), yield* PlaceService);
   const standing = how.checkout ? Effect.succeed(how.checkout) : standingSnapshot();
-  const checkout = yield* checkoutHold(e, run, steps, { standing }, how.config ?? (yield* StoreConfig), memo);
+  const checkout = yield* checkoutHold(home, e, run, steps, { standing }, how.config ?? (yield* StoreConfig), memo);
   const held = { ...base, checkout };
   const standings = how.standings ? how.standings(assess(held).status, steps) : standingsOf(run, steps, git);
   const read = { ...held, standings };
@@ -213,7 +214,7 @@ export const runsListed = Effect.fn('runsListed')(function* (runId?: string, sel
   const schedules = runId ? [] : schedulesListed(home, all);
   return {
     runs: listed,
-    daemon: daemonStanding(),
+    daemon: daemonStanding(home),
     standing: read,
     ...paused,
     ...(schedules.length ? { schedules } : {}),

@@ -182,6 +182,7 @@ export const advancePass = Effect.fn('advancePass')(
   function* (e: Engine, run: Run, slot?: RunSlot, pass?: PassRead) {
     yield* Effect.annotateCurrentSpan({ run: run.id });
     const revisions = pass?.revisions ?? (yield* passRevisions());
+    const home = yield* StoreRoot;
     const took = yield* pinPass(run, new Date().toISOString(), revisions);
     const {
       read: reads,
@@ -192,14 +193,14 @@ export const advancePass = Effect.fn('advancePass')(
     if (run.cancelledAt) yield* stopCancelled(e, run, reads);
     const place = yield* PlaceService;
     const handed = yield* withinEffect('act', handOffAll(run, reads, place));
-    const lacking = readFiles(run, reads);
+    const lacking = readFiles(home, run, reads);
     const heads = headsOf(run, handed.marked ? undefined : pass?.standing, place);
     const memo = statusMemo((r) => (r.id === run.id ? heads() : pass ? headsFor(pass.standing, r) : headsNow(r, place)), place);
-    const landing = landEnding(run, steps, phaseOf, signedOff, asked, spendOf, verdictOf, memo);
+    const landing = landEnding(home, run, steps, phaseOf, signedOff, asked, spendOf, verdictOf, memo);
     const parents = pass?.parents ?? passParents(readsOthers(run) ? yield* standingLive([run]) : standingReader(NOTHING_READ));
     const from = pass
       ? { read: pass, slot }
-      : { standing: standingNow(runsAtOnce.runs.list()).pipe(Effect.provideService(PlaceService, place)) };
+      : { standing: standingNow(runsAtOnce(home).runs.list()).pipe(Effect.provideService(PlaceService, place)) };
     const lift = yield* liftHold(e, run, parents);
     const { checkout, assessed } = yield* passAssessment(e, run, reads, from, memo, yield* standingOf(pass));
     const { ran, settled, marked, timed } = yield* marksOf(e, run, reads, assessed.status);
@@ -220,13 +221,12 @@ export const advancePass = Effect.fn('advancePass')(
     const notes: string[] = [...askNotes, ...handed.collected, ...lacking.notes, ...landing.notes, ...lift.notes, ...closeNotes];
     notes.unshift(...took.notes);
     notes.push(...followed.notes);
-    const home = yield* StoreRoot;
     const f: Filing = {
       e: { ...e, file: (spec) => e.file(inParts(spec)) },
       run: ran,
       reads,
       closer,
-      mayFile: mayFileOf(ran),
+      mayFile: mayFileOf(home, ran),
       notes,
       heads,
       home,
@@ -312,11 +312,12 @@ export const passAssessment = Effect.fnUntraced(function* (
   e: Engine,
   run: Run,
   reads: RunRead,
-  from: Parameters<typeof checkoutHold>[3],
+  from: Parameters<typeof checkoutHold>[4],
   memo: StatusMemo,
   standing: PassStanding,
 ) {
-  const checkout = yield* checkoutHold(e, run, reads.steps, from, yield* StoreConfig, memo, reads.phaseOf);
+  const home = yield* StoreRoot;
+  const checkout = yield* checkoutHold(home, e, run, reads.steps, from, yield* StoreConfig, memo, reads.phaseOf);
   const read = withStandings({ ...reads, checkout }, standing);
   return { checkout, read, assessed: assess(read) };
 });
@@ -346,9 +347,9 @@ const marksOf = Effect.fnUntraced(function* (e: Engine, run: Run, r: RunRead, st
  * or held, or the store paused, while the pass was at work. Once it has said no it says no for the rest of the pass, whatever the store
  * reads after.
  */
-export const mayFileOf = (run: Run): (() => boolean) => {
+export const mayFileOf = (home: string, run: Run): (() => boolean) => {
   let calledOff = false;
-  return () => !(calledOff ||= !runsAtOnce.runs.exists(run.id) || runsAtOnce.runs.calledOff(run.id));
+  return () => !(calledOff ||= !runsAtOnce(home).runs.exists(run.id) || runsAtOnce(home).runs.calledOff(run.id));
 };
 
 /**
@@ -369,20 +370,23 @@ const stopCancelled = Effect.fnUntraced(function* (e: Engine, run: Run, r: RunRe
  * `handoff`, asked of `place`, and marked only on its answer: one refused or not heard is asked again on the next pass.
  */
 const handOffAll = Effect.fnUntraced(function* (run: Run, r: RunRead, place: Place) {
+  const home = yield* StoreRoot;
   let marked = false;
   const collected: string[] = [];
   for (const name of handOffOwed(r.steps, run, r.phaseOf)) {
-    if (!runsAtOnce.runs.exists(run.id)) continue;
+    if (!runsAtOnce(home).runs.exists(run.id)) continue;
     const record = run.steps[name];
     if (!record?.taskId || !record.workspace) continue;
-    const unhanded = isRepositoryRun(run) ? yield* handedOffBy(place, record.workspace, name) : folderPlace(runsDir()).handOff(run, name);
+    const unhanded = isRepositoryRun(run)
+      ? yield* handedOffBy(place, record.workspace, name)
+      : folderPlace(runsDir(home)).handOff(run, name);
     if (unhanded === undefined) {
       run.steps[name] = { ...record, handedOff: record.taskId };
       marked = true;
     }
-    collected.push(...(unhanded === undefined ? [] : [`${name}: ${unhanded}`]), ...collectArtifacts(run, name, r.signedOff(name)));
+    collected.push(...(unhanded === undefined ? [] : [`${name}: ${unhanded}`]), ...collectArtifacts(home, run, name, r.signedOff(name)));
     const step = r.steps.find((s) => s.name === name);
-    if (step) collected.push(...handCloseout(run, step, r.signedOff(name)));
+    if (step) collected.push(...handCloseout(home, run, step, r.signedOff(name)));
   }
   return { collected, marked };
 });
@@ -393,13 +397,13 @@ const handOffAll = Effect.fnUntraced(function* (run: Run, r: RunRead, place: Pla
  * (`StepRecord.filesRead`), which unsigns the step where there is one: so no later pass reads that task's files again. Answers how
  * many steps it read, each a write the record is owed, and a note for each whose closeout is not accepted.
  */
-function readFiles(run: Run, r: RunRead): { read: number; notes: string[] } {
+function readFiles(home: string, run: Run, r: RunRead): { read: number; notes: string[] } {
   const due = filesDue(r.steps, run, r.phaseOf, r.signedOff);
   const notes: string[] = [];
   for (const name of due) {
     const record = run.steps[name];
     if (!record?.taskId) continue;
-    const lacked = filesLacked(run, name, r.signedOff(name));
+    const lacked = filesLacked(home, run, name, r.signedOff(name));
     const why = Object.fromEntries(lacked.map((file) => [file.path, file.why]));
     run.steps[name] = { ...record, filesRead: { taskId: record.taskId, lacked: why } };
     if (lacked.length) {
@@ -425,11 +429,12 @@ const handedOffBy = Effect.fnUntraced(function* (place: Place, workspace: string
  * a person's (`holdOnce`) — by the time it is worded the hold is off the record, and nothing but this knows who took it off.
  */
 const liftHold = Effect.fnUntraced(function* (e: Engine, run: Run, parents: Parents) {
+  const home = yield* StoreRoot;
   const nothing: { notes: string[]; lifted?: string } = { notes: [] };
   if (!run.hold || run.cancelledAt || !run.hold.until.length) return nothing;
   let landed = true;
   for (const id of run.hold.until) if (!(landed = (yield* keptParent(id, parents.git, parents.read).pipe(over(e))).landed)) break;
-  if (!landed || !runsAtOnce.holds.lift(run.id, run.hold.at)) return nothing;
+  if (!landed || !runsAtOnce(home).holds.lift(run.id, run.hold.at)) return nothing;
   const { until, at } = run.hold;
   delete run.hold;
   return {

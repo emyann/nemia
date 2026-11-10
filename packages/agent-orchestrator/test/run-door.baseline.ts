@@ -1,14 +1,15 @@
 /**
- * Every file of `src` that still reads runs past a Run door a program is given: through `runsAtOnce` (`src/runs/runs.store.ts`), the
- * door's synchronous spelling over the files at the module's own root, or through `keptRuns` (`src/record/files.store.ts`), with how
- * many uses each holds (`run-store.test.ts`). A debt, and nothing else: until the Run door is rooted as the Factory door is, such a read
- * reads the module's root, never the `StoreRoot` or the `RunDoor` the program was given.
+ * Every file of `src` that still reads runs past a Run door a program is given: through `runsAtOnce(home)` (`src/runs/runs.store.ts`),
+ * the door's synchronous spelling over the files at the root it is handed, or through `keptRuns(home, …)` (`src/record/files.store.ts`),
+ * with how many calls each holds (`run-store.test.ts`). A debt, and nothing else: such a read goes past the `RunDoor` the program was
+ * given, so a test's memory door never sees it. The count was taken over `runsAtOnce.` while the door's spelling read the module's root,
+ * and holds over `runsAtOnce(` call for call: a respelling lowers no count.
  *
  * It only shrinks: a file moved onto a door it is given takes its line away, a count cut is lowered here, and a file this does not name
  * may hold none at all.
  */
 
-/** Each file by its path from the package, and its uses of `runsAtOnce` and `keptRuns`, comments left out. */
+/** Each file by its path from the package, and its calls of `runsAtOnce` and `keptRuns`, comments left out. */
 export const RUN_DOOR_DEBT: Readonly<Record<string, number>> = {
   'src/branches/merges.verb.ts': 1,
   'src/brief/handed.verb.ts': 1,

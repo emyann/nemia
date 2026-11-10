@@ -133,7 +133,7 @@ writeRun('g-parents-landed', { after: ['a-landed'] });
 writeRun('h-gone-parent', { after: ['x-gone'] });
 working('t-i', filedI);
 writeRun('i-started', { after: ['b-running'], steps: { implement: { taskId: 't-i', workspace: repo, branch: 'wf/i-started/implement' } } });
-await runWith(engine(process.env), passStanding(runStore.runs.list()));
+await runWith(engine(process.env), passStanding(runStore(root).runs.list()));
 
 /** A run as the RunList (`GET /api/runs`) has it: its `status`, with the runs it froze to wait on and when it was made. */
 type Listed = Run['status'] & { after: readonly string[]; createdAt: string };
@@ -220,7 +220,7 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
         'c-cancelled',
       ]) {
         const api = runs.get(id)!;
-        const cli = await runWith(e, list(e, runStore.runs.read(id)));
+        const cli = await runWith(e, list(e, runStore(root).runs.read(id)));
         assert.deepEqual(asWaits(api.waiting), cli.waiting, id);
         assert.deepEqual(
           api.steps.map((s) => s.message),
@@ -229,10 +229,10 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
         );
         if (cli.waiting.length) {
           assert.equal(api.waiting?.word, waitWord(cli.waiting), id);
-          assert.equal(api.waiting?.advice, waitAdvice(runStore.runs.read(id), cli.waiting), id);
+          assert.equal(api.waiting?.advice, waitAdvice(runStore(root).runs.read(id), cli.waiting), id);
           assert.equal(
             api.waiting?.waitingOnYou,
-            !waitAdvice(runStore.runs.read(id), cli.waiting).startsWith(`nothing of ${id} is filed until `),
+            !waitAdvice(runStore(root).runs.read(id), cli.waiting).startsWith(`nothing of ${id} is filed until `),
             `${id}: on you exactly when waitAdvice does not say "nothing of <run> is filed until …", which it says while every run waited on may still land`,
           );
         }

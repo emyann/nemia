@@ -49,7 +49,7 @@ const schedulesOf = Effect.fn('schedulesOf')(function* (home: string, repo: stri
   const { listing } = yield* factoryFiled(home, repo, namespace);
   if (listing === undefined || 'error' in listing) return [];
   const verify = yield* setting('verifyRest');
-  const listed = yield* tried(() => schedulesListed(home, keptRuns(memo, scheduleRun, verify)));
+  const listed = yield* tried(() => schedulesListed(home, keptRuns(home, memo, scheduleRun, verify)));
   return listed.filter((s) => s.factory === namespace).map((s) => scheduleOf(s, listing));
 });
 

@@ -27,6 +27,7 @@ import { names } from './assessed.ts';
 import { staged, story } from './story.ts';
 import { aSkill } from './skill-walks.ts';
 import { SkillName } from '../src/agents/agents.model.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-step-skills-');
 process.env.WF_ROOT = ROOT;
@@ -91,7 +92,8 @@ function implementerGiving(line: string): string {
 const implementAdding = (line: string): string => `---\nplace: git\nagent: implementer\nskills: ${line}\n---\n`;
 
 /** The folder of skills the run froze for its step `step`, whose agent is `agent`. */
-const frozen = (run: { id: string }, step: string, agent: string): string => path.join(agentFilesDir(run, step), pluginOf(agent), 'skills');
+const frozen = (run: { id: string }, step: string, agent: string): string =>
+  path.join(agentFilesDir(rootNow(), run, step), pluginOf(agent), 'skills');
 
 /** Every entry under `dir`, by its path in it, as what it is: `link`, `folder` or a file's text. */
 const entriesOf = (dir: string): Record<string, string> =>
@@ -152,23 +154,23 @@ test('a step given skills from four places: frozen as files under bare names, na
     assert.deepEqual(entriesOf(path.join(at, 'y')), { 'SKILL.md': skill('y', 'The nested one.'), 'notes.md': 'Nested notes.\n' });
     assert.equal(fs.lstatSync(path.join(at, 'x')).isDirectory(), true, 'the linked skill is a folder of its own');
     for (const step of ['implement', 'review', 'ship']) {
-      const all = entriesOf(agentFilesDir(run, step));
+      const all = entriesOf(agentFilesDir(rootNow(), run, step));
       assert.deepEqual(
         Object.keys(all).filter((entry) => all[entry] === 'link'),
         [],
         `${step}: no link is frozen`,
       );
     }
-    files = entriesOf(agentFilesDir(run, 'implement'));
+    files = entriesOf(agentFilesDir(rootNow(), run, 'implement'));
   });
 
   await s.test('the record says each skill as its line writes it, at the version of the folder it was read from', () => {
-    record = runRecord(run.id).workflow ?? [];
+    record = runRecord(rootNow(), run.id).workflow ?? [];
     const implement = stepNamed(record, 'implement');
     assert.deepEqual(implement.skills, ['review-a-change', 'app:y', 'x']);
     assert.deepEqual(implement.agent?.skills, ['implement-a-change', 'apps/web:z', 'review-a-change', 'app:y', 'x']);
     assert.deepEqual(implement.agent?.addedSkills, ['review-a-change', 'app:y', 'x']);
-    const versions = renderedSkillVersions(run, implement);
+    const versions = renderedSkillVersions(rootNow(), run, implement);
     assert.equal(versions.get('app:y'), skillVersion(nested(repo, 'app', 'y')));
     assert.equal(versions.get('apps/web:z'), skillVersion(nested(repo, 'apps/web', 'z')));
     assert.equal(versions.get('x'), skillVersion(nested(repo, '.', 'x')));
@@ -182,7 +184,7 @@ test('a step given skills from four places: frozen as files under bare names, na
         const step = stepNamed(record, name);
         const agent = step.agent!;
         const plugin = pluginOf(agent.name);
-        const prompt = fs.readFileSync(path.join(agentFilesDir(run, name), 'prompt.md'), 'utf8');
+        const prompt = fs.readFileSync(path.join(agentFilesDir(rootNow(), run, name), 'prompt.md'), 'utf8');
         assert.ok(prompt.startsWith(headedLayers([['instructions', agent.instructions!]])), `${name}: the instructions first`);
         const loaded = agent.skills!.map((given) => given.slice(given.lastIndexOf(':') + 1)).filter((bare) => bare !== PRELOADED);
         const listed = `${loaded.map((bare) => `\`${plugin}:${bare}\``).join(', ')}.`;
@@ -224,9 +226,9 @@ test('a step given skills from four places: frozen as files under bare names, na
 
   await s.test('a step whose rendered folder is gone is told every skill whole in its brief, under the name its line writes', () => {
     const found = skillsFor(dev, { repo });
-    const gone = { ...runRecord(run.id), id: 'told-gone-files' };
+    const gone = { ...runRecord(rootNow(), run.id), id: 'told-gone-files' };
     for (const step of record.filter((s) => s.agent?.skills?.length)) {
-      assert.equal(fs.existsSync(agentFilesDir(gone, step.name)), false, `${step.name}: its rendered folder is not there`);
+      assert.equal(fs.existsSync(agentFilesDir(rootNow(), gone, step.name)), false, `${step.name}: its rendered folder is not there`);
       const told = Effect.runSync(toldOf(gone, step).pipe(Effect.provideService(StoreRoot, ROOT)));
       const brief = briefBody(told.step);
       assert.ok(brief.startsWith(headedLayers([['instructions', step.agent!.instructions!]])), `${step.name}: the instructions first`);
@@ -244,14 +246,14 @@ test('a step given skills from four places: frozen as files under bare names, na
   await s.test("the tick tells a step whose rendered folder is gone its skills as the Skill door holds them, not the disk's", () => {
     const implement = stepNamed(record, 'implement');
     const step = { ...implement, agent: { ...implement.agent!, skills: ['tidy-notes'] } };
-    const gone = { ...runRecord(run.id), id: 'told-gone', workflowDir: `${MEMORY_ROOT}/workflows/dev` };
-    assert.equal(fs.existsSync(agentFilesDir(gone, 'implement')), false, 'its rendered folder is not there');
+    const gone = { ...runRecord(rootNow(), run.id), id: 'told-gone', workflowDir: `${MEMORY_ROOT}/workflows/dev` };
+    assert.equal(fs.existsSync(agentFilesDir(rootNow(), gone, 'implement')), false, 'its rendered folder is not there');
     const told = Effect.runSync(
       Effect.gen(function* () {
         const door = yield* SkillDoor;
         yield* door.skills.write(SkillName.read('tidy-notes'), aSkill(), undefined, `${MEMORY_ROOT}/workflows/skills`);
         return yield* toldOf(gone, step);
-      }).pipe(Effect.provide(skillDoorMemory())),
+      }).pipe(Effect.provide(skillDoorMemory()), Effect.provideService(StoreRoot, ROOT)),
     );
     const brief = briefBody(told.step);
     assert.ok(brief.includes(`## Skill \`tidy-notes\`\n\n${aSkill().body}`), `the memory's skill told whole\n\n${brief}`);
@@ -276,8 +278,8 @@ test('a step given skills from four places: frozen as files under bare names, na
 
   await s.test('a later edit of the step and of its skills changes nothing the run froze', () => {
     fs.writeFileSync(path.join(dev, 'implement.md'), '---\nplace: git\nagent: implementer\n---\n');
-    assert.deepEqual(runRecord(run.id).workflow, record);
-    assert.deepEqual(entriesOf(agentFilesDir(run, 'implement')), files);
+    assert.deepEqual(runRecord(rootNow(), run.id).workflow, record);
+    assert.deepEqual(entriesOf(agentFilesDir(rootNow(), run, 'implement')), files);
   });
 });
 
@@ -384,7 +386,7 @@ test("a step's own `skills:` line, read beside its agent's: what it adds, what i
     const folder = path.join(dir, 'dev');
     const steps = [{ name: 'build', after: [], place: 'git' as const, agent: 'tooled', skills: ['look'], body: '' }];
     fenced(
-      refusal(() => writeWorkflow(folder, steps, undefined, { anywhere: true })),
+      refusal(() => writeWorkflow(rootNow(), folder, steps, undefined, { anywhere: true })),
       'tooled',
     );
     assert.equal(fs.readFileSync(path.join(folder, 'build.md'), 'utf8'), '---\nplace: git\nagent: tooled\n---\n', 'nothing written');
@@ -564,10 +566,10 @@ test('REFUSED at a start and at the folder’s check: a skill no session can be 
     const found = { ...skillsFor(dev, { repo }), at: new Map([['x', nested(repo, '.', 'x')]]) };
     const run = { id: 'step-skills-freeze' };
     names(
-      refusal(() => writeAgentFiles(run, steps, found)),
+      refusal(() => writeAgentFiles(rootNow(), run, steps, found)),
       'x is a link',
     );
-    const left = (fs.readdirSync(agentFilesDir(run, 'implement'), { recursive: true }) as string[]).filter(
+    const left = (fs.readdirSync(agentFilesDir(rootNow(), run, 'implement'), { recursive: true }) as string[]).filter(
       (entry) => path.basename(entry) === 'SKILL.md',
     );
     assert.deepEqual(left, []);

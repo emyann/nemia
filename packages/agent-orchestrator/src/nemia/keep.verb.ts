@@ -85,9 +85,9 @@ const NEMIA_PRIORITY = 1_000_000;
  * Where the store's quota is read, `<url>/api/quota` at the address its daemon's api serves (`daemon.json`); undefined with no daemon, one
  * stopped, one serving no board (`nemia up`), or a file that does not read.
  */
-const quotaUrl = (): string | undefined => {
+const quotaUrl = (home: string): string | undefined => {
   try {
-    const held = parseDaemonFile(fs.readFileSync(daemonFile(), 'utf8'));
+    const held = parseDaemonFile(fs.readFileSync(daemonFile(home), 'utf8'));
     return held?.url !== undefined && held.stoppedAt === undefined ? `${held.url}/api/quota` : undefined;
   } catch {
     return undefined;
@@ -124,7 +124,7 @@ export function nemiaSpec(id: string, custom: string | undefined, token: string,
   const step = readNemia();
   const prompt = composePrompt(home, step.body, custom);
   const memory = `Edit(/${memoryDir(home)}/**)`;
-  const quota = quotaUrl();
+  const quota = quotaUrl(home);
   const fence = widened(nemiaFence(TABLE), promptAllows(home));
   const bin = ownBin();
   const settings = nemiaSettings({ ask: fence.ask, deny: [...fence.deny, ...storeDenies(home)] }, bin, process.env.PATH ?? '');

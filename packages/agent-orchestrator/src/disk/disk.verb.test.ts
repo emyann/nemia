@@ -22,6 +22,8 @@ import type { Answered } from '../forget/prune/prune.ts';
 import type { RecentPass } from '../meter/meter.ts';
 import type { DiskEntry } from './disk.ts';
 import type { EngineService as EngineNeeded } from '../runtime-client.ts';
+import type { StoreRoot as StoreRootNeeded } from '../config/root.store.ts';
+import { rootNow } from '../../test/config-given.ts';
 
 const BASE = scratch('wf-disk-');
 const ROOT = path.join(BASE, 'store');
@@ -33,6 +35,7 @@ const { PHASES } = await import('../meter/meter.ts');
 const { storeRoots } = await import('./disk.store.ts');
 const { disk, DISK_METRICS, DISK_SPAN, DISK_SPAN_KEYS, diskOnce, freshDiskMemory } = await import('./disk.verb.ts');
 const { engineOf, HARNESSES, over: overEngine } = await import('../runtime-client.ts');
+const { StoreRoot } = await import('../config/root.store.ts');
 const engine = eachTest(testEngine);
 
 /** A file of `kb` kilobytes under the store. */
@@ -105,7 +108,7 @@ const registryOf = (): Registry => new Map();
 type Registry = (typeof Metric.MetricRegistry)['Service'];
 
 /** `program` over `registry` and the test's engine, and each span it made. */
-const over = async <A>(registry: Registry, program: Effect.Effect<A, unknown, EngineNeeded>) => {
+const over = async <A>(registry: Registry, program: Effect.Effect<A, unknown, EngineNeeded | StoreRootNeeded>) => {
   const spans: Tracer.NativeSpan[] = [];
   const tracer = Tracer.make({
     span(options) {
@@ -115,7 +118,12 @@ const over = async <A>(registry: Registry, program: Effect.Effect<A, unknown, En
     },
   });
   const value = await Effect.runPromise(
-    program.pipe(overEngine(engineOf(engine().layer)), Effect.provideService(Metric.MetricRegistry, registry), Effect.withTracer(tracer)),
+    program.pipe(
+      overEngine(engineOf(engine().layer)),
+      Effect.provideService(StoreRoot, ROOT),
+      Effect.provideService(Metric.MetricRegistry, registry),
+      Effect.withTracer(tracer),
+    ),
   );
   return { value, spans };
 };
@@ -351,7 +359,7 @@ test('a disk sweep: a store of known sizes across factories read by part, kind a
       const memory = freshDiskMemory();
       const first = (await over(registry, diskOnce(ANSWERS, memory))).value.reading;
       const before = entryOf(first.entries, 'runs', 'pipao')!.bytes!;
-      const roots = storeRoots();
+      const roots = storeRoots(rootNow());
       fs.rmSync(path.join(ROOT, 'runs', 'b'), { recursive: true });
       const { reading } = (await over(registry, diskOnce(ANSWERS, memory, roots))).value;
       assert.deepEqual(entryOf(reading.entries, 'runs', 'pipao'), { part: 'runs', factory: 'pipao', unread: 1 });
@@ -598,6 +606,7 @@ test(
         (reading) => void kept.push(reading && `${reading.entries.length} entries`),
       ).pipe(
         overEngine(engineOf(engine().layer)),
+        Effect.provideService(StoreRoot, ROOT),
         Effect.provideService(Metric.MetricRegistry, new Map()),
         Effect.provide(Logger.layer([keeper])),
         Effect.provide(clock.layer),

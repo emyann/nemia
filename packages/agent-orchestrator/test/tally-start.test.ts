@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { Invalid } from '../src/refusal/refusal.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-tally-start-');
 process.env.WF_ROOT = ROOT;
@@ -83,6 +84,6 @@ test('nemia start of a step that declares a tally: refused where its closeout ca
 
   await t.test('a tally its closeout holds is frozen with the step on the run record', async () => {
     const id = await started(triage('held', 'issues, issues.open'));
-    assert.deepEqual(runRecord(id).workflow?.find((s) => s.name === 'triage')?.tally, ['issues', 'issues.open']);
+    assert.deepEqual(runRecord(rootNow(), id).workflow?.find((s) => s.name === 'triage')?.tally, ['issues', 'issues.open']);
   });
 });

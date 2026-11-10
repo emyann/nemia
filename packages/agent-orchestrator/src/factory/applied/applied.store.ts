@@ -11,7 +11,7 @@ import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 import { Result, Schema } from 'effect';
 import { FACTORY_CONDITION_REASONS, FACTORY_CONDITION_STATUSES, FACTORY_CONDITION_TYPES, REVISIONS_POLICIES } from '../factory.ts';
-import { firstRefusal, HOME } from '../../record/record.store.ts';
+import { firstRefusal } from '../../record/record.store.ts';
 import { choicesApply, type MergeAt } from '../upgrade/index.ts';
 import { writeWhole } from '../../whole-file/whole-file.store.ts';
 
@@ -19,7 +19,7 @@ import { writeWhole } from '../../whole-file/whole-file.store.ts';
 const folderAt = (home: string, name: string): string => path.join(home, 'factories', name);
 
 /** The folder the store keeps a factory's own files in, at the module's root. */
-const folderOf = (name: string): string => folderAt(HOME, name);
+const folderOf = (home: string, name: string): string => folderAt(home, name);
 
 /** The folder a templated factory of the store `home` runs from (`treeDir`). */
 export const treeDirAt = (home: string, name: string): string => path.join(folderAt(home, name), 'tree');
@@ -31,13 +31,13 @@ export const appliedDirAt = (home: string, name: string): string => path.join(fo
 export const readStatusAt = (home: string, name: string): Status | undefined => statusIn(path.join(folderAt(home, name), 'status.json'));
 
 /** The folder a templated factory runs from: today's format, seeded once from its base, then the person's. */
-export const treeDir = (name: string): string => path.join(folderOf(name), 'tree');
+export const treeDir = (home: string, name: string): string => path.join(folderOf(home, name), 'tree');
 
 /** The template as the controller last rendered it into the factory: read-only, the base of an upgrade's merge. */
-export const appliedDir = (name: string): string => path.join(folderOf(name), 'applied');
+export const appliedDir = (home: string, name: string): string => path.join(folderOf(home, name), 'applied');
 
 /** What the controller last observed of a templated factory, written by it alone. */
-export const statusFile = (name: string): string => path.join(folderOf(name), 'status.json');
+export const statusFile = (home: string, name: string): string => path.join(folderOf(home, name), 'status.json');
 
 /** One file of a folder to stage: its path in it, its bytes, and its mode where it keeps one (an executable script of a skill). */
 export type Entry = { path: string; bytes: Buffer; mode?: number };
@@ -59,13 +59,14 @@ const TreeWiringSchema = Schema.StructWithRest(
 export type TreeWiring = typeof TreeWiringSchema.Type;
 
 /** The file of a tree's wiring. */
-const wiringFile = (name: string): string => path.join(treeDir(name), 'factory.json');
+const wiringFile = (home: string, name: string): string => path.join(treeDir(home, name), 'factory.json');
 
 /**
  * The wiring of the factory `name`'s tree: what its `factory.json` holds, none (`absent`) while the tree is not rendered, or why it does
  * not read (`error`), naming the fix.
  */
-export const readTreeWiring = (name: string): { wiring: TreeWiring } | { absent: true } | { error: string } => wiringIn(wiringFile(name));
+export const readTreeWiring = (home: string, name: string): { wiring: TreeWiring } | { absent: true } | { error: string } =>
+  wiringIn(wiringFile(home, name));
 
 /** The wiring of the factory `name`'s tree in the store `home` (`readTreeWiring`). */
 export const readTreeWiringAt = (home: string, name: string): { wiring: TreeWiring } | { absent: true } | { error: string } =>
@@ -108,7 +109,7 @@ function wiringOfText(file: string, text: string): { wiring: TreeWiring } | { er
 }
 
 /** The tree's wiring of the factory `name` written whole, `workflows` kept sorted. */
-export const writeTreeWiring = (name: string, wiring: TreeWiring): void => wiringWritten(wiringFile(name), wiring);
+export const writeTreeWiring = (home: string, name: string, wiring: TreeWiring): void => wiringWritten(wiringFile(home, name), wiring);
 
 /** The tree's wiring of the factory `name` in the store `home` written whole (`writeTreeWiring`). */
 export const writeTreeWiringAt = (home: string, name: string, wiring: TreeWiring): void =>
@@ -167,7 +168,7 @@ export type Status = typeof StatusSchema.Type;
 export type Condition = typeof ConditionSchema.Type;
 
 /** The status of the factory `name`, or none where the controller wrote none yet or it does not read: the next pass writes it again. */
-export const readStatus = (name: string): Status | undefined => statusIn(statusFile(name));
+export const readStatus = (home: string, name: string): Status | undefined => statusIn(statusFile(home, name));
 
 /** The status a factory's `file` holds, or none where it is not there or does not read. */
 function statusIn(file: string): Status | undefined {
@@ -180,9 +181,9 @@ function statusIn(file: string): Status | undefined {
 }
 
 /** The status of the factory `name` written whole, only where it differs from what is there; whether it was written. */
-export function writeStatus(name: string, status: Status): boolean {
+export function writeStatus(home: string, name: string, status: Status): boolean {
   const text = `${JSON.stringify(status, null, 2)}\n`;
-  const file = statusFile(name);
+  const file = statusFile(home, name);
   if (fs.existsSync(file) && fs.readFileSync(file, 'utf8') === text) return false;
   fs.mkdirSync(path.dirname(file), { recursive: true });
   writeWhole(file, text);
@@ -288,10 +289,12 @@ function putBack(aside: string, dir: string, failed: Error): void {
 }
 
 /** The tree of the factory `name` replaced by `entries`, unless it no longer digests to `read`, what the merge read: whether it was. */
-export const swapTree = (name: string, entries: readonly Entry[], read: string): boolean => swapFolder(treeDir(name), entries, false, read);
+export const swapTree = (home: string, name: string, entries: readonly Entry[], read: string): boolean =>
+  swapFolder(treeDir(home, name), entries, false, read);
 
 /** The base of the factory `name` replaced by `entries`, read-only: the template as now applied. */
-export const replaceBase = (name: string, entries: readonly Entry[]): void => void swapFolder(appliedDir(name), entries, true);
+export const replaceBase = (home: string, name: string, entries: readonly Entry[]): void =>
+  void swapFolder(appliedDir(home, name), entries, true);
 
 /**
  * The person's choices for an upgrade's conflicts: the version they are for, the name of the template they were made for (none where
@@ -312,12 +315,12 @@ const ResolutionsSchema = Schema.StructWithRest(
 export type Resolutions = typeof ResolutionsSchema.Type;
 
 /** The file of the person's choices for the factory `name`'s upgrade, written by `nemia factory resolve` alone. */
-export const resolutionsFile = (name: string): string => path.join(folderOf(name), 'resolutions.json');
+export const resolutionsFile = (home: string, name: string): string => path.join(folderOf(home, name), 'resolutions.json');
 
 /** The person's choices for the factory `name`'s upgrade, or none where there are none or they do not read. */
-export function readResolutions(name: string): Resolutions | undefined {
+export function readResolutions(home: string, name: string): Resolutions | undefined {
   try {
-    const decoded = Schema.decodeUnknownResult(ResolutionsSchema)(JSON.parse(fs.readFileSync(resolutionsFile(name), 'utf8')));
+    const decoded = Schema.decodeUnknownResult(ResolutionsSchema)(JSON.parse(fs.readFileSync(resolutionsFile(home, name), 'utf8')));
     return Result.isSuccess(decoded) ? decoded.success : undefined;
   } catch {
     return undefined;
@@ -333,5 +336,5 @@ export const choicesFor = (resolutions: Resolutions | undefined, merge: MergeAt)
   resolutions !== undefined && choicesApply(resolutions, merge) ? resolutions.choices : {};
 
 /** The person's choices for the factory `name`'s upgrade written whole. */
-export const writeResolutions = (name: string, resolutions: Resolutions): void =>
-  writeWhole(resolutionsFile(name), `${JSON.stringify(resolutions, null, 2)}\n`);
+export const writeResolutions = (home: string, name: string, resolutions: Resolutions): void =>
+  writeWhole(resolutionsFile(home, name), `${JSON.stringify(resolutions, null, 2)}\n`);

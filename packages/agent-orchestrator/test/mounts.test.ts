@@ -32,6 +32,7 @@ import { writesOutsideByRule } from '../src/workflow/index.ts';
 import { parseWorkflow, agentsDir } from '../src/workflow.ts';
 import { loadAgents } from '../src/agents/read.store.ts';
 import { Invalid } from '../src/refusal/refusal.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-mounts-');
 process.env.WF_ROOT = ROOT;
@@ -95,9 +96,9 @@ const reviewed = (again: boolean) => ({ ...SIGNED, findings: [], again });
 /** Each task the stage's engine was filed, by id, as the run handed it. */
 const filings = () => new Map(stage.board().specs.map((spec) => [spec.id, spec]));
 /** The task filed for `step` of the run `id` now. */
-const filedFor = (id: string, step: string) => filings().get(runRecord(id).steps[step].taskId!)!;
+const filedFor = (id: string, step: string) => filings().get(runRecord(rootNow(), id).steps[step].taskId!)!;
 /** One pass of the run `id`, on the stage's engine. */
-const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(id)));
+const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(rootNow(), id)));
 
 /** What `nemia <argv>` prints, a line each. */
 async function typed(argv: string[]): Promise<string[]> {
@@ -151,8 +152,8 @@ test('mounts on every filing: a factory run whose implement writes one folder of
     async () => {
       const out = await typed(['start', 'build it', '--workflows', wide, '--factory', 'trio', '--repo', own, '--input', given]);
       id = out[0].split(' ')[0];
-      const run = runRecord(id);
-      inputs = inputsDir(run);
+      const run = runRecord(rootNow(), id);
+      inputs = inputsDir(rootNow(), run);
       assert.deepEqual(run.mounts, readOnly(web, docs), 'read back');
       assert.deepEqual(
         JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8')).mounts,
@@ -193,7 +194,7 @@ test('mounts on every filing: a factory run whose implement writes one folder of
     await pass(id);
     await stage.runWith(b.e, retryRun(id, 'implement', { mode: 'fresh' }));
     await pass(id);
-    tried = runRecord(id).steps.implement.taskId!;
+    tried = runRecord(rootNow(), id).steps.implement.taskId!;
     assert.notEqual(tried, `${id}-implement`);
     const filing = filedFor(id, 'implement');
     assert.deepEqual(filing.config?.mounts, writes);
@@ -207,8 +208,8 @@ test('mounts on every filing: a factory run whose implement writes one folder of
       stage.board().end(tried, 'succeeded', { closeout: SIGNED, nativeId: null });
       await pass(id);
       const review = filedFor(id, 'review');
-      const handed = artifactsDir({ id }, 'implement');
-      const ownDir = artifactsDir({ id }, 'review');
+      const handed = artifactsDir(rootNow(), { id }, 'implement');
+      const ownDir = artifactsDir(rootNow(), { id }, 'review');
       assert.deepEqual(
         review.config?.mounts,
         readOnly(web, docs, ownDir, handed, inputs, frozen),
@@ -232,7 +233,7 @@ test('mounts on every filing: a factory run whose implement writes one folder of
   await s.test(
     'a round of implement, on a new session since its try kept no session id, is filed and told every folder as its first filing was',
     async () => {
-      stage.board().settle(runRecord(id).steps.review.taskId!, 'succeeded', reviewed(true));
+      stage.board().settle(runRecord(rootNow(), id).steps.review.taskId!, 'succeeded', reviewed(true));
       await pass(id);
       const round = filedFor(id, 'implement');
       assert.notEqual(round.id, tried, 'a round is filed');
@@ -247,22 +248,22 @@ test('mounts on every filing: a factory run whose implement writes one folder of
     'the ending, filed once a person approves it, reads what implement and review handed over and writes none of it',
     async () => {
       const b = stage.board();
-      const wt = runRecord(id).steps.implement.workspace!;
+      const wt = runRecord(rootNow(), id).steps.implement.workspace!;
       fs.writeFileSync(path.join(wt, 'flag.txt'), 'the flag\n');
       stage.place().world.commit(wt, 'add the flag');
-      b.settle(runRecord(id).steps.implement.taskId!, 'succeeded', {
+      b.settle(runRecord(rootNow(), id).steps.implement.taskId!, 'succeeded', {
         ...SIGNED,
         replies: [{ finding: 'none', answer: 'fixed', why: 'none' }],
       });
       await pass(id);
       await pass(id);
-      b.settle(runRecord(id).steps.review.taskId!, 'succeeded', reviewed(false));
+      b.settle(runRecord(rootNow(), id).steps.review.taskId!, 'succeeded', reviewed(false));
       await pass(id);
       await stage.runWith(b.e, approveRun(id, 'ship'));
       await pass(id);
       const config = filedFor(id, 'ship').config as Filed;
       for (const by of ['implement', 'review']) {
-        const file = path.join(artifactsDir({ id }, by), 'shot.png');
+        const file = path.join(artifactsDir(rootNow(), { id }, by), 'shot.png');
         assert.ok(readsAt(config, file), by);
         assert.equal(writesAt(config, file), false, by);
       }
@@ -283,10 +284,10 @@ test('where a run mounts less: the default factory and a factory of one reposito
         const run = await stage.runPlaced(
           startRun({ brief: 'build it', repo: repos[0], workflowDir: plain, isolate: false, ...(factory ? { factory } : {}) }),
         );
-        assert.equal('mounts' in runRecord(run.id), false, `${String(factory)}: no key`);
+        assert.equal('mounts' in runRecord(rootNow(), run.id), false, `${String(factory)}: no key`);
         await pass(run.id);
         const first = filedFor(run.id, 'implement');
-        const frozen = path.join(ROOT, 'runs', run.id, 'workflow', String(runRecord(run.id).workflowFiles));
+        const frozen = path.join(ROOT, 'runs', run.id, 'workflow', String(runRecord(rootNow(), run.id).workflowFiles));
         assert.deepEqual(first.config?.mounts, readOnly(frozen), `${String(factory)}: the run's copy of its workflow folder alone`);
         assert.doesNotMatch(first.brief, /Folders of this factory|nemia start --input/, String(factory));
         stage.board().settle(first.id, 'succeeded', SIGNED);
@@ -294,7 +295,7 @@ test('where a run mounts less: the default factory and a factory of one reposito
         const review = filedFor(run.id, 'review');
         assert.deepEqual(
           review.config?.mounts,
-          readOnly(artifactsDir(run, 'review'), artifactsDir(run, 'implement'), frozen),
+          readOnly(artifactsDir(rootNow(), run, 'review'), artifactsDir(rootNow(), run, 'implement'), frozen),
           `${String(factory)}: review's own folder, implement's and the workflow's files alone`,
         );
         assert.doesNotMatch(review.brief, /Folders of this factory/, String(factory));
@@ -305,7 +306,7 @@ test('where a run mounts less: the default factory and a factory of one reposito
   await s.test('a folder team in a factory mounts every repository of it, having none of its own', async () => {
     const run = await stage.runPlaced(startRun({ brief: 'a note', repo: repos[0], workflowDir: notes, factory: 'trio' }));
     assert.equal(run.place?.kind, 'folder');
-    assert.deepEqual(runRecord(run.id).mounts, readOnly(...repos));
+    assert.deepEqual(runRecord(rootNow(), run.id).mounts, readOnly(...repos));
   });
 
   await s.test(
@@ -313,13 +314,13 @@ test('where a run mounts less: the default factory and a factory of one reposito
     async () => {
       fs.rmSync(repos[2], { recursive: true });
       const out = await typed(['start', 'build it', '--workflows', plain, '--factory', 'trio', '--repo', repos[0], '--no-worktree']);
-      assert.deepEqual(runRecord(out[0].split(' ')[0]).mounts, readOnly(repos[1]));
+      assert.deepEqual(runRecord(rootNow(), out[0].split(' ')[0]).mounts, readOnly(repos[1]));
       names(out.join('\n'), `not mounted: ${repos[2]}`, 'start again once it is there');
       fs.rmSync(repos[1], { recursive: true });
       const none = await stage.runPlaced(
         startRun({ brief: 'build it', repo: repos[0], workflowDir: plain, isolate: false, factory: 'trio' }),
       );
-      assert.equal('mounts' in runRecord(none.id), false);
+      assert.equal('mounts' in runRecord(rootNow(), none.id), false);
     },
   );
 
@@ -407,7 +408,7 @@ test("REFUSED at nemia start: a factory's folder a step cannot be filed, each In
       await refused({ ...at(dir, repos[0], 'trio') }, volume, 'nemia factory volume add trio <path>:ro', 'nemia factory volume rm trio');
       await typed(['factory', 'volume', 'add', 'trio', `${volume}:ro`]);
       const run = await stage.runPlaced(startRun(at(dir, repos[0], 'trio')));
-      assert.deepEqual(runRecord(run.id).volumes, readOnly(volume));
+      assert.deepEqual(runRecord(rootNow(), run.id).volumes, readOnly(volume));
     },
   );
 
@@ -503,7 +504,7 @@ test("REFUSED at nemia start: a factory's folder a step cannot be filed, each In
     const { repos, plain } = fresh();
     writing(plain, path.basename(repos[0]));
     const run = await stage.runPlaced(startRun(at(plain, repos[0], 'trio')));
-    assert.deepEqual(runRecord(run.id).mounts, readOnly(repos[1], repos[2]));
+    assert.deepEqual(runRecord(rootNow(), run.id).mounts, readOnly(repos[1], repos[2]));
   });
 
   await t.test('REFUSED: a record whose mounts are not mounts is unreadable, naming the field', async () => {
@@ -512,7 +513,7 @@ test("REFUSED at nemia start: a factory's folder a step cannot be filed, each In
     const file = path.join(ROOT, 'runs', `${run.id}.json`);
     fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), mounts: [{ path: 1 }] }));
     assert.throws(
-      () => runRecord(run.id),
+      () => runRecord(rootNow(), run.id),
       (err: Refusal) => err._tag === 'Invalid' && err.message.includes('`mounts.0.path` is 1'),
     );
   });
@@ -654,7 +655,7 @@ test('the folders a step is filed, read by their pure functions and by the model
   );
 
   await t.test('REFUSED: a brief that leaves out a folder its filing mounts names that folder', () => {
-    const handed = artifactsDir({ id: 'r-1' }, 'implement');
+    const handed = artifactsDir(rootNow(), { id: 'r-1' }, 'implement');
     const brief = ['## What was asked for', '', 'build it'].join('\n');
     assert.deepEqual(unnamed({ brief, config: { mounts: readOnly(handed) } }), [handed]);
     const told = [brief, ...mountsLine({ harness: 'claude' }, {}, { handed: readOnly(handed), store: [], inputs: [] })].join('\n');

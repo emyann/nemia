@@ -31,7 +31,7 @@ const { NOTHING_READ, standingReader } = await import('../src/standing/standing.
 const { slotsRead } = await import('../src/cap/slots-read.verb.ts');
 const { Informer, informerMemo, informerRead, informedJudgements, passStarted } = await import('../src/rest/informer.verb.ts');
 const { sameJudgement } = await import('../src/summary/judgement.verb.ts');
-const { filesStore: runStore } = await import('../src/record/files.store.ts');
+const runStore = (await import('../src/record/files.store.ts')).filesStoreAt(rootNow());
 /** The runs waited on as a read with no standing reads them: none of their branches asked. */
 const noParents = () => passParents(standingReader(NOTHING_READ));
 
@@ -123,7 +123,7 @@ tasks.get('r-bad-implement')!.push({ kind: 'measured', at: at(0), attempt: 1, us
 writeRun('r-bad', 1, { implement: { taskId: 'r-bad-implement' } });
 writeRun('r-new', 4, {});
 writeRun('r-old', 3, {});
-const RUNS = () => ['r-a', 'r-bad', 'r-new', 'r-old'].map(runRecord);
+const RUNS = () => ['r-a', 'r-bad', 'r-new', 'r-old'].map((id) => runRecord(rootNow(), id));
 
 test('`slotsOf` and `runSlots`: what the cap counts and holds between passes, off one look at the harnesses or none', async (t) => {
   await t.test(
@@ -131,7 +131,7 @@ test('`slotsOf` and `runSlots`: what the cap counts and holds between passes, of
     async () => {
       process.env.WF_MAX_RUNS = '2';
       calls.list = calls.view = 0;
-      const slots = await runWith(e, slotsOf(e, RUNS(), settingsOf(process.env), noParents()));
+      const slots = await runWith(e, Effect.provide(slotsOf(e, RUNS(), settingsOf(process.env), noParents()), configGiven(rootNow())));
       assert.deepEqual(
         { ...slots, held: [...slots.held] },
         {
@@ -145,7 +145,7 @@ test('`slotsOf` and `runSlots`: what the cap counts and holds between passes, of
       );
       assert.deepEqual(calls, { list: 1, view: 0 }, 'one look at the harnesses for the whole store, and no task viewed again');
       assert.deepEqual(
-        [...(await runWith(e, runSlots(e, RUNS(), settingsOf(process.env), noParents())))],
+        [...(await runWith(e, Effect.provide(runSlots(e, RUNS(), settingsOf(process.env), noParents()), configGiven(rootNow()))))],
         [...slots.held],
         'runSlots answers slotsOf’s held runs',
       );
@@ -155,7 +155,7 @@ test('`slotsOf` and `runSlots`: what the cap counts and holds between passes, of
   await t.test('with no cap slotsOf reads nothing, and runSlots reads nothing on a store with no run waiting to start', async () => {
     process.env.WF_MAX_RUNS = '0';
     calls.list = calls.view = 0;
-    assert.deepEqual(await runWith(e, slotsOf(e, RUNS(), settingsOf(process.env), noParents())), {
+    assert.deepEqual(await runWith(e, Effect.provide(slotsOf(e, RUNS(), settingsOf(process.env), noParents()), configGiven(rootNow()))), {
       cap: 0,
       inFlight: null,
       held: new Map(),
@@ -165,11 +165,14 @@ test('`slotsOf` and `runSlots`: what the cap counts and holds between passes, of
       [
         ...(await runWith(
           e,
-          runSlots(
-            e,
-            RUNS().filter((r) => Object.keys(r.steps).length),
-            settingsOf(process.env),
-            noParents(),
+          Effect.provide(
+            runSlots(
+              e,
+              RUNS().filter((r) => Object.keys(r.steps).length),
+              settingsOf(process.env),
+              noParents(),
+            ),
+            configGiven(rootNow()),
           ),
         )),
       ],

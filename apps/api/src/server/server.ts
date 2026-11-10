@@ -87,7 +87,7 @@ export const serverHandlers = HttpApiBuilder.group(Api, 'server', (handlers) =>
       answered((s) => s.inRequest(SERIES.handler(range === undefined ? {} : { range }, { series: s.memo.series }))),
     )
     .handle('metrics', () => answered(async (s) => metricsOf(await s.inRequest(Metric.snapshot))))
-    .handle('daemon', () => answeredWrite(async () => readDaemon()))
+    .handle('daemon', () => answeredWrite(async ({ home }) => readDaemon(home)))
     .handle('quota', () =>
       answered(({ e, env, quota }) => quota({ env, harness: DEFAULT_HARNESS, ask: () => engineRead('quota', e.quota(DEFAULT_HARNESS)) })),
     )
@@ -100,7 +100,7 @@ export const serverHandlers = HttpApiBuilder.group(Api, 'server', (handlers) =>
       Effect.gen(function* () {
         const s = yield* ServedNow;
         const context = yield* Effect.promise(() => s.inRequest(Effect.context()));
-        return yield* feedOpened({ ...query, selector: selectorsOf(request) }, headers['last-event-id'], s.beats, context);
+        return yield* feedOpened({ ...query, selector: selectorsOf(request) }, headers['last-event-id'], s.beats, context, s.home);
       }),
     ),
 );

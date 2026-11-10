@@ -27,6 +27,7 @@ import { a2aServer, type Answer } from './a2a-server.ts';
 import { scratch } from 'test-kit/scratch';
 import { story, staged } from './story.ts';
 import { bell, until, WAITED, type Waiter } from 'agent-runtime/testing';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-remote-');
 process.env.WF_ROOT = ROOT;
@@ -248,7 +249,7 @@ test(
 
         const view = await Effect.runPromise(e.view(`${id}-ask`));
         assert.equal(view.phase, 'succeeded');
-        assert.ok(runRecord(id).steps.ask?.taskId, 'filed');
+        assert.ok(runRecord(rootNow(), id).steps.ask?.taskId, 'filed');
         assert.ok(decided.join('\n').includes('ask'), decided.join('\n'));
         assert.match(listed.join('\n'), /^\s+ask\s+unverified\s*$/m, listed.join('\n'));
         const everything = (dir: string): string[] =>
@@ -534,7 +535,10 @@ test(
             }
             const ticked = await own(['tick']);
             if (why !== undefined) assert.match(ticked.err, why);
-            assert.ok(runRecord(local).steps.work, `the local step was filed: ${JSON.stringify(runRecord(local).steps)}`);
+            assert.ok(
+              runRecord(rootNow(), local).steps.work,
+              `the local step was filed: ${JSON.stringify(runRecord(rootNow(), local).steps)}`,
+            );
             const runs = fs.readdirSync(path.join(ROOT, 'runs')).length;
             await assert.rejects(
               start(REMOTE),

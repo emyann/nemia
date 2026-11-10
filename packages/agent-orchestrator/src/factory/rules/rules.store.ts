@@ -9,7 +9,6 @@ import path from 'node:path';
 import { factoryNameRefusal, fillsOf, type Factory } from '../factory.ts';
 import type { Fills } from '../../folder/folder.ts';
 import { Conflict, Invalid } from '../../refusal/refusal.ts';
-import { HOME } from '../../record/record.store.ts';
 import { factoryRulesRefusal, FACTORY_RULES_FILE, rulesFile } from './rules.ts';
 import { digestOf } from '../../revisions/revisions.ts';
 
@@ -20,7 +19,7 @@ import { digestOf } from '../../revisions/revisions.ts';
 export type RulesRead = { words: string | null; error: string | null };
 
 /** The folder the store keeps for the factory `name`, beside its file: `$WF_ROOT/factories/<name>`. Refused: a bad name (`Invalid`). */
-export const rulesFolder = (name: string): string => rulesFolderAt(HOME, name);
+export const rulesFolder = (home: string, name: string): string => rulesFolderAt(home, name);
 
 /** The folder the store `home` keeps for the factory `name` (`rulesFolder`). Refused: a bad name (`Invalid`). */
 export function rulesFolderAt(home: string, name: string): string {
@@ -30,7 +29,8 @@ export function rulesFolderAt(home: string, name: string): string {
 }
 
 /** The file the rules of `factory` are kept in (`rulesFile`): its tree's, or the store's folder's for its name. */
-export const rulesAt = (factory: Pick<Factory, 'name' | 'tree'>): string => rulesFile(factory, rulesFolder(factory.name));
+export const rulesAt = (home: string, factory: Pick<Factory, 'name' | 'tree'>): string =>
+  rulesFile(factory, rulesFolder(home, factory.name));
 
 /** The file the rules of `factory` are kept in, in the store `home` (`rulesAt`). */
 export const rulesAtHome = (home: string, factory: Pick<Factory, 'name' | 'tree'>): string =>
@@ -59,8 +59,8 @@ export function readRules(file: string): RulesRead {
  * read and of why they cannot be told (`readRules`), so mending a rules file that does not read moves it, as editing the words does. It is
  * the fourth kind a run resolves, beside its workflow folder, its agents and its skills (`revisions/pin.verb.ts`).
  */
-export function rulesVersion(factory: Pick<Factory, 'name' | 'tree'>): string | null {
-  const { words, error } = readRules(rulesAt(factory));
+export function rulesVersion(home: string, factory: Pick<Factory, 'name' | 'tree'>): string | null {
+  const { words, error } = readRules(rulesAt(home, factory));
   if (words === null && error === null) return null;
   return digestOf([FACTORY_RULES_FILE, words, error]);
 }
@@ -71,8 +71,12 @@ export function rulesVersion(factory: Pick<Factory, 'name' | 'tree'>): string | 
  * where it can or there is none: a start refuses on it, and a read that only loads leaves the rules out. Refused: a name that is no slug
  * (`rulesFolder`, `Invalid`).
  */
-export function factoryFills(factory: Pick<Factory, 'name' | 'hires' | 'tree'>, workflow: string): { fills: Fills; error: string | null } {
-  const { words, error } = readRules(rulesAt(factory));
+export function factoryFills(
+  home: string,
+  factory: Pick<Factory, 'name' | 'hires' | 'tree'>,
+  workflow: string,
+): { fills: Fills; error: string | null } {
+  const { words, error } = readRules(rulesAt(home, factory));
   const rules = error === null && words !== null ? { rules: words } : {};
   return { fills: { factory: factory.name, workflow, agents: fillsOf(factory.hires, workflow), ...rules }, error };
 }
@@ -82,8 +86,8 @@ export function factoryFills(factory: Pick<Factory, 'name' | 'hires' | 'tree'>, 
  * writing nothing: blank words and a frontmatter block (`Invalid`), and a tree not rendered yet (`Conflict`), which a write would leave
  * unseeded.
  */
-export const writeRules = (factory: Pick<Factory, 'name' | 'tree'>, words: string): string =>
-  rulesWritten(rulesAt(factory), factory, words);
+export const writeRules = (home: string, factory: Pick<Factory, 'name' | 'tree'>, words: string): string =>
+  rulesWritten(rulesAt(home, factory), factory, words);
 
 /** The rules of `factory` written onto `file`, its rules' file in a store (`rulesAtHome`), refused as `writeRules` refuses. */
 export function rulesWritten(file: string, factory: Pick<Factory, 'name' | 'tree'>, words: string): string {
@@ -108,7 +112,7 @@ export function rulesWritten(file: string, factory: Pick<Factory, 'name' | 'tree
 }
 
 /** The rules of `factory` removed, whatever is at their file: whether there was anything. */
-export const clearRules = (factory: Pick<Factory, 'name' | 'tree'>): boolean => rulesCleared(rulesAt(factory));
+export const clearRules = (home: string, factory: Pick<Factory, 'name' | 'tree'>): boolean => rulesCleared(rulesAt(home, factory));
 
 /** The rules at `file`, its rules' file in a store, removed whatever is there: whether there was anything. */
 export function rulesCleared(file: string): boolean {

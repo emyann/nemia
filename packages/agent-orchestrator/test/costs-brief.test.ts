@@ -20,6 +20,7 @@ import { Effect } from 'effect';
 import { JournalError } from 'agent-runtime';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-costs-brief-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -57,9 +58,9 @@ const tapped = () => {
 };
 
 /** The engine's pass is the stand-in's to make; the run's, as the daemon makes it, over the tapped engine. */
-const tick = (id: string) => stage.runWith(tapped(), advanceRun(runRecord(id)));
+const tick = (id: string) => stage.runWith(tapped(), advanceRun(runRecord(rootNow(), id)));
 /** The task the record names for `step` now. */
-const taskOf = (id: string, step: string): string => runRecord(id).steps[step].taskId!;
+const taskOf = (id: string, step: string): string => runRecord(rootNow(), id).steps[step].taskId!;
 /** The brief the task `taskId` was filed with. */
 const briefOf = (taskId: string): string => stage.board().tasks.get(taskId)!.spec.brief;
 /** The tasks viewed since the mark that belong to no run but `id`. */

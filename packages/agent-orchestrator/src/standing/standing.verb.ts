@@ -20,6 +20,7 @@ import { runsAtOnce } from '../runs/runs.store.ts';
 import { stepsOrWhy } from '../steps/steps.verb.ts';
 import type { Refusal } from '../refusal/refusal.ts';
 import { readStanding, writeStanding, type StandingFile, type StoodRead } from './standing.store.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /** How long a pass waits for one `standing`: past it, the repository reads unread on this pass, and is asked again on the next. */
 export const STANDING_DEADLINE_MS = 15_000;
@@ -208,8 +209,9 @@ export const standingNow = Effect.fn('standingNow')(function* (
  * cannot be written.
  */
 export const passStanding = Effect.fn('passStanding')(function* (runs: readonly Run[], memo?: StandingMemo) {
+  const home = yield* StoreRoot;
   const standing = yield* standingNow(runs, asksOwn, memo);
-  yield* tried(() => within('act', () => writeStanding(standing.at, [...standing.read.values()])));
+  yield* tried(() => within('act', () => writeStanding(home, standing.at, [...standing.read.values()])));
   return standing;
 });
 
@@ -240,15 +242,16 @@ export const snapshotStanding = (file: StandingFile | undefined): PassStanding =
  * board's list and a run's page read. Fails with the refusal `readStanding` gives a file that does not read.
  */
 export const standingSnapshot = Effect.fn('standingSnapshot')(function* () {
-  return snapshotStanding(yield* tried(() => readStanding()));
+  const home = yield* StoreRoot;
+  return snapshotStanding(yield* tried(() => readStanding(home)));
 });
 
 /** The records of `ids` the store has, none of `runs`: a run named that is not there is left out. */
-const recordsOf = (ids: Iterable<string>, runs: readonly Run[]): Run[] =>
+const recordsOf = (home: string, ids: Iterable<string>, runs: readonly Run[]): Run[] =>
   [...new Set(ids)].flatMap((id) => {
-    if (runs.some((r) => r.id === id) || !runsAtOnce.runs.exists(id)) return [];
+    if (runs.some((r) => r.id === id) || !runsAtOnce(home).runs.exists(id)) return [];
     try {
-      return [runsAtOnce.runs.read(id)];
+      return [runsAtOnce(home).runs.read(id)];
     } catch {
       return [];
     }
@@ -260,7 +263,8 @@ const recordsOf = (ids: Iterable<string>, runs: readonly Run[]): Run[] =>
  * the store failed with.
  */
 export const standingLive = Effect.fn('standingLive')(function* (runs: readonly Run[]) {
-  const related = yield* tried(() => recordsOf([...runs.flatMap(waitedOn), ...runs.flatMap((r) => r.context ?? [])], runs));
+  const home = yield* StoreRoot;
+  const related = yield* tried(() => recordsOf(home, [...runs.flatMap(waitedOn), ...runs.flatMap((r) => r.context ?? [])], runs));
   return standingReader(yield* standingNow([...runs, ...related], asksOwnOr(runs.map((r) => r.id))));
 });
 
@@ -298,7 +302,8 @@ export const asksOwnOr = (ids: readonly string[]): ((run: RepositoryRun) => bool
 
 /** A reader over where the runs of `ids` the store has stand now, each asked of (`standingLive`): none asked where the store has none. */
 export const standingLiveOf = Effect.fn('standingLiveOf')(function* (ids: readonly string[]) {
-  return yield* standingLive(yield* tried(() => recordsOf(ids, [])));
+  const home = yield* StoreRoot;
+  return yield* standingLive(yield* tried(() => recordsOf(home, ids, [])));
 });
 
 /**

@@ -16,6 +16,7 @@ import type { BranchReader } from '../branches/branches.store.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import type { ParentCloseout, ParentStep } from './handed.ts';
 import { firstPiece } from '../piece/piece.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /**
  * What the step `step` of the run `record` said, on the engine's record of its current try (`closeoutOf`) — or why it cannot be given: it
@@ -37,8 +38,8 @@ const stepSaid = Effect.fn('stepSaid')(function* (e: Engine, record: Run, step: 
 });
 
 /** A step of a run that routed on to this one, with its artifacts folder named (`files`), which its brief names as the caller's to read. */
-const filesNamed = (s: ParentStep, record: Run, routed: boolean): ParentStep =>
-  routed && 'said' in s ? { ...s, files: artifactsDir(record, s.step.name) } : s;
+const filesNamed = (home: string, s: ParentStep, record: Run, routed: boolean): ParentStep =>
+  routed && 'said' in s ? { ...s, files: artifactsDir(home, record, s.step.name) } : s;
 
 /**
  * What each run this one waited on or was handed as context concluded, for its roots' briefs (`## From run <id>` in `composeBrief`), each
@@ -61,11 +62,12 @@ export const parentCloseouts = Effect.fn('parentCloseouts')(function* (
   how: ParentCloseout['how'],
   git: BranchReader,
 ) {
+  const home = yield* StoreRoot;
   const out: ParentCloseout[] = [];
   for (const id of new Set(ids)) {
     let record: Run;
     try {
-      record = runsAtOnce.runs.read(id);
+      record = runsAtOnce(home).runs.read(id);
     } catch (err) {
       out.push({ run: id, unreadable: `its record cannot be read: ${(err as Error).message}`, how, landed: false });
       continue;
@@ -78,7 +80,7 @@ export const parentCloseouts = Effect.fn('parentCloseouts')(function* (
     const steps: StepSpec[] = read.success;
     const said: ParentStep[] = [];
     const routed = routedResult(steps, record).length > 0;
-    for (const step of resultSteps(steps, record)) said.push(filesNamed(yield* stepSaid(e, record, step), record, routed));
+    for (const step of resultSteps(steps, record)) said.push(filesNamed(home, yield* stepSaid(e, record, step), record, routed));
     const landed = how === 'waited' || (yield* parentRead(id, git).pipe(over(e))).landed;
     out.push({ run: id, asked: firstPiece(record.brief, '\n'), steps: said, how, landed });
   }

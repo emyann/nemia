@@ -21,6 +21,7 @@ import { TEAM, TEAM_DEV } from './team.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
 import { runGiven, runOver } from './placed.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-ship-install-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -146,13 +147,13 @@ async function atTheGate(given: Given = {}) {
   const repo = given.repo ?? aRepo();
   const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: given.dir ?? folder() }));
   const { e, tasks, filings, settle } = given.board ?? board();
-  await runWith(e, advanceRun(runRecord(run.id)));
-  const work = runRecord(run.id).steps.implement;
+  await runWith(e, advanceRun(runRecord(rootNow(), run.id)));
+  const work = runRecord(rootNow(), run.id).steps.implement;
   (given.work ?? addSub)(work.workspace!);
   git(work.workspace!, 'add', '-A');
   git(work.workspace!, 'commit', '-q', '-m', 'add sub');
   settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  const pass = await runWith(e, advanceRun(runRecord(run.id)));
+  const pass = await runWith(e, advanceRun(runRecord(rootNow(), run.id)));
   return { repo, id: run.id, branch: work.branch!, e, tasks, filings, settle, pass, base: git(repo, 'rev-parse', 'HEAD') };
 }
 
@@ -165,10 +166,10 @@ const MESSAGE = 'Add sub\n\nadd.ts exports sub beside add.\nThe run, its branch:
 async function stagedAndSigned(given: Given & { message?: string; artifacts?: string[] } = {}) {
   const at = await atTheGate(given);
   await runWith(at.e, approveRun(at.id, 'ship', 'Merge it.'));
-  assert.deepEqual((await runWith(at.e, advanceRun(runRecord(at.id)))).filed, ['ship']);
+  assert.deepEqual((await runWith(at.e, advanceRun(runRecord(rootNow(), at.id)))).filed, ['ship']);
   git(at.repo, 'merge', '--no-ff', '--no-commit', at.branch);
   at.settle(`${at.id}-ship`, 'succeeded', { ...SIGNED, artifacts: given.artifacts ?? [], message: given.message ?? MESSAGE });
-  const signed = await runWith(at.e, advanceRun(runRecord(at.id)));
+  const signed = await runWith(at.e, advanceRun(runRecord(rootNow(), at.id)));
   return { ...at, signed, checkId: `${at.id}-ship-check` };
 }
 
@@ -260,8 +261,8 @@ test("an ending's merge that brings a dependency: its check installs what the me
   );
 
   settle(checkId, 'succeeded', undefined, 0);
-  await runWith(e, advanceRun(runRecord(id)));
-  const landed = runRecord(id).steps.ship.landed;
+  await runWith(e, advanceRun(runRecord(rootNow(), id)));
+  const landed = runRecord(rootNow(), id).steps.ship.landed;
   assert.ok(landed && 'commit' in landed, JSON.stringify(landed));
   assert.equal(git(repo, 'rev-parse', 'HEAD^1'), base);
   assert.equal(git(repo, 'status', '--porcelain'), '', 'nothing left in the checkout');
@@ -295,9 +296,9 @@ test("a merge its check refused is aborted with the branch's packages left insta
   const { id, e, tasks, settle, checkId } = await stagedAndSigned({ repo, dir: requiringB(), work: addB });
   assert.equal(runCheck(tasks, checkId, repo).status, 0);
   settle(checkId, 'failed', undefined, 1);
-  await runWith(e, advanceRun(runRecord(id)));
+  await runWith(e, advanceRun(runRecord(rootNow(), id)));
   assert.equal(mergeHead(repo), false, 'aborted');
-  assert.ok(runRecord(id).steps.ship.landed && 'aborted' in runRecord(id).steps.ship.landed!);
+  assert.ok(runRecord(rootNow(), id).steps.ship.landed && 'aborted' in runRecord(rootNow(), id).steps.ship.landed!);
   assert.equal(fs.existsSync(path.join(repo, 'packages', 'b')), false, 'the branch is gone from the checkout');
   assert.ok(fs.lstatSync(path.join(repo, 'node_modules', 'b')).isSymbolicLink(), 'and its package is still installed');
   assert.equal(checkoutParts(repo), null, 'a package the lockfile does not name is not looked for');

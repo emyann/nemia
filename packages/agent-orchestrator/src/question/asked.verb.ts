@@ -8,13 +8,13 @@ import { Effect } from 'effect';
 import type { Args, Flag } from '../command/command.ts';
 import { EngineService, asked, type TaskView } from '../runtime-client.ts';
 import type { Run } from '../record/record.ts';
-import { HOME } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { judgedSteps, workflowsOf } from '../summary/reads.verb.ts';
 import { closeoutOf } from '../views/views.verb.ts';
 import { answerRefusal, answerText, approvedAnswerText, askedQuestions, numberedAnswers, type Answer } from './index.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /** Where a person answered at the terminal, as the words their answers become say it. */
 const AT_THE_TERMINAL = 'at the terminal';
@@ -26,7 +26,7 @@ const INSTEAD = 'with --message "<words>", without --answer';
  * What `step`'s current closeout asks, field by field in the order its step's fields ask them (`askedQuestions`): none where it asks none,
  * or has not signed off. The step is read as it was frozen on the run, or from its workflow folder under `home`.
  */
-export const askedNow = Effect.fn('askedNow')(function* (run: Run, step: string, home: string = HOME) {
+export const askedNow = Effect.fn('askedNow')(function* (home: string, run: Run, step: string) {
   const e = yield* EngineService;
   const taskId = run.steps[step]?.taskId;
   const views = new Map<string, TaskView>();
@@ -48,7 +48,7 @@ export const typedAnswers = Effect.fn('typedAnswers')(function* (
   { note, approval = false }: { note?: string; approval?: boolean } = {},
 ) {
   const run = yield* (yield* RunDoor).runs.read(RunId.read(runId));
-  const questions = (yield* askedNow(run, step)).flatMap((a) => a.questions);
+  const questions = (yield* askedNow(yield* StoreRoot, run, step)).flatMap((a) => a.questions);
   const answers = numberedAnswers(questions, typed, `nemia decide ${runId}`);
   const wrong = Array.isArray(answers) ? answerRefusal(questions, answers, INSTEAD) : answers.error;
   if (wrong !== null || !Array.isArray(answers)) return yield* Effect.fail(new Invalid({ message: wrong ?? '' }));
@@ -70,7 +70,7 @@ export const givenAnswers = Effect.fn('givenAnswers')(function* (
   { note, approval = false, home }: { note?: string | undefined; approval?: boolean; home?: string | undefined } = {},
 ) {
   const run = yield* (yield* RunDoor).runs.read(RunId.read(runId));
-  const questions = (yield* askedNow(run, step, home)).flatMap((a) => a.questions);
+  const questions = (yield* askedNow(home ?? (yield* StoreRoot), run, step)).flatMap((a) => a.questions);
   const wrong = answerRefusal(questions, answers);
   if (wrong !== null) return yield* Effect.fail(new Invalid({ message: wrong }));
   return approval ? approvedAnswerText(step, questions, answers, note) : answerText(questions, answers, note);

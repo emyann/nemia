@@ -21,11 +21,13 @@ import type { Holding } from '../src/wait/wait.verb.ts';
 import type { Effect as EffectOf } from 'effect/Effect';
 import type { Run } from '../src/run.ts';
 import type { PlaceService } from '../src/place/place.store.ts';
+import type { StoreRoot } from '../src/config/root.store.ts';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { decideScreen } from './screens.ts';
 import { staged, story, type Board } from './story.ts';
 import { names } from './assessed.ts';
+import { rootNow, storeGiven } from './config-given.ts';
 
 const ROOT = scratch('wf-hold-');
 process.env.WF_ROOT = ROOT;
@@ -72,9 +74,9 @@ const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null 
 const world = () => stage.place().world;
 const holdFileOf = (id: string) => path.join(ROOT, 'runs', `${id}.hold`);
 /** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `nemia ls` reads. */
-const aPass = (e: Engine) => stage.runWith(e, passStanding(listRuns()));
+const aPass = (e: Engine) => stage.runWith(e, passStanding(listRuns(rootNow())));
 /** One pass of the tick over `run`, as read now or as given. */
-const tick = (b: Board, run: Run | string) => stage.runWith(b.e, advanceRun(typeof run === 'string' ? runRecord(run) : run));
+const tick = (b: Board, run: Run | string) => stage.runWith(b.e, advanceRun(typeof run === 'string' ? runRecord(rootNow(), run) : run));
 
 /**
  * The hold on `id` made one that code older than `nemia hold --by` wrote: its file without `by`, which every screen says as the plain
@@ -148,10 +150,10 @@ const mergedByHand = (repo: string, branch: string): void => {
 const aDone = async (b: Board, repo: string, { merged = false } = {}) => {
   const run = await stage.runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: oneStep() }));
   await tick(b, run.id);
-  committed(runRecord(run.id).steps.implement.workspace!, `fix-${run.id}.ts`);
+  committed(runRecord(rootNow(), run.id).steps.implement.workspace!, `fix-${run.id}.ts`);
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
   await tick(b, run.id);
-  if (merged) mergedByHand(repo, runRecord(run.id).steps.implement.branch!);
+  if (merged) mergedByHand(repo, runRecord(rootNow(), run.id).steps.implement.branch!);
   return run;
 };
 /** A run of `oneStep` in `repo`, its step filed and still running. */
@@ -245,7 +247,7 @@ test('a run held until another lands: said by every screen with why and who, not
     );
     const plain = await aStarted(repo, 'held with none');
     await said(sub, 'hold', plain.id, '--until=' + target.id, '--why=it waits');
-    assert.equal(runRecord(plain.id).hold?.why, 'it waits', '--why=<words> is --why <words>');
+    assert.equal(runRecord(rootNow(), plain.id).hold?.why, 'it waits', '--why=<words> is --why <words>');
     await said(sub, 'hold', plain.id, '--off');
     await said(sub, 'hold', plain.id, '--until', target.id);
     assert.deepEqual(
@@ -285,7 +287,7 @@ test('a run held until another lands: said by every screen with why and who, not
   });
   await s.test('a hold written between the read and the filing holds: the pass checks the file at the filing', async () => {
     const other = await aStarted(repo, 'read before its hold');
-    const stale = runRecord(other.id);
+    const stale = runRecord(rootNow(), other.id);
     fs.writeFileSync(holdFileOf(other.id), JSON.stringify({ at: 'by hand', until: [target.id] }));
     await tick(b, stale);
     assert.ok(!b.filings.includes(`${other.id}-implement`), 'a run read before the hold was put is not filed on that read');
@@ -385,7 +387,11 @@ test('a run held until another lands: said by every screen with why and who, not
       assert.doesNotMatch(screen, /waiting on you|BLOCKED/, screen);
       assert.doesNotMatch(screen, VERBS, screen);
       assert.equal((await stage.runWith(b.e, decideRun(asking.id))).decision.kind, 'running');
-      assert.equal(runRecord(asking.id).steps.implement.taskId, `${asking.id}-implement`, 'the step and its closeout are untouched');
+      assert.equal(
+        runRecord(rootNow(), asking.id).steps.implement.taskId,
+        `${asking.id}-implement`,
+        'the step and its closeout are untouched',
+      );
       const asks = path.join(ROOT, 'runs', `${asking.id}.asks`);
       fs.mkdirSync(asks, { recursive: true });
       fs.writeFileSync(path.join(asks, 'retry-implement-2'), JSON.stringify({ mode: 'continue' }));
@@ -470,7 +476,7 @@ test('a run held until another lands: said by every screen with why and who, not
         new RegExp(`\n  ${literal(words)} as well — nemia hold ${worded.id} --off lifts the hold, and not the wait above$`),
       );
       await said(sub, 'cancel', cancelled.id);
-      const at = runRecord(cancelled.id).cancelledAt!;
+      const at = runRecord(rootNow(), cancelled.id).cancelledAt!;
       assert.deepEqual(await decideScreen(sub, b.e, [child.id], { ...ids, '<id>': child.id, '<at>': at }, place), [
         '<id>  after the parent',
         '',
@@ -486,18 +492,18 @@ test('a run held until another lands: said by every screen with why and who, not
     },
   );
   await s.test('the tick lifts the hold on the pass that reads the run it names landed, and the run goes on on that pass', async () => {
-    const wt = runRecord(target.id).steps.implement.workspace!;
+    const wt = runRecord(rootNow(), target.id).steps.implement.workspace!;
     committed(wt, 'target.ts');
     b.settle(`${target.id}-implement`, 'succeeded', SIGNED);
     await tick(b, target.id);
     await tick(b, run.id);
     assert.ok(fs.existsSync(holdFileOf(run.id)) && !b.filings.includes(`${run.id}-implement`), 'signed off and not merged has not landed');
-    mergedByHand(repo, runRecord(target.id).steps.implement.branch!);
+    mergedByHand(repo, runRecord(rootNow(), target.id).steps.implement.branch!);
     const lifted = await tick(b, run.id);
     assert.ok(lifted.notes.includes(`the hold is lifted: ${target.id} has landed`), lifted.notes.join('\n'));
     assert.ok(!fs.existsSync(holdFileOf(run.id)), 'the hold file is gone');
     assert.ok(b.filings.includes(`${run.id}-implement`), 'and the run went on on the same pass');
-    assert.equal(runRecord(run.id).hold, undefined);
+    assert.equal(runRecord(rootNow(), run.id).hold, undefined);
   });
   await s.test(
     'REFUSED: nemia rm of a run another holds on names the hold to lift; nemia rm of a held run takes its hold with it',
@@ -596,8 +602,8 @@ test('a run held until a person lifts it: no run named, nothing asked nor filed 
     for (let i = 0; i < 5; i++) await tick(b, id);
     assert.equal(b.filings.length, filed, 'nothing filed while held');
     assert.ok(fs.existsSync(holdFileOf(id)), 'the hold stands');
-    assert.deepEqual(runRecord(id).hold?.until, []);
-    assert.equal(runRecord(id).hold?.why, why);
+    assert.deepEqual(runRecord(rootNow(), id).hold?.until, []);
+    assert.equal(runRecord(rootNow(), id).hold?.why, why);
   });
   await s.test("`nemia hold <run> --off` lifts it, and its questions are the person's again", async (sub) => {
     await said(sub, 'hold', id, '--off');
@@ -776,7 +782,7 @@ test('REFUSED by name at shipped defaults: what `nemia hold` refuses — its arg
   });
   await t.test('allowed: what is left holds — the one run that may still land, and words at their caps', async () => {
     assert.equal((await typed(t, 'hold', id, '--until', other.id)).error, undefined);
-    assert.deepEqual(runRecord(id).hold?.until, [other.id]);
+    assert.deepEqual(runRecord(rootNow(), id).hold?.until, [other.id]);
     const capped = await aRunning(b, repo);
     const at = ['hold', capped.id, '--until', target.id, '--why', 'w'.repeat(WHY_CAP), '--by', 'b'.repeat(BY_CAP)];
     assert.equal((await typed(t, ...at)).error, undefined, 'at the caps, held');
@@ -808,9 +814,9 @@ test('REFUSED at shipped defaults: a hold that closes a circle — on a run star
     `${c.id} already waits on ${a.id} to land (${c.id} held until ${d.id}, ${d.id} held until ${a.id})`,
   );
   assert.ok(!fs.existsSync(holdFileOf(a.id)));
-  const others = [runRecord(d.id), runRecord(c.id), runRecord(child.id)];
+  const others = [runRecord(rootNow(), d.id), runRecord(rootNow(), c.id), runRecord(rootNow(), child.id)];
   assert.match(
-    holdRefusal(runRecord(a.id), [c.id], () => ({ record: runRecord(c.id), landed: false }), others) ?? '',
+    holdRefusal(runRecord(rootNow(), a.id), [c.id], () => ({ record: runRecord(rootNow(), c.id), landed: false }), others) ?? '',
     /each would wait on the other for ever/,
     'pure, with the store in the opposite order: the circle is found whichever run is read first',
   );
@@ -857,7 +863,10 @@ test('a hold a pass reads while it files its checks stops the rest of that pass,
   const checks = [`${id}-a-check`, `${id}-b-check`];
   assert.ok(held && lifted, 'the pass filed a check, then read the hold, which was lifted as it was read');
   assert.equal(checks.filter((task) => b.filings.includes(task)).length, 1, `one check filed, and not the other: ${b.filings.join(', ')}`);
-  assert.ok(!fs.existsSync(holdFile) && runRecord(id).hold === undefined, 'nothing holds the run once the pass has read the hold');
+  assert.ok(
+    !fs.existsSync(holdFile) && runRecord(rootNow(), id).hold === undefined,
+    'nothing holds the run once the pass has read the hold',
+  );
   assert.ok(
     !b.filings.includes(`${id}-c`),
     'the ready step c is not filed: the pass read the hold in its checks, and its refusal holds for every phase after, though the store reads clear',
@@ -878,15 +887,15 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
 
   const run = await aStarted(repo, 'held twice');
   await stage.runWith(b.e, hold(run.id, [target.id]));
-  const stale = runRecord(run.id);
+  const stale = runRecord(rootNow(), run.id);
   await stage.runWith(b.e, unhold(run.id));
   await stage.runWith(b.e, hold(run.id, [other.id]));
   const second = fs.readFileSync(holdFileOf(run.id), 'utf8');
   assert.notEqual(JSON.parse(second).at, stale.hold!.at, 'two holds, told apart by when they were put');
-  committed(runRecord(target.id).steps.implement.workspace!, 'target.ts');
+  committed(runRecord(rootNow(), target.id).steps.implement.workspace!, 'target.ts');
   b.settle(`${target.id}-implement`, 'succeeded', SIGNED);
   await tick(b, target.id);
-  mergedByHand(repo, runRecord(target.id).steps.implement.branch!);
+  mergedByHand(repo, runRecord(rootNow(), target.id).steps.implement.branch!);
   const pass = await tick(b, stale);
   assert.ok(
     !pass.notes.some((n) => n.startsWith('the hold is lifted')),
@@ -950,9 +959,9 @@ async function outOfRounds(b: Board, repo = aRepo()) {
   await tick(b, loop.id);
   b.settle(`${loop.id}-review`, 'succeeded', { ...SIGNED, again: true });
   await tick(b, loop.id);
-  b.settle(runRecord(loop.id).steps.implement.taskId!, 'succeeded', SIGNED);
+  b.settle(runRecord(rootNow(), loop.id).steps.implement.taskId!, 'succeeded', SIGNED);
   await tick(b, loop.id);
-  b.settle(runRecord(loop.id).steps.review.taskId!, 'succeeded', { ...SIGNED, again: true });
+  b.settle(runRecord(rootNow(), loop.id).steps.review.taskId!, 'succeeded', { ...SIGNED, again: true });
   await tick(b, loop.id);
   return loop;
 }
@@ -962,7 +971,9 @@ test('the whole screen of a loop out of rounds, and of the round a person asks f
   const loop = await outOfRounds(b);
   const place = stage.place().place;
   assert.deepEqual(
-    untimed(await decideScreen(t, b.e, [loop.id], { '<id>': loop.id, '<repo>': runRecord(loop.id).repo!, '<root>': ROOT }, place)),
+    untimed(
+      await decideScreen(t, b.e, [loop.id], { '<id>': loop.id, '<repo>': runRecord(rootNow(), loop.id).repo!, '<root>': ROOT }, place),
+    ),
     [
       '<id>  a loop',
       '',
@@ -1017,7 +1028,7 @@ test('the whole screen of a loop out of rounds, and of the round a person asks f
 test('the whole screen of a loop a person accepted as it stands', async (t) => {
   const b = stage.board();
   const loop = await outOfRounds(b);
-  committed(runRecord(loop.id).steps.implement.workspace!, 'loop.ts');
+  committed(runRecord(rootNow(), loop.id).steps.implement.workspace!, 'loop.ts');
   await stage.runWith(b.e, acceptRun(loop.id, 'review', 'as it stands'));
   const asks = path.join(ROOT, 'runs', `${loop.id}.asks`);
   const [accepted] = fs.readdirSync(asks).filter((f) => f.startsWith('accept-review-'));
@@ -1026,7 +1037,9 @@ test('the whole screen of a loop a person accepted as it stands', async (t) => {
   await tick(b, loop.id);
   const place = stage.place().place;
   assert.deepEqual(
-    untimed(await decideScreen(t, b.e, [loop.id], { '<id>': loop.id, '<repo>': runRecord(loop.id).repo!, '<root>': ROOT }, place)),
+    untimed(
+      await decideScreen(t, b.e, [loop.id], { '<id>': loop.id, '<repo>': runRecord(rootNow(), loop.id).repo!, '<root>': ROOT }, place),
+    ),
     [
       '<id>  a loop',
       '',
@@ -1071,7 +1084,7 @@ test("a hold's file written by hand is read as it is: a why or a by that is no w
   for (const bad of [7, null, '', ' \n\t ', ['x'], { a: 1 }]) {
     await t.test(`why and by of ${JSON.stringify(bad)} read as none`, () => {
       fs.writeFileSync(holdFileOf(run.id), JSON.stringify({ at: 't', until: ['a-1'], why: bad, by: bad }));
-      const read = runRecord(run.id).hold!;
+      const read = runRecord(rootNow(), run.id).hold!;
       assert.ok(!('why' in read) && !('by' in read), JSON.stringify(read));
       assert.equal(holdWord([{ run: 'a-1' }], read), 'held until a-1 lands');
     });
@@ -1079,13 +1092,13 @@ test("a hold's file written by hand is read as it is: a why or a by that is no w
   await t.test('a long why and by read as one line, each within its cap', () => {
     const long = `${'many words\n'.repeat(30)}end`;
     fs.writeFileSync(holdFileOf(run.id), JSON.stringify({ at: 't', until: ['a-1'], why: long, by: `  op\nerator ${'x'.repeat(100)}` }));
-    const read = runRecord(run.id).hold!;
+    const read = runRecord(rootNow(), run.id).hold!;
     assert.ok(read.why!.length <= WHY_CAP && read.why!.endsWith('…') && !/\s\s|\n/.test(read.why!), read.why);
     assert.ok(read.by!.length <= BY_CAP && read.by!.startsWith('op erator x') && read.by!.endsWith('…'), read.by);
   });
   await t.test('a file with no why and no by, as older code wrote it', () => {
     fs.writeFileSync(holdFileOf(run.id), JSON.stringify({ at: 't', until: ['a-1'] }));
-    assert.deepEqual(runRecord(run.id).hold, { at: 't', until: ['a-1'] });
+    assert.deepEqual(runRecord(rootNow(), run.id).hold, { at: 't', until: ['a-1'] });
     fs.rmSync(holdFileOf(run.id));
   });
 });
@@ -1095,7 +1108,7 @@ test("a hold's file written by hand is read as it is: a why or a by that is no w
  * its lines, and an `@ts-expect-error` over code that stops erring is the failure.
  */
 function _holdProgramTypes() {
-  void (hold('x', []) satisfies EffectOf<Holding, Refusal, EngineService | PlaceService>);
+  void (hold('x', []) satisfies EffectOf<Holding, Refusal, EngineService | PlaceService | StoreRoot>);
   // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
   void (hold('x', []) satisfies EffectOf<Holding, never, EngineService>);
   void (unhold('x') satisfies EffectOf<Holding, Refusal>);
@@ -1114,7 +1127,7 @@ test("REFUSED as a typed failure: each refusal of `hold` and `unhold` is its pro
   const already = await aRunning(b, repo);
   await stage.runWith(b.e, hold(already.id, [target.id]));
   const free = await aRunning(b, repo);
-  const recovered = (program: EffectOf<Holding, Refusal, EngineService | PlaceService>, tag: Refusal['_tag']) =>
+  const recovered = (program: EffectOf<Holding, Refusal, EngineService | PlaceService | StoreRoot>, tag: Refusal['_tag']) =>
     stage.runWith(
       b.e,
       program.pipe(
@@ -1122,7 +1135,7 @@ test("REFUSED as a typed failure: each refusal of `hold` and `unhold` is its pro
         Effect.catchTag(tag, (r) => Effect.succeed(r.message)),
       ),
     );
-  const refusals: Array<[string, () => EffectOf<Holding, Refusal, EngineService | PlaceService>, Refusal['_tag']]> = [
+  const refusals: Array<[string, () => EffectOf<Holding, Refusal, EngineService | PlaceService | StoreRoot>, Refusal['_tag']]> = [
     ['hold of no id', () => hold('Not An Id', [target.id]), 'Invalid'],
     ['hold --until no id', () => hold(free.id, ['Not An Id']), 'Invalid'],
     ['hold of a run not there', () => hold('r-nope', [target.id]), 'Missing'],
@@ -1165,7 +1178,7 @@ test('a defect is no refusal: `hold` and `unhold` die of what the engine or the 
     if (args[0] === holdFileOf(run.id)) throw denied;
     return rm.apply(this, args);
   });
-  await assert.rejects(Effect.runPromise(caught(unhold(run.id))), (err) => err === denied);
+  await assert.rejects(Effect.runPromise(storeGiven(ROOT)(caught(unhold(run.id)))), (err) => err === denied);
   await assert.rejects(stage.runWith(b.e, unhold(run.id)), (err) => err === denied);
   t.mock.restoreAll();
   assert.ok(fs.existsSync(holdFileOf(run.id)), 'the hold stands');

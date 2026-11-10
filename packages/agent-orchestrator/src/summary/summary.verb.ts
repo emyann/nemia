@@ -45,6 +45,7 @@ import {
   stepSaid,
   type StepNeeds,
 } from './judged.verb.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 export type RunSummary = {
   id: string;
@@ -416,9 +417,10 @@ export type SummaryHow = {
  * run, a run whose files stamp as they did given as the run the informer kept. Every listed run stays in the informer, and no other.
  */
 const listedThrough = Effect.fnUntraced(function* (e: Engine, memo: InformerMemo, verify: boolean) {
+  const home = yield* StoreRoot;
   const git = standingReader(yield* standingSnapshot());
   const read = yield* informerRead(e, memo, verify, git, sameJudgement);
-  const all = runsAtOnce.runs.list(undefined, read.given);
+  const all = runsAtOnce(home).runs.list(undefined, read.given);
   read.only(all.map((run) => run.id));
   return { git, read, all };
 });

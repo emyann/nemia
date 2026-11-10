@@ -29,6 +29,8 @@ import {
   type Listed,
   type Pruning,
   type Turned,
+  type Env,
+  wfRoot,
 } from '../runner.ts';
 import { HELP, inputFor, placedIn, usage, confirmed, type Engine } from './flags.ts';
 
@@ -39,10 +41,10 @@ const idsOf = (args: Args): readonly string[] => (Array.isArray(args.runId) ? ar
  * One run `nemia rm` was given, forgotten through `RM`'s handler and said in its line; returns whether it is still there, and whether that
  * is a failure other than a refusal.
  */
-async function rmOne(e: Engine, place: Place, id: string, args: Args): Promise<{ kept: boolean; failed: boolean }> {
+async function rmOne(env: Env, e: Engine, place: Place, id: string, args: Args): Promise<{ kept: boolean; failed: boolean }> {
   try {
     const input = { runId: id, deleteBranches: args.deleteBranches === true, forceUnmerged: args.forceUnmerged === true };
-    const data = await runWith(e, placedIn(place, RM.handler(input)));
+    const data = await runWith(e, placedIn(env, place, RM.handler(input)));
     for (const line of RM.print(data, input)) console.log(line);
     return { kept: data.forgot.kind === 'refused' || data.forgot.kind === 'held', failed: false };
   } catch (err) {
@@ -55,13 +57,13 @@ async function rmOne(e: Engine, place: Place, id: string, args: Args): Promise<{
  * `nemia rm`: each run forgotten, judged on its own, a line each, a refusal included; once every run has had its say, it fails naming those
  * not forgotten, exit 2, or 1 when one failed otherwise.
  */
-export async function rmVerb(args: Args, e: Engine, place: Place): Promise<void> {
+export async function rmVerb(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const ids = idsOf(args);
   if (!ids.length) return console.log(HELP);
   const notForgotten: string[] = [];
   let failed = false;
   for (const id of ids) {
-    const one = await rmOne(e, place, id, args);
+    const one = await rmOne(env, e, place, id, args);
     if (one.kept) notForgotten.push(id);
     failed ||= one.failed;
   }
@@ -100,13 +102,14 @@ function refusedNamed(tally: PruneTally): void {
 
 /** Each of `ids` judged for `nemia prune`, side by side, nothing removed; a run it cannot judge is said and tallied, in the order named. */
 async function judged(
+  env: Env,
   e: Engine,
   place: Place,
   ids: readonly string[],
   flags: { unmerged: boolean; artifacts: boolean },
   tally: PruneTally,
 ): Promise<readonly Listed[]> {
-  const listed = await runWith(e, placedIn(place, judgingMany(ids, flags)));
+  const listed = await runWith(e, placedIn(env, place, judgingMany(ids, flags)));
   for (const l of listed) if ('failed' in l) notPrunedLine(l.id, l.failed, tally);
   return listed;
 }
@@ -116,11 +119,11 @@ async function judged(
  * on its finding: one count over all of them, which reads the engine's feed once. A run it could not count, and a count that fails, are
  * said, and cost only their lines.
  */
-async function withEngine(e: Engine, place: Place, found: Pruning[]): Promise<Pruning[]> {
+async function withEngine(env: Env, e: Engine, place: Place, found: Pruning[]): Promise<Pruning[]> {
   const asked = found.filter((p) => p.kind === 'prunable' || p.kind === 'nothing').map((p) => p.id);
   if (!asked.length) return found;
   try {
-    const { counted, uncounted } = await runWith(e, placedIn(place, runsForgetting(asked)));
+    const { counted, uncounted } = await runWith(e, placedIn(env, place, runsForgetting(asked)));
     for (const { text } of uncounted) console.log(text);
     return found.map((p) => {
       const engine = counted.get(p.id);
@@ -178,15 +181,28 @@ async function removing(
  * (`judgingMany`), a run that could not be judged first; those ready are removed a turn at a time, each turn said as it ends
  * (`freeingMany`): on the listing's judgement under `--yes`, judged again after a person's y.
  */
-export async function pruneVerb(args: Args, e: Engine, place: Place): Promise<void> {
+export async function pruneVerb(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
+  const home = wfRoot(env);
   const ids = idsOf(args);
   const unmerged = args.unmerged === true;
   const yes = args.yes === true;
   const artifacts = args.artifacts === true;
   const named = ids.length > 0;
   const tally: PruneTally = { notPruned: [], failed: false };
-  const listed = await judged(e, place, named ? ids : runsAtOnce.runs.list().map((r) => r.id), { unmerged, artifacts }, tally);
+  const listed = await judged(
+    env,
+    e,
+    place,
+    named
+      ? ids
+      : runsAtOnce(home)
+          .runs.list()
+          .map((r) => r.id),
+    { unmerged, artifacts },
+    tally,
+  );
   const found = await withEngine(
+    env,
     e,
     place,
     listed.flatMap((l) => ('failed' in l ? [] : [l.pruning])),
@@ -204,6 +220,7 @@ export async function pruneVerb(args: Args, e: Engine, place: Place): Promise<vo
   await runWith(
     e,
     placedIn(
+      env,
       place,
       freeingMany(listed, { unmerged, artifacts, yes }, (turn) => saidTurn(turn, tally)),
     ),
@@ -239,27 +256,27 @@ const factoryWords = (args: Args, command: string): { factory: string; words?: s
  * `nemia agents custom`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler (`AGENTS_CUSTOM`) in its
  * store, and what the entry says of them printed.
  */
-export async function agentsCustomRun(args: Args, e: Engine, place: Place): Promise<void> {
+export async function agentsCustomRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const asked = inputFor(AGENTS_CUSTOM, withWords(args, AGENTS_CUSTOM.name));
-  const data = await runWith(e, placedIn(place, AGENTS_CUSTOM.handler(asked)));
+  const data = await runWith(e, placedIn(env, place, AGENTS_CUSTOM.handler(asked)));
   for (const line of AGENTS_CUSTOM.print(data, asked)) console.log(line);
 }
 
 /**
  * `nemia factory instruct`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler, and what it says printed.
  */
-export async function factoryInstructRun(args: Args, e: Engine, place: Place): Promise<void> {
+export async function factoryInstructRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const asked = factoryWords(args, FACTORY_INSTRUCT.name);
-  const data = await runWith(e, placedIn(place, FACTORY_INSTRUCT.handler(asked)));
+  const data = await runWith(e, placedIn(env, place, FACTORY_INSTRUCT.handler(asked)));
   for (const line of FACTORY_INSTRUCT.print(data, asked)) console.log(line);
 }
 
 /**
  * `nemia factory rules`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler, and what it says printed.
  */
-export async function factoryRulesRun(args: Args, e: Engine, place: Place): Promise<void> {
+export async function factoryRulesRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const asked = factoryWords(args, FACTORY_RULES.name);
-  const data = await runWith(e, placedIn(place, FACTORY_RULES.handler(asked)));
+  const data = await runWith(e, placedIn(env, place, FACTORY_RULES.handler(asked)));
   for (const line of FACTORY_RULES.print(data, asked)) console.log(line);
 }
 
@@ -267,18 +284,18 @@ export async function factoryRulesRun(args: Args, e: Engine, place: Place): Prom
  * `nemia factory server add`'s runner: its flags mapped to the McpServer's write its handler takes (`serverAddOf`), handed to it, and what
  * it says printed.
  */
-export async function factoryServerAddRun(args: Args, e: Engine, place: Place): Promise<void> {
+export async function factoryServerAddRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const asked = serverAddOf(args);
-  const data = await runWith(e, placedIn(place, FACTORY_SERVER_ADD.handler(asked)));
+  const data = await runWith(e, placedIn(env, place, FACTORY_SERVER_ADD.handler(asked)));
   for (const line of FACTORY_SERVER_ADD.print(data, asked)) console.log(line);
 }
 
 /**
  * `nemia policy propose`'s runner: the proposal `--file` names read (`wordsFrom`), handed to its entry's handler, and what it says printed.
  */
-export async function policyProposeRun(args: Args, e: Engine, place: Place): Promise<void> {
+export async function policyProposeRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const asked = withWords(args, POLICY_PROPOSE.name);
-  const data = await runWith(e, placedIn(place, POLICY_PROPOSE.handler(asked)));
+  const data = await runWith(e, placedIn(env, place, POLICY_PROPOSE.handler(asked)));
   for (const line of POLICY_PROPOSE.print(data, asked)) console.log(line);
 }
 
@@ -286,9 +303,10 @@ export async function policyProposeRun(args: Args, e: Engine, place: Place): Pro
  * `nemia admit`'s runner: the call read on stdin, decided against the table (`admitted`) under the floor `--at-least` gives, and the answer
  * printed as JSON, or nothing.
  */
-export async function admitRun(args: Args, e: Engine, place: Place): Promise<void> {
-  const floor = typeof args.atLeast === 'string' ? (args.atLeast as Parameters<typeof admitted>[2]) : undefined;
+export async function admitRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
+  const home = wfRoot(env);
+  const floor = typeof args.atLeast === 'string' ? (args.atLeast as Parameters<typeof admitted>[3]) : undefined;
   const auto = typeof args.auto === 'string' ? args.auto : undefined;
-  const answer = await runWith(e, placedIn(place, admitted(fs.readFileSync(0, 'utf8'), TABLE, floor, auto)));
+  const answer = await runWith(e, placedIn(env, place, admitted(home, fs.readFileSync(0, 'utf8'), TABLE, floor, auto)));
   if (answer !== undefined) console.log(JSON.stringify(answer));
 }

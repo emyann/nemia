@@ -101,7 +101,7 @@ test("a held step closed and not yet settled reads as it signed, never the engin
     'the seed: closed, and the engine has not settled it',
   );
   await runWith(engine(process.env), approveRun('h-closed', 'plan'));
-  const listed = await runWith(engine(process.env), list(engine(process.env), runStore.runs.read('h-closed')));
+  const listed = await runWith(engine(process.env), list(engine(process.env), runStore(root).runs.read('h-closed')));
   for (const run of [await detail('h-closed'), await summary('h-closed')]) {
     assert.deepEqual(
       run.steps.map((s) => s.message),

@@ -31,6 +31,7 @@ import { scratch } from 'test-kit/scratch';
 import { TEAM_DEV } from './team.ts';
 import { givenPlace } from './placed.ts';
 import { staged, type Board } from './story.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-faces-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -60,7 +61,7 @@ const { cancelFile, runRecord } = await import('../src/record/record.store.ts');
 const { EngineService: Service, engineOf } = await import('../src/runtime-client.ts');
 const { Invalid, isRefusal } = await import('../src/refusal/refusal.ts');
 const { inputsDir, runsDir } = await import('../src/record/record.store.ts');
-const { filesStore: runStore } = await import('../src/record/files.store.ts');
+const runStore = (await import('../src/record/files.store.ts')).filesStoreAt(rootNow());
 const { freshRestMemo } = await import('../src/tick/tick.verb.ts');
 const { PHASES } = await import('../src/meter/meter.ts');
 const { main } = await import('../src/cli/main.ts');
@@ -174,9 +175,9 @@ const onRound = (id: string, step: string, n: number) => (n === 1 ? `${id}-${ste
 /** Round `n` up to review's word: implement signs off, its check passes, then review signs off saying `again`. */
 const toReview = async (b: Board, id: string, n: number, again: boolean) => {
   b.settle(onRound(id, 'implement', n), 'succeeded', n === 1 ? SIGNED : ANSWERED);
-  assert.deepEqual((await runWith(b.e, advanceRun(runRecord(id)))).checked, ['implement'], `round ${n}: implement's check`);
+  assert.deepEqual((await runWith(b.e, advanceRun(runRecord(rootNow(), id)))).checked, ['implement'], `round ${n}: implement's check`);
   b.settle(`${onRound(id, 'implement', n)}-check`, 'succeeded', undefined, 0);
-  assert.deepEqual((await runWith(b.e, advanceRun(runRecord(id)))).filed, ['review'], `round ${n}: review`);
+  assert.deepEqual((await runWith(b.e, advanceRun(runRecord(rootNow(), id)))).filed, ['review'], `round ${n}: review`);
   b.settle(onRound(id, 'review', n), 'succeeded', reviewSays(again));
 };
 
@@ -192,16 +193,16 @@ const started = async (dir: string) =>
 const throughCheck = async (keys: string, phase: EnginePhase, exitCode?: number) => {
   const run = await started(folder(keys));
   const b = stage.board();
-  await runWith(b.e, advanceRun(runRecord(run.id)));
+  await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  await runWith(b.e, advanceRun(runRecord(run.id)));
+  await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
   b.settle(`${run.id}-implement-check`, phase, undefined, exitCode);
   return { run, b };
 };
 /** A run another waits on, on the board its child is ticked on, its step filed, started with worktrees. */
 const aParent = async (repo: string, b: Board) => {
   const run = repositoryRunOf(await runPlaced(startRun({ brief: 'the parent', repo, workflowDir: oneStep() })));
-  await runWith(b.e, advanceRun(runRecord(run.id)));
+  await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
   return { run };
 };
 /**
@@ -323,13 +324,13 @@ test("each verb's program, given its services, answers what its plain face answe
 
       const run = await started(loopedThenShip());
       const b = stage.board();
-      await runWith(b.e, advanceRun(runRecord(run.id)));
+      await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
       for (const n of [1, 2]) {
         await toReview(b, run.id, n, true);
-        assert.deepEqual((await runWith(b.e, advanceRun(runRecord(run.id)))).looped, ['review'], `round ${n + 1}`);
+        assert.deepEqual((await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)))).looped, ['review'], `round ${n + 1}`);
       }
       await toReview(b, run.id, 3, true);
-      await runWith(b.e, advanceRun(runRecord(run.id)));
+      await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
       await same(
         'nemia retry --round',
         () => over(b.e, roundRun(run.id)),
@@ -341,9 +342,9 @@ test("each verb's program, given its services, answers what its plain face answe
         () => over(b.e, acceptRun(run.id, undefined, ENOUGH)),
         () => runWith(b.e, acceptRun(run.id, undefined, ENOUGH)),
       );
-      assert.deepEqual((await runWith(b.e, advanceRun(runRecord(run.id)))).filed, ['ship']);
+      assert.deepEqual((await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)))).filed, ['ship']);
       b.settle(`${run.id}-ship`, 'succeeded', SIGNED);
-      await runWith(b.e, advanceRun(runRecord(run.id)));
+      await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
       await same(
         'nemia approve',
         () => over(b.e, approveRun(run.id, 'ship', 'land it')),
@@ -351,9 +352,9 @@ test("each verb's program, given its services, answers what its plain face answe
       );
 
       const failed = await started(folder());
-      await runWith(b.e, advanceRun(runRecord(failed.id)));
+      await runWith(b.e, advanceRun(runRecord(rootNow(), failed.id)));
       b.settle(`${failed.id}-implement`, 'failed');
-      await runWith(b.e, advanceRun(runRecord(failed.id)));
+      await runWith(b.e, advanceRun(runRecord(rootNow(), failed.id)));
       await same(
         'nemia retry',
         () => over(b.e, retryRun(failed.id, 'implement', { mode: 'fresh' })),
@@ -361,7 +362,7 @@ test("each verb's program, given its services, answers what its plain face answe
       );
 
       const running = await started(folder());
-      await runWith(b.e, advanceRun(runRecord(running.id)));
+      await runWith(b.e, advanceRun(runRecord(rootNow(), running.id)));
       const taskId = `${running.id}-implement`;
       b.settle(taskId, 'working');
       const told = await over(b.e, sayRun(running.id, 'implement', 'Start with the parser.'));
@@ -377,7 +378,7 @@ test("each verb's program, given its services, answers what its plain face answe
         'nemia cancel',
         async () => {
           const cancelled = await over(b.e, cancelRun(running.id));
-          fs.rmSync(cancelFile(running.id));
+          fs.rmSync(cancelFile(rootNow(), running.id));
           b.tasks.get(taskId)!.stopRequested = false;
           return cancelled;
         },
@@ -395,7 +396,7 @@ test("each verb's program, given its services, answers what its plain face answe
       assert.match(await recovered(b.e, acceptRun('no-such-run', undefined, ENOUGH), 'Missing'), /no such run: no-such-run/);
 
       const run = await started(looped());
-      await runWith(b.e, advanceRun(runRecord(run.id)));
+      await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
       b.settle(`${run.id}-implement`, 'working');
       const refusals: Array<[string, EffectOf<unknown, Refusal, EngineService | PlaceService | StoreRoot>, Promise<unknown>]> = [
         ['nemia retry', retryRun(run.id, 'implement', { mode: 'fresh' }), runWith(b.e, retryRun(run.id, 'implement', { mode: 'fresh' }))],
@@ -436,7 +437,7 @@ test("each verb's program, given its services, answers what its plain face answe
     async () => {
       const b = stage.board();
       const run = await started(folder());
-      await runWith(b.e, advanceRun(runRecord(run.id)));
+      await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
       const boom = new Error('journal');
       const broken = { ...b.e, view: () => Effect.die(boom) };
       const verbs: Array<[string, EffectOf<unknown, Refusal, EngineService | PlaceService | StoreRoot>, () => Promise<unknown>]> = [
@@ -456,7 +457,7 @@ test("each verb's program, given its services, answers what its plain face answe
         assert.equal(uncaught, boom, `${what}: a defect, which no \`Effect.catch\` recovers`);
         assert.equal(await rejection(face(), what), boom, `${what}: its face rejects with the error itself`);
       }
-      assert.ok(!fs.existsSync(asksDir(run.id)) && !runRecord(run.id).cancelledAt, 'nothing written');
+      assert.ok(!fs.existsSync(asksDir(run.id)) && !runRecord(rootNow(), run.id).cancelledAt, 'nothing written');
     },
   );
 
@@ -465,7 +466,7 @@ test("each verb's program, given its services, answers what its plain face answe
     async () => {
       const b = stage.board();
       const run = await started(folder());
-      await runWith(b.e, advanceRun(runRecord(run.id)));
+      await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
       const taskId = `${run.id}-implement`;
       const unheard = await recovered(b.e, sayRun(run.id, 'implement', 'Start with the parser.'), 'Conflict');
       assert.ok(unheard.startsWith(`say: \`${taskId}\``) && unheard.includes('has not started an attempt'), unheard);
@@ -485,11 +486,11 @@ test("each verb's program, given its services, answers what its plain face answe
     async () => {
       const b = stage.board();
       const run = await started(folder());
-      await runWith(b.e, advanceRun(runRecord(run.id)));
+      await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
       const refused = new Error('stop: the engine is not listening');
       const deaf = { ...b.e, stop: () => Effect.die(refused) };
       assert.equal(await rejection(runWith(deaf, cancelRun(run.id)), 'nemia cancel'), refused);
-      assert.equal(runRecord(run.id).cancelledAt, undefined, 'not marked: asking again does both');
+      assert.equal(runRecord(rootNow(), run.id).cancelledAt, undefined, 'not marked: asking again does both');
       assert.ok((await runWith(b.e, cancelRun(run.id))).run.cancelledAt, 'asked again, it stops and marks');
     },
   );
@@ -500,15 +501,15 @@ test("each verb's program, given its services, answers what its plain face answe
       const v = await viewPrograms();
       const { run, b } = await throughCheck('check: npm test\nretries: 1', 'failed', 1);
       const e = b.e;
-      await runWith(e, advanceRun(runRecord(run.id)));
+      await runWith(e, advanceRun(runRecord(rootNow(), run.id)));
       b.settle(`${run.id}-implement-try2`, 'succeeded', SIGNED);
-      await runWith(e, advanceRun(runRecord(run.id)));
+      await runWith(e, advanceRun(runRecord(rootNow(), run.id)));
       const check = `${run.id}-implement-try2-check`;
       b.end(check, 'failed', {
         exitCode: 1,
         printed: { stdout: 'not ok 1 - parses a trailing comma\n# fail 1\n', stderr: 'npm error Test failed.\n' },
       });
-      const record = runRecord(run.id);
+      const record = runRecord(rootNow(), run.id);
       const earlier = `${run.id}-implement`;
       assert.deepEqual(record.steps.implement.tries?.[0].taskId, earlier, 'an earlier try, whose task only every try reads');
 
@@ -542,7 +543,7 @@ test("each verb's program, given its services, answers what its plain face answe
         read.map((p) => p.landed),
         [true, false, false],
       );
-      const lookup = await v.over(b.e, v.parentsRead(runRecord(child.id), git));
+      const lookup = await v.over(b.e, v.parentsRead(runRecord(rootNow(), child.id), git));
       assert.deepStrictEqual(ids.map(lookup), read);
     },
   );
@@ -553,12 +554,15 @@ test("each verb's program, given its services, answers what its plain face answe
       const v = await viewPrograms();
       const { run, b } = await throughCheck('check: npm test', 'failed', 1);
       const e = b.e;
-      const record = runRecord(run.id);
+      const record = runRecord(rootNow(), run.id);
       const check = `${run.id}-implement-check`;
       const repo = aRepo();
       const parent = await aParent(repo, b);
       b.settle(`${parent.run.id}-implement`, 'succeeded', SIGNED);
-      const child = runRecord((await runPlaced(startRun({ brief: 'the child', repo, workflowDir: folder(), after: [parent.run.id] }))).id);
+      const child = runRecord(
+        rootNow(),
+        (await runPlaced(startRun({ brief: 'the child', repo, workflowDir: folder(), after: [parent.run.id] }))).id,
+      );
       const failed = (): TaskPhase => 'failed';
       const live = await v.live([parent.run.id]);
       const reads = (err: unknown) => {
@@ -606,13 +610,13 @@ test("each verb's program, given its services, answers what its plain face answe
   await t.test("`nemia decide`'s program, given the engine as a service, answers what its plain face answers", async () => {
     const run = await runPlaced(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false }));
     const b = stage.board();
-    await runWith(b.e, advanceRun(runRecord(run.id)));
+    await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
     b.settle(`${run.id}-implement`, 'succeeded', { outcome: 'blocked', summary: 'two readings', artifacts: [], needs: 'Rename --flag?' });
-    await runWith(b.e, advanceRun(runRecord(run.id)));
+    await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
     await runWith(b.e, retryRun(run.id, 'implement', { mode: 'continue', message: 'Keep it.' }));
-    await runWith(b.e, advanceRun(runRecord(run.id)));
+    await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
     b.settle(`${run.id}-implement-try2`, 'succeeded', SIGNED);
-    await runWith(b.e, advanceRun(runRecord(run.id)));
+    await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
 
     const face = await runWith(b.e, decideRun(run.id));
     const program = await runPlaced(decideRun(run.id).pipe(Effect.provide(Service.layer(b.e))));
@@ -659,11 +663,11 @@ test("each verb's program, given its services, answers what its plain face answe
       for (const [what, opts] of cases) {
         const ran = await Effect.runPromise(placed(startRun(opts)));
         const face = await runPlaced(startRun(opts));
-        assert.deepStrictEqual(written(ran), runRecord(ran.id), `${what}: the program's run is on the record`);
-        assert.deepStrictEqual(written(face), runRecord(face.id), `${what}: the face's run is on the record`);
+        assert.deepStrictEqual(written(ran), runRecord(rootNow(), ran.id), `${what}: the program's run is on the record`);
+        assert.deepStrictEqual(written(face), runRecord(rootNow(), face.id), `${what}: the face's run is on the record`);
         assert.deepStrictEqual(same(written(ran)), same(written(face)), what);
-        assert.ok(fs.existsSync(path.join(inputsDir(ran), 'notes.md')), `${what}: its input copied`);
-        assert.ok(fs.statSync(path.join(runsDir(), ran.id, 'agents')).isDirectory(), `${what}: its agents rendered`);
+        assert.ok(fs.existsSync(path.join(inputsDir(rootNow(), ran), 'notes.md')), `${what}: its input copied`);
+        assert.ok(fs.statSync(path.join(runsDir(rootNow()), ran.id, 'agents')).isDirectory(), `${what}: its agents rendered`);
       }
     },
   );
@@ -683,14 +687,14 @@ test("each verb's program, given its services, answers what its plain face answe
         ['--no-worktree on a fan-out', { brief: 'x', repo, workflowDir: fan, isolate: false }],
       ];
       for (const [what, opts] of cases) {
-        const before = fs.readdirSync(runsDir()).sort();
+        const before = fs.readdirSync(runsDir(rootNow())).sort();
         const caught = Effect.runSync(placed(startRun(opts)).pipe(Effect.catchTag('Invalid', (r) => Effect.succeed(r))));
         assert.ok(caught instanceof Invalid, `${what}: an Invalid, recovered by its tag`);
         const err = await rejection(runPlaced(startRun(opts)), what);
         assert.ok(err instanceof Invalid, `${what}: the face throws the Invalid itself, not ${String(err)}`);
         assert.equal(err.exitCode, 2, what);
         assert.equal(caught.message, err.message, what);
-        assert.deepEqual(fs.readdirSync(runsDir()).sort(), before, `${what}: nothing written`);
+        assert.deepEqual(fs.readdirSync(runsDir(rootNow())).sort(), before, `${what}: nothing written`);
       }
     },
   );
@@ -701,12 +705,12 @@ test("each verb's program, given its services, answers what its plain face answe
       const input = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'notes.md');
       fs.writeFileSync(input, 'the notes\n');
       const opts = { brief: 'unwritable', repo: aRepo(), workflowDir: folder(), inputs: [input] };
-      const before = fs.readdirSync(runsDir()).sort();
-      fs.chmodSync(runsDir(), 0o555);
-      tt.after(() => fs.chmodSync(runsDir(), 0o755));
+      const before = fs.readdirSync(runsDir(rootNow())).sort();
+      fs.chmodSync(runsDir(rootNow()), 0o555);
+      tt.after(() => fs.chmodSync(runsDir(rootNow()), 0o755));
       const died = thrown(() => Effect.runSync(placed(startRun(opts)).pipe(Effect.catch(() => Effect.succeed('caught')))), 'the program');
       const face = await rejection(runPlaced(startRun(opts)), 'the face');
-      fs.chmodSync(runsDir(), 0o755);
+      fs.chmodSync(runsDir(rootNow()), 0o755);
       for (const [what, err] of [
         ['the program', died],
         ['the face', face],
@@ -717,7 +721,7 @@ test("each verb's program, given its services, answers what its plain face answe
       }
       const anyId = (err: unknown) => (err as Error).message.replaceAll(/unwritable-[a-z0-9]+/g, '<id>');
       assert.equal(anyId(died), anyId(face), 'in the same words, but for the run id');
-      assert.deepEqual(fs.readdirSync(runsDir()).sort(), before, 'no record, and no run directory');
+      assert.deepEqual(fs.readdirSync(runsDir(rootNow())).sort(), before, 'no record, and no run directory');
     },
   );
 
@@ -744,14 +748,14 @@ test("each verb's program, given its services, answers what its plain face answe
         ['a skill', { brief: 'unrendered', repo: ROOT, workflowDir: team }, /agents could not be rendered/],
       ];
       for (const [what, opts, said] of cases) {
-        const before = fs.readdirSync(runsDir()).sort();
+        const before = fs.readdirSync(runsDir(rootNow())).sort();
         const err = await rejection(runPlaced(startRun(opts)), what);
         assert.equal((err as Error & { exitCode?: number }).exitCode, 1, `${what}: ${String(err)}`);
         assert.match((err as Error).message, said, what);
         const id = /runs\/([a-z0-9-]+)\//.exec((err as Error).message)?.[1] ?? '';
         assert.ok(id, `${what}: the message names the run's directory: ${(err as Error).message}`);
         assert.equal(runStore.runs.taken(id), false, `${what}: nothing of ${id} is left`);
-        assert.deepEqual(fs.readdirSync(runsDir()).sort(), before, `${what}: no record, and no run directory`);
+        assert.deepEqual(fs.readdirSync(runsDir(rootNow())).sort(), before, `${what}: no record, and no run directory`);
       }
     },
   );

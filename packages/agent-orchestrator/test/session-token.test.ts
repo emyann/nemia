@@ -13,6 +13,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-session-token-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -46,7 +47,7 @@ const folder = (): string => {
 };
 
 /** One pass over the run `id` on the stage's engine. */
-const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(id)));
+const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(rootNow(), id)));
 
 /** The token the engine's task `id` was filed in its environment. */
 const tokenOf = (id: string): string | undefined => stage.board().tasks.get(id)?.spec.config?.env?.[SESSION_TOKEN];

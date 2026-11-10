@@ -13,6 +13,7 @@ import { scratch } from 'test-kit/scratch';
 import { teamCopy } from './team.ts';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven } from './placed.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-skill-folders-');
 process.env.WF_ROOT = ROOT;
@@ -32,7 +33,7 @@ const runsNow = (): string[] => (fs.existsSync(RUNS) ? fs.readdirSync(RUNS).sort
 const nested = (repo: string, folder: string, name: string): string => path.join(repo, folder, '.claude', 'skills', name);
 /** The folder of skills the run froze for its step `step`, whose agent is `agent`. */
 const frozen = (run: { id: string }, step = 'implement', agent = 'implementer'): string =>
-  path.join(agentFilesDir(run, step), `nemia-${agent}`, 'skills');
+  path.join(agentFilesDir(rootNow(), run, step), `nemia-${agent}`, 'skills');
 
 /** The files of `dir`, by name, each with its text. */
 const filesOf = (dir: string): Record<string, string> =>
@@ -115,7 +116,7 @@ test('a skill named with its folder is given to each agent that adds it, and a s
     );
   const run = await runPlaced(startRun({ brief: 'change the board', repo, workflowDir: dev }));
   for (const [name, agent] of KIT_STEPS) {
-    const step = (runRecord(run.id).workflow ?? []).find((s) => s.name === name)!;
+    const step = (runRecord(rootNow(), run.id).workflow ?? []).find((s) => s.name === name)!;
     assert.deepEqual(
       (step.agent?.skills ?? []).filter((skill) => skill.includes(':')),
       KIT_GIVEN,
@@ -126,7 +127,7 @@ test('a skill named with its folder is given to each agent that adds it, and a s
       assert.deepEqual(filesOf(path.join(frozen(run, name, agent), bare)), filesOf(nested(repo, 'apps/x', bare)), `${name}: ${bare}`);
     }
     assert.ok(Object.keys(filesOf(path.join(frozen(run, name, agent), 'kit-spec'))).includes('reader.mjs'), `${name}: the reader's script`);
-    const prompt = fs.readFileSync(path.join(agentFilesDir(run, name), 'prompt.md'), 'utf8');
+    const prompt = fs.readFileSync(path.join(agentFilesDir(rootNow(), run, name), 'prompt.md'), 'utf8');
     for (const bare of ['kit-build', 'kit-spec']) assert.ok(prompt.includes(`\`nemia-${agent}:${bare}\``), prompt);
     assert.ok(!prompt.includes('apps/x:kit-'), prompt);
   }

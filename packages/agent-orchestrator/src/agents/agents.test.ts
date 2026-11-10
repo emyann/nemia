@@ -35,6 +35,7 @@ import { agentsFor, agentVersion, loadAgents } from './read.store.ts';
 import { cardSkills, skillsFor } from '../skills/read.store.ts';
 import { filedConfig } from '../filed/filed.ts';
 import { headedLayers } from '../workflow/index.ts';
+import { rootNow } from '../../test/config-given.ts';
 
 const ROOT = scratch('wf-agents-table-');
 process.env.WF_ROOT = ROOT;
@@ -1264,7 +1265,9 @@ test('the folder of agents: beside the workflows, read whole, a broken one refus
         const before = fs.readFileSync(path.join(folder, 'implementer.md'), 'utf8');
         names(
           refusal(() =>
-            writeWorkflow(folder, [{ name: 'implement', after: [], place: 'git', body: 'Implement it.' }], undefined, { anywhere: true }),
+            writeWorkflow(rootNow(), folder, [{ name: 'implement', after: [], place: 'git', body: 'Implement it.' }], undefined, {
+              anywhere: true,
+            }),
           ),
           folder,
           'is agents/',
@@ -1282,12 +1285,12 @@ test('the folder of agents: beside the workflows, read whole, a broken one refus
         });
         const folder = path.join(dir, 'dev');
         const steps = loadWorkflows(folder);
-        const written = writeWorkflow(folder, steps, undefined, { anywhere: true });
+        const written = writeWorkflow(rootNow(), folder, steps, undefined, { anywhere: true });
         assert.deepEqual(written.kept, ['build.md'], 'the file with its comment is kept');
         assert.deepEqual(written.steps, steps);
         names(
           refusal(() =>
-            writeWorkflow(folder, [{ name: 'build', after: [], place: 'git', agent: 'builder', body: 'Build it.' }], undefined, {
+            writeWorkflow(rootNow(), folder, [{ name: 'build', after: [], place: 'git', agent: 'builder', body: 'Build it.' }], undefined, {
               anywhere: true,
             }),
           ),
@@ -1311,12 +1314,12 @@ test('the folder of agents: beside the workflows, read whole, a broken one refus
         const folder = path.join(dir, 'dev');
         const draft = (keys: object) => [{ name: 'review', after: [], place: 'git' as const, agent: 'reviewer', body: '', ...keys }];
         names(
-          refusal(() => writeWorkflow(folder, draft({ permissionMode: 'read-only' }), undefined, { anywhere: true })),
+          refusal(() => writeWorkflow(rootNow(), folder, draft({ permissionMode: 'read-only' }), undefined, { anywhere: true })),
           '`permissionMode: read-only`',
           'the former name of `sandbox:`',
           'Send the sandbox as `sandbox:` instead',
         );
-        const kept = refusal(() => writeWorkflow(folder, draft({ permissionMode: 'dontAsk' }), undefined, { anywhere: true }));
+        const kept = refusal(() => writeWorkflow(rootNow(), folder, draft({ permissionMode: 'dontAsk' }), undefined, { anywhere: true }));
         names(
           kept,
           '`permissionMode: dontAsk` on a step that runs on codex',
@@ -1328,7 +1331,7 @@ test('the folder of agents: beside the workflows, read whole, a broken one refus
           `a Claude Code mode is not refused as the sandbox a file would read it as: ${kept}`,
         );
         assert.equal(fs.readFileSync(path.join(folder, 'review.md'), 'utf8'), '---\nplace: git\nagent: reviewer\n---\n', 'nothing written');
-        writeWorkflow(folder, draft({ sandbox: 'read-only' }), undefined, { anywhere: true });
+        writeWorkflow(rootNow(), folder, draft({ sandbox: 'read-only' }), undefined, { anywhere: true });
         assert.equal(
           fs.readFileSync(path.join(folder, 'review.md'), 'utf8'),
           '---\nplace: git\nagent: reviewer\ncodex:\n  fence:\n    sandbox: read-only\n---\n\n',

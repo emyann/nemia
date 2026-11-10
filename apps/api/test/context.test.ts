@@ -19,7 +19,7 @@ import { appOver, eachTest, engineFor } from './placed.ts';
 import { objectOf, toldOf } from './run-reads.ts';
 
 /** `program`, one of the package's inbox verbs, run on the harness's store (`root`): its refusal thrown as itself. */
-const onStore = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, root));
+const onStore = <A, E>(program: Effect.Effect<A, E, StoreRoot>): A => Effect.runSync(Effect.provideService(program, StoreRoot, root));
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);

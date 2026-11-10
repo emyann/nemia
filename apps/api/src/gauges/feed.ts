@@ -33,12 +33,12 @@ const feedEventOf = (line: FeedLine): 'store' | 'daemon' | 'step' | 'removed' | 
  * watch` start — or why it cannot. The package says which numbers the feed has a line boundary at (`feedCursorRefusal`); the api keeps no
  * rule of its own about them, and says only how a reader of the stream comes by a cursor.
  */
-function feedCursorOf(raw: string | undefined): number | { error: string } {
+function feedCursorOf(home: string, raw: string | undefined): number | { error: string } {
   if (!raw) return 0;
   const how =
     'A feed cursor is the id of an event this stream sent, which an EventSource sends back as Last-Event-ID; pass none to read the feed from the start.';
   if (!/^\d+$/.test(raw)) return { error: `\`${raw}\` is not a cursor this feed gave: a feed cursor is a whole number of bytes. ${how}` };
-  const refusal = feedCursorRefusal(Number(raw));
+  const refusal = feedCursorRefusal(home, Number(raw));
   return refusal ? { error: `\`${raw}\` is not a cursor this feed gave: ${refusal}. ${how}` } : Number(raw);
 }
 
@@ -50,32 +50,34 @@ const END = 'end';
  * cursor — a Last-Event-ID or an `after` — wins over `from`, so an EventSource's reconnect resumes where it was, and a `from` of any
  * other value is refused all the same, before the stream opens.
  *
+ * @param home the store's root, whose feed is read
  * @param raw the `from` asked for, none for the feed's start
  * @returns the byte of the feed to read from, or why `from` cannot be read
  */
-function feedStartOf(raw: string | undefined): number | { error: string } {
+function feedStartOf(home: string, raw: string | undefined): number | { error: string } {
   if (raw === undefined) return 0;
   if (raw !== END)
     return {
       error: `\`${raw}\` is not a start this feed takes: \`from=${END}\` starts at the feed's end, which is the one value \`from\` takes; pass none to read the feed from the start, or a cursor this stream gave as \`after\`.`,
     };
-  return feedSize();
+  return feedSize(home);
 }
 
 /**
  * Where a reader that reads the feed once stops: the feed's end as the stream opens (`feedSize`) on `until=end`, none on no `until` — the
  * stream follows the feed until its reader goes — or why `until` cannot be read.
  *
+ * @param home the store's root, whose feed is read
  * @param raw the `until` asked for, none to follow the feed
  * @returns the byte of the feed to stop at, none to follow it, or why `until` cannot be read
  */
-function feedEndOf(raw: string | undefined): number | undefined | { error: string } {
+function feedEndOf(home: string, raw: string | undefined): number | undefined | { error: string } {
   if (raw === undefined) return undefined;
   if (raw !== END)
     return {
       error: `\`${raw}\` is not an end this feed takes: \`until=${END}\` reads the feed to its end as the stream opens and closes it, which is the one value \`until\` takes; pass none to follow the feed.`,
     };
-  return feedSize();
+  return feedSize(home);
 }
 
 /** A hint for a selector a reader typed (`formerHints`), as an event of its own: its data the sentence a person reads. */
@@ -223,14 +225,15 @@ export const feedOpened = (
   lastEventId: string | undefined,
   beats: BeatsShape,
   context: Context.Context<never>,
+  home: string,
 ): Effect.Effect<Stream.Stream<SSEMessage>, BadRequest | Invalid> =>
   Effect.gen(function* () {
-    const start = feedStartOf(query.from);
+    const start = feedStartOf(home, query.from);
     if (typeof start !== 'number') return yield* Effect.fail(new BadRequest({ error: start.error }));
     const cursor = lastEventId || query.after || undefined;
-    const from = cursor === undefined ? start : feedCursorOf(cursor);
+    const from = cursor === undefined ? start : feedCursorOf(home, cursor);
     if (typeof from !== 'number') return yield* Effect.fail(new BadRequest({ error: from.error }));
-    const until = feedEndOf(query.until);
+    const until = feedEndOf(home, query.until);
     if (typeof until === 'object') return yield* Effect.fail(new BadRequest({ error: until.error }));
     const asked = typeof query.selector === 'string' ? [query.selector] : [...(query.selector ?? [])];
     const refused = selectorsRefusal(asked);

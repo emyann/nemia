@@ -14,7 +14,7 @@ import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
-import { storeGiven } from '../../test/config-given.ts';
+import { storeGiven, rootNow } from '../../test/config-given.ts';
 
 const ROOT = scratch('wf-workflows-root-');
 process.env.WF_ROOT = ROOT;
@@ -24,7 +24,7 @@ const { engineOf } = await import('../runtime-client.ts');
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, () => stand().layer);
-const { filesStore: runStore } = await import('../record/files.store.ts');
+const runStore = (await import('../record/files.store.ts')).filesStoreAt(rootNow());
 const { workflowVersion } = await import('../folder/version.store.ts');
 const { removeWorkflowAt } = await import('../folder/write.store.ts');
 const verbs = await import('../inbox/inbox.store.ts');

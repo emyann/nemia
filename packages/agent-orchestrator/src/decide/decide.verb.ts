@@ -49,6 +49,7 @@ import { PlaceService } from '../place/place.store.ts';
 import { readRun } from '../tick/told.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /** A step's current try that a person answered: the try, what they said, and what the try before it needed, when it said. */
 export type Answered = { try: number; message: string; needs?: string };
@@ -259,6 +260,7 @@ function deniedLinesOf(run: Run, views: ReadonlyMap<string, TaskView>): Record<s
  * read threw (`Missing`, for a run that is not there); dies of anything else (`tried`).
  */
 export const decideRun = Effect.fn('decide')(function* (id: string, standing?: StandingAsker) {
+  const home = yield* StoreRoot;
   const config = yield* StoreConfig;
   const e = viewedOnce(yield* EngineService);
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
@@ -272,7 +274,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, standing?: S
   );
   const place = yield* PlaceService;
   const memo = statusMemo((r) => headsOver(live.read())(r), place);
-  const checkout = yield* checkoutHold(e, run, steps, { standing: live.standing }, config, memo);
+  const checkout = yield* checkoutHold(home, e, run, steps, { standing: live.standing }, config, memo);
   const withCheckout = { ...base, checkout };
   const unasked = decision(withCheckout, landedOf(run, standingReader(NOTHING_READ)));
   const git = yield* live.when(unasked.kind !== 'running' && unasked.kind !== 'cancelled');
@@ -282,7 +284,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, standing?: S
   const assessed = assess(read);
   const decide = assessed.toDecide;
   const ending = collisionsDue(steps, run, decide);
-  const collisions = ending ? yield* collisionsAt(run, ending, standings, git, place) : undefined;
+  const collisions = ending ? yield* collisionsAt(home, run, ending, standings, git, place) : undefined;
   const answers = yield* answersOf(e, run, views, yield* (yield* RunDoor).asks.answers(RunId.read(id)));
   const everyTry = yield* everyTryOf(e, run, views);
   const said = saidOf(run, everyTry);

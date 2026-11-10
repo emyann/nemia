@@ -8,7 +8,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
-import { HOME } from '../record/record.store.ts';
 import type { Settings } from '../config/config.store.ts';
 import { countRead } from '../meter/tally.store.ts';
 import { FORMER_PHASE_WORDS, FORMER_PHASES, isPhase, PHASES, RECENT_KEPT, type RecentPass } from '../meter/index.ts';
@@ -37,18 +36,18 @@ import {
 } from './series.ts';
 
 /** The folder of a tier's files. */
-export const tierDir = (tier: Tier): string => path.join(HOME, 'metrics', tier);
+export const tierDir = (home: string, tier: Tier): string => path.join(home, 'metrics', tier);
 
 /** The file of a tier's day. */
-export const dayFile = (tier: Tier, day: string): string => path.join(tierDir(tier), `${day}.jsonl`);
+export const dayFile = (home: string, tier: Tier, day: string): string => path.join(tierDir(home, tier), `${day}.jsonl`);
 
 const DAY_FILE = /^(\d{4}-\d{2}-\d{2})\.jsonl$/;
 
 /** The days a tier holds a file of, oldest first: none before any is written. */
-export const days = (tier: Tier): string[] => {
+export const days = (home: string, tier: Tier): string[] => {
   let names: string[];
   try {
-    names = fs.readdirSync(tierDir(tier));
+    names = fs.readdirSync(tierDir(home, tier));
   } catch {
     return [];
   }
@@ -59,7 +58,7 @@ export const days = (tier: Tier): string[] => {
  * Lines appended to their days' files of `tier`. Refuses as `Invalid` a line labelled by a key outside `SERIES_LABEL_KEYS`, writing
  * none.
  */
-export const appendLines = (tier: Tier, lines: readonly RollupLine[]): void => {
+export const appendLines = (home: string, tier: Tier, lines: readonly RollupLine[]): void => {
   for (const line of lines) {
     const strange = strangeLabels(line.l);
     if (strange.length)
@@ -68,10 +67,10 @@ export const appendLines = (tier: Tier, lines: readonly RollupLine[]): void => {
       });
   }
   if (!lines.length) return;
-  fs.mkdirSync(tierDir(tier), { recursive: true });
+  fs.mkdirSync(tierDir(home, tier), { recursive: true });
   const byDay = new Map<string, string[]>();
   for (const line of lines) byDay.set(dayOf(line.t), [...(byDay.get(dayOf(line.t)) ?? []), `${JSON.stringify(line)}\n`]);
-  for (const [day, texts] of byDay) fs.appendFileSync(dayFile(tier, day), texts.join(''));
+  for (const [day, texts] of byDay) fs.appendFileSync(dayFile(home, tier, day), texts.join(''));
 };
 
 /** A label's free name. */
@@ -132,12 +131,12 @@ const linesIn = (text: string): { lines: RollupLine[]; unread: number } => {
 const TAIL = 16_384;
 
 /** The last line of `tier`'s latest day, read off the file's tail alone; undefined where none reads. */
-export const lastLine = (tier: Tier): RollupLine | undefined => {
-  const day = days(tier).at(-1);
+export const lastLine = (home: string, tier: Tier): RollupLine | undefined => {
+  const day = days(home, tier).at(-1);
   if (!day) return undefined;
   let fd: number | undefined;
   try {
-    fd = fs.openSync(dayFile(tier, day), 'r');
+    fd = fs.openSync(dayFile(home, tier, day), 'r');
     const size = fs.fstatSync(fd).size;
     const length = Math.min(size, TAIL);
     const buf = Buffer.alloc(length);
@@ -158,23 +157,24 @@ export const lastLine = (tier: Tier): RollupLine | undefined => {
 };
 
 /** A tier's day as it reads: its lines, a line that does not read as one left out and the file said once on stderr; none for no file. */
-export const readDay = (tier: Tier, day: string): RollupLine[] => {
+export const readDay = (home: string, tier: Tier, day: string): RollupLine[] => {
   let text: string;
   try {
-    text = fs.readFileSync(dayFile(tier, day), 'utf8');
+    text = fs.readFileSync(dayFile(home, tier, day), 'utf8');
   } catch {
     return [];
   }
   countRead(Buffer.byteLength(text));
   const { lines, unread } = linesIn(text);
-  if (unread) process.stderr.write(`${dayFile(tier, day)}: ${unread} of its lines did not read as a series line and were left out.\n`);
+  if (unread)
+    process.stderr.write(`${dayFile(home, tier, day)}: ${unread} of its lines did not read as a series line and were left out.\n`);
   return lines;
 };
 
 /** What a day's file is now, its size and time of change, to tell a memo it moved; undefined for no file. */
-export const dayStamp = (tier: Tier, day: string): string | undefined => {
+export const dayStamp = (home: string, tier: Tier, day: string): string | undefined => {
   try {
-    const st = fs.statSync(dayFile(tier, day));
+    const st = fs.statSync(dayFile(home, tier, day));
     return `${st.size}:${st.mtimeMs}`;
   } catch {
     return undefined;
@@ -182,36 +182,36 @@ export const dayStamp = (tier: Tier, day: string): string | undefined => {
 };
 
 /** A tier's day deleted; nothing for one that is gone. */
-export const dropDay = (tier: Tier, day: string): void => fs.rmSync(dayFile(tier, day), { force: true });
+export const dropDay = (home: string, tier: Tier, day: string): void => fs.rmSync(dayFile(home, tier, day), { force: true });
 
 /**
  * The series kept on a pass at `now`, from the passes the ring holds after it (`ring`, oldest first): the minutes due rolled and appended,
  * then the hours due rolled from the minute files, then each tier's days past its retention deleted (`WF_METRICS_MINUTE_DAYS`,
  * `WF_METRICS_HOUR_DAYS`). Throws what a read or a write threw, a retention refused among them: the tick's to say, never to stop on.
  */
-export const keepSeries = (ring: readonly RecentPass[], config: Settings, now: number = Date.now()): void => {
-  const lastMinute = lastLine('minute')?.t;
-  appendLines('minute', rollMinutes(ring, minutesDue(ring, lastMinute, now, RECENT_KEPT)));
-  const due = hoursDue(lastMinute, lastLine('hour')?.t, now);
+export const keepSeries = (home: string, ring: readonly RecentPass[], config: Settings, now: number = Date.now()): void => {
+  const lastMinute = lastLine(home, 'minute')?.t;
+  appendLines(home, 'minute', rollMinutes(ring, minutesDue(ring, lastMinute, now, RECENT_KEPT)));
+  const due = hoursDue(lastMinute, lastLine(home, 'hour')?.t, now);
   if (due) {
     const from = due.after === undefined ? '' : dayOf(due.after);
-    const minutes = days('minute')
+    const minutes = days(home, 'minute')
       .filter((d) => d >= from && d <= dayOf(due.before))
-      .flatMap((d) => readDay('minute', d));
-    appendLines('hour', rollHours(minutes, due));
+      .flatMap((d) => readDay(home, 'minute', d));
+    appendLines(home, 'hour', rollHours(minutes, due));
   }
-  for (const day of daysPast(days('minute'), now, config.metricsMinuteDays)) dropDay('minute', day);
-  for (const day of daysPast(days('hour'), now, config.metricsHourDays)) dropDay('hour', day);
+  for (const day of daysPast(days(home, 'minute'), now, config.metricsMinuteDays)) dropDay(home, 'minute', day);
+  for (const day of daysPast(days(home, 'hour'), now, config.metricsHourDays)) dropDay(home, 'hour', day);
 };
 
 /** A tier's day, answered from `memo` while its file has not moved since it was read, and read again once it has. */
-const dayLines = (tier: Tier, day: string, memo: SeriesMemo | undefined): RollupLine[] => {
-  if (!memo) return readDay(tier, day);
+const dayLines = (home: string, tier: Tier, day: string, memo: SeriesMemo | undefined): RollupLine[] => {
+  if (!memo) return readDay(home, tier, day);
   const key = `${tier}/${day}`;
-  const stamp = dayStamp(tier, day);
+  const stamp = dayStamp(home, tier, day);
   const held = memo.get(key);
   if (stamp !== undefined && held?.stamp === stamp) return held.lines;
-  const lines = readDay(tier, day);
+  const lines = readDay(home, tier, day);
   if (stamp === undefined) memo.delete(key);
   else memo.set(key, { stamp, lines });
   return lines;
@@ -223,6 +223,7 @@ const dayLines = (tier: Tier, day: string, memo: SeriesMemo | undefined): Rollup
  * a day leaves by age or with its file, never because this read did not want it, and the other tier's days stay.
  */
 const linesOf = (
+  home: string,
   tier: Tier,
   wanted: readonly string[],
   onDisk: readonly string[],
@@ -233,7 +234,7 @@ const linesOf = (
     const keep = new Set(memoDays(tier, onDisk, now));
     for (const key of memo.keys()) if (key.startsWith(`${tier}/`) && !keep.has(key.slice(tier.length + 1))) memo.delete(key);
   }
-  return wanted.flatMap((d) => dayLines(tier, d, memo));
+  return wanted.flatMap((d) => dayLines(home, tier, d, memo));
 };
 
 /** What `--range` takes, as its refusal says it. */
@@ -247,21 +248,22 @@ export const rangeOf = (text: string | undefined): keyof typeof RANGES => {
 };
 
 /** The series over `range` (`rangeOf`) at `now`, read off its tier's days, from `memo` where one is handed (`linesOf`). Writes nothing. */
-export const seriesRead = (range: string | undefined, memo?: SeriesMemo, now: number = Date.now()): SeriesRead => {
+export const seriesRead = (home: string, range: string | undefined, memo?: SeriesMemo, now: number = Date.now()): SeriesRead => {
   const r = rangeOf(range);
   const tier = RANGES[r].tier;
-  const onDisk = days(tier);
-  return seriesOf(r, linesOf(tier, daysOfRange(r, onDisk, now), onDisk, now, memo), now);
+  const onDisk = days(home, tier);
+  return seriesOf(r, linesOf(home, tier, daysOfRange(r, onDisk, now), onDisk, now, memo), now);
 };
 
 /**
  * The system's health over the UTC days from `from` (every day kept, for null) to `to`, both included, read off the hour lines at `now`,
  * from `memo` where one is handed (`linesOf`): each figure null where nothing was kept.
  */
-export const seriesHealth = (from: string | null, to: string, memo?: SeriesMemo, now: number = Date.now()): Health => {
-  const onDisk = days('hour');
+export const seriesHealth = (home: string, from: string | null, to: string, memo?: SeriesMemo, now: number = Date.now()): Health => {
+  const onDisk = days(home, 'hour');
   return healthOf(
     linesOf(
+      home,
       'hour',
       onDisk.filter((d) => (from === null || d >= from) && d <= to),
       onDisk,

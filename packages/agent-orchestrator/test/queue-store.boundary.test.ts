@@ -19,6 +19,8 @@ import { scratch } from 'test-kit/scratch';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
 import { runGiven, runOver } from './placed.ts';
+import { rootNow } from './config-given.ts';
+import type { StoreRoot as StoreRootNeeded } from '../src/config/root.store.ts';
 
 const ROOT = scratch('wf-queue-');
 const RUNS = path.join(ROOT, 'runs');
@@ -30,7 +32,7 @@ delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
 const { startRun, tickRun, runWith: runEngine, gitPlaceLayer, StoreRoot, ...verbs } = await import('../src/runner.ts');
 /** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
-const atRoot = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
+const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRootNeeded>): A => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
 const readInbox = () => atRoot(verbs.readInbox());
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
@@ -170,7 +172,7 @@ const started = async (
   );
   const file = path.join(RUNS, `${run.id}.json`);
   fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), createdAt }, null, 2));
-  return runRecord(run.id);
+  return runRecord(rootNow(), run.id);
 };
 const at = (minute: number) => `2026-09-16T09:${String(minute).padStart(2, '0')}:00.000Z`;
 
@@ -215,7 +217,7 @@ const aCard = (name: string, keys: Record<string, string>, body: string): string
   return file;
 };
 
-const fromCard = (card: string) => listRuns().filter((r) => r.from?.inbox === card);
+const fromCard = (card: string) => listRuns(rootNow()).filter((r) => r.from?.inbox === card);
 
 test('a queued card whose start fails without a refusal — its `.worktreeinclude` a link to itself, which its place cannot read, say — is not written off: tried again on every pass, where it keeps its place and the card behind it waits, said once on `nemia up`, and started once the failure clears', async (t) => {
   emptyStore(undefined);
@@ -271,7 +273,7 @@ test('a queued card whose start fails without a refusal — its `.worktreeinclud
   );
   const again = await runWith(b.e, tickRun());
   assert.deepEqual(
-    [again.queue && 'failed' in again.queue && again.queue.again, listRuns()],
+    [again.queue && 'failed' in again.queue && again.queue.again, listRuns(rootNow())],
     [true, []],
     'tried again, and nothing started behind it',
   );
@@ -328,7 +330,7 @@ test("REFUSED at shipped defaults: a queued card whose `repo:` is no git reposit
     ),
     `the place's open refuses it, and the card is said once with its name on it: ${queueLine(pass.queue)}`,
   );
-  assert.deepEqual(listRuns(), [], 'and no run');
+  assert.deepEqual(listRuns(rootNow()), [], 'and no run');
 });
 
 test('a `nemia up` at a cap of 1 names the card its queue is stuck on once a slot frees, though its first pass read no queue at all: a daemon says what it has not said, not what the store has not written', async (t) => {

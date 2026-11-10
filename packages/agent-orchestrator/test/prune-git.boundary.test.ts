@@ -16,6 +16,7 @@ import type { PlaceRequests, PlaceVerb } from '../src/place/place.ts';
 import { scratch } from 'test-kit/scratch';
 import { names } from './assessed.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-prune-git-');
 process.env.WF_ROOT = ROOT;
@@ -26,6 +27,7 @@ const { advanceRun, prune, startRun, runWith: runEngine, gitPlaceLayer } = await
 const { runRecord } = await import('../src/record/record.store.ts');
 const { freeingMany, judgingMany } = await import('../src/forget/prune/prune.verb.ts');
 const { PlaceService } = await import('../src/place/place.store.ts');
+const { StoreRoot } = await import('../src/config/root.store.ts');
 const { builtinGitPlace } = await import('../src/place/builtin.store.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const engine = eachTest(testEngine);
@@ -65,8 +67,8 @@ const ONE_STEP = (() => {
 const aFinished = async (repo = aRepo(), work = 'fix.ts') => {
   const e = engineOf(engine().layer);
   const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: ONE_STEP }));
-  await runWith(e, advanceRun(runRecord(run.id)));
-  const wt = runRecord(run.id).steps.implement.workspace!;
+  await runWith(e, advanceRun(runRecord(rootNow(), run.id)));
+  const wt = runRecord(rootNow(), run.id).steps.implement.workspace!;
   fs.writeFileSync(path.join(wt, work), 'export const fixed = true;\n');
   git(wt, 'add', '-A');
   git(wt, 'commit', '-q', '-m', `add ${work}`);
@@ -81,8 +83,8 @@ const aFinished = async (repo = aRepo(), work = 'fix.ts') => {
   if (!fs.existsSync(path.join(wt, 'node_modules', 'big', 'index.js')))
     fs.linkSync(path.join(repo, 'node_modules', 'big', 'index.js'), path.join(wt, 'node_modules', 'big', 'index.js'));
   engine().settle(`${run.id}-implement`, 'succeeded', { closeout: { outcome: 'done', summary: 'did it', artifacts: [], needs: null } });
-  await runWith(e, advanceRun(runRecord(run.id)));
-  git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', runRecord(run.id).steps.implement.branch!);
+  await runWith(e, advanceRun(runRecord(rootNow(), run.id)));
+  git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', runRecord(rootNow(), run.id).steps.implement.branch!);
   return { e, run, repo, wt, outside };
 };
 
@@ -148,9 +150,12 @@ test('after a prompt each run is judged again before its removal: one whose work
   };
   const place = PlaceService.layer(counting);
   const e = first.e;
-  const listed = await runEngine(e, judgingMany(ids).pipe(Effect.provide(place)));
+  const listed = await runEngine(e, Effect.provideService(judgingMany(ids), StoreRoot, rootNow()).pipe(Effect.provide(place)));
   detach(first.wt);
-  const done = await runEngine(e, freeingMany(listed, { yes: false }).pipe(Effect.provide(place)));
+  const done = await runEngine(
+    e,
+    Effect.provideService(freeingMany(listed, { yes: false }), StoreRoot, rootNow()).pipe(Effect.provide(place)),
+  );
   assert.deepEqual(
     done.map((d) => ('failed' in d ? 'failed' : d.pruning.kind)),
     ['refused', 'pruned'],

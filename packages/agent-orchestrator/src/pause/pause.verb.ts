@@ -53,12 +53,13 @@ const runTasks = (run: Run): RunTasks => ({
  * answer is the same.
  */
 const interruptsRead = Effect.fnUntraced(function* (memo?: PauseRuns) {
+  const home = yield* StoreRoot;
   const e = yield* EngineService;
-  const seen = keptRuns(memo, runTasks, yield* setting('verifyRest'));
+  const seen = keptRuns(home, memo, runTasks, yield* setting('verifyRest'));
   const ids = [...new Set(seen.filter((run) => !run.cancelledAt).flatMap((run) => run.tasks))];
   const views = new Map((ids.length ? (yield* asked('list', e.list(ids))).views : []).map((v) => [v.id, v]));
   const runs = liveAmong(seen, (id) => views.get(id)).flatMap((id) => {
-    const run = runsAtOnce.runs.find(id);
+    const run = runsAtOnce(home).runs.find(id);
     return run ? [run] : [];
   });
   const steps = new Map(yield* Effect.forEach(runs, (run) => Effect.map(stepsOf(run), (s) => [run.id, s] as const)));
@@ -125,7 +126,7 @@ export const pauseNow = Effect.fn('pauseNow')(function* (said: { why?: string; b
       continue;
     }
     const ask = { step: i.step, try: tryOf(run, i.step) + 1, mode: 'recheck' as const, interrupted: i.taskId, at: now.toISOString() };
-    if (!runsAtOnce.asks.write(i.run, { kind: 'retry', of: 'try', ask }).written) {
+    if (!runsAtOnce(home).asks.write(i.run, { kind: 'retry', of: 'try', ask }).written) {
       skipped.push(i);
       continue;
     }

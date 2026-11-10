@@ -25,6 +25,7 @@ import { TEAM } from './team.ts';
 import { staged, story } from './story.ts';
 import { promised } from './promised.ts';
 import type { Engine } from '../src/runtime-client.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-schedule-');
 
@@ -37,7 +38,7 @@ const { addFactory, attachWorkflow, setSchedule } = await import('../testing.ts'
 const { listRuns, runRecord } = await import('../src/record/record.store.ts');
 const { main: cli } = await import('../src/cli/main.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
-const { filesStore } = await import('../src/record/files.store.ts');
+const filesStore = (await import('../src/record/files.store.ts')).filesStoreAt(rootNow());
 const stage = staged({ runWith: runEngine, main: cli, engineOf });
 const { runWith } = stage;
 /** `nemia`, as a person types it, its commands given this test's place. */
@@ -104,7 +105,7 @@ const weekly = () => setSchedule({ factory: 'solo', workflow: 'dev', cron: '0 9 
 
 /** The runs a schedule started, oldest fire first: the fire each was started for. */
 const scheduledDues = (): string[] =>
-  listRuns()
+  listRuns(rootNow())
     .flatMap((r) => (r.scheduled ? [r.scheduled.due] : []))
     .sort();
 
@@ -126,13 +127,13 @@ test('a weekly schedule over the weeks: one run a due fire, once after downtime,
   await s.test('a pass on the fire itself, to the second, starts one run for it, on the factory, the fire on its record', async () => {
     t.mock.timers.setTime(Date.parse(MONDAY) + 400);
     const first = await runWith(e, tickRun());
-    const [run] = listRuns();
+    const [run] = listRuns(rootNow());
     assert.deepEqual(first.scheduled, { factory: 'solo', workflow: 'dev', due: MONDAY, run: run?.id });
     assert.deepEqual(
       [run?.scheduled, run?.factory, run?.brief, run?.repo, run?.workflowDir],
       [{ factory: 'solo', workflow: 'dev', due: MONDAY }, 'solo', 'Read the stats', repo, path.join(repo, 'workflows', 'dev')],
     );
-    assert.deepEqual(runRecord(run.id).scheduled, { factory: 'solo', workflow: 'dev', due: MONDAY }, 'read back off the record');
+    assert.deepEqual(runRecord(rootNow(), run.id).scheduled, { factory: 'solo', workflow: 'dev', due: MONDAY }, 'read back off the record');
   });
 
   await s.test('the next pass starts none', async () => {
@@ -169,7 +170,7 @@ test('a due fire waits behind the run cap and behind the queue, then starts', as
     await runWith(e, tickRun());
     t.mock.timers.setTime(Date.parse(MONDAY) + 30_000);
     const held = await runWith(e, tickRun());
-    assert.deepEqual([held.scheduled, scheduledDues(), listRuns().length], [undefined, [], 1]);
+    assert.deepEqual([held.scheduled, scheduledDues(), listRuns(rootNow()).length], [undefined, [], 1]);
   });
 
   await s.test('the cap lifted, it starts on the next pass', async () => {

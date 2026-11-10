@@ -14,6 +14,7 @@ import { nodeChild } from './child.ts';
 import { scratch } from 'test-kit/scratch';
 import { teamCopy } from './team.ts';
 import { placeOver } from './place-over.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-start-place-');
 process.env.WF_ROOT = ROOT;
@@ -22,7 +23,7 @@ const { StoreRoot } = await import('../src/config/root.store.ts');
 const { PlaceService } = await import('../src/place/place.store.ts');
 const { gitPlaceLayer, builtinGitPlace } = await import('../src/place/builtin.store.ts');
 const { runFile } = await import('../src/record/record.store.ts');
-const { filesStore: runStore } = await import('../src/record/files.store.ts');
+const runStore = (await import('../src/record/files.store.ts')).filesStoreAt(rootNow());
 const { Invalid } = await import('../src/refusal/refusal.ts');
 
 const BIN = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
@@ -99,7 +100,7 @@ test("a start opens the place it is given: the record's base, branch and reposit
 
 test('a record written when a run named its place still reads, the name kept as it was written', () => {
   const run = started(PLAIN, aRepo());
-  const file = runFile(run.id);
+  const file = runFile(rootNow(), run.id);
   const named = { skill: 'git', version: 'a'.repeat(64) };
   fs.writeFileSync(file, JSON.stringify({ ...(JSON.parse(fs.readFileSync(file, 'utf8')) as object), placeSkill: named }));
   const read = runStore.runs.read(run.id);

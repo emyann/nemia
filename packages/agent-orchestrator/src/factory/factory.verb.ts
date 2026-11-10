@@ -195,7 +195,7 @@ const listedNow = Effect.fn('listedNow')(function* (memo?: ScheduleRuns) {
   const home = yield* StoreRoot;
   const factories = [...(yield* (yield* FactoryDoor).factories.listed())];
   const verify = yield* setting('verifyRest');
-  const schedules = yield* tried(() => schedulesListed(home, keptRuns(memo, scheduleRun, verify)));
+  const schedules = yield* tried(() => schedulesListed(home, keptRuns(home, memo, scheduleRun, verify)));
   return { factories, schedules, untrusted: yield* untrustedPlaces(factories), dir: factoriesDirAt(yield* StoreRoot) } satisfies Listed;
 });
 
@@ -462,10 +462,11 @@ const FACTORY_RM: Command<{ file: string; instruction: string | null }> = {
   handler: (args) => {
     const name = textOf(args, 'factory');
     return Effect.gen(function* () {
+      const home = yield* StoreRoot;
       yield* tried(() => refuseName(name, 'rm'));
       const door = yield* FactoryDoor;
       const file = yield* door.factories.remove(FactoryName.read(name));
-      return { file, instruction: yield* tried(() => removeInstructionFolder(name)) };
+      return { file, instruction: yield* tried(() => removeInstructionFolder(home, name)) };
     });
   },
   print: ({ file, instruction }, args) => [

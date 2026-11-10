@@ -13,6 +13,7 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from '../../test/story.ts';
 import { teamCopy } from '../../test/team.ts';
+import { rootNow } from '../../test/config-given.ts';
 
 const ROOT = scratch('wf-adopt-');
 process.env.WF_ROOT = ROOT;
@@ -97,9 +98,9 @@ async function aFinished(repo: string, factory: string): Promise<string> {
   const { id } = await stage.runPlaced(startRun({ brief: 'Name it', repo, workflowDir: steps, isolate: false }));
   const file = path.join(ROOT, 'runs', `${id}.json`);
   fs.writeFileSync(file, `${JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), factory }, null, 2)}\n`);
-  await stage.runWith(board.e, advanceRun(runRecord(id)));
+  await stage.runWith(board.e, advanceRun(runRecord(rootNow(), id)));
   board.settle(`${id}-work`, 'succeeded', { outcome: 'done', summary: 'named it', artifacts: [], needs: null });
-  await stage.runWith(board.e, advanceRun(runRecord(id)));
+  await stage.runWith(board.e, advanceRun(runRecord(rootNow(), id)));
   return id;
 }
 
@@ -130,7 +131,7 @@ test('a hand-made factory taken over by a template: previewed, written, its card
       await printedBy(t, 'factory', 'instruction', 'crew', '--store');
       fs.writeFileSync(path.join(FACTORIES, 'crew.json'), `${JSON.stringify({ ...fileOf('crew'), later: { kept: true } }, null, 2)}\n`);
       run = (await printedBy(t, 'start', 'Cache the views', '--factory', 'crew', '--workflows', 'dev'))[0].split(' ')[0];
-      runBefore = JSON.stringify(runRecord(run));
+      runBefore = JSON.stringify(runRecord(rootNow(), run));
       finished = await aFinished(repo, 'crew');
       cardFile = card('views', 'crew', 'dev');
     },
@@ -140,8 +141,8 @@ test('a hand-made factory taken over by a template: previewed, written, its card
     const before = bytesUnder(ROOT);
     const printed = await printedBy(t, 'factory', 'diff', 'crew', '--template', dir);
     assert.deepEqual(bytesUnder(ROOT), before, 'the preview writes nothing');
-    assert.equal(fs.existsSync(appliedDir('crew')), false);
-    assert.equal(fs.existsSync(treeDir('crew')), false);
+    assert.equal(fs.existsSync(appliedDir(rootNow(), 'crew')), false);
+    assert.equal(fs.existsSync(treeDir(rootNow(), 'crew')), false);
     const runs = printed.find((l) => l.startsWith('runs waiting or in flight: '));
     assert.ok(runs, printed.join('\n'));
     assert.ok(runs.includes(run), `it names the run in flight: ${runs}`);
@@ -164,19 +165,23 @@ test('a hand-made factory taken over by a template: previewed, written, its card
     assert.deepEqual(file.instruction, { store: true });
     assert.deepEqual(file.later, { kept: true });
     assert.deepEqual(file.workflows, ['dev'], 'the hand-made wiring is kept in the file, unread');
-    assert.deepEqual(bytesUnder(appliedDir('crew')), bytesUnder(treeDir('crew')), 'the base and the tree are the render');
+    assert.deepEqual(
+      bytesUnder(appliedDir(rootNow(), 'crew')),
+      bytesUnder(treeDir(rootNow(), 'crew')),
+      'the base and the tree are the render',
+    );
     const read = readFactory('crew');
-    assert.equal(read.tree, treeDir('crew'));
+    assert.equal(read.tree, treeDir(rootNow(), 'crew'));
     assert.ok(read.workflows.includes('dev'), "it reads the tree's wiring");
   });
 
   await s.test('the card filed before the takeover starts, on the workflow in the tree', async (t) => {
     const started = (await printedBy(t, 'start', cardFile))[0].split(' ')[0];
-    assert.ok(runRecord(started).workflowDir.startsWith(treeDir('crew')), runRecord(started).workflowDir);
+    assert.ok(runRecord(rootNow(), started).workflowDir.startsWith(treeDir(rootNow(), 'crew')), runRecord(rootNow(), started).workflowDir);
   });
 
   await s.test('the run in flight keeps its record as it was: its workflow folder and its frozen steps', () => {
-    assert.equal(JSON.stringify(runRecord(run)), runBefore);
+    assert.equal(JSON.stringify(runRecord(rootNow(), run)), runBefore);
   });
 
   await s.test("the controller's next pass finds it applied, with no upgrade under way", () => {

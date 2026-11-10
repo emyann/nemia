@@ -20,6 +20,8 @@ import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
 import { story } from '../../test/story.ts';
+import { rootNow } from '../../test/config-given.ts';
+import type { StoreRoot as StoreRootNeeded } from '../config/root.store.ts';
 
 const ROOT = scratch('wf-inbox-');
 const INBOX = path.join(ROOT, 'inbox');
@@ -31,14 +33,14 @@ delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 const { inboxDir, startRun, startFromInbox, StoreRoot, ...verbs } = await import('../runner.ts');
 /** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
-const atRoot = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
+const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRootNeeded>): A => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
 const addToInbox = (opts: Parameters<typeof verbs.addToInbox>[0]) => atRoot(verbs.addToInbox(opts));
 const readInbox = () => atRoot(verbs.readInbox());
 const dropFromInbox = (name: string) => atRoot(verbs.dropFromInbox(name));
 const stand = eachTest(testPlace);
 const runPlaced = runGiven(() => stand().layer);
 const { runRecord } = await import('../record/record.store.ts');
-const { filesStore: runStore } = await import('../record/files.store.ts');
+const runStore = (await import('../record/files.store.ts')).filesStoreAt(rootNow());
 const { informerMemo } = await import('../rest/informer.verb.ts');
 const { INBOX: INBOX_LIST } = await import('./commands.verb.ts');
 const { runWith: runEngine } = await import('../runtime-client.ts');
@@ -128,7 +130,7 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
   const s = story(top);
   await s.test('the inbox is `$WF_ROOT/inbox/`, beside runs/ — and with no folder yet, `nemia inbox` says it is empty', async (t) => {
     emptyInbox();
-    assert.equal(inboxDir(), path.join(ROOT, 'inbox'));
+    assert.equal(inboxDir(rootNow()), path.join(ROOT, 'inbox'));
     assert.deepEqual(readInbox(), []);
     assert.deepEqual(await printedBy(t, 'inbox'), ['the inbox is empty — park an idea with nemia inbox add "<idea>"']);
     assert.match((await printedBy(t, 'inbox', '--help'))[0], /^nemia inbox \[--all\]$/);
@@ -275,7 +277,7 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
           fs.readFileSync(path.join(INBOX, filed), 'utf8'),
           `---\nworkflow: ${path.join(repo, 'workflows', 'dev')}\nrepo: ${repo}\n---\nCache the views between passes\n`,
         );
-        const run = runRecord((await printedBy(t, 'start', path.join(INBOX, filed)))[0].split(' ')[0]);
+        const run = runRecord(rootNow(), (await printedBy(t, 'start', path.join(INBOX, filed)))[0].split(' ')[0]);
         assert.equal(
           run.workflowDir,
           path.join(repo, 'workflows', 'dev'),
@@ -322,7 +324,7 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
       const printed = await printedBy(t, 'start', file);
       const id = printed[0].split(' ')[0];
       assert.match(id, /^cache-the-views-between-pass-[a-z0-9]{4}$/, 'the run id from the body');
-      const run = runRecord(id);
+      const run = runRecord(rootNow(), id);
       assert.deepEqual(
         [run.brief, run.repo, run.workflowDir, run.from],
         [
@@ -363,7 +365,7 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
 
       const plan = fs.mkdtempSync(path.join(ROOT, 'plan-'));
       fs.writeFileSync(path.join(plan, 'a.md'), '---\nworkflow: dev\n---\nParse the flag\n');
-      const planned = runRecord((await printedBy(t, 'start', path.join(plan, 'a.md'), '--repo', repo))[0].split(' ')[0]);
+      const planned = runRecord(rootNow(), (await printedBy(t, 'start', path.join(plan, 'a.md'), '--repo', repo))[0].split(' ')[0]);
       assert.deepEqual(
         [planned.brief, planned.from],
         ['Parse the flag', undefined],
@@ -379,7 +381,7 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
     const other = addToInbox({ text: 'Show the flag', workflow: 'dev', repo });
 
     const printed = await printedBy(t, 'start', path.join(INBOX, card.name));
-    const run = runRecord(printed[0].split(' ')[0]);
+    const run = runRecord(rootNow(), printed[0].split(' ')[0]);
     assert.deepEqual(
       [run.brief, run.workflowDir, run.from],
       ['Cache the views between passes', path.join(repo, 'workflows', 'dev'), { inbox: card.name }],
@@ -399,6 +401,7 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
 
       const over = addToInbox({ text: 'Show the flag', workflow: 'dev', repo });
       const run = runRecord(
+        rootNow(),
         (
           await printedBy(
             t,
@@ -424,7 +427,7 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
       process.chdir(other);
       let here: Run;
       try {
-        here = runRecord((await printedBy(t, 'start', bare.file))[0].split(' ')[0]);
+        here = runRecord(rootNow(), (await printedBy(t, 'start', bare.file))[0].split(' ')[0]);
       } finally {
         process.chdir(cwd);
       }
@@ -442,7 +445,10 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
       const brief = path.join(mine, 'work.md');
       fs.writeFileSync(brief, 'Parse the flag in cli.ts.\n');
       const waits = addToInbox({ text: 'Parse the flag', workflow: 'dev', repo });
-      const child = runRecord((await printedBy(t, 'start', waits.file, '--brief', brief, '--after', byBoard.run.id))[0].split(' ')[0]);
+      const child = runRecord(
+        rootNow(),
+        (await printedBy(t, 'start', waits.file, '--brief', brief, '--after', byBoard.run.id))[0].split(' ')[0],
+      );
       assert.deepEqual(
         [child.brief, child.after, child.from],
         ['Parse the flag in cli.ts.', [byBoard.run.id], { inbox: waits.card.name }],
@@ -475,8 +481,8 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
           context: ['source-b2', 'source-a1'],
         }),
       );
-      assert.deepEqual(runRecord(started.run.id).context, ['source-a1', 'source-b2']);
-      assert.equal(runRecord(started.run.id).after, undefined, 'it waits on none');
+      assert.deepEqual(runRecord(rootNow(), started.run.id).context, ['source-a1', 'source-b2']);
+      assert.equal(runRecord(rootNow(), started.run.id).after, undefined, 'it waits on none');
     },
   );
   await s.test(
@@ -494,7 +500,7 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
         card(`# by a path from the plan folder\nworkflow: ${path.relative(plan, other)}`, 'Document the flag'),
       );
       fs.writeFileSync(path.join(plan, 'd.md'), card('workflow: dev\nafter: a, b', 'Show the flag'));
-      const startedBy = async (...argv: string[]) => runRecord((await printedBy(t, 'start', ...argv))[0].split(' ')[0]);
+      const startedBy = async (...argv: string[]) => runRecord(rootNow(), (await printedBy(t, 'start', ...argv))[0].split(' ')[0]);
 
       const a = await startedBy(path.join(plan, 'a.md'), '--repo', repo);
       assert.deepEqual(
@@ -801,7 +807,7 @@ test(
       fs.chmodSync(INBOX, 0o755);
     }
     const id = printed[0].split(' ')[0];
-    assert.deepEqual(runRecord(id).from, { inbox: 'left-c3d4' });
+    assert.deepEqual(runRecord(rootNow(), id).from, { inbox: 'left-c3d4' });
     assert.ok(printed[2].includes('nemia inbox queue left-c3d4 --off'), printed[2]);
     const listed = (await judgedInbox()).find((l) => l.name === 'left-c3d4')!;
     assert.deepEqual([listed.state, listed.queued], ['running', { at: '2026-09-16T10:00:00.000Z', place: null }]);
@@ -818,14 +824,15 @@ test('a card gone between its start and the taking off of its `queued:` line is 
   const file = path.join(INBOX, 'gone-a1b2.md');
   fs.mkdirSync(INBOX, { recursive: true });
   fs.writeFileSync(file, `---\nworkflow: dev\nrepo: ${repo}\nqueued: 2026-09-16T10:00:00.000Z\n---\nCache the views\n`);
-  const create = runStore.runs.create;
-  t.mock.method(runStore.runs, 'create', (run: Run) => {
-    create(run);
-    fs.rmSync(file);
+  const write = fs.writeFileSync;
+  t.mock.method(fs, 'writeFileSync', function (this: unknown, ...args: Parameters<typeof fs.writeFileSync>) {
+    write.apply(this, args);
+    const created = typeof args[0] === 'string' && path.dirname(args[0]) === path.join(ROOT, 'runs') && args[0].endsWith('.json');
+    if (created && fs.existsSync(file)) fs.rmSync(file);
   });
   const started = await runPlaced(startFromInbox({ name: 'gone-a1b2', callerRepo: repo }));
   assert.equal(started.queueLeft, undefined, 'a card already gone is not a line left');
-  assert.deepEqual(runRecord(started.run.id).from, { inbox: 'gone-a1b2' });
+  assert.deepEqual(runRecord(rootNow(), started.run.id).from, { inbox: 'gone-a1b2' });
   assert.deepEqual(readInbox(), []);
 });
 

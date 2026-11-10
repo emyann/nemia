@@ -233,7 +233,9 @@ const levelHeld = (read: () => FactoryLevelFile | undefined): FactoryLevelFile |
 export function factoryFiles(home: string): FactoryLayer {
   const rulesOf = (name: string, notDone: string) => rulesAtHome(home, readFactoryAt(home, name, notDone));
   const instructionOf = (name: string, notDone: string): FactoryInstruction =>
-    instructionRead(readFactoryAt(home, name, notDone), instructionFileAt(home, name), readInstructionAt, (file) => storeKeeps(name, file));
+    instructionRead(readFactoryAt(home, name, notDone), instructionFileAt(home, name), readInstructionAt, (file) =>
+      storeKeeps(home, name, file),
+    );
   const storeKept = (name: string, notDone: string): FactoryInstruction => {
     const before = instructionOf(name, notDone);
     if (!before.store) throw folderKeptRefusal(name, before.file);
@@ -271,8 +273,8 @@ export function factoryFiles(home: string): FactoryLayer {
     instruction: {
       read: (name) => instructionOf(name, 'There is no instruction to read.'),
       write: (name, words) =>
-        writeInstructionText(name, words, storeKept(name, 'Nothing was written.').file, instructionFileAt(home, name)),
-      clear: (name) => clearInstructionText(name, storeKept(name, 'Nothing was removed.').file),
+        writeInstructionText(home, name, words, storeKept(name, 'Nothing was written.').file, instructionFileAt(home, name)),
+      clear: (name) => clearInstructionText(home, name, storeKept(name, 'Nothing was removed.').file),
     },
     servers: {
       read: (name) => factoryServers(home, name),

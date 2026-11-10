@@ -17,6 +17,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { scratch } from 'test-kit/scratch';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
+import { rootNow } from '../../test/config-given.ts';
 
 const ROOT = scratch('wf-informer-');
 const RUNS_DIR = path.join(ROOT, 'runs');
@@ -64,7 +65,7 @@ const started = async (gates: string[] = []): Promise<string> => {
   const repo = scratch('wf-informer-repo-');
   stand().world.repository(repo, {});
   const run = await runPlaced(startRun({ brief: 'inform me', repo, workflowDir: dir, gates }));
-  await runWith(e(), advanceRun(runRecord(run.id)));
+  await runWith(e(), advanceRun(runRecord(rootNow(), run.id)));
   return run.id;
 };
 
@@ -72,7 +73,7 @@ const started = async (gates: string[] = []): Promise<string> => {
 const atItsGate = async (): Promise<string> => {
   const id = await started(['work']);
   engine().settle(`${id}-work`, 'succeeded', { closeout: SIGNED, startedAt: AT, spawnedAt: AT });
-  await runWith(e(), advanceRun(runRecord(id)));
+  await runWith(e(), advanceRun(runRecord(rootNow(), id)));
   return id;
 };
 
@@ -106,7 +107,7 @@ const asIs: Wrap = (program) => program;
 
 /** The run `id` as one object, through `informer`. */
 const objectOf = (id: string, informer: InformerMemo | undefined, wrap: Wrap = asIs) =>
-  runWith(e(), wrap(informed(runObject(runRecord(id), { memo: { said: new Map() } }), informer)));
+  runWith(e(), wrap(informed(runObject(runRecord(rootNow(), id), { memo: { said: new Map() } }), informer)));
 
 /** Every run's row, through `informer`. */
 const listOf = (informer: InformerMemo, wrap: Wrap = asIs) =>

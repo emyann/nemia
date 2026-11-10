@@ -132,7 +132,7 @@ const decided = async (command: string, floor: 'semi-auto' | 'none' = 'semi-auto
     await stage.runWith(
       stage.board().e,
       Effect.provide(
-        admitted(JSON.stringify({ tool: 'Bash', input: { command }, cwd: '/w' }), TABLE, floor === 'none' ? undefined : floor),
+        admitted(rootNow(), JSON.stringify({ tool: 'Bash', input: { command }, cwd: '/w' }), TABLE, floor === 'none' ? undefined : floor),
         door(),
       ),
     )
@@ -143,7 +143,7 @@ const decidedAtAuto = async (command: string) =>
   (
     await stage.runWith(
       stage.board().e,
-      Effect.provide(admitted(JSON.stringify({ tool: 'Bash', input: { command }, cwd: '/w' }), TABLE, undefined, 'nemia', ROOT), door()),
+      Effect.provide(admitted(ROOT, JSON.stringify({ tool: 'Bash', input: { command }, cwd: '/w' }), TABLE, undefined, 'nemia'), door()),
     )
   )?.decision;
 
@@ -156,7 +156,10 @@ test('Her floor: a call on a run or a factory left at manual is denied, one rais
       await plantRun('r-pipao', 'pipao');
       await plantRun('r-hkb', 'hkb');
       await plantRun('r-default');
-      writeFactoryLevel('hkb', { since: '2026-10-06T08:00:00.000Z', raise: { level: 'semi-auto', until: '2099-01-01T00:00:00.000Z' } });
+      writeFactoryLevel(rootNow(), 'hkb', {
+        since: '2026-10-06T08:00:00.000Z',
+        raise: { level: 'semi-auto', until: '2099-01-01T00:00:00.000Z' },
+      });
       assert.equal(await decided('nemia show r-pipao'), 'deny');
       assert.equal(await decided('nemia start ./brief.md --factory pipao'), 'deny');
       assert.equal(await decided('nemia show r-default'), 'deny', "the default factory follows the store's level, manual where unset");
@@ -212,8 +215,14 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
     'at auto, an approval the default allows is given unasked; at semi-auto, on a refused check, an unread run, or a cap raised, asked',
     async () => {
       for (const name of ['auto', 'semi']) factory(name);
-      writeFactoryLevel('auto', { since: '2026-10-06T08:00:00.000Z', raise: { level: 'auto', until: '2099-01-01T00:00:00.000Z' } });
-      writeFactoryLevel('semi', { since: '2026-10-06T08:00:00.000Z', raise: { level: 'semi-auto', until: '2099-01-01T00:00:00.000Z' } });
+      writeFactoryLevel(rootNow(), 'auto', {
+        since: '2026-10-06T08:00:00.000Z',
+        raise: { level: 'auto', until: '2099-01-01T00:00:00.000Z' },
+      });
+      writeFactoryLevel(rootNow(), 'semi', {
+        since: '2026-10-06T08:00:00.000Z',
+        raise: { level: 'semi-auto', until: '2099-01-01T00:00:00.000Z' },
+      });
       const GATED = [{ name: 'build', after: [], body: 'Build it.', harness: 'codex', gate: true, check: 'npm test' }];
       for (const [id, at] of [
         ['g-auto', 'auto'],

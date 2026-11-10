@@ -23,6 +23,7 @@ import { BOOKMARK_EVERY, feedSize, followFeed, watchChanges, type Versioned } fr
 import { API_VERSION, AnyObjectList, TABLE_ACCEPT, type WatchedObject, watchEventOf } from 'objects';
 import { acceptsTable } from '../objects/table.ts';
 import { type ApiEnv, Beats } from '../layer.ts';
+import { StoreRoot } from '../store.ts';
 
 /** The least time between two reads again of a watched list, however many feed lines arrive. */
 export const WATCH_SETTLE: Duration.Input = '500 millis';
@@ -120,7 +121,8 @@ export const watchable =
     const url = new URL(c.req.url);
     url.searchParams.delete('watch');
     const request = () => new Request(url, { headers: c.req.raw.headers });
-    const at = feedSize();
+    const home = await c.var.runtime.runPromise(StoreRoot);
+    const at = feedSize(home);
     const first = await list(c, request());
     if (!first.ok) return first;
     const initial = await readOf(first, at, versionOf);
@@ -133,7 +135,7 @@ export const watchable =
       for (const object of initial.objects.values()) await stream.writeSSE(frameOf({ type: 'ADDED', object }));
       await stream.writeSSE(bookmarkOf(initial.kind, initial.at));
       const again = Effect.gen(function* () {
-        const at = feedSize();
+        const at = feedSize(home);
         const answer = yield* Effect.promise(async () => list(c, request()));
         if (!answer.ok) return yield* new ListRefused({ status: answer.status });
         const now = yield* Effect.promise(() => readOf(answer, at, versionOf));

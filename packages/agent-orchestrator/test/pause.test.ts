@@ -109,10 +109,11 @@ const printedBy = async (t: TestContext, run: () => unknown): Promise<string[]> 
   return lines.join('\n').split('\n');
 };
 /** The asks of `run` no pass has set aside. */
-const asksOf = (id: string) => (fs.existsSync(asksDir(id)) ? fs.readdirSync(asksDir(id)).filter((f) => f !== 'done') : []);
-const askOf = (id: string, step: string, n: number) => JSON.parse(fs.readFileSync(askFile(id, step, n), 'utf8'));
+const asksOf = (id: string) =>
+  fs.existsSync(asksDir(rootNow(), id)) ? fs.readdirSync(asksDir(rootNow(), id)).filter((f) => f !== 'done') : [];
+const askOf = (id: string, step: string, n: number) => JSON.parse(fs.readFileSync(askFile(rootNow(), id, step, n), 'utf8'));
 /** The runs a schedule started: the fire each was started for. */
-const scheduledDues = (): string[] => listRuns().flatMap((r) => (r.scheduled ? [r.scheduled.due] : []));
+const scheduledDues = (): string[] => listRuns(rootNow()).flatMap((r) => (r.scheduled ? [r.scheduled.due] : []));
 
 test("the store paused, then paused at once, then resumed: nothing new starts, each session stops at its tool call's end, and what the pause stopped is tried again", async (t) => {
   const s = story(t);
@@ -130,18 +131,19 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
   const begun = (workflowDir: string, more: Partial<Parameters<typeof startRun>[0]> = {}) =>
     stage.runPlaced(startRun({ brief: 'paused', repo, workflowDir, isolate: false, ...more }));
   const runs: Record<'session' | 'checking' | 'asked' | 'ended' | 'landing' | 'called', Run> = {} as never;
-  const task = (name: keyof typeof runs, step = 'work') => runRecord(runs[name].id).steps[step].taskId!;
-  const checkOf = (name: keyof typeof runs) => runRecord(runs[name].id).steps.work.check!.taskId;
+  const task = (name: keyof typeof runs, step = 'work') => runRecord(rootNow(), runs[name].id).steps[step].taskId!;
+  const checkOf = (name: keyof typeof runs) => runRecord(rootNow(), runs[name].id).steps.work.check!.taskId;
   const stops: { taskId: string; askOnDisk: boolean }[] = [];
   const stopping = {
     ...b.e,
     stop: (taskId: string) =>
       Effect.suspend(() => {
-        const run = Object.values(runs).find((r) => JSON.stringify(runRecord(r.id).steps).includes(`"${taskId}"`));
+        const run = Object.values(runs).find((r) => JSON.stringify(runRecord(rootNow(), r.id).steps).includes(`"${taskId}"`));
         stops.push({
           taskId,
           askOnDisk:
-            run !== undefined && asksOf(run.id).some((f) => fs.readFileSync(path.join(asksDir(run.id), f), 'utf8').includes(taskId)),
+            run !== undefined &&
+            asksOf(run.id).some((f) => fs.readFileSync(path.join(asksDir(rootNow(), run.id), f), 'utf8').includes(taskId)),
         });
         if (taskId !== task('ended')) return b.e.stop(taskId);
         return Effect.promise(async () => {
@@ -162,7 +164,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
   await s.test(
     'a store with nothing at work: `nemia pause --now --yes` puts the pause, stopping nothing; a folder run started under it is filed nothing, and the pause reads Paused, nothing finishing',
     async (sub) => {
-      assert.deepEqual([readPause(rootNow()), listRuns().flatMap(currentTasks)], [null, []], 'no run of the store has a task yet');
+      assert.deepEqual([readPause(rootNow()), listRuns(rootNow()).flatMap(currentTasks)], [null, []], 'no run of the store has a task yet');
       const said = await printedBy(sub, () => stage.main(['pause', '--now', '--yes', '--why', 'quiet', '--by', 'ann'], stopping));
       names(said[0], 'paused at once', 'by ann: quiet', 'nemia resume');
       names(said[1], 'nothing was stopped');
@@ -183,7 +185,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       assert.match(pausedWords(standing) ?? '', /^Paused since /);
       const feed = await printedBy(sub, () => stage.main(['watch', '--once']));
       assert.equal(feed[0], pausedWords(standing), feed.join('\n'));
-      markCancelled(loose.id);
+      markCancelled(rootNow(), loose.id);
       assert.deepEqual(await printedBy(sub, () => stage.main(['resume'])), [RESUMED]);
       assert.equal(readPause(rootNow()), null);
       assert.equal(b.sessionDrains.at(-1), null, "the sessions' drain lifted");
@@ -201,19 +203,19 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
     await pass();
     for (const name of ['session', 'asked', 'ended', 'landing', 'called'] as const) b.settle(task(name), 'working');
     b.settle(task('checking'), 'succeeded', SIGNED);
-    fs.writeFileSync(path.join(runRecord(runs.landing.id).steps.work.workspace!, 'work.txt'), 'work\n');
+    fs.writeFileSync(path.join(runRecord(rootNow(), runs.landing.id).steps.work.workspace!, 'work.txt'), 'work\n');
     b.settle(task('landing'), 'succeeded', SIGNED);
     await pass();
     b.settle(checkOf('checking'), 'working');
     await stage.runWith(b.e, approveRun(runs.landing.id, 'ship'));
     await pass();
     b.settle(task('landing', 'ship'), 'working');
-    fs.mkdirSync(asksDir(runs.asked.id), { recursive: true });
+    fs.mkdirSync(asksDir(rootNow(), runs.asked.id), { recursive: true });
     fs.writeFileSync(
-      askFile(runs.asked.id, 'work', 2),
+      askFile(rootNow(), runs.asked.id, 'work', 2),
       JSON.stringify({ step: 'work', try: 2, mode: 'fresh', at: '2026-10-04T12:00:00Z' }),
     );
-    markCancelled(runs.called.id);
+    markCancelled(rootNow(), runs.called.id);
     assert.equal(readPause(rootNow()), null);
   });
   await s.test(
@@ -317,7 +319,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
         [],
         'a landing is asked no try',
       );
-      assert.equal(fs.existsSync(asksDir(runs.called.id)), false, 'a run called off is left alone');
+      assert.equal(fs.existsSync(asksDir(rootNow(), runs.called.id)), false, 'a run called off is left alone');
       for (const name of ['session', 'ended', 'called'] as const) parked.add(task(name));
     },
   );
@@ -395,13 +397,13 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       assert.equal(b.sessionDrains.at(-1), null, "the sessions' drain lifted by the resume");
       parked.clear();
       await pass();
-      const resumed = runRecord(runs.session.id).steps.work;
+      const resumed = runRecord(rootNow(), runs.session.id).steps.work;
       assert.deepEqual([resumed.taskId, resumed.tries], [before, undefined], 'the session goes on as the same try: none is filed');
       const checked = stops.find((x) => x.taskId.startsWith(`${runs.checking.id}-`))!.taskId;
-      const rechecked = runRecord(runs.checking.id).steps.work;
+      const rechecked = runRecord(rootNow(), runs.checking.id).steps.work;
       assert.notEqual(rechecked.check?.taskId, checked, 'its check filed again');
       assert.deepEqual(rechecked.tries?.at(-1), { taskId: rechecked.taskId, check: { taskId: checked }, cause: 'recheck', paused: true });
-      assert.equal(runRecord(runs.ended.id).steps.work?.tries, undefined, 'no other session is tried either');
+      assert.equal(runRecord(rootNow(), runs.ended.id).steps.work?.tries, undefined, 'no other session is tried either');
       assert.deepEqual(scheduledDues(), [MONDAY], 'the fire held by the pause starts on the pass after the resume');
       const feed = await printedBy(sub, () => stage.main(['watch', '--once']));
       assert.equal(

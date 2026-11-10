@@ -6,7 +6,7 @@ import { Effect, Schema } from 'effect';
 import { Run as RunObject } from 'objects';
 import { EngineService, asked, tried } from '../runtime-client.ts';
 import type { PlaceService } from '../place/place.store.ts';
-import type { StoreRoot } from '../config/root.store.ts';
+import { StoreRoot } from '../config/root.store.ts';
 import type { StoreConfig } from '../config/config.store.ts';
 import type { Refusal } from '../refusal/refusal.ts';
 import type { StepCloseout, StepTry } from '../resource/tries.verb.ts';
@@ -54,7 +54,7 @@ export const SHOW: Command<Readonly<Record<string, unknown>>, typeof ShowInput.T
   input: ShowInput,
   handler: (args) =>
     Effect.flatMap(
-      tried(() => runsAtOnce.runs.read(args.runId)),
+      Effect.flatMap(StoreRoot, (home) => tried(() => runsAtOnce(home).runs.read(args.runId))),
       (run): Effect.Effect<Readonly<Record<string, unknown>>, Refusal, EngineService | PlaceService | StoreRoot | StoreConfig> =>
         args.raw === true
           ? Effect.succeed(rawOf(run))
@@ -204,7 +204,8 @@ export const LOGS: Command<{ taskId?: string; output?: string }, StepInput> = {
   input: StepInput,
   handler: Effect.fnUntraced(function* ({ runId, step }: StepInput) {
     const e = yield* EngineService;
-    const taskId = runsAtOnce.runs.read(runId).steps[step]?.taskId;
+    const home = yield* StoreRoot;
+    const taskId = runsAtOnce(home).runs.read(runId).steps[step]?.taskId;
     return taskId ? { taskId, output: yield* asked('logs', e.logs(taskId)) } : {};
   }),
   print: ({ output }, { step }) => [output ?? `${step} has not run yet`],

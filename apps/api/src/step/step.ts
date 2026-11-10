@@ -217,6 +217,6 @@ export async function stepPage(
     hiredIn: factory ? [] : hiredInOf(listedAtOnce(home), name, found.name, from, repo),
     hiring: await hiringOf(factory, name, found, hired, from, agents),
     skillsFrom: skillsFromOf(layers, defs.skills, repo, home),
-    recentRuns: recentRunsOf(keptRuns(memo.records.step, stepRun, s.config.verifyRest), dir, found.name, factory?.name ?? null),
+    recentRuns: recentRunsOf(keptRuns(home, memo.records.step, stepRun, s.config.verifyRest), dir, found.name, factory?.name ?? null),
   };
 }

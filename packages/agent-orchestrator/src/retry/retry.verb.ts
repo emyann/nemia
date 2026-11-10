@@ -99,7 +99,7 @@ export const retryRun = Effect.fn('retry')(function* (
     const { stray } = written;
     const why = yield* tried(
       () =>
-        refusal(runsAtOnce.asks.read(id).asks) ??
+        refusal(runsAtOnce(home).asks.read(id).asks) ??
         strayAsk(file, stray, `try ${ask.try} of ${stepName}`, `nemia retry ${id} ${stepName}`) ??
         `try ${ask.try} of ${stepName} is already asked for. Wait for it: nemia ls ${id}.`,
     );

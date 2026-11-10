@@ -19,6 +19,7 @@ import type { Engine } from '../src/runtime-client.ts';
 import { scratch } from 'test-kit/scratch';
 import { unasked } from './unasked.ts';
 import type { EnginePhase } from '../src/views/views-words.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-gate-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -52,9 +53,9 @@ const { runWith, runPlaced } = stage;
 /** A run as one waiting on it reads it, where its branches stand asked now, as a person's verb asks them (`standingLiveOf`). */
 const parentNow = (id: string) => standingLiveOf([id]).pipe(Effect.flatMap((git) => parentRead(id, git)));
 /** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `nemia ls` reads. */
-const aPass = (e: Engine) => runWith(e, passStanding(listRuns()));
+const aPass = (e: Engine) => runWith(e, passStanding(listRuns(rootNow())));
 /** One pass of the tick over the run `id`. */
-const tick = (e: Engine, id: string) => runWith(e, advanceRun(runRecord(id)));
+const tick = (e: Engine, id: string) => runWith(e, advanceRun(runRecord(rootNow(), id)));
 
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
@@ -140,7 +141,7 @@ const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => 
 const heldAtGate = async (phase: EnginePhase = 'succeeded') => {
   const run = await runPlaced(startRun({ brief: 'plan the flag', repo: aRepo(), workflowDir: planned(), isolate: false, gates: ['plan'] }));
   const b = stage.board();
-  await runWith(b.e, advanceRun(runRecord(run.id)));
+  await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
   b.settle(`${run.id}-plan`, phase, phase === 'succeeded' ? SIGNED : undefined);
   return { id: run.id, e: b.e };
 };
@@ -156,8 +157,8 @@ test('a gated run, from `nemia start --gate` to its approval', async (t) => {
       const gated = await runPlaced(
         startRun({ brief: 'plan the flag', repo, workflowDir: planned({ review: 'gate: true' }), isolate: false, gates: ['plan'] }),
       );
-      assert.deepEqual(runRecord(gated.id).gates, ['plan']);
-      assert.equal(runRecord(gated.id).workflow?.find((w) => w.name === 'review')?.gate, true);
+      assert.deepEqual(runRecord(rootNow(), gated.id).gates, ['plan']);
+      assert.equal(runRecord(rootNow(), gated.id).workflow?.find((w) => w.name === 'review')?.gate, true);
       const bare = await runPlaced(startRun({ brief: 'plan the flag', repo, workflowDir: planned(), isolate: false }));
       assert.equal(Object.hasOwn(JSON.parse(recordOf(bare.id)), 'gates'), false);
     },
@@ -179,7 +180,7 @@ test('a gated run, from `nemia start --gate` to its approval', async (t) => {
       ];
       const printed = await printedBy(argv);
       id = printed[0].split(' ')[0];
-      assert.deepEqual(runRecord(id).gates, ['plan', 'implement']);
+      assert.deepEqual(runRecord(rootNow(), id).gates, ['plan', 'implement']);
       assert.ok(
         printed.includes(
           `gated at: plan, implement, review — nothing after each is filed until nemia approve ${id} <step>, once it has signed off`,
@@ -231,7 +232,7 @@ test('a gated run, from `nemia start --gate` to its approval', async (t) => {
     assert.ok(!Number.isNaN(Date.parse(held.at)), 'with the time');
     assert.deepEqual(printed, [`${id}  approved: try 1 of plan, with your words — the next tick files what waits on it`, `   ${file}`]);
     assert.equal(recordOf(id), record, 'the verb writes no record');
-    assert.deepEqual(runRecord(id).approvals, [held], 'composed on read');
+    assert.deepEqual(runRecord(rootNow(), id).approvals, [held], 'composed on read');
   });
   await s.test(
     'the next tick files implement, once, told the approval under `## Approved`; the approval stays, and no record keeps it',
@@ -242,7 +243,7 @@ test('a gated run, from `nemia start --gate` to its approval', async (t) => {
       assert.deepEqual(asksOf(id), ['approve-plan-1'], 'not consumed: it opens the gate on every pass');
       assert.equal(Object.hasOwn(JSON.parse(recordOf(id)), 'approvals'), false);
       const told = b.tasks.get(`${id}-implement`)!.spec.brief;
-      const at = runRecord(id).approvals![0].at;
+      const at = runRecord(rootNow(), id).approvals![0].at;
       assert.ok(
         told.includes('\n## Approved\n\n') &&
           told.includes(`plan, try 1, approved at ${at}:\n\n\`\`\`text\nShip the second reading.\n\`\`\``),
@@ -338,7 +339,7 @@ test("a gate's step proposes the caps of the steps after it, and its approval ma
     for (const pass of [1, 2]) {
       const after = await tick(b.e, id);
       assert.deepEqual(after.tried, [], `pass ${pass}: nothing left of $7`);
-      const l = await runWith(b.e, list(b.e, runRecord(id)));
+      const l = await runWith(b.e, list(b.e, runRecord(rootNow(), id)));
       assert.equal(l.steps[1].message, 'over budget $7.25 of $7', `pass ${pass}`);
     }
   });
@@ -402,7 +403,7 @@ test('a send-back from a gate spends the approval given before it', async (t) =>
   await s.test('it signs off anew and its gate holds again, pass after pass; `nemia ls` says so', async () => {
     gate.settle(try2(), 'succeeded', { ...SIGNED, summary: 'stored, then parsed' });
     for (let pass = 1; pass <= 3; pass++) assert.deepEqual((await tick(gate.e, id)).filed, [], `pass ${pass}`);
-    const l = await runWith(gate.e, list(gate.e, runRecord(id)));
+    const l = await runWith(gate.e, list(gate.e, runRecord(rootNow(), id)));
     assert.deepEqual([l.steps[0].message, l.waitingOnYou], ['awaiting approval', ['plan']]);
     assert.ok(l.steps[0].note?.startsWith('try 2, continued on your word, answered · approve it: nemia approve '), l.steps[0].note);
   });
@@ -449,7 +450,7 @@ test('`nemia cancel` and `nemia rm` at a gate', async (t) => {
   await s.test('`nemia cancel` calls it off as any run — marked, not `already failed`', async () => {
     const printed = await printedBy(['cancel', gate.run.id], gate.e);
     assert.deepEqual(printed, [`${gate.run.id}  cancelled`, '   nothing was in flight — no further steps will be filed']);
-    assert.ok(runRecord(gate.run.id).cancelledAt);
+    assert.ok(runRecord(rootNow(), gate.run.id).cancelledAt);
   });
   await s.test('an approval on a cancelled run files nothing; cancelled again, it says so', async () => {
     approveByHand(gate.run.id, 'plan', 1);
@@ -510,12 +511,12 @@ test('a parent whose last step waits at its gate has not landed, though a person
     fs.writeFileSync(path.join(oneStep, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
     parent = (await runPlaced(startRun({ brief: 'the parent', repo, workflowDir: oneStep, gates: ['implement'] }))).id;
     await tick(b.e, parent);
-    const wt = runRecord(parent).steps.implement.workspace!;
+    const wt = runRecord(rootNow(), parent).steps.implement.workspace!;
     fs.writeFileSync(path.join(wt, 'parent.txt'), 'parent\n');
     stage.place().world.commit(wt, 'add parent.txt');
     b.settle(`${parent}-implement`, 'succeeded', SIGNED);
     await tick(b.e, parent);
-    stage.place().world.stage(repo, runRecord(parent).steps.implement.branch!);
+    stage.place().world.stage(repo, runRecord(rootNow(), parent).steps.implement.branch!);
     stage.place().world.commit(repo, 'merge the parent');
   });
   await s.test('REFUSED: merged, and at its gate, it has not landed; a run `--after` it files nothing, pass after pass', async () => {
@@ -525,14 +526,14 @@ test('a parent whose last step waits at its gate has not landed, though a person
   });
   await s.test('`nemia ls` of the child says it is waiting on the parent', async () => {
     await aPass(b.e);
-    assert.deepEqual((await runWith(b.e, list(b.e, runRecord(child)))).steps[0].message, `waiting on ${parent}`);
+    assert.deepEqual((await runWith(b.e, list(b.e, runRecord(rootNow(), child)))).steps[0].message, `waiting on ${parent}`);
   });
   await s.test(
     "approved by a person's file, with words, composed on read: it has landed, and the child's next tick files its roots",
     async () => {
       approveByHand(parent, 'implement', 1, { at: '2026-09-16T23:10:00.000Z', message: 'the second reading' });
       assert.deepEqual(
-        runRecord(parent).approvals?.find((a) => a.step === 'implement' && a.try === 1),
+        runRecord(rootNow(), parent).approvals?.find((a) => a.step === 'implement' && a.try === 1),
         {
           step: 'implement',
           try: 1,
@@ -582,7 +583,7 @@ test("a wordless `nemia retry` asked while a gated step's harness blocked its se
     assert.equal(b.tasks.has(`${id}-plan-try2`), false);
   });
   await s.test('`nemia ls` says awaiting approval and waiting on you, no try said to be due', async () => {
-    const l = await runWith(b.e, list(b.e, runRecord(id)));
+    const l = await runWith(b.e, list(b.e, runRecord(rootNow(), id)));
     assert.deepEqual([l.steps[0].message, l.waitingOnYou], ['awaiting approval', ['plan']]);
     assert.ok(l.steps[0].note?.startsWith('approve it: '), l.steps[0].note);
   });
@@ -619,20 +620,20 @@ test("an inbox card's `gate:` is frozen on the run it starts", async (t) => {
   const s = story(t);
   const repo = aRepo();
   const card = (name: string, gate: string) => {
-    fs.mkdirSync(inboxDir(), { recursive: true });
-    fs.writeFileSync(path.join(inboxDir(), `${name}.md`), `---\nworkflow: ${planned()}\ngate: ${gate}\n---\nPlan the flag.\n`);
+    fs.mkdirSync(inboxDir(rootNow()), { recursive: true });
+    fs.writeFileSync(path.join(inboxDir(rootNow()), `${name}.md`), `---\nworkflow: ${planned()}\ngate: ${gate}\n---\nPlan the flag.\n`);
   };
   await s.test("beside a start's --gate, a step both name once", async () => {
     card('plan-the-flag-a1b2', 'plan');
     const { run } = await runPlaced(
       startFromInbox({ name: 'plan-the-flag-a1b2', callerRepo: repo, isolate: false, gates: ['review', 'plan'] }),
     );
-    assert.deepEqual(runRecord(run.id).gates, ['review', 'plan']);
+    assert.deepEqual(runRecord(rootNow(), run.id).gates, ['review', 'plan']);
   });
   await s.test('alone', async () => {
     card('plan-the-flag-c3d4', 'implement');
     const { run } = await runPlaced(startFromInbox({ name: 'plan-the-flag-c3d4', callerRepo: repo, isolate: false }));
-    assert.deepEqual(runRecord(run.id).gates, ['implement']);
+    assert.deepEqual(runRecord(rootNow(), run.id).gates, ['implement']);
   });
 });
 
@@ -643,8 +644,8 @@ test('`--gate` and a card’s `gate:`, REFUSED before a run is written', async (
   const typed = (...flags: string[]) =>
     stage.main(['start', 'plan the flag', '--workflows', planned(), '--repo', repo, '--no-worktree', ...flags]);
   const card = (name: string, gate: string) => {
-    fs.mkdirSync(inboxDir(), { recursive: true });
-    fs.writeFileSync(path.join(inboxDir(), `${name}.md`), `---\nworkflow: ${planned()}\ngate: ${gate}\n---\nPlan the flag.\n`);
+    fs.mkdirSync(inboxDir(rootNow()), { recursive: true });
+    fs.writeFileSync(path.join(inboxDir(rootNow()), `${name}.md`), `---\nworkflow: ${planned()}\ngate: ${gate}\n---\nPlan the flag.\n`);
     return name;
   };
   const fromCard = (name: string, gates?: string[]) =>
@@ -686,7 +687,8 @@ test('`--gate` and a card’s `gate:`, REFUSED before a run is written', async (
     });
   }
   await t.test('the refused cards are where they were, in the inbox', () => {
-    for (const name of ['plan-the-flag-e5f6', 'plan-the-flag-g7h8']) assert.ok(fs.existsSync(path.join(inboxDir(), `${name}.md`)), name);
+    for (const name of ['plan-the-flag-e5f6', 'plan-the-flag-g7h8'])
+      assert.ok(fs.existsSync(path.join(inboxDir(rootNow()), `${name}.md`)), name);
   });
 });
 
@@ -773,7 +775,7 @@ test('`nemia approve`, REFUSED with nothing written', async (t) => {
   });
   await t.test('REFUSED a cancelled run', async () => {
     const called = await heldAtGate();
-    markCancelled(called.id);
+    markCancelled(rootNow(), called.id);
     await assert.rejects(
       runWith(called.e, approveRun(called.id, 'plan')),
       refusedAs('Conflict', 'was cancelled at ', 'a cancelled run files nothing'),

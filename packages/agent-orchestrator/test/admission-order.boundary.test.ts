@@ -20,6 +20,7 @@ import { promised } from './promised.ts';
 import { Effect } from 'effect';
 import { plainEngine } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-admission-order-');
 const WORKFLOW = path.join(ROOT, 'workflow');
@@ -232,11 +233,11 @@ test("REFUSED without the momentum: at a ceiling of one, the runtime admits a ru
   const a = await started(folder());
   const b = await started(folder());
   const filedBy = board();
-  await runWith(filedBy.e, advanceRun(runRecord(a.id)));
-  await runWith(filedBy.e, advanceRun(runRecord(b.id)));
+  await runWith(filedBy.e, advanceRun(runRecord(rootNow(), a.id)));
+  await runWith(filedBy.e, advanceRun(runRecord(rootNow(), b.id)));
   filedBy.settle(`${a.id}-implement`, 'succeeded', SIGNED);
   assert.deepEqual(
-    (await runWith(filedBy.e, advanceRun(runRecord(a.id)))).filed,
+    (await runWith(filedBy.e, advanceRun(runRecord(rootNow(), a.id)))).filed,
     ['review'],
     "run a's implement has ended; run b has filed its implement; a's review is filed after it, a pass later",
   );

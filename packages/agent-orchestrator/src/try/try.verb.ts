@@ -75,9 +75,12 @@ const triedAgent = Effect.fnUntraced(function* ({ who, from, name, brief, repo, 
 
 /** The try asked (`TryAsked`) started: the run's id. Refuses, by kind, as the file's head says. */
 export const tryAgent = Effect.fnUntraced(function* (asked: TryAsked) {
+  const home = yield* StoreRoot;
   const reading = yield* Effect.provideService(triedAgent(asked), StoreRoot, asked.home);
   const e = yield* EngineService;
-  const tries = runsAtOnce.runs.list().filter((run) => tryOf(run, asked.home)?.agent === asked.name);
+  const tries = runsAtOnce(home)
+    .runs.list()
+    .filter((run) => tryOf(run, asked.home)?.agent === asked.name);
   const moving = (yield* judgedNow(e, asked.home, tries)).find((run) => run.moving);
   if (moving) {
     return yield* Effect.fail(

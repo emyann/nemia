@@ -10,6 +10,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { eachTest } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
 import { scratch } from 'test-kit/scratch';
+import { rootNow } from '../../test/config-given.ts';
 
 process.env.WF_ROOT = scratch('wf-passes-');
 process.env.WF_VERIFY_REST = '1';
@@ -63,16 +64,16 @@ const row = (name: string, claim: (t: TestContext) => Promise<void>) => ROWS.pus
 const COSTS = [cost(1, 12, 5), cost(2, 300, 6), cost(3, 40, 7)];
 
 row('`nemia passes` with no pass kept says so, and how one is kept', async (t) => {
-  fs.rmSync(recentFile(), { force: true });
+  fs.rmSync(recentFile(rootNow()), { force: true });
   assert.match((await typed(t, ['passes']))[0], /^no pass is kept yet: nemia up, or the api, ticks the store/);
 });
 
 row('`nemia passes --json` is the whole answer, the passes oldest first; --last <n> reads the last n of them', async (t) => {
-  fs.rmSync(recentFile(), { force: true });
-  for (const c of COSTS) recordRecentPass(c);
+  fs.rmSync(recentFile(rootNow()), { force: true });
+  for (const c of COSTS) recordRecentPass(rootNow(), c);
   const all = JSON.parse((await typed(t, ['passes', '--json'])).join('\n'));
   assert.deepEqual(all, passesRead(COSTS.map((c) => recentOf(c))));
-  assert.deepEqual(all, JSON.parse(JSON.stringify(passesOf({}))), 'the answer the api serves, off the same file');
+  assert.deepEqual(all, JSON.parse(JSON.stringify(passesOf(rootNow(), {}))), 'the answer the api serves, off the same file');
   const last = JSON.parse((await typed(t, ['passes', '--json', '--last', '2'])).join('\n'));
   assert.deepEqual(
     last.recent.map((p: { runs: number }) => p.runs),

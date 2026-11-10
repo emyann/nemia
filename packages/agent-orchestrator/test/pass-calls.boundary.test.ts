@@ -19,6 +19,7 @@ import { scratch } from 'test-kit/scratch';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
 import { runGiven, runOver } from './placed.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-pass-calls-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -132,7 +133,7 @@ const board = () => {
  */
 const pass = async (b: ReturnType<typeof board>, id: string) => {
   b.calls.length = 0;
-  const { value, tallies } = await metered(() => runWith(meteredEngine(b.e), advanceRun(runRecord(id))));
+  const { value, tallies } = await metered(() => runWith(meteredEngine(b.e), advanceRun(runRecord(rootNow(), id))));
   assert.ok(tallies, 'the pass was metered');
   return {
     advanced: value,
@@ -292,7 +293,7 @@ row(FILED, 'an approved ending is filed in the checkout, once the pass has read 
   const run = await started(folder({ implement: '', ship: 'after: implement\nworkspace: base\ngate: true' }), true);
   const b = board();
   await pass(b, run.id);
-  fs.writeFileSync(path.join(runRecord(run.id).steps.implement.workspace!, 'flag.ts'), 'export const flag = true;\n');
+  fs.writeFileSync(path.join(runRecord(rootNow(), run.id).steps.implement.workspace!, 'flag.ts'), 'export const flag = true;\n');
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
   const gated = await pass(b, run.id);
   assert.deepEqual(gated.advanced.filed, [], 'the gate holds it');
@@ -331,8 +332,8 @@ test("each question a pass asks its place is one call of its place phase, and ea
   const placed = async () => {
     const e = meteredEngine(b.e);
     const program = Effect.gen(function* () {
-      const runs = [runRecord(run.id)];
-      const read = passRead(e, runs, settingsOf(process.env), yield* passStanding(runs), yield* passRevisions());
+      const runs = [runRecord(rootNow(), run.id)];
+      const read = passRead(rootNow(), e, runs, settingsOf(process.env), yield* passStanding(runs), yield* passRevisions());
       return (yield* advancePass(e, runs[0], undefined, read)).advanced;
     });
     const before = gitRan();
@@ -351,10 +352,10 @@ test("each question a pass asks its place is one call of its place phase, and ea
     'every git process is counted once, in the place phase, and nothing else is',
   );
 
-  fs.writeFileSync(path.join(runRecord(run.id).steps.implement.workspace!, 'flag.ts'), 'export const flag = true;\n');
+  fs.writeFileSync(path.join(runRecord(rootNow(), run.id).steps.implement.workspace!, 'flag.ts'), 'export const flag = true;\n');
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
   const handed = await placed();
-  assert.equal(runRecord(run.id).steps.implement.handedOff, `${run.id}-implement`, 'implement was handed off on this pass');
+  assert.equal(runRecord(rootNow(), run.id).steps.implement.handedOff, `${run.id}-implement`, 'implement was handed off on this pass');
   assert.equal(
     handed.calls,
     3,

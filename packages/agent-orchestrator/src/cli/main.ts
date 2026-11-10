@@ -70,6 +70,7 @@ import {
   pauseNowPreview,
   pauseNowPreviewLines,
   withProposalsPass,
+  type Env,
 } from '../runner.ts';
 import { HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
@@ -118,10 +119,10 @@ const kept = (cursorFile: string | undefined, cursor: number): void => {
 };
 
 /**
- * `nemia watch` from a cursor already checked: the feed's lines as they are written, on stdout, until `stop()` — those its selectors take
- * (`selects`), as `how` prints them (`watchedLine`), in words or as JSON; a feed cut under the watch is
- * said once on stderr, and followed from the start of the feed there is now (`watchFeed`), its cursor file rewritten to 0 with it. In JSON
- * the banner goes to stderr too, so stdout holds nothing but JSON.
+ * `nemia watch` from a cursor already checked: the feed's lines of the store at `home` as they are written, on stdout, until `stop()` —
+ * those its selectors take (`selects`), as `how` prints them (`watchedLine`), in words or as JSON; a feed cut under the watch is said once
+ * on stderr, and followed from the start of the feed there is now (`watchFeed`), its cursor file rewritten to 0 with it. In JSON the
+ * banner goes to stderr too, so stdout holds nothing but JSON.
  *
  * The cursor it has read to is written to its cursor file after every line, selected or not, and answered by `at()`, which the bookmark
  * says while the feed is still: a watcher resumes where the feed ended, never where the last line it printed did.
@@ -129,10 +130,10 @@ const kept = (cursorFile: string | undefined, cursor: number): void => {
  * The banner is printed once the watch holds its cursor, not before: a reader that acts on `watching from` — cuts the feed, or writes to it
  * — finds a watch already there to see it, where a cut before the watch holds its cursor would have it refuse the cursor it was given.
  */
-export function watchPrinted(from: number, how: Watched = {}, keeps: WatchKept = {}): { stop(): void; at(): number } {
+export function watchPrinted(home: string, from: number, how: Watched = {}, keeps: WatchKept = {}): { stop(): void; at(): number } {
   const selectors = keeps.selectors ?? [];
   let at = from;
-  const watch = watchFeed({
+  const watch = watchFeed(home, {
     from,
     onLine: (line, cursor) => {
       at = cursor;
@@ -163,19 +164,20 @@ const bookmarked = (at: number, how: Watched, cursorFile: string | undefined): v
 };
 
 /**
- * `nemia watch` as an Effect: `watchPrinted(from, how, keeps)` held in its scope until it is interrupted, and stopped as that scope closes,
- * so an interrupted watch leaves no watcher and no timer behind; beside it, the store's liveness read off `lease` and printed as it changes
- * (`livenessLines`), whatever its selectors take, and the bookmark of where it has read to every `BOOKMARK_EVERY` (`bookmarked`) — the
- * tick's first emission dropped, since it comes at once and a watch that has just started has said where it is in its banner. It never
- * ends of itself; a cursor it cannot read from fails it.
+ * `nemia watch` as an Effect: `watchPrinted(home, from, how, keeps)` held in its scope until it is interrupted, and stopped as that scope
+ * closes, so an interrupted watch leaves no watcher and no timer behind; beside it, the store's liveness read off `lease` and printed as
+ * it changes (`livenessLines`), whatever its selectors take, and the bookmark of where it has read to every `BOOKMARK_EVERY`
+ * (`bookmarked`) — the tick's first emission dropped, since it comes at once and a watch that has just started has said where it is in its
+ * banner. It never ends of itself; a cursor it cannot read from fails it.
  */
 export const watching = (
+  home: string,
   from: number,
   how: Watched = {},
-  lease: () => DaemonStanding = () => daemonStanding(),
+  lease: () => DaemonStanding = () => daemonStanding(home),
   keeps: WatchKept = {},
 ): Effect.Effect<never, unknown> =>
-  Effect.acquireRelease(Effect.try({ try: () => watchPrinted(from, how, keeps), catch: (err) => err }), (watch) =>
+  Effect.acquireRelease(Effect.try({ try: () => watchPrinted(home, from, how, keeps), catch: (err) => err }), (watch) =>
     Effect.sync(() => watch.stop()),
   ).pipe(
     Effect.tap((watch) =>
@@ -236,22 +238,22 @@ function tickLines(pass: Pass): Pass {
  * `nemia tick`: one pass, and what it did to each run; with `--stats`, what the pass cost. Beside a daemon that ticks the store it is
  * refused, with no way to force it. A queued card that names no repository starts on the one it is typed in, as `nemia start` takes `.`.
  */
-async function tickVerb(args: Args, e: Engine, place: Place): Promise<void> {
+async function tickVerb(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const stats = args.stats === true;
-  const held = storeRefusal('tick');
+  const held = storeRefusal(wfRoot(env), 'tick');
   if (held) throw new Conflict({ message: stats ? `${held} What its last pass cost is read without a pass: nemia up --stats.` : held });
-  const { cost } = tickLines(await runWith(e, placedIn(place, withProposalsPass(tickRun({ repo: path.resolve('.') })))));
+  const { cost } = tickLines(await runWith(e, placedIn(env, place, withProposalsPass(tickRun({ repo: path.resolve('.') })))));
   if (stats) for (const line of cost ? breakdownLines(cost) : ['this pass was not measured']) console.log(line);
   return;
 }
 
-/** `nemia up --stats`: what the last pass cost, read off the store, ticking nothing, and who wrote it. */
-function upStats(): void {
-  const cost = lastPassCost();
-  const daemon = storeRefusal('tick') !== undefined;
+/** `nemia up --stats`: what the last pass cost, read off the store at `home`, ticking nothing, and who wrote it. */
+function upStats(home: string): void {
+  const cost = lastPassCost(home);
+  const daemon = storeRefusal(home, 'tick') !== undefined;
   if (!cost)
     return console.log(
-      `no pass has written what it cost to ${path.join(wfRoot(process.env), 'tick-stats.json')} yet — ${daemon ? 'the daemon that holds this store writes it after its next pass' : 'no daemon holds this store: run nemia tick --stats, or start one (npm start in apps/api, or nemia up; any nemia command that files work starts one too)'}`,
+      `no pass has written what it cost to ${path.join(home, 'tick-stats.json')} yet — ${daemon ? 'the daemon that holds this store writes it after its next pass' : 'no daemon holds this store: run nemia tick --stats, or start one (npm start in apps/api, or nemia up; any nemia command that files work starts one too)'}`,
     );
   for (const line of breakdownLines(cost)) console.log(line);
   return console.log(
@@ -267,12 +269,12 @@ function upStats(): void {
  * said through the process's telemetry (`telemetryLayer`) and its feed's lines published to its live readers (`feedHubLayer`). A queued
  * card that names no repository starts on the one it is typed in, as `nemia start` takes `.`.
  */
-function upVerb(args: Args, e: Engine, place: Place): void | Promise<void> {
-  if (args.stats === true) return upStats();
+function upVerb(env: Env, args: Args, e: Engine, place: Place): void | Promise<void> {
+  const store = wfRoot(env);
+  if (args.stats === true) return upStats(store);
   const asked = everyOf(typeof args.every === 'string' ? args.every : undefined);
   const every = 'refusal' in asked ? usage(asked.refusal) : asked.every;
-  const ceiling = ceilings(settingsOf(process.env));
-  const store = wfRoot(process.env);
+  const ceiling = ceilings(settingsOf(env));
   const onTaken = ({ held, replaced }: TakenStore) =>
     Effect.sync(() => {
       console.log(`up — every ${every}ms, ^C to stop`);
@@ -289,7 +291,7 @@ function upVerb(args: Args, e: Engine, place: Place): void | Promise<void> {
   return runMain(
     daemon.pipe(
       Effect.scoped,
-      Effect.provide(Layer.mergeAll(telemetryLayer(process.env), feedHubLayer(), PlaceService.layer(place), storeConfigLayer(process.env))),
+      Effect.provide(Layer.mergeAll(telemetryLayer(env), feedHubLayer(), PlaceService.layer(place), storeConfigLayer(env))),
     ),
   );
 }
@@ -300,6 +302,7 @@ function upVerb(args: Args, e: Engine, place: Place): void | Promise<void> {
  * it has one, is left at the feed's end.
  */
 async function watchedOnce(
+  env: Env,
   from: number,
   how: Watched,
   selectors: Selectors,
@@ -307,9 +310,9 @@ async function watchedOnce(
   e: Engine,
   place: Place,
 ): Promise<void> {
-  const paused = pausedWords(await runWith(e, placedIn(place, pausedRead())));
+  const paused = pausedWords(await runWith(e, placedIn(env, place, pausedRead())));
   if (paused && how.json !== true) console.log(paused);
-  const { lines, ends, cursor } = readFeedEnds(from);
+  const { lines, ends, cursor } = readFeedEnds(wfRoot(env), from);
   for (const [i, line] of lines.entries()) {
     if (!selects(selectors, line)) continue;
     const end = ends[i];
@@ -333,10 +336,10 @@ async function watchedOnce(
  * (`nemia watch --once 0`) is itself refused beside `--cursor-file`. A cursor a person typed is refused as it always was: that is a typo,
  * not a feed that moved.
  */
-function watchFrom(args: Args, cursorFile: string | undefined): number {
+function watchFrom(home: string, args: Args, cursorFile: string | undefined): number {
   const saved = cursorFile === undefined ? undefined : cursorFileStart(cursorFile);
   if (saved !== undefined) {
-    const refusal = feedCursorRefusal(saved);
+    const refusal = feedCursorRefusal(home, saved);
     if (refusal === undefined) return saved;
     console.error(
       `nemia watch: ${cursorFile} held cursor ${saved}, which the feed cannot be read from (${refusal}) — reading the feed there is ` +
@@ -345,7 +348,7 @@ function watchFrom(args: Args, cursorFile: string | undefined): number {
     return 0;
   }
   const given = typeof args.cursor === 'string' ? Number(args.cursor) : 0;
-  const refusal = feedCursorRefusal(given);
+  const refusal = feedCursorRefusal(home, given);
   if (refusal) usage(refusal);
   return given;
 }
@@ -355,37 +358,38 @@ function watchFrom(args: Args, cursorFile: string | undefined): number {
  * store's liveness until it is stopped (`watching`). Where it starts is `watchFrom`; its cursor file, where it has one, is written at
  * once, so a path in a directory that is not there is refused before a line is read.
  */
-function watchVerb(args: Args, e: Engine, place: Place): void | Promise<void> {
+function watchVerb(env: Env, args: Args, e: Engine, place: Place): void | Promise<void> {
+  const home = wfRoot(env);
   const how: Watched = { json: args.json === true };
   const typed = Array.isArray(args.selector) ? args.selector : [];
   for (const hint of typed.flatMap(formerHints)) console.error(`nemia watch: ${hint}`);
   const selectors = parseSelectors(typed);
   const cursorFile = typeof args.cursorFile === 'string' ? args.cursorFile : undefined;
-  const from = watchFrom(args, cursorFile);
+  const from = watchFrom(home, args, cursorFile);
   kept(cursorFile, from);
-  if (args.once === true) return watchedOnce(from, how, selectors, cursorFile, e, place);
-  return runMain(watching(from, how, undefined, { selectors, cursorFile }));
+  if (args.once === true) return watchedOnce(env, from, how, selectors, cursorFile, e, place);
+  return runMain(watching(home, from, how, undefined, { selectors, cursorFile }));
 }
 
 /**
  * `nemia pause`'s runner: the CLI asks before it pauses at once — `--now` says what it would cut and writes nothing, and acts on `--yes`
  * alone, since the verb takes no yes (`PAUSE`); every other pause is handed to its handler as any command is.
  */
-async function pauseRun(args: Args, e: Engine, place: Place): Promise<void> {
+async function pauseRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   if (args.now === true && args.yes !== true) {
-    for (const line of pauseNowPreviewLines(await runWith(e, placedIn(place, pauseNowPreview())))) console.log(line);
+    for (const line of pauseNowPreviewLines(await runWith(e, placedIn(env, place, pauseNowPreview())))) console.log(line);
     return;
   }
   const given = inputOf(PAUSE, args);
-  const data = await runWith(e, placedIn(place, PAUSE.handler(given)));
+  const data = await runWith(e, placedIn(env, place, PAUSE.handler(given)));
   for (const line of PAUSE.print(data, given)) console.log(line);
 }
 
 /** Each verb `nemia` takes, by its name on the command line: a `Map`, so a name every object has is no verb. */
 export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([['decide', decideVerb]]);
 
-/** A runner of the CLI: the parsed line, the engine, the place, and the store's root the command line read where it was composed. */
-type Runner = (args: Args, e: Engine, place: Place, home: string) => void | Promise<void>;
+/** A runner of the CLI: the environment `main` composes from, the parsed line, the engine and the place. */
+type Runner = (env: Env, args: Args, e: Engine, place: Place) => void | Promise<void>;
 
 /**
  * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`); `nemia rm` and `nemia prune`,
@@ -423,6 +427,7 @@ export const RUNS: ReadonlyMap<string, Runner> = new Map<string, Runner>([
  * handler, and the lines it prints of the answer printed.
  */
 async function commanded(
+  env: Env,
   command: Command | Ran,
   rest: string[],
   e: Engine,
@@ -434,13 +439,13 @@ async function commanded(
   if (args === undefined) return console.log(HELP);
   const wrong = command.check?.(args);
   if (wrong) usage(wrong);
-  if (command.ticks === true) await Effect.runPromise(ensureDaemon(demand(wfRoot(process.env))));
+  if (command.ticks === true) await Effect.runPromise(ensureDaemon(demand(wfRoot(env))));
   const runner = RUNS.get(command.name);
-  if (runner) return runner(args, e, place, wfRoot(process.env));
+  if (runner) return runner(env, args, e, place);
   if (command.handler === undefined)
     throw new Error(`${command.name} has neither a runner nor a handler: give it one in RUNS or its entry`);
   const given = inputOf(command, args);
-  const data = await runWith(e, placedIn(place, command.handler(given)));
+  const data = await runWith(e, placedIn(env, place, command.handler(given)));
   for (const line of command.print(data, given)) console.log(line);
   for (const line of command.note?.(data, given) ?? []) console.error(line);
 }
@@ -483,20 +488,21 @@ export async function main(
   given?: Engine,
   demand: (root: string) => DemandHost = liveDemandHost,
   place: Place = builtinGitPlace,
+  env: Env = process.env,
 ): Promise<void> {
   const renamed = renamedIn(argv);
   if (renamed.hint !== undefined) process.stderr.write(`${renamed.hint}\n`);
   const named = namedIn(renamed.words);
   if (named === undefined) return console.log(HELP);
   const exempt = named.name === 'version' || named.rest.includes('--help');
-  const trial = exempt ? null : trialRefusal(runningRelease(), currentRelease(wfRoot(process.env)), wfRoot(process.env), process.env);
+  const trial = exempt ? null : trialRefusal(runningRelease(), currentRelease(wfRoot(env)), wfRoot(env), env);
   if (trial !== null) throw new Conflict({ message: trial });
-  const e = given ?? engine(process.env);
+  const e = given ?? engine(env);
   const command = TABLE.find((c) => c.name === named.name && c.only?.side !== 'api');
-  if (command) return commanded(command, named.rest, e, demand, place);
+  if (command) return commanded(env, command, named.rest, e, demand, place);
   const verb = VERBS.get(named.name);
   if (verb === undefined) return console.log(HELP);
-  return verb(named.rest, e, place);
+  return verb(env, named.rest, e, place);
 }
 
 /** Runs `argv` as `main` does, for the `wf` alias: its one-line hint first, on stderr, so what a script reads off stdout stays the same. */

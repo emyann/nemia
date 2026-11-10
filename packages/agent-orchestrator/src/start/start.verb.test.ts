@@ -11,13 +11,14 @@ import { scratch } from 'test-kit/scratch';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven } from '../../test/placed.ts';
 import { names } from '../../test/assessed.ts';
+import { rootNow } from '../../test/config-given.ts';
 
 const ROOT = scratch('wf-start-labels-');
 process.env.WF_ROOT = ROOT;
 const RUNS_DIR = path.join(ROOT, 'runs');
 const { startRun } = await import('./start.verb.ts');
 const { START } = await import('./commands.verb.ts');
-const { filesStore: runStore } = await import('../record/files.store.ts');
+const runStore = (await import('../record/files.store.ts')).filesStoreAt(rootNow());
 
 const stand = eachTest(testPlace);
 const runPlaced = runGiven(() => stand().layer);
@@ -81,7 +82,7 @@ test('a key two named runs disagree on is left out, and `nemia start` names it, 
       ],
     },
   ]);
-  const line = START.print({ id: run.id, run }, {}).find((l) => l.includes('team') && l.includes('not inherited'));
+  const line = START.print({ home: rootNow(), id: run.id, run }, {}).find((l) => l.includes('team') && l.includes('not inherited'));
   names(line, 'team', a, 'core', b, 'infra', `nemia label run ${run.id} team=`);
   const typed = await runPlaced(
     startRun({ brief: 'typed', repo, workflowDir: folder(), context: [a, b], labels: { edits: ['team=ops'] } }),
@@ -94,7 +95,7 @@ test('a run started with no labels writes no .labels file, and its start prints 
   assert.equal(fs.existsSync(labelsFile(run.id)), false);
   assert.equal(run.labels, undefined);
   assert.equal(
-    START.print({ id: run.id, run }, {}).some((l) => l.startsWith('label')),
+    START.print({ home: rootNow(), id: run.id, run }, {}).some((l) => l.startsWith('label')),
     false,
   );
 });

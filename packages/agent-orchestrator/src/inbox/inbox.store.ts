@@ -40,8 +40,9 @@ import { workflowFolder } from '../folder/folder.store.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { FactoryDoor, factoryOrNone } from '../factory/door/factories.store.ts';
 import type { Factory } from '../factory/factory.ts';
-import { HOME, isDirectory, runId, runsDir } from '../record/record.store.ts';
+import { isDirectory, runId, runsDir } from '../record/record.store.ts';
 import { keptRuns } from '../record/files.store.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /** The names of the inbox's cards, as `nemia inbox` lists them. */
 export const inboxCards = Effect.fn('inboxCards')(function* () {
@@ -59,12 +60,13 @@ export const inboxCards = Effect.fn('inboxCards')(function* () {
  * `nemia inbox` lists the cards with their state through `inboxJudged` (inbox.verb.ts), which reads each run's phase.
  */
 export const readInbox = Effect.fn('readInbox')(function* () {
+  const home = yield* StoreRoot;
   const door = yield* CardDoor;
   const entries = yield* door.cards.entries();
   const tries = yield* door.tries.list();
   return cardsListed(
     entries,
-    keptRuns(undefined, (run) => ({ id: run.id, ...(run.from === undefined ? {} : { from: run.from }) }), false),
+    keptRuns(home, undefined, (run) => ({ id: run.id, ...(run.from === undefined ? {} : { from: run.from }) }), false),
     isDirectory,
     tries,
     yield* readableFactories(),
@@ -116,16 +118,17 @@ const cardRepoRefusal = Effect.fn('cardRepoRefusal')(function* (opts: {
   dir?: string;
   factory?: string;
 }) {
+  const home = yield* StoreRoot;
   const { workflow, repo } = opts;
   if (repo === undefined || workflow === undefined) return null;
   const door = yield* WorkflowDoor;
   const tree = yield* treeOfFactory(opts.factory);
   const steps = yield* Effect.suspend(() =>
-    door.workflows.read(workflowFolder(workflow, opts.dir ?? process.cwd(), repo, tree), { repo, home: HOME }),
+    door.workflows.read(workflowFolder(workflow, opts.dir ?? process.cwd(), repo, tree), { repo, home: home }),
   ).pipe(Effect.catchCause((cause) => (Cause.hasInterruptsOnly(cause) ? Effect.failCause(cause) : Effect.succeed(null))));
   if (steps === null || !isFolderTeam(steps)) return null;
   return (
-    `--repo ${repo}: this card's workflow has steps that say \`place: folder\`, so a run started from it works in folders it makes under ${workRoot(runsDir(), '<run>')}, with no git repository, and would never look at ${repo}.\n` +
+    `--repo ${repo}: this card's workflow has steps that say \`place: folder\`, so a run started from it works in folders it makes under ${workRoot(runsDir(home), '<run>')}, with no git repository, and would never look at ${repo}.\n` +
     `File the card without a repository, or name a workflow whose steps work on one.`
   );
 });

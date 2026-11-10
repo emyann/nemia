@@ -25,6 +25,7 @@ import { Effect, Metric, Option, References, Tracer } from 'effect';
 import type { Stats } from '../src/stats/stats.ts';
 import { scratch } from 'test-kit/scratch';
 import { staged, story, type Board } from './story.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-measured-run-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -117,7 +118,7 @@ const pageRows = (id: string) =>
   stage.runWith(
     stage.board().e,
     Effect.gen(function* () {
-      const run = runRecord(id);
+      const run = runRecord(rootNow(), id);
       const steps = stepsOf(run);
       const everyTry = yield* everyTryOf(yield* EngineService, run, (yield* taskPhasesRead(run)).views);
       return timelineRows(run, timeline(run, everyTry, steps), steps);
@@ -173,7 +174,7 @@ test('A measured run, end to end: a gate answered, two tries with checks, a loop
   stage.place().world.repository(repo, { 'add.ts': 'export const add = (a, b) => a + b;\n' });
   const workflowDir = folder(MEASURED);
   const { id } = await stage.runPlaced(startRun({ brief: 'add a flag', repo, workflowDir }));
-  const steps = () => runRecord(id).steps;
+  const steps = () => runRecord(rootNow(), id).steps;
   const plan = `${id}-plan`;
   const labelled = (step: string) => ({ run: id, factory: 'default', workflow: path.basename(workflowDir), step, agent: 'none' });
   const commit = (line: string) => {
@@ -188,8 +189,8 @@ test('A measured run, end to end: a gate answered, two tries with checks, a loop
       await tick();
       assert.deepEqual(b.tasks.get(plan)!.spec.labels, labelled('plan'), 'a ready step');
       const { outcome: _, ...keys } = stepAttributes(
-        runRecord(id),
-        runRecord(id).workflow!.find((x) => x.name === 'plan')!,
+        runRecord(rootNow(), id),
+        runRecord(rootNow(), id).workflow!.find((x) => x.name === 'plan')!,
         'done',
       );
       assert.deepEqual({ run: id, ...keys }, labelled('plan'), 'the keys its metrics are kept by, the same');
@@ -199,7 +200,7 @@ test('A measured run, end to end: a gate answered, two tries with checks, a loop
       b.end(plan, 'input-required', { closeout: BLOCKED, usage: used(0.5) });
       await tick(2);
       assert.deepEqual(
-        [runRecord(id).settlesCounted, runRecord(id).gatesTimed, runRecord(id).runTimed],
+        [runRecord(rootNow(), id).settlesCounted, runRecord(rootNow(), id).gatesTimed, runRecord(rootNow(), id).runTimed],
         [[], [], false],
         'started with its marks',
       );
@@ -230,7 +231,11 @@ test('A measured run, end to end: a gate answered, two tries with checks, a loop
     later(9);
     await stage.runWith(b.e, approveRun(id, 'plan'));
     await tick();
-    assert.deepEqual(runRecord(id).gatesTimed, [{ step: 'plan', try: 2 }], 'the gate of the try that answered, marked on the record');
+    assert.deepEqual(
+      runRecord(rootNow(), id).gatesTimed,
+      [{ step: 'plan', try: 2 }],
+      'the gate of the try that answered, marked on the record',
+    );
     assert.deepEqual(await counted('step.gate.wait'), [['plan', 'approved', 1]]);
     assert.equal(await summed('step.gate.wait', 'plan'), 9 * MIN, "from the answer's end, never the first turn's");
     const [gate] = spansOf(WAIT_SPANS.gate, id);
@@ -365,8 +370,8 @@ test('A measured run, end to end: a gate answered, two tries with checks, a loop
       later(1);
       exits(check, 0);
       await tick(2);
-      assert.ok('commit' in runRecord(id).steps.ship.landed!, 'it landed');
-      assert.equal(runRecord(id).runTimed, true, 'marked handed over on its record');
+      assert.ok('commit' in runRecord(rootNow(), id).steps.ship.landed!, 'it landed');
+      assert.equal(runRecord(rootNow(), id).runTimed, true, 'marked handed over on its record');
       const spans = spansOf(TIMELINE_SPAN, id);
       const rows = await pageRows(id);
       assert.deepEqual(spans.map(lineOf).sort(), rows.map(lineOf).sort(), "each span is a row of the page's timeline, and each row a span");
@@ -411,7 +416,7 @@ test('A measured run, end to end: a gate answered, two tries with checks, a loop
   );
 
   await s.test("the run's clock: its five parts add up to its wall, each pinned to the minutes the story let pass", async () => {
-    const run = runRecord(id);
+    const run = runRecord(rootNow(), id);
     const runSteps = stepsOf(run);
     const views = await stage.runWith(
       b.e,
@@ -520,7 +525,11 @@ test('A measured run, end to end: a gate answered, two tries with checks, a loop
       [[], []],
       'REFUSED: nothing handed over again',
     );
-    assert.deepEqual([...(runRecord(id).settlesCounted ?? [])].sort(), [...b.tasks.keys()].sort(), 'every task of the run marked, once');
+    assert.deepEqual(
+      [...(runRecord(rootNow(), id).settlesCounted ?? [])].sort(),
+      [...b.tasks.keys()].sort(),
+      'every task of the run marked, once',
+    );
   });
 
   await s.test("a pass's spans nest under it; a wait's, a denied call's and a timeline number's are roots of their own", async () => {
@@ -542,8 +551,8 @@ test('A measured run, end to end: a gate answered, two tries with checks, a loop
   });
 
   await s.test('the passes are rolled into the series: a line a minute, and the hour they filled once it is done', async () => {
-    const minutes = readDay('minute', '2026-10-06');
-    const hours = readDay('hour', '2026-10-06');
+    const minutes = readDay(rootNow(), 'minute', '2026-10-06');
+    const hours = readDay(rootNow(), 'hour', '2026-10-06');
     assert.ok(
       minutes.some((x) => x.s === 'pass.ms' && x.t === '2026-10-06T10:00:00.000Z'),
       'the first minute',
@@ -580,8 +589,8 @@ test('A run measured as its record says: a lone gate approved, a run called off,
     'a gate approved with nothing after it, on a pass that files nothing and hands over no timeline, is timed once and marked on disk',
     async () => {
       const { id } = await start({ 'intake.md': '---\nplace: git\ngate: true\n---\nAsk.\n' });
-      const { runTimed: _, ...unmarked } = runRecord(id);
-      rewriteRun(unmarked);
+      const { runTimed: _, ...unmarked } = runRecord(rootNow(), id);
+      rewriteRun(rootNow(), unmarked);
       await tick();
       later(1);
       spawn(`${id}-intake`);
@@ -592,8 +601,12 @@ test('A run measured as its record says: a lone gate approved, a run called off,
       await stage.runWith(b.e, approveRun(id, 'intake'));
       await tick(4);
       assert.deepEqual(await counted('step.gate.wait'), [['intake', 'approved', 1]], 'once over every pass');
-      assert.deepEqual(runRecord(id).gatesTimed, [{ step: 'intake', try: 1 }], 'marked timed on disk');
-      assert.deepEqual([runRecord(id).runTimed, spansOf(TIMELINE_SPAN, id)], [undefined, []], 'a record started before the timeline mark');
+      assert.deepEqual(runRecord(rootNow(), id).gatesTimed, [{ step: 'intake', try: 1 }], 'marked timed on disk');
+      assert.deepEqual(
+        [runRecord(rootNow(), id).runTimed, spansOf(TIMELINE_SPAN, id)],
+        [undefined, []],
+        'a record started before the timeline mark',
+      );
     },
   );
 
@@ -618,8 +631,8 @@ test('A run measured as its record says: a lone gate approved, a run called off,
     'REFUSED: a record with none of the marks counts no settle, times no gate or call and hands over no timeline, and gets no mark',
     async () => {
       const { id } = await start(ONE);
-      const { settlesCounted: _s, gatesTimed: _g, deniedCounted: _d, runTimed: _r, ...older } = runRecord(id);
-      rewriteRun(older);
+      const { settlesCounted: _s, gatesTimed: _g, deniedCounted: _d, runTimed: _r, ...older } = runRecord(rootNow(), id);
+      rewriteRun(rootNow(), older);
       await tick();
       spawn(`${id}-work`);
       later(3);
@@ -638,7 +651,7 @@ test('A run measured as its record says: a lone gate approved, a run called off,
         ],
         'the tries of the two checkpoints before, and none of its own',
       );
-      const after = runRecord(id);
+      const after = runRecord(rootNow(), id);
       assert.deepEqual(
         [after.settlesCounted, after.gatesTimed, after.deniedCounted, after.runTimed],
         [undefined, undefined, undefined, undefined],

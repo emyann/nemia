@@ -251,7 +251,7 @@ test('a finished run pruned on the board as `nemia prune` prunes it: what it ref
       assert.ok(hasBranch(branchOf('p-merged')), 'its branch is kept');
       assert.ok(fs.existsSync(path.join(root, 'runs', 'p-merged.json')), 'its record is kept');
 
-      const pruned = runStore.runs.read('p-merged').pruned!;
+      const pruned = runStore(root).runs.read('p-merged').pruned!;
       assert.ok(pruned.artifacts, 'the marker says the files went');
       const run = (await listed()).get('p-merged')!;
       assert.equal(run.pruned?.said, `${prunedWords(pruned)}; ${prunedKept(pruned)}`);
@@ -314,7 +314,7 @@ test('a finished run pruned on the board as `nemia prune` prunes it: what it ref
       assert.equal(fs.existsSync(worktreeOf('p-unmerged')), false, 'its worktree is gone');
       assert.ok(hasBranch(branchOf('p-unmerged')), 'its branch is kept');
       assert.ok(fs.existsSync(filesDir('p-unmerged')), 'its files are kept without `artifacts`');
-      const pruned = runStore.runs.read('p-unmerged').pruned!;
+      const pruned = runStore(root).runs.read('p-unmerged').pruned!;
       assert.equal(pruned.artifacts, undefined);
       assert.equal((await listed()).get('p-unmerged')!.pruned?.said, `${prunedWords(pruned)}; ${prunedKept(pruned)}`);
       assert.match((await listed()).get('p-unmerged')!.pruned?.said ?? '', /; its branches, record and files are kept$/);

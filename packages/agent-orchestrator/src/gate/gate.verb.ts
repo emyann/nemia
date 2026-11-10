@@ -17,6 +17,7 @@ import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { aboveTheWorkflow, approvedCaps, ceilingsOf, laterSteps, proposedBudgets, type StepBudget } from '../budget/budget.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /**
  * What `nemia approve` did: the run, the approval as written, and its file; the caps it set for the steps after the gate, in the order the
@@ -50,6 +51,7 @@ export const approveRun = Effect.fn('approve')(function* (
   message?: string,
   given: readonly StepBudget[] = [],
 ) {
+  const home = yield* StoreRoot;
   if (!(yield* (yield* RunDoor).runs.exists(RunId.read(id))))
     return yield* Effect.fail(
       new Missing({
@@ -71,7 +73,7 @@ export const approveRun = Effect.fn('approve')(function* (
       closeoutReader(views, now, steps),
       closeoutAsked(views),
       exitVerdicts(views, now),
-      runsAtOnce.asks.read(id).asks,
+      runsAtOnce(home).asks.read(id).asks,
       spendReader(views),
       standings,
     );
@@ -103,7 +105,7 @@ export const approveRun = Effect.fn('approve')(function* (
     const { stray } = written;
     const why = yield* tried(
       () =>
-        refusal(runsAtOnce.runs.read(id)) ??
+        refusal(runsAtOnce(home).runs.read(id)) ??
         (stray !== null
           ? `try ${approval.try} of ${stepName} cannot be approved: ${file} is already there, and it is not an approval — ${stray}. It opens no gate, and no tick moves it, so waiting would be for ever. Delete it (rm ${file}), then approve again: nemia approve ${id} ${stepName}.`
           : `try ${approval.try} of ${stepName} is already approved. What waits on it is filed on the next tick: nemia ls ${id}.`),

@@ -174,7 +174,7 @@ async function sweep(pass: Pass, ids: readonly string[], memory: Memory) {
   return { ...done, logged, asked, verbs: asked.map((a) => a.verb) };
 }
 
-const lane = (id: string, step = 'work') => runRecord(id).steps[step].workspace!;
+const lane = (id: string, step = 'work') => runRecord(rootNow(), id).steps[step].workspace!;
 const whole = (id: string) => fs.existsSync(lane(id)) && !fs.existsSync(path.join(ROOT, 'runs', `${id}.pruned`));
 const gone = (id: string) => !fs.existsSync(path.join(ROOT, 'worktrees', id));
 
@@ -199,7 +199,7 @@ async function worked(id: string, outcome: 'done' | 'blocked' = 'done') {
 async function merged(repo = aRepo()) {
   const run = await started(WORK, repo);
   await worked(run.id);
-  git(repo, 'merge', '-q', '--no-ff', '-m', `merge ${run.id}`, runRecord(run.id).steps.work.branch!);
+  git(repo, 'merge', '-q', '--no-ff', '-m', `merge ${run.id}`, runRecord(rootNow(), run.id).steps.work.branch!);
   return run;
 }
 

@@ -10,6 +10,7 @@ import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
 import { eachTest } from '../../test/placed.ts';
 import type { Run } from '../record/record.ts';
+import type { StoreRoot as StoreRootNeeded } from '../config/root.store.ts';
 
 const ROOT = scratch('wf-stats-facts-');
 process.env.WF_ROOT = ROOT;
@@ -24,7 +25,8 @@ const engine = eachTest(testEngine);
 test("a run whose unfrozen folder does not load gives the stats nothing, and says why in the folder's own words", () => {
   const run: Run = { ...aRun('r-unloaded'), workflowDir: path.join(ROOT, 'workflows', 'gone') };
   delete run.workflow;
-  const rooted = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
+  const rooted = <A, E>(program: Effect.Effect<A, E, StoreRootNeeded>): A =>
+    Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
   const why = rooted(stepsOrWhy(run));
   assert.ok('unloaded' in why);
   const said: string[] = [];

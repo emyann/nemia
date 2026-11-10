@@ -56,7 +56,7 @@ const ticking = (): Board => {
 };
 
 /** The store's lines of the feed whose reason is `reason`. */
-const storeLines = (reason: string): FeedLine[] => readFeed(0).lines.filter((l) => 'store' in l && l.reason === reason);
+const storeLines = (reason: string): FeedLine[] => readFeed(rootNow(), 0).lines.filter((l) => 'store' in l && l.reason === reason);
 
 /**
  * A take-over's process: a child of this test, on its `WF_ROOT`, that puts the store's pause through the live host's `pause` and then
@@ -107,12 +107,12 @@ test("a restart with only a landing's check running restarts at once, and the ch
   fs.writeFileSync(path.join(dir, 'work.md'), '---\nplace: git\n---\nwork it\n');
   fs.writeFileSync(path.join(dir, 'ship.md'), '---\nplace: git\nafter: work\ngate: true\nworkspace: base\ncheck: "true"\n---\nship it\n');
   let id = '';
-  const shipOf = () => runRecord(id).steps.ship;
+  const shipOf = () => runRecord(rootNow(), id).steps.ship;
 
   await s.test("a run's ending signed off, its landing check filed and running", async () => {
     id = (await stage.runPlaced(startRun({ brief: 'restart', repo, workflowDir: dir, isolate: true }))).id;
     await pass();
-    const work = runRecord(id).steps.work;
+    const work = runRecord(rootNow(), id).steps.work;
     fs.writeFileSync(path.join(work.workspace!, 'work.txt'), 'work\n');
     b.settle(work.taskId!, 'succeeded', SIGNED);
     await pass();

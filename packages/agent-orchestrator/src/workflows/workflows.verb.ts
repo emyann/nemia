@@ -58,7 +58,7 @@ const placesOf = ({ repo }: Pick<Where, 'repo'>, home: string | undefined): Plac
  */
 export function factoryWriteOf(home: string, name: string, workflow: string): { places: Places; fills: Fills } {
   const { factory, tree } = templatedAtOnce(home, name, 'nemia workflows write');
-  return { places: { repo: factory.repos[0] ?? tree, home }, fills: factoryFills(factory, workflow).fills };
+  return { places: { repo: factory.repos[0] ?? tree, home }, fills: factoryFills(home, factory, workflow).fills };
 }
 
 /**
@@ -203,13 +203,14 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }, Wor
  * hires into it. A run that froze its steps, a card not queued and a factory with a repository's workflow of the name go on without it.
  */
 const usersOf = Effect.fn('usersOf')(function* (dir: string) {
+  const home = yield* StoreRoot;
   const name = path.basename(dir);
-  const runs = runsAtOnce.runs
-    .list(() => {})
+  const runs = runsAtOnce(home)
+    .runs.list(() => {})
     .filter((run) => run.workflow === undefined && path.resolve(run.workflowDir) === dir)
     .map((run) => stillNeeded.run(run.id, dir));
   const cards = (yield* readInbox())
-    .filter((card) => card.queued?.place != null && card.workflow !== null && path.resolve(inboxDir(), card.workflow) === dir)
+    .filter((card) => card.queued?.place != null && card.workflow !== null && path.resolve(inboxDir(home), card.workflow) === dir)
     .map((card) => stillNeeded.card(card.name, dir));
   const factories = (yield* (yield* FactoryDoor).factories.listed()).flatMap((factory) => {
     if ('error' in factory || !factory.workflows.includes(name)) return [];
@@ -271,12 +272,13 @@ export const foldersLoaded = Effect.fn('foldersLoaded')(function* (
   places: Places,
   factory?: Pick<Factory, 'name' | 'hires' | 'tree'>,
 ) {
+  const home = yield* StoreRoot;
   const door = yield* WorkflowDoor;
   const loads: Array<[string, FolderLoaded]> = [];
   for (const dir of dirs) {
     const read = Effect.flatMap(
       tried(() => workflowDirAt(path.resolve(dir))),
-      (at) => door.workflows.read(at, places, factory && factoryFills(factory, path.basename(dir)).fills),
+      (at) => door.workflows.read(at, places, factory && factoryFills(home, factory, path.basename(dir)).fills),
     );
     const loaded = yield* Effect.exit(read);
     loads.push([dir, Exit.isSuccess(loaded) ? { steps: loaded.value } : { error: unloaded(Cause.squash(loaded.cause)) }]);
@@ -312,7 +314,7 @@ export const WORKFLOWS_STEP: Command<{ step: StepSpec | null; steps: string[] },
       Effect.gen(function* () {
         const dir = yield* tried(() => workflowDirAt(path.resolve(where.dir)));
         const factory = yield* factoryOrNone(where.factory);
-        const fills = yield* tried(() => factory && factoryFills(factory, where.name).fills);
+        const fills = yield* tried(() => factory && factoryFills(home, factory, where.name).fills);
         const door = yield* WorkflowDoor;
         const steps = yield* door.workflows.read(dir, placesOf(where, home), fills);
         return { step: steps.find((s) => s.name === where.step) ?? null, steps: steps.map((s) => s.name) };

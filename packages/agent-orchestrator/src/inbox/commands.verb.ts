@@ -1,17 +1,18 @@
 /**
  * `nemia inbox`, each of its forms an entry of the command table: the cards listed, an idea filed as one, a card queued to start on its own
- * or taken off the queue, and a card dropped. The api serves each as a verb of the Card (`objects`' Api, apps/api/src/objects/cards.ts),
- * which calls these handlers, and none on a route of the table's. A card's `from:` (`nemia inbox from`) is the command line's alone: the
- * api writes it as part of the Card's whole write (`update`, `replaceCard`), and reads one card with its file as written (`get`).
+ * or taken off the queue, and a card dropped. None is routed by the table: the Card's verbs are declared in `objects`' Api, and the api's
+ * handlers (apps/api/src/objects/cards.ts) call the handlers of `inbox add`, `inbox queue` and `inbox rm` by their `input`. A card's
+ * `from:` (`nemia inbox from`) is the command line's alone: the api writes it as part of the Card's whole write (`update`, `replaceCard`),
+ * and reads one card with its file as written (`get`).
  */
 import path from 'node:path';
-import { Effect } from 'effect';
+import { Effect, Schema } from 'effect';
 import { rooted } from '../factory/wiring/wire.verb.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { defaultStartsAllowed } from '../factory/factory.store.ts';
 import { inboxDir } from '../record/files.store.ts';
-import { Invalid, Missing } from '../refusal/refusal.ts';
+import { Invalid } from '../refusal/refusal.ts';
 import { parseSelectors, SELECTOR_FORM, selectorsRefusal, selectsLabels } from '../watch/selector.ts';
 import { labelsText, type LeftOut } from '../labels/labels.ts';
 import { firstPiece } from '../piece/piece.ts';
@@ -129,7 +130,7 @@ export const INBOX: Command<{ cards: InboxListing[]; ended: number }> = {
   class: 'read',
   only: {
     side: 'cli',
-    why: "the api serves it as the Card's `listAll` verb of `objects`' Api (`GET /api/cards`, a page of `Card` objects), which reads the inbox as this entry does: no route of its own",
+    why: "the command line's listing: the api's list of the Card (`GET /api/cards`, `objects`' Api) is the package's `cardList`, never this handler, and prints its rows as a Table (`cardTable`)",
   },
   manual: INBOX_HELP,
   handler: (args, env, home, kept) =>
@@ -202,11 +203,26 @@ const ADD_SPEC: Spec = {
 };
 
 /**
+ * What `nemia inbox add`'s handler takes: the idea's text, the file it was read from and that file's folder (`from`, `dir`), and the keys
+ * the card writes. Its own, not `objects`' `CardFile`: a body's `from` is where a workflow is read from, and the api finds the folder.
+ */
+export const InboxAddInput = Schema.Struct({
+  idea: Schema.String,
+  from: Schema.optionalKey(Schema.String),
+  dir: Schema.optionalKey(Schema.String),
+  workflow: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
+  factory: Schema.optionalKey(Schema.String),
+  label: Schema.optionalKey(Schema.Array(Schema.String)),
+});
+export type InboxAddInput = typeof InboxAddInput.Type;
+
+/**
  * `nemia inbox add`: an idea filed as a card. Its handler is handed the idea's text under `idea`, and, for an idea read from a file, the
  * file under `from` and its folder under `dir`, the folder a workflow's path is read from: the CLI's runner reads the file, and the api's
  * route finds the workflow among the folders a start finds one in, so neither a path nor a file reaches the handler from a body.
  */
-export const INBOX_ADD: Command<{ card: InboxCard; file: string; labelsLeftOut?: readonly LeftOut[] }> = {
+export const INBOX_ADD: Command<{ card: InboxCard; file: string; labelsLeftOut?: readonly LeftOut[] }, InboxAddInput> = {
   name: 'inbox add',
   usage: '"<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>] [--label <key=value>]...',
   help: ['park an idea as a card in the inbox, named from its first line'],
@@ -216,28 +232,14 @@ export const INBOX_ADD: Command<{ card: InboxCard; file: string; labelsLeftOut?:
   class: 'act',
   only: {
     side: 'cli',
-    why: "the api serves it as the Card's `create` verb of `objects`' Api (`POST /api/namespaces/:namespace/cards`, the namespace its factory), which calls this entry's handler: no route of its own",
+    why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Card's `create`, whose handler calls this one by its `input`",
   },
-  handler: (args, _env, home) =>
+  input: InboxAddInput,
+  handler: ({ idea, label, ...keys }, _env, home) =>
     rooted(
       home,
       'inbox add',
-      Effect.suspend(() => {
-        const from = textOf(args, 'from');
-        const dir = textOf(args, 'dir');
-        const workflow = textOf(args, 'workflow');
-        const repo = textOf(args, 'repo');
-        const factory = textOf(args, 'factory');
-        return addToInbox({
-          text: textOf(args, 'idea') ?? '',
-          ...(from !== undefined ? { from } : {}),
-          ...(dir !== undefined ? { dir } : {}),
-          ...(workflow !== undefined ? { workflow } : {}),
-          ...(repo !== undefined ? { repo } : {}),
-          ...(factory !== undefined ? { factory } : {}),
-          labels: listOf(args, 'label'),
-        });
-      }),
+      Effect.suspend(() => addToInbox({ text: idea, ...keys, labels: [...(label ?? [])] })),
     ),
   print: ({ card, file, labelsLeftOut }) => [
     `${card.name}  ${firstPiece(card.body, '\n').slice(0, 56)}${card.workflow ? `  workflow: ${card.workflow}` : ''}${card.repo ? `  repo: ${card.repo}` : ''}${card.factory ? `  factory: ${card.factory}` : ''}${card.labels ? `  labels: ${labelsText(card.labels)}` : ''}`,
@@ -288,12 +290,20 @@ type Queued = {
   factoryRepo: string | null;
 };
 
+/** What `nemia inbox queue`'s handler takes: the card, the workflow written with the mark (the command line's alone), and `off`. */
+export const InboxQueueInput = Schema.Struct({
+  name: Schema.String,
+  workflow: Schema.optionalKey(Schema.String),
+  off: Schema.optionalKey(Schema.Boolean),
+});
+export type InboxQueueInput = typeof InboxQueueInput.Type;
+
 /**
  * `nemia inbox queue`: a card marked to start on its own, or with `--off` the mark taken back. `--workflow` is the command line's alone,
  * and written as it is handed: its runner reads a path from where it is typed (`inboxQueueRun`), and this handler reads no folder of its
  * own.
  */
-export const INBOX_QUEUE: Command<Queued> = {
+export const INBOX_QUEUE: Command<Queued, InboxQueueInput> = {
   name: 'inbox queue',
   usage: '<name> [--workflow <w>] [--off]',
   help: ['mark a card to start on its own: the tick starts the oldest queued', 'card once a run slot is free; --off takes the mark back'],
@@ -307,19 +317,15 @@ export const INBOX_QUEUE: Command<Queued> = {
   class: 'act',
   only: {
     side: 'cli',
-    why: "the api serves it as the Card's `queue` and `unqueue` verbs of `objects`' Api (`POST /api/namespaces/:namespace/cards/:name/queue` and `…/unqueue`), which calls this entry's handler: no route of its own",
+    why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Card's `queue` and `unqueue`, whose handlers call this one by its `input`",
   },
-  apiKeys: ['name', 'file', 'was', 'queued', 'place', 'of'],
-  handler: (args, _env, home) =>
+  input: InboxQueueInput,
+  handler: ({ name, workflow, off }, _env, home) =>
     rooted(
       home,
       'inbox queue',
       Effect.gen(function* () {
-        const workflow = textOf(args, 'workflow');
-        const done = yield* queueInInbox(textOf(args, 'name') ?? '', {
-          off: args.off === true,
-          ...(workflow !== undefined ? { workflow } : {}),
-        });
+        const done = yield* queueInInbox(name, { off: off === true, ...(workflow !== undefined ? { workflow } : {}) });
         return {
           name: done.card.name,
           file: done.file,
@@ -376,7 +382,7 @@ export const INBOX_FROM: Command<InboxFrom & { name: string; from: string[] }> =
   class: 'act',
   only: {
     side: 'cli',
-    why: "the api serves it as the Card's `update` verb of `objects`' Api (`PUT /api/namespaces/:namespace/cards/:name`, `spec.from`): no route of its own",
+    why: "the command line's alone: the api writes a card's `from:` with the rest of it, the Card's `update` of `objects`' Api (`replaceCard`), never through this handler",
   },
   handler: (args, _env, home) =>
     rooted(
@@ -394,8 +400,15 @@ export const INBOX_FROM: Command<InboxFrom & { name: string; from: string[] }> =
       : [`${card.name}  ${was.length ? `from: taken off (was ${was.join(', ')})` : 'no from: — nothing to take off'}`],
 };
 
-/** `nemia inbox rm`: one card dropped without starting it, or, for a name with no card, which cards there are — on the api, a `Missing`. */
-export const INBOX_RM: Command<InboxDropped> = {
+/** What `nemia inbox rm`'s handler takes: the card's name. */
+export const InboxRmInput = Schema.Struct({ name: Schema.String });
+export type InboxRmInput = typeof InboxRmInput.Type;
+
+/**
+ * `nemia inbox rm`: one card dropped without starting it, or, for a name with no card, which cards there are (`removed` false), which the
+ * command line prints; the api reads the card before it drops it, and refuses a name with none as `Missing`.
+ */
+export const INBOX_RM: Command<InboxDropped, InboxRmInput> = {
   name: 'inbox rm',
   usage: '<name>',
   help: ['drop a card without starting it'],
@@ -409,14 +422,14 @@ export const INBOX_RM: Command<InboxDropped> = {
   class: 'ask',
   only: {
     side: 'cli',
-    why: "the api serves it as the Card's `delete` verb of `objects`' Api (`DELETE /api/namespaces/:namespace/cards/:name`), which calls this entry's handler: no route of its own",
+    why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Card's `delete`, whose handler calls this one by its `input`",
   },
-  handler: (args, _env, home) => rooted(home, 'inbox rm', dropFromInbox(textOf(args, 'name') ?? '')),
-  apiRefusal: (dropped, args) => (dropped.removed ? null : new Missing({ message: noCardLine(textOf(args, 'name') ?? '', dropped.cards) })),
-  print: (dropped, args) => [
+  input: InboxRmInput,
+  handler: ({ name }, _env, home) => rooted(home, 'inbox rm', dropFromInbox(name)),
+  print: (dropped, { name }) => [
     dropped.removed
-      ? `${textOf(args, 'name')}  dropped, and nothing started — ${dropped.file} removed`
-      : `${noCardLine(textOf(args, 'name') ?? '', dropped.cards)} Nothing to drop.`,
+      ? `${name}  dropped, and nothing started — ${dropped.file} removed`
+      : `${noCardLine(name, dropped.cards)} Nothing to drop.`,
   ],
 };
 

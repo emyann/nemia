@@ -389,7 +389,7 @@ export function treeOfAt(home: string, name: string | undefined): string | undef
  * none: only with `WF_DEFAULT_FACTORY_STARTS=1`, which the package's and the api's tests set for the starts they make in scratch folders.
  * Unset, by default, every such start is refused.
  */
-export const defaultStartsAllowed = (): boolean => process.env.WF_DEFAULT_FACTORY_STARTS === '1';
+export const defaultStartsAllowed = (env: NodeJS.ProcessEnv = process.env): boolean => env.WF_DEFAULT_FACTORY_STARTS === '1';
 
 /** The store's factories that read, and the names of those whose file does not. */
 function readable(home: string): { factories: Factory[]; unread: string[] } {

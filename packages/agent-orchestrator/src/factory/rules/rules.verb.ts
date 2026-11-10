@@ -1,14 +1,15 @@
 /**
  * `nemia factory rules`, an entry of the command table: a factory's rules, the words told to every agent hired into it — read bare,
- * written from `--file`, removed with `--clear`. The api serves the write and the clear on the routes the table generates, and the read by
- * a route of its own, which calls the same handler. Both through the Factory door (`FactoryDoor`); `factoryRules` reads the module's root,
+ * written from `--file`, removed with `--clear`. The api's Factory `rules`, `putRules` and `deleteRules` (`objects`' Api) call its handler
+ * by its `input`. Both through the Factory door (`FactoryDoor`); `factoryRules` reads the module's root,
  * for the package's callers not yet on it.
  */
-import { leftOut, type Args, type Flag, type Spec } from '../../command/command.ts';
+import { leftOut, type Flag, type Spec } from '../../command/command.ts';
 import type { Command } from '../../command/entry.verb.ts';
 import { DEFAULT_FACTORY, defaultFactoryRefusal } from '../factory.ts';
 import { readFactory } from '../factory.store.ts';
-import { Effect } from 'effect';
+import { Effect, Schema } from 'effect';
+import { FactoryRulesWrite } from 'objects';
 import { Conflict, type Refusal } from '../../refusal/refusal.ts';
 import { FactoryName } from '../factory.model.ts';
 import { FactoryDoor } from '../door/factories.store.ts';
@@ -20,12 +21,6 @@ import { readRules, rulesAt } from './rules.store.ts';
  * why the file there cannot be told to a step, else null. `removed`, on a clear alone: whether there were rules to remove.
  */
 export type FactoryRules = { name: string; file: string; words: string | null; error: string | null; removed?: boolean };
-
-/** The text under `key`, or undefined where none was given. */
-const textOf = (args: Args, key: string): string | undefined => {
-  const value = args[key];
-  return typeof value === 'string' ? value : undefined;
-};
 
 /**
  * The factory `name`, for its rules to be read or written. Refused: the default factory, which keeps none (`Conflict`), and the factory
@@ -65,12 +60,21 @@ const SPEC: Spec = {
 };
 
 /**
- * The rules of the factory `args` name, after they are written from their words or removed with `clear`, where they ask either. Refused,
- * writing nothing: as `FACTORY_RULES` says.
+ * What `nemia factory rules` takes: the factory, and the words to write (`objects`' `FactoryRulesWrite`, read by the command line's runner
+ * from `--file`) or `clear`; neither, a read.
  */
-function ruled(args: Args, home: string | undefined): Effect.Effect<FactoryRules, Refusal> {
-  const name = textOf(args, 'factory') ?? '';
-  const words = textOf(args, 'words');
+export const RulesInput = Schema.Struct({
+  factory: Schema.String,
+  words: Schema.optionalKey(FactoryRulesWrite.fields.words),
+  clear: Schema.optionalKey(Schema.Boolean),
+});
+export type RulesInput = typeof RulesInput.Type;
+
+/**
+ * The rules of the factory `name`, after they are written from `words` or removed with `clear`, where they ask either. Refused, writing
+ * nothing: as `FACTORY_RULES` says.
+ */
+function ruled({ factory: name, words, clear }: RulesInput, home: string | undefined): Effect.Effect<FactoryRules, Refusal> {
   return rooted(
     home,
     'factory rules',
@@ -78,7 +82,7 @@ function ruled(args: Args, home: string | undefined): Effect.Effect<FactoryRules
       if (name === DEFAULT_FACTORY) return yield* Effect.fail(new Conflict({ message: defaultFactoryRefusal('rules') }));
       const door = yield* FactoryDoor;
       const factory = FactoryName.read(name);
-      if (args.clear === true) {
+      if (clear === true) {
         const removed = yield* door.rules.clear(factory);
         return { name, ...(yield* door.rules.read(factory)), removed };
       }
@@ -96,7 +100,7 @@ const KEPT = 'a run already started keeps the rules it was started with';
  * after. Refused, writing nothing: the default factory (`Conflict`); a factory that is not there (`Missing`) or does not read; `--file`
  * with `--clear`; blank words and a frontmatter block (`Invalid`); and a templated factory whose tree is not rendered yet (`Conflict`).
  */
-export const FACTORY_RULES: Command<FactoryRules> = {
+export const FACTORY_RULES: Command<FactoryRules, RulesInput> = {
   name: 'factory rules',
   usage: '<name> [--file <path>|- | --clear]',
   help: [
@@ -115,8 +119,9 @@ export const FACTORY_RULES: Command<FactoryRules> = {
   class: { bare: 'read', sets: 'ask', setsBy: ['--file', '--clear'] },
   only: {
     side: 'cli',
-    why: "the api serves it as the Factory's `rules`, `putRules` and `deleteRules` of `objects`' Api, calling this handler",
+    why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Factory's `rules`, `putRules` and `deleteRules`, whose handlers call this one by its `input`",
   },
+  input: RulesInput,
   handler: (args, _env, home) => ruled(args, home),
   print(data, args) {
     const { name } = data;

@@ -16,7 +16,6 @@ import type { Served } from '../layer.ts';
 import { queryOf } from '../factory/parts/index.ts';
 import { answeredWriteIn } from '../objects/refused.ts';
 import { listed } from '../definitions/served.ts';
-import { runPlaced } from '../store.ts';
 
 /** Where a proposal is judged and applied: the store's root, and the repository the request is placed on (`placeFor`). */
 export const placeOf = (s: Served): ProposalPlace => ({ home: s.home, repo: s.repo });
@@ -24,16 +23,16 @@ export const placeOf = (s: Served): ProposalPlace => ({ home: s.home, repo: s.re
 export const proposalsHandlers = HttpApiBuilder.group(Api, 'proposals', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
-      answeredWriteIn(namespace, async (s) => listed('Proposal', await runPlaced(s, s.e, proposalsList(namespace)), queryOf(query))),
+      answeredWriteIn(namespace, async (s) => listed('Proposal', await s.inRequest(proposalsList(namespace)), queryOf(query))),
     )
-    .handle('get', ({ params: { namespace, name } }) => answeredWriteIn(namespace, (s) => runPlaced(s, s.e, proposalGet(namespace, name))))
+    .handle('get', ({ params: { namespace, name } }) => answeredWriteIn(namespace, (s) => s.inRequest(proposalGet(namespace, name))))
     .handle('create', ({ params: { namespace }, payload }) =>
-      answeredWriteIn(namespace, (s) => runPlaced(s, s.e, proposeProgram(s.caller, namespace, payload, placeOf(s)))),
+      answeredWriteIn(namespace, (s) => s.inRequest(proposeProgram(s.caller, namespace, payload, placeOf(s)))),
     )
     .handle('approve', ({ params: { namespace, name } }) =>
-      answeredWriteIn(namespace, (s) => runPlaced(s, s.e, approveProgram(s.caller, namespace, name, placeOf(s)))),
+      answeredWriteIn(namespace, (s) => s.inRequest(approveProgram(s.caller, namespace, name, placeOf(s)))),
     )
     .handle('decline', ({ params: { namespace, name } }) =>
-      answeredWriteIn(namespace, (s) => runPlaced(s, s.e, declineProgram(s.caller, namespace, name))),
+      answeredWriteIn(namespace, (s) => s.inRequest(declineProgram(s.caller, namespace, name))),
     ),
 );

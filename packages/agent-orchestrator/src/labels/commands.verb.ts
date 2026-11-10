@@ -14,12 +14,6 @@ import { labelCard, labelRun } from './labels.verb.ts';
 /** The edits under `labels`, in the order given. */
 const editsOf = (args: Args): string[] => (Array.isArray(args.labels) ? args.labels.map(String) : []);
 
-/** The text under `key`, or the empty text where none was given. */
-const textOf = (args: Args, key: string): string => {
-  const value = args[key];
-  return typeof value === 'string' ? value : '';
-};
-
 /**
  * What an edit did, a line per key it named, as `kubectl label` says it: set, changed from its value, removed, already so, or already
  * absent — then the labels as they stand.
@@ -92,8 +86,12 @@ export const LABEL_RUN: Command<Labelled, LabelRunInput> = {
   print: labelledLines,
 };
 
+/** What `nemia label inbox`'s handler takes: the card's name, and `objects`' `LabelEdit` — the edits, and `overwrite`. */
+export const LabelCardInput = Schema.Struct({ name: Schema.String, ...LabelEdit.fields });
+export type LabelCardInput = typeof LabelCardInput.Type;
+
 /** `nemia label inbox`: an inbox card's `labels:` edited, every other key and its body kept; the run it starts is created with them. */
-export const LABEL_CARD: Command<Labelled> = {
+export const LABEL_CARD: Command<Labelled, LabelCardInput> = {
   name: 'label inbox',
   usage: '<name> <key=value|key->... [--overwrite]',
   help: [
@@ -107,13 +105,14 @@ export const LABEL_CARD: Command<Labelled> = {
   class: 'act',
   only: {
     side: 'cli',
-    why: "the api serves it as the Card's `labels` verb of `objects`' Api (`POST /api/namespaces/:namespace/cards/:name/labels`), which calls this entry's handler: no route of its own",
+    why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Card's `labels`, whose handler calls this one by its `input`",
   },
-  handler: (args, _env, home) =>
+  input: LabelCardInput,
+  handler: ({ name, labels, overwrite }, _env, home) =>
     rooted(
       home,
       'label inbox',
-      Effect.suspend(() => labelCard(textOf(args, 'name'), editsOf(args), args.overwrite === true)),
+      Effect.suspend(() => labelCard(name, [...labels], overwrite === true)),
     ),
   print: labelledLines,
 };

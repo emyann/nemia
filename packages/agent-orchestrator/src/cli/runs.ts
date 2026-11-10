@@ -12,6 +12,8 @@ import {
   POLICY_PROPOSE,
   FACTORY_INSTRUCT,
   FACTORY_RULES,
+  FACTORY_SERVER_ADD,
+  serverAddOf,
   freeingMany,
   HOME,
   judgingMany,
@@ -227,6 +229,13 @@ function wordsFrom(file: string, name: string): string {
 const withWords = (args: Args, command: string): Args =>
   typeof args.file === 'string' ? { ...args, words: wordsFrom(args.file, command) } : args;
 
+/** A factory's words as `nemia factory rules` and `instruct` take them: the factory, the words `--file` names (`wordsFrom`), `--clear`. */
+const factoryWords = (args: Args, command: string): { factory: string; words?: string; clear?: boolean } => ({
+  factory: typeof args.factory === 'string' ? args.factory : '',
+  ...(typeof args.file === 'string' ? { words: wordsFrom(args.file, command) } : {}),
+  ...(args.clear === true ? { clear: true } : {}),
+});
+
 /**
  * `nemia agents custom`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler (`AGENTS_CUSTOM`) in its
  * store, and what the entry says of them printed.
@@ -241,7 +250,7 @@ export async function agentsCustomRun(args: Args, e: Engine, place: Place): Prom
  * `nemia factory instruct`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler, and what it says printed.
  */
 export async function factoryInstructRun(args: Args, e: Engine, place: Place): Promise<void> {
-  const asked = withWords(args, FACTORY_INSTRUCT.name);
+  const asked = factoryWords(args, FACTORY_INSTRUCT.name);
   const data = await runWith(e, placedIn(place, FACTORY_INSTRUCT.handler(asked, undefined, HOME)));
   for (const line of FACTORY_INSTRUCT.print(data, asked)) console.log(line);
 }
@@ -250,9 +259,19 @@ export async function factoryInstructRun(args: Args, e: Engine, place: Place): P
  * `nemia factory rules`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler, and what it says printed.
  */
 export async function factoryRulesRun(args: Args, e: Engine, place: Place): Promise<void> {
-  const asked = withWords(args, FACTORY_RULES.name);
+  const asked = factoryWords(args, FACTORY_RULES.name);
   const data = await runWith(e, placedIn(place, FACTORY_RULES.handler(asked, undefined, HOME)));
   for (const line of FACTORY_RULES.print(data, asked)) console.log(line);
+}
+
+/**
+ * `nemia factory server add`'s runner: its flags mapped to the McpServer's write its handler takes (`serverAddOf`), handed to it, and what
+ * it says printed.
+ */
+export async function factoryServerAddRun(args: Args, e: Engine, place: Place): Promise<void> {
+  const asked = serverAddOf(args);
+  const data = await runWith(e, placedIn(place, FACTORY_SERVER_ADD.handler(asked, undefined, HOME)));
+  for (const line of FACTORY_SERVER_ADD.print(data, asked)) console.log(line);
 }
 
 /**

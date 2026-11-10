@@ -179,7 +179,6 @@ export {
   inboxLines,
   inboxNameRefusal,
   noCardLine,
-  parseInboxCard,
   queueLine,
   queueOrder,
   workflowAt,
@@ -368,7 +367,7 @@ export type { AgentCopiedFrom, AgentFill, AgentPlace, AgentReading, AgentsRead, 
 export type { AgentSource, AgentSourcePlace } from './sources/sources.ts';
 export type { GivenRead, SkillChange, SkillCopied, SkillRead, SkillWritten } from './skills/skills.store.ts';
 export type { WorkflowWritten } from './folder/write.store.ts';
-export { addToInbox, dropFromInbox, inboxEntries, inboxNameAt, queueInInbox, readInbox } from './inbox/inbox.store.ts';
+export { addToInbox, dropFromInbox, inboxNameAt, queueInInbox, readInbox } from './inbox/inbox.store.ts';
 export type { InboxDropped, InboxQueued } from './inbox/inbox.store.ts';
 export {
   addFactory,
@@ -457,7 +456,7 @@ export { CLOSEOUT, LOGS, SHOW, STATS, TOLD, TRIES, TRY } from './command/reads.v
 export { STEP_ARTIFACT, STEP_FILE, STEP_PATH, STEP_TRANSCRIPT } from './command/pages.verb.ts';
 export { runObject, type RunObjectAnswer, type TryCloseout } from './object/run.verb.ts';
 export { runLines, type RunLines, type StepCommands } from './object/lines.verb.ts';
-export { cardList, cardObject, cardWriteRefusal, replaceCard, type CardQuery, type CardReplaced } from './object/card.verb.ts';
+export { cardList, cardObject, cardTable, cardWriteRefusal, replaceCard, type CardQuery, type CardReplaced } from './object/card.verb.ts';
 export { runIn, runList, runNamespace, type RunQuery } from './run-list/run-list.verb.ts';
 export { RUN_COLUMNS, runCells, runTable } from './run-list/table.ts';
 export { continueToken, continuedAfter, listPage, pageOf, type PageAsked, type Paged } from './object/page.ts';
@@ -473,11 +472,15 @@ export { eventKept, eventList, eventObject, type EventQuery } from './event-obje
 export { subscriptionList, subscriptionObject } from './subscription-object/subscription.verb.ts';
 export { templateList, templateObject, templateTree, TemplateRenders, type TemplateTreeRendered } from './template/object/template.verb.ts';
 export { CONCLUDED, folderRefusal, START, StartInput } from './start/commands.verb.ts';
-export { INBOX, INBOX_ADD, INBOX_QUEUE } from './inbox/commands.verb.ts';
+export { INBOX, INBOX_ADD, INBOX_QUEUE, INBOX_RM } from './inbox/commands.verb.ts';
 export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction, type FactoryInstruction } from './factory/instruction.verb.ts';
 export { FACTORY_RULES, factoryRules, type FactoryRules } from './factory/rules/rules.verb.ts';
-/** A factory's own MCP servers: the entry that lists its record with each server's state, and the name rule the board shares. */
-export { FACTORY_SERVERS } from './factory/servers/servers.verb.ts';
+/**
+ * A factory's own MCP servers: the entries that list its record with each server's state, record one (its flags mapped by `serverAddOf`)
+ * and take one off, and the name rule the board shares.
+ */
+export { FACTORY_SERVER_ADD, FACTORY_SERVER_RM, FACTORY_SERVERS, serverAddOf } from './factory/servers/servers.verb.ts';
+export { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE } from './factory/schedule/schedule.verb.ts';
 export { serverNameRefusal, type BuiltinServer } from './factory/servers/index.ts';
 export { BUILTIN_SERVERS, builtinServers } from './factory/servers/servers.store.ts';
 /** A factory's server signed in to and out of from the board, through the engine; the builtin secret stays inside the package. */

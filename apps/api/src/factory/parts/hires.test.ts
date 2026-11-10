@@ -4,7 +4,7 @@
  * what a hire refuses — in a scratch store whose factory is filed with the package's own verbs. Every write is read back from the
  * factory's file, and every refusal leaves it as it was.
  */
-import { root } from '../../test/harness.ts';
+import { root } from '../../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -14,8 +14,8 @@ import { Layer } from 'effect';
 import { addFactory, attachWorkflow, hireRefusalOf } from 'agent-orchestrator';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
-import { app, appOf, liveOf } from '../app.ts';
-import { StoreRoot } from '../store.ts';
+import { app, appOf, liveOf } from '../../app.ts';
+import { StoreRoot } from '../../store.ts';
 
 const own = scratch('nemia-api-hires-own-');
 process.env.HKB_REPO = own;

@@ -7,19 +7,18 @@ import { HttpApiBuilder } from 'effect/http-api';
 import { FACTORY_FIRE, FACTORY_HIRE, hireList, hireObject } from 'agent-orchestrator';
 import { Api } from 'objects';
 import type { Served } from '../../layer.ts';
-import { runPlaced } from '../../store.ts';
 import { defaultRepo, factoryNamed, queryOf } from './parts.ts';
 import { answered } from '../../objects/refused.ts';
 
 /** The Hire `name` of `namespace`, read now. */
-const hireIn = (s: Served, namespace: string, name: string) => runPlaced(s, s.e, hireObject(s.home, defaultRepo(s), namespace, name));
+const hireIn = (s: Served, namespace: string, name: string) => s.inRequest(hireObject(s.home, defaultRepo(s), namespace, name));
 
 export const hiresHandlers = HttpApiBuilder.group(Api, 'hires', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
       answered((s) => {
         factoryNamed(`GET /api/namespaces/${namespace}/hires`, namespace);
-        return runPlaced(s, s.e, hireList(s.home, defaultRepo(s), namespace, queryOf(query)));
+        return s.inRequest(hireList(s.home, defaultRepo(s), namespace, queryOf(query)));
       }),
     )
     .handle('get', ({ params: { namespace, name } }) =>

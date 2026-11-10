@@ -9,10 +9,10 @@
  * Either is read by its name, for its page (`cardObjectOf`), a card first, and pressed by none.
  */
 import { Effect } from 'effect';
-import { API_VERSION, type Card, type CardList, DEFAULT_NAMESPACE } from 'objects';
+import { API_VERSION, type Card, type CardList, DEFAULT_NAMESPACE, type Table } from 'objects';
 import { CardDoor } from '../cards/cards.store.ts';
 import { CardName } from '../inbox/inbox.model.ts';
-import { CARD_IN_PLAY, cardLabels, type InboxListing, parseInboxCard } from '../inbox/index.ts';
+import { CARD_IN_PLAY, cardLabels, INBOX_COLUMNS, inboxCells, type InboxListing, parseInboxCard } from '../inbox/index.ts';
 import { inboxJudged } from '../inbox/inbox.verb.ts';
 import { cardVersion } from '../card-write/card-write.verb.ts';
 
@@ -42,19 +42,23 @@ const namespaceOf = (l: InboxListing): string => l.factory ?? DEFAULT_NAMESPACE;
  */
 const keyOf = (l: InboxListing): string => `${l.name}\n${l.file}`;
 
-/** The body a card's text holds, or none where it does not read. */
-const bodyOf = (l: InboxListing, text: string): string | undefined => {
-  if (l.error !== null) return undefined;
+/**
+ * The body a card's text holds, or why it holds none: the listing's own `error` for an entry it found no card, and for a card the listing
+ * read and whose text no longer parses (edited between the two reads), the parse's own reason, so a card is never listed with no body and
+ * no word of why.
+ */
+const bodyOf = (l: InboxListing, text: string): { readonly body?: string; readonly error?: string } => {
+  if (l.error !== null) return { error: l.error };
   try {
-    return parseInboxCard(l.file, text, () => true).body;
-  } catch {
-    return undefined;
+    return { body: parseInboxCard(l.file, text, () => true).body };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
   }
 };
 
 /** The object of the listed card `l`, of its text and filing time; its text as `status.source` where `source` (a read of one card). */
 const cardOf = (l: InboxListing, text: string, filedAt: string, source = false): Card => {
-  const body = bodyOf(l, text);
+  const { body, error } = bodyOf(l, text);
   return {
     apiVersion: API_VERSION,
     kind: 'Card',
@@ -78,7 +82,7 @@ const cardOf = (l: InboxListing, text: string, filedAt: string, source = false):
       runs: [...l.startedAs],
       ...(l.tried !== undefined ? { lastStart: { ...l.tried } } : {}),
       ...(l.title !== null ? { title: l.title } : {}),
-      ...(l.error !== null ? { error: l.error } : {}),
+      ...(error !== undefined ? { error } : {}),
       inPlay: CARD_IN_PLAY[l.state],
       ...(l.queued !== undefined && l.queued.place !== null ? { place: l.queued.place } : {}),
       file: l.file,
@@ -121,6 +125,31 @@ export const cardListOf = Effect.fn('cardListOf')(function* (listing: readonly I
 });
 
 /**
+ * The same page of `listing` as `cardListOf` answers, as a table (`Table`): the columns `nemia inbox` prints (`INBOX_COLUMNS`), a row per
+ * card of the page with its cells (`inboxCells`) and the card itself, and where the page stands (`continue`). A card that names no factory
+ * is said to start on a repository where `unfactoredStarts` lets it, as `nemia inbox` says it.
+ */
+export const cardTableOf = Effect.fn('cardTableOf')(function* (
+  listing: readonly InboxListing[],
+  query: CardQuery,
+  unfactoredStarts = false,
+) {
+  const list = yield* cardListOf(listing, query);
+  const byKey = new Map(listing.map((l) => [keyOf(l), l]));
+  const table: Table = {
+    kind: 'Table',
+    apiVersion: 'meta.k8s.io/v1',
+    metadata: list.metadata.continue !== undefined ? { continue: list.metadata.continue } : {},
+    columnDefinitions: INBOX_COLUMNS,
+    rows: list.items.flatMap((card) => {
+      const l = byKey.get(`${card.metadata.name}\n${card.status.file ?? ''}`);
+      return l === undefined ? [] : [{ cells: inboxCells(l, unfactoredStarts), object: card }];
+    }),
+  };
+  return table;
+});
+
+/**
  * The card `name` of `listing` as an object, in `namespace` where one is given, its file as written in its `status.source` (a read of one
  * card): a card before a stray entry of the same name (`notes.md` and `notes` both list as `notes`), a stray entry, its `status.error`
  * saying why it is no card, carrying its own file's text where it is a file. `Missing` where no entry has that name, or the one that does
@@ -145,6 +174,11 @@ export const cardObjectOf = Effect.fn('cardObjectOf')(function* (listing: readon
  */
 export const cardList = Effect.fn('cardList')(function* (e: Engine, how: SummaryHow, query: CardQuery) {
   return yield* cardListOf(yield* inboxJudged(e, how), query);
+});
+
+/** A page of the inbox's cards as a table (`cardTableOf`), off the inbox as `nemia inbox` reads it now (`inboxJudged`). */
+export const cardTable = Effect.fn('cardTable')(function* (e: Engine, how: SummaryHow, query: CardQuery, unfactoredStarts = false) {
+  return yield* cardTableOf(yield* inboxJudged(e, how), query, unfactoredStarts);
 });
 
 /** The inbox card `name` as an object (`cardObjectOf`), in `namespace` where one is given, off the inbox as it reads now. */

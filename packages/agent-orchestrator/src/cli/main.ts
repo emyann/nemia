@@ -71,7 +71,16 @@ import {
 import { pauseNowPreview, pauseNowPreviewLines } from '../command/runs.verb.ts';
 import { HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
-import { admitRun, agentsCustomRun, policyProposeRun, factoryInstructRun, factoryRulesRun, pruneVerb, rmVerb } from './runs.ts';
+import {
+  admitRun,
+  agentsCustomRun,
+  policyProposeRun,
+  factoryInstructRun,
+  factoryRulesRun,
+  factoryServerAddRun,
+  pruneVerb,
+  rmVerb,
+} from './runs.ts';
 import { inboxAddRun, inboxQueueRun, startRun } from './start.ts';
 import { agentsWriteRun, skillsWriteRun, workflowsWriteRun } from './writers.ts';
 
@@ -379,8 +388,9 @@ export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([['decide'
  * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`); `nemia rm` and `nemia prune`,
  * whose runners walk the many runs a command line names through their handlers; and `nemia start`, `nemia inbox add`, `nemia inbox queue`,
  * `nemia agents custom`, `nemia factory instruct`, `nemia policy propose`, `nemia agents write`, `nemia skills write` and
- * `nemia workflows write`, whose runners read the files and folders a command line names before their handlers; and `nemia admit`, whose
- * runner reads the call on stdin: handed its arguments once read and checked.
+ * `nemia workflows write`, whose runners read the files and folders a command line names before their handlers; `nemia factory server
+ * add`, whose runner maps its flags to the write its handler takes; and `nemia admit`, whose runner reads the call on stdin: handed its
+ * arguments once read and checked.
  */
 export const RUNS: ReadonlyMap<string, (args: Args, e: Engine, place: Place) => void | Promise<void>> = new Map([
   ['tick', tickVerb],
@@ -394,6 +404,7 @@ export const RUNS: ReadonlyMap<string, (args: Args, e: Engine, place: Place) => 
   ['agents custom', agentsCustomRun],
   ['factory instruct', factoryInstructRun],
   ['factory rules', factoryRulesRun],
+  ['factory server add', factoryServerAddRun],
   ['policy propose', policyProposeRun],
   ['agents write', agentsWriteRun],
   ['skills write', skillsWriteRun],

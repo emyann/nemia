@@ -31,6 +31,7 @@
 import { Schema } from 'effect';
 import { HttpApi, HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';
 import { Card, CardFile, CardList, CardStart, CardWrite } from './card.ts';
+import { Table } from './table.ts';
 import {
   Factory,
   FactoryCommands,
@@ -94,6 +95,11 @@ export { KINDS, type Kind };
 /** The Card and a page of them, named so that the document holds each as a component, as it holds the Run. */
 const CardObject = Card.annotate({ identifier: 'Card' });
 const CardListObject = CardList.annotate({ identifier: 'CardList' });
+/**
+ * A page of cards, or the same page as a `Table` where the request's `Accept` asks for one (`TABLE_ACCEPT`): two answers of one status,
+ * each its own success, so each is read off the endpoint by its kind.
+ */
+const CardListOrTable = [CardListObject, Table] as const;
 
 /** The factory's kinds and a page of each, named so that the document holds each as a component. */
 const FactoryObject = Factory.annotate({ identifier: 'Factory' });
@@ -138,11 +144,11 @@ const cardErrors = [BadRequest, Missing, Conflict, Invalid];
 
 /** The inbox's cards as objects. */
 export class CardsGroup extends HttpApiGroup.make('cards').add(
-  HttpApiEndpoint.get('listAll', '/api/cards', { query: listQuery, success: CardListObject, error: cardErrors }),
+  HttpApiEndpoint.get('listAll', '/api/cards', { query: listQuery, success: CardListOrTable, error: cardErrors }),
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/cards', {
     params: { namespace: Schema.String },
     query: listQuery,
-    success: CardListObject,
+    success: CardListOrTable,
     error: cardErrors,
   }),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/cards/:name', { params: cardParams, success: CardObject, error: cardErrors }),

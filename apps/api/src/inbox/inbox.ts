@@ -1,6 +1,6 @@
 /**
- * What a card filed through the Card's verb files (`filingOf`, objects/cards.ts), and the inbox listed with each card's body and filing
- * time (`listInbox`).
+ * What a card filed through the Card's verb files (`filingOf`, objects/cards.ts). A card listed, an entry that does not read among them
+ * with its `status.error` saying why, is the package's Card (`cardList`), never read again here.
  *
  * The package's inbox: `$WF_ROOT/inbox/`, a card per `<name>.md`, read from disk on each request, as the workflows are, so a card a person
  * has just filed or dropped at the command line reads as it is now. Every verb of a card — listed, read alone with its file as written,
@@ -8,45 +8,11 @@
  * Card's, served from `objects`' `Api` (src/objects/cards.ts). No route of the inbox's own is left: `GET /api/inbox/:name` and `PUT` and
  * `DELETE /api/inbox/:name/from` answer 404, as the others before them.
  */
-import fs from 'node:fs';
 import path from 'node:path';
-import { Effect } from 'effect';
-import { Invalid, parseInboxCard, readFactory, inboxEntries, StoreRoot, type Factory, type InboxListing } from 'agent-orchestrator';
+import { Invalid, readFactory, type Factory } from 'agent-orchestrator';
 import type { CardFile } from 'objects';
 import type { Refusal } from '../guard.ts';
 import { folderOf, type WorkflowSource } from '../workflows/workflows.ts';
-
-/**
- * A card as the board lists it: the package's listing (`InboxListing`) — its name, first line, workflow and repo as the card writes them,
- * the runs it was `startedAs`, its `state` (`CardState`), computed once by the package and passed through as is, the repository its
- * factory picks for it (`factoryRepo`), and, for an entry that does not read as a card, why — with two things the listing does not carry.
- *
- * `body` is the card's text below its frontmatter, the brief a start is prefilled with: null for an entry that does not read. `filedAt` is
- * when its file was last written — when it was filed, unless a person has edited it since — which is what the board orders the cards by,
- * newest first: a card carries no time of its own. Null for an entry gone between the listing and the read.
- */
-export type InboxEntry = InboxListing & { body: string | null; filedAt: string | null };
-
-const isDirectory = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());
-
-/**
- * The inbox as the package lists it (`cards`, the cards in play by default), each entry with its body and when its file was written
- * (`InboxEntry`). An entry dropped, or edited into a card that does not read, since the listing read it is listed as the listing has it,
- * with no body or time, and read again next time.
- */
-export const listInbox = (cards: readonly InboxListing[], home: string): Effect.Effect<InboxEntry[]> =>
-  Effect.map(Effect.provideService(inboxEntries(cards), StoreRoot, home), (read) =>
-    cards.map((entry, at) => inboxEntry(entry, read[at] ?? { filedAt: null, text: null })),
-  );
-
-/** One card of the inbox as `listInbox` lists it: with its body and when its file was written, or neither where it no longer reads. */
-function inboxEntry(entry: InboxListing, read: { filedAt: string | null; text: string | null }): InboxEntry {
-  let body: string | null = null;
-  try {
-    if (read.filedAt !== null && read.text !== null) body = parseInboxCard(entry.file, read.text, isDirectory).body;
-  } catch {}
-  return { ...entry, body, filedAt: read.filedAt };
-}
 
 /** What a card filed hands the package: the idea, and the keys the card writes. */
 export type Filing = { text: string; workflow?: string; repo?: string; factory?: string; label?: string[] };

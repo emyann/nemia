@@ -3,7 +3,6 @@
  * holds, asks the host `main` is handed to start one, once, before it runs; no read does; and the store keeps no `daemon.log` and no lease,
  * since the host's spawn starts nothing. A start that went around the host would leave both, or the reaper's process, and fail here.
  */
-import { rootNow } from './config-given.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -12,20 +11,20 @@ import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
 import { eachTest } from './placed.ts';
 import { heldUnasked } from './unasked.ts';
+import { main } from '../src/cli/main.ts';
+import { liveDemandHost } from '../src/demand/demand.verb.ts';
+import { DEMAND_OFF } from '../src/demand/demand.ts';
+import { TABLE } from '../src/runner.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-demand-cli-');
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-const { main } = await import('../src/cli/main.ts');
-const { liveDemandHost } = await import('../src/demand/demand.verb.ts');
-const { DEMAND_OFF } = await import('../src/demand/demand.ts');
-const { TABLE } = await import('../src/runner.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
 type DemandHost = import('../src/demand/demand.verb.ts').DemandHost;
 
 const NOWHERE = scratch('wf-demand-cli-nowhere-');
-const { [DEMAND_OFF]: _off, ...ON } = process.env;
+const { [DEMAND_OFF]: _off, ...ON } = ENV;
 
-const { engineOf } = await import('../src/runtime-client.ts');
 const engine = eachTest(testEngine);
 heldUnasked(engine);
 
@@ -55,7 +54,7 @@ const READS = [['ls'], ['version'], ['show', 'no-run'], ['inbox'], ['logs', 'no-
 function hostOf(): { host: () => DemandHost; spawns: string[] } {
   const spawns: string[] = [];
   const host: DemandHost = {
-    ...liveDemandHost(rootNow()),
+    ...liveDemandHost(ROOT),
     machine: () => ({ platform: 'linux', wsl: false, systemd: false }),
     call: (argv) => assert.fail(`ran ${argv.join(' ')}`),
     daemon: () => ({ checkout: NOWHERE, entry: path.join(NOWHERE, 'main.ts'), cwd: NOWHERE }),
@@ -75,7 +74,7 @@ async function typed(t: TestContext, argv: string[], host: () => DemandHost): Pr
   t.mock.method(console, 'log', () => undefined);
   t.mock.method(console, 'error', () => undefined);
   try {
-    await main(argv, noEngine(), host);
+    await main(argv, noEngine(), host, undefined, ENV);
   } catch {
     return;
   } finally {

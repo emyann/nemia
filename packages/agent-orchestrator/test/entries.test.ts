@@ -1,14 +1,10 @@
 /**
  * The names each of the package's entries exports, pinned: a file moved into a folder, or a barrel that drops a name, fails here and
- * not in the api. Types are held by the api's typecheck, which reads the entries, and by this package's own.
- *
- * `agent-orchestrator` reads `WF_ROOT` when it loads, so the store is a scratch root set before the first import.
+ * not in the api. Types are held by the api's typecheck, which reads the entries, and by this package's own. Each entry is imported by
+ * its name, as the api imports it, so its import is dynamic.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { scratch } from 'test-kit/scratch';
-
-process.env.WF_ROOT = scratch('wf-entries-');
 
 const PINNED: Record<string, string[]> = {
   'agent-orchestrator': [

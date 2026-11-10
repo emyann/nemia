@@ -3,9 +3,9 @@
  * are left by a sweep and said once, beside a worktree that holds a change. The test place models no lock and no checkout on no branch,
  * so this walk keeps the git place, on the runtime itself as free.test.ts walks the rest.
  *
- * `WF_KEEP_WORKTREES` is deleted at its head, so the rule is read at its shipped default.
+ * The test's store is its own, at `ROOT`, given as `ENV`, where `WF_KEEP_WORKTREES` is unset, so the rule is read at its shipped default.
  */
-import { configGiven, rootNow } from './config-given.ts';
+import { configGiven } from './config-given.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -18,22 +18,26 @@ import { scratch } from 'test-kit/scratch';
 import { runGiven } from './placed.ts';
 import type { PlaceRequests, PlaceVerb } from '../src/place/place.ts';
 import { storeConfigLayer } from '../src/config/root.store.ts';
+import { startRun, runWith as runEngine, gitPlaceLayer, withProposalsPass } from '../src/runner.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import { tickRun, freshRestMemo } from '../src/tick/tick.verb.ts';
+import { PlaceService } from '../src/place/place.store.ts';
+import { builtinGitPlace } from '../src/place/builtin.store.ts';
+import { freeOnce, freshFreeMemory } from '../src/forget/prune/free.verb.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-free-held-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
-process.env.WF_ROOT = ROOT;
-process.env.WF_MAX_CONCURRENT = '50';
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_RUNS;
-delete process.env.WF_KEEP_WORKTREES;
-const { startRun, runWith: runEngine, gitPlaceLayer, withProposalsPass } = await import('../src/runner.ts');
-const runPlaced = runGiven(gitPlaceLayer);
-const { runRecord } = await import('../src/record/record.store.ts');
-const { tickRun, freshRestMemo } = await import('../src/tick/tick.verb.ts');
-const { PlaceService } = await import('../src/place/place.store.ts');
-const { builtinGitPlace } = await import('../src/place/builtin.store.ts');
-const { freeOnce, freshFreeMemory } = await import('../src/forget/prune/free.verb.ts');
+const ENV: Env = {
+  ...process.env,
+  WF_ROOT: ROOT,
+  WF_MAX_CONCURRENT: '50',
+  WF_VERIFY_REST: '1',
+  WF_MAX_RUNS: undefined,
+  WF_KEEP_WORKTREES: undefined,
+};
+const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 type Pass = Awaited<ReturnType<typeof tick>>;
 type Memory = ReturnType<typeof freshFreeMemory>;
@@ -133,7 +137,7 @@ const tick = (memo?: ReturnType<typeof freshRestMemo>) =>
     e,
     withProposalsPass(tickRun({ repo: ROOT, ...(memo ? { memo } : {}) })).pipe(
       Effect.provide(gitPlaceLayer),
-      Effect.provide(storeConfigLayer(process.env)),
+      Effect.provide(storeConfigLayer(ENV)),
     ),
   );
 
@@ -160,7 +164,7 @@ async function sweep(pass: Pass, ids: readonly string[], memory: Memory) {
   const done = await runEngine(
     e,
     freeOnce(answers, memory).pipe(
-      Effect.provide(configGiven(rootNow(), process.env)),
+      Effect.provide(configGiven(ROOT, ENV)),
       Effect.provide(counting(asked)),
       Effect.provide(Logger.layer([keeper])),
       Effect.provideService(References.MinimumLogLevel, 'Info'),
@@ -174,7 +178,7 @@ async function sweep(pass: Pass, ids: readonly string[], memory: Memory) {
   return { ...done, logged, asked, verbs: asked.map((a) => a.verb) };
 }
 
-const lane = (id: string, step = 'work') => runRecord(rootNow(), id).steps[step].workspace!;
+const lane = (id: string, step = 'work') => runRecord(ROOT, id).steps[step].workspace!;
 const whole = (id: string) => fs.existsSync(lane(id)) && !fs.existsSync(path.join(ROOT, 'runs', `${id}.pruned`));
 const gone = (id: string) => !fs.existsSync(path.join(ROOT, 'worktrees', id));
 
@@ -199,7 +203,7 @@ async function worked(id: string, outcome: 'done' | 'blocked' = 'done') {
 async function merged(repo = aRepo()) {
   const run = await started(WORK, repo);
   await worked(run.id);
-  git(repo, 'merge', '-q', '--no-ff', '-m', `merge ${run.id}`, runRecord(rootNow(), run.id).steps.work.branch!);
+  git(repo, 'merge', '-q', '--no-ff', '-m', `merge ${run.id}`, runRecord(ROOT, run.id).steps.work.branch!);
   return run;
 }
 

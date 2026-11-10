@@ -1,11 +1,12 @@
 /**
- * A run's check exports nothing to the daemon's collector: under the client's `engine(process.env)` in a process whose environment names a
+ * A run's check exports nothing to the daemon's collector: under the client's `engine(ENV)` in a process whose environment names a
  * collector, as the daemon's does, a check filed as a run files one, whose command starts a process that exports wherever its
  * environment says (`exporting-child.ts`), posts nothing, since that process is told of no collector. The same process told the
  * address by name posts its span, so the absence is the engine's doing. Against the real worker and a scratch collector.
  *
- * `WF_ROOT`, the collector's address and the ceiling the engine admits under (`WF_MAX_CONCURRENT`, its default) are set before the
- * engine is built, which reads all three; the address is put back after.
+ * The engine is built from `ENV`, which names the test's own store, the collector's address and the ceiling it admits under
+ * (`WF_MAX_CONCURRENT`, its default). The address is set on the process too, as the daemon's is, for every child it starts to
+ * inherit, and put back after.
  */
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,6 +18,9 @@ import { Effect } from 'effect';
 import { CHECK_NICENESS, checkArgv } from '../src/check/check.ts';
 import { scratch } from 'test-kit/scratch';
 import { until, WAITED, type Waiter } from 'agent-runtime/testing';
+import { engine } from '../src/runner.ts';
+import { sessionTelemetryOf } from '../src/telemetry/telemetry.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 /** Every body posted to the scratch collector, by path. */
 const posts: { path: string; body: string }[] = [];
@@ -33,17 +37,14 @@ const COLLECTOR = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
 const found = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 process.env.OTEL_EXPORTER_OTLP_ENDPOINT = COLLECTOR;
-process.env.WF_ROOT = scratch('wf-check-export-');
-delete process.env.WF_MAX_CONCURRENT;
+const ENV: Env = { ...process.env, WF_ROOT: scratch('wf-check-export-'), WF_MAX_CONCURRENT: undefined };
 after(async () => {
   if (found === undefined) delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
   else process.env.OTEL_EXPORTER_OTLP_ENDPOINT = found;
   await new Promise<void>((closed) => server.close(() => closed()));
 });
-const { engine } = await import('../src/runner.ts');
-const { sessionTelemetryOf } = await import('../src/telemetry/telemetry.ts');
 
-const e = engine(process.env);
+const e = engine(ENV);
 
 /** The exporting process as a shell line, its one span named `span`. */
 const exporting = (span: string): string =>
@@ -72,7 +73,7 @@ test(
   "REFUSED: a check's command that starts an exporting process posts nothing to the daemon's collector, and told it by name it posts",
   WAITED,
   async (t) => {
-    assert.equal(sessionTelemetryOf(process.env)?.endpoint, COLLECTOR, 'the engine is given the collector, as the daemon is');
+    assert.equal(sessionTelemetryOf(ENV)?.endpoint, COLLECTOR, 'the engine is given the collector, as the daemon is');
     const workspace = scratch('wf-check-export-ws-');
     const id = await Effect.runPromise(
       e.file({

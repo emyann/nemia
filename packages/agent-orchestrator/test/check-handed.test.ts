@@ -1,11 +1,11 @@
 /**
  * The step after a checked step is handed every `wf <name>:` line of its check's whole stdout, however long the output after it: walked on
- * the client's `engine(process.env)` with the shipped `check` harness, a check filed with the `config` `fileCheck` gives it, run by the
+ * the client's `engine(ENV)` with the shipped `check` harness, a check filed with the `config` `fileCheck` gives it, run by the
  * real detached worker, and read back through `checksHandedRead`, as the pass that files the next step reads it. The engine's log of a task
  * keeps only its end, so the fixture's marked lines sit further from the end than that log reaches; the runtime keeps each stream whole,
  * read through `output`.
  *
- * `WF_ROOT` is set before the runner is imported, which reads it as it loads; `WF_VERIFY_REST` has every run a pass answers from its memo
+ * The test's store is its own, at `ROOT`, given as `ENV`; `WF_VERIFY_REST` has every run a pass answers from its memo
  * of runs at rest judged in full as well.
  */
 import { test } from 'node:test';
@@ -20,18 +20,16 @@ import { until, WAITED, type Waiter } from 'agent-runtime/testing';
 import { Effect } from 'effect';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runOver } from './placed.ts';
+import { engine, tickRun, runWith as runEngine } from '../src/runner.ts';
+import { checksHandedRead } from '../src/views/views.verb.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-check-handed-');
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { engine, tickRun, runWith: runEngine } = await import('../src/runner.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
 const stand = eachTest(testPlace);
-const runWith = runOver(runEngine, () => stand().layer);
-const { checksHandedRead } = await import('../src/views/views.verb.ts');
+const runWith = runOver(runEngine, () => stand().layer, ENV);
 
-const e = engine(process.env);
+const e = engine(ENV);
 
 /** Ticks in test `t`, every 50ms, until the task has settled; answers how. */
 const settled = (t: Waiter, id: string) => {

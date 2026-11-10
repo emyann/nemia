@@ -1,5 +1,5 @@
 /**
- * What a pass asks Claude Code, at shipped defaults: the client's `engine(process.env)` and `tick()`, over a run started from a workflow
+ * What a pass asks Claude Code, at shipped defaults: the client's `engine(ENV)` and `tick()`, over a run started from a workflow
  * folder, so `advance` reads every step in flight as the daemon does. A fake `claude` first on PATH counts each `claude agents` call, and a
  * job reads its brief and runs until the test ends it.
  *
@@ -7,8 +7,9 @@
  * `advance` reads the views the runtime's pass reported (`reportedEngine`) rather than viewing each step in flight, which would observe
  * again.
  *
- * `WF_ROOT` is set before the import, since the module reads it as it loads, with the shipped ceilings and every run the memo answers
- * judged in full; `CLAUDE_CONFIG_DIR`, where Claude Code keeps its sessions and transcripts, is a folder of the test's.
+ * The test's store is its own, at `ROOT`, given as `ENV` with the shipped ceilings and every run the memo answers judged in full;
+ * `CLAUDE_CONFIG_DIR`
+, where Claude Code keeps its sessions and transcripts, is a folder of the test's.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,19 +20,16 @@ import { scratch } from 'test-kit/scratch';
 import { until, WAITED, type Waiter } from 'agent-runtime/testing';
 import { Effect } from 'effect';
 import { runGiven, runOver } from './placed.ts';
-import { rootNow } from './config-given.ts';
+import { engine, startRun, tickRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import { freshRestMemo } from '../src/tick/tick.verb.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-agents-calls-');
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
 process.env.CLAUDE_CONFIG_DIR = scratch('wf-agents-calls-config-');
-const { engine, startRun, tickRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
-const { runRecord } = await import('../src/record/record.store.ts');
-const { freshRestMemo } = await import('../src/tick/tick.verb.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
+const runWith = runOver(runEngine, gitPlaceLayer, ENV);
+const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
@@ -82,12 +80,12 @@ if (args[0] === 'agents') {
 };
 
 const fake = fakes();
-let e = engine(process.env);
+let e = engine(ENV);
 let memo = freshRestMemo();
 const pass = () => runWith(e, tickRun({ repo: ROOT, memo }));
 
 /** The task a run's one step is filed as. */
-const taskOf = (runId: string) => runRecord(rootNow(), runId).steps.work.taskId!;
+const taskOf = (runId: string) => runRecord(ROOT, runId).steps.work.taskId!;
 
 /** Passes in test `t`, every 50ms, until the run's step is at work, as its harness lists it; answers its task. */
 const atWork = (t: Waiter, runId: string) =>
@@ -95,7 +93,7 @@ const atWork = (t: Waiter, runId: string) =>
     t,
     async () => {
       await pass();
-      const taskId = runRecord(rootNow(), runId).steps.work?.taskId;
+      const taskId = runRecord(ROOT, runId).steps.work?.taskId;
       if (!taskId) return undefined;
       return (await Effect.runPromise(e.view(taskId))).phase === 'working' && taskId;
     },
@@ -129,7 +127,7 @@ test('a pass with claude jobs in flight asks `claude agents` nothing, and advanc
 });
 
 test('a job left running across a restart is read at work on the first pass of a fresh engine, off its run file', async () => {
-  e = engine(process.env);
+  e = engine(ENV);
   memo = freshRestMemo();
   const { calls, done } = await counted();
   assert.equal(calls, 0, 'a fresh engine asks Claude Code nothing either');

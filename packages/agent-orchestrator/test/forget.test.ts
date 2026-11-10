@@ -10,8 +10,9 @@
  * words for a harness it lacks, in `forget-runtime.boundary.test.ts`; a worktree held on git in `rm-held`, `rm-signal` and `rm-walk`.
  *
  * The engine's stand-in moves no task by itself: a story settles each one, and a whole-store pass is given an engine pass that reports
- * nothing (`QUIET`) and a `close` that holds a task as it signed, since a stand-in keeps neither. `WF_ROOT` is set before the runner is
- * imported, which reads it as it loads; `WF_DEFAULT_FACTORY_STARTS` beside it starts runs in repositories no factory holds.
+ * nothing (`QUIET`) and a `close` that holds a task as it signed, since a stand-in keeps neither. The test's store is its own, at
+ * `ROOT`, given as `ENV`, whose `WF_DEFAULT_FACTORY_STARTS` starts runs in repositories no factory holds.
+
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -26,30 +27,36 @@ import { scratch } from 'test-kit/scratch';
 import { staged, story, type Board } from './story.ts';
 import { names } from './assessed.ts';
 import { placeOver, unreadBy } from './place-over.ts';
-import { rootNow } from './config-given.ts';
+import { advanceRun, cancelRun, forgetRun, prune, retryRun, runsForgetting, startRun, runWith } from '../src/runner.ts';
+import { stepsNow } from './steps-now.ts';
+import { listRuns, markCancelled, runRecord } from '../src/record/record.store.ts';
+import { runTasks } from '../src/record/record.ts';
+import { LINE_NAME } from '../src/run.ts';
+import { tickRun } from '../src/tick/tick.verb.ts';
+import { freeOnce, freshFreeMemory } from '../src/forget/prune/free.verb.ts';
+import { PlaceService } from '../src/place/place.store.ts';
+import { Invalid } from '../src/refusal/refusal.ts';
+import { idRefusal } from '../src/forget/forget.ts';
+import { EngineService, engineOf } from '../src/runtime-client.ts';
+import { main } from '../src/cli/main.ts';
+import { filesStoreAt } from '../src/record/files.store.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-forget-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-process.env.WF_DEFAULT_FACTORY_STARTS = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-delete process.env.WF_KEEP_WORKTREES;
-const { advanceRun, cancelRun, forgetRun, prune, retryRun, runsForgetting, startRun, runWith } = await import('../src/runner.ts');
-const { stepsNow: stepsOf } = await import('./steps-now.ts');
-const { listRuns, markCancelled, runRecord } = await import('../src/record/record.store.ts');
-const { runTasks } = await import('../src/record/record.ts');
-const runStore = (await import('../src/record/files.store.ts')).filesStoreAt(rootNow());
-const { LINE_NAME } = await import('../src/run.ts');
-const { tickRun } = await import('../src/tick/tick.verb.ts');
-const { freeOnce, freshFreeMemory } = await import('../src/forget/prune/free.verb.ts');
-const { PlaceService } = await import('../src/place/place.store.ts');
-const { Invalid } = await import('../src/refusal/refusal.ts');
-const { idRefusal } = await import('../src/forget/forget.ts');
-const { EngineService, engineOf } = await import('../src/runtime-client.ts');
-const { main } = await import('../src/cli/main.ts');
-const stage = staged({ runWith, main, engineOf });
+const ENV: Env = {
+  ...process.env,
+  WF_ROOT: ROOT,
+  WF_VERIFY_REST: '1',
+  WF_DEFAULT_FACTORY_STARTS: '1',
+  WF_MAX_CONCURRENT: undefined,
+  WF_MAX_RUNS: undefined,
+  WF_KEEP_WORKTREES: undefined,
+};
+/** A run's steps read now, at this test's store. */
+const stepsOf = (run: Parameters<typeof stepsNow>[0]) => stepsNow(run, ROOT);
+const files = filesStoreAt(ROOT);
+const stage = staged({ runWith, main, engineOf, env: ENV });
 const world = () => stage.place().world;
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -118,7 +125,7 @@ const oneStep = (lines = '') => {
   return dir;
 };
 /** One pass over the run `id` on the stage's engine. */
-const pass = (id: string) => stage.runWith(e(), advanceRun(runRecord(rootNow(), id)));
+const pass = (id: string) => stage.runWith(e(), advanceRun(runRecord(ROOT, id)));
 /** A whole-store pass of the tick, as the daemon makes it. */
 const tick = () => stage.runWith(e(), tickRun({ repo: ROOT }));
 const under = (...parts: string[]) => fs.existsSync(path.join(ROOT, ...parts));
@@ -140,13 +147,13 @@ const worktreesOf = (repo: string): string[] => {
 const aParent = async (repo: string, { work, signed = Boolean(work) }: { work?: string; signed?: boolean } = {}) => {
   const run = await stage.runPlaced(startRun({ brief: 'the parent', repo, workflowDir: oneStep() }));
   await pass(run.id);
-  const wt = runRecord(rootNow(), run.id).steps.implement.workspace!;
+  const wt = runRecord(ROOT, run.id).steps.implement.workspace!;
   if (work) {
     fs.writeFileSync(path.join(wt, work), `${work}\n`);
     world().commit(wt, `add ${work}`);
   }
   if (signed) board().settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  return { run, wt, branch: runRecord(rootNow(), run.id).steps.implement.branch! };
+  return { run, wt, branch: runRecord(ROOT, run.id).steps.implement.branch! };
 };
 
 /** `nemia <argv>`, through the CLI, as a person types it: the lines it printed, and the error it ended with, if it did. */
@@ -174,7 +181,7 @@ test('after a landing: the sweep frees the run, `nemia prune --artifacts --yes` 
     const run = await stage.runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: oneStep('harness: codex\ncheck: "true"') }));
     id = run.id;
     assert.deepEqual((await pass(id)).filed, ['implement']);
-    const wt = runRecord(rootNow(), id).steps.implement.workspace!;
+    const wt = runRecord(ROOT, id).steps.implement.workspace!;
     board().settle(`${id}-implement`, 'succeeded', BLOCKED);
     await pass(id);
     await stage.runWith(e(), retryRun(id, 'implement', { mode: 'continue', message: 'the --dry-run flag' }));
@@ -185,13 +192,13 @@ test('after a landing: the sweep frees the run, `nemia prune --artifacts --yes` 
     assert.deepEqual((await pass(id)).checked, ['implement']);
     board().settle(`${id}-implement-try2-check`, 'succeeded', undefined, 0);
     assert.equal((await pass(id)).status, 'succeeded');
-    tasks = runTasks(runRecord(rootNow(), id));
+    tasks = runTasks(runRecord(ROOT, id));
     assert.deepEqual(
       [...tasks].sort(),
       [`${id}-implement`, `${id}-implement-try2`, `${id}-implement-try2-check`],
       'its tries and its check',
     );
-    world().stage(repo, runRecord(rootNow(), id).steps.implement.branch!);
+    world().stage(repo, runRecord(ROOT, id).steps.implement.branch!);
     world().commit(repo, `merge ${id}`);
     const other = await stage.runPlaced(startRun({ brief: 'another run', repo: aRepo(), workflowDir: oneStep() }));
     await pass(other.id);
@@ -199,7 +206,7 @@ test('after a landing: the sweep frees the run, `nemia prune --artifacts --yes` 
   });
 
   await s.test('the sweep after the pass that found it at rest removes its worktree, and marks the run pruned', async () => {
-    const wt = runRecord(rootNow(), id).steps.implement.workspace!;
+    const wt = runRecord(ROOT, id).steps.implement.workspace!;
     const answers = (await tick()).runs.filter((a) => a.run.id === id);
     assert.equal(answers[0]?.feed.atRest, true, 'at rest: what a sweep is fed');
     const done = await stage.runWith(e(), freeOnce(answers, freshFreeMemory()));
@@ -208,7 +215,7 @@ test('after a landing: the sweep frees the run, `nemia prune --artifacts --yes` 
       [[id, 'pruned']],
     );
     assert.ok(!fs.existsSync(wt) && !under('worktrees', id), 'its worktree is gone');
-    assert.ok(hasBranch(repo, runRecord(rootNow(), id).steps.implement.branch!), 'its branch kept');
+    assert.ok(hasBranch(repo, runRecord(ROOT, id).steps.implement.branch!), 'its branch kept');
     assert.ok(under('runs', `${id}.json`), 'and its record');
   });
 
@@ -233,7 +240,7 @@ test('after a landing: the sweep frees the run, `nemia prune --artifacts --yes` 
       const done = await stage.runWith(e(), prune(id, { artifacts: true, yes: true }));
       assert.deepEqual([done.kind, done.worktrees], ['pruned', []]);
       assert.ok(!under('runs', id, 'artifacts') && under('runs', id, 'inputs', 'kept.md') && under('runs', `${id}.json`));
-      assert.ok(runRecord(rootNow(), id).pruned?.artifacts, 'the mark says its files went');
+      assert.ok(runRecord(ROOT, id).pruned?.artifacts, 'the mark says its files went');
       assert.deepEqual(
         tasks.filter((task) => !board().tasks.has(task)),
         [],
@@ -245,7 +252,7 @@ test('after a landing: the sweep frees the run, `nemia prune --artifacts --yes` 
   await s.test(
     '`nemia rm` forgets its tasks — its first try, its second and its check — in one call, its record and every file, keeps its branch, and says so',
     async () => {
-      const branch = runRecord(rootNow(), id).steps.implement.branch!;
+      const branch = runRecord(ROOT, id).steps.implement.branch!;
       const before = board().forgets.length;
       const said = await typed(t, 'rm', id);
       assert.equal(said.error, undefined);
@@ -331,7 +338,7 @@ test('after a landing: the sweep frees the run, `nemia prune --artifacts --yes` 
     const refused = await program({});
     assert.equal(refused.kind, 'refused', 'a step in flight: nothing is touched');
     assert.deepStrictEqual(refused, await stage.runWith(e(), forgetRun(run.id)));
-    const wt = runRecord(rootNow(), run.id).steps.implement.workspace!;
+    const wt = runRecord(ROOT, run.id).steps.implement.workspace!;
     board().settle(`${run.id}-implement`, 'failed');
     await pass(run.id);
     const forgot = await program({ deleteBranches: true, forceUnmerged: true });
@@ -356,7 +363,7 @@ test('after a landing: the sweep frees the run, `nemia prune --artifacts --yes` 
     await pass(run.id);
     board().settle(`${run.id}-implement`, 'succeeded', SIGNED);
     await pass(run.id);
-    assert.equal(runRecord(rootNow(), run.id).steps.implement.workspace?.startsWith(path.join(ROOT, 'runs', run.id)), true, 'a folder run');
+    assert.equal(runRecord(ROOT, run.id).steps.implement.workspace?.startsWith(path.join(ROOT, 'runs', run.id)), true, 'a folder run');
     const forgot = await stage.runWith(e(), forgetRun(run.id));
     assert.deepEqual([forgot.kind, forgot.folder, forgot.engine?.forgotten], ['forgotten', true, [`${run.id}-implement`]]);
     assert.ok(!(await listed()).includes(`${run.id}-implement`) && !fs.existsSync(markerOf(run.id)));
@@ -380,10 +387,10 @@ test('after a landing: the sweep frees the run, `nemia prune --artifacts --yes` 
         createdAt: '2026-01-01T00:00:00Z',
       };
       fs.writeFileSync(path.join(ROOT, 'runs', `${legacy.id}.json`), JSON.stringify(legacy, null, 2));
-      assert.equal(stepsOf(runRecord(rootNow(), legacy.id)).length, 1, 'read from the folder, since the record froze nothing');
+      assert.equal(stepsOf(runRecord(ROOT, legacy.id)).length, 1, 'read from the folder, since the record froze nothing');
       fs.rmSync(legacyDir, { recursive: true });
       assert.throws(
-        () => stepsOf(runRecord(rootNow(), legacy.id)),
+        () => stepsOf(runRecord(ROOT, legacy.id)),
         (err: Error) => err.message.includes(legacy.id) && err.message.includes(legacyDir),
       );
       const said = await typed(t, 'rm', legacy.id);
@@ -500,8 +507,8 @@ test('`nemia rm` refused, then allowed: each run that holds it named on its line
       await pass(run.id);
       board().settle(`${run.id}-implement`, 'succeeded', SIGNED);
       await Effect.runPromise(e().file({ id: `${run.id}-implement-check`, brief: 'npm test', cwd: '/', harness: 'check' }));
-      markCancelled(rootNow(), run.id);
-      assert.equal(runRecord(rootNow(), run.id).steps.implement.check, undefined, 'the check is filed, and the record never says so');
+      markCancelled(ROOT, run.id);
+      assert.equal(runRecord(ROOT, run.id).steps.implement.check, undefined, 'the check is filed, and the record never says so');
       names((await stage.runWith(e(), forgetRun(run.id))).refusal, "implement's check is pending", 'cancelled at', `nemia ls ${run.id}`);
       assert.ok(under('runs', `${run.id}.json`) && under('worktrees', run.id, LINE_NAME));
       board().settle(`${run.id}-implement-check`, 'stopped');
@@ -510,12 +517,8 @@ test('`nemia rm` refused, then allowed: each run that holds it named on its line
       const step = await stage.runPlaced(startRun({ brief: 'filed and never written down', repo: aRepo(), workflowDir: folder() }));
       const taskId = `${step.id}-implement`;
       await Effect.runPromise(e().file({ id: taskId, brief: 'implement it', cwd: '/' }));
-      markCancelled(rootNow(), step.id);
-      assert.equal(
-        runRecord(rootNow(), step.id).steps.implement.taskId,
-        null,
-        'the pass that filed it died there: the record never names it',
-      );
+      markCancelled(ROOT, step.id);
+      assert.equal(runRecord(ROOT, step.id).steps.implement.taskId, null, 'the pass that filed it died there: the record never names it');
       names((await stage.runWith(e(), forgetRun(step.id))).refusal, 'implement is pending', 'cancelled at', `nemia rm ${step.id}`);
       const stoppedBefore = board().stopped.length;
       const filings = board().filings.length;
@@ -532,7 +535,7 @@ test('`nemia rm` refused, then allowed: each run that holds it named on its line
       const at = aRepo();
       const p = await aParent(at, { work: 'kept.txt' });
       fs.writeFileSync(path.join(p.wt, 'uncommitted.txt'), 'work\n');
-      markCancelled(rootNow(), p.run.id);
+      markCancelled(ROOT, p.run.id);
       const deaf = PlaceService.layer(placeOver(stage.place().place, { inventory: () => unreadBy('inventory', 'the inventory broke') }));
       const forgot = await stage.runWith(e(), forgetRun(p.run.id).pipe(Effect.provide(deaf)));
       assert.equal(forgot.kind, 'refused');
@@ -572,7 +575,7 @@ test('`nemia rm` refused, then allowed: each run that holds it named on its line
     async () => {
       const live = await aParent(aRepo());
       const id = live.run.id;
-      markCancelled(rootNow(), id);
+      markCancelled(ROOT, id);
       const asks = path.join(ROOT, 'runs', `${id}.asks`);
       fs.mkdirSync(asks, { recursive: true });
       fs.writeFileSync(
@@ -586,7 +589,7 @@ test('`nemia rm` refused, then allowed: each run that holds it named on its line
         names(printed[0], `${id}${suffix}  not forgotten`, suffix, `nemia rm ${id}.`);
       }
       assert.ok(under('runs', `${id}.json`) && under('runs', `${id}.cancelled`) && under('runs', `${id}.asks`, 'retry-implement-2'));
-      assert.ok(runRecord(rootNow(), id).cancelledAt);
+      assert.ok(runRecord(ROOT, id).cancelledAt);
     },
   );
 
@@ -697,7 +700,7 @@ test('the engine refuses to forget: a task left unsettled waits with its marker 
       assert.equal(forgot.kind, 'forgotten', forgot.refusal);
       assert.ok(closed.includes(task), 'its task held open is closed');
       assert.deepEqual([forgot.engine?.forgotten, forgot.engine?.waiting, forgot.engine?.marker], [[], [task], markerOf(run.id)]);
-      assert.deepEqual(runStore.forgetting.read(run.id), [task], 'the marker keeps its id');
+      assert.deepEqual(files.forgetting.read(run.id), [task], 'the marker keeps its id');
       const said = await typed(t, 'rm', run.id);
       assert.equal(said.error, undefined, 'a second rm, the record gone, exits 0');
       names(said.printed[0], `${run.id}  no such run`, `${task} has not settled yet`);
@@ -729,12 +732,12 @@ test('the engine refuses to forget: a task left unsettled waits with its marker 
     "a marker beside the run's record is a `nemia rm` not finished: a pass forgets nothing of it; one that does not read is said each pass, with how a person removes it",
     async () => {
       const p = await aParent(aRepo(), { work: 'done.txt' });
-      runStore.forgetting.write(p.run.id, runTasks(runRecord(rootNow(), p.run.id)));
+      files.forgetting.write(p.run.id, runTasks(runRecord(ROOT, p.run.id)));
       const before = board().forgets.length;
       assert.equal((await tick()).forgetting, undefined);
       assert.equal(board().forgets.length, before, 'the engine is not asked');
       assert.ok((await listed()).includes(`${p.run.id}-implement`));
-      runStore.forgetting.lift(p.run.id);
+      files.forgetting.lift(p.run.id);
 
       fs.writeFileSync(markerOf('garbled-a1b2'), '{ not json');
       const done = await tick();
@@ -759,7 +762,7 @@ test('the engine refuses to forget: a task left unsettled waits with its marker 
         names(said.printed[0], `${p.run.id}  `, 'forget: the store is read-only.', marker, `rm ${marker}`);
         assert.ok(said.printed[0].endsWith(`rm ${marker}`), said.printed[0]);
         assert.ok(!under('runs', `${p.run.id}.json`), 'the record is gone');
-        assert.deepEqual(runStore.forgetting.read(p.run.id), [task], 'the marker keeps its id');
+        assert.deepEqual(files.forgetting.read(p.run.id), [task], 'the marker keeps its id');
         const before = board().forgets.length;
         const done = await tick();
         assert.equal(board().forgets.length, before + 1, 'a pass asks again');
@@ -789,7 +792,7 @@ test('the engine refuses to forget: a task left unsettled waits with its marker 
       await pass(run.id);
       board().settle(`${run.id}-implement-try2-check`, 'succeeded', undefined, 0);
       assert.equal((await pass(run.id)).status, 'succeeded');
-      const tasks = runTasks(runRecord(rootNow(), run.id));
+      const tasks = runTasks(runRecord(ROOT, run.id));
       const [refused, ...rest] = tasks;
       const marker = markerOf(run.id);
       const message = `task ${refused}'s harness, \`codex\`, still holds session s-1; the next pass lets a finished session go.`;
@@ -810,7 +813,7 @@ test('the engine refuses to forget: a task left unsettled waits with its marker 
         assert.ok(!said.printed[0].includes('waits'), said.printed[0]);
         const left = await listed();
         assert.deepEqual([left.includes(refused), rest.filter((id) => left.includes(id))], [true, []], 'the rest forgotten');
-        assert.deepEqual(runStore.forgetting.read(run.id), tasks, 'the marker keeps their ids');
+        assert.deepEqual(files.forgetting.read(run.id), tasks, 'the marker keeps their ids');
         const done = await tick();
         assert.deepEqual([done.forgetting?.length, done.forgetting?.[0].warn], [1, true], JSON.stringify(done.forgetting));
         names(done.forgetting?.[0]?.text, `${run.id} (removed)`, message, `rm ${marker}`);
@@ -857,7 +860,7 @@ test('the engine refuses to forget: a task left unsettled waits with its marker 
       board().settle(`${unfiled.id}-implement`, 'succeeded', SIGNED);
       await pass(unfiled.id);
       fs.writeFileSync(record, written);
-      assert.deepEqual(runTasks(runRecord(rootNow(), unfiled.id)), [], 'the record names no task');
+      assert.deepEqual(runTasks(runRecord(ROOT, unfiled.id)), [], 'the record names no task');
       const step = await stage.runWith(e(), runsForgetting([unfiled.id]));
       assert.deepEqual(step.counted.get(unfiled.id)?.forgotten, [`${unfiled.id}-implement`], 'prune counts the step adopted');
       const forgot = await stage.runWith(e(), forgetRun(unfiled.id));
@@ -885,7 +888,7 @@ test('the engine refuses to forget: a task left unsettled waits with its marker 
       }
       await stage.runWith(e(), forgetRun(p.run.id));
       assert.deepEqual(
-        listRuns(rootNow()).filter((r) => r.id === p.run.id),
+        listRuns(ROOT).filter((r) => r.id === p.run.id),
         [],
       );
     },

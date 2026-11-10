@@ -115,7 +115,7 @@ const STORE_BOTTOM = [
  * on both (`folder.store.ts`), the run store on them and the
  * store's pause on the bottom,
  * the schedules' cron and tries on the run store, a templated factory's tree, base and status on it (`applied.store.ts`), the factories on
- * the run store and both, and the run store's files on them and on the configuration (`runStore`, whose `keptRuns` reads
+ * the run store and both, and the run store's files on them and on the configuration (`record/files.store.ts`, whose `keptRuns` reads
  * `WF_VERIFY_REST`), the door's pattern on the store's root (`door.store.ts`) and each door on it and the stores it is over — the Run
  * door on the run store's files, the Factory door on the factories and a factory's level, rules and servers, each on the run store, the
  * Workflow door on the folders, their versions (`version.store.ts`, on the skills read and the Agent and Skill doors it reads a

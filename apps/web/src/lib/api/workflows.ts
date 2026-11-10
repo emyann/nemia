@@ -5,7 +5,14 @@
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Option, Schema } from 'effect';
-import { RepositoryAnswer, type DefinitionOrigin, type Workflow, type WorkflowStep, type WorkflowStepStatus } from 'objects';
+import {
+  DEFINITION_ORIGINS,
+  RepositoryAnswer,
+  type DefinitionOrigin,
+  type Workflow,
+  type WorkflowStep,
+  type WorkflowStepStatus,
+} from 'objects';
 import type { GraphEdge, RunGraph } from './graph.ts';
 import type { StepLayers } from './layers.ts';
 import { call, namespaceOf, read, runs, workflows as served, type Refuse } from './objects.ts';
@@ -190,15 +197,16 @@ export type PagePlace = { factory?: string; repo?: string };
 
 /**
  * A step of a workflow, for its page, read in `place`: the factory picked and its repository. Read again on each visit, as the Workflows
- * page is: a person edits the folder, and a factory's hires. `from` is the origin the page's address names; the api reads
- * it as `sourceOf` says.
+ * page is: a person edits the folder, and a factory's hires. `from` is the origin the page's address names, sent as the api's
+ * `?origin=` where it is one (a factory's own tree is `factory`, which the api serves apart from the repository's), else as `sourceOf`
+ * reads it.
  */
 export const stepQuery = (from: string, workflow: string, step: string, place: PagePlace = {}) =>
   queryOptions({
     queryKey: ['workflows', from, workflow, step, place.factory ?? null, place.repo ?? null],
     queryFn: () =>
       served.step(namespaceOf(place.factory), workflow, step, {
-        origin: sourceOf(from),
+        origin: DEFINITION_ORIGINS.find((origin) => origin === from) ?? sourceOf(from),
         ...(place.repo ? { repo: place.repo } : {}),
       }),
   });

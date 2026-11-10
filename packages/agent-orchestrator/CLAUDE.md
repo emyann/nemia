@@ -5,7 +5,7 @@ run slots, worktrees and landing, what a check means, budgets across tries, gate
 it holds today that is a candidate for the runtime is in `docs/architecture.md`, *Who owns what*.
 
 The `nemia` a person types is the client in `apps/cli` (`apps/cli/CLAUDE.md`): it asks the api for the moved reads and spawns this
-package's CLI for everything else — every write, `decide`, a help, and a read typed with `--local` — with the same words. `bin/nemia.ts`
+package's CLI for everything else — every write, a help, and a read typed with `--local` — with the same words. `bin/nemia.ts`
 and `bin/wf.ts` are that in-process CLI, the old path: exported as `agent-orchestrator/bin` and `/bin/wf`, resolved and spawned by
 `apps/cli/src/local.ts` alone, and no package declares them as its bins. A change to a moved read's output changes the client's printer
 too, which holds parity with this one until the in-process reads retire.

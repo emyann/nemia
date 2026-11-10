@@ -2491,7 +2491,8 @@ stateDiagram-v2
   filed for (`taskTryOf`), the two the tick counts by, off the feed's own lines: a restarted daemon writes a denial neither again nor
   never, and a recheck of the step says none of them again. `reason=ToolDenied` is one of her two selectors, and her `grant-access` skill proposes the
   narrowest allow that would have let the call through, or says the deny stands. The denials `nemia stats` counts are its own read of the
-  same views, each ended attempt's calls one by one (`deniedCallsOf` in `src/stats/discipline.ts`, read by `src/stats/stats.verb.ts`).
+  same views, each ended attempt's calls one by one (`deniedCallsOf` in `src/stats/discipline.ts`, read by `src/stats/stats.verb.ts`),
+  null, not measured, where an ended attempt's record does not say its denials.
 - **Her quota and her spend**: her task is allowed `curl -s <url>/api/quota` unasked, the address read off `daemon.json` at filing
   (`quotaUrl` in `keep.verb.ts`), and told it in her first message; none where the daemon serves no board. `nemia level` says what her ended sessions
   cost (`spend`), counted as a step's are (`taskSpend`).

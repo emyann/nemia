@@ -206,13 +206,19 @@ test('GET /api/stats: what it counts over a store of several factories, null nev
     assert.deepEqual(body, await runWith(e, flowNumbers({ from: '2026-09-28', to: '2026-09-28', by: 'factory' })));
   });
   await t.test(
-    'GET /api/stats answers the calls refused per try as null, never 0, where every try ran on a harness that records none',
+    'GET /api/stats answers the calls refused per try as null, never 0, where no end says them, and a measured 0 where one does',
     async () => {
-      const { body } = await asked('?from=2026-09-28&to=2026-09-28');
-      assert.equal(body.all.total.tries, 2, 'two tries ended, each on codex');
+      const { body } = await asked('?from=2026-09-28&to=2026-09-28&ofFactory=default');
+      assert.equal(body.all.total.tries, 1, 'one try ended, its end saying neither its skills nor its denials');
       assert.equal(body.all.total.deniedPerTry, null);
       assert.equal(body.all.days[0].deniedPerTry, null);
       assert.deepEqual([body.all.steps[0].deniedCalls, body.all.steps[0].deniedTries, body.all.steps[0].denials], [null, 0, []]);
+      const other = await asked('?from=2026-09-28&to=2026-09-28&ofFactory=other');
+      assert.equal(
+        other.body.all.total.deniedPerTry,
+        0,
+        'an end that says its skills and no denials was denied none, as the runtime reads it',
+      );
     },
   );
   await t.test(

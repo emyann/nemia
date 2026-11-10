@@ -1,30 +1,19 @@
 /**
  * The calls a try was refused, the skills it loaded and was due to load, and the rules it kept and broke (`discipline.ts`), as tables:
- * every call of every ended attempt, one per call, measured only on a harness whose sessions record them and on a session that ran as a
- * job (`JOBS_SINCE`); every skill of every ended attempt, measured only where each ended attempt says; the skills whose paths a try
+ * every call of every ended attempt, one per call, measured only where each ended attempt says its denials; every skill of every ended
+ * attempt, measured only where each ended attempt says; the skills whose paths a try
  * touched; and a rule broken by a call the try was denied that one of its `breaks` matches, as a `disallowedTools:` rule matches a call,
  * kept otherwise, and counted on no try whose denials were not measured.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  JOBS_SINCE,
-  deniedCallsOf,
-  deniesRecorded,
-  filesTouchedOf,
-  ranAsJob,
-  ruleRowsOf,
-  rulesOfTry,
-  skillRowsOf,
-  skillsDueOf,
-  skillsLoadedOf,
-} from './discipline.ts';
+import { deniedCallsOf, filesTouchedOf, ruleRowsOf, rulesOfTry, skillRowsOf, skillsDueOf, skillsLoadedOf } from './discipline.ts';
 import type { SkillRule } from '../skills/skills.ts';
 
 const write = { tool: 'Write', what: '/x' };
 const push = { tool: 'Bash', what: 'git push' };
 
-const DENIED: Array<{ name: string; view: Parameters<typeof deniedCallsOf>[0]; calls: unknown[] }> = [
+const DENIED: Array<{ name: string; view: Parameters<typeof deniedCallsOf>[0]; calls: unknown[] | null }> = [
   {
     name: 'every ended attempt gives each call it was denied, one per call, in order; an attempt not ended gives none',
     view: {
@@ -38,41 +27,35 @@ const DENIED: Array<{ name: string; view: Parameters<typeof deniedCallsOf>[0]; c
     },
     calls: [write, write, push],
   },
-  { name: 'a session denied nothing', view: { state: { attempts: [{ ended: 'succeeded' }] } }, calls: [] },
-  { name: 'no view', view: undefined, calls: [] },
-];
-
-const RECORDED: Array<{ name: string; step: Parameters<typeof deniesRecorded>[0]; recorded: boolean }> = [
-  { name: 'a step on codex records no denial', step: { harness: 'codex' }, recorded: false },
-  { name: 'a step on a remote agent records no denial', step: { harness: 'a2a:x' }, recorded: false },
-  { name: 'an old record frozen with the retired `background: true` records none', step: { background: true }, recorded: false },
-  { name: 'no harness: is the default, claude, which records them', step: {}, recorded: true },
-  { name: 'a job on claude records them', step: { harness: 'claude' }, recorded: true },
-];
-
-test('`deniedCallsOf` and `deniesRecorded`: the calls a session was denied, and the steps whose sessions record them', async (t) => {
-  for (const row of DENIED) await t.test(row.name, () => assert.deepEqual(deniedCallsOf(row.view), row.calls));
-  for (const row of RECORDED) await t.test(row.name, () => assert.equal(deniesRecorded(row.step), row.recorded));
-});
-
-const before = new Date(Date.parse(JOBS_SINCE) - 1000).toISOString();
-const after = new Date(Date.parse(JOBS_SINCE) + 1000).toISOString();
-
-const JOBS: Array<{ name: string; session: Parameters<typeof ranAsJob>[0]; job: boolean }> = [
   {
-    name: 'filed before JOBS_SINCE: a Claude Code background session, whenever it spawned',
-    session: { filedAt: before, spawnedAt: after },
-    job: false,
+    name: 'a denial on one end is counted, beside an end denied nothing',
+    view: {
+      state: {
+        attempts: [
+          { ended: 'failed', denials: [] },
+          { ended: 'succeeded', denials: [push] },
+        ],
+      },
+    },
+    calls: [push],
   },
-  { name: 'filed at JOBS_SINCE exactly is a job', session: { filedAt: JOBS_SINCE, spawnedAt: JOBS_SINCE }, job: true },
-  { name: 'filed after is a job', session: { filedAt: after, spawnedAt: after }, job: true },
-  { name: 'with no filing known, a spawn before says no', session: { filedAt: null, spawnedAt: before }, job: false },
-  { name: 'with no filing known, a spawn after says yes', session: { filedAt: null, spawnedAt: after }, job: true },
-  { name: 'neither filing nor spawn known: no job', session: { filedAt: null, spawnedAt: null }, job: false },
+  {
+    name: 'every end says none denied: measured, an empty list',
+    view: { state: { attempts: [{ ended: 'succeeded', denials: [] }] } },
+    calls: [],
+  },
+  { name: 'an end that does not say its denials: not measured', view: { state: { attempts: [{ ended: 'succeeded' }] } }, calls: null },
+  {
+    name: 'one end that does not say, beside one that does: the task is not measured',
+    view: { state: { attempts: [{ ended: 'failed', denials: [push] }, { ended: 'succeeded' }] } },
+    calls: null,
+  },
+  { name: 'no attempt ended: not measured yet', view: { state: { attempts: [{ ended: null, denials: [push] }] } }, calls: null },
+  { name: 'no view', view: undefined, calls: null },
 ];
 
-test('`ranAsJob`: a session filed before steps ran as jobs records no denial, nor one whose filing and spawn are unknown', async (t) => {
-  for (const row of JOBS) await t.test(row.name, () => assert.equal(ranAsJob(row.session), row.job));
+test('`deniedCallsOf`: the calls a session was denied, measured only where each ended attempt says them', async (t) => {
+  for (const row of DENIED) await t.test(row.name, () => assert.deepEqual(deniedCallsOf(row.view), row.calls));
 });
 
 const ended = (more: object = {}) => ({ ended: 'succeeded', ...more });

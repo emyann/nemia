@@ -261,13 +261,13 @@ wf stats --json                            # what GET /api/stats answers
   an older task is judged by its own. A check refused or unfinished, a round's check, and one at half
   its deadline or less say nothing. `--line` ends with how many of the last 14 days there were, where
   any.
-- **A refused call counts where the harness records it**: every call each ended attempt of a try's
-  own session was denied, one per call, on a step that runs as a job on `claude`. `denied` is their mean per measured try (`0.5/try`); a step's row sums them,
+- **A refused call counts where each ended attempt's record says them**: every call each ended attempt of a try's
+  own session was denied, one per call, where the runtime wrote `denials` on the end (`[]` for none denied); one end
+  without it leaves the try unmeasured (`deniedCallsOf`). `denied` is their mean per measured try (`0.5/try`); a step's row sums them,
   says how many of its tries were measured where not all (`3 (2 of 4)`), and names each call with its
-  count. A try on codex, on a remote agent or of a run frozen with the retired `background: true` records none, and a recheck's try
-  ran no session: none is measured, so a day of only those reads `—`. Nor is a session filed before
-  2026-09-23 19:04:31 UTC (`JOBS_SINCE`), when `claude` steps began to run as jobs: until then each ran
-  as `claude --bg`, which records no denial, and its journal does not say which it was.
+  count. A try on codex or on a remote agent, whose harness cannot say, and a recheck's try, which
+  ran no session, are not measured, so a day of only those reads `—`. Nor is an end from before 2026-09-30 that said no skills:
+  the runtime reads an end that says its skills and no denials as denied none, and one that says neither as not measured.
 - **A skill load counts where every end of the try's own session says what it loaded**: the runtime
   writes `skills` on an attempt's end where its harness can say (a `claude` job), `[]` for none, one
   entry per load. A try is measured when each ended attempt of its own session carries the key; one end

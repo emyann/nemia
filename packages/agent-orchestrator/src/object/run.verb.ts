@@ -46,7 +46,7 @@ import { driftOf, gateOf, type StepTry } from '../resource/tries.verb.ts';
 import { filedOf, type StepFiled, toldOf } from '../resource/told.verb.ts';
 import { folderFiles, workFolderOf } from '../resource/files.store.ts';
 import { type LastSaid, lastLineOf } from '../resource/checks.verb.ts';
-import { readOf, totalOf, usedOf } from '../resource/usage.ts';
+import { readOf, totalOf, usedOf } from '../resource/index.ts';
 import type { Run as RunObject, RunSpec, RunStatus, RunStepStatus, StepTold, TryCloseout, TryShort } from './run.model.ts';
 import { runNamespace } from '../run-list/index.ts';
 import { prunedWords } from '../record/record.ts';

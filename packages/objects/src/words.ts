@@ -208,8 +208,11 @@ export const PEAK_MARKS = ['cap', 'large'] as const;
 /** One of `PEAK_MARKS`. */
 export type PeakMark = (typeof PEAK_MARKS)[number];
 
-/** Where the way a try's session runs came from: what it was filed with, the default, or its tools. */
-export const RUNS_IN_BY = ['filed', 'default', 'tools'] as const;
+/**
+ * Where the mode a try's session ran in came from, beside what it was filed with: the mode filed, its harness's default where none was,
+ * or its harness, which ran it in another mode than the one filed.
+ */
+export const RUNS_IN_BY = ['filed', 'default', 'harness'] as const;
 
 /** One of `RUNS_IN_BY`. */
 export type RunsInBy = (typeof RUNS_IN_BY)[number];

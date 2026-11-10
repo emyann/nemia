@@ -491,7 +491,7 @@ export { judgedNow, runsSummarized, type RunSummary, type SummaryHow } from './s
 export { turnOfTry, type StepAcceptance, type StepApproval, type StepAttempts, type StepCloseout } from './resource/tries.verb.ts';
 export type { StepGate, StepReply, StepTry, StepUnreadable } from './resource/tries.verb.ts';
 export type { StepFiled, TaskPart } from './resource/told.verb.ts';
-export { totalOf, usedOf, type RunRead, type StepUsed, type Usage } from './resource/usage.ts';
+export { totalOf, usedOf, type RunRead, type StepUsed, type Usage } from './resource/index.ts';
 export { tailOf, type LastSaid, type StepCheck, type StepLog } from './resource/checks.verb.ts';
 export { refusedName, typeOf, type StepArtifact, type StepValue } from './resource/files.store.ts';
 export { kindsDrift, revisionNow, REVISION_KINDS, stepsDrift, type Drift } from './revisions/revisions.ts';

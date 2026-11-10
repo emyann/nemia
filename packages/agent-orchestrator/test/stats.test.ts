@@ -363,7 +363,8 @@ const RULES = [
 
 /**
  * A run of five steps whose sessions were denied calls: write, on claude, twice, its second try rechecked; codex, background and a
- * session filed before steps ran as jobs, each denied one that nothing records; and quiet, denied nothing.
+ * session filed before steps ran as jobs, whose ends say no denials, as the runtime writes them where its harness could not say; and
+ * quiet, whose end says it was denied nothing.
  */
 function aDeniedRun() {
   ran('denied-write', {
@@ -375,9 +376,9 @@ function aDeniedRun() {
   ran('denied-write-2', { from: 2, to: 2, day: DENIED_DAY, attempts: [{ denials: [rm] }] });
   ran('denied-write-2-check', { from: 2, to: 3, exitCode: null, day: DENIED_DAY });
   ran('denied-write-2-check-2', { from: 3, to: 4, exitCode: 0, day: DENIED_DAY });
-  ran('denied-codex', { from: 1, to: 1, day: UNMEASURED_DAY, attempts: [{ denials: [rm] }] });
-  ran('denied-bg', { from: 2, to: 2, day: UNMEASURED_DAY, attempts: [{ denials: [rm] }] });
-  ran('denied-quiet', { from: 1, to: 1, day: QUIET_DAY });
+  ran('denied-codex', { from: 1, to: 1, day: UNMEASURED_DAY });
+  ran('denied-bg', { from: 2, to: 2, day: UNMEASURED_DAY });
+  ran('denied-quiet', { from: 1, to: 1, day: QUIET_DAY, attempts: [{ denials: [] }] });
   ran('denied-before-jobs', { from: 18, to: 18, day: BG_DAY });
   rendered('denied', 'write', 'implementer', RULED, { rules: JSON.stringify({ rules: RULES }) });
   rendered('denied', 'write', 'implementer', 'look');

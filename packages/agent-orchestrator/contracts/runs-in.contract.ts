@@ -10,20 +10,16 @@
  * harness ran it in another (Claude Code dropping `auto` on a model; Codex's sandbox narrowed by tools that write nothing).
  */
 import { type Implementation, spec } from '@emyann/tsverify';
+import type { RunsInBy } from 'objects';
 
-/**
- * Where a try's mode came from. `objects`' `RUNS_IN_BY` holds `filed | default | tools` today; implement replaces `tools` with
- * `harness` there (`packages/objects/src/words.ts`) and types this function by `objects`' `RunsInBy`, which changes no law.
- */
-export type RunsInWord = 'filed' | 'default' | 'harness';
-
-/** A try's mode as the board reads it: the mode, and where it came from. */
-export type RunsIn = { readonly mode: string; readonly by: RunsInWord };
+/** A try's mode as the board reads it: the mode, and where it came from (`objects`' `RunsInBy`, `filed | default | harness`). */
+export type RunsIn = { readonly mode: string; readonly by: RunsInBy };
 
 const runsInSpec = spec<(filed: string | undefined, ranIn: string | undefined) => RunsIn | null>({
   ensures: {
     unmeasuredIsNone: {
-      description: 'A try whose session has said no mode yet, or whose harness cannot say one, shows none: never the mode it was filed with',
+      description:
+        'A try whose session has said no mode yet, or whose harness cannot say one, shows none: never the mode it was filed with',
       condition: ({ input: [, ranIn], output }) => ranIn !== undefined || output === null,
     },
     measuredIsShown: {

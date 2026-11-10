@@ -26,6 +26,7 @@ import {
 } from './stats.ts';
 import { statsLine, statsLines } from './stats-words.ts';
 import type { SkillRule } from '../skills/skills.ts';
+import { deniedCallsOf } from './discipline.ts';
 
 const MIN = 60_000;
 const minus = (at: string, ms: number): string => new Date(Date.parse(at) - ms).toISOString();
@@ -148,7 +149,12 @@ function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Tr
     timeline: timeline(run, filedViews(views, filed), steps),
     succeeded: (taskId: string) => views.get(taskId)?.phase === 'succeeded',
     verdictOf: (taskId: string) => verdicts.get(taskId) ?? null,
-    deniedOf: (taskId: string) => denied.get(taskId) ?? [],
+    /** What its end says it was denied, read as the stats read a view (`deniedCallsOf`): a try given no `denied` ends saying none. */
+    deniedOf: (taskId: string) => {
+      const said = denied.get(taskId);
+      const view = { state: { attempts: [{ ended: 'succeeded', ...(said ? { denials: said.map((tool) => ({ tool })) } : {}) }] } };
+      return deniedCallsOf(view)?.map((d) => d.tool) ?? null;
+    },
     skillsOf: (taskId: string) => skills.get(taskId) ?? null,
     filesOf: (taskId: string) => files.get(taskId) ?? null,
     rulesOf: (_step: Workflow): ReadonlyMap<string, readonly SkillRule[]> => new Map(),
@@ -194,7 +200,7 @@ const factsOfAll = (...reads: ReturnType<typeof readOf>[]): Facts => ({
   frozen: [],
 });
 
-/** A day after `JOBS_SINCE`, when every `claude` step ran as a job that records its denials, and the moment the stats are read on it. */
+/** A day whose `claude` tries ran as jobs, and the moment the stats are read on it. */
 const JOBS_DAY = '2026-09-28';
 const JOBS_NOW = new Date(`${JOBS_DAY}T20:00:00.000Z`);
 
@@ -531,22 +537,26 @@ test("`factsOf`: one run's timeline and record as a fact per try that ended, and
       },
     },
     {
-      name: 'a claude try filed before steps ran as jobs has its denials unmeasured; one after has them',
+      name: 'denials are measured where its end says them, whenever the try was filed: none denied before 2026-09-23 is [], an end after that does not say is null',
       check: () => {
-        const r = readOf('bg', planner, { design: [{ end: at(1) }, { end: at(1, JOBS_DAY), denied: ['Write(/x)'] }] });
+        const r = declaring(readOf('ends', planner, { design: [{ end: at(1), denied: [] }, { end: at(1, JOBS_DAY) }] }), declaredSpec);
+        const tries = factsOf(r).tries;
         assert.deepEqual(
-          factsOf(r).tries.map((x) => x.denied),
-          [null, ['Write(/x)']],
+          tries.map((x) => x.denied),
+          [[], null],
+        );
+        assert.deepEqual(
+          tries.map((x) => x.rules?.map((rule) => rule.broken) ?? null),
+          [[false], null],
+          'its rules kept on the measured try, and on the unmeasured one neither kept nor broken',
         );
       },
     },
     {
-      name: 'a codex try records no denial: null, not []',
+      name: 'a codex try, whose end says no denials: null, not []',
       check: () =>
         assert.equal(
-          factsOf(
-            readOf('codex', [step('design', [], { harness: 'codex' })], { design: [{ end: at(1, JOBS_DAY), denied: ['Write(/x)'] }] }),
-          ).tries[0].denied,
+          factsOf(readOf('codex', [step('design', [], { harness: 'codex' })], { design: [{ end: at(1, JOBS_DAY) }] })).tries[0].denied,
           null,
         ),
     },
@@ -623,7 +633,7 @@ test("`factsOf`: one run's timeline and record as a fact per try that ended, and
       },
     },
     {
-      name: 'a codex try, or one before steps ran as jobs, keeps and breaks no rule',
+      name: 'a try whose end does not say its denials — a codex try, an older journal — keeps and breaks no rule',
       check: () => {
         const codex = declaring(
           readOf('codex', [step('design', [], { by: 'planner', harness: 'codex' })], { design: [{ end: at(1, JOBS_DAY) }] }),
@@ -635,7 +645,8 @@ test("`factsOf`: one run's timeline and record as a fact per try that ended, and
     },
     {
       name: 'a measured try of a step whose skills declare no rule has none: [], not null',
-      check: () => assert.deepEqual(factsOf(readOf('undeclared', planner, { design: [{ end: at(1, JOBS_DAY) }] })).tries[0].rules, []),
+      check: () =>
+        assert.deepEqual(factsOf(readOf('undeclared', planner, { design: [{ end: at(1, JOBS_DAY), denied: [] }] })).tries[0].rules, []),
     },
     {
       name: "a try's tallies are its own session's closeout's values: a measured empty list is 0",
@@ -705,7 +716,7 @@ test('`headlineOf`: the headline numbers of a set of facts, each mean over what 
       { end: at(1, JOBS_DAY), denied: ['Write(/x)', 'Bash(git push)'] },
       { end: at(2, JOBS_DAY), denied: [] },
     ],
-    implement: [{ end: at(3, JOBS_DAY), denied: ['Write(/x)'] }],
+    implement: [{ end: at(3, JOBS_DAY) }],
   };
   await rowsOf(t, [
     {
@@ -753,12 +764,12 @@ test('`headlineOf`: the headline numbers of a set of facts, each mean over what 
       check: () => assert.equal(headline(readOf('denied', deniedSteps, deniedTries)).deniedPerTry, 1),
     },
     {
-      name: 'a codex step records no denial: nothing measured, null, not 0',
+      name: 'a codex step, whose ends say no denials: nothing measured, null, not 0',
       check: () => assert.equal(headline(readOf('codex', deniedSteps, { implement: deniedTries.implement })).deniedPerTry, null),
     },
     {
       name: 'a claude try denied nothing is a measured 0',
-      check: () => assert.equal(headline(readOf('none', deniedSteps, { design: [{ end: at(1, JOBS_DAY) }] })).deniedPerTry, 0),
+      check: () => assert.equal(headline(readOf('none', deniedSteps, { design: [{ end: at(1, JOBS_DAY), denied: [] }] })).deniedPerTry, 0),
     },
     {
       name: 'skills loaded are a mean per measured try: a try whose ends do not say is left out, never 0',
@@ -930,7 +941,7 @@ test('`statsOf`: the facts bucketed by UTC day and by a key, filtered, totalled 
       },
     },
     {
-      name: 'a claude try before steps ran as jobs leaves the tile before at null, and the last tile is not diluted with 0',
+      name: 'a try whose end does not say its denials leaves the tile before at null, and the last tile is not diluted with 0',
       check: () => {
         const r = readOf('bg', planner, { design: [{ end: at(1) }, { end: at(1, JOBS_DAY), denied: ['Write(/x)'] }] });
         const { all } = statsOf(factsOfAll(r), {}, JOBS_NOW);
@@ -1008,7 +1019,7 @@ test('`statsOf`: the facts bucketed by UTC day and by a key, filtered, totalled 
       name: "a codex step's refused calls are null over 0 tries, with no call",
       check: () => {
         const [row] = statsOf(
-          factsOfAll(readOf('codex', [step('design', [], { by: 'planner', harness: 'codex' })], deniedByCall)),
+          factsOfAll(readOf('codex', [step('design', [], { by: 'planner', harness: 'codex' })], { design: [{ end: at(1, JOBS_DAY) }] })),
           {},
           JOBS_NOW,
         ).all.steps;
@@ -1068,14 +1079,14 @@ test('`statsOf`: the facts bucketed by UTC day and by a key, filtered, totalled 
         ]),
     },
     {
-      name: 'a try whose denials were not measured — on codex, before steps ran as jobs, undeclared — gives no row, never a row of zeros',
+      name: 'a try whose denials were not measured — on codex, an older journal — or undeclared gives no row, never a row of zeros',
       check: () => {
         const codex = declaring(
           readOf('codex', [step('design', [], { by: 'planner', harness: 'codex' })], { design: [{ end: at(1, JOBS_DAY) }] }),
           declaredSpec,
         );
         const before = declaring(readOf('before', planner, { design: [{ end: at(1) }] }), declaredSpec);
-        const undeclared = readOf('undeclared', planner, { design: [{ end: at(1, JOBS_DAY) }] });
+        const undeclared = readOf('undeclared', planner, { design: [{ end: at(1, JOBS_DAY), denied: [] }] });
         for (const r of [codex, before, undeclared])
           assert.deepEqual(statsOf(factsOfAll(r), {}, JOBS_NOW).all.steps[0].rules, [], r.run.id);
       },
@@ -1247,7 +1258,7 @@ test('`statsLines` and `statsLine`: the stats in words, — where nothing was me
           JOBS_NOW,
         );
         assert.match(statsLine(codex), /— \(—\) calls denied/);
-        const none = statsOf(factsOfAll(readOf('none', planner, { design: [{ end: at(1, JOBS_DAY) }] })), {}, JOBS_NOW);
+        const none = statsOf(factsOfAll(readOf('none', planner, { design: [{ end: at(1, JOBS_DAY), denied: [] }] })), {}, JOBS_NOW);
         assert.match(statsLine(none), /0\/try \(—\) calls denied/);
         none.all.tiles.last.deniedPerTry = 1 / 300;
         assert.match(statsLine(none), / 0\.003\/try \(—\) calls denied/);

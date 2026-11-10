@@ -19,7 +19,7 @@ import { firstPiece } from '../piece/piece.ts';
 import { cardInPlay, cardLabels, inboxLines, noCardLine, type InboxCard, type InboxListing } from './inbox.ts';
 import { addToInbox, dropFromInbox, queueInInbox, type InboxDropped, type InboxQueued } from './inbox.store.ts';
 import { EngineService } from '../runtime-client.ts';
-import { howOf } from '../command/pages.verb.ts';
+import { howOf } from '../summary/how.verb.ts';
 import { inboxJudged, setFrom, type InboxFrom } from './inbox.verb.ts';
 
 export const INBOX_HELP = `nemia inbox [--all]

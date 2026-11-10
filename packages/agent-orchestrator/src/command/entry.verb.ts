@@ -1,6 +1,7 @@
 /**
  * The two shapes of an entry of the command table: a command whole, which a handler serves on either side (`Command`), and one the CLI
- * serves alone and runs itself, with no handler (`Ran`).
+ * serves alone and runs itself, with no handler (`Ran`); and what the entries share, defined in their features' folders: their check
+ * (`checked`), and the flags that select runs and show their labels (`-l <selector>`, `--show-labels`, `-L <key>`).
  */
 import { Effect, type Schema } from 'effect';
 import type { PlaceService } from '../place/place.store.ts';
@@ -12,7 +13,11 @@ import type { ScheduleRuns } from '../factory/schedule/listed.store.ts';
 import type { PauseRuns } from '../pause/pause.ts';
 import type { SeriesMemo } from '../series/series.ts';
 import type { Filings } from '../summary/reads.verb.ts';
-import type { Args, CommandSpec } from './command.ts';
+import type { Args, CommandSpec, Flag } from './command.ts';
+import type { Run } from '../record/record.ts';
+import type { Labels } from '../labels/labels.ts';
+import { labelSegments, runLabelMap } from '../runlist/runlist.ts';
+import { parseSelectors, selectorsRefusal, SELECTOR_FORM, type Selectors } from '../watch/selector.ts';
 
 /**
  * What a caller that lives long keeps between its calls of the table's handlers: the stats' memo of each run's facts (`stats`), the
@@ -82,3 +87,61 @@ export const tableEntry = <D extends object, I>(command: Command<D, I>): Command
  */
 export const checked = (wrong: string | null | undefined): Effect.Effect<void, Invalid> =>
   wrong ? Effect.fail(new Invalid({ message: wrong })) : Effect.void;
+
+/**
+ * The selectors an entry of the table is given under `selector`, in the order given — `-l` at the command line, each given again for
+ * another, and the api's `?selector=`, one or many — none where unset: a list's read takes the runs whose labels one of them takes.
+ */
+export const selectorTexts = (args: Args): readonly string[] => {
+  const value = args['selector'];
+  return typeof value === 'string' ? [value] : Array.isArray(value) ? value : [];
+};
+
+/** Why the selectors under `selector` are refused, or null where each is one: an entry's `check`. */
+export const selectorCheck = (args: Args): string | null => selectorsRefusal(selectorTexts(args)) ?? null;
+
+/**
+ * The selectors under `selector`, parsed (`parseSelectors`); refused as `Invalid` (exit 2, 422 on the api) where one is no selector, in
+ * the grammar's own words (`selectorsRefusal`), which end on the form it takes. None where none was given.
+ */
+export const selectorsIn = (args: Args): Effect.Effect<Selectors, Invalid> => {
+  const refusal = selectorCheck(args);
+  return refusal === null ? Effect.succeed(parseSelectors(selectorTexts(args))) : Effect.fail(new Invalid({ message: refusal }));
+};
+
+/**
+ * `-l <selector>`, `--show-labels` and `-L <key>` of the command `command`: the runs whose labels a selector takes, each given again for
+ * another; each line with its whole map; and that label's value beside each line, given again for another (`labelsShown`).
+ */
+export const labelFlags = (command: string): Flag[] => [
+  selectorFlag(command),
+  { flag: '--show-labels', kind: 'switch', key: 'showLabels' },
+  {
+    flag: '-L',
+    kind: 'text',
+    key: 'labelColumns',
+    many: true,
+    takes: `${command} -L takes the label key to show beside each line, given again for another: ${command} -L team`,
+  },
+];
+
+/** What a line of `map`'s ends on as `--show-labels` and `-L` ask under `args` (`labelSegments`): nothing with neither. */
+export const labelsShown = (args: Args, map: Labels): string => {
+  const columns = args['labelColumns'];
+  return labelSegments(map, { all: args['showLabels'] === true, columns: Array.isArray(columns) ? columns : [] });
+};
+
+/** What each run's head line ends on as `--show-labels` and `-L` ask under `args`, of the run's whole map (`runLabelMap`). */
+export const runsShown =
+  (args: Args) =>
+  (run: Run): string =>
+    labelsShown(args, runLabelMap(run));
+
+/** `-l <selector>`, given again for another, of the command `command`: the runs whose labels one of them takes. */
+export const selectorFlag = (command: string): Flag => ({
+  flag: '-l',
+  kind: 'text',
+  key: 'selector',
+  many: true,
+  takes: `${command} -l takes a selector of the runs' labels: ${SELECTOR_FORM}`,
+});

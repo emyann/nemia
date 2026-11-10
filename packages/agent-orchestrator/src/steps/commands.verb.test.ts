@@ -14,7 +14,7 @@ import { heldUnasked } from '../../test/unasked.ts';
 
 const ROOT = scratch('wf-pages-');
 process.env.WF_ROOT = ROOT;
-const { STEP_ARTIFACT, STEP_FILE } = await import('./pages.verb.ts');
+const { STEP_ARTIFACT, STEP_FILE } = await import('./commands.verb.ts');
 const { startRun, runWith: runEngine } = await import('../runner.ts');
 const stand = eachTest(testPlace);
 const runWith = runOver(runEngine, () => stand().layer);

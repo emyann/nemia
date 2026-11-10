@@ -1,84 +1,15 @@
 /**
- * The board's reads of a run's steps, each an entry of the command table served on the api alone: of one of a run's steps a file of its
- * files directory (`STEP_ARTIFACT`) or of its own folder (`STEP_FILE`), the path of one of its tasks through the runtime's lifecycle
- * (`STEP_PATH`), and a read of that task's conversation (`STEP_TRANSCRIPT`). A run is found among those the store lists, never by a path
- * made of its id, and a file by its name, never by a path. The api resolves the task a request names, words the answer for what is not
- * there, and judges what it is handed.
+ * The board's reads of a run's step, entries of the command table the api alone serves: a file of its files directory, a file of a folder
+ * step's own folder, its task's path through the runtime's lifecycle and its conversation.
  */
 import { Effect, Schema } from 'effect';
 import { EngineService, asked, tried, type Engine } from '../runtime-client.ts';
-import type { Args, Flag, Positional, Spec } from './command.ts';
-import type { Command, Kept } from './entry.verb.ts';
+import type { Flag, Positional, Spec } from '../command/command.ts';
+import type { Command } from '../command/entry.verb.ts';
 import { artifactFile, fileIn } from '../artifacts/artifacts.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
-import { isRepositoryRun, type Run } from '../record/record.ts';
-import { verifiesRest } from '../config/config.store.ts';
-import { informerMemo } from '../rest/informer.verb.ts';
-import { HOME } from '../record/record.store.ts';
-import type { SummaryHow } from '../summary/summary.verb.ts';
-import { Invalid } from '../refusal/refusal.ts';
-import type { Labels } from '../labels/labels.ts';
-import { labelSegments, runLabelMap } from '../runlist/runlist.ts';
-import { parseSelectors, selectorsRefusal, SELECTOR_FORM, type Selectors } from '../watch/selector.ts';
-
-/**
- * The selectors an entry of the table is given under `selector`, in the order given — `-l` at the command line, each given again for
- * another, and the api's `?selector=`, one or many — none where unset: a list's read takes the runs whose labels one of them takes.
- */
-export const selectorTexts = (args: Args): readonly string[] => {
-  const value = args['selector'];
-  return typeof value === 'string' ? [value] : Array.isArray(value) ? value : [];
-};
-
-/** Why the selectors under `selector` are refused, or null where each is one: an entry's `check`. */
-export const selectorCheck = (args: Args): string | null => selectorsRefusal(selectorTexts(args)) ?? null;
-
-/**
- * The selectors under `selector`, parsed (`parseSelectors`); refused as `Invalid` (exit 2, 422 on the api) where one is no selector, in
- * the grammar's own words (`selectorsRefusal`), which end on the form it takes. None where none was given.
- */
-export const selectorsIn = (args: Args): Effect.Effect<Selectors, Invalid> => {
-  const refusal = selectorCheck(args);
-  return refusal === null ? Effect.succeed(parseSelectors(selectorTexts(args))) : Effect.fail(new Invalid({ message: refusal }));
-};
-
-/**
- * `-l <selector>`, `--show-labels` and `-L <key>` of the command `command`: the runs whose labels a selector takes, each given again for
- * another; each line with its whole map; and that label's value beside each line, given again for another (`labelsShown`).
- */
-export const labelFlags = (command: string): Flag[] => [
-  selectorFlag(command),
-  { flag: '--show-labels', kind: 'switch', key: 'showLabels' },
-  {
-    flag: '-L',
-    kind: 'text',
-    key: 'labelColumns',
-    many: true,
-    takes: `${command} -L takes the label key to show beside each line, given again for another: ${command} -L team`,
-  },
-];
-
-/** What a line of `map`'s ends on as `--show-labels` and `-L` ask under `args` (`labelSegments`): nothing with neither. */
-export const labelsShown = (args: Args, map: Labels): string => {
-  const columns = args['labelColumns'];
-  return labelSegments(map, { all: args['showLabels'] === true, columns: Array.isArray(columns) ? columns : [] });
-};
-
-/** What each run's head line ends on as `--show-labels` and `-L` ask under `args`, of the run's whole map (`runLabelMap`). */
-export const runsShown =
-  (args: Args) =>
-  (run: Run): string =>
-    labelsShown(args, runLabelMap(run));
-
-/** `-l <selector>`, given again for another, of the command `command`: the runs whose labels one of them takes. */
-export const selectorFlag = (command: string): Flag => ({
-  flag: '-l',
-  kind: 'text',
-  key: 'selector',
-  many: true,
-  takes: `${command} -l takes a selector of the runs' labels: ${SELECTOR_FORM}`,
-});
+import { isRepositoryRun } from '../record/record.ts';
 
 /** A text flag under `key`, as the api hands it. */
 const keyed = (key: string): Flag => ({ flag: `--${key}`, kind: 'text', key });
@@ -104,17 +35,6 @@ export type StepTaskInput = typeof StepTaskInput.Type;
 /** What a read of a step's conversation takes: its task's, and the cursor to read from, none for the start. */
 export const StepTranscriptInput = Schema.Struct({ ...StepTaskInput.fields, after: Schema.optionalKey(Schema.String) });
 export type StepTranscriptInput = typeof StepTranscriptInput.Type;
-
-/**
- * How a read of the list reads, as the inbox's do: the informer and the feed's filing times its caller keeps, verified as its
- * environment says; a caller that keeps neither judges every run.
- */
-export const howOf = (env?: NodeJS.ProcessEnv, home?: string, kept?: Kept): SummaryHow => ({
-  home: home ?? HOME,
-  memo: kept?.runs ?? informerMemo(),
-  filings: kept?.filings ?? { filed: new Map(), cursor: 0 },
-  verify: env ? verifiesRest(env) : false,
-});
 
 /** The file `name` of the files directory of the step `step` of the run `id` (`artifactFile`), or null where there is none. */
 export const STEP_ARTIFACT: Command<{ file: Buffer | null }, StepFileInput> = {

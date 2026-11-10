@@ -5,10 +5,10 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { forgetLine, type Forgot } from '../forget/forget.ts';
-import type { Pruning } from '../forget/prune/prune.ts';
-import { commandLine, parseArgv } from './command.ts';
-import { forgetRefusal, PRUNE, pruneRefusal, RM } from './runs.verb.ts';
+import { forgetLine, type Forgot } from './forget.ts';
+import type { Pruning } from './prune/prune.ts';
+import { commandLine, parseArgv } from '../command/command.ts';
+import { forgetRefusal, PRUNE, pruneRefusal, RM } from './commands.verb.ts';
 
 test('the runs a command line names are read in the order given, each once, beside the switches in any place', () => {
   assert.deepEqual(parseArgv(RM.spec, ['a', 'b', 'a', '--delete-branches']), { runId: ['a', 'b'], deleteBranches: true });

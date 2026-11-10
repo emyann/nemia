@@ -389,9 +389,11 @@ export { retryRun, type Asked } from './retry/retry.verb.ts';
 export { sayRun, type Told } from './say/say.verb.ts';
 export { COMMANDS, TABLE } from './command/commands.verb.ts';
 export { admitted } from './admission/admit.verb.ts';
-export { HOLD, PRUNE, RM } from './command/runs.verb.ts';
-export { CLOSEOUT, LOGS, SHOW, STATS, TOLD, TRIES, TRY } from './command/reads.verb.ts';
-export { STEP_ARTIFACT, STEP_FILE, STEP_PATH, STEP_TRANSCRIPT } from './command/pages.verb.ts';
+export { HOLD } from './wait/commands.verb.ts';
+export { PRUNE, RM } from './forget/commands.verb.ts';
+export { CLOSEOUT, LOGS, SHOW, TOLD, TRIES, TRY } from './object/commands.verb.ts';
+export { STATS } from './stats/commands.verb.ts';
+export { STEP_ARTIFACT, STEP_FILE, STEP_PATH, STEP_TRANSCRIPT } from './steps/commands.verb.ts';
 export { runObject, type RunObjectAnswer, type TryCloseout } from './object/run.verb.ts';
 export { runLines, type RunLines, type StepCommands } from './object/lines.verb.ts';
 export { cardList, cardObject, cardTable, cardWriteRefusal, replaceCard, type CardQuery, type CardReplaced } from './object/card.verb.ts';
@@ -430,7 +432,10 @@ export type { Command, Ran } from './command/entry.verb.ts';
  * The table's entries the api calls by type, each with its `input` (`Command<D, I>`): `factory hire` and `factory fire`, the Hire's writes.
  */
 export { FACTORY_FIRE, FACTORY_HIRE } from './factory/factory.verb.ts';
-export { LS, REFRESH, RETRY, SAY } from './command/commands.verb.ts';
+export { LS } from './list/commands.verb.ts';
+export { REFRESH } from './revisions/commands.verb.ts';
+export { RETRY } from './retry/commands.verb.ts';
+export { SAY } from './say/commands.verb.ts';
 export { APPROVE } from './gate/commands.verb.ts';
 /** Nemia's entries the api calls by type (the nemia group of `objects`' Api): her level, her memory, and an agent's rules for auto. */
 export { LEVEL } from './nemia/level.verb.ts';
@@ -441,7 +446,7 @@ export { POLICY, POLICY_CONFIRM, POLICY_DROP } from './auto/auto.verb.ts';
  * tried, looked for (`sources`), copied in and their custom instructions; the skills listed, shown and written; a workflow folder
  * written, removed, and one step of it read.
  */
-export { AGENTS, AGENT_CARD } from './command/commands.verb.ts';
+export { AGENTS, AGENT_CARD } from './roster/commands.verb.ts';
 export { AGENTS_REMOVE, AGENTS_TRY, AGENTS_WRITE } from './agents/library.verb.ts';
 export { AGENTS_SOURCES } from './sources/sources.verb.ts';
 export { AGENTS_COPY } from './sources/copy.verb.ts';
@@ -521,9 +526,9 @@ export { ProposalDoor, proposalDoorFiles, type ProposalDoorShape } from './propo
 export { delegationGet, delegationPut, delegationRemove, delegationsList } from './delegation/delegation.verb.ts';
 export { DelegationDoor, delegationDoorFiles, type DelegationDoorShape } from './delegation/delegation.store.ts';
 export { decisionRead, diffFiles, DIFF_LINES, runDecision, type DecisionRead } from './decide/decision.verb.ts';
-export { CEILINGS } from './command/commands.verb.ts';
-export { PAUSE, PAUSE_NOW, PAUSED, RESUME, pauseNowPreview, pauseNowPreviewLines } from './command/runs.verb.ts';
+export { CEILINGS } from './cap/commands.verb.ts';
+export { PAUSE, PAUSE_NOW, PAUSED, RESUME, pauseNowPreview, pauseNowPreviewLines } from './pause/commands.verb.ts';
 export { PASSES } from './meter/passes.verb.ts';
-export { SERIES } from './command/reads.verb.ts';
+export { SERIES } from './series/commands.verb.ts';
 export { SUBSCRIBE, UNSUBSCRIBE } from './subscription/subscription.verb.ts';
 export { FACTORY_ADD } from './factory/factory.verb.ts';

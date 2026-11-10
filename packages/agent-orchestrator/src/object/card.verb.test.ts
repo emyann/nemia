@@ -21,7 +21,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { eachTest } from '../../test/placed.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { engineOf } from '../runtime-client.ts';
-import { howOf } from '../command/pages.verb.ts';
+import { howOf } from '../summary/how.verb.ts';
 import { cardList, cardListOf, cardObject, cardObjectOf, type CardQuery } from './card.verb.ts';
 
 const engine = eachTest(testEngine);

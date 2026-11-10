@@ -1,13 +1,14 @@
 /**
  * A command of the orchestrator, said once as data: its name, the arguments it takes and how a command line spells them, the refusals of
- * its arguments in its own words, its help, and the side it is served on alone. Pure: the table that holds every command, with the
- * handler each calls and what it prints, is `commands.verb.ts`; the CLI parses, refuses and helps from a spec here, and the api calls an
- * entry by its exported name, its body the endpoint's own Schema in objects' `Api`.
+ * its arguments in its own words, its help, and the side it is served on alone. Pure: the table that lists every command is
+ * `commands.verb.ts`, each entry, with the handler it calls and what it prints, in its feature's folder; the CLI parses, refuses and
+ * helps from a spec here, and the api calls an entry by its exported name, its body the endpoint's own Schema in objects' `Api`.
  */
 import { dollarsOf } from '../keys/index.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import type { CommandClass } from '../admission/index.ts';
 import { FORMER_MODES } from '../retry/index.ts';
+import { oneLine } from '../record/record.ts';
 
 /** The CLI's name, as every command line the package writes says it. */
 export const CLI = 'nemia';
@@ -217,6 +218,59 @@ export const amountIn = (args: Args, key: string): number | undefined => {
   const value = args[key];
   return typeof value === 'number' ? value : undefined;
 };
+
+/** `--why` or `--by`: the flag, the key it fills, what it takes as its refusals say it, and the longest it may be. */
+export type Said = { readonly flag: '--why' | '--by'; readonly key: 'why' | 'by'; readonly takes: string; readonly cap: number };
+
+/** Each of `said`'s refusals of a value left out, saying what it takes, ending on the command's forms. */
+export const takesOf = (said: readonly Said[], shape: string): Readonly<Record<string, string>> =>
+  Object.fromEntries(said.map(({ flag, takes }) => [flag, `${flag} takes ${takes}: ${shape}.`]));
+
+/**
+ * The refusal of `flag`'s value left out, in `refusals`, which holds one for each text flag of its command (`takesOf`): a flag it holds
+ * none for is thrown, naming it.
+ */
+export const takesFor = (refusals: Readonly<Record<string, string>>, flag: string): string => {
+  const takes = refusals[flag];
+  if (takes === undefined) throw new Error(`${flag} has no refusal of its value left out: add it to its command's table of them`);
+  return takes;
+};
+
+/** `--why` or `--by`'s value as one line: every run of whitespace, a newline included, one space. */
+export const saidOf = (args: Args, key: 'why' | 'by'): string | undefined => {
+  const value = args[key];
+  return typeof value === 'string' ? oneLine(value, Number.POSITIVE_INFINITY) : undefined;
+};
+
+/**
+ * Refused of `--why` or `--by`: a value starting `--`, which reads as the value left out (its refusal in `takes`), blank, or longer than
+ * its cap.
+ */
+export function saidRefusal(args: Args, { flag, key, takes, cap }: Said, refusals: Readonly<Record<string, string>>): string | null {
+  const value = args[key];
+  if (typeof value !== 'string') return null;
+  if (value.startsWith('--')) return takesFor(refusals, flag);
+  const line = saidOf(args, key) ?? '';
+  if (!line) return `${flag} takes ${takes}, and was given only blanks: give it words, or leave ${flag} out.`;
+  if (line.length > cap) return `${flag} takes at most ${cap} characters, and was given ${line.length}: say it shorter.`;
+  return null;
+}
+
+/** `--why` and `--by` as `command` takes them, for what it puts (`a hold`): each a text flag given once, refused in `refusals`' words. */
+export const saidFlags = (
+  said: readonly Said[],
+  command: string,
+  puts: string,
+  refusals: Readonly<Record<string, string>>,
+  shape: string,
+) =>
+  said.map(({ flag, key }) => ({
+    flag,
+    kind: 'text' as const,
+    key,
+    takes: refusals[flag],
+    twice: `${command} takes ${flag} once: ${puts} says one ${key}. ${shape}.`,
+  }));
 
 /**
  * The refusal of a text flag's value left out on the command line — empty, or starting `--`, which reads as the value left out — in the

@@ -13,9 +13,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Cause, Effect, Exit, Fiber, Schedule } from 'effect';
-import type { FeedLine, Paused } from '../../../api/src/client/client.ts';
-import { get, served, sessionHeaders, urlOf } from '../client.ts';
-import { daemonStarted } from '../daemon.ts';
+import { sessionHeaders, urlOf } from '../client.ts';
+import { served } from '../daemon.ts';
+import { asked as objectsAsked } from '../objects.ts';
 import { spawned } from '../local.ts';
 import { Refused } from '../refused.ts';
 import { servedAt } from '../where.ts';
@@ -160,7 +160,7 @@ function onSent(s: Sent, asked: Asked, at: At): 'cut' | undefined {
   } else if (s.event !== 'readable' && s.id !== undefined) {
     at.cursor = Number(s.id);
     kept(asked.cursorFile, at.cursor);
-    console.log(watchedLine(JSON.parse(s.data) as FeedLine, at.cursor, asked.how));
+    console.log(watchedLine(s.data, at.cursor, asked.how));
   }
   return undefined;
 }
@@ -233,16 +233,12 @@ async function firstOpen(asked: Asked, at: At, base: string): Promise<Opened | '
 /** `nemia watch --once`: the pause in words, the lines to the feed's end as the stream opened, and where that is. */
 async function once(asked: Asked, args: readonly string[]): Promise<number> {
   const at: At = { cursor: 0, hinted: false };
-  let base = await served('watch');
-  let got = await firstOpen(asked, at, base);
+  const base = await served('watch');
+  const got = await firstOpen(asked, at, base);
   if (got === 'old') return spawned(['watch', ...args]);
-  if (got.kind === 'none') {
-    base = await daemonStarted('watch');
-    got = await opened(base, asked, at.cursor);
-  }
   if (got.kind !== 'open') throw noneAnswers(base, got.kind === 'none' ? got.why : got.said);
   if (asked.how.json !== true) {
-    const paused = pausedWords(await get<Paused>('watch', '/api/pause'));
+    const paused = pausedWords(await objectsAsked('watch', (client) => client.server.paused()));
     if (paused) console.log(paused);
   }
   const ended = await readOn(got.body, asked, at);

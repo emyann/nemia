@@ -54,9 +54,9 @@ export async function closeout(args: readonly string[]): Promise<number> {
   if (typed === undefined) return spawned(['closeout', ...args]);
   const { runId, step, tryNo } = typed;
   let read: TryCloseout;
-  if (tryNo !== undefined) read = await asked('closeout', (client) => client.runs.closeout({ params: { runId, step, try: tryNo } }));
+  if (tryNo !== undefined) read = await asked('closeout', (client) => client.steps.closeout({ params: { runId, step, try: tryNo } }));
   else {
-    const { tries } = await asked('closeout', (client) => client.runs.tries({ params: { runId, step } }));
+    const { tries } = await asked('closeout', (client) => client.steps.tries({ params: { runId, step } }));
     const latest = tries.at(-1);
     if (latest === undefined)
       throw new Refused(

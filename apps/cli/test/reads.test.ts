@@ -1,12 +1,11 @@
 /**
- * The moved reads over HTTP, held to the old path: on one seeded store, served by an api started with `--no-tick` on a free port, `nemia
- * show`, `show --raw`, `closeout`, `closeout --try`, `ls`, `ls <run>` and `inbox`, and `ls` and `inbox` with `-l`, `--show-labels` and
- * `-L` on a labelled run and card, print the same stdout and exit with the same code as the same command typed with `--local`, which
- * runs the orchestrator's own CLI in process (the parity guard: the printers live twice
- * until the in-process reads retire). Each read is seen asking the api, by the request line the api says. A bare 404 — an api older than
- * this client — exits 2 naming the restart, as does a client still reading `GET /api/inbox`, which the CardList replaced (planted); an
- * unknown run exits 2 with the api's refusal; no api serving the store, and none started (`NEMIA_DAEMON_START=off`), exits 2 naming
- * `--local`.
+ * The moved reads over HTTP, on one seeded store served by an api started with `--no-tick` on a free port. `nemia show`, `show --raw`,
+ * `closeout` and `closeout --try` print the same stdout and exit with the same code as the same command typed with `--local`, which runs
+ * the orchestrator's own CLI in process (the parity guard: the printers live twice until the in-process reads retire). `nemia ls` and
+ * `nemia inbox` print the server's `Table` of the runs and of the cards (fc2e), asked with `TABLE_ACCEPT`, with `-l`, `--show-labels`
+ * and `-L` on a labelled run and card; `nemia ls <run>`, which no server table prints yet, is the old path's. Each read is seen asking
+ * the api, by the request line the api says. A bare 404 — an api older than this client — exits 2 naming the restart; an unknown run
+ * exits 2 with the api's refusal; no api serving the store, and none started (`NEMIA_DAEMON_START=off`), exits 2 naming `--local`.
  *
  * The store is a scratch folder (`test-kit/scratch`, which reaps what runs in it), never this machine's; the api writes no lease with
  * `--no-tick`, so the test writes the one the client reads, its `url` alone: a lease that names no holder, which both paths word alike.
@@ -20,7 +19,6 @@ import http from 'node:http';
 import path from 'node:path';
 import { ambient } from './ambient.ts';
 import { scratch } from 'test-kit/scratch';
-import { get, Refused } from '../src/client.ts';
 
 const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 const API = path.join(import.meta.dirname, '..', '..', 'api');
@@ -190,57 +188,57 @@ test.after(() => api.stop());
 /** Each read the parity holds, by the route the api answers it on. */
 const READS: ReadonlyArray<readonly [readonly string[], RegExp]> = [
   [['show', RUN], /\/api\/runs\/r-parity\b/],
-  [['show', RUN, '--raw'], /\/api\/runs\/r-parity\b/],
+  [['show', RUN, '--raw'], /\/api\/runs\/r-parity\/record\b/],
   [['closeout', RUN, 'build'], /\/api\/runs\/r-parity\/steps\/build\/tries/],
   [['closeout', RUN, 'build', '--try', '1'], /\/api\/runs\/r-parity\/steps\/build\/tries\/1\/closeout/],
   [['closeout', RUN, 'review'], /\/api\/runs\/r-parity\/steps\/review\/tries/],
-  [['ls'], /\/api\/listing\b/],
-  [['ls', RUN], /\/api\/listing\/r-parity\b/],
-  [['ls', 'r-parked'], /\/api\/listing\/r-parked\b/],
-  [['inbox'], /\/api\/cards\b/],
-  [['ls', '-l', 'team=core', '--show-labels', '-L', 'team'], /\/api\/listing\b/],
-  [['ls', '-l', 'team=core', '-l', 'team', '-L', 'workflow'], /\/api\/listing\b/],
-  [['ls', RUN, '--show-labels'], /\/api\/listing\/r-parity\b/],
-  [['inbox', '-l', 'team=core', '-l', 'team=docs', '--show-labels', '-L', 'team'], /\/api\/cards\b/],
-  [['inbox', '-L', 'team', '-L', 'workflow'], /\/api\/cards\b/],
-  [['inbox', '-l', 'team=nope'], /\/api\/cards\b/],
-  [['inbox', '--all'], /\/api\/cards\b/],
-  [['inbox', '-l', 'team=gone'], /\/api\/cards\b/],
-  [['inbox', '-l', 'team=gone', '--all'], /\/api\/cards\b/],
 ];
 
-test("a started card says its run's phase, `waiting on you` where its run waits on a person; one whose run ended is listed with --all alone", async () => {
+test("`nemia ls` prints the server's table of the runs: its columns of priority 0 under their names, a row per run", async () => {
+  const before = api.said().length;
+  const listed = await nemia(['ls']);
+  assert.equal(listed.code, 0, listed.err);
+  assert.match(listed.out, /^NAME +BRIEF +COST +NOTE$/m, "the server's columns, each name in capitals");
+  assert.match(listed.out, /^r-parity +Hold the reads to the old path$/m, "a run's row: its name and its brief's first line");
+  assert.match(listed.out, /^r-cancelled +The run r-cancelled +cancelled$/m, 'a run called off says so in its note');
+  assert.doesNotMatch(listed.out, /LABELS/, 'the labels are a column of priority 1, shown when asked');
+  assert.match(api.said().slice(before), /\/api\/runs\b/, 'it asked the runs list');
+});
+
+test('`nemia ls -l <selector> --show-labels -L <key>`: the runs a selector takes, with their labels column and a column of the key', async () => {
+  const listed = await nemia(['ls', '-l', 'team=core', '--show-labels', '-L', 'team']);
+  assert.equal(listed.code, 0, listed.err);
+  assert.match(listed.out, /^NAME +BRIEF +COST +NOTE +LABELS +TEAM$/m);
+  assert.match(listed.out, /^r-parity .*factory=default,team=core,workflow=no-such-workflow +core$/m, "the run's labels, and its team");
+  assert.doesNotMatch(listed.out, /^r-held /m, 'a run the selector does not take is not listed: it reached the api');
+  const none = await nemia(['ls', '-l', 'team=nope']);
+  assert.equal(none.code, 0, none.err);
+  assert.match(none.out, /no run matches -l team=nope/);
+});
+
+test("`nemia inbox` prints the server's table of the cards in play, then how to start one; --all keeps every card", async () => {
+  const before = api.said().length;
   const listed = await nemia(['inbox']);
   assert.equal(listed.code, 0, listed.err);
-  assert.match(listed.out, /^hold-the-reads .*  started as r-parity, waiting on you$/m, 'its run waits on a person');
+  assert.match(listed.out, /^NAME +TITLE +WORKFLOW +REPO +FACTORY +QUEUED +STATE +RUNS$/m, "the server's columns");
+  assert.match(listed.out, /^hold-the-reads .*waiting on you +r-parity$/m, "a started card's state beside its run");
+  assert.match(listed.out, /^notes\.txt /m, 'an entry that is no card is listed too, never hidden');
   assert.doesNotMatch(listed.out, /^called-off /m, 'its run was called off: out of the cards in play');
+  assert.match(listed.out, /start one: nemia start /);
+  assert.match(api.said().slice(before), /\/api\/cards\b/, 'it asked the cards list');
   const all = await nemia(['inbox', '--all']);
-  assert.match(
-    all.out,
-    /^called-off .*  started as r-cancelled, cancelled$/m,
-    'listed with --all, sent to the api as ?all=true, in its phase',
-  );
+  assert.match(all.out, /^called-off .*cancelled +r-cancelled$/m, 'listed with --all, in its phase');
   const gone = await nemia(['inbox', '-l', 'team=gone']);
   assert.match(gone.out, /1 whose run ended/, 'a selector only ended cards match says how many, and how to list them');
   assert.match(gone.out, /nemia inbox --all/);
 });
 
-test('the labels the parity seeds show on the lines a person asks them on', async () => {
-  const listed = await nemia(['ls', '-l', 'team=core', '--show-labels']);
-  assert.match(
-    listed.out,
-    /^r-parity .*  labels: factory=default,team=core,workflow=no-such-workflow$/m,
-    "the run's whole map on its head line",
-  );
-  assert.doesNotMatch(listed.out, /^r-held /m, 'a run the selector does not take is not listed: it reached the api');
-  const either = await nemia(['inbox', '-l', 'team=core', '-l', 'team=docs']);
-  assert.match(either.out, /^cache-the-views /m, 'one selector takes a card');
-  assert.match(either.out, /^tidy-the-docs /m, 'and another takes another');
+test('`nemia inbox -l … -L <key>`: the cards either selector takes, each with a column of the key off its labels', async () => {
+  const either = await nemia(['inbox', '-l', 'team=core', '-l', 'team=docs', '-L', 'team']);
+  assert.equal(either.code, 0, either.err);
+  assert.match(either.out, /^cache-the-views .* core$/m, 'one selector takes a card, its team its column');
+  assert.match(either.out, /^tidy-the-docs .* docs$/m, 'and another takes another');
   assert.doesNotMatch(either.out, /^hold-the-reads /m, 'and neither takes a card with no labels');
-  const cards = await nemia(['inbox', '-L', 'team']);
-  assert.match(cards.out, /^cache-the-views .*  team: core$/m, "a card's column");
-  assert.match(cards.out, /^hold-the-reads .*  team: <none>$/m, 'a card with no such key says none');
-  assert.match(cards.out, /^notes\.txt .*  team: <none>$/m, 'an entry that is no card is listed too, never hidden');
 });
 
 for (const [argv, route] of READS)
@@ -277,15 +275,6 @@ test("REFUSED: an unknown run is the api's refusal, exit 2, naming the command t
   assert.match(shown.err, /no-such-run/);
   assert.match(shown.err, /nemia ls/);
   assert.equal(shown.out, '');
-});
-
-test('REFUSED, planted: a client still reading `GET /api/inbox`, which the CardList replaced, fails — exit 2 naming the restart', async () => {
-  await assert.rejects(get('inbox', '/api/inbox', {}, ENV), (err: unknown) => {
-    assert.ok(err instanceof Refused, String(err));
-    assert.equal(err.code, 2);
-    assert.match(err.message, /nemia service restart/);
-    return true;
-  });
 });
 
 test('REFUSED: a bare 404 — an api older than this nemia, with no /api/listing — exits 2 naming `nemia service restart`', async (t) => {

@@ -30,11 +30,12 @@ export type Route = 'api' | 'process';
 export type Routed = { readonly name: string; readonly local: boolean; readonly help: boolean };
 
 /** Whether `name` is one of `READ_VERBS`. */
-const moved = (name: string): boolean => name === 'show' || name === 'closeout' || name === 'ls' || name === 'inbox' || name === 'watch';
+const reads: readonly string[] = READ_VERBS;
+const moved = (name: string): boolean => reads.includes(name);
 
 /** Whether `name` is one of `CLIENT_VERBS`. */
-const own = (name: string): boolean =>
-  name === 'get' || name === 'apply' || name === 'explain' || name === 'propose' || name === 'proposals' || name === 'decide';
+const clients: readonly string[] = CLIENT_VERBS;
+const own = (name: string): boolean => clients.includes(name);
 
 const routeSpec = spec<(command: Routed) => Route>({
   ensures: {

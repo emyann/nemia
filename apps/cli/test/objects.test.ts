@@ -35,7 +35,7 @@ test('REFUSED: a moved read the api never answers gives up at its bound, exit 2,
   const env: NodeJS.ProcessEnv = { WF_ROOT: root, NEMIA_DAEMON_START: 'off' };
 
   const began = performance.now();
-  const refused = await asked('show', (client) => client.runs.show({ params: { runId: 'any' } }), env, SHORT_MS).then(
+  const refused = await asked('show', (client) => client.runs.show({ params: { name: 'any' } }), env, SHORT_MS).then(
     () => assert.fail('the read answered, though the api never did'),
     (err: unknown) => err,
   );

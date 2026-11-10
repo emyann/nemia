@@ -1,9 +1,9 @@
 /**
  * The client of the objects: `objects`' `Api` made into a typed client (`HttpApiClient.make`) over the url of the daemon serving this
- * store, found by its lease (`where.ts`) and started on demand where none serves (`daemon.ts`), as every GET of `client.ts` finds it. A
- * read asks it through `asked`, which answers the decoded object, or throws a `Refused` the bin prints and exits with.
+ * store, found by its lease (`where.ts`) and, where none listens there, started once and waited for until it is ready (`daemon.ts`). A
+ * read asks it once through `asked`, which answers the decoded object, or throws a `Refused` the bin prints and exits with.
  *
- * A refused connection starts a daemon once and asks again. A refusal of the `Api`'s (`Missing`, `Conflict`, `Invalid`, `Unjudged`,
+ * A refusal of the `Api`'s (`Missing`, `Conflict`, `Invalid`, `Unjudged`,
  * `Forbidden`, `Unauthorized`) is the api's own words, exit 2. Every request carries the session's token where `WF_SESSION_TOKEN` holds
  * one (`sessionHeaders`). A 404 whose body is no refusal is a daemon older than this client, refused naming the restart; an answer that
  * does not decode as the `Api` says is one too, the daemon and this client being of two builds. A read the api takes and does not answer
@@ -14,8 +14,8 @@ import { Cause, Duration, Effect, Exit, Option } from 'effect';
 import { FetchHttpClient, HttpClient, HttpClientError, HttpClientRequest } from 'effect/http';
 import { HttpApiClient } from 'effect/http-api';
 import { Api, type APIResource, Conflict, Forbidden, Invalid, Missing, Unauthorized, Unjudged } from 'objects';
-import { olderThanThis, Refused, served, sessionHeaders, unanswered } from './client.ts';
-import { daemonStarted } from './daemon.ts';
+import { olderThanThis, Refused, sessionHeaders, unanswered } from './client.ts';
+import { served } from './daemon.ts';
 import { resourceNamed } from './objects/resource.ts';
 import { CLIENT_VERBS } from './route.ts';
 
@@ -31,11 +31,14 @@ const localWay = (verb: string): string =>
  */
 export const READ_BOUND_MS = 30_000;
 
-/** The typed client of the `Api` at `base`, each request carrying the session's token where `env` holds one (`sessionHeaders`). */
-const clientAt = (base: string, env: NodeJS.ProcessEnv = process.env) =>
+/**
+ * The typed client of the `Api` at `base`, each request carrying the session's token where `env` holds one (`sessionHeaders`) and
+ * `headers` beside it (an `Accept` that asks a list for its `Table`).
+ */
+const clientAt = (base: string, env: NodeJS.ProcessEnv = process.env, headers: Readonly<Record<string, string>> = {}) =>
   HttpApiClient.make(Api, {
     baseUrl: base,
-    transformClient: HttpClient.mapRequest(HttpClientRequest.setHeaders(sessionHeaders(env))),
+    transformClient: HttpClient.mapRequest(HttpClientRequest.setHeaders({ ...sessionHeaders(env), ...headers })),
   });
 
 /** What a read asks of: every group of the `Api`, each endpoint a method. */
@@ -57,12 +60,6 @@ const isRefusal = (err: unknown): err is Missing | Conflict | Invalid | Unjudged
 const failureOf = <A, E>(exit: Exit.Exit<A, E>): E | undefined =>
   Exit.isFailure(exit) ? Option.getOrUndefined(Cause.findErrorOption(exit.cause)) : undefined;
 
-/** Whether `exit` failed before the api answered at all: no connection. */
-const unreached = <A, E>(exit: Exit.Exit<A, E>): boolean => {
-  const failed = failureOf(exit);
-  return HttpClientError.isHttpClientError(failed) && failed.reason._tag === 'TransportError';
-};
-
 /** The path of the request a client error is about, as a line names it. */
 const pathOf = (err: HttpClientError.HttpClientError): string => {
   try {
@@ -73,9 +70,18 @@ const pathOf = (err: HttpClientError.HttpClientError): string => {
 };
 
 /** `call` asked of the client at `base`, run to its end or until `boundMs` is gone, when it is interrupted and fails with a timeout. */
-const attempt = <A, E>(base: string, call: (client: ObjectsClient) => Effect.Effect<A, E>, boundMs: number, env: NodeJS.ProcessEnv) =>
+const attempt = <A, E>(
+  base: string,
+  call: (client: ObjectsClient) => Effect.Effect<A, E>,
+  boundMs: number,
+  env: NodeJS.ProcessEnv,
+  headers: Readonly<Record<string, string>>,
+) =>
   Effect.runPromiseExit(
-    Effect.flatMap(clientAt(base, env), call).pipe(Effect.timeout(Duration.millis(boundMs)), Effect.provide(FetchHttpClient.layer)),
+    Effect.flatMap(clientAt(base, env, headers), call).pipe(
+      Effect.timeout(Duration.millis(boundMs)),
+      Effect.provide(FetchHttpClient.layer),
+    ),
   );
 
 /** A daemon that took the read and did not answer it within `boundMs`: refused, naming its status and the read in process. */
@@ -114,22 +120,18 @@ const thrown = (said: string): never => {
 };
 
 /**
- * What `call` answers of the objects' client, for the read `verb` names, in a process whose environment is `env`: on the daemon its lease
- * names, else one started now; on one started again where the first takes no connection. Each attempt has `boundMs` to answer.
+ * What `call` answers of the objects' client, for the read `verb` names, in a process whose environment is `env`: asked once, of the
+ * daemon `served` made ready, within `boundMs`, each request carrying `headers`.
  */
 export async function asked<A, E>(
   verb: string,
   call: (client: ObjectsClient) => Effect.Effect<A, E>,
   env: NodeJS.ProcessEnv = process.env,
   boundMs: number = READ_BOUND_MS,
+  headers: Readonly<Record<string, string>> = {},
 ): Promise<A> {
-  let base = await served(verb, env);
-  let exit = await attempt(base, call, boundMs, env);
-  if (unreached(exit)) {
-    base = await daemonStarted(verb, env);
-    exit = await attempt(base, call, boundMs, env);
-  }
-  return answerOf(exit, verb, base, boundMs);
+  const base = await served(verb, env);
+  return answerOf(await attempt(base, call, boundMs, env, headers), verb, base, boundMs);
 }
 
 /** The factories the api lists (`FactoryList`, `GET /api/factories`), the default first on its own repository, for the read `verb`. */

@@ -230,6 +230,7 @@ export const StoredEventSchema = Schema.Union([
   event('spawned', { attempt: Schema.Finite, error: Schema.optional(Schema.String), mono: Schema.optional(MonotonicSchema) }),
   Ended,
   event('measured', { attempt: Schema.Finite, usage: UsageSchema }),
+  event('exited', { attempt: Schema.Finite, exitCode: Schema.Finite }),
   event('counted', { attempt: Schema.Finite, usage: UsageSchema }),
   event('denied', { attempt: Schema.Finite, tool: Schema.String, what: Schema.optional(Schema.String) }),
   event('image', {

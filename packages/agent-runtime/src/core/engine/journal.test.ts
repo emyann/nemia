@@ -631,6 +631,14 @@ test('decode: an entry no runtime wrote fails its read, naming the task, the ent
     },
   );
 
+  await t.test('an exited entry is read back as written; one whose exit code is no number fails the read, naming the field', async () => {
+    const exited = { kind: 'exited', at: '2026-09-24T00:00:01Z', attempt: 1, exitCode: 0 };
+    const events = await run(legacyStore({ 't-ok': [TODAY, exited] }), readOf('t-ok'));
+    assert.deepEqual(events.at(-1), exited);
+    const error = await refusedRead([TODAY, { ...exited, exitCode: 'zero' }]);
+    naming(error.message, 'entry 2 is a `exited` event', '`exitCode`');
+  });
+
   await t.test(
     'a denied entry is read back as written, with its call or without; one that names no tool fails the read, naming the field',
     async () => {

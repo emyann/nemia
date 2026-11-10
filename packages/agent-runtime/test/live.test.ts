@@ -70,15 +70,24 @@ const skip = live ? false : 'set AE_LIVE=1 to run against Claude Code (spends mo
 const tmp = (label: string) => scratch(`ae-live-${label}-`);
 
 /**
- * Do `act`, tick until every task has settled or ten minutes pass, check, and leave no session behind — one that
- * `act` threw on included. The engine releases a session once its end is on the record; this stops and removes each one that
- * never got that far, and passes over a task with no view, which has nothing known to clean.
+ * Every ended attempt of every task in `views` says how its process exited. A job's attempt may end on its closing statement
+ * while its process still runs, and the engine writes the exit on a later pass, once the process has gone (`exited`): a test
+ * that asserts the exit waits for it, as for the settling, rather than for however fast the job ran.
+ */
+const exited = (views: Record<string, TaskView>) =>
+  Object.values(views).every((v) => v.state.attempts.every((a) => a.ended === null || a.exitCode !== null));
+
+/**
+ * Do `act`, tick until every task has settled and `also` holds of their views, or ten minutes pass, check, and leave no session
+ * behind — one that `act` threw on included. The engine releases a session once its end is on the record; this stops and
+ * removes each one that never got that far, and passes over a task with no view, which has nothing known to clean.
  */
 const settleThenCheck = async (
   engine: EngineShape,
   ids: Record<string, string>,
   check: (views: Record<string, TaskView>) => void,
   act?: () => Promise<void>,
+  also: (views: Record<string, TaskView>) => boolean = () => true,
 ) => {
   const views: Record<string, TaskView> = {};
   try {
@@ -87,7 +96,7 @@ const settleThenCheck = async (
     while (Date.now() < until) {
       await Effect.runPromise(engine.tick());
       for (const [k, id] of Object.entries(ids)) views[k] = await Effect.runPromise(engine.view(id));
-      if (Object.values(views).every((v) => v.state.settled)) break;
+      if (Object.values(views).every((v) => v.state.settled) && also(views)) break;
       await new Promise((r) => setTimeout(r, 5_000));
     }
     check(views);
@@ -454,21 +463,27 @@ test(
         }),
       ),
     };
-    await settleThenCheck(engine, ids, (views) => {
-      const { state } = views.capped;
-      t.diagnostic(
-        `settled ${state.settled}: ${JSON.stringify(state.attempts.map((a) => ({ n: a.n, ended: a.ended, reason: a.reason, exitCode: a.exitCode, usage: a.usage, resumeFrom: a.resumeFrom })))}`,
-      );
-      assert.equal(state.settled, 'failed', `settled: ${views.capped?.phase}`);
-      const [first] = state.attempts;
-      assert.deepEqual(
-        [first?.ended, first?.reason, first?.limit, first?.exitCode],
-        ['failed', 'harness', 'budget', 1],
-        'it ended at its cap, as the harness printed it',
-      );
-      assert.ok((first?.usage?.costUsd ?? 0) >= BELOW_ONE_RESPONSE, `and cost at least its cap: ${first?.usage?.costUsd}`);
-      assert.equal(state.attempts.length, 1, 'a budget spent is spent: no attempt 2');
-    });
+    await settleThenCheck(
+      engine,
+      ids,
+      (views) => {
+        const { state } = views.capped;
+        t.diagnostic(
+          `settled ${state.settled}: ${JSON.stringify(state.attempts.map((a) => ({ n: a.n, ended: a.ended, reason: a.reason, exitCode: a.exitCode, usage: a.usage, resumeFrom: a.resumeFrom })))}`,
+        );
+        assert.equal(state.settled, 'failed', `settled: ${views.capped?.phase}`);
+        const [first] = state.attempts;
+        assert.deepEqual(
+          [first?.ended, first?.reason, first?.limit, first?.exitCode],
+          ['failed', 'harness', 'budget', 1],
+          'it ended at its cap, as the harness printed it',
+        );
+        assert.ok((first?.usage?.costUsd ?? 0) >= BELOW_ONE_RESPONSE, `and cost at least its cap: ${first?.usage?.costUsd}`);
+        assert.equal(state.attempts.length, 1, 'a budget spent is spent: no attempt 2');
+      },
+      undefined,
+      exited,
+    );
   },
 );
 
@@ -523,22 +538,28 @@ test(
         }),
       ),
     };
-    await settleThenCheck(engine, ids, (views) => {
-      const [denied] = views.denied.state.attempts;
-      const [control] = views.control.state.attempts;
-      t.diagnostic(
-        `denied: ${views.denied.state.settled}, ${JSON.stringify(denied?.denials)}; control: ${views.control.state.settled}, ${JSON.stringify(control?.denials)}`,
-      );
-      assert.equal(views.denied.state.settled, 'succeeded', `the denied job finished its work: ${views.denied.phase}`);
-      assert.equal(denied?.exitCode, 0, "it ran as a job: a process of the engine's, which exited");
-      assert.ok(
-        (denied?.denials ?? []).some((d) => d.tool === 'Write'),
-        'its attempt says the write outside its folder was denied',
-      );
-      assert.equal(fs.existsSync(path.join(probe, 'outside', 'x.txt')), false, 'and nothing was written there');
-      assert.equal(views.control.state.settled, 'succeeded', `the control finished: ${views.control.phase}`);
-      assert.deepEqual(control?.denials, [], 'and was denied nothing, measured: an empty list, never absent');
-    });
+    await settleThenCheck(
+      engine,
+      ids,
+      (views) => {
+        const [denied] = views.denied.state.attempts;
+        const [control] = views.control.state.attempts;
+        t.diagnostic(
+          `denied: ${views.denied.state.settled}, ${JSON.stringify(denied?.denials)}; control: ${views.control.state.settled}, ${JSON.stringify(control?.denials)}`,
+        );
+        assert.equal(views.denied.state.settled, 'succeeded', `the denied job finished its work: ${views.denied.phase}`);
+        assert.equal(denied?.exitCode, 0, "it ran as a job: a process of the engine's, which exited");
+        assert.ok(
+          (denied?.denials ?? []).some((d) => d.tool === 'Write'),
+          'its attempt says the write outside its folder was denied',
+        );
+        assert.equal(fs.existsSync(path.join(probe, 'outside', 'x.txt')), false, 'and nothing was written there');
+        assert.equal(views.control.state.settled, 'succeeded', `the control finished: ${views.control.phase}`);
+        assert.deepEqual(control?.denials, [], 'and was denied nothing, measured: an empty list, never absent');
+      },
+      undefined,
+      exited,
+    );
   },
 );
 
@@ -765,24 +786,30 @@ test(
       const ids = {
         job: await Effect.runPromise(engine.file({ ...common, cwd: job })),
       };
-      await settleThenCheck(engine, ids, (views) => {
-        const last = (k: string) => views[k]?.state.attempts.at(-1);
-        t.diagnostic(
-          `job: ${views.job?.state.settled}, exit ${last('job')?.exitCode}, said ${JSON.stringify(last('job')?.closeout)}, denied ${JSON.stringify(last('job')?.denials)}, wrote ${M11_WRITTEN.filter((f) => fs.existsSync(path.join(job, f)))}`,
-        );
-        assert.equal(views.job?.state.settled, 'succeeded', `the job settled: ${views.job?.phase}`);
-        assert.equal(typeof last('job')?.exitCode, 'number', 'it ran as a job: a process that exited');
-        assert.deepEqual(
-          M11_WRITTEN.filter((f) => fs.existsSync(path.join(job, f))),
-          ['ALLOWED'],
-          'the job ran the command its settings allow, and not the one they do not list',
-        );
-        assert.deepEqual(
-          last('job')?.denials,
-          [{ tool: 'Bash', what: 'npm' }],
-          'and its attempt records one denial, the unlisted command: the allowed one ran',
-        );
-      });
+      await settleThenCheck(
+        engine,
+        ids,
+        (views) => {
+          const last = (k: string) => views[k]?.state.attempts.at(-1);
+          t.diagnostic(
+            `job: ${views.job?.state.settled}, exit ${last('job')?.exitCode}, said ${JSON.stringify(last('job')?.closeout)}, denied ${JSON.stringify(last('job')?.denials)}, wrote ${M11_WRITTEN.filter((f) => fs.existsSync(path.join(job, f)))}`,
+          );
+          assert.equal(views.job?.state.settled, 'succeeded', `the job settled: ${views.job?.phase}`);
+          assert.equal(typeof last('job')?.exitCode, 'number', 'it ran as a job: a process that exited');
+          assert.deepEqual(
+            M11_WRITTEN.filter((f) => fs.existsSync(path.join(job, f))),
+            ['ALLOWED'],
+            'the job ran the command its settings allow, and not the one they do not list',
+          );
+          assert.deepEqual(
+            last('job')?.denials,
+            [{ tool: 'Bash', what: 'npm' }],
+            'and its attempt records one denial, the unlisted command: the allowed one ran',
+          );
+        },
+        undefined,
+        exited,
+      );
     } finally {
       for (const dir of [job]) fs.rmSync(dir, { recursive: true, force: true });
     }

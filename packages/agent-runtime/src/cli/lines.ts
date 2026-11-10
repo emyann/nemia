@@ -137,6 +137,7 @@ const KINDS: Record<string, string> = {
   spawned: 'started',
   ended: 'ended',
   measured: 'measured',
+  exited: 'exited',
   counted: 'counted',
   denied: 'denied',
   image: 'image',
@@ -152,6 +153,7 @@ const KINDS: Record<string, string> = {
 const EXTRAS: { [K in Event['kind']]?: (event: Extract<Event, { kind: K }>) => string } = {
   settled: (e) => `  ${e.outcome}`,
   measured: (e) => `  attempt ${e.attempt}: ${costLine(e.usage)}`,
+  exited: (e) => `  attempt ${e.attempt}: exit ${e.exitCode}`,
   counted: (e) => `  attempt ${e.attempt}: ${runningLine(e.usage)}`,
   denied: (e) => `  attempt ${e.attempt}: ${denialText(e)}`,
   image: (e) => `  attempt ${e.attempt}: ${[e.image, e.harnessVersion, e.ranIn && `in ${e.ranIn}`].filter(Boolean).join(', ')}`,

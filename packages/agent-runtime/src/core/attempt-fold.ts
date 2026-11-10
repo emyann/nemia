@@ -15,7 +15,7 @@ function imageInto(a: Attempt, e: Extract<Event, { kind: 'image' }>): void {
 /** An event about one attempt, `e`, written into that attempt's fold `a`: every one but its end (`endAttempt`, `domain.ts`). */
 export function foldInto(
   a: Attempt,
-  e: Extract<Event, { kind: 'spawned' | 'measured' | 'counted' | 'denied' | 'image' | 'gap' | 'process' | 'held' | 'released' }>,
+  e: Extract<Event, { kind: 'spawned' | 'measured' | 'exited' | 'counted' | 'denied' | 'image' | 'gap' | 'process' | 'held' | 'released' }>,
 ): void {
   switch (e.kind) {
     case 'spawned':
@@ -25,6 +25,9 @@ export function foldInto(
       return;
     case 'measured':
       a.usage = { ...a.usage, ...e.usage };
+      return;
+    case 'exited':
+      a.exitCode = e.exitCode;
       return;
     case 'counted':
       a.usage = e.usage;

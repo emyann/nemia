@@ -491,6 +491,20 @@ const pathsNamed = (brief: string, mounted: readonly string[] = []): string[] =>
     .filter((t) => /^given(\/|$)/.test(t) || t.startsWith('/'))
     .filter((t) => !mounted.some((m) => t === m || t.startsWith(`${m}/`)));
 
+test("a folder team handed a card and no file copies the card into each root's given/inputs/cards, and its brief names it there", async () => {
+  fs.mkdirSync(path.join(ROOT, 'inbox'), { recursive: true });
+  fs.writeFileSync(path.join(ROOT, 'inbox', 'tides-k2q9.md'), 'What the tides do.\n');
+  const run = await runPlaced(startRun({ brief: 'a note handed a card', repo: NOT_A_REPO, workflowDir: FAN, cards: ['tides-k2q9'] }));
+  const { e, tasks } = board();
+  assert.deepEqual((await runWith(e, advanceRun(runRecord(ROOT, run.id)))).filed, ['a', 'b']);
+  for (const name of ['a', 'b']) {
+    const folder = path.join(ROOT, 'runs', run.id, 'work', name);
+    assert.equal(fs.readFileSync(path.join(folder, 'given', 'inputs', 'cards', 'tides-k2q9.md'), 'utf8'), 'What the tides do.\n');
+    const brief = tasks.get(`${run.id}-${name}`)?.spec.brief ?? '';
+    assert.ok(brief.includes('`tides-k2q9`') && brief.includes('`given/inputs`'), `${name}'s brief names the card in its copy`);
+  }
+});
+
 test('a folder team with a fan-in, given files at its start: what each brief tells a step to read is inside its own folder, and on disk', async () => {
   const run = await runPlaced(
     startRun({

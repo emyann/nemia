@@ -30,18 +30,21 @@ import type { HarnessSettings } from '../harness-settings/harness-settings.ts';
 import { settingsAt } from '../harness-settings/harness-settings.verb.ts';
 import { afterRefusal } from '../wait/wait.ts';
 import { contextRefusal } from './context.ts';
-import { inputRefusal, type InputFile } from './inputs.ts';
+import { cardsRefusal, inputRefusal, type InputFile } from './inputs.ts';
+import { CardDoor } from '../cards/cards.store.ts';
+import { CardName } from '../inbox/inbox.model.ts';
+import { inboxNameRefusal } from '../inbox/inbox.ts';
 import { inboxDir } from '../record/files.store.ts';
 import { runsAtOnce } from '../runs/runs.store.ts';
 import { storeRootRefusal } from './store-root.ts';
-import { artifactsDir, inputsDir, runId, runsDir } from '../record/record.store.ts';
+import { artifactsDir, cardsDir, inputsDir, runId, runsDir } from '../record/record.store.ts';
 import { writeAgentFiles } from '../agents/agents.store.ts';
 import { carriedFilesOf, freezeCarriedFiles, freezeWorkflowFiles, workflowFilesOf } from '../frozen/frozen.store.ts';
 import { PlaceService, openPlace } from '../place/place.store.ts';
 import { parentRecord } from '../steps/steps.verb.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
 import { standingLiveOf } from '../standing/standing.verb.ts';
-import { Invalid } from '../refusal/refusal.ts';
+import { Invalid, Missing } from '../refusal/refusal.ts';
 import { NO_ALLOWS, repoAllows, type Allows } from '../trust/allows.verb.ts';
 import {
   factoryMountRefusal,
@@ -305,6 +308,8 @@ export type StartOptions = {
   after?: readonly string[];
   context?: readonly string[];
   inputs?: readonly string[];
+  /** The inbox cards to hand the run (`nemia start --card`), by name: each copied into its `inputs/cards/` (`cardsDir`). */
+  cards?: readonly string[];
   from?: { inbox: string };
   scheduled?: { factory: string; workflow: string; due: string };
   gates?: readonly string[];
@@ -331,6 +336,7 @@ type Told = Pick<
   | 'after'
   | 'context'
   | 'inputs'
+  | 'cards'
   | 'from'
   | 'scheduled'
   | 'gates'
@@ -469,6 +475,7 @@ function toldOf(
     ...(after.length ? { after: [...after] } : {}),
     ...(context.length ? { context: [...context] } : {}),
     ...(inputs.length ? { inputs: inputs.map((f) => path.basename(f.resolved)) } : {}),
+    ...(opts.cards?.length ? { cards: [...opts.cards] } : {}),
     ...(opts.from ? { from: { inbox: opts.from.inbox } } : {}),
     ...(opts.scheduled
       ? { scheduled: { factory: opts.scheduled.factory, workflow: opts.scheduled.workflow, due: opts.scheduled.due } }
@@ -540,13 +547,18 @@ const repositoryRun = Effect.fn('repositoryRun')(function* (id: string, told: To
   return run;
 });
 
-/** Copies `inputs` into the run's own `inputs/` (`inputsDir`); throws with exit 1 when one cannot be, the run's directory removed. */
-function copyInputs(home: string, run: Run, inputs: readonly InputFile[]): void {
-  if (!inputs.length) return;
+/**
+ * Copies `inputs` into the run's own `inputs/` (`inputsDir`), and the text of each card handed (`cards`, by name) into its `cards/`
+ * (`cardsDir`) as `<name>.md`, each exclusively; throws with exit 1 when one cannot be, the run's directory removed.
+ */
+function copyInputs(home: string, run: Run, inputs: readonly InputFile[], cards: ReadonlyMap<string, string>): void {
+  if (!inputs.length && !cards.size) return;
   const dir = inputsDir(home, run);
   try {
     fs.mkdirSync(dir, { recursive: true });
     for (const f of inputs) fs.copyFileSync(f.resolved, path.join(dir, path.basename(f.resolved)), fs.constants.COPYFILE_EXCL);
+    if (cards.size) fs.mkdirSync(cardsDir(home, run));
+    for (const [name, text] of cards) fs.writeFileSync(path.join(cardsDir(home, run), `${name}.md`), text, { flag: 'wx' });
   } catch (err) {
     runsAtOnce(home).runs.forget(run.id);
     throw Object.assign(
@@ -611,6 +623,11 @@ export const repoFor = (home: string, name: string | undefined, named: string | 
  * `inputs` are files to hand every step (`nemia start --input`), by path from where `nemia start` is typed: refused before anything is
  * written when one is not a file or two would take one name (`inputRefusal`), then copied into the run's own `inputs/` (`inputsDir`), and
  * their names frozen on the record. Left out, no directory is made, and the record has no `inputs`.
+ *
+ * `cards` are inbox cards to hand every step (`nemia start --card`), by name: refused before anything is written when one is no card's
+ * name, is named twice, is not in the inbox (`Missing`), or an `--input` would take their folder (`cardsRefusal`), then each copied as it
+ * reads now into the run's `inputs/cards/<name>.md` (`cardsDir`), and their names frozen on the record. Left out, the record has no
+ * `cards`.
  *
  * `from` says where the brief came from — the inbox card `startFromInbox` starts — and is frozen on the record. Left out, the record has
  * none.
@@ -683,7 +700,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
     factory,
     opts.gates,
     refused,
-    Boolean(opts.inputs?.length),
+    givenAny(opts),
     yield* tried(() => repoAllows(opts.repo, opts.factory)),
     found,
     harnessSettings,
@@ -697,6 +714,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const inputs = yield* tried(() => inputsOf(opts.inputs ?? []));
   const refusedInputs = inputRefusal(inputs);
   if (refusedInputs) return yield* Effect.fail(new Invalid({ message: refusedInputs }));
+  const cards = yield* cardsOf(opts.cards ?? [], inputs);
   yield* tried(() => workflowFilesOf(opts.workflowDir));
   yield* tried(() => carriedFilesOf(opts.workflowDir));
   let id = runId(opts.brief);
@@ -714,12 +732,35 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const told = toldOf(opts, steps, inputs, factory, mounts, volumes, harnessSettings);
   const stepRecords = Object.fromEntries(steps.map((s) => [s.name, { taskId: null }]));
   const run = yield* folder ? folderRun(id, told, stepRecords) : repositoryRun(id, told, stepRecords, opts.repo, isolate);
-  yield* tried(() => copyInputs(home, run, inputs));
+  yield* tried(() => copyInputs(home, run, inputs, cards));
   Object.assign(run, yield* tried(() => renderAgents(home, run, steps, found)));
   const pinned = yield* pinsOf(run, steps, run.createdAt);
   if (pinned.length) run.pinned = pinned;
   yield* (yield* RunDoor).runs.create(run);
   return yield* labelled(run, inherited);
+});
+
+/** Whether a start hands its run anything to copy into its inputs: a file (`--input`) or a card (`--card`). */
+const givenAny = (opts: Pick<StartOptions, 'inputs' | 'cards'>): boolean => Boolean(opts.inputs?.length || opts.cards?.length);
+
+/**
+ * The text of each inbox card `cards` names, by name, read through the Card door: refused before anything is written where they cannot
+ * be handed (`cardsRefusal`) — `Missing` where the only fault is a card the inbox does not have, else `Invalid`.
+ */
+const cardsOf = Effect.fn('cardsOf')(function* (cards: readonly string[], inputs: readonly InputFile[]) {
+  const door = yield* CardDoor;
+  const texts = new Map<string, string>();
+  for (const card of new Set(cards)) {
+    if (inboxNameRefusal(card) !== undefined) continue;
+    const text = yield* door.cards.read(CardName.read(card));
+    if (text !== null) texts.set(card, text);
+  }
+  const names = inputs.map((f) => path.basename(f.resolved));
+  const unnamed = cards.filter((card) => inboxNameRefusal(card) !== undefined);
+  const refused = cardsRefusal(cards, unnamed, [...texts.keys()], names);
+  if (refused === null) return texts;
+  const onlyMissing = cardsRefusal(cards, unnamed, cards, names) === null;
+  return yield* Effect.fail(onlyMissing ? new Missing({ message: refused }) : new Invalid({ message: refused }));
 });
 
 /** The start's `--label` edits, parsed: refused `Invalid`, naming `--label`, where one does not parse (`parseLabelEdits`). */

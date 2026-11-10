@@ -12,6 +12,7 @@ import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { fenceReach, unruledIn } from 'agent-runtime/vocabulary';
 import { filedSettings, SETTINGS_HARNESS } from '../harness-settings/harness-settings.ts';
 import { splitServers, type FactoryServer, type FactoryServers } from '../factory/servers/index.ts';
+import type { HandedFolders, HandedRunMounts } from '../../contracts/handed-runs.contract.ts';
 
 /**
  * The harness's arguments a step is filed with, which the engine carries to the runner unread (`HarnessArgs`), all from the workflow the
@@ -22,7 +23,8 @@ import { splitServers, type FactoryServer, type FactoryServers } from '../factor
  * where the step's fence writes (`volumeMounts`), then the folders its brief names beside them (`filedFolders`): its own
  * files directory, read-only, for a step that writes outside its directory only by rule (`ownMounts`), the
  * artifacts folder of each step it comes after, read-only, then the store's folders its `reads:` names, read-only, the inbox at `t.inbox`,
- * then the run's inputs folder at `t.inputs`, read-only, given only for a run given inputs, then the run's copy of its workflow folder
+ * then the run's inputs folder at `t.inputs`, read-only, given only for a run given inputs or cards, then the folders of each run it is
+ * handed at `t.runs`, read-only (`handedRunMounts`), then the run's copy of its workflow folder
  * at `t.workflowFiles` and of its carried files at `t.carriedFiles`, each read-only (`workflowMounts`); the key left out with none, the
  * MCP servers its sessions load, its factory's record first and the checkout's `.mcp.json` for the rest (`serversOf`), the step's files
  * directory and the run's copies of its workflow folder and its carried files, the run's labels and the try's session token in its
@@ -44,8 +46,8 @@ export const filedConfig = <Own extends object>(
     workflowFiles?: string;
     /** The run's copy of its carried files (`carriedFilesDir`), absolute: absent where the record names none. */
     carriedFiles?: string;
-    /** The artifacts folders of the run that routed on to this one, for a root (`callerMounts`): absent for every other step. */
-    caller?: readonly Mount[];
+    /** The folders of each run this one is handed, as the pass found them on disk (`filedFoldersAt`): absent for a run handed none. */
+    runs?: readonly HandedRunFolders[];
     own: Own;
     landingDenied: () => readonly string[];
     /**
@@ -170,9 +172,10 @@ export const ownMounts = (step: StepSpec, runArtifacts: string): Mount[] => {
 
 /**
  * The folders a step is filed with beyond its factory's, each read-only: those the steps before it handed over, then the store's, then
- * the run's inputs folder. And `named`, for its brief alone and no part of the filing: by the path of a handed folder, which of the
- * files its step's closeout named are there as the step is filed (`HandedFiles`), where the tick read them; and `closeouts`, the paths of
- * the handed folders that hold the step's `closeout.json` (`HANDED_CLOSEOUT`), whose files the brief does not list.
+ * the run's inputs folder, the folders of the runs it is handed. And `named`, for its brief alone and no part of the filing: by the path
+ * of a handed folder, which of the files its step's closeout named are there as the step is filed (`HandedFiles`), where the tick read
+ * them; and `closeouts`, the paths of the handed folders that hold the step's `closeout.json` (`HANDED_CLOSEOUT`), whose files the
+ * brief does not list.
  */
 export type FiledFolders = {
   /** The step's own files directory, read-only, where its mode writes outside its directory only by rule (`ownMounts`). */
@@ -184,8 +187,10 @@ export type FiledFolders = {
   workflow?: Mount[];
   /** The run's copy of its carried files, read-only (`workflowMounts`): absent or empty where it is not mounted. */
   carried?: Mount[];
-  /** The result steps' artifacts folders of the run that routed on to this one, read-only, on a local root (`callerMounts`). */
-  caller?: Mount[];
+  /** The folders of each run this one is handed, read-only, on a local step (`handedRunMounts`). */
+  runs?: Mount[];
+  /** Each run this one is handed and its folders as the pass found them, for its brief alone (`mountsLine`): none of the filing. */
+  runsFound?: readonly HandedRunFolders[];
   named?: Readonly<Record<string, HandedFiles>>;
   closeouts?: readonly string[];
 };
@@ -194,13 +199,20 @@ export type FiledFolders = {
  * The folders a step is filed with beyond its factory's, the one source of the filing's (`filedConfig`) and of what its brief names
  * (`mountsLine`, `inputsLine`): its own files directory (`ownMounts`), the artifacts folder of each step it comes after, under
  * `t.runArtifacts` (`handedMounts`), the store's folders its `reads:` names, the inbox at `t.inbox` (`readsMounts`), the run's inputs
- * folder at `t.inputs`, given only for a run given inputs (`inputsMounts`), and on a local root the caller's folders at `t.caller`
- * (`callerMounts` in brief/handed.ts). Pure.
+ * folder at `t.inputs`, given only for a run given inputs or cards (`inputsMounts`), and the folders of each run it is handed at
+ * `t.runs` (`handedRunMounts`), on every step and not the roots alone, since they are read off the run's frozen record. Pure.
  */
 export const filedFolders = (
   step: StepSpec,
   steps: readonly StepSpec[],
-  t: { runArtifacts: string; inbox: string; inputs?: string; workflowFiles?: string; carriedFiles?: string; caller?: readonly Mount[] },
+  t: {
+    runArtifacts: string;
+    inbox: string;
+    inputs?: string;
+    workflowFiles?: string;
+    carriedFiles?: string;
+    runs?: readonly HandedRunFolders[];
+  },
 ): FiledFolders => ({
   own: ownMounts(step, t.runArtifacts),
   handed: handedMounts(step, steps, t.runArtifacts),
@@ -208,17 +220,18 @@ export const filedFolders = (
   inputs: inputsMounts(step, steps, t.inputs),
   workflow: workflowMounts(step, t.workflowFiles),
   carried: workflowMounts(step, t.carriedFiles),
-  caller: local(step.harness) ? [...(t.caller ?? [])] : [],
+  runs: handedRunMounts(step, t.runs ?? []),
+  runsFound: t.runs ?? [],
 });
 
 /**
- * A step's folders beyond its factory's, in the order they are filed: its own, the handed ones, the caller's, the store's, the run's
+ * A step's folders beyond its factory's, in the order they are filed: its own, the handed ones, the handed runs', the store's, the run's
  * inputs, then the run's copies of its workflow folder and of its carried files.
  */
 const folders = (f: FiledFolders): Mount[] => [
   ...(f.own ?? []),
   ...f.handed,
-  ...(f.caller ?? []),
+  ...(f.runs ?? []),
   ...f.store,
   ...f.inputs,
   ...(f.workflow ?? []),
@@ -247,6 +260,35 @@ export const inputsMounts = (
   steps: readonly Pick<StepSpec, 'place'>[],
   dir: string | undefined,
 ): Mount[] => (dir !== undefined && local(step.harness) && !isFolderTeam(steps) ? [{ path: dir, readOnly: true }] : []);
+
+/**
+ * A run this one is handed (`--from`, a card's `from:`, the run that routed on to it), as the pass found its folders on disk when it
+ * files a step: its id, and its `artifacts/` and its `inputs/`, each absolute and present only where it is a directory now (a run given
+ * no input has no `inputs/`; a run forgotten has neither).
+ */
+export type HandedRunFolders = { run: string; artifacts?: string; inputs?: string };
+
+/**
+ * The folders of each run this one is handed (`found`), each read-only, for a step whatever steps it comes after: it reads another run's
+ * work and writes none of it, and Read, Grep and Glob reach them. Only the folders found are mounted. None on a harness fenced by a
+ * sandbox, which reads the disk already, nor on a remote agent, filed no local field; the default harness (no `harness:`) is fenced by
+ * its mode (`local`, spelled out so its proof reads no declaration).
+ */
+export const handedRunMounts: HandedRunMounts = (step, found) =>
+  !isRemoteHarness(step.harness) && (step.harness === undefined || !sandboxed(step.harness))
+    ? handedFolders(found).map((folder) => ({ path: folder, readOnly: true }))
+    : [];
+
+/**
+ * Each folder the pass found of the runs a run is handed (`found`), by its absolute path: each run's `artifacts/`, then each run's
+ * `inputs/`.
+ */
+export const handedFolders: HandedFolders = (found) => {
+  const folders: string[] = [];
+  for (const f of found) if (f.artifacts !== undefined) folders.push(f.artifacts);
+  for (const f of found) if (f.inputs !== undefined) folders.push(f.inputs);
+  return folders;
+};
 
 /**
  * The run's copy of its workflow folder (`dir`, its absolute path, undefined where the record names none), read-only, for a step whose

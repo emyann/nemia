@@ -112,7 +112,7 @@ export const folderPlace = (runs: string): Place => ({
     if (given.inputs || given.from.length > 0) ownGiven(workspace);
     if (given.inputs) {
       copyGiven(inputsRoot(runs, run.id), path.join(workspace, given.inputs));
-      notes.push(`${given.inputs}: the files nemia start --input gave the run, copied in`);
+      notes.push(`${given.inputs}: the files nemia start --input gave the run and the cards --card handed it, copied in`);
     }
     for (const g of given.from) {
       copyGiven(g.source, path.join(workspace, g.dir));

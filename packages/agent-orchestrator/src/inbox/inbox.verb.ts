@@ -80,6 +80,8 @@ export type InboxStart = {
   context?: readonly string[];
   isolate?: boolean;
   inputs?: readonly string[];
+  /** The inbox cards to hand the run (`nemia start --card`), by name, beside this one. */
+  cards?: readonly string[];
   /** The steps its run is gated at (`nemia start --gate`), beside the card's own `gate:`. */
   gates?: readonly string[];
   /** The start's label edits (`nemia start --label`), over the card's own `labels:` and what its runs agree on. */
@@ -203,6 +205,7 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
     after: opts.after,
     ...(context.length ? { context } : {}),
     inputs: opts.inputs,
+    cards: opts.cards,
     from: { inbox: card.name },
     ...(gates.length ? { gates } : {}),
     ...(factory !== undefined ? { factory } : {}),

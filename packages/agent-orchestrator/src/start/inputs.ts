@@ -1,15 +1,16 @@
 /**
- * The files `nemia start --input` gives a run: why they are refused (`inputRefusal`), and how a step's brief and `nemia decide` name them
- * (`inputsLine`, `inputsNote`); what a step's brief says of the folders its run mounts (`mountsLine`); and where a run came from
- * (`fromNote`). Pure.
+ * The files `nemia start --input` gives a run and the inbox cards `nemia start --card` hands it: why they are refused (`inputRefusal`,
+ * `cardsRefusal`), and how a step's brief and `nemia decide` name them (`inputsLine`, `inputsNote`); what a step's brief says of the
+ * folders its run mounts (`mountsLine`), the folders of the runs it is handed among them; and where a run came from (`fromNote`). Pure.
  */
 import path from 'node:path';
 import { GIVEN } from '../workspace/workspace.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import type { StepSpec } from '../step/step.ts';
-import type { Mount, Run } from '../record/record.ts';
+import { CARDS_FOLDER, type Mount, type Run } from '../record/record.ts';
 import { stepMounts } from '../factory/factory.ts';
-import type { FiledFolders } from '../filed/filed.ts';
+import type { FiledFolders, HandedRunFolders } from '../filed/filed.ts';
+import type { CardsRefusal, NamedTwice } from '../../contracts/handed-runs.contract.ts';
 import { volumeMounts } from '../factory/volume/volume.ts';
 import type { Fenced } from '../workflow/index.ts';
 import { HANDED_CLOSEOUT, type HandedFiles } from '../artifacts/artifacts.ts';
@@ -47,6 +48,31 @@ export function inputRefusal(inputs: readonly InputFile[]): string | null {
   return null;
 }
 
+/**
+ * Why `nemia start --card` cannot hand the run these inbox cards, in words that name the fix — or null. Pure, and asked before anything is
+ * written: a name the inbox refuses as a card's (one of `unnamed`, as `inboxNameRefusal` judged them), a card named twice, an `--input`
+ * whose name (`inputs`, each file's name in the run's `inputs/`) would take the cards' folder, and a name with no card in the inbox (none
+ * of `found`, the names the inbox holds a card of), asked last, so a caller that asks again with every card found learns whether it was
+ * only that.
+ */
+export const cardsRefusal: CardsRefusal = (cards, unnamed, found, inputs) => {
+  const notName = cards.find((c) => unnamed.includes(c));
+  if (notName !== undefined)
+    return `--card ${notName}: that is no card's name. A card is named by its file in the inbox, minus .md, with no slash and no leading dot: give the name nemia inbox lists.`;
+  const twice = namedTwice(cards);
+  if (twice !== undefined) return `--card ${twice} is given twice, and each card is copied once. Give it one --card.`;
+  if (cards.length > 0 && inputs.includes(CARDS_FOLDER)) {
+    return `--input ${CARDS_FOLDER}: the run keeps the cards --card hands it in a folder of that name in its inputs, and the file would take its place. Rename the file, or hand it as a card.`;
+  }
+  const missing = cards.find((c) => !found.includes(c));
+  if (missing !== undefined)
+    return `--card ${missing}: the inbox has no card ${missing}. Name a card nemia inbox lists, or file it first: nemia inbox add "<idea>".`;
+  return null;
+};
+
+/** The first of `names` given before it in `names`, or undefined where each is given once. Pure. */
+export const namedTwice: NamedTwice = (names) => names.find((name, at) => names.slice(0, at).includes(name));
+
 const PICTURES = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.avif']);
 const TEXTS = new Set(['.md', '.txt', '.json', '.yaml', '.yml', '.csv', '.log', '.html', '.xml', '.toml']);
 
@@ -58,9 +84,10 @@ const inputKind = (name: string): 'a picture' | 'a text file' | 'a file' => {
 };
 
 /**
- * What a step's brief says, under a heading of its own (`INPUTS_HEADING`), when `nemia start --input` gave the run files: what they are,
- * part of what was asked; each by name with what it is (`inputKind`); then where they are and what the step may do with them. It obliges
- * no step to open one. Undefined for a run given none, or with no directory to name.
+ * What a step's brief says, under a heading of its own (`INPUTS_HEADING`), when `nemia start --input` gave the run files or
+ * `nemia start --card` handed it inbox cards: what they are, part of what was asked; each file by name with what it is (`inputKind`) and
+ * each card by name, copied under `cards/` (`CARDS_FOLDER`); then where they are and what the step may do with them. It obliges no step
+ * to open one. Undefined for a run given none, or with no directory to name.
  *
  * `inFolder` for a step of a folder run, which is fenced to its own folder, a job that asks nobody: the run's own
  * `inputs/` sits beside that folder, outside the fence, and named it the session would be denied the read with no prompt and no way to say
@@ -75,10 +102,16 @@ export const inputsLine = (
   names: readonly string[] | undefined,
   inFolder = false,
   folders?: Pick<FiledFolders, 'inputs'>,
+  cards: readonly string[] = [],
 ): string | undefined => {
-  if (!dir || !names?.length) return undefined;
-  const files = names.map((n) => `\`${n}\`, ${inputKind(n)}`).join('; ');
-  const said = `The person gave these files with what was asked for (\`nemia start --input\`). They are part of what was asked, there for you to build your understanding of the task: ${files}.`;
+  if (!dir || (!names?.length && !cards.length)) return undefined;
+  const files = names?.length
+    ? `The person gave these files with what was asked for (\`nemia start --input\`). They are part of what was asked, there for you to build your understanding of the task: ${names.map((n) => `\`${n}\`, ${inputKind(n)}`).join('; ')}.`
+    : undefined;
+  const handed = cards.length
+    ? `The person handed these inbox cards with it (\`nemia start --card\`), each copied as it read when the run started, under \`${CARDS_FOLDER}/\` as \`<name>.md\`: ${cards.map((c) => `\`${c}\``).join(', ')}.`
+    : undefined;
+  const said = [files, handed].filter((x) => x !== undefined).join(' ');
   const mounted = inFolder ? undefined : folders?.inputs[0];
   if (mounted)
     return `${said} You may read them and must not write them, in \`${mounted.path}\`. The folder is mounted read-only; read them with Read, Grep and Glob.`;
@@ -130,9 +163,9 @@ function namedWords(step: string, files: HandedFiles | undefined): string {
  * to write (`stepMounts`), the others to read and never write; then the factory's volumes as the step is filed them (`volumeLines`);
  * then the folders it is filed with beyond them (`folders`, as `filedFolders`
  * in filed.ts files them), to read and never write: its own files directory (`own`), the artifacts folders of the steps before it
- * (`handed`), each with how to list it, the store's folders its `reads:` names (`store`), the folders of the run that routed on to this
- * one (`caller`), and the run's copies of its workflow folder (`workflow`) and its carried files (`carried`), each by its path and its
- * variable (`WF_WORKFLOW_FILES`, `WF_CARRIED_FILES`); a blank line
+ * (`handed`), each with how to list it, the store's folders its `reads:` names (`store`), the folders of each run it is handed
+ * (`runsFound`, `handedRunLines`), and the run's copies of its workflow folder (`workflow`) and its carried files (`carried`), each by
+ * its path and its variable (`WF_WORKFLOW_FILES`, `WF_CARRIED_FILES`); a blank line
  * before them. Nothing for a run
  * that mounts none and a step given no other folder, and for a step on a remote agent, which is filed none.
  */
@@ -147,7 +180,7 @@ export const mountsLine = (
   const { handed, store } = local ? folders : { handed: [], store: [] };
   const own = (local ? folders.own : undefined) ?? [];
   const workflow = [
-    ...callerLines(local, folders.caller),
+    ...handedRunLines(local, folders.runsFound),
     ...workflowLines(local, folders.workflow),
     ...carriedLines(local, folders.carried),
   ];
@@ -204,14 +237,22 @@ function volumeLines(volumes: readonly Mount[]): string[] {
 }
 
 /**
- * What a brief says of the folders of the run that routed on to this one (`caller`, as `callerMounts` files them on a root, read-only), for
- * a local step: their paths, to read and never write. Nothing where none is mounted, and for a remote agent.
+ * What a brief says of the folders of each run this one is handed (`found`, as `filedFoldersAt` found them and `handedRunMounts` files
+ * them, read-only), for a local step: each run's `artifacts/` and `inputs/` by their paths, to read and never write, with how to search
+ * one; and for a run whose folders are gone from the store, that they are. Nothing where none is handed, and for a remote agent.
  */
-const callerLines = (local: boolean, caller: readonly Mount[] | undefined): string[] =>
-  local && caller?.length
-    ? [
-        `The files the run that routed on to this one wrote, which you may read and must not write: ${pathsOf(caller)}. Each is mounted read-only, a folder of a step its \`## From run\` below names; read it with Read, Grep and Glob.`,
-      ]
+const handedRunLines = (local: boolean, found: readonly HandedRunFolders[] | undefined): string[] =>
+  local
+    ? (found ?? []).map((f) => {
+        const paths = [
+          ...(f.artifacts === undefined ? [] : [`\`${f.artifacts}\` (its steps' folders, each with its closeout)`]),
+          ...(f.inputs === undefined ? [] : [`\`${f.inputs}\` (the files and cards it was handed)`]),
+        ];
+        const first = f.artifacts ?? f.inputs;
+        if (first === undefined)
+          return `This run is handed run ${f.run}, whose folders are no longer in the store: what it concluded is all that is given of it.`;
+        return `The folders of run ${f.run}, which this run is handed, which you may read and must not write: ${paths.join(', ')}. Each is mounted read-only on its own path, and the store above it is not: search one with Glob or Grep under its own path, as \`${first}/**\`.`;
+      })
     : [];
 
 /**
@@ -245,8 +286,10 @@ const carriedLines = (local: boolean, carried: readonly Mount[] | undefined): st
 export const fromNote = (run: Pick<Run, 'from'>): string | undefined => (run.from ? `from inbox card ${run.from.inbox}` : undefined);
 
 /**
- * What `nemia decide` says under a run's line when `nemia start --input` gave it files: each by name, and where they are. Undefined for a
- * run given none.
+ * What `nemia decide` says under a run's line when `nemia start --input` gave it files or `--card` handed it cards: each by name, and
+ * where they are. Undefined for a run given neither.
  */
-export const inputsNote = (dir: string, names: readonly string[] | undefined): string | undefined =>
-  names?.length ? `inputs  ${names.join(', ')}  —  in ${dir}` : undefined;
+export const inputsNote = (dir: string, names: readonly string[] | undefined, cards: readonly string[] = []): string | undefined => {
+  const all = [...(names ?? []), ...cards.map((c) => `${CARDS_FOLDER}/${c}.md`)];
+  return all.length ? `inputs  ${all.join(', ')}  —  in ${dir}` : undefined;
+};

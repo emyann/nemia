@@ -18,14 +18,13 @@ import {
   isRepositoryRun,
   lackedOf,
   type CloseoutAsked,
-  type Mount,
   type Run,
   type StepRecord,
   type StepStatus,
   type TaskPhase,
 } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
-import { filedFolders, type FiledFolders } from '../filed/filed.ts';
+import { filedFolders, type FiledFolders, type HandedRunFolders } from '../filed/filed.ts';
 import { artifactFiles, filesHanded, holdsCloseout } from '../artifacts/artifacts.store.ts';
 import { lackLines } from '../artifacts/artifacts.ts';
 import type { EndingStopped, RetryBriefing } from '../brief/index.ts';
@@ -49,7 +48,7 @@ import { landingWords, placeSay } from '../place/landing.store.ts';
 import type { Place } from '../place/place.store.ts';
 import type { PlaceSay } from '../place/place.ts';
 import { composeBrief } from '../brief/index.ts';
-import { artifactsDir, inputsDir } from '../record/record.store.ts';
+import { artifactsDir, inputsDir, isDirectory, runsDir } from '../record/record.store.ts';
 import { carriedFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
 import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
 import { doorAtOnce } from '../factory/door/factories.store.ts';
@@ -196,20 +195,44 @@ export function placeTold(
 
 /**
  * The folders a step of `run` is filed from (`filedFolders`): the run's artifacts folder, the store's inbox, the run's inputs
- * folder (`inputsDir`) only when its record names an input, so a run given none is filed and told as before, and the run's copy of its
- * workflow folder (`workflowFilesDir`) and of its carried files (`carriedFilesDir`), each only when its record names one. What a *brief*
- * reads, which asks for no server; `filedAt` is what a filing takes.
+ * folder (`inputsDir`) only when its record names an input or a card, so a run given none is filed and told as before, the folders of
+ * each run it is handed (`handedRunsAt`), and the run's copy of its workflow folder (`workflowFilesDir`) and of its carried files
+ * (`carriedFilesDir`), each only when its record names one. What a *brief* reads, which asks for no server; `filedAt` is what a filing
+ * takes.
  */
 export const filedFoldersAt = (
   home: string,
-  run: Pick<Run, 'id' | 'inputs' | 'workflowFiles' | 'carriedFiles'>,
-): { runArtifacts: string; inbox: string; inputs?: string; workflowFiles?: string; carriedFiles?: string } => ({
+  run: Pick<Run, 'id' | 'inputs' | 'cards' | 'context' | 'workflowFiles' | 'carriedFiles'>,
+): {
+  runArtifacts: string;
+  inbox: string;
+  inputs?: string;
+  workflowFiles?: string;
+  carriedFiles?: string;
+  runs?: HandedRunFolders[];
+} => ({
   runArtifacts: path.dirname(artifactsDir(home, run, 'step')),
   inbox: inboxDir(home),
-  ...(run.inputs?.length ? { inputs: inputsDir(home, run) } : {}),
+  ...(run.inputs?.length || run.cards?.length ? { inputs: inputsDir(home, run) } : {}),
+  ...(run.context?.length ? { runs: handedRunsAt(home, run.context) } : {}),
   ...(run.workflowFiles === undefined ? {} : { workflowFiles: workflowFilesDir(home, run, run.workflowFiles) }),
   ...(run.carriedFiles === undefined ? {} : { carriedFiles: carriedFilesDir(home, run, run.carriedFiles) }),
 });
+
+/**
+ * The folders of each run in `ids` (the runs a run is handed, its `context`) as they are on disk now, read on every filing: its
+ * `artifacts/` and its `inputs/` in the store `home`, each only where it is a directory, so a run forgotten since is mounted nothing.
+ */
+const handedRunsAt = (home: string, ids: readonly string[]): HandedRunFolders[] =>
+  [...new Set(ids)].map((id) => {
+    const artifacts = path.join(runsDir(home), id, 'artifacts');
+    const inputs = inputsDir(home, { id });
+    return {
+      run: id,
+      ...(isDirectory(artifacts) ? { artifacts } : {}),
+      ...(isDirectory(inputs) ? { inputs } : {}),
+    };
+  });
 
 /**
  * What a step of `run` is filed with (`filedConfig`): its folders, and the MCP servers the run's factory records, read from the store
@@ -217,7 +240,7 @@ export const filedFoldersAt = (
  * reads a store nobody named (`test/root-given.test.ts`).
  */
 export const filedAt = (
-  run: Pick<Run, 'id' | 'inputs' | 'factory' | 'workflowFiles' | 'carriedFiles'>,
+  run: Pick<Run, 'id' | 'inputs' | 'cards' | 'context' | 'factory' | 'workflowFiles' | 'carriedFiles'>,
   home: string,
 ): {
   runArtifacts: string;
@@ -225,6 +248,7 @@ export const filedAt = (
   inputs?: string;
   workflowFiles?: string;
   carriedFiles?: string;
+  runs?: HandedRunFolders[];
   servers: FactoryServers;
 } => ({
   ...filedFoldersAt(home, run),
@@ -279,9 +303,8 @@ export const foldersTold = (
   run: Run,
   reads: { steps: readonly StepSpec[]; signedOff: (step: string) => Closeout | undefined },
   step: StepSpec,
-  caller: readonly Mount[] = [],
 ): FiledFolders => {
-  const folders = filedFolders(step, reads.steps, { ...filedFoldersAt(home, run), caller });
+  const folders = filedFolders(step, reads.steps, filedFoldersAt(home, run));
   const closeouts = folders.handed.filter((m) => holdsCloseout(home, run, path.basename(m.path))).map((m) => m.path);
   const named = folders.handed
     .filter((m) => !closeouts.includes(m.path))

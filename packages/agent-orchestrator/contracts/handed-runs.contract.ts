@@ -3,47 +3,84 @@
  * before anything is written when one cannot be handed (`cardsRefusal`, src/start/inputs.ts), and the folders of each run it is handed
  * (`--from`, a card's `from:`) that a step is filed with, read-only (`handedRunMounts`, src/filed/filed.ts).
  *
- * Neither function exists yet: each spec exports its type under the function's name, and the code takes it. `inboxNameRefusal`
- * (src/inbox/inbox.ts) is the inbox's own judgement of a name, declared pure here and nothing more: a name it refuses is no card's.
+ * Each spec exports its type under the function's name, and the code takes it. Which names the inbox refuses as a card's is its own
+ * judgement (`inboxNameRefusal`, src/inbox/inbox.ts), handed in as data.
  */
 import { assume, type Implementation, spec } from '@emyann/tsverify';
-import { inboxNameRefusal } from '../src/inbox/inbox.ts';
 import { isRemoteHarness } from '../src/harness/harness.ts';
 import type { Mount } from '../src/record/record.ts';
 import type { StepSpec } from '../src/step/step.ts';
+import { handedFolders, type HandedRunFolders } from '../src/filed/filed.ts';
+import { sandboxed } from '../src/workflow/index.ts';
 
-export const cardName = assume(inboxNameRefusal, { pure: true });
+/**
+ * Whether a harness is fenced by a sandbox (`sandboxed`), read off the runtime's declarations, which the purity check cannot see into:
+ * declared, and nothing of it assumed. No law reads it: a sandboxed step reads the disk already, so it may be filed the folders or none.
+ */
+export const fencedBySandbox = assume(sandboxed, { pure: false });
+
+/**
+ * `cardsRefusal(cards, unnamed, found, inputs)`: the names `--card` gave, those of them the inbox refuses as a card's name (`unnamed`,
+ * by `inboxNameRefusal`), those it holds a card of (`found`, read through the Card door), and each `--input` file's name in the run's
+ * inputs. Both judgements are handed as data: the verifier reads each call of a function it is given as any value, so a law over
+ * `exists(c)` could not be tied to the code's own call, and it did not tie a law's call of `inboxNameRefusal`, declared pure, to the
+ * code's (a counterexample at `[""]` either way).
+ */
 
 /** The folder under the run's `inputs/` the handed cards are copied into: an `--input` of this name would take the same path. */
 const CARDS = 'cards';
 
-/** Whether `name` is given more than once in `names`. */
-const twice = (names: readonly string[], name: string): boolean => names.filter((n) => n === name).length > 1;
+/** Whether a name is given more than once in `names`: one of them was given before. */
+const twice = (names: readonly string[]): boolean => names.some((name, at) => names.slice(0, at).includes(name));
 
-const cardsRefusalSpec = spec<(cards: readonly string[], exists: (name: string) => boolean, inputs: readonly string[]) => string | null>({
+const namedTwiceSpec = spec<(names: readonly string[]) => string | undefined>({
+  ensures: {
+    foundWhenTwice: {
+      description: 'A name given more than once is found',
+      condition: ({ input: [names], output }) => !twice(names) || output !== undefined,
+    },
+    noneWhenOnce: {
+      description: 'Names each given once find none',
+      condition: ({ input: [names], output }) => twice(names) || output === undefined,
+    },
+    oneOfThem: {
+      description: 'What is found is one of the names',
+      condition: ({ input: [names], output }) => output === undefined || names.includes(output),
+    },
+  },
+  open: ['output'],
+});
+
+/** The type of the helper `cardsRefusal` leans on for a card named twice (`namedTwice`, src/start/inputs.ts). */
+export type NamedTwice = Implementation<typeof namedTwiceSpec>;
+
+const cardsRefusalSpec = spec<
+  (cards: readonly string[], unnamed: readonly string[], found: readonly string[], inputs: readonly string[]) => string | null
+>({
   ensures: {
     aCardsName: {
       description: "A name the inbox refuses as a card's name is refused",
-      condition: ({ input: [cards], output }) => cards.every((c) => inboxNameRefusal(c) === undefined) || output !== null,
+      condition: ({ input: [cards, unnamed], output }) => cards.every((c) => !unnamed.includes(c)) || output !== null,
     },
     aCardThatIsThere: {
       description: 'A name with no card in the inbox is refused, before anything is written',
-      condition: ({ input: [cards, exists], output }) =>
-        cards.every((c) => inboxNameRefusal(c) !== undefined || exists(c)) || output !== null,
+      condition: ({ input: [cards, unnamed, found], output }) =>
+        cards.every((c) => unnamed.includes(c) || found.includes(c)) || output !== null,
     },
     onceEach: {
       description: 'A card named twice is refused: each is copied once',
-      condition: ({ input: [cards], output }) => !cards.some((c) => twice(cards, c)) || output !== null,
+      condition: ({ input: [cards], output }) => !twice(cards) || output !== null,
     },
     noInputInTheirPlace: {
       description: "An --input named `cards` is refused beside a card: the cards' folder in the run's inputs takes that name",
-      condition: ({ input: [cards, , inputs], output }) => cards.length === 0 || !inputs.includes(CARDS) || output !== null,
+      condition: ({ input: [cards, , , inputs], output }) => cards.length === 0 || !inputs.includes(CARDS) || output !== null,
     },
     takenOtherwise: {
       description: 'Cards that are each a card in the inbox, named once, with no --input in their place, are taken — none among them',
-      condition: ({ input: [cards, exists, inputs], output }) =>
+      condition: ({ input: [cards, unnamed, found, inputs], output }) =>
         output === null ||
-        cards.some((c) => inboxNameRefusal(c) !== undefined || !exists(c) || twice(cards, c)) ||
+        cards.some((c) => unnamed.includes(c) || !found.includes(c)) ||
+        twice(cards) ||
         (cards.length > 0 && inputs.includes(CARDS)),
     },
   },
@@ -52,16 +89,28 @@ const cardsRefusalSpec = spec<(cards: readonly string[], exists: (name: string) 
 /** The function's type, which the code takes: it then imports nothing of tsverify. */
 export type CardsRefusal = Implementation<typeof cardsRefusalSpec>;
 
-/**
- * A run this one is handed, as the pass found its folders on disk when it files a step: its id, and its `artifacts/` and its `inputs/`,
- * each absolute and present only where it is a directory now (a run given no input has no `inputs/`; a run forgotten has neither).
- * Implement moves it into src/filed/filed.ts beside the function, which changes no law.
- */
-export type HandedRunFolders = { run: string; artifacts?: string; inputs?: string };
+const handedFoldersSpec = spec<(found: readonly HandedRunFolders[]) => string[]>({
+  ensures: {
+    onlyTheirs: {
+      description: "Only a handed run's artifacts and inputs folders, as the pass found them, are listed",
+      condition: ({ input: [found], output }) => output.every((p) => found.some((f) => f.artifacts === p || f.inputs === p)),
+    },
+    everyArtifacts: {
+      description: "Every handed run's artifacts folder the pass found is listed",
+      condition: ({ input: [found], output }) => found.every((f) => f.artifacts === undefined || output.includes(f.artifacts)),
+    },
+    everyInputs: {
+      description: "Every handed run's inputs folder the pass found is listed",
+      condition: ({ input: [found], output }) => found.every((f) => f.inputs === undefined || output.includes(f.inputs)),
+    },
+  },
+});
 
-/** Each folder the pass found of `found`, by its absolute path. */
-const foundPaths = (found: readonly HandedRunFolders[]): string[] =>
-  found.flatMap((f) => [...(f.artifacts === undefined ? [] : [f.artifacts]), ...(f.inputs === undefined ? [] : [f.inputs])]);
+/** The type of each folder the pass found of the runs a run is handed, by its absolute path (`handedFolders`, src/filed/filed.ts). */
+export type HandedFolders = Implementation<typeof handedFoldersSpec>;
+
+/** Each folder the pass found of `found`, by its absolute path: the code's own list, whose laws are above. */
+const foundPaths = (found: readonly HandedRunFolders[]): string[] => handedFolders(found);
 
 const handedRunMountsSpec = spec<(step: Pick<StepSpec, 'harness'>, found: readonly HandedRunFolders[]) => Mount[]>({
   ensures: {
@@ -79,7 +128,7 @@ const handedRunMountsSpec = spec<(step: Pick<StepSpec, 'harness'>, found: readon
     },
     everyStepOfTheDefaultHarness: {
       description:
-        "A step on the default harness, fenced by its mode, is filed every folder found — whatever steps it comes after, not the roots alone — so Read, Grep and Glob reach them",
+        'A step on the default harness, fenced by its mode, is filed every folder found — whatever steps it comes after, not the roots alone — so Read, Grep and Glob reach them',
       condition: ({ input: [step, found], output }) =>
         step.harness !== undefined || foundPaths(found).every((p) => output.some((m) => m.path === p)),
     },

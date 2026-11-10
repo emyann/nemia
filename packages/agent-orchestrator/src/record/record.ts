@@ -74,6 +74,9 @@ export type Hold = { at: string; until: readonly string[]; why?: string; by?: st
 /** The longest a hold's why is kept and shown (`nemia hold --why`): what is over it is clipped with `…` (`oneLine`). */
 export const WHY_CAP = 200;
 
+/** The folder under a run's `inputs/` that `nemia start --card` copies each card it is handed into, as `<name>.md`. */
+export const CARDS_FOLDER = 'cards';
+
 /** The longest a hold's name for who put it is kept and shown (`nemia hold --by`). */
 export const BY_CAP = 64;
 

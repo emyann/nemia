@@ -35,7 +35,7 @@ import {
   triedFrom,
   type Round,
 } from '../status/status.ts';
-import { callerMounts, composeBrief, remoteBrief, type ParentCloseout, type RetryBriefing } from '../brief/index.ts';
+import { composeBrief, remoteBrief, type ParentCloseout, type RetryBriefing } from '../brief/index.ts';
 import { handedOf } from '../brief/handed.verb.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
 import { roundBriefed, roundFiled, roundFiledNote } from '../round/round.ts';
@@ -612,7 +612,7 @@ function readySpec(
           step.after.length ? undefined : parents,
           inputsDir(home, run),
           said.checked,
-          foldersTold(home, run, reads, told.step, callerMounts(step, parents)),
+          foldersTold(home, run, reads, told.step),
           said.costs,
           { words: said.words, say: said.say, targets: said.targets },
           place.merge,
@@ -628,7 +628,6 @@ function readySpec(
         model: step.model,
         ...filedAt(run, f.home),
         ...stepToken(f.home, run, step, stepTaskId(run, step.name, tryOf(run, step.name)), tryOf(run, step.name)),
-        caller: callerMounts(step, parents),
         budgetUsd: budgetUsdFor(budgetOf(step, run), stepSpend(run, step.name, reads.spendOf)),
         own: told.own,
         landingDenied: () => said.words?.denied ?? [],

@@ -211,7 +211,7 @@ export function composeBrief(
     ? step.after
     : steps.filter((s) => s.name !== step.name && run.steps[s.name]?.taskId).map((s) => s.name);
 
-  const inputs = inputsLine(inputsDir, run.inputs, inFolder, folders);
+  const inputs = inputsLine(inputsDir, run.inputs, inFolder, folders, run.cards);
   const request = [run.brief, ...mountsLine(step, run, folders), ...(inputs ? ['', INPUTS_HEADING, '', inputs] : [])];
   const opening = [opened(step), ''];
   const parts = [...opening, '## What was asked for', '', ...request, ...handed.parents, ...handed.decided];
@@ -411,6 +411,12 @@ export function remoteBrief(
         `Files were given with it (\`nemia start --input\`): ${run.inputs.map((n) => `\`${n}\``).join(', ')}. They stay on the machine that runs this workflow and are not sent to you.`,
       ]
     : [];
+  const cards = run.cards?.length
+    ? [
+        '',
+        `Inbox cards were handed with it (\`nemia start --card\`): ${run.cards.map((n) => `\`${n}\``).join(', ')}. They stay on the machine that runs this workflow and are not sent to you.`,
+      ]
+    : [];
   const handed = [
     ...(parents ?? []).map((p) => handedSection(p, true)),
     approvedSection(step, run, steps),
@@ -424,6 +430,7 @@ export function remoteBrief(
     '',
     run.brief,
     ...inputs,
+    ...cards,
     ...handed,
     ...given,
     ...(retry ? [remoteTrySection(step, retry)] : []),

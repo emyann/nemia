@@ -7,8 +7,7 @@ import { Cause, Effect, Exit, Result } from 'effect';
 import { asked, over, type Engine } from '../runtime-client.ts';
 import type { StepSpec } from '../workflow.ts';
 import type { Run } from '../record/record.ts';
-import { resultSteps, routedResult } from '../branches/index.ts';
-import { artifactsDir } from '../record/record.store.ts';
+import { resultSteps } from '../branches/index.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { runsAtOnce } from '../runs/runs.store.ts';
 import { closeoutOf, parentRead } from '../views/views.verb.ts';
@@ -36,10 +35,6 @@ const stepSaid = Effect.fn('stepSaid')(function* (e: Engine, record: Run, step: 
   if ('error' in c) return { name: step.name, unreadable: `its closeout cannot be read: ${c.error}` };
   return { step, said: c } satisfies ParentStep;
 });
-
-/** A step of a run that routed on to this one, with its artifacts folder named (`files`), which its brief names as the caller's to read. */
-const filesNamed = (home: string, s: ParentStep, record: Run, routed: boolean): ParentStep =>
-  routed && 'said' in s ? { ...s, files: artifactsDir(home, record, s.step.name) } : s;
 
 /**
  * What each run this one waited on or was handed as context concluded, for its roots' briefs (`## From run <id>` in `composeBrief`), each
@@ -79,8 +74,7 @@ export const parentCloseouts = Effect.fn('parentCloseouts')(function* (
     }
     const steps: StepSpec[] = read.success;
     const said: ParentStep[] = [];
-    const routed = routedResult(steps, record).length > 0;
-    for (const step of resultSteps(steps, record)) said.push(filesNamed(home, yield* stepSaid(e, record, step), record, routed));
+    for (const step of resultSteps(steps, record)) said.push(yield* stepSaid(e, record, step));
     const landed = how === 'waited' || (yield* parentRead(id, git).pipe(over(e))).landed;
     out.push({ run: id, asked: firstPiece(record.brief, '\n'), steps: said, how, landed });
   }

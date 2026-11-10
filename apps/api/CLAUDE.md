@@ -22,8 +22,8 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   a name refusal.
 - **The run object, its sub-resources and the list answer from the app's informer** (`Informer`, one per app from `liveOf`; the
   package's `informerRead` in `rest/informer.verb.ts`): a run at rest while its record, its stamps, the feed for its tasks and its
-  branch tips stand, and a moving run within the pass that judged it. A write through the api drops its run (`uninformed`,
-  `commands/routes.ts`). A new input `summaryOf` reads for a run goes into one of those, or a poll answers it stale. The informer keeps the run it
+  branch tips stand, and a moving run within the pass that judged it. A write through the api drops its run (`dropInformed`, by
+  `acted` in `src/objects/runs.ts`). A new input `summaryOf` reads for a run goes into one of those, or a poll answers it stale. The informer keeps the run it
   judged and hands it to the store in place of a read of its record (`given`), so a warm list reads no record of a run at rest. The
   RunList serves each run's listed object kept beside its judgement, its disk parts read per request (`diskPartsOf`).
   `WF_VERIFY_REST=1` (set by the harness) judges every kept answer afresh and is handed nothing from memory, so every record is read
@@ -45,33 +45,31 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
 - **The list's `toDecide` is not the package's decision**: `decision` answers `awaiting` where `toDecide` says nothing.
 - **A remote step's wait is answered with `wf say`** (`answerIn` in the package's `needsOf`), never in Claude Code.
 - **A new key in `STEP_KEYS` or `AGENT_KEYS` has sites here**: see `packages/agent-orchestrator/CLAUDE.md`.
-- **The objects are served by HttpApi handlers in `src/objects/`** (`runs.ts`, `cards.ts`; the factories in `src/factory/`:
-  `factories.ts`, where a request is answered in `place.ts`, and its parts in `src/factory/parts/`: `mcp-servers.ts`, `schedules.ts`,
-  `hires.ts`, `volumes.ts`, and in `parts.ts` what they share, their paths and the guard words of their writes; the Workflows, Agents and Skills in `src/definitions/`: `workflows.ts`, `agents.ts`, `skills.ts`,
-  in `served.ts` what they share and in `routes.ts` their paths and guard words, each request placed in its namespace's factory by
-  `placeFor`, a write of yours taken in `default` alone; the cluster's builtin templates, the feed's subscriptions and its lines as
-  events in `src/template-objects/templates.ts` and `src/feed-objects/` (`subscriptions.ts`, `events.ts`), a template's documents read from its render by the definitions' own
-  tree readers, `treeWorkflowsHeld`, `treeAgentsHeld` and `treeSkillsHeld`), built from `objects`' one `Api` into a web
-  handler (`serve.ts`) that Hono's routes hand exactly the paths it serves, each inside `served`, guarded first where it writes: a handler
-  reads the request's services (`ServedNow`, the app's informer among them), never a layer of its own. A path added to the `Api` gets its
-  forwarding route there, or Hono answers it 404. The feed, `watch` and every other route stay Hono's.
+- **`objects`' `Api` is the one route table** (`docs/architecture.md`): every route the api serves is an endpoint there, served by the
+  mount (`src/objects/serve.ts`, `.all(MOUNT, mount(runtime))` in `app.ts`), and Hono is the host alone — its middleware, the three
+  OpenAPI routes and the 404. A route is added to the `Api` and handled in its group's folder (`runs/`, `steps/`, `decide/`, `server/`,
+  `nemia/`, `workflows/`, `agents/`, `skills/`, `factory/`, `proposals/`, `src/objects/` for the runs and cards), never on Hono:
+  `test/served.test.ts` derives what is served from the `Api`. A handler reads the request's services (`ServedNow`, the app's informer
+  among them), never a layer of its own, and calls the package's verbs by type (`ENTRY.handler(input, env, home)` through `inRequest`),
+  each request of a namespaced kind placed in its namespace's factory (`placeFor`, `answeredIn`), a write of yours taken in `default`
+  alone. A refusal's status is its class's, said once (`refusedAs`, `statusOf`, `src/objects/refused.ts`).
 - **Who a request is from is resolved before any router** (`callerGate`, `src/caller/caller.ts`): a handler reads `caller` off `Served`,
   never the `Authorization` header, and hands it to the package's program, which judges it (`src/proposals/`). A token refused is a 401
   on every route, not the proposals' alone. A test that presents a live token mints it through the package's `TokenDoor`, its run
   planted and its task filed on the stand-in (`src/proposals/proposals.test.ts`).
-- **Every list is watched by `watchable`** (`src/watch/watch.ts`, `?watch=true`): a list's route goes through `listed` in `serve.ts`
-  (and `partsRoutes`' and `definitionsRoutes`' `listed`), or it is not watched, which `src/watch/watch.test.ts` refuses for every GET
-  list of the `Api`. A watch reads its list again through its own route, so each open one costs a list read per feed line (at most
-  one per 500 ms) and per resync: a watch of runs on a busy feed reads the RunList about a third of the time (the measure below).
-  The Event lists are the exception: their watch follows the feed (`eventsFollowed`, `src/feed-objects/events-watch.ts`) and never reads
-  the list again, since a read of it is a read of the whole feed. A list whose objects carry parts measured to the read hands
-  `watchable` the version it compares them at (`versionOf`; the runs' `runWatchVersion`, which leaves out a going run's `wallMs` and
-  `clock`), or its watch sends a MODIFIED of each on every read. Discovery (`GET /api`,
-  `src/discovery/discovery.ts`) is read off the `Api`, so a path added there is discovered with nothing to change. SSE under HttpApi was
-  measured on 2026-11-05 (`docs/measure-2026-11-05-sse-under-httpapi.md`): the watch's frames are already HttpApi's and it can move;
-  the feed can once its opening comment and its `Last-Event-ID` resume are written through `StreamSse({ events })`. Neither moved yet.
-- **A request body is decoded by its route's schema** (`readBody` in `body.ts`) and refused in the route's own words, the first wrong
-  key named: no schema message reaches a response. A new key goes into the schema and its `*_SHAPE`, with a test that makes it refuse.
+- **Every list is watched by `watchable`** (`src/watch/watch.ts`, `?watch=true`): a GET whose success is a `<Kind>List` is watched by
+  the mount with nothing to add (`src/objects/serve.ts`), which `src/watch/watch.test.ts` holds for every such endpoint of the `Api`; a
+  watch asked for a `Table` is refused 406. A watch reads its list again, so each open one costs a list read per feed line (at most one
+  per 500 ms) and per resync: a watch of runs on a busy feed reads the RunList about a third of the time (the measure below). The Event
+  lists are the exception: their watch follows the feed (`eventsFollowed`, `src/feed-objects/events-watch.ts`). A list whose objects
+  carry parts measured to the read hands `watchable` the version it compares them at (the runs' `runWatchVersion`, which leaves out a
+  going run's `wallMs` and `clock`), or its watch sends a MODIFIED of each on every read. Discovery (`GET /api`,
+  `src/discovery/discovery.ts`) is read off the `Api` by `objects`' `resourcesOf`. The feed and a step's stream are `StreamSse`
+  endpoints.
+- **A request body is decoded by its endpoint's Schema** and refused 400 with the `field` it stopped at (`src/body.ts`, read by
+  `serve.ts`): no schema message reaches a response. A new key goes into the Schema in `objects`, with a test that makes it refuse.
+- **A server-side `Table`** (Kubernetes' `Accept: application/json;as=Table;g=meta.k8s.io;v=v1`, `TABLE_ACCEPT`) is answered where an
+  endpoint declares `Table` beside its list (runs, cards) and the request accepts it (`wantsTable`, `src/objects/table.ts`).
 - **A feed fixture writes the events the runtime writes**: the runtime decodes its feed, so a fixture event missing a field the
   runtime always writes fails the read, not the assertion you meant.
 - **A handler reads what it needs through `served(c, …)`** (`layer.ts`), never off a module: the engine, the store's root, the

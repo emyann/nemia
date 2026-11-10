@@ -68,84 +68,18 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  * `runtime.context()` needs it, and put on every request before any router is reached (`served`, layer.ts). A service the layer gives
  * twice is the one given last (`Layer.merge`): how a test gives the api an engine, a root or an asker of its own.
  *
- * The api's routes: every one the board reads and writes, its groups each in a router of their own. Each is declared by an entry of the
- * package's command table — a command of the CLI's on its route, or one the api serves alone (`only: api`), the board's library, pages
- * and merge check among them — or is the api's own, a stream or a read of the server or the machine, each with why
- * (`OWN` in test/served.test.ts).
+ * Hono is the host alone. Every route the api serves is an endpoint of `objects`' `Api`, the one route table, served by the mount
+ * (`.all(MOUNT, mount(runtime))`, objects/serve.ts): its body decoded by the endpoint's Schema (a 400 naming the `field`), its handler
+ * in the folder of its group (runs/, steps/, decide/, server/, nemia/, workflows/, agents/, skills/, factory/, proposals/, objects/),
+ * each calling the package's verbs by type, and a GET answering a `…List` watched on `?watch=true` (watch/watch.ts) and a `Table` where
+ * the request accepts one (objects/table.ts). Only the three OpenAPI routes stay outside it: the document, its page and the page's
+ * script (openapi/). A path neither serves is the api's own 404 (`noRoute`).
  *
- * - server/server.ts — the server and the machine, served through `objects`' Api by the mount (its `server` group): health, version,
- *   capabilities, the repository a start runs in, your store, the run slots, the passes, the series, the metrics, the daemon, the quota,
- *   the flow numbers, the store's pause read, put and lifted, and the workflow feed followed as server-sent events.
- * - factory/factories.ts, and factory/parts/: mcp-servers.ts, schedules.ts, hires.ts, volumes.ts — the factories as objects, and their
- *   servers, schedules, hires and volumes in each factory's namespace, served through `objects`' Api by the mount (objects/serve.ts,
- *   the handlers through factory/index.ts). A handler of a namespaced kind is answered in its namespace's factory and on the repository
- *   `?repo=` names (`answeredIn`, objects/refused.ts), refused when it names a repository no factory has (`placeFor`, factory/place.ts).
- * - `GET /api/capabilities` — what the repository offers a step, read from the checkout on each request (capabilities/capabilities.ts), and
- *   what each step of each workflow gets of it (capabilities/reach.ts). Each MCP server the settings enable is started and asked for its
- *   tools once while the app runs (`McpAsker`); one that fails is an `error` on its entry, never a failed request.
- * - workflows/, agents/, skills/ — the Workflows, Agents and Skills as objects, each in a namespace (`default`, the api's repository and
- *   your library, or a factory's), served through `objects`' Api (objects/serve.ts), each group's handlers in its folder (`handlers.ts`),
- *   what they share in definitions/served.ts: listed, read by origin, and yours written in `default` alone; a workflow's step read for its
- *   page and the builder's form (`GET /api/workflows/keys`); where agent files are looked for (`GET /api/agents/sources`), one copied into
- *   yours, and an agent's custom instructions (`…/agents/<name>/instructions`).
- * - proposals/ — a factory's Proposals, made by any caller of the factory, approved by the person or a delegated agent at auto and
- *   applied, declined by the person; and its Delegations, written by the person alone; served through `objects`' Api (objects/serve.ts),
- *   each judged by who calls (`caller`, caller/caller.ts).
- * - workflows/workflows.ts — a run of a workflow started, the board's first write, or of an inbox card.
- * - workflows/yours.ts — your store's folders under the store root, and the line that files a factory in it.
- * - inbox/inbox.ts — what a card filed through the Card's verb files, and the inbox listed with each card's body. The Card's verbs —
- *   listed, read alone with its file as written, written whole, filed, dropped, started, queued, labelled — are the objects'
- *   (objects/cards.ts).
- * - stats/stats.ts — the flow numbers of every run in the store, as `nemia stats --json` prints them.
- * - `GET /api/ceilings` — the cap on runs in flight the daemon's last pass ran with, and the runs it counts and holds: what the Factory
- *   says over its floor. 422 for a `WF_MAX_RUNS` in the api's environment that is not a count, before any pass wrote the daemon's
- *   (`maxRuns`, an `Invalid`).
- * - `GET /api/passes` — what the recent passes of the tick cost, `{ recent, histogram, parts, summary, bounds }`, as `nemia passes --json`
- *   prints it: read off the store's `tick-recent.json`, which the ticking process keeps, the api's own or a `nemia up`'s. `?last=<n>` keeps
- *   the last n; 422 for one that is not a whole number from 1.
- * - `GET /api/series` — the system's series over a range, `{ range, span, from, to, series }`, as `nemia series --json` prints it: read
- *   off the store's `metrics/` minute lines for `?range=24h` (the default) and its hour lines for `7d`, `30d` and `all`, which the ticking
- *   process keeps; a past day off the app's memo while its file has not moved. 422 for a range it does not take.
- * - `GET /api/metrics` — the process's metrics, each `{ name, type, description, attributes }` and its value (`MetricRead`,
- *   gauges/ceilings.ts), in the registry of the app's runtime: the files the runtime read for each request, its journals and every
- *   other, by its route's pattern (`api.poll.reads`, about, since a pass or another request reading at the same time is counted too),
- *   and the pass's (`pass.duration`, `pass.phase.duration`, `pass.journal_reads`, `store.runs`, `sessions.queued`, `sessions.admitted`)
- *   only where this process ticks: an api started with `--no-tick`, or beside a `nemia up`, has none of them.
- * - `GET /api/pause` — the store's pause, `{ pause, finishing, staged, held }`: since when, by whom and why, or null; each task still
- *   finishing under it (`{ run, step, kind, calling? }`, a `session`, `check` or `landing`, and the tool a session is in a call to),
- *   none once it is Paused; each landing it holds with its merge staged in the repository's checkout (MERGE_HEAD), and each other step
- *   signed off (`{ run, step }`), its check not filed until it resumes (`pausedRead`). Put on
- *   `POST /api/pause` and lifted on `DELETE /api/pause` (commands/routes.ts).
- * - `GET /api/pause/now` — what a pause at once (`POST /api/pause` with `now`) would stop, `{ interrupts, cost }`: each step session or
- *   check at work, of a run not called off, but a landing (`{ run, step, kind, taskId }`, a `session` or `check`), and the sentence of
- *   what an interrupted step costs (`nowRead`). Read off one view of the engine, and nothing written.
- * - `GET /api/daemon` — whether a nemia up ticks the store, and since when, and when it last passed: read off daemon.json and the process
- *   table as nemia ls reads them, and never written, the file being the daemon's. What the Factory says over its floor when nothing ticks.
- *   500 for a daemon.json that is there and cannot be read — a directory in its place, a permission: the package throws rather than call
- *   it free.
- * - `GET /api/quota` — the subscription's quota, as the engine's `quota` answers it for the `claude` harness (Claude Code's get_usage
- *   request), asked at most once a keep however many boards read (`QuotaAsker`, gauges/quota.ts): what the Factory says over its floor.
- *   Every case is a 200 with a sentence, the harness's failures and the engine's refusals included.
- * - commands/routes.ts — the routes the package's table generates, each through one pipeline: the store's pause put and lifted,
- *   `nemia pause` and `nemia resume`'s routes; an agent's custom instructions
- *   written and cleared; and a factory's instruction put where it is kept, and written and cleared.
- * - gauges/feed.ts — the workflow feed followed, as server-sent events.
- * - nemia/nemia.ts — Nemia, the store's own agent: where she is (`nemia level`'s read), and the facts she keeps (`nemia memory`). Her
- *   level is set on the route the table generates from `nemia level`.
- * - nemia/chat.ts — Nemia's chat: her history paged and followed, the person's words sent, and their read mark moved.
- *
- * A route lets the orchestrator's refusals through, and `onError` answers each as the one map says (`refusedAs`, objects/refused.ts), at
- * its class's status, `{ error }` in its words (`answerError`). Any other error is a 500 there: a route that has better words for one, or
- * a truer status, answers it itself.
- *
- * Every write under `/api/` meets the one guard first (`writeGuard`, guard.ts), whatever route serves it. After the routes still on Hono,
- * the mount hands every other request under `/api/` to the web handler of `objects`' `Api` (`.all(MOUNT, mount(runtime))`,
- * objects/serve.ts); a path neither serves is the api's own 404 (`noRoute`).
- *
- * Every request, whichever route answers it, says one line and is traced as a server span: `saidRequest` (request/request.ts), registered
- * after the runtime's middleware and before every router, on the runtime the request carries. Then who it is from (`callerGate`,
- * caller/caller.ts): the person with no `Authorization`, an agent's session by the token it presents, a token refused 401 whatever the
- * route.
+ * Before any of them, every request says one line and is traced as a server span (`saidRequest`, request/request.ts); who it is from is
+ * resolved (`callerGate`, caller/caller.ts: the person with no `Authorization`, an agent's session by the token it presents, a token
+ * refused 401 whatever the route); and every write under `/api/` meets the one guard (`writeGuard`, guard.ts: a 403 off the host or the
+ * site, a 415 off JSON). A refusal thrown anywhere is answered by the one map (`refusedAs`, objects/refused.ts), at its class's status
+ * (`answerError`).
  */
 export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtime: ApiRuntime } {
   const runtime = ManagedRuntime.make(layer);

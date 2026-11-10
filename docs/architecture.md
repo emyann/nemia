@@ -27,7 +27,7 @@ runtime's `contract.test.ts`, the web's and the cli's `structure.test.ts`):
 
 - the web reaches the api over HTTP alone, and the shapes of what it serves by `objects` (`apps/web/test/structure.test.ts`, and the
   web's lint block);
-- the cli reaches the api over HTTP alone, the shapes of its answers by `import type` from `apps/api/src/client/client.ts`, the store's
+- the cli reaches the api over HTTP alone, the shapes of its answers by `objects`' Schemas and the error body by `import type` from `apps/api/src/client/client.ts`, the store's
   daemon by its lease (`daemon.json`'s `url`) in `src/where.ts`, and the in-process path by spawning `agent-orchestrator/bin` from
   `src/local.ts` (`apps/cli/test/structure.test.ts`, the cli's lint block, and the resolve in
   `packages/agent-orchestrator/test/contract.test.ts`). What it does not move — `decide` and every write but one — stays on that path;
@@ -264,7 +264,7 @@ was read at, and an agent of yours tried on a short brief, each one entry of the
 (`src/agents/library.verb.ts`, `src/skills/skills.verb.ts`, `src/workflows/workflows.verb.ts`), its handler refusing a place but yours. The
 command line reads a person's file or draft folder into the form the board sends (`src/cli/writers.ts`); the api guards the write and
 words the board's answer. Both sides hand a handler only what its one spec gives it (`test/writers-cli.test.ts`,
-`apps/api/src/commands/writers.test.ts`).
+`apps/api/src/agents/writers.test.ts`).
 
 **A proposal is how a factory's definitions change by an agent's hand**, and each layer owns one part of it. The kinds are
 `objects`'s (`Proposal` and `Delegation`, `packages/objects/src/proposal.ts` and `delegation.ts`, their words closed in `words.ts`:
@@ -653,11 +653,11 @@ the entry files, `main.ts`, `app.ts` and `layer.ts`, which may read the environm
 which import no node:fs (nor fs/promises), node:child_process, node:http, node:https, node:net or node:os, nor `@hono/node-server`,
 and read neither `process.env` nor `fetch`. A reader that does today is listed with what it reaches (`MOVES`), and the list only
 shrinks. Its `src/` is a folder per page or verb a
-person uses — `runs/`, `objects/` (the handlers of `objects`' `Api`, the run object and the cards, built into one web handler mounted on Hono's routes for the paths it serves), `openapi/`, `steps/`, `decide/`, `asks/`, `inbox/`, `factory/`, `capabilities/`, `workflows/`,
+person uses — `runs/`, `objects/` (the handlers of the run object and the cards, and the mount that serves every endpoint of `objects`' `Api`, the one route table, under Hono as host), `openapi/`, `steps/`, `decide/`, `server/`, `nemia/`, `asks/`, `inbox/`, `factory/`, `capabilities/`, `workflows/`,
 `agents/`. The root holds `main.ts`, `app.ts`, `port.ts`, `guard.ts`, `store.ts`, `layer.ts` (the services a handler reads, and
-`served`, which runs it on the app's `ManagedRuntime`) and `body.ts` (the request-body reader every folder uses) and nothing else.
+`served`, which runs it on the app's `ManagedRuntime`) and `body.ts` (the mount's body decoder, naming the `field` a 400 stopped at) and nothing else.
 Its folders keep the rule every package keeps, *Folders, in every package* below; a folder of two files or more has a face,
-`index.ts`, which holds only re-exports by name, and one of one file has none. `app.ts` mounts each folder through its face. An
+`index.ts`, which holds only re-exports by name, and one of one file has none. `app.ts` mounts `objects`' `Api` once, and each folder's handlers are built from it through its face. An
 import between two folders names the file it needs wherever the face would close a cycle — `steps/` reads a run's try — since a cycle
 of values passes the typecheck and fails only as the modules load. Test: `apps/api/test/layout.test.ts`.
 

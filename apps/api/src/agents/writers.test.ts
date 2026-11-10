@@ -107,7 +107,7 @@ test("each writer's route hands its handler only the keys its one spec gives a h
   const elsewhere = scratch('nemia-api-writers-copy-');
   fs.writeFileSync(path.join(elsewhere, 'clerk.md'), '---\ndescription: Use this when notes need filing.\n---\nFile them.\n');
   await heldToSpec(t, 'agents copy', 200, () =>
-    sent('POST', '/api/agents/yours/copy', { file: path.join(elsewhere, 'clerk.md'), as: 'filing-clerk', keep: [] }),
+    sent('POST', `${D}/agents/copy`, { file: path.join(elsewhere, 'clerk.md'), as: 'filing-clerk', keep: [] }),
   );
 
   const skill = {

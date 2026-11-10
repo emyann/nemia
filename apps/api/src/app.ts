@@ -5,9 +5,6 @@ import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { feedHubLayer, gitPlaceLayer, informerLayer, runningRelease, storeRootLayer, telemetryLayer } from 'agent-orchestrator';
 import { callerGate } from './caller/caller.ts';
-import { agents } from './agents/index.ts';
-import { customInstructions } from './custom/custom.ts';
-import { commands } from './commands/index.ts';
 import { McpAsker } from './capabilities/index.ts';
 import { QuotaAsker } from './gauges/index.ts';
 import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, type Services } from './layer.ts';
@@ -15,10 +12,8 @@ import { bodyOf, MOUNT, mount, noRoute, refusedAs, statusOf } from './objects/in
 import { writeGuard } from './guard.ts';
 import { openapi, REFERENCE_BUNDLE, referenceOf } from './openapi/index.ts';
 import { saidRequest } from './request/request.ts';
-import { step } from './step/step.ts';
 import { Followings } from './steps/index.ts';
 import { Engine } from './store.ts';
-import { builder } from './workflows/index.ts';
 
 /**
  * What the api answers an error a route on Hono threw: a refusal — the orchestrator's by its tag, the api's own refusal of a session token
@@ -85,17 +80,19 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  *   servers, schedules, hires and volumes in each factory's namespace, served through `objects`' Api by the mount (objects/serve.ts,
  *   the handlers through factory/index.ts). A handler of a namespaced kind is answered in its namespace's factory and on the repository
  *   `?repo=` names (`answeredIn`, objects/refused.ts), refused when it names a repository no factory has (`placeFor`, factory/place.ts).
- * - definitions/ — the Workflows, Agents and Skills as objects, each in a namespace (`default`, the api's repository and your library, or a
- *   factory's), served through `objects`' Api (objects/serve.ts): listed, read by origin, and yours written in `default` alone.
+ * - `GET /api/capabilities` — what the repository offers a step, read from the checkout on each request (capabilities/capabilities.ts), and
+ *   what each step of each workflow gets of it (capabilities/reach.ts). Each MCP server the settings enable is started and asked for its
+ *   tools once while the app runs (`McpAsker`); one that fails is an `error` on its entry, never a failed request.
+ * - workflows/, agents/, skills/ — the Workflows, Agents and Skills as objects, each in a namespace (`default`, the api's repository and
+ *   your library, or a factory's), served through `objects`' Api (objects/serve.ts), each group's handlers in its folder (`handlers.ts`),
+ *   what they share in definitions/served.ts: listed, read by origin, and yours written in `default` alone; a workflow's step read for its
+ *   page and the builder's form (`GET /api/workflows/keys`); where agent files are looked for (`GET /api/agents/sources`), one copied into
+ *   yours, and an agent's custom instructions (`…/agents/<name>/instructions`).
  * - proposals/ — a factory's Proposals, made by any caller of the factory, approved by the person or a delegated agent at auto and
  *   applied, declined by the person; and its Delegations, written by the person alone; served through `objects`' Api (objects/serve.ts),
  *   each judged by who calls (`caller`, caller/caller.ts).
  * - workflows/workflows.ts — a run of a workflow started, the board's first write, or of an inbox card.
- * - workflows/builder.ts — what a step's form is drawn from (`GET /api/workflows/keys`), and the builder's write the Workflow's PUT calls.
- * - agents/agents.ts — where agents are looked for (`GET /api/agents/sources`), and the reads and writes the Agent object calls.
- * - custom/custom.ts — a person's custom instructions for an agent, by its name, read through `nemia agents custom`'s entry; written and
- *   cleared on the routes the table generates from it (commands/routes.ts).
- * - agents/skills.ts — the reads and writes of a skill the Skill object calls.
+ * - workflows/yours.ts — your store's folders under the store root, and the line that files a factory in it.
  * - inbox/inbox.ts — what a card filed through the Card's verb files, and the inbox listed with each card's body. The Card's verbs —
  *   listed, read alone with its file as written, written whole, filed, dropped, started, queued, labelled — are the objects'
  *   (objects/cards.ts).
@@ -162,11 +159,6 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .use(writeGuard)
     .route('/', openapi)
     .route('/', referenceOf(viewerScript))
-    .route('/', step)
-    .route('/', builder)
-    .route('/', agents)
-    .route('/', customInstructions)
-    .route('/', commands)
     .all(MOUNT, mount(runtime))
     .notFound(noRoute)
     .onError(answerError);

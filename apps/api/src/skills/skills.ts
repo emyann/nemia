@@ -1,5 +1,5 @@
 /**
- * The skills an agent of yours can be given, as the board's skill picker lists them, and a builtin skill copied into your library.
+ * The skills an agent of yours can be given, as the Skill objects list them (`handlers.ts`), and a builtin skill copied into your library.
  *
  * An agent of yours finds a skill as a start finds it (`lookupRoots`): the store's `workflows/skills/` — your library — then the
  * `.claude/skills/` of the repository the board serves. The first that has a name wins, so a name in both is listed once, in your library.
@@ -11,9 +11,9 @@
  * whether it is loaded every turn (`preload: true`), what it costs a turn (`skillTurnCost`: about, at four characters a token), and the
  * agents of yours that give it.
  *
- * And one skill on a page of its own (`skillDetail`), and one of yours written on the board (`writeSkill`): made, changed at the version it
- * was read at, or its `preload:` alone switched. Every write is to your library; the api writes nothing into a checkout, so a skill of the
- * repository's is read there, and a page says the `cp -r` that moves a skill between the two.
+ * And a SKILL.md as the Skill's spec (`skillSpecOf`), and one of yours written (`written`): made, changed at the version it was read at,
+ * or its `preload:` alone switched. Every write is to your library; the api writes nothing into a checkout, so a skill of the
+ * repository's is read there, and its object says the `cp -r` that moves a skill between the two.
  */
 import path from 'node:path';
 import { Effect, Schema } from 'effect';
@@ -28,11 +28,11 @@ import {
   SkillDoor,
   skillDirIn,
   type AgentPlace,
+  SKILLS_LIST,
+  SKILLS_READ,
+  SKILLS_WRITE,
   type SkillChange,
-  type SkillPage,
   type SkillRead,
-  type SkillWritten,
-  skillCopyCommand,
 } from 'agent-orchestrator';
 import {
   SKILLS_FOLDER,
@@ -46,11 +46,9 @@ import {
   type SkillsFound,
 } from 'agent-orchestrator/workflow';
 import type { Refusal } from '../guard.ts';
-
-import type { Engine, RunsOn } from '../store.ts';
-import { placesOf, type InRequest } from '../workflows/workflows.ts';
-import { commandNamed, runPlaced } from '../store.ts';
-import type { DefinitionOrigin } from 'objects';
+import type { Served } from '../layer.ts';
+import { placesOf } from '../workflows/workflows.ts';
+import type { DefinitionOrigin, SkillSpec } from 'objects';
 
 /**
  * Where a skill is: your library (the store's), the repository the board serves (its `.claude/skills/`, or `workflows/skills/` beside its
@@ -77,9 +75,6 @@ export type SkillRow = {
 
 /** One place the picker lists, in the order an agent of yours finds a name, the builtin last: its skills by name. */
 export type SkillPlace = { from: SkillSource; dir: string; skills: SkillRow[] };
-
-/** What a copy answers: the skill as it now reads in your library, and its files by their path in it. */
-export type SkillAdded = { skill: SkillRow; written: string[] };
 
 /** The repository's own skills folder, the one its sessions are given, which the skills page lists first of the repository's. */
 export const repoSkillsDir = (repo: string): string => path.join(path.resolve(repo), '.claude', SKILLS_FOLDER);
@@ -144,22 +139,13 @@ export function foundInOf(dir: string, repo: string, home: string): string | nul
   return parts[0] === '' || parts[0] === '..' || path.isAbsolute(parts.join(path.sep)) ? null : parts.join('/');
 }
 
-/**
- * The board's skill library in the package's table, each entry served on the api alone: the skill folders listed, each read
- * (`skills`), one skill read for its page (`skills show`), and one of yours written or copied (`skills write`).
- */
-const LIST = commandNamed('skills');
-const READ = commandNamed('skills show');
-const WRITE = commandNamed('skills write');
+/** Each skill folder of `dirs` read now, through the table's `skills` (`SKILLS_LIST`) at the request's store, by folder. */
+export const readsOf = (s: Served, dirs: readonly string[]): Promise<Record<string, SkillRead>> =>
+  s.inRequest(SKILLS_LIST.handler({ skills: dirs }, undefined, s.home));
 
-/** Each skill folder of `dirs` read now, through the table's `skills` at the store's root `home`, by folder. */
-export const readsOf = async (e: Engine['Service'], on: RunsOn, dirs: readonly string[], home: string) =>
-  (await runPlaced({ ...on, home }, e, LIST.handler({ skills: dirs }, undefined, home))) as Record<string, SkillRead>;
-
-/** The version of the skill in the folder `dir`, as the package reads it through its Skill door (`skills show`): null where none reads. */
-export const skillVersionAt = async (e: Engine['Service'], on: RunsOn, dir: string, home: string) =>
-  ((await runPlaced({ ...on, home }, e, READ.handler({ from: 'yours', name: path.basename(dir), dir }, undefined, home))) as SkillPage)
-    .version;
+/** The version of the skill in the folder `dir`, as the package reads it through its Skill door (`SKILLS_READ`): null where none reads. */
+export const skillVersionAt = async (s: Served, dir: string): Promise<string | null> =>
+  (await s.inRequest(SKILLS_READ.handler({ name: path.basename(dir), dir }, undefined, s.home))).version;
 
 /**
  * The reading of the folder `dir` among `reads`, which the table's `skills` gives for each folder it was asked: thrown, naming the
@@ -196,10 +182,10 @@ export function yourAgentsSkills(agents: Agents): Array<[string, string[]]> {
  * of one repository's places for skills have, which happens only when the store is in that repository and nothing says which is given, is
  * listed in yours with the package's refusal as its `error`. Any other skill the package refuses — a link in it that is not followed, rules
  * that do not read — is listed in the place its folder is in (`skillDirIn`, `sourceOf`), unread where a link is refused, with that refusal.
+ * Each folder is read by `readSkills` (`readsOf`, on a request).
  */
 export async function listSkills(
-  e: Engine['Service'],
-  on: RunsOn,
+  readSkills: (dirs: readonly string[]) => Promise<Record<string, SkillRead>>,
   repo: string,
   home: string,
   yoursRead: YourSkills,
@@ -216,7 +202,7 @@ export async function listSkills(
     .sort(([a], [b]) => a.localeCompare(b));
   const dirOf = ([name, at]: (typeof sorted)[number]) =>
     at instanceof WorkflowError ? (skillDirIn([yours.dir, inRepo.dir], name) ?? path.join(yours.dir, name)) : at;
-  const reads = await readsOf(e, on, [...sorted.map(dirOf), ...builtinNames.map((name) => path.join(builtin, name))], home);
+  const reads = await readSkills([...sorted.map(dirOf), ...builtinNames.map((name) => path.join(builtin, name))]);
   const where = new Map<string, Extract<SkillSource, 'yours' | 'repo'>>();
   for (const [name, at] of sorted) {
     const dir = dirOf([name, at]);
@@ -293,44 +279,10 @@ const SKILL_KEYS = {
 };
 
 /** A skill as a request sends it, a key no skill has kept, so it is refused once every key a skill has is read (`skillDraftFrom`). */
-export const SKILL_DRAFT = Schema.StructWithRest(Schema.Struct(SKILL_KEYS), [Schema.Record(Schema.String, Schema.Unknown)]);
+const SKILL_DRAFT = Schema.StructWithRest(Schema.Struct(SKILL_KEYS), [Schema.Record(Schema.String, Schema.Unknown)]);
 
 /** An agent that gives a skill: its place — the factory's own, in its tree, besides the two — and its name. */
 export type SkillUser = { from: AgentPlace | 'factory'; name: string };
-
-/**
- * One skill on its own page. `skill` is its row as the list has it; `version` what a write of it carries back (`skillVersion`); `draft`
- * what its form is filled from (`skillDraftOf`), or null where its SKILL.md does not read — `skill.error` says why, and `body` is its
- * instructions all the same, so a skill of yours can be mended; `users` the agents, of either place, that give this very folder, as their
- * start would find it; `copyHint` the command that takes it to the other place, since the api writes no checkout — null for a builtin
- * skill.
- */
-export type SkillDetail = {
-  skill: SkillRow;
-  version: string;
-  draft: SkillDraft | null;
-  body: string;
-  users: SkillUser[];
-  copyHint: string | null;
-};
-
-/** What a write of a skill answers: the skill as it now reads, and what was written. */
-export type SkillSaved = SkillDetail & { written: string[] };
-
-/**
- * Where the skill `name` of `from` is: your library's folder of it, the repository's — its `.claude/skills/` first, then
- * `workflows/skills/`: the order its page takes, while a start of an agent of the repository's finds `workflows/skills/` first — or
- * Nemia's builtin skills. Null when that place has none.
- */
-export function skillDirOf(from: SkillSource, name: string, repo: string, home: string, builtin: string = BUILTIN_SKILLS): string | null {
-  const places =
-    from === 'yours'
-      ? [librarySkills(home)]
-      : from === 'builtin'
-        ? [builtin]
-        : [repoSkillsDir(repo), path.join(path.resolve(repo), 'workflows', SKILLS_FOLDER)];
-  return skillDirIn(places, name);
-}
 
 /**
  * The agents of both places, yours in the store `home`, that give the skill whose folder is `dir`, read through the Agent and Skill doors,
@@ -363,48 +315,6 @@ export const skillUsers = Effect.fnUntraced(function* (dir: string, name: string
   return users;
 });
 
-/**
- * The skill `name` of `from` read now, for its page, the agents that give it read through the doors over `inRequest`. Null when that
- * place has no such skill. A SKILL.md that cannot be read, or does not read as a draft, leaves `draft` null, the row saying why, and the
- * page is filled from the body.
- */
-export async function skillDetail(
-  e: Engine['Service'],
-  on: RunsOn,
-  inRequest: InRequest,
-  from: SkillSource,
-  name: string,
-  repo: string,
-  home: string,
-  builtin: string = BUILTIN_SKILLS,
-): Promise<SkillDetail | null> {
-  const dir = skillDirOf(from, name, repo, home, builtin);
-  if (dir === null) return null;
-  const users = await inRequest(skillUsers(dir, name, repo, home));
-  const { text, version, ...read } = (await runPlaced({ ...on, home }, e, READ.handler({ from, name, dir }, undefined, home))) as SkillPage;
-  const skill = skillRow(
-    name,
-    dir,
-    from,
-    read,
-    users.filter((user) => user.from === 'yours').map((user) => user.name),
-  );
-  const file = path.join(dir, 'SKILL.md');
-  let draft: SkillDraft | null = null;
-  try {
-    draft = skillDraftOf(file, name, text);
-  } catch {}
-  let body: string;
-  try {
-    body = splitFrontmatter(file, text).body;
-  } catch {
-    body = text.trim();
-  }
-  const copyHint =
-    from === 'yours' ? skillCopyCommand(dir, repoSkillsDir(repo)) : from === 'repo' ? skillCopyCommand(dir, librarySkills(home)) : null;
-  return { skill, version: version ?? '', draft, body, users, copyHint };
-}
-
 /** A draft from a skill as sent, refused (400) when it has a key no skill has: each value is then judged by the package, in its words. */
 export function skillDraftFrom(skill: typeof SKILL_DRAFT.Type, route: string, shape: string): SkillDraft | Refusal {
   const unknown = Object.keys(skill).filter((key) => !Object.hasOwn(SKILL_KEYS, key));
@@ -425,26 +335,35 @@ export function skillDraftFrom(skill: typeof SKILL_DRAFT.Type, route: string, sh
 }
 
 /**
- * A skill of yours written into the library through the table's `skills write` (`WRITE`), and answered as its page reads it now. `name`
- * is the skill's name on the path, none for a skill made. Throws what the package refuses, which `app.onError` answers by its kind.
+ * A SKILL.md, the file `file` of the skill `name` holding `text`, as the Skill's spec: its draft (`skillDraftOf`), or, where it does not
+ * read as one, its body alone — the text after its frontmatter, or all of it where that does not read either — and why (`unread`, the
+ * package's words), so a skill of yours can be mended from what it says. The one reading of a SKILL.md into a spec.
  */
-export async function written(
-  e: Engine['Service'],
-  on: RunsOn,
-  inRequest: InRequest,
-  change: SkillChange,
-  { version, name }: { version: string | null; name?: string },
-  repo: string,
-  home: string,
-): Promise<{ status: 200 | 201; body: SkillSaved } | { status: 500; error: string }> {
-  const args = {
-    from: 'yours',
-    change: JSON.stringify(change),
-    ...(version !== null && { version }),
-    ...(name !== undefined && { name }),
-  };
-  const wrote = (await runPlaced({ ...on, home }, e, WRITE.handler(args, undefined, home))) as SkillWritten;
-  const detail = await skillDetail(e, on, inRequest, 'yours', wrote.name, repo, home);
-  if (detail === null) return { status: 500, error: `${wrote.dir} was written, and then could not be read back.` };
-  return { status: version === null ? 201 : 200, body: { ...detail, written: wrote.written } };
+export function skillSpecOf(file: string, name: string, text: string): { spec: SkillSpec; unread: string | null } {
+  try {
+    const { name: _name, ...spec } = skillDraftOf(file, name, text);
+    return { spec, unread: null };
+  } catch (err) {
+    if (!(err instanceof WorkflowError)) throw err;
+    return { spec: { body: bodyOf(file, text) }, unread: err.message };
+  }
+}
+
+/** The body of a SKILL.md that does not read as a draft: what follows its frontmatter, or all of it, trimmed, where that does not read. */
+function bodyOf(file: string, text: string): string {
+  try {
+    return splitFrontmatter(file, text).body;
+  } catch (err) {
+    if (!(err instanceof WorkflowError)) throw err;
+    return text.trim();
+  }
+}
+
+/**
+ * A skill of yours written into the library through the table's `skills write` (`SKILLS_WRITE`): `change` at the `version` it was read at,
+ * none for a skill made, `name` the skill's name on the path. Throws what the package refuses, which the one map answers by its kind.
+ */
+export async function written(s: Served, change: SkillChange, { version, name }: { version: string | null; name?: string }): Promise<void> {
+  const input = { from: 'yours', change, ...(version !== null && { version }), ...(name !== undefined && { name }) };
+  await s.inRequest(SKILLS_WRITE.handler(input, undefined, s.home));
 }

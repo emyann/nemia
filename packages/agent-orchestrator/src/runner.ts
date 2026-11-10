@@ -496,6 +496,17 @@ export { APPROVE, ApproveInput } from './gate/commands.verb.ts';
 export { LEVEL } from './nemia/level.verb.ts';
 export { MEMORY } from './nemia/memory.verb.ts';
 export { POLICY, POLICY_CONFIRM, POLICY_DROP } from './auto/auto.verb.ts';
+/**
+ * The definitions' entries the api calls by type, each with its `input`: the agents listed, read as a card, written, removed,
+ * tried, looked for (`sources`), copied in and their custom instructions; the skills listed, shown and written; a workflow folder
+ * written, removed, and one step of it read.
+ */
+export { AGENTS, AGENT_CARD } from './command/commands.verb.ts';
+export { AGENTS_REMOVE, AGENTS_TRY, AGENTS_WRITE } from './agents/library.verb.ts';
+export { AGENTS_SOURCES } from './sources/sources.verb.ts';
+export { AGENTS_COPY } from './sources/copy.verb.ts';
+export { SKILLS_LIST, SKILLS_READ, SKILLS_WRITE } from './skills/skills.verb.ts';
+export { WORKFLOWS_REMOVE, WORKFLOWS_STEP, WORKFLOWS_WRITE } from './workflows/workflows.verb.ts';
 export { CLI, CLI_VERBS, commandBreaks, commandLine, generated, helpOf, leftOut, parseArgv, routeList } from './command/command.ts';
 export { renamedIn, renamedValues } from './command/command.ts';
 export type { Args, CommandSpec, Flag, Positional, Route, Spec } from './command/command.ts';

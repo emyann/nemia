@@ -6,7 +6,7 @@
 import path from 'node:path';
 import { commandLine, FACTORY_ADD, LEVEL, yourAgentsDir } from 'agent-orchestrator';
 import type { YourStore } from 'objects';
-import { librarySkills } from '../agents/skills.ts';
+import { librarySkills } from '../skills/skills.ts';
 
 export type { YourStore };
 

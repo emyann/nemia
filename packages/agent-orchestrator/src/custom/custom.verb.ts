@@ -1,10 +1,10 @@
 /**
  * `nemia agents custom`, an entry of the command table: a person's custom instructions for one agent, read, written and cleared. The api
- * serves the write and the clear on the routes the table generates, and the read by a route of its own, which calls the same handler; each
- * through the Agent door's `custom` (`AgentDoor`, run `rooted` at the store's root its handler is given).
+ * calls its handler by type (`CustomInput`) for an agent's `…/agents/<name>/instructions` and Nemia's own; each through the Agent door's
+ * `custom` (`AgentDoor`, run `rooted` at the store's root its handler is given).
  */
-import { Effect } from 'effect';
-import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
+import { Effect, Schema } from 'effect';
+import { leftOut, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { customInstructionsFile } from '../agents/read.store.ts';
 import { isStoreAgent } from './custom.store.ts';
@@ -12,12 +12,6 @@ import { AgentDoor } from '../agents/agent-door.store.ts';
 import { AgentName } from '../agents/agents.model.ts';
 import { rooted } from '../factory/wiring/wire.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
-
-/** The text under `key`, or undefined where none was given. */
-const textOf = (args: Args, key: string): string | undefined => {
-  const value = args[key];
-  return typeof value === 'string' ? value : undefined;
-};
 
 /** The refusal of a value flag of `nemia agents custom` given twice. */
 const twice = (flag: string): string => `nemia agents custom takes ${flag} once: one agent's words are one file.`;
@@ -42,20 +36,10 @@ const REPO = {
   only: { side: 'cli', why: 'the api looks in the repository the request is served on (?repo=)' },
 } satisfies Flag;
 
-/** `nemia agents custom`'s spec: the agent's name, then `--file`, `--clear` or `--repo`; and the words, which a body alone carries. */
+/** `nemia agents custom`'s spec: the agent's name, then `--file`, `--clear` or `--repo`. */
 const SPEC: Spec = {
   positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
-  flags: [
-    FILE,
-    REPO,
-    { flag: '--clear', kind: 'switch', key: 'clear' },
-    {
-      flag: '--words',
-      kind: 'text',
-      key: 'words',
-      only: { side: 'api', why: 'the command line reads the words from --file', required: true },
-    },
-  ],
+  flags: [FILE, REPO, { flag: '--clear', kind: 'switch', key: 'clear' }],
   unknown: (arg) =>
     `nemia agents custom takes one agent's name, then --file <path> (or --file - for stdin), --clear or --repo <r>, not ${arg}.`,
   apart: (_value, flag) => (flag === '--repo' ? REPO.takes : FILE.takes),
@@ -74,11 +58,23 @@ const KEPT = 'a run already started keeps the words it was started with';
 const TOLD = "her open session is told at the keeper's next beat";
 
 /**
+ * What `nemia agents custom`'s handler takes: the agent's `name`; the repository whose agents it is looked for in (`repo`, `.` where none
+ * is named); `clear`, to remove the words; and the `words` to write, which the command line reads off `--file` and the api is sent.
+ */
+export const CustomInput = Schema.Struct({
+  name: Schema.String,
+  repo: Schema.optionalKey(Schema.String),
+  clear: Schema.optionalKey(Schema.Boolean),
+  words: Schema.optionalKey(Schema.String),
+});
+export type CustomInput = typeof CustomInput.Type;
+
+/**
  * `nemia agents custom`: the custom instructions for the agent `name` in the store `home` — read bare, written from `words`, removed with
  * `clear` — for a run on `repo`, `.` where none is named. Refused, writing nothing, as the package refuses: a name no place has, blank
  * words, a frontmatter block, and, on a read, a file there that does not read.
  */
-export const AGENTS_CUSTOM: Command<Read | Cleared> = {
+export const AGENTS_CUSTOM: Command<Read | Cleared, CustomInput> = {
   name: 'agents custom',
   usage: '<name> [--file <path>|-] [--clear] [--repo .]',
   help: [
@@ -96,29 +92,21 @@ export const AGENTS_CUSTOM: Command<Read | Cleared> = {
       : leftOut(SPEC, args),
   writes: true,
   class: { bare: 'read', sets: 'ask', setsBy: ['--file', '--clear'], readsBy: ['--repo'] },
-  route: [
-    {
-      method: 'GET',
-      path: '/api/custom-instructions/:name',
-      status: 200,
-      hand: "a read of a command that writes: the api's route answers a file that does not read with why, beside the words",
-    },
-    { method: 'PUT', path: '/api/custom-instructions/:name', status: 200, sets: { clear: false } },
-    { method: 'DELETE', path: '/api/custom-instructions/:name', status: 200, sets: { clear: true } },
-  ],
-  handler: (args, _env, home) =>
+  only: {
+    side: 'cli',
+    why: "the api serves it as the Agent's `instructions`, `putInstructions` and `deleteInstructions` verbs of `objects`' Api (`/api/namespaces/:namespace/agents/:name/instructions`) and Nemia's at `/api/nemia/instructions`, each calling this entry's handler: no route of its own",
+  },
+  input: CustomInput,
+  handler: ({ name, repo = '.', clear, words }, _env, home) =>
     rooted(
       home,
       'nemia agents custom',
       Effect.gen(function* () {
         const root = yield* StoreRoot;
-        const name = textOf(args, 'name') ?? '';
-        const repo = textOf(args, 'repo') ?? '.';
         const file = customInstructionsFile(root, name);
         const door = (yield* AgentDoor).custom;
         const agent = AgentName.read(name);
-        if (args.clear === true) return { name, file, removed: yield* door.clear(agent, repo) };
-        const words = textOf(args, 'words');
+        if (clear === true) return { name, file, removed: yield* door.clear(agent, repo) };
         if (words !== undefined) yield* door.write(agent, words, repo);
         return { name, file, words: (yield* door.read(agent, repo)) ?? null, error: null };
       }),

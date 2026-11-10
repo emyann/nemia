@@ -10,18 +10,30 @@
  * Writes are yours, in `default` alone (`writeGoes`): made with its steps (the builder's `write`, builder.ts), written whole at the
  * `metadata.resourceVersion` it was read at — a stale one is a 409 — and removed at the `?resourceVersion=` it was read at
  * (`workflows rm`). The builder's refusal of a step is an `Invalid` naming the steps (`steps`).
+ *
+ * A step of one is read for its page (`step`, step/step.ts) in the namespace's factory, its folder the one the namespace serves of that
+ * name (from `?origin=`, where one is asked); and the builder's form (`keys`), in no namespace, is read from yours' agents.
  */
 import path from 'node:path';
 import { Effect } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
-import { definitionRevision, foldersIn, typedGraphOf, workflowStale, workflowVersion, type FolderLoaded } from 'agent-orchestrator';
-import { Api, API_VERSION, Conflict, Invalid, type Workflow, type WorkflowStep } from 'objects';
+import {
+  definitionRevision,
+  foldersIn,
+  typedGraphOf,
+  unattachedRefusal,
+  WORKFLOWS_REMOVE,
+  workflowStale,
+  workflowVersion,
+  type FolderLoaded,
+} from 'agent-orchestrator';
+import { Api, API_VERSION, Conflict, Invalid, Missing, type Workflow, type WorkflowStep } from 'objects';
 import type { Served } from '../layer.ts';
 import { queryOf } from '../factory/parts/index.ts';
-import { answeredWriteIn, readerRefused } from '../objects/refused.ts';
-import { commandNamed, runPlaced } from '../store.ts';
-import { draftOf, isRoleKey, schemasOf, write, type StepBody } from '../workflows/builder.ts';
-import { workflowNameRefusal } from '../workflows/words.ts';
+import { answered, answeredIn, answeredWriteIn, readerRefused } from '../objects/refused.ts';
+import { stepPage } from '../step/step.ts';
+import { draftOf, isRoleKey, keyForm, schemasOf, write, yourAgentsRead, type StepBody } from './builder.ts';
+import { workflowNameRefusal } from './words.ts';
 import {
   listed as listingOf,
   loadedAt,
@@ -30,10 +42,18 @@ import {
   type ListedStep,
   type WorkflowListing,
   type WorkflowSource,
-} from '../workflows/workflows.ts';
-import { listed, originAsked, servedNamed, servedOf, thereOf, writeGoes, writtenAt, type Held, type Origin } from './served.ts';
-
-const REMOVE = commandNamed('workflows rm');
+} from './workflows.ts';
+import {
+  listed,
+  originAsked,
+  servedNamed,
+  servedOf,
+  thereOf,
+  writeGoes,
+  writtenAt,
+  type Held,
+  type Origin,
+} from '../definitions/served.ts';
 
 /** A folder of a workflow, where it is: the source word the api's own reads give it, and its path. */
 type Folder = { from: WorkflowSource; dir: string };
@@ -251,8 +271,17 @@ export const workflowsHandlers = HttpApiBuilder.group(Api, 'workflows', (handler
             error: `${route} takes the \`?resourceVersion=\` the Workflow was read at, so a folder changed since is not removed unseen.`,
           });
         const before = await workflowAt(s, namespace, name, 'yours');
-        await runPlaced(s, s.e, REMOVE.handler({ from: 'yours', name, version, repo: s.repo }, undefined, s.home));
+        await s.inRequest(WORKFLOWS_REMOVE.handler({ from: 'yours', name, version, repo: s.repo }, undefined, s.home));
         return before;
       }),
-    ),
+    )
+    .handle('step', ({ params: { namespace, name, step }, query }) =>
+      answeredIn(namespace, async (s) => {
+        const unattached = s.factory && unattachedRefusal(s.factory, name);
+        if (unattached) throw new Missing({ error: unattached });
+        const { item } = servedNamed(heldIn(s), name, originAsked(query.origin), listPath(namespace));
+        return stepPage(s, { name, ...item }, step);
+      }),
+    )
+    .handle('keys', () => answered(async (s) => keyForm(await s.inRequest(yourAgentsRead(s.home))))),
 );

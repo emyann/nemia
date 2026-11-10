@@ -10,7 +10,7 @@
 import { Schema } from 'effect';
 import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
 import { CardSkill, SkillCost, WriteMeta, definitionStatus } from './definition.ts';
-import { DEFINITION_ORIGINS } from './words.ts';
+import { AGENT_SOURCE_PLACES, DEFINITION_ORIGINS } from './words.ts';
 
 const Text = Schema.NullOr(Schema.String);
 
@@ -119,3 +119,68 @@ export const AgentCard = Schema.Struct({
   why: Schema.String,
 });
 export type AgentCard = typeof AgentCard.Type;
+
+/**
+ * One agent file the store knows of (`GET /api/agents/sources`): where it was found (`place`, and `repo` for a repository's), its folder
+ * and file, its name, what it says it is for, its version (what a copy records), and, for one that does not read, why.
+ */
+export const AgentSource = Schema.Struct({
+  place: Schema.Literals(AGENT_SOURCE_PLACES),
+  repo: Text,
+  dir: Schema.String,
+  file: Schema.String,
+  name: Schema.String,
+  description: Text,
+  version: Text,
+  error: Text,
+});
+export type AgentSource = typeof AgentSource.Type;
+
+/** Every agent file the store knows of, each a file `POST …/agents/copy` takes. */
+export const AgentSources = Schema.Struct({ sources: Schema.Array(AgentSource) }).annotate({ identifier: 'AgentSources' });
+export type AgentSources = typeof AgentSources.Type;
+
+/**
+ * An agent file copied into your library (`POST /api/namespaces/default/agents/copy`), as `nemia agents copy` copies it: the file, the
+ * name it takes there (`as`, its own where left out), and each skill or schema of the copy whose library's version stays (`keep`).
+ */
+export const AgentCopy = Schema.Struct({
+  file: Schema.String,
+  as: Schema.optionalKey(Schema.String),
+  keep: Schema.optionalKey(Schema.Array(Schema.String)),
+}).annotate({ identifier: 'AgentCopy' });
+export type AgentCopy = typeof AgentCopy.Type;
+
+/** What a copy did: the agent's name in your library, the parts it wrote and those it reused, by name, and the record's file. */
+export const AgentCopied = Schema.Struct({
+  name: Schema.String,
+  copied: Schema.Array(Schema.String),
+  reused: Schema.Array(Schema.String),
+  record: Schema.String,
+}).annotate({ identifier: 'AgentCopied' });
+export type AgentCopied = typeof AgentCopied.Type;
+
+/**
+ * A person's custom instructions for an agent (`…/agents/<name>/instructions`), one record per agent name: the file they are kept in, the
+ * words (null for none), and `error`, why a file there does not read — a link, a frontmatter block, not a file — which stops every run
+ * naming the agent until it is cleared or written again.
+ */
+export const AgentInstructions = Schema.Struct({
+  name: Schema.String,
+  file: Schema.String,
+  words: Text,
+  error: Text,
+}).annotate({ identifier: 'AgentInstructions' });
+export type AgentInstructions = typeof AgentInstructions.Type;
+
+/** Custom instructions written (`PUT …/instructions`): what the agent is told after its instructions. The last write wins. */
+export const AgentInstructionsWrite = Schema.Struct({ words: Schema.String }).annotate({ identifier: 'AgentInstructionsWrite' });
+export type AgentInstructionsWrite = typeof AgentInstructionsWrite.Type;
+
+/** Custom instructions cleared (`DELETE …/instructions`): the file looked at, and whether there were words to remove. */
+export const AgentInstructionsCleared = Schema.Struct({
+  name: Schema.String,
+  file: Schema.String,
+  removed: Schema.Boolean,
+}).annotate({ identifier: 'AgentInstructionsCleared' });
+export type AgentInstructionsCleared = typeof AgentInstructionsCleared.Type;

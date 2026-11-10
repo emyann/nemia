@@ -29,7 +29,7 @@ import {
   type Pruning,
   type Turned,
 } from '../runner.ts';
-import { HELP, placedIn, usage, confirmed, type Engine } from './flags.ts';
+import { HELP, inputFor, placedIn, usage, confirmed, type Engine } from './flags.ts';
 
 /** The runs a command line named, in the order given, each once (the many positional of `RM`, and of `nemia prune`). */
 const idsOf = (args: Args): readonly string[] => (Array.isArray(args.runId) ? args.runId : []);
@@ -232,7 +232,7 @@ const withWords = (args: Args, command: string): Args =>
  * store, and what the entry says of them printed.
  */
 export async function agentsCustomRun(args: Args, e: Engine, place: Place): Promise<void> {
-  const asked = withWords(args, AGENTS_CUSTOM.name);
+  const asked = inputFor(AGENTS_CUSTOM, withWords(args, AGENTS_CUSTOM.name));
   const data = await runWith(e, placedIn(place, AGENTS_CUSTOM.handler(asked, undefined, HOME)));
   for (const line of AGENTS_CUSTOM.print(data, asked)) console.log(line);
 }

@@ -10,7 +10,7 @@
 import { Schema } from 'effect';
 import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
 import { TypedGraph } from './graph.ts';
-import { WriteMeta, definitionStatus } from './definition.ts';
+import { CardSkill, WriteMeta, definitionStatus } from './definition.ts';
 import { PLACE_KINDS } from './words.ts';
 
 const Strings = Schema.Array(Schema.String);
@@ -276,3 +276,74 @@ export type WorkflowWrite = typeof WorkflowWrite.Type;
 /** A workflow of yours made (`POST …/workflows`): its name, and its spec, of one step. */
 export const WorkflowCreate = Schema.Struct({ metadata: Schema.Struct({ name: Schema.String }), spec: WorkflowSpec });
 export type WorkflowCreate = typeof WorkflowCreate.Type;
+
+/**
+ * One key of a step's form (`GET /api/workflows/keys`): the key, the package's line of what it means, how it is set, the words it may be
+ * set to where there are some, and, for a key whose words are the harness's, those of each harness.
+ */
+export const KeyField = Schema.Struct({
+  key: Schema.Literals(STEP_KEYS),
+  meaning: Schema.String,
+  kind: Schema.Literals(STEP_KEY_FORMS),
+  choices: Schema.NullOr(Strings),
+  byHarness: Schema.NullOr(Schema.Record(Schema.String, Strings)),
+});
+export type KeyField = typeof KeyField.Type;
+
+/**
+ * What the builder's form is drawn from (`GET /api/workflows/keys`): every key a step may set, in the package's order, the default
+ * harness, the keys an agent may set (`roleKeys`) and those a step's file sets as its policy over its agent (`policyKeys`), the role values
+ * each agent of yours gives a step it is attached to (`agents`), and how a step names a remote A2A agent with the keys it may not set.
+ */
+export const KeyForm = Schema.Struct({
+  keys: Schema.Array(KeyField),
+  defaultHarness: Schema.String,
+  roleKeys: Schema.Array(Schema.Literals(STEP_KEYS)),
+  policyKeys: Schema.Array(Schema.Literals(STEP_KEYS)),
+  agents: Schema.Record(Schema.String, StepKeys),
+  remote: Schema.Struct({ prefix: Schema.String, refuses: Schema.Array(Schema.Literals(STEP_KEYS)) }),
+}).annotate({ identifier: 'KeyForm' });
+export type KeyForm = typeof KeyForm.Type;
+
+/** One key of a file as a step's page lays them out: the key, its value as the package read it (null where unset), and what it means. */
+export const KeyRow = Schema.Struct({ key: Schema.String, value: Text, meaning: Schema.String });
+export type KeyRow = typeof KeyRow.Type;
+
+/**
+ * A workflow step's page (`GET /api/namespaces/<namespace>/workflows/<name>/steps/<step>`): which workflow (`from`, the place it is read
+ * from, `dir` its folder) and step, its body, its file as written, every key a step may set with its value as the loader read it, what its
+ * agent says it can do (`agentSkills`, null for none), and, read now in the namespace's factory (`factory`, null for `default`): what a run
+ * of it would be told by layer, the agent the factory hires into it, the factories that hire into it (with none named), whether an agent
+ * can be hired into it and which, where each skill of its layers is found, and its newest runs.
+ */
+export const WorkflowStepPage = Schema.Struct({
+  workflow: Schema.String,
+  from: Schema.Literals(['repo', 'yours']),
+  dir: Schema.String,
+  step: Schema.String,
+  body: Schema.String,
+  source: Schema.String,
+  keys: Schema.Array(KeyRow),
+  agentSkills: Schema.NullOr(Schema.Array(CardSkill)),
+  factory: Text,
+  layers: StepLayers,
+  hired: Text,
+  hiredIn: Schema.Array(Schema.Struct({ factory: Schema.String, agent: Schema.String })),
+  hiring: Schema.Struct({
+    refused: Text,
+    agents: Schema.Array(Schema.Struct({ name: Schema.String, description: Text })),
+  }),
+  skillsFrom: Schema.Array(
+    Schema.Struct({ name: Schema.String, from: Schema.NullOr(Schema.Literals(['yours', 'repo', 'builtin'])), foundIn: Text }),
+  ),
+  recentRuns: Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      brief: Schema.String,
+      createdAt: Schema.String,
+      factory: Text,
+      filed: Schema.Boolean,
+    }),
+  ),
+}).annotate({ identifier: 'WorkflowStepPage' });
+export type WorkflowStepPage = typeof WorkflowStepPage.Type;

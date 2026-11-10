@@ -11,7 +11,8 @@ import type { Command } from '../command/entry.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { rooted } from '../factory/wiring/wire.verb.ts';
 import { Conflict, Invalid } from '../refusal/refusal.ts';
-import { writerSpec, writerText, yourSkillsDir, yoursOf } from '../yours/yours.ts';
+import { AgentCopy } from 'objects';
+import { writerSpec, yourSkillsDir, yoursOf } from '../yours/yours.ts';
 import { AgentDoor } from '../agents/agent-door.store.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
 import { AgentName, SkillName } from '../agents/agents.model.ts';
@@ -142,8 +143,11 @@ const copiedLines = ({ name, copied, reused }: AgentCopied): string[] => [
   `give it to a step: nemia factory hire <factory> ${name} --step <workflow>/<step>`,
 ];
 
-/** `nemia agents copy`: an agent file copied into your library (`copyAgent`). */
-export const AGENTS_COPY: Command<AgentCopied> = {
+/**
+ * `nemia agents copy`: an agent file copied into your library (`copyAgent`). Its handler takes objects' `AgentCopy`, the body of
+ * `POST /api/namespaces/default/agents/copy`, which the api calls it by: `file`, `as` and `keep`, as the command line's flags spell them.
+ */
+export const AGENTS_COPY: Command<AgentCopied, AgentCopy> = {
   name: 'agents copy',
   usage: '<file> [--as <name>] [--keep <part>]...',
   help: [
@@ -172,20 +176,17 @@ export const AGENTS_COPY: Command<AgentCopied> = {
   ),
   writes: true,
   class: 'ask',
-  route: { method: 'POST', path: '/api/agents/yours/copy', status: 200 },
-  handler: (args, _env, home) =>
+  only: {
+    side: 'cli',
+    why: "the api serves it as the Agent's `copy` verb of `objects`' Api (`/api/namespaces/:namespace/agents/copy`), which calls this entry's handler: no route of its own",
+  },
+  input: AgentCopy,
+  handler: ({ file, as, keep = [] }, _env, home) =>
     rooted(
       home,
       'nemia agents copy',
       Effect.gen(function* () {
-        const as = writerText(args, 'as');
-        const keep = args.keep;
-        return yield* copyAgent({
-          file: writerText(args, 'file') ?? '',
-          ...(as !== undefined && { as }),
-          keep: Array.isArray(keep) ? keep.map(String) : [],
-          home: yield* StoreRoot,
-        });
+        return yield* copyAgent({ file, ...(as !== undefined && { as }), keep: [...keep], home: yield* StoreRoot });
       }),
     ),
   print: copiedLines,

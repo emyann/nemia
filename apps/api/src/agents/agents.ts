@@ -1,6 +1,6 @@
 /**
- * The board's agents (`agents/` beside each place it lists workflows from): each listed with the steps that name it, one read, and one of
- * yours made, put back or removed through the package's `writeAgent` and `removeAgent`.
+ * What the Agent objects (`handlers.ts`) are made from: an agent as listed, with what it is given and why it is untried, and one of yours
+ * written through the package's `writeAgent` (`saved`).
  *
  * A step is a node of a workflow, and an agent is one thing a node may have attached (`agent:`): what the node's work is told first and
  * runs with. So an agent lists the nodes that name it, and an edit of one changes each of them — in what a later `nemia start` freezes, and
@@ -9,24 +9,18 @@
  * The repository's agents are read-only here, as its workflows are: the api writes nothing into a checkout.
  */
 import { Effect, Schema } from 'effect';
-import { Hono } from 'hono';
 import {
-  agentRead,
+  AGENTS_WRITE,
   agentSkillsFound,
   type AgentFill,
   type AgentReading,
   type AgentSchema,
-  type AgentWritten,
   untriedOf,
   type Untried,
 } from 'agent-orchestrator';
-import { agentNameRefusal, type AgentCardShape, type AgentDraft } from 'agent-orchestrator/workflow';
-
-import { type ApiEnv, served } from '../layer.ts';
-import type { Engine, RunsOn } from '../store.ts';
-import { givenSkills, type GivenSkill } from './skills.ts';
-import type { InRequest, WorkflowSource } from '../workflows/workflows.ts';
-import { commandNamed, runPlaced } from '../store.ts';
+import { agentNameRefusal, type AgentDraft } from 'agent-orchestrator/workflow';
+import type { Served } from '../layer.ts';
+import { givenSkills, type GivenSkill } from '../skills/skills.ts';
 
 export type { AgentUser } from 'agent-orchestrator';
 
@@ -48,14 +42,6 @@ export type AgentListing = Omit<AgentReading, 'custom'> & { given: GivenSkill[];
 export type LibraryAgent = AgentListing & { fills: AgentFill[]; factories: string[] };
 
 /**
- * The board's agent library in the package's table, each entry served on the api alone: an agent written (`agents write`), removed
- * (`agents rm`), tried (`agents run`) and read for its page (`agents read`).
- */
-const WRITE = commandNamed('agents write');
-/** The package's listing of the agent files the store knows (`nemia agents sources`): on `GET /api/agents/sources`. */
-const SOURCES = commandNamed('agents sources');
-
-/**
  * The package's reading of an agent as the board lists it: its custom instructions' file left out, what it is given — its skills found
  * through the Skill door as a start on `repo` finds them — and why it is untried. An agent of a factory's tree `tree` finds the tree's
  * skills first, as a start in that factory does, and gives each as the factory's.
@@ -72,24 +58,6 @@ export const listingOf = Effect.fnUntraced(function* (
       : [];
   return { ...read, given, untried: untriedOf({ ...read, schemaFile: read.schema?.file ?? null }, home) } satisfies AgentListing;
 });
-
-/**
- * One agent as the listing has it, read through the Agent door, its skills found as a start on `repo` finds them, or null when `dir` has
- * no agent of that name.
- */
-export const listedAgent = Effect.fnUntraced(function* (from: WorkflowSource, dir: string, name: string, repo: string, home: string) {
-  const read = yield* agentRead(from, dir, name, { repo, home });
-  return read && (yield* listingOf(read, repo, home));
-});
-
-/**
- * An agent as an A2A Agent Card, and the truth about it: `servedOverA2A` is always false, and `why` says what the shape leaves out and why
- * a client could not call it. The board shows the card with that sentence beside it, so nothing reads as an address.
- */
-export type AgentCardAnswer = { card: AgentCardShape; servedOverA2A: false; why: string };
-
-/** What a write of an agent answers with: the agent as it now reads, and its files by name — written, and removed. */
-export type AgentSaved = { agent: AgentListing; written: string[]; removed: string[] };
 
 const AgentName = Schema.String.check(Schema.makeFilter((name: string) => agentNameRefusal(name) === undefined));
 
@@ -112,9 +80,6 @@ const POST_BODY = Schema.Struct({ name: AgentName, ...DRAFT_FIELDS });
 /** A draft's fields as a write sends them: the agent's lines, its keys, its instructions and its schema. */
 export type AgentDraftBody = Omit<typeof POST_BODY.Type, 'name'>;
 
-/** What a try answers with: the run it started, which the board follows on the run's page. */
-export type AgentTried = { id: string };
-
 /** A draft off a decoded body, each line trimmed, and one with nothing in it unset. */
 export function agentDraftOf(body: AgentDraftBody, name: string): { draft: AgentDraft; schema: AgentSchema | null } {
   const line = (value: string | null | undefined): string | null => (value?.trim() ? value.trim() : null);
@@ -134,52 +99,21 @@ export function agentDraftOf(body: AgentDraftBody, name: string): { draft: Agent
 }
 
 /**
- * The agents' one route of their own; every other read and write of an agent is the Agent object's, at
- * `/api/namespaces/<namespace>/agents[/<name>]` (`src/definitions/agents.ts`), which calls `saved` here for its writes.
- *
- * - `GET /api/agents/sources` — the agent files the store knows (`{ sources: AgentSource[] }`, as `nemia agents sources` lists them):
- *   each repository's a factory names, then your library, then the folder `?path=` names, a folder that is not there a 404. Each is a file
- *   `POST /api/agents/yours/copy` takes.
- */
-export const agents = new Hono<ApiEnv>().get('/api/agents/sources', (c) =>
-  served(c, async ({ e, placeService, env, home, trace }) => {
-    const at = c.req.query('path');
-    return c.json(await runPlaced({ placeService, home, trace }, e, SOURCES.handler(at === undefined ? {} : { path: at }, env, home)));
-  }),
-);
-
-/** Where an agent is written: its place on the path (`from`), and the repository and store it reads. */
-type AgentAt = { from: string; repo: string; home: string };
-
-/**
- * `writeAgent`, through the table's `agents write` (`WRITE`), answered: the agent as it now reads, with its status. `version` is what the
- * agent was read at, none for a new one, and `name` the one it is renamed from. Throws what the package refuses, which `app.onError`
- * answers by its kind, and any other error.
+ * An agent of yours written through the table's `agents write` (`AGENTS_WRITE`): its draft and schema, at the `version` it was read at,
+ * none for a new one, and the `name` it is renamed from. Throws what the package refuses, which the one map answers by its kind, and any
+ * other error.
  */
 export async function saved(
-  e: Engine['Service'],
-  on: RunsOn,
-  inRequest: InRequest,
-  { from, repo, home }: AgentAt,
+  s: Served,
   { draft, schema, version, name }: { draft: AgentDraft; schema: AgentSchema | null; version?: string; name?: string },
-  ok: 200 | 201,
-): Promise<{ body: AgentSaved; status: 200 | 201 }> {
-  const args = {
-    from,
-    repo,
-    draft: JSON.stringify(draft),
-    schema: JSON.stringify(schema),
+): Promise<void> {
+  const input = {
+    from: 'yours',
+    repo: s.repo,
+    draft,
+    schema,
     ...(version !== undefined && { version }),
     ...(name !== undefined && { name }),
   };
-  const done = (await runPlaced({ ...on, home }, e, WRITE.handler(args, undefined, home))) as AgentWritten;
-  const agent = await inRequest(listedAgent('yours', done.dir, done.agent.name, repo, home));
-  if (agent === null)
-    throw new Error(
-      `The agent ${done.agent.name} written to ${done.dir} does not read back: GET /api/namespaces/default/agents/${done.agent.name} says why, in the Agent's \`status.error\`.`,
-    );
-  return {
-    body: { agent, written: done.written, removed: done.removed },
-    status: ok,
-  };
+  await s.inRequest(AGENTS_WRITE.handler(input, undefined, s.home));
 }

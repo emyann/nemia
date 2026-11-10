@@ -45,7 +45,7 @@ const inRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot>): Promise<A> =>
 const versionOf = (dir: string): string =>
   Effect.runSync(versionIn(dir, { repo, home: root }).pipe(Effect.provideService(StoreRoot, root)));
 
-type KeyForm = import('./builder.ts').KeyForm;
+type KeyForm = import('objects').KeyForm;
 type WorkflowSaved = import('./builder.ts').WorkflowSaved;
 type BuildRefused = import('./builder.ts').BuildRefused;
 type ListedStep = import('./workflows.ts').ListedStep;

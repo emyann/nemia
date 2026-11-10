@@ -34,7 +34,9 @@ import {
   schedulesHandlers,
   volumesHandlers,
 } from '../factory/index.ts';
-import { agentsHandlers, skillsHandlers, workflowsHandlers } from '../definitions/index.ts';
+import { agentsHandlers } from '../agents/index.ts';
+import { skillsHandlers } from '../skills/index.ts';
+import { workflowsHandlers } from '../workflows/index.ts';
 import { delegationsHandlers, proposalsHandlers } from '../proposals/index.ts';
 import { endpointOf } from './endpoints.ts';
 import { ServedNow } from './refused.ts';

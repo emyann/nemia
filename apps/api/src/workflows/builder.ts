@@ -21,8 +21,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Schema } from 'effect';
-import { Hono } from 'hono';
-import { AgentDoor, HARNESS_CHOICES, remoteAgents, SkillDoor, type WorkflowWritten, workflowVersion } from 'agent-orchestrator';
+import { AgentDoor, HARNESS_CHOICES, remoteAgents, SkillDoor, WORKFLOWS_WRITE, workflowVersion } from 'agent-orchestrator';
 import {
   AGENT_KEYS,
   AGENT_OWN_KEYS,
@@ -44,49 +43,11 @@ import {
   type StepDraft,
   type StepKey,
 } from 'agent-orchestrator/workflow';
-import { type Guarded, type Refusal } from '../guard.ts';
-import { type ApiEnv, type Served, served } from '../layer.ts';
-import { STEP_KEY_FORM } from 'objects';
+import { type Refusal } from '../guard.ts';
+import type { Served } from '../layer.ts';
+import { STEP_KEY_FORM, type KeyForm } from 'objects';
 import { schemaNameRefusal, WORDS, type KeyKind } from './words.ts';
-import type { Engine } from '../store.ts';
 import { listed, loadedAt, loadedOf, placesOf, specOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
-import { commandNamed, runPlaced } from '../store.ts';
-import type { PlaceService } from 'agent-orchestrator';
-
-/**
- * One key of a step's form: the key, the package's line of what it means, how it is set, and the words it may be set to where there are
- * some.
- */
-export type KeyField = {
-  key: StepKey;
-  meaning: string;
-  kind: KeyKind;
-  choices: readonly string[] | null;
-  byHarness: Readonly<Record<string, readonly string[]>> | null;
-};
-
-/**
- * What the builder's form is drawn from (`GET /api/workflows/keys`): every key a step may set, in the package's order, and the default
- * harness. `roleKeys` are the keys an agent may set (the package's `AGENT_KEYS` but its description), which a step with an agent takes from
- * it unless its file sets them itself: the form shows those as the agent's until one is changed. `policyKeys` are those a step's file sets
- * as its policy over its agent (the package's `OVERRIDE_KEYS`): the fence keys, which only tighten the agent's, and the skills
- * and MCP servers it adds.
- *
- * `agents` are the role values of each agent of yours that loads, as a step's spec gives them and only those it sets: a step attached to
- * one on the board shows its values before the save reads them back, and a step moved from one agent to another shows the other's.
- *
- * `remote` is how a step names a remote A2A agent, `harness: <prefix><name>`, and the keys such a step may not set, which the form leaves
- * off it (`REMOTE_REFUSED_KEYS`). The harness's `choices` offer each agent the store's `a2a-agents.json` declares beside the local
- * harnesses; `byHarness` has none of them, since a remote agent takes none of those words.
- */
-export type KeyForm = {
-  keys: KeyField[];
-  defaultHarness: string;
-  roleKeys: StepKey[];
-  policyKeys: StepKey[];
-  agents: Record<string, Partial<WorkflowStepSpec>>;
-  remote: { prefix: string; refuses: StepKey[] };
-};
 
 /**
  * The keys a step may take from its agent: the agent's keys but its own (`AGENT_OWN_KEYS`) — its description, the skills it is given
@@ -104,7 +65,7 @@ const ROLE_KEYS: readonly StepKey[] = AGENT_KEYS.filter(
 export type YourAgents = { readonly names: readonly string[]; readonly agents: Agents };
 
 /** Yours' agents read through the Agent door: the folder listed, and the agents a workflow of yours alone finds. */
-const yourAgentsRead = (home: string) =>
+export const yourAgentsRead = (home: string) =>
   Effect.gen(function* () {
     const door = yield* AgentDoor;
     const names = yield* door.agents.list(path.join(home, 'workflows', AGENTS_FOLDER));
@@ -146,6 +107,20 @@ function harnessChoices(): readonly string[] {
   }
 }
 
+/**
+ * What the builder's form is drawn from (`GET /api/workflows/keys`, objects' `KeyForm`): every key a step may set, in the package's order,
+ * and the default harness. `roleKeys` are the keys an agent may set (the package's `AGENT_KEYS` but its description), which a step with
+ * an agent takes from it unless its file sets them itself: the form shows those as the agent's until one is changed. `policyKeys` are those
+ * a step's file sets as its policy over its agent (the package's `OVERRIDE_KEYS`): the fence keys, which only tighten the agent's, and the
+ * skills and MCP servers it adds.
+ *
+ * `agents` are the role values of each agent of yours that loads, as a step's spec gives them and only those it sets: a step attached to
+ * one on the board shows its values before the save reads them back, and a step moved from one agent to another shows the other's.
+ *
+ * `remote` is how a step names a remote A2A agent, `harness: <prefix><name>`, and the keys such a step may not set, which the form leaves
+ * off it (`REMOTE_REFUSED_KEYS`). The harness's `choices` offer each agent the store's `a2a-agents.json` declares beside the local
+ * harnesses; `byHarness` has none of them, since a remote agent takes none of those words.
+ */
 export const keyForm = (yours: YourAgents): KeyForm => ({
   keys: STEP_KEYS.map((key) => ({
     key,
@@ -200,17 +175,6 @@ const STEP_BODY = Schema.Struct({
   own: Schema.optionalKey(Schema.NullOr(Schema.Struct({ keys: Schema.Array(Schema.String), body: Schema.String }))),
 });
 export type StepBody = typeof STEP_BODY.Type;
-
-/** A write of yours, as the guard's refusals word it (guard.ts). */
-export const buildGuard = (route: string, does: string, shape: string): Guarded => ({
-  route,
-  does,
-  forAnother: 'write one',
-  why: "a workflow's steps are what agents are told and run with in this repository, once a run of it starts",
-  reach: "build it on the board's Workflows page",
-  instead: "Build it on the board's Workflows page, or edit the folder's files",
-  shape,
-});
 
 /** What a JSON value of each kind is, as a refusal of the wrong one says it. */
 const TYPES: Readonly<Record<KeyKind, { is: (value: unknown) => boolean; said: string }>> = (() => {
@@ -378,16 +342,19 @@ export function putSchemasBack(dir: string, written: readonly SchemaWas[]): void
       fs.rmSync(at, { force: true });
       continue;
     }
-    let holds: string | undefined;
-    try {
-      holds = fs.readFileSync(at, 'utf8');
-    } catch {}
-    if (holds !== was) fs.writeFileSync(at, was);
+    const holds = heldAt(at);
+    if ('unread' in holds || holds.text !== was) fs.writeFileSync(at, was);
   }
 }
 
-/** The table's entry a folder of yours is written through, served on both sides. */
-const WRITE = commandNamed('workflows write');
+/** What the file `at` holds now, or why it holds nothing to keep — gone, or not readable — in the disk's words: either is written back. */
+function heldAt(at: string): { text: string } | { unread: string } {
+  try {
+    return { text: fs.readFileSync(at, 'utf8') };
+  } catch (err) {
+    return { unread: err instanceof Error ? err.message : String(err) };
+  }
+}
 
 /**
  * A write of the folder `name` at `dir`, of yours, read as a start on `repo` reads it, through the engine `e`: a change of the folder
@@ -395,8 +362,8 @@ const WRITE = commandNamed('workflows write');
  * judged with are read through the doors on the request's services (`inRequest`).
  */
 export type Writing = {
-  e: Engine['Service'];
-  placeService: PlaceService['Service'];
+  e: Served['e'];
+  placeService: Served['placeService'];
   trace: Served['trace'];
   name: string;
   dir: string;
@@ -407,8 +374,8 @@ export type Writing = {
 };
 
 /**
- * A folder written through the package (`WRITE`, the table's `workflows write`), with the schemas pasted for it, or its refusal (422,
- * with the steps it names), then read back from disk.
+ * A folder written through the package (`WORKFLOWS_WRITE`, the table's `workflows write`), with the schemas pasted for it, or its
+ * refusal (422, with the steps it names), then read back from disk.
  *
  * Judged whole before a byte is written: the steps' names by `writeWorkflow` itself, which refuses them before anything; the schemas and
  * the steps together by `judgedWith`. Then the schemas are written and the folder after them, whose parse now reads them from disk. Should
@@ -459,15 +426,15 @@ export async function write(
       written.push({ file, was });
       fs.writeFileSync(path.join(dir, file), text);
     }
-    const args = {
+    const input = {
       from: 'yours',
       name,
-      draft: JSON.stringify(steps),
+      draft: [...steps],
       repo,
       ...(readme !== undefined && { readme }),
       ...(changes && { version: await inRequest(workflowVersion(dir, places)) }),
     };
-    result = (await runPlaced({ placeService, home, trace }, e, WRITE.handler(args, undefined, home))) as WorkflowWritten;
+    result = await inRequest(WORKFLOWS_WRITE.handler(input, undefined, home));
   } catch (err) {
     putSchemasBack(dir, written);
     if (err instanceof WorkflowError) return refused(err.message);
@@ -489,17 +456,10 @@ export async function write(
 }
 
 /**
- * The builder's route, `GET /api/workflows/keys`: what a step's form is drawn from, the package's keys, in its order, and what each may
- * be set to. Its writes are the Workflow object's (`src/definitions/workflows.ts`), which call `draftOf`, `schemasOf` and `write` here.
- */
-export const builder = new Hono<ApiEnv>().get('/api/workflows/keys', (c) =>
-  served(c, async ({ home, inRequest }) => c.json(keyForm(await inRequest(yourAgentsRead(home))))),
-);
-
-/**
- * What the definitions' handlers read of the disk (src/definitions/), kept beside the folder store's other reads until the folder store
- * moves them: when a file was last written (the epoch where it cannot be read), the names of the `.md` files directly in a folder, the
- * folders holding a SKILL.md (a link among them), a SKILL.md's text (none for a link the picker refused), and a folder's files by path.
+ * What the definitions' handlers read of the disk (workflows/, agents/, skills/), kept beside the folder store's other reads until the
+ * folder store moves them: when a file was last written (the epoch where it cannot be read), the names of the `.md` files directly in a
+ * folder, the folders holding a SKILL.md (a link among them), a SKILL.md's text (none for a link the picker refused, and the disk's words
+ * for one it cannot read), and a folder's files by path.
  */
 export const writtenAt = (at: string): string => {
   try {
@@ -533,12 +493,12 @@ export const skillFoldersIn = (dir: string): string[] => {
   }
 };
 
-export const skillTextOf = (dir: string, refused: boolean): string | null => {
+export const skillTextOf = (dir: string, refused: boolean): { text: string } | { unread: string | null } => {
   try {
-    if (refused && fs.lstatSync(dir).isSymbolicLink()) return null;
-    return fs.readFileSync(path.join(dir, 'SKILL.md'), 'utf8');
-  } catch {
-    return null;
+    if (refused && fs.lstatSync(dir).isSymbolicLink()) return { unread: null };
+    return { text: fs.readFileSync(path.join(dir, 'SKILL.md'), 'utf8') };
+  } catch (err) {
+    return { unread: `${path.join(dir, 'SKILL.md')} cannot be read: ${err instanceof Error ? err.message : String(err)}` };
   }
 };
 

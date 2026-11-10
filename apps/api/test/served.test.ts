@@ -21,15 +21,7 @@ const META = ['GET /openapi/v3/nemia/v1', 'GET /openapi', 'GET /openapi/scalar.j
  * The routes still served by Hono and not yet declared on the `Api`, each a line of app.ts before the mount. Transitional: each later part
  * of the change that moves a route onto the `Api` deletes its row here and its line there; the list ends empty, and goes with this note.
  */
-const NOT_YET_IN_API = [
-  'GET /api/workflows/:from/:name/:step',
-  'GET /api/workflows/keys',
-  'GET /api/agents/sources',
-  'GET /api/custom-instructions/:name',
-  'PUT /api/custom-instructions/:name',
-  'DELETE /api/custom-instructions/:name',
-  'POST /api/agents/yours/copy',
-] as const;
+const NOT_YET_IN_API = [] as const;
 
 /** Each route Hono serves as `METHOD path`, once, but middleware and the mount (`ALL`), which serve no route of their own. */
 const routesOf = (routes: readonly { method: string; path: string }[]): string[] => [

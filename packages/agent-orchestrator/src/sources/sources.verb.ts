@@ -2,15 +2,19 @@
  * `nemia agents sources` as an entry of the command table (`AGENTS_SOURCES`): every agent file the store knows of, read
  * (`agentSources`), to copy into a person's library with `nemia agents copy`.
  */
-import { Effect } from 'effect';
+import { Effect, Schema } from 'effect';
 import type { Command } from '../command/entry.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { rooted } from '../factory/wiring/wire.verb.ts';
 import { agentSources } from './sources.store.ts';
 import { sourcesLines, type AgentSource } from './sources.ts';
 
+/** What `nemia agents sources`' handler takes: the folder of agent files `--path` names, besides those the store knows of. */
+export const SourcesInput = Schema.Struct({ path: Schema.optionalKey(Schema.String) });
+export type SourcesInput = typeof SourcesInput.Type;
+
 /** `nemia agents sources`: every agent file the store knows of, to copy into your library, and the folder named with `--path`. */
-export const AGENTS_SOURCES: Command<{ sources: AgentSource[] }> = {
+export const AGENTS_SOURCES: Command<{ sources: AgentSource[] }, SourcesInput> = {
   name: 'agents sources',
   usage: '[--path <folder>]',
   help: ['the agent files the store knows of, to copy into your library:', "each repository's, yours, and those of a --path <folder>"],
@@ -29,19 +33,16 @@ export const AGENTS_SOURCES: Command<{ sources: AgentSource[] }> = {
   },
   writes: false,
   class: 'read',
-  route: {
-    method: 'GET',
-    path: '/api/agents/sources',
-    status: 200,
-    hand: 'the board reads the listing at its own path, beside the agents',
+  only: {
+    side: 'cli',
+    why: "the api serves it as the Agent's `sources` verb of `objects`' Api (`GET /api/agents/sources`), which calls this entry's handler: no route of its own",
   },
-  handler: (args, _env, home) => {
-    const at = typeof args.path === 'string' ? args.path : undefined;
-    return rooted(
+  input: SourcesInput,
+  handler: ({ path: at }, _env, home) =>
+    rooted(
       home,
       'agents sources',
       Effect.flatMap(StoreRoot, (root) => agentSources({ ...(at !== undefined && { at }), home: root })),
-    );
-  },
+    ),
   print: sourcesLines,
 };

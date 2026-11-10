@@ -45,8 +45,21 @@ import { Hire, HireList, HireWrite } from './hire.ts';
 import { McpServer, McpServerList, McpServerWrite, SignInStarted, SignInState, SignedOut } from './mcp-server.ts';
 import { Schedule, ScheduleList, ScheduleWrite } from './schedule.ts';
 import { Volume, VolumeList } from './volume.ts';
-import { Workflow, WorkflowCreate, WorkflowList, WorkflowWrite } from './workflow.ts';
-import { Agent, AgentCard, AgentList, AgentTried, AgentTry, AgentWrite } from './agent.ts';
+import { KeyForm, Workflow, WorkflowCreate, WorkflowList, WorkflowStepPage, WorkflowWrite } from './workflow.ts';
+import {
+  Agent,
+  AgentCard,
+  AgentCopied,
+  AgentCopy,
+  AgentInstructions,
+  AgentInstructionsCleared,
+  AgentInstructionsWrite,
+  AgentList,
+  AgentSources,
+  AgentTried,
+  AgentTry,
+  AgentWrite,
+} from './agent.ts';
 import { Skill, SkillFiles, SkillList, SkillWrite } from './skill.ts';
 import { LabelEdit, Labelled } from './labels.ts';
 import { Template, TemplateList } from './template.ts';
@@ -353,7 +366,8 @@ const removeQuery = { resourceVersion: Schema.optionalKey(Schema.String) };
 
 /**
  * A namespace's workflows: the factory's resolved view of each name (`default`: the api's repository and your library), listed, read,
- * and — yours, in `default` alone — made, written whole and removed.
+ * and — yours, in `default` alone — made, written whole and removed; a step of one read for its page, in the namespace's factory. And
+ * the builder's form (`keys`), in no namespace: under one, `keys` would read as a workflow's name.
  */
 export class WorkflowsGroup extends HttpApiGroup.make('workflows').add(
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/workflows', {
@@ -386,9 +400,21 @@ export class WorkflowsGroup extends HttpApiGroup.make('workflows').add(
     success: WorkflowObject,
     error: definitionErrors,
   }),
+  HttpApiEndpoint.get('step', '/api/namespaces/:namespace/workflows/:name/steps/:step', {
+    params: { ...cardParams, step: Schema.String },
+    query: originQuery,
+    success: WorkflowStepPage,
+    error: definitionErrors,
+  }),
+  HttpApiEndpoint.get('keys', '/api/workflows/keys', { success: KeyForm, error: definitionErrors }),
 ) {}
 
-/** A namespace's agents, as the workflows: listed, read, yours made, written and removed in `default`, tried, and read as a card. */
+/**
+ * A namespace's agents, as the workflows: listed, read, yours made, written and removed in `default`, tried, and read as a card; an agent
+ * file copied into yours, in `default` alone; and an agent's custom instructions, one record per agent's name, read in any namespace and
+ * written and cleared in `default` alone. And where agent files are looked for (`sources`), in no namespace: under one, `sources` would
+ * read as an agent's name.
+ */
 export class AgentsGroup extends HttpApiGroup.make('agents').add(
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/agents', {
     params: namespaceParams,
@@ -430,6 +456,33 @@ export class AgentsGroup extends HttpApiGroup.make('agents').add(
     params: cardParams,
     query: originQuery,
     success: AgentCard,
+    error: definitionErrors,
+  }),
+  HttpApiEndpoint.get('sources', '/api/agents/sources', {
+    query: { path: Schema.optionalKey(Schema.String) },
+    success: AgentSources,
+    error: definitionErrors,
+  }),
+  HttpApiEndpoint.post('copy', '/api/namespaces/:namespace/agents/copy', {
+    params: namespaceParams,
+    payload: AgentCopy,
+    success: AgentCopied,
+    error: definitionErrors,
+  }),
+  HttpApiEndpoint.get('instructions', '/api/namespaces/:namespace/agents/:name/instructions', {
+    params: cardParams,
+    success: AgentInstructions,
+    error: definitionErrors,
+  }),
+  HttpApiEndpoint.put('putInstructions', '/api/namespaces/:namespace/agents/:name/instructions', {
+    params: cardParams,
+    payload: AgentInstructionsWrite,
+    success: AgentInstructions,
+    error: definitionErrors,
+  }),
+  HttpApiEndpoint.delete('deleteInstructions', '/api/namespaces/:namespace/agents/:name/instructions', {
+    params: cardParams,
+    success: AgentInstructionsCleared,
     error: definitionErrors,
   }),
 ) {}

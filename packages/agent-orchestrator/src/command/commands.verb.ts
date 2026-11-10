@@ -44,7 +44,7 @@ import { amountIn, commandLine, renamedValues, type Args, type CommandSpec, type
 import { type Command, type Ran, tableEntry } from './entry.verb.ts';
 import { READS, SERIES } from './reads.verb.ts';
 import { AGENTS_CUSTOM } from '../custom/custom.verb.ts';
-import { LIBRARY_ENTRIES } from '../agents/library.verb.ts';
+import { AgentCardInput, AgentsInput, LIBRARY_ENTRIES } from '../agents/library.verb.ts';
 import { SKILL_ENTRIES } from '../skills/skills.verb.ts';
 import { mergeRun } from '../merge/merge.verb.ts';
 import { mergeAskedLine } from '../merge/merge.ts';
@@ -515,7 +515,7 @@ function agentsRefusal(args: Args): string | null {
 }
 
 /** `nemia agents`: every agent of both places, the repository's then yours, each read now through the Agent door. */
-const AGENTS: Command<AgentsRead> = {
+export const AGENTS: Command<AgentsRead, AgentsInput> = {
   name: 'agents',
   usage: '[--repo .]',
   help: [
@@ -531,17 +531,18 @@ const AGENTS: Command<AgentsRead> = {
     side: 'cli',
     why: "the api serves it as the Agent's `list` verb of `objects`' Api (`/api/namespaces/:namespace/agents`), which calls this entry's handler: no route of its own",
   },
-  handler: (args, _env, home) =>
+  input: AgentsInput,
+  handler: ({ repo = '.' }, _env, home) =>
     rooted(
       home,
       'agents',
-      Effect.flatMap(StoreRoot, (root) => agentsRead({ repo: textOf(args, 'repo') ?? '.', home: root })),
+      Effect.flatMap(StoreRoot, (root) => agentsRead({ repo, home: root })),
     ),
   print: agentsLines,
 };
 
 /** `nemia agents card`: one agent in the shape of an A2A Agent Card, from the place it is in. */
-const AGENT_CARD: Command<CardRead> = {
+export const AGENT_CARD: Command<CardRead, AgentCardInput> = {
   name: 'agents card',
   usage: '<name> [--repo .] [--from repo|yours]',
   help: [
@@ -558,21 +559,15 @@ const AGENT_CARD: Command<CardRead> = {
     side: 'cli',
     why: "the api serves it as the Agent's `card` verb of `objects`' Api (`/api/namespaces/:namespace/agents`), which calls this entry's handler: no route of its own",
   },
-  handler: (args, _env, home) =>
+  input: AgentCardInput,
+  handler: ({ name, repo = '.', from }, _env, home) =>
     rooted(
       home,
       'agents card',
-      Effect.flatMap(StoreRoot, (root) => {
-        const from = textOf(args, 'from');
-        return agentCardRead(textOf(args, 'name') ?? '', {
-          repo: textOf(args, 'repo') ?? '.',
-          home: root,
-          ...((from === 'repo' || from === 'yours') && { from }),
-        });
-      }),
+      Effect.flatMap(StoreRoot, (root) => agentCardRead(name, { repo, home: root, ...(from !== undefined && { from }) })),
     ),
   print: ({ card }) => [JSON.stringify(card, null, 2)],
-  note: (data, args) => cardNote(data, textOf(args, 'name') ?? ''),
+  note: (data, { name }) => cardNote(data, name),
 };
 
 /** Every command with a handler defined once, in the order `nemia`'s help lists them: what the api may serve. */

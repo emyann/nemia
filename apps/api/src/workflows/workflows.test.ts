@@ -37,7 +37,7 @@ const versionOf = (dir: string): string =>
   Effect.runSync(versionIn(dir, { repo, home: root }).pipe(Effect.provideService(StoreRoot, root)));
 
 type WorkflowStepSpec = import('./workflows.ts').WorkflowStepSpec;
-type WorkflowStepPage = import('../step/step.ts').WorkflowStepPage;
+type WorkflowStepPage = import('objects').WorkflowStepPage;
 type WorkflowListing = import('./workflows.ts').WorkflowListing;
 
 const write = (file: string, text: string): void => {
@@ -282,7 +282,7 @@ test("a person reads the workflows on the board, opens a step's page, and is ref
   );
 
   await s.test(
-    "GET /api/workflows/:from/:name/:step is a step's page: which workflow and step, its body, its file as written, and every key a step may set with its value as the loader read it and what it means",
+    "GET /api/namespaces/default/workflows/:name/steps/:step?origin= is a step's page: which workflow and step, its body, its file as written, and every key a step may set with its value as the loader read it and what it means",
     async () => {
       const before = [filesOf(good), filesOf(mine)];
 
@@ -422,16 +422,17 @@ test("a person reads the workflows on the board, opens a step's page, and is ref
   );
 
   await s.test(
-    "a step's page from somewhere that is not repo or yours (400), for a workflow there is not (404, in a start's words), a folder the loader refuses (422, in its words), and a step the folder does not have (404, naming its steps) — nothing read outside the folder",
+    "a step's page from an origin that is none (422, naming the origins), for a workflow the namespace does not serve there (404, naming where they are listed), a folder the loader refuses (422, in its words), and a step the folder does not have (404, naming its steps) — nothing read outside the folder",
     async () => {
       const from = await stepPage('elsewhere', 'good', 'review');
-      assert.equal(from.status, 400);
-      assert.match(((await from.json()) as { error: string }).error, /`repo` or `yours`.*This request's was 'elsewhere'\./);
+      assert.equal(from.status, 422);
+      assert.match(((await from.json()) as { error: string }).error, /\belsewhere\b/);
 
       const unknown = await stepPage('repo', 'nope', 'review');
       assert.equal(unknown.status, 404);
       const { error } = (await unknown.json()) as { error: string };
-      assert.ok(error.startsWith("No workflow 'nope' in "), error);
+      assert.match(error, /\bnope\b/);
+      assert.match(error, /GET \/api\/namespaces\/default\/workflows\b/);
       for (const [where, name] of [
         ['repo', '..%2Fworkflows%2Fgood'],
         ['repo', 'mine'],
@@ -487,8 +488,9 @@ test("a person reads the workflows on the board, opens a step's page, and is ref
   );
 });
 
-/** A step's page, as the board asks for it. */
-const stepPage = (from: string, name: string, step: string) => app.request(`/api/workflows/${from}/${name}/${step}`);
+/** A step's page, as the board asks for it: the Workflow's `step` in `default`, from the origin `from`. */
+const stepPage = (from: string, name: string, step: string) =>
+  app.request(`/api/namespaces/default/workflows/${name}/steps/${step}?origin=${from}`);
 
 /** Every key a step may set, in the package's order, with the values `set` gives over the `place: git` every step says, and its meaning. */
 const rows = (set: Record<string, string | null>) =>

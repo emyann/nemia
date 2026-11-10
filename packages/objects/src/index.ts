@@ -453,3 +453,14 @@ export {
   CALL_STATES,
   type CallState,
 } from './words.ts';
+export {
+  AgentCopied,
+  AgentCopy,
+  AgentInstructions,
+  AgentInstructionsCleared,
+  AgentInstructionsWrite,
+  AgentSource,
+  AgentSources,
+} from './agent.ts';
+export { KeyField, KeyForm, KeyRow, WorkflowStepPage } from './workflow.ts';
+export { AGENT_SOURCE_PLACES, type AgentSourcePlace } from './words.ts';

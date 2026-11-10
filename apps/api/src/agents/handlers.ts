@@ -7,12 +7,27 @@
  * other than the path's renames it) and removed at the `?resourceVersion=` it was read at, through `agents write` and `agents rm`; a
  * removal of one a step still names is the package's `Conflict`, with its `users`. A try (`agents run`) starts a run of one of yours; the
  * repository's is refused with the copy that makes it yours. Its card is `agents card`'s.
+ *
+ * Beside the objects, each through its entry of the package's, called by type: where agent files are looked for (`sources`, `nemia agents
+ * sources`), in no namespace; one copied into yours (`copy`, `nemia agents copy`), in `default` alone; and a person's custom instructions
+ * for an agent (`instructions`, `nemia agents custom`), one record per agent's name, told to whichever agent of that name a run finds:
+ * read in any namespace — a file there that does not read answered with why, beside no words — and written and cleared in `default`
+ * alone. A run reads them once, at its start, so a write or a clear reaches only the runs started after it. A name in a path is refused
+ * (400) before a file is read, so none reaches outside the folder; a name no place has is a 404.
  */
 import path from 'node:path';
 import { Effect } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
 import {
+  AGENT_CARD,
+  AGENTS,
+  AGENTS_COPY,
+  AGENTS_CUSTOM,
+  AGENTS_REMOVE,
+  AGENTS_SOURCES,
+  AGENTS_TRY,
   agentRead,
+  customInstructionsFile,
   definitionRevision,
   factoriesFilling,
   inFactory,
@@ -20,23 +35,34 @@ import {
   stepsFilled,
   untriedOf,
   type AgentReading,
-  type AgentsRead,
-  type CardRead,
 } from 'agent-orchestrator';
-import { AGENTS_FOLDER, agentNameRefusal } from 'agent-orchestrator/workflow';
-import { type Agent, type AgentSpec, Api, API_VERSION, Invalid } from 'objects';
+import { AGENTS_FOLDER, agentNameRefusal, WorkflowError } from 'agent-orchestrator/workflow';
+import {
+  type Agent,
+  type AgentInstructions,
+  type AgentInstructionsCleared,
+  type AgentSpec,
+  Api,
+  API_VERSION,
+  BadRequest,
+  Invalid,
+} from 'objects';
 import type { Served } from '../layer.ts';
-import { agentDraftOf, listingOf, saved, type AgentDraftBody, type LibraryAgent } from '../agents/agents.ts';
+import { agentDraftOf, listingOf, saved, type AgentDraftBody, type LibraryAgent } from './agents.ts';
 import { queryOf } from '../factory/parts/index.ts';
-import { answeredWriteIn } from '../objects/refused.ts';
+import { answered, answeredIn, answeredWriteIn } from '../objects/refused.ts';
 import { markdownNamesIn } from '../workflows/builder.ts';
-import { commandNamed, runPlaced } from '../store.ts';
-import { listed, originAsked, servedNamed, servedOf, thereOf, writeGoes, writtenAt, type Held, type Origin } from './served.ts';
-
-const AGENTS = commandNamed('agents');
-const AGENT_CARD = commandNamed('agents card');
-const REMOVE = commandNamed('agents rm');
-const TRY = commandNamed('agents run');
+import {
+  listed,
+  originAsked,
+  servedNamed,
+  servedOf,
+  thereOf,
+  writeGoes,
+  writtenAt,
+  type Held,
+  type Origin,
+} from '../definitions/served.ts';
 
 /** The agents of the factory's tree, read as the repository's are, then told apart by their origin. */
 const treeAgents = (s: Served) =>
@@ -71,7 +97,7 @@ export async function treeAgentsHeld(s: Served, origin: Origin, fills = fillsIn(
  * other only where it fills a step there (`inFactory`).
  */
 async function heldIn(s: Served): Promise<Held<LibraryAgent>[]> {
-  const { agents } = (await runPlaced(s, s.e, AGENTS.handler({ repo: s.repo }, s.env, s.home))) as AgentsRead;
+  const { agents } = await s.inRequest(AGENTS.handler({ repo: s.repo }, s.env, s.home));
   const fills = fillsIn(s);
   const own = await treeAgentsHeld(s, 'factory', fills);
   const trees = new Set(own.map(({ item }) => item.file));
@@ -178,8 +204,74 @@ const versioned = (route: string, version: string | undefined): string => {
   return version;
 };
 
+/** Where an agent's custom instructions are, as a refusal names it. */
+const instructionsPath = (namespace: string, name: string) => `/api/namespaces/${namespace}/agents/${name}/instructions`;
+
+/** `name` as an agent's, or a 400 (`BadRequest`) in the package's words, before any file is read. */
+const agentNamed = (route: string, name: string): string => {
+  const wrong = agentNameRefusal(name);
+  if (wrong !== undefined) throw new BadRequest({ error: `${route}: ${wrong}` });
+  return name;
+};
+
+/** What `nemia agents custom` answers when it is asked for words: the words read or written, never a clear's. */
+const wordsOf = (answer: AgentInstructions | AgentInstructionsCleared): AgentInstructions => {
+  if ('removed' in answer) throw new Error(`nemia agents custom answered a clear of ${answer.name} where its words were asked.`);
+  return answer;
+};
+
+/** What `nemia agents custom` answers when it is asked to clear: the clear, never words. */
+const clearedOf = (answer: AgentInstructions | AgentInstructionsCleared): AgentInstructionsCleared => {
+  if (!('removed' in answer)) throw new Error(`nemia agents custom answered the words of ${answer.name} where a clear was asked.`);
+  return answer;
+};
+
+/**
+ * The custom instructions for the agent `name`, read through `nemia agents custom`'s entry on the request's repository: a file there the
+ * package refuses — a link, a frontmatter block, not a file — answered with its words in `error`, beside no words, since it stops every
+ * run naming the agent until it is cleared or written again; a name no place has is the package's `Missing`.
+ */
+async function instructionsRead(s: Served, name: string): Promise<AgentInstructions> {
+  try {
+    return wordsOf(await s.inRequest(AGENTS_CUSTOM.handler({ name, repo: s.repo }, undefined, s.home)));
+  } catch (err) {
+    if (!(err instanceof WorkflowError)) throw err;
+    return { name, file: customInstructionsFile(s.home, name), words: null, error: err.message };
+  }
+}
+
 const A2A_WHY = (name: string) =>
   `Nothing here serves ${name} over A2A: this card describes the agent, and declares no interfaces and no security schemes. A2A marks \`supportedInterfaces\` REQUIRED, so it is not a card a client could call.`;
+
+/** The agent `name` tried on `brief` (`nemia agents run`'s entry): one of yours alone, any other refused with how to copy it. */
+async function triedIn(s: Served, namespace: string, name: string, brief: string | undefined): Promise<{ id: string }> {
+  const route = `POST /api/namespaces/${namespace}/agents/${name}/try`;
+  const held = await heldIn(s);
+  const there = thereOf(held, name);
+  writeGoes(namespace, 'act', there);
+  if (there !== 'yours') {
+    const agent = servedNamed(held, name, undefined, listPath(namespace)).item;
+    const untried = agent.untried ?? untriedOf({ from: 'repo', name, file: agent.file, keys: {}, schemaFile: null }, s.home);
+    throw new Invalid({
+      error: `${route}: ${untried?.why ?? 'only an agent of yours is tried.'}${untried?.copy ? ` \`${untried.copy}\`` : ''}`,
+    });
+  }
+  const { id } = await s.inRequest(AGENTS_TRY.handler({ from: 'yours', name, brief, repo: s.repo }, undefined, s.home));
+  return { id };
+}
+
+/** The A2A card of the agent `name` from `origin` (`nemia agents card`'s entry), beside why nothing serves it over A2A. */
+async function cardIn(s: Served, namespace: string, name: string, origin: string | undefined) {
+  const served = servedNamed(await heldIn(s), name, originAsked(origin), listPath(namespace));
+  if (served.item.error !== null) throw new Invalid({ error: served.item.error });
+  if (served.origin === 'factory')
+    throw new Invalid({
+      error: `${name} is the factory's own agent, whose card is not drawn here: its skills are \`status.card\` of GET /api/namespaces/${namespace}/agents/${name}?origin=factory.`,
+    });
+  const from = served.origin === 'yours' ? 'yours' : 'repo';
+  const { card } = await s.inRequest(AGENT_CARD.handler({ name, repo: s.repo, from }, s.env, s.home));
+  return { card, servedOverA2A: false as const, why: A2A_WHY(name) };
+}
 
 export const agentsHandlers = HttpApiBuilder.group(Api, 'agents', (handlers) =>
   handlers
@@ -197,8 +289,7 @@ export const agentsHandlers = HttpApiBuilder.group(Api, 'agents', (handlers) =>
         const route = `POST /api/namespaces/${namespace}/agents`;
         const name = named(route, payload.metadata.name);
         writeGoes(namespace, 'create', thereOf(await heldIn(s), name));
-        const yours = { from: 'yours' as const, repo: s.repo, home: s.home };
-        await saved(s.e, s, s.inRequest, yours, agentDraftOf(draftBodyOf(payload.spec), name), 201);
+        await saved(s, agentDraftOf(draftBodyOf(payload.spec), name));
         return agentAt(s, namespace, name, 'yours');
       }),
     )
@@ -209,7 +300,7 @@ export const agentsHandlers = HttpApiBuilder.group(Api, 'agents', (handlers) =>
         const version = versioned(route, payload.metadata.resourceVersion);
         const to = payload.metadata.name === undefined ? name : named(route, payload.metadata.name);
         const given = agentDraftOf(draftBodyOf(payload.spec), to);
-        await saved(s.e, s, s.inRequest, { from: 'yours', repo: s.repo, home: s.home }, { ...given, version, name }, 200);
+        await saved(s, { ...given, version, name });
         return agentAt(s, namespace, to, 'yours');
       }),
     )
@@ -219,38 +310,36 @@ export const agentsHandlers = HttpApiBuilder.group(Api, 'agents', (handlers) =>
         writeGoes(namespace, 'remove', thereOf(await heldIn(s), name));
         const version = versioned(route, query.resourceVersion);
         const before = await agentAt(s, namespace, name, 'yours');
-        await runPlaced(s, s.e, REMOVE.handler({ from: 'yours', name, version, repo: s.repo }, undefined, s.home));
+        await s.inRequest(AGENTS_REMOVE.handler({ from: 'yours', name, version, repo: s.repo }, undefined, s.home));
         return before;
       }),
     )
     .handle('try', ({ params: { namespace, name }, payload }) =>
-      answeredWriteIn(namespace, async (s) => {
-        const route = `POST /api/namespaces/${namespace}/agents/${name}/try`;
-        const held = await heldIn(s);
-        const there = thereOf(held, name);
-        writeGoes(namespace, 'act', there);
-        if (there !== 'yours') {
-          const agent = servedNamed(held, name, undefined, listPath(namespace)).item;
-          const untried = agent.untried ?? untriedOf({ from: 'repo', name, file: agent.file, keys: {}, schemaFile: null }, s.home);
-          throw new Invalid({
-            error: `${route}: ${untried?.why ?? 'only an agent of yours is tried.'}${untried?.copy ? ` \`${untried.copy}\`` : ''}`,
-          });
-        }
-        const tried = TRY.handler({ from: 'yours', name, brief: payload.brief, repo: s.repo }, undefined, s.home);
-        return { id: ((await runPlaced(s, s.e, tried)) as { id: string }).id };
+      answeredWriteIn(namespace, (s) => triedIn(s, namespace, name, payload.brief)),
+    )
+    .handle('card', ({ params: { namespace, name }, query }) => answeredWriteIn(namespace, (s) => cardIn(s, namespace, name, query.origin)))
+    .handle('sources', ({ query }) => answered((s) => s.inRequest(AGENTS_SOURCES.handler(query, undefined, s.home))))
+    .handle('copy', ({ params: { namespace }, payload }) =>
+      answeredWriteIn(namespace, (s) => {
+        writeGoes(namespace, 'act', 'yours');
+        return s.inRequest(AGENTS_COPY.handler(payload, undefined, s.home));
       }),
     )
-    .handle('card', ({ params: { namespace, name }, query }) =>
+    .handle('instructions', ({ params: { namespace, name } }) =>
+      answeredIn(namespace, (s) => instructionsRead(s, agentNamed(`GET ${instructionsPath(namespace, name)}`, name))),
+    )
+    .handle('putInstructions', ({ params: { namespace, name }, payload: { words } }) =>
       answeredWriteIn(namespace, async (s) => {
-        const served = servedNamed(await heldIn(s), name, originAsked(query.origin), listPath(namespace));
-        if (served.item.error !== null) throw new Invalid({ error: served.item.error });
-        if (served.origin === 'factory')
-          throw new Invalid({
-            error: `${name} is the factory's own agent, whose card is not drawn here: its skills are \`status.card\` of GET /api/namespaces/${namespace}/agents/${name}?origin=factory.`,
-          });
-        const from = served.origin === 'yours' ? 'yours' : 'repo';
-        const { card } = (await runPlaced(s, s.e, AGENT_CARD.handler({ name, repo: s.repo, from }, s.env, s.home))) as CardRead;
-        return { card, servedOverA2A: false as const, why: A2A_WHY(name) };
+        writeGoes(namespace, 'act', 'yours');
+        const agent = agentNamed(`PUT ${instructionsPath(namespace, name)}`, name);
+        return wordsOf(await s.inRequest(AGENTS_CUSTOM.handler({ name: agent, repo: s.repo, words }, undefined, s.home)));
+      }),
+    )
+    .handle('deleteInstructions', ({ params: { namespace, name } }) =>
+      answeredWriteIn(namespace, async (s) => {
+        writeGoes(namespace, 'act', 'yours');
+        const agent = agentNamed(`DELETE ${instructionsPath(namespace, name)}`, name);
+        return clearedOf(await s.inRequest(AGENTS_CUSTOM.handler({ name: agent, repo: s.repo, clear: true }, undefined, s.home)));
       }),
     ),
 );

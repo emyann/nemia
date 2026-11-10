@@ -27,7 +27,6 @@
 
 /** Each test file by its path from the repository root, and the lines of it that expect a whole sentence of what the code said. */
 export const PINNED_WORDS: Readonly<Record<string, number>> = {
-  'apps/api/src/agents/skills.test.ts': 3,
   'apps/api/src/asks/gate.test.ts': 2,
   'apps/api/src/capabilities/capabilities.test.ts': 15,
   'apps/api/src/decide/decision.test.ts': 1,
@@ -38,6 +37,7 @@ export const PINNED_WORDS: Readonly<Record<string, number>> = {
   'apps/api/src/inbox/inbox.test.ts': 2,
   'apps/api/src/inbox/queue.test.ts': 1,
   'apps/api/src/runs/prune.test.ts': 2,
+  'apps/api/src/skills/skills.test.ts': 3,
   'apps/api/src/stats/stats.test.ts': 2,
   'apps/api/src/step/step.test.ts': 1,
   'apps/api/src/steps/path.test.ts': 1,

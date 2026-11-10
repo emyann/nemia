@@ -50,8 +50,9 @@ export type Asked =
  * own, since `startRun` takes any string and `nemia start` prints its help for none. The body's shape (400) is its endpoint's.
  *
  * `after`, `context`, `cards` and `label` are only shaped by the body: whether this run may wait on each run, be handed each run or card,
- * or take each label is `startRun`'s to say (`afterRefusal`, `contextRefusal`, `cardsRefusal`, `parseLabelEdits`), in its words. With a `card` the brief is what the person made
- * of its body, and may be left out, for the body as it is; a blank one is the package's to refuse, as `nemia start <card> --brief ""` is.
+ * or take each label is `startRun`'s to say (`afterRefusal`, `contextRefusal`, `cardsRefusal`, `parseLabelEdits`), in its words. With a
+ * `card` the brief is what the person made of its body, and may be left out, for the body as it is; a blank one is the package's to
+ * refuse, as `nemia start <card> --brief ""` is.
  */
 function startOf(body: Omit<RunStart, 'card'> & { card?: string }, repo: string, home: string, tree?: string): Asked | Refusal {
   const { workflow, brief, from, after, context, cards, card, label } = body;

@@ -20,7 +20,7 @@ import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
-import type { RunDecision } from '../decide/decision.ts';
+import type { RunDecision } from 'objects';
 import { acceptFile, acceptRun, list, roundRun, runStore } from 'agent-orchestrator';
 import { story } from 'test-kit/checkpoints';
 import { objectOf, stepOf } from '../../test/run-reads.ts';

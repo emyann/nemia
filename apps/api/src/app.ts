@@ -24,7 +24,6 @@ import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Service
 import { nemia, nemiaChat } from './nemia/index.ts';
 import { bodyOf, MOUNT, mount, noRoute, refusedAs, statusOf } from './objects/index.ts';
 import { writeGuard } from './guard.ts';
-import { runs } from './runs/index.ts';
 import { openapi, REFERENCE_BUNDLE, referenceOf } from './openapi/index.ts';
 import { saidRequest } from './request/request.ts';
 import { stats } from './stats/stats.ts';
@@ -122,7 +121,6 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  * - inbox/inbox.ts — what a card filed through the Card's verb files, and the inbox listed with each card's body. The Card's verbs —
  *   listed, read alone with its file as written, written whole, filed, dropped, started, queued, labelled — are the objects'
  *   (objects/cards.ts).
- * - runs/runs.ts — what `nemia decide` shows of a run; the runs themselves are the objects' (objects/runs.ts).
  * - stats/stats.ts — the flow numbers of every run in the store, as `nemia stats --json` prints them.
  * - `GET /api/ceilings` — the cap on runs in flight the daemon's last pass ran with, and the runs it counts and holds: what the Factory
  *   says over its floor. 422 for a `WF_MAX_RUNS` in the api's environment that is not a count, before any pass wrote the daemon's
@@ -199,7 +197,6 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', yours)
     .route('/', agents)
     .route('/', customInstructions)
-    .route('/', runs)
     .route('/', stats)
     .get('/api/ceilings', (c) => served(c, async (s) => c.json(await ceilingsOf(s))))
     .get('/api/passes', (c) =>

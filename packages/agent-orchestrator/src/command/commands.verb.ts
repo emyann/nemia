@@ -4,18 +4,17 @@
  * entry on its route; an entry served on one side alone says so (`only`). Today: a start of work (`nemia start`, `START`, of a brief, and
  * of a folder of cards at the command line alone), the inbox (`INBOXES`), the factories (`FACTORIES`, their schedules among them), their
  * templates (`TEMPLATES`), a person's asks of a run — `nemia retry`, `nemia approve`, `nemia refresh` and `nemia say` — the runs and their
- * steps (`nemia ls`, `runsListed`), three reads the api alone serves: a run's decision (`decideRun`), whether its branches still merge
- * (`MERGES`) and the run slots (`slotsOf`), the agents of both places (`nemia agents`, `agentsRead`), one agent's card (`nemia agents
- * card`, `agentCardRead`) and its custom instructions (`nemia agents custom`, `AGENTS_CUSTOM`), a run's course (`nemia cancel`, `nemia
- * hold`, `nemia rm`, `nemia prune`), and the store's pause (`nemia pause`, `nemia resume`, and its read the api alone serves):
- * `runs.verb.ts`; Nemia's level and memory (`nemia level`, `nemia memory`: `nemia/`); an agent's rules at auto (`nemia policy`:
- * `POLICY_ENTRIES`, and what they reach, `POLICY_REACH`: `reach/`); who may speak in her chat as an agent (`nemia chat speakers`,
- * `allow`, `disallow`: `CHAT_SPEAKER_ENTRIES`, `chat/`); the reads of the store (`nemia show`, `nemia logs`, `nemia stats`:
- * `reads.verb.ts`); the rewrite of a former frontmatter as YAML (`nemia frontmatter rewrite`, `FRONTMATTER_REWRITE`); and what the board
- * alone reads and writes, each served on the api alone: a card's page (`INBOXES`), a run's page and its steps' files, path and conversation
- * (`PAGES`), the agent and skill libraries (`LIBRARY_ENTRIES`, `SKILL_ENTRIES`) and the workflow builder (`WORKFLOW_ENTRIES`). The whole
- * table (`TABLE`) adds the commands the CLI serves alone and runs itself, with no handler: `nemia tick`, `nemia up` and `nemia watch`
- * (`RAN`).
+ * steps (`nemia ls`, `runsListed`), a read the api alone serves: the run slots (`slotsOf`), the agents of both places (`nemia agents`,
+ * `agentsRead`), one agent's card (`nemia agents card`, `agentCardRead`) and its custom instructions (`nemia agents custom`,
+ * `AGENTS_CUSTOM`), a run's course (`nemia cancel`, `nemia hold`, `nemia rm`, `nemia prune`), and the store's pause (`nemia pause`, `nemia
+ * resume`, and its read the api alone serves): `runs.verb.ts`; Nemia's level and memory (`nemia level`, `nemia memory`: `nemia/`); an
+ * agent's rules at auto (`nemia policy`: `POLICY_ENTRIES`, and what they reach, `POLICY_REACH`: `reach/`); who may speak in her chat as an
+ * agent (`nemia chat speakers`, `allow`, `disallow`: `CHAT_SPEAKER_ENTRIES`, `chat/`); the reads of the store (`nemia show`, `nemia logs`,
+ * `nemia stats`: `reads.verb.ts`); the rewrite of a former frontmatter as YAML (`nemia frontmatter rewrite`, `FRONTMATTER_REWRITE`); and
+ * what the board alone reads and writes, each served on the api alone: a card's page (`INBOXES`), a run's page and its steps' files, path
+ * and conversation (`PAGES`), the agent and skill libraries (`LIBRARY_ENTRIES`, `SKILL_ENTRIES`) and the workflow builder
+ * (`WORKFLOW_ENTRIES`). The whole table (`TABLE`) adds the commands the CLI serves alone and runs itself, with no handler: `nemia tick`,
+ * `nemia up` and `nemia watch` (`RAN`).
  */
 import { Effect, Schema } from 'effect';
 import { RunRefresh, RunRetry, RunSay, type SaidAfter } from 'objects';
@@ -33,7 +32,6 @@ import { saidLines } from '../say/say.ts';
 import { sayRun } from '../say/say.verb.ts';
 import { budgetRefusal, budgetWord } from '../status/status.ts';
 import { roundBudgetRefusal } from '../round/round.ts';
-import { decideRun, type Decided } from '../decide/decide.verb.ts';
 import { slotsRead, type Slots } from '../cap/slots-read.verb.ts';
 import { runsListed } from '../list/list.verb.ts';
 import { lsLines, type RunsListed } from '../list/list.ts';
@@ -48,7 +46,6 @@ import { READS, SERIES } from './reads.verb.ts';
 import { AGENTS_CUSTOM } from '../custom/custom.verb.ts';
 import { LIBRARY_ENTRIES } from '../agents/library.verb.ts';
 import { SKILL_ENTRIES } from '../skills/skills.verb.ts';
-import { MERGES } from '../branches/merges.verb.ts';
 import { mergeRun } from '../merge/merge.verb.ts';
 import { mergeAskedLine } from '../merge/merge.ts';
 import { WORKFLOW_ENTRIES } from '../workflows/workflows.verb.ts';
@@ -465,26 +462,6 @@ export const LS: Command<RunsListed> = {
   print: (listed, args) => [...(listed.paused ? pausedLines(listed.paused) : []), ...lsLines(listed, Date.now(), runsShown(args))],
 };
 
-const DECIDE: Command<Decided> = {
-  name: 'decide',
-  usage: '<runId>',
-  help: ['what is left for a person to do on a run, and the commands that do it'],
-  spec: {
-    positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],
-    flags: [],
-    unknown: (arg) => `nemia decide does not take ${arg}.`,
-  },
-  writes: false,
-  class: 'read',
-  route: { method: 'GET', path: '/api/runs/:runId/decision', status: 200 },
-  only: {
-    side: 'api',
-    why: "nemia decide is the CLI's own verb: it prints a run's whole screen — its steps, closeouts, checks and diffs — off this decision, which the api answers as data",
-  },
-  handler: (args, env) => decideRun(named(args).runId, env),
-  print: () => [],
-};
-
 const CEILINGS: Command<Slots> = {
   name: 'ceilings',
   usage: '',
@@ -615,8 +592,6 @@ export const COMMANDS: readonly Command[] = [
   LS,
   ...READS,
   ...PAGES,
-  DECIDE,
-  MERGES,
   CEILINGS,
   PASSES,
   SERIES,

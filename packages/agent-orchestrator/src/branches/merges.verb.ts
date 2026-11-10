@@ -1,7 +1,6 @@
-/** The merge check (`mergesOf`) and its entry in the command table (`MERGES`), served on the api alone. */
+/** The merge check (`mergesOf`): what a run's decision says under each branch ahead of the base (`decisionRead`). */
 import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
-import type { Command } from '../command/entry.verb.ts';
 import { isRepositoryRun } from '../record/record.ts';
 import { runStore } from '../record/files.store.ts';
 import { PlaceService, trialMerges, type Place } from '../place/place.store.ts';
@@ -29,31 +28,11 @@ export function mergesOf(place: Place, runId: string, branches: readonly string[
 }
 
 /**
- * Whether each branch named still merges onto the base branch of the run named (`mergesOf`), keyed by branch: what the board's decision
- * says under each branch ahead of the base.
+ * `mergesOf` on the place the program is given: whether each of `branches` still merges onto the base branch of the run `runId`, none asked
+ * for no branch. Fails with `Missing` for a run the store does not have.
  */
-export const MERGES: Command<Record<string, StandingMerge>> = {
-  name: 'merges',
-  usage: '<runId> [<branches> ...]',
-  help: ["whether each of a run's branches still merges onto its base branch"],
-  spec: {
-    positionals: [
-      { key: 'runId', takes: 'required', kind: 'name' },
-      { key: 'branches', takes: 'many', kind: 'name' },
-    ],
-    flags: [],
-    unknown: (arg) => `the merge check does not take ${arg}.`,
-  },
-  writes: false,
-  class: 'read',
-  only: {
-    side: 'api',
-    why: "the board's decision says whether each branch ahead still merges onto its base; nemia decide leaves a trial merge to the person",
-  },
-  handler: (args) =>
-    Effect.gen(function* () {
-      const place = yield* PlaceService;
-      return yield* tried(() => mergesOf(place, String(args.runId ?? ''), Array.isArray(args.branches) ? args.branches : []));
-    }),
-  print: () => [],
-};
+export const mergesRead = Effect.fn('mergesRead')(function* (runId: string, branches: readonly string[]) {
+  if (!branches.length) return {};
+  const place = yield* PlaceService;
+  return yield* tried(() => mergesOf(place, runId, branches));
+});

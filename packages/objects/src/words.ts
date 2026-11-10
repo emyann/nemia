@@ -583,3 +583,14 @@ export const TRANSCRIPT_ORIGINS = [
 
 /** One of `TRANSCRIPT_ORIGINS`. */
 export type TranscriptOrigin = (typeof TRANSCRIPT_ORIGINS)[number];
+
+/**
+ * The label of a command `nemia decide` offers on a run awaiting a person (`DecideCommand`, decide.ts): land it, drop it, read it, once
+ * more, refresh, approve, send back, forget it.
+ */
+export const DECIDE_LABELS = ['land it', 'drop it', 'read it', 'once more', 'refresh', 'approve', 'send back', 'forget it'] as const;
+export type DecideLabel = (typeof DECIDE_LABELS)[number];
+
+/** Which of its three the lesson line of a decision is (`Lesson`, decide.ts): written where the next agent reads, nothing, or not known. */
+export const LESSON_STATES = ['written', 'nothing', 'unknown'] as const;
+export type LessonState = (typeof LESSON_STATES)[number];

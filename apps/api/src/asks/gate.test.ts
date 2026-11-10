@@ -15,7 +15,7 @@
  * stories write beside the runs, and what they write stays.
  */
 import { root } from '../../test/harness.ts';
-import type { DecideCommand, Decidable } from '../decide/decision.ts';
+import type { DecideCommand, Decidable } from 'objects';
 import { closeoutOf, listedOf, objectOf, stepOf } from '../../test/run-reads.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

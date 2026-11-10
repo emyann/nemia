@@ -566,3 +566,6 @@ export { approveProgram, declineProgram, proposalGet, proposalsList } from './ap
 export { ProposalDoor, proposalDoorFiles, type ProposalDoorShape } from './proposal/proposal.store.ts';
 export { delegationGet, delegationPut, delegationRemove, delegationsList } from './delegation/delegation.verb.ts';
 export { DelegationDoor, delegationDoorFiles, type DelegationDoorShape } from './delegation/delegation.store.ts';
+export { decisionRead, diffFiles, DIFF_LINES, runDecision, type DecisionHow, type DecisionRead } from './decide/decision.verb.ts';
+export { lessonOf } from './branches/index.ts';
+export { runCostWords } from './decide/decide.ts';

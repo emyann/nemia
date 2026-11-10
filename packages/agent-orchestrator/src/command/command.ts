@@ -469,13 +469,15 @@ export function commandLine(command: Pick<CommandSpec, 'name' | 'spec'>, args: A
 
 /**
  * The verbs the CLI runs by a hand of its own, outside the table (`VERBS` in `cli/main.ts`), each with its usage and help as `nemia`'s
- * help prints them; who answers for one is its table entry's of the same name, served on the api alone.
+ * help prints them, and its class: `nemia decide`, a read, whose screen is printed off the run's decision (`decisionRead`), which the api
+ * serves as data.
  */
-export const CLI_VERBS: readonly Pick<CommandSpec, 'name' | 'usage' | 'help'>[] = [
+export const CLI_VERBS: readonly Pick<CommandSpec, 'name' | 'usage' | 'help' | 'class'>[] = [
   {
     name: 'decide',
     usage: '<runId> [--sensitive <globs>]',
     help: ['what the run produced, and the choice it leaves you (nemia decide --help)'],
+    class: 'read',
   },
 ];
 

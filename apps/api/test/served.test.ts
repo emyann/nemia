@@ -30,7 +30,6 @@ const NOT_YET_IN_API = [
   'GET /api/store',
   'GET /api/agents/sources',
   'GET /api/custom-instructions/:name',
-  'GET /api/runs/:runId/decision',
   'GET /api/stats',
   'GET /api/ceilings',
   'GET /api/passes',

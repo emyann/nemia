@@ -11,6 +11,7 @@ import { Table } from './table.ts';
 import { Concluded, RunLines, RunRecord, RunsListed } from './run-reads.ts';
 import { LabelEdit, Labelled } from './labels.ts';
 import { Run, RunList } from './run.ts';
+import { RunDecision } from './decide.ts';
 import {
   RunApprove,
   RunApproved,
@@ -158,5 +159,10 @@ export class RunsGroup extends HttpApiGroup.make('runs').add(
     query: listingQuery,
     success: RunsListed,
     error: [Missing, Invalid],
+  }),
+  HttpApiEndpoint.get('decision', '/api/runs/:runId/decision', {
+    params: { runId: Schema.String },
+    success: RunDecision,
+    error: [Missing, Unjudged],
   }),
 ) {}

@@ -16,7 +16,7 @@ import type { Workflow } from '../step/step.ts';
 import { hasStarted, holdsOf, waitedOn, waitsOf, type Wait } from '../wait/wait.ts';
 import { roundOffers, roundsDue } from '../round/round.ts';
 import { deniedWords, harnessWaitLine } from '../list/list.ts';
-import { choicesOf, costLine, decision, runCostLines, type DecideCommand, type Decision } from './decide.ts';
+import { choicesOf, costLine, decision, runCostLines, runCostWords, type DecideCommand, type Decision } from './decide.ts';
 import { assess } from '../tick/assess.ts';
 import { acceptedLines, gateLines } from '../brief/index.ts';
 import { parseCloseout, type Closeout } from '../closeout/index.ts';
@@ -94,6 +94,8 @@ export type Decided = {
   costs: Record<string, string>;
   /** The run's `cost` line, after its steps (`runCostLines`): every step's tries together. None before any attempt has ended. */
   runCost: string[];
+  /** What the run has cost, in its `cost` line's words without the label (`runCostWords`); null before any attempt has ended. */
+  runCostSaid: string | null;
   /**
    * For each step whose current try a person answered, the answer beside the `needs` it answers (`Answered`): the answer off the person's
    * ask file, the `needs` off the engine's record of the try before, as the run's record keeps neither.
@@ -320,6 +322,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
     used,
     costs,
     runCost: runCostLines(run, spendOf),
+    runCostSaid: runCostWords(run, spendOf),
     answers,
     answering: answerLines(steps, run, d, phaseOf, reader, asked, spendOf),
     gates: gateLines(steps, run, phaseOf, reader, asked, verdictOf, spendOf, asks, rounds),

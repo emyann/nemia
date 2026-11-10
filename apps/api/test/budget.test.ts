@@ -16,7 +16,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { RunDecision } from '../src/decide/decision.ts';
+import type { RunDecision } from 'objects';
 import {
   askFile,
   decideRun,

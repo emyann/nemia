@@ -46,6 +46,7 @@ import { findRun, noSuchRun, taskOfStep } from '../store.ts';
 import { runStart } from '../runs/index.ts';
 import { answered, answeredIn, locatedAt, refusedAs, ServedNow } from './refused.ts';
 import { wantsTable } from './table.ts';
+import { decisionHandler } from '../decide/decide.ts';
 
 /**
  * `program` over the app's informer of each run's judgement (`Informer`, the package's), which the store's daemon's pass fills: what the
@@ -283,5 +284,6 @@ export const runsHandlers = HttpApiBuilder.group(Api, 'runs', (handlers) =>
     )
     .handle('listingOne', ({ params: { name }, query }) =>
       answered(async (s) => asJson(await s.inRequest(informed(s, LS.handler({ runId: name, ...selected(query) }, s.env, s.home))))),
-    ),
+    )
+    .handle('decision', ({ params: { runId } }) => decisionHandler(runId)),
 );

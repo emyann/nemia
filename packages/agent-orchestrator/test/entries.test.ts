@@ -643,6 +643,12 @@ const PINNED: Record<string, string[]> = {
     'turnOfTry',
     'typeOf',
     'usedOf',
+    'decisionRead',
+    'diffFiles',
+    'DIFF_LINES',
+    'runDecision',
+    'lessonOf',
+    'runCostWords',
   ],
   'agent-orchestrator/run': [
     'BY_CAP',

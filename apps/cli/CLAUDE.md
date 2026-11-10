@@ -20,8 +20,9 @@ run on the orchestrator's own CLI, spawned with the same words (`src/local.ts`).
   /api/health` answers, bounded; the read then asks once (`asked`). No read retries after a refused connection.
 - **A list is printed as the server prints it** (`src/reads/table.ts`, fc2e): `nemia ls` and `nemia inbox` ask with `Accept:
   TABLE_ACCEPT` and print the `Table`'s columns of priority 0 (every one with `-o wide`, `Labels` with `--show-labels`, a column per
-  `-L <key>` off each row's object), kubectl's way. The client keeps no printer of a list; `nemia ls <run>`, which no server table prints
-  yet, goes to the old path.
+  `-L <key>` off each row's object), kubectl's way. The client keeps no printer of a list but the lines `nemia ls` says around
+  the runs' Table, from server reads that serve no Table: the pause first, a line per schedule and the daemon's last
+  (`src/reads/standing.ts`). `nemia ls <run>`, which no server table prints yet, goes to the old path.
 - **One store fact, in `src/where.ts`**: the store's root (`WF_ROOT`, else `~/.agent-workflows`) and the `url` its lease holds
   (`daemon.json`). No other file of `src` spells a store path or reads a file of the store: what it shows comes from the api.
 - **One process, in `src/local.ts`**: the orchestrator's CLI entries, `agent-orchestrator/bin` and `/bin/wf`, resolved and spawned with

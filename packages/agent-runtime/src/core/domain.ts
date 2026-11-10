@@ -391,6 +391,10 @@ export type EndReason = 'harness' | 'lost' | 'unstartable' | 'operator' | 'deadl
  * - `measured`: what an ended attempt consumed, read once its session was let go — for a harness that writes part of it
  *   only as the session's process exits, which is after the end was written (Claude Code's cost). Merged into the
  *   attempt's `usage`. A fact for the record, written once; `decide` never reads it.
+ * - `exited`: how an ended attempt's process exited, read once it had — for an attempt whose end was written before its
+ *   process exited, as one ended on its statement while its process still runs is: written by the engine once, off the sighting
+ *   of the session it still looks for (`releaseFinished`), where the record has no exit and the sighting has one. Sets the
+ *   attempt's `exitCode`. A fact for the record; `decide` never reads it.
  * - `counted`: what a long-lived attempt in flight has consumed so far, its counts and never a cost, written by the engine off a
  *   sighting each time they differ from the record (`countedFacts`). Replaces the attempt's `usage` whole, so a count its runner
  *   no longer gives — tokens past a compaction — is dropped, not kept stale; an end that carries none keeps it. `decide` never
@@ -518,6 +522,7 @@ export type Event =
       mono?: Monotonic;
     }
   | { kind: 'measured'; at: string; attempt: number; usage: Usage }
+  | { kind: 'exited'; at: string; attempt: number; exitCode: number }
   | { kind: 'counted'; at: string; attempt: number; usage: Usage }
   | ({ kind: 'denied'; at: string; attempt: number } & Denial)
   | { kind: 'image'; at: string; attempt: number; image?: string; harnessVersion?: string; ranIn?: string }

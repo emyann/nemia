@@ -1630,7 +1630,8 @@ test('the release: a finished session is let go and looked for no more, what it 
       sessions.set(name, { ...sessions.get(name)!, state: 'working', busy: false, quietMs: 120_000 });
       for (pass = 1; pass <= 3; pass++) await run(tick());
       assert.equal((await run(view(id, new Map()))).state.settled, 'succeeded', 'ended quiet while its process still runs');
-      sessions.set(name, { ...sessions.get(name)!, state: 'completed', quietMs: undefined, usage: { costUsd: 0.25 } });
+      assert.equal((await run(view(id, new Map()))).state.attempts[0].exitCode, null, 'and no exit yet: its process has not exited');
+      sessions.set(name, { ...sessions.get(name)!, state: 'completed', quietMs: undefined, usage: { costUsd: 0.25 }, exitCode: 0 });
       for (pass = 4; pass <= 6; pass++) await run(tick());
       const events = await run(eventsOf(id));
       assert.deepEqual(
@@ -1638,6 +1639,12 @@ test('the release: a finished session is let go and looked for no more, what it 
         [{ costUsd: 0.25 }],
         'measured once it ended',
       );
+      assert.deepEqual(
+        events.filter((e) => e.kind === 'exited').map((e) => e.kind === 'exited' && e.exitCode),
+        [0],
+        'its exit written once its process exited, and once',
+      );
+      assert.equal((await run(view(id, new Map()))).state.attempts[0].exitCode, 0, 'so its attempt says how its process exited');
       assert.deepEqual(released, [1, 2, 3, 4, 5], 'released on each pass it was at work, the pass it was seen ended, and the next');
       assert.deepEqual(
         told.slice(1).map((names) => names.includes(name)),

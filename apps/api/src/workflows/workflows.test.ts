@@ -21,7 +21,7 @@ import { StoreRoot, workflowVersion as versionIn } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
 import { listedOf, objectOf } from '../../test/run-reads.ts';
 import { listWorkflows, specOf } from './workflows.ts';
-import { engine, builtinGitPlace, hireRefusalOf, loadWorkflows, passStanding, runStore, settingsOf } from 'agent-orchestrator';
+import { engine, builtinGitPlace, hireRefusalOf, loadWorkflows, passStanding, runsAtOnce, settingsOf } from 'agent-orchestrator';
 import { AGENTS_FOLDER, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
 /** The scratch repository, set as `HKB_REPO`, which the api reads on each request: a git repository, as `nemia start` reads its HEAD. */
 const repo = scratch('nemia-api-repo-');
@@ -520,7 +520,7 @@ test('a person starts runs from the board: the record as `nemia start` writes it
       assert.equal(res.headers.get('location'), `/api/runs/${id}`);
 
       assert.deepEqual(runFiles(), [id, `${id}.json`], "the record, and the run's own folder beside it");
-      const run = runStore(root).runs.read(id);
+      const run = runsAtOnce(root).runs.read(id);
       assert.deepEqual(
         fs.readdirSync(path.join(root, 'runs', id)),
         ['workflow'],
@@ -596,7 +596,7 @@ test('a person starts runs from the board: the record as `nemia start` writes it
       const res = await post({ workflow: 'good', from: 'repo', brief: 'Once it lands.', after: ['p-running'] });
       assert.equal(res.status, 201, await res.clone().text());
       const { id } = (await res.json()) as { id: string };
-      assert.deepEqual(runStore(root).runs.read(id).after, ['p-running']);
+      assert.deepEqual(runsAtOnce(root).runs.read(id).after, ['p-running']);
       assert.deepEqual(filedTasks(), [], 'nothing filed');
 
       const unread = await objectOf(app, id);
@@ -604,14 +604,14 @@ test('a person starts runs from the board: the record as `nemia start` writes it
         unread.status.waiting?.word.startsWith('waiting on p-running (where it stands is unread: '),
         `no pass has read where p-running stands since it was written: ${unread.status.waiting?.word}`,
       );
-      await runWith(engine(process.env), passStanding(runStore(root).runs.list()));
+      await runWith(engine(process.env), passStanding(runsAtOnce(root).runs.list()));
       const detail = await objectOf(app, id);
       assert.deepEqual([detail.spec.after, detail.status.waiting?.word], [['p-running'], 'waiting on p-running']);
 
       const none = await post({ workflow: 'good', from: 'repo', brief: 'Right away.', after: [] });
       assert.equal(none.status, 201);
       assert.equal(
-        Object.hasOwn(runStore(root).runs.read(((await none.json()) as { id: string }).id), 'after'),
+        Object.hasOwn(runsAtOnce(root).runs.read(((await none.json()) as { id: string }).id), 'after'),
         false,
         'none to wait on is a run that waits on none: a record with no `after`, as `nemia start` writes without one',
       );
@@ -625,7 +625,7 @@ test('a person starts runs from the board: the record as `nemia start` writes it
       const res = await post({ workflow: 'good', from: 'repo', brief: 'Read it.', context: ['p-running'] });
       assert.equal(res.status, 201, await res.clone().text());
       const { id } = (await res.json()) as { id: string };
-      assert.deepEqual([runStore(root).runs.read(id).context, runStore(root).runs.read(id).after], [['p-running'], undefined]);
+      assert.deepEqual([runsAtOnce(root).runs.read(id).context, runsAtOnce(root).runs.read(id).after], [['p-running'], undefined]);
       const detail = await objectOf(app, id);
       assert.deepEqual([detail.spec.context, detail.spec.after, detail.status.waiting], [['p-running'], [], null]);
     },
@@ -857,7 +857,7 @@ test('POST /api/namespaces/default/runs: what a start refuses, writing nothing, 
 
       const chosen = await post({ workflow: 'good', from: 'yours', brief: 'Do it my way.' });
       assert.equal(chosen.status, 201);
-      const run = runStore(root).runs.read(((await chosen.json()) as { id: string }).id);
+      const run = runsAtOnce(root).runs.read(((await chosen.json()) as { id: string }).id);
       assert.equal(run.workflowDir, yours);
       assert.deepEqual(Object.keys(run.steps), ['implement']);
     },

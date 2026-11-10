@@ -18,7 +18,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { askFile, list, runStore } from 'agent-orchestrator';
+import { askFile, list, runsAtOnce } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import type { RunList } from 'objects';
 import { testEngine } from 'agent-runtime/testing';
@@ -303,7 +303,7 @@ test('a person answers a blocked step, rechecks a refused check and continues th
       assert.deepEqual(asked(), ['retry-implement-2']);
       assert.equal(fs.readFileSync(recordFile, 'utf8'), record, "the api wrote nothing of the run's record");
 
-      const words = await runWith(engine(), list(engine(), runStore(root).runs.read(R)));
+      const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)));
       const run = await object();
       const implement = stepOf(run, 'implement');
       assert.equal(implement.note, 'try 2 asked (--continue, with your answer) — the next tick files it');
@@ -381,7 +381,7 @@ test('a person answers a blocked step, rechecks a refused check and continues th
         "and stopped no session: the api wrote the asks and nothing else, stopping the session is the tick's",
       );
 
-      const words = await runWith(engine(), list(engine(), runStore(root).runs.read(R)));
+      const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)));
       const noteOf = (name: string) => words.steps.find((s) => s.name === name)?.note;
       const run = await object();
       const held = stepOf(run, 'held');
@@ -476,7 +476,7 @@ test('a person answers a blocked step, rechecks a refused check and continues th
       assert.equal(implementTries[0].closeout!.needs, blocked.needs, "the question the answer answers is on the try before's closeout");
       assert.equal(implement.needs, null, 'the current try signed off done');
 
-      const words = await runWith(engine(), list(engine(), runStore(root).runs.read(A)));
+      const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(A)));
       for (const [where, said] of [
         ['object', run.status],
         ['list', await summary(A)],

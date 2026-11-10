@@ -26,7 +26,7 @@ import {
   retryRun,
   roundAskFile,
   roundRun,
-  runStore,
+  runsAtOnce,
   usedLines,
 } from 'agent-orchestrator';
 import { Effect } from 'effect';
@@ -434,7 +434,7 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
       );
       assert.equal(stepOf(run, 'implement').spent?.said, '$2.10');
 
-      const words = await runWith(engine(), list(engine(), runStore(root).runs.read(R)));
+      const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)));
       assert.ok(run.status.cost);
       const { usd, ...total } = run.status.cost;
       assert.deepEqual(
@@ -467,7 +467,7 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
         'its cap is there, and what it cost of it is not known: no of',
       );
       assert.equal(
-        (await runWith(engine(), list(engine(), runStore(root).runs.read(FREE)))).cost,
+        (await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(FREE)))).cost,
         undefined,
         '`nemia ls` prints no cost for it either',
       );
@@ -477,7 +477,7 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
   await s.test(
     "a step over its budget, on the list and on the detail, in `nemia ls`'s words — waiting on you, and moving nothing — with its cap, what it has cost of it, and the raise the package takes",
     async () => {
-      const words = await runWith(engine(), list(engine(), runStore(root).runs.read(R)));
+      const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)));
       const listed = await summary();
       const statuses = ['over budget $2.10 of $2', 'over budget — implement $2.10 of $2', 'over budget $4.25 of $3'];
       assert.deepEqual(
@@ -614,7 +614,7 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
       assert.ok(!Number.isNaN(Date.parse(roundWhen)), roundWhen);
       assert.equal(fs.readFileSync(recordFile, 'utf8'), record, "the api wrote nothing of the run's record");
 
-      const words = await runWith(engine(), list(engine(), runStore(root).runs.read(R)));
+      const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)));
       const run = await detail();
       assert.deepEqual(
         run.status.steps.map(({ name, note }) => ({ name, note })),
@@ -711,7 +711,7 @@ test('steps past their budget on their own work: one that signed off blocked is 
   );
 
   await s.test('both read their asks in notes, as `nemia ls` has them until the tick files them, and neither is waited on', async () => {
-    const words = await runWith(engine(), list(engine(), runStore(root).runs.read(R2)));
+    const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R2)));
     const after = await detail(R2);
     assert.deepEqual(
       after.status.steps.map(({ name, note }) => ({ name, note })),

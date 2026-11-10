@@ -28,7 +28,7 @@ import {
   passStanding,
   Informer,
   informerRead,
-  runStore,
+  runsAtOnce,
   standingReader,
   standingSnapshot,
   verifiesRest,
@@ -46,7 +46,7 @@ const snapshotGit = async () => standingReader(await runWith(e, standingSnapshot
  * A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what the list reads, and a tip it
  * read is one the memo watches.
  */
-const aPass = () => runWith(e, passStanding(runStore(root).runs.list()));
+const aPass = () => runWith(e, passStanding(runsAtOnce(root).runs.list()));
 /** The app's informer of each run's judgement (`Informer`, given by `liveOf`), which the list reads and keeps runs in. */
 const resting = await runtime.runPromise(
   Effect.gen(function* () {
@@ -721,7 +721,7 @@ test('what a poll costs: the journals of the runs still moving, and no more, on 
           'each row with its clock read, in flight as much as waiting',
         );
         assert.deepEqual(
-          runStore(root).runs.read('r-asks').after,
+          runsAtOnce(root).runs.read('r-asks').after,
           ['r-paged'],
           'it was started after the finished run, whose journal is not read',
         );

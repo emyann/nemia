@@ -21,7 +21,7 @@ import { testPlace } from 'agent-orchestrator/testing';
 import type { Said } from 'agent-orchestrator';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import { listedOf, objectOf, type ObjectStep } from '../../test/run-reads.ts';
-import { list, runStore, sayRun } from 'agent-orchestrator';
+import { list, runsAtOnce, sayRun } from 'agent-orchestrator';
 import { story } from 'test-kit/checkpoints';
 
 const stand = eachTest(testPlace);
@@ -202,7 +202,7 @@ test("a person's words to a working session: the package's `sayRun` hands them t
       for (const other of steps.filter((s) => s.name !== 'implement'))
         assert.deepEqual(other.said, [], `${other.name}: nobody told it anything`);
       assert.equal(
-        (await runWith(engine(), list(engine(), runStore(root).runs.read(R)))).steps.find((s) => s.name === 'implement')!.note,
+        (await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)))).steps.find((s) => s.name === 'implement')!.note,
         'said to 1×',
         "`nemia ls`'s words",
       );

@@ -3,8 +3,8 @@
  * story of the ceilings: the Card's `spec.queued` and `status.lastStart` (`GET /api/cards`); the Card's `queue` and `unqueue` verbs
  * (`POST /api/namespaces/:namespace/cards/:name/queue` and `…/unqueue`, objects/cards.ts), a card queued and taken off the queue through
  * the package's `nemia inbox queue` entry; and GET /api/ceilings (app.ts), the cap the daemon's last pass ran with and the runs it counts
- * and holds, held to the package's `runSlots` — in the harness's scratch store (`root`) and a scratch repository; and the shell's
- * `WF_MAX_RUNS` is dropped, so no cap comes from it.
+ * and holds, held to the package's `runSlots` — in the harness's scratch store (`root`) and a scratch repository. The api and the
+ * package's programs are given this file's environment (`ENV`), with no `WF_MAX_RUNS`, so no cap comes from the shell.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
@@ -15,17 +15,21 @@ import path from 'node:path';
 import type { Card, CardList } from 'objects';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
-import { app } from '../app.ts';
+import { appOf, liveOf } from '../app.ts';
 import {
   addToInbox,
+  builtin,
   engine,
+  type EngineService,
   type InboxListing,
   PHASES,
+  type PlaceService,
   queueInInbox,
   queueOrder,
   readInbox,
   runSlots,
-  runStore,
+  runWith as runEngine,
+  runsAtOnce,
   slotWord,
   standingReader,
   standingSnapshot,
@@ -34,15 +38,24 @@ import {
   type StoreConfig,
   type StoreRoot,
 } from 'agent-orchestrator';
-import { runWith } from '../../test/builtin-place.ts';
 import { Effect } from 'effect';
+
+const repo = scratch('nemia-api-queue-repo-');
+/**
+ * The environment this file's api and programs read: the harness's store (`root`), this file's repository, and no `WF_MAX_RUNS`. A
+ * test that means a setting sets it here, in its own scope: the api reads it on each request.
+ */
+const ENV: NodeJS.ProcessEnv = { ...process.env, WF_ROOT: root, WF_MAX_RUNS: undefined, HKB_REPO: repo };
+const { app } = appOf(liveOf(ENV));
 
 /** `program`, one of the package's inbox verbs, run on the harness's store (`root`) and its settings: its refusal thrown as itself. */
 const onStore = <A, E>(program: Effect.Effect<A, E, StoreRoot | StoreConfig>): A =>
-  Effect.runSync(Effect.provide(program, storeConfigLayer({ ...process.env, WF_ROOT: root })));
-delete process.env.WF_MAX_RUNS;
-const repo = scratch('nemia-api-queue-repo-');
-process.env.HKB_REPO = repo;
+  Effect.runSync(Effect.provide(program, storeConfigLayer(ENV)));
+/** `program` run over the engine `e`, given the package's git place and the store and settings `ENV` names. */
+const runWith = <A, E>(
+  e: Parameters<typeof runEngine>[0],
+  program: Effect.Effect<A, E, EngineService | PlaceService | StoreRoot | StoreConfig>,
+): Promise<A> => runEngine(e, builtin(program.pipe(Effect.provide(storeConfigLayer(ENV)))));
 const git = (...args: string[]) =>
   execFileSync(
     'git',
@@ -327,10 +340,10 @@ test('the queue verbs: what a queue or a take-back refuses, writing nothing', as
   await t.test(
     "as shipped, a card that names no factory is a 422 in the package's words; a factory's card is queued, one queued before the rule taken back",
     async (t) => {
-      const was = process.env.WF_DEFAULT_FACTORY_STARTS;
-      delete process.env.WF_DEFAULT_FACTORY_STARTS;
+      const was = ENV.WF_DEFAULT_FACTORY_STARTS;
+      ENV.WF_DEFAULT_FACTORY_STARTS = undefined;
       t.after(() => {
-        if (was !== undefined) process.env.WF_DEFAULT_FACTORY_STARTS = was;
+        ENV.WF_DEFAULT_FACTORY_STARTS = was;
       });
       clear();
       fs.mkdirSync(inbox, { recursive: true });
@@ -441,11 +454,8 @@ const ceilings = async (): Promise<Ceilings> => {
 
 /** The runs the package's own `runSlots` holds, on the same store, the runs waited on read off `standing.json`, as the api answers them. */
 const packageHeld = async (): Promise<Ceilings['held']> => {
-  const git = standingReader(await runWith(engine(process.env), standingSnapshot()));
-  const held = await runWith(
-    engine(process.env),
-    runSlots(engine(process.env), runStore(root).runs.list(), settingsOf(process.env), { git, read: new Map() }),
-  );
+  const git = standingReader(await runWith(engine(ENV), standingSnapshot()));
+  const held = await runWith(engine(ENV), runSlots(engine(ENV), runsAtOnce(root).runs.list(), settingsOf(ENV), { git, read: new Map() }));
   return [...held].map(([run, slot]) => ({ run, ...slot, word: slotWord(slot) }));
 };
 
@@ -534,10 +544,10 @@ test("a person reads the ceilings: no cap, then the cap of the daemon's last pas
       clear();
       seedRuns();
       t.after(() => {
-        delete process.env.WF_MAX_RUNS;
+        ENV.WF_MAX_RUNS = undefined;
       });
 
-      process.env.WF_MAX_RUNS = '1';
+      ENV.WF_MAX_RUNS = '1';
       tickWrote({ sessions: 2, runs: 0 });
       assert.deepEqual(await ceilings(), { last: { sessions: 2, runs: 0 }, cap: 0, inFlight: null, held: [], pass: null });
       tickWrote({ sessions: 2, runs: 3 });
@@ -551,7 +561,7 @@ test("a person reads the ceilings: no cap, then the cap of the daemon's last pas
         "before any pass: the api's own",
       );
 
-      process.env.WF_MAX_RUNS = 'two';
+      ENV.WF_MAX_RUNS = 'two';
       const res = await app.request('/api/ceilings');
       assert.equal(res.status, 422, 'an Invalid, as every route answers one');
       const notCount = ((await res.json()) as { error: string }).error;

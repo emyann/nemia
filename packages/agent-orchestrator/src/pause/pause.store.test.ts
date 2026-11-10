@@ -94,3 +94,9 @@ test('the pause on disk: put, read back, refused, lifted, read when it does not 
     refusedAs(() => cutPause(ROOT), 'Missing', 'nemia pause');
   });
 });
+
+test("the engine's ceiling is the store's sessions per pool, and none at all where the setting is refused", () => {
+  const root = scratch('wf-ceiling-');
+  assert.equal(storeAdmission(root, settingsOf({ WF_MAX_CONCURRENT: '3' })).maxConcurrent, 3);
+  assert.equal('maxConcurrent' in storeAdmission(root, settingsOf({ WF_MAX_CONCURRENT: 'many' })), false);
+});

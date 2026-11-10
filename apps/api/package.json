@@ -4,7 +4,7 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev": "node --watch --watch-path=src --watch-path=contracts --watch-path=../../packages/agent-orchestrator/src --watch-path=../../packages/agent-orchestrator/place/git --watch-path=../../packages/agent-runtime/src --watch-path=../../packages/agent-orchestrator/contracts --watch-path=../../packages/agent-runtime/contracts --watch-path=../../packages/objects/src src/main.ts --no-tick",
+    "dev": "node --watch --watch-path=src --watch-path=contracts --watch-path=../../packages/agent-orchestrator/src --watch-path=../../packages/agent-orchestrator/place/git --watch-path=../../packages/agent-runtime/src --watch-path=../../packages/agent-orchestrator/contracts --watch-path=../../packages/agent-runtime/contracts --watch-path=../../packages/objects/src --watch-path=../../packages/objects/contracts src/main.ts --no-tick",
     "start": "node src/main.ts",
     "test": "node --import ./test/harness.ts --test --test-concurrency=2 --test-timeout=120000 'test/*.test.ts' 'src/**/*.test.ts'",
     "typecheck": "tsrs --noEmit && tsrs --noEmit -p test"

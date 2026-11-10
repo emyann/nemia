@@ -1,3 +1,4 @@
+import '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { TABLE_ACCEPT } from 'objects';

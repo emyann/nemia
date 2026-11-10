@@ -96,6 +96,13 @@ const holdWords = (name: string, holding: NonNullable<Run['status']['holding']>)
 };
 
 /**
+ * Whether no result branch is left to name: none at all, or what to decide names every one already — it names only those ahead of the
+ * base, so a result branch that is not is still named.
+ */
+const resultNamed = ({ result = [], toDecide }: Run['status']): boolean =>
+  result.every((branch) => toDecide?.kind === 'result' && toDecide.branches.includes(branch));
+
+/**
  * What waits on you, as `nemia ls` said it under a run (`asksLines`): what to decide with its command, the steps waiting on you (an
  * approval named once) with `nemia decide`, a run waited on that never lands with what to do, a hold with what lifts it, and where its
  * work ended up (`result`), landed or not, unless what to decide names those branches already.
@@ -108,7 +115,7 @@ const waitsCell = ({ metadata: { name }, status }: Run): string => {
     ...(asked.length ? [`waiting on you: ${asked.join(', ')} — nemia decide ${name}`] : []),
     ...(waiting?.waitingOnYou ? [`waiting on you: ${waiting.advice}`] : []),
     ...(holding ? [holdWords(name, holding)] : []),
-    ...(status.result?.length && toDecide?.kind !== 'result' ? [`result: ${status.result.join(', ')} — nemia decide ${name}`] : []),
+    ...(resultNamed(status) ? [] : [`result: ${(status.result ?? []).join(', ')} — nemia decide ${name}`]),
   ].join('; ');
 };
 

@@ -183,7 +183,7 @@ test('a step notes the questions its closeout asks and what its session at work 
   );
 });
 
-test('a run whose result steps have branches names them with `nemia decide <run>`, but not twice where what to decide names them', () => {
+test('a run whose result steps have branches names them with `nemia decide <run>`, but not twice where what to decide names every one', () => {
   const landed = runOf('r-landed', { status: { status: 'landed', result: ['wf/r-landed/implement'] } });
   assert.equal(cellOf(landed, 'Waits'), 'result: wf/r-landed/implement — nemia decide r-landed');
   const deciding = runOf('r-decide', {
@@ -194,6 +194,18 @@ test('a run whose result steps have branches names them with `nemia decide <run>
     },
   });
   assert.equal(cellOf(deciding, 'Waits'), 'to decide: wf/r-decide/implement is ahead of main');
+  const partly = runOf('r-partly', {
+    status: {
+      status: 'succeeded',
+      result: ['wf/r-partly/a', 'wf/r-partly/b'],
+      toDecide: { kind: 'result', branches: ['wf/r-partly/a'], said: 'wf/r-partly/a is ahead of main' },
+    },
+  });
+  assert.equal(
+    cellOf(partly, 'Waits'),
+    'to decide: wf/r-partly/a is ahead of main; result: wf/r-partly/a, wf/r-partly/b — nemia decide r-partly',
+    'a result branch what to decide does not name, not being ahead, is still named',
+  );
 });
 
 test('a page is a Table: its place kept, a row per judged run with its metadata, then a row per run that could not be judged', () => {

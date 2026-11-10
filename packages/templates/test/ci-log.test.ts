@@ -10,7 +10,7 @@ import { failures } from '../sdlc/carried/ci-log.ts';
 /** The page that failed, as the e2e runner names it, and the reason it gives. */
 const PAGE = 'the run page (/runs/give-the-board-a-look-e2e0) in the dark theme';
 const WHY = "tokens's spec says the stat is drawn — not visible after 10000 ms";
-const SHOT = '/home/runner/work/r/r/apps/web/.e2e/run-dark.png';
+const SHOT = '.e2e/run-dark.png';
 
 /** A shard's log as GitHub serves it: stamped, the worker's lines tagged `[w1] `, then the runner's own, npm's, and the upload's. */
 const SHARD = [

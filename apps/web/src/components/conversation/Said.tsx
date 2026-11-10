@@ -14,6 +14,7 @@ import type { ReactNode } from 'react';
 import { Marker, MarkerContent } from '@/components/ui/marker';
 import { CutButton, cutShape } from '@/components/look';
 import { mark, type ConversationItem } from '@/lib/conversation';
+import { routeOfHref } from '@/lib/routeHref';
 import { timeOfDay } from '@/lib/timeOfDay';
 import { Markdown } from '../markdown/Markdown';
 
@@ -42,7 +43,10 @@ export function Note({ what, marks, children }: { what: string; marks: string; c
   );
 }
 
-/** The agent's words: the sentence as it stands, markdown and all, and each page it named as a filled button under it. */
+/**
+ * The agent's words: the sentence as it stands, markdown and all, and each page it named as a filled button under it, its address cut
+ * into the path, search and hash the router's link takes (`routeOfHref`), so its preload reads the page the address names.
+ */
 function Theirs({ said, marks }: { said: Spoken; marks: string }) {
   return (
     <div {...mark(marks, 'message', 'agent')} className="flex max-w-[94%] flex-col gap-1.5">
@@ -57,7 +61,7 @@ function Theirs({ said, marks }: { said: Spoken; marks: string }) {
       {said.links.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {said.links.map((link) => (
-            <CutButton key={`${link.href} ${link.words}`} to={link.href}>
+            <CutButton key={`${link.href} ${link.words}`} {...routeOfHref(link.href)}>
               {link.words}
             </CutButton>
           ))}

@@ -17,11 +17,11 @@
  * (`inMemory`), given to the deliverer, to `nemia subscribe` and `nemia unsubscribe` and to the hub's writer, and read and written by the
  * story through the same doors. The feed cut under its reader alone is told on the files (`onFiles`): a cut is a file written shorter
  * under a cursor, and nothing cuts a feed in memory. That story subscribes and unsubscribes through `nemia` itself (`stage.main`),
- * whose store is the files, and reads the deliverer's file by the module's spelling. Its files are at `ROOT`, which is the root `nemia` is
- * given (`ENV`) and the `StoreRoot` every deliverer is given, so the command and the program never name two stores; the factories and
- * their levels a floor reads are on those files too. Every subscription a story puts goes through `kept`, and the one `nemia subscribe`
- * writes is dropped as its test ends, whatever their verdict, so a story on the files leaves no subscription for the next one's
- * deliverer to follow.
+ * whose store is the files, and reads the deliverer's file there (`deliveryAtRoot`, handed the root). Its files are at `ROOT`, which is
+ * the root `nemia` is given (`ENV`) and the `StoreRoot` every deliverer is given, so the command and the program never name two stores;
+ * the factories and their levels a floor reads are on those files too. Every subscription a story puts goes through `kept`, and the one
+ * `nemia subscribe` writes is dropped as its test ends, whatever their verdict, so a story on the files leaves no subscription for the
+ * next one's deliverer to follow.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -37,7 +37,7 @@ import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
 import { SUBSCRIPTION_DIGEST_CHECKS, deliver } from '../src/subscription/deliver.verb.ts';
-import { SubscriptionDoor, subscriptionDoorFiles, readDelivery as deliveryAtModule } from '../src/subscription/subscription.store.ts';
+import { SubscriptionDoor, subscriptionDoorFiles, readDelivery as deliveryAtRoot } from '../src/subscription/subscription.store.ts';
 import { subscriptionDoorMemory } from '../src/subscription/memory.store.ts';
 import { SUBSCRIBE, UNSUBSCRIBE } from '../src/subscription/subscription.verb.ts';
 import { SubscriptionName } from '../src/feed/feed.model.ts';
@@ -432,12 +432,12 @@ test(
     const task = await longLived('t-cut');
     let d: ReturnType<typeof delivering>;
     await s.test('a wake said, and the cursor kept at the end of the file', async () => {
-      assert.equal(deliveryAtModule(ROOT, 'cut'), undefined, 'no file of the deliverer before the subscription');
+      assert.equal(deliveryAtRoot(ROOT, 'cut'), undefined, 'no file of the deliverer before the subscription');
       await stage.main(['subscribe', 'cut', task]);
       t.after(() => {
         if (listedIn(w).includes('cut')) dropSubscription(w, 'cut');
       });
-      assert.deepEqual(listedIn(w), ['cut'], 'nemia subscribe writes its file at the module root the deliverer reads');
+      assert.deepEqual(listedIn(w), ['cut'], 'nemia subscribe writes its file at the store root the deliverer reads');
       d = delivering(t, e, w);
       await d.quiet(3, 'the deliverer at rest: its subscriptions, its digest and its beat');
       appended(w, line('r-9', 'running'), line('r-9', 'verified ✓'), line('r-9', 'awaiting approval'));
@@ -452,13 +452,13 @@ test(
       await d.clock.adjust('1 second');
       await held(t, () => toldTo(task).length === 2, 'the cut feed read again from its start');
       assert.deepEqual(fieldsOf(toldTo(task)[1]), ['r-10 build blocked']);
-      await held(t, () => deliveryAtModule(ROOT, 'cut')?.cursor === feedSize(w), 'the cursor at the end of the new feed');
+      await held(t, () => deliveryAtRoot(ROOT, 'cut')?.cursor === feedSize(w), 'the cursor at the end of the new feed');
     });
     await s.test("unsubscribed through nemia, its file and the deliverer's gone from the files", async () => {
       await stage.main(['unsubscribe', 'cut']);
       assert.deepEqual(listedIn(w), [], 'its file removed');
       await d.clock.adjust('5 seconds');
-      await held(t, () => deliveryAtModule(ROOT, 'cut') === undefined, 'the deliverer drops its file once it has stopped it');
+      await held(t, () => deliveryAtRoot(ROOT, 'cut') === undefined, 'the deliverer drops its file once it has stopped it');
     });
   },
 );

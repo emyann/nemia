@@ -24,6 +24,7 @@ import {
   ProposalSpec,
   ScheduleSpec,
   SkillSpec,
+  type Table,
   WorkflowSpec,
 } from 'objects';
 import type { ObjectsClient } from '../objects.ts';
@@ -93,6 +94,17 @@ export type KindCalls = {
 /** A list's query: the selectors, sent as `labelSelector` where any was given. */
 const query = (labelSelector: readonly string[]) => (labelSelector.length ? { labelSelector } : {});
 
+/**
+ * A list's page, of a list that answers a `Table` only where asked for one (`TABLE_ACCEPT`), which `get` never asks: a `Table` all the
+ * same is an api this client does not read, said as such.
+ */
+const pageOf = <L extends Page, E>(listed: Effect.Effect<L | Table, E>): Effect.Effect<L, E | Error> =>
+  Effect.flatMap(listed, (list) =>
+    'items' in list
+      ? Effect.succeed(list)
+      : Effect.fail(new Error('the api answered a Table to a list asked for its objects: restart it, `nemia service restart`')),
+  );
+
 /** `spec` read by `decode`, or why it is not one: the decoder's own words. */
 function decoded<S>(decode: (spec: unknown) => S, spec: unknown): { spec: S } | string {
   try {
@@ -137,18 +149,18 @@ const params = ({ namespace, name }: Applied) => ({ params: { namespace, name } 
 export const KIND_CALLS: { readonly [K in Kind]: KindCalls } = {
   Run: {
     list: {
-      in: (namespace, s) => (c) => c.runs.list({ params: { namespace }, query: query(s) }),
-      all: (s) => (c) => c.runs.listAll({ query: query(s) }),
+      in: (namespace, s) => (c) => pageOf(c.runs.list({ params: { namespace }, query: query(s) })),
+      all: (s) => (c) => pageOf(c.runs.listAll({ query: query(s) })),
     },
     get: {
       in: (namespace, name) => (c) => c.runs.get({ params: { namespace, name } }),
-      all: (runId) => (c) => c.runs.show({ params: { runId } }),
+      all: (name) => (c) => c.runs.show({ params: { name } }),
     },
   },
   Card: {
     list: {
-      in: (namespace, s) => (c) => c.cards.list({ params: { namespace }, query: query(s) }),
-      all: (s) => (c) => c.cards.listAll({ query: query(s) }),
+      in: (namespace, s) => (c) => pageOf(c.cards.list({ params: { namespace }, query: query(s) })),
+      all: (s) => (c) => pageOf(c.cards.listAll({ query: query(s) })),
     },
     get: {
       in: (namespace, name) => (c) => c.cards.get({ params: { namespace, name } }),

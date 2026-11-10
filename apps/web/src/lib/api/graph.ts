@@ -1,20 +1,10 @@
-/**
- * A run's steps as a graph, as agent-orchestrator draws it off the workflow (`runGraph`), as the board's row of a run holds it
- * (`runRowOf`): the Run's own graph, without what a step is handed, its kinds `objects`' (`EdgeKind`, `NodeKind`).
- */
-import type { EdgeKind, NodeKind } from 'objects';
+/** A run's graph as the board draws it, read off `objects`' (`ObjectGraph`, `GraphEdge`, `GraphNode`). */
+import type { GraphEdge as GraphEdgeAnswer, ObjectGraph } from 'objects';
 
-/**
- * Mirrors `GraphEdge` in agent-orchestrator: `after`, `to` waits on `from`; `loop`, `from` runs `to` again; `route`, `to` runs on the
- * route `from`, a condition, answers.
- */
-export type GraphEdge =
-  | { from: string; to: string; kind: Extract<EdgeKind, 'after'> }
-  | { from: string; to: string; kind: Extract<EdgeKind, 'loop'>; rounds: number }
-  | { from: string; to: string; kind: Extract<EdgeKind, 'route'>; route: string };
+export type { GraphNode } from 'objects';
 
-/** Mirrors `RunGraph` in agent-orchestrator: the steps the run's card leads to, and every edge between steps. */
-export type RunGraph = { roots: string[]; edges: GraphEdge[]; nodes?: GraphNode[] };
+/** An edge between steps the board draws: every kind but `input`, what a step is handed, which it draws none of. */
+export type GraphEdge = Exclude<GraphEdgeAnswer, { kind: 'input' }>;
 
-/** Mirrors `GraphNode` in agent-orchestrator: a step, a condition with the routes it ends on, or a route to a workflow. */
-export type GraphNode = { name: string; kind: NodeKind; ends?: string[]; workflow?: string };
+/** The steps the run's card leads to, and every edge between steps the board draws. */
+export type RunGraph = Omit<ObjectGraph, 'edges'> & { edges: GraphEdge[] };

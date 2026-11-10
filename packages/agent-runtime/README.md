@@ -776,8 +776,8 @@ dontAsk, default and manual 1; acceptEdits 2; auto 3; bypassPermissions 4 — re
 the word a task naming none runs in (`given`: `auto`, `workspace-write`), the lowest rank that writes unasked (`writes`), the mode
 a session held to its directory runs in (`held`: `dontAsk`), the modes a session nobody attends runs in without stopping to ask a
 person (`unasking`: `dontAsk`, `bypassPermissions`; none on Codex), and the words dropped on `model` (`dropped`: `auto` on a model of
-`CLAUDE_AUTO_DROPPED`). It is `undefined` for any other harness. The runtime refuses none of these itself: `{ model: 'haiku' }` is
-filed in `auto` and runs in `default`, as the measure above says. `unruledIn(harness, path)` gives the first character of `path`
+`CLAUDE_AUTO_DROPPED`). It is `undefined` for any other harness. The runtime refuses none of these itself: `{ model: 'claude-haiku-4-5' }`
+is filed in `auto` and runs in `default` (measured on Claude Code 2.1.316, where the `haiku` alias, now `claude-haiku-5-5`, keeps `auto`). `unruledIn(harness, path)` gives the first character of `path`
 that a permission rule of the harness cannot carry, the set its mounts are refused by (`CLAUDE_UNRULED`), and `undefined` for a path
 every rule carries or a harness whose fence takes no rule naming a path, so a caller that builds a rule from a path refuses it in its
 own words first.
@@ -2094,6 +2094,7 @@ of pure code sits beside it.
 | `src/harness/claude/trust.ts` | Claude Code's trust of a folder in its `.claude.json` (`claudeConfigFile`, in `CLAUDE_CONFIG_DIR` when set): read by `claudeTrusts`, and one key set by `claudeTrust`, which keeps every other key and a write that lands meanwhile |
 | `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: every session on the Agent SDK: a task as a job on its own process (`claudeJobSpec`, the bin), holder or not, and a long-lived one attached (`withAttached`), refused `unstartable` with no holder (`LONG_LIVED_UNHELD`); a job's bridge file and hold file read into its sighting (`heldSighting`) |
 | `src/harness/claude/job-hold.ts` | what a held session and a held job share: the hook's hold, a sub-agent's call, the calls in flight, and the two files a job is held by — the store's sessions' drain (`putSessionDrain`, `liftSessionDrain`, `sessionDrainOf`) and the job's own hold file (`readJobHold`, `writeJobHold`) |
+| `src/harness/claude/job-hooks.ts` | a job's hold at its hooks (`jobHoldOf`): its `PreToolUse` hook holding a new main-thread call while the drain stands and cutting one that comes once it has parked, its `PostToolUse` hooks, and the look `bin/ae-claude-job.ts` runs every poll |
 | `src/harness/claude/job-env.ts` | the environment a session run to its end is given, a job's or an attached one's (`CLAUDE_JOB_ENV`) |
 | `src/harness/claude/attached.ts` | Claude Code attached on the Agent SDK (`attachedSessions`): the holder's `hold`, adoption and resume, and the runner's verbs over the run files |
 | `src/harness/claude/session-bridge.ts` | the claude.ai bridge of an attached session, behind one door: the SDK's undeclared `enableRemoteControl` read off the `query()` object, its answer decoded, and refused in words where it is absent |

@@ -16,12 +16,16 @@ export class RunnerError extends Schema.TaggedError<RunnerError>()('RunnerError'
   refused: Schema.optionalKey(Schema.Boolean),
 }) {}
 
-/** The OS errors a spawn may fail with for a short-lived reason — no process slot, no descriptor, no memory — that waiting can clear. */
+/**
+ * The OS errors a spawn may fail with for a short-lived reason — no process slot, no descriptor, no memory — that waiting can clear.
+ * Exported only for the tests that import it.
+ */
 export const TRANSIENT_ERRNOS: readonly string[] = ['EAGAIN', 'EMFILE', 'ENFILE', 'ENOMEM'];
 
 /**
  * Whether `cause`, an error a spawn failed with before anything started, refuses it: true unless its `code` is one of
  * `TRANSIENT_ERRNOS`, which a later attempt may not meet.
+ * Exported only for the tests that import it.
  */
 export const refusedOsError = (cause: unknown): boolean => {
   const code = (cause as NodeJS.ErrnoException | undefined)?.code;

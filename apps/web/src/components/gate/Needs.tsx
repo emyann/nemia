@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode } from 'react';
-import type { RunView } from '../../lib/runView';
+import type { RunDetail } from '../../lib/runView';
 import { askedOf, needsOf, needText, offersOf, stepAnchor, type OfferKind } from '../../lib/asks';
 import { onYouOf, toDecideOf } from '../../lib/factory';
 import { Continue } from './Decide';
@@ -7,7 +7,7 @@ import { Markdown } from '../markdown/Markdown';
 import { container } from '../../lib/meaning';
 
 /** The line of an offer's command (`kind`) for its step, as the api answers it on the step (`commands`); none for a step the run lacks. */
-const lineOf = (run: RunView, offer: { step: string; kind: OfferKind }): string =>
+const lineOf = (run: RunDetail, offer: { step: string; kind: OfferKind }): string =>
   run.steps.find((s) => s.name === offer.step)?.commands[offer.kind] ?? '';
 
 /**
@@ -33,7 +33,7 @@ function StepLink({ step, onStep, children }: { step: string; onStep: ((step: st
  * section, where Approve and Send back are, by a hash the browser scrolls to and no navigation, or given `onStep` a button calling it with
  * the step (`StepLink`) — or the result branch nobody has merged. Nothing while there is nothing to decide.
  */
-export function ToDecideBanner({ run, onStep }: { run: RunView; onStep?: (step: string) => void }) {
+export function ToDecideBanner({ run, onStep }: { run: RunDetail; onStep?: (step: string) => void }) {
   const decide = toDecideOf(run);
   if (!decide) return null;
   return (
@@ -86,7 +86,7 @@ function NeedWords({ need }: { need: ReturnType<typeof needsOf>[number] }) {
  * wait, in the package's words (`answerIn`): the harness answers it, and this board does not — Continue only asks the tick for another try.
  * Once that try is asked, the next tick stops the session, so that advice goes, and the step's note says what was asked instead.
  */
-export function NeedsBanner({ run, onStep }: { run: RunView; onStep?: (step: string) => void }) {
+export function NeedsBanner({ run, onStep }: { run: RunDetail; onStep?: (step: string) => void }) {
   const needs = needsOf(run).filter((need) => need.kind !== 'approve');
   const said = onYouOf(run);
   const asks = run.waitingOnYou

@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { Gauge, TriangleAlert } from 'lucide-react';
 import { IconButton } from '@/components/ui/ds';
-import { daemonQuery, quotaQuery } from '@/lib/api';
+import { daemonQuery } from '@/lib/api/daemon';
+import { quotaQuery } from '@/lib/api/quota';
 import type { Bar } from '@/lib/bar';
 import type { FeedStatus } from '@/lib/feed';
 import { type DaemonTone, daemonDot, quotaShort } from '@/lib/footer';

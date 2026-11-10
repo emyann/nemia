@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
-import type { RunAnswer } from '../src/runs/runs.ts';
+import type { Run as RunAnswer } from 'objects';
 import { objectOf } from './run-reads.ts';
 import { app } from '../src/app.ts';
 import { Effect } from 'effect';

@@ -483,7 +483,9 @@ export default {
       ];
       if (JSON.stringify(filesIn(made)) !== JSON.stringify(files))
         throw new Refused(`the folder's files are the steps as built — ${made} holds ${JSON.stringify(filesIn(made))}`);
-      const stepPage = await page.request.get(new URL(`/api/workflows/yours/${name}/implement`, page.url()).href);
+      const stepPage = await page.request.get(
+        new URL(`/api/namespaces/default/workflows/${name}/steps/implement?origin=yours`, page.url()).href,
+      );
       const { source } = (await stepPage.json()) as { source?: string };
       if (source !== files[0][1]) throw new Refused(`the step's page reads implement.md as written — it read ${JSON.stringify(source)}`);
       await settled(page);

@@ -1,11 +1,12 @@
 /**
- * The Workflow (`src/workflow.ts`): a workflow and a page of them decoded from JSON and encoded back equal; its graph typed, every node
- * with its kind, its nodes always there; its origin one of the four words; and the write bodies.
+ * The Workflow (`src/workflow.ts`): a workflow and a page of them as the Api's endpoints answer them, every key kept; its graph typed,
+ * every node with its kind, its nodes always there; its origin one of the four words; and the write bodies the Api takes.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import { API_VERSION, DEFINITION_ORIGINS, EDGE_KINDS, GraphEdge, Workflow, WorkflowCreate, WorkflowList, WorkflowWrite } from 'objects';
+import { API_VERSION, DEFINITION_ORIGINS, EDGE_KINDS, GraphEdge, Workflow, WorkflowCreate } from 'objects';
+import { answered, taken } from './served.ts';
 
 const step = {
   name: 'design',
@@ -45,14 +46,13 @@ const workflow = {
 
 const shadowed = { ...workflow, status: { ...workflow.status, origin: 'yours', shadowedBy: 'repo' } };
 
-const roundTrip = <S extends Schema.Codec<unknown, unknown>>(schema: S, value: unknown): unknown =>
-  JSON.parse(JSON.stringify(Schema.encodeSync(schema)(Schema.decodeUnknownSync(schema)(JSON.parse(JSON.stringify(value))))));
-
-test('a workflow and a page of them decode from JSON and encode back the same, absent keys left absent', () => {
-  assert.deepEqual(roundTrip(Workflow, workflow), workflow);
-  assert.deepEqual(roundTrip(Workflow, shadowed), shadowed);
+test("the Api's get answers a workflow and its list a page of them, every key kept, absent keys left absent; another kind refused", () => {
+  assert.deepEqual(answered('workflows', 'get', workflow), workflow);
+  assert.deepEqual(answered('workflows', 'get', shadowed), shadowed);
   const page = { apiVersion: API_VERSION, kind: 'WorkflowList', metadata: {}, items: [workflow, shadowed] };
-  assert.deepEqual(roundTrip(WorkflowList, page), page);
+  assert.deepEqual(answered('workflows', 'list', page), page);
+  assert.equal(answered('workflows', 'get', { ...workflow, kind: 'Agent' }), undefined);
+  assert.equal(answered('workflows', 'list', { ...page, kind: 'AgentList' }), undefined);
 });
 
 test('REFUSED: a node without its kind, a kind outside the words, a graph without nodes, an origin outside the four words', () => {
@@ -74,8 +74,9 @@ test('every edge kind of EDGE_KINDS is one GraphEdge reads, and no other', () =>
 
 test('the write bodies: a whole spec with the version it was read at, and a create of one step by its name', () => {
   const write = { metadata: { resourceVersion: 'sha256:1' }, spec: workflow.spec, schemas: [{ file: 'design.json', text: '{}' }] };
-  assert.deepEqual(roundTrip(WorkflowWrite, write), write);
+  assert.deepEqual(taken('workflows', 'replace', write), write);
   const create = { metadata: { name: 'mine' }, spec: { steps: [{ name: 'only', keys: { harness: 'claude' }, body: 'Do it.' }] } };
-  assert.deepEqual(roundTrip(WorkflowCreate, create), create);
+  assert.deepEqual(taken('workflows', 'create', create), create);
   assert.throws(() => Schema.decodeUnknownSync(WorkflowCreate)({ spec: create.spec }), 'a create names its workflow');
+  assert.equal(taken('workflows', 'create', write), undefined, 'a whole write is no create');
 });

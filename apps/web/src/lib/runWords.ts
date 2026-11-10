@@ -5,8 +5,8 @@
  * and composes them. Pure.
  */
 import { format, formatDistanceStrict, isSameDay, isSameYear } from 'date-fns';
-import type { RunSummary } from './api/runs.ts';
-import type { WaitOn } from './api/reasons.ts';
+import type { RunView } from './api/judged.ts';
+import type { WaitOn } from 'objects';
 import { stepState, type StepState } from './status.ts';
 import { timeOfDay, unreadable, UNREADABLE, zoneOf } from './timeOfDay.ts';
 import { durationWords } from './duration.ts';
@@ -50,13 +50,13 @@ export const waitKindOf: Record<StepState, WaitKind | null> = {
 };
 
 /** A step of a row as the words read it: its name, its codes, and its check's verdict. */
-type CodedStep = Pick<RunSummary['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via' | 'verdict'>;
+type CodedStep = Pick<RunView['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via' | 'verdict'>;
 
 /** What the words read of a row of the light answer: of each step its name and its codes, and of the run who it waits on. */
-type WaitingRow = Pick<RunSummary, 'cancelledAt' | 'holding' | 'waiting' | 'waitingOnYou'> & { steps: ReadonlyArray<CodedStep> };
+type WaitingRow = Pick<RunView, 'cancelledAt' | 'holding' | 'waiting' | 'waitingOnYou'> & { steps: ReadonlyArray<CodedStep> };
 
 /** A row whose button is worded: a `WaitingRow` that says of each step the task of its work too, none for a step not filed yet. */
-type OpenedRow = WaitingRow & { steps: ReadonlyArray<CodedStep & Pick<RunSummary['steps'][number], 'taskId'>> };
+type OpenedRow = WaitingRow & { steps: ReadonlyArray<CodedStep & Pick<RunView['steps'][number], 'taskId'>> };
 
 /** A wait: its kind, the step that waits, none for a wait of the run's own, and how many of the run's steps are done. */
 type Wait = Waited & { kind: WaitKind };
@@ -184,7 +184,7 @@ export function agoWords(at: Date, now: Date): string {
 
 /** A run's steps as the rail draws them: each by its name and its state. */
 export const railStates = (
-  steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via'>>,
+  steps: ReadonlyArray<Pick<RunView['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via'>>,
   cancelled: boolean,
   held: boolean,
 ): Array<{ name: string; state: StepState; on: WaitOn | null }> =>
@@ -193,7 +193,7 @@ export const railStates = (
 /** What the rail says aloud: each step and its word, in the run's order: `design verified, land waits on you`, a step a
  * check verified told from one done on its own word. */
 export const railSaid = (
-  steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via'>>,
+  steps: ReadonlyArray<Pick<RunView['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via'>>,
   cancelled: boolean,
   held: boolean,
 ): string =>

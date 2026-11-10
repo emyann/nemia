@@ -39,7 +39,7 @@ export const testHarnessesOf = (declared: readonly HarnessDeclared[]): TestHarne
 };
 
 /** A verb the stand-in does not keep: a test that reaches it has outgrown the stand-in. */
-export const unkept = (verb: string) => () =>
+const unkept = (verb: string) => () =>
   Effect.die(
     new Error(`the test engine keeps no \`${verb}\`: add it to src/service/test-engine.ts, with its walk in test/engine-walks.ts`),
   );

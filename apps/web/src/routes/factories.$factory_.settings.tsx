@@ -9,7 +9,8 @@ import { FactoryServers } from '@/components/factory/FactoryServers';
 import { FactoryVolumes } from '@/components/factory/FactoryVolumes';
 import { routeLink } from '@/components/nav/routeLink';
 import { LinkButton } from '@/components/ui/button';
-import { delegationsQuery, factoriesQuery, factoryInstructionQuery, factoryRulesQuery, factoryServersQuery } from '@/lib/api';
+import { delegationsQuery } from '@/lib/api/proposals';
+import { factoriesQuery, factoryInstructionQuery, factoryRulesQuery, factoryServersQuery } from '@/lib/api/factories';
 
 /**
  * A factory's settings, at /factories/$factory/settings: `$factory_` draws it on its own, not inside the floor, which has no outlet for it.

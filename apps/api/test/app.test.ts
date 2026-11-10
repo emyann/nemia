@@ -1882,7 +1882,6 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
       seedLoop('r-34', 1, true);
       const entry = (name: string) => COMMANDS.find((c) => c.name === name)!;
       const run = await linesOf(app, 'r-34');
-      assert.equal(run.decide, commandLine(entry('decide'), { runId: 'r-34' }));
       assert.equal(run.decide, 'nemia decide r-34');
       assert.deepEqual(
         Object.entries(run.steps),

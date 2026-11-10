@@ -1,4 +1,4 @@
-import type { StepArtifact, StepValue } from '../../lib/api';
+import type { StepArtifact, StepValue } from '../../lib/api/tries.ts';
 import { when } from '../step/Facts';
 
 /** Bytes as a person reads them, as the CLI's `decide` prints a file's size and the CLI's `prune` a worktree's (`sizeOf`). */

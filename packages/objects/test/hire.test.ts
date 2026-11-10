@@ -1,12 +1,13 @@
 /**
- * The Hire (`src/hire.ts`): a step's hire, named `<workflow>.<step>`, and a page of them decoded from JSON and encoded back equal, one
- * missing every optional key read; who fills it and where each setting came from closed words; and the write body as the old route was
- * sent it.
+ * The Hire (`src/hire.ts`): a step's hire, named `<workflow>.<step>`, and a page of them as the Api's endpoints answer them, every key
+ * kept, one missing every optional key read; who fills it and where each setting came from closed words; and the write body the Api
+ * takes.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import { API_VERSION, Hire, HireList, HireWrite } from 'objects';
+import { API_VERSION, Hire, HireWrite } from 'objects';
+import { answered, taken } from './served.ts';
 
 const hired = {
   apiVersion: API_VERSION,
@@ -50,19 +51,19 @@ const unfilled = {
 
 const clash = { ...unfilled, status: { ...unfilled.status, filled: 'refused', error: 'a.b.c is a.b/c and a/b.c: rename one' } };
 
-const roundTrip = <S extends Schema.Codec<unknown, unknown>>(schema: S, value: unknown): unknown =>
-  JSON.parse(JSON.stringify(Schema.encodeSync(schema)(Schema.decodeUnknownSync(schema)(JSON.parse(JSON.stringify(value))))));
-
-test('a hire and a page of them decode from JSON and encode back the same, absent keys left absent', () => {
-  assert.deepEqual(roundTrip(Hire, hired), hired);
-  assert.deepEqual(roundTrip(Hire, unfilled), unfilled);
-  assert.deepEqual(roundTrip(Hire, clash), clash);
+test("the Api's get answers a hire and its list a page of them, every key kept, absent keys left absent; another kind refused", () => {
+  assert.deepEqual(answered('hires', 'get', hired), hired);
+  assert.deepEqual(answered('hires', 'get', unfilled), unfilled);
+  assert.deepEqual(answered('hires', 'get', clash), clash);
   const page = { apiVersion: API_VERSION, kind: 'HireList', metadata: { remainingItemCount: 0 }, items: [hired, unfilled] };
-  assert.deepEqual(roundTrip(HireList, page), page);
+  assert.deepEqual(answered('hires', 'list', page), page);
+  assert.equal(answered('hires', 'get', { ...hired, kind: 'Card' }), undefined);
+  assert.equal(answered('hires', 'list', { ...page, kind: 'CardList' }), undefined);
 });
 
-test('the write decodes as the old route was sent it', () => {
-  assert.deepEqual(roundTrip(HireWrite, { agent: 'reviewer' }), { agent: 'reviewer' });
+test("the Api's put takes the write as the old route was sent it, and refuses one with no agent", () => {
+  assert.deepEqual(taken('hires', 'put', { agent: 'reviewer' }), { agent: 'reviewer' });
+  assert.equal(taken('hires', 'put', {}), undefined);
 });
 
 test('REFUSED: a fill origin or a setting origin off its words, a setting left out, a write with no agent, and another kind', () => {

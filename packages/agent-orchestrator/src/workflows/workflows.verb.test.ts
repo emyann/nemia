@@ -67,10 +67,10 @@ function folder(name: string, files: Record<string, string>): string {
 test('a folder written from its steps through the entry is the folder its list and its step read back', async () => {
   const onMemory = memoryOver();
   const dir = path.join(ROOT, 'workflows', 'written');
-  const draft = JSON.stringify([
-    { name: 'plan', after: [], place: 'git', body: 'Plan it.' },
-    { name: 'build', after: ['plan'], place: 'git', body: 'Build it.' },
-  ]);
+  const draft = [
+    { name: 'plan', after: [], place: 'git' as const, body: 'Plan it.' },
+    { name: 'build', after: ['plan'], place: 'git' as const, body: 'Build it.' },
+  ];
   const done = await runWith(e(), onMemory(WORKFLOWS_WRITE.handler({ from: 'yours', name: 'written', draft }, undefined, ROOT)));
   assert.deepEqual(done.written, ['build.md', 'plan.md']);
   assert.equal(fs.existsSync(dir), false, 'written to the memory layer, not the disk');
@@ -84,10 +84,7 @@ test('a folder written from its steps through the entry is the folder its list a
       ['build', ['plan']],
     ],
   );
-  const read = await runWith(
-    e(),
-    onMemory(WORKFLOWS_STEP.handler({ from: 'yours', name: 'written', step: 'build', dir }, undefined, ROOT)),
-  );
+  const read = await runWith(e(), onMemory(WORKFLOWS_STEP.handler({ name: 'written', step: 'build', dir }, undefined, ROOT)));
   assert.equal(read.step?.body, 'Build it.');
   assert.deepEqual(read.steps, ['plan', 'build']);
 });
@@ -95,12 +92,9 @@ test('a folder written from its steps through the entry is the folder its list a
 test('a step the folder does not have is none, with the names of those it has', async () => {
   const onMemory = memoryOver();
   const dir = path.join(ROOT, 'workflows', 'one-step');
-  const draft = JSON.stringify([{ name: 'only', after: [], place: 'git', body: 'Do it.' }]);
+  const draft = [{ name: 'only', after: [], place: 'git' as const, body: 'Do it.' }];
   await runWith(e(), onMemory(WORKFLOWS_WRITE.handler({ from: 'yours', name: 'one-step', draft }, undefined, ROOT)));
-  const read = await runWith(
-    e(),
-    onMemory(WORKFLOWS_STEP.handler({ from: 'yours', name: 'one-step', step: 'other', dir }, undefined, ROOT)),
-  );
+  const read = await runWith(e(), onMemory(WORKFLOWS_STEP.handler({ name: 'one-step', step: 'other', dir }, undefined, ROOT)));
   assert.deepEqual(read, { step: null, steps: ['only'] });
 });
 
@@ -115,10 +109,10 @@ test("REFUSED: a folder that does not load is listed with the loader's words who
 
 test("REFUSED: a draft the model's Workflow refuses is thrown as the door's Invalid, naming the file, and nothing is written", async () => {
   const dir = path.join(ROOT, 'workflows', 'twice');
-  const draft = JSON.stringify([
-    { name: 'plan', after: [], place: 'git', body: 'Plan it.' },
-    { name: 'plan', after: [], place: 'git', body: 'Plan it again.' },
-  ]);
+  const draft = [
+    { name: 'plan', after: [], place: 'git' as const, body: 'Plan it.' },
+    { name: 'plan', after: [], place: 'git' as const, body: 'Plan it again.' },
+  ];
   await assert.rejects(runWith(e(), WORKFLOWS_WRITE.handler({ from: 'yours', name: 'twice', draft }, undefined, ROOT)), (err: Error) => {
     assert.deepEqual([(err as { _tag?: string })._tag, (err as { exitCode?: number }).exitCode], ['Invalid', 2]);
     assert.ok(err.message.includes('plan.md'), err.message);

@@ -4,7 +4,7 @@
  * command line's alone: its runner starts a run per card (`nemia start <folder>`), and `folderRefusal` says what such a start does not
  * take.
  */
-import { Effect } from 'effect';
+import { Effect, Schema } from 'effect';
 import { rooted } from '../factory/wiring/wire.verb.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
@@ -64,18 +64,6 @@ each other, a file that is not .md, a folder with no card, and a card whose work
 
 The folder says what --after, --workflows and --no-worktree would, and nemia start <folder> refuses them. A nemia start that
 refuses part-way stops the plan: the runs it started stand, and it prints a nemia start for each card left.`;
-
-/** The text under `key`, or undefined where none was given. */
-const textOf = (args: Args, key: string): string | undefined => {
-  const value = args[key];
-  return typeof value === 'string' ? value : undefined;
-};
-
-/** Every value under `key`, in the order given. */
-const listOf = (args: Args, key: string): string[] => {
-  const value = args[key];
-  return Array.isArray(value) ? [...value] : [];
-};
 
 /** Why a value flag of `nemia start` is taken once, as its refusal says it. */
 const ONCE: Readonly<Record<string, string>> = {
@@ -314,26 +302,23 @@ const hintsOf = Effect.fnUntraced(function* (run: Run) {
   return yield* hints.pipe(Effect.orElseSucceed((): readonly string[] => []));
 });
 
-/** An inbox card's start, off the handler's arguments (`START`). */
-const cardStart = Effect.fnUntraced(function* (card: string, args: Args) {
-  const brief = textOf(args, 'instead');
-  const workflow = textOf(args, 'workflows');
-  const repo = textOf(args, 'repo');
-  const factory = textOf(args, 'factory');
+/** An inbox card's start, off what the handler was handed (`START`). */
+const cardStart = Effect.fnUntraced(function* (card: string, given: StartInput) {
+  const { instead: brief, workflows: workflow, repo, factory } = given;
   const started = yield* startFromInbox({
     name: card,
     ...(brief !== undefined ? { brief } : {}),
     ...(workflow !== undefined ? { workflow } : {}),
     ...(repo !== undefined ? { repo } : {}),
-    callerRepo: textOf(args, 'at') ?? '.',
-    isolate: args.noWorktree !== true,
-    after: listOf(args, 'after'),
-    context: listOf(args, 'context'),
-    inputs: listOf(args, 'inputs'),
-    gates: listOf(args, 'gates'),
-    labels: listOf(args, 'label'),
+    callerRepo: given.at ?? '.',
+    isolate: given.noWorktree !== true,
+    after: [...(given.after ?? [])],
+    context: [...(given.context ?? [])],
+    inputs: [...(given.inputs ?? [])],
+    gates: [...(given.gates ?? [])],
+    labels: [...(given.label ?? [])],
     ...(factory !== undefined ? { factory } : {}),
-    fix: textOf(args, 'fix') ?? '--factory <name>',
+    fix: given.fix ?? '--factory <name>',
   });
   return {
     id: started.run.id,
@@ -387,6 +372,37 @@ const START_LINES: readonly string[] = [
 /** What `nemia start --help` prints: the start of one brief, then the start of a folder of cards (`FOLDER_HELP`). */
 export const START_HELP = [`nemia start ${START_USAGE}`, ...START_LINES.map((line) => `  ${line}`), '', FOLDER_HELP].join('\n');
 
+/** A text, or none: a key a caller may hand as undefined. */
+const Text = Schema.optional(Schema.String);
+
+/** Texts given many times, or none. */
+const Texts = Schema.optional(Schema.Array(Schema.String));
+
+/**
+ * What `nemia start`'s handler is handed (`START`): a brief's start — `brief`, `workflows` (the folder), `repo` and `repoNamed`, the
+ * runs it waits on (`after`) and is handed as context (`context`), `inputs`, `gates`, its `label` edits, `noWorktree` and `factory` — or
+ * an inbox card's under `card`, with `instead`, `at` and `fix`. What a caller found, never a body: the api finds the folder from the
+ * Run's `RunStart` (`objects`), the CLI from where it is typed.
+ */
+export const StartInput = Schema.Struct({
+  brief: Text,
+  workflows: Text,
+  repo: Text,
+  repoNamed: Schema.optional(Schema.Boolean),
+  after: Texts,
+  context: Texts,
+  inputs: Texts,
+  gates: Texts,
+  label: Texts,
+  noWorktree: Schema.optional(Schema.Boolean),
+  factory: Text,
+  card: Text,
+  instead: Text,
+  at: Text,
+  fix: Text,
+});
+export type StartInput = typeof StartInput.Type;
+
 /**
  * `nemia start`: a run of a brief, or of an inbox card. Its handler is handed what its caller found: under `card`, an inbox card's name,
  * with `instead` the brief in place of its body, `at` the repository when neither the card nor its factory names one, and `fix` how the
@@ -394,7 +410,7 @@ export const START_HELP = [`nemia start ${START_USAGE}`, ...START_LINES.map((lin
  * a person named it. The CLI's runner reads a brief's file and finds the folder from where it is typed; the api's route finds both from its
  * body, so no path a body sends reaches the handler.
  */
-export const START: Command<Started> = {
+export const START: Command<Started, StartInput> = {
   name: 'start',
   usage: START_USAGE,
   help: START_LINES,
@@ -404,14 +420,10 @@ export const START: Command<Started> = {
   writes: true,
   ticks: true,
   class: 'act',
-  route: {
-    method: 'POST',
-    path: '/api/namespaces/:namespace/runs',
-    status: 201,
-    hand: 'its body names a workflow by `from` and name, or an inbox card by name, which the api finds among the folders a start finds one in, in the factory the request is served in: never a path sent',
-  },
-  handler: Effect.fnUntraced(function* (args: Args, _env?: NodeJS.ProcessEnv, home?: string) {
-    const started = yield* startOf(args, home);
+  only: { side: 'cli', why: "the api serves it as the Run's `create` of `objects`' Api, calling this handler with the folder it found" },
+  input: StartInput,
+  handler: Effect.fnUntraced(function* (given: StartInput, _env?: NodeJS.ProcessEnv, home?: string) {
+    const started = yield* startOf(given, home);
     const paused = yield* pausedRead();
     const landed: string[] = [];
     const context = started.run.context ?? [];
@@ -437,7 +449,10 @@ type Concluded = { run: string; landed: boolean; section: string };
  * reads it now. The board's preview of a run picked as context. Refused with `Invalid` for an id that is not a run's (`idRefusal`), before
  * the store is read, and with `Missing` for a run the store does not have.
  */
-export const CONCLUDED: Command<Concluded> = {
+/** What `nemia concluded` takes, and the api's `GET /api/runs/:name/concluded` calls it with: the run, by its id. */
+const ConcludedInput = Schema.Struct({ runId: Schema.String });
+
+export const CONCLUDED: Command<Concluded, typeof ConcludedInput.Type> = {
   name: 'concluded',
   usage: '<runId>',
   help: ['what a run started with --from <runId> would be handed of it, now'],
@@ -449,9 +464,9 @@ export const CONCLUDED: Command<Concluded> = {
   },
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/runs/:runId/concluded', status: 200 },
-  handler: Effect.fnUntraced(function* (args: Args) {
-    const id = textOf(args, 'runId') ?? '';
+  input: ConcludedInput,
+  handler: Effect.fnUntraced(function* (args: typeof ConcludedInput.Type) {
+    const id = args.runId;
     const notId = idRefusal(id, 'read', 'nemia concluded');
     if (notId) throw new Invalid({ message: notId });
     if (!runStore.runs.exists(id))
@@ -465,25 +480,24 @@ export const CONCLUDED: Command<Concluded> = {
   print: ({ section }) => [section.replace(/^\n+/, '')],
 };
 
-/** A run of a brief, or of an inbox card under `card`, started off the handler's arguments (`START`). */
-const startOf = Effect.fnUntraced(function* (args: Args, home: string | undefined) {
-  const card = textOf(args, 'card');
-  if (card !== undefined) return yield* rooted(home, 'start', cardStart(card, args));
-  const factory = textOf(args, 'factory');
+/** A run of a brief, or of an inbox card under `card`, started off what the handler was handed (`START`). */
+const startOf = Effect.fnUntraced(function* (given: StartInput, home: string | undefined) {
+  const { card, factory } = given;
+  if (card !== undefined) return yield* rooted(home, 'start', cardStart(card, given));
   const run = yield* rooted(
     home,
     'start',
     startRun({
-      brief: textOf(args, 'brief') ?? '',
-      repo: textOf(args, 'repo') ?? '.',
-      repoNamed: args.repoNamed === true,
-      workflowDir: textOf(args, 'workflows') ?? '',
-      isolate: args.noWorktree !== true,
-      after: listOf(args, 'after'),
-      context: listOf(args, 'context'),
-      inputs: listOf(args, 'inputs'),
-      gates: listOf(args, 'gates'),
-      labels: { edits: listOf(args, 'label') },
+      brief: given.brief ?? '',
+      repo: given.repo ?? '.',
+      repoNamed: given.repoNamed === true,
+      workflowDir: given.workflows ?? '',
+      isolate: given.noWorktree !== true,
+      after: [...(given.after ?? [])],
+      context: [...(given.context ?? [])],
+      inputs: [...(given.inputs ?? [])],
+      gates: [...(given.gates ?? [])],
+      labels: { edits: [...(given.label ?? [])] },
       ...(factory !== undefined ? { factory } : {}),
     }),
   );

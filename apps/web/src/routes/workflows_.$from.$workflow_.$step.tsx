@@ -3,7 +3,7 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { Skills } from '../components/agent/AgentParts';
 import { StepHire } from '../components/step/StepHire';
 import { RecentRuns, StepAgent, StepTold, StepWritten } from '../components/step/StepParts';
-import { stepQuery } from '../lib/api';
+import { stepQuery } from '../lib/api/workflows.ts';
 import { fromWord, pagePlaceOf } from '../lib/factories';
 import { container } from '../lib/meaning';
 

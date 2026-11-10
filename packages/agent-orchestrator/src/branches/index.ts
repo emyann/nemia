@@ -7,6 +7,7 @@ export {
   countsLine,
   inFullLines,
   lessonLine,
+  lessonOf,
   parseGlobs,
   resultSteps,
   routedResult,

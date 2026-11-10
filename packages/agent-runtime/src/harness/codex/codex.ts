@@ -16,6 +16,7 @@ import { codexMcpServerNames, codexMcpServers, mcpRefuses, pickedProjectMcp } fr
  *
  * Reads only `[projects."<path>"]` tables holding `trust_level = "trusted"` — the shape Codex writes
  * itself — not TOML in general. A config it cannot read trusts nothing.
+ * Exported only for the tests that import it.
  */
 export const trustedProjects = (toml: string): Set<string> => {
   const trusted = new Set<string>();

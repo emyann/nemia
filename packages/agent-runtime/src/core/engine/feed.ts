@@ -30,7 +30,10 @@ import { alive } from '../../process/alive.ts';
 /** How long an append or a rotation waits for the feed's lock held by a live process before it fails, naming the holder. */
 export const FEED_LOCK_WAIT_MS = 2_000;
 
-/** The bytes of a header, `{"feedBase":B}` or `{"sealedTo":S}` padded with spaces, and its line break. */
+/**
+ * The bytes of a header, `{"feedBase":B}` or `{"sealedTo":S}` padded with spaces, and its line break.
+ * Exported only for the tests that import it.
+ */
 export const HEADER_BYTES = 34;
 
 /**
@@ -48,17 +51,17 @@ export type ForgottenFeed = {
  * A read of the feed: the entries after the cursor asked with, still kept, where to resume, and how many lines after it were
  * forgotten, when any.
  */
-export type FeedRead = { entries: unknown[]; cursor: number; forgotten?: number };
+type FeedRead = { entries: unknown[]; cursor: number; forgotten?: number };
 
 /** The three files of the feed under `root`. */
-export const feedFiles = (root: string) => ({
+const feedFiles = (root: string) => ({
   head: path.join(root, 'feed.jsonl'),
   sealed: path.join(root, 'feed.sealed.jsonl'),
   lock: path.join(root, 'feed.lock'),
 });
 
 /** A header line of `key`: the JSON object, padded to `HEADER_BYTES` with its line break. */
-export const headerLine = (key: 'feedBase' | 'sealedTo', value: number): string => {
+const headerLine = (key: 'feedBase' | 'sealedTo', value: number): string => {
   const text = `{"${key}":${value}}`;
   return `${text.padEnd(HEADER_BYTES - 1)}\n`;
 };

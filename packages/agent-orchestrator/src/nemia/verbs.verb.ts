@@ -16,8 +16,8 @@ export const REGENERATE =
 /** An entry as the skill reads it: its name, usage, help, class and the side it is served on alone. */
 type Entry = Pick<CommandSpec, 'name' | 'usage' | 'help' | 'only' | 'class'>;
 
-/** A verb the CLI runs by a hand of its own: its name, usage and help, its class its table entry's. */
-type CliVerb = Pick<CommandSpec, 'name' | 'usage' | 'help'>;
+/** A verb the CLI runs by a hand of its own: its name, usage, help and class. */
+type CliVerb = Pick<CommandSpec, 'name' | 'usage' | 'help' | 'class'>;
 
 /** The skill's sections, in order: the class each lists, its heading, and what it tells her of every verb under it; none lists `none`. */
 const SECTIONS: readonly { readonly class: 'read' | 'act' | 'ask' | 'answer'; readonly heading: string; readonly says: string }[] = [
@@ -59,12 +59,8 @@ function helpLines(entry: Entry): readonly string[] {
  */
 export function verbsSkillOf(table: readonly Entry[], cliVerbs: readonly CliVerb[]): string {
   const served = table.filter((c) => c.only?.side !== 'api');
-  const own = cliVerbs.flatMap((v) => {
-    const entry = table.find((c) => c.name === v.name);
-    return entry === undefined ? [] : [{ ...v, class: entry.class }];
-  });
   const sections = SECTIONS.flatMap((s) => {
-    const under = [...served, ...own].filter((c) => sectionOf(c.class) === s.class).map((c) => ({ ...c, help: helpLines(c) }));
+    const under = [...served, ...cliVerbs].filter((c) => sectionOf(c.class) === s.class).map((c) => ({ ...c, help: helpLines(c) }));
     return under.length === 0 ? [] : [`## ${s.heading}`, '', s.says, '', '```text', helpOf(under), '```', ''];
   });
   return [

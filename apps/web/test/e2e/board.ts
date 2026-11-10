@@ -13,8 +13,8 @@ import {
   rowsOf,
   type FinishedPage,
   type OpenRuns,
-  type RunSummary,
 } from '../../src/lib/api/runs.ts';
+import { judged, type RunView } from '../../src/lib/api/judged.ts';
 import { factoryViewOf, type Factory } from '../../src/lib/api/factories.ts';
 import { instantWhole, instantWords } from '../../src/lib/instant.ts';
 import { attachedFiles, attachedRun, DIAMOND } from './seed.ts';
@@ -554,8 +554,15 @@ export const runListPath = (factory: string | undefined, query: Record<string, s
   return `${factory === undefined ? '/api/runs' : `/api/namespaces/${encodeURIComponent(factory)}/runs`}${params ? `?${params}` : ''}`;
 };
 
-/** Every run's row, read apart from the page as the board reads them: the plain RunList whole (`GET /api/runs`), made rows (`rowsOf`). */
-export const rowsAnswered = async (page: Page): Promise<RunSummary[]> => rowsOf(await answered<RunList>(page, '/api/runs'));
+/**
+ * Every run, read apart from the page as the board reads them: the plain RunList whole (`GET /api/runs`), each run's view (`rowsOf`). The
+ * api judges every run of the seed: a run it could not judge is refused.
+ */
+export const rowsAnswered = async (page: Page): Promise<RunView[]> =>
+  rowsOf(await answered<RunList>(page, '/api/runs')).map((row) => {
+    if (judged(row)) return row;
+    throw new Refused(`the api judges every run of the seed: it could not judge ${row.id} (${row.unjudged})`);
+  });
 
 /** The frame, read apart from the page as the board reads it: the RunList of the runs not finished, of every factory or `factory`'s. */
 export const openAnswered = async (page: Page, factory?: string): Promise<OpenRuns> =>

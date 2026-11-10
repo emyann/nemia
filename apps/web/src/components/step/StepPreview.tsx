@@ -2,7 +2,9 @@ import { useContext, useEffect, useId, useMemo, useRef, useState, type KeyboardE
 import { Button, PopoverContext } from 'react-aria-components';
 import { useQuery } from '@tanstack/react-query';
 import { BottomSheet, PreviewCard, PreviewTrigger } from '@/components/ui/ds';
-import { agentsQuery, type RunSummary, type WaitOn } from '@/lib/api';
+import { agentsQuery } from '@/lib/api/agents';
+import type { RunView } from '@/lib/api/judged';
+import { type WaitOn } from 'objects';
 import { useRunRead } from '@/lib/runView';
 import { barSaid } from '@/lib/runWords';
 import type { StepState } from '@/lib/status';
@@ -12,7 +14,7 @@ import { cn, focusRing } from '@/components/ui/ds/utils';
 import { StepCard } from './StepCard';
 
 /** The run a rail belongs to, as its row on the list gives it. */
-type RailRun = Pick<RunSummary, 'id' | 'cancelledAt' | 'holding' | 'steps'>;
+type RailRun = Pick<RunView, 'id' | 'cancelledAt' | 'holding' | 'steps'>;
 
 /** A bar of the rail as the rail hands it: its step's name and state. */
 type RailStep = { name: string; state: StepState; on: WaitOn | null };

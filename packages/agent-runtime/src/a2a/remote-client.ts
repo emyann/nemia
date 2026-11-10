@@ -39,7 +39,7 @@ export type Credentials = (scheme: string, agentUrl: string, harness: string) =>
 export type MissingCredential = (scheme: string, agentUrl: string, harness: string) => string;
 
 /** Where the card of an agent given by `address` is read: the address itself when it names a `.json` file, else beneath its path. */
-export const cardUrlOf = (address: string): URL => {
+const cardUrlOf = (address: string): URL => {
   const url = new URL(address);
   if (url.pathname.endsWith('.json')) return url;
   if (!url.pathname.endsWith('/')) url.pathname = `${url.pathname}/`;
@@ -63,7 +63,7 @@ const spokenOf = (card: AgentCard): AgentInterface[] =>
 const originOf = (url: string): string | undefined => (URL.canParse(url) ? new URL(url).origin : undefined);
 
 /** The headers a card's requirements ask for, as the caller's secrets meet them — or why none can be met. */
-export type Auth = { headers: Record<string, string> } | { refusal: string };
+type Auth = { headers: Record<string, string> } | { refusal: string };
 
 /**
  * One scheme's header, or why it cannot be sent. An OAuth 2 or OpenID Connect scheme is sent as a bearer token that
@@ -262,7 +262,7 @@ const clientFetchOf = (bounded: Bounded, auth: () => Auth) =>
   );
 
 /** What the client knows of the agent: its card, the URL its secrets are asked for, and the SDK's client. */
-export type Seam = { card: AgentCard; agentUrl: string; client: Client };
+type Seam = { card: AgentCard; agentUrl: string; client: Client };
 
 /**
  * A connection: `client` the view of the agent, made at the first call and dropped at the first failure; `ask` a call on the

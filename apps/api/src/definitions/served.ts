@@ -3,9 +3,10 @@
  * (`definitionsServed`, the orchestrator's) with what shadows it; a page of them as `<Kind>List`; and a write's refusal
  * (`definitionWriteRefusal`) as the `Api`'s error.
  */
-import { Invalid as Refused, pageOf, parseSelectors, selectorsRefusal, selectsLabels, type ObjectQuery } from 'agent-orchestrator';
+import { Effect, Result } from 'effect';
+import { objectsListed, type ObjectQuery } from 'agent-orchestrator';
 import { definitionsServed, definitionWriteRefusal, type DefinitionWrite } from 'agent-orchestrator/workflow';
-import { API_VERSION, DEFINITION_ORIGINS, Invalid, Missing, type DefinitionOrigin } from 'objects';
+import { DEFINITION_ORIGINS, Invalid, Missing, type DefinitionOrigin } from 'objects';
 export { writtenAt } from '../workflows/builder.ts';
 
 /** An origin a definition is read from: the factory's tree, the repository, yours, or Nemia's builtin. */
@@ -76,22 +77,12 @@ export function writeGoes(namespace: string, does: DefinitionWrite, there: Origi
 
 type Named = { metadata: { name: string; labels?: Readonly<Record<string, string>> } };
 
-/** A page of `items` as `<kind>List`: those its label selectors keep, sorted by name, cut by `limit` after `continue`. */
+/**
+ * A page of `items` as `<kind>List`: the orchestrator's one list page (`objectsListed`), those its label selectors keep, sorted by name,
+ * cut by `limit` after `continue`; its refusal thrown as the `Api`'s `Invalid`.
+ */
 export const listed = <const K extends string, T extends Named>(kind: K, items: readonly T[], query: ObjectQuery) => {
-  const selectors = query.labelSelector ?? [];
-  const refusal = selectorsRefusal(selectors);
-  if (refusal !== undefined)
-    throw new Invalid({ error: `labelSelector: ${refusal}. Correct it, or leave labelSelector out to list every ${kind}.` });
-  const parsed = parseSelectors(selectors);
-  const kept = items
-    .filter((o) => selectsLabels(parsed, o.metadata.labels ?? {}))
-    .sort((a, b) => (a.metadata.name < b.metadata.name ? -1 : a.metadata.name > b.metadata.name ? 1 : 0));
-  const page = pageOf(kept, (o) => o.metadata.name, { limit: query.limit ?? null, continue: query.continue });
-  if (page instanceof Refused) throw new Invalid({ error: page.message });
-  return {
-    apiVersion: API_VERSION as typeof API_VERSION,
-    kind: `${kind}List` as const,
-    metadata: { remainingItemCount: page.remainingItemCount, ...(page.continue !== undefined ? { continue: page.continue } : {}) },
-    items: [...page.items],
-  };
+  const page = Effect.runSync(Effect.result(objectsListed(kind, items, query, kind)));
+  if (Result.isFailure(page)) throw new Invalid({ error: page.failure.message });
+  return page.success;
 };

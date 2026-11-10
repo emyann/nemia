@@ -17,7 +17,11 @@ import type {
   Schedule,
   ScheduleList,
 } from 'objects';
-import type { Capabilities, Ceilings, Daemon, InboxEntry, PassCost, Quota, QuotaWindow, StepReach } from '../src/lib/api.ts';
+import type { Capabilities, StepReach } from '../src/lib/api/capabilities.ts';
+import type { Ceilings, PassCost } from '../src/lib/api/ceilings.ts';
+import type { Daemon } from '../src/lib/api/daemon.ts';
+import type { InboxEntry } from '../src/lib/api/inbox.ts';
+import type { Quota, QuotaWindow } from '../src/lib/api/quota.ts';
 
 /**
  * A queued card whose start the tick tried and did not make, `queued` and `tried` both set, and which a record names: its state its run's

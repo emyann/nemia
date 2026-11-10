@@ -3,7 +3,10 @@ import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tansta
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { AgentForm } from '../components/agent/AgentForm';
 import { AgentRefused, RouteLink } from '../components/agent/AgentParts';
-import { AgentRefusal, createAgent, hireAgent, keyFormQuery, storeQuery, type AgentDraft } from '../lib/api';
+import { AgentRefusal, createAgent, type AgentDraft } from '../lib/api/agents.ts';
+import { hireAgent } from '../lib/api/factories.ts';
+import { keyFormQuery } from '../lib/api/builder.ts';
+import { storeQuery } from '../lib/api/store.ts';
 import { invalidateAgents, invalidateHires } from '../lib/agentWrites';
 import { hireOnCreate, hirePlaceOf, type HirePlace } from '../lib/factories';
 

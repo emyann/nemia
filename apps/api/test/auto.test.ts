@@ -1,10 +1,10 @@
 /**
- * An agent's rules for auto on the api, through the entries of the package's command table: `GET /api/policy/:name` reads the default in
- * force while nothing is confirmed, beside what the agent proposed and its words kept as guidance; `PUT /api/policy/:name/rules/:id`
- * confirms a proposed rule as the person read it, keeping the default beside it, and refuses one not proposed (404), one that reads
- * otherwise since (409), one in force already (409), a confirm with no words (422) or a key but them (400), and a request from another
- * site (403), each writing nothing; `DELETE` drops a rule, and takes no body but `{}` (400); a name that is no agent's is a 400; the
- * former spelling `/api/auto/…` is a 308 to the same path under `/api/policy/`.
+ * An agent's rules for auto on the api, the nemia group of `objects`' Api calling the entries of the package's command table by type:
+ * `GET /api/policy/:name` reads the default in force while nothing is confirmed, beside what the agent proposed and its words kept as
+ * guidance; `PUT /api/policy/:name/rules/:id` confirms a proposed rule as the person read it, keeping the default beside it, and refuses
+ * one not proposed (404), one that reads otherwise since (409), one in force already (409), a body with no words (400, naming
+ * `payload.words`) or blank words (422), and a request from another site (403), each writing nothing; `DELETE` drops a rule; a name
+ * that is no agent's is the package's 422; the former spelling `/api/auto/…` is no route (404).
  *
  * At shipped defaults, over the harness's scratch store (`root`).
  */
@@ -71,21 +71,22 @@ test('A person keeps her rules: the default in force, a proposed rule refused bu
     },
   );
   await s.test(
-    'REFUSED, writing nothing: a rule not proposed, a body but {}, a request from another site, and a name that is no agent',
+    'REFUSED, writing nothing: a rule not proposed, a body with no words or blank ones, a request from another site, and a name that is no agent',
     async () => {
       const ghost = await asked('PUT', '/api/policy/nemia/rules/ghost', { words: WORDS });
       assert.equal(ghost.status, 404);
       assert.match(String(ghost.body.error), /^nemia proposed no rule ghost/);
-      assert.equal((await asked('PUT', '/api/policy/nemia/rules/tries', { words: WORDS, why: 'go' })).status, 400);
       const wordless = await asked('PUT', '/api/policy/nemia/rules/tries', {});
-      assert.equal(wordless.status, 422);
-      assert.match(String(wordless.body.error), /takes the rule's words as you read them/);
-      assert.equal((await asked('DELETE', '/api/policy/nemia/rules/default', { why: 'go' })).status, 400);
+      assert.equal(wordless.status, 400);
+      assert.equal(wordless.body.field, 'payload.words');
+      const blank = await asked('PUT', '/api/policy/nemia/rules/tries', { words: '  ' });
+      assert.equal(blank.status, 422);
+      assert.match(String(blank.body.error), /takes the rule's words as you read them/);
       const foreign = await asked('PUT', '/api/policy/nemia/rules/tries', { words: WORDS }, { ...BOARD, 'sec-fetch-site': 'cross-site' });
       assert.equal(foreign.status, 403);
       assert.equal(fs.existsSync(CONFIRMED), false);
       const hidden = await asked('GET', '/api/policy/.nemia');
-      assert.equal(hidden.status, 400);
+      assert.equal(hidden.status, 422);
       assert.match(String(hidden.body.error), /is not an agent's name/);
     },
   );
@@ -123,13 +124,12 @@ test('A person keeps her rules: the default in force, a proposed rule refused bu
     );
     assert.equal(dropped.body.isDefault, false);
   });
-  await s.test("the routes' former spelling, /api/auto/…, is sent on to /api/policy/… with its method and body kept", async () => {
-    const res = await app.request('/api/auto/nemia/rules/tries?x=1', {
-      method: 'PUT',
-      headers: BOARD,
-      body: JSON.stringify({ words: WORDS }),
-    });
-    assert.equal(res.status, 308);
-    assert.equal(res.headers.get('location'), '/api/policy/nemia/rules/tries?x=1');
-  });
+  await s.test(
+    "the routes' former spelling, /api/auto/…, is no route: the api's 404, naming where the paths it serves are listed",
+    async () => {
+      const res = await asked('PUT', '/api/auto/nemia/rules/tries?x=1', { words: WORDS });
+      assert.equal(res.status, 404);
+      assert.match(String(res.body.error), /is no route of this api/);
+    },
+  );
 });

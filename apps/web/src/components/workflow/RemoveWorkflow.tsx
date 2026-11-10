@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { removeWorkflow, type WorkflowListing } from '../../lib/api';
+import { removeWorkflow, type WorkflowListing } from '../../lib/api/workflows.ts';
 import { rereadWorkflows } from '../../lib/placed';
 
 /**

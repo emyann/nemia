@@ -37,7 +37,7 @@ export type HolderAgent = { card: Record<string, unknown> };
  * `follows`, so its headers alone are bounded and the stream itself is not. A failure is the follow's own refusal, naming
  * what the holder said.
  */
-export const holderFollowOf =
+const holderFollowOf =
   (agent: HolderAgent, harness: string, credentials: Credentials | undefined) =>
   (name: string): Stream.Stream<Followed, RunnerError> => {
     const connection = connectionOf(harness, agent, credentials, REQUEST_MS, SEND_MS);

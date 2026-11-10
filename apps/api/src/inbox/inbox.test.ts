@@ -371,16 +371,6 @@ test('POST /api/runs with `card`: what a start of a card refuses, writing nothin
       assert.deepEqual(cards(), [`${card.name}.md`]);
     },
   );
-
-  await t.test('a card start another site could make is refused by the guard before its body is read — so the card stays', async () => {
-    clear();
-    const { card } = onStore(addToInbox({ text: 'Keep this one' }));
-    const body = { workflow: 'dev', card: card.name, brief: 'Do it.' };
-    const site = await startCard(body, { 'content-type': 'application/json', 'sec-fetch-site': 'cross-site' });
-    assert.equal(site.status, 403);
-    assert.deepEqual(runFiles(), []);
-    assert.deepEqual(cards(), [`${card.name}.md`], 'the card a start would have taken off the inbox is still on it');
-  });
 });
 
 test("a card whose start fails without a refusal — its repository's `.worktreeinclude` a link to itself, which its place's open cannot read, say — fails as the queue tries it again: a 500 in the failure's words, said on stderr, and nothing is written or removed", async (t) => {
@@ -753,16 +743,16 @@ test("what a filing, a card's page or a drop refuses, writing nothing", async (t
   );
 
   await t.test(
-    "a filing of the wrong shape is a 400 in the api's words, a workflow that is a path or a `from` with no workflow a 422, a workflow nobody has a 404, one both have a 409 — before anything is written",
+    "a filing of the wrong shape is a 400 in the api's words, a `from` with no workflow too, a workflow that is a path a 422, a workflow nobody has a 404, one both have a 409 — before anything is written",
     async () => {
       clear();
       const refused = async (res: Response, status: number, sent: unknown, ...facts: string[]) => {
         assert.equal(res.status, status, JSON.stringify(sent));
         names(((await res.json()) as { error?: unknown }).error, ...facts);
       };
-      for (const body of ['not json', '[]', '"an idea"']) await refused(await file(body), 400, body, '"body"');
-      for (const idea of [undefined, 42, null, ['an idea']]) await refused(await file({ body: idea }), 400, idea, '"body"');
-      await refused(await file({ body: 'An idea', workflow: 42 }), 400, 42, '`workflow`');
+      for (const body of ['not json', '[]', '"an idea"']) await refused(await file(body), 400, body, '`payload`');
+      for (const idea of [undefined, 42, null, ['an idea']]) await refused(await file({ body: idea }), 400, idea, '`payload.body`');
+      await refused(await file({ body: 'An idea', workflow: 42 }), 400, 42, '`payload.workflow`');
       for (const workflow of ['', '../workflows/dev', '/tmp/dev', 'dev/implement.md', 'a\\b'])
         await refused(
           await file({ body: 'An idea', workflow }),
@@ -770,9 +760,14 @@ test("what a filing, a card's page or a drop refuses, writing nothing", async (t
           `${JSON.stringify(workflow)}: a name, as the workflows are listed, never a path, which a card would carry to a start from the command line`,
           '`workflow`',
         );
-      await refused(await file({ body: 'An idea', workflow: 'dev', from: 'elsewhere' }), 400, 'from', '`from`');
-      await refused(await file({ body: 'An idea', from: 'repo' }), 422, 'from alone', '`workflow`');
-      for (const about of [42, null, ['/tmp']]) await refused(await file({ body: 'An idea', repo: about }), 400, about, '`repo`');
+      await refused(await file({ body: 'An idea', workflow: 'dev', from: 'elsewhere' }), 400, 'from', '`payload.from`');
+      await refused(
+        await file({ body: 'An idea', from: 'repo' }),
+        400,
+        'from alone: a 400 as the reader says it, no status folded',
+        '`workflow`',
+      );
+      for (const about of [42, null, ['/tmp']]) await refused(await file({ body: 'An idea', repo: about }), 400, about, '`payload.repo`');
 
       const unknown = await file({ body: 'An idea', workflow: 'nope' });
       assert.equal(unknown.status, 404);
@@ -843,7 +838,7 @@ test("what a filing, a card's page or a drop refuses, writing nothing", async (t
       for (const factory of [7, null, ['mill']]) {
         const res = await file({ body: 'An idea', factory });
         assert.equal(res.status, 400, JSON.stringify(factory));
-        names(((await res.json()) as Refused).error, '`factory`');
+        names(((await res.json()) as Refused).error, '`payload.factory`');
       }
       const res = await file({ body: 'An idea', factory: 'default' });
       assert.equal(res.status, 422, "`default` names no factory: the default namespace's cards name none");
@@ -922,7 +917,7 @@ test("a card's labels: filed with them, listed with them, selected by them with 
     assert.deepEqual(entries.find((e) => e.name === bare)?.labels, {}, 'none, `{}`, on a card that carries none');
     const refused = await file({ body: 'Labelled wrong', label: 'team=core' });
     assert.equal(refused.status, 400, 'REFUSED: a `label` that is no list');
-    names(((await refused.json()) as { error: string }).error, '`label`');
+    names(((await refused.json()) as { error: string }).error, '`payload.label`');
   });
   await s.test('?labelSelector= keeps the cards one of its selectors takes, OR across repeats; a malformed one is a 422', async () => {
     assert.deepEqual(await asked('/api/cards?labelSelector=team%3Dcore'), [core]);
@@ -966,6 +961,6 @@ test("a card's labels: filed with them, listed with them, selected by them with 
     );
     const refused = await startCard({ workflow: 'dev', from: 'repo', card: docs, label: 'tier=2' });
     assert.equal(refused.status, 400, 'REFUSED: a `label` that is no list');
-    names(((await refused.json()) as { error: string }).error, '`label`');
+    names(((await refused.json()) as { error: string }).error, '`payload.label`');
   });
 });

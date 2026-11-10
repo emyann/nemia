@@ -8,7 +8,7 @@ import type { SpawnRequest } from '../seam.ts';
  * `resource` as OpenTelemetry's `OTEL_RESOURCE_ATTRIBUTES`: `key=value` pairs, by key, joined by commas, each value percent-encoded so
  * that a `,`, a `=` or a `%` in it is read back as itself.
  */
-export const resourceAttributes = (resource: Record<string, string>): string =>
+const resourceAttributes = (resource: Record<string, string>): string =>
   Object.entries(resource)
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
     .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)

@@ -13,14 +13,15 @@
  */
 import { isDeepStrictEqual } from 'node:util';
 import { Effect } from 'effect';
-import { API_VERSION, type Run as RunObject, type RunList, type RunState, type RunUnjudged } from 'objects';
+import { type Run as RunObject, type RunList, type RunState, type RunUnjudged } from 'objects';
 import type { Run } from '../run.ts';
 import type { Engine } from '../runtime-client.ts';
 import { finishedAtOf, kindOf, selectedRuns } from '../runlist/runlist.ts';
 import { framed, framePartsOf, unjudgedStateOf } from '../runlist/runlist.verb.ts';
 import { storeRunsListed, summaryOf, type SummaryHow } from '../summary/summary.verb.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
-import { parseSelectors, selectorsRefusal } from '../watch/selector.ts';
+import { parseSelectors } from '../watch/selector.ts';
+import { listOf, selectorsRefused } from '../object/listed.verb.ts';
 import { pageOf } from '../object/page.ts';
 import { finishedPageOf, runNamespace, runStateSelector, type RunStateSelector, byFinishedPlace } from './run-list.ts';
 
@@ -55,9 +56,8 @@ const byName = (a: Listed, b: Listed): number => (a.id < b.id ? -1 : a.id > b.id
  */
 const keptOf = <R extends Listed>(runs: readonly R[], query: RunQuery): readonly R[] | Invalid => {
   const selectors = query.labelSelector ?? [];
-  const refusal = selectorsRefusal(selectors);
-  if (refusal !== undefined)
-    return new Invalid({ message: `labelSelector: ${refusal}. Correct it, or leave labelSelector out to list every run` });
+  const refused = selectorsRefused(selectors, 'run');
+  if (refused !== undefined) return refused;
   const { namespace } = query;
   const inNamespace = namespace === undefined ? runs : runs.filter((run) => runNamespace(run.factory) === namespace);
   return [...selectedRuns(inNamespace, parseSelectors(selectors))].sort(byName);
@@ -101,16 +101,7 @@ export const runListOf = Effect.fn('runListOf')(function* <R extends Listed, E, 
     if ('unjudged' in answer) unjudged.push({ name: run.id, namespace: runNamespace(run.factory), error: answer.unjudged });
     else items.push(answer);
   }
-  const answered: RunList = {
-    apiVersion: API_VERSION,
-    kind: 'RunList',
-    metadata: {
-      remainingItemCount: page.remainingItemCount,
-      ...(page.continue !== undefined ? { continue: page.continue } : {}),
-    },
-    items,
-    ...(unjudged.length ? { unjudged } : {}),
-  };
+  const answered: RunList = { ...listOf('Run', page, items), ...(unjudged.length ? { unjudged } : {}) };
   return answered;
 });
 
@@ -210,17 +201,10 @@ const framedList = (
   items: RunObject[],
   unjudged: RunUnjudged[],
   frame: { counts: { waiting: number; inFlight: number; finished: number }; asOf: string },
-): RunList => ({
-  apiVersion: API_VERSION,
-  kind: 'RunList',
-  metadata: {
-    remainingItemCount: page.remainingItemCount,
-    ...(page.continue !== undefined ? { continue: page.continue } : {}),
-    ...frame,
-  },
-  items,
-  ...(unjudged.length ? { unjudged } : {}),
-});
+): RunList => {
+  const list = listOf('Run', page, items);
+  return { ...list, metadata: { ...list.metadata, ...frame }, ...(unjudged.length ? { unjudged } : {}) };
+};
 
 /** How many of `stated` are in each state. */
 const countsOf = (stated: readonly Stated[]) => {

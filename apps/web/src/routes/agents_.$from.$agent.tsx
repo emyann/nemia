@@ -11,13 +11,13 @@ import {
   agentQuery,
   AgentRefusal,
   customInstructionsQuery,
-  keyFormQuery,
   readAgent,
   removeAgent,
   saveAgent,
   type AgentDraft,
   type AgentListing,
-} from '../lib/api';
+} from '../lib/api/agents.ts';
+import { keyFormQuery } from '../lib/api/builder.ts';
 import { formKeyOf, keptAfterCopy, keptAfterSave, settleSave, type KeptForm } from '../lib/agents';
 import { invalidateAgents } from '../lib/agentWrites';
 import { FACTORY_WAY, pagePlaceOf } from '../lib/factories';

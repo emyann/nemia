@@ -1,5 +1,6 @@
 import { Cell, Column, Row, Table, TableBody, TableHeader, Tag } from '@/components/ui/ds';
-import type { ListedRun } from '@/lib/api';
+import type { ListedRun } from '@/lib/api/runs';
+import { judged, type UnjudgedRun } from '@/lib/api/judged';
 import { factoryOf } from '@/lib/factories';
 import { titleOf } from '@/lib/factory';
 import { LabelTags } from '../field/Labels';
@@ -14,15 +15,8 @@ import { CopyId, CutFrame, CutTag, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TA
 /** A column's heading, in the look's small caps. */
 const HEAD = 'text-label-small uppercase';
 
-/** What a row in flight does now: the word of its step as a tag and its note; for a run the api could not judge, the api's sentence. */
+/** What a row in flight does now: the word of its step as a tag and its note. */
 function Now({ run }: { run: ListedRun }) {
-  if (run.unreadable) {
-    return (
-      <span data-now-unreadable className={`text-body-small break-words ${ink.failure}`}>
-        {run.unreadable}
-      </span>
-    );
-  }
   const now = nowOf(run);
   if (!now) return null;
   return (
@@ -40,13 +34,47 @@ function Now({ run }: { run: ListedRun }) {
 }
 
 /**
+ * A run in flight the list could not judge, a task it reads having a journal that does not read: its id for its title, a link, with a
+ * copy control and its factory; no steps, nothing at work and no cost, since nothing of it is judged; and what it does now, the list's
+ * sentence of why.
+ */
+function UnjudgedRow({ run, room }: { run: UnjudgedRun; room: number }) {
+  return (
+    <Row id={run.id} data-run={run.id} data-unreadable="" className={FRAMED_ROW}>
+      <Cell className="py-1">
+        <span className="flex flex-col gap-4 pb-2">
+          <TextLink to="/runs/$runId" params={{ runId: run.id }} title={run.id} className="block truncate text-title-small">
+            {run.id}
+          </TextLink>
+          <span className="flex items-center gap-2">
+            <CopyId id={run.id} room={room} />
+            <span data-factory={factoryOf(run)} className="text-label-small uppercase text-on-surface-variant">
+              {factoryOf(run)}
+            </span>
+          </span>
+        </span>
+      </Cell>
+      <Cell />
+      <Cell>
+        <span data-now-unreadable className={`text-body-small break-words ${ink.failure}`}>
+          {run.unjudged}
+        </span>
+      </Cell>
+      <Cell data-clock />
+      <Cell data-cost />
+    </Row>
+  );
+}
+
+/**
  * The runs in flight, as the kit's dense table in the look's cut frame, in the hue of a session at work: each run's title as a link,
  * its id with a copy control and its factory, each control and each factory at one edge from row to row; its own steps as a rail, each
  * bar a button that opens its step's card; what it does now, its note cut to the column's room with the whole of it on hover; its time
  * at work at `asOf`, a preview over it breaking that clock down (`RunClockCell`); and its cost, a preview over it breaking its tokens
- * down by kind (`RunCostCell`). Narrower than its columns, the table scrolls sideways inside its frame.
+ * down by kind (`RunCostCell`). Narrower than its columns, the table scrolls sideways inside its frame. A run the list could not judge
+ * is a row of its own (`UnjudgedRow`).
  */
-export function FlightTable({ runs, asOf }: { runs: readonly ListedRun[]; asOf: Date }) {
+export function FlightTable({ runs, asOf }: { runs: readonly (ListedRun | UnjudgedRun)[]; asOf: Date }) {
   const room = Math.max(0, ...runs.map((run) => run.id.length));
   return (
     <CutFrame hue="alive" size={24}>
@@ -70,41 +98,50 @@ export function FlightTable({ runs, asOf }: { runs: readonly ListedRun[]; asOf: 
             </Column>
           </TableHeader>
           <TableBody>
-            {runs.map((run) => (
-              <Row key={run.id} id={run.id} data-run={run.id} data-unreadable={run.unreadable ? '' : undefined} className={FRAMED_ROW}>
-                <Cell className="py-1">
-                  <span className="flex flex-col gap-4 pb-2">
-                    <TextLink to="/runs/$runId" params={{ runId: run.id }} title={titleOf(run)} className="block truncate text-title-small">
-                      {titleOf(run)}
-                    </TextLink>
-                    <span className="flex items-center gap-2">
-                      <CopyId id={run.id} room={room} />
-                      <span data-factory={factoryOf(run)} className="text-label-small uppercase text-on-surface-variant">
-                        {factoryOf(run)}
+            {runs.map((run) =>
+              judged(run) ? (
+                <Row key={run.id} id={run.id} data-run={run.id} className={FRAMED_ROW}>
+                  <Cell className="py-1">
+                    <span className="flex flex-col gap-4 pb-2">
+                      <TextLink
+                        to="/runs/$runId"
+                        params={{ runId: run.id }}
+                        title={titleOf(run)}
+                        className="block truncate text-title-small"
+                      >
+                        {titleOf(run)}
+                      </TextLink>
+                      <span className="flex items-center gap-2">
+                        <CopyId id={run.id} room={room} />
+                        <span data-factory={factoryOf(run)} className="text-label-small uppercase text-on-surface-variant">
+                          {factoryOf(run)}
+                        </span>
+                        <LabelTags labels={run.labels} />
                       </span>
-                      <LabelTags labels={run.labels} />
                     </span>
-                  </span>
-                </Cell>
-                <Cell>
-                  <RunSteps
-                    steps={run.steps}
-                    cancelled={run.cancelledAt !== null}
-                    held={run.holding != null}
-                    wrap={previewBar(run, asOf)}
-                  />
-                </Cell>
-                <Cell>
-                  <Now run={run} />
-                </Cell>
-                <Cell data-clock>
-                  <RunClockCell run={run} asOf={asOf} finished={false} />
-                </Cell>
-                <Cell data-cost className={`font-mono text-body-small whitespace-nowrap ${ink.money}`}>
-                  <RunCostCell run={run} />
-                </Cell>
-              </Row>
-            ))}
+                  </Cell>
+                  <Cell>
+                    <RunSteps
+                      steps={run.steps}
+                      cancelled={run.cancelledAt !== null}
+                      held={run.holding != null}
+                      wrap={previewBar(run, asOf)}
+                    />
+                  </Cell>
+                  <Cell>
+                    <Now run={run} />
+                  </Cell>
+                  <Cell data-clock>
+                    <RunClockCell run={run} asOf={asOf} finished={false} />
+                  </Cell>
+                  <Cell data-cost className={`font-mono text-body-small whitespace-nowrap ${ink.money}`}>
+                    <RunCostCell run={run} />
+                  </Cell>
+                </Row>
+              ) : (
+                <UnjudgedRow key={run.id} run={run} room={room} />
+              ),
+            )}
           </TableBody>
         </Table>
       </div>

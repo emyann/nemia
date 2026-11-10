@@ -2,7 +2,11 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { FactoriesCanvas } from '@/components/factory/FactoriesCanvas';
 import { OverviewStrip } from '@/components/frame/OverviewStrip';
-import { ceilingsQuery, daemonQuery, factoriesQuery, quotaQuery, runsQuery } from '@/lib/api';
+import { ceilingsQuery } from '@/lib/api/ceilings';
+import { daemonQuery } from '@/lib/api/daemon';
+import { factoriesQuery } from '@/lib/api/factories';
+import { quotaQuery } from '@/lib/api/quota';
+import { runsQuery } from '@/lib/api/runs';
 import { factoryBlocks, factorySearch } from '@/lib/factories';
 
 export const Route = createFileRoute('/')({

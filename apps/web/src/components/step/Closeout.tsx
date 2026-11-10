@@ -1,6 +1,10 @@
 import { useId, useState, type ReactNode } from 'react';
 import { Switch } from '@/components/ui/switch';
-import type { CheckResult, CheckVerdict, StepAttempts, StepCloseout, StepTry } from '../../lib/api';
+import type { CheckResult, StepCheck } from 'objects';
+
+/** A check's verdict: its result, and the code it exited with. */
+type CheckVerdict = NonNullable<StepCheck['verdict']>;
+import type { StepAttempts, StepCloseout, StepTry } from '../../lib/api/tries.ts';
 import { durationWords } from '../../lib/duration';
 import { foldsAtGate, imagePaths, type Outcome, outcomeOf, outcomeWord } from '../../lib/outcome';
 import { bodyLeadsWith, summaryShown } from '../../lib/transcript';

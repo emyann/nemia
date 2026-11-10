@@ -1,3 +1,2 @@
-/** Nemia's routes and her chat's, as app.ts mounts them. */
-export { nemia } from './nemia.ts';
-export { nemiaChat } from './chat.ts';
+/** Nemia's group of `objects`' Api, as serve.ts provides it to the mount. */
+export { nemiaHandlers } from './nemia.ts';

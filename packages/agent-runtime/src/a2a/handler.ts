@@ -92,6 +92,7 @@ const DEFAULT_PER_PAGE = 50;
  * How many listings may have pages still to serve at once. Listings overlap — every read of a view, a transcript or a
  * tick observes — so a page is served from the listing its token names, never only the latest. A client that stops
  * paging part-way leaves its listing behind; past this many, the oldest is dropped, and a token of it refused.
+ * Exported only for the tests that import it.
  */
 export const OPEN_LISTINGS = 64;
 

@@ -1,7 +1,9 @@
 import { useCallback, useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Background, BackgroundVariant, MarkerType, Position, ReactFlow, type Connection } from '@xyflow/react';
-import { BuildRefusal, keyFormQuery, saveWorkflow, workflowsQuery, type StepLayers, type WorkflowListing } from '../../lib/api';
+import { BuildRefusal, saveWorkflow, workflowsQuery, type WorkflowListing } from '../../lib/api/workflows.ts';
+import { keyFormQuery } from '../../lib/api/builder.ts';
+import { type StepLayers } from '../../lib/api/layers.ts';
 import {
   addStep,
   connect,

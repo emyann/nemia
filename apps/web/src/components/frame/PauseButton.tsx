@@ -5,7 +5,7 @@ import { Dialog, DialogTrigger, Form, Heading, Popover, TextField } from 'react-
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { pauseNowQuery, pauseQuery, putPause, resumePause } from '@/lib/api';
+import { pauseNowQuery, pauseQuery, putPause, resumePause } from '@/lib/api/pause';
 import { interruptSentence, PAUSE_PARKS, type PauseState, type PauseWords, pauseWords } from '@/lib/pause';
 import { cn } from '@/lib/utils';
 import { useNow } from '@/lib/useNow';

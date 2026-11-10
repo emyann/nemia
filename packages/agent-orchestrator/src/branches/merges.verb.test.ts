@@ -1,6 +1,6 @@
 /**
  * The merge check (`mergesOf`), against a run on a real repository and the git place's trial merges: a branch that merges cleanly, one
- * that conflicts, and one git does not have; and the entry that serves it (`MERGES`), refusing a run the store does not have. `WF_ROOT`
+ * that conflicts, and one git does not have; and a run the store does not have, refused. `WF_ROOT`
  * is set before the import, since the store reads it as it loads.
  */
 import { test } from 'node:test';
@@ -9,15 +9,11 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
-import { promised } from '../../test/promised.ts';
-import { runOver } from '../../test/placed.ts';
+import { Missing } from '../refusal/refusal.ts';
 
 process.env.WF_ROOT = scratch('wf-merge-root-');
-const { MERGES, mergesOf } = await import('./merges.verb.ts');
+const { mergesOf } = await import('./merges.verb.ts');
 const { builtinGitPlace } = await import('../place/builtin.store.ts');
-const { runWith: runEngine } = await import('../runtime-client.ts');
-const { gitPlaceLayer } = await import('../place/builtin.store.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
 
 /** A repository on `main` with `src/a.ts`, and its git. */
 function repoOf() {
@@ -85,9 +81,9 @@ test("a branch git does not have is neither clean nor conflicted: it carries git
   assert.match(gone.said, /^whether it merges onto main is not known: .*no-such-run/);
 });
 
-test("REFUSED: the merge check of a run the store does not have, in the store's words whole", async () => {
-  await assert.rejects(runWith(promised({}), MERGES.handler({ runId: 'r-none', branches: ['wf/r-none/implement'] })), (err: Error) => {
-    assert.equal(err.message, "no such run: r-none  (try 'nemia ls')");
-    return true;
-  });
+test('REFUSED: the merge check of a run the store does not have is `Missing`, naming the run', () => {
+  assert.throws(
+    () => mergesOf(builtinGitPlace, 'r-none', ['wf/r-none/implement']),
+    (err: Error) => err instanceof Missing && /r-none/.test(err.message),
+  );
 });

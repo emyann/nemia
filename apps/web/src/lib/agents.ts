@@ -1,4 +1,5 @@
-import type { AgentDraft, AgentListing, AgentRoleKey, KeyForm } from './api';
+import type { AgentDraft, AgentListing, AgentRoleKey } from './api/agents.ts';
+import type { KeyForm } from './api/builder.ts';
 import { remoteRefuses } from './builder.ts';
 
 /**

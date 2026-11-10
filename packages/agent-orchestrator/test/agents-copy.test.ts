@@ -48,7 +48,7 @@ const agentsRead = (at: { repo: string; home: string }) => Effect.runSync(agents
 const FIXTURE = path.join(import.meta.dirname, 'fixtures', 'agents-copy', 'repo');
 
 /** The copy `args` asks for, into the library of the store `home`. */
-const copy = (args: Record<string, string | readonly string[]>, home: string) =>
+const copy = (args: { file: string; as?: string; keep?: readonly string[] }, home: string) =>
   stage.runWith(stage.board().e, AGENTS_COPY.handler(args, undefined, home));
 
 /** `nemia agents sources`' program over the store `home`, as its handler runs it: what it lists, or the refusal it fails with. */

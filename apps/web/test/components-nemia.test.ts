@@ -24,11 +24,11 @@ const { NemiaFace } = await import('../src/components/nemia/NemiaFace.tsx');
 const { UP } = await import('../src/lib/presence.ts');
 const { ChatLostBand, ChatRetryingBand, ChatStoppedBand, ChatUnreadableBand } = await import('../src/components/nemia/chat/ChatBand.tsx');
 const { dockWords } = await import('../src/lib/presence.ts');
-type ChatEvent = import('../src/lib/api.ts').ChatEvent;
+type ChatEvent = import('../src/lib/api/chat.ts').ChatEvent;
 const { ChatAsk } = await import('../src/components/nemia/chat/ChatAsk.tsx');
 const { ChatAskMany } = await import('../src/components/nemia/chat/ChatAskMany.tsx');
 const { ChatActions } = await import('../src/components/nemia/chat/ChatActions.tsx');
-type AskQuestion = import('../src/lib/api.ts').AskQuestion;
+type AskQuestion = import('../src/lib/api/chat.ts').AskQuestion;
 
 /** Nemia's section, drawn over a cache holding `level`, her memory, `facts`, and each fact's words, read as if opened once. */
 async function nemiaWith(level: Record<string, unknown>, facts: string[] = []): Promise<string> {

@@ -6,11 +6,12 @@
  * answers.
  */
 import path from 'node:path';
-import { Effect } from 'effect';
+import { Effect, Schema } from 'effect';
 import { tried } from '../runtime-client.ts';
-import type { Args, Flag, Positional, Spec } from '../command/command.ts';
+import { Invalid } from '../refusal/refusal.ts';
+import type { Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { cliPath, factoryFlag, FROM, versionFlag, writerSpec, writerText, yoursOrRefused } from '../yours/yours.ts';
+import { cliPath, factoryFlag, FROM, versionFlag, writerSpec, yoursOrRefused } from '../yours/yours.ts';
 import { templatedTree } from '../factory/factory.store.ts';
 import { rooted } from '../factory/wiring/wire.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
@@ -19,12 +20,6 @@ import { SkillDoor, type SkillPage } from './skill-door.store.ts';
 import type { SkillChange, SkillCopied, SkillRead, SkillWritten } from './skills.store.ts';
 
 export type { SkillPage } from './skill-door.store.ts';
-
-/** The text under `key`, or undefined where none was given. */
-const textOf = (args: Args, key: string): string | undefined => {
-  const value = args[key];
-  return typeof value === 'string' ? value : undefined;
-};
 
 /** A text flag under `key`, as the api hands it. */
 const keyed = (key: string): Flag => ({ flag: `--${key}`, kind: 'text', key });
@@ -36,8 +31,12 @@ const apiSpec = (positionals: readonly Positional[], keys: readonly string[]): S
   unknown: (arg) => `the board's skills take no ${arg}.`,
 });
 
+/** What `skills`' handler takes: the skill folders to read. */
+export const SkillsInput = Schema.Struct({ skills: Schema.optionalKey(Schema.Array(Schema.String)) });
+export type SkillsInput = typeof SkillsInput.Type;
+
 /** Each skill folder `skills` names read now through the door (the skill named by its folder), by folder. */
-export const SKILLS_LIST: Command<Record<string, SkillRead>> = {
+export const SKILLS_LIST: Command<Record<string, SkillRead>, SkillsInput> = {
   name: 'skills',
   usage: '[<skills> ...]',
   help: ['the skill folders named, each read'],
@@ -45,30 +44,34 @@ export const SKILLS_LIST: Command<Record<string, SkillRead>> = {
   writes: false,
   class: 'read',
   only: { side: 'api', why: "the board's skill picker lists every skill by place; at the command line a person lists the folders" },
-  handler: (args, _env, home) =>
+  input: SkillsInput,
+  handler: ({ skills: dirs = [] }, _env, home) =>
     rooted(
       home,
       'skills',
       Effect.gen(function* () {
         const door = yield* SkillDoor;
-        const dirs = Array.isArray(args.skills) ? args.skills : [];
         const reads = yield* Effect.forEach(dirs, (dir) =>
           Effect.map(
             door.skills.read(SkillName.read(path.basename(dir)), path.dirname(dir)),
             ({ text: _text, version: _version, ...read }) => [dir, read] as const,
           ),
         );
-        return Object.fromEntries(reads) as Record<string, SkillRead>;
+        return Object.fromEntries(reads);
       }),
     ),
   print: () => [],
 };
 
+/** What `skills show`'s handler takes: the skill's name, and its folder, as the api resolved it. */
+export const SkillShowInput = Schema.Struct({ name: Schema.String, dir: Schema.String });
+export type SkillShowInput = typeof SkillShowInput.Type;
+
 /**
  * The skill `name` whose folder is `dir`, as the api resolved it in the place `from`, read for its page (`SkillPage`) through the door,
  * in the folder of skills `dir` is in.
  */
-export const SKILLS_READ: Command<SkillPage> = {
+export const SKILLS_READ: Command<SkillPage, SkillShowInput> = {
   name: 'skills show',
   usage: '<from> <name>',
   help: ['one skill, read for its page'],
@@ -85,13 +88,14 @@ export const SKILLS_READ: Command<SkillPage> = {
     side: 'api',
     why: "the board's skill page reads one skill with its form and its users; at the command line a person reads its SKILL.md",
   },
-  handler: (args, _env, home) =>
+  input: SkillShowInput,
+  handler: ({ name, dir }, _env, home) =>
     rooted(
       home,
       'skills show',
       Effect.gen(function* () {
         const door = yield* SkillDoor;
-        return yield* door.skills.read(SkillName.read(textOf(args, 'name') ?? ''), path.dirname(textOf(args, 'dir') ?? ''));
+        return yield* door.skills.read(SkillName.read(name), path.dirname(dir));
       }),
     ),
   print: () => [],
@@ -108,7 +112,28 @@ const writtenLines = (data: SkillWritten | SkillCopied): string[] => [
  * at the `version` it was read at, none for a skill made. Written to the tree of the factory `--factory` names for the place
  * `factory`. Refused, as `Invalid`, for a place but those two (`yoursOrRefused`).
  */
-export const SKILLS_WRITE: Command<SkillWritten | SkillCopied> = {
+/** A skill's change as the writer hands it, read by the command line off its SKILL.md and built by the api from the Skill's spec. */
+const SkillChangeValue = Schema.declare(
+  (u: unknown): u is SkillChange => typeof u === 'object' && u !== null && typeof (u as { name?: unknown }).name === 'string',
+);
+
+/**
+ * What `nemia skills write`'s handler takes: the place it writes (`from`, `yours` or `factory`, and the `factory` whose tree), the skill's
+ * name on the path where it changes one (`name`), the `version` it was read at, and either its `change` or the builtin skill to `copy`
+ * from the folder of builtin skills (`builtin`).
+ */
+export const SkillWriteInput = Schema.Struct({
+  from: Schema.String,
+  name: Schema.optionalKey(Schema.String),
+  factory: Schema.optionalKey(Schema.String),
+  version: Schema.optionalKey(Schema.String),
+  change: Schema.optionalKey(SkillChangeValue),
+  copy: Schema.optionalKey(Schema.String),
+  builtin: Schema.optionalKey(Schema.String),
+});
+export type SkillWriteInput = typeof SkillWriteInput.Type;
+
+export const SKILLS_WRITE: Command<SkillWritten | SkillCopied, SkillWriteInput> = {
   name: 'skills write',
   usage: '(yours | factory) [<name>] --file <SKILL.md> [--factory <name>] [--version <v>]',
   help: [
@@ -137,23 +162,28 @@ export const SKILLS_WRITE: Command<SkillWritten | SkillCopied> = {
     side: 'cli',
     why: "the api serves it as the Skill's `create`, `replace` and `copy` verb of `objects`' Api (`/api/namespaces/:namespace/skills`), which calls this entry's handler: no route of its own",
   },
-  handler: (args, _env, home) =>
+  input: SkillWriteInput,
+  handler: ({ from, name, factory, version, change, copy, builtin = '' }, _env, home) =>
     rooted(
       home,
       'skills write',
       Effect.gen(function* () {
         const root = yield* StoreRoot;
         const library = yield* tried(() =>
-          yoursOrRefused('nemia skills write', 'skills', writerText(args, 'from') ?? '', writerText(args, 'name') ?? null, '', root, {
-            factory: writerText(args, 'factory'),
-            treeOf: (factory) => templatedTree(factory, 'nemia skills write'),
+          yoursOrRefused('nemia skills write', 'skills', from, name ?? null, '', root, {
+            factory,
+            treeOf: (named) => templatedTree(named, 'nemia skills write'),
           }),
         );
         const door = yield* SkillDoor;
-        const copy = writerText(args, 'copy');
-        if (copy !== undefined) return yield* door.skills.copy(SkillName.read(copy), writerText(args, 'builtin') ?? '', library);
-        const change = yield* tried(() => JSON.parse(writerText(args, 'change') ?? 'null') as SkillChange);
-        return yield* door.skills.write(SkillName.read(change?.name), change, writerText(args, 'version'), library);
+        if (copy !== undefined) return yield* door.skills.copy(SkillName.read(copy), builtin, library);
+        if (change === undefined)
+          return yield* Effect.fail(
+            new Invalid({
+              message: 'nemia skills write takes the skill to write, its SKILL.md: nemia skills write yours --file <SKILL.md>.',
+            }),
+          );
+        return yield* door.skills.write(SkillName.read(change.name), change, version, library);
       }),
     ),
   print: writtenLines,

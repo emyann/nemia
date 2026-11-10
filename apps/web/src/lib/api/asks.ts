@@ -5,23 +5,18 @@
  */
 
 import { Schema } from 'effect';
-import type { RetryMode } from 'objects';
+import type { RetryMode, RunApprove, RunStepStatus } from 'objects';
 import { decoded } from './read.ts';
 import { runs } from './objects.ts';
-import type { TranscriptEvent } from './steps.ts';
 
 /**
- * Mirrors `Said` in agent-orchestrator, the engine's `said` entry: words a person said to a step's running session, when, to which attempt
- * of its task, and the last event of the session's transcript before they were handed over (`after`, by its `kind` and `id`), null where
- * the transcript held none.
+ * Words a person said to a step's running session, when, to which attempt of its task, and the last event of the session's transcript
+ * before they were handed over (`after`): `objects`' own, off a step's status.
  */
-export type Said = { at: string; attempt: number; text: string; after: { kind: TranscriptEvent['kind']; id: string } | null };
+export type Said = RunStepStatus['said'][number];
 
-/**
- * Mirrors `Answer` in agent-orchestrator's question/question.ts: a person's answer to one question a step asks, by its title — the labels
- * they chose, and words of their own.
- */
-export type QuestionAnswer = { question: string; chose: readonly string[]; own?: string };
+/** A person's answer to one question a step asks, by its title — the labels they chose, and words of their own: `objects`' own. */
+export type QuestionAnswer = NonNullable<RunApprove['answers']>[number];
 
 /**
  * How the CLI's `retry` tries a step again (`objects`' `RetryMode`): continue its session, a new one, or its check run again and no
@@ -30,10 +25,10 @@ export type QuestionAnswer = { question: string; chose: readonly string[]; own?:
 export type { RetryMode } from 'objects';
 
 /** What an ask for a try answers: the try asked for, its ask file, and whether the tick stops the step's blocked session first. */
-export type AskedTry = { try: number; file: string; stopFirst: boolean };
+type AskedTry = { try: number; file: string; stopFirst: boolean };
 
 /** What an ask for a round answers: the looping step, the round asked for, and its ask file. */
-export type AskedRound = { step: string; round: number; file: string };
+type AskedRound = { step: string; round: number; file: string };
 
 /**
  * What an ask of a try must answer of `RunAsked`, which keeps each key optional since a try's ask and a round's answer different ones; and
@@ -50,7 +45,7 @@ const TRY_MAY = "The ask may be written: look at the step's note on the run's pa
 const ROUND_MAY = "The ask may be written: look at the looping step's note on the run's page before asking again.";
 
 /** What an approval answers: the try approved, when, its words — null for none — and the approval's file. */
-export type Approved = { try: number; at: string; message: string | null; file: string };
+type Approved = { try: number; at: string; message: string | null; file: string };
 
 /**
  * Ask for another try of a step, as the CLI's `retry` does: the api calls the package's `retry()`, which writes the ask and nothing else,

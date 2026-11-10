@@ -78,7 +78,6 @@ export const ROUTE: Command<{ step: string; try: number; route: string; at: stri
   ticks: true,
   class: 'act',
   only: { side: 'cli', why: 'the board offers no route control yet: nemia route writes the file' },
-  apiKeys: ['step', 'try', 'route', 'at', 'file'],
   handler: Effect.fnUntraced(function* (args: Args) {
     const id = textOf(args, 'runId') ?? '';
     const step = textOf(args, 'step') ?? '';

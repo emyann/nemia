@@ -1,11 +1,10 @@
 /**
- * The client's pause lines (`nemia ls`, `nemia watch`) say what the orchestrator's `pausedLines` and `pausedWords` say of the same pause:
- * a timed pause's count of sessions finishing a call and when they are cut, and each step it holds parked.
+ * The client's pause line (`nemia watch`) says what the orchestrator's `pausedWords` says of the same pause: a timed pause's count of
+ * sessions finishing a call and when they are cut, and what the pause does.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { pausedLines as orchestratorLines, pausedWords as orchestratorWords } from 'agent-orchestrator';
-import { pausedLines } from '../src/reads/ls-lines.ts';
+import { pausedWords as orchestratorWords } from 'agent-orchestrator';
 import { pausedWords } from '../src/watch/lines.ts';
 
 const at = '2026-11-03T10:00:00.000Z';
@@ -24,25 +23,20 @@ const paused = {
   held: [],
 };
 
-test("the client's pause lines are the orchestrator's: the count of sessions finishing a call, when they are cut, and each step parked", () => {
-  assert.deepEqual(pausedLines(paused, now), orchestratorLines(paused, now));
+test("the client's pause line is the orchestrator's: the count of sessions finishing a call, and when they are cut", () => {
   assert.equal(pausedWords(paused, now), orchestratorWords(paused, now));
   const cut = { ...paused, pause: { ...paused.pause, timeoutMs: 0 } };
-  assert.deepEqual(pausedLines(cut, now), orchestratorLines(cut, now));
+  assert.equal(pausedWords(cut, now), orchestratorWords(cut, now));
   assert.match(pausedWords(cut, now) ?? '', /cut now/, 'a pause at once says its calls are being cut');
   assert.match(pausedWords(cut, now) ?? '', /each working session is cut at once and parks/, 'and that each session is cut at once');
   assert.doesNotMatch(pausedWords(cut, now) ?? '', /once the timeout passes/, 'never that it waits on a timeout');
   const parked = { ...paused, finishing: [] };
-  assert.deepEqual(pausedLines(parked, now), orchestratorLines(parked, now));
+  assert.equal(pausedWords(parked, now), orchestratorWords(parked, now));
 });
 
 test("the client says what the orchestrator says a pause does: a timed one parks each session at its call's end, an untimed one lets it run on", () => {
   const untimed = { ...paused, pause: { at, by: 'ann' } };
-  assert.deepEqual(pausedLines(untimed, now), orchestratorLines(untimed, now));
   assert.equal(pausedWords(untimed, now), orchestratorWords(untimed, now));
   assert.match(pausedWords(paused, now) ?? '', /each working session stops when its current tool call ends, cut once the timeout passes/);
   assert.match(pausedWords(untimed, now) ?? '', /each working session runs on to its end/);
-  for (const p of [paused, untimed]) {
-    assert.doesNotMatch(pausedLines(p, now).join('\n'), /what runs finishes/);
-  }
 });

@@ -41,7 +41,7 @@ import type { Observe } from '../../contracts/observe.contract.ts';
  * peak where the kernel keeps one, and how many processes the kernel's OOM killer ended in it. Read by the runner off the cgroup's
  * files (`cgroupMemoryOf`, `harness/cgroup.ts`); carried, never read by `decide`.
  */
-export type MemoryUse = { limitBytes: number; peakBytes?: number; oomKills: number };
+type MemoryUse = { limitBytes: number; peakBytes?: number; oomKills: number };
 
 /** What a task asks of its host's resources, as a container's `resources`: a memory limit, a Kubernetes quantity. */
 export type TaskResources = { limits?: { memory?: string } };
@@ -811,12 +811,15 @@ export function waitsForInput(state: State): boolean {
 }
 
 /** A task a person may ask to stop (`requestStop`): not settled, and not asked to stop already. */
-export const stoppable = (state: State): boolean => !state.settled && !state.stopRequested;
+const stoppable = (state: State): boolean => !state.settled && !state.stopRequested;
 
 /** A task a person may answer or close: waiting on their word (`waitsForInput`), and not asked to stop, which outranks it. */
-export const awaitsWord = (state: State): boolean => waitsForInput(state) && !state.stopRequested;
+const awaitsWord = (state: State): boolean => waitsForInput(state) && !state.stopRequested;
 
-/** Each guard a verb of `VERBS` names, by that name: the predicate its refusal asks of the task's state. */
+/**
+ * Each guard a verb of `VERBS` names, by that name: the predicate its refusal asks of the task's state.
+ * Exported only for the tests that import it.
+ */
 export const VERB_GUARDS: Record<VerbGuard, (state: State) => boolean> = { stoppable, awaitsWord };
 
 /** Whether a person's verb is taken in this state: the guard `VERBS` names for it, asked of the state. */
@@ -908,6 +911,7 @@ export type Now = {
 /**
  * How long a long-lived task's session may be listed with no process before the runtime ends its attempt `lost`: Claude Code
  * respawns a process it lost within some ten seconds, and one listed so for two minutes is not coming back.
+ * Exported only for the tests that import it.
  */
 export const RESPAWN_GAP_MS = 120_000;
 
@@ -1022,6 +1026,7 @@ export const lifecycleOf: LifecycleOf = (state) => {
  * 9. `PREVIOUS_LIVE`, when the session the turn continues — for the first turn, what the task was filed against; for a
  *    later one, the session that ended the turn before it — is still held by its harness: it is stopped first.
  * 10. `READY` otherwise: in a later turn, told the person's answer; else the brief.
+ * Exported only for the tests that import it.
  */
 export const observe: Observe = (state, observed, now) => {
   if (state.settled) return { type: 'SETTLED', outcome: state.settled };

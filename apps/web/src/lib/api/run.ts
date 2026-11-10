@@ -4,48 +4,15 @@
  * the api serves by hand beside the object. What the run's pages draw is composed from them (`runViewOf`, `lib/runView.ts`).
  */
 import { queryOptions } from '@tanstack/react-query';
-import { Schema } from 'effect';
-import { decodes } from './decodes.ts';
 import { pace } from '../feed.ts';
-import { get } from './read.ts';
 import { retryUnlessGone, readGone } from './gone.ts';
-import { WorkflowPageAddressSchema, type WorkflowPageAddress } from './address.ts';
-import type { StepTold, StepTry } from 'objects';
-import { runs } from './objects.ts';
+import { RunLines, type StepTold, type StepTry } from 'objects';
+import { call, read, runs, steps } from './objects.ts';
 
 /** A step's lines beside its controls: its approval at its gate, a try in its session, and words said to it. */
-export type StepCommands = { approve: string; retry: string; say: string };
+export type { StepCommands, RunLines } from 'objects';
 
-/**
- * Mirrors `RunLinesAnswer` in apps/api/src/runs/runs.ts: the lines a person types about a run, built off the orchestrator's command
- * table — what there is to decide, the refresh of its revisions, where it came from (null for a run started from no card) and each
- * frozen step's approve, retry and say — and where its workflow's page is on the board, null where the api cannot say.
- */
-export type RunLines = {
-  decide: string;
-  refresh: string;
-  fromNote: string | null;
-  steps: Record<string, StepCommands>;
-  workflowPage: WorkflowPageAddress | null;
-};
-
-const StepCommandsSchema = decodes<StepCommands>()(Schema.Struct({ approve: Schema.String, retry: Schema.String, say: Schema.String }));
-
-/** Decodes a `RunLines`. */
-const RunLinesSchema = decodes<RunLines>()(
-  Schema.Struct({
-    decide: Schema.String,
-    refresh: Schema.String,
-    fromNote: Schema.NullOr(Schema.String),
-    steps: Schema.Record(Schema.String, StepCommandsSchema),
-    workflowPage: Schema.NullOr(WorkflowPageAddressSchema),
-  }),
-);
-
-export { retryUnlessGone, readGone } from './gone.ts';
-
-/** The run's path under the api. */
-const runPath = (id: string): string => `/api/runs/${encodeURIComponent(id)}`;
+export { readGone } from './gone.ts';
 
 /**
  * The run object, under the run's own key, which every event of the feed about the run reads again, exactly, and which the board polls
@@ -68,7 +35,7 @@ export const stepTriesQuery = (id: string, step: string, stamp: string) =>
   queryOptions({
     queryKey: ['runs', id, 'steps', step, 'tries', stamp],
     queryFn: (): Promise<readonly StepTry[]> =>
-      runs.tries(id, step).then(
+      steps.tries(id, step).then(
         (read) => read.tries,
         (error: unknown) => {
           if (readGone(error)) return [];
@@ -84,7 +51,7 @@ export const stepToldQuery = (id: string, step: string, stamp: string) =>
   queryOptions({
     queryKey: ['runs', id, 'steps', step, 'told', stamp],
     queryFn: (): Promise<StepTold | null> =>
-      runs.told(id, step).then(
+      steps.told(id, step).then(
         (read) => read,
         (error: unknown) => {
           if (readGone(error)) return null;
@@ -99,7 +66,7 @@ export const stepToldQuery = (id: string, step: string, stamp: string) =>
 export const runLinesQuery = (id: string) =>
   queryOptions({
     queryKey: ['runs', id, 'lines'],
-    queryFn: () => get(`${runPath(id)}/lines`, RunLinesSchema),
+    queryFn: () => call((c) => c.runs.lines({ params: { name: id } }), read(RunLines)),
     staleTime: Infinity,
     retry: retryUnlessGone,
   });

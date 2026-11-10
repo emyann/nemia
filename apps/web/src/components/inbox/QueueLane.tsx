@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router';
-import { workflowNameOf, type InboxEntry } from '@/lib/api';
+import { workflowNameOf } from '@/lib/api/workflows';
+import { type InboxEntry } from '@/lib/api/inbox';
 import { agoWords } from '@/lib/runWords';
 import { repoName } from '@/lib/factory';
 import { ordinal } from '@/lib/inbox';

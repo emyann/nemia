@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { copySkill, skillsQuery, type GivenSkill, type SkillPlace, type SkillRow } from '../../lib/api';
+import { copySkill, skillsQuery, type SkillPlace, type SkillRow } from '../../lib/api/skills.ts';
+import { type GivenSkill } from '../../lib/api/library.ts';
 import { invalidateSkills } from '../../lib/agentWrites';
 import { skillList, withoutSkill, withSkill } from '../../lib/agents';
 import { costWords, givenRows, offerOf, PLACE_LABELS } from '../../lib/skills';

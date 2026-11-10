@@ -1,6 +1,6 @@
 import { CircleDashed } from 'lucide-react';
-import type { StepCodes } from '../../lib/api';
-import { stateClass, stepState } from '../../lib/status';
+
+import { stateClass, stepState, type StepCodes } from '../../lib/status';
 import { chipTitle, stateWordsOf } from '../../lib/words';
 
 /**

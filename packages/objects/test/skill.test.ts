@@ -1,11 +1,12 @@
 /**
- * The Skill (`src/skill.ts`): a skill and a page of them decoded from JSON and encoded back equal; its origin one of the four words; the
- * write taking a whole spec or `preload` alone; and its files by path.
+ * The Skill (`src/skill.ts`): a skill and a page of them as the Api's endpoints answer them, every key kept; its origin one of the four
+ * words; the write the Api takes, a whole spec or `preload` alone; and its files by path.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import { API_VERSION, Skill, SkillFiles, SkillList, SkillWrite } from 'objects';
+import { API_VERSION, Skill, SkillWrite } from 'objects';
+import { answered, taken } from './served.ts';
 
 const skill = {
   apiVersion: API_VERSION,
@@ -33,14 +34,13 @@ const unread = {
   status: { ...skill.status, origin: 'factory', entry: null, error: 'no description' },
 };
 
-const roundTrip = <S extends Schema.Codec<unknown, unknown>>(schema: S, value: unknown): unknown =>
-  JSON.parse(JSON.stringify(Schema.encodeSync(schema)(Schema.decodeUnknownSync(schema)(JSON.parse(JSON.stringify(value))))));
-
-test('a skill and a page of them decode from JSON and encode back the same, absent keys left absent', () => {
-  assert.deepEqual(roundTrip(Skill, skill), skill);
-  assert.deepEqual(roundTrip(Skill, unread), unread);
+test("the Api's get answers a skill and its list a page of them, every key kept, absent keys left absent; another kind refused", () => {
+  assert.deepEqual(answered('skills', 'get', skill), skill);
+  assert.deepEqual(answered('skills', 'get', unread), unread);
   const page = { apiVersion: API_VERSION, kind: 'SkillList', metadata: {}, items: [skill, unread] };
-  assert.deepEqual(roundTrip(SkillList, page), page);
+  assert.deepEqual(answered('skills', 'list', page), page);
+  assert.equal(answered('skills', 'get', { ...skill, kind: 'Agent' }), undefined);
+  assert.equal(answered('skills', 'list', { ...page, kind: 'AgentList' }), undefined);
 });
 
 test('REFUSED: an origin outside the four words, and a write that is neither a spec nor preload', () => {
@@ -50,8 +50,10 @@ test('REFUSED: an origin outside the four words, and a write that is neither a s
 
 test('the write takes a whole spec, or preload alone; the files are paths', () => {
   const whole = { metadata: { resourceVersion: 'sha256:s' }, spec: { description: 'd', body: 'b' } };
-  assert.deepEqual(roundTrip(SkillWrite, whole), whole);
+  assert.deepEqual(taken('skills', 'replace', whole), whole);
   const preload = { metadata: { resourceVersion: 'sha256:s' }, preload: true };
-  assert.deepEqual(roundTrip(SkillWrite, preload), preload);
-  assert.deepEqual(roundTrip(SkillFiles, { paths: ['SKILL.md', 'ref/a.md'] }), { paths: ['SKILL.md', 'ref/a.md'] });
+  assert.deepEqual(taken('skills', 'replace', preload), preload);
+  assert.deepEqual(answered('skills', 'files', { paths: ['SKILL.md', 'ref/a.md'] }), { paths: ['SKILL.md', 'ref/a.md'] });
+  assert.equal(taken('skills', 'replace', { metadata: {} }), undefined);
+  assert.equal(answered('skills', 'files', { paths: [1] }), undefined);
 });

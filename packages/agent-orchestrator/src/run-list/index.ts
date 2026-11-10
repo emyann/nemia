@@ -12,3 +12,4 @@ export {
   type RunStateSelector,
 } from './run-list.ts';
 export { nameFirst } from './name-order.ts';
+export { RUN_COLUMNS, runCells, runTable } from './table.ts';

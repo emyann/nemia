@@ -31,6 +31,7 @@
 import { Schema } from 'effect';
 import { HttpApi, HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';
 import { Card, CardFile, CardList, CardStart, CardWrite } from './card.ts';
+import { Table } from './table.ts';
 import {
   Factory,
   FactoryCommands,
@@ -45,18 +46,34 @@ import { Hire, HireList, HireWrite } from './hire.ts';
 import { McpServer, McpServerList, McpServerWrite, SignInStarted, SignInState, SignedOut } from './mcp-server.ts';
 import { Schedule, ScheduleList, ScheduleWrite } from './schedule.ts';
 import { Volume, VolumeList } from './volume.ts';
-import { Workflow, WorkflowCreate, WorkflowList, WorkflowWrite } from './workflow.ts';
-import { Agent, AgentCard, AgentList, AgentTried, AgentTry, AgentWrite } from './agent.ts';
+import { KeyForm, Workflow, WorkflowCreate, WorkflowList, WorkflowStepPage, WorkflowWrite } from './workflow.ts';
+import {
+  Agent,
+  AgentCard,
+  AgentCopied,
+  AgentCopy,
+  AgentInstructions,
+  AgentInstructionsCleared,
+  AgentInstructionsWrite,
+  AgentList,
+  AgentSources,
+  AgentTried,
+  AgentTry,
+  AgentWrite,
+} from './agent.ts';
 import { Skill, SkillFiles, SkillList, SkillWrite } from './skill.ts';
 import { LabelEdit, Labelled } from './labels.ts';
 import { Template, TemplateList } from './template.ts';
 import { BadRequest, Conflict, Failed, Forbidden, Invalid, listQuery, Missing, Unauthorized, Unjudged, WriteFailed } from './api-errors.ts';
 import { DelegationsGroup, ProposalsGroup } from './proposal-api.ts';
 import { RunsGroup } from './run-api.ts';
+import { StepsGroup } from './step-api.ts';
+import { NemiaGroup } from './nemia-api.ts';
 import { Subscription, SubscriptionList } from './subscription.ts';
 import { Event, EventList } from './event.ts';
 import { KINDS, type Kind } from './words.ts';
 import { APIResourceList } from './discovery.ts';
+import { ServerGroup, Subscribed, SubscriptionWrite, Unsubscribed } from './server-api.ts';
 
 export {
   BadRequest,
@@ -75,28 +92,14 @@ export {
 
 export { KINDS, type Kind };
 
-/** The plural each kind is served by, its paths' collection: `/api/<plural>` and `/api/namespaces/<namespace>/<plural>`. */
-export const RESOURCE_PLURALS: { readonly [K in Kind]: string } = {
-  Run: 'runs',
-  Card: 'cards',
-  Factory: 'factories',
-  McpServer: 'mcpservers',
-  Schedule: 'schedules',
-  Hire: 'hires',
-  Volume: 'volumes',
-  Workflow: 'workflows',
-  Agent: 'agents',
-  Skill: 'skills',
-  Template: 'templates',
-  Subscription: 'subscriptions',
-  Event: 'events',
-  Proposal: 'proposals',
-  Delegation: 'delegations',
-};
-
 /** The Card and a page of them, named so that the document holds each as a component, as it holds the Run. */
 const CardObject = Card.annotate({ identifier: 'Card' });
 const CardListObject = CardList.annotate({ identifier: 'CardList' });
+/**
+ * A page of cards, or the same page as a `Table` where the request's `Accept` asks for one (`TABLE_ACCEPT`): two answers of one status,
+ * each its own success, so each is read off the endpoint by its kind.
+ */
+const CardListOrTable = [CardListObject, Table] as const;
 
 /** The factory's kinds and a page of each, named so that the document holds each as a component. */
 const FactoryObject = Factory.annotate({ identifier: 'Factory' });
@@ -136,16 +139,16 @@ const namespaceParams = { namespace: Schema.String };
 /** A factory, by its name. */
 const factoryParams = { name: Schema.String };
 
-/** What a card's verbs refuse with. */
-const cardErrors = [Missing, Conflict, Invalid];
+/** What a card's verbs refuse with: a request its reader refuses before the package is asked (400) among them. */
+const cardErrors = [BadRequest, Missing, Conflict, Invalid];
 
 /** The inbox's cards as objects. */
 export class CardsGroup extends HttpApiGroup.make('cards').add(
-  HttpApiEndpoint.get('listAll', '/api/cards', { query: listQuery, success: CardListObject, error: cardErrors }),
+  HttpApiEndpoint.get('listAll', '/api/cards', { query: listQuery, success: CardListOrTable, error: cardErrors }),
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/cards', {
     params: { namespace: Schema.String },
     query: listQuery,
-    success: CardListObject,
+    success: CardListOrTable,
     error: cardErrors,
   }),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/cards/:name', { params: cardParams, success: CardObject, error: cardErrors }),
@@ -369,7 +372,8 @@ const removeQuery = { resourceVersion: Schema.optionalKey(Schema.String) };
 
 /**
  * A namespace's workflows: the factory's resolved view of each name (`default`: the api's repository and your library), listed, read,
- * and — yours, in `default` alone — made, written whole and removed.
+ * and — yours, in `default` alone — made, written whole and removed; a step of one read for its page, in the namespace's factory. And
+ * the builder's form (`keys`), in no namespace: under one, `keys` would read as a workflow's name.
  */
 export class WorkflowsGroup extends HttpApiGroup.make('workflows').add(
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/workflows', {
@@ -402,9 +406,21 @@ export class WorkflowsGroup extends HttpApiGroup.make('workflows').add(
     success: WorkflowObject,
     error: definitionErrors,
   }),
+  HttpApiEndpoint.get('step', '/api/namespaces/:namespace/workflows/:name/steps/:step', {
+    params: { ...cardParams, step: Schema.String },
+    query: originQuery,
+    success: WorkflowStepPage,
+    error: definitionErrors,
+  }),
+  HttpApiEndpoint.get('keys', '/api/workflows/keys', { success: KeyForm, error: definitionErrors }),
 ) {}
 
-/** A namespace's agents, as the workflows: listed, read, yours made, written and removed in `default`, tried, and read as a card. */
+/**
+ * A namespace's agents, as the workflows: listed, read, yours made, written and removed in `default`, tried, and read as a card; an agent
+ * file copied into yours, in `default` alone; and an agent's custom instructions, one record per agent's name, read in any namespace and
+ * written and cleared in `default` alone. And where agent files are looked for (`sources`), in no namespace: under one, `sources` would
+ * read as an agent's name.
+ */
 export class AgentsGroup extends HttpApiGroup.make('agents').add(
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/agents', {
     params: namespaceParams,
@@ -446,6 +462,33 @@ export class AgentsGroup extends HttpApiGroup.make('agents').add(
     params: cardParams,
     query: originQuery,
     success: AgentCard,
+    error: definitionErrors,
+  }),
+  HttpApiEndpoint.get('sources', '/api/agents/sources', {
+    query: { path: Schema.optionalKey(Schema.String) },
+    success: AgentSources,
+    error: definitionErrors,
+  }),
+  HttpApiEndpoint.post('copy', '/api/namespaces/:namespace/agents/copy', {
+    params: namespaceParams,
+    payload: AgentCopy,
+    success: AgentCopied,
+    error: definitionErrors,
+  }),
+  HttpApiEndpoint.get('instructions', '/api/namespaces/:namespace/agents/:name/instructions', {
+    params: cardParams,
+    success: AgentInstructions,
+    error: definitionErrors,
+  }),
+  HttpApiEndpoint.put('putInstructions', '/api/namespaces/:namespace/agents/:name/instructions', {
+    params: cardParams,
+    payload: AgentInstructionsWrite,
+    success: AgentInstructions,
+    error: definitionErrors,
+  }),
+  HttpApiEndpoint.delete('deleteInstructions', '/api/namespaces/:namespace/agents/:name/instructions', {
+    params: cardParams,
+    success: AgentInstructionsCleared,
     error: definitionErrors,
   }),
 ) {}
@@ -535,13 +578,27 @@ export class TemplatesGroup extends HttpApiGroup.make('templates').add(
   }),
 ) {}
 
-/** The feed's subscriptions, which no namespace holds, listed and read; subscribing and unsubscribing stay the api's own routes. */
+/**
+ * The feed's subscriptions, which no namespace holds, listed and read; and a long-lived task given one (`nemia subscribe`), and one taken
+ * away (`nemia unsubscribe`).
+ */
 export class SubscriptionsGroup extends HttpApiGroup.make('subscriptions').add(
   HttpApiEndpoint.get('listAll', '/api/subscriptions', { query: listQuery, success: SubscriptionListObject, error: objectErrors }),
   HttpApiEndpoint.get('get', '/api/subscriptions/:name', {
     params: templateParams,
     success: SubscriptionObject,
     error: objectErrors,
+  }),
+  HttpApiEndpoint.post('subscribe', '/api/subscriptions/:name', {
+    params: templateParams,
+    payload: SubscriptionWrite,
+    success: Subscribed.pipe(Schema.annotate({ httpApiStatus: 201 })),
+    error: [...objectErrors, Failed],
+  }),
+  HttpApiEndpoint.delete('unsubscribe', '/api/subscriptions/:name', {
+    params: templateParams,
+    success: Unsubscribed,
+    error: [...objectErrors, Failed],
   }),
 ) {}
 
@@ -565,14 +622,37 @@ export class EventsGroup extends HttpApiGroup.make('events').add(
   }),
 ) {}
 
-/** Everything the api serves as objects. */
 /** The api's discovery: every resource it serves, read off this definition (Kubernetes' `/api`, for Nemia's one group version). */
 export class DiscoveryGroup extends HttpApiGroup.make('discovery').add(
   HttpApiEndpoint.get('resources', '/api', { success: APIResourceList.annotate({ identifier: 'APIResourceList' }) }),
 ) {}
 
+/**
+ * The plural each kind is served by, its paths' collection (`/api/<plural>` and `/api/namespaces/<namespace>/<plural>`): the name of the
+ * group that serves it, read off the group.
+ */
+export const RESOURCE_PLURALS = {
+  Run: RunsGroup.identifier,
+  Card: CardsGroup.identifier,
+  Factory: FactoriesGroup.identifier,
+  McpServer: McpServersGroup.identifier,
+  Schedule: SchedulesGroup.identifier,
+  Hire: HiresGroup.identifier,
+  Volume: VolumesGroup.identifier,
+  Workflow: WorkflowsGroup.identifier,
+  Agent: AgentsGroup.identifier,
+  Skill: SkillsGroup.identifier,
+  Template: TemplatesGroup.identifier,
+  Subscription: SubscriptionsGroup.identifier,
+  Event: EventsGroup.identifier,
+  Proposal: ProposalsGroup.identifier,
+  Delegation: DelegationsGroup.identifier,
+} as const satisfies { readonly [K in Kind]: string };
+
+/** Everything the api serves as objects. */
 export const Api = HttpApi.make('nemia')
   .add(RunsGroup)
+  .add(StepsGroup)
   .add(CardsGroup)
   .add(FactoriesGroup)
   .add(McpServersGroup)
@@ -588,4 +668,6 @@ export const Api = HttpApi.make('nemia')
   .add(EventsGroup)
   .add(ProposalsGroup)
   .add(DelegationsGroup)
-  .add(DiscoveryGroup);
+  .add(DiscoveryGroup)
+  .add(ServerGroup)
+  .add(NemiaGroup);

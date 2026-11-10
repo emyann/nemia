@@ -129,7 +129,7 @@ export type TranscriptEvent = {
  * The words a harness has for where a transcript event came from, the Agent SDK's (`SDKMessageOrigin['kind']`), held equal to them in
  * Claude's reader.
  */
-export const ORIGIN_KINDS = [
+const ORIGIN_KINDS = [
   'human',
   'channel',
   'peer',

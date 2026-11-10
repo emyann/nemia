@@ -4,14 +4,10 @@
  * shares.
  */
 import { Schema } from 'effect';
-import { decodes } from './decodes.ts';
 import { decoded, UnreadAnswer } from './read.ts';
 
 /** What a stream's `unreadable` event says: why the api could not read it, and whether it reads it again on its own beat. */
 export type StreamUnreadable = { error: string; retrying: boolean };
-
-/** Decodes a `StreamUnreadable`. */
-export const UnreadableSchema = decodes<StreamUnreadable>()(Schema.Struct({ error: Schema.String, retrying: Schema.Boolean }));
 
 /**
  * The data `data` of a stream event named `event`, decoded by its schema in `schemas`; an `UnreadAnswer` for data that is no JSON or not

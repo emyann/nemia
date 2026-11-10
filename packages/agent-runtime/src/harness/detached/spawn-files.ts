@@ -10,7 +10,7 @@ import { sessionMcp, writeMcpConfig } from '../mcp.ts';
 import type { HarnessIO, HarnessSpec, RunInput } from './detached.ts';
 
 /** Where each of a run's files goes, by what it holds: the names `detachedOps` keeps for the run. */
-export type SpawnAt = {
+type SpawnAt = {
   /** A file beside the run's own under an end (`besideRun`), for what the spec prepares. */
   beside: (end: string) => string;
   schema: string;

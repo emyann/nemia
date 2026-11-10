@@ -8,7 +8,7 @@ import type { StoreOps } from './journal.ts';
 import { refsOf, type BodyRef } from './bodies.ts';
 
 /** One attempt a journal names: its number, and the id its harness knew its session by, when the journal says one. */
-export type KeptAttempt = { n: number; nativeId?: string };
+type KeptAttempt = { n: number; nativeId?: string };
 
 /**
  * What the store keeps of one task: its journal's bytes on disk, the bytes of the bodies it is first to name, the harness it

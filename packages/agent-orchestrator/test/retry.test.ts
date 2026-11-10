@@ -884,7 +884,7 @@ test("`nemia retry` writes a person's ask, and the tick honours it once, consumi
   );
 });
 
-test('`nemia retry --model` on a Claude Code step in `auto` (F21): a haiku model refused, by name, writing no ask; anything that keeps the step as it asked is asked', async (t) => {
+test('`nemia retry --model` on a Claude Code step in `auto` (F21): a model that drops it refused, by name, writing no ask; anything that keeps the step as it asked is asked', async (t) => {
   const refusedModel = async (lines: string[], model: string, ...facts: string[]) => {
     const run = await throughCheck(['check: npm test', ...lines], 'failed', { exitCode: 1 });
     await assert.rejects(
@@ -901,16 +901,19 @@ test('`nemia retry --model` on a Claude Code step in `auto` (F21): a haiku model
     const run = await throughCheck(['check: npm test', ...lines], 'failed', { exitCode: 1 });
     assert.equal((await stage.runWith(stage.board().e, retryRun(run.id, 'implement', { mode: 'fresh', model }))).ask.model, model);
   };
-  for (const model of ['haiku', 'claude-haiku-4-5-20251001', 'claude-sonnet-4-5'])
+  for (const model of ['claude-haiku-4-5-20251001', 'claude-sonnet-4-5'])
     await t.test(`REFUSED ${model} on a step that names no mode, filed in \`auto\` by default`, () =>
       refusedModel([], model, 'implement names no `permissionMode:`', '`auto`', 'a job denies every call `default` would ask about'),
     );
-  await t.test('REFUSED haiku on a step that says `permissionMode: auto`', () =>
-    refusedModel(['permissionMode: auto'], 'haiku', 'implement says `permissionMode: auto`'),
+  await t.test('REFUSED claude-haiku-4-5 on a step that says `permissionMode: auto`', () =>
+    refusedModel(['permissionMode: auto'], 'claude-haiku-4-5', 'implement says `permissionMode: auto`'),
   );
   await t.test('sonnet, which keeps the mode, is asked', () => askedModel([], 'sonnet'));
-  await t.test('haiku on a step in `dontAsk` is asked', () => askedModel(['permissionMode: dontAsk'], 'haiku'));
-  await t.test('haiku on a codex step is asked', () => askedModel(['harness: codex'], 'haiku'));
+  await t.test('haiku, whose alias keeps the mode, is asked on a step that says `permissionMode: auto`', () =>
+    askedModel(['permissionMode: auto'], 'haiku'),
+  );
+  await t.test('claude-haiku-4-5 on a step in `dontAsk` is asked', () => askedModel(['permissionMode: dontAsk'], 'claude-haiku-4-5'));
+  await t.test('claude-haiku-4-5 on a codex step is asked', () => askedModel(['harness: codex'], 'claude-haiku-4-5'));
 });
 
 test('REFUSED: `nemia retry` on what the run is in — exit 2, by kind and name, and no ask written', async (t) => {

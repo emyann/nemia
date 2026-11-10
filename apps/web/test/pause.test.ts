@@ -7,7 +7,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Paused } from '../src/lib/api.ts';
+import type { Paused } from '../src/lib/api/pause.ts';
 import { clockWord } from '../src/lib/quota.ts';
 import { finishingSentence, interruptSentence, parkedSentence, pauseWords } from '../src/lib/pause.ts';
 

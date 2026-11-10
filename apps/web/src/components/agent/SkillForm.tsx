@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
-import type { SkillDetail, SkillDraft } from '../../lib/api';
+import type { SkillDetail, SkillDraft } from '../../lib/api/skills.ts';
 import { draftOfForm, EMPTY_SKILL_FORM, skillEdited, skillFormOf, type SkillForm as Form } from '../../lib/skills';
 import { Field } from './AgentForm';
 

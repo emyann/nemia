@@ -37,7 +37,7 @@ type Fanned = { at: PartialAt; followers: Set<Follower> };
  * Where the attached sessions under `root` are found, for `pushesOf`: `holds` says whether this process still runs a session of that
  * name, which tells a session parked on its way to being taken up again here from one its holder has let go of.
  */
-export type PushSource = { root: string; holds: (name: string) => boolean };
+type PushSource = { root: string; holds: (name: string) => boolean };
 
 /** The fan-out of the attached sessions: the push from the message loop, a follow, and how many follow a session now. */
 export type Pushes = {

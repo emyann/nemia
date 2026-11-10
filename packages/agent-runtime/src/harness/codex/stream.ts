@@ -44,7 +44,7 @@ const ItemStartedSchema = Schema.Struct({ type: Schema.Literal('item.started'), 
 const ItemCompletedSchema = Schema.Struct({ type: Schema.Literal('item.completed'), item: ItemSchema });
 
 /** The events of a Codex `exec --json` stream the runtime reads, in what it reads of each. A field it starts reading is added here. */
-export const CodexEventSchema = Schema.Union([
+const CodexEventSchema = Schema.Union([
   ThreadStartedSchema,
   TurnStartedSchema,
   TurnCompletedSchema,
@@ -53,7 +53,7 @@ export const CodexEventSchema = Schema.Union([
 ]);
 
 /** An event of a Codex stream as `CodexEventSchema` decodes it. */
-export type CodexEvent = typeof CodexEventSchema.Type;
+type CodexEvent = typeof CodexEventSchema.Type;
 
 const DECODERS: Readonly<Record<string, (line: unknown) => Result.Result<CodexEvent, Schema.SchemaError>>> = Object.fromEntries(
   CodexEventSchema.members.map((m) => [m.fields.type.literal, Schema.decodeUnknownResult(m)]),
@@ -97,6 +97,7 @@ const sumOf = (turns: readonly Partial<Record<'input' | 'read', number>>[] | und
  * The events the runtime reads in what `codex exec --json` printed, decoded, in the order printed; or why the stream is refused
  * (`wrong`, a sentence that names the line, the event, its first wrong field and the fix, and quotes at most 60 characters of
  * what it found there).
+ * Exported only for the tests that import it.
  */
 export const codexEventsOf = (output: string): { events: CodexEvent[] } | { wrong: string } => {
   const events: CodexEvent[] = [];

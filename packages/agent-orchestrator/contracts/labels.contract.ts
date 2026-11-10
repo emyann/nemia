@@ -5,7 +5,7 @@
  * code computes, which tsverify does not read: `src/labels/labels.test.ts` holds those sentences, a row each.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import type { Edited, LabelEdit, Labels } from '../src/labels/labels.ts';
+import type { Edited, LabelChange, Labels } from '../src/labels/labels.ts';
 
 /** A map read at any key, which may be missing: the contracts are read without `noUncheckedIndexedAccess`. */
 type Read = Readonly<Record<string, string | undefined>>;
@@ -17,10 +17,10 @@ const at = (map: Read, key: string): string | undefined => map[key];
 const carries = (map: Labels, key: string): boolean => Object.hasOwn(map, key);
 
 /** Whether an edit would change a value `current` already holds: a `key=value` whose key carries another value. */
-const changesAValue = (current: Labels, edits: readonly LabelEdit[]): boolean =>
+const changesAValue = (current: Labels, edits: readonly LabelChange[]): boolean =>
   edits.some((e) => e.op === 'set' && carries(current, e.key) && at(current, e.key) !== e.value);
 
-const labelEditsSpec = spec<(current: Labels, edits: readonly LabelEdit[], overwrite: boolean) => Edited>({
+const labelEditsSpec = spec<(current: Labels, edits: readonly LabelChange[], overwrite: boolean) => Edited>({
   ensures: {
     noSilentOverwrite: {
       description: 'Without --overwrite, an edit that would change a value a key holds is refused',

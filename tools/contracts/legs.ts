@@ -26,6 +26,8 @@ export const ROOTS = [
   'packages/agent-runtime/src',
   'packages/agent-orchestrator/src',
   'packages/agent-orchestrator/place',
+  'packages/objects/src',
+  'apps/api/src/guard.ts',
   'apps/cli/src',
   'apps/web/src/lib/brought.ts',
   'apps/web/src/lib/proposals.ts',

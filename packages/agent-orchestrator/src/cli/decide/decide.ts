@@ -9,25 +9,20 @@ import {
   LESSON,
   parseGlobs,
   answersOr,
-  approvedFirst,
   artifactFiles,
   askedQuestions,
   artifactLines,
   artifactsDir,
   branchWord,
-  branchesToRead,
-  changesOf,
   countsLine,
   checkoutLine,
   decideRun,
+  decisionRead,
   dollars,
   runWith,
   type Place,
   dueNote,
   fromNote,
-  holdAdvice,
-  holdNeedsYou,
-  holdWord,
   inFullLines,
   inputsDir,
   inputsNote,
@@ -56,10 +51,9 @@ import {
   unjudgedOf,
   usedLines,
   verdictWord,
-  waitAdvice,
-  waitWord,
 } from '../../runner.ts';
-import type { BranchChanges, CheckReport, DecideCommand, Decided, GateBudgets, RepositoryRun } from '../../runner.ts';
+import type { BranchChanges, CheckReport, DecisionRead, DecideCommand, Decided, GateBudgets, RepositoryRun } from '../../runner.ts';
+import type { RunHolding, RunWaiting } from 'objects';
 import { HELP, placedIn, usage, type Engine } from '../flags.ts';
 
 export const DECIDE_HELP = `nemia decide <runId> [--sensitive <globs>]
@@ -156,28 +150,65 @@ export async function decideVerb(rest: string[], e: Engine, place: Place): Promi
   if (runId.startsWith('--'))
     usage(`nemia decide takes the run first: nemia decide <runId> [--sensitive <globs>] — not ${runId} before it.`);
   const { sensitive } = decideHow(rest.slice(1));
-  const decided = await runWith(e, placedIn(place, decideRun(runId))).catch(async (err: unknown) => {
-    const unjudged = await runWith(e, placedIn(place, unjudgedOf(e, runStore.runs.read(runId), err, 'nemia decide')));
-    throw unjudged ? new Error(unjudged.said) : err;
-  });
-  const { run, steps } = decided;
-  const head = headOf(run);
-  const out = heldOutOf(steps, decided.checkout);
-  const decision = standstill(decided, head, steps, out);
-  if (!decision) return;
-
-  console.log(`${head}\n`);
+  const read = await runWith(e, placedIn(place, decisionRead(runId, process.env, sensitive ? { sensitive } : {}))).catch(
+    async (err: unknown) => {
+      const unjudged = await runWith(e, placedIn(place, unjudgedOf(e, runStore.runs.read(runId), err, 'nemia decide')));
+      throw unjudged ? new Error(unjudged.said) : err;
+    },
+  );
+  const deciding = await standstill(read, e, place);
+  if (!deciding) return;
+  const { run, decided, decision, out } = deciding;
+  const { steps } = decided;
+  console.log(`${headOf(run)}\n`);
   printRefusals(run, decision);
   printStops(decided, decision, out.heldOut);
-  const git = isRepositoryRun(run) ? run : undefined;
-  const changes = git ? changesRead(place, git, decision.branches, steps, sensitive) : undefined;
-  if (changes) printTouched(changes.toRead, sensitive);
+  printTouched(read.touched, sensitive);
   for (const name of namesInOrder(run, steps)) printStep(decided, name, steps, place);
   printTotals(decided);
-  if (changes) printBranches(changes.results);
-  printStanding(decided, decision, git);
+  printBranches(read.results);
+  printStanding(decided, decision, isRepositoryRun(run) ? run : undefined);
   printCollisions(decided);
   printChoice(decided, steps);
+}
+
+/**
+ * Prints the whole screen of a run with nothing to decide, by the read model's decision (`decisionRead`) — called off or landed, waiting
+ * on others, held, held by the cap on runs in flight, or running, a step of it waiting on you or not — and returns undefined; returns what
+ * the deciding screen of a run awaiting a person prints, and prints nothing.
+ */
+/** A screen printed whole by `print`: nothing left to print after it. */
+const shown = (print: () => void): undefined => {
+  print();
+  return undefined;
+};
+
+async function standstill(
+  { run, decision: said, decided }: DecisionRead,
+  e: Engine,
+  place: Place,
+): Promise<{ run: Decided['run']; decided: Decided; decision: Awaiting; out: HeldOut } | undefined> {
+  const head = headOf(run);
+  if ('nothing' in said) return shown(() => console.log(`${head}\n\n  ${said.nothing}`));
+  if ('waiting' in said) return shown(() => printWaiting(run, said.waiting, said.holding, head));
+  if ('holding' in said && said.holding) {
+    const inFlight = await runWith(e, placedIn(place, decideRun(run.id)));
+    return shown(() => printHold(inFlight, said.holding, head));
+  }
+  if (decided === undefined)
+    throw new Error(`the decision of ${run.id} was read without the run's reading: report it as a defect of nemia decide`);
+  const out = heldOutOf(decided.steps, decided.checkout);
+  const held = 'running' in said ? said.held : undefined;
+  if (held)
+    return shown(() =>
+      console.log(
+        `${head}\n\n  ${slotWord(held)}\n  nothing of ${run.id} is filed until a run in flight settles, oldest held first; nothing to decide yet`,
+      ),
+    );
+  const decision = decided.decision;
+  if ('running' in said || decision.kind !== 'awaiting')
+    return shown(() => printRunning(decided, decision.kind === 'running' ? decision.waiting : [], head, decided.steps, out));
+  return { run, decided, decision, out };
 }
 
 /** The decision of a run waiting on a person: the one that has a deciding screen. */
@@ -211,40 +242,20 @@ function heldOutOf(steps: Steps, checkout: Decided['checkout']): HeldOut {
   return { ending, heldOut: checkout && ending ? `  ${checkoutLine(ending.name, checkout)}` : '' };
 }
 
-/**
- * Prints the whole screen of a run with nothing to decide — cancelled, waiting on others, held, held by the cap on runs in flight, running
- * or landed — and returns undefined; returns the decision of a run awaiting a person, and prints nothing.
- */
-function standstill(d: Decided, head: string, steps: Steps, out: HeldOut): Awaiting | undefined {
-  const { run, decision } = d;
-  if (decision.kind === 'cancelled') console.log(`${head}\n\n  cancelled at ${decision.at} — nothing to decide`);
-  else if (d.waiting.length) printWaiting(d, head);
-  else if (run.hold) printHold(d, head);
-  else if (d.held)
-    console.log(
-      `${head}\n\n  ${slotWord(d.held)}\n  nothing of ${run.id} is filed until a run in flight settles, oldest held first; nothing to decide yet`,
-    );
-  else if (decision.kind === 'running') printRunning(d, decision.waiting, head, steps, out);
-  else if (decision.kind === 'landed') printLanded(run, decision.branches, head, steps);
-  else return decision;
-  return undefined;
-}
-
 /** The screen of a run waiting on others (`--after`): what it waits for, and a hold beside it, whose lifting does not start the run. */
-function printWaiting({ run, waiting, holding }: Decided, head: string): void {
-  const never = run.hold && holdNeedsYou(holding);
-  const alsoHeld = run.hold
-    ? `\n  ${holdWord(holding, run.hold)} as well — ${never ? holdAdvice(run, holding) : `nemia hold ${run.id} --off lifts the hold, and not the wait above`}`
+function printWaiting(run: Decided['run'], waiting: RunWaiting, holding: RunHolding | undefined, head: string): void {
+  const alsoHeld = holding
+    ? `\n  ${holding.word} as well — ${holding.waitingOnYou ? holding.advice : `nemia hold ${run.id} --off lifts the hold, and not the wait above`}`
     : '';
-  console.log(`${head}\n\n  ${waitWord(waiting)}\n  ${waitAdvice(run, waiting)}${alsoHeld}`);
+  console.log(`${head}\n\n  ${waiting.word}\n  ${waiting.advice}${alsoHeld}`);
 }
 
 /** The screen of a run a person held (`nemia hold`): the hold, what still runs and what each blocked step waits for, and how to lift it. */
-function printHold({ run, decision, holding, waitingOn }: Decided, head: string): void {
-  console.log(`${head}\n\n  ${holdWord(holding, run.hold)}`);
+function printHold({ decision, waitingOn }: Decided, holding: RunHolding, head: string): void {
+  console.log(`${head}\n\n  ${holding.word}`);
   if (decision.kind === 'running' && decision.waiting.length) console.log(`  still running: ${decision.waiting.join(', ')}`);
   for (const [name, line] of Object.entries(waitingOn)) console.log(`  ${name}: ${line}`);
-  console.log(`  ${holdAdvice(run, holding)}`);
+  console.log(`  ${holding.advice}`);
 }
 
 /**
@@ -263,15 +274,6 @@ function printRunning(d: Decided, waiting: string[], head: string, steps: Steps,
   for (const r of d.rounding) console.log(`  ${r.step}: ${roundDueNote(steps, r)}`);
   if (heldOut) console.log(heldOut);
   console.log('  nothing to decide yet');
-}
-
-/** The screen of a landed run: its branches on the base branch, and an ending approved first that never ran. */
-function printLanded(run: Decided['run'], branches: string[], head: string, steps: Steps): void {
-  const unrun = steps.find((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId);
-  const never = unrun
-    ? `\n  ${unrun.name} never ran: nothing is left for it to merge, and nothing waits on you — close the record if you want it closed: nemia cancel ${run.id}`
-    : '';
-  console.log(`${head}\n\n  landed — ${branches.join(', ')} is already on ${run.branch}${never}`);
 }
 
 /**
@@ -356,32 +358,6 @@ function printAwaitingApproval(run: Decided['run'], steps: Steps, awaitingApprov
     console.log(
       `  AWAITING APPROVAL${onYouNote}: ${unrun.join(', ')}  — this workflow's ending, at its gate: nothing of it has run${run.pruned ? ', and pruned, it cannot be approved' : ', and your approval is what runs it'}`,
     );
-}
-
-/**
- * What the screen's branches changed, read once from the run's place (`changesOf`), with the diffs of the files `sensitive` names — the
- * check-affecting ones by default: the branches to read (`branchesToRead`) and the result branches.
- */
-function changesRead(
-  place: Place,
-  git: RepositoryRun,
-  branches: string[],
-  steps: Steps,
-  sensitive: string[] | undefined,
-): { toRead: BranchChanges[]; results: BranchChanges[] } {
-  const toRead = branchesToRead(
-    branches,
-    namesInOrder(git, steps).map((name) => git.steps[name]?.branch),
-    git.isolate ? git.branch : undefined,
-  );
-  const read = changesOf(place, git, [...toRead, ...branches], sensitive ?? CHECK_AFFECTING);
-  const of = (branch: string): BranchChanges => {
-    const changes = read.find((c) => c.branch === branch);
-    if (changes === undefined)
-      throw new Error(`the changes of ${branch} were not read with the others: report it as a defect of nemia decide`);
-    return changes;
-  };
-  return { toRead: toRead.map(of), results: branches.map(of) };
 }
 
 /**

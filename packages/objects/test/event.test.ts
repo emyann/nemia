@@ -1,11 +1,12 @@
 /**
- * The Event (`src/event.ts`): a run's, a step's, a daemon's and the store's event, and a page of them, decoded from JSON and encoded
- * back equal; and the closed words it carries held — a reason, a kind, a type or a source out of its words refused.
+ * The Event (`src/event.ts`): a run's, a step's, a daemon's and the store's event, and a page of them, as the Api's endpoints answer them,
+ * every key kept; and the closed words it carries held — a reason, a kind, a type or a source out of its words refused.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import { API_VERSION, Event, EventList } from 'objects';
+import { API_VERSION, Event } from 'objects';
+import { answered } from './served.ts';
 
 const meta = (name: string, namespace?: string) => ({
   name,
@@ -62,13 +63,12 @@ const store = {
   source: 'person',
 } as const;
 
-const roundTrip = <S extends Schema.Codec<unknown, unknown>>(schema: S, value: unknown): unknown =>
-  JSON.parse(JSON.stringify(Schema.encodeSync(schema)(Schema.decodeUnknownSync(schema)(JSON.parse(JSON.stringify(value))))));
-
-test("a run's, a step's, a daemon's and the store's event, and a page of them, decode and encode back the same", () => {
-  for (const event of [run, step, daemon, store]) assert.deepEqual(roundTrip(Event, event), event);
+test("the Api's get answers a run's, a step's, a daemon's and the store's event, its list a page of them; another kind refused", () => {
+  for (const event of [run, step, daemon, store]) assert.deepEqual(answered('events', 'getAll', event), event);
   const page = { apiVersion: API_VERSION, kind: 'EventList', metadata: { continue: 'x', remainingItemCount: 2 }, items: [run, daemon] };
-  assert.deepEqual(roundTrip(EventList, page), page);
+  assert.deepEqual(answered('events', 'listAll', page), page);
+  assert.equal(answered('events', 'getAll', { ...run, kind: 'Run' }), undefined);
+  assert.equal(answered('events', 'listAll', { ...page, kind: 'RunList' }), undefined);
 });
 
 test('REFUSED: a reason, an involved kind, a type or a source out of its words', () => {

@@ -1,5 +1,5 @@
 /**
- * An agent file copied into your library on the board's route (`POST /api/agents/yours/copy`, `nemia agents copy`'s entry), the agent
+ * An agent file copied into your library (`POST /api/namespaces/default/agents/copy`, `nemia agents copy`'s entry), the agent
  * files the store knows read on `GET /api/agents/sources`, and where a copy came from on `GET /api/namespaces/default/agents` — in a
  * scratch store, from a
  * scratch folder. Every write is read back from disk, and every refusal is made to refuse, asserted on its words, with yours as it was.
@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { AgentSource } from 'agent-orchestrator';
+import { addFactory, type AgentSource } from 'agent-orchestrator';
 import { scratch } from 'test-kit/scratch';
 import { app } from '../app.ts';
 import { listedIn } from '../../test/definitions.ts';
@@ -21,6 +21,7 @@ import { story } from 'test-kit/checkpoints';
 const repo = scratch('nemia-api-copy-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
+addFactory({ name: 'elsewhere', repos: [repo] });
 
 type LibraryAgent = import('./agents.ts').LibraryAgent;
 
@@ -43,7 +44,11 @@ function source(name: string, keys: string[], body = 'Scout the ground.'): strin
 
 const json = { 'content-type': 'application/json' };
 const copy = (body: unknown) =>
-  app.request('/api/agents/yours/copy', { method: 'POST', headers: json, body: typeof body === 'string' ? body : JSON.stringify(body) });
+  app.request('/api/namespaces/default/agents/copy', {
+    method: 'POST',
+    headers: json,
+    body: typeof body === 'string' ? body : JSON.stringify(body),
+  });
 
 /** What yours holds: each file under the library's agents and skills, by its path, and the copies' records. */
 const held = (): string[] =>
@@ -139,15 +144,22 @@ test('a copy the store refuses — a key another harness writes, a file not ther
   );
 
   await t.test(
-    'REFUSED at shipped defaults: a file that is not there is a 404 naming `nemia agents sources`; a `keep` that is no list a 400 naming it',
+    'REFUSED at shipped defaults: a file that is not there is a 404 naming `nemia agents sources`; a `keep` that is no list a 400 naming `payload.keep`; a copy outside `default` a 422 naming it',
     async () => {
       await refused({ file: path.join(from, 'agents', 'nobody.md') }, 404, /nemia agents sources lists the agents the store knows/);
-      await refused({ file: source('scout', ['description: x']), keep: 'scouting' }, 400, /^`keep` lists the skills and the schema/);
-      await refused(
-        { file: source('scout', ['description: x']), also: true },
-        400,
-        /^POST \/api\/agents\/yours\/copy does not take `also`: /,
-      );
+      const before = held();
+      const res = await copy({ file: source('scout', ['description: x']), keep: 'scouting' });
+      assert.equal(res.status, 400);
+      assert.equal(((await res.json()) as { field?: string }).field, 'payload.keep');
+      assert.deepEqual(held(), before, 'nothing written');
+      const elsewhere = await app.request('/api/namespaces/elsewhere/agents/copy', {
+        method: 'POST',
+        headers: json,
+        body: JSON.stringify({ file: source('scout', ['description: x']) }),
+      });
+      assert.equal(elsewhere.status, 422);
+      assert.match(((await elsewhere.json()) as { error: string }).error, /\/api\/namespaces\/default\//);
+      assert.deepEqual(held(), before, 'nothing written');
     },
   );
 });

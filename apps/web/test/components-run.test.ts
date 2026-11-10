@@ -28,8 +28,8 @@ const { BreakdownRows } = await import('../src/components/look/Breakdown.tsx');
 const { clockBreakdown } = await import('../src/lib/breakdown.ts');
 const { instantWhole } = await import('../src/lib/instant.ts');
 const { timeToTheSecond } = await import('../src/lib/timeOfDay.ts');
-type RunView = import('../src/lib/runView.ts').RunView;
-type StepUsed = import('../src/lib/api.ts').StepUsed;
+type RunDetail = import('../src/lib/runView.ts').RunDetail;
+type StepUsed = import('../src/lib/api/usage.ts').StepUsed;
 const { Timeline } = await import('../src/components/run/Timeline.tsx');
 
 test('a run visited by its address that the store does not have is said gone by its id, and where the runs are listed', () => {
@@ -40,8 +40,8 @@ test('a run visited by its address that the store does not have is said gone by 
 
 test("the run page's timeline: a row per try's session and per check, in the api's words — a recheck, a check still running, a task with no record — and the totals", async () => {
   const { Timeline } = await import('../src/components/run/Timeline.tsx');
-  type TaskSpan = NonNullable<RunView['steps'][number]['timeline'][number]['session']>;
-  type TimelineTotal = RunView['timeline']['run'];
+  type TaskSpan = NonNullable<RunDetail['steps'][number]['timeline'][number]['session']>;
+  type TimelineTotal = RunDetail['timeline']['run'];
   const T = (m: number, s = 0) => new Date(Date.UTC(2026, 8, 13, 8, m, s)).toISOString();
   const span = (taskId: string, at: TaskSpan['at'], queued: string, ran: string, times: Partial<TaskSpan> = {}): TaskSpan => ({
     taskId,
@@ -69,7 +69,7 @@ test("the run page's timeline: a row per try's session and per check, in the api
     usage: { responses: 54 },
     used: '54 responses · tool calls not measured · tokens in not measured · tokens out not measured',
   };
-  const run: RunView = {
+  const run: RunDetail = {
     ...base,
     steps: [
       {
@@ -214,7 +214,7 @@ test("the timeline has a cost column: what each session cost, `not measured` whe
   });
   const base = runWith(null);
   const total = { ...base.timeline.run, loop: 'review', tasks: 2 };
-  const run: RunView = {
+  const run: RunDetail = {
     ...base,
     steps: [
       {
@@ -335,7 +335,7 @@ test("a try's run is tagged try and names the agent it tried, linked to its page
 });
 
 /** A run's card on the floor, inside the router its title links with, as the floor draws it: shown in the bar or not (`inspected`). */
-async function cardMarkup(run: RunView, inspected: boolean, reads: string[] = []): Promise<string> {
+async function cardMarkup(run: RunDetail, inspected: boolean, reads: string[] = []): Promise<string> {
   const { RunNode } = await import('../src/components/run/RunNode.tsx');
   const data = {
     run,
@@ -376,7 +376,7 @@ test('a card that reads runs as context says how many in a chip, each run on hov
 
 test("a ghost's card writes the api's word for what it waits on, then an arrow to each run it waits on, the word naming each run once", async () => {
   const base = atGate({}, { waitingOnYou: [], waitingOnYouWords: [] });
-  const ghost: RunView = {
+  const ghost: RunDetail = {
     ...base,
     toDecide: null,
     waiting: {
@@ -435,7 +435,7 @@ test('the run bar says a run not read yet, a read that failed, and a run gone fr
   const { RunBody } = await import('../src/components/run/RunBar.tsx');
   const { ReadRefusal } = await import('../src/lib/api/read.ts');
   const run = atGate();
-  const body = (props: { run: RunView | undefined; error: unknown }) => pagedWith(createElement(RunBody, { id: run.id, ...props }));
+  const body = (props: { run: RunDetail | undefined; error: unknown }) => pagedWith(createElement(RunBody, { id: run.id, ...props }));
   assert.match(await body({ run: undefined, error: null }), />Reading the run…</);
   assert.match(await body({ run: undefined, error: new Error('the api is down') }), /Could not read the run r-1: the api is down/);
   const gone = await body({ run, error: new ReadRefusal('gone', 404) });

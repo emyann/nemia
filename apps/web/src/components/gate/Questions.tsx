@@ -5,7 +5,8 @@
  * to the api, where they are checked against what the step asks now and written in the package's words.
  */
 import { useId, useState } from 'react';
-import type { Question, QuestionAnswer, RetryMode } from '../../lib/api';
+import type { Question } from '../../lib/api/tries.ts';
+import type { QuestionAnswer, RetryMode } from '../../lib/api/asks.ts';
 import { askedSaid, type Answer } from '../../lib/asks';
 import { cn } from '../../lib/utils';
 import { OFFERS } from '../../lib/words';

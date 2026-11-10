@@ -89,6 +89,7 @@ const QueuedCommand = Schema.Struct({
 /**
  * The lines of a Claude Code transcript the runtime reads, by `type`, in what it reads of each; every other key is not checked. A
  * field the runtime starts reading is added here.
+ * Exported only for the tests that import it.
  */
 export const LINES = {
   user: Schema.Struct({
@@ -126,7 +127,10 @@ export const LINES = {
   'agent-name': Schema.Struct({ type: Schema.Literal('agent-name'), agentName: Schema.optional(Schema.String) }),
 };
 
-/** A kind of line the runtime reads: a `type` of `LINES`. */
+/**
+ * A kind of line the runtime reads: a `type` of `LINES`.
+ * Exported only for the tests that import it.
+ */
 export type LineKind = keyof typeof LINES;
 
 /** A line of one of `kinds`, as its schema in `LINES` decodes it. */

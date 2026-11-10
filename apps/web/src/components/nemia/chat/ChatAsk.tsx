@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { CutTag, cutShape, TEXT_LINK } from '@/components/look';
 import { container } from '@/lib/meaning';
 import { askAnswered, linksOf, type ChatAsk as Ask } from '@/lib/chatFollowing';
-import type { AskPick, AskQuestion, PermissionFacts } from '@/lib/api';
+import type { AskPick, AskQuestion, PermissionFacts } from '@/lib/api/chat';
 import { timeOfDay } from '@/lib/timeOfDay';
 import { Markdown } from '../../markdown/Markdown';
 

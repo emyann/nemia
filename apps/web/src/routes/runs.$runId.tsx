@@ -23,8 +23,10 @@ import { PruneRun } from '../components/run/PruneRun';
 import { KindsBehind } from '../components/run/KindsBehind';
 import { Labels } from '../components/field/Labels';
 import { runsMoved } from '../lib/runWrites';
-import { factoriesQuery, labelRun, readGone } from '../lib/api';
-import { loadRun, useRunView, type RunView, type StepView } from '../lib/runView';
+import { factoriesQuery } from '../lib/api/factories.ts';
+import { labelRun } from '../lib/api/labels.ts';
+import { readGone } from '../lib/api/gone.ts';
+import { loadRun, useRunView, type RunDetail, type StepView } from '../lib/runView';
 import { namespaceOf } from '../lib/runNamespace';
 import { untrustedFor, type UntrustedPlace } from '../lib/factories';
 import { askedIn, decideDrawn, gateOffered, stepAnchor } from '../lib/asks';
@@ -96,7 +98,7 @@ function RunRead({ runId }: { runId: string }) {
  * The run's labels, a person's edited in place: an edit reads the run's object again (`exact`, as a hold does) and every list it is on
  * (`runsMoved`), so the chip shows with no reload.
  */
-function RunLabels({ run }: { run: RunView }) {
+function RunLabels({ run }: { run: RunDetail }) {
   const queryClient = useQueryClient();
   const edit = (edits: readonly string[]) =>
     labelRun(namespaceOf(run.labels.factory), run.id, edits).then(() => runsMoved(queryClient, run.id));
@@ -117,7 +119,7 @@ function RunLabels({ run }: { run: RunView }) {
  * it made; when it started, its first step filed, and the wait before, which a run started `--after` runs spends doing nothing; and, only
  * once the CLI's `prune` removed its worktrees, the prune: the run is then read as it ended, and nothing of it can be tried again.
  */
-function Run({ run }: { run: RunView }) {
+function Run({ run }: { run: RunDetail }) {
   const runCancelled = run.cancelledAt !== null;
   return (
     <article className="space-y-6">
@@ -210,7 +212,7 @@ function Run({ run }: { run: RunView }) {
  * `--artifacts` removed its files, what that freed: the files then go from what is kept. One prune took both, or its files alone, or the
  * files went later than the worktrees, each at its own time.
  */
-function Pruned({ pruned: { at, worktrees, artifacts } }: { pruned: NonNullable<RunView['pruned']> }) {
+function Pruned({ pruned: { at, worktrees, artifacts } }: { pruned: NonNullable<RunDetail['pruned']> }) {
   const bytes = worktrees.reduce((sum, w) => sum + w.bytes, 0);
   const count = `${worktrees.length} worktree${worktrees.length === 1 ? '' : 's'}`;
   const title = [
@@ -272,7 +274,7 @@ const deniedRow = (calls: readonly string[], cause: UntrustedPlace | undefined):
  * The place the run `run` works on that a harness does not trust, read off the factories' answer only where a step of it was denied a
  * call (`asked`): nothing while that is read, and nothing where every place is trusted.
  */
-function useDeniedCause(run: RunView, asked: boolean): UntrustedPlace | undefined {
+function useDeniedCause(run: RunDetail, asked: boolean): UntrustedPlace | undefined {
   const { data } = useQuery({ ...factoriesQuery, enabled: asked });
   return asked && data ? untrustedFor(data, { repo: run.repo }) : undefined;
 }
@@ -305,7 +307,7 @@ function useDeniedCause(run: RunView, asked: boolean): UntrustedPlace | undefine
  * waits on. Once approved, under the step: when, and the words every step after the gate is handed — or, for the step that ends the run,
  * what its own approval filed and the terms it acts on.
  */
-function StepSection({ run, step, runCancelled }: { run: RunView; step: StepView; runCancelled: boolean }) {
+function StepSection({ run, step, runCancelled }: { run: RunDetail; step: StepView; runCancelled: boolean }) {
   const { spec, closeout, gate } = step;
   const cause = useDeniedCause(run, Boolean(step.denied));
   const atGate = gateOffered(step, runCancelled);
@@ -383,7 +385,7 @@ function StepSection({ run, step, runCancelled }: { run: RunView; step: StepView
  * sending back the steps it waits on; any other beside what the step handed on, with the questions it asks (`askedIn`) and the budgets
  * it proposes for the steps after it (`gate.budgets`), sending back the step.
  */
-function AtGate({ run, step, acts }: { run: RunView; step: StepView; acts: boolean }) {
+function AtGate({ run, step, acts }: { run: RunDetail; step: StepView; acts: boolean }) {
   const back = acts
     ? run.graph.edges.filter((e) => (e.kind === 'after' || e.kind === 'route') && e.to === step.name).map((e) => e.from)
     : [step.name];
@@ -414,7 +416,7 @@ function AtGate({ run, step, acts }: { run: RunView; step: StepView; acts: boole
  * What the run took, or how long it has been at work, as its card's clock says it (`runClock`), the start, the end and the wall time on
  * hover; it moves every second while a task of it runs (`clockCounts`). Nothing before the run started, which the `started` row says.
  */
-function RunTook({ run }: { run: RunView }) {
+function RunTook({ run }: { run: RunDetail }) {
   const finished = !inFlight(run);
   const now = useNow(clockCounts(run, finished) ? 1_000 : 30_000);
   if (run.startedAt === null) return null;
@@ -432,7 +434,7 @@ function RunTook({ run }: { run: RunView }) {
  * When the run started — its first step filed — and, where it waited before that, for how long: the wait the Factory's card does not count
  * as time at work (`runClock`). Not yet while nothing of it is filed, and never for a run called off first.
  */
-function startedRow(run: RunView): ReactNode {
+function startedRow(run: RunDetail): ReactNode {
   if (run.startedAt === null) return run.cancelledAt ? 'never: called off first' : 'not yet';
   const waited = waitedMs(run)!;
   return (
@@ -447,7 +449,7 @@ function startedRow(run: RunView): ReactNode {
  * What the run waits on other runs for: a start `--after` runs, and a person's hold, which carries its Lift. While a hold stands no step
  * offers an answer — the package refuses each — so it is the one thing on the page asked of anyone.
  */
-function RunWaits({ run }: { run: RunView }) {
+function RunWaits({ run }: { run: RunDetail }) {
   return (
     <>
       {run.waiting && <RunWait label="Waiting on runs" wait={run.waiting} />}
@@ -461,7 +463,7 @@ function RunWaits({ run }: { run: RunView }) {
 }
 
 /** A run's id, its page's heading. */
-function RunHeading({ run }: { run: RunView }) {
+function RunHeading({ run }: { run: RunDetail }) {
   return <h1 className="font-mono text-body-medium text-muted-foreground">{run.id}</h1>;
 }
 

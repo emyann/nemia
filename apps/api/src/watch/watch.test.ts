@@ -13,8 +13,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer, Metric, Schema } from 'effect';
 import { FEED_FOLLOWERS } from 'agent-orchestrator';
-import { Api, WatchedObject, watchEventOf } from 'objects';
+import { TABLE_ACCEPT, WatchedObject, watchEventOf } from 'objects';
 import { appOf, liveOf } from '../app.ts';
+import { ENDPOINTS } from '../objects/endpoints.ts';
 import { Beats } from '../layer.ts';
 import { until, type Waiter } from '../../test/waits.ts';
 
@@ -251,11 +252,16 @@ test('a watch of the runs by state sends no MODIFIED for the clock alone: a run 
   }
 });
 
-test('the watch refuses watch=yes, and limit or continue beside watch=true, with 400 before any stream; an unknown namespace is the list own refusal', async () => {
+test('the watch refuses watch=yes, and limit or continue beside watch=true, with 400 before any stream, a Table asked with 406; an unknown namespace is the list own refusal', async () => {
   for (const query of ['watch=yes', 'watch=true&limit=2', 'watch=true&continue=YQ']) {
     const res = await app.request(`/api/cards?${query}`);
     assert.equal(res.status, 400, query);
     assert.equal(typeof ((await res.json()) as { error: unknown }).error, 'string', `${query} says why in \`error\``);
+  }
+  for (const url of ['/api/cards?watch=true', '/api/runs?watch=true']) {
+    const res = await app.request(url, { headers: { accept: TABLE_ACCEPT } });
+    assert.equal(res.status, 406, `${url} asked as a Table: refused, never a stream of rows`);
+    assert.equal(typeof ((await res.json()) as { error: unknown }).error, 'string', `${url} says why in \`error\``);
   }
   const plain = await app.request('/api/namespaces/nowhere/hires');
   const watched = await app.request('/api/namespaces/nowhere/hires?watch=true');
@@ -276,12 +282,15 @@ test('aborting a watch lets its feed reader go', async (t) => {
   await waitFor(t, () => followers() === before, 'followers() === before');
 });
 
-/** Every GET of a collection the `Api` serves, its params filled: a namespace `default`, a template the store builds in (`sdlc`). */
-const collections = Object.values(Api.groups)
-  .flatMap((group) => Object.values(group.endpoints))
-  .filter((e) => e.method === 'GET' && e.path !== '/api' && !/\/:[A-Za-z]+$/.test(e.path) && !e.path.includes('/runs/:runId/'))
-  .filter((e) => !/\/(rules|instruction|commands|card|files|sign-in|told)$/.test(e.path))
-  .map((e) => e.path.replace(':namespace', 'default').replace(':name', 'sdlc'));
+/**
+ * Every GET of a collection the `Api` serves, its params filled: a namespace `default`, a template the store builds in (`sdlc`). A
+ * collection is what the Api declares one: an endpoint whose success has a `kind` ending in `List` (`ENDPOINTS`, read off `Api`) — so
+ * neither the builder's `keys` (a `KeyForm`), nor the server's reads, nor a run's reads under its name, which are no list of a kind; nor
+ * the discovery document (`/api`), a list of resources rather than of objects.
+ */
+const collections = ENDPOINTS.filter((e) => e.method === 'GET' && e.path !== '/api' && e.kinds.some((k) => k.endsWith('List'))).map((e) =>
+  e.path.replace(':namespace', 'default').replace(':name', 'sdlc'),
+);
 
 test('every list the Api serves answers ?watch=true with its objects ADDED, then a BOOKMARK of its kind', async (t) => {
   assert.ok(collections.length >= 15, `${collections.length} lists found`);

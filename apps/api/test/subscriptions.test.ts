@@ -48,7 +48,6 @@ async function asked(method: string, name: string, body?: unknown, headers: Reco
 }
 
 const file = (name: string): string => path.join(root, 'subscriptions', `${name}.json`);
-const SHAPE = '`{ "task": "<task>", "selectors"?: ["<selector>"], "digestEvery"?: <minutes>, "atLeast"?: "<level>" }`';
 
 test('A person subscribes a long-lived task: given by its words or the defaults, an empty selectors list as the default, each refusal writing nothing, and a floor stored with the level it takes', async (t) => {
   const s = story(t);
@@ -100,23 +99,16 @@ test('A person subscribes a long-lived task: given by its words or the defaults,
     },
   );
   await s.test('REFUSED: a body that is not a subscription, and a name that names no file, 400 before anything is written', async () => {
-    assert.deepEqual(await asked('POST', 'b', 'not json'), {
-      status: 400,
-      body: { error: `POST …/subscribe takes a JSON body: ${SHAPE}.` },
-    });
-    const noTask = await asked('POST', 'b', {});
-    assert.equal(noTask.status, 400);
-    assert.match(String(noTask.body.error), /^`task` names the engine's long-lived task the feed is said to.*This request's was left out/);
-    const oneWord = await asked('POST', 'b', { task: 'nemia', selectors: 'waits=person' });
-    assert.equal(oneWord.status, 400);
-    assert.equal(
-      oneWord.body.error,
-      "`selectors` is what wakes the task, as `nemia subscribe -l <selector>` takes each: a list of text, one selector of the feed's " +
-        `lines each, or left out for waits=person, the lines that wait on a person. This request's was "waits=person": ${SHAPE}.`,
-    );
-    const soon = await asked('POST', 'b', { task: 'nemia', digestEvery: 'soon' });
-    assert.equal(soon.status, 400);
-    assert.match(String(soon.body.error), /^`digestEvery` is the minutes a digest waits for a wake/);
+    const refusedAt = async (body: unknown, field: string) => {
+      const answer = await asked('POST', 'b', body);
+      assert.equal(answer.status, 400);
+      assert.equal(answer.body.field, field, 'the key it refused');
+      assert.match(String(answer.body.error), /GET \/openapi\/v3\/nemia\/v1/, 'and where the shape is said');
+    };
+    await refusedAt('not json', 'payload');
+    await refusedAt({}, 'payload.task');
+    await refusedAt({ task: 'nemia', selectors: 'waits=person' }, 'payload.selectors');
+    await refusedAt({ task: 'nemia', digestEvery: 'soon' }, 'payload.digestEvery');
     const dotted = await asked('POST', '..up', { task: 'nemia' });
     assert.equal(dotted.status, 400);
     assert.match(String(dotted.body.error), /is no subscription's name/);
@@ -151,18 +143,14 @@ test('A person subscribes a long-lived task: given by its words or the defaults,
     },
   );
   await s.test(
-    "REFUSED: a floor that is no level is a 422 in the package's words, naming --at-least and the levels; one of the wrong type a 400 naming the shape",
+    "REFUSED: a floor that is no level is a 422 in the package's words, naming --at-least and the levels; one of the wrong type a 400 naming the key",
     async () => {
       const nonsense = await asked('POST', 'd', { task: 'nemia', atLeast: 'nonsense' });
       assert.equal(nonsense.status, 422);
       assert.match(String(nonsense.body.error), /^--at-least takes a level, one of .*, and "nonsense" is none/);
       const numbered = await asked('POST', 'd', { task: 'nemia', atLeast: 7 });
       assert.equal(numbered.status, 400);
-      assert.match(
-        String(numbered.body.error),
-        /^`atLeast` is the level a run's factory is at least at for its lines to be carried, as `nemia subscribe --at-least <level>` takes it/,
-      );
-      assert.match(String(numbered.body.error), /This request's was 7: .*"atLeast"\?: "<level>"/);
+      assert.equal(numbered.body.field, 'payload.atLeast');
       assert.equal(fs.existsSync(file('d')), false, 'nothing written');
     },
   );

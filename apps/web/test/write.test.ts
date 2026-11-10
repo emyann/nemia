@@ -1,13 +1,14 @@
 /**
- * The board's writes decode the api's answers where they enter (`send`, src/lib/api/read.ts): an answer that does not decode is refused as
- * one this board does not read — never as a refusal of the api's, since the write may be done — with the route, the first wrong key, what
- * was there, what to look at before writing again and the fix; a key the board does not know is dropped; a refusal of the api's stays in
- * its words and status, as the family's own class where it has one. A refusal fixture per family of writes.
+ * The board's writes decode the api's answers where they enter (the objects' client, src/lib/api/objects.ts): an answer that does not
+ * decode is refused as one this board does not read — never as a refusal of the api's, since the write may be done — with the route, the
+ * first wrong key, what was there, what to look at before writing again and the fix; a key the board does not know is dropped; a refusal
+ * of the api's stays in its words and status, as the family's own class where it has one. A refusal fixture per family of writes.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Schema } from 'effect';
-import { ReadRefusal, send, UnreadAnswer, WriteRefusal } from '../src/lib/api/read.ts';
+import { Resumed } from 'objects';
+import { ReadRefusal, UnreadAnswer, WriteRefusal } from '../src/lib/api/read.ts';
+import { call, write, type Refuse } from '../src/lib/api/objects.ts';
 import { liftHold, pruneRun, putHold, removeRun } from '../src/lib/api/runs.ts';
 import { approveStep, askRound, askTry, sayToStep } from '../src/lib/api/asks.ts';
 import { dropCard, fileCard, queueCard, startCard } from '../src/lib/api/inbox.ts';
@@ -57,63 +58,62 @@ const rejection = (promise: Promise<unknown>): Promise<unknown> =>
     (err: unknown) => err,
   );
 
-const Thing = Schema.Struct({ id: Schema.String });
 const MAY = 'The thing may be written: look at it before writing it again.';
 
-test("send: a write sent as JSON, its answer decoded, and a refusal of the api's kept in its words and status", async (t) => {
+/** A pause as the api answers one. */
+const PAUSE = { at: '2026-11-09T10:00:00.000Z', by: 'ann' };
+
+/** A pause put through the objects' client (`POST /api/pause`), built as `refuse` says where the api refuses it. */
+const pause = (refuse?: Refuse) => call((c) => c.server.pause({ payload: { why: 'merging' } }), write(Resumed, MAY, undefined, refuse));
+
+/** A pause lifted through the objects' client (`DELETE /api/pause`): a write that sends no body. */
+const resume = () => call((c) => c.server.resume(), write(Resumed, MAY));
+
+test("a write through the objects' client: sent as JSON, its answer decoded, and a refusal of the api's kept in its words and status", async (t) => {
   await t.test("a write is sent as JSON by its method, and resolves with the schema's keys alone", async (t) => {
-    const sent = answering(t, { id: 'x-1', colour: 'blue' }, 201);
-    assert.deepEqual(await send('POST', '/api/x', Thing, { body: { a: 1 }, may: MAY }), { id: 'x-1' });
+    const sent = answering(t, { pause: PAUSE, colour: 'blue' }, 201);
+    assert.deepEqual(await pause(), { pause: PAUSE });
     const [{ url, init }] = sent as [(typeof sent)[number]];
     assert.deepEqual(
-      [url, init?.method, new Headers(init?.headers).get('content-type'), init?.body],
-      ['/api/x', 'POST', 'application/json', '{"a":1}'],
+      [url, init?.method, new Headers(init?.headers).get('content-type'), text(init?.body)],
+      ['/api/pause', 'POST', 'application/json', '{"why":"merging"}'],
     );
-    await send('DELETE', '/api/x', Thing, { may: MAY });
-    assert.equal(sent[1]?.init?.body, undefined, 'a write with no body sends none');
+    await resume();
+    assert.equal(text(sent[1]?.init?.body), undefined, 'a write with no body sends none');
   });
   await t.test(
     'REFUSED: a 2xx answer without a key the board reads is an UnreadAnswer naming the route, the key, the may words and the fix',
     async (t) => {
-      answering(t, { name: 'x' }, 201);
-      await assert.rejects(send('POST', '/api/x', Thing, { may: MAY }), unread('POST /api/x', 'id', 'is missing.', MAY));
-      answering(t, { id: 7 });
-      await assert.rejects(
-        send('PUT', '/api/x', Thing, { may: MAY }),
-        unread('PUT /api/x', 'id', 'is 7, where the board reads string.', MAY),
-      );
+      answering(t, { lifted: true }, 201);
+      await assert.rejects(pause(), unread('POST /api/pause', 'pause', 'is missing.', MAY));
+      answering(t, { pause: { ...PAUSE, by: 7 } });
+      await assert.rejects(resume(), unread('DELETE /api/pause', 'pause.by', 'is 7, where the board reads string.', MAY));
     },
   );
   await t.test(
     "REFUSED: a 2xx answer that is not JSON is refused at the answer itself, and never built as the caller's refusal",
     async (t) => {
       answering(t, '<html>ok</html>');
-      const refused = (words: string, status: number) => new SkillRefusal(words, status);
       await assert.rejects(
-        send('DELETE', '/api/x', Thing, { may: MAY, refused }),
-        unread('DELETE /api/x', 'the answer', 'is undefined, where the board reads object', MAY),
+        pause((words, status) => new SkillRefusal(words, status)),
+        unread('POST /api/pause', 'the answer', 'is undefined, where the board reads object', MAY),
       );
     },
   );
   await t.test("REFUSED: a write the api refused rejects in its words and status, a WriteRefusal, or the caller's class", async (t) => {
     answering(t, { error: 'changed since' }, 409);
-    const err = await rejection(send('PUT', '/api/x', Thing, { may: MAY }));
+    const err = await rejection(pause());
     assert.ok(err instanceof WriteRefusal && !(err instanceof ReadRefusal), String(err));
     assert.equal(err.message, 'changed since');
     assert.equal(err.status, 409);
 
     answering(t, '<html>Bad Gateway</html>', 502, 'Bad Gateway');
-    const gateway = await rejection(send('DELETE', '/api/x', Thing, { may: MAY }));
+    const gateway = await rejection(resume());
     assert.ok(gateway instanceof WriteRefusal, String(gateway));
-    assert.equal(gateway.message, 'DELETE /api/x answered 502 Bad Gateway');
+    assert.match(gateway.message, /^DELETE \/api\/pause answered 502/);
 
     answering(t, { error: 'taken', users: ['a'] }, 409);
-    const built = await rejection(
-      send('POST', '/api/x', Thing, {
-        may: MAY,
-        refused: (words, status, body) => new AgentRefusal(words, [JSON.stringify(body)], status),
-      }),
-    );
+    const built = await rejection(pause((words, status, body) => new AgentRefusal(words, [JSON.stringify(body)], status)));
     assert.ok(built instanceof AgentRefusal, String(built));
     assert.deepEqual([built.message, built.users, built.status], ['taken', ['{"error":"taken","users":["a"]}'], 409]);
   });

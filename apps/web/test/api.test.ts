@@ -1,25 +1,21 @@
+import type * as RunObject from 'objects';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isDeepStrictEqual } from 'node:util';
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
-import {
-  decisionQuery,
-  proposalQuery,
-  ReadRefusal,
-  readGone,
-  retryUnlessGone,
-  runObjectQuery,
-  sayToStep,
-  WriteRefusal,
-  type RunObject,
-} from '../src/lib/api.ts';
+import { decisionQuery } from '../src/lib/api/decision.ts';
+import { proposalQuery } from '../src/lib/api/proposals.ts';
+import { ReadRefusal, WriteRefusal } from '../src/lib/api/read.ts';
+import { readGone, retryUnlessGone } from '../src/lib/api/gone.ts';
+import { runObjectQuery } from '../src/lib/api/run.ts';
+import { sayToStep } from '../src/lib/api/asks.ts';
 import { decisionStamp } from '../src/lib/decide.ts';
 import { coded, decidable, type Word } from './run-fixtures.ts';
 import { bell, until, WAITED } from './waits.ts';
 
-const { workflowNameOf } = await import('../src/lib/api.ts');
+const { workflowNameOf } = await import('../src/lib/api/workflows.ts');
 
-const { startRun } = await import('../src/lib/api.ts');
+const { startRun } = await import('../src/lib/api/workflows.ts');
 
 /** POST /api/namespaces/default/runs answering each start with `answer()`, for the length of the test: the requests the board sent. */
 function starting(t: { after: (fn: () => void) => void }, answer: () => Response) {
@@ -189,7 +185,7 @@ test(
   },
 );
 
-const { askTry } = await import('../src/lib/api.ts');
+const { askTry } = await import('../src/lib/api/asks.ts');
 
 /** POST …/retry answering `status` and `body`, for the length of the test; what was sent is kept in `sent`. */
 function asking(t: { after: (fn: () => void) => void }, status: number, body: string, sent: Array<{ url: string; init: RequestInit }>) {
@@ -203,7 +199,7 @@ function asking(t: { after: (fn: () => void) => void }, status: number, body: st
   });
 }
 
-const { askRound } = await import('../src/lib/api.ts');
+const { askRound } = await import('../src/lib/api/asks.ts');
 
 test("each ask of a run's page: posted as the api takes it, read back, and refused in the api's words", async (t) => {
   await t.test(

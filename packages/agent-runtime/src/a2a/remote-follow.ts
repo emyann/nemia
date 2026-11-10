@@ -24,16 +24,19 @@ import type { Connection } from './remote-client.ts';
 import { wordsOf } from './said.ts';
 
 /** How long a subscription may say nothing before the Task is read whole and subscribed to again. */
-export const QUIET_MS = 60_000;
+const QUIET_MS = 60_000;
 
-/** How many subscriptions in a row may drop, none giving anything new, before the follow leaves the session to be read again. */
+/**
+ * How many subscriptions in a row may drop, none giving anything new, before the follow leaves the session to be read again.
+ * Exported only for the tests that import it.
+ */
 export const RESUBSCRIBES = 5;
 
 /** The first wait before a dropped subscription is made again, doubled at each drop in a row. */
-export const RESUBSCRIBE_MS = 500;
+const RESUBSCRIBE_MS = 500;
 
 /** How often a follow reads the Task whole where it does not subscribe: a card that does not stream, a stream that kept dropping. */
-export const READ_EVERY_MS = 1_000;
+const READ_EVERY_MS = 1_000;
 
 /** How often a follow reads the entry of a session whose message is still being sent. */
 const SENDING_POLL = '1 second';

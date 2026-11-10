@@ -1,8 +1,7 @@
 /**
  * The library's reads decode the api's answers where they enter: the agents, the skills and the workflows as the objects serve them
- * (`objects.ts`), each seen as the board's view of its kind, and a step's page, the builder's form and the repository (`get`): a key the
- * board does not know is dropped, and one the api leaves out stays out. Which keys each answer has is `objects`' own, and of the routes
- * kept on Hono `test/wire.test.ts`'s.
+ * (`objects.ts`), each seen as the board's view of its kind, and a step's page, the builder's form and the repository: a key the board
+ * does not know is dropped, and one the api leaves out stays out. Which keys each answer has is `objects`' own.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -99,11 +98,11 @@ test("a step's page and a list of workflows are read in the place named, under a
         'apps/site/.claude/skills/set-type',
         'where a skill named with its folder was found is kept',
       );
-      assert.equal(asked.at(-1), '/api/workflows/yours/w/review?factory=f');
+      assert.equal(asked.at(-1), '/api/namespaces/f/workflows/w/steps/review?origin=yours');
       assert.notDeepEqual(placed.queryKey, stepQuery('yours', 'w', 'review').queryKey, 'two places, two answers kept apart');
       assert.notDeepEqual(placed.queryKey, stepQuery('yours', 'w', 'review', { factory: 'g' }).queryKey);
       await (stepQuery('yours', 'w', 'review', { factory: 'f', repo: '/code/app' }).queryFn as unknown as () => Promise<unknown>)();
-      assert.equal(asked.at(-1), '/api/workflows/yours/w/review?factory=f&repo=%2Fcode%2Fapp');
+      assert.equal(asked.at(-1), '/api/namespaces/f/workflows/w/steps/review?origin=yours&repo=%2Fcode%2Fapp');
     },
   );
   await t.test("a Workflow is read as the board's view of it, and a step its object spells `workspace: main` is unread", async (t) => {

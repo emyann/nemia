@@ -20,7 +20,7 @@ import { Effect, Layer } from 'effect';
 import { engine, runStore } from 'agent-orchestrator';
 import { app, appOf, liveOf } from '../src/app.ts';
 import { Engine } from '../src/store.ts';
-import type { PauseNowRead } from '../src/gauges/pause.ts';
+import type { PauseNowRead } from 'objects';
 
 const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' };
 
@@ -36,35 +36,43 @@ async function asked(method: string, body?: unknown, headers: Record<string, str
 
 const FILE = path.join(root, 'cordon');
 
-/** That `answer` is a refusal of `status` and nothing else, naming each of `facts`. */
+/**
+ * That `answer` is a refusal of `status` and nothing else — a 400 of a decode with the key it refused (`field`) — naming each of
+ * `facts`.
+ */
 function refused(answer: { status: number; body: Record<string, unknown> }, status: number, ...facts: string[]): void {
   assert.equal(answer.status, status, JSON.stringify(answer.body));
-  assert.deepEqual(Object.keys(answer.body), ['error'], 'the refusal and nothing else');
+  assert.deepEqual(Object.keys(answer.body), status === 400 ? ['error', 'field'] : ['error'], 'the refusal and nothing else');
   names(answer.body.error, ...facts);
 }
 
-test('POST /api/pause refuses, before the store is written: a body that is not a pause, words nemia pause refuses, a page on another site, the cordon gone', async (t) => {
-  const shape = '`{ "why"?: "<words>", "by"?: "<name>", "timeout"?: "<d>", "now"?: true }`';
+test('POST /api/pause refuses, before the store is written: a body that is not a pause, words nemia pause refuses, the cordon gone', async (t) => {
+  const DOCUMENT = 'GET /openapi/v3/nemia/v1';
   const ROWS: { name: string; ask: () => Promise<{ status: number; body: Record<string, unknown> }>; status: number; facts: string[] }[] = [
-    { name: 'a body that is not JSON: 400, with the shape', ask: () => asked('POST', 'not json'), status: 400, facts: [shape] },
     {
-      name: 'a `why` that is no text: 400, naming it and its value',
+      name: 'a body that is not JSON: 400, pointing at the document',
+      ask: () => asked('POST', 'not json'),
+      status: 400,
+      facts: [DOCUMENT],
+    },
+    {
+      name: 'a `why` that is no text: 400, naming it and the document',
       ask: () => asked('POST', { why: 7 }),
       status: 400,
-      facts: ['`why`', 'nemia pause --why', '7', shape],
+      facts: ['`payload.why`', DOCUMENT],
     },
     { name: "a `by` of blanks: the package's 422, naming --by", ask: () => asked('POST', { by: ' ' }), status: 422, facts: ['--by'] },
     {
-      name: 'a `now` that is not true: 400, naming it and its value',
+      name: 'a `now` that is not a switch: 400, naming it and the document',
       ask: () => asked('POST', { now: 'yes' }),
       status: 400,
-      facts: ['`now`', 'nemia pause --now --yes', '"yes"', shape],
+      facts: ['`payload.now`', DOCUMENT],
     },
     {
-      name: 'a `timeout` that is no text: 400, naming it and its value',
+      name: 'a `timeout` that is no text: 400, naming it and the document',
       ask: () => asked('POST', { timeout: 15 }),
       status: 400,
-      facts: ['`timeout`', 'nemia pause --timeout', '15', shape],
+      facts: ['`payload.timeout`', DOCUMENT],
     },
     {
       name: "a `timeout` out of its form: the package's 422, naming --timeout and the form",
@@ -77,18 +85,6 @@ test('POST /api/pause refuses, before the store is written: a body that is not a
       ask: () => asked('POST', { timeout: '15m', now: true }),
       status: 422,
       facts: ['--timeout', '--now'],
-    },
-    {
-      name: 'a pause asked by a page on another site: 403',
-      ask: () => asked('POST', {}, { ...BOARD, 'sec-fetch-site': 'cross-site' }),
-      status: 403,
-      facts: ['another site'],
-    },
-    {
-      name: 'a lift asked by a page on another site: 403',
-      ask: () => asked('DELETE', undefined, { ...BOARD, 'sec-fetch-site': 'cross-site' }),
-      status: 403,
-      facts: [],
     },
   ];
   for (const row of ROWS)

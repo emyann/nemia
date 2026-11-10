@@ -3,7 +3,7 @@
  * door (`replaceCard`), refused as `cardWriteRefusal` says; and the `resourceVersion` a card is served and compared at (`cardVersion`).
  * A controller: Effect programs over the Card and Run doors.
  */
-import { createHash } from 'node:crypto';
+import { versionDigest } from '../digest/digest.ts';
 import { Effect } from 'effect';
 import { type CardWrite, DEFAULT_NAMESPACE } from 'objects';
 import type { CardWriteRefusal } from '../../contracts/card-write.contract.ts';
@@ -18,7 +18,7 @@ import { CardName } from '../inbox/inbox.model.ts';
 import { cardText, fromLine, inboxNameRefusal, parseInboxCard, startedRefusal, type InboxCard } from '../inbox/index.ts';
 
 /** The digest of a card's text, its `resourceVersion`: changed by every write of the file, and by nothing else. */
-export const cardVersion = (text: string): string => createHash('sha256').update(text).digest('hex').slice(0, 16);
+export const cardVersion = versionDigest;
 
 /** What `replaceCard` did: the card as it reads now, its file, and whether the file was written (a write that changed nothing is not). */
 export type CardReplaced = { card: InboxCard; file: string; written: boolean };

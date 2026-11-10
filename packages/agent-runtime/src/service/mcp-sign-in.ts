@@ -48,7 +48,10 @@ export type McpSignInState = {
   readonly why?: string;
 };
 
-/** The folder, under the engine's root, a sign-in's `claude mcp add --scope local` files the server in, and its session runs in. */
+/**
+ * The folder, under the engine's root, a sign-in's `claude mcp add --scope local` files the server in, and its session runs in.
+ * Exported only for the tests that import it.
+ */
 export const SIGN_IN_FOLDER = 'mcp-sign-in';
 
 type Held = { readonly name: string; readonly session: McpSignInSession; readonly until: string };
@@ -73,7 +76,7 @@ const watched = (held: Held, withinMs: number, settle: (state: McpSignInState) =
 };
 
 /** The seams a test gives in place of Claude Code: the CLI child, the held session, and the sign-in's bound. */
-export type SignInSeams = { readonly cli?: McpCli; readonly ask?: McpSignInAsk; readonly withinMs?: number };
+type SignInSeams = { readonly cli?: McpCli; readonly ask?: McpSignInAsk; readonly withinMs?: number };
 
 /** The server a sign-in or sign-out may be asked of, or why not: a remote server with an OAuth client and a callback port. */
 const signInRefusal = (name: unknown, server: unknown): string | undefined => {

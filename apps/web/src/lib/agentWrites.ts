@@ -1,5 +1,9 @@
 import type { QueryClient } from '@tanstack/react-query';
-import { agentsQuery, factoriesQuery, keyFormQuery, skillsQuery, workflowsQuery } from './api';
+import { agentsQuery } from './api/agents.ts';
+import { factoriesQuery } from './api/factories.ts';
+import { keyFormQuery } from './api/builder.ts';
+import { skillsQuery } from './api/skills.ts';
+import { workflowsQuery } from './api/workflows.ts';
 
 /**
  * What an agent's write changes on the board: the agents, each read from disk again; the workflows, whose version covers the agents their

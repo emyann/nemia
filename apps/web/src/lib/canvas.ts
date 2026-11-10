@@ -3,7 +3,8 @@
  * complete, and where a person left the nodes — a run's steps, or the Factory's runs and which are open. Pure, apart
  * from the storage calls at the end, each of which survives a browser that refuses storage.
  */
-import type { GraphEdge, RunGraph, StepAttempts } from './api';
+import type { GraphEdge, RunGraph } from './api/graph.ts';
+import type { StepAttempts } from './api/tries.ts';
 import type { Point } from './layout';
 import { satisfiesAfter, type StepState } from './status.ts';
 import type { Frozen } from './frozen.ts';

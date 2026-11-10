@@ -1,11 +1,12 @@
 /**
- * The Subscription (`src/subscription.ts`): a subscription with a digest pending and one with nothing, and a page of them, decoded from
- * JSON and encoded back equal; a scope that is no level refused.
+ * The Subscription (`src/subscription.ts`): a subscription with a digest pending and one with nothing, and a page of them, as the Api's
+ * endpoints answer them, every key kept; a scope that is no level, and another kind, refused.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import { API_VERSION, Subscription, SubscriptionList } from 'objects';
+import { API_VERSION, Subscription } from 'objects';
+import { answered } from './served.ts';
 
 const pending = {
   apiVersion: API_VERSION,
@@ -23,14 +24,13 @@ const quiet = {
   status: { from: 400, cursor: 400, pending: 0, error: 'the delivery file does not parse' },
 } as const;
 
-const roundTrip = <S extends Schema.Codec<unknown, unknown>>(schema: S, value: unknown): unknown =>
-  JSON.parse(JSON.stringify(Schema.encodeSync(schema)(Schema.decodeUnknownSync(schema)(JSON.parse(JSON.stringify(value))))));
-
-test('a subscription and a page of them decode from JSON and encode back the same, absent keys left absent', () => {
-  assert.deepEqual(roundTrip(Subscription, pending), pending);
-  assert.deepEqual(roundTrip(Subscription, quiet), quiet);
+test("the Api's get answers a subscription and its list a page of them, every key kept, absent keys left absent", () => {
+  assert.deepEqual(answered('subscriptions', 'get', pending), pending);
+  assert.deepEqual(answered('subscriptions', 'get', quiet), quiet);
   const page = { apiVersion: API_VERSION, kind: 'SubscriptionList', metadata: {}, items: [pending, quiet] };
-  assert.deepEqual(roundTrip(SubscriptionList, page), page);
+  assert.deepEqual(answered('subscriptions', 'listAll', page), page);
+  assert.equal(answered('subscriptions', 'get', { ...pending, kind: 'Event' }), undefined);
+  assert.equal(answered('subscriptions', 'listAll', { ...page, kind: 'EventList' }), undefined);
 });
 
 test('REFUSED: a scope whose atLeast is no level', () => {

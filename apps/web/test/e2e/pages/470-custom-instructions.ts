@@ -13,7 +13,7 @@ const CUSTOM = {
   frontmatter: '---\nmodel: opus\n---\nBe bold.',
 } as const;
 
-const route = `/api/custom-instructions/${CUSTOM.agent}`;
+const route = `/api/namespaces/default/agents/${CUSTOM.agent}/instructions`;
 
 const answered = (page: Page, method: 'PUT' | 'DELETE') =>
   page.waitForResponse((r) => r.request().method() === method && new URL(r.url()).pathname === route, { timeout: WAIT_MS });

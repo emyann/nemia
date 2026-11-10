@@ -25,6 +25,8 @@ import {
 import { PLACES } from '../keys/index.ts';
 import {
   codexModeLine,
+  FORMER_HARNESS_PROMPTS,
+  FORMER_KEYS,
   formerKeyLine,
   formerKeysIn,
   formerFenceIn,
@@ -300,13 +302,22 @@ const OutputSchemaSchema = Schema.StructWithRest(
 );
 
 /**
+ * The words a former `systemPrompt:` line said: each former word of `harnessPrompt:` (`FORMER_HARNESS_PROMPTS`), and each word of it that
+ * kept its name (`no-coding`).
+ */
+const SYSTEM_PROMPT_WORDS: readonly string[] = [
+  ...Object.keys(FORMER_HARNESS_PROMPTS),
+  ...HARNESS_PROMPTS.filter((word) => !Object.values(FORMER_HARNESS_PROMPTS).includes(word)),
+];
+
+/**
  * The agent a step names, as the parser resolves it (`StepAgent`): each key it gives one a step has (`STEP_KEYS`) or had (`FORMER_KEYS`),
  * its harness prompt under its name now or its former one, in the words each had (`FORMER_OWN_KEYS`), every other key kept.
  */
 const StepAgentSchema = Schema.StructWithRest(
   Schema.Struct({
     name: Schema.String,
-    keys: Schema.mutable(Schema.Array(Schema.Literals([...STEP_KEYS, 'disallow', 'allow']))),
+    keys: Schema.mutable(Schema.Array(Schema.Literals([...STEP_KEYS, ...Object.keys(FORMER_KEYS)]))),
     body: Schema.String,
     given: Schema.Record(Schema.String, Schema.String),
     instructions: Schema.optionalKey(Schema.String),
@@ -317,7 +328,7 @@ const StepAgentSchema = Schema.StructWithRest(
     agentDenies: Schema.optionalKey(Strings),
     harnessPrompt: Schema.optionalKey(Schema.Literals(HARNESS_PROMPTS)),
     mcp: Schema.optionalKey(Strings),
-    systemPrompt: Schema.optionalKey(Schema.Literals(['default', 'no-coding', 'own'])),
+    systemPrompt: Schema.optionalKey(Schema.Literals(SYSTEM_PROMPT_WORDS)),
   }),
   Rest,
 );

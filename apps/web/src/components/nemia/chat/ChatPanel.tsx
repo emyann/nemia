@@ -24,7 +24,7 @@ import { useEffect } from 'react';
 import { CutFrame } from '@/components/look';
 import { askInWords, wordsAnswer } from '@/lib/chatFollowing';
 import { composerButton, composerWords, sessionOf } from '@/lib/nemia';
-import type { NemiaLevel } from '@/lib/api';
+import type { NemiaLevel } from '@/lib/api/nemia';
 import type { Presence } from '@/lib/presence';
 import type { NemiaChat } from '@/lib/useNemiaChat';
 import { cn } from '@/lib/utils';

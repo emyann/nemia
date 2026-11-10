@@ -16,7 +16,7 @@
     },
     {
       "term": "Ask route",
-      "meaning": "a person's ask of a run over HTTP, one route per command of the orchestrator's table: another try, or with `\"round\": true` another round of the loop the step closes, on `POST /api/namespaces/:namespace/runs/:name/steps/:step/retry`; an approval at a gate, or of a loop out of rounds as it stands, on `POST /api/namespaces/:namespace/runs/:name/steps/:step/approve`; the new revisions, or with `\"base\": true` a merge of the base into a loop's work, on `POST /api/namespaces/:namespace/runs/:name/refresh`: named actions of objects' `Api`, served by `apps/api/src/objects/runs.ts` through the pipeline of `apps/api/src/commands/routes.ts`.",
+      "meaning": "a person's ask of a run over HTTP, one route per command of the orchestrator's table: another try, or with `\"round\": true` another round of the loop the step closes, on `POST /api/namespaces/:namespace/runs/:name/steps/:step/retry`; an approval at a gate, or of a loop out of rounds as it stands, on `POST /api/namespaces/:namespace/runs/:name/steps/:step/approve`; the new revisions, or with `\"base\": true` a merge of the base into a loop's work, on `POST /api/namespaces/:namespace/runs/:name/refresh`: named actions of objects' `Api`, served by `apps/api/src/objects/runs.ts`, each handler calling the orchestrator's entry by its exported name with its typed `input`.",
       "retired": [
         {
           "spelling": "/round",
@@ -108,7 +108,6 @@
     {
       "term": "Phase / reason / message",
       "meaning": "what each step and each try carries at the api: its `phase` and its `reason`, the codes a reader groups and compares, and its `message`, the sentence a person reads and nothing compares.",
-      "type": "RunAnswer",
       "see": {
         "label": "The api",
         "href": "/map/#the-api"
@@ -129,7 +128,6 @@
     {
       "term": "Verdict",
       "meaning": "a check's verdict at the api, as codes, its `result` and its `exit`, on a step and on its `StepCheck`, null where no check judged it; the word a person reads for it is the board's to draw.",
-      "type": "StepCheck",
       "see": {
         "label": "The api",
         "href": "/map/#the-api"
@@ -138,7 +136,6 @@
     {
       "term": "Waiting on you",
       "meaning": "`waitingOnYou`: the steps of a run that wait on a person, in order; `waitingOnYouWords`, the same steps as `nemia ls` names them (`approve plan` for a step at its gate); and, on a run's `--after` wait and its hold, `waitingOnYou` whether only a person ends it.",
-      "type": "RunAnswer",
       "retired": [
         {
           "spelling": "onYou",

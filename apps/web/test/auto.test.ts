@@ -1,7 +1,7 @@
 /**
- * An agent's rules for Auto on the board: the mirror of what the api answers, which decodes the rules in force, the proposal and the
- * custom instruction (its shape held by `test/wire.test.ts`), and the writes of a confirm, sending the words the person read, and a drop,
- * with an empty body, each on its route.
+ * An agent's rules for Auto on the board: what the api answers, decoded by `objects`' schemas — the rules in force, the proposal and the
+ * custom instruction (`AgentInstructions`) — and the writes of a confirm, sending the words the person read, and a drop, each on its
+ * route.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -63,14 +63,14 @@ test('policyQuery, confirmRule, dropRule: her rules read back as the api answers
     assert.deepEqual(await readAuto(), { ...LIST, proposed: null, instruction: null });
   });
   await t.test(
-    'a confirm is a PUT sending the words read and a drop a DELETE sending an empty body, each reading the rules back',
+    'a confirm is a PUT sending the words read and a drop a DELETE sending no body (its endpoint declares none), each reading the rules back',
     async (t) => {
       const calls = answering(t, LIST);
       assert.deepEqual(await confirmRule('nemia', 'tries', 'Try again.'), LIST);
       assert.deepEqual(await dropRule('nemia', 'default'), LIST);
       assert.deepEqual(calls, [
         { method: 'PUT', path: '/api/policy/nemia/rules/tries', body: { words: 'Try again.' } },
-        { method: 'DELETE', path: '/api/policy/nemia/rules/default', body: {} },
+        { method: 'DELETE', path: '/api/policy/nemia/rules/default', body: undefined },
       ]);
     },
   );

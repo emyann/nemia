@@ -1,5 +1,5 @@
 import { MarkerType } from '@xyflow/react';
-import type { RunView, StepView } from '../../lib/runView';
+import type { RunDetail, StepView } from '../../lib/runView';
 import { edgesOf, edgeStroke, LOOP_SOURCE, LOOP_TARGET, type EdgeState } from '../../lib/canvas';
 import { contextEdges, runEdges } from '../../lib/factory';
 import { nodeKinds, routedOf, routesOf, takenRoutes } from '../../lib/routing';
@@ -12,7 +12,7 @@ import type { StepNodeData } from './StepNode';
  * `waitingOnYou` decides the human gate beside the step's own word; for a condition or a workflow node, its graph node, and what its
  * sentence says of its route or its card (`routedOf`).
  */
-export const stepData = (run: RunView, index: number): StepNodeData => ({
+export const stepData = (run: RunDetail, index: number): StepNodeData => ({
   step: run.steps[index],
   index,
   runCancelled: run.cancelledAt !== null,
@@ -49,7 +49,7 @@ function drawn(id: string, source: string, target: string, state: EdgeState, loo
  * state (`stepState`), its note, its round due and the route it took (`takenRoutes`, off its `message`) are read from. A run's view is
  * one; a workflow's steps, none of them started, are another.
  */
-export type StepGraphFacts = Pick<RunView, 'cancelledAt' | 'holding' | 'graph'> & {
+export type StepGraphFacts = Pick<RunDetail, 'cancelledAt' | 'holding' | 'graph'> & {
   readonly steps: ReadonlyArray<Pick<StepView, 'name' | 'phase' | 'reason' | 'on' | 'via' | 'note' | 'roundDue' | 'message'>>;
 };
 

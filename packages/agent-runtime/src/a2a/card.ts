@@ -95,7 +95,7 @@ const RequirementSchema = held({
 });
 
 /** An A2A 1.0 agent card, in what the runtime reads of it. */
-export const CardSchema = held({
+const CardSchema = held({
   supportedInterfaces: Schema.Array(InterfaceSchema).check(Schema.isMinLength(1, { message: 'Expected at least one interface' })),
   securitySchemes: Schema.optional(Schema.Record(Schema.String, SchemeSchema)),
   securityRequirements: Schema.optional(Schema.Array(RequirementSchema)),

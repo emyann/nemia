@@ -1,5 +1,6 @@
 import type { DefinitionOrigin } from 'objects';
-import type { GivenSkill, SkillCost, SkillDetail, SkillDraft, SkillPlace, SkillRow, SkillSource, SkillUser } from './api';
+import type { GivenSkill, SkillCost, SkillSource } from './api/library.ts';
+import type { SkillDetail, SkillDraft, SkillPlace, SkillRow, SkillUser } from './api/skills.ts';
 
 /** What each place of skills is called on the board. */
 export const PLACE_LABELS: Readonly<Record<SkillSource, string>> = {

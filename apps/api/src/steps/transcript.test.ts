@@ -14,7 +14,7 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { StepTranscript } from './steps.ts';
+import type { StepTranscript } from 'objects';
 import { app } from '../app.ts';
 import { engine } from 'agent-orchestrator';
 

@@ -2,7 +2,7 @@
  * A write or a removal of an agent or a skill, judged against the version it was read at (agent-orchestrator, src/agents/agents.ts,
  * `definitionVersionRefusal`): what is at its name now (`DefinitionThere`), the version the writer read it at, if any, and the refusal's
  * kind, or null where the act goes on. The Workflow door's laws (`workflow-version.contract.ts`), in a definition's words: one that is
- * not held but something else is at its name is `other`. The words are nobody's law; the kind is the api's answer (`REFUSAL_STATUS`).
+ * not held but something else is at its name is `other`. The words are nobody's law; the kind is the api's answer (its `refusedAs`).
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 import type { VersionRefused } from '../src/folder/folder.ts';

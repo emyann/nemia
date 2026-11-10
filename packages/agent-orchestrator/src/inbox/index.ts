@@ -23,3 +23,4 @@ export {
 } from './inbox.ts';
 export type { CardListing, CardRun, CardState, InboxCard, InboxListing, LabelsShown, QueueStarted, MissedStart } from './inbox.ts';
 export { queueFactoryRefusal } from './queue-factory.ts';
+export { INBOX_COLUMNS, inboxCells } from './table.ts';

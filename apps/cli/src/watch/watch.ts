@@ -293,11 +293,12 @@ const stretch = (asked: Asked, at: At, live: { state: 'up' | 'down'; base: strin
 const SIGNALS = (['SIGINT', 'SIGTERM', 'SIGHUP'] as const).map((s) => [s, 128 + os.constants.signals[s]] as const);
 
 /**
- * Runs `program` until it ends or a signal interrupts it; on a signal, exits 128 and its number once its finalizers ran, as the
- * orchestrator's `runMain` does; else resolves its value or rejects with its failure.
+ * Runs `program`, which never ends of itself, until a signal interrupts it; resolves 128 and the signal's number once its finalizers
+ * ran, as the orchestrator's `runMain` exits, and leaves the exit to the bin, which waits for what was printed to drain; rejects with
+ * its failure.
  */
-function runMain<A, E>(program: Effect.Effect<A, E>): Promise<A> {
-  return new Promise<A>((resolve, reject) => {
+function runMain<E>(program: Effect.Effect<never, E>): Promise<number> {
+  return new Promise<number>((resolve, reject) => {
     let stoppedWith: number | undefined;
     const fiber = Effect.runFork(program);
     const stops = SIGNALS.map(([signal, code]) => {
@@ -310,9 +311,8 @@ function runMain<A, E>(program: Effect.Effect<A, E>): Promise<A> {
     });
     fiber.addObserver((exit) => {
       for (const [signal, stop] of stops) process.off(signal, stop);
-      if (stoppedWith !== undefined) process.exit(stoppedWith);
-      if (Exit.isSuccess(exit)) resolve(exit.value);
-      else reject(Cause.squash(exit.cause));
+      if (stoppedWith !== undefined) resolve(stoppedWith);
+      else if (Exit.isFailure(exit)) reject(Cause.squash(exit.cause));
     });
   });
 }

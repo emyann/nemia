@@ -52,5 +52,8 @@ run on the orchestrator's own CLI, spawned with the same words (`src/local.ts`).
 - **A refusal is a `Refused` (`src/refused.ts`)**: its words name the command to type next and its `code` is the exit code, 2 for a
   usage refusal; the bin prints the words and exits with the code. A test asserts the code and that a command is named, never the
   sentence.
+- **A bin ends through `exited` (`src/exited.ts`)**, which exits with the code once stdout and stderr have drained: a bare
+  `process.exit` drops what a pipe has not taken yet, past its 64 KiB (`apps/cli/test/pipe.test.ts`). `nemia watch` stopped by a
+  signal answers its code to the bin rather than exiting itself.
 - **The source is under `noUncheckedIndexedAccess`, and lint refuses a `!`** there, as in the orchestrator and the api. Tests run from
   this folder: `node --test test/<file>`.

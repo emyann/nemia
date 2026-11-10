@@ -21,7 +21,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { approvalFile, approveRun, askFile, list, retryRun, runStore } from 'agent-orchestrator';
+import { approvalFile, approveRun, askFile, list, retryRun, runsAtOnce } from 'agent-orchestrator';
 import { answerText, approvedAnswerText, onYouWords, type Question } from 'agent-orchestrator/run';
 import { parseWorkflow } from 'agent-orchestrator/workflow';
 import { Effect } from 'effect';
@@ -368,7 +368,7 @@ test('a person approves a gate on the board: the need on the list and the detail
       assert.deepEqual(run.status.waitingOnYou, ['plan']);
       assert.deepEqual(run.status.waitingOnYouWords, ['approve plan']);
 
-      const words = await runWith(engine(), list(engine(), runStore(root).runs.read(R)));
+      const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)));
       assert.deepEqual(run.status.waitingOnYouWords, onYouWords(words), 'as `nemia ls` has it after `→ waiting on you:`');
       const listed = await summary();
       assert.deepEqual(listed.waitingOnYou, words.waitingOnYou);
@@ -442,7 +442,7 @@ test('a person approves a gate on the board: the need on the list and the detail
     assert.deepEqual(plan.gate, { awaiting: false, approval: { try: 1, at: took.at, message: 'Ship the second reading.' } });
     assert.equal(plan.approve, null);
     assert.deepEqual([run.status.waitingOnYou, run.status.waitingOnYouWords], [[], []]);
-    const words = await runWith(engine(), list(engine(), runStore(root).runs.read(R)));
+    const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)));
     assert.equal(plan.message, words.steps.find((s) => s.name === 'plan')?.message, 'as `nemia ls` has it until the tick files what waits');
     assert.deepEqual((await summary()).waitingOnYou, words.waitingOnYou, 'and nobody waited on, as `nemia ls` has it');
   });

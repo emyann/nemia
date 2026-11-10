@@ -13,7 +13,7 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 import { app } from '../app.ts';
-import { addToInbox, fromNote, inboxDir, startFromInbox, runStore, engine, StoreRoot } from 'agent-orchestrator';
+import { addToInbox, fromNote, inboxDir, startFromInbox, runsAtOnce, engine, StoreRoot } from 'agent-orchestrator';
 import { addFactory } from 'agent-orchestrator/testing';
 import { runWith } from '../../test/builtin-place.ts';
 import { objectOf, linesOf } from '../../test/run-reads.ts';
@@ -175,7 +175,7 @@ test('a person starts a card: the run carries where it came from, and the card s
       assert.deepEqual(answered, { id: answered.id, card: card.name }, 'the answer says no removal: the card is kept');
       assert.equal(res.headers.get('location'), `/api/runs/${answered.id}`);
 
-      const run = runStore(root).runs.read(answered.id);
+      const run = runsAtOnce(root).runs.read(answered.id);
       assert.deepEqual(
         { from: run.from, brief: run.brief, workflowDir: run.workflowDir, repo: run.repo, after: run.after },
         {
@@ -199,7 +199,7 @@ test('a person starts a card: the run carries where it came from, and the card s
       const { card: plain } = onStore(addToInbox({ text: 'Keep the brief\n\nAs the card says it.' }));
       const bodied = await startCard({ workflow: 'mine', card: plain.name });
       assert.equal(bodied.status, 201, await bodied.clone().text());
-      const bodiedRun = runStore(root).runs.read(((await bodied.json()) as CardStarted).id);
+      const bodiedRun = runsAtOnce(root).runs.read(((await bodied.json()) as CardStarted).id);
       assert.deepEqual(
         [bodiedRun.brief, bodiedRun.workflowDir, bodiedRun.from],
         ['Keep the brief\n\nAs the card says it.', mine, { inbox: plain.name }],
@@ -221,7 +221,7 @@ test('a person starts a card: the run carries where it came from, and the card s
       const lines = await linesOf(app, id);
       assert.equal(
         lines.fromNote,
-        fromNote(runStore(root).runs.read(id)),
+        fromNote(runsAtOnce(root).runs.read(id)),
         "`nemia decide`'s sentence is the lines read's alone: the object leaves it out",
       );
       assert.equal(lines.fromNote, `from inbox card ${card.name}`);
@@ -532,7 +532,7 @@ test("a person files cards, in a factory and out of one, lists them, opens a car
       const started = await startCard({ workflow: 'dev', card: name });
       assert.equal(started.status, 201, await started.clone().text());
       assert.equal(
-        runStore(root).runs.read(((await started.json()) as CardStarted).id).repo,
+        runsAtOnce(root).runs.read(((await started.json()) as CardStarted).id).repo,
         repo,
         'started, the run names the repository as the api does, so the board lists it with the runs on it',
       );

@@ -21,7 +21,7 @@ import { story } from 'test-kit/checkpoints';
 import { linesOf, listedOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
 import { workflowsListed } from '../../test/definitions.ts';
-import { addToInbox, loadWorkflows, readInbox, runStore, hireRefusalOf, unfilledRefusal, StoreRoot } from 'agent-orchestrator';
+import { addToInbox, loadWorkflows, readInbox, runsAtOnce, hireRefusalOf, unfilledRefusal, StoreRoot } from 'agent-orchestrator';
 import { addFactory, attachWorkflow, clearSchedule, hireAgent, removeFactory, setSchedule } from 'agent-orchestrator/testing';
 import { Effect } from 'effect';
 
@@ -270,7 +270,7 @@ test('a person works in a factory with hires: the listing names what is unfilled
       const res = await post('/api/namespaces/hired/runs', { workflow: 'alpha', brief: 'Add a cache' });
       assert.equal(res.status, 201, await res.clone().text());
       const { id } = (await res.json()) as { id: string };
-      const run = runStore(root).runs.read(id);
+      const run = runsAtOnce(root).runs.read(id);
       assert.deepEqual([run.factory, run.repo, run.workflowDir], ['hired', repoR, path.join(repoR, 'workflows', 'alpha')]);
 
       const listed = await listedOf(app, id);
@@ -301,7 +301,7 @@ test('a person works in a factory with hires: the listing names what is unfilled
       const res = await post(`/api/namespaces/default/cards/${card.name}/start?factory=hired`, { workflow: 'alpha' });
       assert.equal(res.status, 201, await res.clone().text());
       const { id } = (await res.json()) as { id: string };
-      const run = runStore(root).runs.read(id);
+      const run = runsAtOnce(root).runs.read(id);
       assert.deepEqual([run.factory, run.repo, run.from?.inbox], ['hired', repoR, card.name]);
       assert.deepEqual(
         onStore(readInbox()).find((c) => c.name === card.name)?.startedAs,
@@ -367,7 +367,7 @@ test('POST /api/namespaces/default/runs as shipped: the factory a start that nam
     const repoT = asShipped(t);
     const res = await post(`/api/namespaces/default/runs?repo=${encodeURIComponent(repoT)}`, { workflow: 'delta', brief: 'Add a cache' });
     assert.equal(res.status, 201, await res.clone().text());
-    const run = runStore(root).runs.read(((await res.json()) as { id: string }).id);
+    const run = runsAtOnce(root).runs.read(((await res.json()) as { id: string }).id);
     assert.deepEqual([run.factory, run.repo], ['trio', repoT]);
   });
 
@@ -403,7 +403,7 @@ test('POST /api/namespaces/default/runs as shipped: the factory a start that nam
         brief: 'Add a cache',
       });
       assert.equal(res.status, 201, await res.clone().text());
-      const run = runStore(root).runs.read(((await res.json()) as { id: string }).id);
+      const run = runsAtOnce(root).runs.read(((await res.json()) as { id: string }).id);
       assert.deepEqual([run.factory, run.repo], ['trio', repoT], 'started in the one factory that holds its repository');
     },
   );
@@ -605,7 +605,7 @@ test('a person reads the factories: the default first, each by name, a broken fi
 
         const res = await post('/api/namespaces/treed/runs', { workflow: 'alpha', brief: 'Add a cache' });
         assert.equal(res.status, 201, await res.clone().text());
-        const run = runStore(root).runs.read(((await res.json()) as { id: string }).id);
+        const run = runsAtOnce(root).runs.read(((await res.json()) as { id: string }).id);
         assert.deepEqual([run.factory, run.repo, run.workflowDir], ['treed', repoR, path.join(tree, 'workflows', 'alpha')]);
       } finally {
         removeFactory('treed');

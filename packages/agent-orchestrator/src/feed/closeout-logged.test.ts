@@ -5,7 +5,7 @@
  * makes one.
  *
  * A file of its own, since the feed is the store's one file and a run another test file's passes do not name would be said `removed`
- * there. `WF_ROOT` is read as the module loads, so it is set before the import.
+ * there.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,11 +16,10 @@ import { StoreRoot } from '../config/root.store.ts';
 import { parseCloseout } from '../closeout/closeout.ts';
 import type { FeedCloseout, FeedWords } from './feed.ts';
 import { scratch } from 'test-kit/scratch';
+import { emitFeed } from './feed.verb.ts';
+import { freshFeedMemo } from './feed.store.ts';
 
 const ROOT = scratch('wf-closeout-logged-');
-process.env.WF_ROOT = ROOT;
-const { emitFeed } = await import('./feed.verb.ts');
-const { freshFeedMemo } = await import('./feed.store.ts');
 
 /** One log record as the test logger kept it: its level, its message, and the annotations it was written under. */
 type Kept = { level: string; message: unknown; annotations: Record<string, unknown> };

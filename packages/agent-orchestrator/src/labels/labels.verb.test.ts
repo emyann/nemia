@@ -7,18 +7,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Exit, Layer } from 'effect';
 import { names } from '../../test/assessed.ts';
-import { scratch } from 'test-kit/scratch';
-
-process.env.WF_ROOT = scratch('wf-labels-verb-');
-const { labelCard, labelRun } = await import('./labels.verb.ts');
-const { LABEL_RUN } = await import('./commands.verb.ts');
-const { RunDoor } = await import('../runs/runs.store.ts');
-const { runDoorMemory } = await import('../runs/memory.store.ts');
-const { CardDoor } = await import('../cards/cards.store.ts');
-const { cardDoorMemory } = await import('../cards/memory.store.ts');
-const { CardName } = await import('../inbox/inbox.model.ts');
-const { RunId } = await import('../record/record.model.ts');
-const { aRun } = await import('../../test/run-walks.ts');
+import { labelCard, labelRun } from './labels.verb.ts';
+import { LABEL_RUN } from './commands.verb.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { runDoorMemory } from '../runs/memory.store.ts';
+import { CardDoor } from '../cards/cards.store.ts';
+import { cardDoorMemory } from '../cards/memory.store.ts';
+import { CardName } from '../inbox/inbox.model.ts';
+import { RunId } from '../record/record.model.ts';
+import { aRun } from '../../test/run-walks.ts';
 
 /** A program run over fresh memory doors, a run `r-1` and a card `cache-a1` planted first: its exit. */
 function over<A, E>(program: Effect.Effect<A, E>, card = '---\nworkflow: build\nfrom: a-1x2y\n---\nCache the views.\n') {

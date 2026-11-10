@@ -6,7 +6,7 @@
  * what the file ends up saying. `feedPhase` is a total table (`FEED_WORD`), held end to end by `test/run-feed.test.ts`.
  *
  * A run's feed as the tick writes it, pass by pass, and `nemia watch` reading it, is `test/run-feed.test.ts`'s; the hub and its live
- * readers `feed.verb.test.ts`'s. `WF_ROOT` is read as the module loads, so it is set before the import.
+ * readers `feed.verb.test.ts`'s.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -39,18 +39,18 @@ import { listing as coded, listingInput, type ListedInput } from '../../test/ass
 import { reasonOf } from './reason.ts';
 import { factoryLevelOf, type FactoryLevel, type FactoryLevelFile } from '../level/level.ts';
 import { codedStep, runCodes, type CodedStep } from '../phase/phase.ts';
-import { rootNow } from '../../test/config-given.ts';
+import * as store from './feed.store.ts';
+import { main, watchPrinted, watching } from '../cli/main.ts';
+import { engineOf } from '../runtime-client.ts';
+import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-feed-');
 const FEED = path.join(ROOT, 'feed.jsonl');
 
-process.env.WF_ROOT = ROOT;
-const store = await import('./feed.store.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 const { feedCursorRefusal, freshFeedMemo, readFeed, watchFeed } = store;
 /** The lines the feed's writer wrote (`recordFeed`), as a pass hands it what it judged. */
 const recordFeed = (...args: Parameters<typeof store.recordFeed>) => store.recordFeed(...args).lines;
-const { main, watchPrinted, watching } = await import('../cli/main.ts');
-const { engineOf } = await import('../runtime-client.ts');
 
 /** Refused by name: exit 2, and the message — never `String(err)`, which starts with `Error: `. */
 const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && pattern.test(err.message);
@@ -59,9 +59,9 @@ const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) =>
 const emptyStore = () => fs.rmSync(FEED, { force: true });
 
 /** Every line in the feed, read off the file as a reader with cursor 0 would. */
-const lines = (): RunLine[] => readFeed(rootNow(), 0).lines.filter(isRunLine);
+const lines = (): RunLine[] => readFeed(ROOT, 0).lines.filter(isRunLine);
 /** The store's lines in the feed: its pause put and lifted. */
-const storeLines = (): StoreLine[] => readFeed(rootNow(), 0).lines.filter(isStoreLine);
+const storeLines = (): StoreLine[] => readFeed(ROOT, 0).lines.filter(isStoreLine);
 const size = (): number => fs.statSync(FEED, { throwIfNoEntry: false })?.size ?? 0;
 
 /** What a pass judged of a step at work, with the calls `denials` says it was denied, and the labels a filing gives it. */
@@ -108,7 +108,7 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
       const push = { step: 'plan', try: 1, call: 'Bash(git push)' };
       const memo = freshFeedMemo();
       const at = '2026-10-16T04:00:00.000Z';
-      for (let i = 0; i < 10; i++) recordFeed(rootNow(), new Map([['r-1', atWork([push])]]), { at, memo });
+      for (let i = 0; i < 10; i++) recordFeed(ROOT, new Map([['r-1', atWork([push])]]), { at, memo });
       assert.deepEqual(
         shots(),
         [
@@ -131,14 +131,14 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
         "the message a person reads is the owner's wording",
       );
 
-      recordFeed(rootNow(), new Map([['r-1', atWork([push, push])]]), { at, memo });
-      recordFeed(rootNow(), new Map([['r-1', atWork([push, push])]]), { at, memo });
+      recordFeed(ROOT, new Map([['r-1', atWork([push, push])]]), { at, memo });
+      recordFeed(ROOT, new Map([['r-1', atWork([push, push])]]), { at, memo });
       assert.equal(shots().length, 2, 'the same call denied a second time in the same try is one more line, and no repeat of the first');
 
       const restarted = freshFeedMemo();
-      recordFeed(rootNow(), new Map([['r-1', atWork([push, push])]]), { at, memo: restarted });
+      recordFeed(ROOT, new Map([['r-1', atWork([push, push])]]), { at, memo: restarted });
       assert.equal(shots().length, 2, 'a daemon with no fold reads the feed and writes neither of them again');
-      recordFeed(rootNow(), new Map([['r-1', atWork([push, push, push])]]), { at, memo: restarted });
+      recordFeed(ROOT, new Map([['r-1', atWork([push, push, push])]]), { at, memo: restarted });
       assert.equal(shots().length, 3, 'nor misses the third');
     },
   );
@@ -147,19 +147,19 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
     const memo = freshFeedMemo();
     const at = '2026-10-16T04:00:00.000Z';
     const first = { step: 'plan', try: 1, call: 'Bash(ls)' };
-    recordFeed(rootNow(), new Map([['r-1', atWork([first])]]), { at, memo });
+    recordFeed(ROOT, new Map([['r-1', atWork([first])]]), { at, memo });
     assert.equal(shots().length, 1);
     const reworded = freshFeedMemo();
-    recordFeed(rootNow(), new Map([['r-1', atWork([{ ...first, call: 'Bash(ls) — reworded by a newer nemia' }])]]), { at, memo: reworded });
+    recordFeed(ROOT, new Map([['r-1', atWork([{ ...first, call: 'Bash(ls) — reworded by a newer nemia' }])]]), { at, memo: reworded });
     assert.equal(shots().length, 1, 'a denial of the same step and try, worded anew, is the one the feed holds — not a second');
-    recordFeed(rootNow(), new Map([['r-1', atWork([first, { ...first, try: 2 }])]]), { at, memo: freshFeedMemo() });
+    recordFeed(ROOT, new Map([['r-1', atWork([first, { ...first, try: 2 }])]]), { at, memo: freshFeedMemo() });
     assert.equal(shots().length, 2, 'and the same call on another try is its own line');
   });
   await t.test("a person's act is one line per act, never one per pass — and a restarted daemon writes it neither again nor never", () => {
     emptyStore();
     const memo = freshFeedMemo();
     const acts = withOnce({ acts: [APPROVED, CANCELLED], held: '2026-10-16T03:45:00.000Z' });
-    for (let i = 0; i < 10; i++) recordFeed(rootNow(), new Map([['r-1', acts]]), { at: AT, memo });
+    for (let i = 0; i < 10; i++) recordFeed(ROOT, new Map([['r-1', acts]]), { at: AT, memo });
     assert.deepEqual(
       [...said('Approved'), ...said('CancelAsked'), ...said('HoldPut')],
       [
@@ -203,7 +203,7 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
     );
 
     const restarted = freshFeedMemo();
-    for (let i = 0; i < 3; i++) recordFeed(rootNow(), new Map([['r-1', acts]]), { at: AT, memo: restarted });
+    for (let i = 0; i < 3; i++) recordFeed(ROOT, new Map([['r-1', acts]]), { at: AT, memo: restarted });
     assert.equal(
       [...said('Approved'), ...said('CancelAsked'), ...said('HoldPut')].length,
       3,
@@ -214,9 +214,9 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
     emptyStore();
     const memo = freshFeedMemo();
     const first = { acts: [APPROVED] };
-    recordFeed(rootNow(), new Map([['r-1', withOnce(first)]]), { at: AT, memo });
+    recordFeed(ROOT, new Map([['r-1', withOnce(first)]]), { at: AT, memo });
     const again = { run: 'r-1', step: 'plan', word: 'approved', note: 'try 2 · at 2026-10-16T05:00:00.000Z', try: 2 };
-    for (let i = 0; i < 3; i++) recordFeed(rootNow(), new Map([['r-1', withOnce({ acts: [APPROVED, again] })]]), { at: AT, memo });
+    for (let i = 0; i < 3; i++) recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [APPROVED, again] })]]), { at: AT, memo });
     assert.deepEqual(
       said('Approved').map((l) => [l.try, l.note]),
       [
@@ -231,9 +231,9 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
     const memo = freshFeedMemo();
     const put = '2026-10-16T03:45:00.000Z';
     const none = { acts: [] };
-    for (let i = 0; i < 2; i++) recordFeed(rootNow(), new Map([['r-1', withOnce({ ...none, held: put })]]), { at: AT, memo });
+    for (let i = 0; i < 2; i++) recordFeed(ROOT, new Map([['r-1', withOnce({ ...none, held: put })]]), { at: AT, memo });
     assert.equal(said('HoldLifted').length, 0, 'while the hold stands, no lift is due');
-    for (let i = 0; i < 10; i++) recordFeed(rootNow(), new Map([['r-1', withOnce(none)]]), { at: AT, memo });
+    for (let i = 0; i < 10; i++) recordFeed(ROOT, new Map([['r-1', withOnce(none)]]), { at: AT, memo });
     assert.deepEqual(
       said('HoldLifted'),
       [
@@ -252,8 +252,8 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
     );
 
     const again = '2026-10-16T06:00:00.000Z';
-    for (let i = 0; i < 2; i++) recordFeed(rootNow(), new Map([['r-1', withOnce({ ...none, held: again })]]), { at: AT, memo });
-    for (let i = 0; i < 5; i++) recordFeed(rootNow(), new Map([['r-1', withOnce(none)]]), { at: AT, memo });
+    for (let i = 0; i < 2; i++) recordFeed(ROOT, new Map([['r-1', withOnce({ ...none, held: again })]]), { at: AT, memo });
+    for (let i = 0; i < 5; i++) recordFeed(ROOT, new Map([['r-1', withOnce(none)]]), { at: AT, memo });
     assert.deepEqual(
       [said('HoldPut').map((l) => l.note), said('HoldLifted').map((l) => l.note)],
       [
@@ -263,7 +263,7 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
       'a hold put, lifted, put and lifted again is two puts and two lifts, each told apart by the moment its hold was put',
     );
     const restarted = freshFeedMemo();
-    for (let i = 0; i < 3; i++) recordFeed(rootNow(), new Map([['r-1', withOnce(none)]]), { at: AT, memo: restarted });
+    for (let i = 0; i < 3; i++) recordFeed(ROOT, new Map([['r-1', withOnce(none)]]), { at: AT, memo: restarted });
     assert.equal(said('HoldLifted').length, 2, 'and a daemon with no fold writes neither lift a second time');
   });
   await t.test(
@@ -272,8 +272,8 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
       emptyStore();
       const memo = freshFeedMemo();
       const put = '2026-10-16T03:45:00.000Z';
-      recordFeed(rootNow(), new Map([['r-1', withOnce({ acts: [], held: put })]]), { at: AT, memo });
-      for (let i = 0; i < 10; i++) recordFeed(rootNow(), new Map([['r-1', withOnce({ acts: [], lifted: put })]]), { at: AT, memo });
+      recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [], held: put })]]), { at: AT, memo });
+      for (let i = 0; i < 10; i++) recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [], lifted: put })]]), { at: AT, memo });
       assert.deepEqual(
         said('HoldLifted'),
         [
@@ -296,7 +296,7 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
     emptyStore();
     const memo = freshFeedMemo();
     const put = '2026-10-16T03:45:00.000Z';
-    for (let i = 0; i < 10; i++) recordFeed(rootNow(), new Map([['r-1', withOnce({ acts: [], lifted: put })]]), { at: AT, memo });
+    for (let i = 0; i < 10; i++) recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [], lifted: put })]]), { at: AT, memo });
     assert.deepEqual(
       [...said('HoldPut'), ...said('HoldLifted')].map((l) => [l.word, l.note, l.source]),
       [
@@ -314,7 +314,7 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
       const put = '2026-10-16T03:45:00.000Z';
       const again = '2026-10-16T06:00:00.000Z';
       const why = 'need to put the laptop on sleep';
-      const pass = (pause: FeedPause, m = memo) => recordFeed(rootNow(), new Map(), { at: AT, memo: m, pause });
+      const pass = (pause: FeedPause, m = memo) => recordFeed(ROOT, new Map(), { at: AT, memo: m, pause });
       const words = () => storeLines().map((l) => [l.word, l.note]);
       const told = () => storeLines().map((l) => [l.by, l.why, l.message]);
       await t.test('a pause that stands is one put over many passes, saying who put it and why beside its note', () => {
@@ -361,8 +361,8 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
       await t.test('a caller that read no pause says nothing of the store, however the feed stands', () => {
         pass({ at: '2026-10-16T07:00:00.000Z' });
         const before = storeLines().length;
-        recordFeed(rootNow(), new Map(), { at: AT, memo });
-        recordFeed(rootNow(), new Map(), { at: AT, memo: freshFeedMemo() });
+        recordFeed(ROOT, new Map(), { at: AT, memo });
+        recordFeed(ROOT, new Map(), { at: AT, memo: freshFeedMemo() });
         assert.equal(storeLines().length, before, 'no absence is read where nobody looked');
       });
     },
@@ -375,7 +375,7 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
       const at = Date.parse(AT);
       const until = new Date(at + 3_600_000).toISOString();
       const row = (factory: string, file: FactoryLevelFile | undefined, when = at) => factoryLevelOf(factory, file, 'manual', when);
-      const pass = (levels: FactoryLevel[], m = memo) => recordFeed(rootNow(), new Map(), { at: AT, memo: m, levels });
+      const pass = (levels: FactoryLevel[], m = memo) => recordFeed(ROOT, new Map(), { at: AT, memo: m, levels });
       const said = () => storeLines().map((l) => [l.labels?.factory, l.note]);
       const AUTO: FactoryLevelFile = { level: 'auto', since: AT };
       const RAISED: FactoryLevelFile = { level: 'semi-auto', since: AT, raise: { level: 'auto', until } };
@@ -411,8 +411,8 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
         assert.equal(storeLines().length, 5);
       });
       await t.test('a caller that read no levels says nothing of them, however the feed stands', () => {
-        recordFeed(rootNow(), new Map(), { at: AT, memo });
-        recordFeed(rootNow(), new Map(), { at: AT, memo: freshFeedMemo() });
+        recordFeed(ROOT, new Map(), { at: AT, memo });
+        recordFeed(ROOT, new Map(), { at: AT, memo: freshFeedMemo() });
         assert.equal(storeLines().length, 5, 'no level is read where nobody looked');
       });
       await t.test('a level line naming no factory is no word the fold keeps', () => {
@@ -431,7 +431,7 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
       { run: 'r-1', step: 'plan', word: 'session lost', note: 'try 1', try: 1 },
       { run: 'r-1', step: 'plan', word: 'session lost', note: 'try 1', try: 1 },
     ];
-    for (let i = 0; i < 10; i++) recordFeed(rootNow(), new Map([['r-1', withOnce({ acts: [], faults })]]), { at: AT, memo });
+    for (let i = 0; i < 10; i++) recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [], faults })]]), { at: AT, memo });
     assert.deepEqual(
       [...said('SpawnFailed'), ...said('SessionLost')],
       [
@@ -442,10 +442,10 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
       'two attempts of one try lost are two lines and the spawn refused is a third, each the runtime telling us and waking nobody',
     );
     const restarted = freshFeedMemo();
-    for (let i = 0; i < 3; i++) recordFeed(rootNow(), new Map([['r-1', withOnce({ acts: [], faults })]]), { at: AT, memo: restarted });
+    for (let i = 0; i < 3; i++) recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [], faults })]]), { at: AT, memo: restarted });
     assert.equal([...said('SpawnFailed'), ...said('SessionLost')].length, 3, 'and a daemon with no fold writes none of them again');
     for (let i = 0; i < 2; i++)
-      recordFeed(rootNow(), new Map([['r-1', withOnce({ acts: [], faults: [...faults, faults[1]] })]]), { at: AT, memo: restarted });
+      recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [], faults: [...faults, faults[1]] })]]), { at: AT, memo: restarted });
     assert.equal(said('SessionLost').length, 3, 'nor misses a third attempt lost');
   });
   await t.test('REFUSED: a one-shot holds no entry in the fold — the step says its own word once, however many denials it carries', () => {
@@ -457,10 +457,10 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
       lines()
         .filter((l) => l.step === 'plan' && l.reason !== 'ToolDenied')
         .map((l) => l.word);
-    for (let i = 0; i < 3; i++) recordFeed(rootNow(), new Map([['r-1', atWork([denied])]]), { at, memo });
+    for (let i = 0; i < 3; i++) recordFeed(ROOT, new Map([['r-1', atWork([denied])]]), { at, memo });
     assert.deepEqual(state(), ['running'], "the step's word is said once");
     const done = { ...atWork([denied]), steps: [{ name: 'plan', word: 'unverified · done' }] };
-    for (let i = 0; i < 10; i++) recordFeed(rootNow(), new Map([['r-1', done]]), { at, memo });
+    for (let i = 0; i < 10; i++) recordFeed(ROOT, new Map([['r-1', done]]), { at, memo });
     assert.deepEqual(state(), ['running', 'unverified · done'], 'and its next word once — never again on every pass');
     assert.equal(shots().length, 1, 'and its denial stays one line');
   });
@@ -472,20 +472,20 @@ test('the cursor never passes a partial line: a line being written is not read, 
   const next = JSON.stringify({ at: '2026-09-22T10:00:04.000Z', run: 'r-a', step: 'plan', word: 'pending' });
   fs.writeFileSync(FEED, `${whole}\n${next.slice(0, 20)}`);
 
-  const first = readFeed(rootNow(), 0);
+  const first = readFeed(ROOT, 0);
   assert.deepEqual(
     first.lines.map((l) => l.word),
     ['running'],
   );
   assert.equal(first.cursor, Buffer.byteLength(whole) + 1, 'the cursor stops where the partial line starts');
   assert.deepEqual(
-    readFeed(rootNow(), first.cursor),
+    readFeed(ROOT, first.cursor),
     { lines: [], cursor: first.cursor },
     'and reading from there again reads nothing, and moves nothing',
   );
 
   fs.appendFileSync(FEED, `${next.slice(20)}\n`);
-  const second = readFeed(rootNow(), first.cursor);
+  const second = readFeed(ROOT, first.cursor);
   assert.deepEqual(
     second.lines.map((l) => l.word),
     ['pending'],
@@ -504,7 +504,7 @@ test('readFeed reads every line whose fields are text, whatever its writer signe
     ];
     const good = { at, run: 'r-a', step: 'plan', word: 'pending', note: 'waits on you' };
     fs.writeFileSync(FEED, [...bad, good].map((l) => `${JSON.stringify(l)}\n`).join(''));
-    const read = readFeed(rootNow(), 0);
+    const read = readFeed(ROOT, 0);
     assert.deepEqual(read.lines, [upgraded(good)], 'the one line that reads is read, upgraded to a v1 signal');
     assert.equal(read.cursor, size());
   });
@@ -517,7 +517,7 @@ test('readFeed reads every line whose fields are text, whatever its writer signe
       { at, run: 'r-a', word: 'running', reason: 'ReasonANewerNemiaNamed', apiVersion: 'nemia/v2' },
     ];
     fs.writeFileSync(FEED, half.map((l) => `${JSON.stringify(l)}\n`).join(''));
-    const read = readFeed(rootNow(), 0).lines;
+    const read = readFeed(ROOT, 0).lines;
     assert.equal(read.length, 3, 'no line is dropped for a key it lacks, or for one this nemia does not know');
     assert.deepEqual(
       { reason: read[0].reason, waits: read[0].waits, source: read[0].source },
@@ -559,7 +559,7 @@ test(
         .map((l) => `${l}\n`)
         .join(''),
     );
-    const whole = readFeed(rootNow(), 0);
+    const whole = readFeed(ROOT, 0);
     assert.equal(
       whole.lines.length,
       4,
@@ -568,7 +568,7 @@ test(
 
     const got: { line: FeedLine; cursor: number }[] = [];
     const arrived = bell();
-    const watch = watchFeed(rootNow(), {
+    const watch = watchFeed(ROOT, {
       intervalMs: 20,
       onLine: (l, cursor) => {
         got.push({ line: l, cursor });
@@ -592,12 +592,8 @@ test(
       'every line, once, in order',
     );
     for (const [i, { cursor }] of got.entries()) {
-      assert.equal(feedCursorRefusal(rootNow(), cursor), undefined, `line ${i}'s cursor is one the feed takes`);
-      assert.deepEqual(
-        readFeed(rootNow(), cursor).lines,
-        whole.lines.slice(i + 1),
-        `from line ${i}'s cursor, the lines after it and no other`,
-      );
+      assert.equal(feedCursorRefusal(ROOT, cursor), undefined, `line ${i}'s cursor is one the feed takes`);
+      assert.deepEqual(readFeed(ROOT, cursor).lines, whole.lines.slice(i + 1), `from line ${i}'s cursor, the lines after it and no other`);
     }
     assert.equal(got.at(-1)!.cursor, whole.cursor, "the last line's cursor is the end a read hands out");
     assert.equal(
@@ -626,7 +622,7 @@ test(
       if (String(file) === FEED && ++opens === 2) fs.rmSync(FEED, { force: true });
       return fd;
     }) as typeof fs.openSync);
-    const watch = watchFeed(rootNow(), {
+    const watch = watchFeed(ROOT, {
       from,
       intervalMs: 20,
       onLine: () => {},
@@ -673,7 +669,7 @@ test(
       err.push(a.join(' '));
       said.ring();
     });
-    const watch = watchPrinted(rootNow(), from);
+    const watch = watchPrinted(ROOT, from);
     try {
       assert.deepEqual(
         out,
@@ -725,7 +721,7 @@ test('`nemia watch` interrupted in the process, as a signal interrupts it, leave
     cleared.push(timer);
     clear(timer);
   });
-  const fiber = Effect.runFork(watching(rootNow(), from));
+  const fiber = Effect.runFork(watching(ROOT, from));
   await bannered;
   assert.equal(closes.length, 1, 'the watch holds one watcher of the feed');
   assert.equal(timers.length, 1, 'and one timer');
@@ -739,7 +735,7 @@ test('`nemia watch` interrupted in the process, as a signal interrupts it, leave
   const printed = out.length;
   const got: string[] = [];
   let arrived: () => void = () => {};
-  const other = watchFeed(rootNow(), {
+  const other = watchFeed(ROOT, {
     from,
     intervalMs: 20,
     onLine: (l) => {
@@ -769,7 +765,7 @@ test(
     fs.writeFileSync(FEED, `${line}\n${line}\n`);
     const errors: Error[] = [];
     const refused = bell();
-    const watch = watchFeed(rootNow(), {
+    const watch = watchFeed(ROOT, {
       from: size(),
       intervalMs: 20,
       onLine: () => {},
@@ -805,7 +801,7 @@ test(
     const heard = (ok: () => boolean, what: string) =>
       until(t, ok, () => `${what}; the watch said ${said.join(', ') || 'nothing'}`, { bell: spoke });
     const count = (word: string) => said.filter((w) => w === word).length;
-    const watch = watchFeed(rootNow(), {
+    const watch = watchFeed(ROOT, {
       intervalMs: 20,
       onLine: () => {
         said.push('line');
@@ -852,7 +848,7 @@ test('`wf --help` names nemia watch whole, and says which feed is whose', async 
   t.mock.method(console, 'log', (...args: unknown[]) => {
     out.push(args.join(' '));
   });
-  await main(['--help'], engineOf(testEngine().layer));
+  await main(['--help'], engineOf(testEngine().layer), undefined, undefined, ENV);
   const printed = out.join('\n');
   assert.equal(/^ {2}nemia feed\b/m.test(printed), false, 'nemia feed is retired: nemia watch --once reads once');
   assert.match(printed, /^ {2}nemia watch \[cursor\] \[--once\] \[-l <selector>\]\.\.\. \[--cursor-file <path>\] \[--json\]$/m);

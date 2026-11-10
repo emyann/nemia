@@ -1,7 +1,7 @@
 /**
  * `nemia passes` (`passes.verb.ts`): the recent passes the tick kept in `$WF_ROOT/tick-recent.json`, read whole or the last `--last`, as
- * lines or as JSON, and a `--last` that is not a whole number from 1 refused. A store of its own: `WF_ROOT` is read as the module loads, so
- * it is set before the import. No pass is run here: the passes are written as the tick writes them (`recordRecentPass`).
+ * lines or as JSON, and a `--last` that is not a whole number from 1 refused. A store of its own, at `ROOT`. No pass is run here: the
+ * passes are written as the tick writes them (`recordRecentPass`).
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,16 +10,18 @@ import { testEngine } from 'agent-runtime/testing';
 import { eachTest } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
 import { scratch } from 'test-kit/scratch';
-import { rootNow } from '../../test/config-given.ts';
+import { main as cli } from '../cli/main.ts';
+import { recentFile, recordRecentPass } from '../daemon/daemon.store.ts';
+import { PHASES, passCost, passesRead, recentOf } from './meter.ts';
+import { passesOf } from './passes.verb.ts';
+import { engineOf } from '../runtime-client.ts';
+import type { Env } from '../config/config.store.ts';
 
-process.env.WF_ROOT = scratch('wf-passes-');
-process.env.WF_VERIFY_REST = '1';
-const { main } = await import('../cli/main.ts');
-const { recentFile, recordRecentPass } = await import('../daemon/daemon.store.ts');
-const { PHASES, passCost, passesRead, recentOf } = await import('./meter.ts');
-const { passesOf } = await import('./passes.verb.ts');
+const ROOT = scratch('wf-passes-');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
+/** The CLI over this file's store, `ENV`. */
+const main: typeof cli = (argv, e, demand, place) => cli(argv, e, demand, place, ENV);
 
-const { engineOf } = await import('../runtime-client.ts');
 const engine = eachTest(testEngine);
 heldUnasked(engine);
 
@@ -64,16 +66,16 @@ const row = (name: string, claim: (t: TestContext) => Promise<void>) => ROWS.pus
 const COSTS = [cost(1, 12, 5), cost(2, 300, 6), cost(3, 40, 7)];
 
 row('`nemia passes` with no pass kept says so, and how one is kept', async (t) => {
-  fs.rmSync(recentFile(rootNow()), { force: true });
+  fs.rmSync(recentFile(ROOT), { force: true });
   assert.match((await typed(t, ['passes']))[0], /^no pass is kept yet: nemia up, or the api, ticks the store/);
 });
 
 row('`nemia passes --json` is the whole answer, the passes oldest first; --last <n> reads the last n of them', async (t) => {
-  fs.rmSync(recentFile(rootNow()), { force: true });
-  for (const c of COSTS) recordRecentPass(rootNow(), c);
+  fs.rmSync(recentFile(ROOT), { force: true });
+  for (const c of COSTS) recordRecentPass(ROOT, c);
   const all = JSON.parse((await typed(t, ['passes', '--json'])).join('\n'));
   assert.deepEqual(all, passesRead(COSTS.map((c) => recentOf(c))));
-  assert.deepEqual(all, JSON.parse(JSON.stringify(passesOf(rootNow(), {}))), 'the answer the api serves, off the same file');
+  assert.deepEqual(all, JSON.parse(JSON.stringify(passesOf(ROOT, {}))), 'the answer the api serves, off the same file');
   const last = JSON.parse((await typed(t, ['passes', '--json', '--last', '2'])).join('\n'));
   assert.deepEqual(
     last.recent.map((p: { runs: number }) => p.runs),

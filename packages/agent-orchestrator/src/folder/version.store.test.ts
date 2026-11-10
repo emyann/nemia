@@ -13,17 +13,17 @@ import { Effect, Layer } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { teamCopy } from '../../test/team.ts';
 import { anAgent } from '../../test/agent-walks.ts';
+import { workflowVersion } from './version.store.ts';
+import { frontmatterKey } from '../former/former.ts';
+import { agentVersion } from '../agents/read.store.ts';
+import { lookupRoots, skillsFor, skillVersion } from '../skills/read.store.ts';
+import { agentDoorFiles, AgentDoor } from '../agents/agent-door.store.ts';
+import { agentDoorMemory } from '../agents/agent-memory.store.ts';
+import { skillDoorFiles } from '../skills/skill-door.store.ts';
+import { AgentName } from '../agents/agents.model.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
-process.env.WF_ROOT = scratch('wf-version-root-');
-const { workflowVersion } = await import('./version.store.ts');
-const { frontmatterKey } = await import('../former/former.ts');
-const { agentVersion } = await import('../agents/read.store.ts');
-const { lookupRoots, skillsFor, skillVersion } = await import('../skills/read.store.ts');
-const { agentDoorFiles, AgentDoor } = await import('../agents/agent-door.store.ts');
-const { agentDoorMemory } = await import('../agents/agent-memory.store.ts');
-const { skillDoorFiles } = await import('../skills/skill-door.store.ts');
-const { AgentName } = await import('../agents/agents.model.ts');
-const { StoreRoot } = await import('../config/root.store.ts');
+const ROOT = scratch('wf-version-root-');
 type Places = import('../skills/read.store.ts').Places;
 
 /** The version as the synchronous reader gave it before the doors: the oracle the program is held equal to. */
@@ -82,7 +82,7 @@ function syncVersion(dir: string, places: Places): string {
 }
 
 /** The program's version over the files doors at a store's root. */
-const doorVersion = (dir: string, places: Places, root = process.env.WF_ROOT as string): string =>
+const doorVersion = (dir: string, places: Places, root = ROOT): string =>
   Effect.runSync(workflowVersion(dir, places).pipe(Effect.provide(Layer.mergeAll(agentDoorFiles(root), skillDoorFiles(root)))));
 
 /** A step file naming `agent`, and `skills` where given. */

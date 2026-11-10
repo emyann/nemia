@@ -8,9 +8,7 @@ import { Engine } from 'agent-runtime';
 import { Effect, Exit, Tracer } from 'effect';
 import { asyncOps, plainEngine, type AsyncRunner } from '../../test/promised.ts';
 import { scratch } from 'test-kit/scratch';
-
-process.env.WF_ROOT = scratch('wf-quota-spans-');
-const { askedQuota } = await import('./up.verb.ts');
+import { askedQuota } from './up.verb.ts';
 
 /** A harness that runs nothing and reports no quota. */
 const idle: AsyncRunner = {

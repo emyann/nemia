@@ -1,7 +1,6 @@
 /**
  * The merge check (`mergesOf`), against a run on a real repository and the git place's trial merges: a branch that merges cleanly, one
- * that conflicts, and one git does not have; and a run the store does not have, refused. `WF_ROOT`
- * is set before the import, since the store reads it as it loads.
+ * that conflicts, and one git does not have; and a run the store does not have, refused.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,11 +9,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { Missing } from '../refusal/refusal.ts';
-import { rootNow } from '../../test/config-given.ts';
+import { mergesOf } from './merges.verb.ts';
+import { builtinGitPlace } from '../place/builtin.store.ts';
 
-process.env.WF_ROOT = scratch('wf-merge-root-');
-const { mergesOf } = await import('./merges.verb.ts');
-const { builtinGitPlace } = await import('../place/builtin.store.ts');
+const ROOT = scratch('wf-merge-root-');
 
 /** A repository on `main` with `src/a.ts`, and its git. */
 function repoOf() {
@@ -38,7 +36,7 @@ function repoOf() {
 
 /** A repository run `id` on `repo`, branched from `main`, its record written as `nemia start` would. */
 function runOn(id: string, repo: string): void {
-  const file = path.join(process.env.WF_ROOT ?? '', 'runs', `${id}.json`);
+  const file = path.join(ROOT, 'runs', `${id}.json`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(
     file,
@@ -64,11 +62,11 @@ test('a branch merges cleanly, then conflicts once main writes its file otherwis
   commit('src/a.ts', 'export const a = 1;\n', 'implement');
   git('checkout', '-q', 'main');
   runOn('r-1', repo);
-  assert.deepEqual(mergesOf(rootNow(), builtinGitPlace, 'r-1', ['wf/r-1/implement']), {
+  assert.deepEqual(mergesOf(ROOT, builtinGitPlace, 'r-1', ['wf/r-1/implement']), {
     'wf/r-1/implement': { clean: true, said: 'merges cleanly onto main' },
   });
   commit('src/a.ts', 'export const a = 2;\n', 'main writes a.ts too');
-  assert.deepEqual(mergesOf(rootNow(), builtinGitPlace, 'r-1', ['wf/r-1/implement']), {
+  assert.deepEqual(mergesOf(ROOT, builtinGitPlace, 'r-1', ['wf/r-1/implement']), {
     'wf/r-1/implement': { clean: false, conflicts: ['src/a.ts'], said: 'conflicts with main in 1 file: src/a.ts' },
   });
   assert.equal(git('status', '--porcelain'), '', "a trial in git's object store alone");
@@ -77,14 +75,14 @@ test('a branch merges cleanly, then conflicts once main writes its file otherwis
 test("a branch git does not have is neither clean nor conflicted: it carries git's own word for why it cannot say", () => {
   const { repo } = repoOf();
   runOn('r-2', repo);
-  const gone = mergesOf(rootNow(), builtinGitPlace, 'r-2', ['wf/no-such-run/implement'])['wf/no-such-run/implement'];
+  const gone = mergesOf(ROOT, builtinGitPlace, 'r-2', ['wf/no-such-run/implement'])['wf/no-such-run/implement'];
   assert.ok('error' in gone && /no-such-run/.test(gone.error), JSON.stringify(gone));
   assert.match(gone.said, /^whether it merges onto main is not known: .*no-such-run/);
 });
 
 test('REFUSED: the merge check of a run the store does not have is `Missing`, naming the run', () => {
   assert.throws(
-    () => mergesOf(rootNow(), builtinGitPlace, 'r-none', ['wf/r-none/implement']),
+    () => mergesOf(ROOT, builtinGitPlace, 'r-none', ['wf/r-none/implement']),
     (err: Error) => err instanceof Missing && /r-none/.test(err.message),
   );
 });

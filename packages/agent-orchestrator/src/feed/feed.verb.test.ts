@@ -2,7 +2,7 @@
  * The feed's one emission (`emitFeed`) and its live readers (`followFeed`), over a store of the file's own: what a reader is handed when
  * it keeps up, when it lags behind the hub, when another process writes, and when the feed is cut under it; and what a writer says.
  *
- * A file of its own, since the feed is the store's one file. `WF_ROOT` is read as the module loads, so it is set before the import. Every
+ * A file of its own, since the feed is the store's one file. Every
  * pass here judges one run, `r-1`, a word no pass said before, so each writes one line and none says a run `removed`; each test reads from
  * the feed's end, so no test reads another's lines. The live tests run on a runtime with a hub
  * (`feedHubLayer`) and no logger; a line another process writes is emitted with no hub, as `nemia tick` by hand writes one.
@@ -16,15 +16,20 @@ import { isRunLine, type FeedWords } from './feed.ts';
 import { scratch } from 'test-kit/scratch';
 import { bell, until, WAITED } from 'agent-runtime/testing';
 import { StoreRoot } from '../config/root.store.ts';
-import { rootNow } from '../../test/config-given.ts';
+import {
+  emitFeed,
+  FEED_FOLLOW_BEATS,
+  FEED_FOLLOW_LINES,
+  FEED_FOLLOW_READS,
+  FEED_FOLLOWERS,
+  FeedHub,
+  feedHubLayer,
+  followFeed,
+} from './feed.verb.ts';
+import { feedSize } from './feed.store.ts';
 
 const ROOT = scratch('wf-feed-verb-');
 const FEED = path.join(ROOT, 'feed.jsonl');
-
-process.env.WF_ROOT = ROOT;
-const { emitFeed, FEED_FOLLOW_BEATS, FEED_FOLLOW_LINES, FEED_FOLLOW_READS, FEED_FOLLOWERS, FeedHub, feedHubLayer, followFeed } =
-  await import('./feed.verb.ts');
-const { feedSize } = await import('./feed.store.ts');
 
 /** The store's root as the tick and the api give it, which the Feed door reads by (`FeedDoor`). */
 const rooted = StoreRoot.layer(ROOT);
@@ -58,7 +63,7 @@ const read = (t: TestContext, ok: () => boolean, what: string) => until(t, ok, w
  * A reader from `from` on `rt`, the feed's end by default, each item it is handed kept in `got`, counted once it holds its cursor: stopped
  * once the test `t` ends, and no longer counted. `handed(ok, what)` waits until `ok()` holds, asked as each item is handed.
  */
-async function following(t: TestContext, rt: ReturnType<typeof hubbed>, beat: Duration.Input, from = feedSize(rootNow())) {
+async function following(t: TestContext, rt: ReturnType<typeof hubbed>, beat: Duration.Input, from = feedSize(ROOT)) {
   const got: Followed[] = [];
   const pushed = bell();
   const was = followers();
@@ -120,7 +125,7 @@ test(
       [...cursors].sort((a, b) => a - b),
       'each cursor past the one before',
     );
-    assert.equal(cursors.at(-1), feedSize(rootNow()), 'the last cursor is the end of the feed');
+    assert.equal(cursors.at(-1), feedSize(ROOT), 'the last cursor is the end of the feed');
     assert.equal(
       counted(FEED_FOLLOW_READS) - reads,
       1,
@@ -134,7 +139,7 @@ test(
   WAITED,
   async (t) => {
     const rt = hubbed(t);
-    const from = feedSize(rootNow());
+    const from = feedSize(ROOT);
     await foreign('caught');
     const lines = counted(FEED_FOLLOW_LINES);
     const reader = await following(t, rt, '5 millis', from);
@@ -184,7 +189,7 @@ test(
     assert.deepEqual(reader.words(), ['theirs, on a beat']);
     assert.deepEqual(
       reader.got.map((f) => f.kind === 'line' && f.cursor),
-      [feedSize(rootNow())],
+      [feedSize(ROOT)],
     );
   },
 );
@@ -225,7 +230,7 @@ test('REFUSED: a cursor the feed cannot be read from fails the stream before the
   await foreign('cursor');
   const was = followers();
   for (const [from, said] of [
-    [feedSize(rootNow()) + 5, /is past the end of the feed/],
+    [feedSize(ROOT) + 5, /is past the end of the feed/],
     [1, /falls inside a line of the feed/],
   ] as const) {
     const exit = await Effect.runPromiseExit(Stream.runDrain(followFeed(from, { beat: '1 hour' })).pipe(Effect.provide(rooted)));
@@ -259,7 +264,7 @@ test('REFUSED: the lines of one emission reach a reader as one chunk, a run and 
   const pushed = bell();
   const was = followers();
   const fiber = rt.runFork(
-    Stream.runForEachArray(followFeed(feedSize(rootNow()), { beat: '1 hour' }), (chunk) =>
+    Stream.runForEachArray(followFeed(feedSize(ROOT), { beat: '1 hour' }), (chunk) =>
       Effect.sync(() => {
         chunks.push([...chunk]);
         pushed.ring();
@@ -278,7 +283,7 @@ test('REFUSED: the lines of one emission reach a reader as one chunk, a run and 
     'one chunk of two lines, the run first',
   );
   const [, step] = chunks[0];
-  assert.equal(step.kind === 'line' && step.cursor, feedSize(rootNow()));
+  assert.equal(step.kind === 'line' && step.cursor, feedSize(ROOT));
 });
 
 test('each line emitFeed writes is logged at Info, annotated with its labels, its reason, how serious it is, and its word', async () => {

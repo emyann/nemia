@@ -2,8 +2,6 @@
  * The factories' listing, which the board polls (`GET /api/factories`, `FACTORY`): a schedule's last run is found among the runs the
  * store has, so the listing reads every record — through the memo a serving caller hands it, each run whose files have not moved is
  * answered from memory, and a warm read reads no finished run's record.
- *
- * `WF_ROOT` is set before the import, since the store reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,19 +12,19 @@ import { scratch } from 'test-kit/scratch';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
+import { FACTORY } from './factory.verb.ts';
+import { addFactoryAt, attachWorkflowAt, setScheduleAt } from './factory.store.ts';
+import { recordMemo } from '../rest/index.ts';
+import { metered } from '../meter/tally.store.ts';
+import { runWith as runEngine, engineOf } from '../runtime-client.ts';
+import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-factory-listing-');
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '0';
-const { FACTORY } = await import('./factory.verb.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '0' };
 type ScheduleRuns = import('./schedule/listed.store.ts').ScheduleRuns;
-const { addFactory, attachWorkflow, setSchedule } = await import('../../testing.ts');
-const { recordMemo } = await import('../rest/index.ts');
-const { metered } = await import('../meter/tally.store.ts');
-const { runWith: runEngine, engineOf } = await import('../runtime-client.ts');
 
 const stand = eachTest(testPlace);
-const runWith = runOver(runEngine, () => stand().layer);
+const runWith = runOver(runEngine, () => stand().layer, ENV);
 const engine = eachTest(testEngine);
 heldUnasked(engine);
 const e = () => engineOf(engine().layer);
@@ -56,9 +54,9 @@ test("a warm read of the factories reads no finished run's record, however many 
   fs.mkdirSync(RUNS, { recursive: true });
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stand().world.repository(repo, {});
-  addFactory({ name: 'nemia', repos: [repo] });
-  attachWorkflow({ factory: 'nemia', workflow: 'janitor' });
-  setSchedule({ factory: 'nemia', workflow: 'janitor', cron: '0 3 * * *', brief: 'tidy' });
+  addFactoryAt(ROOT, { name: 'nemia', repos: [repo] });
+  attachWorkflowAt(ROOT, { factory: 'nemia', workflow: 'janitor' });
+  setScheduleAt(ROOT, { factory: 'nemia', workflow: 'janitor', cron: '0 3 * * *', brief: 'tidy' });
   writeRun('r-fired', { factory: 'nemia', workflow: 'janitor', due: '2026-10-15T03:00:00.000Z' });
 
   const kept = { records: { factories: recordMemo() as ScheduleRuns } };

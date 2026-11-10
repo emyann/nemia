@@ -8,16 +8,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Exit, Layer } from 'effect';
 import type { CardWrite } from 'objects';
-import { scratch } from 'test-kit/scratch';
-
-process.env.WF_ROOT = scratch('wf-card-write-');
-const { replaceCard, cardVersion } = await import('./card-write.verb.ts');
-const { RunDoor } = await import('../runs/runs.store.ts');
-const { runDoorMemory } = await import('../runs/memory.store.ts');
-const { CardDoor } = await import('../cards/cards.store.ts');
-const { cardDoorMemory } = await import('../cards/memory.store.ts');
-const { CardName } = await import('../inbox/inbox.model.ts');
-const { aRun } = await import('../../test/run-walks.ts');
+import { replaceCard, cardVersion } from './card-write.verb.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { runDoorMemory } from '../runs/memory.store.ts';
+import { CardDoor } from '../cards/cards.store.ts';
+import { cardDoorMemory } from '../cards/memory.store.ts';
+import { CardName } from '../inbox/inbox.model.ts';
+import { aRun } from '../../test/run-walks.ts';
 
 const QUEUED = '2026-11-01T10:00:00.000Z';
 

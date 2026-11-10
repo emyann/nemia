@@ -3,25 +3,22 @@
  * (`artifactPlace`), one file a step left read by name and never by path (`fileIn`, `artifactFile`), and each reason a named file is not
  * one the run has, off the disk alone (`filesLacked`). Then those that are there for the step after (`filesHanded`), the tasks whose
  * files a pass reads (`filesDue`), a near name (`nearName`), what a step is told of its files (`artifactsContract`) and what `nemia
- * decide` says of them (`artifactLines`). A closeout naming files in a run is told in `test/closeouts.test.ts`. `WF_ROOT` is set before
- * the import, since the store reads it as it loads.
+ * decide` says of them (`artifactLines`). A closeout naming files in a run is told in `test/closeouts.test.ts`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
+import { artifactFile, fileIn, filesHanded, filesLacked } from './artifacts.store.ts';
+import { REFUSING, artifactLines, artifactPlace, artifactsContract, filesDue, nearName } from './artifacts.ts';
 
 const ROOT = scratch('wf-artifacts-root-');
-process.env.WF_ROOT = ROOT;
-const { artifactFile, fileIn, filesHanded, filesLacked } = await import('./artifacts.store.ts');
-const { REFUSING, artifactLines, artifactPlace, artifactsContract, filesDue, nearName } = await import('./artifacts.ts');
 import type { Run } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import type { StepRecord } from '../record/record.ts';
 import type { StepSpec } from '../step/step.ts';
 import { names } from '../../test/assessed.ts';
-import { rootNow } from '../../test/config-given.ts';
 
 /** A run whose step `build` works in `workspace`, with its files directory made: the run, and that directory. */
 function aRun(workspace: string | undefined): { run: Run; dir: string } {
@@ -93,7 +90,7 @@ test('the artifact path rules: artifactPlace, fileIn and filesLacked', async (t)
     const dir = path.join(ROOT, 'runs', 'r-1', 'artifacts', 'build');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'shot.png'), 'png');
-    assert.equal(artifactFile(rootNow(), { id: 'r-1' }, 'build', 'shot.png')?.toString(), 'png');
+    assert.equal(artifactFile(ROOT, { id: 'r-1' }, 'build', 'shot.png')?.toString(), 'png');
     assert.equal(fileIn(dir, 'shot.png')?.toString(), 'png');
     assert.equal(fileIn(dir, 'gone.png'), null);
   });
@@ -119,7 +116,7 @@ test('the artifact path rules: artifactPlace, fileIn and filesLacked', async (t)
       fs.mkdirSync(path.join(workspace, 'shots'));
       fs.symlinkSync(path.join(beside, 'secret.txt'), path.join(workspace, 'link.txt'));
       const lacked = filesLacked(
-        rootNow(),
+        ROOT,
         run,
         'build',
         naming(
@@ -160,18 +157,18 @@ test('the artifact path rules: artifactPlace, fileIn and filesLacked', async (t)
       fs.mkdirSync(path.join(dir, 'blocked.md'));
       fs.writeFileSync(path.join(workspace, 'blocked.md'), 'its copy is refused by a directory in its place');
       assert.deepEqual(
-        filesLacked(rootNow(), run, 'build', naming(path.join(dir, 'shot.png'), 'collected.md', 'uncopied.md', 'blocked.md')),
+        filesLacked(ROOT, run, 'build', naming(path.join(dir, 'shot.png'), 'collected.md', 'uncopied.md', 'blocked.md')),
         [],
       );
-      assert.deepEqual(filesLacked(rootNow(), run, 'build', naming()), []);
-      assert.deepEqual(filesLacked(rootNow(), run, 'build', undefined), []);
+      assert.deepEqual(filesLacked(ROOT, run, 'build', naming()), []);
+      assert.deepEqual(filesLacked(ROOT, run, 'build', undefined), []);
     },
   );
   await t.test(
     'filesLacked: a path from the workspace root is not judged where there is no workspace to read, none on the record or none on disk',
     () => {
-      assert.deepEqual(filesLacked(rootNow(), aRun(undefined).run, 'build', naming('gone.md')), []);
-      assert.deepEqual(filesLacked(rootNow(), aRun(path.join(scratch('wf-lacked-ws-'), 'removed')).run, 'build', naming('gone.md')), []);
+      assert.deepEqual(filesLacked(ROOT, aRun(undefined).run, 'build', naming('gone.md')), []);
+      assert.deepEqual(filesLacked(ROOT, aRun(path.join(scratch('wf-lacked-ws-'), 'removed')).run, 'build', naming('gone.md')), []);
     },
   );
 });
@@ -183,13 +180,13 @@ test('filesHanded', async (t) => {
     fs.mkdirSync(path.join(dir, 'notes'));
     fs.writeFileSync(path.join(dir, 'notes', 'a.md'), 'collected');
     const handed = filesHanded(
-      rootNow(),
+      ROOT,
       run,
       'build',
       naming(path.join(dir, 'shot.png'), 'notes/a.md', path.join(dir, 'gone.png'), 'gone.md', '/etc/hosts'),
     );
     assert.deepEqual(handed, { there: [path.join(dir, 'shot.png'), path.join(dir, 'notes', 'a.md')], gone: 3 });
-    assert.deepEqual(filesHanded(rootNow(), run, 'build', undefined), { there: [], gone: 0 });
+    assert.deepEqual(filesHanded(ROOT, run, 'build', undefined), { there: [], gone: 0 });
   });
 });
 

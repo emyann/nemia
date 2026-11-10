@@ -11,7 +11,7 @@ import { Effect } from 'effect';
 import type { ProposableKind } from 'objects';
 import { tried, type EngineService } from '../runtime-client.ts';
 import type { PlaceService } from '../place/place.store.ts';
-import { Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
+import { Invalid, type Refusal } from '../refusal/refusal.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { AgentDoor } from '../agents/agent-door.store.ts';
 import { AgentName, SkillName } from '../agents/agents.model.ts';
@@ -19,10 +19,8 @@ import { SkillDoor } from '../skills/skill-door.store.ts';
 import { workflowDirAt } from '../folder/folder.store.ts';
 import { isReadme, splitFrontmatter, AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
 import { frontmatterValues } from '../frontmatter/frontmatter.ts';
-import { templatedTreeAt, readFactoryAt } from '../factory/factory.store.ts';
-import { FactoryDoor } from '../factory/door/factories.store.ts';
-import { FactoryName } from '../factory/factory.model.ts';
-import { factoryInstruction } from '../factory/instruction.verb.ts';
+import { FactoryDoor, filedAtOnce, treeChecked } from '../factory/door/factories.store.ts';
+import { FactoryName, isDefaultFactory } from '../factory/factory.model.ts';
 import { factoryObject } from '../factory/object/factory.verb.ts';
 import { hireObject } from '../factory/object/hire.verb.ts';
 import { mcpServerObject } from '../factory/object/mcp-server.verb.ts';
@@ -44,14 +42,15 @@ const NONE: Current = { version: null };
  * made from no template, which has no tree a proposal writes: its definitions are its repositories' and the person's library's.
  */
 export const treeDir = (home: string, factory: string, what: 'workflows' | 'agents' | 'skills'): string => {
-  if (readFactoryAt(home, factory, 'Nothing was proposed.').tree === undefined)
+  const filed = filedAtOnce(home, factory);
+  if (filed?.tree === undefined)
     throw new Invalid({
       message:
         `nemia propose: the factory ${factory} is made from no template, so it has no tree a proposal writes: its ${what} are its ` +
         "repositories', changed there, and your library's, which the person writes (`nemia workflows write yours <name> --folder <draft>`, " +
         '`nemia agents write yours`, `nemia skills write yours`). Nothing was proposed.',
     });
-  const workflows = path.join(templatedTreeAt(home, factory, 'nemia propose'), 'workflows');
+  const workflows = path.join(treeChecked(factory, filed, 'nemia propose').tree, 'workflows');
   return what === 'workflows' ? workflows : path.join(workflows, what === 'agents' ? AGENTS_FOLDER : SKILLS_FOLDER);
 };
 
@@ -143,13 +142,15 @@ const factoryNow = (place: ProposalPlace, factory: string) =>
       served.version === null
         ? Effect.succeed(NONE)
         : Effect.gen(function* () {
-            const rules = yield* (yield* FactoryDoor).rules.read(FactoryName.read(factory));
-            const record = yield* tried(() => readFactoryAt(place.home, factory, 'Nothing was proposed.'));
-            const instruction = yield* tried(() => factoryInstruction(factory).words);
+            const door = yield* FactoryDoor;
+            const named = FactoryName.read(factory);
+            const rules = yield* door.rules.read(named);
+            const record = yield* door.factories.read(named);
+            const instruction = (yield* door.instruction.read(named)).words;
             return {
               version: served.version,
               spec: {
-                workflows: [...record.workflows],
+                workflows: isDefaultFactory(record) ? [] : [...record.workflows],
                 ...(rules.words !== null && { rules: rules.words }),
                 ...(instruction !== null && { instruction }),
               },
@@ -187,7 +188,3 @@ export const currentOf = (
           );
   }
 };
-
-/** A refusal that says no factory is there. */
-export const noFactoryThere = (factory: string): Missing =>
-  new Missing({ message: `there is no factory ${factory}: list them with nemia factory ls.` });

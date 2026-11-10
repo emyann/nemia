@@ -30,8 +30,9 @@ import { WorkflowDir } from '../folder/folder.model.ts';
 import { AgentName, SkillName } from '../agents/agents.model.ts';
 import type { Refusal } from '../refusal/refusal.ts';
 import { factoryFills, rulesVersion } from '../factory/rules/rules.store.ts';
-import { DEFAULT_FACTORY, revisionsOf, type Factory } from '../factory/factory.ts';
-import { readFactory } from '../factory/factory.store.ts';
+import { revisionsOf, type Factory } from '../factory/factory.ts';
+import { factoryOrNone } from '../factory/door/factories.store.ts';
+import { runNamespace } from '../run-list/index.ts';
 import { runStore } from '../record/files.store.ts';
 import { within, withinEffect } from '../meter/tally.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
@@ -54,10 +55,6 @@ export type Kept = { kept: string };
 
 /** A refusal's or an error's first line, which is what a note on the feed has room for. */
 const firstLine = (said: string): string => firstPiece(said, '\n');
-
-/** The factory a run was started in, read; none for the default factory, which is no file. */
-const factoryOf = (run: Pick<Run, 'factory'>): Factory | undefined =>
-  run.factory === undefined || run.factory === DEFAULT_FACTORY ? undefined : readFactory(run.factory);
 
 /** The name a workflow folder is known by, within its kind: the folder's own, as a factory attaches it. */
 const workflowName = (dir: string): string => path.basename(path.resolve(dir));
@@ -89,7 +86,7 @@ function kindsIn(run: Pick<Run, 'workflowDir' | 'factory'>, steps: readonly Work
     named.push({ kind: 'agent', name: agent.name });
     for (const skill of agent.skills ?? []) named.push({ kind: 'skill', name: skill });
   }
-  if (run.factory !== undefined && run.factory !== DEFAULT_FACTORY) named.push({ kind: 'rules', name: run.factory });
+  named.push({ kind: 'rules', name: runNamespace(run.factory) });
   return named.filter((k, i) => named.findIndex((o) => o.kind === k.kind && o.name === k.name) === i);
 }
 
@@ -167,7 +164,7 @@ function once<A extends unknown[], T>(f: (...args: A) => T, key: (...args: A) =>
  * world for itself.
  */
 export type PassRevisions = {
-  readonly factory: (run: Pick<Run, 'factory'>) => Factory | undefined;
+  readonly factory: (run: Pick<Run, 'factory'>) => Effect.Effect<Factory | undefined, Refusal>;
   readonly skills: (run: FolderRun) => Effect.Effect<SkillsFound, Refusal>;
   readonly steps: (run: FolderRun) => Effect.Effect<Workflow[], Refusal>;
   readonly allows: (run: FolderRun) => Allows;
@@ -201,7 +198,11 @@ export const passRevisions = Effect.fn('passRevisions')(function* () {
     run.repo === undefined ? null : path.resolve(run.repo),
     run.factory ?? null,
   ];
-  const factory = once(factoryOf, (run) => String(run.factory ?? ''));
+  const factoryCache = yield* Cache.make({
+    capacity: PASS_KEYS,
+    lookup: (name: string) => withinEffect('revisions', factoryOrNone(name)),
+  });
+  const factory = (run: Pick<Run, 'factory'>) => Cache.get(factoryCache, runNamespace(run.factory));
   const skillsCache = yield* Cache.make({
     capacity: PASS_KEYS,
     lookup: (key: string) =>
@@ -215,7 +216,9 @@ export const passRevisions = Effect.fn('passRevisions')(function* () {
     capacity: PASS_KEYS,
     lookup: (key: string) => {
       const run = runOfKey(key);
-      return Effect.suspend(() => stepsNow(run, placesOf(run.repo), factory(run))).pipe((read) => withinEffect('revisions', read));
+      return Effect.flatMap(factory(run), (named) => stepsNow(run, placesOf(run.repo), named)).pipe((read) =>
+        withinEffect('revisions', read),
+      );
     },
   });
   const steps = (run: FolderRun) => Cache.get(stepsCache, JSON.stringify(where(run)));
@@ -229,7 +232,7 @@ export const passRevisions = Effect.fn('passRevisions')(function* () {
       const [kind, name, ...rest] = JSON.parse(key) as [KindName['kind'], string, ...Array<string | null>];
       const run = runOfKey(JSON.stringify(rest));
       return Effect.gen(function* () {
-        return yield* digestFor({ kind, name }, run, placesOf(run.repo), factory(run), yield* skills(run));
+        return yield* digestFor({ kind, name }, run, placesOf(run.repo), yield* factory(run), yield* skills(run));
       }).pipe((read) => withinEffect('revisions', read));
     },
   });
@@ -359,7 +362,7 @@ export type Behind = Drift & { hash: string };
 export const behindNow = Effect.fn('behindNow')(function* (run: Run, succeeded: boolean, given?: PassRevisions) {
   if (succeeded || run.cancelledAt || run.pruned || !hasStarted(run)) return [];
   const read = yield* readOr(given);
-  if (follows(run, read)) return [];
+  if (yield* follows(run, read)) return [];
   const now = yield* pinsNow(run, read);
   return kindsDrift(run.pinned, now).flatMap((d): Behind[] => {
     const at = now.find((p) => p.kind === d.kind && p.name === d.name);
@@ -463,13 +466,11 @@ const firstResolve = Effect.fnUntraced(function* (run: Run, at: string, read: Pa
  * its file removed or broken since the run started — follows nothing: the run keeps what it resolved, as a pinned run does, and the
  * factory's refusal is the start's and the verbs' to say, not every pass's.
  */
-function follows(run: Run, read: PassRevisions): boolean {
-  try {
-    return revisionsOf(read.factory(run)) === 'follow';
-  } catch {
-    return false;
-  }
-}
+const follows = (run: Run, read: PassRevisions): Effect.Effect<boolean> =>
+  read.factory(run).pipe(
+    Effect.map((factory) => revisionsOf(factory) === 'follow'),
+    Effect.orElseSucceed(() => false),
+  );
 
 /**
  * The run's steps and pins taken again on a person's ask (`nemia refresh`), for a run that has filed: the ask is spent either way. The ask
@@ -509,7 +510,7 @@ const refreshDue = Effect.fnUntraced(function* (run: Run, at: string, read: Pass
 export const followPass = Effect.fn('followPass')(function* (run: Run, at: string, filing: boolean, given?: PassRevisions) {
   if (!filing || run.cancelledAt || run.pruned || !hasStarted(run)) return NOTHING;
   const read = yield* readOr(given);
-  if (!follows(run, read)) return NOTHING;
+  if (!(yield* follows(run, read))) return NOTHING;
   return yield* Effect.gen(function* () {
     const resolved = yield* refreshedNow(run, at, read);
     if (!resolved || isDeepStrictEqual([...(run.pinned ?? [])], resolved.pins)) return NOTHING;
@@ -541,7 +542,7 @@ export const refreshRun = Effect.fn('refresh')(function* (id: string) {
       }),
     );
   const read = yield* passRevisions();
-  if (follows(run, read))
+  if (yield* follows(run, read))
     return yield* Effect.fail(
       new Conflict({
         message: `run ${id} is in the factory ${run.factory}, which follows revisions: its every filing takes what the files hold, so there is nothing to refresh. To keep a run's revisions until a refresh, nemia factory revisions ${run.factory} pinned. Nothing was written.`,

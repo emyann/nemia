@@ -69,6 +69,7 @@ import {
   PAUSE,
   pauseNowPreview,
   pauseNowPreviewLines,
+  withProposalsPass,
 } from '../runner.ts';
 import { HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
@@ -240,7 +241,10 @@ async function tickVerb(args: Args, e: Engine, place: Place): Promise<void> {
   const held = storeRefusal('tick');
   if (held) throw new Conflict({ message: stats ? `${held} What its last pass cost is read without a pass: nemia up --stats.` : held });
   const { cost } = tickLines(
-    await runWith(e, placedIn(place, tickRun({ repo: path.resolve('.') }).pipe(Effect.provide(storeRootLayer(process.env))))),
+    await runWith(
+      e,
+      placedIn(place, withProposalsPass(tickRun({ repo: path.resolve('.') })).pipe(Effect.provide(storeRootLayer(process.env)))),
+    ),
   );
   if (stats) for (const line of cost ? breakdownLines(cost) : ['this pass was not measured']) console.log(line);
   return;

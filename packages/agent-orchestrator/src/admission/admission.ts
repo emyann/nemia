@@ -4,9 +4,9 @@
  * through at `auto` (`PolicyReads`), or is asked every time (`asksAlways`); the table's commands it types (`typedIn`), and the runs and
  * factories they name (`namedIn`). Pure: the caller reads the state (`admit.verb.ts`).
  */
+import { DEFAULT_NAMESPACE } from 'objects';
 import type { AdmissionAnswer, AdmissionCall } from 'agent-runtime/vocabulary';
 import { parseArgv, renamedIn, type Spec } from '../command/command.ts';
-import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { atLeast, type Level } from '../level/level.ts';
 import { allowedBy, RULE_ANSWERS, NO_FACTS, type PolicyRule, type Facts } from '../auto/index.ts';
 import type { CommandClass } from './class.ts';
@@ -118,7 +118,7 @@ export type Scope = {
 
 /** How a factory's level is raised, as the refusal says it: the store's for the default factory, else the factory's own. */
 const raiseWords = (factory: string, least: Level): string =>
-  factory === DEFAULT_FACTORY ? `nemia level ${least}` : `nemia level ${least} --factory ${factory} [--for <duration>]`;
+  factory === DEFAULT_NAMESPACE ? `nemia level ${least}` : `nemia level ${least} --factory ${factory} [--for <duration>]`;
 
 /** The denial of `line`, which acts on the factory `factory` at `level`, below `least`, through `what`. */
 const below = (line: string, what: string, factory: string, level: Level, least: Level): AdmissionAnswer => ({

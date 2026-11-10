@@ -119,7 +119,7 @@ function carriedOf(folder: string, command: Writer): { path: string; text: strin
 
 /**
  * `nemia workflows write`'s runner: the draft folder `--folder` names read as a start reads a folder, its agents looked for beside it
- * and in yours, through the Workflow door (`draftSteps`), or in the tree written for the place `factory` (`templatedTree`) and its
+ * and in yours, through the Workflow door (`draftSteps`), or in the tree written for the place `factory` (`templatedTreeOf`) and its
  * repository, filled with its hires (`factoryDraftOf`), into the
  * steps the builder sends, its README where it has one, and the other files it carries (`carriedOf`).
  */

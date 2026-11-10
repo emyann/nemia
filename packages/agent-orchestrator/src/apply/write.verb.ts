@@ -2,8 +2,8 @@
  * One proposed object written into its factory, through the doors and verbs that already write a factory: a Workflow through the Workflow
  * door at the factory's tree, judged as `nemia workflows write factory` judges it (`factoryWriteOf`); an Agent and a Skill through their
  * doors at the tree; a Hire and the Factory's attached workflows through `wire`, judged by `wiringRefusal`; an McpServer, the rules and the
- * instruction through the Factory door and `nemia factory instruct`'s handler. Answers the revision it made: `<resource>/<name>#<n>`, the
- * ledger's number, for a kind the ledger counts, else `<resource>/<name>`.
+ * instruction through the Factory door, so a Factory's spec is written through the doors alone. Answers the revision it made:
+ * `<resource>/<name>#<n>`, the ledger's number, for a kind the ledger counts, else `<resource>/<name>`.
  */
 import path from 'node:path';
 import { Effect } from 'effect';
@@ -29,10 +29,8 @@ import { workflowDirAt } from '../folder/folder.store.ts';
 import type { StepDraft } from '../workflow/index.ts';
 import { definitionRevision } from '../revisions/revisions.store.ts';
 import type { RevisionKind } from '../revisions/revisions.ts';
-import { FactoryDoor } from '../factory/door/factories.store.ts';
+import { FactoryDoor, filedFactory } from '../factory/door/factories.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
-import { readFactoryAt } from '../factory/factory.store.ts';
-import { FACTORY_INSTRUCT } from '../factory/instruction.verb.ts';
 import { ownAgentRefusal } from '../factory/wiring/own-agent.store.ts';
 import { wire } from '../factory/wiring/wire.verb.ts';
 import { withoutEntry } from '../factory/wiring/wiring.ts';
@@ -150,17 +148,18 @@ const serverWritten = (factory: string, object: ProposedObject) =>
     return uncounted(object);
   });
 
-/** The Factory's attached workflows, rules and instruction, each the proposal names, written. */
-const factoryWritten = (place: ProposalPlace, factory: string, object: ProposedObject) =>
+/** The Factory's attached workflows, rules and instruction, each the proposal names, written through the Factory door. */
+const factoryWritten = (factory: string, object: ProposedObject) =>
   Effect.gen(function* () {
     const spec = object.spec as { workflows?: readonly string[]; rules?: string; instruction?: string };
+    const door = yield* FactoryDoor;
     if (spec.workflows !== undefined) {
-      const was = (yield* tried(() => readFactoryAt(place.home, factory, 'Nothing was written.'))).workflows;
+      const was = (yield* filedFactory(factory, 'attach')).workflows;
       for (const workflow of spec.workflows.filter((w) => !was.includes(w))) yield* wire(factory, { verb: 'attach', workflow });
       for (const workflow of was.filter((w) => !spec.workflows?.includes(w))) yield* wire(factory, { verb: 'detach', workflow });
     }
-    if (spec.rules !== undefined) yield* (yield* FactoryDoor).rules.write(FactoryName.read(factory), spec.rules);
-    if (spec.instruction !== undefined) yield* FACTORY_INSTRUCT.handler({ factory, words: spec.instruction }, {}, place.home);
+    if (spec.rules !== undefined) yield* door.rules.write(FactoryName.read(factory), spec.rules);
+    if (spec.instruction !== undefined) yield* door.instruction.write(FactoryName.read(factory), spec.instruction);
     return uncounted(object);
   });
 
@@ -183,7 +182,7 @@ export const objectWritten = (
       case 'McpServer':
         return serverWritten(factory, object);
       case 'Factory':
-        return factoryWritten(place, factory, object);
+        return factoryWritten(factory, object);
     }
   })();
   return Effect.provideService(written, StoreRoot, place.home);

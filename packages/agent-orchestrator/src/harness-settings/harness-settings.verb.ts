@@ -6,11 +6,10 @@
 import { Effect } from 'effect';
 import type { Args, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { FactoryDoor } from '../factory/door/factories.store.ts';
+import { FactoryDoor, filedFactory } from '../factory/door/factories.store.ts';
 import { rooted } from '../factory/wiring/wire.verb.ts';
 import { tried } from '../runtime-client.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
-import { FactoryName } from '../factory/factory.model.ts';
 import { refuseName } from '../factory/factory.store.ts';
 import type { Factory } from '../factory/factory.ts';
 import {
@@ -119,7 +118,7 @@ export const FACTORY_SETTING_SET: Command<{ file: string; name: string; value: u
         const value = yield* jsonOf(textOf(args, 'value'));
         yield* tried(() => refuseName(name, 'setting'));
         const door = yield* FactoryDoor;
-        const factory = yield* door.factories.read(FactoryName.read(name));
+        const factory = yield* filedFactory(name, 'setting');
         const harnessSettings = withSetting(factory.harnessSettings, harness, key, value);
         const refused = harnessSettingsRefusal(harnessSettings, name);
         if (refused) return yield* Effect.fail(new Invalid({ message: `${refused}. Nothing was changed.` }));
@@ -152,7 +151,7 @@ export const FACTORY_SETTING_RM: Command<{ file: string; removed: string }> = {
         const { harness, key } = yield* keyOf(textOf(args, 'setting'));
         yield* tried(() => refuseName(name, 'setting'));
         const door = yield* FactoryDoor;
-        const factory = yield* door.factories.read(FactoryName.read(name));
+        const factory = yield* filedFactory(name, 'setting');
         const removed = `${harness}.${key}`;
         const named = settingsNamed(factory.harnessSettings).map((s) => s.name);
         if (!named.includes(removed))

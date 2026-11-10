@@ -1,59 +1,41 @@
 /**
  * A factory's instruction, what Nemia is to know of the factory and no step is told (its agents are told its rules, `nemia factory rules`),
- * its two verbs each an entry of the command table: `nemia factory instruction`, where it is kept — read bare, and set or cleared in the
- * factory's file — and `nemia factory instruct`, the text the store keeps, written or cleared. The api's Factory `instruction` and
- * `…InstructionWords` verbs (`objects`' Api) call their handlers by their `input`.
+ * its two verbs each an entry of the command table, each through the Factory door: `nemia factory instruction`, where it is kept — read
+ * bare, and set or cleared in the factory's spec — and `nemia factory instruct`, the text the store keeps, written or cleared. The api's
+ * Factory `instruction` and `…InstructionWords` verbs (`objects`' Api) call their handlers by their `input`.
  */
-import { Schema } from 'effect';
+import path from 'node:path';
+import { Effect, Schema } from 'effect';
 import { FactoryInstructionWords } from 'objects';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { DEFAULT_FACTORY, defaultFactoryRefusal, instructionAt, type FactoryWrite, type InstructionAt } from './factory.ts';
-import { readFactory, setInstruction } from './factory.store.ts';
-import { clearInstructionText, instructionFile, readInstructionAt, storeKeeps, writeInstructionText } from './instruction.store.ts';
-import { Conflict } from '../refusal/refusal.ts';
-import { tried } from '../runtime-client.ts';
+import { defaultFactoryRefusal, DEFAULT_INSTRUCTION, instructionPathRefusal, type InstructionAt } from './factory.ts';
+import { readFactory } from './factory.store.ts';
+import { instructionFile, readInstructionAt, storeKeeps, type FactoryInstruction } from './instruction.store.ts';
+import { FactoryDoor, filedFactory, instructionRead } from './door/factories.store.ts';
+import { FactoryName } from './factory.model.ts';
+import { Conflict, Invalid, type Refusal } from '../refusal/refusal.ts';
+import { rooted } from './wiring/wire.verb.ts';
+import { DEFAULT_NAMESPACE } from 'objects';
+
+export type { FactoryInstruction };
 
 /**
- * A factory's instruction as it reads: its factory's `name`; `path`, the path in its first folder its file names, null where it names
- * none (`NEMIA.md`) or keeps it in the store; `store`, whether it is kept in the store; `file`, the file it is read from; `words`, null
- * where there is no file; `error`, why a file there does not read, else null; and `stored`, whether the store keeps text for it, read or
- * not.
- */
-export type FactoryInstruction = {
-  name: string;
-  path: string | null;
-  store: boolean;
-  file: string;
-  words: string | null;
-  error: string | null;
-  stored: boolean;
-};
-
-/** A factory's name a verb of its instruction is given, refused when it is the default factory, which keeps none (`Conflict`). */
-function refuseDefault(name: string, verb: FactoryWrite): void {
-  if (name === DEFAULT_FACTORY) throw new Conflict({ message: defaultFactoryRefusal(verb) });
-}
-
-/**
- * The instruction of the factory `name`, read afresh where its file says it is kept (`instructionAt`). Refused: the default factory
- * (`Conflict`), and the factory as `readFactory` refuses it — a name that is no slug or whose file does not read (`Invalid`), a name
- * with no file (`Missing`).
+ * The instruction of the factory `name`, read afresh where its file says it is kept (`instructionAt`), at the module's root: the plain
+ * spelling the package's entry still exports, for a caller with no root to give. Refused as the door refuses its read.
  */
 export function factoryInstruction(name: string): FactoryInstruction {
-  refuseDefault(name, 'instruction');
-  const factory = readFactory(name, 'There is no instruction to read.');
-  const at = instructionAt(factory, instructionFile(name));
-  const read = readInstructionAt(at);
-  return {
-    name,
-    path: at.in === 'folder' && factory.instruction !== undefined ? at.path : null,
-    store: at.in === 'store',
-    file: at.file,
-    ...read,
-    stored: storeKeeps(name, factory.tree === undefined ? undefined : at.file),
-  };
+  if (name === DEFAULT_NAMESPACE) throw new Conflict({ message: defaultFactoryRefusal('instruction') });
+  return instructionRead(readFactory(name, 'There is no instruction to read.'), instructionFile(name), readInstructionAt, (file) =>
+    storeKeeps(name, file),
+  );
 }
+
+/** The instruction of the factory `name`, read through the Factory door. */
+const instructionNow = (name: string): Effect.Effect<FactoryInstruction, Refusal> =>
+  Effect.gen(function* () {
+    return yield* (yield* FactoryDoor).instruction.read(FactoryName.read(name));
+  });
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -142,16 +124,40 @@ function readLines(data: FactoryInstruction): string[] {
 }
 
 /**
- * The instruction of the factory `args` name, after its place is set as they ask (`placeAsked`), if they ask one, in its file
- * (`setInstruction`). Refused, writing nothing: as `FACTORY_INSTRUCTION` says.
+ * The factory `name`'s spec with its instruction kept at `at`, a path kept as `path.normalize` spells it, or, `at` undefined, the key
+ * removed, so it reads `NEMIA.md` in its first folder again; written back through the door. Refused before anything is written: a path
+ * that is not one (`instructionPathRefusal`, `Invalid`), the factory (`filedFactory`), and one made from a template, whose instruction
+ * is its tree's (`Invalid`).
  */
-function placed(args: InstructionInput): FactoryInstruction {
-  const name = args.factory;
-  refuseDefault(name, 'instruction');
-  const asked = placeAsked(args);
-  if (asked !== undefined) setInstruction({ factory: name, at: asked.at });
-  return factoryInstruction(name);
-}
+const instructionPlaced = (name: string, at: InstructionAt | undefined): Effect.Effect<string, Refusal> =>
+  Effect.gen(function* () {
+    if (at !== undefined && 'path' in at) {
+      const bad = instructionPathRefusal(at.path);
+      if (bad) return yield* Effect.fail(new Invalid({ message: `${bad} Nothing was changed.` }));
+    }
+    const factory = yield* filedFactory(name, 'instruction');
+    if (factory.tree !== undefined)
+      return yield* Effect.fail(
+        new Invalid({
+          message: `${name} is made from a template, and its instruction is its tree's NEMIA.md, at ${path.join(factory.tree, DEFAULT_INSTRUCTION)}: write it with nemia factory instruct ${name} --file <path>. Nothing was changed.`,
+        }),
+      );
+    const { instruction: _was, ...rest } = factory;
+    const kept = at === undefined ? undefined : 'path' in at ? { path: path.normalize(at.path) } : { store: true as const };
+    return yield* (yield* FactoryDoor).factories.rewrite(kept === undefined ? rest : { ...rest, instruction: kept });
+  });
+
+/**
+ * The instruction of the factory `args` name, after its place is set as they ask (`placeAsked`), if they ask one, in its spec
+ * (`instructionPlaced`). Refused, writing nothing: as `FACTORY_INSTRUCTION` says.
+ */
+const placed = (args: InstructionInput): Effect.Effect<FactoryInstruction, Refusal> =>
+  Effect.gen(function* () {
+    const name = args.factory;
+    const asked = placeAsked(args);
+    if (asked !== undefined) yield* instructionPlaced(name, asked.at);
+    return yield* instructionNow(name);
+  });
 
 /**
  * `nemia factory instruction`: where the instruction of the factory `name` is kept — read bare; set to a path in its first folder
@@ -178,7 +184,7 @@ export const FACTORY_INSTRUCTION: Command<FactoryInstruction, InstructionInput> 
     why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Factory's `instruction`, `putInstruction` and `deleteInstruction`, whose handlers call this one by its `input`",
   },
   input: InstructionInput,
-  handler: (args) => tried(() => placed(args)),
+  handler: (args, _env, home) => rooted(home, 'factory instruction', placed(args)),
   print(data, args) {
     const asked = placeAsked(args);
     return asked === undefined ? readLines(data) : [`${data.name}: instruction ${keptLine(data)}`];
@@ -237,7 +243,7 @@ export const FACTORY_INSTRUCT: Command<Instructed, InstructInput> = {
     why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Factory's `putInstructionWords` and `deleteInstructionWords`, whose handlers call this one by its `input`",
   },
   input: InstructInput,
-  handler: (args) => tried(() => instructed(args)),
+  handler: (args, _env, home) => rooted(home, 'factory instruct', instructed(args)),
   print(data) {
     if (data.removed !== undefined)
       return [data.removed ? `${data.name}: instruction removed, ${data.file}` : `${data.name} has no instruction in the store to remove`];
@@ -246,20 +252,17 @@ export const FACTORY_INSTRUCT: Command<Instructed, InstructInput> = {
 };
 
 /**
- * The instruction of the factory `args` name, after its text in the store is written from their words or removed with `clear`. Refused,
- * writing nothing: as `FACTORY_INSTRUCT` says.
+ * The instruction of the factory `args` name, after its text in the store is written from their words or removed with `clear`, through
+ * the Factory door. Refused, writing nothing: as `FACTORY_INSTRUCT` says.
  */
-function instructed({ factory: name, words, clear }: InstructInput): Instructed {
-  refuseDefault(name, 'instruct');
-  const before = factoryInstruction(name);
-  if (!before.store)
-    throw new Conflict({
-      message: `${name}'s instruction is read from ${before.file}, in the factory's first folder, and the store writes no file there: edit it in the folder, or keep it in the store first — nemia factory instruction ${name} --store. Nothing was written.`,
-    });
-  if (clear === true) {
-    const removed = clearInstructionText(name, before.file);
-    return { ...factoryInstruction(name), removed };
-  }
-  writeInstructionText(name, words ?? '', before.file);
-  return factoryInstruction(name);
-}
+export const instructed = ({ factory: name, words, clear }: InstructInput): Effect.Effect<Instructed, Refusal> =>
+  Effect.gen(function* () {
+    const door = (yield* FactoryDoor).instruction;
+    const factory = FactoryName.read(name);
+    if (clear === true) {
+      const removed = yield* door.clear(factory);
+      return { ...(yield* door.read(factory)), removed };
+    }
+    yield* door.write(factory, words ?? '');
+    return yield* door.read(factory);
+  });

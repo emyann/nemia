@@ -9,7 +9,7 @@ import { Effect, Schema } from 'effect';
 import { tried } from '../runtime-client.ts';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
 import { cliPath, factoryFlag, FROM, versionFlag, writerSpec, yoursOrRefused } from '../yours/yours.ts';
-import { templatedTree } from '../factory/factory.store.ts';
+import { templatedTreeOf } from '../factory/door/factories.store.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { HOME } from '../record/record.store.ts';
 import type { AgentPlace, AgentReading } from '../roster/roster.ts';
@@ -149,7 +149,7 @@ export const AGENTS_WRITE: Command<AgentWritten, AgentWriteInput> = {
       'nemia agents write',
       Effect.gen(function* () {
         const root = yield* StoreRoot;
-        const tree = (named: string) => templatedTree(named, 'nemia agents write');
+        const tree = (named: string) => templatedTreeOf(root, named, 'nemia agents write');
         const repo = yield* tried(() => (from === 'factory' && factory !== undefined ? tree(factory) : given.repo));
         const dir = yield* tried(() =>
           yoursOrRefused('nemia agents write', 'agents', from, name ?? null, repo ?? '', root, { factory, treeOf: tree }),

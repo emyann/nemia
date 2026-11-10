@@ -298,7 +298,7 @@ async function feedStreamed(app: App, feed: FeedRead): Promise<void> {
  */
 async function tickMeasured(orch: Orchestrator, place: Place, fence: Fence, wf: string, repeat: number, informed = false) {
   const base = orch
-    .tickRun({ repo: wf, verifyRest: false })
+    .withProposalsPass(orch.tickRun({ repo: wf, verifyRest: false }))
     .pipe(Effect.provide(Layer.merge(orch.PlaceService.layer(place), orch.storeRootLayer(process.env))));
   let informer = orch.informerMemo();
   const program = Effect.suspend(() => (informed ? base.pipe(Effect.provideService(orch.Informer, informer)) : base));
@@ -334,7 +334,7 @@ const passedOver = (orch: Orchestrator, place: Place, fence: Fence, wf: string, 
   const built = await fresh();
   const informer = await built.runtime.runPromise(Effect.service(orch.Informer));
   const program = orch
-    .tickRun({ repo: wf, verifyRest: false })
+    .withProposalsPass(orch.tickRun({ repo: wf, verifyRest: false }))
     .pipe(
       Effect.provide(Layer.merge(orch.PlaceService.layer(place), orch.storeRootLayer(process.env))),
       Effect.provideService(orch.Informer, informer),

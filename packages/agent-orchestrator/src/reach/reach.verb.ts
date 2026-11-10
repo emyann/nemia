@@ -11,8 +11,7 @@ import type { Command } from '../command/entry.verb.ts';
 import { agentNameRefusal } from '../agents/agents.ts';
 import { rootGiven } from '../config/root.store.ts';
 import { rooted } from '../factory/wiring/wire.verb.ts';
-import { FactoryDoor } from '../factory/door/factories.store.ts';
-import { FactoryName } from '../factory/factory.model.ts';
+import { filedFactory } from '../factory/door/factories.store.ts';
 import { factoryRepo } from '../factory/factory.ts';
 import { workflowFolder } from '../folder/folder.store.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
@@ -77,7 +76,7 @@ const messageOf = (cause: Cause.Cause<unknown>): string => {
 
 /** Each workflow attached to `factory` read, or why it does not, at the store `home`: its gated steps' sites, or its refusal. */
 const factorySites = Effect.fnUntraced(function* (home: string, name: string) {
-  const factory = yield* (yield* FactoryDoor).factories.read(FactoryName.read(name));
+  const factory = yield* filedFactory(name, 'hire');
   const repo = factoryRepo(factory, undefined, process.cwd());
   const door = yield* WorkflowDoor;
   const sites: GateSite[] = [];

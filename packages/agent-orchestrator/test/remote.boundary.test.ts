@@ -38,7 +38,7 @@ const CALLS = path.join(BIN, 'calls.log');
 for (const name of ['claude', 'codex'])
   fs.writeFileSync(path.join(BIN, name), `#!/bin/sh\necho "${name} $*" >> '${CALLS}'\nexit 1\n`, { mode: 0o755 });
 process.env.PATH = `${BIN}${path.delimiter}${process.env.PATH}`;
-const { EngineService, engine, feedHubLayer, followStep, retryRun, tickRun, runWith } = await import('../src/runner.ts');
+const { EngineService, engine, feedHubLayer, followStep, retryRun, tickRun, runWith, withProposalsPass } = await import('../src/runner.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const { storeRootLayer } = await import('../src/config/root.store.ts');
@@ -182,7 +182,7 @@ async function following(t: TestContext, agent: string, url: string) {
     ),
   );
   t.after(() => rt.dispose());
-  const ticked = () => rt.runPromise(tickRun({ repo: ROOT }).pipe(Effect.provide(storeRootLayer(process.env))));
+  const ticked = () => rt.runPromise(withProposalsPass(tickRun({ repo: ROOT })).pipe(Effect.provide(storeRootLayer(process.env))));
   await until(
     t,
     async () => {

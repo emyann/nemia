@@ -266,6 +266,7 @@ export {
 } from './daemon/daemon.store.ts';
 export type { TakenStore } from './daemon/daemon.store.ts';
 export { holdUrl, runMain, up } from './daemon/up.verb.ts';
+export { withProposalsPass } from './apply/pass.verb.ts';
 export { ensureDaemon, liveDemandHost, type DemandHost } from './demand/demand.verb.ts';
 export { telemetryLayer } from './telemetry/telemetry.store.ts';
 export { addPass, breakdownLines, heaviest, PHASES, STATS_EVERY_MS, summaryDue, summaryLine } from './meter/index.ts';
@@ -320,7 +321,6 @@ export {
   addFactory,
   attachWorkflow,
   defaultStartsAllowed,
-  detachWorkflow,
   factoriesDir,
   fireAgent,
   hireAgent,
@@ -331,7 +331,6 @@ export {
   setInstruction,
   setSchedule,
   startFactory,
-  templatedTree,
 } from './factory/factory.store.ts';
 export { EngineService, HARNESSES, asked, engine, engineOf, remoteAgents, runWith } from './runtime-client.ts';
 export { HARNESS_CHOICES } from 'agent-runtime/vocabulary';

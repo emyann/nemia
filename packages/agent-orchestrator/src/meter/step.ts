@@ -13,6 +13,7 @@
  * counted on the first pass that reads its attempt ended and past those the tick has counted (`deniedCounted`). A gate approved on a try
  * that answered an earlier try's session is timed only while the run's timeline is still to hand over (`runTimed` is `false`).
  */
+import { runNamespace } from '../run-list/index.ts';
 import path from 'node:path';
 import { Invalid } from '../refusal/refusal.ts';
 import { attemptVerdict } from '../check/check.ts';
@@ -20,7 +21,6 @@ import { stepTaskId, type Run } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import type { StepStatus } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
-import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import type { SpendOf } from '../status/status.ts';
 import { hasGate } from '../status/status.ts';
 import {
@@ -59,7 +59,7 @@ export type StepKeys = { factory: string; workflow: string; step: string; agent:
 
 /** The two labels a run is known by, whatever the step: its factory or the default, and its workflow's folder. */
 export const runKeys = (run: Pick<Run, 'factory' | 'workflowDir'>): Pick<StepKeys, 'factory' | 'workflow'> => ({
-  factory: run.factory ?? DEFAULT_FACTORY,
+  factory: runNamespace(run.factory),
   workflow: path.basename(run.workflowDir),
 });
 

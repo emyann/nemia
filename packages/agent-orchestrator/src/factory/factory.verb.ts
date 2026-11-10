@@ -18,10 +18,10 @@ import {
   type FactoryListing,
   type RevisionsPolicy,
 } from './factory.ts';
-import { factoriesDir, factoryRepos, readFactories, refuseName } from './factory.store.ts';
+import { factoriesDir, factoryRepos, refuseName } from './factory.store.ts';
 import { ownAgentRefusal } from './wiring/own-agent.store.ts';
 import { FactoryName } from './factory.model.ts';
-import { FactoryDoor } from './door/factories.store.ts';
+import { FactoryDoor, filedFactory } from './door/factories.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { rooted, wire } from './wiring/wire.verb.ts';
 import { removeInstructionFolder } from './instruction.store.ts';
@@ -180,7 +180,7 @@ const WRITTEN_HERE = { side: 'cli', why: 'the board files, attaches to and remov
 const textOf = (args: Args, key: string): string => (typeof args[key] === 'string' ? args[key] : '');
 
 /**
- * The listing every factory shares: those of the store, as `readFactories` reads them, their schedules as `schedulesListed` does, and
+ * The listing every factory shares: those of the store, as the door lists them, their schedules as `schedulesListed` does, and
  * their places a harness does not trust now, as `untrustedPlaces` reads them.
  */
 type Listed = { factories: FactoryListing[]; schedules: ScheduleListed[]; untrusted: Untrusted[] };
@@ -192,10 +192,8 @@ type Listed = { factories: FactoryListing[]; schedules: ScheduleListed[]; untrus
  * read, and the answer is the same.
  */
 const listedNow = Effect.fn('listedNow')(function* (memo?: ScheduleRuns) {
-  const { factories, schedules } = yield* tried(() => ({
-    factories: readFactories(),
-    schedules: schedulesListed(keptRuns(memo, scheduleRun)),
-  }));
+  const factories = [...(yield* (yield* FactoryDoor).factories.listed())];
+  const schedules = yield* tried(() => schedulesListed(keptRuns(memo, scheduleRun)));
   return { factories, schedules, untrusted: yield* untrustedPlaces(factories) } satisfies Listed;
 });
 
@@ -224,7 +222,7 @@ export const FACTORY: Command<Listed> = {
   class: 'read',
   only: { side: 'cli', why: "the api serves it as the Factory's `listAll` of `objects`' Api, calling this handler" },
   manual: FACTORY_HELP,
-  handler: (_args, _env, _home, kept) => listedNow(kept?.records?.factories),
+  handler: (_args, _env, home, kept) => rooted(home, 'factory', listedNow(kept?.records?.factories)),
   print: listed,
 };
 
@@ -241,7 +239,7 @@ const FACTORY_LS: Command<Listed> = {
   writes: false,
   class: 'read',
   only: { side: 'cli', why: "the api lists the factories as the Factory's `listAll`: ls is the command line's second name for it" },
-  handler: (_args, _env, _home, kept) => listedNow(kept?.records?.factories),
+  handler: (_args, _env, home, kept) => rooted(home, 'factory', listedNow(kept?.records?.factories)),
   print: listed,
 };
 
@@ -544,7 +542,7 @@ const FACTORY_REVISIONS: Command<{ file: string; was: RevisionsPolicy | null }> 
         if (revisions === undefined) return yield* Effect.fail(new Invalid({ message: revisionsRefusal(args) }));
         yield* tried(() => refuseName(name, 'revisions'));
         const door = yield* FactoryDoor;
-        const factory = yield* door.factories.read(FactoryName.read(name));
+        const factory = yield* filedFactory(name, 'revisions');
         const file = yield* door.factories.rewrite({ ...factory, revisions });
         return { file, was: factory.revisions ?? null };
       }),

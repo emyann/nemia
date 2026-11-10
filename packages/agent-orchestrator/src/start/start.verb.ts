@@ -4,6 +4,7 @@
  * through it. A controller whose program requires nothing: the runtime it reads, through the client (`runtime-client.ts`), is its
  * harnesses, which say which steps a session can be bridged for, and never the engine.
  */
+import { DEFAULT_NAMESPACE } from 'objects';
 import fs from 'node:fs';
 import path from 'node:path';
 import { configRefusal, readRemote, tried } from '../runtime-client.ts';
@@ -43,7 +44,6 @@ import { standingLiveOf } from '../standing/standing.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { NO_ALLOWS, repoAllows, type Allows } from '../trust/allows.verb.ts';
 import {
-  DEFAULT_FACTORY,
   factoryMountRefusal,
   factoryMounts,
   factoryVolumes,
@@ -57,6 +57,7 @@ import {
   type Factory,
 } from '../factory/factory.ts';
 import { readFactory } from '../factory/factory.store.ts';
+import { factoryOrNone } from '../factory/door/factories.store.ts';
 import { factoryFills } from '../factory/rules/rules.store.ts';
 import { Context, Effect } from 'effect';
 import { RunDoor } from '../runs/runs.store.ts';
@@ -575,7 +576,7 @@ function renderAgents(run: Run, steps: readonly Workflow[], found: SkillsFound):
 
 /** The factory a run is started in, read (`readFactory`); none for no name and for the default factory, which is no file. */
 const factoryNamed = (name: string | undefined): Factory | undefined =>
-  name === undefined || name === DEFAULT_FACTORY ? undefined : readFactory(name);
+  name === undefined || name === DEFAULT_NAMESPACE ? undefined : readFactory(name);
 
 /**
  * The repository a run started in the factory `name` works on (`factoryRepo`): `named`, else the factory's one repository, else
@@ -656,7 +657,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const edits = yield* labelEditsOf(opts);
   const isolate = opts.isolate ?? true;
   const places = placesOf(opts.repo);
-  const factory = yield* tried(() => factoryNamed(opts.factory));
+  const factory = yield* factoryOrNone(opts.factory);
   const harnessSettings = yield* settingsAt(factory);
   const refused = yield* StartRefusal;
   const { declared } = yield* PlaceService;

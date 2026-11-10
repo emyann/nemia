@@ -7,25 +7,32 @@
  * it (`docs/features.md`).
  */
 import { Effect } from 'effect';
-import { EngineService, mcpServerOf, tried, type McpSignInStarted, type McpSignInState } from '../../runtime-client.ts';
+import { EngineService, mcpServerOf, type McpSignInStarted, type McpSignInState } from '../../runtime-client.ts';
 import { Conflict, Invalid, Missing } from '../../refusal/refusal.ts';
 import { shippedSecretOf } from './clients.ts';
-import { factoryServers } from './servers.store.ts';
 import { factoryThere } from './servers.verb.ts';
+import { doorAt } from '../door/factories.store.ts';
+import { FactoryName } from '../factory.model.ts';
 
-/** The server `server` of `factory`'s record, as its sign-in is handed it; refused (`Missing`) for a factory or a server not there. */
+/**
+ * The server `server` of `factory`'s record, read through the Factory door at the store `home`, as its sign-in is handed it; refused
+ * (`Missing`) for a factory or a server not there.
+ */
 const recorded = (factory: string, server: string, home: string, verb: string) =>
-  tried(() => {
-    factoryThere(factory, verb);
-    const record = factoryServers(home, factory);
-    const found = Object.hasOwn(record, server) ? record[server] : undefined;
-    if (found === undefined) {
-      throw new Missing({
-        message: `${factory} records no server \`${server}\`, so none was ${verb}. Add it first: nemia factory server add ${factory} ${server} --url <address>, or on the factory's settings page.`,
-      });
-    }
-    return mcpServerOf(found);
-  });
+  doorAt(home, (door) =>
+    Effect.gen(function* () {
+      yield* factoryThere(factory, verb);
+      const record = yield* door.servers.read(FactoryName.read(factory));
+      const found = Object.hasOwn(record, server) ? record[server] : undefined;
+      if (found === undefined)
+        return yield* Effect.fail(
+          new Missing({
+            message: `${factory} records no server \`${server}\`, so none was ${verb}. Add it first: nemia factory server add ${factory} ${server} --url <address>, or on the factory's settings page.`,
+          }),
+        );
+      return mcpServerOf(found);
+    }),
+  );
 
 /** A refusal of the engine's, in a refusal's kind: a port another sign-in waits on is a `Conflict`, anything else `Invalid`. */
 const kindOf = (e: { readonly message: string; readonly held: boolean }) =>

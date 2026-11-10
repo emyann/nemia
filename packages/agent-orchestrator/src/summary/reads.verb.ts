@@ -8,8 +8,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';
 import { asked, over, type Engine, type TaskView, unreadableJournal } from '../runtime-client.ts';
-import { DEFAULT_FACTORY } from '../factory/factory.ts';
-import { readFactory } from '../factory/factory.store.ts';
+import { doorAt } from '../factory/door/factories.store.ts';
+import { FactoryName, isDefaultFactory } from '../factory/factory.model.ts';
+import { runNamespace } from '../run-list/index.ts';
 import type { Fills } from '../folder/folder.ts';
 import { WorkflowDir } from '../folder/folder.model.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
@@ -123,16 +124,17 @@ export const seenBy = (e: Engine, views: Views): Engine => ({
 
 /**
  * What a read of `run`'s workflow folder is handed of the factory it started in, read now: its hires and rules (`factoryFills`), none for
- * a run in no factory or the default one; or, for a factory that is not there (`gone`) or whose file does not read, its name alone. Throws
- * what is no refusal.
+ * a run in no factory or the default one, as the Factory door answers it at the store `home`; or, for a factory that is not there (`gone`)
+ * or whose file does not read, its name alone. Throws what is no refusal.
  */
-function factoryRead(run: Run): { fills?: Fills; unread?: { name: string; gone: boolean } } {
-  if (run.factory === undefined || run.factory === DEFAULT_FACTORY) return {};
+function factoryRead(run: Run, home: string): { fills?: Fills; unread?: { name: string; gone: boolean } } {
+  const name = runNamespace(run.factory);
   try {
-    return { fills: factoryFills(readFactory(run.factory), path.basename(path.resolve(run.workflowDir))).fills };
+    const record = Effect.runSync(doorAt(home, (door) => door.factories.read(FactoryName.read(name))));
+    return isDefaultFactory(record) ? {} : { fills: factoryFills(record, path.basename(path.resolve(run.workflowDir))).fills };
   } catch (err) {
     if (!isRefusal(err)) throw err;
-    return { unread: { name: run.factory, gone: err instanceof Missing } };
+    return { unread: { name, gone: err instanceof Missing } };
   }
 }
 
@@ -156,7 +158,7 @@ const stopped = (why: string): string => (/[.!?]$/.test(why) ? why : `${why}.`);
  * (`judgedUnlessUnreadable` answers `unloadedWords`), and its page says that instead.
  */
 export function workflowsOf(run: Run, home: string): { steps: Workflow[]; warning: null } | { steps: null; warning: string } {
-  const { fills, unread } = factoryRead(run);
+  const { fills, unread } = factoryRead(run, home);
   try {
     const read = Effect.gen(function* () {
       return yield* (yield* WorkflowDoor).workflows.read(WorkflowDir.read(run.workflowDir), { repo: run.repo, home }, fills);

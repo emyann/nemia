@@ -26,7 +26,7 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-const { lastPassCost, startRun, tickRun, runWith: runEngine } = await import('../runner.ts');
+const { lastPassCost, startRun, tickRun, runWith: runEngine, withProposalsPass } = await import('../runner.ts');
 const stand = eachTest(testPlace);
 const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
@@ -497,7 +497,7 @@ writes("a pass's metrics go into the registry of whoever runs it: its time, each
   const own = <A, E>(program: import('effect').Effect.Effect<A, E>) =>
     Effect.runPromise(program.pipe(Effect.provideService(Metric.MetricRegistry, registry)));
   await own(
-    tickRun({}).pipe(
+    withProposalsPass(tickRun({})).pipe(
       Effect.provide(storeRootLayer(process.env)),
       Effect.provide(stand().layer),
       Effect.provide(EngineService.layer(fake({ queued: ['t-q', 't-r'], running: { claude: 3 } }))),

@@ -15,7 +15,7 @@ import { instructionAt, type Factory } from '../factory/factory.ts';
 import { instructionFile, readInstructionAt } from '../factory/instruction.store.ts';
 import { factoriesDirAt } from '../factory/factory.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
-import { FactoryDoor } from '../factory/door/factories.store.ts';
+import { FactoryDoor, filedFactory } from '../factory/door/factories.store.ts';
 import { TemplateDoor } from './door/templates.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { rooted } from '../factory/wiring/wire.verb.ts';
@@ -155,7 +155,7 @@ export function instructionOf(factory: Factory): { words: string | null; error: 
 /** The factory `name`'s parts an export holds, read through the Factory door: the factory, its file, its instruction and its rules. */
 const factoryParts = Effect.fn('factoryParts')(function* (name: string) {
   const door = yield* FactoryDoor;
-  const factory = yield* door.factories.read(FactoryName.read(name));
+  const factory = yield* filedFactory(name, 'rules');
   const rules = yield* door.rules.read(FactoryName.read(name));
   const file = path.join(factoriesDirAt(yield* StoreRoot), `${name}.json`);
   return { factory, file, instruction: instructionOf(factory), rules } satisfies FactoryParts;

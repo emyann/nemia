@@ -49,7 +49,7 @@ const { followPass, passRevisions, pinPass, resolvedNow } = await import('../src
 const { refreshRun } = await import('../src/revisions/pin.verb.ts');
 const { metered } = await import('../src/meter/tally.store.ts');
 const { writeRules } = await import('../src/factory/rules/rules.store.ts');
-const { setRevisions } = await import('../src/factory/factory.store.ts');
+const { followed } = await import('./factory-planted.ts');
 const { StoreRoot } = await import('../src/config/root.store.ts');
 const { agentDoorMemory } = await import('../src/agents/agent-memory.store.ts');
 const { AgentDoor } = await import('../src/agents/agent-door.store.ts');
@@ -275,7 +275,7 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
       const factory = `follows-${t.name}`;
       addFactory({ name: factory, repos: [repo] });
       attachWorkflow({ factory, workflow: t.name });
-      setRevisions({ factory, revisions: 'follow' });
+      followed(ROOT, factory, 'follow');
       const run = await started(t.dir, repo, { factory });
       const b = board();
       await runWith(b.e, advanceRun(readRun(run.id)));
@@ -314,7 +314,7 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
       const factory = `follows-done-${t.name}`;
       addFactory({ name: factory, repos: [repo] });
       attachWorkflow({ factory, workflow: t.name });
-      setRevisions({ factory, revisions: 'follow' });
+      followed(ROOT, factory, 'follow');
       const run = await started(t.dir, repo, { factory });
       const b = board();
       await runWith(b.e, advanceRun(readRun(run.id)));
@@ -878,7 +878,7 @@ test('a step that ended is judged by the fields it was filed with: a run that fo
   const factory = `follows-filed-${team0.name}`;
   addFactory({ name: factory, repos: [repo] });
   attachWorkflow({ factory, workflow: team0.name });
-  setRevisions({ factory, revisions: 'follow' });
+  followed(ROOT, factory, 'follow');
   const run = await started(team0.dir, repo, { factory });
   const b = board();
 

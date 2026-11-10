@@ -10,6 +10,7 @@ import { Effect, Exit } from 'effect';
 import { CardDoor } from '../cards/cards.store.ts';
 import type { PlaceService } from '../place/place.store.ts';
 import { cardDoorMemory } from '../cards/memory.store.ts';
+import { factoryDoorMemory } from '../factory/door/memory.store.ts';
 import { cardDoorFiles } from '../cards/cards.store.ts';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -27,14 +28,17 @@ import { cardList, cardListOf, cardObject, cardObjectOf, type CardQuery } from '
 const engine = eachTest(testEngine);
 const stand = eachTest(testPlace);
 
-/** Runs `program` against a fresh memory door on which `cards` are filed first, by name to their text, given the test place. */
+/**
+ * Runs `program` against a fresh memory door on which `cards` are filed first, by name to their text, given the test place and a memory
+ * Factory door holding no factory.
+ */
 const over = <A, E>(cards: Readonly<Record<string, string>>, program: Effect.Effect<A, E, PlaceService>) =>
   Effect.runSyncExit(
     Effect.gen(function* () {
       const door = yield* CardDoor;
       for (const [name, text] of Object.entries(cards)) yield* door.cards.add(CardName.read(name), text);
       return yield* program;
-    }).pipe(Effect.provide(cardDoorMemory()), Effect.provide(stand().layer)),
+    }).pipe(Effect.provide(cardDoorMemory()), Effect.provide(factoryDoorMemory()), Effect.provide(stand().layer)),
   );
 
 /** The inbox as the listing reads it now, through the door: no run started from any card. */

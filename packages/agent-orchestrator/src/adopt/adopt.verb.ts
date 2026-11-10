@@ -15,8 +15,7 @@ import { leftOut, type Args, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { Conflict, Invalid } from '../refusal/refusal.ts';
 import { refuseName } from '../factory/factory.store.ts';
-import { FactoryName } from '../factory/factory.model.ts';
-import { FactoryDoor } from '../factory/door/factories.store.ts';
+import { FactoryDoor, filedFactory } from '../factory/door/factories.store.ts';
 import { rooted } from '../factory/wiring/wire.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import type { Factory, FactoryTemplate } from '../factory/factory.ts';
@@ -76,7 +75,7 @@ const takeoverAsked = Effect.fn('takeoverAsked')(function* (args: Args, verb: st
         message: `${verb}: ${name} is made from no template, so name the template to take it over with: ${verb} ${name} --template <name|folder|archive> [--set <key>=<value> ...]. ${notDone}`,
       }),
     );
-  const factory = yield* (yield* FactoryDoor).factories.read(FactoryName.read(name));
+  const factory = yield* filedFactory(name, 'adopt');
   if (factory.template !== undefined)
     return yield* Effect.fail(new Conflict({ message: `${verb}: ${templatedAdoptRefusal(name)} ${notDone}` }));
   const source = sourceGiven(given);

@@ -2,7 +2,8 @@
  * The factory a queued card asks for: a card is queued only where it could be started on its own, in a factory it names. Pure: the store
  * hands in the factories on file and whether a start that names none is allowed.
  */
-import { DEFAULT_FACTORY, defaultStartRefusal } from '../factory/factory.ts';
+import { DEFAULT_NAMESPACE } from 'objects';
+import { defaultStartRefusal } from '../factory/factory.ts';
 import type { InboxCard } from './inbox.ts';
 
 const NOT_STARTED = 'Nothing was started.';
@@ -20,7 +21,7 @@ export function queueFactoryRefusal(
   names: readonly string[],
   unfactoredStarts: boolean,
 ): string | null {
-  if (card.factory === DEFAULT_FACTORY) {
+  if (card.factory === DEFAULT_NAMESPACE) {
     return defaultStartRefusal(`\`factory: <name>\` in ${file}`, names).replace(NOT_STARTED, NOT_QUEUED);
   }
   if (card.factory !== undefined || unfactoredStarts) return null;

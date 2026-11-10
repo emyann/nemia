@@ -12,7 +12,7 @@ import { Invalid } from '../refusal/refusal.ts';
 import type { Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { cliPath, factoryFlag, FROM, versionFlag, writerSpec, yoursOrRefused } from '../yours/yours.ts';
-import { templatedTree } from '../factory/factory.store.ts';
+import { templatedTreeOf } from '../factory/door/factories.store.ts';
 import { rooted } from '../factory/wiring/wire.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { SkillName } from '../agents/agents.model.ts';
@@ -172,7 +172,7 @@ export const SKILLS_WRITE: Command<SkillWritten | SkillCopied, SkillWriteInput> 
         const library = yield* tried(() =>
           yoursOrRefused('nemia skills write', 'skills', from, name ?? null, '', root, {
             factory,
-            treeOf: (named) => templatedTree(named, 'nemia skills write'),
+            treeOf: (named) => templatedTreeOf(root, named, 'nemia skills write'),
           }),
         );
         const door = yield* SkillDoor;

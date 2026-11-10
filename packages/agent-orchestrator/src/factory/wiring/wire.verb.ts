@@ -9,8 +9,7 @@ import { tried } from '../../runtime-client.ts';
 import type { Refusal } from '../../refusal/refusal.ts';
 import { rootGiven, StoreRoot } from '../../config/root.store.ts';
 import type { Factory } from '../factory.ts';
-import { FactoryName } from '../factory.model.ts';
-import { FactoryDoor } from '../door/factories.store.ts';
+import { FactoryDoor, filedFactory } from '../door/factories.store.ts';
 import { wiringChecked, wiringNamesRefused } from '../factory.store.ts';
 import type { WiringChange } from './wiring.ts';
 
@@ -38,7 +37,7 @@ export const wire = (
   Effect.gen(function* () {
     yield* tried(() => wiringNamesRefused(name, change));
     const door = yield* FactoryDoor;
-    const was = yield* door.factories.read(FactoryName.read(name));
+    const was = yield* filedFactory(name, change.verb);
     const now = yield* tried(() => wiringChecked(was, change, onDisk));
     return { was, now, file: yield* door.factories.rewrite(now) };
   });

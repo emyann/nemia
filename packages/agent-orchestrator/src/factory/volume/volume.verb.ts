@@ -8,12 +8,11 @@ import { Effect } from 'effect';
 import type { Args, Spec } from '../../command/command.ts';
 import type { Command } from '../../command/entry.verb.ts';
 import { StoreRoot } from '../../config/root.store.ts';
-import { FactoryDoor } from '../door/factories.store.ts';
+import { FactoryDoor, filedFactory } from '../door/factories.store.ts';
 import { rooted } from '../wiring/wire.verb.ts';
 import { tried } from '../../runtime-client.ts';
 import { Invalid, Missing } from '../../refusal/refusal.ts';
 import { isDirectory } from '../../record/record.store.ts';
-import { FactoryName } from '../factory.model.ts';
 import { refuseName } from '../factory.store.ts';
 import { factoryVolumes, volumeMark, type Volume } from '../factory.ts';
 import { volumeOf, volumeRefusal, withVolume } from './volume.ts';
@@ -100,7 +99,7 @@ export const FACTORY_VOLUME_ADD: Command<Added> = {
         if (typeof volume === 'string') return yield* Effect.fail(new Invalid({ message: volume }));
         yield* tried(() => refuseName(name, 'volume'));
         const door = yield* FactoryDoor;
-        const factory = yield* door.factories.read(FactoryName.read(name));
+        const factory = yield* filedFactory(name, 'volume');
         const refused = volumeRefusal(factory, volume, yield* StoreRoot, isDirectory);
         if (refused) return yield* Effect.fail(new Invalid({ message: refused }));
         const { volumes, was } = withVolume(factory, volume);
@@ -147,7 +146,7 @@ export const FACTORY_VOLUME_RM: Command<{ file: string; removed: string }> = {
       Effect.gen(function* () {
         yield* tried(() => refuseName(name, 'volume'));
         const door = yield* FactoryDoor;
-        const factory = yield* door.factories.read(FactoryName.read(name));
+        const factory = yield* filedFactory(name, 'volume');
         const spelled = textOf(args, 'path');
         const unmarked = spelled.replace(/:(ro|rw)$/, '');
         const at = path.resolve(unmarked);

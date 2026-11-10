@@ -28,7 +28,7 @@ import type { Agents } from '../agents/agents.ts';
 import type { Places } from '../skills/read.store.ts';
 import type { Fills, Found } from './folder.ts';
 import { HOME, isDirectory } from '../record/record.store.ts';
-import { readFactoriesAt } from '../factory/factory.store.ts';
+import { doorAtOnce } from '../factory/door/factories.store.ts';
 
 /**
  * What `writeWorkflow` did: the folder, its steps as they now read, and its files by name — written, left as they were because they already
@@ -252,16 +252,19 @@ function workflowPlaceRefusal(home: string, at: string, repo?: string): string |
   return `${at} is not a workflow in the store's workflows/ (${path.join(store, '<name>')}) nor in a repository's the store knows (<repo>/workflows/<name>, for a factory's repo), and writing a workflow removes the files of the steps it no longer has. Write it to a folder in one of the two, give its repository to a factory (nemia factory add <name> --repo <repo>), or pass { anywhere: true } to write ${at} all the same.`;
 }
 
+/** The factories of the store `home`, as the Factory door lists each with its file. */
+const listedAt = (home: string) => doorAtOnce(home, (door) => door.factories.listed());
+
 /** The repositories the store knows, each resolved: every factory's `repos` that reads, and `repo` when the caller names one. */
 export function knownReposAt(home: string, repo?: string): Set<string> {
-  const known = new Set(readFactoriesAt(home).flatMap((f) => ('repos' in f ? f.repos.map((r) => path.resolve(r)) : [])));
+  const known = new Set(listedAt(home).flatMap((f) => ('repos' in f ? f.repos.map((r) => path.resolve(r)) : [])));
   if (repo) known.add(path.resolve(repo));
   return known;
 }
 
 /** The trees of the factories made from a template, each resolved: where such a factory runs from, laid out as a repository. */
 const factoryTrees = (home: string): Set<string> =>
-  new Set(readFactoriesAt(home).flatMap((f) => ('tree' in f && f.tree !== undefined ? [path.resolve(f.tree)] : [])));
+  new Set(listedAt(home).flatMap((f) => ('tree' in f && f.tree !== undefined ? [path.resolve(f.tree)] : [])));
 
 /**
  * Whether `dir` holds the workflows the board lists: the store's `workflows/`, or the `workflows/` of a repository the store knows — a

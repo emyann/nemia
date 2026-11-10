@@ -28,7 +28,6 @@ const {
   addFactory,
   advanceRun,
   attachWorkflow,
-  detachWorkflow,
   fireAgent,
   hireAgent,
   inboxDir,
@@ -44,6 +43,7 @@ const {
   runWith: runEngine,
 } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
+const { detached } = await import('./factory-planted.ts');
 const { main: cli } = await import('../src/cli/main.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { nemiaDefinition } = await import('../src/nemia/level.store.ts');
@@ -593,7 +593,7 @@ test('a start in a factory refused step by step, each naming its fix, until it s
     attachWorkflow({ factory: 'pipao', workflow: 'dev' });
     await startRefused(start, 'Invalid', 'build', 'pipao', 'dev', 'nemia factory attach pipao build');
     attachWorkflow({ factory: 'pipao', workflow: 'build' });
-    detachWorkflow({ factory: 'pipao', workflow: 'dev' });
+    detached(ROOT, 'pipao', 'dev');
     await startRefused(
       () => runPlaced(startRun({ brief: 'dev it', repo, workflowDir: dev, isolate: false, factory: 'pipao' })),
       'Invalid',

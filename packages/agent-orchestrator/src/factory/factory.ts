@@ -14,10 +14,25 @@ import { untrustedLines, type Untrusted } from '../trust/trust.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { settingLines, type SettingsAsRead } from '../harness-settings/harness-settings.ts';
-import type { ConditionStatus, FactoryConditionReason, FactoryConditionType, RevisionsPolicy } from 'objects';
+import type {
+  ConditionStatus,
+  DEFAULT_NAMESPACE as OBJECTS_DEFAULT,
+  FactoryConditionReason,
+  FactoryConditionType,
+  RevisionsPolicy,
+} from 'objects';
 
-/** The one default factory's name: listed by `nemia factory ls`, refused to `nemia factory add` and `nemia factory rm`. */
-export const DEFAULT_FACTORY = 'default';
+/**
+ * objects' `DEFAULT_NAMESPACE`, the default factory's name, its type that constant's: spelled here, as a pure file the package's light
+ * entries reach loads no Schema (`PINNED_MODULES`, `test/refusal.test.ts`), and the type refuses any other word.
+ */
+const DEFAULT_NAMESPACE: typeof OBJECTS_DEFAULT = 'default';
+
+/**
+ * The default factory's name under its old spelling: kept only so the run core's files compile until they move onto `DEFAULT_NAMESPACE`
+ * too, and deleted then.
+ */
+export const DEFAULT_FACTORY = DEFAULT_NAMESPACE;
 
 /** A factory's name: a lowercase slug of 1 to 40 characters, since it names a file in the store and, later, a record's field. */
 export const FACTORY_NAME = /^[a-z0-9][a-z0-9-]{0,39}$/;
@@ -264,7 +279,16 @@ const INSTEAD: Record<FactoryWrite, string> = {
 
 /** The refusal of `nemia factory <verb>` on the default factory, which is read, never written. */
 export const defaultFactoryRefusal = (verb: FactoryWrite): string =>
-  `\`${DEFAULT_FACTORY}\` is the default factory: it holds every run and card that names no factory, and is read, never written, so nemia factory ${verb} does not take it. ${INSTEAD[verb]}`;
+  `\`${DEFAULT_NAMESPACE}\` is the default factory: it holds every run and card that names no factory, and is read, never written, so nemia factory ${verb} does not take it. ${INSTEAD[verb]}`;
+
+/**
+ * The Factory door's refusal of a write of the default factory that no verb refused first: its spec written back (`spec`), or its level,
+ * which is the store's (`level`).
+ */
+export const defaultWriteRefusal = (what: 'spec' | 'level'): string =>
+  what === 'level'
+    ? `the default factory's level is the store's own: set it with no --factory, nemia level <level>. Nothing was written.`
+    : `\`${DEFAULT_NAMESPACE}\` is the default factory: it holds every run and card that names no factory, and is read, never written. Write to a factory nemia factory ls lists. Nothing was written.`;
 
 /**
  * Why `workflow` cannot name a workflow, or undefined: a workflow is named by its folder, which is not empty, not hidden, holds no slash,
@@ -359,7 +383,7 @@ export function hireRefusalOf(
   workflow: string,
   named: string | null,
 ): string | null {
-  if (factory === undefined || factory.name === DEFAULT_FACTORY) return defaultFactoryRefusal('hire');
+  if (factory === undefined || factory.name === DEFAULT_NAMESPACE) return defaultFactoryRefusal('hire');
   if (!factory.workflows.includes(workflow)) return unattachedHireRefusal(factory.name, workflow);
   if (named === null) return null;
   return `The step's own file names its agent, \`agent: ${named}\`, which fills it in every factory, and a start refuses a hire beside it. To hire into this step, delete its \`agent:\` line.`;
@@ -447,7 +471,7 @@ export function ambiguousFactoryRefusal(at: string, holding: readonly Holding[],
  * now. Names the fix (`fix`) and the store's factories (`names`).
  */
 export const defaultStartRefusal = (fix: string, names: readonly string[]): string =>
-  `\`${DEFAULT_FACTORY}\` is the default factory: it holds the history of the runs and cards that named no factory, and no run is started in it. Name a factory — ${fix}, ${choices(names)}. Nothing was started.`;
+  `\`${DEFAULT_NAMESPACE}\` is the default factory: it holds the history of the runs and cards that named no factory, and no run is started in it. Name a factory — ${fix}, ${choices(names)}. Nothing was started.`;
 
 /**
  * Why a run in `factory` cannot start: the runtime refuses the step `where` (`<workflow>/<step>`) a folder of the factory, mounted for
@@ -641,9 +665,9 @@ export function factoryLines(
   untrusted: readonly Untrusted[] = [],
 ): string[] {
   const sorted = [...listing].sort((a, b) => a.name.localeCompare(b.name));
-  const width = Math.max(DEFAULT_FACTORY.length, ...sorted.map((l) => l.name.length));
+  const width = Math.max(DEFAULT_NAMESPACE.length, ...sorted.map((l) => l.name.length));
   return [
-    `${DEFAULT_FACTORY.padEnd(width)}  every run and card that names no factory — read, never written`,
+    `${DEFAULT_NAMESPACE.padEnd(width)}  every run and card that names no factory — read, never written`,
     ...sorted.flatMap((l) => [
       `${l.name.padEnd(width)}  ${'error' in l ? `${l.file} ${l.error}` : l.repos.join(', ')}`,
       ...('error' in l

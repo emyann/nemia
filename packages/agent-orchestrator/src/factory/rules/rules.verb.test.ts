@@ -58,7 +58,7 @@ test('REFUSED: `nemia factory rules`, nothing written', async (t) => {
         names(err.message, ...facts);
         return true;
       });
-      assert.deepEqual(done(door.factories.list()), ['acme']);
+      assert.deepEqual(done(door.factories.list()), ['default', 'acme']);
       assert.equal(done(door.rules.read(FactoryName.read('acme'))).words, null);
     });
   await t.test('--file with --clear, by the check, before anything is read', () =>

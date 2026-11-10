@@ -16,7 +16,7 @@ import type { Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { cliPath, factoryFlag, FROM, versionFlag, writerSpec, yoursOrRefused } from '../yours/yours.ts';
 import { workflowNameRefusal } from '../factory/factory.ts';
-import { readFactories, readFactory, readFactoryAt, templatedTree, templatedTreeAt } from '../factory/factory.store.ts';
+import { FactoryDoor, factoryOrNone, templatedAtOnce, templatedTreeOf } from '../factory/door/factories.store.ts';
 import { factoryFills } from '../factory/rules/rules.store.ts';
 import type { Factory } from '../factory/factory.ts';
 import { readInbox } from '../inbox/inbox.store.ts';
@@ -49,20 +49,14 @@ const placesOf = ({ repo }: Pick<Where, 'repo'>, home: string | undefined): Plac
   ...(home !== undefined && { home }),
 });
 
-/** The factory the arguments name, read once from the store; none where they name none. */
-function factoryIn({ factory }: Pick<Where, 'factory'>): Factory | undefined {
-  return factory === undefined ? undefined : readFactory(factory);
-}
-
 /**
  * How a write of the workflow `workflow` into the tree of the templated factory `name`, in the store `home`, is judged, as a run of it
  * would read it: its agents and skills looked for in the factory's repository, the one a run of it works on — its tree where it names
  * none — and in `home`, and its steps filled with the factory's hires into them and its rules (`factoryFills`). Refused as
- * `templatedTreeAt` refuses the factory.
+ * `templatedTreeOf` refuses the factory.
  */
 export function factoryWriteOf(home: string, name: string, workflow: string): { places: Places; fills: Fills } {
-  const tree = templatedTreeAt(home, name, 'nemia workflows write');
-  const factory = readFactoryAt(home, name, 'Nothing was written.');
+  const { factory, tree } = templatedAtOnce(home, name, 'nemia workflows write');
   return { places: { repo: factory.repos[0] ?? tree, home }, fills: factoryFills(factory, workflow).fills };
 }
 
@@ -73,7 +67,7 @@ export function factoryWriteOf(home: string, name: string, workflow: string): { 
  */
 export function factoryDraftOf(home: string, name: string, workflow: string): { places: Places; fills: Fills } {
   const { places, fills } = factoryWriteOf(home, name, workflow);
-  return { places: { ...places, home: templatedTreeAt(home, name, 'nemia workflows write') }, fills };
+  return { places: { ...places, home: templatedTreeOf(home, name, 'nemia workflows write') }, fills };
 }
 
 /** Where a write's folder looks for its agents and skills, and the hires it is filled with: for the place `factory`, `factoryWriteOf`. */
@@ -91,7 +85,7 @@ const writeJudgedOf = (where: Where, home: string): { places: Places; fills?: Fi
 function yoursWorkflowDir(who: string, { from = '', name, repo = '', factory }: Where, home: string): WorkflowDir {
   const yours = yoursOrRefused(who, 'workflows', from, name, repo, home, {
     factory,
-    treeOf: (factory) => templatedTree(factory, who),
+    treeOf: (factory) => templatedTreeOf(home, factory, who),
   });
   const badName = workflowNameRefusal(name);
   if (badName) throw new Invalid({ message: `${who}: ${badName}` });
@@ -218,7 +212,7 @@ const usersOf = Effect.fn('usersOf')(function* (dir: string) {
   const cards = (yield* readInbox())
     .filter((card) => card.queued?.place != null && card.workflow !== null && path.resolve(inboxDir(), card.workflow) === dir)
     .map((card) => stillNeeded.card(card.name, dir));
-  const factories = readFactories().flatMap((factory) => {
+  const factories = (yield* (yield* FactoryDoor).factories.listed()).flatMap((factory) => {
     if ('error' in factory || !factory.workflows.includes(name)) return [];
     if (factory.repos.some((repo) => isDirectory(path.join(repo, 'workflows', name)))) return [];
     const hires = Object.keys(factory.hires).filter((step) => step.startsWith(`${name}/`));
@@ -322,10 +316,8 @@ export const WORKFLOWS_STEP: Command<{ step: Workflow | null; steps: string[] },
       'workflows step',
       Effect.gen(function* () {
         const dir = yield* tried(() => workflowDirAt(path.resolve(where.dir)));
-        const fills = yield* tried(() => {
-          const factory = factoryIn(where);
-          return factory && factoryFills(factory, where.name).fills;
-        });
+        const factory = yield* factoryOrNone(where.factory);
+        const fills = yield* tried(() => factory && factoryFills(factory, where.name).fills);
         const door = yield* WorkflowDoor;
         const steps = yield* door.workflows.read(dir, placesOf(where, home), fills);
         return { step: steps.find((s) => s.name === where.step) ?? null, steps: steps.map((s) => s.name) };

@@ -26,7 +26,7 @@ process.env.WF_MAX_CONCURRENT = '50';
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_KEEP_WORKTREES;
-const { startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
+const { startRun, runWith: runEngine, gitPlaceLayer, withProposalsPass } = await import('../src/runner.ts');
 const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');
 const { tickRun, freshRestMemo } = await import('../src/tick/tick.verb.ts');
@@ -130,7 +130,10 @@ const counting = (asked: Asked) =>
 const tick = (memo?: ReturnType<typeof freshRestMemo>) =>
   runEngine(
     e,
-    tickRun({ repo: ROOT, ...(memo ? { memo } : {}) }).pipe(Effect.provide(gitPlaceLayer), Effect.provide(storeRootLayer(process.env))),
+    withProposalsPass(tickRun({ repo: ROOT, ...(memo ? { memo } : {}) })).pipe(
+      Effect.provide(gitPlaceLayer),
+      Effect.provide(storeRootLayer(process.env)),
+    ),
   );
 
 /** Passes until `ok` holds of one, a dozen at most. */

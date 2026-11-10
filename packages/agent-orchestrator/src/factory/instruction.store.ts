@@ -13,6 +13,22 @@ import { HOME } from '../record/record.store.ts';
 /** The words of a factory's instruction, null where there is no file; and why the file there does not read, null where it reads. */
 export type InstructionRead = { words: string | null; error: string | null };
 
+/**
+ * A factory's instruction as it reads: its factory's `name`; `path`, the path in its first folder its file names, null where it names
+ * none (`NEMIA.md`) or keeps it in the store; `store`, whether it is kept in the store; `file`, the file it is read from; `words`, null
+ * where there is no file; `error`, why a file there does not read, else null; and `stored`, whether the store keeps text for it, read or
+ * not. What the Factory door's `instruction.read` answers.
+ */
+export type FactoryInstruction = {
+  name: string;
+  path: string | null;
+  store: boolean;
+  file: string;
+  words: string | null;
+  error: string | null;
+  stored: boolean;
+};
+
 /** The folder the store keeps the factory `name`'s instruction in, beside its file: `$WF_ROOT/factories/<name>`. Refused: a bad name. */
 export const instructionFolder = (name: string): string => instructionFolderAt(HOME, name);
 
@@ -96,16 +112,17 @@ export const storeKeeps = (name: string, file = instructionFile(name)): boolean 
 
 /**
  * `nemia factory instruct`: `words` written as the instruction the store keeps for the factory `name`, trimmed, at `file` (its tree's
- * `NEMIA.md` where it was made from a template), and the file. A link at the file or at its folder is replaced, never written through.
- * Refused, writing nothing: blank words (`Invalid`), and a tree not rendered yet (`Conflict`), which a write would leave unseeded.
+ * `NEMIA.md` where it was made from a template, else `storeFile`, the store's), and the file. A link at the file or at its folder is
+ * replaced, never written through. Refused, writing nothing: blank words (`Invalid`), and a tree not rendered yet (`Conflict`), which a
+ * write would leave unseeded.
  */
-export function writeInstructionText(name: string, words: string, file = instructionFile(name)): string {
+export function writeInstructionText(name: string, words: string, file = instructionFile(name), storeFile = instructionFile(name)): string {
   if (!words.trim())
     throw new Invalid({
       message: `the instruction of ${name} is blank. Write the words Nemia is to know of the factory, or clear it: nemia factory instruct ${name} --clear. Nothing was written.`,
     });
   const folder = path.dirname(file);
-  if (file !== instructionFile(name) && !fs.statSync(folder, { throwIfNoEntry: false })?.isDirectory())
+  if (file !== storeFile && !fs.statSync(folder, { throwIfNoEntry: false })?.isDirectory())
     throw new Conflict({
       message: `${name} is made from a template, and its tree is not rendered yet, at ${folder}: start the daemon, nemia up, and write it once nemia factory ls shows it applied. Nothing was written.`,
     });

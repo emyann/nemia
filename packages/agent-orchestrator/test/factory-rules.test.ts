@@ -262,7 +262,7 @@ test("a factory's rules and its instruction, from none to cleared: told as their
   await s.test('kept in the store: `nemia factory instruct` writes its words trimmed, and from --file', async (sub) => {
     const written = await stage.runWith(
       stage.board().e,
-      FACTORY_INSTRUCT.handler({ factory: 'pipao', words: '  Ship small.  ', clear: false }),
+      FACTORY_INSTRUCT.handler({ factory: 'pipao', words: '  Ship small.  ', clear: false }, undefined, ROOT),
     );
     const kept = path.join(ROOT, 'factories', 'pipao', 'NEMIA.md');
     assert.equal(written.words, 'Ship small.\n');

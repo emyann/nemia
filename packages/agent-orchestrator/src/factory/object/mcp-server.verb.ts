@@ -8,7 +8,6 @@
  */
 import { Effect } from 'effect';
 import { API_VERSION, type McpServer, type McpServerList } from 'objects';
-import { DEFAULT_FACTORY } from '../factory.ts';
 import { Missing, type Invalid } from '../../refusal/refusal.ts';
 import { BUILTIN_SERVERS, builtinServers } from '../servers/servers.store.ts';
 import { maskedHeaders, type FactoryServer } from '../servers/index.ts';
@@ -42,10 +41,13 @@ export const mcpServerOf = (s: ServerListed, namespace: string, filedAt: string,
   };
 };
 
-/** The servers of the factory `namespace`, read now at `home`; none for the default factory; `Missing` where no factory has the name. */
+/**
+ * The servers of the factory `namespace`, read now at `home`; none for the default factory, which the door answers with no listing;
+ * `Missing` where no factory has the name.
+ */
 const serversOf = Effect.fn('serversOf')(function* (home: string, repo: string, namespace: string) {
-  const { factory } = yield* factoryFiled(home, repo, namespace);
-  if (namespace === DEFAULT_FACTORY) return [];
+  const { factory, listing: filed } = yield* factoryFiled(home, repo, namespace);
+  if (filed === undefined) return [];
   const listing: ServersListing = yield* FACTORY_SERVERS.handler({ factory: namespace }, undefined, home);
   return listing.servers.map((s) => mcpServerOf(s, namespace, factory.metadata.creationTimestamp, listing.unread));
 });

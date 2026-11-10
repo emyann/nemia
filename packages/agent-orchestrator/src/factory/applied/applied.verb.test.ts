@@ -22,11 +22,11 @@ process.env.WF_ROOT = ROOT;
 const FACTORIES = path.join(ROOT, 'factories');
 const { templated: programsAt } = await import('../../../test/templated.ts');
 const { exportTemplate, reconciled, reconciledAt } = programsAt(ROOT);
-const { attachWorkflow, detachWorkflow, fireAgent, hireAgent, readFactories, readFactory } = await import('../../runner.ts');
+const { attachWorkflow, fireAgent, hireAgent, readFactories, readFactory } = await import('../../runner.ts');
 const { main: cli } = await import('../../cli/main.ts');
 const { reconcile } = await import('./applied.verb.ts');
 const { appliedDir, readStatus, statusFile, treeDir } = await import('./applied.store.ts');
-const { setRevisions } = await import('../factory.store.ts');
+const { detached, followed } = await import('../../../test/factory-planted.ts');
 const stand = eachTest(testPlace);
 /** `nemia`, as a person types it, its commands given this test's place. */
 const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place);
@@ -413,7 +413,7 @@ test("what a templated factory's verbs read and write: its tree's wiring, instru
       const { dir, repo } = template();
       await apply('wired', dir, repo, '--set', 'budget=7');
       await assert.rejects(async () => attachWorkflow({ factory: 'wired', workflow: 'other' }), refusedNaming('Conflict', 'nemia up'));
-      await assert.rejects(async () => setRevisions({ factory: 'wired', revisions: 'follow' }), refusedNaming('Conflict', 'nemia up'));
+      await assert.rejects(async () => followed(ROOT, 'wired', 'follow'), refusedNaming('Conflict', 'nemia up'));
       reconciled(templated('wired'));
       const own = fs.readFileSync(path.join(FACTORIES, 'wired.json'), 'utf8');
       const wiring = () => JSON.parse(fs.readFileSync(path.join(treeDir('wired'), 'factory.json'), 'utf8'));
@@ -432,9 +432,9 @@ test("what a templated factory's verbs read and write: its tree's wiring, instru
       assert.equal(wiring().hires['dev/review'], 'implementer');
       attachWorkflow({ factory: 'wired', workflow: 'other' });
       assert.deepEqual(wiring().workflows, ['dev', 'other', 'triage']);
-      detachWorkflow({ factory: 'wired', workflow: 'other' });
+      detached(ROOT, 'wired', 'other');
       assert.deepEqual(readFactory('wired').workflows, ['dev', 'triage']);
-      setRevisions({ factory: 'wired', revisions: 'follow' });
+      followed(ROOT, 'wired', 'follow');
       assert.deepEqual(
         [wiring().revisions, readFactory('wired').revisions],
         ['follow', 'follow'],

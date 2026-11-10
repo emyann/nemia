@@ -38,9 +38,9 @@
  * (inbox.store.ts and inbox.verb.ts read them).
  */
 import path from 'node:path';
-import { CARD_KEY_MEANINGS, CARD_KEYS, CARD_STATES } from 'objects';
+import { CARD_KEY_MEANINGS, CARD_KEYS, CARD_STATES, DEFAULT_NAMESPACE } from 'objects';
 import { bodyOf, frontmatterKeys, type PlanFile } from '../plan/plan.ts';
-import { DEFAULT_FACTORY, factoryNameRefusal, type Factory } from '../factory/factory.ts';
+import { factoryNameRefusal, type Factory } from '../factory/factory.ts';
 import type { Run } from '../record/record.ts';
 import type { RunPhase } from '../phase/phase.ts';
 import { isReadme, splitFrontmatter, WorkflowError } from '../step/step.ts';
@@ -640,7 +640,7 @@ const labelSegments = (map: Labels, show: LabelsShown): string =>
 export const cardLabels = (l: Pick<InboxListing, 'labels' | 'workflow' | 'factory'>): Labels => ({
   ...l.labels,
   ...(l.workflow ? { workflow: l.workflow } : {}),
-  factory: l.factory || DEFAULT_FACTORY,
+  factory: l.factory || DEFAULT_NAMESPACE,
 });
 
 /**

@@ -120,7 +120,7 @@ test("a factory's level said on the feed: each change of the level in force is o
     );
   });
   await s.test('a daemon restarted, with no fold of its own, writes no level line again', async () => {
-    const levels = await Effect.runPromise(levelsNow());
+    const levels = await stage.runPlaced(levelsNow());
     assert.deepEqual(recordFeed(new Map(), { memo: freshFeedMemo(), pause: readPause(), levels }).lines, []);
   });
   await s.test('a factory left at manual, and the default factory, are never said', async () => {

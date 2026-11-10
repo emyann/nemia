@@ -6,10 +6,10 @@
  */
 import { leftOut, type Flag, type Spec } from '../../command/command.ts';
 import type { Command } from '../../command/entry.verb.ts';
-import { DEFAULT_FACTORY, defaultFactoryRefusal } from '../factory.ts';
+import { defaultFactoryRefusal } from '../factory.ts';
 import { readFactory } from '../factory.store.ts';
 import { Effect, Schema } from 'effect';
-import { FactoryRulesWrite } from 'objects';
+import { DEFAULT_NAMESPACE, FactoryRulesWrite } from 'objects';
 import { Conflict, type Refusal } from '../../refusal/refusal.ts';
 import { FactoryName } from '../factory.model.ts';
 import { FactoryDoor } from '../door/factories.store.ts';
@@ -27,7 +27,7 @@ export type FactoryRules = { name: string; file: string; words: string | null; e
  * as `readFactory` refuses it — a name that is no slug or whose file does not read (`Invalid`), a name with no file (`Missing`).
  */
 function factoryOf(name: string, notDone: string) {
-  if (name === DEFAULT_FACTORY) throw new Conflict({ message: defaultFactoryRefusal('rules') });
+  if (name === DEFAULT_NAMESPACE) throw new Conflict({ message: defaultFactoryRefusal('rules') });
   return readFactory(name, notDone);
 }
 
@@ -79,7 +79,6 @@ function ruled({ factory: name, words, clear }: RulesInput, home: string | undef
     home,
     'factory rules',
     Effect.gen(function* () {
-      if (name === DEFAULT_FACTORY) return yield* Effect.fail(new Conflict({ message: defaultFactoryRefusal('rules') }));
       const door = yield* FactoryDoor;
       const factory = FactoryName.read(name);
       if (clear === true) {

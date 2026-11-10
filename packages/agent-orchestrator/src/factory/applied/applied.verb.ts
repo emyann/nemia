@@ -14,7 +14,9 @@ import { tried } from '../../runtime-client.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../../command/command.ts';
 import type { Command } from '../../command/entry.verb.ts';
 import { Invalid } from '../../refusal/refusal.ts';
-import { addFactory, factoryRepos, readFactories } from '../factory.store.ts';
+import { factoryRepos, refuseName } from '../factory.store.ts';
+import { FactoryDoor } from '../door/factories.store.ts';
+import { StoreRoot } from '../../config/root.store.ts';
 import type { Factory, FactoryConditionReason, FactoryConditionType, FactoryTemplate } from '../factory.ts';
 import { openedTree, packageSkillNames, problemLine, type OpenTemplate } from '../../template/template.store.ts';
 import { TemplateSource } from '../../template/door/templates.model.ts';
@@ -32,6 +34,7 @@ import {
   stageFolder,
   swapTree,
   treeDir,
+  treeDirAt,
   writeStatus,
   choicesFor,
   type Condition,
@@ -438,7 +441,7 @@ function observed(
 /** One pass: every factory of the store made from a template, reconciled (`reconcileFactory`). The factories reconciled, by name. */
 export const reconcileOnce = Effect.fn('reconcileOnce')(function* () {
   const done: string[] = [];
-  for (const factory of readFactories()) {
+  for (const factory of yield* (yield* FactoryDoor).factories.listed()) {
     if ('error' in factory || factory.template === undefined) continue;
     const templated = factory as Factory & { template: FactoryTemplate };
     yield* reconcileFactory(templated).pipe(
@@ -535,7 +538,10 @@ const applied = Effect.fn('applied')(function* (args: Args) {
         message: `nemia factory apply makes a factory from a template: name a builtin template, or a template's folder or archive, with --template <name|folder|archive>. Nothing was filed.`,
       }),
     );
-  const repos = yield* tried(() => factoryRepos(name, manyOf(args, 'repos')));
+  const repos = yield* tried(() => {
+    refuseName(name, 'add');
+    return factoryRepos(name, manyOf(args, 'repos'));
+  });
   const source = sourceGiven(given);
   const read = yield* renderedAt(source, manyOf(args, 'sets'));
   if ('problems' in read)
@@ -545,9 +551,11 @@ const applied = Effect.fn('applied')(function* (args: Args) {
       }),
     );
   const template = { source, version: read.version, params: read.params };
-  const { factory, file } = yield* tried(() => addFactory({ name, repos, template }));
+  const tree = treeDirAt(yield* StoreRoot, name);
+  const factory: Factory = { name, repos, workflows: [], hires: {}, schedules: {}, template, tree };
+  const file = yield* (yield* FactoryDoor).factories.create(factory);
   const place = builtinPlace(source, yield* BuiltinTemplates);
-  return { name: factory.name, repos: factory.repos, file, template, place, tree: treeDir(name) } satisfies Applied;
+  return { name, repos, file, template, place, tree } satisfies Applied;
 });
 
 /**

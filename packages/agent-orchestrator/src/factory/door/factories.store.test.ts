@@ -11,7 +11,7 @@ import { debtBreaks, seamUses, sourcesUnder, type DebtBreak } from 'test-kit/deb
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { act, done, doorFrom, walksOn } from '../../../test/door-walks.ts';
-import { aFactory, FACTORY_WALKS } from '../../../test/factory-walks.ts';
+import { aFactory, FACTORY_WALKS, readFiled } from '../../../test/factory-walks.ts';
 import { FactoryDoor, factoryDoorFiles } from './factories.store.ts';
 import { FactoryName } from '../factory.model.ts';
 import { StoreRoot } from '../../config/root.store.ts';
@@ -45,7 +45,7 @@ test('a file written before the counter reads as generation 1, and a change of i
   done(door.factories.create(aFactory('acme', { workflows: ['build'] })));
   const { generation: _filed, ...old } = JSON.parse(fs.readFileSync(file, 'utf8')) as { generation?: number };
   fs.writeFileSync(file, `${JSON.stringify(old, null, 2)}\n`);
-  assert.equal(generationOf(done(door.factories.read(FactoryName.read('acme')))), 1);
+  assert.equal(generationOf(readFiled(door, 'acme')), 1);
   done(door.factories.rewrite(aFactory('acme', { workflows: ['build'], hires: { 'build/review': 'reviewer' } })));
   assert.equal((JSON.parse(fs.readFileSync(file, 'utf8')) as { generation?: number }).generation, 2);
 });
@@ -78,13 +78,40 @@ test('the default door reads the files at the store root the program is given, a
   const read = Effect.gen(function* () {
     return yield* (yield* FactoryDoor).factories.read(FactoryName.read('acme'));
   });
-  assert.deepEqual(act(Effect.provideService(list, StoreRoot, root)), ['acme']);
+  assert.deepEqual(act(Effect.provideService(list, StoreRoot, root)), ['default', 'acme']);
   assert.deepEqual(act(list), { refused: 'Invalid' });
   assert.deepEqual(act(read), { refused: 'Invalid' });
 });
 
-/** The functions of the stores the Factory door is over that `src`'s code still calls rather than yielding the door. */
+/**
+ * The functions of the stores the Factory door is over, which `src`'s code calls only through the door: each module-root spelling, and
+ * each spelling that takes the store's root (`…At`), which a caller that names its root reaches through the door at that root instead
+ * (`doorAt`, `doorAtOnce`).
+ */
 const SEAM = [
+  'readFactoriesAt',
+  'readFactoryAt',
+  'addFactoryAt',
+  'createFactoryAt',
+  'removeFactoryAt',
+  'rewriteFactoryAt',
+  'templatedTreeAt',
+  'treeOfAt',
+  'factoryNamesAt',
+  'startFactoryAt',
+  'hireAgentAt',
+  'fireAgentAt',
+  'attachWorkflowAt',
+  'setInstructionAt',
+  'setScheduleAt',
+  'clearScheduleAt',
+  'readFactoryLevelAt',
+  'writeFactoryLevelAt',
+  'rulesWritten',
+  'rulesCleared',
+  'readInstructionAt',
+  'writeInstructionText',
+  'clearInstructionText',
   'readFactory',
   'readFactories',
   'addFactory',
@@ -92,9 +119,7 @@ const SEAM = [
   'hireAgent',
   'fireAgent',
   'attachWorkflow',
-  'detachWorkflow',
   'setInstruction',
-  'setRevisions',
   'setSchedule',
   'clearSchedule',
   'factoryNames',
@@ -117,6 +142,7 @@ const OWN = [
   'src/level/level.store.ts',
   'src/factory/rules/rules.store.ts',
   'src/factory/servers/servers.store.ts',
+  'src/factory/instruction.store.ts',
   'src/factory/door/factories.store.ts',
 ];
 
@@ -136,7 +162,7 @@ test("no file of src calls the factories' stores but as test/factory-door.baseli
   assert.deepEqual(debtBreaks(seamUses(sourcesUnder(PKG, 'src', OWN), SEAM_CALL), FACTORY_DOOR_DEBT).map(inWords), []);
 });
 
-test('REFUSED: a converted file that calls a store again, and a count the baseline holds above what is left', async () => {
+test('REFUSED: a converted file that calls a store again, by either spelling, and a count the baseline holds above what is left', async () => {
   const { FACTORY_DOOR_DEBT } = await import('../../../test/factory-door.baseline.ts');
   const sources = sourcesUnder(PKG, 'src', OWN);
   const again = {
@@ -144,6 +170,11 @@ test('REFUSED: a converted file that calls a store again, and a count the baseli
     'src/factory/wiring/wire.verb.ts': `${sources['src/factory/wiring/wire.verb.ts']}\nconst x = readFactory('a');\n`,
   };
   assert.equal(debtBreaks(seamUses(again, SEAM_CALL), FACTORY_DOOR_DEBT).length, 1);
+  const rootedAgain = {
+    ...sources,
+    'src/workflows/workflows.verb.ts': `${sources['src/workflows/workflows.verb.ts']}\nconst y = readFactoryAt(home, 'a');\n`,
+  };
+  assert.equal(debtBreaks(seamUses(rootedAgain, SEAM_CALL), FACTORY_DOOR_DEBT).length, 1, 'a rooted spelling is a bypass too');
   const [first] = Object.keys(FACTORY_DOOR_DEBT);
   assert.equal(debtBreaks(seamUses(sources, SEAM_CALL), { ...FACTORY_DOOR_DEBT, [first]: (FACTORY_DOOR_DEBT[first] ?? 0) + 1 }).length, 1);
 });

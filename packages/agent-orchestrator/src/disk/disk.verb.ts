@@ -4,8 +4,8 @@
  * read, what is free, and the runs that hold the most; `disk` is the loop the daemon forks. A controller: it reads the disk and the
  * engine on every sweep and decides on nothing it remembers.
  */
+import { runNamespace } from '../run-list/index.ts';
 import { Cause, Effect, Metric, type Duration } from 'effect';
-import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { rootSpan } from '../meter/meter.verb.ts';
 import { runTasks } from '../record/record.ts';
 import { EngineService, HARNESSES, tried, type KeptReport } from '../runtime-client.ts';
@@ -157,7 +157,7 @@ const keptAsked = Effect.gen(function* () {
 export const diskOnce = Effect.fn('diskOnce')(function* (answers: readonly Answered[], memory: DiskMemory, given?: readonly DiskRoot[]) {
   const kept = yield* keptAsked;
   const roots = given ?? (yield* tried(storeRoots));
-  const factories = new Map(answers.map((a) => [a.run.id, a.run.factory ?? DEFAULT_FACTORY]));
+  const factories = new Map(answers.map((a) => [a.run.id, runNamespace(a.run.factory)]));
   const runs = { ids: new Set(factories.keys()), factoryOf: (id: string) => factories.get(id) };
   const walking = roots.flatMap((root, k) => (root.own === undefined ? [{ root, k }] : []));
   const walked = yield* walk(
@@ -177,7 +177,7 @@ export const diskOnce = Effect.fn('diskOnce')(function* (answers: readonly Answe
     read.read[k] = walked.read[at] ?? false;
   }
   const at = new Date().toISOString();
-  const tasks = new Map(answers.flatMap((a) => runTasks(a.run).map((taskId) => [taskId, a.run.factory ?? DEFAULT_FACTORY])));
+  const tasks = new Map(answers.flatMap((a) => runTasks(a.run).map((taskId) => [taskId, runNamespace(a.run.factory)])));
   const walkedReading = readingOf(roots, read, runs, yield* tried(storeFree), at);
   const reading = { ...walkedReading, entries: withKept(walkedReading.entries, kept, (taskId) => tasks.get(taskId)) };
   const largest = largestOf(roots, read, runs);

@@ -4,6 +4,7 @@
  * through it, so a stored name stays readable (decision Q22).
  */
 import { Schema } from 'effect';
+import { DEFAULT_NAMESPACE } from 'objects';
 import { brandedId, type Id } from '../model/brand.model.ts';
 import type { ErModel } from '../model/er.model.ts';
 import { StepName, WorkflowName } from '../record/record.model.ts';
@@ -11,6 +12,8 @@ import { AgentName } from '../agents/agents.model.ts';
 import { TemplateSource } from '../template/door/templates.model.ts';
 import { factoryNameRefusal, REVISIONS_POLICIES } from './factory.ts';
 import { HarnessSettings } from '../harness-settings/harness-settings.model.ts';
+import type { Factory as FactoryAsRead, Schedule as ScheduleAsRead, Volume as VolumeAsRead } from './factory.ts';
+import type { SettingsAsRead } from '../harness-settings/harness-settings.ts';
 
 /** A factory's name: its file's in the store, minus `.json`, a lowercase slug (`factoryNameRefusal`, over `FACTORY_NAME`). */
 export const FactoryName = brandedId('FactoryName', factoryNameRefusal);
@@ -29,7 +32,7 @@ export const Volume = Schema.Struct({
 export type Volume = typeof Volume.Type;
 
 /** A schedule of a workflow a factory has attached (`Schedule`). */
-const Schedule = Schema.Struct({
+export const Schedule = Schema.Struct({
   cron: Schema.String,
   brief: Schema.String,
   repo: Schema.optional(Schema.String),
@@ -98,6 +101,45 @@ export const Factory = Schema.Struct({
   )
   .annotate({ identifier: 'Factory' });
 export type Factory = typeof Factory.Type;
+
+/**
+ * The default factory as the door answers it (`DefaultFactory`): the one that holds every run and card naming no factory. It is no file,
+ * so it has no repository, workflow, hire or schedule of its own; its `kind` is what tells it from a filed `Factory`, which has none. The
+ * door refuses every write of it (`Conflict`) and answers its level as the store's.
+ */
+export const DefaultFactory = Schema.Struct({
+  kind: Schema.Literal('default'),
+  name: Schema.Literal(DEFAULT_NAMESPACE),
+}).annotate({ identifier: 'DefaultFactory' });
+export type DefaultFactory = typeof DefaultFactory.Type;
+
+/** The default factory's one record, as the door serves it. */
+export const DEFAULT_FACTORY_RECORD: DefaultFactory = { kind: 'default', name: DEFAULT_NAMESPACE };
+
+/**
+ * What the door reads under a factory's name: a filed factory as its store reads it (`factory.ts`'s `Factory`, the model's before its
+ * names are checked, a read being not decoded), or the default (`DefaultFactory`), told apart by `kind`.
+ */
+export type FactoryRecord = FactoryAsRead | DefaultFactory;
+
+/** Whether `record` is the default factory's. */
+export const isDefaultFactory = (record: FactoryRecord): record is DefaultFactory => 'kind' in record && record.kind === 'default';
+
+/**
+ * Whether `A` and `B` are each assignable to the other and name the same keys, so an optional field one alone adds is no match either:
+ * what holds a hand type to its Schema's.
+ */
+type Same<A, B> = [A, keyof A] extends [B, keyof B] ? ([B, keyof B] extends [A, keyof A] ? true : false) : false;
+
+/**
+ * The hand types of `factory.ts`, which its pure readers take, held to these Schemas' encoded sides — a field added to one alone does not
+ * compile: a factory as its store reads it (its harness settings as its file holds them, judged at the door's write, not on read), a
+ * volume and a schedule.
+ */
+export const factoryHeld: Same<FactoryAsRead, Omit<typeof Factory.Encoded, 'harnessSettings'> & { harnessSettings?: SettingsAsRead }> =
+  true;
+export const volumeHeld: Same<VolumeAsRead, typeof Volume.Encoded> = true;
+export const scheduleHeld: Same<ScheduleAsRead, typeof Schedule.Encoded> = true;
 
 /** A factory's hire of an agent into one step of a workflow (`nemia factory hire`): a key `<workflow>/<step>` of its hires, split. */
 export const Hire = Schema.Struct({

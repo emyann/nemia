@@ -72,7 +72,7 @@ test('REFUSED: `nemia factory instruction`, the record unchanged', async (t) => 
     ['the default factory', () => setInstruction({ factory: 'default', at: { store: true } }), 'Conflict', ['nemia factory instruction']],
     [
       'the default factory, by its handler',
-      () => runWith(noEngine(), FACTORY_INSTRUCTION.handler({ factory: 'default' })),
+      () => runWith(noEngine(), FACTORY_INSTRUCTION.handler({ factory: 'default' }, undefined, ROOT)),
       'Conflict',
       ['nemia factory instruction'],
     ],
@@ -103,7 +103,7 @@ test('REFUSED: `nemia factory instruction`, the record unchanged', async (t) => 
 test('REFUSED: `nemia factory instruct`, nothing written', async (t) => {
   await t.test('the default factory', async () => {
     await assert.rejects(
-      runWith(noEngine(), FACTORY_INSTRUCT.handler({ factory: 'default', words: 'x', clear: false })),
+      runWith(noEngine(), FACTORY_INSTRUCT.handler({ factory: 'default', words: 'x', clear: false }, undefined, ROOT)),
       refused('Conflict', 'nemia factory instruct'),
     );
     assert.ok(!fs.existsSync(storeFolder('default')));
@@ -113,7 +113,7 @@ test('REFUSED: `nemia factory instruct`, nothing written', async (t) => {
     async () => {
       const repo = filed();
       await assert.rejects(
-        runWith(noEngine(), FACTORY_INSTRUCT.handler({ factory: 'pipao', words: 'x', clear: false })),
+        runWith(noEngine(), FACTORY_INSTRUCT.handler({ factory: 'pipao', words: 'x', clear: false }, undefined, ROOT)),
         refused('Conflict', path.join(repo, 'NEMIA.md'), 'nemia factory instruction pipao --store'),
       );
       assert.ok(!fs.existsSync(storeFolder('pipao')), 'no store folder');

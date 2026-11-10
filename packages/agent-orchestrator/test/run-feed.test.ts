@@ -57,7 +57,7 @@ const { tryOf } = await import('../src/record/record.ts');
 const { freshRestMemo } = await import('../src/tick/tick.verb.ts');
 const { runLabels, stepLabels } = await import('../src/telemetry/telemetry.ts');
 const { DEFAULT_FACTORY } = await import('../src/factory/factory.ts');
-const { setRevisions } = await import('../src/factory/factory.store.ts');
+const { followed } = await import('./factory-planted.ts');
 const { main, watchPrinted } = await import('../src/cli/main.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const stage = staged({ runWith: runEngine, main, engineOf });
@@ -702,7 +702,7 @@ test('a pinned run whose files moved past its pins says `revisions behind` once 
     const factory = 'follows';
     addFactory({ name: factory, repos: [repo] });
     attachWorkflow({ factory, workflow: name });
-    setRevisions({ factory, revisions: 'follow' });
+    followed(ROOT, factory, 'follow');
     const follows = await stage.runPlaced(startRun({ brief: 'follows', repo, workflowDir: dir, isolate: false, factory }));
     await tick();
     fs.writeFileSync(step, `${first}An edit it follows.\n`);

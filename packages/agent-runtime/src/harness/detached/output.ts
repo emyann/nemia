@@ -93,7 +93,8 @@ export const sessionTokensOf = (modelUsage: Printed<'result'>['modelUsage']): Us
 
 /**
  * `claudeResultOutput`'s reading of `result`, with the denials a stream named before its result (`claudeStreamOutput`) joined
- * ahead of the result's own. Everything else is the result's alone, and a stream with no result says only what it denied.
+ * ahead of the result's own. Everything else is the result's alone, and a stream with no result says only what it denied. A result
+ * says its denials even when there are none (`[]`): it lists every call refused.
  */
 const readClaude = (
   result: Printed<'result'> | undefined,
@@ -116,7 +117,7 @@ const readClaude = (
     ...(Object.keys(usage).length ? { usage } : {}),
     ...(whole ? { ownTokens: own } : {}),
     ...(result.subtype === 'error_max_budget_usd' ? { limit: 'budget' } : {}),
-    ...(denials.length ? { denials } : {}),
+    denials,
   };
 };
 
@@ -187,9 +188,9 @@ const isCall = (block: Exclude<Printed<'assistant'>['message']['content'], strin
 
 /**
  * What a stream says, gathered from its decoded lines in one pass: its last result; its `permission_denied` events, in order; the
- * input each call was made with, by id; whether an `init` line started it, the first folder one names and the first model one
- * names; its `Skill` calls and its file tools' calls, each once by id, first called first; and the ids of the calls an event or a
- * result says were denied.
+ * input each call was made with, by id; whether an `init` line started it, the first folder one names, the first model one
+ * names, and the last version and mode one names; its `Skill` calls and its file tools' calls, each once by id, first called
+ * first; and the ids of the calls an event or a result says were denied.
  */
 type StreamFacts = {
   result?: Printed<'result'>;
@@ -204,6 +205,8 @@ type StreamFacts = {
    * last is the process that runs now.
    */
   harnessVersion?: string;
+  /** The mode its last `init` line names: one per turn, so a turn in another mode than the first is the mode it runs in now. */
+  permissionMode?: string;
   skills: Map<string, unknown>;
   files: Map<string, [string, unknown]>;
   denied: Set<string>;
@@ -232,6 +235,7 @@ const gather = (facts: StreamFacts, printed: PrintedLine): void => {
     facts.cwd ??= printed.line.cwd;
     facts.model ??= printed.line.model;
     if (printed.line.claude_code_version) facts.harnessVersion = printed.line.claude_code_version;
+    if (printed.line.permissionMode) facts.permissionMode = printed.line.permissionMode;
   } else if (printed.kind === 'assistant') gatherCalls(facts, printed.line);
 };
 
@@ -249,7 +253,9 @@ const gather = (facts: StreamFacts, printed: PrintedLine): void => {
  * it read or wrote (`touchedFiles`), only by one whose `init` line names its folder; the model it really started on, only by one
  * whose `init` line names a model, which is the alias — `opus` — already resolved to the model id the harness chose for it; what it
  * answers it `ranOn`, so no field of a recorded fact is spelt as the harness argument that asked for it. The version of Claude
- * Code it runs, `harnessVersion`, is the last `init` line's `claude_code_version`, said only by a stream with one that names it.
+ * Code it runs, `harnessVersion`, is the last `init` line's `claude_code_version`, said only by a stream with one that names it; the
+ * mode it ran in, `ranIn`, the last `init` line's `permissionMode`, likewise. What it was denied is said, `[]` for nothing, by a stream
+ * with its `init` line or its result, which measured it; one with neither cannot say.
  *
  * Throws an `Error` naming the line, its field and the fix when a line of a kind it reads does not decode (`printedLinesOf`).
  */
@@ -259,11 +265,13 @@ export const claudeStreamOutput = (output: string): HarnessOutput => {
   const skills = facts.started ? loadedSkills(facts) : undefined;
   const files = facts.cwd === undefined ? undefined : touchedFiles(facts.cwd, facts);
   return {
+    ...(facts.started ? { denials: [] } : {}),
     ...readClaude(facts.result, facts.events, facts.inputs),
     ...(skills ? { skills } : {}),
     ...(files ? { files } : {}),
     ...(facts.model ? { ranOn: facts.model } : {}),
     ...(facts.harnessVersion ? { harnessVersion: facts.harnessVersion } : {}),
+    ...(facts.permissionMode ? { ranIn: facts.permissionMode } : {}),
   };
 };
 
@@ -348,11 +356,15 @@ export const claudeStreamKept = (output: string): string => {
     .join('\n');
 };
 
-/** What a reader reads once `line` follows what `read` already said: the first folder, the first model, the last version named. */
+/**
+ * What a reader reads once `line` follows what `read` already said: the first folder, the first model, the last version and the last
+ * mode named.
+ */
 const readAfter = (read: InitRead | undefined, line: InitRead): InitRead => ({
   cwd: read?.cwd ?? line.cwd,
   model: read?.model ?? line.model,
   claude_code_version: line.claude_code_version ?? read?.claude_code_version,
+  permissionMode: line.permissionMode ?? read?.permissionMode,
 });
 
 /**
@@ -364,8 +376,8 @@ export const initLineKept = (text: string, read: InitRead | undefined): { kept?:
   if (printedKindOf(text) !== 'system init') return undefined;
   const [printed] = decoded(text, ['system init']);
   if (printed?.kind !== 'system init') return undefined;
-  const { cwd, model, claude_code_version } = printed.line;
-  const line: InitRead = { cwd, model, claude_code_version };
+  const { cwd, model, claude_code_version, permissionMode } = printed.line;
+  const line: InitRead = { cwd, model, claude_code_version, permissionMode };
   const kept = initKept(line, read);
   return {
     ...(kept ? { kept: JSON.stringify({ type: 'system', subtype: 'init', ...kept }) } : {}),
@@ -397,14 +409,15 @@ export const claudePartials = (output: string, before: number): { marks: Partial
 /**
  * What a capture keeps of an `init` line `line`, given what its earlier `init` lines already say to a reader (`read`, none before the
  * first): the first always, cut to what a reader reads; a later one only where it names a folder or a model none named before, or a
- * version of Claude Code other than the last; else nothing. Proved by its contract (`contracts/capture.contract.ts`).
+ * version of Claude Code or a mode other than the last; else nothing. Proved by its contract (`contracts/capture.contract.ts`).
  */
 export const initKept: InitKept = (line, read) => {
-  const { cwd, model, claude_code_version: version } = line;
+  const { cwd, model, claude_code_version: version, permissionMode: mode } = line;
   const changes =
     read === undefined ||
     (read.cwd === undefined && cwd !== undefined) ||
     (read.model === undefined && model !== undefined) ||
-    (version !== undefined && version !== read.claude_code_version);
-  return changes ? { cwd, model, claude_code_version: version } : undefined;
+    (version !== undefined && version !== read.claude_code_version) ||
+    (mode !== undefined && mode !== read.permissionMode);
+  return changes ? { cwd, model, claude_code_version: version, permissionMode: mode } : undefined;
 };

@@ -120,6 +120,11 @@ const RunFileSchema = Schema.StructWithRest(
      * run file spawned before it was written.
      */
     image: Schema.optional(Schema.String),
+    /**
+     * The mode its spec's command runs the session in (`HarnessSpec.command`'s `ranIn`), written by the spawn: the run's
+     * `Sighting.ranIn` where its output says none. Absent where the command gave none, and from a run file spawned before it was written.
+     */
+    ranIn: Schema.optional(Schema.String),
     /** For a spec with `input`: what the worker writes on the harness's stdin (`RunInput`). Absent, the run takes no words. */
     input: Schema.optional(
       Schema.Struct({

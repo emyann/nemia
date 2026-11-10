@@ -92,12 +92,12 @@ test("a kept output beside a finished run's log: taken for it while its key is t
     }
   });
   await t.test(
-    'a kept output of a version the readers only added fields to is taken as it is: the log is not read, and what it lacks is absent',
+    'a kept output of every former version is read again from the log: each says no denials where the readers now say `[]`',
     async () => {
-      assert.deepEqual(SAID_EXTENDED, [1, 2, 3, 4, 6]);
-      for (const version of SAID_EXTENDED) {
+      assert.deepEqual(SAID_EXTENDED, []);
+      for (const version of [1, 2, 3, 4, 6, 10]) {
         const kept = await withKept(({ log, kept }) => keep(kept, log, { version }));
-        assert.deepEqual(kept, { payload: 'kept', reads: 0 }, `version ${version}: no skills, files nor model, read before they were`);
+        assert.deepEqual(kept, { payload: 'logged', reads: 1 }, `version ${version}: kept before an empty list of denials was said`);
       }
     },
   );
@@ -306,8 +306,8 @@ test('claudeStreamKept and the shipped readers over the corpus: what they read i
     const lone = [stream.init, stream.denied('toolu_b', 'Bash')].join('\n');
     assert.deepEqual(
       claudeStreamOutput(claudeStreamKept(lone)),
-      { denials: [{ tool: 'Bash' }], skills: [], ranOn: MODEL },
-      'the keep keeps what the `init` line says to a reader, so the model the session really started on survives it',
+      { denials: [{ tool: 'Bash' }], skills: [], ranOn: MODEL, ranIn: 'default' },
+      'the keep keeps what the `init` line says to a reader, so the model the session really started on and its mode survive it',
     );
   });
   await t.test('a kept capture holds nothing of the conversation no reader reads; a capture that does is named', () => {
@@ -345,7 +345,7 @@ test('claudeStreamKept and the shipped readers over the corpus: what they read i
       for (const at of [10, 12]) assert.ok(kept.split('\n').includes(whole[at]), `line ${at + 1} kept as printed`);
       const keys = (line: string | undefined) => Object.keys(JSON.parse(line ?? '{}'));
       const lines = kept.split('\n');
-      assert.deepEqual(keys(lines.find((l) => l.includes('"init"'))), ['type', 'subtype', 'cwd', 'model']);
+      assert.deepEqual(keys(lines.find((l) => l.includes('"init"'))), ['type', 'subtype', 'cwd', 'model', 'permissionMode']);
       assert.deepEqual(keys(lines.find((l) => l.includes('"permission_denied"'))), ['type', 'subtype', 'tool_name', 'tool_use_id']);
       assert.deepEqual(keys(lines.find((l) => l.includes('"result"'))), ['type', 'subtype', 'structured_output', 'total_cost_usd']);
       assert.ok(kept.length < CONVERSATION_STREAM.length, `${kept.length} of ${CONVERSATION_STREAM.length} characters`);

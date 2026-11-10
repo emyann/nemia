@@ -41,6 +41,10 @@ const seen = (image?: string, harnessVersion?: string): Sighting => ({
   ...(harnessVersion ? { harnessVersion } : {}),
 });
 const ended: Event = { kind: 'ended', at: at(30), attempt: 1, sessionId: 's1', observed: 'succeeded', reason: 'harness' };
+/** An `image` entry naming the mode `ranIn`, and the code `image` where given. */
+const moded = (ranIn: string, image?: string): Event => ({ kind: 'image', at: at(10), attempt: 1, ...(image ? { image } : {}), ranIn });
+/** An end that says the mode `ranIn`. */
+const endedIn = (ranIn: string): Event => ({ ...ended, kind: 'ended', ranIn });
 
 test('imageFacts: the code and harness version of an attempt in flight, journalled whenever its sighting says other than the record', async (t) => {
   await t.test('IMAGE: an unended attempt sighted with both is written one image entry with both', () => {
@@ -75,6 +79,20 @@ test('imageFacts: the code and harness version of an attempt in flight, journall
   await t.test('IMAGE: nothing is written with no sighting', () => {
     assert.deepEqual(imageFacts(fold(TASK, inFlight()), undefined, at(20)), []);
   });
+  await t.test(
+    'IMAGE: the mode a sighting says the session runs in, other than the record, is written; the same again writes nothing',
+    () => {
+      assert.deepEqual(imageFacts(fold(TASK, inFlight(imaged(V1, '2.1.316'))), { ...seen(V1, '2.1.316'), ranIn: 'auto' }, at(20)), [
+        { kind: 'image', at: at(20), attempt: 1, ranIn: 'auto' },
+      ]);
+      const auto = fold(TASK, inFlight(moded('auto', V1)));
+      assert.deepEqual(imageFacts(auto, { ...seen(V1), ranIn: 'auto' }, at(20)), []);
+      assert.deepEqual(imageFacts(auto, { ...seen(V1), ranIn: 'default' }, at(20)), [
+        { kind: 'image', at: at(20), attempt: 1, ranIn: 'default' },
+      ]);
+      assert.deepEqual(imageFacts(auto, seen(V1), at(20)), [], 'a sighting that says none takes nothing away');
+    },
+  );
 });
 
 test('fold: an attempt keeps the latest image and harness version its entries said, and an end keeps them', async (t) => {
@@ -82,6 +100,14 @@ test('fold: an attempt keeps the latest image and harness version its entries sa
     const [a] = fold(TASK, inFlight(imaged(V1, '2.1.316'), imaged(V2), imaged(undefined, '2.1.317'))).attempts;
     assert.equal(a?.image, V2);
     assert.equal(a?.harnessVersion, '2.1.317');
+  });
+  await t.test('FOLD: the latest mode an entry said wins, and an end that says one sets it', () => {
+    const [a] = fold(TASK, inFlight(moded('auto', V1), moded('default'), imaged(V2))).attempts;
+    assert.equal(a?.ranIn, 'default');
+    const [b] = fold(TASK, inFlight(moded('auto', V1), endedIn('default'))).attempts;
+    assert.equal(b?.ranIn, 'default');
+    const [c] = fold(TASK, inFlight(moded('auto', V1), ended)).attempts;
+    assert.equal(c?.ranIn, 'auto', 'an end that says none keeps it');
   });
   await t.test('FOLD: an end keeps them', () => {
     const [a] = fold(TASK, inFlight(imaged(V1, '2.1.316'), ended)).attempts;
@@ -93,7 +119,7 @@ test('fold: an attempt keeps the latest image and harness version its entries sa
   });
 });
 
-test('a pass: a job first seen already over is journalled its image before its end, under the memo in check mode', async () => {
+test('a pass: a job first seen already over is journalled its image and mode before its end, under the memo in check mode', async () => {
   const sessions = new Map<string, Sighting>();
   const spawned: SpawnRequest[] = [];
   const layer = Layer.mergeAll(Journal.test(), Runner.test({ sessions, spawned }), tickMemoLayer({ verify: true }));
@@ -103,11 +129,13 @@ test('a pass: a job first seen already over is journalled its image before its e
   const name = nameFor(id, 1);
   const s = sessions.get(name);
   assert.ok(s, 'the pass started a session');
-  sessions.set(name, { ...s, state: 'completed', exitCode: 0, image: V1, harnessVersion: '2.1.316' });
+  sessions.set(name, { ...s, state: 'completed', exitCode: 0, image: V1, harnessVersion: '2.1.316', ranIn: 'auto' });
   await run(tick());
   const events = await run(Effect.flatMap(Journal, (j) => j.read(TaskId.read(id))));
   const kinds = events.map((e) => e.kind);
   assert.ok(kinds.indexOf('image') !== -1 && kinds.indexOf('image') < kinds.indexOf('ended'), `image before ended: ${kinds.join(', ')}`);
   const [a] = fold(id, events).attempts;
-  assert.deepEqual([a?.image, a?.harnessVersion], [V1, '2.1.316']);
+  assert.deepEqual([a?.image, a?.harnessVersion, a?.ranIn], [V1, '2.1.316', 'auto']);
+  const end = events.find((e) => e.kind === 'ended');
+  assert.equal(end?.kind === 'ended' && end.ranIn, 'auto', 'the end carries the mode, as it does the model');
 });

@@ -182,8 +182,8 @@ const resumedRequest = (root: string, run: AttachedRun): SpawnRequest | undefine
 
 /**
  * A run file's sighting: its state, whether a process still holds the session and which (`held`, `pid`), the code its holder runs
- * (`image`), its bridge, its call in flight, and what its capture says it closed out with, used and was denied, and the Claude Code
- * it runs (`harnessVersion`).
+ * (`image`), its bridge, its call in flight, and what its capture says it closed out with, used and was denied (`[]` for nothing, once
+ * an `init` line or a result measured it), the Claude Code it runs (`harnessVersion`) and the mode it ran in (`ranIn`).
  *
  * A session a holder still runs (`isOpen`) says whether its process is there, which `decide` reads for a long-lived task alone: held,
  * its idle session is open (`idleOf`); with its holder gone it is one the harness is taking up again (`respawning`), and is not
@@ -200,7 +200,7 @@ const sightingOf = (root: string, run: AttachedRun): Sighting => {
     ...(run.sessionId ? { nativeId: run.sessionId } : {}),
     ...said,
     ...(own ? { usage: own } : {}),
-    ...(denials?.length ? { denials } : {}),
+    ...(denials ? { denials } : {}),
     ...(held === undefined ? {} : { held }),
     ...(held === true ? { pid: run.owner } : {}),
     ...(run.image ? { image: run.image } : {}),

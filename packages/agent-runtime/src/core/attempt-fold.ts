@@ -5,6 +5,13 @@
 import type { Attempt, Event } from './domain.ts';
 import { holdInto } from './deadline.ts';
 
+/** An `image` entry `e` written into its attempt's fold `a`: each of the code, the harness's version and the mode it names, the latest. */
+function imageInto(a: Attempt, e: Extract<Event, { kind: 'image' }>): void {
+  if (e.image !== undefined) a.image = e.image;
+  if (e.harnessVersion !== undefined) a.harnessVersion = e.harnessVersion;
+  if (e.ranIn !== undefined) a.ranIn = e.ranIn;
+}
+
 /** An event about one attempt, `e`, written into that attempt's fold `a`: every one but its end (`endAttempt`, `domain.ts`). */
 export function foldInto(
   a: Attempt,
@@ -26,8 +33,7 @@ export function foldInto(
       a.denials = [...(a.denials ?? []), e.what === undefined ? { tool: e.tool } : { tool: e.tool, what: e.what }];
       return;
     case 'image':
-      if (e.image !== undefined) a.image = e.image;
-      if (e.harnessVersion !== undefined) a.harnessVersion = e.harnessVersion;
+      imageInto(a, e);
       return;
     case 'gap':
       if (a.gapSince === undefined && e.mono) a.gapMono = e.mono;

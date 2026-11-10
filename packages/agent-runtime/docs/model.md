@@ -68,6 +68,7 @@ erDiagram
     list skills "optional"
     list files "optional"
     string ranOn "optional"
+    string ranIn "optional"
     string image "optional"
     string harnessVersion "optional"
     string limit "optional"

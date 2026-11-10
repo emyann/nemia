@@ -7,11 +7,10 @@
  * to the journal fails nothing else.
  *
  * The shape pinned: an `ended` carries, off the same sighting as `usage` and `exitCode`, `denials` (the tool calls a harness
- * denied the session), `skills` (the skills it loaded), `ranOn` (the model its session really ran on) and `limit` (the limit its
- * harness says it stopped at), and, for a task
- * that asked for a closing statement, `closedOut`, whether one came; `filed` carries `holdOpen`, and a task held open writes
- * `input` and `closed` — the fifth run; the spend cap is one of the harness's arguments, so `filed`, a spawn and an `input`
- * carry it under `config`.
+ * denied the session), `skills` (the skills it loaded), `ranOn` (the model its session really ran on), `ranIn` (the mode it ran in) and
+ * `limit` (the limit its harness says it stopped at), and, for a task that asked for a closing statement, `closedOut`, whether
+ * one came; `filed` carries `holdOpen`, and a task held open writes `input` and `closed` — the fifth run; the spend cap is one of
+ * the harness's arguments, so `filed`, a spawn and an `input` carry it under `config`.
  *
  * A journal an older runtime wrote may have no `denials`, `closedOut` or `holdOpen` key and no `input` or `closed` event, and
  * folds and decides the same (`decide.test.ts`, HELD OPEN); it may carry `maxAttempts` and `resume` on `filed`, and folds and
@@ -150,6 +149,7 @@ test("the journal's words, run by run: each written as the engine wrote it befor
         skills: undefined,
         files: undefined,
         ranOn: undefined,
+        ranIn: undefined,
         limit: undefined,
       },
       { kind: 'settled', at: '<at>', outcome: 'succeeded', note: undefined },
@@ -200,6 +200,7 @@ test("the journal's words, run by run: each written as the engine wrote it befor
           skills: undefined,
           files: undefined,
           ranOn: undefined,
+          ranIn: undefined,
           limit: undefined,
         },
         { kind: 'settled', at: '<at>', outcome: 'succeeded', note: undefined },
@@ -284,6 +285,7 @@ test("the journal's words, run by run: each written as the engine wrote it befor
         skills: undefined,
         files: undefined,
         ranOn: undefined,
+        ranIn: undefined,
         limit: undefined,
       },
       { kind: 'settled', at: '<at>', outcome: 'stopped', note: 'operator' },
@@ -327,6 +329,7 @@ test("the journal's words, run by run: each written as the engine wrote it befor
         skills: undefined,
         files: undefined,
         ranOn: undefined,
+        ranIn: undefined,
         limit: undefined,
       });
       assert.deepEqual((await Effect.runPromise(b.engine.view(id))).state.attempts[0]?.denials, denials);
@@ -475,6 +478,7 @@ test("the journal's words, run by run: each written as the engine wrote it befor
       skills: undefined,
       files: undefined,
       ranOn: undefined,
+      ranIn: undefined,
       limit: undefined,
     });
     assert.deepEqual(await b.record(id), [

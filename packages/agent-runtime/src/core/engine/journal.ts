@@ -278,8 +278,9 @@ const usageOf = <U extends { turns?: number; responses?: number }>(usage: U): Om
 
 /**
  * A stored end in the shape the runtime reads: a former `done` as `succeeded`, a former `budget` reason as the harness's end at it,
- * a former reason (`FORMER_REASONS`) as the harness's end with no statement, whether it closed out by today's name, and its usage's
- * responses by today's.
+ * a former reason (`FORMER_REASONS`) as the harness's end with no statement, whether it closed out by today's name, its usage's
+ * responses by today's, and an end that says `skills` and no `denials` as denied nothing (`[]`): the reader that says skills read
+ * the same stream for denials, and dropped an empty list of them.
  */
 const upgradedEnd = (event: Extract<Resolved, { kind: 'ended' }>): Event => {
   const { stated, usage, ...rest } = event;
@@ -290,6 +291,7 @@ const upgradedEnd = (event: Extract<Resolved, { kind: 'ended' }>): Event => {
     observed,
     ...(closedOut === undefined ? {} : { closedOut }),
     ...(usage === undefined ? {} : { usage: usageOf(usage) }),
+    ...(rest.skills !== undefined && rest.denials === undefined ? { denials: [] } : {}),
   };
   if (end.reason === 'budget') return { ...end, reason: 'harness', limit: 'budget' };
   if (isFormer(end.reason)) return { ...end, reason: 'harness', closedOut: false, former: end.reason };
@@ -342,6 +344,9 @@ const renamed = (config: Record<string, unknown>): Record<string, unknown> => {
  *   statement where its task asked for one): read as the harness's end, `reason: 'harness'` with `closedOut: false`, its
  *   outcome as written and that reason kept as `former`, so the layer above still tells such an end apart.
  * - A usage's `turns`, on an `ended`, a `measured` or a `counted` event: read as `responses`, the model's responses it counted.
+ * - An end that says `skills` and no `denials`, as a reader that dropped an empty list of denials wrote it: read as `denials: []`,
+ *   measured and none denied, since the stream that says skills is the one denials are read from. An end that says neither is left
+ *   as it is: not measured.
  * - A harness argument filed under a former name (`RENAMED_ARGS`: `checkoutMcp`, the servers of the checkout's `.mcp.json` the
  *   session loads), under a `filed` or an `input` event's `config` or at a `filed` event's top level: read by today's name,
  *   `projectMcp`, where a value already given by it is kept.

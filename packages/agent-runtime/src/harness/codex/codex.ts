@@ -105,7 +105,7 @@ const codexPicked = (r: SpawnRequest): Record<string, McpServer> | undefined => 
  * 1. `exec --json --skip-git-repo-check -C <cwd>`: JSONL events on stdout, run outside a git repository too, in the
  *    task's working root.
  * 2. `-s <sandbox>`: the sandbox the task named, as itself (`sandboxOf`), so a task that asks for a reviewer that cannot
- *    write gets one.
+ *    write gets one. Its output never says the sandbox, so the command says it beside its argv (`ranIn`), the attempt's mode.
  * 3. `-m <model>`, where the task names one.
  * 4. `--worktree`, where the task asks for one. Codex's worktree flag takes no value, so it is safe immediately before
  *    the prompt, unlike Claude's; the spec is where that difference lives, so the engine never learns that harnesses
@@ -159,6 +159,7 @@ export const codex: HarnessSpec = {
       r.brief,
     ],
     ...(r.config?.env ? { env: r.config.env } : {}),
+    ranIn: sandboxOf(r),
   }),
   refuses: (task) => {
     const { permissionMode, effort, disallowedTools, allowedTools, mcp } = task.config ?? {};

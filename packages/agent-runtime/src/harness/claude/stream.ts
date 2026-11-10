@@ -103,6 +103,11 @@ const PRINTED = {
      * older one.
      */
     claude_code_version: Schema.optional(Schema.NonEmptyString),
+    /**
+     * The mode the turn runs in, as the SDK's init message names it (`sdk.d.ts:6259`), one per turn: a model that cannot run `auto`
+     * runs in `default`, and its init line says so. Read as written, never matched against the modes Claude Code has.
+     */
+    permissionMode: Schema.optional(Schema.NonEmptyString),
   }),
   stream_event: Schema.Struct({
     type: Schema.Literal('stream_event'),

@@ -49,6 +49,7 @@ const CLAIMS: Record<string, string> = {
   '5609': 'SDKMessageOrigin',
   '6100-6103': 'total_cost_usd',
   '6244': 'claude_code_version',
+  '6259': 'permissionMode',
   '9396': 'autoCompactWindow',
   '9603': 'claudeMdExcludes',
 };

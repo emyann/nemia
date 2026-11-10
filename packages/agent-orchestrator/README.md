@@ -2114,6 +2114,20 @@ wf start ./ui.md --repo ~/code/myapp --input ./mock.png --input ./notes/api.md
   that is not a regular file, two inputs of one name, one file given twice, and `--input` with no file.
 - **`wf start <folder>` refuses `--input`.** A card has no input files of its own; start that card by hand with its files.
 
+### Inbox cards handed to a run: `wf start --card`
+
+```bash
+wf start ./untangle.md --repo ~/code/myapp --card one-surface-lbpq --card rows-qeyh
+```
+
+A brief that names cards on the same ground hands them by name, as `--from` hands runs. Each card is copied as it reads at start
+into `runs/<id>/inputs/cards/<name>.md`, so a card edited, started or removed afterwards reads in the run as it was; the names are
+frozen on the record as `cards`, in the order given, and the api's start body takes the same list as `cards`. The inputs folder is
+then mounted and named exactly as for `--input`, and every step's brief names the cards beside the files, under `cards/`; a folder
+run's copy carries them in `given/inputs/cards/`. Refused before anything is written, by kind: a name with no card in the inbox
+(`Missing`, naming `nemia inbox add`), and a name given twice, a name that is no card's, or an `--input` named `cards` beside a card
+(`Invalid`), judged by `cardsRefusal` (`contracts/handed-runs.contract.ts`). `wf start <folder>` refuses `--card`.
+
 ## A step's files: `runs/<id>/artifacts/<step>/`
 
 Some of what a step makes is for the steps after it and the person who decides, and does not belong on
@@ -2828,6 +2842,13 @@ roots on the first pass. Each source becomes a `## From run <id>` section on the
 the runs it waited on. A source that had landed when the roots were filed is labelled so; one still in flight is accepted, read
 once, then, and labelled *not landed, not judged*: what it had concluded so far, its change not in this workspace and its account
 judged by nobody. `wf start` says so on a `reads:` line for each.
+
+**Every step of a run handed another reads that run's folders.** Its `runs/<id>/artifacts/` (each step's folder, its
+`closeout.json` and the files it named) and its `runs/<id>/inputs/` are filed read-only on every local step of this run, its roots
+and every step after them, from the record's `context` alone, found on disk at each filing (`handedRunMounts`, `filedFoldersAt`), and
+each brief names both paths with how to search them (`Glob` under the folder's own path). A run whose folders are gone since — forgotten
+— is mounted nothing, and the brief says so. A run a route files is one of these: its card's `from:` names the caller, so the routed
+run reads the caller's inputs and artifacts from its first step. A remote agent is filed none.
 
 `wf concluded <runId>` prints the section exactly as a root would be handed it now, and the board's start form previews it. A
 card's `from:` (`wf inbox from`, below) and the api's start body key `context` are the same list. `wf start` refuses, by name: a
@@ -4281,7 +4302,7 @@ holding a concurrency slot forever.
 | `src/cancel/cancel.ts` | what cancelling a run has to do, and what to tell the person who asked (`cancelPlan`) — pure |
 | `src/forget/forgetting/forgetting.ts` | what the engine forgot of a run's tasks, pure: each run's share of one answer (`forgettingOf`), whether nothing is left (`forgettingDone`), and its words (`engineWords`, `uncountedWords`) |
 | `src/forget/forget.ts` | `wf rm` from the run's side — pure: **`forgetRefusal`**, whether a run may be forgotten, which worktrees, branches and check logs are its own (`runWorktrees`, `branchFates`, `checkLogsOf`), and the line that says what was done (`forgetLine`) |
-| `src/start/inputs.ts` | the files `wf start --input` gives a run — pure: why one is refused (`inputRefusal`), how a brief and `wf decide` name them (`inputsLine`, `inputsNote`), and where a run came from (`fromNote`) |
+| `src/start/inputs.ts` | the files `wf start --input` gives a run and the cards `--card` hands it — pure: why one is refused (`inputRefusal`, `cardsRefusal`), how a brief and `wf decide` name them (`inputsLine`, `inputsNote`), what a brief says of the folders a step is filed with, a handed run's among them (`mountsLine`), and where a run came from (`fromNote`) |
 | `src/decide/decide.ts` | what is left for a person to do about a run (`decision`), and the cost lines `wf decide` prints (`costLine`, `runCostLines`, `runCostWords`) — pure |
 | `src/list/list.ts` | what `wf ls` shows of a run and its steps (`listing`), and the words it and the board say of a wait (`waitingWords`, `harnessWaitLine`, `deniedWords`, `onYouWords`) — pure |
 | `src/brief/brief.ts` | what a step is told — pure: its brief (`composeBrief`), or on a remote agent its remote brief (`remoteBrief`), with what the runs it waited on concluded (`ParentCloseout`) |
@@ -4387,7 +4408,7 @@ for the same reason, and so does the `wf` command.
 | path | |
 |---|---|
 | `runs/<id>.json` | a run's record, the tick's to write — `slotHeldAt` among it, once the cap on runs in flight held the run, and `gates` from its start; beside it, a person's facts in files of their own: `<id>.cancelled`, `<id>.asks/` — retry and round asks, approvals at a gate, and acceptances of a loop out of rounds |
-| `runs/<id>/` | the run's own files, outside every git workspace: `inputs/` (`wf start --input`) and `artifacts/<step>/`; a folder run's (`place: folder`) steps work here too, in `work/<step>/`, each given a copy of what its brief names in `work/<step>/given/` |
+| `runs/<id>/` | the run's own files, outside every git workspace: `inputs/` (`wf start --input`, and `inputs/cards/` for `--card`) and `artifacts/<step>/`, each mounted read-only on the steps of a run handed this one (`--from`); a folder run's (`place: folder`) steps work here too, in `work/<step>/`, each given a copy of what its brief names in `work/<step>/given/` |
 | `inbox/` | cards before they are started, one `<name>.md` each (`wf inbox`); a card started leaves it |
 | `queue/` | a queued card's last start that did not happen, `<name>.json`, the tick's to write: the card's text, the repository tried, why, and whether it was a refusal |
 | `factories/` | a factory each, `<name>.json` holding `{ "repos": [...], "workflows": [...], "hires": {...} }`, `wf factory add`, `attach`, `detach`, `hire` and `fire`'s to write and `wf factory rm`'s to remove; the default factory is no file |

@@ -236,6 +236,17 @@
       ]
     },
     {
+      "term": "Handed card",
+      "meaning": "an inbox card a person hands a run by name (`nemia start --card`, the api's start `cards`): copied as it reads at start into the run's `inputs/cards/<name>.md`, its name frozen on the record as `cards`, and named on every step's brief beside the files given with it. One that is not in the inbox is refused at start, before anything is written.",
+      "retired": []
+    },
+    {
+      "term": "Handed run",
+      "meaning": "a run another is handed as context (`nemia start --from`, a card's `from:`, the caller a route's card names), frozen on the record as `context`: what it concluded is a `## From run` section on the roots' briefs, and its artifacts and inputs folders, as found on disk at each filing, are mounted read-only on every local step and named on its brief. Never waited on.",
+      "type": "HandedRunFolders",
+      "retired": []
+    },
+    {
       "term": "Harness fence keys",
       "meaning": "the fence keys of every harness, one list for the package (`HARNESS_FENCE_KEYS`, from the runtime's `HARNESS_KNOBS`): each written under its own harness's block, `permissionMode`, `tools`, `allowedTools` and `disallowedTools` under `claude: { fence: … }` and `sandbox` under `codex: { fence: … }`. Read by a template and by the markdown readers alike; a top-level fence key is their former spelling, still read, which `nemia frontmatter rewrite` moves into the block.",
       "type": "HARNESS_FENCE_KEYS"

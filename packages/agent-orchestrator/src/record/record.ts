@@ -388,7 +388,7 @@ export const stopsFollowers = (s: StepStatus): boolean =>
  * it lifts and the run files on after it: a read of what the run still needs once a hold lifts reads this. Pure, and proved by
  * `contracts/honours-asks.contract.ts`.
  */
-export const endedForGood: EndedForGood = (run) => run.cancelledAt !== undefined || run.pruned !== undefined;
+export const endedForGood: EndedForGood = (run) => Boolean(run.cancelledAt) || run.pruned !== undefined;
 
 /**
  * Whether a person's ask of the run is honoured, and anything may be asked of a person, on this pass: never of a run called off, pruned

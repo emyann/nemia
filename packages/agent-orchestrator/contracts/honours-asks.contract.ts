@@ -21,8 +21,11 @@ export type RunMarks = {
   readonly hold?: { readonly at: string } | undefined;
 };
 
-/** The run was called off. */
-const calledOff = (r: RunMarks): boolean => r.cancelledAt !== undefined;
+/**
+ * The run was called off: a moment is written in `cancelledAt`. Read by truthiness, as every other guard of a cancellation reads it
+ * (`holdsOpen`'s laws, `gate.contract.ts`), so the two predicates stand in for those guards on every record, an empty one included.
+ */
+const calledOff = (r: RunMarks): boolean => !!r.cancelledAt;
 
 /** The run was pruned: its worktrees are gone. */
 const pruned = (r: RunMarks): boolean => r.pruned !== undefined;
@@ -30,11 +33,7 @@ const pruned = (r: RunMarks): boolean => r.pruned !== undefined;
 /** A hold stands on the run. */
 const held = (r: RunMarks): boolean => r.hold !== undefined;
 
-/** A cancellation is a moment written by `nemia cancel`, never empty (`readRun` reads the record's `cancelledAt` as it is). */
-const written = (r: RunMarks): boolean => r.cancelledAt === undefined || r.cancelledAt.length > 0;
-
 const endedForGoodSpec = spec<(run: RunMarks) => boolean>({
-  requires: ({ input: [run] }) => written(run),
   ensures: {
     aCalledOffRunIsEndedForGood: {
       description: 'A run called off will never file anything again, whatever else is so of it',
@@ -53,7 +52,6 @@ const endedForGoodSpec = spec<(run: RunMarks) => boolean>({
 export type EndedForGood = Implementation<typeof endedForGoodSpec>;
 
 const honoursAsksSpec = spec<(run: RunMarks) => boolean>({
-  requires: ({ input: [run] }) => written(run),
   ensures: {
     aHeldRunHonoursNoAsk: {
       description: 'A held run honours no ask and asks nothing of a person until its hold lifts',

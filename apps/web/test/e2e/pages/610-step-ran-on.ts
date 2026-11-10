@@ -25,7 +25,7 @@ export default {
     );
     await expectVisible(
       bar.locator('[data-fact="permission mode"] dd', { hasText: DIAMOND.ranIn.measured }).filter({ hasText: 'by harness' }),
-      'and the mode its session says it runs in, marked as its harness\'s where it was filed with another',
+      "and the mode its session says it runs in, marked as its harness's where it was filed with another",
     );
     await photograph(bar, path.join(OUT, `step-ran-on-inspector-${await themeOf(page)}.png`));
 

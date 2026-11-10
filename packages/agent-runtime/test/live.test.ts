@@ -537,7 +537,7 @@ test(
       );
       assert.equal(fs.existsSync(path.join(probe, 'outside', 'x.txt')), false, 'and nothing was written there');
       assert.equal(views.control.state.settled, 'succeeded', `the control finished: ${views.control.phase}`);
-      assert.equal(control?.denials, undefined, 'and was denied nothing: a denial is not printed for every job');
+      assert.deepEqual(control?.denials, [], 'and was denied nothing, measured: an empty list, never absent');
     });
   },
 );
@@ -706,7 +706,7 @@ test(
     );
     assert.equal(resumed.state.settled, 'succeeded', `the resume settled: ${resumed.phase}`);
     assert.equal(child?.nativeId, parent?.nativeId, 'in the same session');
-    assert.equal(child?.denials, undefined, "the resume, which called nothing, carries none of its parent's denials");
+    assert.deepEqual(child?.denials, [], "the resume, which called nothing, carries none of its parent's denials, measured");
   },
 );
 

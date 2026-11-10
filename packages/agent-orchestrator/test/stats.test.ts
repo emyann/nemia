@@ -8,7 +8,7 @@
  *
  * Every story plants its runs in the one store and takes them out once it ends, so the next reads none of them. What `factsOf` and
  * `statsOf` decide off hand-built timelines is the tables of `src/stats/stats.test.ts`; the memo over the runtime's feed,
- * `src/stats/stats-memo.test.ts`. `WF_ROOT` is set before the command line is imported, which reads it as the module loads.
+ * `src/stats/stats-memo.test.ts`. Its store is its own at `ROOT`, given as `ENV`.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,15 +19,15 @@ import type { TestEnd } from 'agent-runtime/testing';
 import type { Stats } from '../src/runner.ts';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
+import { main } from '../src/cli/main.ts';
+import { engineOf, runWith } from '../src/runtime-client.ts';
+import { Invalid } from '../src/refusal/refusal.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-stats-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-const { main } = await import('../src/cli/main.ts');
-const { engineOf, runWith } = await import('../src/runtime-client.ts');
-const { Invalid } = await import('../src/refusal/refusal.ts');
-const stage = staged({ runWith, main, engineOf });
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
+const stage = staged({ runWith, main, engineOf, env: ENV });
 
 const DAY = '2026-09-28';
 const at = (hour: number, day = DAY): string => `${day}T${String(hour).padStart(2, '0')}:00:00.000Z`;

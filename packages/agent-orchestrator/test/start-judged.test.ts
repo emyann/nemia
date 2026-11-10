@@ -7,10 +7,10 @@
  * with nothing written, and started once the refusal `startRun` reads (`StartRefusal`) is another; and a store whose path a permission
  * rule cannot carry, refused in the store's words before the runtime's (`storeRootRefusal`).
  *
- * The store's root is read as the modules load, so it is one for the file, and holds a `(`: a step naming nothing under the store starts
+ * The store's root is one for the file, given as `ENV`, and holds a `(`: a step naming nothing under the store starts
  * there, which every start of the story and the second table is. A root that holds a `*`, and one every rule carries, are rows of the
  * pure `storeRootRefusal` (`src/start/store-root.test.ts`); an ending after a step starting under a root every rule carries is the
- * start of `mounts.test.ts`'s story. `WF_ROOT` is set before the runner is imported.
+ * start of `mounts.test.ts`'s story.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,26 +20,26 @@ import { Effect, Layer } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { names } from './assessed.ts';
 import { staged, story } from './story.ts';
-import { rootNow } from './config-given.ts';
+import { runWith } from '../src/runner.ts';
+import { configRefused, startRun, StartRefusal, stepsToStart } from '../src/start/start.verb.ts';
+import { startPlan } from '../src/plan/plan.verb.ts';
+import { StoreRoot } from '../src/config/root.store.ts';
+import { AgentDoor } from '../src/agents/agent-door.store.ts';
+import { agentDoorMemory } from '../src/agents/agent-memory.store.ts';
+import { AgentName } from '../src/agents/agents.model.ts';
+import { agentFilesDir } from '../src/agents/agents.store.ts';
+import { anAgent } from './agent-walks.ts';
+import { loadWorkflows } from '../src/workflows/workflows.store.ts';
+import { configRefusal, engineOf } from '../src/runtime-client.ts';
+import { main } from '../src/cli/main.ts';
+import { filesStoreAt } from '../src/record/files.store.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = path.join(scratch('wf-start-judged-'), 'First (Last)');
 fs.mkdirSync(ROOT);
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-const { runWith } = await import('../src/runner.ts');
-const { configRefused, startRun, StartRefusal, stepsToStart } = await import('../src/start/start.verb.ts');
-const { startPlan } = await import('../src/plan/plan.verb.ts');
-const { StoreRoot } = await import('../src/config/root.store.ts');
-const { AgentDoor } = await import('../src/agents/agent-door.store.ts');
-const { agentDoorMemory } = await import('../src/agents/agent-memory.store.ts');
-const { AgentName } = await import('../src/agents/agents.model.ts');
-const { agentFilesDir } = await import('../src/agents/agents.store.ts');
-const { anAgent } = await import('./agent-walks.ts');
-const { loadWorkflows } = await import('../src/workflows/workflows.store.ts');
-const { configRefusal, engineOf } = await import('../src/runtime-client.ts');
-const { main } = await import('../src/cli/main.ts');
-const runStore = (await import('../src/record/files.store.ts')).filesStoreAt(rootNow());
-const stage = staged({ runWith, main, engineOf });
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
+const rooted = filesStoreAt(ROOT);
+const stage = staged({ runWith, main, engineOf, env: ENV });
 type ConfigRefused = import('../src/start/start.verb.ts').ConfigRefused;
 type Workflow = import('../src/step/step.ts').StepSpec;
 type Refusal = Error & { _tag?: string; exitCode?: number };
@@ -206,14 +206,14 @@ test("configRefused: the runtime asked of each local step's first filing, refuse
 
   await t.test("REFUSED: a step's value its harness refuses, named by the line it comes from and the field it is filed as", () => {
     names(
-      configRefused(rootNow(), over('implement', { effort: 'ultra' }), PLACES, [], DENIED),
+      configRefused(ROOT, over('implement', { effort: 'ultra' }), PLACES, [], DENIED),
       'implement: `effort: ultra` (filed as `effort`): ',
       configRefusal('claude', { effort: 'ultra' })!,
     );
   });
 
   await t.test('REFUSED: an ending on a harness that cannot be denied the commit it lands, named by the step alone', () => {
-    const why = configRefused(rootNow(), over('ship', { harness: 'codex' }), PLACES, [], DENIED);
+    const why = configRefused(ROOT, over('ship', { harness: 'codex' }), PLACES, [], DENIED);
     names(why, `ship: ${configRefusal('codex', { disallowedTools: [...DENIED] })}`);
   });
 
@@ -222,17 +222,17 @@ test("configRefused: the runtime asked of each local step's first filing, refuse
     () => {
       const ungated = over('ship', { harness: 'codex', gate: undefined });
       assert.match(
-        configRefused(rootNow(), ungated, PLACES, [], DENIED)!,
+        configRefused(ROOT, ungated, PLACES, [], DENIED)!,
         /^ship: .*is a deny list/,
         'an ungated ending lands on its check all the same',
       );
       assert.match(
-        configRefused(rootNow(), ungated, PLACES, ['ship'], DENIED)!,
+        configRefused(ROOT, ungated, PLACES, ['ship'], DENIED)!,
         /^ship: .*is a deny list/,
         'a gate given at start changes nothing',
       );
       assert.equal(
-        configRefused(rootNow(), over('ship', { harness: 'codex', gate: undefined, check: undefined }), PLACES, [], DENIED),
+        configRefused(ROOT, over('ship', { harness: 'codex', gate: undefined, check: undefined }), PLACES, [], DENIED),
         undefined,
       );
     },
@@ -240,8 +240,8 @@ test("configRefused: the runtime asked of each local step's first filing, refuse
 
   await t.test('a step on a remote agent is asked nothing, and a folder whose every step its harness takes is no refusal', () => {
     const [implement] = loadWorkflows(lone('taken', 'effort: high'), PLACES);
-    assert.equal(configRefused(rootNow(), [implement], PLACES, [], DENIED), undefined);
-    assert.equal(configRefused(rootNow(), [{ ...implement, harness: 'a2a:reviewer', effort: 'ultra' }], PLACES, [], DENIED), undefined);
+    assert.equal(configRefused(ROOT, [implement], PLACES, [], DENIED), undefined);
+    assert.equal(configRefused(ROOT, [{ ...implement, harness: 'a2a:reviewer', effort: 'ultra' }], PLACES, [], DENIED), undefined);
   });
 
   await t.test('stepsToStart asks the same of a folder it lets through, the gates beside the workflow', () => {
@@ -306,7 +306,7 @@ test("REFUSED at nemia start, before a run is written: a step's first filing its
     started(dir, { repo, factory: 'settled', refused: (...args: unknown[]) => void asked.push(args[6]) });
     assert.deepEqual(asked, [harnessSettings]);
     const steps = loadWorkflows(dir, PLACES);
-    assert.equal(configRefused(rootNow(), steps, PLACES, [], [], {}, harnessSettings), undefined, 'and the runtime takes that filing');
+    assert.equal(configRefused(ROOT, steps, PLACES, [], [], {}, harnessSettings), undefined, 'and the runtime takes that filing');
   });
 
   await t.test(
@@ -416,7 +416,7 @@ test("REFUSED at nemia start: a store whose path holds a `(`, which no permissio
       }).pipe(Effect.provide(Layer.mergeAll(stage.place().layer, agentDoorMemory())), Effect.provideService(StoreRoot, ROOT)),
     );
     assert.equal(fs.existsSync(path.join(at.dir, 'scribe.md')), false, 'the agent is on no disk');
-    const prompt = fs.readFileSync(path.join(agentFilesDir(rootNow(), run, 'implement'), 'prompt.md'), 'utf8');
+    const prompt = fs.readFileSync(path.join(agentFilesDir(ROOT, run, 'implement'), 'prompt.md'), 'utf8');
     assert.ok(prompt.includes('Write the notes, scribe.'), 'its instructions are rendered from the memory');
     assert.deepEqual(run.pinned?.find((p) => p.kind === 'agent')?.hash, version, "its pin carries the Agent door's version of it");
   });
@@ -437,7 +437,7 @@ test("nemia start copies the workflow folder whole into the run's own, read-only
       assert.equal(fs.statSync(path.join(copy, file)).mode & 0o222, 0, `${file}: no write bit`);
     }
     assert.deepEqual(fs.readdirSync(path.join(ROOT, 'runs', id, 'workflow')), [record.workflowFiles], 'one copy, no sibling left');
-    runStore.runs.forget(id);
+    rooted.runs.forget(id);
     assert.equal(fs.existsSync(path.join(ROOT, 'runs', id)), false, '`nemia rm` removes the copy with the run, its files unwritable');
   });
 

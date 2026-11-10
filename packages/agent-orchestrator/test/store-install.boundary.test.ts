@@ -4,7 +4,7 @@
  * pass left, read by its `.git`, and a cancel that lands while `npm ci` runs. The test place models no ignore rule and no link, and no
  * stand-in starts `npm`, so these keep the git place; the rest of the run store is walked in store.test.ts.
  *
- * `WF_ROOT` is set before the runner is imported, since it is read as the module loads.
+ * Its store is its own at `ROOT`, given as `ENV`.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,7 +16,10 @@ import type { TaskPhase } from '../src/run.ts';
 import { scratch } from 'test-kit/scratch';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
-import { rootNow } from './config-given.ts';
+import { advanceRun, cancelRun, forgetRun, startRun, startPlan, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import { LINE_NAME } from '../src/run.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-store-install-');
 const WORKFLOW = path.join(ROOT, 'workflow');
@@ -25,15 +28,9 @@ fs.mkdirSync(WORKFLOW, { recursive: true });
 fs.writeFileSync(path.join(WORKFLOW, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
 fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
 
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { advanceRun, cancelRun, forgetRun, startRun, startPlan, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
-const runWith = runOver(runEngine, gitPlaceLayer);
-const runPlaced = runGiven(gitPlaceLayer);
-const { runRecord } = await import('../src/record/record.store.ts');
-const { LINE_NAME } = await import('../src/run.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
+const runWith = runOver(runEngine, gitPlaceLayer, ENV);
+const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
@@ -230,8 +227,8 @@ test("a step's worktree gets what .worktreeinclude lists from the main checkout 
   const run = await isolated(repo);
   fs.appendFileSync(path.join(repo, '.worktreeinclude'), `../${path.basename(outside)}/secret\n`);
   const { e, tasks } = board();
-  const pass = await runWith(e, advanceRun(runRecord(rootNow(), run.id)));
-  const wt = runRecord(rootNow(), run.id).steps.implement.workspace!;
+  const pass = await runWith(e, advanceRun(runRecord(ROOT, run.id)));
+  const wt = runRecord(ROOT, run.id).steps.implement.workspace!;
   assert.equal(wt, path.join(ROOT, 'worktrees', run.id, LINE_NAME), 'a worktree, as shipped');
 
   assert.equal(
@@ -287,8 +284,8 @@ test("a worktree whose main packages could only be linked — its store on anoth
     throw Object.assign(new Error("EXDEV: cross-device link not permitted, link 'a' -> 'b'"), { code: 'EXDEV', syscall: 'link' });
   });
   const { e } = board();
-  const pass = await runWith(e, advanceRun(runRecord(rootNow(), run.id)));
-  const wt = runRecord(rootNow(), run.id).steps.implement.workspace!;
+  const pass = await runWith(e, advanceRun(runRecord(ROOT, run.id)));
+  const wt = runRecord(ROOT, run.id).steps.implement.workspace!;
   assert.ok(fs.lstatSync(path.join(wt, 'node_modules/third')).isSymbolicLink());
   assert.deepEqual(pass.notes, [
     "implement: node_modules: main's packages linked, not hardlinked — EXDEV: cross-device link not permitted, link 'a' -> 'b'; a fenced step's reads under it leave its worktree and are denied",
@@ -345,8 +342,8 @@ test('a worktree whose lockfile asks for what the main checkout has not installe
 
   const run = await isolated(repo);
   const { e, tasks } = board();
-  const pass = await runWith(e, advanceRun(runRecord(rootNow(), run.id)));
-  const wt = runRecord(rootNow(), run.id).steps.implement.workspace!;
+  const pass = await runWith(e, advanceRun(runRecord(ROOT, run.id)));
+  const wt = runRecord(ROOT, run.id).steps.implement.workspace!;
   assert.equal(
     fs.readFileSync(path.join(wt, 'package-lock.json'), 'utf8'),
     fs.readFileSync(path.join(repo, 'package-lock.json'), 'utf8'),
@@ -379,13 +376,13 @@ test('a pass that dies after cutting a worktree does not wedge every pass after 
       throw new Error('the tick died here');
     },
   });
-  await assert.rejects(runWith(dying, advanceRun(runRecord(rootNow(), run.id))), /the tick died here/);
+  await assert.rejects(runWith(dying, advanceRun(runRecord(ROOT, run.id))), /the tick died here/);
   const wt = path.join(ROOT, 'worktrees', run.id, LINE_NAME);
   assert.ok(fs.existsSync(path.join(wt, '.git')), 'the worktree and its branch were made');
 
-  const pass = await runWith(e, advanceRun(runRecord(rootNow(), run.id)));
+  const pass = await runWith(e, advanceRun(runRecord(ROOT, run.id)));
   assert.deepEqual([pass.filed, filings], [['implement'], [`${run.id}-implement`]]);
-  assert.equal(runRecord(rootNow(), run.id).steps.implement?.workspace, wt, 'in the worktree that pass cut');
+  assert.equal(runRecord(ROOT, run.id).steps.implement?.workspace, wt, 'in the worktree that pass cut');
 });
 
 /** Git in a checkout, as a person types it there. */
@@ -458,7 +455,7 @@ const heldInNpmCi = async (t: TestContext, b: ReturnType<typeof board>, brief: s
     fs.writeFileSync(let_go, '');
   });
   const run = await runPlaced(startRun({ brief, repo, workflowDir: folder() }));
-  const pass = runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
+  const pass = runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
   while (!fs.existsSync(started)) await new Promise((r) => setTimeout(r, 10));
   const wt = path.join(ROOT, 'worktrees', run.id, LINE_NAME);
   assert.ok(worktreesOf(repo).includes(wt), 'the pass has cut the worktree, and not filed the step');
@@ -490,7 +487,7 @@ test("REFUSED at shipped defaults: a pass still cutting a step's worktree when `
   await runWith(b.e, cancelRun(run.id));
   const pass = await release();
   assert.deepEqual([pass.filed, b.filings, b.stopped], [[], [], []], 'nothing filed, so nothing to stop');
-  assert.equal(runRecord(rootNow(), run.id).steps.implement.taskId, null);
+  assert.equal(runRecord(ROOT, run.id).steps.implement.taskId, null);
   const forgot = await runWith(b.e, forgetRun(run.id));
   assert.deepEqual([forgot.kind, forgot.removed], ['forgotten', [wt]]);
 });

@@ -15,17 +15,16 @@ import { scratch } from 'test-kit/scratch';
 import { TEAM } from './team.ts';
 import { names } from './assessed.ts';
 import { story } from './story.ts';
+import { main } from '../src/cli/main.ts';
+import { TABLE } from '../src/runner.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-writers-cli-');
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
 process.env.NEMIA_DAEMON_START = 'off';
-const { main } = await import('../src/cli/main.ts');
-const { TABLE } = await import('../src/runner.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
 type Args = import('../src/command/command.ts').Args;
 type Command = import('../src/command/entry.verb.ts').Command;
-
-const { engineOf } = await import('../src/runtime-client.ts');
 
 /** The engine's stand-in, new for each test and with no task: every run it is asked of has filed nothing yet. */
 const engine = eachTest(testEngine);
@@ -39,7 +38,7 @@ async function typed(t: TestContext, ...argv: string[]): Promise<{ out: string; 
   const log = t.mock.method(console, 'log', (...args: unknown[]) => void out.push(args.join(' ')));
   const err = t.mock.method(console, 'error', () => undefined);
   try {
-    await main(argv, engineOf(engine().layer));
+    await main(argv, engineOf(engine().layer), undefined, undefined, ENV);
     return { out: out.join('\n') };
   } catch (e) {
     const { message, _tag, exitCode } = e as Error & { _tag?: string; exitCode?: number };

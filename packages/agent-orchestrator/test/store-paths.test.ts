@@ -1,5 +1,5 @@
 /**
- * A run's record, a person's files beside it and the inbox are read and written through `runStore` (`src/record/files.store.ts`): over
+ * A run's record, a person's files beside it and the inbox are read and written through `filesStoreAt` (`src/record/files.store.ts`): over
  * the orchestrator's `src` and the api's, tests left out (`sourcesOf`), a call that hands `fs` a path from `runsDir()` or `inboxDir()`,
  * or one built from them, is refused outside the store's own two files (`OWN`), read off each file's syntax tree, so a call oxfmt splits
  * over lines is the same call. Each of `RULES` is a part of the matcher, and each is proven by a fixture that only it refuses:
@@ -63,7 +63,7 @@ const EXCEPTIONS: Readonly<Record<string, Exception>> = {
     through: ['agentFilesDir'],
     why:
       "a run's rendered agents, runs/<id>/agents/<step>, are written once at nemia start and read by the tick: neither its record, a " +
-      "person's file nor the inbox, which are runStore's",
+      "person's file nor the inbox, which are filesStoreAt's",
   },
   'packages/agent-orchestrator/src/frozen/frozen.store.ts': {
     through: ['workflowFilesDir', 'carriedFilesDir'],
@@ -250,7 +250,7 @@ function programOf(texts: ReadonlyMap<string, string>): { sources: Map<string, t
 }
 
 const FIX =
-  'read and write it through runStore, adding the method to RunStore (src/record/record.ts), or name the file in EXCEPTIONS ' +
+  'read and write it through filesStoreAt, adding the method to RunStore (src/record/record.ts), or name the file in EXCEPTIONS ' +
   '(test/store-paths.test.ts) with the declarations it goes through and why';
 
 /** What `texts` break of the rule under `exceptions` and `rules`, each a sentence naming the file, the line and the fix. */
@@ -268,7 +268,7 @@ function breaks(
   }
   for (const [file, exception] of Object.entries(exceptions)) {
     const source = sources.get(file);
-    if (!exception.why.trim()) out.push(`${file}'s exception says no why: say why its paths reach fs outside runStore`);
+    if (!exception.why.trim()) out.push(`${file}'s exception says no why: say why its paths reach fs outside filesStoreAt`);
     if (!source) {
       out.push(`${file} is excepted but is not read: where it moved, rename its entry; else take it off`);
       continue;
@@ -388,7 +388,7 @@ test('an exception lets its declarations through, and no other root of its file'
 test('REFUSED: an exception with no why, one through a name its file does not declare, one not needed, one for no file', () => {
   const texts = one(AGENTS_TEXT, AGENTS);
   assert.deepEqual(breaks(texts, { [AGENTS]: { through: ['agentFilesDir'], why: ' ' } }), [
-    `${AGENTS}'s exception says no why: say why its paths reach fs outside runStore`,
+    `${AGENTS}'s exception says no why: say why its paths reach fs outside filesStoreAt`,
   ]);
   assert.deepEqual(breaks(texts, { [AGENTS]: { through: ['agentFilesDir', 'nowhere'], why: 'its own' } }), [
     `${AGENTS}'s exception goes through nowhere, which it does not declare: name a declaration`,

@@ -13,8 +13,7 @@
  * Walked at shipped defaults, over the tests' team's `dev` (`team.ts`), whose review loops back to implement: a first try, a nudge, an
  * answer to a blocked step (`nemia retry --message`), a round 2 and a round 3 — and over a folder whose loop's target declares an `output:`
  * of its own. And the run's own nudge
- * to sign off, filed with no person's word when a session ends `unsigned`. `WF_ROOT` is read as the module loads, so it is set before the
- * import.
+ * to sign off, filed with no person's word when a session ends `unsigned`. Its store is its own at `ROOT`, given as `ENV`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,19 +27,19 @@ import { TEAM } from './team.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
-import { rootNow } from './config-given.ts';
+import { advanceRun, retryRun, startRun, runWith as runEngine } from '../src/runner.ts';
+import { stepsNow as stepsOf } from './steps-now.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-cache-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-process.env.WF_ROOT = ROOT;
-const { advanceRun, retryRun, startRun, runWith: runEngine } = await import('../src/runner.ts');
-const { stepsNow: stepsOf } = await import('./steps-now.ts');
-const { engineOf } = await import('../src/runtime-client.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
-const runWith = runOver(runEngine, () => stand().layer);
-const runPlaced = runGiven(() => stand().layer);
-const { runRecord } = await import('../src/record/record.store.ts');
+const runWith = runOver(runEngine, () => stand().layer, ENV);
+const runPlaced = runGiven(() => stand().layer, ENV);
 
 const LOOPED = ['dev'];
 
@@ -123,7 +122,7 @@ async function walk(
   first: { mode: 'continue' | 'fresh'; model?: string } = { mode: 'continue' },
 ): Promise<{ id: string; filed: Filed[]; target: string; looping: string; steps: StepSpec[] }> {
   const run = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir }));
-  const steps = stepsOf(run);
+  const steps = stepsOf(run, ROOT);
   const looping = steps.find((s) => s.loop)!;
   const target = looping.loop!;
   const b = board();
@@ -132,7 +131,7 @@ async function walk(
     id === `${run.id}-${step}` ? 1 : Number(new RegExp(`^${run.id}-${step}-try(\\d+)$`).exec(id)?.[1] ?? NaN);
 
   for (let pass = 0; pass < 60; pass++) {
-    const p = await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
+    const p = await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     const pending = [...b.tasks.entries()].filter(([, t]) => t.phase === 'pending');
     if (!pending.length && !p.looped.length && !p.tried.length) break;
     for (const [id, t] of pending) {
@@ -348,13 +347,13 @@ test('REFUSED by the check: a chain that changes its schema — round 1 without 
 for (const name of LOOPED) {
   test(`${name}, at shipped defaults: the run's own nudge to sign off continues an unsigned session filed as that session was — schema, model, effort, tools, window`, async () => {
     const run = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: path.join(TEAM, name) }));
-    const target = stepsOf(run).find((s) => s.loop)!.loop!;
+    const target = stepsOf(run, ROOT).find((s) => s.loop)!.loop!;
     const b = board();
     const order: string[] = [];
     const first = `${run.id}-${target}`;
     const nudge = `${first}-try2`;
     for (let pass = 0; pass < 20 && !b.tasks.has(nudge); pass++) {
-      await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
+      await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
       for (const [id, t] of b.tasks) {
         if (t.phase !== 'pending' || id === nudge) continue;
         order.push(id);
@@ -376,6 +375,6 @@ for (const name of LOOPED) {
     const filed = [...order, nudge].map((id) => b.tasks.get(id)!.spec);
     assert.equal(b.tasks.get(nudge)!.spec.resumeFrom, `native-${first}`, 'the same session, continued');
     assert.deepEqual(chainDifferences(filed), []);
-    assert.equal(runRecord(rootNow(), run.id).steps[target]?.tries?.at(-1)?.cause, 'signoff');
+    assert.equal(runRecord(ROOT, run.id).steps[target]?.tries?.at(-1)?.cause, 'signoff');
   });
 }

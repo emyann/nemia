@@ -16,7 +16,8 @@ import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { TEAM } from './team.ts';
 import { advanceRun, startRun, startFromInbox, runWith, list } from '../src/runner.ts';
-import { artifactsDir, runRecord, rewriteRun } from '../src/record/record.store.ts';
+import { artifactsDir, inputsDir, runRecord, rewriteRun } from '../src/record/record.store.ts';
+import { mountHolds, readsAt, writesAt, type Filed } from './mounted.ts';
 import { resultSteps } from '../src/branches/branches.ts';
 import { stepsOf } from '../src/steps/steps.verb.ts';
 import { inboxAt } from '../src/cards/cards.store.ts';
@@ -54,10 +55,10 @@ const folder = (): string => {
   return dir;
 };
 
-const started = async () => {
+const started = async (inputs: readonly string[] = []) => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stage.place().world.repository(repo, { 'a.txt': 'one\n' });
-  return stage.runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: folder() }));
+  return stage.runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: folder(), inputs }));
 };
 
 const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
@@ -69,8 +70,8 @@ const cards = (): string[] => (fs.existsSync(inboxAt(ROOT)) ? fs.readdirSync(inb
  * A run whose plan has signed off on `surface`, which triage's table routes by, and on the routed card's `title`, null when none is
  * given; labelled with `labels` when given.
  */
-const planned = async (surface: string, given: { title?: string; labels?: Record<string, string> } = {}) => {
-  const run = await started();
+const planned = async (surface: string, given: { title?: string; labels?: Record<string, string>; inputs?: readonly string[] } = {}) => {
+  const run = await started(given.inputs);
   if (given.labels) files.labels.put(run.id, given.labels);
   assert.deepEqual((await pass(run.id)).filed, ['plan']);
   stage.board().settle(`${run.id}-plan`, 'succeeded', {
@@ -207,31 +208,51 @@ test("a routed card takes its title from the producer's closeout, else the run's
   });
 });
 
-test("the run a routed card starts mounts the caller's result folders read-only on its root, and its brief names them", async (t) => {
+test("the run a routed card starts mounts the caller's artifacts and inputs read-only on every step, and each brief names them", async (t) => {
   const s = story(t);
-  const id = await planned('web');
+  const notes = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'notes.md');
+  fs.writeFileSync(notes, 'the rows\n');
+  const id = await planned('web', { inputs: [notes] });
   const repo = runRecord(ROOT, id).repo ?? '';
   const deliver = path.join(repo, 'workflows', 'deliver');
   fs.mkdirSync(deliver, { recursive: true });
   fs.writeFileSync(path.join(deliver, 'implement.md'), '---\nplace: git\n---\nbuild it\n');
+  fs.writeFileSync(path.join(deliver, 'review.md'), '---\nplace: git\nafter: implement\n---\nreview it\n');
   await pass(id);
   const card = runRecord(ROOT, id).steps.ship?.sent?.card ?? '';
-  const plan = artifactsDir(ROOT, runRecord(ROOT, id), 'plan');
+  const artifacts = path.dirname(artifactsDir(ROOT, runRecord(ROOT, id), 'plan'));
+  const inputs = inputsDir(ROOT, runRecord(ROOT, id));
+  let routed = '';
 
-  await s.test('the card starts as the tick starts one, and the pass files its root with the caller folder mounted read-only', async () => {
-    assert.ok(card, 'the card was sent');
-    const routed = (await stage.runPlaced(startFromInbox({ name: card, callerRepo: repo }))).run.id;
-    assert.deepEqual(runRecord(ROOT, routed).context, [id], 'handed the caller as context');
-    await pass(routed);
-    const spec = stage.board().specs.find((x) => x.id === `${routed}-implement`);
-    assert.ok(spec, 'the root is filed');
-    const mounts = (spec.config as { mounts?: { path: string; readOnly?: boolean }[] }).mounts ?? [];
-    assert.ok(
-      mounts.some((m) => m.path === plan && m.readOnly === true),
-      JSON.stringify(mounts),
-    );
+  /** The step `name` of the routed run, as the pass filed it: its config reaches the caller's input and plan's closeout, its brief names both folders. */
+  const handedTo = (name: string) => {
+    const spec = stage.board().specs.find((x) => x.id === `${routed}-${name}`);
+    assert.ok(spec, `${name} is filed`);
+    const config = spec.config as Filed;
+    for (const folder of [artifacts, inputs])
+      assert.ok(mountHolds(config, `${folder}/x`, true), `${folder} is mounted read-only: ${JSON.stringify(config.mounts)}`);
+    assert.ok(readsAt(config, path.join(inputs, 'notes.md')), "the caller's input is read");
+    assert.ok(readsAt(config, path.join(artifacts, 'plan', 'closeout.json')), "the caller's plan folder is read");
+    assert.ok(!writesAt(config, path.join(inputs, 'notes.md')), "the caller's input is never written");
     const named = spec.brief.split('## What was asked for')[1]?.split('\n## ')[0] ?? '';
-    assert.ok(named.includes(plan), "the mount line under what was asked for names the caller's folder");
+    assert.ok(named.includes(artifacts) && named.includes(inputs), 'the mount line under what was asked for names both folders');
+  };
+
+  await s.test(
+    'the card starts as the tick starts one, and the pass files its root with the caller folders mounted read-only',
+    async () => {
+      assert.ok(card, 'the card was sent');
+      routed = (await stage.runPlaced(startFromInbox({ name: card, callerRepo: repo }))).run.id;
+      assert.deepEqual(runRecord(ROOT, routed).context, [id], 'handed the caller as context');
+      await pass(routed);
+      handedTo('implement');
+    },
+  );
+
+  await s.test('the step after the root is filed with the same folders, not the root alone', async () => {
+    stage.board().settle(`${routed}-implement`, 'succeeded', { outcome: 'done', summary: 'built', artifacts: [], needs: null });
+    await pass(routed);
+    handedTo('review');
   });
 });
 

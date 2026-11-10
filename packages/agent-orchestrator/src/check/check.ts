@@ -26,6 +26,7 @@
 import { isRepositoryRun, type Run, type StepRecord, type StepStatus, type TaskPhase } from '../record/record.ts';
 import { endsOnBase, type Workflow } from '../step/step.ts';
 import { outOfMemoryWords } from '../out-of-memory/out-of-memory.ts';
+import { firstPiece } from '../piece/piece.ts';
 import type { KilledAtLimit } from '../../contracts/out-of-memory.contract.ts';
 
 /**
@@ -337,19 +338,31 @@ export function reportedLines(log: string): { lines: string[]; cut: number } {
 export const FAILING_LINES = 40;
 
 /**
+ * A runner's own line for a subject that failed, `<tool>: FAILED — <subject>: <why>`, also said by one of its workers as `<tool>: worker
+ * <n> FAILED — …` and relayed with the worker's tag before it (`[w<n>] `): its subject, which names the page or the case. The runner
+ * prints one failure several times, by the worker and again by itself, so its subject is what says it once.
+ */
+const SUBJECT_FAILED = /^\s*(?:\[[^\]\s]+\] )?[\w.-]+: (?:worker \d+ )?FAILED — (.+)$/;
+
+/**
  * The lines of a check's output that name a failing test, as node's reporters print one: a line that starts `✖` (spec) or `not ok `
  * (TAP), after its indent and the prefix a tool gave it (turbo's `pkg:test: `) — trimmed, each once, in order, and never the heading
- * `✖ failing tests:` the spec reporter lists them again under. Past `FAILING_LINES`, the first that many, and `cut`, how many more there
- * were. A check of another shape names none.
+ * `✖ failing tests:` the spec reporter lists them again under — and a runner's failed subject (`SUBJECT_FAILED`), once per subject, as
+ * it was first said. Past `FAILING_LINES`, the first that many, and `cut`, how many more there were. A check of another shape names none.
  */
 export function failingLines(log: string): { lines: string[]; cut: number } {
-  const all = new Set<string>();
+  const all = new Map<string, string>();
   for (const raw of log.split('\n')) {
     const line = raw.replace(/\r$/, '');
     const [, at, failed] = /^(\S+:\S+: )?\s*((?:✖|not ok ).*)$/.exec(line) ?? [];
-    if (failed !== undefined && !failed.startsWith('✖ failing tests:')) all.add(`${at ?? ''}${failed.trimEnd()}`);
+    const said = SUBJECT_FAILED.exec(line.replace(/^\S+:\S+: /, ''))?.[1];
+    const subject = said === undefined ? undefined : firstPiece(said, ': ').trim();
+    if (failed !== undefined && !failed.startsWith('✖ failing tests:')) {
+      const said = `${at ?? ''}${failed.trimEnd()}`;
+      if (!all.has(said)) all.set(said, said);
+    } else if (subject !== undefined && !all.has(`FAILED — ${subject}`)) all.set(`FAILED — ${subject}`, line.trim());
   }
-  const lines = [...all];
+  const lines = [...all.values()];
   return { lines: lines.slice(0, FAILING_LINES), cut: Math.max(0, lines.length - FAILING_LINES) };
 }
 
@@ -384,7 +397,8 @@ export function landingSaidSection(said: LandingSaid): string {
   return [
     ...head,
     `The run executed ${codeSpan(said.command)} on the merged tree after ${said.step} signed off (its task ${codeSpan(said.check)}). In`,
-    '`failing`, each line of its output that names a failing test (`✖` or `not ok`); then its exit and the last lines of each stream.',
+    '`failing`, each line of its output that names a failing test (`✖` or `not ok`) or a subject a runner said `FAILED` of, once each;',
+    'then its exit and the last lines of each stream.',
     ...(said.partial
       ? ['Its whole stdout was not kept, so `failing` is read from the end of it: a line printed earlier may be missing.']
       : []),

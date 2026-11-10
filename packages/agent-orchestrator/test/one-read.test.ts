@@ -9,7 +9,7 @@
  * module loads. Beside the table: the tables' empty read is `readersOf`'s, and the engine's `needs-human` is compared in `src/views/`
  * alone (`blockedWord`, `harnessBlocked`), so no reader judges a blocked session by a word of its own.
  */
-import { settingsOf } from '../src/config/config.store.ts';
+import { settingsOf, StoreConfig } from '../src/config/config.store.ts';
 import { rootNow } from './config-given.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -31,10 +31,9 @@ const { filesStore: runStore } = await import('../src/record/files.store.ts');
 /** The run `id` as a reader is given it, the store's pause composed onto it (`runs.read`). */
 const theRun = (id: string) => runStore.runs.read(id);
 const { passStanding, standingSnapshot } = await import('../src/standing/standing.verb.ts');
-const { readRun: theRead, withStandings } = await import('../src/tick/told.verb.ts');
+const { readRun: theRead } = await import('../src/tick/told.verb.ts');
+const { passAssessment } = await import('../src/tick/advance.verb.ts');
 const { cancelPlan } = await import('../src/cancel/cancel.ts');
-const { assess } = await import('../src/tick/assess.ts');
-const { checkoutHold } = await import('../src/ending/ending.verb.ts');
 const { headsOver, standingReader } = await import('../src/standing/standing.verb.ts');
 const { statusMemo } = await import('../src/place/landing.store.ts');
 const { PlaceService } = await import('../src/place/place.store.ts');
@@ -54,18 +53,17 @@ const tick = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord
 const aPass = () => stage.runWith(stage.board().e, passStanding(listRuns()));
 
 /**
- * The run as the tick's pass reads and assesses it (`advancePass`): its one read (`readRun`), the checkout read off what `nemia ls` reads
- * where branches stand, and the branch standings that reading holds (`withStandings`).
+ * The run as the tick's pass reads and assesses it: its one read (`readRun`), then the pass's own assessment (`passAssessment`, which
+ * `advancePass` calls), the checkout read off what `nemia ls` reads where branches stand.
  */
 const tickRead = (e: Engine, run: Run) =>
   Effect.gen(function* () {
     const { read: reads } = yield* theRead(e, run, { earlierTries: 'budgeted' });
     const snapshot = yield* standingSnapshot();
     const memo = statusMemo(headsOver(standingReader(snapshot)), yield* PlaceService);
-    const from = { standing: Effect.succeed(snapshot) };
-    const checkout = yield* checkoutHold(e, run, reads.steps, from, settingsOf(process.env), memo, reads.phaseOf);
-    const read = withStandings({ ...reads, checkout }, snapshot);
-    const assessed = assess(read);
+    const { read, assessed } = yield* passAssessment(e, run, reads, { standing: Effect.succeed(snapshot) }, memo, snapshot).pipe(
+      Effect.provide(StoreConfig.layer(settingsOf(process.env))),
+    );
     return {
       ...assessed,
       plan: cancelPlan(read, assessed),

@@ -47,7 +47,7 @@ import { withinEffect } from '../meter/tally.store.ts';
 import { PlaceService, type Place } from '../place/place.store.ts';
 import { onceFacts, roundsGranted, settledOnce, timelineFacts, type StepFact } from '../meter/index.ts';
 import { checkoutHold, landEnding } from '../ending/ending.verb.ts';
-import { statusMemo } from '../place/landing.store.ts';
+import { statusMemo, type StatusMemo } from '../place/landing.store.ts';
 import type { PassRead } from '../cap/cap.verb.ts';
 import { fileChecks, fileReady, fileRounds, fileTries, type Closer, type Filing, type Heads } from './file.verb.ts';
 import { withStandings, type RunRead } from './told.verb.ts';
@@ -200,9 +200,8 @@ export const advancePass = Effect.fn('advancePass')(
     const from = pass
       ? { read: pass, slot }
       : { standing: standingNow(runsAtOnce.runs.list()).pipe(Effect.provideService(PlaceService, place)) };
-    const checkout = yield* checkoutHold(e, run, steps, from, yield* StoreConfig, memo, phaseOf);
     const lift = yield* liftHold(e, run, parents);
-    const assessed = assess(withStandings({ ...reads, checkout }, yield* standingOf(pass)));
+    const { checkout, assessed } = yield* passAssessment(e, run, reads, from, memo, yield* standingOf(pass));
     const { ran, settled, marked, timed } = yield* marksOf(e, run, reads, assessed.status);
     const closer = closerOf(e, reads.views);
     const closeNotes = yield* closeHeldOpen(ran, reads, closer);
@@ -305,6 +304,24 @@ const timedOnce = Effect.fnUntraced(function* (e: Engine, run: Run, r: RunRead, 
 });
 
 /** The standing of the store's branches the pass reads (`PassRead`'s), or, for a one-off verb that hands none, the store's as it is now. */
+/**
+ * The pass's assessment of a run, the truth every other reader of it agrees with (`test/one-read.test.ts` reads it by this name): its one
+ * read (`reads`), the checkout another run's ending holds (`checkoutHold`, over `from` and `memo`), and where its branches stand
+ * (`withStandings`), judged by `assess`. Read after a hold the pass lifts, which `assess` reads off the run.
+ */
+export const passAssessment = Effect.fnUntraced(function* (
+  e: Engine,
+  run: Run,
+  reads: RunRead,
+  from: Parameters<typeof checkoutHold>[3],
+  memo: StatusMemo,
+  standing: PassStanding,
+) {
+  const checkout = yield* checkoutHold(e, run, reads.steps, from, yield* StoreConfig, memo, reads.phaseOf);
+  const read = withStandings({ ...reads, checkout }, standing);
+  return { checkout, read, assessed: assess(read) };
+});
+
 const standingOf = (pass: PassRead | undefined) => (pass ? Effect.succeed(pass.standing) : standingSnapshot());
 
 /**

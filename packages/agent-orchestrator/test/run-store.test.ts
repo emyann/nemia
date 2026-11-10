@@ -17,7 +17,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { seamUses, sourcesUnder } from 'test-kit/debt';
+import { debtBreaks, seamUses, sourcesUnder, type DebtBreak } from 'test-kit/debt';
 import type { Run } from '../src/run.ts';
 import type { PersonRequest } from '../src/record/record.ts';
 import { scratch } from 'test-kit/scratch';
@@ -479,6 +479,40 @@ test('REFUSED: a file of src that reads the files store, or the run store by its
   assert.equal(said.length, 2, said.join('\n'));
   assert.ok(said[0]?.startsWith('src/cancel/cancel.verb.ts reads the run store past the Run door 2 time(s)'), said[0]);
   assert.ok(said[1]?.startsWith('src/try/try.verb.ts reads the run store past the Run door 1 time(s)'), said[1]);
+});
+
+/** A read of runs that a door given to the program does not see: `runsAtOnce`'s groups and `keptRuns`, what `RUN_DOOR_DEBT` counts. */
+const UNROOTED_READ = /\brunsAtOnce\s*\.|\bkeptRuns\s*\(/g;
+
+/** What a break of the count says: a file it does not name or a count grown, a count fallen, a file with none left. */
+const unrootedInWords = ({ file, uses: n, kind, owed }: DebtBreak): string =>
+  kind === 'grown'
+    ? `${file} reads runs past the door it is given ${n} time(s) where test/run-door.baseline.ts names ${owed}: yield RunDoor instead`
+    : kind === 'fallen'
+      ? `${file} reads runs past the door it is given ${n} time(s): lower its count in test/run-door.baseline.ts to ${n}, which only shrinks`
+      : `${file} reads runs past the door it is given no more: take its line out of test/run-door.baseline.ts`;
+
+test('no file of src reads runs past the door it is given but as test/run-door.baseline.ts counts it, and the count only shrinks', async () => {
+  const { RUN_DOOR_DEBT } = await import('./run-door.baseline.ts');
+  assert.deepEqual(debtBreaks(seamUses(sourcesUnder(PKG, 'src', DOOR_AND_FILES), UNROOTED_READ), RUN_DOOR_DEBT).map(unrootedInWords), []);
+});
+
+test('REFUSED: a new read through runsAtOnce in a file the count does not name, and a count held above what is left', async () => {
+  const { RUN_DOOR_DEBT } = await import('./run-door.baseline.ts');
+  const sources = sourcesUnder(PKG, 'src', DOOR_AND_FILES);
+  const again = {
+    ...sources,
+    'src/cancel/cancel.verb.ts': `${sources['src/cancel/cancel.verb.ts']}\nconst z = runsAtOnce.runs.read('a');\n`,
+  };
+  assert.deepEqual(
+    debtBreaks(seamUses(again, UNROOTED_READ), RUN_DOOR_DEBT).map(({ file, kind }) => [file, kind]),
+    [['src/cancel/cancel.verb.ts', 'grown']],
+  );
+  const above = debtBreaks(seamUses(sources, UNROOTED_READ), { ...RUN_DOOR_DEBT, 'src/try/try.verb.ts': 2 });
+  assert.deepEqual(
+    above.map(({ file, kind }) => [file, kind]),
+    [['src/try/try.verb.ts', 'fallen']],
+  );
 });
 
 /** A run under `id` started out of the inbox's card `card`. */

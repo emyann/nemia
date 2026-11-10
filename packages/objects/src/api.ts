@@ -58,6 +58,7 @@ import { Subscription, SubscriptionList } from './subscription.ts';
 import { Event, EventList } from './event.ts';
 import { KINDS, type Kind } from './words.ts';
 import { APIResourceList } from './discovery.ts';
+import { ServerGroup, Subscribed, SubscriptionWrite, Unsubscribed } from './server-api.ts';
 
 export {
   BadRequest,
@@ -517,13 +518,27 @@ export class TemplatesGroup extends HttpApiGroup.make('templates').add(
   }),
 ) {}
 
-/** The feed's subscriptions, which no namespace holds, listed and read; subscribing and unsubscribing stay the api's own routes. */
+/**
+ * The feed's subscriptions, which no namespace holds, listed and read; and a long-lived task given one (`nemia subscribe`), and one taken
+ * away (`nemia unsubscribe`).
+ */
 export class SubscriptionsGroup extends HttpApiGroup.make('subscriptions').add(
   HttpApiEndpoint.get('listAll', '/api/subscriptions', { query: listQuery, success: SubscriptionListObject, error: objectErrors }),
   HttpApiEndpoint.get('get', '/api/subscriptions/:name', {
     params: templateParams,
     success: SubscriptionObject,
     error: objectErrors,
+  }),
+  HttpApiEndpoint.post('subscribe', '/api/subscriptions/:name', {
+    params: templateParams,
+    payload: SubscriptionWrite,
+    success: Subscribed.pipe(Schema.annotate({ httpApiStatus: 201 })),
+    error: [...objectErrors, Failed],
+  }),
+  HttpApiEndpoint.delete('unsubscribe', '/api/subscriptions/:name', {
+    params: templateParams,
+    success: Unsubscribed,
+    error: [...objectErrors, Failed],
   }),
 ) {}
 
@@ -593,4 +608,5 @@ export const Api = HttpApi.make('nemia')
   .add(EventsGroup)
   .add(ProposalsGroup)
   .add(DelegationsGroup)
-  .add(DiscoveryGroup);
+  .add(DiscoveryGroup)
+  .add(ServerGroup);

@@ -50,7 +50,7 @@ export const PINNED_WORDS: Readonly<Record<string, number>> = {
   'apps/api/test/nemia-chat.test.ts': 1,
   'apps/api/test/nemia.test.ts': 1,
   'apps/api/test/remote.test.ts': 2,
-  'apps/api/test/subscriptions.test.ts': 7,
+  'apps/api/test/subscriptions.test.ts': 4,
   'apps/api/test/waits.test.ts': 1,
   'apps/docs/test/waits.test.ts': 1,
   'apps/web/test/api.test.ts': 5,

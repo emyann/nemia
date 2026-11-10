@@ -569,3 +569,10 @@ export { DelegationDoor, delegationDoorFiles, type DelegationDoorShape } from '.
 export { decisionRead, diffFiles, DIFF_LINES, runDecision, type DecisionHow, type DecisionRead } from './decide/decision.verb.ts';
 export { lessonOf } from './branches/index.ts';
 export { runCostWords } from './decide/decide.ts';
+export { CEILINGS } from './command/commands.verb.ts';
+export { PAUSE, PAUSE_NOW, PAUSED, RESUME } from './command/runs.verb.ts';
+export { PASSES } from './meter/passes.verb.ts';
+export { SERIES } from './command/reads.verb.ts';
+export { SUBSCRIBE, UNSUBSCRIBE } from './subscription/subscription.verb.ts';
+export { LEVEL } from './nemia/level.verb.ts';
+export { FACTORY_ADD } from './factory/factory.verb.ts';

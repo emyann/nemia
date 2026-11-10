@@ -1,36 +1,25 @@
 import fs from 'node:fs/promises';
-import { Layer, ManagedRuntime, Metric } from 'effect';
+import { Layer, ManagedRuntime } from 'effect';
 import { type ErrorHandler, Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import {
-  feedHubLayer,
-  gitPlaceLayer,
-  informerLayer,
-  leaseRelease,
-  runningRelease,
-  storeRootLayer,
-  telemetryLayer,
-  VERSION,
-} from 'agent-orchestrator';
-import { DEFAULT_HARNESS } from 'agent-orchestrator/workflow';
+import { feedHubLayer, gitPlaceLayer, informerLayer, runningRelease, storeRootLayer, telemetryLayer } from 'agent-orchestrator';
 import { callerGate } from './caller/caller.ts';
 import { agents } from './agents/index.ts';
 import { customInstructions } from './custom/custom.ts';
 import { commands } from './commands/index.ts';
-import { capabilitiesWithSteps, McpAsker } from './capabilities/index.ts';
-import { ceilingsOf, metricsOf, passesOf, seriesOf, pauseNowOf, pauseOf, feed, QuotaAsker, readDaemon } from './gauges/index.ts';
-import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Services } from './layer.ts';
+import { McpAsker } from './capabilities/index.ts';
+import { QuotaAsker } from './gauges/index.ts';
+import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, type Services } from './layer.ts';
 import { nemia, nemiaChat } from './nemia/index.ts';
 import { bodyOf, MOUNT, mount, noRoute, refusedAs, statusOf } from './objects/index.ts';
 import { writeGuard } from './guard.ts';
 import { openapi, REFERENCE_BUNDLE, referenceOf } from './openapi/index.ts';
 import { saidRequest } from './request/request.ts';
-import { stats } from './stats/stats.ts';
 import { step } from './step/step.ts';
 import { Followings } from './steps/index.ts';
-import { engineRead, Engine } from './store.ts';
-import { builder, workflows, yours } from './workflows/index.ts';
+import { Engine } from './store.ts';
+import { builder } from './workflows/index.ts';
 
 /**
  * What the api answers an error a route on Hono threw: a refusal — the orchestrator's by its tag, the api's own refusal of a session token
@@ -46,12 +35,6 @@ export const answerError: ErrorHandler = (err, c) => {
   console.error(err);
   return c.json({ error: err.message }, 500);
 };
-
-/** The code this process runs, as the lease records it: an install's kind, folder, tag and commit, not its source; a checkout's folder. */
-const RELEASE = leaseRelease(runningRelease());
-
-/** What `GET /api/version` answers. */
-export type VersionAnswer = { version: string; release: typeof RELEASE };
 
 /**
  * Every service the api reads, live, over `env`: the settings read from it on each request (`ApiConfig`), the package's engine (`Engine`)
@@ -96,16 +79,13 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  * and merge check among them — or is the api's own, a stream or a read of the server or the machine, each with why
  * (`OWN` in test/served.test.ts).
  *
- * - `GET /api/health` — `{ ok: true }` while the api answers.
- * - `GET /api/version` — `{ version, release }`, the orchestrator's package version (`VERSION`) and the code the api runs (`RELEASE`), a
- *   checkout or an install: what the board's bottom bar says.
+ * - server/server.ts — the server and the machine, served through `objects`' Api by the mount (its `server` group): health, version,
+ *   capabilities, the repository a start runs in, your store, the run slots, the passes, the series, the metrics, the daemon, the quota,
+ *   the flow numbers, the store's pause read, put and lifted, and the workflow feed followed as server-sent events.
  * - factory/factories.ts, and factory/parts/: mcp-servers.ts, schedules.ts, hires.ts, volumes.ts — the factories as objects, and their
  *   servers, schedules, hires and volumes in each factory's namespace, served through `objects`' Api by the mount (objects/serve.ts,
  *   the handlers through factory/index.ts). A handler of a namespaced kind is answered in its namespace's factory and on the repository
  *   `?repo=` names (`answeredIn`, objects/refused.ts), refused when it names a repository no factory has (`placeFor`, factory/place.ts).
- * - `GET /api/capabilities` — what the repository offers a step, read from the checkout on each request (capabilities/capabilities.ts), and
- *   what each step of each workflow gets of it (capabilities/reach.ts). Each MCP server the settings enable is started and asked for its
- *   tools once while the app runs (`McpAsker`); one that fails is an `error` on its entry, never a failed request.
  * - definitions/ — the Workflows, Agents and Skills as objects, each in a namespace (`default`, the api's repository and your library, or a
  *   factory's), served through `objects`' Api (objects/serve.ts): listed, read by origin, and yours written in `default` alone.
  * - proposals/ — a factory's Proposals, made by any caller of the factory, approved by the person or a delegated agent at auto and
@@ -113,7 +93,6 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  *   each judged by who calls (`caller`, caller/caller.ts).
  * - workflows/workflows.ts — a run of a workflow started, the board's first write, or of an inbox card.
  * - workflows/builder.ts — what a step's form is drawn from (`GET /api/workflows/keys`), and the builder's write the Workflow's PUT calls.
- * - workflows/yours.ts — your store's folders under the store root, and the line that files a factory in it.
  * - agents/agents.ts — where agents are looked for (`GET /api/agents/sources`), and the reads and writes the Agent object calls.
  * - custom/custom.ts — a person's custom instructions for an agent, by its name, read through `nemia agents custom`'s entry; written and
  *   cleared on the routes the table generates from it (commands/routes.ts).
@@ -184,49 +163,13 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .use(writeGuard)
     .route('/', openapi)
     .route('/', referenceOf(viewerScript))
-    .get('/api/health', (c) => c.json({ ok: true }))
-    .get('/api/version', (c) => c.json({ version: VERSION, release: RELEASE }))
-    .get('/api/capabilities', (c) =>
-      served(c, async ({ e, placeService, env, repo, home, mcp, inRequest, trace }) =>
-        c.json(await capabilitiesWithSteps(repo, { e, placeService, trace, env, home, asker: mcp, inRequest })),
-      ),
-    )
-    .route('/', workflows)
     .route('/', step)
     .route('/', builder)
-    .route('/', yours)
     .route('/', agents)
     .route('/', customInstructions)
-    .route('/', stats)
-    .get('/api/ceilings', (c) => served(c, async (s) => c.json(await ceilingsOf(s))))
-    .get('/api/passes', (c) =>
-      served(c, async ({ e, placeService, home, trace }) => c.json(await passesOf(e, { placeService, home, trace }, c.req.query('last')))),
-    )
-    .get('/api/series', (c) =>
-      served(c, async ({ e, placeService, memo, home, trace }) =>
-        c.json(await seriesOf(e, { placeService, home, trace }, c.req.query('range'), memo.series)),
-      ),
-    )
-    .get('/api/metrics', async (c) => c.json(metricsOf(await runtime.runPromise(Metric.snapshot))))
-    .get('/api/pause', (c) =>
-      served(c, async ({ e, placeService, home, trace }) => c.json(await pauseOf(e, { placeService, home, trace }))),
-    )
-    .get('/api/pause/now', (c) =>
-      served(c, async ({ e, placeService, memo, home, trace }) =>
-        c.json(await pauseNowOf(e, { placeService, home, trace }, memo.records.pause)),
-      ),
-    )
-    .get('/api/daemon', (c) => c.json(readDaemon()))
-    .get('/api/quota', (c) =>
-      served(c, async ({ e, env, quota }) => {
-        const harness = DEFAULT_HARNESS;
-        return c.json(await quota({ env, harness, ask: () => engineRead('quota', e.quota(harness)) }));
-      }),
-    )
-    .route('/', commands)
-    .route('/', feed)
     .route('/', nemia)
     .route('/', nemiaChat)
+    .route('/', commands)
     .all(MOUNT, mount(runtime))
     .notFound(noRoute)
     .onError(answerError);

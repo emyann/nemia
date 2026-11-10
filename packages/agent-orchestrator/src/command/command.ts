@@ -496,6 +496,7 @@ type Entry = Pick<CommandSpec, 'name' | 'route' | 'only' | 'ticks'> & {
   readonly spec?: Spec;
   readonly handler?: unknown;
   readonly writes?: boolean;
+  readonly input?: unknown;
 };
 
 /**
@@ -566,8 +567,9 @@ function routedTwice(c: Entry, routed: Map<string, string>): string[] {
 
 /**
  * Where a table of commands breaks its rules, a sentence each: a name defined twice; two entries routed on one method and path, of which
- * the api would serve the first alone; an entry served nowhere — neither routed on the api nor said to be served on one side alone (`only`)
- * — so a gap between the CLI and the api is never left unsaid; a name that is a former one (`RENAMED`), which no line reaches; a name that
+ * the api would serve the first alone; an entry served nowhere — neither routed on the api, nor typed (`input`, which the api calls it
+ * by from an endpoint of objects' `Api`), nor said to be served on one side alone (`only`) — so a gap between the CLI and the api is never
+ * left unsaid; a name that is a former one (`RENAMED`), which no line reaches; a name that
  * is both a command the CLI serves and one of the CLI's own verbs (`verbs`), which the CLI would run twice over — an entry served on the
  * api alone shares a verb's name freely; how an entry runs (`runBreaks`); its words for its sides (`sideBreaks`); and a runner of the CLI
  * (`runners`) that runs no entry the CLI serves.
@@ -580,8 +582,10 @@ export function commandBreaks(table: readonly Entry[], verbs: readonly string[],
     if (seen.has(c.name)) breaks.push(`${c.name} is defined twice: a command is one entry of the table`);
     seen.add(c.name);
     breaks.push(...routedTwice(c, routed));
-    if (!routeList(c).length && !c.only)
-      breaks.push(`${c.name} has no route and no only: give it its route on the api, or say which side alone serves it, and why`);
+    if (!routeList(c).length && !c.only && c.input === undefined)
+      breaks.push(
+        `${c.name} has no route, no input and no only: give it its input, which the api calls it by, or say which side alone serves it, and why`,
+      );
     const renamed = RENAMED.get(c.name);
     if (renamed) breaks.push(`${c.name} is a former name in RENAMED, which runs a line that says it as ${renamed.to}: name the entry anew`);
     if (c.only?.side !== 'api' && verbs.includes(c.name))

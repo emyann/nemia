@@ -256,6 +256,18 @@ test('a server that exits before it answers is an error with what it printed on 
   );
 });
 
+test('a server whose refusal reaches the api before its stderr does is an error quoting what it printed, once its stderr has ended', async () => {
+  const repo = repoWith({
+    '.mcp.json': { mcpServers: { refuse: fixture({ HKB_TEST_MODE: 'refuse' }) } },
+    '.claude/settings.json': { enabledMcpjsonServers: ['refuse'] },
+  });
+  const { status, body } = await served(repo);
+  assert.equal(status, 200);
+  assert.equal(body.mcp[0].tools, null);
+  assert.match(body.mcp[0].error ?? '', /tools: .*refused/);
+  assert.match(body.mcp[0].error ?? '', /stderr:\nfixture: .*FIXTURE_KEY$/);
+});
+
 /** A deadline for asking a server that the test can wait for; the api's own is `ASK_MS`. */
 const WAITABLE_DEADLINE_MS = 200;
 

@@ -66,7 +66,9 @@ import {
   liveDemandHost,
   type DemandHost,
   renamedIn,
+  PAUSE,
 } from '../runner.ts';
+import { pauseNowPreview, pauseNowPreviewLines } from '../command/runs.verb.ts';
 import { HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
 import { admitRun, agentsCustomRun, policyProposeRun, factoryInstructRun, factoryRulesRun, pruneVerb, rmVerb } from './runs.ts';
@@ -356,6 +358,20 @@ function watchVerb(args: Args, e: Engine, place: Place): void | Promise<void> {
   return runMain(watching(from, how, undefined, { selectors, cursorFile }));
 }
 
+/**
+ * `nemia pause`'s runner: the CLI asks before it pauses at once — `--now` says what it would cut and writes nothing, and acts on `--yes`
+ * alone, since the verb takes no yes (`PAUSE`); every other pause is handed to its handler as any command is.
+ */
+async function pauseRun(args: Args, e: Engine, place: Place): Promise<void> {
+  if (args.now === true && args.yes !== true) {
+    for (const line of pauseNowPreviewLines(await runWith(e, placedIn(place, pauseNowPreview())))) console.log(line);
+    return;
+  }
+  const given = inputOf(PAUSE, args);
+  const data = await runWith(e, placedIn(place, PAUSE.handler(given, process.env, wfRoot(process.env))));
+  for (const line of PAUSE.print(data, given)) console.log(line);
+}
+
 /** Each verb `nemia` takes, by its name on the command line: a `Map`, so a name every object has is no verb. */
 export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([['decide', decideVerb]]);
 
@@ -383,6 +399,7 @@ export const RUNS: ReadonlyMap<string, (args: Args, e: Engine, place: Place) => 
   ['skills write', skillsWriteRun],
   ['workflows write', workflowsWriteRun],
   ['admit', admitRun],
+  ['pause', pauseRun],
 ]);
 
 /**
@@ -413,6 +430,7 @@ async function commanded(command: Command | Ran, rest: string[], e: Engine, dema
  * handler takes that the parse left out or gave another type refused, exit 2, before anything is read. The decoded value is what the
  * typed entry takes, its input erased as the table holds it (`tableEntry`).
  */
+function inputOf<D extends object, I>(command: Command<D, I>, args: Args): I;
 function inputOf(command: Command, args: Args): Args {
   if (command.input === undefined) return args;
   const decoded = Schema.decodeUnknownExit(command.input)(args);

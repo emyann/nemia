@@ -247,7 +247,7 @@ export const StepCheck = Schema.Struct({
 export type StepCheck = typeof StepCheck.Type;
 
 /** The release a session ran on (`SessionRelease`, release.ts): an install's tag, or a checkout's folder. */
-const SessionReleaseSchema = Schema.Union([
+export const SessionReleaseSchema = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('install'), tag: Schema.String }),
   Schema.Struct({ kind: Schema.Literal('checkout'), root: Schema.String }),
 ]).annotate({ identifier: 'SessionRelease' });

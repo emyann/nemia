@@ -27,7 +27,7 @@ import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Clock, Effect, Fiber, Layer, Logger, ManagedRuntime, Metric } from 'effect';
+import { Clock, Effect, Fiber, Layer, Logger, ManagedRuntime, Metric, Schema } from 'effect';
 import { bell, until, WAITED } from 'agent-runtime/testing';
 import type { FeedLine, FeedWords } from '../src/feed/feed.ts';
 import type { FeedDoorShape } from '../src/feed/feed.store.ts';
@@ -115,12 +115,19 @@ const listedIn = (w: World): string[] => done(w.subs.subscriptions.list()).liste
 /** The subscription `name` taken away from `w`, as a story does between deliverers. */
 const dropSubscription = (w: World, name: string): void => done(w.subs.subscriptions.drop(SubscriptionName.read(name)));
 
-/** The command line `argv` of `command` read and checked as the CLI reads it, then handed to its handler over the stage's engine on `w`. */
+/**
+ * The command line `argv` of `command` read and checked as the CLI reads it, decoded through its `input`, then handed to its handler over
+ * the stage's engine on `w`.
+ */
 const typed = async (w: World, command: typeof SUBSCRIBE | typeof UNSUBSCRIBE, argv: string[]): Promise<unknown> => {
   const args = parseArgv(command.spec, argv);
   assert.ok(args, `${argv.join(' ')} reads`);
   assert.equal(command.check?.(args) ?? null, null, `${argv.join(' ')} is refused by no check`);
-  return runWith(stage.board().e, Effect.provide(command.handler(args, process.env, ROOT), w.layer) as never);
+  const handled =
+    command === SUBSCRIBE
+      ? SUBSCRIBE.handler(Schema.decodeUnknownSync(SUBSCRIBE.input)(args), process.env, ROOT)
+      : UNSUBSCRIBE.handler(Schema.decodeUnknownSync(UNSUBSCRIBE.input)(args), process.env, ROOT);
+  return runWith(stage.board().e, Effect.provide(handled, w.layer) as never);
 };
 
 /** A wait on what the deliverer did, asked as the clock moves and as a task is asked to hear. */

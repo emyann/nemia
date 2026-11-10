@@ -135,11 +135,13 @@ async function opened(base: string, asked: Asked, from: number, signal?: AbortSi
 type At = { cursor: number; hinted: boolean };
 
 /**
- * One event of the stream, printed as the in-process watch prints it and its cursor kept: a line, its id the cursor; a bookmark, which a
+ * One event of the stream, printed as the in-process watch prints it and its cursor kept: the `opened` event the stream opens with,
+ * skipped; a line, its id the cursor; a bookmark, which a
  * `--once` read leaves to its end; a hint, said once on stderr; a failed read said on stderr. Answers `cut`
  * for a feed cut under the cursor.
  */
 function onSent(s: Sent, asked: Asked, at: At): 'cut' | undefined {
+  if (s.event === 'opened') return undefined;
   if (s.event === 'hint') {
     if (!at.hinted) console.error(`nemia watch: ${(JSON.parse(s.data) as { message: string }).message}`);
     return undefined;

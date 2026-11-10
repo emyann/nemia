@@ -271,7 +271,7 @@ const ADD_SPEC: Spec = {
  * `nemia factory add`: one factory filed, and where; then, unless `--no-trust`, each of its places trusted for the harnesses that keep
  * a trust (`trustPlaces`), and what was done of it.
  */
-const FACTORY_ADD: Command<{ name: string; repos: readonly string[]; file: string; trusts: readonly PlaceTrust[] }> = {
+export const FACTORY_ADD: Command<{ name: string; repos: readonly string[]; file: string; trusts: readonly PlaceTrust[] }> = {
   name: 'factory add',
   usage: '<name> --repo <path> [--repo <path> ...] [--no-trust]',
   help: ['file a factory: a lowercase slug naming one or more directories,', 'each trusted for its steps unless --no-trust'],

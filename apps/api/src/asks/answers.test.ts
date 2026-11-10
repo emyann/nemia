@@ -1,8 +1,8 @@
 /**
  * The questions a closeout asks, on a run's detail (`StepCloseout.questions`), and a person's answers to them on POST …/retry
- * (`givenAnswers`, the package's): checked against the questions the step's current closeout asks, written as the words the package gives them
- * (`answerText`), and refused (422) when they do not fit or ride on a recheck, and (400) when they are no list `RunRetry` reads. A
- * closeout that asks in free text is answered as before; one whose question fields do not read says why (`refused`), and the run asks
+ * (`givenAnswers`, the package's): checked against the questions the step's current closeout asks, written as the words the package
+ * gives them (`answerText`), and refused (422) when they do not fit or ride on a recheck, and (400) when they are no list `RunRetry`
+ * reads. A closeout that asks in free text is answered as before; one whose question fields do not read says why (`refused`), and the run asks
  * its session to mend them before a person's word.
  *
  * One table of what the route refuses, then the story of a person reading the questions and answering them.

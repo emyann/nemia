@@ -396,17 +396,26 @@ export class McpAsker extends Context.Service<McpAsker, AskServer>()('api/McpAsk
 const SAID_LINES = 20;
 
 /**
- * How long a server that failed to list its tools is given for the last of its stderr to arrive before the error quotes it: the transport
- * closes a server that exits before its stderr has been read to the end.
+ * The most a server that failed to list its tools, once stopped, is waited on for its stderr to end before the error quotes what it has
+ * printed: a stopped server's stderr ends as its process does, so this bounds only a stream that never says so.
  */
-const STDERR_SETTLE_MS = 50;
+const STDERR_END_MS = 2_000;
+
+/** When `stream` ends — its end, its close or its error — or at once where there is none. */
+const endOf = (stream: { once(event: string, listener: () => void): unknown } | null): Promise<void> =>
+  new Promise((resolve) => {
+    if (stream === null) return resolve();
+    for (const event of ['end', 'close', 'error']) stream.once(event, () => resolve());
+  });
 
 /** A server as the api starts it: its name, and the command and args `.mcp.json` writes, which an error quotes. */
 type Started = Pick<Declared, 'name' | 'args'> & { command: string };
 
 /**
  * Start the server as `launch` says, in the repository, ask it `tools/list` over stdio, and stop it. Succeeds with the tools, or with why
- * not and what it printed (after `STDERR_SETTLE_MS`), quoting the entry as `.mcp.json` writes it; never fails. The client and its server
+ * not and what it printed, quoting the entry as `.mcp.json` writes it; never fails. What it printed is read to its end: a server that
+ * failed is stopped (`client.close()`) and its stderr waited on until it ends (`endOf`, at most `STDERR_END_MS`), so a line it printed
+ * after the client saw it fail is quoted too; a server that never started has no stderr to wait on. The client and its server
  * are taken in the ask's scope and closed as it closes (`client.close()`: stdin ended, then SIGTERM, then SIGKILL), whatever ends it: an
  * answer, `deadlineMs` passed, or an interruption; a request of the listing still in flight is rejected by that close. The listing is given
  * no abort signal: the client closes itself on an aborted `connect` and does not wait for the server, which a close after it then misses.
@@ -414,7 +423,7 @@ type Started = Pick<Declared, 'name' | 'args'> & { command: string };
 export const serverAsk = (repo: string, server: Started, launch: Launch, deadlineMs: number): Effect.Effect<Answer> =>
   Effect.gen(function* () {
     let said = '';
-    const { client, transport } = yield* Effect.acquireRelease(
+    const { client, transport, ended } = yield* Effect.acquireRelease(
       Effect.sync(() => {
         const transport = new StdioClientTransport({
           command: launch.command,
@@ -424,7 +433,7 @@ export const serverAsk = (repo: string, server: Started, launch: Launch, deadlin
           stderr: 'pipe',
         });
         transport.stderr?.on('data', (chunk: Buffer) => (said = (said + chunk.toString()).slice(-16_000)));
-        return { transport, client: new Client({ name: 'nemia-api', version: '0.0.0' }) };
+        return { transport, client: new Client({ name: 'nemia-api', version: '0.0.0' }), ended: endOf(transport.stderr) };
       }),
       ({ client }) => Effect.promise(() => client.close().catch(() => {})),
     );
@@ -435,7 +444,7 @@ export const serverAsk = (repo: string, server: Started, launch: Launch, deadlin
       }),
       Effect.map((tools): Answer => ({ tools, error: null, checkedAt: new Date().toISOString() })),
       Effect.catch((err) =>
-        Effect.sleep(STDERR_SETTLE_MS).pipe(
+        stderrEnded(client, err, ended).pipe(
           Effect.map((): Answer => {
             const tail = said.trimEnd().split('\n').slice(-SAID_LINES).join('\n');
             const printed = tail ? `\nWhat it printed on stderr:\n${tail}` : '';
@@ -445,6 +454,18 @@ export const serverAsk = (repo: string, server: Started, launch: Launch, deadlin
       ),
     );
   }).pipe(Effect.scoped);
+
+/**
+ * A server that failed (`err`) stopped, and its stderr ended: at once for one that never started — no command to run, which printed
+ * nothing — else once the stream says so, at most `STDERR_END_MS` after the server was stopped.
+ */
+const stderrEnded = (client: Client, err: unknown, ended: Promise<void>): Effect.Effect<void> =>
+  (err as NodeJS.ErrnoException)?.code === 'ENOENT'
+    ? Effect.void
+    : Effect.promise(() => client.close().catch(() => {})).pipe(
+        Effect.andThen(Effect.promise(() => ended).pipe(Effect.timeoutOption(STDERR_END_MS))),
+        Effect.asVoid,
+      );
 
 /**
  * The tools a connected server lists, every page of them. A server that offers no tools — only prompts or resources — has no `tools/list`

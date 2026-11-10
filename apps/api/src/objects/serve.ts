@@ -44,6 +44,7 @@ import { type Listed, watchable } from '../watch/watch.ts';
 import { discoveryHandlers } from '../discovery/discovery.ts';
 import { eventsFollowed, eventsHandlers, subscriptionsHandlers } from '../feed-objects/index.ts';
 import { templatesHandlers } from '../template-objects/templates.ts';
+import { serverHandlers } from '../server/server.ts';
 
 /** Where every path the api serves is listed, with what each takes. */
 const DOCUMENT = 'GET /openapi/v3/nemia/v1';
@@ -161,6 +162,7 @@ export const objectsHandler = (runtime: ApiRuntime) =>
         subscriptionsHandlers,
         eventsHandlers,
         discoveryHandlers,
+        serverHandlers,
       ]),
       Layer.provide(decodeRefused),
       Layer.provide(HttpServer.layerServices),

@@ -15,7 +15,7 @@ import { forgetRun } from '../forget/forget.verb.ts';
 import type { EngineForgetting } from '../forget/forgetting/forgetting.ts';
 import { pruneLines, type Pruning } from '../forget/prune/prune.ts';
 import { prune } from '../forget/prune/prune.verb.ts';
-import { Conflict, Missing } from '../refusal/refusal.ts';
+import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { BY_CAP, oneLine, WHY_CAP, type Hold } from '../record/record.ts';
 import { holdWord } from '../wait/wait.ts';
 import { hold, unhold } from '../wait/wait.verb.ts';
@@ -35,7 +35,7 @@ import {
   type PausedNow,
 } from '../pause/pause.ts';
 import { Effect, Schema } from 'effect';
-import { RunHold, RunPrune } from 'objects';
+import { PauseWrite, RunHold, RunPrune } from 'objects';
 import { tryOf } from '../summary/reads.verb.ts';
 import { runStore } from '../record/files.store.ts';
 import { HOME } from '../record/record.store.ts';
@@ -419,31 +419,50 @@ const PAUSE_SAID: readonly Said[] = [
 /** `nemia pause`'s `--why` and `--by`, each with its refusal of a value left out. */
 const PAUSE_TAKES = takesOf(PAUSE_SAID, PAUSE_SHAPE);
 
-/** What `nemia pause --now` would stop, before it acts: the pause that stands, if one does, and each task at work but a landing. */
+/**
+ * What `nemia pause --now` without `--yes` says, before anything acts: the pause that stands, if one does, and each task at work but a
+ * landing.
+ */
 type PauseNowRead = { pause: Pause | null; interrupts: Interrupt[] };
 
-/**
- * What `nemia pause` answers: the pause put; with `--now`, what it would stop (`PauseNowRead`), or with `--yes` what it did (`PausedNow`).
- */
-type PauseAnswer = { pause: Pause } | PausedNow | PauseNowRead;
+/** What `nemia pause` answers: the pause put; with `now`, what it did (`PausedNow`). */
+type PauseAnswer = { pause: Pause } | PausedNow;
+
+/** Why `nemia pause`'s arguments are refused before anything is read, or null: `--why` and `--by` (`saidRefusal`), then `--timeout`. */
+const pauseRefusal = (args: Args): string | null =>
+  PAUSE_SAID.map((s) => saidRefusal(args, s, PAUSE_TAKES)).find((r) => r !== null) ??
+  pauseTimeoutRefusal(textOf(args, 'timeout'), args.now === true, PAUSE_SHAPE);
 
 /**
- * `nemia pause`'s handler, by its flags: a plain pause, which parks every session at its call's end within `--timeout` or the store's
- * timeout (`timeoutAt`), refused while one stands; `--now`, which only reads; `--now --yes`, which acts.
+ * `nemia pause`'s handler, by its input: a plain pause, which parks every session at its call's end within `timeout` or the store's
+ * timeout (`timeoutAt`), refused while one stands; `now`, which pauses at once. Its input refused first, as `Invalid`, whoever calls it.
  */
-const pauseBy = Effect.fnUntraced(function* (args: Args, home?: string) {
-  const said = { why: saidOf(args, 'why'), by: saidOf(args, 'by') };
-  if (args.now !== true) return { pause: yield* pauseParked(said, textOf(args, 'timeout'), home) } satisfies PauseAnswer;
-  if (args.yes !== true) return { pause: readPause(), interrupts: yield* nowRead() } satisfies PauseAnswer;
+const pauseBy = Effect.fnUntraced(function* (input: PauseWrite, home?: string) {
+  const wrong = pauseRefusal(input);
+  if (wrong !== null) return yield* Effect.fail(new Invalid({ message: wrong }));
+  const said = { why: saidOf(input, 'why'), by: saidOf(input, 'by') };
+  if (input.now !== true) return { pause: yield* pauseParked(said, input.timeout, home) } satisfies PauseAnswer;
   return (yield* pauseNow(said)) satisfies PauseAnswer;
 });
 
 /**
+ * What `nemia pause --now` would cut, said and nothing written: the pause that stands and each task at work but a landing. The CLI's own
+ * question before it acts (`--yes` acts); the board asks its own, reading `GET /api/pause/now`.
+ */
+export const pauseNowPreview = Effect.fnUntraced(function* () {
+  return { pause: readPause(), interrupts: yield* nowRead() } satisfies PauseNowRead;
+});
+
+/** The lines `nemia pause --now` prints of what it would cut (`pauseNowPreview`). */
+export const pauseNowPreviewLines = ({ pause, interrupts }: PauseNowRead): readonly string[] => nowLines(interrupts, pause !== null);
+
+/**
  * `nemia pause`: the store paused, every session parked at its tool call's end within the timeout (`pauseParked`), on `POST /api/pause`
  * too; the pause as written, its timeout `--timeout` (`timeout` in the body) or the store's. Refused while a pause stands (`Conflict`).
- * `--now` says what a pause at once would cut and writes nothing; `--now --yes`, as the route always does, pauses at once (`pauseNow`).
+ * `now` pauses at once (`pauseNow`). The verb takes no yes: `--yes` is the CLI's, whose runner says what `--now` would cut and acts on
+ * `--yes` alone (`pauseNowPreview`).
  */
-export const PAUSE: Command<PauseAnswer> = {
+export const PAUSE: Command<PauseAnswer, PauseWrite> = {
   name: 'pause',
   usage: '[--why "<words>"] [--by <name>] [--timeout <d> | --now [--yes]]',
   help: [
@@ -475,31 +494,28 @@ export const PAUSE: Command<PauseAnswer> = {
       ...saidFlags(PAUSE_SAID, 'nemia pause', 'a pause', PAUSE_TAKES, PAUSE_SHAPE),
       timeoutFlag(PAUSE_SHAPE),
       { flag: '--now', kind: 'switch', key: 'now' },
-      { flag: '--yes', kind: 'switch', key: 'yes' },
+      { flag: '--yes', kind: 'switch', key: 'yes', only: { side: 'cli', why: 'the board asks its own question before it pauses at once' } },
     ],
     unknown: (arg) => `nemia pause does not take ${arg}: ${PAUSE_SHAPE}.`,
     apart: (_value, flag) => takesFor(PAUSE_TAKES, flag),
   },
-  check: (args) =>
-    PAUSE_SAID.map((s) => saidRefusal(args, s, PAUSE_TAKES)).find((r) => r !== null) ??
-    pauseTimeoutRefusal(textOf(args, 'timeout'), args.now === true, PAUSE_SHAPE),
+  check: pauseRefusal,
   writes: true,
   class: 'act',
-  route: { method: 'POST', path: '/api/pause', status: 200, sets: { yes: true } },
-  handler: (args, _env, home) => pauseBy(args, home),
-  print: (answer) =>
-    'interrupts' in answer
-      ? nowLines(answer.interrupts, answer.pause !== null)
-      : 'kept' in answer
-        ? pausedNowLines(answer)
-        : [pauseWords(answer.pause)],
+  input: PauseWrite,
+  handler: (input, _env, home) => pauseBy(input, home),
+  print: (answer) => ('kept' in answer ? pausedNowLines(answer) : [pauseWords(answer.pause)]),
 };
+
+/** What `nemia resume`'s handler takes: nothing. */
+const ResumeInput = Schema.Struct({});
+type ResumeInput = typeof ResumeInput.Type;
 
 /**
  * `nemia resume`: the store's pause lifted (`resumePause`), then the sessions' drain, each session parked going on as the same try; on
  * `DELETE /api/pause` too; the pause lifted. Refused with none (`Missing`).
  */
-export const RESUME: Command<{ pause: Pause }> = {
+export const RESUME: Command<{ pause: Pause }, ResumeInput> = {
   name: 'resume',
   usage: '',
   help: ['resume the store: each session parked goes on as the same try, and the', 'next pass files what waits'],
@@ -511,7 +527,7 @@ export const RESUME: Command<{ pause: Pause }> = {
   writes: true,
   ticks: true,
   class: 'act',
-  route: { method: 'DELETE', path: '/api/pause', status: 200 },
+  input: ResumeInput,
   handler: () => tried(() => ({ pause: resumePause() })).pipe(Effect.tap(() => sessionsDrained(null))),
   print: () => [RESUMED],
 };
@@ -524,7 +540,6 @@ export const PAUSED: Command<Paused> = {
   spec: { positionals: [], flags: [], unknown: (arg) => `the pause takes no ${arg}.` },
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/pause', status: 200 },
   only: {
     side: 'api',
     why: 'the board says the pause in its bottom bar; at the command line, nemia ls says it, what finishes and each check it holds',
@@ -541,7 +556,6 @@ export const PAUSE_NOW: Command<{ interrupts: Interrupt[]; cost: string }> = {
   spec: { positionals: [], flags: [], unknown: (arg) => `what a pause at once would stop takes no ${arg}.` },
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/pause/now', status: 200 },
   only: { side: 'api', why: 'the board confirms a pause at once with it; at the command line, nemia pause --now says it' },
   handler: Effect.fnUntraced(function* (_args, _env, _home, kept) {
     return { interrupts: yield* nowRead(kept?.records?.pause), cost: NOW_COST };

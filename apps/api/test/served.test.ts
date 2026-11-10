@@ -21,35 +21,16 @@ const META = ['GET /openapi/v3/nemia/v1', 'GET /openapi', 'GET /openapi/scalar.j
  * of the change that moves a route onto the `Api` deletes its row here and its line there; the list ends empty, and goes with this note.
  */
 const NOT_YET_IN_API = [
-  'GET /api/health',
-  'GET /api/version',
-  'GET /api/capabilities',
-  'GET /api/repository',
   'GET /api/workflows/:from/:name/:step',
   'GET /api/workflows/keys',
-  'GET /api/store',
   'GET /api/agents/sources',
   'GET /api/custom-instructions/:name',
-  'GET /api/stats',
-  'GET /api/ceilings',
-  'GET /api/passes',
-  'GET /api/series',
-  'GET /api/metrics',
-  'GET /api/pause',
-  'GET /api/pause/now',
-  'GET /api/daemon',
-  'GET /api/quota',
   'PUT /api/custom-instructions/:name',
   'DELETE /api/custom-instructions/:name',
   'POST /api/agents/yours/copy',
-  'POST /api/pause',
-  'DELETE /api/pause',
-  'POST /api/subscriptions/:name',
-  'DELETE /api/subscriptions/:name',
   'PUT /api/level',
   'PUT /api/policy/:name/rules/:id',
   'DELETE /api/policy/:name/rules/:id',
-  'GET /api/feed/stream',
   'GET /api/level',
   'GET /api/nemia/memory',
   'GET /api/nemia/memory/:fact',
@@ -105,8 +86,10 @@ test('every endpoint of the Api is served by the mount: neither the 404 for no r
       url,
       method === 'GET' ? {} : { method, headers: { 'content-type': 'application/json' }, body: method === 'DELETE' ? undefined : '{}' },
     );
-    const text = await res.text();
-    const body: unknown = text === '' ? undefined : JSON.parse(text);
+    const servedOnceItsHeadIs = (res.headers.get('content-type') ?? '').startsWith('text/event-stream');
+    if (servedOnceItsHeadIs) await res.body?.cancel();
+    const text = servedOnceItsHeadIs ? '' : await res.text();
+    const body: unknown = servedOnceItsHeadIs ? true : text === '' ? undefined : JSON.parse(text);
     if ((res.status === 404 && saysNoRoute(body)) || (res.status >= 500 && body === undefined))
       unserved.push(`${group}.${name}: ${method} ${url} answered ${res.status}`);
   }

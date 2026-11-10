@@ -2,6 +2,7 @@
  * `nemia passes`, and `GET /api/passes`: what the recent passes of the tick cost (`PassesRead`), read off the store's `tick-recent.json`
  * (`recentPasses`), so the command line and the api answer the same, whichever process ticks. A controller: an entry of the command table.
  */
+import { Schema } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { recentPasses } from '../daemon/daemon.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
@@ -37,8 +38,12 @@ export const passesOf = (args: Args): PassesRead => {
   return passesRead(Number.isFinite(n) ? recent.slice(-n) : recent);
 };
 
+/** What `nemia passes`' handler takes: `--last`, as the text given, and `--json`, the CLI's. */
+export const PassesInput = Schema.Struct({ last: Schema.optionalKey(Schema.String), json: Schema.optionalKey(Schema.Boolean) });
+export type PassesInput = typeof PassesInput.Type;
+
 /** `nemia passes`: the recent passes of the tick, a histogram of their times and where it went, phase by phase. */
-export const PASSES: Command<PassesRead> = {
+export const PASSES: Command<PassesRead, PassesInput> = {
   name: 'passes',
   usage: '[--last <n>] [--json]',
   help: [
@@ -59,7 +64,7 @@ export const PASSES: Command<PassesRead> = {
   },
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/passes', status: 200 },
-  handler: (args) => tried(() => passesOf(args)),
+  input: PassesInput,
+  handler: (input) => tried(() => passesOf(input)),
   print: (read, args) => (args.json === true ? [JSON.stringify(read, null, 2)] : passesLines(read)),
 };

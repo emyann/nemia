@@ -18,7 +18,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import { Hono } from 'hono';
 import {
   cardSkills,
   fillsOf,
@@ -44,7 +43,6 @@ import {
 } from 'agent-orchestrator/workflow';
 import { toldLayers, type ToldLayers } from 'agent-orchestrator/run';
 import type { Refusal } from '../guard.ts';
-import { type ApiEnv, served } from '../layer.ts';
 import { StoreRoot, type Engine, type RunsOn } from '../store.ts';
 import { graphOf, workflowVersion, type RunGraph } from 'agent-orchestrator';
 import { runPlaced } from '../store.ts';
@@ -437,13 +435,3 @@ export function agentSkillsOf(step: Workflow, found: { readonly agents: Agents; 
     return null;
   }
 }
-
-/**
- * The repository a start runs in. The workflows themselves are the Workflow object's, at `/api/namespaces/<namespace>/workflows[/<name>]`
- * (`src/definitions/workflows.ts`); a step's page is `step` (step/step.ts); a run is started by the Run's `create`
- * (`POST /api/namespaces/<namespace>/runs`, runs/start.ts).
- *
- * - `GET /api/repository` — the repository a start runs in, as the request's `?factory=` and `?repo=` resolve it: what the start form
- *   lists the runs of, for a run to wait on.
- */
-export const workflows = new Hono<ApiEnv>().get('/api/repository', (c) => served(c, ({ repo }) => c.json({ repo })));

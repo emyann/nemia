@@ -594,3 +594,56 @@ export type DecideLabel = (typeof DECIDE_LABELS)[number];
 /** Which of its three the lesson line of a decision is (`Lesson`, decide.ts): written where the next agent reads, nothing, or not known. */
 export const LESSON_STATES = ['written', 'nothing', 'unknown'] as const;
 export type LessonState = (typeof LESSON_STATES)[number];
+
+/** What still finishes under a pause: a step's session, its check, or a landing. */
+export const FINISHING_KINDS = ['session', 'check', 'landing'] as const;
+export type FinishingKind = (typeof FINISHING_KINDS)[number];
+
+/** What a pause at once cuts: a step's session or its check, never a landing. */
+export const INTERRUPT_KINDS = ['session', 'check'] as const;
+export type InterruptKind = (typeof INTERRUPT_KINDS)[number];
+
+/** The kind of a metric of the process, in Effect's own words for it. */
+export const METRIC_TYPES = ['Counter', 'Frequency', 'Gauge', 'Histogram', 'Summary'] as const;
+export type MetricType = (typeof METRIC_TYPES)[number];
+
+/** Where the store's daemon stands: none, a file that does not read, stopped, gone, stalled, or `ticking`, the one moving the runs. */
+export const DAEMON_KINDS = ['none', 'unreadable', 'stopped', 'gone', 'stalled', 'ticking'] as const;
+export type DaemonKind = (typeof DAEMON_KINDS)[number];
+
+/** What the api's process table says of the daemon's pid: the same process, another, not known, or gone. */
+export const DAEMON_IDENTITIES = ['same', 'other', 'unknown', 'gone'] as const;
+export type DaemonIdentity = (typeof DAEMON_IDENTITIES)[number];
+
+/** Where the subscription's quota stands as the board is given it, each said in `Quota`'s note. */
+export const QUOTA_STATES = ['fresh', 'asking', 'no-plan', 'unanswered', 'no-claude', 'timeout', 'failed', 'unknown'] as const;
+export type QuotaState = (typeof QUOTA_STATES)[number];
+
+/** The ranges the system's series are read over, and the span of a point in each. */
+export const SERIES_RANGES = ['24h', '7d', '30d', 'all'] as const;
+export type SeriesRange = (typeof SERIES_RANGES)[number];
+export const SERIES_SPANS = ['minute', 'hour', 'day'] as const;
+export type SeriesSpan = (typeof SERIES_SPANS)[number];
+
+/** What the flow numbers' rows go by. */
+export const STATS_BY = ['agent', 'step', 'factory', 'workflow', 'repo'] as const;
+export type StatsBy = (typeof STATS_BY)[number];
+
+/**
+ * The events of the feed's stream: `opened`, the first, sent the moment it opens so a proxy hands its head on, which every reader skips; a
+ * line's, by what it is about (`store`, `daemon`, `step`, `removed`, `run`); where it has read to (`bookmark`); a label query's hint
+ * (`hint`); and a read that failed and the read after it (`unreadable`, `readable`).
+ */
+export const FEED_STREAM_EVENTS = [
+  'opened',
+  'store',
+  'daemon',
+  'step',
+  'removed',
+  'run',
+  'bookmark',
+  'hint',
+  'unreadable',
+  'readable',
+] as const;
+export type FeedStreamEventName = (typeof FEED_STREAM_EVENTS)[number];

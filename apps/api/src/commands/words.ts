@@ -4,7 +4,7 @@
  */
 import type { Words } from '../body.ts';
 import { AGENTS_COPY, AGENTS_CUSTOM, POLICY_CONFIRM, POLICY_DROP } from './library.ts';
-import { LEVEL, SUBSCRIBE, UNSUBSCRIBE } from './sessions.ts';
+import { LEVEL } from './sessions.ts';
 
 /**
  * What a route's path names: the run and the step — `step` empty on a route that names none, `runId` on a route of the store's own, where
@@ -39,40 +39,7 @@ export type RouteWords = {
   readonly notJson?: (at: Named) => string;
 };
 
-/** The body `POST /api/pause` takes: `nemia pause`'s flags, as JSON, `now` its `--now`, which the route acts on as `--yes` does. */
-const PAUSE_SHAPE = '`{ "why"?: "<words>", "by"?: "<name>", "timeout"?: "<d>", "now"?: true }`';
-
-/** What `issue` says of a key of `POST /api/pause`'s body sent wrong, `input` what the request sent. */
-const pauseKeyWords = (key: unknown, input: unknown): string => {
-  const was = `This request's was ${JSON.stringify(input)}: ${PAUSE_SHAPE}.`;
-  if (key === 'now') return `\`now\` cuts what still finishes, as \`nemia pause --now --yes\` does: true, or left out. ${was}`;
-  if (key === 'why' || key === 'by' || key === 'timeout')
-    return `\`${key}\` is ${key === 'why' ? 'why the store is paused' : key === 'by' ? 'who pauses it' : 'how long a call in flight is given'}, as \`nemia pause --${key} ${key === 'timeout' ? '10m' : '"<words>"'}\` takes it: text, or left out. ${was}`;
-  return `POST /api/pause takes a JSON object: ${PAUSE_SHAPE}.`;
-};
-
-/** The store paused: its body and its failures; a pause that stands is the package's 409. */
-const PAUSE: RouteWords = {
-  shape: PAUSE_SHAPE,
-  issue:
-    () =>
-    ({ path: [key], input }) =>
-      pauseKeyWords(key, input),
-  failed: (_at, said) => `POST /api/pause: the store was not paused — ${said}. Pause it with \`nemia pause\`.`,
-};
-
-/** The store resumed; it takes no body, and none standing is the package's 404. */
-const RESUME: RouteWords = {
-  shape: '`{}`',
-  issue: () => () => 'DELETE /api/pause takes no body: `{}`.',
-  failed: (_at, said) => `DELETE /api/pause: the store was not resumed — ${said}. Resume it with \`nemia resume\`.`,
-};
-
 export const WORDS: Readonly<Record<string, RouteWords>> = {
-  pause: PAUSE,
-  resume: RESUME,
-  subscribe: SUBSCRIBE,
-  unsubscribe: UNSUBSCRIBE,
   level: LEVEL,
   'policy confirm': POLICY_CONFIRM,
   'policy rm': POLICY_DROP,

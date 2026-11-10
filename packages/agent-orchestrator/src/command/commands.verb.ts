@@ -73,9 +73,6 @@ import { writerText as textOf } from '../yours/yours.ts';
 import { refreshRun } from '../revisions/pin.verb.ts';
 import { driftWords, type Drift } from '../revisions/revisions.ts';
 
-/** The run's id and the step's name, as every route and command line names them. */
-const named = (args: Args): { runId: string; step: string } => ({ runId: textOf(args, 'runId') ?? '', step: textOf(args, 'step') ?? '' });
-
 /** What `nemia retry`'s how is read off: its parsed flags, or its typed input. */
 type HowGiven = { readonly mode?: unknown; readonly model?: unknown; readonly message?: unknown; readonly budget?: unknown };
 
@@ -462,14 +459,16 @@ export const LS: Command<RunsListed> = {
   print: (listed, args) => [...(listed.paused ? pausedLines(listed.paused) : []), ...lsLines(listed, Date.now(), runsShown(args))],
 };
 
-const CEILINGS: Command<Slots> = {
+/**
+ * The cap on runs in flight, the runs it counts and the runs it holds (`slotsRead`), which the api alone serves (`GET /api/ceilings`).
+ */
+export const CEILINGS: Command<Slots> = {
   name: 'ceilings',
   usage: '',
   help: ['the cap on runs in flight, the runs it counts and the runs it holds'],
   spec: { positionals: [], flags: [], unknown: (arg) => `the ceilings take no ${arg}.` },
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/ceilings', status: 200 },
   only: {
     side: 'api',
     why: 'the board says the run slots over its Factory; at the command line, nemia ls and nemia decide say a run held for one beside the run',

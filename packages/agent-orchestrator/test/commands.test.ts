@@ -45,9 +45,16 @@ test('every shipped command is classed once, and no class breaks its rules', () 
 /** A route as the pins say it: a route the api writes by hand (`hand`) marked so, its why left to the entry. */
 const pinned = (r: Route) => (r.hand === undefined ? r : { ...r, hand: true });
 
-test("each command is served on the api where it was before the table, a run's named actions and its start by objects' Api alone", () => {
+test("each command is served on the api where it was before the table — or typed (`input`), which the api calls it by from objects' Api — the lift of a hold, a removal and a prune where their routes were, a run's named actions in its namespace", () => {
   assert.deepEqual(
-    TABLE.map((c) => [c.name, Array.isArray(c.route) ? c.route.map(pinned) : c.route ? pinned(c.route as Route) : c.only?.side]),
+    TABLE.map((c) => [
+      c.name,
+      Array.isArray(c.route)
+        ? c.route.map(pinned)
+        : c.route
+          ? pinned(c.route as Route)
+          : (c.only?.side ?? ('input' in c && c.input !== undefined ? 'typed' : undefined)),
+    ]),
     [
       ['start', 'cli'],
       ['concluded', { method: 'GET', path: '/api/runs/:runId/concluded', status: 200 }],
@@ -107,14 +114,14 @@ test("each command is served on the api where it was before the table, a run's n
       ['try', 'api'],
       ['told', 'api'],
       ['logs', 'cli'],
-      ['stats', { method: 'GET', path: '/api/stats', status: 200 }],
+      ['stats', 'typed'],
       ['step artifact', 'api'],
       ['step file', 'api'],
       ['step path', 'api'],
       ['step transcript', 'api'],
-      ['ceilings', { method: 'GET', path: '/api/ceilings', status: 200 }],
-      ['passes', { method: 'GET', path: '/api/passes', status: 200 }],
-      ['series', { method: 'GET', path: '/api/series', status: 200 }],
+      ['ceilings', 'api'],
+      ['passes', 'typed'],
+      ['series', 'typed'],
       ['agents', 'cli'],
       ['agents card', 'cli'],
       ['agents sources', { method: 'GET', path: '/api/agents/sources', status: 200, hand: true }],
@@ -138,13 +145,13 @@ test("each command is served on the api where it was before the table, a run's n
       ['hold', 'cli'],
       ['rm', 'cli'],
       ['prune', 'cli'],
-      ['pause', { method: 'POST', path: '/api/pause', status: 200, sets: { yes: true } }],
+      ['pause', 'typed'],
       ['pause-timeout', 'cli'],
-      ['resume', { method: 'DELETE', path: '/api/pause', status: 200 }],
-      ['paused', { method: 'GET', path: '/api/pause', status: 200 }],
-      ['pause now', { method: 'GET', path: '/api/pause/now', status: 200 }],
-      ['subscribe', { method: 'POST', path: '/api/subscriptions/:name', status: 201 }],
-      ['unsubscribe', { method: 'DELETE', path: '/api/subscriptions/:name', status: 200 }],
+      ['resume', 'typed'],
+      ['paused', 'api'],
+      ['pause now', 'api'],
+      ['subscribe', 'typed'],
+      ['unsubscribe', 'typed'],
       [
         'level',
         [

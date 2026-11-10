@@ -7,8 +7,8 @@
  * A controller: it reads the task off the engine (`EngineService`, `asked`) before it puts the subscription, and the feed's size, where
  * the subscription's news starts.
  */
-import { Effect } from 'effect';
-import type { Args } from '../command/command.ts';
+import { Effect, Schema } from 'effect';
+import { SubscriptionWrite } from 'objects';
 import type { Command } from '../command/entry.verb.ts';
 import { FeedDoor } from '../feed/feed.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
@@ -36,6 +36,17 @@ const SUBSCRIBE_SELECTOR_TAKES = `nemia subscribe -l takes a selector of the fee
 /** What `nemia subscribe` answers: the subscription put, under its name. */
 export type Subscribed = { name: string; subscription: Subscription };
 
+/**
+ * What `nemia subscribe`'s handler takes: the subscription's name, and the body `POST /api/subscriptions/:name` takes (objects'
+ * `SubscriptionWrite`): the task, the selectors (`-l`), the minutes (`--digest-every`) and the floor (`--at-least`).
+ */
+export const SubscribeInput = Schema.Struct({ name: Schema.String, ...SubscriptionWrite.fields });
+export type SubscribeInput = typeof SubscribeInput.Type;
+
+/** What `nemia unsubscribe`'s handler takes: the subscription's name. */
+export const UnsubscribeInput = Schema.Struct({ name: Schema.String });
+export type UnsubscribeInput = typeof UnsubscribeInput.Type;
+
 /** How a long-lived task is filed for a subscription, as the refusal of any other says it; Nemia's own is filed by her keeper. */
 const FILE_IT = 'file it long-lived: AE_ROOT=$WF_ROOT/engine ae file, with restartPolicy: Always';
 
@@ -57,12 +68,14 @@ const reservedRefusal = (name: string): Conflict | undefined =>
  * A list given empty comes to the default too, and never to an empty filter, which `selects` takes every line of the feed for: the api's
  * body schema takes `"selectors": []` as a list of text, and `-l` given no selector is refused before this.
  */
-const askedOf = (args: Args): { name: string; task: string; selectors: string[]; digestEvery: number; atLeast?: string } => ({
-  name: String(args.name ?? ''),
-  task: String(args.task ?? ''),
-  selectors: Array.isArray(args.selectors) && args.selectors.length ? [...(args.selectors as readonly string[])] : [...DEFAULT_SELECTORS],
-  digestEvery: typeof args.digestEvery === 'number' ? args.digestEvery : DEFAULT_DIGEST_EVERY,
-  ...(typeof args.atLeast === 'string' ? { atLeast: args.atLeast } : {}),
+const askedOf = (
+  input: Partial<SubscribeInput>,
+): { name: string; task: string; selectors: string[]; digestEvery: number; atLeast?: string } => ({
+  name: input.name ?? '',
+  task: input.task ?? '',
+  selectors: input.selectors?.length ? [...input.selectors] : [...DEFAULT_SELECTORS],
+  digestEvery: input.digestEvery ?? DEFAULT_DIGEST_EVERY,
+  ...(input.atLeast === undefined ? {} : { atLeast: input.atLeast }),
 });
 
 /**
@@ -81,9 +94,15 @@ function taskRefusal(task: string, state: TaskView['state']): Missing | Invalid 
   return undefined;
 }
 
-/** Puts the subscription asked for, its news starting at the feed's end, once the engine says its task is long-lived and open. */
-const subscribe = Effect.fn('subscribe')(function* (args: Args) {
-  const { name, task, selectors, digestEvery, atLeast } = askedOf(args);
+/**
+ * Puts the subscription asked for, its news starting at the feed's end, once the engine says its task is long-lived and open. Refused
+ * first, as `Invalid`, what `subscribeRefusalOf` refuses of what was asked, whoever asks.
+ */
+const subscribe = Effect.fn('subscribe')(function* (input: SubscribeInput) {
+  const wanted = askedOf(input);
+  const wrong = subscribeRefusalOf(wanted);
+  if (wrong !== undefined) return yield* Effect.fail(new Invalid({ message: wrong }));
+  const { name, task, selectors, digestEvery, atLeast } = wanted;
   const reserved = reservedRefusal(name);
   if (reserved) return yield* Effect.fail(reserved);
   const e = yield* EngineService;
@@ -101,7 +120,7 @@ const subscribe = Effect.fn('subscribe')(function* (args: Args) {
 });
 
 /** `nemia subscribe`: a long-lived task given a subscription to the feed (`subscribe`). */
-export const SUBSCRIBE: Command<Subscribed> = {
+export const SUBSCRIBE: Command<Subscribed, SubscribeInput> = {
   name: 'subscribe',
   usage: '<name> <task> [-l <selector>]... [--digest-every <minutes>] [--at-least <level>]',
   help: [
@@ -133,11 +152,20 @@ export const SUBSCRIBE: Command<Subscribed> = {
     unknown: (arg) => retiredWakeRefusal('nemia subscribe', arg) ?? `nemia subscribe does not take ${arg}: ${SUBSCRIBE_FORM}.`,
     missing: `nemia subscribe takes the subscription's name and the task it tells: ${SUBSCRIBE_FORM}.`,
   },
-  check: (args) => subscribeRefusalOf(askedOf(args)) ?? null,
+  check: (args) =>
+    subscribeRefusalOf(
+      askedOf({
+        name: typeof args.name === 'string' ? args.name : '',
+        task: typeof args.task === 'string' ? args.task : '',
+        ...(Array.isArray(args.selectors) ? { selectors: args.selectors } : {}),
+        ...(typeof args.digestEvery === 'number' ? { digestEvery: args.digestEvery } : {}),
+        ...(typeof args.atLeast === 'string' ? { atLeast: args.atLeast } : {}),
+      }),
+    ) ?? null,
   writes: true,
   class: 'act',
-  route: { method: 'POST', path: '/api/subscriptions/:name', status: 201 },
-  handler: (args, _env, home) => rooted(home, 'subscribe', subscribe(args)),
+  input: SubscribeInput,
+  handler: (input, _env, home) => rooted(home, 'subscribe', subscribe(input)),
   note: ({ subscription: s }) => s.selectors.flatMap(formerHints).map((hint) => `nemia subscribe: ${hint}`),
   print: ({ name, subscription: s }) => [
     `subscribed ${name}: ${s.task} is told at once of a line taken by ${s.selectors.join(' or ')}, and of the rest in a digest every ` +
@@ -149,7 +177,7 @@ export const SUBSCRIBE: Command<Subscribed> = {
  * `nemia unsubscribe`: a subscription taken away, its file removed alone (`subscriptions.drop`); the deliverer's next read of the
  * subscriptions stops it and removes its `<name>.state.json` (`reconcile` in `deliver.verb.ts`).
  */
-export const UNSUBSCRIBE: Command<{ name: string }> = {
+export const UNSUBSCRIBE: Command<{ name: string }, UnsubscribeInput> = {
   name: 'unsubscribe',
   usage: '<name>',
   help: ['take the subscription <name> away: its task is told nothing more of the feed'],
@@ -161,13 +189,12 @@ export const UNSUBSCRIBE: Command<{ name: string }> = {
   check: (args) => subscriptionNameRefusal(String(args.name ?? '')) ?? null,
   writes: true,
   class: 'act',
-  route: { method: 'DELETE', path: '/api/subscriptions/:name', status: 200 },
-  handler: (args, _env, home) =>
+  input: UnsubscribeInput,
+  handler: ({ name }, _env, home) =>
     rooted(
       home,
       'unsubscribe',
       Effect.gen(function* () {
-        const name = String(args.name);
         const reserved = reservedRefusal(name);
         if (reserved) return yield* Effect.fail(reserved);
         yield* (yield* SubscriptionDoor).subscriptions.drop(SubscriptionName.read(name));

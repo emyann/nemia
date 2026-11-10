@@ -66,8 +66,14 @@ const steps = (...named: readonly string[]): FeedWords => ({
 });
 
 type Block = { event?: string; data?: string; id?: string };
-/** Server-sent events as a reader gets them: the fields of each block, a comment line read as nothing, as an EventSource reads it. */
-const blocks = (text: string): Block[] =>
+/**
+ * Server-sent events as a reader gets them: the fields of each block, a comment line read as nothing, as an EventSource reads it, and the
+ * `opened` event the stream opens with skipped, as every reader of it skips it (`OPENED`).
+ */
+const blocks = (text: string): Block[] => sent(text).filter((block) => block.event !== OPENED.event);
+
+/** Every block of server-sent events, the `opened` event among them. */
+const sent = (text: string): Block[] =>
   text
     .split('\n\n')
     .map((block) =>
@@ -133,7 +139,7 @@ const open = async (query = '', headers: Record<string, string> = {}, over: { re
 const followers = () => Effect.runSync(Metric.value(FEED_FOLLOWERS)).value;
 
 test(
-  'A board follows the feed: a transition arrives as it is written, the stream opens with a comment, resumes after Last-Event-ID or from its end, and carries the daemon line, a denial and a line another process wrote',
+  'A board follows the feed: a transition arrives as it is written, the stream opens with an event of its own, resumes after Last-Event-ID or from its end, and carries the daemon line, a denial and a line another process wrote',
   WAITED,
   async (t) => {
     const s = story(t);
@@ -174,15 +180,15 @@ test(
       },
     );
     await s.test(
-      'a stream says it is open before its first line, as a comment: a feed with no line yet still answers, through a proxy that sends a head with its first bytes',
+      'a stream says it is open before its first line, as an `opened` event every reader skips: a feed with no line yet still answers, through a proxy that sends a head with its first bytes',
       async (t) => {
         const pass = emptyFeed();
         const { reader, text } = await open();
         try {
           const [first] = await pass({ 'r-1': planAt('running') });
           const said = await readUntil(t, reader, text, (s) => s.length >= 1);
-          assert.ok(text.value.startsWith(OPENED), `the stream's first bytes are its comment, before any line: ${text.value}`);
-          assert.equal(said[0].data, JSON.stringify(first), 'then the first line, the comment read as nothing');
+          assert.deepEqual(sent(text.value)[0], { event: 'opened', data: '' }, `the stream's first event, before any line: ${text.value}`);
+          assert.equal(said[0].data, JSON.stringify(first), 'then the first line, the opening skipped');
         } finally {
           await reader.cancel();
         }

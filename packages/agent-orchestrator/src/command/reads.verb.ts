@@ -276,10 +276,29 @@ function statsRefusal(args: Args): string | null {
 }
 
 /**
+ * What `nemia stats`' handler takes: each query key's value as given (`--from`, …, `--repo`), the selectors (`-l`, given again for
+ * another), and how the CLI prints (`--line`, `--json`).
+ */
+export const StatsInput = Schema.Struct({
+  from: Schema.optionalKey(Schema.String),
+  to: Schema.optionalKey(Schema.String),
+  by: Schema.optionalKey(Schema.String),
+  agent: Schema.optionalKey(Schema.String),
+  step: Schema.optionalKey(Schema.String),
+  factory: Schema.optionalKey(Schema.String),
+  workflow: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
+  selector: Schema.optionalKey(Schema.Array(Schema.String)),
+  line: Schema.optionalKey(Schema.Boolean),
+  json: Schema.optionalKey(Schema.Boolean),
+});
+export type StatsInput = typeof StatsInput.Type;
+
+/**
  * `nemia stats`: the flow numbers of every run in the store, as tiles and a row per day, one line (`--line`), or JSON (`--json`). The api
  * answers the same `Stats` on its route, through the memo it keeps (`kept.stats`), verified as its environment says.
  */
-export const STATS: Command<Stats> = {
+export const STATS: Command<Stats, StatsInput> = {
   name: 'stats',
   usage:
     '[--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [-l <selector>] [--line|--json]',
@@ -314,8 +333,8 @@ export const STATS: Command<Stats> = {
   check: statsRefusal,
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/stats', status: 200 },
-  handler: Effect.fnUntraced(function* (args: Args, env?: NodeJS.ProcessEnv, _home?: string, kept?: Kept) {
+  input: StatsInput,
+  handler: Effect.fnUntraced(function* (args: StatsInput, env?: NodeJS.ProcessEnv, _home?: string, kept?: Kept) {
     const selectors = yield* selectorsIn(args);
     const query = yield* tried(() => statsQueryOf(givenOf(args), (key) => `--${key}`));
     return yield* statsRun(selectors.length ? { ...query, selectors } : query, new Date(), {
@@ -327,8 +346,12 @@ export const STATS: Command<Stats> = {
   print: (s, args) => (args.json === true ? [JSON.stringify(s, null, 2)] : args.line === true ? [statsLine(s)] : statsLines(s)),
 };
 
+/** What `nemia series`' handler takes: `--range`, as the text given, and `--json`, the CLI's. */
+export const SeriesInput = Schema.Struct({ range: Schema.optionalKey(Schema.String), json: Schema.optionalKey(Schema.Boolean) });
+export type SeriesInput = typeof SeriesInput.Type;
+
 /** `nemia series`: the system's series over a range, a point a minute, an hour or a day. */
-export const SERIES: Command<SeriesRead> = {
+export const SERIES: Command<SeriesRead, SeriesInput> = {
   name: 'series',
   usage: '[--range 24h|7d|30d|all] [--json]',
   help: [
@@ -349,8 +372,8 @@ export const SERIES: Command<SeriesRead> = {
   },
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/series', status: 200 },
-  handler: (args, _env, _home, kept?: Kept) => tried(() => seriesRead(textOf(args, 'range'), kept?.series)),
+  input: SeriesInput,
+  handler: (input, _env, _home, kept?: Kept) => tried(() => seriesRead(input.range, kept?.series)),
   print: (read, args) => (args.json === true ? [JSON.stringify(read, null, 2)] : seriesLines(read)),
 };
 

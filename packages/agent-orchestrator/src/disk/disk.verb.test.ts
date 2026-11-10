@@ -6,7 +6,7 @@
  * sessions' records, absent where the runtime keeps none. Told as one story on `story(t)`, each checkpoint planting the store afresh
  * and sharing the test's stand-in, whose planted sizes it takes on in its order (a sweep whose `kept` fails first, then one that keeps
  * no record, then each kept); the loop's rest, on a steered clock, stays a test of its own. The kinds, parts and sums as tables are in
- * `disk.test.ts`. `WF_ROOT` is set before the store is imported, which reads it as the module loads.
+ * `disk.test.ts`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -23,19 +23,17 @@ import type { RecentPass } from '../meter/meter.ts';
 import type { DiskEntry } from './disk.ts';
 import type { EngineService as EngineNeeded } from '../runtime-client.ts';
 import type { StoreRoot as StoreRootNeeded } from '../config/root.store.ts';
-import { rootNow } from '../../test/config-given.ts';
+import { walk, WALK_BURST } from '../forget/prune/freed.store.ts';
+import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
+import { samplesOf } from '../series/series.ts';
+import { PHASES } from '../meter/meter.ts';
+import { storeRoots } from './disk.store.ts';
+import { disk, DISK_METRICS, DISK_SPAN, DISK_SPAN_KEYS, diskOnce, freshDiskMemory } from './disk.verb.ts';
+import { engineOf, HARNESSES, over as overEngine } from '../runtime-client.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 const BASE = scratch('wf-disk-');
 const ROOT = path.join(BASE, 'store');
-process.env.WF_ROOT = ROOT;
-const { walk, WALK_BURST } = await import('../forget/prune/freed.store.ts');
-const { DEFAULT_NAMESPACE } = await import('../factory/factory.ts');
-const { samplesOf } = await import('../series/series.ts');
-const { PHASES } = await import('../meter/meter.ts');
-const { storeRoots } = await import('./disk.store.ts');
-const { disk, DISK_METRICS, DISK_SPAN, DISK_SPAN_KEYS, diskOnce, freshDiskMemory } = await import('./disk.verb.ts');
-const { engineOf, HARNESSES, over: overEngine } = await import('../runtime-client.ts');
-const { StoreRoot } = await import('../config/root.store.ts');
 const engine = eachTest(testEngine);
 
 /** A file of `kb` kilobytes under the store. */
@@ -359,7 +357,7 @@ test('a disk sweep: a store of known sizes across factories read by part, kind a
       const memory = freshDiskMemory();
       const first = (await over(registry, diskOnce(ANSWERS, memory))).value.reading;
       const before = entryOf(first.entries, 'runs', 'pipao')!.bytes!;
-      const roots = storeRoots(rootNow());
+      const roots = storeRoots(ROOT);
       fs.rmSync(path.join(ROOT, 'runs', 'b'), { recursive: true });
       const { reading } = (await over(registry, diskOnce(ANSWERS, memory, roots))).value;
       assert.deepEqual(entryOf(reading.entries, 'runs', 'pipao'), { part: 'runs', factory: 'pipao', unread: 1 });

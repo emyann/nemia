@@ -1,8 +1,7 @@
 /**
  * One step followed live (`followStep`) over an engine of the test's own, whose task's attempts, follow streams and history the test sets
  * by hand, and a store of its own, whose run record and feed lines it writes: across a person's answer, across a try, to its end, and a
- * harness that does not stream. A file of its own, since `WF_ROOT` is read as the module loads; the feed's hub is the process's, so a
- * line written wakes a follower at once.
+ * harness that does not stream. A file of its own, since the feed's hub is the process's, so a line written wakes a follower at once.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,15 +14,14 @@ import { StoreRoot } from '../config/root.store.ts';
 import { eachTest } from '../../test/placed.ts';
 import type { Run } from '../record/record.ts';
 import { bell, until, WAITED } from 'agent-runtime/testing';
+import { followStep, followTask } from './following.verb.ts';
+import { emitFeed, feedHubLayer } from '../feed/feed.verb.ts';
+import { EngineService } from '../runtime-client.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { runDoorMemory } from '../runs/memory.store.ts';
+import { RunId } from '../record/record.model.ts';
 
 const ROOT = scratch('wf-following-');
-process.env.WF_ROOT = ROOT;
-const { followStep, followTask } = await import('./following.verb.ts');
-const { emitFeed, feedHubLayer } = await import('../feed/feed.verb.ts');
-const { EngineService } = await import('../runtime-client.ts');
-const { RunDoor } = await import('../runs/runs.store.ts');
-const { runDoorMemory } = await import('../runs/memory.store.ts');
-const { RunId } = await import('../record/record.model.ts');
 
 /** The Run door of the test running now, in memory: the step's record a test plants, and the one `followStep` reads. */
 const door = eachTest(runDoorMemory);

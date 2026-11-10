@@ -17,18 +17,19 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../../place/memory/index.ts';
 import { eachTest, runOver } from '../../../test/placed.ts';
 import { names } from '../../../test/assessed.ts';
+import { FACTORY_RULES } from './rules.verb.ts';
+import { FactoryDoor } from '../door/factories.store.ts';
+import { FactoryName } from '../factory.model.ts';
+import { factoryDoorMemory } from '../door/memory.store.ts';
+import { runWith as runEngine } from '../../runner.ts';
+import { engineOf } from '../../runtime-client.ts';
+import type { Env } from '../../config/config.store.ts';
 
 const ROOT = scratch('wf-rules-verb-');
-process.env.WF_ROOT = ROOT;
-const { FACTORY_RULES } = await import('./rules.verb.ts');
-const { FactoryDoor } = await import('../door/factories.store.ts');
-const { FactoryName } = await import('../factory.model.ts');
-const { factoryDoorMemory } = await import('../door/memory.store.ts');
-const { runWith: runEngine } = await import('../../runner.ts');
-const { engineOf } = await import('../../runtime-client.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
-const runWith = runOver(runEngine, () => stand().layer);
+const runWith = runOver(runEngine, () => stand().layer, ENV);
 
 const memory = factoryDoorMemory();
 const door = doorFrom(FactoryDoor, memory);

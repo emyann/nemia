@@ -4,7 +4,7 @@
  * and a run in flight. `nemia factory diff --template` previews the takeover and writes nothing; `nemia factory adopt --plan` writes it;
  * the card then starts on the tree; the run in flight keeps its record; the controller's next pass finds the factory applied; and a
  * takeover stopped between its writes is finished by the next. Then what `nemia factory adopt` refuses, each with nothing written.
- * `WF_ROOT` is set before `src` is imported, which reads it as it loads.
+ * The test's own store is at `ROOT`, its settings given as `ENV`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,22 +13,24 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from '../../test/story.ts';
 import { teamCopy } from '../../test/team.ts';
-import { rootNow } from '../../test/config-given.ts';
+import { templated as programsAt } from '../../test/templated.ts';
+import { readFactoryAt } from '../factory/factory.store.ts';
+import { appliedDir, treeDir } from '../factory/applied/applied.store.ts';
+import { runRecord } from '../record/record.store.ts';
+import { advanceRun, startRun } from '../runner.ts';
+import { main } from '../cli/main.ts';
+import { engineOf, runWith } from '../runtime-client.ts';
+import { FACTORY_PLAN } from '../factory/upgrade/upgrade.verb.ts';
+import { FACTORY_ADOPT } from './adopt.verb.ts';
+import { withBuiltins } from '../../test/templated.ts';
+import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-adopt-');
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
 const FACTORIES = path.join(ROOT, 'factories');
 const INBOX = path.join(ROOT, 'inbox');
-const { templated: programsAt } = await import('../../test/templated.ts');
 const { exportTemplate, reconciled } = programsAt(ROOT);
-const { readFactory } = await import('../../testing.ts');
-const { appliedDir, treeDir } = await import('../factory/applied/applied.store.ts');
-const { runRecord } = await import('../record/record.store.ts');
-const { advanceRun, startRun } = await import('../runner.ts');
-const { main } = await import('../cli/main.ts');
-const { engineOf, runWith } = await import('../runtime-client.ts');
-const stage = staged({ runWith, main, engineOf });
+const stage = staged({ runWith, main, engineOf, env: ENV });
 
 /** Every file under `dir`, by its path in it, with its bytes, so a verb is seen to have written nothing there. */
 const bytesUnder = (dir: string): Record<string, string> =>
@@ -98,9 +100,9 @@ async function aFinished(repo: string, factory: string): Promise<string> {
   const { id } = await stage.runPlaced(startRun({ brief: 'Name it', repo, workflowDir: steps, isolate: false }));
   const file = path.join(ROOT, 'runs', `${id}.json`);
   fs.writeFileSync(file, `${JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), factory }, null, 2)}\n`);
-  await stage.runWith(board.e, advanceRun(runRecord(rootNow(), id)));
+  await stage.runWith(board.e, advanceRun(runRecord(ROOT, id)));
   board.settle(`${id}-work`, 'succeeded', { outcome: 'done', summary: 'named it', artifacts: [], needs: null });
-  await stage.runWith(board.e, advanceRun(runRecord(rootNow(), id)));
+  await stage.runWith(board.e, advanceRun(runRecord(ROOT, id)));
   return id;
 }
 
@@ -131,7 +133,7 @@ test('a hand-made factory taken over by a template: previewed, written, its card
       await printedBy(t, 'factory', 'instruction', 'crew', '--store');
       fs.writeFileSync(path.join(FACTORIES, 'crew.json'), `${JSON.stringify({ ...fileOf('crew'), later: { kept: true } }, null, 2)}\n`);
       run = (await printedBy(t, 'start', 'Cache the views', '--factory', 'crew', '--workflows', 'dev'))[0].split(' ')[0];
-      runBefore = JSON.stringify(runRecord(rootNow(), run));
+      runBefore = JSON.stringify(runRecord(ROOT, run));
       finished = await aFinished(repo, 'crew');
       cardFile = card('views', 'crew', 'dev');
     },
@@ -141,8 +143,8 @@ test('a hand-made factory taken over by a template: previewed, written, its card
     const before = bytesUnder(ROOT);
     const printed = await printedBy(t, 'factory', 'diff', 'crew', '--template', dir);
     assert.deepEqual(bytesUnder(ROOT), before, 'the preview writes nothing');
-    assert.equal(fs.existsSync(appliedDir(rootNow(), 'crew')), false);
-    assert.equal(fs.existsSync(treeDir(rootNow(), 'crew')), false);
+    assert.equal(fs.existsSync(appliedDir(ROOT, 'crew')), false);
+    assert.equal(fs.existsSync(treeDir(ROOT, 'crew')), false);
     const runs = printed.find((l) => l.startsWith('runs waiting or in flight: '));
     assert.ok(runs, printed.join('\n'));
     assert.ok(runs.includes(run), `it names the run in flight: ${runs}`);
@@ -165,27 +167,23 @@ test('a hand-made factory taken over by a template: previewed, written, its card
     assert.deepEqual(file.instruction, { store: true });
     assert.deepEqual(file.later, { kept: true });
     assert.deepEqual(file.workflows, ['dev'], 'the hand-made wiring is kept in the file, unread');
-    assert.deepEqual(
-      bytesUnder(appliedDir(rootNow(), 'crew')),
-      bytesUnder(treeDir(rootNow(), 'crew')),
-      'the base and the tree are the render',
-    );
-    const read = readFactory('crew');
-    assert.equal(read.tree, treeDir(rootNow(), 'crew'));
+    assert.deepEqual(bytesUnder(appliedDir(ROOT, 'crew')), bytesUnder(treeDir(ROOT, 'crew')), 'the base and the tree are the render');
+    const read = readFactoryAt(ROOT, 'crew');
+    assert.equal(read.tree, treeDir(ROOT, 'crew'));
     assert.ok(read.workflows.includes('dev'), "it reads the tree's wiring");
   });
 
   await s.test('the card filed before the takeover starts, on the workflow in the tree', async (t) => {
     const started = (await printedBy(t, 'start', cardFile))[0].split(' ')[0];
-    assert.ok(runRecord(rootNow(), started).workflowDir.startsWith(treeDir(rootNow(), 'crew')), runRecord(rootNow(), started).workflowDir);
+    assert.ok(runRecord(ROOT, started).workflowDir.startsWith(treeDir(ROOT, 'crew')), runRecord(ROOT, started).workflowDir);
   });
 
   await s.test('the run in flight keeps its record as it was: its workflow folder and its frozen steps', () => {
-    assert.equal(JSON.stringify(runRecord(rootNow(), run)), runBefore);
+    assert.equal(JSON.stringify(runRecord(ROOT, run)), runBefore);
   });
 
   await s.test("the controller's next pass finds it applied, with no upgrade under way", () => {
-    const status = reconciled(readFactory('crew') as Parameters<typeof reconciled>[0]);
+    const status = reconciled(readFactoryAt(ROOT, 'crew') as Parameters<typeof reconciled>[0]);
     assert.deepEqual(
       status.conditions.map((c) => [c.type, c.status, c.reason]),
       [
@@ -292,10 +290,6 @@ test('what nemia factory adopt refuses, each with nothing written', async (t) =>
   });
 });
 
-const { FACTORY_PLAN } = await import('../factory/upgrade/upgrade.verb.ts');
-const { FACTORY_ADOPT } = await import('./adopt.verb.ts');
-const { withBuiltins } = await import('../../test/templated.ts');
-
 test('--template names a builtin template by its name: the takeover records the name, and a name no builtin has is refused', async (t) => {
   const { repo, dir } = repoAndTemplate();
   const builtins = scratch('wf-adopt-builtins-');
@@ -319,7 +313,7 @@ test('--template names a builtin template by its name: the takeover records the 
     assert.ok(preview.line.includes('--template team '), preview.line);
     await handled(FACTORY_ADOPT, { factory: 'named', template: 'team', plan: preview.digest });
     assert.equal((fileOf('named').template as { source: string }).source, 'team');
-    const status = programsAt(ROOT, builtins).reconciled(readFactory('named') as Parameters<typeof reconciled>[0]);
+    const status = programsAt(ROOT, builtins).reconciled(readFactoryAt(ROOT, 'named') as Parameters<typeof reconciled>[0]);
     assert.equal(status.conditions[0]?.reason, 'Rendered');
   });
 });

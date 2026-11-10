@@ -23,15 +23,15 @@ import { scratch } from 'test-kit/scratch';
 import { eachTest } from '../../test/placed.ts';
 import { names } from '../../test/assessed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
-import { rootNow } from '../../test/config-given.ts';
+import { livenessLines, main, watching, watchPrinted } from './main.ts';
+import { RAN } from '../command/commands.verb.ts';
+import { parseArgv } from '../command/command.ts';
+import { engineOf } from '../runtime-client.ts';
+import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-watch-');
-process.env.WF_ROOT = ROOT;
+const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 const FEED = path.join(ROOT, 'feed.jsonl');
-const { livenessLines, main, watching, watchPrinted } = await import('./main.ts');
-const { RAN } = await import('../command/commands.verb.ts');
-const { parseArgv } = await import('../command/command.ts');
-const { engineOf } = await import('../runtime-client.ts');
 
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
@@ -148,7 +148,7 @@ test('what a watch takes and prints of a line: `-l waits=person` in place of the
 /** What `nemia <argv>` was refused with, at exit 2. */
 const refused = async (argv: string[]): Promise<string> => {
   try {
-    await main(argv, engineOf(engine().layer), undefined, stand().place);
+    await main(argv, engineOf(engine().layer), undefined, stand().place, ENV);
   } catch (err) {
     assert.equal((err as { exitCode?: number }).exitCode, 2, (err as Error).message);
     return (err as Error).message;
@@ -212,7 +212,7 @@ test(
       printed.ring();
     });
     t.mock.method(console, 'error', (...a: unknown[]) => err.push(a.join(' ')));
-    const watch = watchPrinted(rootNow(), 0, { json: true }, { selectors: parseSelectors(['waits=person']) });
+    const watch = watchPrinted(ROOT, 0, { json: true }, { selectors: parseSelectors(['waits=person']) });
     try {
       assert.deepEqual(err, ['watching from 0, ^C to stop']);
       const text = [ROUTINE[0], WAKES[0]].map((l) => `${JSON.stringify(l)}\n`).join('');
@@ -247,7 +247,7 @@ test(
     const lines = async (how: Watched) => {
       out.length = 0;
       err.length = 0;
-      const fiber = Effect.runFork(watching(rootNow(), 0, how, () => ({ kind: 'none' })));
+      const fiber = Effect.runFork(watching(ROOT, 0, how, () => ({ kind: 'none' })));
       try {
         await until(t, () => out.length + err.length === 2, 'the banner and the liveness', { bell: printed });
       } finally {
@@ -285,7 +285,7 @@ test(
     t.mock.method(console, 'error', () => {});
     const ada = upgraded({ at: AT, run: 'r-1', step: 'implement', word: 'running', labels: { run: 'r-1', agent: 'ada' } });
     const agora = upgraded({ at: AT, run: 'r-2', step: 'review', word: 'running', labels: { run: 'r-2', agent: 'agora' } });
-    const watch = watchPrinted(rootNow(), 0, {}, { selectors: parseSelectors(['agent=ada']), cursorFile: file });
+    const watch = watchPrinted(ROOT, 0, {}, { selectors: parseSelectors(['agent=ada']), cursorFile: file });
     try {
       const text = [agora, ada, agora].map((l) => `${JSON.stringify(l)}\n`).join('');
       fs.appendFileSync(FEED, text);
@@ -316,7 +316,7 @@ test('a watch that has fallen silent bookmarks its cursor at its cadence, and wr
   t.mock.method(console, 'error', () => {});
   const steered = steeredClock();
   const fiber = Effect.runFork(
-    watching(rootNow(), 0, { json: true }, () => ({ kind: 'none' }), {
+    watching(ROOT, 0, { json: true }, () => ({ kind: 'none' }), {
       selectors: parseSelectors(['reason=Failed']),
       cursorFile: file,
     }).pipe(Effect.provide(steered.layer)),

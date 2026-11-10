@@ -3,8 +3,7 @@
  * branch touched, the lesson, the check-affecting diffs cut per file, what each step consumed, and the commands — and nothing of it, and
  * no `git` at all, for a run still running, held, or called off. The route that serves it is the api's (`apps/api/src/decide/`).
  *
- * Walked through the real engine over journals this file writes, and the git place. `WF_ROOT` is set before the import: the store and the
- * engine's root are read as the modules load.
+ * Walked through the real engine over journals this file writes, and the git place. Its store is at `root`, given as `ENV`.
  */
 import { test } from 'node:test';
 import { story } from 'test-kit/checkpoints';
@@ -15,23 +14,23 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { Effect, type Layer } from 'effect';
 import type { Decidable, DecideCommand, RunDecision } from 'objects';
-import { rootNow } from '../../test/config-given.ts';
+import { engine, runWith as runEngine } from '../runtime-client.ts';
+import { builtinGitPlace, gitPlaceLayer } from '../place/builtin.store.ts';
+import { PlaceService } from '../place/place.store.ts';
+import { storeConfigLayer } from '../config/root.store.ts';
+import { standingWhen } from '../standing/standing.verb.ts';
+import { Missing, isRefusal } from '../refusal/refusal.ts';
+import { runDecision, diffFiles, DIFF_LINES } from './decision.verb.ts';
+import type { Env } from '../config/config.store.ts';
+import { filesStoreAt } from '../record/files.store.ts';
 
 const root = scratch('wf-decision-');
-process.env.WF_ROOT = root;
-const { engine, runWith: runEngine } = await import('../runtime-client.ts');
-const { builtinGitPlace, gitPlaceLayer } = await import('../place/builtin.store.ts');
-const { PlaceService } = await import('../place/place.store.ts');
-const { storeConfigLayer } = await import('../config/root.store.ts');
-const { standingWhen } = await import('../standing/standing.verb.ts');
-const runStore = (await import('../record/files.store.ts')).filesStoreAt(rootNow());
-const { Missing, isRefusal } = await import('../refusal/refusal.ts');
-const { runDecision, diffFiles, DIFF_LINES } = await import('./decision.verb.ts');
+const ENV: Env = { ...process.env, WF_ROOT: root };
+const stored = filesStoreAt(root);
 type Place = import('../place/place.store.ts').Place;
-type PlaceService = import('../place/place.store.ts').PlaceService;
 
 /** The engine every read of this file goes through, over the journals it writes under the store's root. */
-const e = engine(process.env);
+const e = engine(ENV);
 
 const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
 /**
@@ -142,18 +141,14 @@ function writeRun(run: { id: string; repo: string; baseRef: string } & Record<st
  * The decision of the run `id` (`runDecision`), read over `env` — the app's environment, where the cap on runs in flight is read — and the
  * place `place` gives: the git place unless a test counts what it is asked.
  */
-const decisionOf = async (
-  id: string,
-  env: NodeJS.ProcessEnv = process.env,
-  place: Layer.Layer<PlaceService> = gitPlaceLayer,
-): Promise<RunDecision> => {
+const decisionOf = async (id: string, env: Env = ENV, place: Layer.Layer<PlaceService> = gitPlaceLayer): Promise<RunDecision> => {
   const read = await runEngine(e, runDecision(id).pipe(Effect.provide(place), Effect.provide(storeConfigLayer({ ...env, WF_ROOT: root }))));
   assert.ok('decision' in read, JSON.stringify(read));
   return read.decision;
 };
 
 /** A decision there is to make: `nemia decide`'s whole reading (`Decidable`), not `running` nor `nothing`. */
-const decidable = async (id: string, env?: NodeJS.ProcessEnv): Promise<Decidable> => {
+const decidable = async (id: string, env?: Env): Promise<Decidable> => {
   const body = await decisionOf(id, env);
   assert.ok('commands' in body, JSON.stringify(body));
   return body;
@@ -352,11 +347,11 @@ test("a finished run's decision: what its branch touched, the lesson, the diffs 
       const one = countedStanding();
       await runEngine(
         e,
-        Effect.flatMap(standingWhen(runStore.runs.list(), 'r-d1'), (asker) => asker.standing).pipe(Effect.provide(one.layer)),
+        Effect.flatMap(standingWhen(stored.runs.list(), 'r-d1'), (asker) => asker.standing).pipe(Effect.provide(one.layer)),
       );
       assert.ok(one.asks() > 0, 'one ask asks the place its standing, which the count sees');
       const served = countedStanding();
-      assert.ok('commands' in (await decisionOf('r-d1', process.env, served.layer)));
+      assert.ok('commands' in (await decisionOf('r-d1', ENV, served.layer)));
       assert.equal(served.asks(), one.asks(), 'the decision asks as one ask does, never twice');
     },
   );
@@ -424,9 +419,9 @@ test("a run in flight is `running` and runs not one `git`: still running, and he
       journal('t-d13-implement', [filed('t-d13-implement'), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
       writeRun({ id: 'r-d13', repo, baseRef: base, steps: { implement: { taskId: 't-d13-implement', branch }, review: { taskId: null } } });
       writeRun({ id: 'r-d12', repo, baseRef: base, steps: {} });
-      assert.equal(process.env.WF_MAX_RUNS, 'set-it-in-the-test', "the process's own is not a count, which the package refuses by name");
+      assert.equal(ENV.WF_MAX_RUNS, 'set-it-in-the-test', "the process's own is not a count, which the package refuses by name");
       const before = gitCount();
-      const body = await decisionOf('r-d12', { ...process.env, WF_MAX_RUNS: '1' });
+      const body = await decisionOf('r-d12', { ...ENV, WF_MAX_RUNS: '1' });
       assert.equal(gitCount(), before, 'no git call for a run nothing of which is filed');
       assert.deepEqual(
         body,
@@ -831,8 +826,8 @@ test("a run whose approved ending waits for the repository's checkout, which ano
     },
   });
   approve('r-d14');
-  assert.equal(process.env.WF_MAX_RUNS, 'set-it-in-the-test', "the process's own is not a count, which the package refuses by name");
-  const answer = () => decidable('r-d14', { ...process.env, WF_MAX_RUNS: '1' });
+  assert.equal(ENV.WF_MAX_RUNS, 'set-it-in-the-test', "the process's own is not a count, which the package refuses by name");
+  const answer = () => decidable('r-d14', { ...ENV, WF_MAX_RUNS: '1' });
   assert.ok(!('baseHeldBy' in (await answer())), 'no other run is in the checkout, so nothing holds it');
 
   settledTask('t-d15-implement', done);

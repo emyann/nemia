@@ -1,17 +1,15 @@
 /**
- * The store's root listed for a sweep (`storeRoots`) and the room on its file system (`storeFree`), on a store of scratch. `WF_ROOT` is
- * set before the store is imported, which reads it as the module loads. One table, its rows in order: the first finds no store.
+ * The store's root listed for a sweep (`storeRoots`) and the room on its file system (`storeFree`), on a store of scratch. One table,
+ * its rows in order: the first finds no store.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
-import { rootNow } from '../../test/config-given.ts';
+import { storeFree, storeRoots } from './disk.store.ts';
 
 const ROOT = path.join(scratch('wf-disk-store-'), 'store');
-process.env.WF_ROOT = ROOT;
-const { storeFree, storeRoots } = await import('./disk.store.ts');
 
 /** A file at `at`, under the store. */
 const file = (...at: string[]): void => {
@@ -22,7 +20,7 @@ const file = (...at: string[]): void => {
 test("`storeRoots` and `storeFree`: the roots a sweep walks, and the room on the store's file system", async (t) => {
   await t.test('REFUSED: a store whose root does not list has no roots, and says so', () => {
     assert.throws(
-      () => storeRoots(rootNow()),
+      () => storeRoots(ROOT),
       (err: Error) => err.message.includes('ENOENT') && err.message.includes(ROOT),
     );
   });
@@ -38,7 +36,7 @@ test("`storeRoots` and `storeFree`: the roots a sweep walks, and the room on the
     file('inbox', 'card.md');
     file('feed.jsonl');
     const held = (...at: string[]) => fs.lstatSync(path.join(ROOT, ...at)).blocks * 512;
-    const roots = storeRoots(rootNow()).map((root) => ({ ...root, path: path.relative(ROOT, root.path) }));
+    const roots = storeRoots(ROOT).map((root) => ({ ...root, path: path.relative(ROOT, root.path) }));
     const sorted = roots.sort((x, y) => x.path.localeCompare(y.path));
     assert.deepEqual(sorted, [
       { part: 'other', kind: 'other', path: '', own: held() },
@@ -60,13 +58,13 @@ test("`storeRoots` and `storeFree`: the roots a sweep walks, and the room on the
     fs.rmSync(path.join(ROOT, 'worktrees'), { recursive: true });
     fs.writeFileSync(path.join(ROOT, 'worktrees'), 'no folder');
     assert.deepEqual(
-      storeRoots(rootNow()).filter((root) => root.part === 'worktrees'),
+      storeRoots(ROOT).filter((root) => root.part === 'worktrees'),
       [{ part: 'worktrees', kind: 'checkout', path: path.join(ROOT, 'worktrees') }],
     );
   });
 
   await t.test('the room on the store’s file system is no more than its size', () => {
-    const { free, size } = storeFree(rootNow());
+    const { free, size } = storeFree(ROOT);
     assert.ok(Number.isSafeInteger(free) && Number.isSafeInteger(size), `${free} of ${size}`);
     assert.ok(free >= 0 && size > 0 && free <= size, `${free} of ${size}`);
   });

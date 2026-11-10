@@ -2,7 +2,6 @@
  * `nemia daemon`: the store's daemon as its lease stands — its pid, its url and its state — printed in words or as JSON; and, on a store
  * no daemon ticks, the start asked of the host `main` is handed (`ensureDaemon`), once, before it answers, as every command that ticks.
  */
-import { rootNow } from '../../test/config-given.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -10,20 +9,22 @@ import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
 import { eachTest } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
+import { main as cli } from '../cli/main.ts';
+import { liveDemandHost } from '../demand/demand.verb.ts';
+import { DEMAND_OFF } from '../demand/demand.ts';
+import { heldUrl, releaseStore, takeStore } from './daemon.store.ts';
+import { TABLE } from '../runner.ts';
+import { engineOf } from '../runtime-client.ts';
+import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-daemon-verb-');
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-const { main } = await import('../cli/main.ts');
-const { liveDemandHost } = await import('../demand/demand.verb.ts');
-const { DEMAND_OFF } = await import('../demand/demand.ts');
-const { heldUrl, releaseStore, takeStore } = await import('./daemon.store.ts');
-const { TABLE } = await import('../runner.ts');
-const { engineOf } = await import('../runtime-client.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
+/** The CLI over this file's store, `ENV`. */
+const main: typeof cli = (argv, e, demand, place) => cli(argv, e, demand, place, ENV);
 type DemandHost = import('../demand/demand.verb.ts').DemandHost;
 
 const NOWHERE = scratch('wf-daemon-verb-nowhere-');
-const { [DEMAND_OFF]: _off, ...ON } = process.env;
+const { [DEMAND_OFF]: _off, ...ON } = ENV;
 const engine = eachTest(testEngine);
 heldUnasked(engine);
 
@@ -31,7 +32,7 @@ heldUnasked(engine);
 function hostOf(): { host: () => DemandHost; spawns: string[] } {
   const spawns: string[] = [];
   const host: DemandHost = {
-    ...liveDemandHost(rootNow()),
+    ...liveDemandHost(ROOT),
     machine: () => ({ platform: 'linux', wsl: false, systemd: false }),
     call: (argv) => assert.fail(`ran ${argv.join(' ')}`),
     daemon: () => ({ checkout: NOWHERE, entry: path.join(NOWHERE, 'main.ts'), cwd: NOWHERE }),
@@ -66,9 +67,9 @@ test('nemia daemon is served on the command line alone and starts the daemon as 
 });
 
 test('nemia daemon --json, on a store whose lease holds a url, prints the url and the pid, and starts nothing', async (t) => {
-  const { held } = takeStore(rootNow(), { every: 4000, cwd: ROOT, by: 'api' });
-  t.after(() => releaseStore(rootNow(), held));
-  assert.equal(heldUrl(rootNow(), 'http://127.0.0.1:65530'), true);
+  const { held } = takeStore(ROOT, { every: 4000, cwd: ROOT, by: 'api' });
+  t.after(() => releaseStore(ROOT, held));
+  assert.equal(heldUrl(ROOT, 'http://127.0.0.1:65530'), true);
   const { host, spawns } = hostOf();
   const answer: unknown = JSON.parse(await printed(t, ['daemon', '--json'], host));
   assert.deepEqual(answer, { state: 'ticking', by: 'api', pid: process.pid, url: 'http://127.0.0.1:65530' });

@@ -1,7 +1,7 @@
 /**
  * A template rendered into a factory's tree: the tests' team exported, rendered back, and loaded by today's reader as the team itself
  * loads, its hires filling the steps; a parameter given where a document names it; and what today's folder has no line for refused by
- * name. `WF_ROOT` is set before the import, since the store's modules read it as they load.
+ * name.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,12 +10,12 @@ import path from 'node:path';
 import { parse, stringify } from 'yaml';
 import { scratch } from 'test-kit/scratch';
 import { plantStepOutput, STEP_OUTPUT_SCHEMA, teamCopy } from '../../../test/team.ts';
+import { templated } from '../../../test/templated.ts';
+import { loadWorkflows } from '../../workflows/workflows.store.ts';
+import { renderFactory, resolveParams } from './index.ts';
 
-process.env.WF_ROOT = scratch('wf-render-');
-const { templated } = await import('../../../test/templated.ts');
-const { exportTemplate, openTemplate } = templated(process.env.WF_ROOT);
-const { loadWorkflows } = await import('../../workflows/workflows.store.ts');
-const { renderFactory, resolveParams } = await import('./index.ts');
+const ROOT = scratch('wf-render-');
+const { exportTemplate, openTemplate } = templated(ROOT);
 
 /** The tests' team exported into a template folder, and the repository it came from. */
 function exported(): { repo: string; dir: string } {

@@ -3,14 +3,13 @@
  * variable a secret is read from and the refusal that names it, the keys a remote step may not set, each refused at load from the step and
  * from its agent, and `nemia start`'s refusal of a name the file does not declare: one table, a row each; and the brief a remote step is
  * told after a run and on a later try. What the tick files and the agent itself, reached over HTTP on the real engine, are
- * `test/remote.boundary.test.ts`'s. `WF_ROOT` is set before the import, since the module reads it as it loads.
+ * `test/remote.boundary.test.ts`'s.
  *
  * The holder's branch of `credentials` is here too, beside the remote one: a lease written by hand for a process that is alive and
  * is not this one — the test runner that started it, `process.ppid`, which needs no process started — and the token written into the
  * file a holder's engine mints it in. That path is the runtime's own, and that the two processes agree on
  * it is what `apps/api/test/holder-stream.boundary.test.ts` proves with a real holder; this file proves the branch that reads it.
  */
-import { rootNow } from '../../test/config-given.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -26,24 +25,26 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
 import type { EnginePhase } from '../views/views-words.ts';
+import { advanceRun, procStartOf, remoteAgents, startRun, runWith as runEngine } from '../runner.ts';
+import { BEARER } from 'agent-runtime';
+import { engineOf } from '../runtime-client.ts';
+import { runRecord } from '../record/record.store.ts';
+import { credentialsAt, missingCredential, readRemote } from '../runtime-client.ts';
+import { remoteBrief } from '../run.ts';
+import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-a2a-agents-');
-process.env.WF_ROOT = ROOT;
-const { advanceRun, remoteAgents, startRun, runWith: runEngine } = await import('../runner.ts');
-const { engineOf } = await import('../runtime-client.ts');
-const { runRecord } = await import('../record/record.store.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
-const runWith = runOver(runEngine, () => stand().layer);
-const runPlaced = runGiven(() => stand().layer);
+const runWith = runOver(runEngine, () => stand().layer, ENV);
+const runPlaced = runGiven(() => stand().layer, ENV);
 const board = () => {
   const held = engine();
   const settle = (id: string, phase: EnginePhase, closeout?: unknown) => held.settle(id, phase, closeout === undefined ? {} : { closeout });
   return { e: engineOf(held.layer), tasks: held.tasks, settle };
 };
-const { credentialsAt, missingCredential, readRemote } = await import('../runtime-client.ts');
-const credentials = credentialsAt(rootNow());
-const { remoteBrief } = await import('../run.ts');
+const credentials = credentialsAt(ROOT);
 
 const FILE = path.join(ROOT, 'a2a-agents.json');
 const declare = (agents: unknown): void => fs.writeFileSync(FILE, typeof agents === 'string' ? agents : JSON.stringify(agents));
@@ -190,12 +191,12 @@ test('a2a-agents.json, the secrets a remote step is given and the keys it may no
     async () => {
       declare({ reviewer: { url: 'ftp://a.example' }, critic: { url: 'https://a.example/critic' } });
       try {
-        assert.deepEqual([...remoteAgents(rootNow()).keys()], ['critic'], 'the entry refused is left out, and the others are not');
-        const refused = readRemote(rootNow()).refused.get('reviewer')!;
+        assert.deepEqual([...remoteAgents(ROOT).keys()], ['critic'], 'the entry refused is left out, and the others are not');
+        const refused = readRemote(ROOT).refused.get('reviewer')!;
         assert.ok(refused.startsWith(`${FILE}: \`reviewer\`: `), refused);
         assert.match(refused, /the `a2a:reviewer` harness/);
         declare({ reviewer: { card: { name: 'no interfaces' } } });
-        const noInterfaces = readRemote(rootNow()).refused.get('reviewer')!;
+        const noInterfaces = readRemote(ROOT).refused.get('reviewer')!;
         assert.ok(noInterfaces.startsWith(`${FILE}: \`reviewer\`: `), noInterfaces);
         assert.match(noInterfaces, /`card`/);
         assert.match(noInterfaces, /`supportedInterfaces` is missing/);
@@ -203,21 +204,21 @@ test('a2a-agents.json, the secrets a remote step is given and the keys it may no
           reviewer: { card: { supportedInterfaces: [{ url: 3, protocolBinding: 'JSONRPC' }] } },
           critic: { url: 'https://a.example/critic' },
         });
-        const wrong = readRemote(rootNow()).refused.get('reviewer')!;
+        const wrong = readRemote(ROOT).refused.get('reviewer')!;
         assert.ok(wrong.startsWith(`${FILE}: \`reviewer\`: `), wrong);
         assert.match(wrong, /its `supportedInterfaces\.0\.url` is 3, where an A2A 1\.0 card holds string/);
-        assert.deepEqual([...remoteAgents(rootNow()).keys()], ['critic'], 'a card that does not decode is left out');
+        assert.deepEqual([...remoteAgents(ROOT).keys()], ['critic'], 'a card that does not decode is left out');
         declare({ reviewer: { url: 'https://a.example/reviewer' } });
-        assert.deepEqual([...remoteAgents(rootNow()).keys()], ['reviewer']);
-        assert.equal(readRemote(rootNow()).refused.size, 0);
+        assert.deepEqual([...remoteAgents(ROOT).keys()], ['reviewer']);
+        assert.equal(readRemote(ROOT).refused.size, 0);
         declare('{ reviewer: ');
         assert.match(
-          refusal(() => remoteAgents(rootNow())),
+          refusal(() => remoteAgents(ROOT)),
           /a2a-agents\.json: is not JSON/,
           'a file refused as it stands is refused by remoteAgents()',
         );
-        assert.match(readRemote(rootNow()).unread!, /a2a-agents\.json: is not JSON/, 'and said by readRemote()');
-        assert.equal(readRemote(rootNow()).agents.size, 0, 'with no agent');
+        assert.match(readRemote(ROOT).unread!, /a2a-agents\.json: is not JSON/, 'and said by readRemote()');
+        assert.equal(readRemote(ROOT).agents.size, 0, 'with no agent');
       } finally {
         fs.rmSync(FILE, { force: true });
       }
@@ -243,8 +244,6 @@ test('a2a-agents.json, the secrets a remote step is given and the keys it may no
   );
 
   await t.test("the holder's token is answered for its scheme and a harness the lease names, and for nothing else", async (row) => {
-    const { procStartOf } = await import('../runner.ts');
-    const { BEARER } = await import('agent-runtime');
     const engineRoot = path.join(ROOT, 'engine');
     const tokenFile = path.join(engineRoot, 'a2a', 'holder-token');
     const writeToken = (token: string) => {
@@ -529,12 +528,12 @@ test('the tick files a remote step with no harness arguments, schema, hold or se
     fs.writeFileSync(input, 'hour,height\n');
     const run = await runPlaced(startRun({ brief: 'a note on tides', repo: HERE, workflowDir: dir, inputs: [input] }));
     const { e, tasks, settle } = board();
-    await runWith(e, advanceRun(runRecord(rootNow(), run.id)));
+    await runWith(e, advanceRun(runRecord(ROOT, run.id)));
     const draft = tasks.get(`${run.id}-draft`)!.spec;
     assert.ok('config' in draft && 'closeoutSchema' in draft, 'a local step is filed as it always was');
 
     settle(`${run.id}-draft`, 'succeeded', { outcome: 'done', summary: 'drafted', artifacts: [], needs: null });
-    await runWith(e, advanceRun(runRecord(rootNow(), run.id)));
+    await runWith(e, advanceRun(runRecord(ROOT, run.id)));
     const ask = tasks.get(`${run.id}-ask`)?.spec;
     assert.ok(ask, `signed off, the draft lets the remote step be filed: ${[...tasks.keys()].join(', ')}`);
     assert.equal(ask.harness, 'a2a:reviewer');

@@ -17,7 +17,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { AWAY, DAEMON_ONLY, ENGINE, REAL_HOME, SENTINEL, STORE } from './ambient.ts';
+import { AWAY, ENGINE, REAL_HOME, SENTINEL, STORE } from './ambient.ts';
+import { SESSION_VARIABLES } from '../src/config/config.store.ts';
 import { machineTempDir, scratch } from 'test-kit/scratch';
 
 const PACKAGE = path.join(import.meta.dirname, '..');
@@ -170,7 +171,7 @@ test("REFUSED under the daemon's OTEL_EXPORTER_OTLP_ENDPOINT: a test file sees n
 });
 
 /** What the daemon sets for each session it files, as a step's own run of the suite inherits it. */
-const DAEMONS: Record<(typeof DAEMON_ONLY)[number], string> = {
+const DAEMONS: Record<(typeof SESSION_VARIABLES)[number], string> = {
   WF_SESSION_TOKEN: 'a-token-no-test-minted',
   WF_MEMORY_LIMIT: '6Gi',
   WF_CGROUP_PARENT: 'sessions.slice',

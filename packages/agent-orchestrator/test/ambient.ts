@@ -15,10 +15,10 @@
  * And no `OTEL_EXPORTER_OTLP_ENDPOINT`: a suite typed in a shell that names a collector would post every test daemon's spans to it
  * (`otlpOf`). A test that exports sets the address of a collector it made itself.
  *
- * And none of the daemon's per-session variables (`DAEMON_ONLY`): `WF_SESSION_TOKEN`, which the daemon mints for each session and a
- * `nemia` child sends as `Authorization: Bearer` to a test's api that never minted it, and `WF_MEMORY_LIMIT` and `WF_CGROUP_PARENT`,
- * which the daemon's unit sets and a test that files through the real engine would inherit. A step's own run of the suite reads what
- * CI reads, which sets none of them. A test that means one sets it in its own scope.
+ * And none of the daemon's per-session variables (`SESSION_VARIABLES`, the package's one list): `WF_SESSION_TOKEN`, which the daemon mints
+ * for each session and a `nemia` child sends as `Authorization: Bearer` to a test's api that never minted it, and `WF_MEMORY_LIMIT` and
+ * `WF_CGROUP_PARENT`, which the daemon's unit sets and a test that files through the real engine would inherit. A step's own run of the
+ * suite reads what CI reads, which sets none of them. A test that means one sets it in its own scope.
  *
  * And `CLAUDE_CONFIG_DIR` set to a scratch folder (`CONFIG`): `nemia factory add`, `apply` and `trust` give a place its harness's trust
  * in the harness's own file, which a test must never write on the person's machine. A test of a trust sets a folder of its own.
@@ -39,6 +39,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
+import { SESSION_VARIABLES } from '../src/config/config.store.ts';
 
 /** The value both ceilings start with in a test: not a count, so `maxRuns` and `maxConcurrent` refuse it with exit 2. */
 export const SENTINEL = 'set-it-in-the-test';
@@ -49,9 +50,7 @@ process.env.WF_DEFAULT_FACTORY_STARTS = '1';
 process.env.NEMIA_DAEMON_START = 'off';
 delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 
-/** The daemon's per-session variables, which no test process starts with: a test that means one sets it itself. */
-export const DAEMON_ONLY = ['WF_SESSION_TOKEN', 'WF_MEMORY_LIMIT', 'WF_CGROUP_PARENT'] as const;
-for (const name of DAEMON_ONLY) delete process.env[name];
+for (const name of SESSION_VARIABLES) delete process.env[name];
 
 /** Where a harness keeps its own files in a test: a folder of this process's, never the person's. */
 export const CONFIG = scratch('wf-ambient-claude-');

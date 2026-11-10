@@ -64,9 +64,7 @@ const page = (namespace: string | undefined, query: ListQuery) =>
         continue: query.continue,
         labelSelector: [...listOf(query.labelSelector), ...listOf(query.selector)],
       };
-      return table
-        ? s.inRequest(cardTable(s.e, howOf(s), asked, s.config.defaultFactoryStarts))
-        : s.inRequest(cardList(s.e, howOf(s), asked));
+      return table ? s.inRequest(cardTable(s.e, howOf(s), asked)) : s.inRequest(cardList(s.e, howOf(s), asked));
     }),
   );
 

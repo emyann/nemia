@@ -23,6 +23,7 @@ import type { SummaryHow } from '../summary/summary.verb.ts';
 import type { Engine } from '../runtime-client.ts';
 import { Missing } from '../refusal/refusal.ts';
 import { listOf, pageListed } from './listed.verb.ts';
+import { setting } from '../config/config.store.ts';
 
 /** What a list of cards is asked: its namespace (none for every card), `?limit=`, `?continue=`, and its label selectors, OR'd. */
 export type CardQuery = {
@@ -132,7 +133,7 @@ export const cardListOf = Effect.fn('cardListOf')(function* (listing: readonly I
 export const cardTableOf = Effect.fn('cardTableOf')(function* (
   listing: readonly InboxListing[],
   query: CardQuery,
-  unfactoredStarts = false,
+  unfactoredStarts: boolean,
 ) {
   const list = yield* cardListOf(listing, query);
   const byKey = new Map(listing.map((l) => [keyOf(l), l]));
@@ -176,9 +177,12 @@ export const cardList = Effect.fn('cardList')(function* (e: Engine, how: Summary
   return yield* cardListOf(yield* inboxJudged(e, how), query);
 });
 
-/** A page of the inbox's cards as a table (`cardTableOf`), off the inbox as `nemia inbox` reads it now (`inboxJudged`). */
-export const cardTable = Effect.fn('cardTable')(function* (e: Engine, how: SummaryHow, query: CardQuery, unfactoredStarts = false) {
-  return yield* cardTableOf(yield* inboxJudged(e, how), query, unfactoredStarts);
+/**
+ * A page of the inbox's cards as a table (`cardTableOf`), off the inbox as `nemia inbox` reads it now (`inboxJudged`): where a card that
+ * names no factory starts is the store's setting (`StoreConfig`'s `defaultFactoryStarts`).
+ */
+export const cardTable = Effect.fn('cardTable')(function* (e: Engine, how: SummaryHow, query: CardQuery) {
+  return yield* cardTableOf(yield* inboxJudged(e, how), query, yield* setting('defaultFactoryStarts'));
 });
 
 /** The inbox card `name` as an object (`cardObjectOf`), in `namespace` where one is given, off the inbox as it reads now. */

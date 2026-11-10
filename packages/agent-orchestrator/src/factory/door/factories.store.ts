@@ -293,13 +293,12 @@ export const FactoryDoor = Context.Reference<FactoryDoorShape>('agent-orchestrat
 
 /**
  * The factory `name` filed, read through the door: what a verb that changes a factory reads, the default factory, which `nemia factory
- * <verb>` does not take, refused `Conflict` as the door refuses its writes.
+ * <verb>` does not take, refused `Conflict` as the door refuses its writes. A write asked it, so a miss says nothing was changed.
  */
 export const filedFactory = (name: string, verb: FactoryWrite): Effect.Effect<Factory, Refusal> =>
   Effect.gen(function* () {
     const record = yield* (yield* FactoryDoor).factories
       .read(FactoryName.read(name))
-      // A write was asked, so its miss says what a write's does: nothing was changed.
       .pipe(
         Effect.catchTag('Missing', (miss) =>
           Effect.fail(new Missing({ message: miss.message.replace(/Nothing was read\.$/, 'Nothing was changed.') })),

@@ -299,7 +299,7 @@ async function feedStreamed(app: App, feed: FeedRead): Promise<void> {
 async function tickMeasured(orch: Orchestrator, place: Place, fence: Fence, wf: string, repeat: number, informed = false) {
   const base = orch
     .withProposalsPass(orch.tickRun({ repo: wf, verifyRest: false }))
-    .pipe(Effect.provide(Layer.merge(orch.PlaceService.layer(place), orch.storeRootLayer(process.env))));
+    .pipe(Effect.provide(Layer.merge(orch.PlaceService.layer(place), orch.storeConfigLayer(process.env))));
   let informer = orch.informerMemo();
   const program = Effect.suspend(() => (informed ? base.pipe(Effect.provideService(orch.Informer, informer)) : base));
   let pass: Pass | undefined;
@@ -313,11 +313,11 @@ async function tickMeasured(orch: Orchestrator, place: Place, fence: Fence, wf: 
   };
   const cold: Timed[] = [];
   for (let i = 0; i < repeat; i++) {
-    const e = passEngine(orch.engine(), fence);
+    const e = passEngine(orch.engine(process.env), fence);
     informer = orch.informerMemo();
     cold.push(await timed(() => passOf(e)));
   }
-  const kept = passEngine(orch.engine(), fence);
+  const kept = passEngine(orch.engine(process.env), fence);
   informer = orch.informerMemo();
   await passOf(kept);
   const warm: Timed[] = [];
@@ -336,12 +336,12 @@ const passedOver = (orch: Orchestrator, place: Place, fence: Fence, wf: string, 
   const program = orch
     .withProposalsPass(orch.tickRun({ repo: wf, verifyRest: false }))
     .pipe(
-      Effect.provide(Layer.merge(orch.PlaceService.layer(place), orch.storeRootLayer(process.env))),
+      Effect.provide(Layer.merge(orch.PlaceService.layer(place), orch.storeConfigLayer(process.env))),
       Effect.provideService(orch.Informer, informer),
     );
   fence.arm('pass');
   try {
-    await orch.runWith(passEngine(orch.engine(), fence), program);
+    await orch.runWith(passEngine(orch.engine(process.env), fence), program);
   } finally {
     fence.arm('read');
   }
@@ -373,16 +373,18 @@ const chatFold = <R>(rest: Stream.Stream<unknown, never, R>) =>
  * cursor) and the fold of one moment (`chatFold`), each cold over an engine and reads built afresh per call and warm over one kept.
  */
 async function chatMeasured(orch: Orchestrator, place: Place, fence: Fence, repeat: number) {
-  const placed = Layer.merge(orch.PlaceService.layer(place), orch.storeRootLayer(process.env));
+  const placed = Layer.merge(orch.PlaceService.layer(place), orch.storeConfigLayer(process.env));
+  const root = orch.wfRoot(process.env);
   const fresh = (): ChatOver => ({
-    e: passEngine(orch.engine(), fence),
-    reads: { home: process.env.WF_ROOT, runs: orch.informerMemo(), filings: { filed: new Map(), cursor: 0 }, env: process.env },
+    e: passEngine(orch.engine(process.env), fence),
+    reads: { runs: orch.informerMemo(), filings: { filed: new Map(), cursor: 0 } },
   });
-  const history = (at: ChatOver) => orch.runWith(at.e, orch.chatHistory(orch.nemiaChatPlace(), {}, at.reads).pipe(Effect.provide(placed)));
+  const history = (at: ChatOver) =>
+    orch.runWith(at.e, orch.chatHistory(orch.nemiaChatPlace(root), {}, at.reads).pipe(Effect.provide(placed)));
   const listed = await history(fresh());
   const none: ChatFollow = () => Stream.empty;
   const followed = (at: ChatOver, follow: ChatFollow) =>
-    orch.runWith(at.e, orch.followChat(orch.nemiaChatPlace, listed.cursor, at.reads, follow).pipe(Effect.provide(placed)));
+    orch.runWith(at.e, orch.followChat(() => orch.nemiaChatPlace(root), listed.cursor, at.reads, follow).pipe(Effect.provide(placed)));
   type Rest = Awaited<ReturnType<typeof followed>>['rest'];
   let n = 0;
   const moment: ChatFollow = () => {
@@ -426,7 +428,7 @@ async function chatMeasured(orch: Orchestrator, place: Place, fence: Fence, repe
     for (let i = 0; i < repeat; i++) warm.push(await timed(() => folds(kept, rest)));
     return { cold: medianOf(cold), warm: medianOf(warm) };
   };
-  const task = orch.nemiaChatPlace().task ?? null;
+  const task = orch.nemiaChatPlace(root).task ?? null;
   return {
     asked: { task, events: listed.events.length, cursor: listed.cursor },
     measures: {

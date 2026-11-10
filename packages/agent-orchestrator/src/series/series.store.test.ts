@@ -9,6 +9,7 @@
  *
  * A store of its own: `WF_ROOT` is read as the module loads, so it is set before the import.
  */
+import { settingsOf } from '../config/config.store.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -107,11 +108,11 @@ const refusedAs =
 /** Four passes rolled into the minutes 13:57 to 14:00, and those of 13:00 into its hour, by three passes of the tick. */
 const fourMinutes = () => {
   const ring = [pass('2026-10-05T13:57:10Z', 10), pass('2026-10-05T13:58:05Z', 20)];
-  keepSeries(ring, at('13:58:30'));
+  keepSeries(ring, settingsOf(process.env), at('13:58:30'));
   ring.push(pass('2026-10-05T13:59:10Z', 30), pass('2026-10-05T14:00:05Z', 40));
-  keepSeries(ring, at('14:00:30'));
+  keepSeries(ring, settingsOf(process.env), at('14:00:30'));
   ring.push(pass('2026-10-05T14:01:05Z', 50));
-  keepSeries(ring, at('14:01:30'));
+  keepSeries(ring, settingsOf(process.env), at('14:01:30'));
 };
 
 const FILES: { name: string; check: (t: TestContext) => void | Promise<void> }[] = [
@@ -197,10 +198,10 @@ const KEPT: { name: string; check: (t: TestContext) => void | Promise<void> }[] 
     name: 'passes roll into the minutes done, the minutes into the hour once it is done, and a restart rolls nothing twice',
     check: () => {
       const ring = [pass('2026-10-05T13:57:10Z', 10), pass('2026-10-05T13:58:05Z', 20)];
-      keepSeries(ring, at('13:58:30'));
+      keepSeries(ring, settingsOf(process.env), at('13:58:30'));
       assert.deepEqual(passMs('minute'), [['13:57', 1, 10]], 'the minute now is in is not done');
       ring.push(pass('2026-10-05T13:59:10Z', 30), pass('2026-10-05T14:00:05Z', 40));
-      keepSeries(ring, at('14:00:30'));
+      keepSeries(ring, settingsOf(process.env), at('14:00:30'));
       assert.deepEqual(passMs('minute'), [
         ['13:57', 1, 10],
         ['13:58', 1, 20],
@@ -208,8 +209,8 @@ const KEPT: { name: string; check: (t: TestContext) => void | Promise<void> }[] 
       ]);
       assert.deepEqual(passMs('hour'), [['13:00', 3, 60]]);
       ring.push(pass('2026-10-05T14:01:05Z', 50));
-      keepSeries(ring, at('14:01:30'));
-      keepSeries(ring, at('14:01:40'));
+      keepSeries(ring, settingsOf(process.env), at('14:01:30'));
+      keepSeries(ring, settingsOf(process.env), at('14:01:40'));
       assert.deepEqual(passMs('minute').at(-1), ['14:00', 1, 40]);
       assert.equal(passMs('minute').length, 4, 'once each');
       assert.deepEqual(passMs('hour'), [['13:00', 3, 60]], 'the hour now is in waits');
@@ -224,12 +225,12 @@ const KEPT: { name: string; check: (t: TestContext) => void | Promise<void> }[] 
         line('2026-10-05T10:00:00.000Z', 1),
       ]);
       appendLines('hour', [line('2020-01-01T10:00:00.000Z', 1), line('2026-10-05T10:00:00.000Z', 1)]);
-      keepSeries([], at('14:02:00'));
+      keepSeries([], settingsOf(process.env), at('14:02:00'));
       assert.deepEqual(days('minute'), ['2026-09-05', '2026-10-05']);
       assert.deepEqual(days('hour'), ['2020-01-01', '2026-10-05']);
       process.env.WF_METRICS_HOUR_DAYS = '30';
       t.after(() => delete process.env.WF_METRICS_HOUR_DAYS);
-      keepSeries([], at('14:02:00'));
+      keepSeries([], settingsOf(process.env), at('14:02:00'));
       assert.deepEqual(days('hour'), ['2026-10-05']);
     },
   },
@@ -253,7 +254,7 @@ const KEPT: { name: string; check: (t: TestContext) => void | Promise<void> }[] 
         undefined,
         'from the memo',
       );
-      keepSeries([pass('2026-10-05T14:03:10Z', 70)], at('14:04:00'));
+      keepSeries([pass('2026-10-05T14:03:10Z', 70)], settingsOf(process.env), at('14:04:00'));
       assert.equal(seriesRead('24h', memo, at('14:05:00')).series.find((x) => x.s === 'pass.ms')!.points.length, 5, 'read again');
       assert.equal(seriesHealth('2026-10-05', '2026-10-05').runs, 40);
       assert.equal(seriesHealth('2026-10-06', '2026-10-07').runs, null);

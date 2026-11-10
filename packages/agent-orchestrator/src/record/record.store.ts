@@ -182,7 +182,7 @@ const markerOf = (file: string): { json: unknown } | undefined => {
   }
 };
 
-export const HOME = wfRoot();
+export const HOME = wfRoot(process.env);
 
 export const runsDir = () => path.join(HOME, 'runs');
 export const runFile = (id: string) => path.join(runsDir(), `${id}.json`);

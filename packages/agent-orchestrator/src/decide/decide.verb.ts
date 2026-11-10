@@ -4,6 +4,7 @@
  * runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`EngineService`), run with
  * `runWith`.
  */
+import { StoreConfig } from '../config/config.store.ts';
 import { gatesBudgets, type GateBudgets } from '../gate-budgets/gate-budgets.ts';
 import { Effect } from 'effect';
 import { EngineService, asked as engineAsked, nameFor, over, tried, type Engine, type TaskView, type Usage } from '../runtime-client.ts';
@@ -251,13 +252,14 @@ function deniedLinesOf(run: Run, views: ReadonlyMap<string, TaskView>): Record<s
  * and the cap's parents where a run waits on another. A run still running or called off has no standings: nothing of it is decided on them.
  *
  * A cancelled, pruned or held run has no try or round due. Each line that would offer a verb (`retryLines`, `roundLines`, `answerLines`,
- * `overBudgetLine`, `gateLines`) says itself that it offers none, so the api's decision, which calls the same functions, says the same.
- * The cap on runs in flight, whose `WF_MAX_RUNS` before any pass is `env`'s, is read for both facts it bears on: whether a run nothing of
- * which is filed is held (`slotsOf`), and which run's ending holds the repository's checkout (`checkoutHold`).
- * Where the branches stand is asked through `standing` where it is given, so a caller that asked already asks no second time.
- * Fails with a refusal a read threw (`Missing`, for a run that is not there); dies of anything else (`tried`).
+ * `overBudgetLine`, `gateLines`) says itself that it offers none, so the api's decision, which calls the same functions, says the same. The
+ * cap on runs in flight, whose `WF_MAX_RUNS` before any pass is the program's `StoreConfig`'s, is read for both facts it bears on: whether
+ * a run nothing of which is filed is held (`slotsOf`), and which run's ending holds the repository's checkout (`checkoutHold`). Where the
+ * branches stand is asked through `standing` where it is given, so a caller that asked already asks no second time. Fails with a refusal a
+ * read threw (`Missing`, for a run that is not there); dies of anything else (`tried`).
  */
-export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.ProcessEnv = process.env, standing?: StandingAsker) {
+export const decideRun = Effect.fn('decide')(function* (id: string, standing?: StandingAsker) {
+  const config = yield* StoreConfig;
   const e = viewedOnce(yield* EngineService);
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
   const runs = yield* (yield* RunDoor).runs.list();
@@ -270,7 +272,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
   );
   const place = yield* PlaceService;
   const memo = statusMemo((r) => headsOver(live.read())(r), place);
-  const checkout = yield* checkoutHold(e, run, steps, { standing: live.standing }, env, memo);
+  const checkout = yield* checkoutHold(e, run, steps, { standing: live.standing }, config, memo);
   const withCheckout = { ...base, checkout };
   const unasked = decision(withCheckout, landedOf(run, standingReader(NOTHING_READ)));
   const git = yield* live.when(unasked.kind !== 'running' && unasked.kind !== 'cancelled');
@@ -290,7 +292,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
   const waitingOn = waitingOnOf(id, run, views);
   const denied = deniedLinesOf(run, views);
   const parents = passParents(yield* live.when(runs.some((r) => waitedOn(r).length > 0)));
-  const held = !hasStarted(run) && !run.cancelledAt ? (yield* slotsOf(e, runs, env, parents)).held.get(id) : undefined;
+  const held = !hasStarted(run) && !run.cancelledAt ? (yield* slotsOf(e, runs, config, parents)).held.get(id) : undefined;
   const offers = [
     ...roundOffers(steps, run, d, spendOf),
     ...mergeOffers(place, steps, run, d, rounds, phaseOf, reader, asked, spendOf, verdictOf),

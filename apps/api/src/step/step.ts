@@ -9,7 +9,7 @@
  */
 import path from 'node:path';
 import { Effect } from 'effect';
-import { AGENTS, AgentDoor, fillsOf, hireRefusalOf, keptRuns, Missing, readFactories, SkillDoor, WORKFLOWS_STEP } from 'agent-orchestrator';
+import { AGENTS, AgentDoor, fillsOf, hireRefusalOf, keptRuns, listedAtOnce, Missing, SkillDoor, WORKFLOWS_STEP } from 'agent-orchestrator';
 import type { AgentReading, Factory, FactoryListing } from 'agent-orchestrator';
 import { toldLayers, type Run, type ToldLayers } from 'agent-orchestrator/run';
 import type { SkillsFound, Workflow } from 'agent-orchestrator/workflow';
@@ -190,7 +190,7 @@ export async function stepPage(
 ): Promise<WorkflowStepPage> {
   const { repo, home, factory, memo } = s;
   const input = { name, step: asked, dir, repo, ...(factory && { factory: factory.name }) };
-  const { step: found, steps } = await s.inRequest(WORKFLOWS_STEP.handler(input, undefined, home));
+  const { step: found, steps } = await s.inRequest(WORKFLOWS_STEP.handler(input));
   if (!found) throw new Missing({ message: `No step '${asked}' in workflow ${name} (${dir}). Its steps are: ${steps.join(', ')}.` });
   const places = placesOf(repo, home);
   const defs = await s.inRequest(
@@ -201,7 +201,7 @@ export async function stepPage(
   );
   const layers = toldLayers(found, null);
   const hired = factory ? (fillsOf(factory.hires, name)[found.name] ?? null) : null;
-  const agents = async () => (await s.inRequest(AGENTS.handler({ repo }, s.env, home))).agents;
+  const agents = async () => (await s.inRequest(AGENTS.handler({ repo }))).agents;
   return {
     workflow: name,
     from,
@@ -214,9 +214,9 @@ export async function stepPage(
     factory: factory?.name ?? null,
     layers,
     hired,
-    hiredIn: factory ? [] : hiredInOf(readFactories(), name, found.name, from, repo),
+    hiredIn: factory ? [] : hiredInOf(listedAtOnce(home), name, found.name, from, repo),
     hiring: await hiringOf(factory, name, found, hired, from, agents),
     skillsFrom: skillsFromOf(layers, defs.skills, repo, home),
-    recentRuns: recentRunsOf(keptRuns(memo.records.step, stepRun), dir, found.name, factory?.name ?? null),
+    recentRuns: recentRunsOf(keptRuns(memo.records.step, stepRun, s.config.verifyRest), dir, found.name, factory?.name ?? null),
   };
 }

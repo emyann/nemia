@@ -3,12 +3,9 @@
  * reads — `nemia cancel`, `nemia show`, `nemia logs` and `nemia approve` of a loop — over a store and a repository of their own, on the
  * test place.
  *
- * The root test below types `factory servers default`, and the factory is `default` on purpose. A `factory servers` read is two reads:
- * the factory's own existence (`factoryThere`), and its record. The record is read under the root the handler is given (`rootGiven`,
- * which is what that test pins); the existence check returns early for `DEFAULT_NAMESPACE` and otherwise calls `readFactories()`, whose
- * `factoriesDir()` still reads the module-level root `factory.store.ts` pinned as it loaded. So any other name would fail there and not
- * at the read — `factory.store.ts` is unconverted, carries the most lines of `test/global-roots.baseline.ts` and is the next card's
- * work, the baseline only shrinking. `default` is the one name where the two roots cannot differ, so it isolates the read.
+ * The root test below types `factory servers default`: a `factory servers` read is the factory's own existence (`factoryThere`) and its
+ * record, both through the Factory door at the root `main` gives the handler as it is typed (`StoreRoot`, `storeConfigLayer` of the
+ * process's environment), which is what that test pins. `default` has a record and no file, so the test plants only the record.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';

@@ -24,12 +24,17 @@ import { FactoryName, isDefaultFactory } from '../factory/factory.model.ts';
 import { factoryObject } from '../factory/object/factory.verb.ts';
 import { hireObject } from '../factory/object/hire.verb.ts';
 import { mcpServerObject } from '../factory/object/mcp-server.verb.ts';
+import type { StoreRoot } from '../config/root.store.ts';
+import type { StoreConfig } from '../config/config.store.ts';
 
 /** Where a proposal is read and applied: the store's root, and the repository the api serves (the default factory's). */
 export type ProposalPlace = { readonly home: string; readonly repo: string };
 
-/** What reading a proposal's objects needs: the engine and the place, which the served Hires and McpServers read through. */
-export type ProposalNeeds = EngineService | PlaceService;
+/**
+ * What reading a proposal's objects needs: the engine and the place, which the served Hires and McpServers read through, and the store's
+ * root and settings their handlers are given (`StoreRoot`, `StoreConfig`).
+ */
+export type ProposalNeeds = EngineService | PlaceService | StoreRoot | StoreConfig;
 
 /** An object as it is now: the version it is served at, null where nothing is at its name, and its spec where something is. */
 export type Current = { readonly version: string | null; readonly spec?: unknown };

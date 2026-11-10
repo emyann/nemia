@@ -12,6 +12,7 @@
  * runs at rest, and a difference throws (`verifyRest` in tick.verb.ts). The stage's engine keeps no pass of its own: `ticking` hands it
  * one that reports nothing, so a pass reads each task off the stand-in as a person settled it.
  */
+import { settingsOf } from '../src/config/config.store.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -35,9 +36,7 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
 const {
-  addFactory,
   advanceRun,
-  attachWorkflow,
   cancelRun,
   decideRun,
   retryRun,
@@ -51,6 +50,7 @@ const {
   runningRelease,
   ...verbs
 } = await import('../src/runner.ts');
+const { addFactory, attachWorkflow } = await import('../testing.ts');
 /** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
 const atRoot = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
 const addToInbox = (opts: Parameters<typeof verbs.addToInbox>[0]) => atRoot(verbs.addToInbox(opts));
@@ -329,7 +329,9 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
         'the work beside it waits as before, listed by id: the watcher took no slot',
       );
       const held = async () =>
-        [...(await runWith(b.e, runSlots(b.e, listRuns(), process.env, noParents())))].map(([id]) => id).sort((x, y) => x.localeCompare(y));
+        [...(await runWith(b.e, runSlots(b.e, listRuns(), settingsOf(process.env), noParents())))]
+          .map(([id]) => id)
+          .sort((x, y) => x.localeCompare(y));
       assert.deepEqual(await held(), [younger.id, older.id], 'between passes too');
 
       b.settle(`${watcher.id}-supervise`, 'succeeded', {

@@ -29,13 +29,17 @@ import {
   slotWord,
   standingReader,
   standingSnapshot,
-  StoreRoot,
+  settingsOf,
+  storeConfigLayer,
+  type StoreConfig,
+  type StoreRoot,
 } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
 import { Effect } from 'effect';
 
-/** `program`, one of the package's inbox verbs, run on the harness's store (`root`): its refusal thrown as itself. */
-const onStore = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, root));
+/** `program`, one of the package's inbox verbs, run on the harness's store (`root`) and its settings: its refusal thrown as itself. */
+const onStore = <A, E>(program: Effect.Effect<A, E, StoreRoot | StoreConfig>): A =>
+  Effect.runSync(Effect.provide(program, storeConfigLayer({ ...process.env, WF_ROOT: root })));
 delete process.env.WF_MAX_RUNS;
 const repo = scratch('nemia-api-queue-repo-');
 process.env.HKB_REPO = repo;
@@ -437,8 +441,11 @@ const ceilings = async (): Promise<Ceilings> => {
 
 /** The runs the package's own `runSlots` holds, on the same store, the runs waited on read off `standing.json`, as the api answers them. */
 const packageHeld = async (): Promise<Ceilings['held']> => {
-  const git = standingReader(await runWith(engine(), standingSnapshot()));
-  const held = await runWith(engine(), runSlots(engine(), runStore.runs.list(), process.env, { git, read: new Map() }));
+  const git = standingReader(await runWith(engine(process.env), standingSnapshot()));
+  const held = await runWith(
+    engine(process.env),
+    runSlots(engine(process.env), runStore.runs.list(), settingsOf(process.env), { git, read: new Map() }),
+  );
   return [...held].map(([run, slot]) => ({ run, ...slot, word: slotWord(slot) }));
 };
 

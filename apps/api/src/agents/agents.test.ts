@@ -337,7 +337,7 @@ test('a person reads the agents: both places listed, one read by name, the card 
           [],
           "the file of a person's custom instructions is the CLI's to print, not a key of the board's",
         );
-        const { agents: read } = (await runWith(engine(), AGENTS_ENTRY.handler({ repo }, process.env, root))) as AgentsRead;
+        const { agents: read } = (await runWith(engine(process.env), AGENTS_ENTRY.handler({ repo }))) as AgentsRead;
         assert.ok(read.find((a) => a.name === 'reviewer' && a.from === 'yours')?.custom, 'the package read the custom file');
         const board = (one: object) => {
           const { given: _given, untried: _untried, fills: _fills, factories: _factories, ...rest } = one as Record<string, unknown>;
@@ -349,10 +349,7 @@ test('a person reads the agents: both places listed, one read by name, the card 
         );
         const res = await readAt('/api/agents/yours/reviewer/card');
         assert.equal(res.status, 200, await res.clone().text());
-        const { card } = (await runWith(
-          engine(),
-          CARD_ENTRY.handler({ name: 'reviewer', repo, from: 'yours' }, process.env, root),
-        )) as CardRead;
+        const { card } = (await runWith(engine(process.env), CARD_ENTRY.handler({ name: 'reviewer', repo, from: 'yours' }))) as CardRead;
         assert.deepEqual(((await res.json()) as { card: unknown }).card, card);
       } finally {
         clearCustomInstructions(root, 'reviewer', repo);

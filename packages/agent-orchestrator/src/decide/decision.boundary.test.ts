@@ -21,7 +21,7 @@ process.env.WF_ROOT = root;
 const { engine, runWith: runEngine } = await import('../runtime-client.ts');
 const { builtinGitPlace, gitPlaceLayer } = await import('../place/builtin.store.ts');
 const { PlaceService } = await import('../place/place.store.ts');
-const { storeRootLayer } = await import('../config/root.store.ts');
+const { storeConfigLayer } = await import('../config/root.store.ts');
 const { standingWhen } = await import('../standing/standing.verb.ts');
 const { filesStore: runStore } = await import('../record/files.store.ts');
 const { Missing, isRefusal } = await import('../refusal/refusal.ts');
@@ -30,7 +30,7 @@ type Place = import('../place/place.store.ts').Place;
 type PlaceService = import('../place/place.store.ts').PlaceService;
 
 /** The engine every read of this file goes through, over the journals it writes under the store's root. */
-const e = engine();
+const e = engine(process.env);
 
 const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
 /**
@@ -146,7 +146,7 @@ const decisionOf = async (
   env: NodeJS.ProcessEnv = process.env,
   place: Layer.Layer<PlaceService> = gitPlaceLayer,
 ): Promise<RunDecision> => {
-  const read = await runEngine(e, runDecision(id, env).pipe(Effect.provide(place), Effect.provide(storeRootLayer(process.env))));
+  const read = await runEngine(e, runDecision(id).pipe(Effect.provide(place), Effect.provide(storeConfigLayer({ ...env, WF_ROOT: root }))));
   assert.ok('decision' in read, JSON.stringify(read));
   return read.decision;
 };

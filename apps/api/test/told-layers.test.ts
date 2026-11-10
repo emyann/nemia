@@ -12,11 +12,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { toldOf } from './run-reads.ts';
-import { addFactory, attachWorkflow, startRun } from 'agent-orchestrator';
+import { startRun } from 'agent-orchestrator';
 import { PRECEDENCE } from 'agent-orchestrator/run';
 import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { testPlace, addFactory, attachWorkflow } from 'agent-orchestrator/testing';
 import { appOver, eachTest, engineFor, runOver } from './placed.ts';
 
 const stand = eachTest(testPlace);

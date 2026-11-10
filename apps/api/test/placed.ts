@@ -13,7 +13,15 @@
  */
 import { afterEach, beforeEach } from 'node:test';
 import { Effect, Layer } from 'effect';
-import { engineOf, runWith as runEngine, storeRootLayer, type EngineService, type PlaceService, type StoreRoot } from 'agent-orchestrator';
+import {
+  engineOf,
+  runWith as runEngine,
+  storeConfigLayer,
+  type EngineService,
+  type PlaceService,
+  type StoreConfig,
+  type StoreRoot,
+} from 'agent-orchestrator';
 import type { TestEngine } from 'agent-runtime/testing';
 import type { TestPlace } from 'agent-orchestrator/testing';
 import { appOf, liveOf } from '../src/app.ts';
@@ -31,8 +39,11 @@ const layerOf = (given: Given): Layer.Layer<PlaceService> => (typeof given === '
  */
 export const runOver =
   (given: Given) =>
-  <A, E>(e: Parameters<typeof runEngine>[0], program: Effect.Effect<A, E, EngineService | PlaceService | StoreRoot>): Promise<A> =>
-    runEngine(e, program.pipe(Effect.provide(layerOf(given)), Effect.provide(storeRootLayer(process.env))));
+  <A, E>(
+    e: Parameters<typeof runEngine>[0],
+    program: Effect.Effect<A, E, EngineService | PlaceService | StoreRoot | StoreConfig>,
+  ): Promise<A> =>
+    runEngine(e, program.pipe(Effect.provide(layerOf(given)), Effect.provide(storeConfigLayer(process.env))));
 
 /** The engine a package program reads, over the stand-in `engine`: what `engine()` of the package is to the real one. */
 export const engineFor = (engine: TestEngine): ReturnType<typeof engineOf> => engineOf(engine.layer);

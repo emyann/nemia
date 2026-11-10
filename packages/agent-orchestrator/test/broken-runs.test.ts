@@ -13,6 +13,7 @@
  * `WF_ROOT` is set before the runner is imported: it is read as the module loads. `WF_MAX_CONCURRENT` admits sessions enough for every
  * run, and no cap is set on runs but in the checkpoint that counts the slots.
  */
+import { rootNow } from './config-given.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -332,8 +333,8 @@ test('one broken run does not stop the others: each left out and said once, the 
   await s.test(
     'under a pause, a pass and `nemia ls` over a run at work whose folder stops loading finish, its finishing tasks read without it',
     async (c) => {
-      putPause({ why: 'a test pauses', by: 'ann' });
-      c.after(() => resumePause());
+      putPause(rootNow(), { why: 'a test pauses', by: 'ann' });
+      c.after(() => resumePause(rootNow()));
       const paused = await pass();
       assert.ok(paused.pause, 'the pass read the pause');
       assert.ok(

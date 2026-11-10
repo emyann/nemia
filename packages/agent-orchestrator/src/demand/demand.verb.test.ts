@@ -4,6 +4,7 @@
  * off; a daemon that ends before it takes the store. Beside it the shipped wait, a Mac's login agent, a spawn that throws and a store
  * taken by another while one starts, each said and none thrown.
  */
+import { rootNow } from '../../test/config-given.ts';
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -45,7 +46,7 @@ function hostOf(over: Partial<DemandHost> = {}): { host: DemandHost; said: strin
   const said: string[] = [];
   const calls: string[] = [];
   const host: DemandHost = {
-    ...liveDemandHost(),
+    ...liveDemandHost(rootNow()),
     machine: () => NO_SYSTEM,
     dirs: () => ({ home: HOME, configHome: CONFIG }),
     roots: () => ({ root: ROOT, defaultRoot: ROOT }),
@@ -105,7 +106,7 @@ test('a ticking command starts a daemon on demand: none, one live, a login servi
       assert.equal(daemonStanding().kind, 'none');
       const { host, said } = hostOf({
         spawn: (spec) => {
-          const child = liveDemandHost().spawn(spec);
+          const child = liveDemandHost(rootNow()).spawn(spec);
           if (child.pid !== undefined) started.push(child.pid);
           return child;
         },
@@ -181,7 +182,7 @@ test(
     fs.rmSync(CONFIG, { recursive: true, force: true });
     unitFor('nemia', ROOT);
     t.after(() => fs.rmSync(CONFIG, { recursive: true, force: true }));
-    const live = liveDemandHost();
+    const live = liveDemandHost(rootNow());
     let reads = 0;
     const { host, said } = hostOf({
       machine: () => ({ platform: 'linux', wsl: false, systemd: true }),

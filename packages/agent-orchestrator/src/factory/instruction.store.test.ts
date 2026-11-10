@@ -23,14 +23,8 @@ const ROOT = scratch('wf-instruction-');
 const FACTORIES = path.join(ROOT, 'factories');
 
 process.env.WF_ROOT = ROOT;
-const {
-  readFactories,
-  setInstruction,
-  FACTORY_INSTRUCT,
-  FACTORY_INSTRUCTION,
-  factoryInstruction,
-  runWith: runEngine,
-} = await import('../runner.ts');
+const { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction, runWith: runEngine } = await import('../runner.ts');
+const { readFactories, setInstruction } = await import('../../testing.ts');
 const stand = eachTest(testPlace);
 const runWith = runOver(runEngine, () => stand().layer);
 const { readInstructionAt, writeInstructionText } = await import('./instruction.store.ts');
@@ -72,7 +66,7 @@ test('REFUSED: `nemia factory instruction`, the record unchanged', async (t) => 
     ['the default factory', () => setInstruction({ factory: 'default', at: { store: true } }), 'Conflict', ['nemia factory instruction']],
     [
       'the default factory, by its handler',
-      () => runWith(noEngine(), FACTORY_INSTRUCTION.handler({ factory: 'default' }, undefined, ROOT)),
+      () => runWith(noEngine(), FACTORY_INSTRUCTION.handler({ factory: 'default' })),
       'Conflict',
       ['nemia factory instruction'],
     ],
@@ -103,7 +97,7 @@ test('REFUSED: `nemia factory instruction`, the record unchanged', async (t) => 
 test('REFUSED: `nemia factory instruct`, nothing written', async (t) => {
   await t.test('the default factory', async () => {
     await assert.rejects(
-      runWith(noEngine(), FACTORY_INSTRUCT.handler({ factory: 'default', words: 'x', clear: false }, undefined, ROOT)),
+      runWith(noEngine(), FACTORY_INSTRUCT.handler({ factory: 'default', words: 'x', clear: false })),
       refused('Conflict', 'nemia factory instruct'),
     );
     assert.ok(!fs.existsSync(storeFolder('default')));
@@ -113,7 +107,7 @@ test('REFUSED: `nemia factory instruct`, nothing written', async (t) => {
     async () => {
       const repo = filed();
       await assert.rejects(
-        runWith(noEngine(), FACTORY_INSTRUCT.handler({ factory: 'pipao', words: 'x', clear: false }, undefined, ROOT)),
+        runWith(noEngine(), FACTORY_INSTRUCT.handler({ factory: 'pipao', words: 'x', clear: false })),
         refused('Conflict', path.join(repo, 'NEMIA.md'), 'nemia factory instruction pipao --store'),
       );
       assert.ok(!fs.existsSync(storeFolder('pipao')), 'no store folder');
@@ -168,7 +162,7 @@ test('a rules or instruction file that cannot be told is read with why, and neve
     filed({ instruction: { store: true } });
     fs.mkdirSync(storeFolder('pipao'), { recursive: true });
     fs.symlinkSync(outside, path.join(storeFolder('pipao'), 'NEMIA.md'));
-    names(factoryInstruction('pipao').error, 'link');
+    names(factoryInstruction(ROOT, 'pipao').error, 'link');
     writeInstructionText('pipao', 'mine');
     assert.equal(fs.readFileSync(outside, 'utf8'), 'Words from elsewhere.\n');
     assert.ok(!fs.lstatSync(path.join(storeFolder('pipao'), 'NEMIA.md')).isSymbolicLink());
@@ -178,7 +172,7 @@ test('a rules or instruction file that cannot be told is read with why, and neve
     const secret = path.join(ROOT, 'secret.md');
     fs.writeFileSync(secret, 'secret\n');
     fs.symlinkSync(secret, path.join(repo, 'NEMIA.md'));
-    const escaped = factoryInstruction('pipao');
+    const escaped = factoryInstruction(ROOT, 'pipao');
     assert.equal(escaped.words, null);
     names(escaped.error, secret);
     fs.writeFileSync(path.join(repo, 'real.md'), 'inside\n');
@@ -192,7 +186,7 @@ test('a rules or instruction file that cannot be told is read with why, and neve
   await t.test('instruction: a path written by hand that climbs out of the folder is not read', () => {
     const repo = filed({ instruction: { path: '../secret.md' } });
     fs.writeFileSync(path.join(path.dirname(repo), 'secret.md'), 'secret\n');
-    const answer = factoryInstruction('pipao');
+    const answer = factoryInstruction(ROOT, 'pipao');
     assert.equal(answer.words, null);
     names(answer.error, 'inside');
   });

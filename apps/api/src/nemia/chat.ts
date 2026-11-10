@@ -51,6 +51,7 @@ import {
   followChat,
   nemiaChatPlace,
   PlaceService,
+  StoreConfig,
   StoreRoot,
   type ChatChanges,
   type ChatFollow,
@@ -78,11 +79,9 @@ export type ChatReadAnswer = Effect.Success<ReturnType<typeof readThrough>>;
 type Frame = typeof ChatStreamEvent.Type;
 
 /** How her chat reads the runs that wait on the person: as the board's list does, off the app's informer. */
-const readsOf = ({ home, memo, informer, env }: Served): ChatReads => ({
-  home,
+const readsOf = ({ memo, informer }: Served): ChatReads => ({
   ...(informer ? { runs: informer } : {}),
   filings: memo.filings,
-  env,
 });
 
 /**
@@ -111,7 +110,10 @@ const framesAfter = (shown: string, x: ChatSent): readonly [string, Frame[]] => 
   return [shown, [{ event: 'readable', data: {} }]];
 };
 
-/** What `followChat`'s changes read with once the stream is open: the request's engine, the app's place and the store's root. */
+/**
+ * What `followChat`'s changes read with once the stream is open: the request's engine, the app's place, and the store's root and
+ * settings.
+ */
 const placed =
   (s: Served) =>
   <A, E, R>(stream: Stream.Stream<A, E, R>) =>
@@ -119,6 +121,7 @@ const placed =
       Stream.provideService(EngineService, s.e),
       Stream.provideService(PlaceService, s.placeService),
       Stream.provideService(StoreRoot, s.home),
+      Stream.provideService(StoreConfig, s.config),
     );
 
 /** A page of her history (`GET /api/nemia/chat`), `limit` read as the number it was sent as, so a wrong one is the package's 422. */
@@ -126,7 +129,7 @@ export const chatPage = (query: { readonly before?: string; readonly limit?: str
   answered((s) =>
     s.inRequest(
       chatHistory(
-        nemiaChatPlace(),
+        nemiaChatPlace(s.home),
         { before: query.before || undefined, ...(query.limit ? { limit: Number(query.limit) } : {}) },
         readsOf(s),
       ),
@@ -141,7 +144,7 @@ export const chatStream = (after: string | undefined) =>
   answered(async (s) => {
     const follow: ChatFollow = (taskId, caught) => s.followings.follow(s.e, { kind: 'task', taskId }, caught);
     const paces = { ...(s.beats.chat ? { beatMs: s.beats.chat } : {}), ...(s.beats.chatFiles ? { filesMs: s.beats.chatFiles } : {}) };
-    const { first, rest } = await s.inRequest(followChat(nemiaChatPlace, after, readsOf(s), follow, paces));
+    const { first, rest } = await s.inRequest(followChat(() => nemiaChatPlace(s.home), after, readsOf(s), follow, paces));
     const opening = framesOf(first, '');
     const relayed = placed(s)(rest).pipe(Stream.mapAccum((): string => opening.shown, framesAfter));
     return Stream.concat(Stream.fromIterable(opening.frames), relayed);
@@ -152,15 +155,16 @@ export const chatSend = ({ text, from }: typeof ChatSend.Type) =>
   Effect.flatMap(HttpServerRequest.HttpServerRequest, (request) =>
     answeredWrite((s) => {
       const via = request.headers['sec-fetch-site'] === 'same-origin' ? 'board' : 'elsewhere';
-      return s.inRequest(chatSay(nemiaChatPlace(), text, from ?? { kind: 'person' }, via));
+      return s.inRequest(chatSay(nemiaChatPlace(s.home), text, from ?? { kind: 'person' }, via));
     }),
   );
 
 /** The turn she is answering stopped (`POST /api/nemia/chat/stop`). */
-export const chatStop = () => answeredWrite((s) => s.inRequest(stopTurn(nemiaChatPlace())));
+export const chatStop = () => answeredWrite((s) => s.inRequest(stopTurn(nemiaChatPlace(s.home))));
 
 /** An ask of hers answered (`POST /api/nemia/chat/answer`). */
-export const chatAnswer = (given: typeof ChatAnswerWrite.Type) => answeredWrite((s) => s.inRequest(answerAsk(nemiaChatPlace(), given)));
+export const chatAnswer = (given: typeof ChatAnswerWrite.Type) =>
+  answeredWrite((s) => s.inRequest(answerAsk(nemiaChatPlace(s.home), given)));
 
 /** The person's read mark moved (`POST /api/nemia/chat/read`). */
-export const chatRead = (through: string) => answeredWrite((s) => s.inRequest(readThrough(nemiaChatPlace(), through)));
+export const chatRead = (through: string) => answeredWrite((s) => s.inRequest(readThrough(nemiaChatPlace(s.home), through)));

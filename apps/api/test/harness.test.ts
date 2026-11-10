@@ -218,7 +218,7 @@ test("REFUSED, whatever the daemon's: a test that ticks with WF_MAX_CONCURRENT l
     else process.env.WF_MAX_RUNS = runs;
   });
   process.env.WF_MAX_RUNS = '0';
-  await assert.rejects(runWith(engine(), withProposalsPass(tickRun({}))), (err: Error) => {
+  await assert.rejects(runWith(engine(process.env), withProposalsPass(tickRun({}))), (err: Error) => {
     assert.equal(
       err.message,
       'WF_MAX_CONCURRENT=set-it-in-the-test is not a count from 1. It is the most sessions at work per pool at once, a whole number: WF_MAX_CONCURRENT=4 — or unset, for 2.',

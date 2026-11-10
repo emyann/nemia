@@ -106,7 +106,7 @@ const listOf = (memo: InformerMemo, wrap: <A, E, R>(p: Effect.Effect<A, E, R>) =
     wrap(
       runList(
         e(),
-        { home: ROOT, memo, filings: { filed: new Map(), cursor: 0 }, verify: verifiesRest() },
+        { home: ROOT, memo, filings: { filed: new Map(), cursor: 0 }, verify: verifiesRest(process.env) },
         { memo: { filings: { filed: new Map(), cursor: 0 }, said: new Map() } },
         {},
       ),

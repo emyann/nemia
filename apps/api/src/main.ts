@@ -39,7 +39,7 @@ let asker: QuotaAsker['Service'];
 let services: Context.Context<Services>;
 const running = runningRelease();
 try {
-  const trial = trialRefusal(running, currentRelease(), wfRoot(process.env), process.env);
+  const trial = trialRefusal(running, currentRelease(wfRoot(process.env)), wfRoot(process.env), process.env);
   if (trial !== null) throw new Conflict({ message: trial });
   args = argsOf(process.argv.slice(2));
   port = portOf(process.env.PORT, args.ticks);

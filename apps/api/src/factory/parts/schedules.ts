@@ -32,7 +32,7 @@ export const schedulesHandlers = HttpApiBuilder.group(Api, 'schedules', (handler
     .handle('put', ({ params: { namespace, name }, payload }) =>
       answered(async (s) => {
         factoryNamed(`PUT /api/namespaces/${namespace}/schedules/${name}`, namespace);
-        await s.inRequest(FACTORY_SCHEDULE.handler({ factory: namespace, workflow: name, ...payload }, s.env, s.home));
+        await s.inRequest(FACTORY_SCHEDULE.handler({ factory: namespace, workflow: name, ...payload }));
         return scheduleIn(s, namespace, name);
       }),
     )
@@ -40,7 +40,7 @@ export const schedulesHandlers = HttpApiBuilder.group(Api, 'schedules', (handler
       answered(async (s) => {
         factoryNamed(`DELETE /api/namespaces/${namespace}/schedules/${name}`, namespace);
         const schedule = await scheduleIn(s, namespace, name);
-        await s.inRequest(FACTORY_UNSCHEDULE.handler({ factory: namespace, workflow: name }, s.env, s.home));
+        await s.inRequest(FACTORY_UNSCHEDULE.handler({ factory: namespace, workflow: name }));
         return schedule;
       }),
     ),

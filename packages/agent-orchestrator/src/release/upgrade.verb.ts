@@ -4,6 +4,7 @@
  * rebuild, so a rollback is the same command with an older tag. The command the CLI serves alone: it builds for minutes and restarts the
  * daemon that serves the api.
  */
+import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
 import { Cause, Effect } from 'effect';
 import type { Args } from '../command/command.ts';
@@ -187,7 +188,8 @@ const removedAfter = Effect.fn('removedAfter')(function* (root: string, host: Se
  * Upgrades the store to `tag` (`prepared`, which switches the pointer), restarts the daemon (`restarted`), then removes what no one needs
  * (`removedAfter`); refused before the switch.
  */
-export const upgrade = Effect.fn('upgrade')(function* (args: Args, host: ServiceHost = liveHost(), env: NodeJS.ProcessEnv = process.env) {
+export const upgrade = Effect.fn('upgrade')(function* (args: Args, given?: ServiceHost, env: NodeJS.ProcessEnv = process.env) {
+  const host = given ?? liveHost(yield* StoreRoot);
   const tag = typeof args.tag === 'string' ? args.tag : '';
   const root = host.roots().root;
   const place = yield* PlaceService;
@@ -248,7 +250,7 @@ const UPGRADE: Command<Upgraded> = {
   writes: true,
   class: 'ask',
   only: { side: 'cli', why: 'builds for minutes and restarts the daemon that serves the api' },
-  handler: (args, _env, home) => Effect.flatMap(timedHost(args, home, 'upgrade'), (host) => upgrade(args, host)),
+  handler: (args) => Effect.flatMap(StoreRoot, (home) => Effect.flatMap(timedHost(args, home, 'upgrade'), (host) => upgrade(args, host))),
   print: (data) => data.lines,
 };
 

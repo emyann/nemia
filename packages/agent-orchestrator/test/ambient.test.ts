@@ -51,7 +51,7 @@ function runFixture(reader: 'maxRuns' | 'maxConcurrent', name: string, expected:
       "import assert from 'node:assert/strict';",
       `import { ${reader} } from '${CONFIG}';`,
       names ? `delete process.env.${name};` : '',
-      `test('the default', () => assert.equal(${reader}(), ${expected}));`,
+      `test('the default', () => assert.equal(${reader}(process.env), ${expected}));`,
       '',
     ].join('\n'),
   );

@@ -185,16 +185,14 @@ const selected = ({ labelSelector, selector }: { readonly labelSelector?: Listed
 /** A try removed (`nemia rm`, a try alone, its refusals thrown): what the engine forgot of it. */
 const removed = (at: At) =>
   acted(at, async (s) => {
-    const { id, removed, engine } = await s.inRequest(RM.handler({ runId: at.name, onlyTry: true, refuses: true }, s.env, s.home));
+    const { id, removed, engine } = await s.inRequest(RM.handler({ runId: at.name, onlyTry: true, refuses: true }));
     return { id, removed, engine };
   });
 
 /** The run brought onto its workflow's newest revision or merged with its base (`nemia refresh`): what it asked, its keys given. */
 const refreshed = (at: At, payload: RunRefresh) =>
   acted(at, async (s) => {
-    const { drift, step, target, onto, sha, round, file } = await s.inRequest(
-      REFRESH.handler({ runId: at.name, ...payload }, s.env, s.home),
-    );
+    const { drift, step, target, onto, sha, round, file } = await s.inRequest(REFRESH.handler({ runId: at.name, ...payload }));
     return {
       ...given('drift', drift),
       ...given('step', step),
@@ -209,7 +207,7 @@ const refreshed = (at: At, payload: RunRefresh) =>
 /** The run pruned (`nemia prune`, asked once, its refusals thrown): what it let go and what it left. */
 const pruned = (at: At, payload: RunPrune) =>
   acted(at, async (s) => {
-    const done = await s.inRequest(PRUNE.handler({ runId: at.name, ...payload, yes: true, refuses: true }, s.env, s.home));
+    const done = await s.inRequest(PRUNE.handler({ runId: at.name, ...payload, yes: true, refuses: true }));
     const { id, lines, worktrees, artifacts, left } = done;
     return { id, pruned: done.pruned, lines, worktrees, artifacts, left };
   });
@@ -217,7 +215,7 @@ const pruned = (at: At, payload: RunPrune) =>
 /** Another try or round of the step `at.step` asked for (`nemia retry`): the file the ask is written to, and what it asked. */
 const retried = (at: At & { readonly step: string }, payload: RunRetry) =>
   acted(at, async (s) => {
-    const asked = await s.inRequest(RETRY.handler({ runId: at.name, step: at.step, ...payload }, s.env, s.home));
+    const asked = await s.inRequest(RETRY.handler({ runId: at.name, step: at.step, ...payload }));
     return {
       ...given('try', asked.try),
       file: asked.file,
@@ -231,14 +229,14 @@ const retried = (at: At & { readonly step: string }, payload: RunRetry) =>
 /** The step `at.step` approved at its gate (`nemia approve`): the approval written. */
 const approved = (at: At & { readonly step: string }, payload: RunApprove) =>
   acted(at, async (s) => {
-    const done = await s.inRequest(APPROVE.handler({ runId: at.name, step: at.step, ...payload }, s.env, s.home));
+    const done = await s.inRequest(APPROVE.handler({ runId: at.name, step: at.step, ...payload }));
     return { step: done.step, try: done.try, at: done.at, message: done.message, file: done.file };
   });
 
 /** Words said to the step `at.step`'s session (`nemia say`): when, to which attempt, and what follows them. */
 const said = (at: At & { readonly step: string }, payload: RunSay) =>
   acted(at, async (s) => {
-    const { at: when, attempt, text, after } = await s.inRequest(SAY.handler({ runId: at.name, step: at.step, ...payload }, s.env, s.home));
+    const { at: when, attempt, text, after } = await s.inRequest(SAY.handler({ runId: at.name, step: at.step, ...payload }));
     return { at: when, attempt, text, after };
   });
 
@@ -254,13 +252,13 @@ export const runsHandlers = HttpApiBuilder.group(Api, 'runs', (handlers) =>
     .handle('refresh', ({ params: { namespace, name }, payload }) => refreshed({ namespace, name }, payload))
     .handle('prune', ({ params: { namespace, name }, payload }) => pruned({ namespace, name }, payload))
     .handle('labels', ({ params: { namespace, name }, payload }) =>
-      acted({ namespace, name }, (s) => s.inRequest(LABEL_RUN.handler({ runId: name, ...payload }, s.env, s.home))),
+      acted({ namespace, name }, (s) => s.inRequest(LABEL_RUN.handler({ runId: name, ...payload }))),
     )
     .handle('hold', ({ params: { namespace, name }, payload }) =>
-      acted({ namespace, name }, (s) => s.inRequest(HOLD.handler({ runId: name, ...payload, off: false }, s.env, s.home))),
+      acted({ namespace, name }, (s) => s.inRequest(HOLD.handler({ runId: name, ...payload, off: false }))),
     )
     .handle('unhold', ({ params: { namespace, name } }) =>
-      acted({ namespace, name }, (s) => s.inRequest(HOLD.handler({ runId: name, off: true }, s.env, s.home))),
+      acted({ namespace, name }, (s) => s.inRequest(HOLD.handler({ runId: name, off: true }))),
     )
     .handle('retry', ({ params, payload }) => retried(params, payload))
     .handle('approve', ({ params, payload }) => approved(params, payload))
@@ -272,18 +270,16 @@ export const runsHandlers = HttpApiBuilder.group(Api, 'runs', (handlers) =>
         return { ...runLines(run), workflowPage: workflowPageOf(run, repo, home) };
       }),
     )
-    .handle('concluded', ({ params: { name } }) => answered((s) => s.inRequest(CONCLUDED.handler({ runId: name }, s.env, s.home))))
+    .handle('concluded', ({ params: { name } }) => answered((s) => s.inRequest(CONCLUDED.handler({ runId: name }))))
     .handle('record', ({ params: { name } }) =>
       answered(async (s) => {
         found(name);
-        return asJson(await s.inRequest(SHOW.handler({ runId: name, raw: true }, s.env, s.home)));
+        return asJson(await s.inRequest(SHOW.handler({ runId: name, raw: true })));
       }),
     )
-    .handle('listing', ({ query }) =>
-      answered(async (s) => asJson(await s.inRequest(informed(s, LS.handler(selected(query), s.env, s.home))))),
-    )
+    .handle('listing', ({ query }) => answered(async (s) => asJson(await s.inRequest(informed(s, LS.handler(selected(query)))))))
     .handle('listingOne', ({ params: { name }, query }) =>
-      answered(async (s) => asJson(await s.inRequest(informed(s, LS.handler({ runId: name, ...selected(query) }, s.env, s.home))))),
+      answered(async (s) => asJson(await s.inRequest(informed(s, LS.handler({ runId: name, ...selected(query) }))))),
     )
     .handle('decision', ({ params: { runId }, query }) => decisionHandler(runId, query.sensitive)),
 );

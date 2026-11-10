@@ -4,6 +4,7 @@
  * settled. Read through `bridgeOf`, which every task's view answers the same. A store of its own, since `WF_ROOT` is read as the module
  * loads.
  */
+import { rootNow } from '../../test/config-given.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
@@ -43,7 +44,7 @@ const engineWith = (bridge: TaskView['bridge'], settled: string | null = null) =
 const levelOver = (bridge: TaskView['bridge'], settled: string | null = null) => runWith(engineWith(bridge, settled), LEVEL.handler({}));
 
 test("`nemia level`'s reach: the attach line, then her web link off her task's view, or why not, and nothing once she is settled", async (t) => {
-  writeLevel({ level: 'semi-auto', since: '2026-10-06T08:00:00.000Z', task: TASK });
+  writeLevel(rootNow(), { level: 'semi-auto', since: '2026-10-06T08:00:00.000Z', task: TASK });
   await t.test('her bridge up: the attach line first, then the link, printed under "reach her:"', async () => {
     const up = await levelOver({ url: LINK });
     assert.deepEqual(up.reach, [ATTACH, LINK], 'the attach line first, then the link');

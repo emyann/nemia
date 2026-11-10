@@ -26,7 +26,7 @@ process.env.WF_VERIFY_REST = '1';
 const FACTORIES = path.join(ROOT, 'factories');
 const { templated: programsAt } = await import('./templated.ts');
 const { exportTemplate, reconciled, reconciledAt } = programsAt(ROOT);
-const { readFactory } = await import('../src/runner.ts');
+const { readFactory } = await import('../testing.ts');
 const { appliedDir, digestOf, entriesIn, readStatus, replaceBase, resolutionsFile, statusFile, swapTree, treeDir } =
   await import('../src/factory/applied/applied.store.ts');
 const { runRecord } = await import('../src/record/record.store.ts');

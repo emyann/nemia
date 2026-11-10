@@ -8,7 +8,7 @@
  * The workflow a body names is found among the folders a start finds one in (`folderOf`, workflows/workflows.ts), in the factory the
  * request is served in: never a path sent.
  */
-import { START, startFactory, type StartInput } from 'agent-orchestrator';
+import { START, startFactoryAtOnce, type StartInput } from 'agent-orchestrator';
 import { Conflict, Invalid, Missing, type RunStart } from 'objects';
 import { declaredAs } from '../objects/refused.ts';
 import type { Refusal } from '../guard.ts';
@@ -101,7 +101,7 @@ async function cardStarted(s: Served, asked: Extract<Asked, { card: string }>, f
     context: asked.context,
     label: asked.label,
   };
-  const started = await s.inRequest(START.handler(given, undefined, s.home));
+  const started = await s.inRequest(START.handler(given));
   return {
     id: started.id,
     card: started.card,
@@ -121,14 +121,16 @@ async function cardStarted(s: Served, asked: Extract<Asked, { card: string }>, f
  * checkout, no commit — which the queue tries again on its next pass. In a factory (the namespace of one), the run is started in it
  * (`startRun`'s `factory`), which refuses a workflow it has not attached, a step its hires leave unfilled and a repository outside it, each
  * an `Invalid`. Every run is started in a factory: a start in `default`, which names none, runs in the one factory whose repository holds
- * the api's repository, or `?repo=`, on that repository (`startFactory`, as `nemia start` finds it), and is refused, `Invalid`, where none
- * or two do, naming the namespace to start it in.
+ * the api's repository, or `?repo=`, on that repository (`startFactoryAtOnce`, as `nemia start` finds it), and is refused, `Invalid`, where
+ * none or two do, naming the namespace to start it in.
  */
 export async function runStart(s: Served, body: RunStart): Promise<{ id: string }> {
   const { repo, home, factory } = s;
   const asked = startOf(body, repo, home, factory?.tree);
   if ('status' in asked) throw declaredAs(START_REFUSALS, asked);
-  const found = factory ? { factory, repo } : startFactory(undefined, repo, 'POST /api/namespaces/<name>/runs');
+  const found = factory
+    ? { factory, repo }
+    : startFactoryAtOnce(home, undefined, repo, 'POST /api/namespaces/<name>/runs', s.config.defaultFactoryStarts);
   const given: StartInput = {
     brief: asked.brief,
     repo: found.repo ?? repo,
@@ -138,6 +140,6 @@ export async function runStart(s: Served, body: RunStart): Promise<{ id: string 
     label: asked.label,
     factory: found.factory?.name,
   };
-  const { id } = await s.inRequest(START.handler(given, undefined, home));
+  const { id } = await s.inRequest(START.handler(given));
   return { id };
 }

@@ -11,6 +11,7 @@
  * or in the default one where `WF_DEFAULT_FACTORY_STARTS` (which `test/ambient.ts` sets) lets it: `asShipped` deletes the switch for a
  * checkpoint.
  */
+import { rootNow } from './config-given.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -24,24 +25,9 @@ const ROOT = scratch('wf-factory-start-');
 const FACTORIES = path.join(ROOT, 'factories');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
-const {
-  addFactory,
-  advanceRun,
-  attachWorkflow,
-  fireAgent,
-  hireAgent,
-  inboxDir,
-  parseArgv,
-  readFactories,
-  readFactory,
-  repoFor,
-  setInstruction,
-  setSchedule,
-  START,
-  startRun,
-  startFromInbox,
-  runWith: runEngine,
-} = await import('../src/runner.ts');
+const { advanceRun, inboxDir, parseArgv, repoFor, START, startRun, startFromInbox, runWith: runEngine } = await import('../src/runner.ts');
+const { addFactory, attachWorkflow, fireAgent, hireAgent, readFactories, readFactory, setInstruction, setSchedule } =
+  await import('../testing.ts');
 const { runRecord } = await import('../src/record/record.store.ts');
 const { detached } = await import('./factory-planted.ts');
 const { main: cli } = await import('../src/cli/main.ts');
@@ -490,9 +476,9 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     await typedFrom(ROOT, ['factory', 'add', 'mono', '--repo', c]);
     attachWorkflow({ factory: 'mono', workflow: 'build' });
     hired('mono');
-    assert.equal(repoFor('mono', undefined, ROOT), c);
-    assert.equal(repoFor('mono', '/elsewhere', ROOT), '/elsewhere', 'a repository named is kept, for the start to judge');
-    assert.equal(repoFor(undefined, undefined, ROOT), ROOT);
+    assert.equal(repoFor(rootNow(), 'mono', undefined, ROOT), c);
+    assert.equal(repoFor(rootNow(), 'mono', '/elsewhere', ROOT), '/elsewhere', 'a repository named is kept, for the start to judge');
+    assert.equal(repoFor(rootNow(), undefined, undefined, ROOT), ROOT);
     const out = await typedFrom(ROOT, ['start', 'build it', '--workflows', build, '--factory', 'mono', '--no-worktree']);
     assert.deepEqual([runRecord(startedId(out)).repo, runRecord(startedId(out)).factory], [c, 'mono']);
     assert.ok(out.includes(`factory: mono, on ${c}`), out.join('\n'));

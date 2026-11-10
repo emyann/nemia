@@ -34,6 +34,9 @@ import type { Engine } from '../src/runtime-client.ts';
 import { decideScreen } from './screens.ts';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
+import { storeGiven } from './config-given.ts';
+import type { StoreRoot } from '../src/config/root.store.ts';
+import type { StoreConfig } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-folder-');
 const NOT_A_REPO = path.join(ROOT, 'somewhere');
@@ -95,11 +98,10 @@ const {
   startQueued,
   runWith: runEngine,
   gitPlaceLayer,
-  StoreRoot,
   ...verbs
 } = await import('../src/runner.ts');
 /** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
-const atRoot = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
+const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot | StoreConfig>): A => Effect.runSync(storeGiven(ROOT, process.env)(program));
 const addToInbox = (opts: Parameters<typeof verbs.addToInbox>[0]) => atRoot(verbs.addToInbox(opts));
 const queueInInbox = (...args: Parameters<typeof verbs.queueInInbox>) => atRoot(verbs.queueInInbox(...args));
 const runWith = runOver(runEngine, gitPlaceLayer);

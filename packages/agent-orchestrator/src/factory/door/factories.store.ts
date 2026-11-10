@@ -40,6 +40,7 @@ import {
   readFactoryAt,
   removeFactoryAt,
   rewriteFactoryAt,
+  startFactoryAt,
   treeChecked,
 } from '../factory.store.ts';
 import { levelDiffers } from './generation.ts';
@@ -339,6 +340,45 @@ export const doorAtOnce = <A>(home: string, use: (door: FactoryDoorShape) => Eff
 /** A tree's check, said beside the door that reads the factory it is of. */
 export { treeChecked };
 
+/**
+ * What the factories' store judges and names without reading a factory, said through the door so no file of `src` but the door's
+ * imports the store (`factories.store.test.ts`): a name's check, a factory's repositories, where the factories are, a wiring's and a
+ * schedule's judgement.
+ */
+export {
+  factoriesDirAt,
+  factoryRepos,
+  refuseName,
+  scheduleOf,
+  scheduleRefused,
+  wiringChecked,
+  wiringNamesRefused,
+} from '../factory.store.ts';
+
+/**
+ * Every factory of the store `home` as its file reads, or why it does not, through the door at once: the default, which is no file, left
+ * out.
+ */
+export const listedAtOnce = (home: string): readonly FactoryListing[] => doorAtOnce(home, (door) => door.factories.listed());
+
+/**
+ * The factory a start in the store `home` goes to, named or found from the folder `at` (`startFactoryAt`), the default factory only where
+ * `defaultStarts` lets it.
+ */
+export const startFactoryAtOnce = (
+  home: string,
+  named: string | undefined,
+  at: string,
+  fix: string,
+  defaultStarts: boolean,
+): { factory?: Factory; repo?: string } => startFactoryAt(home, named, at, fix, defaultStarts);
+
+/**
+ * The factory `name` of the store `home`, as a start or a filing in it reads it: refused as `readFactoryAt` refuses it, `notDone` saying
+ * what the caller did not do. For a caller that is no program and names what it did not do.
+ */
+export const readFactoryAtOnce = (home: string, name: string, notDone: string): Factory => readFactoryAt(home, name, notDone);
+
 /** The factory `name` filed in the store `home`, read through the door at once; none for the default, which has no spec of its own. */
 export const filedAtOnce = (home: string, name: string): Factory | undefined =>
   doorAtOnce(home, (door) =>
@@ -359,3 +399,10 @@ export const templatedTreeOf = (home: string, name: string, who: string): string
 
 /** The Factory door over the files of the store `root`, as a layer: for a program that names its root by the door, not by `StoreRoot`. */
 export const factoryDoorFiles = (root: string): Layer.Layer<never> => Layer.succeed(FactoryDoor)(factoryDoorOver(factoryFiles(root)));
+
+/**
+ * The factory `name` filed in the store `home`, read through the door at once, for `verb`: refused as `filedFactory` refuses it, the
+ * default factory among it, which has no spec of its own.
+ */
+export const factoryAtOnce = (home: string, name: string, verb: FactoryWrite): Factory =>
+  Effect.runSync(Effect.provide(filedFactory(name, verb), factoryDoorFiles(home)));

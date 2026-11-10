@@ -9,6 +9,7 @@ import type { Refusal } from '../refusal/refusal.ts';
 import type { EngineService } from '../runtime-client.ts';
 import type { PlaceService } from '../place/place.store.ts';
 import type { StoreRoot } from '../config/root.store.ts';
+import type { StoreConfig } from '../config/config.store.ts';
 import type { Run } from '../record/record.ts';
 import type { RunState } from './apply.ts';
 
@@ -17,7 +18,7 @@ export type ProposalsActed = (
   repo: string | undefined,
   runs: readonly Pick<Run, 'id'>[],
   judged: ReadonlyMap<string, { readonly status: RunState }>,
-) => Effect.Effect<void, Refusal, EngineService | PlaceService | StoreRoot>;
+) => Effect.Effect<void, Refusal, EngineService | PlaceService | StoreRoot | StoreConfig>;
 
 /** The proposals pass the tick runs, given where the program that runs the pass is composed. */
 export class ProposalsAct extends Context.Service<ProposalsAct, ProposalsActed>()('agent-orchestrator/ProposalsAct') {}

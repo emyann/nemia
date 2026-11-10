@@ -14,6 +14,9 @@
  * after, so a store of forty runs is built in a few passes. Every pass that is not a measurement judges the runs the memo answered
  * in full as well (`verifyRest`), and throws where the two differ.
  */
+import { rootNow, storeGiven } from '../../test/config-given.ts';
+import type { StoreRoot } from '../config/root.store.ts';
+import type { StoreConfig } from '../config/config.store.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -36,9 +39,9 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 process.env.WF_MAX_CONCURRENT = '10000';
 delete process.env.WF_MAX_RUNS;
-const { approveRun, forgetRun, isRepositoryRun, prune, retryRun, startRun, StoreRoot, ...verbs } = await import('../runner.ts');
+const { approveRun, forgetRun, isRepositoryRun, prune, retryRun, startRun, ...verbs } = await import('../runner.ts');
 /** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
-const atRoot = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
+const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot | StoreConfig>): A => Effect.runSync(storeGiven(ROOT, process.env)(program));
 const addToInbox = (opts: Parameters<typeof verbs.addToInbox>[0]) => atRoot(verbs.addToInbox(opts));
 const queueInInbox = (...args: Parameters<typeof verbs.queueInInbox>) => atRoot(verbs.queueInInbox(...args));
 const readInbox = () => atRoot(verbs.readInbox());
@@ -472,7 +475,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
     'the same store paused: once the pass after the pause has read every run with it, every finished run is answered from memory',
     async () => {
       const [none] = sizes.map((z) => z.cost) as [PassCost];
-      putPause({ why: 'merging by hand', by: 'ann' });
+      putPause(rootNow(), { why: 'merging by hand', by: 'ann' });
       try {
         await s.measured();
         const paused = await s.measured();
@@ -485,7 +488,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
         );
         assert.equal(journals(paused), journals(none), 'no journal read more than the runs in flight make');
       } finally {
-        resumePause();
+        resumePause(rootNow());
       }
       await s.measured();
       assert.equal((await s.measured()).rested, FINISHED, 'and once it is lifted, as before');

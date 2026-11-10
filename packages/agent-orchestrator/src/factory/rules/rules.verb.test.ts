@@ -35,7 +35,7 @@ const door = doorFrom(FactoryDoor, memory);
 done(door.factories.create(aFactory('acme')));
 
 /** The command run with `args`, as the CLI and the api run it, over the memory door. */
-const run = (args: RulesInput) => runWith(engineOf(engine().layer), Effect.provide(FACTORY_RULES.handler(args, undefined, ROOT), memory));
+const run = (args: RulesInput) => runWith(engineOf(engine().layer), Effect.provide(FACTORY_RULES.handler(args), memory));
 
 test('REFUSED: `nemia factory rules`, nothing written', async (t) => {
   const rows: Array<[string, RulesInput, 'Conflict' | 'Missing' | 'Invalid', string[]]> = [

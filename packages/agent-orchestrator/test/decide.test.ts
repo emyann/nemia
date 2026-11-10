@@ -8,6 +8,8 @@
  *
  * `WF_ROOT` is set before the runner is imported: it is read as the module loads.
  */
+import type { StoreRoot } from '../src/config/root.store.ts';
+import type { StoreConfig } from '../src/config/config.store.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -897,7 +899,7 @@ test('a run on two branches, side by side: each read, each in full, the longer n
  */
 async function _decideProgramTypes() {
   const { Effect } = await import('effect');
-  void (decideRun('x') satisfies EffectOf<Decided, Refusal, EngineService | PlaceService>);
+  void (decideRun('x') satisfies EffectOf<Decided, Refusal, EngineService | PlaceService | StoreRoot | StoreConfig>);
   // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
   void (decideRun('x') satisfies EffectOf<Decided, never, EngineService>);
   // @ts-expect-error -- decideRun requires EngineService, and runPromise takes no requirement

@@ -9,6 +9,8 @@
  * module loads. Beside the table: the tables' empty read is `readersOf`'s, and the engine's `needs-human` is compared in `src/views/`
  * alone (`blockedWord`, `harnessBlocked`), so no reader judges a blocked session by a word of its own.
  */
+import { settingsOf } from '../src/config/config.store.ts';
+import { rootNow } from './config-given.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -61,7 +63,7 @@ const tickRead = (e: Engine, run: Run) =>
     const snapshot = yield* standingSnapshot();
     const memo = statusMemo(headsOver(standingReader(snapshot)), yield* PlaceService);
     const from = { standing: Effect.succeed(snapshot) };
-    const checkout = yield* checkoutHold(e, run, reads.steps, from, process.env, memo, reads.phaseOf);
+    const checkout = yield* checkoutHold(e, run, reads.steps, from, settingsOf(process.env), memo, reads.phaseOf);
     const read = withStandings({ ...reads, checkout }, snapshot);
     const assessed = assess(read);
     return {
@@ -290,11 +292,11 @@ test('one read of a run: the tick, nemia ls, nemia decide, nemia prune and the r
     stage.board().settle(`${id}-implement`, 'failed');
     await tick(id);
     await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'fresh' }));
-    putPause({ why: 'a release' });
+    putPause(rootNow(), { why: 'a release' });
     try {
       agree(await readers(id));
     } finally {
-      resumePause();
+      resumePause(rootNow());
     }
   });
 

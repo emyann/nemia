@@ -3,6 +3,7 @@
  * taking the card out of the inbox; and the inbox listed with each card's state (`inboxJudged`), which reads each started card's run's
  * phase. A controller: Effect programs, which reach the runtime through `start/start.verb.ts` and the judged list.
  */
+import { setting } from '../config/config.store.ts';
 import { DEFAULT_NAMESPACE } from 'objects';
 import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';
@@ -43,7 +44,6 @@ import { cardRuns, type SummaryHow } from '../summary/summary.verb.ts';
 import type { Engine } from '../runtime-client.ts';
 import { contextRefusal } from '../start/index.ts';
 import { placesOf } from '../folder/lookup.store.ts';
-import { defaultStartsAllowed } from '../factory/factory.store.ts';
 import { factoryOrNone } from '../factory/door/factories.store.ts';
 import { defaultStartRefusal, factoryRepo } from '../factory/factory.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
@@ -120,7 +120,8 @@ function cardWorkflow(
 
 /**
  * The factory a card in `file` is started in: `opts.factory`, else the card's own `factory:` (`named`). Refused, `Invalid`: neither, unless
- * `defaultStartsAllowed` (`unfactoredCardRefusal`), and the default factory (`defaultStartRefusal`), which no run is started in.
+ * `StoreConfig`'s `defaultFactoryStarts` (`unfactoredCardRefusal`), and the default factory (`defaultStartRefusal`), which no run is
+ * started in.
  */
 const cardFactory = Effect.fn('cardFactory')(function* (
   opts: Pick<InboxStart, 'factory' | 'fix'>,
@@ -128,7 +129,7 @@ const cardFactory = Effect.fn('cardFactory')(function* (
   file: string,
 ) {
   const factory = opts.factory ?? named;
-  if (factory === undefined && !defaultStartsAllowed())
+  if (factory === undefined && !(yield* setting('defaultFactoryStarts')))
     return yield* Effect.fail(new Invalid({ message: unfactoredCardRefusal(file, yield* filedNames(), opts.fix) }));
   if (factory === DEFAULT_NAMESPACE) {
     const fix = opts.factory === undefined ? `\`factory: <name>\` in ${file}` : (opts.fix ?? '<name>');
@@ -152,11 +153,11 @@ const cardFactory = Effect.fn('cardFactory')(function* (
  * `queueLeft`. A started card is not started again (`startedRefusal`). Refused by name before anything is written, exit 2: a name that is
  * not a card's (`inboxNameRefusal`), a card not there (`Missing`) — naming the cards there are — a card that does not read, a card already
  * started (`Conflict`), no factory from either — `Invalid`, naming the line to write and `fix` (`unfactoredCardRefusal`), unless
- * `defaultStartsAllowed` — or the default factory named (`defaultStartRefusal`), no workflow, a workflow that does not load behind the
- * card, a `gate:` naming no step of it, in the card's words, a `from:` naming a run the store does not have or one also waited on
- * (`contextRefusal`), and a `brief` with nothing in it. The run is handed as context the card's `from:` and `context`, in that order. And
- * refused as `start()` refuses it: an `--after`, an `--input` or a `--gate` it refuses, a factory not there, or one that does not offer the
- * workflow or does not work on the repository.
+ * `StoreConfig`'s `defaultFactoryStarts` — or the default factory named (`defaultStartRefusal`), no workflow, a workflow that does not load
+ * behind the card, a `gate:` naming no step of it, in the card's words, a `from:` naming a run the store does not have or one also waited
+ * on (`contextRefusal`), and a `brief` with nothing in it. The run is handed as context the card's `from:` and `context`, in that order.
+ * And refused as `start()` refuses it: an `--after`, an `--input` or a `--gate` it refuses, a factory not there, or one that does not offer
+ * the workflow or does not work on the repository.
  */
 export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: InboxStart) {
   const refused = inboxNameRefusal(opts.name);
@@ -309,8 +310,8 @@ const dropStaleTries = (names: Iterable<string>, listing: readonly CardListing[]
  * The repository a queued card's line names (`on`), when it was tried on the daemon's (`fromDaemon`): none for a card that names no
  * factory, refused wherever a daemon runs, unless `WF_DEFAULT_FACTORY_STARTS=1` starts it there.
  */
-const daemonsRepo = (card: Pick<InboxListing, 'factory'>, on: string, fromDaemon: boolean): { on?: string } =>
-  fromDaemon && (card.factory !== null || defaultStartsAllowed()) ? { on } : {};
+const daemonsRepo = (card: Pick<InboxListing, 'factory'>, on: string, fromDaemon: boolean, defaultStarts: boolean): { on?: string } =>
+  fromDaemon && (card.factory !== null || defaultStarts) ? { on } : {};
 
 /**
  * The queue's next card started (`nextQueued`), one try: through `startFromInbox`, with the card's `workflow:` and `factory:`, on the
@@ -341,7 +342,7 @@ export const startQueued = Effect.fn('startQueued')(function* (repo: string, giv
   const next = nextQueued(listing, repo, factories);
   if (!next) return undefined;
   const { repo: on, fromDaemon } = queueRepo(next, repo, factories);
-  const where = daemonsRepo(next, on, fromDaemon);
+  const where = daemonsRepo(next, on, fromDaemon, yield* setting('defaultFactoryStarts'));
   const tried = yield* Effect.exit(startFromInbox({ name: next.name, callerRepo: repo }));
   if (Exit.isSuccess(tried)) {
     const started = tried.value;

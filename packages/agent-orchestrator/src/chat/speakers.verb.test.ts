@@ -10,6 +10,7 @@ import { Effect, Exit } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { CHAT_ALLOW, CHAT_DISALLOW, CHAT_SPEAKERS } from './speakers.verb.ts';
 import { speakersFile } from './chat.store.ts';
+import { storeGiven } from '../../test/config-given.ts';
 
 /** The tag a handler's refusal carries, or undefined where it answered. */
 const refusedAs = async (program: Effect.Effect<unknown, unknown>): Promise<string | undefined> => {
@@ -19,31 +20,35 @@ const refusedAs = async (program: Effect.Effect<unknown, unknown>): Promise<stri
   return failure?._tag === 'Fail' ? (failure.error as { _tag?: string })._tag : 'Die';
 };
 
-/** A handler's answer, run with no engine or place: these commands need neither. */
-const answer = <A>(program: Effect.Effect<A, unknown, unknown>) => Effect.runPromise(program as Effect.Effect<A>);
+/** A handler's answer at the store `home`, run with no engine or place: these commands need neither. */
+const answer = <A>(home: string, program: Effect.Effect<A, unknown, unknown>) =>
+  Effect.runPromise(storeGiven(home)(program) as Effect.Effect<A>);
 
 test('nemia chat allow, disallow and speakers: the names an agent may speak under in her chat', async (t) => {
   const home = scratch('wf-chat-speakers-');
   await t.test('none is allowed before the person allows one', async () => {
-    assert.deepEqual(await answer(CHAT_SPEAKERS.handler({}, {}, home)), { allowed: [] });
+    assert.deepEqual(await answer(home, CHAT_SPEAKERS.handler({})), { allowed: [] });
   });
   await t.test('a name allowed twice is listed once, in her chat’s own folder', async () => {
-    await answer(CHAT_ALLOW.handler({ name: 'operator' }, {}, home));
-    await answer(CHAT_ALLOW.handler({ name: 'operator' }, {}, home));
-    await answer(CHAT_ALLOW.handler({ name: 'nemia-ab12/design' }, {}, home));
-    assert.deepEqual(await answer(CHAT_SPEAKERS.handler({}, {}, home)), { allowed: ['operator', 'nemia-ab12/design'] });
+    await answer(home, CHAT_ALLOW.handler({ name: 'operator' }));
+    await answer(home, CHAT_ALLOW.handler({ name: 'operator' }));
+    await answer(home, CHAT_ALLOW.handler({ name: 'nemia-ab12/design' }));
+    assert.deepEqual(await answer(home, CHAT_SPEAKERS.handler({})), { allowed: ['operator', 'nemia-ab12/design'] });
     assert.ok(fs.existsSync(speakersFile(path.join(home, 'nemia'))));
   });
   await t.test('a name taken back is gone, and the others stay', async () => {
-    assert.deepEqual(await answer(CHAT_DISALLOW.handler({ name: 'operator' }, {}, home)), { allowed: ['nemia-ab12/design'] });
+    assert.deepEqual(await answer(home, CHAT_DISALLOW.handler({ name: 'operator' })), { allowed: ['nemia-ab12/design'] });
   });
   await t.test('REFUSED: a name no agent speaks under, by the check and by the handler, with nothing written', async () => {
     assert.equal(typeof CHAT_ALLOW.check?.({ name: 'You' }), 'string');
-    assert.equal(await refusedAs(CHAT_ALLOW.handler({ name: 'person' }, {}, home) as never), 'Invalid');
-    assert.deepEqual(await answer(CHAT_SPEAKERS.handler({}, {}, home)), { allowed: ['nemia-ab12/design'] });
+    assert.equal(await refusedAs(storeGiven(home)(CHAT_ALLOW.handler({ name: 'person' })) as Effect.Effect<unknown, unknown>), 'Invalid');
+    assert.deepEqual(await answer(home, CHAT_SPEAKERS.handler({})), { allowed: ['nemia-ab12/design'] });
   });
-  await t.test('REFUSED: a call given no store root', async () => {
-    assert.equal(await refusedAs(CHAT_ALLOW.handler({ name: 'operator' }) as never), 'Invalid');
+  await t.test('REFUSED: a call given no store root does not compile, and one run all the same writes nothing', async () => {
+    const before = fs.readFileSync(speakersFile(path.join(home, 'nemia')), 'utf8');
+    // @ts-expect-error -- the handler asks the store root, and it is given none
+    assert.equal(await refusedAs(CHAT_ALLOW.handler({ name: 'operator' })), 'Die');
+    assert.equal(fs.readFileSync(speakersFile(path.join(home, 'nemia')), 'utf8'), before);
   });
   await t.test('each write is the person’s own setting, asked of them every time, and the CLI’s alone', () => {
     for (const c of [CHAT_ALLOW, CHAT_DISALLOW])

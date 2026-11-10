@@ -148,8 +148,8 @@ export function skillFiles(home: string): SkillLayer {
 
 /**
  * The Skill door, as the service a program yields: a reference whose default is rooted (`rootedDoor`) — the door over the files at the
- * store's root the program is given, refused `Invalid` where it was given none — so a handler that yields it is run through
- * `rooted(home, verb, program)` (`src/factory/wiring/wire.verb.ts`), and a test gives `skillDoorMemory()` with no root at all.
+ * store's root the program is given, refused `Invalid` where it was given none — so a handler that yields it is run where its program is
+ * composed with `StoreRoot` (`storeConfigLayer`, `src/config/root.store.ts`), and a test gives `skillDoorMemory()` with no root at all.
  */
 export const SkillDoor = Context.Reference<SkillDoorShape>('agent-orchestrator/SkillDoor', {
   defaultValue: () => rootedDoor((root) => skillDoorOver(skillFiles(root)), 'Skill door'),

@@ -46,7 +46,7 @@ const QUERY_KEYS: Record<QueryKey, keyof StatsAsked> = {
  *   `nemia stats -l` keeps them (OR across repeats, the run's whole map read as `GET /api/runs` reads it); a selector the package's
  *   grammar refuses is a 422 naming the key or the clause.
  */
-export async function statsOf(query: StatsAsked, { env, home, memo, inRequest }: Served): Promise<Stats> {
+export async function statsOf(query: StatsAsked, { memo, inRequest }: Served): Promise<Stats> {
   const given = Object.fromEntries(
     (Object.entries(QUERY_KEYS) as [QueryKey, keyof StatsAsked][]).flatMap(([key, name]) => {
       const value = query[name];
@@ -55,7 +55,5 @@ export async function statsOf(query: StatsAsked, { env, home, memo, inRequest }:
   );
   statsQueryOf(given, (key) => `?${QUERY_KEYS[key]}=`);
   const selector = query.selector === undefined ? undefined : [...query.selector];
-  return inRequest(
-    STATS.handler({ ...given, ...(selector?.length ? { selector } : {}) }, env, home, { stats: memo.stats, series: memo.series }),
-  );
+  return inRequest(STATS.handler({ ...given, ...(selector?.length ? { selector } : {}) }, { stats: memo.stats, series: memo.series }));
 }

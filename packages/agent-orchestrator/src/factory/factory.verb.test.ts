@@ -20,7 +20,7 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '0';
 const { FACTORY } = await import('./factory.verb.ts');
 type ScheduleRuns = import('./schedule/listed.store.ts').ScheduleRuns;
-const { addFactory, attachWorkflow, setSchedule } = await import('./factory.store.ts');
+const { addFactory, attachWorkflow, setSchedule } = await import('../../testing.ts');
 const { recordMemo } = await import('../rest/index.ts');
 const { metered } = await import('../meter/tally.store.ts');
 const { runWith: runEngine, engineOf } = await import('../runtime-client.ts');
@@ -49,7 +49,7 @@ const writeRun = (id: string, scheduled?: { factory: string; workflow: string; d
     }),
   );
 
-const listed = (kept?: Parameters<typeof FACTORY.handler>[3]) => runWith(e(), FACTORY.handler({}, process.env, ROOT, kept));
+const listed = (kept?: Parameters<typeof FACTORY.handler>[1]) => runWith(e(), FACTORY.handler({}, kept));
 
 test("a warm read of the factories reads no finished run's record, however many there are, and answers a cold read's own", async () => {
   fs.rmSync(RUNS, { recursive: true, force: true });

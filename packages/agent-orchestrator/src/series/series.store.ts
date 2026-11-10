@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
 import { HOME } from '../record/record.store.ts';
-import { metricsHourDays, metricsMinuteDays } from '../config/config.store.ts';
+import type { Settings } from '../config/config.store.ts';
 import { countRead } from '../meter/tally.store.ts';
 import { FORMER_PHASE_WORDS, FORMER_PHASES, isPhase, PHASES, RECENT_KEPT, type RecentPass } from '../meter/index.ts';
 import { ALL_KINDS, DISK_PARTS } from '../disk/disk.ts';
@@ -189,7 +189,7 @@ export const dropDay = (tier: Tier, day: string): void => fs.rmSync(dayFile(tier
  * then the hours due rolled from the minute files, then each tier's days past its retention deleted (`WF_METRICS_MINUTE_DAYS`,
  * `WF_METRICS_HOUR_DAYS`). Throws what a read or a write threw, a retention refused among them: the tick's to say, never to stop on.
  */
-export const keepSeries = (ring: readonly RecentPass[], now: number = Date.now()): void => {
+export const keepSeries = (ring: readonly RecentPass[], config: Settings, now: number = Date.now()): void => {
   const lastMinute = lastLine('minute')?.t;
   appendLines('minute', rollMinutes(ring, minutesDue(ring, lastMinute, now, RECENT_KEPT)));
   const due = hoursDue(lastMinute, lastLine('hour')?.t, now);
@@ -200,8 +200,8 @@ export const keepSeries = (ring: readonly RecentPass[], now: number = Date.now()
       .flatMap((d) => readDay('minute', d));
     appendLines('hour', rollHours(minutes, due));
   }
-  for (const day of daysPast(days('minute'), now, metricsMinuteDays())) dropDay('minute', day);
-  for (const day of daysPast(days('hour'), now, metricsHourDays())) dropDay('hour', day);
+  for (const day of daysPast(days('minute'), now, config.metricsMinuteDays)) dropDay('minute', day);
+  for (const day of daysPast(days('hour'), now, config.metricsHourDays)) dropDay('hour', day);
 };
 
 /** A tier's day, answered from `memo` while its file has not moved since it was read, and read again once it has. */

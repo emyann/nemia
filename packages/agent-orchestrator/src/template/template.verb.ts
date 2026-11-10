@@ -13,12 +13,10 @@ import { Invalid } from '../refusal/refusal.ts';
 import { writerText as textOf } from '../yours/yours.ts';
 import { instructionAt, type Factory } from '../factory/factory.ts';
 import { instructionFile, readInstructionAt } from '../factory/instruction.store.ts';
-import { factoriesDirAt } from '../factory/factory.store.ts';
+import { factoriesDirAt, FactoryDoor, filedFactory } from '../factory/door/factories.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
-import { FactoryDoor, filedFactory } from '../factory/door/factories.store.ts';
 import { TemplateDoor } from './door/templates.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import { rooted } from '../factory/wiring/wire.verb.ts';
 import { AgentDoor } from '../agents/agent-door.store.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
 import type { AgentName } from '../agents/agents.model.ts';
@@ -112,7 +110,7 @@ const TEMPLATE_CHECK: Command<{ folder: string; digest: string | undefined }> = 
   class: 'read',
   only: HERE,
   manual: TEMPLATE_HELP,
-  handler: (args, _env, home) => rooted(home, 'template lint', lintedTemplate(textOf(args, 'folder') ?? '')),
+  handler: (args) => lintedTemplate(textOf(args, 'folder') ?? ''),
   print: ({ folder, digest }) => [`${folder} passes`, digestLine(digest)],
 };
 
@@ -221,8 +219,7 @@ const TEMPLATE_EXPORT: Command<Exported> = {
   class: 'ask',
   only: HERE,
   manual: TEMPLATE_HELP,
-  handler: (args, _env, home) =>
-    rooted(home, 'template export', exportedTemplate(textOf(args, 'folder') ?? '', textOf(args, 'from') ?? '', textOf(args, 'factory'))),
+  handler: (args) => exportedTemplate(textOf(args, 'folder') ?? '', textOf(args, 'from') ?? '', textOf(args, 'factory')),
   print: ({ dir, from }) => [
     ...from.map(({ part, from: at }) => `${part}  ${at}`),
     `written: ${dir}`,
@@ -255,8 +252,7 @@ const TEMPLATE_PACK: Command<{ out: string; digest: string }> = {
   class: 'ask',
   only: HERE,
   manual: TEMPLATE_HELP,
-  handler: (args, _env, home) =>
-    rooted(home, 'template pack', packedTemplate(textOf(args, 'folder') ?? '', textOf(args, 'out'), process.cwd())),
+  handler: (args) => packedTemplate(textOf(args, 'folder') ?? '', textOf(args, 'out'), process.cwd()),
   print: ({ out, digest }) => [`written: ${out}`, digestLine(digest)],
 };
 
@@ -282,8 +278,7 @@ const TEMPLATE_UNPACK: Command<{ dir: string; digest: string | undefined }> = {
   class: 'ask',
   only: HERE,
   manual: TEMPLATE_HELP,
-  handler: (args, _env, home) =>
-    rooted(home, 'template unpack', unpackedTemplate(textOf(args, 'archive') ?? '', textOf(args, 'dir') ?? '')),
+  handler: (args) => unpackedTemplate(textOf(args, 'archive') ?? '', textOf(args, 'dir') ?? ''),
   print: ({ dir, digest }) => [`written: ${dir}`, digestLine(digest), `lint it: nemia template lint ${dir}`],
 };
 

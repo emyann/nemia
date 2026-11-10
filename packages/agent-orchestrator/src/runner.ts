@@ -36,8 +36,18 @@ export type { SessionHarness, SessionRelease } from './release/release.ts';
 export { currentRelease } from './release/release.store.ts';
 export { runningRelease } from './release/version.verb.ts';
 export { Conflict, Forbidden, Invalid, isRefusal, Missing, type Refusal } from './refusal/refusal.ts';
-export { maxConcurrent, maxRuns, verifiesRest, wfRoot } from './config/config.store.ts';
-export { StoreRoot, storeRootLayer } from './config/root.store.ts';
+export {
+  maxConcurrent,
+  maxRuns,
+  SESSION_VARIABLES,
+  setting,
+  type Settings,
+  settingsOf,
+  StoreConfig,
+  verifiesRest,
+  wfRoot,
+} from './config/config.store.ts';
+export { StoreRoot, storeConfigLayer, storeRootLayer } from './config/root.store.ts';
 export {
   AGENT_FACING,
   CHECK_AFFECTING,
@@ -320,21 +330,7 @@ export type { AgentFill, AgentPlace, AgentReading, AgentsRead, AgentUser, CardRe
 export type { AgentSource } from './sources/sources.ts';
 export type { SkillChange, SkillRead } from './skills/skills.store.ts';
 export { addToInbox, dropFromInbox, inboxNameAt, queueInInbox, readInbox } from './inbox/inbox.store.ts';
-export {
-  addFactory,
-  attachWorkflow,
-  defaultStartsAllowed,
-  factoriesDir,
-  fireAgent,
-  hireAgent,
-  readFactories,
-  readFactory,
-  clearSchedule,
-  removeFactory,
-  setInstruction,
-  setSchedule,
-  startFactory,
-} from './factory/factory.store.ts';
+export { factoriesDirAt, filedAtOnce, listedAtOnce, readFactoryAtOnce, startFactoryAtOnce } from './factory/door/factories.store.ts';
 export { EngineService, HARNESSES, asked, engine, engineOf, remoteAgents, runWith } from './runtime-client.ts';
 export { HARNESS_CHOICES } from 'agent-runtime/vocabulary';
 export { envNameOf } from './harness/a2a.store.ts';

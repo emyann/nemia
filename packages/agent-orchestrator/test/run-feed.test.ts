@@ -12,6 +12,7 @@
  * counts only its own runs' lines. `WF_ROOT` is set before the runner is imported, which reads it as it loads; `WF_VERIFY_REST=1` judges
  * in full every run a pass answers from its memo of runs at rest.
  */
+import { rootNow } from './config-given.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -33,9 +34,7 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
 const {
-  addFactory,
   approveRun,
-  attachWorkflow,
   cancelRun,
   hold,
   unhold,
@@ -48,6 +47,7 @@ const {
   watchFeed,
   runWith: runEngine,
 } = await import('../src/runner.ts');
+const { addFactory, attachWorkflow } = await import('../testing.ts');
 const { recordFeed } = await import('../src/feed/feed.store.ts');
 const { isRunLine } = await import('../src/feed/feed.ts');
 const { runRecord, rewriteRun } = await import('../src/record/record.store.ts');
@@ -1208,8 +1208,8 @@ test("the store's pause and resume, each one line of the store's, said once by t
   const s = story(t);
   emptyStore();
   const { pauseFile, readPause } = await import('../src/pause/pause.store.ts');
-  fs.rmSync(pauseFile(), { force: true });
-  t.after(() => fs.rmSync(pauseFile(), { force: true }));
+  fs.rmSync(pauseFile(rootNow()), { force: true });
+  t.after(() => fs.rmSync(pauseFile(rootNow()), { force: true }));
   const storeSaid = () =>
     readFeed(0)
       .lines.filter((l) => 'store' in l)
@@ -1218,11 +1218,11 @@ test("the store's pause and resume, each one line of the store's, said once by t
   let at = '';
   await s.test('nemia pause, then passes, is one `store paused` of the store, a person’s deed', async () => {
     await printedBy(t, 'pause', '--why', 'a rebase');
-    at = readPause()!.at;
+    at = readPause(rootNow())!.at;
     await ticks(3);
     assert.deepEqual(storeSaid(), [[STORE, 'StorePaused', 'store paused', `since ${at}`, 'person']]);
     const [put] = readFeed(0).lines.filter((l) => 'store' in l);
-    const by = readPause()!.by;
+    const by = readPause(rootNow())!.by;
     assert.deepEqual(
       [put && 'by' in put ? put.by : undefined, put && 'why' in put ? put.why : undefined],
       [by, 'a rebase'],
@@ -1236,7 +1236,7 @@ test("the store's pause and resume, each one line of the store's, said once by t
     assert.equal(storeSaid().length, 1);
   });
   await s.test('a second daemon, with no fold of its own, reading the same store writes the put neither again nor never', async () => {
-    assert.deepEqual(recordFeed(judged(await tick()), { memo: freshFeedMemo(), pause: readPause() }).lines, []);
+    assert.deepEqual(recordFeed(judged(await tick()), { memo: freshFeedMemo(), pause: readPause(rootNow()) }).lines, []);
   });
   await s.test('nemia resume, then passes, is one `store resumed`, read off the put the feed holds', async () => {
     await printedBy(t, 'resume');
@@ -1245,7 +1245,11 @@ test("the store's pause and resume, each one line of the store's, said once by t
       [STORE, 'StorePaused', 'store paused', `since ${at}`, 'person'],
       [STORE, 'StoreResumed', 'store resumed', `since ${at}`, 'person'],
     ]);
-    assert.deepEqual(recordFeed(judged(await tick()), { memo: freshFeedMemo(), pause: readPause() }).lines, [], 'and a restart none');
+    assert.deepEqual(
+      recordFeed(judged(await tick()), { memo: freshFeedMemo(), pause: readPause(rootNow()) }).lines,
+      [],
+      'and a restart none',
+    );
   });
   await s.test('nemia watch -l kind=Store prints the two lines of the store and no other', async () => {
     const printed = (await printedBy(t, 'watch', '--once', '-l', 'kind=Store')).filter((l) => /\d\d:\d\d:\d\d/.test(l));

@@ -4,7 +4,7 @@
  */
 import type { Run } from '../../record/record.ts';
 import type { RecordMemo } from '../../rest/index.ts';
-import { readFactories } from '../factory.store.ts';
+import { listedAtOnce } from '../door/factories.store.ts';
 import type { Factory, Schedule } from '../factory.ts';
 import { firesOf, readScheduleTry } from './schedule.store.ts';
 import { scheduleDue, settledFire, type ScheduleListed, type ScheduleTry } from './schedule.ts';
@@ -42,8 +42,8 @@ const lastRun = (runs: readonly ScheduleRun[], factory: string, workflow: string
     .sort((a, b) => b.due - a.due)[0]?.run;
 
 /** Every schedule of every factory that reads, factories by name, then workflows by name, each read at `now`. */
-export function schedulesRead(runs: readonly ScheduleRun[], now: number): Read[] {
-  return readFactories()
+export function schedulesRead(home: string, runs: readonly ScheduleRun[], now: number): Read[] {
+  return listedAtOnce(home)
     .filter((f): f is Factory & { file: string } => !('error' in f))
     .sort((a, b) => a.name.localeCompare(b.name))
     .flatMap((factory) =>
@@ -85,8 +85,8 @@ function refusedOf(r: Read): string | null {
 }
 
 /** Every factory's schedules as `nemia ls` and the api list them (`ScheduleListed`), at `now`. */
-export function schedulesListed(runs: readonly ScheduleRun[], now: number = Date.now()): ScheduleListed[] {
-  return schedulesRead(runs, now).map((r) => ({
+export function schedulesListed(home: string, runs: readonly ScheduleRun[], now: number = Date.now()): ScheduleListed[] {
+  return schedulesRead(home, runs, now).map((r) => ({
     factory: r.factory.name,
     workflow: r.workflow,
     cron: r.schedule.cron,

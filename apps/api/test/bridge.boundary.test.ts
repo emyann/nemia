@@ -90,7 +90,7 @@ test("a step that says remote: true answers its session's web link on its detail
   const [implement, review] = ((await res.json()) as RunAnswer).status.steps;
   assert.deepEqual(implement.filed?.bridge, { url: 'https://claude.ai/code/session_01StepLink', why: null });
   assert.equal(
-    (await Effect.runPromise(engine().view('r-70-implement'))).bridge?.url,
+    (await Effect.runPromise(engine(process.env).view('r-70-implement'))).bridge?.url,
     implement.filed?.bridge?.url,
     "the link is the engine's own, off the run file its session's holder wrote",
   );

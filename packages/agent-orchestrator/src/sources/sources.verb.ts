@@ -5,7 +5,6 @@
 import { Effect, Schema } from 'effect';
 import type { Command } from '../command/entry.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import { rooted } from '../factory/wiring/wire.verb.ts';
 import { agentSources } from './sources.store.ts';
 import { sourcesLines, type AgentSource } from './sources.ts';
 
@@ -38,11 +37,6 @@ export const AGENTS_SOURCES: Command<{ sources: AgentSource[] }, SourcesInput> =
     why: "the api serves it as the Agent's `sources` verb of `objects`' Api (`GET /api/agents/sources`), which calls this entry's handler: no route of its own",
   },
   input: SourcesInput,
-  handler: ({ path: at }, _env, home) =>
-    rooted(
-      home,
-      'agents sources',
-      Effect.flatMap(StoreRoot, (root) => agentSources({ ...(at !== undefined && { at }), home: root })),
-    ),
+  handler: ({ path: at }) => Effect.flatMap(StoreRoot, (root) => agentSources({ ...(at !== undefined && { at }), home: root })),
   print: sourcesLines,
 };

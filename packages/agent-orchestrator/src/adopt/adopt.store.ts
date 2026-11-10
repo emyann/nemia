@@ -12,7 +12,7 @@ import { Invalid } from '../refusal/refusal.ts';
 import { CardDoor } from '../cards/cards.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { parseInboxCard } from '../inbox/index.ts';
-import { factoriesDirAt } from '../factory/factory.store.ts';
+import { factoriesDirAt } from '../factory/door/factories.store.ts';
 import type { Factory, FactoryTemplate } from '../factory/factory.ts';
 import { readRules, rulesAtHome } from '../factory/rules/rules.store.ts';
 import { appliedDirAt, digestOf, entriesIn, stageFolder, treeDirAt, treeWiringOf, type Entry } from '../factory/applied/applied.store.ts';

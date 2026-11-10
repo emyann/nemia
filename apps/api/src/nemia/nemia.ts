@@ -37,7 +37,7 @@ const NEMIA = 'nemia';
  * written from `words`, cleared with `clear`. A read and a write answer the words; a clear what it removed.
  */
 const custom = (s: Served, args: { words?: string; clear?: true }) =>
-  s.inRequest(AGENTS_CUSTOM.handler({ name: NEMIA, repo: s.repo, ...args }, undefined, s.home));
+  s.inRequest(AGENTS_CUSTOM.handler({ name: NEMIA, repo: s.repo, ...args }));
 
 /** Her custom instructions as a read or a write answers them; a clear's answer here is a fault of the entry's. */
 const wordsOf = async (s: Served, args: { words?: string }) => {
@@ -48,15 +48,15 @@ const wordsOf = async (s: Served, args: { words?: string }) => {
 
 export const nemiaHandlers = HttpApiBuilder.group(Api, 'nemia', (handlers) =>
   handlers
-    .handle('level', () => answered((s) => s.inRequest(LEVEL.handler({}, s.env, s.home))))
-    .handle('setLevel', ({ payload }) => answeredWrite((s) => s.inRequest(LEVEL.handler(payload, s.env, s.home))))
-    .handle('memory', () => answered((s) => s.inRequest(MEMORY.handler({}, s.env, s.home))))
-    .handle('fact', ({ params: { fact } }) => answered((s) => s.inRequest(MEMORY.handler({ fact }, s.env, s.home))))
-    .handle('policy', ({ params: { name } }) => answered((s) => s.inRequest(POLICY.handler({ name }, s.env, s.home))))
+    .handle('level', () => answered((s) => s.inRequest(LEVEL.handler({}))))
+    .handle('setLevel', ({ payload }) => answeredWrite((s) => s.inRequest(LEVEL.handler(payload))))
+    .handle('memory', () => answered((s) => s.inRequest(MEMORY.handler({}))))
+    .handle('fact', ({ params: { fact } }) => answered((s) => s.inRequest(MEMORY.handler({ fact }))))
+    .handle('policy', ({ params: { name } }) => answered((s) => s.inRequest(POLICY.handler({ name }))))
     .handle('confirmRule', ({ params: { name, id }, payload: { words } }) =>
-      answeredWrite((s) => s.inRequest(POLICY_CONFIRM.handler({ name, id, words }, s.env, s.home))),
+      answeredWrite((s) => s.inRequest(POLICY_CONFIRM.handler({ name, id, words }))),
     )
-    .handle('dropRule', ({ params: { name, id } }) => answeredWrite((s) => s.inRequest(POLICY_DROP.handler({ name, id }, s.env, s.home))))
+    .handle('dropRule', ({ params: { name, id } }) => answeredWrite((s) => s.inRequest(POLICY_DROP.handler({ name, id }))))
     .handle('chat', ({ query }) => chatPage(query))
     .handle('chatStream', ({ query, headers }) => chatStream(headers['last-event-id'] || query.after || undefined))
     .handle('chatSend', ({ payload }) => chatSend(payload))

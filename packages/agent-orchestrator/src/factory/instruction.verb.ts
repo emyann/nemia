@@ -10,25 +10,22 @@ import { FactoryInstructionWords } from 'objects';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { defaultFactoryRefusal, DEFAULT_INSTRUCTION, instructionPathRefusal, type InstructionAt } from './factory.ts';
-import { readFactory } from './factory.store.ts';
-import { instructionFile, readInstructionAt, storeKeeps, type FactoryInstruction } from './instruction.store.ts';
-import { FactoryDoor, filedFactory, instructionRead } from './door/factories.store.ts';
+import type { FactoryInstruction } from './instruction.store.ts';
+import { doorAtOnce, FactoryDoor, filedFactory } from './door/factories.store.ts';
 import { FactoryName } from './factory.model.ts';
 import { Conflict, Invalid, type Refusal } from '../refusal/refusal.ts';
-import { rooted } from './wiring/wire.verb.ts';
 import { DEFAULT_NAMESPACE } from 'objects';
 
 export type { FactoryInstruction };
 
 /**
- * The instruction of the factory `name`, read afresh where its file says it is kept (`instructionAt`), at the module's root: the plain
- * spelling the package's entry still exports, for a caller with no root to give. Refused as the door refuses its read.
+ * The instruction of the factory `name` in the store `home`, read afresh where its file says it is kept (`instructionAt`), through the
+ * Factory door at once: the plain spelling the package's entry exports, for a caller that is no program. Refused as the door refuses its
+ * read.
  */
-export function factoryInstruction(name: string): FactoryInstruction {
+export function factoryInstruction(home: string, name: string): FactoryInstruction {
   if (name === DEFAULT_NAMESPACE) throw new Conflict({ message: defaultFactoryRefusal('instruction') });
-  return instructionRead(readFactory(name, 'There is no instruction to read.'), instructionFile(name), readInstructionAt, (file) =>
-    storeKeeps(name, file),
-  );
+  return doorAtOnce(home, (door) => door.instruction.read(FactoryName.read(name)));
 }
 
 /** The instruction of the factory `name`, read through the Factory door. */
@@ -184,7 +181,7 @@ export const FACTORY_INSTRUCTION: Command<FactoryInstruction, InstructionInput> 
     why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Factory's `instruction`, `putInstruction` and `deleteInstruction`, whose handlers call this one by its `input`",
   },
   input: InstructionInput,
-  handler: (args, _env, home) => rooted(home, 'factory instruction', placed(args)),
+  handler: (args) => placed(args),
   print(data, args) {
     const asked = placeAsked(args);
     return asked === undefined ? readLines(data) : [`${data.name}: instruction ${keptLine(data)}`];
@@ -243,7 +240,7 @@ export const FACTORY_INSTRUCT: Command<Instructed, InstructInput> = {
     why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Factory's `putInstructionWords` and `deleteInstructionWords`, whose handlers call this one by its `input`",
   },
   input: InstructInput,
-  handler: (args, _env, home) => rooted(home, 'factory instruct', instructed(args)),
+  handler: (args) => instructed(args),
   print(data) {
     if (data.removed !== undefined)
       return [data.removed ? `${data.name}: instruction removed, ${data.file}` : `${data.name} has no instruction in the store to remove`];

@@ -4,6 +4,8 @@
  * `nemia ls` reads the repository's own checkout as the pass that would file into it reads it (`checkoutHold`, in `ending.verb.ts`). A
  * controller, reaching the runtime through the client (`runtime-client.ts`).
  */
+import { StoreRoot } from '../config/root.store.ts';
+import { type Settings, StoreConfig } from '../config/config.store.ts';
 import { realReleasesDir } from '../release/release.store.ts';
 import { Cause, Effect, Exit } from 'effect';
 import { EngineService, asked, over, unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
@@ -59,8 +61,8 @@ import { currentTasks, finishingAmong, parkedAmong, type Pause, type Paused, typ
  * @param checkout Where the branches stand, as `git` was read off it, to read the run whose `workspace: base` step holds the repository's
  *   own checkout over (`checkoutHold`), as the pass reads it; left out, the tick's last reading (`standingSnapshot`), read only where the
  *   run's ending asks for the checkout.
- * @param env The environment the cap on runs in flight (`WF_MAX_RUNS`) is read over where the checkout is (`checkoutHold`); left out,
- *   the process's.
+ * @param config The settings the cap on runs in flight (`WF_MAX_RUNS`) is read from where the checkout is (`checkoutHold`); left out,
+ *   the program's (`StoreConfig`).
  * @param git The call's branch reader (`standingReader`): what was read of where the result branches stand, never git asked as it goes.
  * @param parent The runs it waits on and is held until, as `parentsRead` read them; left out, read here.
  */
@@ -71,7 +73,7 @@ export type ListReadingHow = {
   standings?: (status: Assessment['status'], steps: readonly Workflow[]) => readonly BranchStanding[];
   slot?: RunSlot;
   checkout?: PassStanding;
-  env?: NodeJS.ProcessEnv;
+  config?: Settings;
   git: BranchReader;
   parent?: (id: string) => ParentRun;
   /**
@@ -112,7 +114,7 @@ export const listReading = Effect.fnUntraced(function* (e: Engine, run: Run, how
   const { steps, views, phaseOf, answers, spendOf } = base;
   const memo = statusMemo(headsOver(git), yield* PlaceService);
   const standing = how.checkout ? Effect.succeed(how.checkout) : standingSnapshot();
-  const checkout = yield* checkoutHold(e, run, steps, { standing }, how.env ?? process.env, memo);
+  const checkout = yield* checkoutHold(e, run, steps, { standing }, how.config ?? (yield* StoreConfig), memo);
   const held = { ...base, checkout };
   const standings = how.standings ? how.standings(assess(held).status, steps) : standingsOf(run, steps, git);
   const read = { ...held, standings };
@@ -181,8 +183,9 @@ const readOrUnjudged = Effect.fnUntraced(function* (
  * (`selectedRuns`), off each composed record before any is judged; the cap, the pause and the schedules are still read of the whole store.
  * A step at work says what its session runs on under the real releases folder of the store at `home`, where it is given (`ranOnOf`).
  */
-export const runsListed = Effect.fn('runsListed')(function* (runId?: string, selectors: Selectors = [], home?: string) {
-  const releases = home === undefined ? undefined : realReleasesDir(home);
+export const runsListed = Effect.fn('runsListed')(function* (runId?: string, selectors: Selectors = []) {
+  const home = yield* StoreRoot;
+  const releases = realReleasesDir(home);
   const e = yield* EngineService;
   const door = yield* RunDoor;
   const all = runId ? [yield* door.runs.read(RunId.read(runId))] : yield* door.runs.list();
@@ -196,7 +199,7 @@ export const runsListed = Effect.fn('runsListed')(function* (runId?: string, sel
   const among = yield* stepsAmong(runs);
   if (runs.length) {
     const viewed = viewedOnce(e);
-    const held = yield* runSlots(viewed, store, process.env, passParents(git));
+    const held = yield* runSlots(viewed, store, yield* StoreConfig, passParents(git));
     for (const run of runs) {
       const read = yield* readOrUnjudged(viewed, run, held.get(run.id), standing, releases);
       const steps = among.get(run.id) ?? [];
@@ -204,10 +207,10 @@ export const runsListed = Effect.fn('runsListed')(function* (runId?: string, sel
       reads.push({ run, read, steps, staged: () => mergeStaged(run, steps, memo) });
     }
   }
-  const pause = readPause();
+  const pause = readPause(home);
   const paused = pause ? { paused: yield* pausedOf(e, pause, store, reads) } : {};
   const read = standing.at === undefined ? { none: true as const } : { at: standing.at };
-  const schedules = runId ? [] : schedulesListed(all);
+  const schedules = runId ? [] : schedulesListed(home, all);
   return {
     runs: listed,
     daemon: daemonStanding(),
@@ -274,8 +277,9 @@ const pausedOf = Effect.fnUntraced(function* (e: Engine, pause: Pause, runs: rea
  * runs that can hold one (`holdingReads`).
  */
 export const pausedRead = Effect.fn('pausedRead')(function* () {
+  const home = yield* StoreRoot;
   const e = yield* EngineService;
-  const pause = readPause();
+  const pause = readPause(home);
   if (!pause) return { pause: null, finishing: [], parked: [], staged: [], held: [] } satisfies Paused;
   const runs = yield* (yield* RunDoor).runs.list();
   const viewed = viewedOnce(e);

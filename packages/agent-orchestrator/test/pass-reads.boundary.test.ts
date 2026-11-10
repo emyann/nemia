@@ -14,6 +14,8 @@
  * `WF_ROOT` is set before the runner is imported: the module reads it as it loads. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo of runs at rest; each pass here is handed a fresh memo, so none is.
  */
+import { configGiven, rootNow } from './config-given.ts';
+import { settingsOf } from '../src/config/config.store.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -269,7 +271,7 @@ row(ONCE, "a pass reads each task's view once, and once more after a write of th
 
 row(ONCE, "the cap's slots are read once for the pass, however many claims ask", async () => {
   const { b } = await theStore();
-  const read = passRead(b.e, runStore.runs.list(), process.env, NOTHING_READ, aPassRevisions());
+  const read = passRead(b.e, runStore.runs.list(), settingsOf(process.env), NOTHING_READ, aPassRevisions());
   b.lists.calls = 0;
   const first = await Effect.runPromise(read.slots);
   const second = await Effect.runPromise(read.slots);
@@ -328,9 +330,9 @@ row(ONCE, "a run's own claim on the checkout reads the slot its pass gave it, an
         },
         slot: undefined,
       },
-      process.env,
+      settingsOf(process.env),
       statusMemo(() => undefined, builtinGitPlace),
-    ),
+    ).pipe(Effect.provide(configGiven(rootNow(), process.env))),
   );
   assert.equal(hold, undefined, 'no other run claims the checkout in what the pass listed');
   assert.equal(asked, 0, "the cap's slots are not read for the run's own claim");

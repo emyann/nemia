@@ -12,6 +12,7 @@
  *
  * And the daemon's other sweep, of the store's disk (`disk`): that `up` forks it once its first pass answered and hands its reading on.
  */
+import { configGiven, rootNow } from './config-given.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -22,7 +23,7 @@ import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { steeredClock } from './steered.ts';
 import type { PlaceRequests, PlaceVerb } from '../src/place/place.ts';
-import { storeRootLayer } from '../src/config/root.store.ts';
+import { storeConfigLayer } from '../src/config/root.store.ts';
 
 const ROOT = scratch('wf-free-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -147,6 +148,7 @@ async function sweep(pass: Pass, ids: readonly string[], memory: Memory) {
   const done = await runEngine(
     engine(),
     freeOnce(answers, memory).pipe(
+      Effect.provide(configGiven(rootNow(), process.env)),
       Effect.provide(counting(asked)),
       Effect.provide(Logger.layer([keeper])),
       Effect.provideService(References.MinimumLogLevel, 'Info'),
@@ -487,7 +489,7 @@ test(
       const daemon = Effect.runFork(
         Effect.scoped(up(engine(), { every: 20, repo: ROOT, holder: 'up' })).pipe(
           Effect.provide(stage.place().layer),
-          Effect.provide(storeRootLayer(process.env)),
+          Effect.provide(storeConfigLayer(process.env)),
           Effect.provide(Logger.layer([])),
         ),
       );
@@ -506,7 +508,7 @@ test(
         const daemon = Effect.runFork(
           Effect.scoped(up(engine(), { every: 20, repo: ROOT, holder: 'up', onTaken: () => turns })).pipe(
             Effect.provide(stage.place().layer),
-            Effect.provide(storeRootLayer(process.env)),
+            Effect.provide(storeConfigLayer(process.env)),
             Effect.provide(Logger.layer([])),
           ),
         );
@@ -553,6 +555,7 @@ test(
     const clock = steeredClock();
     const loop = Effect.runFork(
       free(answers).pipe(
+        Effect.provide(storeConfigLayer(process.env)),
         Effect.provide(EngineService.layer(engine())),
         Effect.provide(stage.place().layer),
         Effect.provide(Logger.layer([keeper])),

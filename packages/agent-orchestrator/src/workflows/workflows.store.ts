@@ -279,9 +279,10 @@ export function workflowFiles(home: string): WorkflowLayer {
 }
 
 /**
- * The Workflow door, as the service a program yields: a reference whose default is rooted (`rootedDoor`) — the door over the files at
- * the store's root the program is given, refused `Invalid` where it was given none — so a handler that yields it is run through
- * `rooted(home, verb, program)` (`src/factory/wiring/wire.verb.ts`), and a test gives `workflowDoorMemory()` with no root at all.
+ * The Workflow door, as the service a program yields: a reference whose default is rooted (`rootedDoor`) — the door over the files at the
+ * store's root the program is given, refused `Invalid` where it was given none — so a handler that yields it is run where its program is
+ * composed with `StoreRoot` (`storeConfigLayer`, `src/config/root.store.ts`), and a test gives `workflowDoorMemory()` with no root at
+ * all.
  */
 export const WorkflowDoor = Context.Reference<WorkflowDoorShape>('agent-orchestrator/WorkflowDoor', {
   defaultValue: () => rootedDoor((root) => workflowDoorOver(workflowFiles(root)), 'Workflow door'),

@@ -202,7 +202,7 @@ export const skillsHandlers = HttpApiBuilder.group(Api, 'skills', (handlers) =>
     .handle('copy', ({ params: { namespace, name } }) =>
       answeredWriteIn(namespace, async (s) => {
         writeGoes(namespace, 'act', thereOf(await heldIn(s), name));
-        await s.inRequest(SKILLS_WRITE.handler({ from: 'yours', copy: name, builtin: BUILTIN_SKILLS }, undefined, s.home));
+        await s.inRequest(SKILLS_WRITE.handler({ from: 'yours', copy: name, builtin: BUILTIN_SKILLS }));
         return skillAt(s, namespace, name, 'yours');
       }),
     )

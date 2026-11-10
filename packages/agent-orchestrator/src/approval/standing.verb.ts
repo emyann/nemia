@@ -3,6 +3,7 @@
  * level in force (`levelOfFactory`), the grants of the delegation the person wrote it there (`DelegationDoor`, none by default), and the
  * rules for auto the person confirmed it over that factory's proposals (`proposalRulesIn`). Read afresh at each approval and each pass.
  */
+import { StoreRoot } from '../config/root.store.ts';
 import { Effect } from 'effect';
 import type { Proposal } from 'objects';
 import type { ProposalFacts, ProposalRule, Standing } from '../../contracts/proposal-approval.contract.ts';
@@ -16,7 +17,7 @@ import { DelegationDoor } from '../delegation/delegation.store.ts';
 /** `agent`'s standing in `factory`, in the store `home`: none of its confirmed rules read where the person's list does not read. */
 export const standingOf = (home: string, agent: string, factory: string): Effect.Effect<Standing, Refusal> =>
   Effect.gen(function* () {
-    const level = yield* levelOfFactory(factory);
+    const level = yield* levelOfFactory(factory).pipe(Effect.provideService(StoreRoot, home));
     const delegation = yield* (yield* DelegationDoor).delegations.read(factory, agent);
     const list = yield* tried(() => listInForce(readConfirmed(home, agent)?.rules)).pipe(Effect.orElseSucceed(() => []));
     const rules: ProposalRule[] = proposalRulesIn(list, factory).map((r) => ({

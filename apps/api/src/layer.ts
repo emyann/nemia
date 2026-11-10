@@ -2,9 +2,9 @@
  * What the api's handlers run on: the services every route may read, the runtime an app builds from their layer (`appOf` in app.ts), and
  * `served`, which runs a handler on the request's runtime over them. A test gives the api another environment, engine, root, asker or
  * memo by building an app over a layer of its own, and what the app keeps between requests is its own (`ReadMemo`, the askers, the steps
- * followed: `Followings`). The root is the app's own service, given where the app's layer is composed from `WF_ROOT` (`StoreRoot`,
- * store.ts; `storeRootLayer` at `app.ts`): what the package still reads off a root of its own as it loads is named in its
- * `test/global-roots.baseline.ts`.
+ * followed: `Followings`). The root and the settings are the app's own services, given where the app's layer is composed from its
+ * environment (`StoreRoot` and `StoreConfig`, store.ts; `storeConfigLayer` at `app.ts`): what the package still reads off a root of its
+ * own as it loads is named in its `test/global-roots.baseline.ts`.
  */
 import { Context, type Duration, Effect, Layer, type ManagedRuntime, Metric, Tracer } from 'effect';
 import type { Context as RequestContext } from 'hono';
@@ -32,7 +32,7 @@ import { routeOf } from './request/request.ts';
 import { type Place, placeFor } from './factory/place.ts';
 import { QuotaAsker } from './gauges/quota.ts';
 import { Followings } from './steps/following.ts';
-import { Engine, type RequestTrace, StoreRoot } from './store.ts';
+import { Engine, type RequestTrace, StoreConfig, StoreRoot } from './store.ts';
 import type { StepRun } from './step/step.ts';
 
 /**
@@ -102,7 +102,7 @@ export const Beats = Context.Reference<BeatsShape>('api/Beats', { defaultValue: 
  * Every service a handler may read: what an app's layer provides whole, the steps followed live among them (`Followings`), and the place
  * the package's programs ask (`PlaceService`).
  */
-export type Services = ApiConfig | Engine | StoreRoot | McpAsker | QuotaAsker | ReadMemo | Followings | PlaceService;
+export type Services = ApiConfig | Engine | StoreRoot | StoreConfig | McpAsker | QuotaAsker | ReadMemo | Followings | PlaceService;
 
 /** The runtime an app runs its handlers on, built once from its layer. */
 export type ApiRuntime = ManagedRuntime.ManagedRuntime<Services, never>;
@@ -140,6 +140,8 @@ export type Served = {
   e: Engine['Service'];
   placeService: PlaceService['Service'];
   home: string;
+  /** The store's settings the app's layer gave (`StoreConfig`), which a package program run apart is given (`runPlaced`). */
+  config: StoreConfig['Service'];
   mcp: McpAsker['Service'];
   quota: QuotaAsker['Service'];
   memo: ReadMemo['Service'];
@@ -209,13 +211,15 @@ export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | 
         const e = yield* Engine;
         const inRequest = <A, E>(program: Effect.Effect<A, E, Services | EngineService>): Promise<A> =>
           Effect.runPromiseWith(context)(underRequest(c, Effect.provideService(program, EngineService, e)));
-        const placedIn = (namespace: string): Place => placeFor({ factory: namespace, repo: c.req.query('repo') }, env, running);
+        const home = yield* StoreRoot;
+        const placedIn = (namespace: string): Place => placeFor({ factory: namespace, repo: c.req.query('repo') }, env, home, running);
         const services = {
           env,
           running,
           e,
           placeService: yield* PlaceService,
-          home: yield* StoreRoot,
+          home,
+          config: yield* StoreConfig,
           mcp: yield* McpAsker,
           quota: yield* QuotaAsker,
           memo: yield* ReadMemo,
@@ -229,7 +233,7 @@ export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | 
         };
         const before = yield* readsOf(services.e);
         return yield* Effect.promise(async () =>
-          handle({ ...services, ...placeFor({ factory: c.req.query('factory'), repo: c.req.query('repo') }, env, running) }),
+          handle({ ...services, ...placeFor({ factory: c.req.query('factory'), repo: c.req.query('repo') }, env, home, running) }),
         ).pipe(
           Effect.ensuring(
             Effect.flatMap(readsOf(services.e), (after) =>

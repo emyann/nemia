@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer, Logger, Option, References, Tracer } from 'effect';
-import { addFactory, attachWorkflow } from 'agent-orchestrator';
+import { addFactory, attachWorkflow } from 'agent-orchestrator/testing';
 import { appOf, liveOf } from '../src/app.ts';
 import { tookOf } from '../src/request/request.ts';
 import { until, WAITED } from 'agent-runtime/testing';

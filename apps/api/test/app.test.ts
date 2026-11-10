@@ -767,7 +767,7 @@ test("a store's runs read on the list and on a run's page: each summarized with 
   await s.test(
     'the api words a step as list does — `unknown` for a task the engine has no record of, `pending` for one queued',
     async () => {
-      const e = engine();
+      const e = engine(process.env);
       for (const id of ['r-2', 'r-4', 'r-5']) {
         const words = await runWith(e, list(e, runStore.runs.read(id)));
         const run = await listed(id);
@@ -1161,7 +1161,9 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
         ['implement', 'review'],
       );
       assert.deepEqual(
-        (await runWith(engine(), list(engine(), runStore.runs.read('r-43')))).steps.map((s: { name: string }) => s.name),
+        (await runWith(engine(process.env), list(engine(process.env), runStore.runs.read('r-43')))).steps.map(
+          (s: { name: string }) => s.name,
+        ),
         ['implement', 'review'],
         'the steps `nemia ls` lists, and no other',
       );
@@ -1572,7 +1574,7 @@ type Judgement = [
  * Each run on both endpoints: where it stands, whether it moves, who it waits on, each step's word and note — and those are `nemia ls`'s.
  */
 async function expectJudged(cases: readonly Judgement[]) {
-  const e = engine();
+  const e = engine(process.env);
   for (const [id, status, moving, waitingOnYou, rows, why] of cases) {
     const words = await runWith(e, list(e, runStore.runs.read(id)));
     for (const [where, run] of [
@@ -1624,7 +1626,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
     assert.equal(detail.warning, null);
   });
   await s.test("the api's words, and who it says is waited on, are `list`'s — a refused check's exit code among them", async () => {
-    const e = engine();
+    const e = engine(process.env);
     for (const id of ['r-20', 'r-21']) {
       const words = await runWith(e, list(e, runStore.runs.read(id)));
       const detail = (await objectOf(app, id)).status;
@@ -1801,7 +1803,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
         steps: { a: { taskId: 't-28-a', check: { taskId: 'r-28-a-check' } }, b: { taskId: null } },
       });
 
-      const e = engine();
+      const e = engine(process.env);
       const cases: Array<[id: string, status: string, moving: boolean, waitingOnYou: string[], word: string, why: string]> = [
         [
           'r-27',
@@ -2433,7 +2435,7 @@ test("what a step runs with: the workflow's effort, context and tools, the mode 
     "a step says what it runs with: the workflow's effort, context window and tools, and what the engine filed its try with where the workflow says nothing",
     async () => {
       await Effect.runPromise(
-        engine().file({
+        engine(process.env).file({
           id: 'r-51-implement',
           brief: 'Implement it.',
           cwd: '/code/app',
@@ -2504,7 +2506,7 @@ test("what a step runs with: the workflow's effort, context and tools, the mode 
   await s.test(
     'a step says the mode its session runs in, as its harness decides it — a Codex sandbox narrowed by its tools, read-only for a reviewer that may not write whatever mode it named — at shipped defaults',
     async () => {
-      const e = engine();
+      const e = engine(process.env);
       const cases: Array<[id: string, spec: { harness: string; permissionMode?: string; tools?: string[] }, runsIn: object]> = [
         ['r-54-claude', { harness: 'claude' }, { mode: 'auto', by: 'default' }],
         ['r-54-claude-mode', { harness: 'claude', permissionMode: 'dontAsk' }, { mode: 'dontAsk', by: 'filed' }],
@@ -2539,7 +2541,7 @@ test("what a step runs with: the workflow's effort, context and tools, the mode 
       ] as const) {
         const spec = { harness: 'claude', ...(permissionMode ? { permissionMode } : {}) };
         await Effect.runPromise(
-          engine().file({
+          engine(process.env).file({
             id: `${id}-implement`,
             brief: 'Implement it.',
             cwd: '/code/app',
@@ -2599,7 +2601,7 @@ test("what a step runs with: the workflow's effort, context and tools, the mode 
     "a model a person's `nemia retry --model` asked for is on the try it was asked for, past a recheck — and on no other",
     async () => {
       await Effect.runPromise(
-        engine().file({
+        engine(process.env).file({
           id: 'r-55-implement-try2',
           brief: 'Implement it.',
           cwd: '/code/app',
@@ -2962,7 +2964,7 @@ test("where a run's time and tokens went, on its list line and its page, and the
         [4, 1, '17s', '26m15s, 1 still running', 'still going'],
       );
 
-      const e = engine();
+      const e = engine(process.env);
       const views = new Map((await Effect.runPromise(e.list())).views.map((view) => [view.id, view]));
       const { filed } = await runWith(e, filingsRead());
       const theirs = timeline(runStore.runs.read('r-60'), views, filed);
@@ -3056,7 +3058,7 @@ test("where a run's time and tokens went, on its list line and its page, and the
       assert.deepEqual(run.tokens, summary.tokens, "the run's page carries the same total, with its split");
       assert.equal(run.tokens?.split, '2.7M read from the cache · 230k written to it · 70k uncached · 40k out');
 
-      const views = new Map((await Effect.runPromise(engine().list())).views.map((view) => [view.id, view]));
+      const views = new Map((await Effect.runPromise(engine(process.env).list())).views.map((view) => [view.id, view]));
       const record = runStore.runs.read('r-61');
       assert.deepEqual(
         { atWork: summary.atWork, tokens: summary.tokens },

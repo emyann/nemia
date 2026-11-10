@@ -14,7 +14,7 @@ const ROOT = scratch('wf-reads-verb-');
 process.env.WF_ROOT = ROOT;
 const { workflowsOf } = await import('./reads.verb.ts');
 const { loadWorkflows } = await import('../workflows/workflows.store.ts');
-const { addFactory, attachWorkflow, hireAgent, removeFactory } = await import('../factory/factory.store.ts');
+const { addFactory, attachWorkflow, hireAgent, removeFactory } = await import('../../testing.ts');
 const { DEFAULT_NAMESPACE } = await import('../factory/factory.ts');
 type Run = import('../record/record.ts').Run;
 

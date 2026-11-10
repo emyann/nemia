@@ -5,6 +5,7 @@
  * refusal of its latest fire. The default factory schedules nothing. What a schedule fired is found among every run's record, read through
  * the memo a caller that polls hands in (`keptRuns`): a warm read reads no finished run's record, and a run started since is read.
  */
+import { setting } from '../../config/config.store.ts';
 import { Effect } from 'effect';
 import { API_VERSION, type Schedule, type ScheduleList } from 'objects';
 import type { FactoryListing } from '../factory.ts';
@@ -47,7 +48,8 @@ export const scheduleOf = (s: ScheduleListed, listing: Exclude<FactoryListing, {
 const schedulesOf = Effect.fn('schedulesOf')(function* (home: string, repo: string, namespace: string, memo: ScheduleRuns | undefined) {
   const { listing } = yield* factoryFiled(home, repo, namespace);
   if (listing === undefined || 'error' in listing) return [];
-  const listed = yield* tried(() => schedulesListed(keptRuns(memo, scheduleRun)));
+  const verify = yield* setting('verifyRest');
+  const listed = yield* tried(() => schedulesListed(home, keptRuns(memo, scheduleRun, verify)));
   return listed.filter((s) => s.factory === namespace).map((s) => scheduleOf(s, listing));
 });
 

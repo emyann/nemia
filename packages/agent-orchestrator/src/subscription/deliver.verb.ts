@@ -25,6 +25,7 @@
  *
  * A controller: it reaches the runtime through the client (`EngineService`), run by `up` (`daemon/up.verb.ts`) once it holds the store.
  */
+import type { StoreRoot } from '../config/root.store.ts';
 import { Cause, Data, Effect, FiberMap, Metric, Ref, Schedule, Semaphore, Stream, type Duration } from 'effect';
 import type { NonEmptyReadonlyArray } from 'effect/Array';
 import { instantNow } from '../daemon/daemon.store.ts';
@@ -150,7 +151,7 @@ const saidOnce = (): SaidOnce => {
  * Whether the subscription carries a line of the run `run`: unscoped, always; scoped, where the run's factory is at its floor now. A run
  * that does not read is not carried; a level that does not read fails (`LevelUnread`), and a defect is not caught.
  */
-const carries = (d: Delivering, run: string): Effect.Effect<boolean, LevelUnread> => {
+const carries = (d: Delivering, run: string): Effect.Effect<boolean, LevelUnread, StoreRoot> => {
   const floor = d.sub.scope?.atLeast;
   if (floor === undefined) return Effect.succeed(true);
   return Effect.gen(function* () {
@@ -168,7 +169,7 @@ const carries = (d: Delivering, run: string): Effect.Effect<boolean, LevelUnread
  * One read of the feed, its lines ending at `cursor`, delivered: a run's line the subscription does not carry passed, a daemon's carried
  * by every one; where a carried line wakes, the message said, then the cursor kept; else the routine lines folded into the digest.
  */
-const onLines = (d: Delivering, lines: readonly FeedLine[], cursor: number): Effect.Effect<void, LevelUnread, EngineService> =>
+const onLines = (d: Delivering, lines: readonly FeedLine[], cursor: number): Effect.Effect<void, LevelUnread, EngineService | StoreRoot> =>
   Effect.gen(function* () {
     const at = yield* Ref.get(d.state);
     const carried = yield* Effect.filter(lines, (line) => (isRunLine(line) ? carries(d, line.run) : Effect.succeed(true)));
@@ -196,7 +197,7 @@ const digestPass = (d: Delivering): Effect.Effect<void, never, EngineService> =>
  */
 const onRead =
   (d: Delivering) =>
-  (items: NonEmptyReadonlyArray<Followed>): Effect.Effect<void, LevelUnread, EngineService> =>
+  (items: NonEmptyReadonlyArray<Followed>): Effect.Effect<void, LevelUnread, EngineService | StoreRoot> =>
     Effect.gen(function* () {
       for (const item of items)
         if (item.kind === 'unreadable') yield* Effect.logWarning(`the subscription ${d.name} waits for the feed to read: ${item.error}`);
@@ -219,7 +220,7 @@ const GATHERED = 1024;
  * The feed followed from the cursor, for ever, a read at a time; cut under it, read again from its start; a read whose level does not
  * read, said once and read again from the cursor kept a beat later.
  */
-const reading = (d: Delivering): Effect.Effect<never, never, EngineService> =>
+const reading = (d: Delivering): Effect.Effect<never, never, EngineService | StoreRoot> =>
   Effect.suspend(() => Ref.get(d.state)).pipe(
     Effect.flatMap((at) =>
       followFeed(at.cursor, { beat: d.o.beat }).pipe(
@@ -246,7 +247,12 @@ const reading = (d: Delivering): Effect.Effect<never, never, EngineService> =>
  * The subscription `name` delivered, from where its deliverer's file says it was if the file was written for it, else from its `from`,
  * until interrupted.
  */
-const delivering = (name: string, sub: Subscription, o: DeliverOptions, say: SaidOnce): Effect.Effect<never, never, EngineService> =>
+const delivering = (
+  name: string,
+  sub: Subscription,
+  o: DeliverOptions,
+  say: SaidOnce,
+): Effect.Effect<never, never, EngineService | StoreRoot> =>
   Effect.gen(function* () {
     const read = yield* (yield* SubscriptionDoor).deliveries.read(SubscriptionName.read(name)).pipe(Effect.orDie);
     if (read !== null && 'unread' in read) yield* say(read.unread);
@@ -295,7 +301,7 @@ const reconcile = (fibers: FiberMap.FiberMap<string>, started: Map<string, strin
  * The deliverer, for as long as it runs: the subscriptions read again each `every` (`reconcile`), each delivered by a fiber of its own.
  * A read that throws is a warning, and the next is tried a beat later.
  */
-export const deliver = (options: Partial<DeliverOptions> = {}): Effect.Effect<never, never, EngineService> => {
+export const deliver = (options: Partial<DeliverOptions> = {}): Effect.Effect<never, never, EngineService | StoreRoot> => {
   const o = { ...DELIVER_DEFAULTS, ...options };
   return Effect.scoped(
     Effect.gen(function* () {

@@ -9,7 +9,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { addFactory, factoryRules } from 'agent-orchestrator';
+import { factoryRules } from 'agent-orchestrator';
+import { addFactory } from 'agent-orchestrator/testing';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 import { app } from '../app.ts';
@@ -101,7 +102,7 @@ test('the rules routes: what a read or a write refuses, writing nothing', async 
     const ghost = await refused(() => app.request('/api/factories/ghost/rules'), 404);
     assert.equal(
       ghost,
-      packageSays(() => factoryRules('ghost')),
+      packageSays(() => factoryRules(root, 'ghost')),
     );
     for (const fact of ['ghost', 'mill']) assert.ok(ghost.includes(fact), `${fact}: ${ghost}`);
     assert.match(await refused(() => send('PUT', '/api/factories/ghost/rules', { words: 'x' }), 404), /Nothing was written\.$/);
@@ -111,7 +112,7 @@ test('the rules routes: what a read or a write refuses, writing nothing', async 
     const fallback = await refused(() => app.request('/api/factories/default/rules'), 409);
     assert.equal(
       fallback,
-      packageSays(() => factoryRules('default')),
+      packageSays(() => factoryRules(root, 'default')),
     );
     assert.match(fallback, /nemia factory rules does not take it/);
     await refused(() => send('PUT', '/api/factories/default/rules', { words: 'No.' }), 409);

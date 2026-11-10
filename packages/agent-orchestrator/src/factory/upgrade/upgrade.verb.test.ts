@@ -24,7 +24,8 @@ process.env.WF_ROOT = ROOT;
 const FACTORIES = path.join(ROOT, 'factories');
 const { templated: programsAt } = await import('../../../test/templated.ts');
 const { exportTemplate, reconciled } = programsAt(ROOT);
-const { FACTORY_RULES, factoryRules, readFactory, runWith: runEngine } = await import('../../runner.ts');
+const { FACTORY_RULES, factoryRules, runWith: runEngine } = await import('../../runner.ts');
+const { readFactory } = await import('../../../testing.ts');
 const stand = eachTest(testPlace);
 const runWith = runOver(runEngine, () => stand().layer);
 const { main: cli } = await import('../../cli/main.ts');
@@ -352,7 +353,7 @@ test("a factory's rules carried by an upgrade: taken where the tree has none, a 
     assert.equal(status.upgrade, undefined, 'no conflict');
     assert.equal(textIn(treeDir('ruled'), RULES), 'Never push on a Friday.\n');
     assert.equal(textIn(appliedDir('ruled'), RULES), 'Never push on a Friday.\n');
-    assert.deepEqual(factoryRules('ruled'), {
+    assert.deepEqual(factoryRules(ROOT, 'ruled'), {
       name: 'ruled',
       file: path.join(treeDir('ruled'), RULES),
       words: 'Never push on a Friday.',
@@ -364,7 +365,7 @@ test("a factory's rules carried by an upgrade: taken where the tree has none, a 
     async (t) => {
       t.mock.method(console, 'log', () => {});
       const { dir } = await applied('both');
-      await runWith(noEngine(), FACTORY_RULES.handler({ factory: 'both', words: 'Ours: push whenever.' }, undefined, ROOT));
+      await runWith(noEngine(), FACTORY_RULES.handler({ factory: 'both', words: 'Ours: push whenever.' }));
       assert.equal(textIn(treeDir('both'), RULES), 'Ours: push whenever.\n', "a templated factory's rules are its tree's");
       released(dir, '0.2.0', 5);
       fs.writeFileSync(path.join(dir, RULES), 'Theirs: never push on a Friday.\n');
@@ -605,7 +606,7 @@ const { withBuiltins } = await import('../../../test/templated.ts');
 
 /** The handler of `command` over `args`, with `builtins` as the folder of the builtin templates. */
 const handledWith = <D extends object>(builtins: string, command: Command<D>, args: Args) =>
-  runWith(noEngine(), withBuiltins(command.handler(args, undefined, ROOT), builtins));
+  runWith(noEngine(), withBuiltins(command.handler(args), builtins));
 
 test('--template names a builtin template by its name: an upgrade records the name, and a name no builtin has is refused', async (t) => {
   t.mock.method(console, 'log', () => {});

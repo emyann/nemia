@@ -4,6 +4,7 @@
  * is the store's own, on a scratch `WF_ROOT`, set before the import since the pause's store reads it as it loads. Each host keeps a log of
  * what it was asked, in order, which the take-over's tests read.
  */
+import { configGiven, rootNow } from '../../test/config-given.ts';
 import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -127,7 +128,7 @@ function hostOf(world: World): { host: ServiceHost; events: string[] } {
       return '';
     },
     linger: () => true,
-    standing: readPause,
+    standing: () => readPause(rootNow()),
     lease: () => {
       const read = world.lease;
       const next = world.later?.shift();
@@ -142,13 +143,13 @@ function hostOf(world: World): { host: ServiceHost; events: string[] } {
       world.onSignal?.();
     },
     pause: (said) => {
-      const put = putPause(said);
+      const put = putPause(rootNow(), said);
       events.push('pause');
       return put;
     },
     resume: () => {
       events.push('resume');
-      return resumePause();
+      return resumePause(rootNow());
     },
     calls: () =>
       Effect.sync(() => {
@@ -175,6 +176,7 @@ const install = (args: Args, host: ServiceHost) => runWith(engineOf(engine().lay
  */
 const taking = (host: ServiceHost, clock?: Steered) => {
   const program = installService({ takeOver: String(OLD) }, host).pipe(
+    Effect.provide(configGiven(rootNow(), process.env)),
     Effect.provide(EngineService.layer(engineOf(engine().layer))),
     Effect.provide(stand().layer),
   );
@@ -206,7 +208,7 @@ let telling = false;
 beforeEach(() => {
   if (telling) return;
   fs.rmSync(path.join(HOME, '.config'), { recursive: true, force: true });
-  fs.rmSync(pauseFile(), { force: true });
+  fs.rmSync(pauseFile(rootNow()), { force: true });
 });
 
 /** A unit written for the service, as install leaves it, so a restart finds it installed. */
@@ -260,7 +262,7 @@ test('a hand daemon handed to the service: install, --take-over <pid>, restarts,
     ]);
     assert.match(events[5], new RegExp(`^say pid ${NEW} ticks the store`));
     assert.deepEqual(events.slice(6), [`read ${NEW} passed`, 'resume']);
-    assert.equal(readPause(), null);
+    assert.equal(readPause(rootNow()), null);
     assert.ok(
       done.lines.some((l) => l.includes(`took the store over from pid ${OLD}`) && l.includes(`as pid ${NEW}`)),
       done.lines.join('\n'),
@@ -294,7 +296,7 @@ test('a hand daemon handed to the service: install, --take-over <pid>, restarts,
     assert.deepEqual(events.slice(4), [`read ${NEW} passed`, 'resume']);
     assert.equal(done.did, 'restarted');
     assert.equal(done.pid, NEW);
-    assert.equal(readPause(), null);
+    assert.equal(readPause(rootNow()), null);
     assert.match(done.lines[0], new RegExp(`pid ${OLD} stopped, and pid ${NEW} ticks the store`));
   });
 
@@ -341,7 +343,7 @@ test('a hand daemon handed to the service: install, --take-over <pid>, restarts,
   await s.test(
     'a pause a person put stands through a restart, and through one where nothing ticks: neither put again nor lifted',
     async () => {
-      putPause({ by: 'ann', why: 'reading the night' });
+      putPause(rootNow(), { by: 'ann', why: 'reading the night' });
       for (const ticking of [true, false]) {
         const world: World = ticking ? { lease: lease(OLD), unitPid: OLD } : { lease: lease(OLD, 'stopped'), unitPid: null };
         world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
@@ -349,7 +351,7 @@ test('a hand daemon handed to the service: install, --take-over <pid>, restarts,
         const { host, events } = hostOf(world);
         const done = await restart({}, host);
         assert.ok(!events.includes('pause') && !events.includes('resume'), events.join('\n'));
-        assert.equal(readPause()?.by, 'ann');
+        assert.equal(readPause(rootNow())?.by, 'ann');
         assert.equal(done.did, ticking ? 'restarted' : 'started');
         assert.equal(done.paused, true);
         assert.ok(
@@ -357,7 +359,7 @@ test('a hand daemon handed to the service: install, --take-over <pid>, restarts,
           done.lines.join('\n'),
         );
       }
-      resumePause();
+      resumePause(rootNow());
     },
   );
 
@@ -442,7 +444,7 @@ test('REFUSED: install, --take-over and restart, each by its kind and naming its
           refusedWith('Conflict', /nemia service status/, /nemia resume/, /systemctl --user start nemia\.service/)(err) &&
           !/was started/.test(err.message),
       );
-      assert.ok(readPause() !== null);
+      assert.ok(readPause(rootNow()) !== null);
       assert.ok(events.includes('systemctl --user start nemia.service') && !events.includes('resume'), events.join('\n'));
     },
   );
@@ -468,7 +470,7 @@ test('REFUSED: install, --take-over and restart, each by its kind and naming its
       refusedWith('Conflict', new RegExp(`ps -p ${OLD}`), /systemctl --user start nemia\.service/, /nemia resume/),
     );
     assert.ok(!events.includes('systemctl --user start nemia.service'), events.join('\n'));
-    assert.ok(readPause() !== null, 'the store stays paused');
+    assert.ok(readPause(rootNow()) !== null, 'the store stays paused');
   });
 
   await t.test('restart whose start the system refuses: Conflict carrying its line, the start line and the log', async () => {
@@ -494,7 +496,7 @@ test('REFUSED: install, --take-over and restart, each by its kind and naming its
     const { host, events } = hostOf({ lease: lease(OLD), unitPid: null });
     await assert.rejects(install({ takeOver: String(OLD) }, { ...host, stopMs: 30 }), refusedWith('Conflict', new RegExp(`ps -p ${OLD}`)));
     assert.ok(!events.includes('systemctl --user start nemia.service'), events.join('\n'));
-    assert.ok(readPause() !== null);
+    assert.ok(readPause(rootNow()) !== null);
   });
 
   for (const ended of ['stopped', 'gone'] as const)
@@ -516,7 +518,7 @@ test('REFUSED: install, --take-over and restart, each by its kind and naming its
           ),
         );
         assert.ok(!events.includes('resume'), events.join('\n'));
-        assert.ok(readPause() !== null, 'the store stays paused');
+        assert.ok(readPause(rootNow()) !== null, 'the store stays paused');
       },
     );
 
@@ -542,7 +544,7 @@ test('REFUSED: install, --take-over and restart, each by its kind and naming its
       refusedWith('Conflict', /journalctl --user -u nemia\.service/, /nemia service status/, /nemia resume/),
     );
     assert.ok(!events.includes('resume'), events.join('\n'));
-    assert.match(readPause()?.why ?? '', new RegExp(`pid ${OLD}`));
+    assert.match(readPause(rootNow())?.why ?? '', new RegExp(`pid ${OLD}`));
   });
 
   await t.test('restart beside a daemon started by hand: Conflict naming its --take-over line, nothing signalled', async () => {
@@ -550,21 +552,21 @@ test('REFUSED: install, --take-over and restart, each by its kind and naming its
     const { host, events } = hostOf({ lease: lease(OLD), unitPid: null });
     await assert.rejects(restart({}, host), refusedWith('Conflict', new RegExp(`nemia service install --take-over ${OLD}`)));
     assert.deepEqual(events, []);
-    assert.equal(readPause(), null);
+    assert.equal(readPause(rootNow()), null);
   });
 
   await t.test('restart with no service installed: Missing, naming nemia service install', async () => {
     const { host, events } = hostOf({ lease: lease(OLD, 'stopped'), unitPid: null });
     await assert.rejects(restart({}, host), refusedWith('Missing', /no service nemia/, /nemia service install/));
     nothingWritten(events);
-    assert.equal(readPause(), null);
+    assert.equal(readPause(rootNow()), null);
   });
 
   await t.test('restart with no service installed beside a daemon: Missing, naming its --take-over line', async () => {
     const { host, events } = hostOf({ lease: lease(OLD), unitPid: null });
     await assert.rejects(restart({}, host), refusedWith('Missing', new RegExp(`nemia service install --take-over ${OLD}`)));
     nothingWritten(events);
-    assert.equal(readPause(), null);
+    assert.equal(readPause(rootNow()), null);
   });
 
   await t.test('restart while the holder is stalled: Conflict naming it, nothing signalled', async () => {
@@ -639,7 +641,7 @@ test('a take-over whose daemon takes its own let-go to stop is not refused: the 
   assert.equal(done.did, 'taken', 'the daemon let the store go on its own time and was never refused for it');
   assert.ok(slow.length * bound.pollMs > bound.timeoutMs, 'and it waited past the timeout it gives a call in flight, read by read');
   assert.ok(events.includes(`signal ${OLD}`), events.join('\n'));
-  assert.equal(readPause(), null, 'and the pause it put is lifted, since the take-over succeeded');
+  assert.equal(readPause(rootNow()), null, 'and the pause it put is lifted, since the take-over succeeded');
 });
 
 /** A task as the engine lists it, as far as the take-over reads one: a job (`restartPolicy` absent) or a session living in the daemon. */
@@ -764,24 +766,24 @@ test('a take-over interrupted while it waits on a call lifts its drain and its p
 });
 
 test('a pause a person put stands through a take-over: it is neither put again nor lifted', async () => {
-  putPause({ by: 'ann', why: 'reading the night' });
+  putPause(rootNow(), { by: 'ann', why: 'reading the night' });
   const world: World = { lease: lease(OLD), unitPid: null };
   world.onSignal = () => (world.lease = lease(OLD, 'gone'));
   world.onStart = () => passing(world, NEW);
   const { host, events } = hostOf(world);
   assert.equal((await install({ takeOver: String(OLD) }, host)).did, 'taken');
   assert.ok(!events.includes('pause') && !events.includes('resume'), events.join('\n'));
-  assert.equal(readPause()?.by, 'ann');
+  assert.equal(readPause(rootNow())?.by, 'ann');
 });
 
 test('status says the pause that stands, by whom and why, as its file says it, and nothing of one once it is lifted', async () => {
   const why = 'need to put the laptop on sleep';
-  putPause({ by: 'yrnd1', why });
+  putPause(rootNow(), { by: 'yrnd1', why });
   const { host } = hostOf({ lease: lease(OLD), unitPid: null });
   const paused = (await status(host)).lines.filter((l) => l.startsWith('pause: '));
   assert.equal(paused.length, 1);
   assert.ok(paused[0].includes('yrnd1') && paused[0].includes(why), paused[0]);
-  resumePause();
+  resumePause(rootNow());
   assert.deepEqual(
     (await status(host)).lines.filter((l) => l.startsWith('pause: ')),
     [],
@@ -794,7 +796,7 @@ test(
   async (t) => {
     const world: World = { lease: lease(OLD), unitPid: null };
     const { host } = hostOf(world);
-    const live = liveHost();
+    const live = liveHost(rootNow());
     let reads = 0;
     const shipped = { ...host, pollMs: live.pollMs, waitMs: live.waitMs, stopMs: live.stopMs, lease: () => (reads++, host.lease()) };
     assert.ok(
@@ -835,10 +837,10 @@ test('Nemia’s fence asks before the service’s restart', () => {
 });
 
 test("the live host's pause names this process, so the daemon's pass lifts it once the command has ended", () => {
-  liveHost().pause({ by: 'nemia service restart' });
+  liveHost(rootNow()).pause({ by: 'nemia service restart' });
   try {
-    assert.equal(readPauseFile()?.heldBy?.pid, process.pid);
+    assert.equal(readPauseFile(rootNow())?.heldBy?.pid, process.pid);
   } finally {
-    resumePause();
+    resumePause(rootNow());
   }
 });

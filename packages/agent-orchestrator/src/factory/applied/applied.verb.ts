@@ -14,15 +14,13 @@ import { tried } from '../../runtime-client.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../../command/command.ts';
 import type { Command } from '../../command/entry.verb.ts';
 import { Invalid } from '../../refusal/refusal.ts';
-import { factoryRepos, refuseName } from '../factory.store.ts';
-import { FactoryDoor } from '../door/factories.store.ts';
+import { FactoryDoor, factoryRepos, refuseName } from '../door/factories.store.ts';
 import { StoreRoot } from '../../config/root.store.ts';
 import type { Factory, FactoryConditionReason, FactoryConditionType, FactoryTemplate } from '../factory.ts';
 import { openedTree, packageSkillNames, problemLine, type OpenTemplate } from '../../template/template.store.ts';
 import { TemplateSource } from '../../template/door/templates.model.ts';
 import { BuiltinTemplates, TemplateDoor, templatePlace } from '../../template/door/templates.store.ts';
 import { builtinPlace, nameOfSource, sourceGiven } from '../../template/door/templates.ts';
-import { rooted } from '../wiring/wire.verb.ts';
 import type { FactorySpec } from '../../template/index.ts';
 import {
   appliedDir,
@@ -572,9 +570,9 @@ export const FACTORY_APPLY: Command<Applied & { trusts: readonly PlaceTrust[] }>
   class: 'ask',
   asksAlways: true,
   only: HERE,
-  handler: (args, _env, home) =>
+  handler: (args) =>
     Effect.gen(function* () {
-      const filed = yield* rooted(home, 'factory apply', applied(args));
+      const filed = yield* applied(args);
       return { ...filed, trusts: args.noTrust === true ? [] : yield* trustPlaces(filed.repos) };
     }),
   print: ({ name, repos, file, template, place, tree, trusts }) => [

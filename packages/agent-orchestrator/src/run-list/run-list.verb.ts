@@ -179,11 +179,11 @@ const objectsOf = (e: Engine, { home, memo }: SummaryHow, reads: RunReads, verif
 };
 
 /** What a list asked by state reads through: the store's root, its judgement of many runs at once, the feed's filing times, the objects. */
-type ByStateReads<E, R> = {
+type ByStateReads<E, R, O = R> = {
   readonly home: string;
   readonly judging: (some: readonly Run[]) => Effect.Effect<Judgements, E, R>;
   readonly filed: Effect.Effect<ReadonlyMap<string, string>, E, R>;
-  readonly objectOf: (run: Run, judgement: Judgement, filed: ReadonlyMap<string, string>) => Effect.Effect<RunObjectAnswer, E, R>;
+  readonly objectOf: (run: Run, judgement: Judgement, filed: ReadonlyMap<string, string>) => Effect.Effect<RunObjectAnswer, E, O>;
 };
 
 /** A run a list asked by state keeps: its record, its judgement or why it has none, its state, and when it finished for a finished one. */
@@ -227,11 +227,11 @@ const statedOf = (run: Run, one: JudgedOrWhy, home: string): Stated => {
  * answers it, with the frame's parts laid on its status (`framePartsOf`), measured to `metadata.asOf`. A run left unjudged is named in
  * `unjudged` with its state.
  */
-const byState = Effect.fnUntraced(function* <E, R>(
+const byState = Effect.fnUntraced(function* <E, R, O>(
   all: readonly Run[],
   query: RunQuery,
   field: RunStateSelector,
-  reads: ByStateReads<E, R>,
+  reads: ByStateReads<E, R, O>,
 ) {
   const kept = keptOf(all, query);
   if (kept instanceof Invalid) return yield* Effect.fail(kept);

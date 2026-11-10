@@ -75,7 +75,7 @@ test("`INBOX`: the cards in play by default — a card whose run ended left out 
   own.settle('t-r-at-work', 'working');
   own.settle('t-r-ended', 'failed', { exitCode: 1 });
   const listed = async (args: Parameters<typeof INBOX.handler>[0]) => {
-    const { cards, ended } = await runWith(e, INBOX.handler(args, undefined, ROOT));
+    const { cards, ended } = await runWith(e, INBOX.handler(args));
     return { cards: cards.map((c) => [c.name, c.state]), ended };
   };
   try {

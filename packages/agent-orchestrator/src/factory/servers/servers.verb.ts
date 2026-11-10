@@ -13,10 +13,9 @@
 import { Effect, Schema } from 'effect';
 import { EngineService, signsInMcp, tried, type McpServerState, type McpServersRead } from '../../runtime-client.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../../command/command.ts';
-import { rootGiven, StoreRoot } from '../../config/root.store.ts';
+import { StoreRoot } from '../../config/root.store.ts';
 import { FactoryName, isDefaultFactory } from '../factory.model.ts';
 import { doorAt, FactoryDoor } from '../door/factories.store.ts';
-import { rooted } from '../wiring/wire.verb.ts';
 import type { Command } from '../../command/entry.verb.ts';
 import { noFactoryLine } from '../factory.ts';
 import { Invalid, Missing, type Refusal } from '../../refusal/refusal.ts';
@@ -112,7 +111,7 @@ export const FACTORY_SERVERS: Command<ServersListing> = {
   writes: false,
   class: 'read',
   only: { side: 'cli', why: "the api serves it as the McpServer's `list` of `objects`' Api, calling this handler" },
-  handler: (args, _env, home) => serversListed(textOf(args, 'factory'), rootGiven(home, 'factory servers')),
+  handler: (args) => Effect.flatMap(StoreRoot, (home) => serversListed(textOf(args, 'factory'), home)),
   print: ({ factory, servers, unread }) =>
     servers.length === 0
       ? [`${factory}  no server recorded — nemia factory server add ${factory} <server> --url <address>`]
@@ -319,27 +318,23 @@ export const FACTORY_SERVER_ADD: Command<Added, ServerAddInput> = {
     why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the McpServer's `put`, whose handler calls this one by its `input`; the command line's runner maps its flags to it (`serverAddOf`)",
   },
   input: ServerAddInput,
-  handler: ({ factory, server: name, type, ...write }, _env, home) =>
-    rooted(
-      home,
-      'factory server add',
-      Effect.gen(function* () {
-        const store = yield* StoreRoot;
-        const bad = serverNameRefusal(name);
-        if (bad) return yield* Effect.fail(new Invalid({ message: `${bad} Nothing was recorded.` }));
-        yield* factoryThere(factory, 'recorded');
-        const wrong = writeRefusal(write);
-        if (wrong) return yield* Effect.fail(new Invalid({ message: wrong }));
-        const server = { ...write, type: type ?? 'http' };
-        const refused = factoryServerRefusal(server);
-        if (refused) return yield* Effect.fail(new Invalid({ message: `${refused} Nothing was recorded.` }));
-        const door = yield* FactoryDoor;
-        const record = yield* door.servers.read(FactoryName.read(factory));
-        const kept = yield* tried(() => headersKept(server, record[name]));
-        yield* door.servers.write(FactoryName.read(factory), { ...record, [name]: kept });
-        return { file: factoryServersFile(store, factory), name, server: masked(kept), replaced: maskedOrNull(record[name]) };
-      }),
-    ),
+  handler: ({ factory, server: name, type, ...write }) =>
+    Effect.gen(function* () {
+      const store = yield* StoreRoot;
+      const bad = serverNameRefusal(name);
+      if (bad) return yield* Effect.fail(new Invalid({ message: `${bad} Nothing was recorded.` }));
+      yield* factoryThere(factory, 'recorded');
+      const wrong = writeRefusal(write);
+      if (wrong) return yield* Effect.fail(new Invalid({ message: wrong }));
+      const server = { ...write, type: type ?? 'http' };
+      const refused = factoryServerRefusal(server);
+      if (refused) return yield* Effect.fail(new Invalid({ message: `${refused} Nothing was recorded.` }));
+      const door = yield* FactoryDoor;
+      const record = yield* door.servers.read(FactoryName.read(factory));
+      const kept = yield* tried(() => headersKept(server, record[name]));
+      yield* door.servers.write(FactoryName.read(factory), { ...record, [name]: kept });
+      return { file: factoryServersFile(store, factory), name, server: masked(kept), replaced: maskedOrNull(record[name]) };
+    }),
   print: ({ file, name, server, replaced }, { factory }) => [
     `${factory}  ${name} → ${server.type} ${server.url}${replaced === null ? '' : ` (was ${replaced.url})`}`,
     `recorded: ${file}${server.oauth === undefined ? '' : ' — sign the server in before a step needs it'}`,
@@ -373,28 +368,24 @@ export const FACTORY_SERVER_RM: Command<{ file: string; removed: string }, Serve
     why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the McpServer's `delete`, whose handler calls this one by its `input`",
   },
   input: ServerRmInput,
-  handler: ({ factory, server: name }, _env, home) =>
-    rooted(
-      home,
-      'factory server rm',
-      Effect.gen(function* () {
-        const store = yield* StoreRoot;
-        yield* factoryThere(factory, 'removed');
-        const door = yield* FactoryDoor;
-        const record = yield* door.servers.read(FactoryName.read(factory));
-        if (!Object.hasOwn(record, name)) {
-          const names = Object.keys(record);
-          return yield* Effect.fail(
-            new Missing({
-              message: `${factory} records no server \`${name}\`: ${names.length ? `its servers are ${names.join(', ')}` : 'it records none'}. Nothing was removed.`,
-            }),
-          );
-        }
-        const { [name]: _gone, ...left } = record;
-        yield* door.servers.write(FactoryName.read(factory), left);
-        return { file: factoryServersFile(store, factory), removed: name };
-      }),
-    ),
+  handler: ({ factory, server: name }) =>
+    Effect.gen(function* () {
+      const store = yield* StoreRoot;
+      yield* factoryThere(factory, 'removed');
+      const door = yield* FactoryDoor;
+      const record = yield* door.servers.read(FactoryName.read(factory));
+      if (!Object.hasOwn(record, name)) {
+        const names = Object.keys(record);
+        return yield* Effect.fail(
+          new Missing({
+            message: `${factory} records no server \`${name}\`: ${names.length ? `its servers are ${names.join(', ')}` : 'it records none'}. Nothing was removed.`,
+          }),
+        );
+      }
+      const { [name]: _gone, ...left } = record;
+      yield* door.servers.write(FactoryName.read(factory), left);
+      return { file: factoryServersFile(store, factory), removed: name };
+    }),
   print: ({ file, removed }, { factory }) => [
     `${factory}  ${removed} removed`,
     `recorded: ${file} — the sign-in the harness filed for it is left in the harness's own store`,

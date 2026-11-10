@@ -31,7 +31,7 @@ const app = appOf(
   Layer.merge(
     liveOf(),
     Layer.succeed(Engine)({
-      ...engine(),
+      ...engine(process.env),
       view: (id: string) => Effect.succeed({ id, phase: 'pending', state: { settled: null, ...TASKS[id] } }),
     } as never),
   ),

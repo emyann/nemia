@@ -8,12 +8,10 @@ import { Effect } from 'effect';
 import type { Args, Spec } from '../../command/command.ts';
 import type { Command } from '../../command/entry.verb.ts';
 import { StoreRoot } from '../../config/root.store.ts';
-import { FactoryDoor, filedFactory } from '../door/factories.store.ts';
-import { rooted } from '../wiring/wire.verb.ts';
+import { FactoryDoor, filedFactory, refuseName } from '../door/factories.store.ts';
 import { tried } from '../../runtime-client.ts';
 import { Invalid, Missing } from '../../refusal/refusal.ts';
 import { isDirectory } from '../../record/record.store.ts';
-import { refuseName } from '../factory.store.ts';
 import { factoryVolumes, volumeMark, type Volume } from '../factory.ts';
 import { volumeOf, volumeRefusal, withVolume } from './volume.ts';
 
@@ -89,24 +87,20 @@ export const FACTORY_VOLUME_ADD: Command<Added> = {
   writes: true,
   class: 'ask',
   only: ONLY_HERE,
-  handler: (args, _env, home) => {
+  handler: (args) => {
     const name = textOf(args, 'factory');
-    return rooted(
-      home,
-      'factory volume add',
-      Effect.gen(function* () {
-        const volume = volumeOf(textOf(args, 'volume'), process.cwd());
-        if (typeof volume === 'string') return yield* Effect.fail(new Invalid({ message: volume }));
-        yield* tried(() => refuseName(name, 'volume'));
-        const door = yield* FactoryDoor;
-        const factory = yield* filedFactory(name, 'volume');
-        const refused = volumeRefusal(factory, volume, yield* StoreRoot, isDirectory);
-        if (refused) return yield* Effect.fail(new Invalid({ message: refused }));
-        const { volumes, was } = withVolume(factory, volume);
-        const file = yield* door.factories.rewrite({ ...factory, volumes });
-        return { file, volume, was };
-      }),
-    );
+    return Effect.gen(function* () {
+      const volume = volumeOf(textOf(args, 'volume'), process.cwd());
+      if (typeof volume === 'string') return yield* Effect.fail(new Invalid({ message: volume }));
+      yield* tried(() => refuseName(name, 'volume'));
+      const door = yield* FactoryDoor;
+      const factory = yield* filedFactory(name, 'volume');
+      const refused = volumeRefusal(factory, volume, yield* StoreRoot, isDirectory);
+      if (refused) return yield* Effect.fail(new Invalid({ message: refused }));
+      const { volumes, was } = withVolume(factory, volume);
+      const file = yield* door.factories.rewrite({ ...factory, volumes });
+      return { file, volume, was };
+    });
   },
   print: ({ file, volume, was }, args) => [
     `${textOf(args, 'factory')}  volume ${volume.path} ${volumeMark(volume)}${was === null || was === volume.readOnly ? '' : ` (was ${volumeMark({ readOnly: was })})`}`,
@@ -138,33 +132,29 @@ export const FACTORY_VOLUME_RM: Command<{ file: string; removed: string }> = {
   writes: true,
   class: 'ask',
   only: ONLY_HERE,
-  handler: (args, _env, home) => {
+  handler: (args) => {
     const name = textOf(args, 'factory');
-    return rooted(
-      home,
-      'factory volume rm',
-      Effect.gen(function* () {
-        yield* tried(() => refuseName(name, 'volume'));
-        const door = yield* FactoryDoor;
-        const factory = yield* filedFactory(name, 'volume');
-        const spelled = textOf(args, 'path');
-        const unmarked = spelled.replace(/:(ro|rw)$/, '');
-        const at = path.resolve(unmarked);
-        const volumes = factoryVolumes(factory);
-        if (!volumes.some((v) => v.path === at)) {
-          const named = volumes.map((v) => v.path);
-          return yield* Effect.fail(
-            new Missing({
-              message: `${name} mounts no volume ${at}: ${named.length ? `its volumes are ${named.join(', ')}` : 'it mounts none'}. Nothing was removed.`,
-            }),
-          );
-        }
-        const left = volumes.filter((v) => v.path !== at);
-        const { volumes: _gone, ...rest } = factory;
-        const file = yield* door.factories.rewrite(left.length ? { ...rest, volumes: left } : rest);
-        return { file, removed: at };
-      }),
-    );
+    return Effect.gen(function* () {
+      yield* tried(() => refuseName(name, 'volume'));
+      const door = yield* FactoryDoor;
+      const factory = yield* filedFactory(name, 'volume');
+      const spelled = textOf(args, 'path');
+      const unmarked = spelled.replace(/:(ro|rw)$/, '');
+      const at = path.resolve(unmarked);
+      const volumes = factoryVolumes(factory);
+      if (!volumes.some((v) => v.path === at)) {
+        const named = volumes.map((v) => v.path);
+        return yield* Effect.fail(
+          new Missing({
+            message: `${name} mounts no volume ${at}: ${named.length ? `its volumes are ${named.join(', ')}` : 'it mounts none'}. Nothing was removed.`,
+          }),
+        );
+      }
+      const left = volumes.filter((v) => v.path !== at);
+      const { volumes: _gone, ...rest } = factory;
+      const file = yield* door.factories.rewrite(left.length ? { ...rest, volumes: left } : rest);
+      return { file, removed: at };
+    });
   },
   print: ({ file, removed }, args) => [`${textOf(args, 'factory')}  volume ${removed} removed`, `changed: ${file}`],
 };

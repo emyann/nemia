@@ -2,7 +2,7 @@
  * `nemia subscribe` and `nemia unsubscribe`: a long-lived task given a subscription to the feed, and one taken away, on
  * `POST /api/subscriptions/:name` and `DELETE /api/subscriptions/:name` too. What a subscription is told, and when, is the daemon's
  * deliverer (`deliver.verb.ts`); its file is put and dropped through the Subscription door (`SubscriptionDoor`), at the store's root the
- * handler is given (`rooted`).
+ * handler is given (`StoreRoot`).
  *
  * A controller: it reads the task off the engine (`EngineService`, `asked`) before it puts the subscription, and the feed's size, where
  * the subscription's news starts.
@@ -15,7 +15,6 @@ import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { EngineService, asked, type TaskView } from '../runtime-client.ts';
 import { SubscriptionDoor } from './subscription.store.ts';
 import { SubscriptionName } from '../feed/feed.model.ts';
-import { rooted } from '../factory/wiring/wire.verb.ts';
 import { NEMIA_SUBSCRIPTION } from '../nemia/nemia.ts';
 import { LEVELS, type Level } from '../level/level.ts';
 import { SELECTOR_FORM } from '../watch/selector.ts';
@@ -165,7 +164,7 @@ export const SUBSCRIBE: Command<Subscribed, SubscribeInput> = {
   writes: true,
   class: 'act',
   input: SubscribeInput,
-  handler: (input, _env, home) => rooted(home, 'subscribe', subscribe(input)),
+  handler: (input) => subscribe(input),
   note: ({ subscription: s }) => s.selectors.flatMap(formerHints).map((hint) => `nemia subscribe: ${hint}`),
   print: ({ name, subscription: s }) => [
     `subscribed ${name}: ${s.task} is told at once of a line taken by ${s.selectors.join(' or ')}, and of the rest in a digest every ` +
@@ -190,16 +189,12 @@ export const UNSUBSCRIBE: Command<{ name: string }, UnsubscribeInput> = {
   writes: true,
   class: 'act',
   input: UnsubscribeInput,
-  handler: ({ name }, _env, home) =>
-    rooted(
-      home,
-      'unsubscribe',
-      Effect.gen(function* () {
-        const reserved = reservedRefusal(name);
-        if (reserved) return yield* Effect.fail(reserved);
-        yield* (yield* SubscriptionDoor).subscriptions.drop(SubscriptionName.read(name));
-        return { name };
-      }),
-    ),
+  handler: ({ name }) =>
+    Effect.gen(function* () {
+      const reserved = reservedRefusal(name);
+      if (reserved) return yield* Effect.fail(reserved);
+      yield* (yield* SubscriptionDoor).subscriptions.drop(SubscriptionName.read(name));
+      return { name };
+    }),
   print: ({ name }) => [`unsubscribed ${name}: its task is told nothing more of the feed.`],
 };

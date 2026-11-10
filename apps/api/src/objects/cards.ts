@@ -16,7 +16,6 @@ import {
   cardList,
   cardObject,
   cardTable,
-  defaultStartsAllowed,
   INBOX_ADD,
   INBOX_QUEUE,
   INBOX_RM,
@@ -67,7 +66,7 @@ const page = (namespace: string | undefined, query: ListQuery) =>
         labelSelector: [...listOf(query.labelSelector), ...listOf(query.selector)],
       };
       return table
-        ? s.inRequest(cardTable(s.e, howOf(s), asked, defaultStartsAllowed(s.env)))
+        ? s.inRequest(cardTable(s.e, howOf(s), asked, s.config.defaultFactoryStarts))
         : s.inRequest(cardList(s.e, howOf(s), asked));
     }),
   );
@@ -89,7 +88,7 @@ const factoryOf = (namespace: string): string | undefined => (namespace === DEFA
 const queued = (namespace: string, name: string, off: boolean) =>
   answered(async (s) => {
     await cardIn(s, namespace, name);
-    await s.inRequest(INBOX_QUEUE.handler({ name, off }, s.env, s.home));
+    await s.inRequest(INBOX_QUEUE.handler({ name, off }));
     return cardIn(s, namespace, name);
   });
 
@@ -119,14 +118,14 @@ export const cardsHandlers = HttpApiBuilder.group(Api, 'cards', (handlers) =>
         const asked = filingOf({ ...payload, ...(factory === undefined ? {} : { factory }) }, s.repo, s.home);
         if ('status' in asked) throw readerRefused(asked);
         const { text, ...keys } = asked;
-        const { card } = await s.inRequest(INBOX_ADD.handler({ idea: text, ...keys }, undefined, s.home));
+        const { card } = await s.inRequest(INBOX_ADD.handler({ idea: text, ...keys }));
         return cardIn(s, card.factory ?? DEFAULT_NAMESPACE, card.name);
       }),
     )
     .handle('delete', ({ params: { namespace, name } }) =>
       answered(async (s) => {
         const card = await cardIn(s, namespace, name);
-        const dropped = await s.inRequest(INBOX_RM.handler({ name }, s.env, s.home));
+        const dropped = await s.inRequest(INBOX_RM.handler({ name }));
         if (!dropped.removed) throw new Missing({ message: noCardLine(name, dropped.cards) });
         return card;
       }),
@@ -147,7 +146,7 @@ export const cardsHandlers = HttpApiBuilder.group(Api, 'cards', (handlers) =>
     .handle('labels', ({ params: { namespace, name }, payload }) =>
       answered(async (s) => {
         await cardIn(s, namespace, name);
-        return s.inRequest(LABEL_CARD.handler({ name, ...payload }, s.env, s.home));
+        return s.inRequest(LABEL_CARD.handler({ name, ...payload }));
       }),
     ),
 );

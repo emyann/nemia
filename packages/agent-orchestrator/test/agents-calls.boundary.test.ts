@@ -1,7 +1,7 @@
 /**
- * What a pass asks Claude Code, at shipped defaults: the client's `engine()` and `tick()`, over a run started from a workflow folder, so
- * `advance` reads every step in flight as the daemon does. A fake `claude` first on PATH counts each `claude agents` call, and a job reads
- * its brief and runs until the test ends it.
+ * What a pass asks Claude Code, at shipped defaults: the client's `engine(process.env)` and `tick()`, over a run started from a workflow
+ * folder, so `advance` reads every step in flight as the daemon does. A fake `claude` first on PATH counts each `claude agents` call, and a
+ * job reads its brief and runs until the test ends it.
  *
  * A `claude agents` call costs about 0.2-0.4 s, and every Claude Code session is a job, read off its run file: a pass asks it nothing, and
  * `advance` reads the views the runtime's pass reported (`reportedEngine`) rather than viewing each step in flight, which would observe
@@ -81,7 +81,7 @@ if (args[0] === 'agents') {
 };
 
 const fake = fakes();
-let e = engine();
+let e = engine(process.env);
 let memo = freshRestMemo();
 const pass = () => runWith(e, tickRun({ repo: ROOT, memo }));
 
@@ -128,7 +128,7 @@ test('a pass with claude jobs in flight asks `claude agents` nothing, and advanc
 });
 
 test('a job left running across a restart is read at work on the first pass of a fresh engine, off its run file', async () => {
-  e = engine();
+  e = engine(process.env);
   memo = freshRestMemo();
   const { calls, done } = await counted();
   assert.equal(calls, 0, 'a fresh engine asks Claude Code nothing either');

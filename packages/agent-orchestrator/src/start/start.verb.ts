@@ -4,7 +4,6 @@
  * through it. A controller whose program requires nothing: the runtime it reads, through the client (`runtime-client.ts`), is its
  * harnesses, which say which steps a session can be bridged for, and never the engine.
  */
-import { DEFAULT_NAMESPACE } from 'objects';
 import fs from 'node:fs';
 import path from 'node:path';
 import { configRefusal, readRemote, tried } from '../runtime-client.ts';
@@ -57,8 +56,7 @@ import {
   unfilledRefusal,
   type Factory,
 } from '../factory/factory.ts';
-import { readFactory } from '../factory/factory.store.ts';
-import { factoryOrNone } from '../factory/door/factories.store.ts';
+import { factoryOrNone, filedAtOnce } from '../factory/door/factories.store.ts';
 import { factoryFills } from '../factory/rules/rules.store.ts';
 import { Context, Effect } from 'effect';
 import { RunDoor } from '../runs/runs.store.ts';
@@ -158,7 +156,7 @@ function startable(
   if (unallowed) throw new Invalid({ message: unallowed });
   const placeSkill = placeSkillRefusal(steps, found);
   if (placeSkill) throw new Invalid({ message: placeSkill });
-  const undeclared = undeclaredRefusal(steps);
+  const undeclared = undeclaredRefusal(steps, HOME);
   if (undeclared) throw new Invalid({ message: undeclared });
   const unruled = storeRootRefusal(HOME, steps, {
     runArtifacts: startArtifacts(),
@@ -271,13 +269,13 @@ export const StartRefusal = Context.Reference<ConfigRefused>('orchestrator/Start
  * refused by the runtime, in the file's words (`readRemote`) — and only when a step names a remote agent, and only the entry it names:
  * `engine()` leaves out what is refused, and every other command and run works on.
  */
-function undeclaredRefusal(steps: readonly Workflow[]): string | undefined {
+function undeclaredRefusal(steps: readonly Workflow[], home: string): string | undefined {
   const remote = steps
     .map((s) => ({ s, name: remoteNameOf(s.harness) }))
     .filter((r): r is { s: Workflow; name: string } => r.name !== undefined);
   const [first] = remote;
   if (first === undefined) return undefined;
-  const read = readRemote();
+  const read = readRemote(home);
   if (read.unread)
     return `${first.s.name}: \`harness: ${first.s.harness}\` names a remote A2A agent, and the file that declares them is refused. ${read.unread}`;
   const refused = remote.find(({ name }) => read.refused.has(name));
@@ -285,7 +283,7 @@ function undeclaredRefusal(steps: readonly Workflow[]): string | undefined {
     return `${refused.s.name}: \`harness: ${refused.s.harness}\` names a remote A2A agent whose entry is refused. ${read.refused.get(refused.name)}`;
   const missing = remote.find(({ name }) => !read.agents.has(name));
   if (!missing) return undefined;
-  const file = remoteAgentsFile(HOME);
+  const file = remoteAgentsFile(home);
   const has = read.agents.size === 0 ? 'declares none' : `declares ${[...read.agents.keys()].map((n) => `\`${n}\``).join(', ')}`;
   return `${missing.s.name}: \`harness: ${missing.s.harness}\` names a remote A2A agent \`${missing.name}\`, and ${file} ${has}. Add it there — \`{ "${missing.name}": { "url": "https://…" } }\`, the agent's base URL, where its card is served — or name a declared one.`;
 }
@@ -403,26 +401,27 @@ function mountRefusal(
  * The factory's folders `startRun` left out of `run`'s mounts, as `nemia start` says them: each of its repositories but the run's own that
  * is no directory now, as none was at start. None for a run in the default factory, or in one whose file no longer reads.
  */
-export function leftOutMounts(run: Run): string[] {
-  return leftOut(run).mounts;
+export function leftOutMounts(home: string, run: Run): string[] {
+  return leftOut(home, run).mounts;
 }
 
 /**
  * The factory's volumes `startRun` left out of `run`'s volumes, as `nemia start` says them: each no directory now, as none was at start.
  */
-export function leftOutVolumes(run: Run): string[] {
-  return leftOut(run).volumes;
+export function leftOutVolumes(home: string, run: Run): string[] {
+  return leftOut(home, run).volumes;
 }
 
 /** The factory's folders and volumes `startRun` left out of `run`, each no directory now; none where the factory does not read. */
-function leftOut(run: Run): { mounts: string[]; volumes: string[] } {
+function leftOut(home: string, run: Run): { mounts: string[]; volumes: string[] } {
   if (!run.factory) return { mounts: [], volumes: [] };
-  let factory: Factory;
+  let factory: Factory | undefined;
   try {
-    factory = readFactory(run.factory);
+    factory = filedAtOnce(home, run.factory);
   } catch {
     return { mounts: [], volumes: [] };
   }
+  if (factory === undefined) return { mounts: [], volumes: [] };
   const mounted = new Set([...(run.mounts ?? []), ...(run.volumes ?? [])].map((m) => m.path));
   const missing = (at: string) => !mounted.has(at) && !isDirectory(at);
   return {
@@ -575,17 +574,19 @@ function renderAgents(run: Run, steps: readonly Workflow[], found: SkillsFound):
   }
 }
 
-/** The factory a run is started in, read (`readFactory`); none for no name and for the default factory, which is no file. */
-const factoryNamed = (name: string | undefined): Factory | undefined =>
-  name === undefined || name === DEFAULT_NAMESPACE ? undefined : readFactory(name);
+/**
+ * The factory a run is started in, read through the door (`filedAtOnce`); none for no name and for the default factory, which is no file.
+ */
+const factoryNamed = (home: string, name: string | undefined): Factory | undefined =>
+  name === undefined ? undefined : filedAtOnce(home, name);
 
 /**
  * The repository a run started in the factory `name` works on (`factoryRepo`): `named`, else the factory's one repository, else
  * `fallback`. What `nemia start` resolves its workflow folder against, before `start` judges it. Refused as `start` refuses the factory:
  * none by that name, or one whose file does not read (`readFactory`).
  */
-export const repoFor = (name: string | undefined, named: string | undefined, fallback: string): string =>
-  factoryRepo(factoryNamed(name), named, fallback);
+export const repoFor = (home: string, name: string | undefined, named: string | undefined, fallback: string): string =>
+  factoryRepo(factoryNamed(home, name), named, fallback);
 
 /**
  * Starts a run of `opts.workflowDir`'s steps, and returns its record, written. Requires nothing: it reads no engine.

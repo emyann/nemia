@@ -495,7 +495,7 @@ test('a gated run read by the list at every event from being filed to being appr
   assert.deepEqual(gated.waitingOnYou, ['design']);
   assert.equal(gated.steps.find((s) => s.name === 'design')?.message, 'awaiting approval');
 
-  await runWith(engine(), approveRun(id, 'design'));
+  await runWith(engine(process.env), approveRun(id, 'design'));
   const approved = await read('approved');
   assert.ok(!resting.runs.has(id), 'the approval takes it out');
   assert.equal(approved.moving, true, 'implement is due: the tick files it');

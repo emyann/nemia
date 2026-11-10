@@ -21,7 +21,7 @@ import { StoreRoot, workflowVersion as versionIn } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
 import { listedOf, objectOf } from '../../test/run-reads.ts';
 import { listWorkflows, specOf } from './workflows.ts';
-import { engine, builtinGitPlace, hireRefusalOf, loadWorkflows, passStanding, runStore } from 'agent-orchestrator';
+import { engine, builtinGitPlace, hireRefusalOf, loadWorkflows, passStanding, runStore, settingsOf } from 'agent-orchestrator';
 import { AGENTS_FOLDER, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
 /** The scratch repository, set as `HKB_REPO`, which the api reads on each request: a git repository, as `nemia start` reads its HEAD. */
 const repo = scratch('nemia-api-repo-');
@@ -604,7 +604,7 @@ test('a person starts runs from the board: the record as `nemia start` writes it
         unread.status.waiting?.word.startsWith('waiting on p-running (where it stands is unread: '),
         `no pass has read where p-running stands since it was written: ${unread.status.waiting?.word}`,
       );
-      await runWith(engine(), passStanding(runStore.runs.list()));
+      await runWith(engine(process.env), passStanding(runStore.runs.list()));
       const detail = await objectOf(app, id);
       assert.deepEqual([detail.spec.after, detail.status.waiting?.word], [['p-running'], 'waiting on p-running']);
 
@@ -755,9 +755,15 @@ test('POST /api/namespaces/default/runs: what a start refuses, writing nothing, 
       write(path.join(clash, 'build.md'), '---\nplace: git\ncheck: npm run build\n---\nBuild it.\n');
       write(path.join(clash, 'build-check.md'), '---\nafter: build\nplace: git\n---\nCheck the build by hand.\n');
       assert.equal(
-        (await listWorkflows(engine(), { placeService: builtinGitPlace, trace: undefined }, repo, root, inRoot)).find(
-          (w) => w.name === 'clash',
-        )?.error,
+        (
+          await listWorkflows(
+            engine(process.env),
+            { placeService: builtinGitPlace, config: settingsOf(process.env), trace: undefined },
+            repo,
+            root,
+            inRoot,
+          )
+        ).find((w) => w.name === 'clash')?.error,
         null,
         "the loader reads this folder; `nemia start` refuses it, as the run files build's check as `build-check`",
       );

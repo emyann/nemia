@@ -150,12 +150,10 @@ export async function decideVerb(rest: string[], e: Engine, place: Place): Promi
   if (runId.startsWith('--'))
     usage(`nemia decide takes the run first: nemia decide <runId> [--sensitive <globs>] — not ${runId} before it.`);
   const { sensitive } = decideHow(rest.slice(1));
-  const read = await runWith(e, placedIn(place, decisionRead(runId, process.env, sensitive ? { sensitive } : {}))).catch(
-    async (err: unknown) => {
-      const unjudged = await runWith(e, placedIn(place, unjudgedOf(e, runsAtOnce.runs.read(runId), err, 'nemia decide')));
-      throw unjudged ? new Error(unjudged.said) : err;
-    },
-  );
+  const read = await runWith(e, placedIn(place, decisionRead(runId, sensitive ? { sensitive } : {}))).catch(async (err: unknown) => {
+    const unjudged = await runWith(e, placedIn(place, unjudgedOf(e, runsAtOnce.runs.read(runId), err, 'nemia decide')));
+    throw unjudged ? new Error(unjudged.said) : err;
+  });
   const deciding = await standstill(read, e, place);
   if (!deciding) return;
   const { run, decided, decision, out } = deciding;

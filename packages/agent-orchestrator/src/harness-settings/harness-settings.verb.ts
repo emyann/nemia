@@ -6,12 +6,9 @@
 import { Effect } from 'effect';
 import type { Args, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { FactoryDoor } from '../factory/door/factories.store.ts';
-import { rooted } from '../factory/wiring/wire.verb.ts';
+import { FactoryDoor, filedFactory, refuseName } from '../factory/door/factories.store.ts';
 import { tried } from '../runtime-client.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
-import { FactoryName } from '../factory/factory.model.ts';
-import { refuseName } from '../factory/factory.store.ts';
 import type { Factory } from '../factory/factory.ts';
 import {
   SETTABLE,
@@ -109,24 +106,20 @@ export const FACTORY_SETTING_SET: Command<{ file: string; name: string; value: u
   writes: true,
   class: 'ask',
   only: ONLY_HERE,
-  handler: (args, _env, home) => {
+  handler: (args) => {
     const name = textOf(args, 'factory');
-    return rooted(
-      home,
-      'factory setting set',
-      Effect.gen(function* () {
-        const { harness, key } = yield* keyOf(textOf(args, 'setting'));
-        const value = yield* jsonOf(textOf(args, 'value'));
-        yield* tried(() => refuseName(name, 'setting'));
-        const door = yield* FactoryDoor;
-        const factory = yield* door.factories.read(FactoryName.read(name));
-        const harnessSettings = withSetting(factory.harnessSettings, harness, key, value);
-        const refused = harnessSettingsRefusal(harnessSettings, name);
-        if (refused) return yield* Effect.fail(new Invalid({ message: `${refused}. Nothing was changed.` }));
-        const file = yield* door.factories.rewrite({ ...factory, harnessSettings });
-        return { file, name: `${harness}.${key}`, value };
-      }),
-    );
+    return Effect.gen(function* () {
+      const { harness, key } = yield* keyOf(textOf(args, 'setting'));
+      const value = yield* jsonOf(textOf(args, 'value'));
+      yield* tried(() => refuseName(name, 'setting'));
+      const door = yield* FactoryDoor;
+      const factory = yield* filedFactory(name, 'setting');
+      const harnessSettings = withSetting(factory.harnessSettings, harness, key, value);
+      const refused = harnessSettingsRefusal(harnessSettings, name);
+      if (refused) return yield* Effect.fail(new Invalid({ message: `${refused}. Nothing was changed.` }));
+      const file = yield* door.factories.rewrite({ ...factory, harnessSettings });
+      return { file, name: `${harness}.${key}`, value };
+    });
   },
   print: ({ file, name, value }, args) => [
     `${textOf(args, 'factory')}  setting ${name} ${JSON.stringify(value)}`,
@@ -143,30 +136,26 @@ export const FACTORY_SETTING_RM: Command<{ file: string; removed: string }> = {
   writes: true,
   class: 'ask',
   only: ONLY_HERE,
-  handler: (args, _env, home) => {
+  handler: (args) => {
     const name = textOf(args, 'factory');
-    return rooted(
-      home,
-      'factory setting rm',
-      Effect.gen(function* () {
-        const { harness, key } = yield* keyOf(textOf(args, 'setting'));
-        yield* tried(() => refuseName(name, 'setting'));
-        const door = yield* FactoryDoor;
-        const factory = yield* door.factories.read(FactoryName.read(name));
-        const removed = `${harness}.${key}`;
-        const named = settingsNamed(factory.harnessSettings).map((s) => s.name);
-        if (!named.includes(removed))
-          return yield* Effect.fail(
-            new Missing({
-              message: `${name} sets no ${removed}: ${named.length ? `its settings are ${named.join(', ')}` : 'it sets none'}. Nothing was removed.`,
-            }),
-          );
-        const { harnessSettings: _gone, ...rest } = factory;
-        const left = withoutSetting(factory.harnessSettings, harness, key);
-        const file = yield* door.factories.rewrite(left ? { ...rest, harnessSettings: left } : rest);
-        return { file, removed };
-      }),
-    );
+    return Effect.gen(function* () {
+      const { harness, key } = yield* keyOf(textOf(args, 'setting'));
+      yield* tried(() => refuseName(name, 'setting'));
+      const door = yield* FactoryDoor;
+      const factory = yield* filedFactory(name, 'setting');
+      const removed = `${harness}.${key}`;
+      const named = settingsNamed(factory.harnessSettings).map((s) => s.name);
+      if (!named.includes(removed))
+        return yield* Effect.fail(
+          new Missing({
+            message: `${name} sets no ${removed}: ${named.length ? `its settings are ${named.join(', ')}` : 'it sets none'}. Nothing was removed.`,
+          }),
+        );
+      const { harnessSettings: _gone, ...rest } = factory;
+      const left = withoutSetting(factory.harnessSettings, harness, key);
+      const file = yield* door.factories.rewrite(left ? { ...rest, harnessSettings: left } : rest);
+      return { file, removed };
+    });
   },
   print: ({ file, removed }, args) => [`${textOf(args, 'factory')}  setting ${removed} removed`, `changed: ${file}`],
 };

@@ -48,7 +48,8 @@ export const proposalsActed: ProposalsActed = (repo, runs, judged) =>
   });
 
 /**
- * `program` (a tick's pass) with the proposals pass given to it: what the daemon's loop runs each pass with (`up`), so that a test of the
- * tick acts on proposals as the daemon does.
+ * `program` (a tick's pass) with the proposals pass given to it: what every program that runs the pass is composed with — `nemia tick`
+ * (`cli/main.ts`), the daemon's loop (`up`), and a test's — so every tick acts on proposals.
  */
-export const withProposalsPass = <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.provideService(program, ProposalsAct, proposalsActed);
+export const withProposalsPass = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, ProposalsAct>> =>
+  Effect.provideService(program, ProposalsAct, proposalsActed);

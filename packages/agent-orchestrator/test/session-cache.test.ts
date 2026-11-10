@@ -39,7 +39,7 @@ const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 
 const LOOPED = ['dev'];
 
@@ -131,7 +131,7 @@ async function walk(
     id === `${run.id}-${step}` ? 1 : Number(new RegExp(`^${run.id}-${step}-try(\\d+)$`).exec(id)?.[1] ?? NaN);
 
   for (let pass = 0; pass < 60; pass++) {
-    const p = await runWith(b.e, advanceRun(readRun(run.id)));
+    const p = await runWith(b.e, advanceRun(runRecord(run.id)));
     const pending = [...b.tasks.entries()].filter(([, t]) => t.phase === 'pending');
     if (!pending.length && !p.looped.length && !p.tried.length) break;
     for (const [id, t] of pending) {
@@ -353,7 +353,7 @@ for (const name of LOOPED) {
     const first = `${run.id}-${target}`;
     const nudge = `${first}-try2`;
     for (let pass = 0; pass < 20 && !b.tasks.has(nudge); pass++) {
-      await runWith(b.e, advanceRun(readRun(run.id)));
+      await runWith(b.e, advanceRun(runRecord(run.id)));
       for (const [id, t] of b.tasks) {
         if (t.phase !== 'pending' || id === nudge) continue;
         order.push(id);
@@ -375,6 +375,6 @@ for (const name of LOOPED) {
     const filed = [...order, nudge].map((id) => b.tasks.get(id)!.spec);
     assert.equal(b.tasks.get(nudge)!.spec.resumeFrom, `native-${first}`, 'the same session, continued');
     assert.deepEqual(chainDifferences(filed), []);
-    assert.equal(readRun(run.id).steps[target]?.tries?.at(-1)?.cause, 'signoff');
+    assert.equal(runRecord(run.id).steps[target]?.tries?.at(-1)?.cause, 'signoff');
   });
 }

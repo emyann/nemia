@@ -6,7 +6,7 @@
  * and a copy here would go stale the moment a task settles. Cancellation is the exception: "somebody called this off" is a fact about
  * no step's task, and the engine has never heard of the run, so `cancelledAt` lives on the run.
  */
-export { durationWord } from './status/status.ts';
+export { durationWord } from './usage/usage.ts';
 /**
  * The shell a step's `check:` runs under, and its deadlines, a round's and a landing's, for a template's tests that run a rendered check
  * as a run would and hold a script's own bounds under them (`packages/templates`), from the `agent-orchestrator/run` subpath.

@@ -15,7 +15,7 @@ import {
   type NemiaLevel,
 } from '../../lib/api/nemia.ts';
 import { type Bridge } from '../../lib/api/bridge.ts';
-import { DEFAULT_NAME } from '../../lib/factories';
+import { DEFAULT_NAMESPACE } from 'objects';
 import {
   factoryWords,
   freshLevel,
@@ -208,7 +208,7 @@ function FactoriesPart({
  * for a chosen stretch, and the end of a raise in force. The default factory's level is the store's, picked above.
  */
 function FactoryRow({ row, now, pending, onAsk }: { row: FactoryLevel; now: Date; pending: boolean; onAsk: (ask: LevelAsk) => void }) {
-  const byDefault = row.factory === DEFAULT_NAME;
+  const byDefault = row.factory === DEFAULT_NAMESPACE;
   return (
     <div data-factory-level={row.factory} data-level={row.level} className="flex flex-col gap-2 rounded-lg border px-3 py-2">
       <div className="flex flex-wrap items-center gap-2">

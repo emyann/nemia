@@ -28,9 +28,9 @@ const { checkedTree, packageSkillNames, problemLine } = await import('./template
 const { TemplateDoor } = await import('./door/templates.store.ts');
 const { TemplateSource } = await import('./door/templates.model.ts');
 const { StoreRoot } = await import('../config/root.store.ts');
-const { addFactory, attachWorkflow, hireAgent } = await import('../runner.ts');
+const { addFactory, attachWorkflow, hireAgent } = await import('../../testing.ts');
 const { writeRules } = await import('../factory/rules/rules.store.ts');
-const { setRevisions } = await import('../factory/factory.store.ts');
+const { followed } = await import('../../test/factory-planted.ts');
 const { main } = await import('../cli/main.ts');
 const { engineOf } = await import('../runtime-client.ts');
 const engine = eachTest(testEngine);
@@ -297,7 +297,7 @@ test('what export writes from a repository and a factory, read back as it was wr
     "with --factory, the draft holds that factory's attached workflows only, its hires, its revisions policy and its instruction",
     () => {
       const repo = factoryOnTeam('crew');
-      setRevisions({ factory: 'crew', revisions: 'follow' });
+      followed(ROOT, 'crew', 'follow');
       fs.writeFileSync(path.join(repo, 'NEMIA.md'), 'Run the crew.\n');
       const dir = target();
       const { from } = exportTemplate({ dir, from: repo, factory: 'crew' });

@@ -12,6 +12,7 @@
  *
  * And the daemon's other sweep, of the store's disk (`disk`): that `up` forks it once its first pass answered and hands its reading on.
  */
+import { configGiven, rootNow } from './config-given.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -22,7 +23,7 @@ import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { steeredClock } from './steered.ts';
 import type { PlaceRequests, PlaceVerb } from '../src/place/place.ts';
-import { storeRootLayer } from '../src/config/root.store.ts';
+import { storeConfigLayer } from '../src/config/root.store.ts';
 
 const ROOT = scratch('wf-free-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -33,8 +34,8 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_KEEP_WORKTREES;
 const { approveRun, cancelRun, decideRun, startRun, runWith: runEngine } = await import('../src/runner.ts');
-const { readRun } = await import('../src/record/record.store.ts');
-const { runStore } = await import('../src/record/files.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
+const { filesStore: runStore } = await import('../src/record/files.store.ts');
 const { tickRun, freshRestMemo } = await import('../src/tick/tick.verb.ts');
 const { PlaceService } = await import('../src/place/place.store.ts');
 const { free, freeOnce, freshFreeMemory, FREE_A_SWEEP } = await import('../src/forget/prune/free.verb.ts');
@@ -42,7 +43,7 @@ const { EngineService, engineOf } = await import('../src/runtime-client.ts');
 const { freeable, freeSaid, freeTurn } = await import('../src/forget/prune/prune.ts');
 const { up } = await import('../src/daemon/up.verb.ts');
 const { recentPasses } = await import('../src/daemon/daemon.store.ts');
-const { DEFAULT_FACTORY } = await import('../src/factory/factory.ts');
+const { DEFAULT_NAMESPACE } = await import('../src/factory/factory.ts');
 const { main } = await import('../src/cli/main.ts');
 const stage = staged({ runWith: runEngine, main, engineOf });
 const world = () => stage.place().world;
@@ -147,6 +148,7 @@ async function sweep(pass: Pass, ids: readonly string[], memory: Memory) {
   const done = await runEngine(
     engine(),
     freeOnce(answers, memory).pipe(
+      Effect.provide(configGiven(rootNow(), process.env)),
       Effect.provide(counting(asked)),
       Effect.provide(Logger.layer([keeper])),
       Effect.provideService(References.MinimumLogLevel, 'Info'),
@@ -160,7 +162,7 @@ async function sweep(pass: Pass, ids: readonly string[], memory: Memory) {
   return { ...done, logged, asked, verbs: asked.map((a) => a.verb) };
 }
 
-const lane = (id: string, step = 'work') => readRun(id).steps[step].workspace!;
+const lane = (id: string, step = 'work') => runRecord(id).steps[step].workspace!;
 const whole = (id: string) => fs.existsSync(lane(id)) && !fs.existsSync(path.join(ROOT, 'runs', `${id}.pruned`));
 const gone = (id: string) => !fs.existsSync(path.join(ROOT, 'worktrees', id));
 
@@ -184,7 +186,7 @@ async function worked(id: string, outcome: 'done' | 'blocked' = 'done') {
 async function merged(repo = aRepo()) {
   const run = await started(WORK, repo);
   await worked(run.id);
-  mergedIn(repo, readRun(run.id).steps.work.branch!, `merge ${run.id}`);
+  mergedIn(repo, runRecord(run.id).steps.work.branch!, `merge ${run.id}`);
   return run;
 }
 
@@ -198,7 +200,7 @@ async function land(id: string, repo: string) {
 async function shipped(id: string, repo: string) {
   await stage.runWith(engine(), approveRun(id, 'ship'));
   await ticked(() => atWork(id), `${id}'s ending at work`);
-  mergedIn(repo, readRun(id).steps.work.branch!, `land ${id}`);
+  mergedIn(repo, runRecord(id).steps.work.branch!, `land ${id}`);
   sign(id);
   return ticked((pass) => rests(pass, id, 'succeeded'), `${id} landed and at rest`);
 }
@@ -225,7 +227,7 @@ test(
         const { id, repo } = await started(ENDING);
         await land(id, repo);
         const wt = lane(id);
-        const branch = readRun(id).steps.work.branch!;
+        const branch = runRecord(id).steps.work.branch!;
         const tip = world().tip(repo, branch);
         assert.ok(tip, 'the run has its branch');
         const record = fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8');
@@ -294,7 +296,7 @@ test(
         assert.deepEqual([left.verbs, left.freed, whole(inFlight.id)], [[], [], true]);
         const done = await sweep(pass, [settled.id], freshFreeMemory());
         assert.deepEqual([done.freed.map((p) => p.id), gone(settled.id)], [[settled.id], true]);
-        assert.equal(readRun(settled.id).pruned?.worktrees.length, 1);
+        assert.equal(runRecord(settled.id).pruned?.worktrees.length, 1);
       },
     );
 
@@ -339,7 +341,7 @@ test(
         );
         assert.deepEqual([first.freed, first.said, first.logged, whole(id)], [[], [], [], true]);
 
-        mergedIn(repo, readRun(id).steps.work.branch!, 'by hand');
+        mergedIn(repo, runRecord(id).steps.work.branch!, 'by hand');
         const done = await sweep(await tick(), [id], memory);
         assert.deepEqual([done.freed.map((p) => p.id), gone(id)], [[id], true], 'on its base now, it is finished');
       },
@@ -355,7 +357,7 @@ test(
         world().branch(repo, 'other', { 'other.txt': "another run's work\n" });
         const pass = await ticked((p) => rests(p, id, 'cancelled'), 'cancelled at its gate, and at rest');
         world().stage(repo, 'other');
-        assert.ok(fs.existsSync(readRun(id).stagedFile!), "a merge is staged in the checkout, and it is not this run's");
+        assert.ok(fs.existsSync(runRecord(id).stagedFile!), "a merge is staged in the checkout, and it is not this run's");
 
         const done = await sweep(pass, [id], freshFreeMemory());
         assert.deepEqual(
@@ -389,7 +391,7 @@ test(
         const done = await sweep(await tick(freshRestMemo()), [id], freshFreeMemory());
         assert.deepEqual([done.freed.map((p) => p.id), gone(id)], [[id], true]);
         assert.deepEqual(
-          readRun(id).pruned?.worktrees.map((w) => w.path),
+          runRecord(id).pruned?.worktrees.map((w) => w.path),
           [wt],
         );
       },
@@ -399,7 +401,7 @@ test(
       const a = await started(ENDING);
       const b = await started(ENDING, a.repo, { after: [a.id] });
       await worked(a.id);
-      assert.ok(!readRun(b.id).steps.work?.taskId, 'B waits while A has not landed');
+      assert.ok(!runRecord(b.id).steps.work?.taskId, 'B waits while A has not landed');
       const landed = await shipped(a.id, a.repo);
       const memory = freshFreeMemory();
       assert.deepEqual(
@@ -487,13 +489,13 @@ test(
       const daemon = Effect.runFork(
         Effect.scoped(up(engine(), { every: 20, repo: ROOT, holder: 'up' })).pipe(
           Effect.provide(stage.place().layer),
-          Effect.provide(storeRootLayer(process.env)),
+          Effect.provide(storeConfigLayer(process.env)),
           Effect.provide(Logger.layer([])),
         ),
       );
       t.after(() => Effect.runPromise(Fiber.interrupt(daemon)));
       await until(t, () => gone(id), `the daemon frees ${id}`, { everyMs: 50 });
-      assert.equal(readRun(id).pruned?.worktrees.length, 1);
+      assert.equal(runRecord(id).pruned?.worktrees.length, 1);
     });
 
     await s.test(
@@ -506,7 +508,7 @@ test(
         const daemon = Effect.runFork(
           Effect.scoped(up(engine(), { every: 20, repo: ROOT, holder: 'up', onTaken: () => turns })).pipe(
             Effect.provide(stage.place().layer),
-            Effect.provide(storeRootLayer(process.env)),
+            Effect.provide(storeConfigLayer(process.env)),
             Effect.provide(Logger.layer([])),
           ),
         );
@@ -522,10 +524,10 @@ test(
           'REFUSED: a sweep before the first pass answered, which the fibers forked had two hundred turns to start, and which knows no run and so no factory',
         );
         assert.ok(first.at < read.at);
-        const ours = read.disk!.entries.find((entry) => entry.part === 'runs' && entry.factory === DEFAULT_FACTORY);
+        const ours = read.disk!.entries.find((entry) => entry.part === 'runs' && entry.factory === DEFAULT_NAMESPACE);
         assert.ok(ours?.bytes, `the runs the pass answered, ${id} among them, are their factory's: ${JSON.stringify(read.disk!.entries)}`);
         assert.equal(
-          readRun(id).factory,
+          runRecord(id).factory,
           undefined,
           'a run of no factory is the default factory’s once a pass answered it, and no factory’s before',
         );
@@ -553,6 +555,7 @@ test(
     const clock = steeredClock();
     const loop = Effect.runFork(
       free(answers).pipe(
+        Effect.provide(storeConfigLayer(process.env)),
         Effect.provide(EngineService.layer(engine())),
         Effect.provide(stage.place().layer),
         Effect.provide(Logger.layer([keeper])),

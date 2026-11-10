@@ -4,8 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import { PlaceKind, placeModel } from './place.model.ts';
-import { erDiagram } from '../model/er.model.ts';
+import { PlaceKind } from './place.model.ts';
 import { placeOf, type Run } from '../record/record.ts';
 
 /** Each kind a record says, as the store reads it: a record with no `place` is a git run's. */
@@ -17,5 +16,4 @@ test('every kind of place a run record holds decodes as a PlaceKind, and no othe
   await t.test('a folder record reads folder', () => assert.equal(placeOf({ place: { kind: 'folder' } }), 'folder'));
   await t.test('REFUSED: the former spelling repository', () => assert.equal(Schema.is(PlaceKind)('repository'), false));
   await t.test('REFUSED: a kind no record holds', () => assert.equal(Schema.is(PlaceKind)('remote'), false));
-  await t.test('draws no block in the diagram: a kind is an attribute', () => assert.ok(!erDiagram(placeModel).includes('{')));
 });

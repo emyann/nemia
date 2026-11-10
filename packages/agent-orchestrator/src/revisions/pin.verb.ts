@@ -12,6 +12,7 @@
  *
  * A controller: it gathers digests from four stores, which only a controller may do (`CONTROLLER` in `test/boundary.test.ts`).
  */
+import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { Cache, Cause, Effect } from 'effect';
@@ -30,15 +31,16 @@ import { WorkflowDir } from '../folder/folder.model.ts';
 import { AgentName, SkillName } from '../agents/agents.model.ts';
 import type { Refusal } from '../refusal/refusal.ts';
 import { factoryFills, rulesVersion } from '../factory/rules/rules.store.ts';
-import { DEFAULT_FACTORY, revisionsOf, type Factory } from '../factory/factory.ts';
-import { readFactory } from '../factory/factory.store.ts';
-import { runStore } from '../record/files.store.ts';
+import { revisionsOf, type Factory } from '../factory/factory.ts';
+import { factoryOrNone } from '../factory/door/factories.store.ts';
+import { runNamespace } from '../run-list/index.ts';
+import { runsAtOnce } from '../runs/runs.store.ts';
 import { within, withinEffect } from '../meter/tally.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { Conflict } from '../refusal/refusal.ts';
 import type { SkillsFound } from '../agents/agents.ts';
-import type { Run } from '../record/record.ts';
+import { endedForGood, type Run } from '../record/record.ts';
 import { repoAllows, type Allows } from '../trust/allows.verb.ts';
 import { appendRevision, ledgerOf } from './revisions.store.ts';
 import { kindsDrift, revisionNow, stepsDrift, type Drift, type KindName, type Pin, type Revision, type RevisionKind } from './revisions.ts';
@@ -54,10 +56,6 @@ export type Kept = { kept: string };
 
 /** A refusal's or an error's first line, which is what a note on the feed has room for. */
 const firstLine = (said: string): string => firstPiece(said, '\n');
-
-/** The factory a run was started in, read; none for the default factory, which is no file. */
-const factoryOf = (run: Pick<Run, 'factory'>): Factory | undefined =>
-  run.factory === undefined || run.factory === DEFAULT_FACTORY ? undefined : readFactory(run.factory);
 
 /** The name a workflow folder is known by, within its kind: the folder's own, as a factory attaches it. */
 const workflowName = (dir: string): string => path.basename(path.resolve(dir));
@@ -89,7 +87,7 @@ function kindsIn(run: Pick<Run, 'workflowDir' | 'factory'>, steps: readonly Work
     named.push({ kind: 'agent', name: agent.name });
     for (const skill of agent.skills ?? []) named.push({ kind: 'skill', name: skill });
   }
-  if (run.factory !== undefined && run.factory !== DEFAULT_FACTORY) named.push({ kind: 'rules', name: run.factory });
+  named.push({ kind: 'rules', name: runNamespace(run.factory) });
   return named.filter((k, i) => named.findIndex((o) => o.kind === k.kind && o.name === k.name) === i);
 }
 
@@ -167,7 +165,7 @@ function once<A extends unknown[], T>(f: (...args: A) => T, key: (...args: A) =>
  * world for itself.
  */
 export type PassRevisions = {
-  readonly factory: (run: Pick<Run, 'factory'>) => Factory | undefined;
+  readonly factory: (run: Pick<Run, 'factory'>) => Effect.Effect<Factory | undefined, Refusal>;
   readonly skills: (run: FolderRun) => Effect.Effect<SkillsFound, Refusal>;
   readonly steps: (run: FolderRun) => Effect.Effect<Workflow[], Refusal>;
   readonly allows: (run: FolderRun) => Allows;
@@ -180,7 +178,10 @@ export type PassRevisions = {
 type Numbering = (kind: RevisionKind, name: string, hash: string, at: string) => Revision;
 
 /** The number `hash` stands at for `kind` and `name`, read off the ledger and never appended: the next number for a content it lacks. */
-const lookedUp: Numbering = (kind, name, hash, at) => revisionNow(ledgerOf(kind, name), hash, at);
+const lookedUp =
+  (home: string): Numbering =>
+  (kind, name, hash, at) =>
+    revisionNow(ledgerOf(home, kind, name), hash, at);
 
 /** As many keys as one pass's `Cache` holds: more than a pass can name, so nothing a pass read is let go before the pass is. */
 const PASS_KEYS = Number.MAX_SAFE_INTEGER;
@@ -196,12 +197,17 @@ const runOfKey = (key: string): FolderRun => {
  * `Cache` of that pass, keyed by what it reads and holding the `Exit`, so a concurrent miss waits on the one lookup and a failure is kept.
  */
 export const passRevisions = Effect.fn('passRevisions')(function* () {
+  const home = yield* StoreRoot;
   const where = (run: FolderRun): Array<string | null> => [
     path.resolve(run.workflowDir),
     run.repo === undefined ? null : path.resolve(run.repo),
     run.factory ?? null,
   ];
-  const factory = once(factoryOf, (run) => String(run.factory ?? ''));
+  const factoryCache = yield* Cache.make({
+    capacity: PASS_KEYS,
+    lookup: (name: string) => withinEffect('revisions', factoryOrNone(name)),
+  });
+  const factory = (run: Pick<Run, 'factory'>) => Cache.get(factoryCache, runNamespace(run.factory));
   const skillsCache = yield* Cache.make({
     capacity: PASS_KEYS,
     lookup: (key: string) =>
@@ -215,7 +221,9 @@ export const passRevisions = Effect.fn('passRevisions')(function* () {
     capacity: PASS_KEYS,
     lookup: (key: string) => {
       const run = runOfKey(key);
-      return Effect.suspend(() => stepsNow(run, placesOf(run.repo), factory(run))).pipe((read) => withinEffect('revisions', read));
+      return Effect.flatMap(factory(run), (named) => stepsNow(run, placesOf(run.repo), named)).pipe((read) =>
+        withinEffect('revisions', read),
+      );
     },
   });
   const steps = (run: FolderRun) => Cache.get(stepsCache, JSON.stringify(where(run)));
@@ -229,18 +237,22 @@ export const passRevisions = Effect.fn('passRevisions')(function* () {
       const [kind, name, ...rest] = JSON.parse(key) as [KindName['kind'], string, ...Array<string | null>];
       const run = runOfKey(JSON.stringify(rest));
       return Effect.gen(function* () {
-        return yield* digestFor({ kind, name }, run, placesOf(run.repo), factory(run), yield* skills(run));
+        return yield* digestFor({ kind, name }, run, placesOf(run.repo), yield* factory(run), yield* skills(run));
       }).pipe((read) => withinEffect('revisions', read));
     },
   });
   const digest = (of: KindName, run: FolderRun) => Cache.get(digestCache, JSON.stringify([of.kind, of.name, ...where(run)]));
-  const revision = once(appendRevision, (kind, name, hash) => JSON.stringify([kind, name, hash]));
-  const looked = once(lookedUp, (kind, name, hash) => JSON.stringify([kind, name, hash]));
+  const revision = once<Parameters<Numbering>, Revision>(
+    (kind, name, hash, at) => appendRevision(home, kind, name, hash, at),
+    (kind, name, hash) => JSON.stringify([kind, name, hash]),
+  );
+  const looked = once(lookedUp(home), (kind, name, hash) => JSON.stringify([kind, name, hash]));
   return { factory, skills, steps, allows, digest, revision, looked } satisfies PassRevisions;
 });
 
 /** The pass's reader `read` where one was handed, else one made for this call alone. */
-const readOr = (read: PassRevisions | undefined): Effect.Effect<PassRevisions> => (read ? Effect.succeed(read) : passRevisions());
+const readOr = (read: PassRevisions | undefined): Effect.Effect<PassRevisions, never, StoreRoot> =>
+  read ? Effect.succeed(read) : passRevisions();
 
 /**
  * The pins of `steps` as the world holds them now, each given its number in the ledger by `number`: appended where the digest has moved
@@ -338,7 +350,7 @@ export const driftNow = Effect.fn('driftNow')(function* (run: Run, given?: PassR
 });
 
 /** The pins the run's next filing would take, numbered without a write (`driftNow`'s): none where nothing would be filed or read. */
-const pinsNow = (run: Run, read: PassRevisions): Effect.Effect<Pin[]> =>
+const pinsNow = (run: Run, read: PassRevisions): Effect.Effect<Pin[], never, StoreRoot> =>
   !hasStarted(run) || !run.pinned?.length
     ? Effect.succeed([])
     : Effect.gen(function* () {
@@ -354,12 +366,13 @@ export type Behind = Drift & { hash: string };
  * revisions until a refresh: what the feed says as `revisions behind` (`behindOf`). Each carries the digest of what the files hold, since
  * two edits nobody has resolved read as the one next number. `[]` for a run that follows revisions, whose next filing takes the files
  * whatever they hold, and for a run that will file nothing again — one that succeeded (`succeeded`, the pass's own judgement), one called
- * off, one pruned. A run that failed or waits at a gate keeps it: a retry or an approval files again. Read every pass, never written.
+ * off, one pruned. A run that failed or waits at a gate keeps it: a retry or an approval files again, and so does a held one, which files
+ * again once the hold lifts (`endedForGood`). Read every pass, never written.
  */
 export const behindNow = Effect.fn('behindNow')(function* (run: Run, succeeded: boolean, given?: PassRevisions) {
-  if (succeeded || run.cancelledAt || run.pruned || !hasStarted(run)) return [];
+  if (succeeded || endedForGood(run) || !hasStarted(run)) return [];
   const read = yield* readOr(given);
-  if (follows(run, read)) return [];
+  if (yield* follows(run, read)) return [];
   const now = yield* pinsNow(run, read);
   return kindsDrift(run.pinned, now).flatMap((d): Behind[] => {
     const at = now.find((p) => p.kind === d.kind && p.name === d.name);
@@ -413,17 +426,18 @@ const NOTHING: PinnedPass = { wrote: false, notes: [], lift: false };
  *
  * One run's world stops that run alone: a resolve that throws leaves it the revisions, the step set and the prompts it had and says why
  * (`unread`), and so does a folder whose steps are a set no run may take (`stepSetRefusal`), which `nemia start` refuses too — the pass
- * judges every other run either way.
+ * judges every other run either way. A run called off or pruned is never resolved (`endedForGood`); a held one is, since it files again
+ * once the hold lifts, on the pins this keeps.
  *
  * @param read What this pass reads once for every run it resolves (`PassRevisions`), so ten runs on one workflow folder read and digest
  *   it once between them. A one-off verb that hands none — `advanceRun`, `nemia refresh`, `nemia start` — reads the world for itself.
  */
 export const pinPass = Effect.fn('pinPass')(function* (run: Run, at: string, given?: PassRevisions) {
-  if (run.cancelledAt || run.pruned) return NOTHING;
+  if (endedForGood(run)) return NOTHING;
   const filed = hasStarted(run);
   const read = yield* readOr(given);
   return yield* (filed ? refreshDue(run, at, read) : firstResolve(run, at, read)).pipe(
-    Effect.catchCause((cause) => Effect.sync(() => unread(Cause.squash(cause), filed && runStore.refresh.stands(run.id)))),
+    Effect.catchCause((cause) => Effect.sync(() => unread(Cause.squash(cause), filed && runsAtOnce.refresh.stands(run.id)))),
   );
 });
 
@@ -463,24 +477,22 @@ const firstResolve = Effect.fnUntraced(function* (run: Run, at: string, read: Pa
  * its file removed or broken since the run started — follows nothing: the run keeps what it resolved, as a pinned run does, and the
  * factory's refusal is the start's and the verbs' to say, not every pass's.
  */
-function follows(run: Run, read: PassRevisions): boolean {
-  try {
-    return revisionsOf(read.factory(run)) === 'follow';
-  } catch {
-    return false;
-  }
-}
+const follows = (run: Run, read: PassRevisions): Effect.Effect<boolean> =>
+  read.factory(run).pipe(
+    Effect.map((factory) => revisionsOf(factory) === 'follow'),
+    Effect.orElseSucceed(() => false),
+  );
 
 /**
  * The run's steps and pins taken again on a person's ask (`nemia refresh`), for a run that has filed: the ask is spent either way. The ask
- * is read off its own file every pass (`runStore.refresh.stands`), never off the record, which never holds it. A filed run nobody asked
- * resolves nothing here: a resolve is every `.md` of the folder and a digest of every agent and skill file it names, which a pass may not
- * pay per run for a number nothing files on. A run whose factory follows revisions is resolved by `followPass`, once the pass knows it
+ * is read off its own file every pass (the Run door's `refresh.stands`), never off the record, which never holds it. A filed run nobody
+ * asked resolves nothing here: a resolve is every `.md` of the folder and a digest of every agent and skill file it names, which a pass may
+ * not pay per run for a number nothing files on. A run whose factory follows revisions is resolved by `followPass`, once the pass knows it
  * has something to file. So a pinned run's edit after a filing is numbered when something resolves that content — another run's filing,
  * or this run's `nemia refresh`, which resolves to answer.
  */
 const refreshDue = Effect.fnUntraced(function* (run: Run, at: string, read: PassRevisions) {
-  if (!runStore.refresh.stands(run.id)) return NOTHING;
+  if (!runsAtOnce.refresh.stands(run.id)) return NOTHING;
   const resolved = yield* refreshedNow(run, at, read);
   if (!resolved)
     return {
@@ -504,12 +516,13 @@ const refreshDue = Effect.fnUntraced(function* (run: Run, at: string, read: Pass
  * given, whatever reaches it a full pass (a restarted daemon, a stamp moved), and a run at rest acts on no pass a memo would have
  * skipped. Level-triggered: it reads the factory, the files and the run's pins on the pass, and writes only where the pins moved, so a
  * due filing with no edit is filed on that pass. A folder that does not load, and a factory that no longer reads (`follows`), leave the
- * run what it had, unsaid, since it would be said on every pass.
+ * run what it had, unsaid, since it would be said on every pass. A held run has no filing due, so it is left alone by `filing` alone,
+ * its pins kept for the lift; one called off or pruned is left alone whatever it is handed (`endedForGood`).
  */
 export const followPass = Effect.fn('followPass')(function* (run: Run, at: string, filing: boolean, given?: PassRevisions) {
-  if (!filing || run.cancelledAt || run.pruned || !hasStarted(run)) return NOTHING;
+  if (!filing || endedForGood(run) || !hasStarted(run)) return NOTHING;
   const read = yield* readOr(given);
-  if (!follows(run, read)) return NOTHING;
+  if (!(yield* follows(run, read))) return NOTHING;
   return yield* Effect.gen(function* () {
     const resolved = yield* refreshedNow(run, at, read);
     if (!resolved || isDeepStrictEqual([...(run.pinned ?? [])], resolved.pins)) return NOTHING;
@@ -541,7 +554,7 @@ export const refreshRun = Effect.fn('refresh')(function* (id: string) {
       }),
     );
   const read = yield* passRevisions();
-  if (follows(run, read))
+  if (yield* follows(run, read))
     return yield* Effect.fail(
       new Conflict({
         message: `run ${id} is in the factory ${run.factory}, which follows revisions: its every filing takes what the files hold, so there is nothing to refresh. To keep a run's revisions until a refresh, nemia factory revisions ${run.factory} pinned. Nothing was written.`,

@@ -3,8 +3,8 @@
  * could not judge (`UnjudgedRun`), which a reader of a list tells apart (`judged`); and the parts of a run's status the board names, as
  * `objects` says them (`RunStatus`, `RunStepStatus`), by the names the board's pages read them by. Pure.
  */
-import { DEFAULT_NAMESPACE } from 'objects';
 import type { Run, RunSpec, RunSpecStep, RunStatus as RunStatusAnswer, RunStatusWord, RunStepStatus } from 'objects';
+import { factoryIn } from './namespace.ts';
 
 export type { PlaceKind, RunHolding, RunWaiting, Spent } from 'objects';
 
@@ -73,10 +73,6 @@ const specOf = (s: RunSpecStep | undefined): StepSpecView | null => {
   const { name: _name, input: _input, ...rest } = s;
   return rest;
 };
-
-/** The factory of a run in `namespace`: null for the default factory's, which names none. */
-export const factoryIn = (namespace: string | undefined): string | null =>
-  namespace === undefined || namespace === DEFAULT_NAMESPACE ? null : namespace;
 
 /**
  * The view of a run (`RunView`): its object's spec and status under the names the board reads, its factory, the graph without what a

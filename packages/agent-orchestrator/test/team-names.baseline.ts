@@ -71,7 +71,6 @@ export const TEAM_NAMES: Baseline = {
   'packages/agent-orchestrator/src/roster/fills.store.test.ts': { count: 23, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/src/factory/rules/rules.store.test.ts': { count: 13, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/src/factory/rules/rules.test.ts': { count: 7, ...TEAM_MOVES.fixtures },
-  'packages/agent-orchestrator/src/runlist/runlist.test.ts': { count: 1, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/src/series/series.test.ts': { count: 1, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/src/factory/servers/servers.test.ts': { count: 9, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/src/stats/marks.test.ts': { count: 5, ...TEAM_MOVES.fixtures },

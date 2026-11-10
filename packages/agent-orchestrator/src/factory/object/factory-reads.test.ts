@@ -14,7 +14,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../../place/memory/index.ts';
 import { eachTest, runOver } from '../../../test/placed.ts';
 import { heldUnasked } from '../../../test/unasked.ts';
-import { addFactory, attachWorkflow, setSchedule } from '../factory.store.ts';
+import { addFactory, attachWorkflow, setSchedule } from '../../../testing.ts';
 import { metered } from '../../meter/tally.store.ts';
 import { recordMemo } from '../../rest/index.ts';
 import { engineOf, runWith as runEngine } from '../../runtime-client.ts';

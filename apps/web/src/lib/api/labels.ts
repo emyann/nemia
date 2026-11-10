@@ -4,7 +4,8 @@ import { Schema } from 'effect';
 import { decoded } from './read.ts';
 import { selectorKey } from './selector.ts';
 import { Labelled, Stats } from 'objects';
-import { call, cards, namespaceOf, read, runs } from './objects.ts';
+import { call, cards, read, runs } from './objects.ts';
+import { namespaceOf } from './namespace.ts';
 
 /** A label map: a key, its value. */
 export type Labels = Record<string, string>;

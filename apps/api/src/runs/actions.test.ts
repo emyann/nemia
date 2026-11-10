@@ -123,7 +123,7 @@ async function asTyped(name: string, argv: string[]) {
   assert.ok(args, `nemia ${name} ${argv.join(' ')} is given enough`);
   assert.equal(command.check?.(args) ?? null, null, `nemia ${name} ${argv.join(' ')} passes its check`);
   const given = command.input === undefined ? args : (Schema.decodeUnknownSync(command.input)(args) as typeof args);
-  return runWith(engine(), command.handler(given));
+  return runWith(engine(process.env), command.handler(given));
 }
 
 /** Every file under a run's asks directory, waiting or consumed. */
@@ -174,7 +174,7 @@ function aGitTry(id: string, repo: string, git?: ReturnType<typeof aGitRepo>): s
 function rmTyped(id: string) {
   const args = parseArgv(RM.spec, [id]);
   assert.ok(args && RM.check?.(args) == null, `nemia rm ${id} passes its check`);
-  return runWith(engine(), RM.handler({ runId: id }));
+  return runWith(engine(process.env), RM.handler({ runId: id }));
 }
 
 test('an action on its endpoint answers what its `nemia` entry answers: the same file and words written, the same refusal, the same removal', async (t) => {

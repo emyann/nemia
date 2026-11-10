@@ -6,7 +6,7 @@
  *
  * It keys on the stamp alone — no feed cursor, no branch tips, unlike the informer of each run's judgement (`informer.verb.ts`) and the
  * stats' — because a projection of the record has no other input: what a pass reads of a run beside its record is a person's file beside
- * it, and the stamp is a `stat` of the record and of every such file (`restStamps` in record.store.ts), which is exactly what `readRun`
+ * it, and the stamp is a `stat` of the record and of every such file (`restStamps` in record.store.ts), which is exactly what `runRecord`
  * composes. A projection that read the engine's feed, git or the store's pause would belong in one of those memos instead.
  *
  * A cache of a pure function, never a source of truth: a caller that hands no memo reads every record, which is what the command line and a

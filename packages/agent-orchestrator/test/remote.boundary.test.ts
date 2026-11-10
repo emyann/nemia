@@ -1,5 +1,5 @@
 /**
- * A workflow step on a remote A2A agent, on the real engine `nemia up` makes (`engine()`) and the SDK's own server over HTTP
+ * A workflow step on a remote A2A agent, on the real engine `nemia up` makes (`engine(process.env)`) and the SDK's own server over HTTP
  * (`a2a-server.ts`): the A2A talk is the runtime's, so no stand-in tells it. Two tests.
  *
  * The remote step end to end, a story: `nemia start` on a folder team whose step says `harness: a2a:<name>`, the store's
@@ -38,10 +38,10 @@ const CALLS = path.join(BIN, 'calls.log');
 for (const name of ['claude', 'codex'])
   fs.writeFileSync(path.join(BIN, name), `#!/bin/sh\necho "${name} $*" >> '${CALLS}'\nexit 1\n`, { mode: 0o755 });
 process.env.PATH = `${BIN}${path.delimiter}${process.env.PATH}`;
-const { EngineService, engine, feedHubLayer, followStep, retryRun, tickRun, runWith } = await import('../src/runner.ts');
+const { EngineService, engine, feedHubLayer, followStep, retryRun, tickRun, runWith, withProposalsPass } = await import('../src/runner.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
-const { readRun } = await import('../src/record/record.store.ts');
-const { storeRootLayer } = await import('../src/config/root.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
+const { storeConfigLayer } = await import('../src/config/root.store.ts');
 const { main: cli } = await import('../src/cli/main.ts');
 const stage = staged({ runWith, main: cli, engineOf });
 
@@ -139,7 +139,7 @@ async function remoteRun(t: Waiter, name: string, answer: Answer, secret: string
   try {
     declare({ [name]: { url: server.url } });
     const id = await started(team(`${name}-team`, `a2a:${name}`));
-    const e = engine();
+    const e = engine(process.env);
     await settle(t, e, id);
     return { server, id, e, decided: await printed(['decide', id], e), listed: await printed(['ls'], e) };
   } finally {
@@ -170,7 +170,7 @@ const shown = (got: Moment[]): string[] =>
 async function following(t: TestContext, agent: string, url: string) {
   declare({ [agent]: { url } });
   const id = await started(team(`${agent}-team`, `a2a:${agent}`, 'ask', 'Read the note.'), false);
-  const e = engine();
+  const e = engine(process.env);
   const rt = ManagedRuntime.make(
     Layer.mergeAll(
       feedHubLayer(),
@@ -178,11 +178,11 @@ async function following(t: TestContext, agent: string, url: string) {
       EngineService.layer(e),
       stage.place().layer,
       Layer.succeed(References.MinimumLogLevel, 'Warn'),
-      storeRootLayer(process.env),
+      storeConfigLayer(process.env),
     ),
   );
   t.after(() => rt.dispose());
-  const ticked = () => rt.runPromise(tickRun({ repo: ROOT }).pipe(Effect.provide(storeRootLayer(process.env))));
+  const ticked = () => rt.runPromise(withProposalsPass(tickRun({ repo: ROOT })).pipe(Effect.provide(storeConfigLayer(process.env))));
   await until(
     t,
     async () => {
@@ -248,7 +248,7 @@ test(
 
         const view = await Effect.runPromise(e.view(`${id}-ask`));
         assert.equal(view.phase, 'succeeded');
-        assert.ok(readRun(id).steps.ask?.taskId, 'filed');
+        assert.ok(runRecord(id).steps.ask?.taskId, 'filed');
         assert.ok(decided.join('\n').includes('ask'), decided.join('\n'));
         assert.match(listed.join('\n'), /^\s+ask\s+unverified\s*$/m, listed.join('\n'));
         const everything = (dir: string): string[] =>
@@ -321,7 +321,7 @@ test(
         try {
           declare({ asker: { url: server.url } });
           const id = await started(team('asker-team', 'a2a:asker'));
-          const e = engine();
+          const e = engine(process.env);
           let seen = 'not read yet';
           await until(
             c,
@@ -528,13 +528,13 @@ test(
             const made = await own(['ls']);
             assert.match(made.out.join('\n'), new RegExp(local), made.out.join('\n'));
             if (why !== undefined) {
-              assert.match(made.err, why, 'engine() says why it left the file or the entry out');
+              assert.match(made.err, why, 'the engine says why it left the file or the entry out');
               assert.ok(made.err.includes('until the file is fixed and this process restarts'), made.err);
               assert.ok(made.err.includes('refused by `nemia start`'), made.err);
             }
             const ticked = await own(['tick']);
             if (why !== undefined) assert.match(ticked.err, why);
-            assert.ok(readRun(local).steps.work, `the local step was filed: ${JSON.stringify(readRun(local).steps)}`);
+            assert.ok(runRecord(local).steps.work, `the local step was filed: ${JSON.stringify(runRecord(local).steps)}`);
             const runs = fs.readdirSync(path.join(ROOT, 'runs')).length;
             await assert.rejects(
               start(REMOTE),

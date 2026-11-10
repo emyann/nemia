@@ -7,9 +7,10 @@ import { RunRetry } from 'objects';
 import { ANSWER_HELP, answerFlag, givenAnswers, recheckAnswerRefusal, typedAnswers, typedOf } from '../question/asked.verb.ts';
 import { messageRefusal, modeWord, type RetryHow } from './index.ts';
 import { retryRun } from './retry.verb.ts';
-import { rootGiven, StoreRoot } from '../config/root.store.ts';
+import { StoreRoot } from '../config/root.store.ts';
 import { roundRun } from '../round/round.verb.ts';
-import { budgetRefusal, budgetWord } from '../status/status.ts';
+import { budgetRefusal } from '../status/status.ts';
+import { budgetWord } from '../money/money.ts';
 import { roundBudgetRefusal } from '../round/round.ts';
 import { amountIn, commandLine, renamedValues, type Args } from '../command/command.ts';
 import { checked, type Command } from '../command/entry.verb.ts';
@@ -171,7 +172,8 @@ export const RETRY: Command<
   class: 'answer',
   only: { side: 'cli', why: "the api serves it as the Run's `retry` of `objects`' Api, calling this handler" },
   input: RetryInput,
-  handler: Effect.fnUntraced(function* (input: RetryInput, _env, home) {
+  handler: Effect.fnUntraced(function* (input: RetryInput) {
+    const home = yield* StoreRoot;
     const { answers, ...flags } = input;
     yield* checked(retryRefusal(flags) ?? askRefusal(input));
     const { runId, step } = input;
@@ -192,7 +194,7 @@ export const RETRY: Command<
           ? { message: yield* typedAnswers(runId, at, typed, { note: how.message }) }
           : {};
     const { ask, file, stopFirst } = yield* retryRun(runId, at, { ...how, ...message }, { stopBlocked: true }).pipe(
-      Effect.provideService(StoreRoot, rootGiven(home, 'retry')),
+      Effect.provideService(StoreRoot, home),
     );
     return { try: ask.try, file, stopFirst, ...hinted };
   }),

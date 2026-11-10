@@ -104,3 +104,50 @@ export function evictedBy(taskIds: Iterable<string>, ids: ReadonlySet<string>): 
  */
 export const informedOf: Informed = ({ stampHeld, quiet, tipsHeld, atRest, samePass }) =>
   stampHeld && quiet && tipsHeld && (atRest || samePass) ? 'serve' : 'judge';
+
+/**
+ * How an input of a run's judgement is watched: `stamp`, a file named for the run in the store, stamped (`restStamps`, record.store.ts);
+ * `feed`, a task's journal, by its line on the engine's feed (`followedFeed`); `tips`, a branch's tip as git reads it
+ * (`BranchReader.heads`); `request`, read again on every request and never kept (`diskPartsOf`, object/run.verb.ts).
+ */
+export type Watch = 'stamp' | 'feed' | 'tips' | 'request';
+
+/**
+ * Every input a run's judgement and its listed object are read on, each with what watches it (`Watch`): the one list the store's stamp,
+ * the informer (`informerRead`) and the parts read on every request (`diskPartsOf`) are held to. An input read and not named here is
+ * what `WF_VERIFY_REST=1` refuses: name it here, with its watch, and give it to the one that watches it.
+ */
+export const RUN_INPUTS = {
+  record: 'stamp',
+  cancelled: 'stamp',
+  pruned: 'stamp',
+  hold: 'stamp',
+  labels: 'stamp',
+  refresh: 'stamp',
+  asks: 'stamp',
+  journals: 'feed',
+  tips: 'tips',
+  onDisk: 'request',
+  warning: 'request',
+  files: 'request',
+} as const satisfies Record<string, Watch>;
+
+/** An input of a run's judgement, by its name in `RUN_INPUTS`. */
+export type RunInput = keyof typeof RUN_INPUTS;
+
+/** The inputs `RUN_INPUTS` says `watch` watches. */
+export type InputsWatchedBy<W extends Watch> = { [K in RunInput]: (typeof RUN_INPUTS)[K] extends W ? K : never }[RunInput];
+
+/**
+ * The file each stamped input is, named for the run in the store's `runs/`: `<id>.<suffix>`. `restStamps` stamps these, and any other
+ * file so named, a marker nobody has named yet included.
+ */
+export const STAMPED_FILES: Readonly<Record<InputsWatchedBy<'stamp'>, string>> = {
+  record: 'json',
+  cancelled: 'cancelled',
+  pruned: 'pruned',
+  hold: 'hold',
+  labels: 'labels',
+  refresh: 'refresh',
+  asks: 'asks',
+};

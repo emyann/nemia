@@ -14,6 +14,9 @@
  * after, so a store of forty runs is built in a few passes. Every pass that is not a measurement judges the runs the memo answered
  * in full as well (`verifyRest`), and throws where the two differ.
  */
+import { rootNow, storeGiven } from '../../test/config-given.ts';
+import type { StoreRoot } from '../config/root.store.ts';
+import type { StoreConfig } from '../config/config.store.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -36,13 +39,13 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 process.env.WF_MAX_CONCURRENT = '10000';
 delete process.env.WF_MAX_RUNS;
-const { approveRun, forgetRun, isRepositoryRun, prune, retryRun, startRun, StoreRoot, ...verbs } = await import('../runner.ts');
+const { approveRun, forgetRun, isRepositoryRun, prune, retryRun, startRun, ...verbs } = await import('../runner.ts');
 /** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
-const atRoot = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
+const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot | StoreConfig>): A => Effect.runSync(storeGiven(ROOT, process.env)(program));
 const addToInbox = (opts: Parameters<typeof verbs.addToInbox>[0]) => atRoot(verbs.addToInbox(opts));
 const queueInInbox = (...args: Parameters<typeof verbs.queueInInbox>) => atRoot(verbs.queueInInbox(...args));
 const readInbox = () => atRoot(verbs.readInbox());
-const { listRuns, readRun } = await import('../record/record.store.ts');
+const { listRuns, runRecord } = await import('../record/record.store.ts');
 const { resumePause, putPause } = await import('../pause/pause.store.ts');
 const { tickRun, freshRestMemo } = await import('./tick.verb.ts');
 const { acceptFile, approvalFile, asksDir, holdFile, markCancelled, pruneFile, restStamps, runFile, runsDir, writeAsk } =
@@ -472,7 +475,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
     'the same store paused: once the pass after the pause has read every run with it, every finished run is answered from memory',
     async () => {
       const [none] = sizes.map((z) => z.cost) as [PassCost];
-      putPause({ why: 'merging by hand', by: 'ann' });
+      putPause(rootNow(), { why: 'merging by hand', by: 'ann' });
       try {
         await s.measured();
         const paused = await s.measured();
@@ -485,7 +488,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
         );
         assert.equal(journals(paused), journals(none), 'no journal read more than the runs in flight make');
       } finally {
-        resumePause();
+        resumePause(rootNow());
       }
       await s.measured();
       assert.equal((await s.measured()).rested, FINISHED, 'and once it is lifted, as before');
@@ -579,7 +582,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
     }
     assert.deepEqual(
       released,
-      [readRun(run.id).steps.work.taskId],
+      [runRecord(run.id).steps.work.taskId],
       "the release of the run's session is traced, on the pass that let it go",
     );
     assert.equal(
@@ -597,7 +600,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
       markCancelled(run.id);
       s.touched.add(run.id);
       const before = await s.rested();
-      assert.equal(readRun(run.id).steps.work?.taskId ?? null, null, 'nothing of it filed');
+      assert.equal(runRecord(run.id).steps.work?.taskId ?? null, null, 'nothing of it filed');
       assert.ok(s.memo.runs.has(run.id), 'at rest after the pass that judged it');
       assert.equal(await s.rested(), before + 1, 'answered from memory on the next, and judged the same in full (verifyRest)');
       assert.equal((await s.answered(run.id)).status, 'cancelled');
@@ -633,7 +636,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
       for (const run of [ok, broke, off]) assert.ok(s.memo.runs.has(run.id), `${run.id} at rest with its worktrees there`);
       for (const run of [ok, broke, off]) await s.evicts(`${run.id}: its worktrees gone`, worktreesGone, run);
       assert.deepEqual(
-        [ok, broke, off].map((r) => readRun(r.id).steps.plan?.handedOff ?? null),
+        [ok, broke, off].map((r) => runRecord(r.id).steps.plan?.handedOff ?? null),
         [null, null, null],
         'no hand-off written down: none was made',
       );
@@ -692,7 +695,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
       for (let k = 0; k < 8 && ![first, second].every((r) => s.memo.runs.has(r.id)); k++) {
         await s.verified();
         for (const run of [first, second]) {
-          const workspace = readRun(run.id).steps.implement?.workspace;
+          const workspace = runRecord(run.id).steps.implement?.workspace;
           if (workspace) fs.writeFileSync(path.join(workspace, `${run.id}.ts`), 'export const done = true;\n');
         }
         await h.signAll(inFlight);
@@ -700,7 +703,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
       assert.ok(s.memo.runs.has(first.id) && s.memo.runs.has(second.id), 'both runs at rest at the gate of their ending');
       await runWith(h.e, approveRun(first.id, 'ship', 'Merge it.'));
       await s.verified();
-      assert.ok(readRun(first.id).steps.ship?.taskId, "the first run's ending filed in the checkout");
+      assert.ok(runRecord(first.id).steps.ship?.taskId, "the first run's ending filed in the checkout");
       inFlight.push(first);
       await runWith(h.e, approveRun(second.id, 'ship', 'Merge it too.'));
 
@@ -722,7 +725,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
         `only the records of the runs in flight read (${cost.records} of ${listed}): the checkout's claims and the queue are read off the pass's own listing`,
       );
       const waiting = pass.runs.find((a) => a.run.id === second.id)!;
-      assert.equal(readRun(second.id).steps.ship?.taskId ?? null, null, "the second run's ending is not filed");
+      assert.equal(runRecord(second.id).steps.ship?.taskId ?? null, null, "the second run's ending is not filed");
       assert.equal(
         waiting.feed.steps.find((step) => step.name === 'ship')?.word,
         `waiting on the checkout (${first.id}'s ship has it)`,
@@ -850,7 +853,7 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
     await runWith(s.h.e, retryRun(run.id, 'work', { mode: 'fresh' }));
     assert.equal(await s.rested(), before - 1, 'the ask read');
     assert.equal((await s.finish()).rested, before, 'the try filed, signed, settled, and the run at rest again');
-    assert.equal(readRun(run.id).steps.work.taskId, `${run.id}-work-try2`, 'on its second try');
+    assert.equal(runRecord(run.id).steps.work.taskId, `${run.id}-work-try2`, 'on its second try');
   });
 
   await t.test('an approval at a gate, a file in the asks, and the step it lets go filed', async () => {
@@ -862,12 +865,12 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
       await s.h.signAll();
     }
     assert.ok(s.memo.runs.has(gated.id), 'a run waiting at a gate, its task settled, is at rest');
-    assert.equal(readRun(gated.id).steps.work?.taskId ?? null, null, 'work waits on the gate');
+    assert.equal(runRecord(gated.id).steps.work?.taskId ?? null, null, 'work waits on the gate');
     const waiting = await s.rested();
     await runWith(s.h.e, approveRun(gated.id, 'plan'));
     assert.ok(fs.existsSync(approvalFile(gated.id, 'plan', 1)), 'the approval is a file in the asks');
     assert.equal(await s.rested(), waiting - 1, 'the approval read');
-    assert.ok(readRun(gated.id).steps.work?.taskId, 'and work filed on it');
+    assert.ok(runRecord(gated.id).steps.work?.taskId, 'and work filed on it');
     assert.equal((await s.finish()).rested, waiting, 'the run finished, and at rest again');
   });
 
@@ -912,14 +915,14 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
   await t.test('a result branch moved, its tip written; one deleted, and a commit on the base branch, move nothing', async () => {
     const s = await small({ isolated: 2 });
     const run = s.aResting(true);
-    const [branch, tip] = Object.entries(readRun(run.id).tips ?? {})[0] ?? [];
+    const [branch, tip] = Object.entries(runRecord(run.id).tips ?? {})[0] ?? [];
     assert.ok(branch && tip, 'the run has a tip on its record');
     let moved = tip;
     await s.evicts('a branch moved', () => (moved = world().branch(run.repo, branch, {})), run, 2, 0);
-    assert.equal(readRun(run.id).tips![branch], moved, 'the tip the pass saw is on the record');
+    assert.equal(runRecord(run.id).tips![branch], moved, 'the tip the pass saw is on the record');
 
     const before = await s.rested();
-    const lanes = Object.values(readRun(run.id).steps).flatMap((step) =>
+    const lanes = Object.values(runRecord(run.id).steps).flatMap((step) =>
       step.branch === branch && step.workspace ? [step.workspace] : [],
     );
     const dropped = stand().place.askNow('remove', { repo: run.repo, workspaces: lanes, branches: [branch] });
@@ -927,7 +930,7 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
     assert.equal(await s.rested(), before, 'a branch git no longer has keeps the tip last seen: nothing to judge again');
     world().commit(run.repo, 'later on the base branch');
     assert.equal(await s.rested(), before, 'the base branch is none of the key');
-    assert.equal(readRun(run.id).tips![branch], moved);
+    assert.equal(runRecord(run.id).tips![branch], moved);
   });
 
   await t.test(
@@ -935,7 +938,7 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
     async () => {
       const s = await small({ isolated: 2 });
       const run = s.aResting(true);
-      const [branch, tip] = Object.entries(readRun(run.id).tips ?? {})[0] ?? [];
+      const [branch, tip] = Object.entries(runRecord(run.id).tips ?? {})[0] ?? [];
       assert.ok(branch && tip, 'the run has a tip on its record');
       const tippedThere = [...s.memo.runs.values()].filter((k) => k.run.repo === run.repo && k.tipped.length > 0).length;
       assert.ok(tippedThere > 1, 'runs of its repository rest on their tips');
@@ -951,9 +954,9 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
       );
       const pass = await runWith(s.h.e, tickRun({ repo: ROOT, memo: s.memo, verifyRest: true }).pipe(Effect.provide(unread)));
       assert.equal(pass.cost!.rested, before - tippedThere, 'every run of it whose tips the memo holds is judged in full, and no other');
-      assert.equal(readRun(run.id).tips![branch], tip, 'and the tip the record holds is kept: the pass read no head');
+      assert.equal(runRecord(run.id).tips![branch], tip, 'and the tip the record holds is kept: the pass read no head');
       assert.equal(await s.rested(), before - 1, 'its standing read again, the run whose branch moved is judged afresh');
-      assert.equal(readRun(run.id).tips![branch], moved, 'and its tip written');
+      assert.equal(runRecord(run.id).tips![branch], moved, 'and its tip written');
       await s.rested();
       assert.equal(await s.rested(), before, 'and at rest again');
     },
@@ -1043,7 +1046,7 @@ test('every input of a run at rest takes it, and it alone, out of the memo; a me
       const s = await small({ inFlight: 1 });
       const id = s.inFlight[0].id;
       const { run: _, ...advanced } = await s.answered(id);
-      const run = readRun(id);
+      const run = runRecord(id);
       s.memo.runs.set(id, { stamp: restStamps().get(id)!, run, tipped: [], advanced });
       await assert.rejects(
         s.verified(),

@@ -2,7 +2,8 @@
  * A run's steps as a program (`stepsOf`, `steps.verb.ts`): a frozen record's read with no door and no root; an unfrozen one's folder read
  * through the Workflow door the program is given, at the store's root it is given, its agents found through the Agent door — never the
  * disk at the module's root — and refused `UnloadedFolder` where it does not load, a defect of the read included; refused `Invalid`, and
- * not as a folder that does not load, where no root was given. `stepsOrNone` and `unloadedOf` read the refusal alone.
+ * not as a folder that does not load, where no root was given. `stepsOrNone` and `unloadedOf` read the refusal alone, and `stepsOrWhy`
+ * keeps its reason.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -24,7 +25,7 @@ import { WorkflowDir } from '../folder/folder.model.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { UnloadedFolder, unloadedFolder } from './steps.ts';
-import { stepsOf, stepsOrNone, unloadedOf } from './steps.verb.ts';
+import { stepsOf, stepsOrNone, stepsOrWhy, unloadedOf } from './steps.verb.ts';
 
 /** `run`'s record with no frozen workflow, its folder `dir`: what a record written before `nemia start` froze one holds. */
 const unfrozen = (dir: string): Run => {
@@ -108,4 +109,19 @@ test('an unfrozen record whose folder is gone reads no steps, and is left out in
   assert.deepEqual(rooted(stepsOrNone(run)), []);
   const why = rooted(unloadedOf(run));
   assert.ok(why?.includes(run.workflowDir));
+});
+
+test('stepsOrWhy: an unfrozen folder that does not load is answered with its reason, a frozen record with its steps, no root refused', () => {
+  const root = scratch('wf-steps-why-');
+  const run = unfrozen(path.join(root, 'workflows', 'gone'));
+  const rooted = <A, E>(program: Effect.Effect<A, E>) => Effect.runSync(Effect.provideService(program, StoreRoot, root));
+  const read = rooted(stepsOrWhy(run));
+  assert.ok('unloaded' in read, 'the folder that does not load is answered, not refused');
+  const refusal = failureOf(Effect.provideService(stepsOf(run), StoreRoot, root));
+  assert.ok(refusal instanceof UnloadedFolder);
+  assert.equal(read.unloaded, refusal.why, "the reason is the refusal's own");
+  const frozen = aRun('r-frozen');
+  const steps = Effect.runSync(stepsOrWhy(frozen));
+  assert.ok('steps' in steps);
+  assert.equal(failureOf(stepsOrWhy(unfrozen(path.join(root, 'workflows', 'dev')))) instanceof Invalid, true, 'no root is no reason');
 });

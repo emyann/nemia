@@ -17,7 +17,8 @@ import {
   factoryBlocks,
   openBlockOf,
   runsOf,
-  factoryOf,
+  factoryIn,
+  namespaceOf,
   factorySearch,
   floorPlace,
   hireOnCreate,
@@ -248,11 +249,18 @@ test('startRepo, floorPlace, whyNotStarted, untrustedFor: where a card or a floo
   );
 });
 
-test('factoryOf, shownIn, workflowFactories, listPlace, hirePlaceOf: which factory a run, a card or a workflow is in, and what an address reads', async (t) => {
+test('namespaceOf, factoryIn, shownIn, workflowFactories, listPlace, hirePlaceOf: which factory a run, a card or a workflow is in, and what an address reads', async (t) => {
   await t.test('a run or a card is tagged with the factory it names, and with default when it names none or names default', () => {
-    assert.equal(factoryOf({ factory: null }), 'default');
-    assert.equal(factoryOf({ factory: 'default' }), 'default');
-    assert.equal(factoryOf({ factory: 'nemia' }), 'nemia');
+    assert.equal(namespaceOf(null), 'default');
+    assert.equal(namespaceOf(undefined), 'default');
+    assert.equal(namespaceOf('default'), 'default');
+    assert.equal(namespaceOf('nemia'), 'nemia');
+  });
+  await t.test("a name goes back to the api's form: null for the default factory and for none, a named factory as it is", () => {
+    assert.equal(factoryIn('default'), null);
+    assert.equal(factoryIn(undefined), null);
+    assert.equal(factoryIn('nemia'), 'nemia');
+    for (const factory of [null, 'nemia']) assert.equal(factoryIn(namespaceOf(factory)), factory, 'the two converters undo each other');
   });
   await t.test(
     "a filter keeps the runs or cards of its factory in their order — the default's naming none or naming default — and no filter keeps all",

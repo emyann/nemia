@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { FINISHED_SIZE, type FinishedPage } from '@/lib/api/runs';
 import { runLinesQuery } from '@/lib/api/run';
 import { workflowNameOf } from '@/lib/api/workflows';
-import { factoryOf } from '@/lib/factories';
+import { namespaceOf } from '@/lib/factories';
 import { titleOf } from '@/lib/factory';
 import { ink } from '@/lib/meaning';
 import { agoWords } from '@/lib/runWords';
@@ -47,8 +47,8 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
         </TextLink>
         <LabelTags labels={run.labels} />
       </Cell>
-      <Cell truncate data-factory={factoryOf(run)} className="text-label-small uppercase text-on-surface-variant">
-        {factoryOf(run)}
+      <Cell truncate data-factory={namespaceOf(run.factory)} className="text-label-small uppercase text-on-surface-variant">
+        {namespaceOf(run.factory)}
       </Cell>
       <Cell data-workflow-cell>
         <TextLink

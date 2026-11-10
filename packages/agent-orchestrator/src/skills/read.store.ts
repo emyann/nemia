@@ -18,6 +18,7 @@ import { ownSkill, type Agent, type SkillsFound } from '../agents/agents.ts';
 import { givenSkillOf, type GivenSkill } from '../keys/index.ts';
 import { skillEntryOf, type AgentSkill, type SkillRule } from './skills.ts';
 import { lookedUp, type LookupRoot } from './skills.ts';
+import { LOOKUP, type DefinitionOrigin } from '../definition/served.ts';
 
 /**
  * Where else a workflow's agents and skills are looked for, beside its own folder: the repository it runs on, whose `.claude/agents/` and
@@ -30,15 +31,20 @@ export type Places = { repo?: string; home?: string };
 const REPOSITORY_HOLDER = '.claude';
 
 /**
- * The folders a workflow's agents and skills are looked for in, each holding an `agents/` and a `skills/`, in the order a name is found:
- * the workflow's own root (the folder beside it, `agentsDir`'s parent), then the repository's `.claude/`, then the store's `workflows/`.
- * So the repository wins over the store, and a workflow of the store finds its own first. One folder is listed once.
+ * The folders a workflow's agents and skills are looked for in, each holding an `agents/` and a `skills/`, in the one order a name is
+ * looked up (`LOOKUP`, which the served definitions read too): the workflow's own root (the folder beside it, `agentsDir`'s parent), as a
+ * factory's tree is, then the repository's `.claude/`, then yours, the store's `workflows/`. The builtin skills hold no root: they are
+ * found past every root (`skillsFor`). So the repository wins over the store, and a workflow of the store finds its own first. One
+ * folder is listed once.
  */
 export function lookupRoots(workflowDir: string, places: Places = {}): string[] {
-  const roots = [path.dirname(agentsDir(workflowDir))];
-  if (places.repo) roots.push(path.join(path.resolve(places.repo), REPOSITORY_HOLDER));
-  if (places.home) roots.push(path.join(path.resolve(places.home), 'workflows'));
-  return [...new Set(roots)];
+  const rootOf: Readonly<Record<DefinitionOrigin, string | undefined>> = {
+    factory: path.dirname(agentsDir(workflowDir)),
+    repo: places.repo ? path.join(path.resolve(places.repo), REPOSITORY_HOLDER) : undefined,
+    yours: places.home ? path.join(path.resolve(places.home), 'workflows') : undefined,
+    builtin: undefined,
+  };
+  return [...new Set(LOOKUP.flatMap((origin) => rootOf[origin] ?? []))];
 }
 
 /**

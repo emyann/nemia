@@ -12,6 +12,10 @@
  * person tells it, is on the stand-ins in `test/pause.test.ts`. A store of its own, since
  * `tick` reads every run under `WF_ROOT`, which is read as the module loads and so set before the import.
  */
+import { settingsOf } from '../config/config.store.ts';
+import { rootNow, storeGiven } from '../../test/config-given.ts';
+import type { StoreRoot } from '../config/root.store.ts';
+import type { StoreConfig } from '../config/config.store.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -34,13 +38,13 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_MAX_CONCURRENT = '10000';
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
-const { approveRun, retryRun, startRun, StoreRoot, ...verbs } = await import('../runner.ts');
+const { approveRun, retryRun, startRun, ...verbs } = await import('../runner.ts');
 /** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
-const atRoot = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
+const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot | StoreConfig>): A => Effect.runSync(storeGiven(ROOT, process.env)(program));
 const addToInbox = (opts: Parameters<typeof verbs.addToInbox>[0]) => atRoot(verbs.addToInbox(opts));
 const queueInInbox = (...args: Parameters<typeof verbs.queueInInbox>) => atRoot(verbs.queueInInbox(...args));
 const readInbox = () => atRoot(verbs.readInbox());
-const { approvalFile, asksDir, readRun } = await import('../record/record.store.ts');
+const { approvalFile, asksDir, runRecord } = await import('../record/record.store.ts');
 const { tickRun, freshRestMemo } = await import('./tick.verb.ts');
 const { engineOf, runWith: runEngine, storeAdmission } = await import('../runtime-client.ts');
 const place = testPlace();
@@ -136,7 +140,7 @@ const engine = () => {
       journal: asyncStore(memoryJournal(tasks, starts)),
       harnesses: { claude: asyncOps(runner), codex: asyncOps(runner), check: asyncOps(runner) },
       defaultHarness: 'claude',
-      ...storeAdmission(),
+      ...storeAdmission(rootNow(), settingsOf(process.env)),
     }),
   );
   const of = (name: string, runs: readonly Run[]) => runs.some((r) => name.startsWith(`ae/${r.id}-`));
@@ -159,7 +163,7 @@ const MEMO = freshRestMemo();
 const pass = (memo = MEMO) => runWith(h.e, tickRun({ repo: ROOT, memo, verifyRest: true }));
 const begun = async (workflowDir: string, more: Partial<Parameters<typeof startRun>[0]> = {}) =>
   await runPlaced(startRun({ brief: 'paused', repo: REPO, workflowDir, isolate: false, ...more }));
-const taskOf = (run: Run, step: string): string | undefined => readRun(run.id).steps[step]?.taskId ?? undefined;
+const taskOf = (run: Run, step: string): string | undefined => runRecord(run.id).steps[step]?.taskId ?? undefined;
 /** The row `nemia ls` lists for `step` of `run`: its word and its note. */
 const rowOf = async (run: Run, step: string) => {
   const [{ listed }] = (await runWith(h.e, runsListed(run.id))).runs;
@@ -192,7 +196,7 @@ const LANDS = aRepo();
 
 /** A file left in the workspace of `run`'s step `work`, for the step at work there to hand off, as a session leaves its work. */
 const worked = (run: string) => {
-  const { workspace } = readRun(run).steps.work;
+  const { workspace } = runRecord(run).steps.work;
   assert.ok(workspace, `${run} has a workspace`);
   fs.writeFileSync(path.join(workspace, 'work.txt'), 'work\n');
 };
@@ -226,7 +230,7 @@ test('while the store is paused nothing new starts and the work goes on; the pas
   const queuedTask = taskOf(await queued, 'work')!;
   assert.equal((await Effect.runPromise(h.e.view(queuedTask))).admission, 'queued', 'a task filed and not yet admitted');
 
-  const pause = putPause({ why: 'merging by hand', by: 'ann' });
+  const pause = putPause(rootNow(), { why: 'merging by hand', by: 'ann' });
   const born = begun(ONE);
   await runWith(h.e, retryRun(refused.id, 'work', { mode: 'fresh' }));
   await runWith(h.e, approveRun(gated.id, 'plan'));
@@ -263,7 +267,7 @@ test('while the store is paused nothing new starts and the work goes on; the pas
   await pass(freshRestMemo());
   await pass();
   const last = await pass();
-  const repo = readRun(landing.id).repo!;
+  const repo = runRecord(landing.id).repo!;
   const held = [{ run: landing.id, step: 'ship', repo }];
   const checks = [{ run: checked.id, step: 'work' }];
   assert.deepEqual(
@@ -292,7 +296,7 @@ test('while the store is paused nothing new starts and the work goes on; the pas
   assert.equal((await Effect.runPromise(h.e.view(queuedTask))).admission, 'queued', 'the queued task not admitted');
   assert.equal((await Effect.runPromise(h.e.view(taskOf(running, 'plan')!))).phase, 'succeeded', "running's plan finished");
   assert.equal(taskOf(running, 'work'), undefined, "running's work, ready, not filed");
-  assert.equal(readRun(checked.id).steps.work?.check, undefined, "checked's work signed, its check not filed");
+  assert.equal(runRecord(checked.id).steps.work?.check, undefined, "checked's work signed, its check not filed");
   assert.equal(taskOf(refused, 'work'), `${refused.id}-work`, "refused's try asked, not filed");
   assert.deepEqual(
     fs.readdirSync(asksDir(refused.id)).filter((f) => f !== 'done'),
@@ -312,7 +316,7 @@ test('while the store is paused nothing new starts and the work goes on; the pas
     { pause, finishing: [], parked: [], staged: held, held: checks },
     'nemia ls names the pause, and the landing whose merge it holds staged in the checkout, its check not filed',
   );
-  assert.equal(readRun(landing.id).steps.ship?.check, undefined);
+  assert.equal(runRecord(landing.id).steps.ship?.check, undefined);
   assert.deepEqual(await runWith(h.e, pausedRead()), listed.paused, 'and the api reads the same');
   const ls = COMMANDS.find((c) => c.name === 'ls')!;
   assert.deepEqual(ls.print(listed, {}).slice(0, 3), pausedLines(listed.paused), 'nemia ls says it first');
@@ -331,13 +335,13 @@ test('while the store is paused nothing new starts and the work goes on; the pas
   );
   spoiled.pop();
 
-  resumePause();
+  resumePause(rootNow());
   const lifted = await pass();
   assert.equal(lifted.pause, undefined, 'the pass after the lift says no pause');
   assert.ok(taskOf(running, 'work'), "running's work filed");
-  assert.ok(readRun(checked.id).steps.work?.check, "checked's check filed");
+  assert.ok(runRecord(checked.id).steps.work?.check, "checked's check filed");
   assert.equal((await rowOf(checked, 'work')).message, 'checking', 'and checking, once its check is filed');
-  putPause({ why: 'again', by: 'ann' });
+  putPause(rootNow(), { why: 'again', by: 'ann' });
   try {
     assert.equal((await rowOf(checked, 'work')).message, 'checking', 'a check filed before the pause is checking under it');
     assert.equal(
@@ -346,13 +350,13 @@ test('while the store is paused nothing new starts and the work goes on; the pas
       'and the pause holds it not',
     );
   } finally {
-    resumePause();
+    resumePause(rootNow());
   }
   assert.equal(taskOf(refused, 'work'), `${refused.id}-work-try2`, "refused's try filed");
   assert.ok(taskOf(gated, 'work'), "gated's work filed on the approval");
   assert.ok(taskOf(await born, 'work'), 'the run started while paused filed');
   assert.ok(lifted.queue, 'the queued card tried');
-  assert.ok(readRun(landing.id).steps.ship?.check, "landing's check filed");
+  assert.ok(runRecord(landing.id).steps.ship?.check, "landing's check filed");
   assert.equal((await runWith(h.e, runsListed())).paused, undefined, 'and nemia ls says no pause');
   assert.deepEqual(await runWith(h.e, pausedRead()), { pause: null, finishing: [], parked: [], staged: [], held: [] });
   await pass();
@@ -373,21 +377,21 @@ test("each pass sets the sessions' drain from the pause before the engine's tick
     tallied: undefined,
   });
   const pass = () => runWith(e, tickRun());
-  putPause({ by: 'ann' }, new Date(), 900_000);
+  putPause(rootNow(), { by: 'ann' }, new Date(), 900_000);
   try {
     await pass();
     assert.deepEqual(stand.sessionDrains, [{ graceMs: 900_000 }], 'a timed pause puts the drain at its timeout');
     assert.deepEqual(seenAtTick, [1], "before the engine's tick");
   } finally {
-    resumePause();
+    resumePause(rootNow());
   }
   await pass();
   assert.deepEqual(stand.sessionDrains, [{ graceMs: 900_000 }, null], 'no pause lifts it');
-  putPause({ by: 'the take-over' });
+  putPause(rootNow(), { by: 'the take-over' });
   try {
     await pass();
     assert.deepEqual(stand.sessionDrains, [{ graceMs: 900_000 }, null], 'a pause with no timeout leaves the drain as it stands');
   } finally {
-    resumePause();
+    resumePause(rootNow());
   }
 });

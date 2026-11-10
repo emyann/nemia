@@ -4,6 +4,7 @@
  * runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`EngineService`), run with
  * `runWith`.
  */
+import { StoreConfig } from '../config/config.store.ts';
 import { gatesBudgets, type GateBudgets } from '../gate-budgets/gate-budgets.ts';
 import { Effect } from 'effect';
 import { EngineService, asked as engineAsked, nameFor, over, tried, type Engine, type TaskView, type Usage } from '../runtime-client.ts';
@@ -14,31 +15,25 @@ import type { SaidTo } from '../say/say.ts';
 import type { BranchStanding, Round, SpendOf } from '../status/status.ts';
 import type { Workflow } from '../step/step.ts';
 import { hasStarted, holdsOf, waitedOn, waitsOf, type Wait } from '../wait/wait.ts';
-import { roundOffers, roundsDue } from '../round/round.ts';
+import { roundOffers } from '../round/round.ts';
 import { deniedWords, harnessWaitLine } from '../list/list.ts';
 import { choicesOf, costLine, decision, runCostLines, runCostWords, type DecideCommand, type Decision } from './decide.ts';
 import { assess } from '../tick/assess.ts';
 import { acceptedLines, gateLines } from '../brief/index.ts';
 import { parseCloseout, type Closeout } from '../closeout/index.ts';
-import { answerLines, answerOf, overBudgetLine, retriesDue, retryOffers, type Retry, type RetryAsk } from '../retry/index.ts';
+import { answerLines, answerOf, overBudgetLine, retryOffers, type Retry, type RetryAsk } from '../retry/index.ts';
 import { timeline, type Timeline } from '../timeline/index.ts';
-import { stepsOf } from '../steps/steps.verb.ts';
-import { landedOf, standingsOf, type BranchReader } from '../branches/branches.store.ts';
+import { landedOf, standingsOf } from '../branches/branches.store.ts';
 import { headsOver, NOTHING_READ, standingReader, standingWhen, type StandingAsker } from '../standing/standing.verb.ts';
 import {
   checkReportsRead,
-  closeoutAsked,
   closeoutOf,
-  closeoutReader,
   consumption,
   deniedOf,
   everyTryOf,
-  harnessBlocked,
   parentsRead,
   passParents,
   saidIn,
-  spendReader,
-  taskPhasesRead,
   viewedOnce,
   waitingOf,
   type CheckReport,
@@ -51,6 +46,7 @@ import { collisionsDue, type Collisions } from '../collide/collide.ts';
 import { collisionsAt } from '../collide/collisions.verb.ts';
 import { landingDenies, statusMemo } from '../place/landing.store.ts';
 import { PlaceService } from '../place/place.store.ts';
+import { readRun } from '../tick/told.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 
@@ -256,39 +252,35 @@ function deniedLinesOf(run: Run, views: ReadonlyMap<string, TaskView>): Record<s
  * and the cap's parents where a run waits on another. A run still running or called off has no standings: nothing of it is decided on them.
  *
  * A cancelled, pruned or held run has no try or round due. Each line that would offer a verb (`retryLines`, `roundLines`, `answerLines`,
- * `overBudgetLine`, `gateLines`) says itself that it offers none, so the api's decision, which calls the same functions, says the same.
- * The cap on runs in flight, whose `WF_MAX_RUNS` before any pass is `env`'s, is read for both facts it bears on: whether a run nothing of
- * which is filed is held (`slotsOf`), and which run's ending holds the repository's checkout (`checkoutHold`).
- * Where the branches stand is asked through `standing` where it is given, so a caller that asked already asks no second time.
- * Fails with a refusal a read threw (`Missing`, for a run that is not there); dies of anything else (`tried`).
+ * `overBudgetLine`, `gateLines`) says itself that it offers none, so the api's decision, which calls the same functions, says the same. The
+ * cap on runs in flight, whose `WF_MAX_RUNS` before any pass is the program's `StoreConfig`'s, is read for both facts it bears on: whether
+ * a run nothing of which is filed is held (`slotsOf`), and which run's ending holds the repository's checkout (`checkoutHold`). Where the
+ * branches stand is asked through `standing` where it is given, so a caller that asked already asks no second time. Fails with a refusal a
+ * read threw (`Missing`, for a run that is not there); dies of anything else (`tried`).
  */
-export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.ProcessEnv = process.env, standing?: StandingAsker) {
+export const decideRun = Effect.fn('decide')(function* (id: string, standing?: StandingAsker) {
+  const config = yield* StoreConfig;
   const e = viewedOnce(yield* EngineService);
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
   const runs = yield* (yield* RunDoor).runs.list();
   const live = standing ?? (yield* standingWhen(runs, id));
-  const steps = yield* stepsOf(run);
-  const { views, phaseOf } = yield* taskPhasesRead(run).pipe(over(e));
+  const { read: base } = yield* readRun(e, run);
+  const { steps, views, phaseOf, signedOff: reader, asked, verdictOf, asks, roundAsks: rounds, spendOf } = base;
   const closeouts = Object.fromEntries(Object.keys(run.steps).map((name) => [name, closeoutOf(views, run, name)]));
   const checks = Object.fromEntries(
     yield* checkReportsRead(run, steps, phaseOf, (p) => p === 'succeeded' || p === 'failed' || p === 'stopped').pipe(over(e)),
   );
-  const { asks, rounds } = yield* (yield* RunDoor).asks.read(RunId.read(id));
-  const reader = closeoutReader(views, run, steps);
-  const asked = closeoutAsked(views);
-  const verdictOf = (name: string) => checks[name]?.verdict;
-  const blocked = harnessBlocked(views);
-  const spendOf = spendReader(views);
   const place = yield* PlaceService;
   const memo = statusMemo((r) => headsOver(live.read())(r), place);
-  const checkout = yield* checkoutHold(e, run, steps, { standing: live.standing }, env, memo);
-  const decided = (git: BranchReader) =>
-    decision(steps, run, phaseOf, landedOf(run, git), reader, asked, verdictOf, asks, rounds, blocked, spendOf, checkout);
-  const unasked = decided(standingReader(NOTHING_READ));
+  const checkout = yield* checkoutHold(e, run, steps, { standing: live.standing }, config, memo);
+  const withCheckout = { ...base, checkout };
+  const unasked = decision(withCheckout, landedOf(run, standingReader(NOTHING_READ)));
   const git = yield* live.when(unasked.kind !== 'running' && unasked.kind !== 'cancelled');
-  const d = yield* tried(() => decided(git));
+  const d = yield* tried(() => decision(withCheckout, landedOf(run, git)));
   const standings = d.kind === 'running' || d.kind === 'cancelled' ? [] : yield* tried(() => standingsOf(run, steps, git));
-  const { toDecide: decide } = assess(steps, run, phaseOf, reader, asked, verdictOf, asks, rounds, blocked, spendOf, standings);
+  const read = { ...withCheckout, standings };
+  const assessed = assess(read);
+  const decide = assessed.toDecide;
   const ending = collisionsDue(steps, run, decide);
   const collisions = ending ? yield* collisionsAt(run, ending, standings, git, place) : undefined;
   const answers = yield* answersOf(e, run, views, yield* (yield* RunDoor).asks.answers(RunId.read(id)));
@@ -300,8 +292,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
   const waitingOn = waitingOnOf(id, run, views);
   const denied = deniedLinesOf(run, views);
   const parents = passParents(yield* live.when(runs.some((r) => waitedOn(r).length > 0)));
-  const held = !hasStarted(run) && !run.cancelledAt ? (yield* slotsOf(e, runs, env, parents)).held.get(id) : undefined;
-  const ended = Boolean(run.cancelledAt || run.pruned || run.hold);
+  const held = !hasStarted(run) && !run.cancelledAt ? (yield* slotsOf(e, runs, config, parents)).held.get(id) : undefined;
   const offers = [
     ...roundOffers(steps, run, d, spendOf),
     ...mergeOffers(place, steps, run, d, rounds, phaseOf, reader, asked, spendOf, verdictOf),
@@ -314,8 +305,8 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
     decision: d,
     closeouts,
     checks,
-    retrying: ended ? [] : retriesDue(steps, run, phaseOf, reader, asked, verdictOf, asks, blocked, spendOf),
-    rounding: ended ? [] : roundsDue(steps, run, phaseOf, reader, asked, rounds, spendOf, verdictOf),
+    retrying: assessed.retry,
+    rounding: assessed.round,
     offers: offers.map((o) => o.said),
     commands: choicesOf(steps, run, d, offers),
     overBudgetLine: overBudgetLine(steps, run, d, spendOf),

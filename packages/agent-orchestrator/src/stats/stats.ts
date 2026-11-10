@@ -11,12 +11,12 @@
  * `stats.verb.ts` reads the store and the engine and hands them here; `stats-words.ts` says the answer. A number with nothing measured
  * under it is `null`, never 0.
  */
+import { runNamespace } from '../run-list/index.ts';
 import path from 'node:path';
 import { Invalid } from '../refusal/refusal.ts';
 import { isRepositoryRun, tryOf, type Run } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { endsOnBase, type Workflow } from '../step/step.ts';
-import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { askedAgain, landsOnCheck } from '../status/status.ts';
 import { gateWaitOf, tryEndOf, type Timeline, type TimelineTry } from '../timeline/index.ts';
 import { healthOf, type Health } from '../series/series.ts';
@@ -148,7 +148,7 @@ const knownSum = (values: ReadonlyArray<number | null | undefined>): number | nu
 /** The keys a run's facts carry. */
 export const keysOf = (run: Run): RunKeys => ({
   run: run.id,
-  factory: run.factory ?? DEFAULT_FACTORY,
+  factory: runNamespace(run.factory),
   workflow: path.basename(run.workflowDir),
   repo: run.repo ?? null,
 });

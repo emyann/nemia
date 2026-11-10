@@ -21,7 +21,7 @@ import type {} from '../src/place/place.ts';
 import { type Closeout } from '../src/closeout/closeout.ts';
 import { type EarlierTry } from '../src/retry/retry-ask.ts';
 import { type OutputSchema, type Workflow } from '../src/workflow.ts';
-import { names, phases, run, step, STEPS } from './assessed.ts';
+import { listingInput, names, phases, run, step, STEPS } from './assessed.ts';
 
 const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
 
@@ -193,19 +193,21 @@ test("`nemia ls` notes a step whose current try's session a person told somethin
     (id: string): ListedPhase =>
       m[id] ?? 'unknown';
   const rows = (r: Run, words: Record<string, ListedPhase>, told: Record<string, number>) =>
-    listing({
-      steps: STEPS,
-      run: r,
-      phaseOf: word(words),
-      closeoutOf: () => undefined,
-      askedCloseout: () => false,
-      verdictOf: () => undefined,
-      asks: [],
-      roundAsks: [],
-      answers: [],
-      waits: [],
-      saidTo: (name) => told[name] ?? 0,
-    }).steps;
+    listing(
+      listingInput({
+        steps: STEPS,
+        run: r,
+        phaseOf: word(words),
+        closeoutOf: () => undefined,
+        askedCloseout: () => false,
+        verdictOf: () => undefined,
+        asks: [],
+        roundAsks: [],
+        answers: [],
+        waits: [],
+        saidTo: (name) => told[name] ?? 0,
+      }),
+    ).steps;
   const live = run({ implement: 't1', review: null });
   assert.deepEqual(rows(live, { t1: 'working' }, { implement: 2 })[0], {
     name: 'implement',

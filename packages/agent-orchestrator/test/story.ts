@@ -22,6 +22,8 @@ import { testPlace } from '../place/memory/index.ts';
 import type { Engine, EngineService, engineOf } from '../src/runtime-client.ts';
 import type { Place, PlaceService } from '../src/place/place.store.ts';
 import type { StoreRoot } from '../src/config/root.store.ts';
+import type { StoreConfig } from '../src/config/config.store.ts';
+import type { ProposalsAct } from '../src/apply/act.verb.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
 import { steeredClock, type Steered } from './steered.ts';
 import type { EnginePhase } from '../src/views/views-words.ts';
@@ -53,10 +55,13 @@ export type Stage = {
   place: () => ReturnType<typeof testPlace>;
   /** The engine's stand-in and the controllers' engine over it. */
   board: () => Board;
-  /** `program` over the engine `e`, given this test's place and the store's root. */
-  runWith: <A, E>(e: Engine, program: Effect.Effect<A, E, EngineService | PlaceService | StoreRoot>) => Promise<A>;
-  /** `program`, which asks no engine, given this test's place. */
-  runPlaced: <A, E>(program: Effect.Effect<A, E, PlaceService | StoreRoot>) => Promise<A>;
+  /** `program` over the engine `e`, given this test's place, the store's root and the proposals pass a tick's pass is composed with. */
+  runWith: <A, E>(
+    e: Engine,
+    program: Effect.Effect<A, E, EngineService | PlaceService | StoreRoot | StoreConfig | ProposalsAct>,
+  ) => Promise<A>;
+  /** `program`, which asks no engine, given this test's place, the store's root and the proposals pass. */
+  runPlaced: <A, E>(program: Effect.Effect<A, E, PlaceService | StoreRoot | StoreConfig | ProposalsAct>) => Promise<A>;
   /** `nemia argv` as a person types it, over `e` (the board's engine when none is named), given this test's place. */
   main: (argv: string[], e?: Engine) => Promise<unknown>;
   /** A clock no real time moves, made the first time it is asked in this test. */

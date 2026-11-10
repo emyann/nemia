@@ -6,11 +6,12 @@ import { Effect, Schema } from 'effect';
 import { Run as RunObject } from 'objects';
 import { EngineService, asked, tried } from '../runtime-client.ts';
 import type { PlaceService } from '../place/place.store.ts';
+import type { StoreRoot } from '../config/root.store.ts';
+import type { StoreConfig } from '../config/config.store.ts';
 import type { Refusal } from '../refusal/refusal.ts';
-import { rooted } from '../factory/wiring/wire.verb.ts';
 import type { StepCloseout, StepTry } from '../resource/tries.verb.ts';
 import { runObject, stepCloseout, stepTold, stepTries, stepTry, type TryCloseout } from './run.verb.ts';
-import { runStore } from '../record/files.store.ts';
+import { runsAtOnce } from '../runs/runs.store.ts';
 import type { Run } from '../record/record.ts';
 import type { Args } from '../command/command.ts';
 import type { Command, Kept } from '../command/entry.verb.ts';
@@ -51,18 +52,14 @@ export const SHOW: Command<Readonly<Record<string, unknown>>, typeof ShowInput.T
   writes: false,
   class: 'read',
   input: ShowInput,
-  handler: (args, _env, home, kept?: Kept) =>
+  handler: (args, kept?: Kept) =>
     Effect.flatMap(
-      tried(() => runStore.runs.read(args.runId)),
-      (run): Effect.Effect<Readonly<Record<string, unknown>>, Refusal, EngineService | PlaceService> =>
+      tried(() => runsAtOnce.runs.read(args.runId)),
+      (run): Effect.Effect<Readonly<Record<string, unknown>>, Refusal, EngineService | PlaceService | StoreRoot | StoreConfig> =>
         args.raw === true
           ? Effect.succeed(rawOf(run))
           : Effect.map(
-              rooted(
-                home,
-                'show',
-                runObject(run, { memo: { filings: kept?.filings ?? { filed: new Map(), cursor: 0 }, said: new Map() } }),
-              ),
+              runObject(run, { memo: { filings: kept?.filings ?? { filed: new Map(), cursor: 0 }, said: new Map() } }),
               (object) => ('unjudged' in object ? object : Schema.encodeSync(RunObject)(object)),
             ),
     ),
@@ -104,7 +101,7 @@ export const TRIES: Command<{ tries: StepTry[] }, StepInput> = {
   class: 'read',
   only: { side: 'api', why: API_ONLY },
   input: StepInput,
-  handler: ({ runId, step }, _env, home) => rooted(home, 'tries', stepTries(runId, step)),
+  handler: ({ runId, step }) => stepTries(runId, step),
   print: (data) => [JSON.stringify(data, null, 2)],
 };
 
@@ -122,7 +119,7 @@ export const TRY: Command<StepTry, TryInput> = {
   class: 'read',
   only: { side: 'api', why: API_ONLY },
   input: TryInput,
-  handler: ({ runId, step, try: n }, _env, home) => rooted(home, 'try', stepTry(runId, step, n)),
+  handler: ({ runId, step, try: n }) => stepTry(runId, step, n),
   print: (data) => [JSON.stringify(data, null, 2)],
 };
 
@@ -165,7 +162,7 @@ export const CLOSEOUT: Command<TryCloseout, CloseoutInput> = {
   class: 'read',
   only: { side: 'cli', why: "the api serves it as the `closeout` of `objects`' steps group, calling this handler" },
   input: CloseoutInput,
-  handler: ({ runId, step, try: n }, _env, home) => rooted(home, 'closeout', stepCloseout(runId, step, n)),
+  handler: ({ runId, step, try: n }) => stepCloseout(runId, step, n),
   print: ({ try: n, closeout, unreadable }, { step }) =>
     closeout
       ? closeoutLines(n, closeout)
@@ -182,7 +179,7 @@ export const TOLD: Command<Effect.Success<ReturnType<typeof stepTold>>, StepInpu
   class: 'read',
   only: { side: 'api', why: API_ONLY },
   input: StepInput,
-  handler: ({ runId, step }, _env, home) => rooted(home, 'told', stepTold(runId, step)),
+  handler: ({ runId, step }) => stepTold(runId, step),
   print: (data) => [JSON.stringify(data, null, 2)],
 };
 
@@ -208,7 +205,7 @@ export const LOGS: Command<{ taskId?: string; output?: string }, StepInput> = {
   input: StepInput,
   handler: Effect.fnUntraced(function* ({ runId, step }: StepInput) {
     const e = yield* EngineService;
-    const taskId = runStore.runs.read(runId).steps[step]?.taskId;
+    const taskId = runsAtOnce.runs.read(runId).steps[step]?.taskId;
     return taskId ? { taskId, output: yield* asked('logs', e.logs(taskId)) } : {};
   }),
   print: ({ output }, { step }) => [output ?? `${step} has not run yet`],

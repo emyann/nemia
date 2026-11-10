@@ -14,8 +14,8 @@ const ROOT = scratch('wf-reads-verb-');
 process.env.WF_ROOT = ROOT;
 const { workflowsOf } = await import('./reads.verb.ts');
 const { loadWorkflows } = await import('../workflows/workflows.store.ts');
-const { addFactory, attachWorkflow, hireAgent, removeFactory } = await import('../factory/factory.store.ts');
-const { DEFAULT_FACTORY } = await import('../factory/factory.ts');
+const { addFactory, attachWorkflow, hireAgent, removeFactory } = await import('../../testing.ts');
+const { DEFAULT_NAMESPACE } = await import('../factory/factory.ts');
 type Run = import('../record/record.ts').Run;
 
 const write = (file: string, text: string): void => {
@@ -159,7 +159,7 @@ test('REFUSED: a run of a factory whose file no longer reads names the factory, 
 test('a run in no factory, or in the default one, is read with its places and no hires, and no factory file is asked for', () => {
   const { repo, folder } = repository();
   write(path.join(folder, 'design.md'), '---\nplace: git\nagent: seldon\nskills: spec-it\n---\nDesign it.\n');
-  for (const factory of [undefined, DEFAULT_FACTORY]) {
+  for (const factory of [undefined, DEFAULT_NAMESPACE]) {
     const read = workflowsOf(runOf(repo, folder, factory), ROOT);
     assert.equal(read.warning, null);
     assert.equal(read.steps?.[0].agent?.name, 'seldon');
@@ -169,7 +169,7 @@ test('a run in no factory, or in the default one, is read with its places and no
 test("REFUSED: a run whose record says the default factory, its folder broken, is warned in the loader's words: no factory is said gone", () => {
   const { repo, folder } = repository();
   const why = loaderWords(folder, repo);
-  const warning = workflowsOf(runOf(repo, folder, DEFAULT_FACTORY, false), ROOT).warning;
+  const warning = workflowsOf(runOf(repo, folder, DEFAULT_NAMESPACE, false), ROOT).warning;
   assert.equal(warning, `The workflow folder ${folder} no longer reads as a workflow: ${why}`);
   assert.doesNotMatch(warning ?? '', /the factory default/);
 });

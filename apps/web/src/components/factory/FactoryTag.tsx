@@ -1,6 +1,6 @@
 /** The factory tags a row or a card shows. */
 import { Factory } from 'lucide-react';
-import { DEFAULT_NAME } from '@/lib/factories';
+import { DEFAULT_NAMESPACE } from 'objects';
 import { cn } from '@/lib/utils';
 import { RouteLink } from '../agent/AgentParts';
 
@@ -17,7 +17,7 @@ const mark = <Factory aria-hidden className="size-3 shrink-0" />;
  * and never linked, since a run of it is read on the Runs page.
  */
 export function FactoryTag({ name, linked = false }: { name: string; linked?: boolean }) {
-  if (name === DEFAULT_NAME) {
+  if (name === DEFAULT_NAMESPACE) {
     return (
       <span data-factory-tag={name} title="The default factory: it holds every run and card that names none" className={cn(TAG, MUTED)}>
         {mark}

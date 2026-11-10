@@ -3,7 +3,7 @@ import { Layer, ManagedRuntime } from 'effect';
 import { type ErrorHandler, Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import { feedHubLayer, gitPlaceLayer, informerLayer, runningRelease, storeRootLayer, telemetryLayer } from 'agent-orchestrator';
+import { feedHubLayer, gitPlaceLayer, informerLayer, runningRelease, storeConfigLayer, telemetryLayer } from 'agent-orchestrator';
 import { callerGate } from './caller/caller.ts';
 import { McpAsker } from './capabilities/index.ts';
 import { QuotaAsker } from './gauges/index.ts';
@@ -32,7 +32,8 @@ export const answerError: ErrorHandler = (err, c) => {
 
 /**
  * Every service the api reads, live, over `env`: the settings read from it on each request (`ApiConfig`), the package's engine (`Engine`)
- * and the store's root, read from `env` (`StoreRoot`, `storeRootLayer`: `WF_ROOT`), an MCP asker and a quota asker with nothing asked yet
+ * and the store's root and settings, read from `env` (`StoreRoot` and `StoreConfig`, `storeConfigLayer`: `WF_ROOT` and every `WF_`
+ * setting), an MCP asker and a quota asker with nothing asked yet
  * (`McpAsker`, `QuotaAsker`), reads that have kept nothing yet (`ReadMemo`), an informer of each run's judgement holding none, which the
  * daemon's passes fill and every request reads (`informerLayer`: one per app, so the store's daemon and the board's reads judge a run
  * once), the steps followed live, none yet (`Followings`), the hub the feed's lines are published to as the process's daemon writes them
@@ -47,8 +48,8 @@ export const answerError: ErrorHandler = (err, c) => {
 export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Services> =>
   Layer.mergeAll(
     ApiConfig.layer(env, runningRelease()),
-    Engine.live,
-    storeRootLayer(env),
+    Engine.live(env),
+    storeConfigLayer(env),
     McpAsker.live,
     QuotaAsker.live,
     ReadMemo.live,

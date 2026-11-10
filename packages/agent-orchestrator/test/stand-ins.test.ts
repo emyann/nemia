@@ -93,7 +93,7 @@ const PLANTS: Readonly<Record<string, readonly string[]>> = {
 /** A test given the engine's stand-in through the runtime's testing entry, as a test of the orchestrator or the api writes it. */
 const ENGINE_LINE =
   "import { testEngine } from 'agent-runtime/testing';\nimport { eachTest } from './placed.ts';\n" +
-  "const { engineOf } = await import('../src/runtime-client.ts');\nconst engine = eachTest(testEngine);\nconst e = () => engineOf(engine().layer);\n";
+  "const { engineOf } = await import('../src/runtime-client.ts');\nconst engine = eachTest(testEngine);\nconst e = () => engineOf(engine(process.env).layer);\n";
 
 /** Words that name the real thing and reach nothing: each must measure no site. */
 const WORDS = [
@@ -312,7 +312,8 @@ test('the runtime is judged for git and a process alone, where the engine is its
   assert.deepEqual(kindsIn('packages/agent-runtime/test/x.test.ts'), ['git', 'process']);
   assert.deepEqual(kindsIn('apps/api/test/x.test.ts'), ['git', 'process', 'engine', 'hand']);
   assert.deepEqual(kindsIn(`${T}/x.test.ts`), ['git', 'process', 'engine', 'hand']);
-  const api = "import { engine, builtin } from 'agent-orchestrator';\nimport { Engine } from '../src/store.ts';\nEngine.of(engine());\n";
+  const api =
+    "import { engine, builtin } from 'agent-orchestrator';\nimport { Engine } from '../src/store.ts';\nEngine.of(engine(process.env));\n";
   assert.deepEqual(reachOf('apps/api/test/x.test.ts', over({ 'apps/api/test/x.test.ts': api })).kinds, ['place', 'engine', 'hand']);
 });
 
@@ -419,7 +420,7 @@ test("the api's stand-ins, the test place by the orchestrator's testing entry an
     "import { Layer } from 'effect';\nimport { testPlace } from 'agent-orchestrator/testing';\n" +
     "import { testEngine } from 'agent-runtime/testing';\nimport { Engine } from '../src/store.ts';\n" +
     "import { eachTest } from './placed.ts';\nconst stand = eachTest(testPlace);\nconst engine = eachTest(testEngine);\n" +
-    'const layer = () => Layer.merge(Engine.over(engine().layer), stand().layer);\n';
+    'const layer = () => Layer.merge(Engine.over(engine(process.env).layer), stand().layer);\n';
   assert.deepEqual(reachOf(file, over({ [file]: text })).sites, []);
   assert.deepEqual(breaksOf({ [file]: text }), []);
   const real = `${text}import { gitPlaceLayer } from 'agent-orchestrator';\nLayer.merge(gitPlaceLayer, layer());\n`;

@@ -36,7 +36,7 @@ function herEngine(history: TranscriptEvent[]) {
   const follows: string[] = [];
   const closed: string[] = [];
   const e = {
-    ...engine(),
+    ...engine(process.env),
     view: (id: string) =>
       Effect.sync(() => ({
         id,

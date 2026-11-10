@@ -25,11 +25,11 @@ process.env.WF_DEFAULT_FACTORY_STARTS = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 const { runList } = await import('../run-list/run-list.verb.ts');
-const { kindOf } = await import('./runlist.ts');
+const { kindOf } = await import('../run-state/run-state.ts');
 const { judgedNow } = await import('../summary/summary.verb.ts');
 const { advanceRun, approveRun, startRun, runWith: runEngine } = await import('../runner.ts');
 const { Invalid } = await import('../refusal/refusal.ts');
-const { readRun } = await import('../record/record.store.ts');
+const { runRecord } = await import('../record/record.store.ts');
 const { engineOf } = await import('../runtime-client.ts');
 const { metered } = await import('../meter/tally.store.ts');
 const { informerMemo } = await import('../rest/informer.verb.ts');
@@ -68,12 +68,12 @@ const started = async (steps: Record<string, string | null>, gates: string[] = [
   const repo = scratch('wf-runlist-repo-');
   stand().world.repository(repo, {});
   const run = await runPlaced(startRun({ brief: 'list me', repo, workflowDir: folder(steps), isolate, gates }));
-  await runWith(e(), advanceRun(readRun(run.id)));
+  await runWith(e(), advanceRun(runRecord(run.id)));
   return run.id;
 };
 
 /** One more pass over the run `id`. */
-const advanced = (id: string) => runWith(e(), advanceRun(readRun(id)));
+const advanced = (id: string) => runWith(e(), advanceRun(runRecord(id)));
 
 /** A run of one step that signed off: finished. */
 const aFinished = async () => {
@@ -163,7 +163,7 @@ test('each selector takes exactly the runs kindOf puts in its state; the counts 
         judgedNow(
           e(),
           ROOT,
-          all.map((id) => readRun(id)),
+          all.map((id) => runRecord(id)),
         ),
       )
     ).map((s) => [s.id, kindOf(s)]),
@@ -350,7 +350,7 @@ test('a run that waits on a run which never lands, held until one that will, wai
   seeded(t);
   const parent = await started({ work: null }, [], true);
   const lands = await anInFlight();
-  const { repo } = readRun(parent) as { repo: string };
+  const { repo } = runRecord(parent) as { repo: string };
   const child = await runPlaced(startRun({ brief: 'after it', repo, workflowDir: folder({ work: null }), after: [parent] }));
   cancelled(parent, T0 + MIN);
   fs.writeFileSync(

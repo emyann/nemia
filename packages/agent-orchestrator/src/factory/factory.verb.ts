@@ -4,6 +4,7 @@
  * does; hired into and fired from, which the api serves as a Hire's writes, `/api/namespaces/:namespace/hires/<workflow>.<step>`; and
  * its instruction's two verbs (instruction.verb.ts), which the api serves. Their handlers answer data, and the CLI prints it.
  */
+import { setting } from '../config/config.store.ts';
 import { Effect, Schema } from 'effect';
 import { HireWrite } from 'objects';
 import { tried } from '../runtime-client.ts';
@@ -18,12 +19,11 @@ import {
   type FactoryListing,
   type RevisionsPolicy,
 } from './factory.ts';
-import { factoriesDir, factoryRepos, readFactories, refuseName } from './factory.store.ts';
+import { factoriesDirAt, FactoryDoor, factoryRepos, filedFactory, refuseName } from './door/factories.store.ts';
 import { ownAgentRefusal } from './wiring/own-agent.store.ts';
 import { FactoryName } from './factory.model.ts';
-import { FactoryDoor } from './door/factories.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import { rooted, wire } from './wiring/wire.verb.ts';
+import { wire } from './wiring/wire.verb.ts';
 import { removeInstructionFolder } from './instruction.store.ts';
 import { FACTORY_INSTRUCT, FACTORY_INSTRUCTION } from './instruction.verb.ts';
 import { FACTORY_RULES } from './rules/rules.verb.ts';
@@ -180,10 +180,10 @@ const WRITTEN_HERE = { side: 'cli', why: 'the board files, attaches to and remov
 const textOf = (args: Args, key: string): string => (typeof args[key] === 'string' ? args[key] : '');
 
 /**
- * The listing every factory shares: those of the store, as `readFactories` reads them, their schedules as `schedulesListed` does, and
+ * The listing every factory shares: those of the store, as the door lists them, their schedules as `schedulesListed` does, and
  * their places a harness does not trust now, as `untrustedPlaces` reads them.
  */
-type Listed = { factories: FactoryListing[]; schedules: ScheduleListed[]; untrusted: Untrusted[] };
+type Listed = { factories: FactoryListing[]; schedules: ScheduleListed[]; untrusted: Untrusted[]; dir: string };
 
 /**
  * The store's factories, their schedules with the runs they started, and their places not trusted, each read now. A schedule reads of a
@@ -192,17 +192,17 @@ type Listed = { factories: FactoryListing[]; schedules: ScheduleListed[]; untrus
  * read, and the answer is the same.
  */
 const listedNow = Effect.fn('listedNow')(function* (memo?: ScheduleRuns) {
-  const { factories, schedules } = yield* tried(() => ({
-    factories: readFactories(),
-    schedules: schedulesListed(keptRuns(memo, scheduleRun)),
-  }));
-  return { factories, schedules, untrusted: yield* untrustedPlaces(factories) } satisfies Listed;
+  const home = yield* StoreRoot;
+  const factories = [...(yield* (yield* FactoryDoor).factories.listed())];
+  const verify = yield* setting('verifyRest');
+  const schedules = yield* tried(() => schedulesListed(home, keptRuns(memo, scheduleRun, verify)));
+  return { factories, schedules, untrusted: yield* untrustedPlaces(factories), dir: factoriesDirAt(yield* StoreRoot) } satisfies Listed;
 });
 
 /** The lines `nemia factory` prints of the store's factories, and how to file one or remove one. */
-const listed = ({ factories, schedules, untrusted }: Listed): string[] => [
+const listed = ({ factories, schedules, untrusted, dir }: Listed): string[] => [
   ...factoryLines(factories, schedules, Date.now(), untrusted),
-  `\nfile one: nemia factory add <name> --repo <path> — remove one: nemia factory rm <name> — in ${factoriesDir()}`,
+  `\nfile one: nemia factory add <name> --repo <path> — remove one: nemia factory rm <name> — in ${dir}`,
 ];
 
 /** `nemia factory`: the default factory, then each in the store; a word it does not take is refused naming its nine forms. */
@@ -224,7 +224,7 @@ export const FACTORY: Command<Listed> = {
   class: 'read',
   only: { side: 'cli', why: "the api serves it as the Factory's `listAll` of `objects`' Api, calling this handler" },
   manual: FACTORY_HELP,
-  handler: (_args, _env, _home, kept) => listedNow(kept?.records?.factories),
+  handler: (_args, kept) => listedNow(kept?.records?.factories),
   print: listed,
 };
 
@@ -241,7 +241,7 @@ const FACTORY_LS: Command<Listed> = {
   writes: false,
   class: 'read',
   only: { side: 'cli', why: "the api lists the factories as the Factory's `listAll`: ls is the command line's second name for it" },
-  handler: (_args, _env, _home, kept) => listedNow(kept?.records?.factories),
+  handler: (_args, kept) => listedNow(kept?.records?.factories),
   print: listed,
 };
 
@@ -280,7 +280,7 @@ export const FACTORY_ADD: Command<{ name: string; repos: readonly string[]; file
   writes: true,
   class: 'ask',
   only: WRITTEN_HERE,
-  handler: (args, _env, home) =>
+  handler: (args) =>
     Effect.gen(function* () {
       const name = textOf(args, 'name');
       const given = Array.isArray(args.repos) ? args.repos : [];
@@ -289,14 +289,10 @@ export const FACTORY_ADD: Command<{ name: string; repos: readonly string[]; file
         return factoryRepos(name, given);
       });
       const factory: Factory = { name, repos, workflows: [], hires: {}, schedules: {} };
-      const file = yield* rooted(
-        home,
-        'factory add',
-        Effect.gen(function* () {
-          const door = yield* FactoryDoor;
-          return yield* door.factories.create(factory);
-        }),
-      );
+      const file = yield* Effect.gen(function* () {
+        const door = yield* FactoryDoor;
+        return yield* door.factories.create(factory);
+      });
       const trusts = args.noTrust === true ? [] : yield* trustPlaces(factory.repos);
       return { name: factory.name, repos: factory.repos, file, trusts };
     }),
@@ -327,15 +323,11 @@ const FACTORY_ATTACH: Command<{ file: string; already: boolean }> = {
   writes: true,
   class: 'ask',
   only: WRITTEN_HERE,
-  handler: (args, _env, home) =>
-    rooted(
-      home,
-      'factory attach',
-      Effect.map(wire(textOf(args, 'factory'), { verb: 'attach', workflow: textOf(args, 'workflow') }), ({ was, now, file }) => ({
-        file,
-        already: now === was,
-      })),
-    ),
+  handler: (args) =>
+    Effect.map(wire(textOf(args, 'factory'), { verb: 'attach', workflow: textOf(args, 'workflow') }), ({ was, now, file }) => ({
+      file,
+      already: now === was,
+    })),
   print: ({ file, already }, args) => [
     `${textOf(args, 'factory')}  ${already ? 'already attached' : 'attached'} ${textOf(args, 'workflow')}`,
     `${already ? 'unchanged' : 'attached'}: ${file}`,
@@ -351,12 +343,8 @@ const FACTORY_DETACH: Command<{ file: string }> = {
   writes: true,
   class: 'ask',
   only: WRITTEN_HERE,
-  handler: (args, _env, home) =>
-    rooted(
-      home,
-      'factory detach',
-      Effect.map(wire(textOf(args, 'factory'), { verb: 'detach', workflow: textOf(args, 'workflow') }), ({ file }) => ({ file })),
-    ),
+  handler: (args) =>
+    Effect.map(wire(textOf(args, 'factory'), { verb: 'detach', workflow: textOf(args, 'workflow') }), ({ file }) => ({ file })),
   print: ({ file }, args) => [`${textOf(args, 'factory')}  detached ${textOf(args, 'workflow')}`, `detached: ${file}`],
 };
 
@@ -414,17 +402,13 @@ export const FACTORY_HIRE: Command<{ file: string; replaced: string | null }, Hi
   class: 'ask',
   only: { side: 'cli', why: "the api serves it as the Hire's `put` of `objects`' Api, calling this handler" },
   input: HireInput,
-  handler: ({ factory: named, agent, step }, _env, home) =>
-    rooted(
-      home,
-      'factory hire',
-      Effect.gen(function* () {
-        const root = yield* StoreRoot;
-        const { was, file } = yield* wire(named, { verb: 'hire', step, agent }, (factory) => ownAgentRefusal(root, factory, step));
-        const replaced = was.hires[step];
-        return { file, replaced: replaced !== undefined && replaced !== agent ? replaced : null };
-      }),
-    ),
+  handler: ({ factory: named, agent, step }) =>
+    Effect.gen(function* () {
+      const root = yield* StoreRoot;
+      const { was, file } = yield* wire(named, { verb: 'hire', step, agent }, (factory) => ownAgentRefusal(root, factory, step));
+      const replaced = was.hires[step];
+      return { file, replaced: replaced !== undefined && replaced !== agent ? replaced : null };
+    }),
   print: ({ file, replaced }, { factory, step, agent }) => [
     `${factory}  ${step} ← ${agent}${replaced === null ? '' : ` (was ${replaced})`}`,
     `hired: ${file}`,
@@ -448,17 +432,13 @@ export const FACTORY_FIRE: Command<{ file: string; fired: string }, FireInput> =
   class: 'ask',
   only: { side: 'cli', why: "the api serves it as the Hire's `delete` of `objects`' Api, calling this handler" },
   input: FireInput,
-  handler: ({ factory, step }, _env, home) =>
-    rooted(
-      home,
-      'factory fire',
-      Effect.gen(function* () {
-        const { was, file } = yield* wire(factory, { verb: 'fire', step });
-        const fired = was.hires[step];
-        if (fired === undefined) return yield* Effect.fail(new Missing({ message: unhiredFireRefusal(factory, step, was.hires) }));
-        return { file, fired };
-      }),
-    ),
+  handler: ({ factory, step }) =>
+    Effect.gen(function* () {
+      const { was, file } = yield* wire(factory, { verb: 'fire', step });
+      const fired = was.hires[step];
+      if (fired === undefined) return yield* Effect.fail(new Missing({ message: unhiredFireRefusal(factory, step, was.hires) }));
+      return { file, fired };
+    }),
   print: ({ file, fired }, { factory, step }) => [`${factory}  ${step}  fired ${fired}`, `fired: ${file}`],
 };
 
@@ -479,18 +459,14 @@ const FACTORY_RM: Command<{ file: string; instruction: string | null }> = {
   writes: true,
   class: 'ask',
   only: WRITTEN_HERE,
-  handler: (args, _env, home) => {
+  handler: (args) => {
     const name = textOf(args, 'factory');
-    return rooted(
-      home,
-      'factory rm',
-      Effect.gen(function* () {
-        yield* tried(() => refuseName(name, 'rm'));
-        const door = yield* FactoryDoor;
-        const file = yield* door.factories.remove(FactoryName.read(name));
-        return { file, instruction: yield* tried(() => removeInstructionFolder(name)) };
-      }),
-    );
+    return Effect.gen(function* () {
+      yield* tried(() => refuseName(name, 'rm'));
+      const door = yield* FactoryDoor;
+      const file = yield* door.factories.remove(FactoryName.read(name));
+      return { file, instruction: yield* tried(() => removeInstructionFolder(name)) };
+    });
   },
   print: ({ file, instruction }, args) => [
     `${textOf(args, 'factory')}  removed — ${file}`,
@@ -534,21 +510,17 @@ const FACTORY_REVISIONS: Command<{ file: string; was: RevisionsPolicy | null }> 
   writes: true,
   class: 'ask',
   only: { side: 'cli', why: "the board shows a factory's revisions policy in no control yet: nemia factory revisions writes it" },
-  handler: (args, _env, home) => {
+  handler: (args) => {
     const name = textOf(args, 'factory');
-    return rooted(
-      home,
-      'factory revisions',
-      Effect.gen(function* () {
-        const revisions = policyOf(args);
-        if (revisions === undefined) return yield* Effect.fail(new Invalid({ message: revisionsRefusal(args) }));
-        yield* tried(() => refuseName(name, 'revisions'));
-        const door = yield* FactoryDoor;
-        const factory = yield* door.factories.read(FactoryName.read(name));
-        const file = yield* door.factories.rewrite({ ...factory, revisions });
-        return { file, was: factory.revisions ?? null };
-      }),
-    );
+    return Effect.gen(function* () {
+      const revisions = policyOf(args);
+      if (revisions === undefined) return yield* Effect.fail(new Invalid({ message: revisionsRefusal(args) }));
+      yield* tried(() => refuseName(name, 'revisions'));
+      const door = yield* FactoryDoor;
+      const factory = yield* filedFactory(name, 'revisions');
+      const file = yield* door.factories.rewrite({ ...factory, revisions });
+      return { file, was: factory.revisions ?? null };
+    });
   },
   print: ({ file, was }, args) => [
     `${textOf(args, 'factory')}  revisions: ${textOf(args, 'revisions')}${was === null || was === textOf(args, 'revisions') ? '' : ` (was ${was})`}`,

@@ -14,17 +14,17 @@
  * beneath the rest — so no cycle forms among them (`test/boundary.test.ts`).
  *
  * What of the I/O never names the engine sits beneath the controllers, and this file re-exports what it exported of them:
- * `record.store.ts` (a run's id, its files' names, a step's check stderr, artifacts and inputs), `files.store.ts` (the run store a run's
- * record and a person's files beside it are read and written through, `runStore`, and the inbox's folder, `inboxDir`),
- * `daemon.store.ts` (`tick.json` and who ticks the store), `feed.store.ts` (the feed's file), `worktree.store.ts` (git, a step's worktree,
- * its `node_modules`, the hand-off commit), `branches.store.ts` (what git says of a run's result branches), `artifacts.store.ts` (the
- * files a step hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written), `agents/read.store.ts` and
- * `skills/read.store.ts` (the agents and the skills a folder's steps may name, read), `lookup.store.ts` (the workflow folders a place
- * holds), `agents.store.ts`, `roster.store.ts`, `fills.store.ts`, `try.store.ts`, `custom.store.ts` and `skills.store.ts` (an agent, the
- * agents of both places read, the steps each fills, an agent's try folder written, a person's custom instructions for one, and a skill
- * read and written), `place.store.ts` (a place skill's verbs run and heard), `plan.store.ts` (a plan folder read), `inbox.store.ts` (the
- * inbox's cards filed, queued and dropped), `factory.store.ts` (the factories, `factoriesDir`), `config.store.ts` (the `WF_`
- * environment) and `root.store.ts` (the store's root as the service a program is given, `StoreRoot`)
+ * `record.store.ts` (a run's id, its files' names, a step's check stderr, artifacts and inputs), `files.store.ts` (the inbox's folder,
+ * `inboxDir`), the Run door's synchronous face (`runsAtOnce`, `runs.store.ts`), which a run's record and a person's files beside it are
+ * read and written through, `daemon.store.ts` (`tick.json` and who ticks the store), `feed.store.ts` (the feed's file), `worktree.store.ts`
+ * (git, a step's worktree, its `node_modules`, the hand-off commit), `branches.store.ts` (what git says of a run's result branches),
+ * `artifacts.store.ts` (the files a step hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written),
+ * `agents/read.store.ts` and `skills/read.store.ts` (the agents and the skills a folder's steps may name, read), `lookup.store.ts` (the
+ * workflow folders a place holds), `agents.store.ts`, `roster.store.ts`, `fills.store.ts`, `try.store.ts`, `custom.store.ts` and
+ * `skills.store.ts` (an agent, the agents of both places read, the steps each fills, an agent's try folder written, a person's custom
+ * instructions for one, and a skill read and written), `place.store.ts` (a place skill's verbs run and heard), `plan.store.ts` (a plan
+ * folder read), `inbox.store.ts` (the inbox's cards filed, queued and dropped), `factory.store.ts` (the factories, `factoriesDir`),
+ * `config.store.ts` (the `WF_` environment) and `root.store.ts` (the store's root as the service a program is given, `StoreRoot`)
  * and `telemetry.store.ts` (what a daemon's process logs and exports, `telemetryLayer`). They import neither the runtime nor a controller,
  * and load as a tree: the bottom, beneath `record.store.ts`, beneath `worktree.store.ts` and `write.store.ts`, beneath the rest, so no
  * cycle can form (`test/boundary.test.ts`).
@@ -36,8 +36,18 @@ export type { SessionHarness, SessionRelease } from './release/release.ts';
 export { currentRelease } from './release/release.store.ts';
 export { runningRelease } from './release/version.verb.ts';
 export { Conflict, Forbidden, Invalid, isRefusal, Missing, type Refusal } from './refusal/refusal.ts';
-export { maxConcurrent, maxRuns, verifiesRest, wfRoot } from './config/config.store.ts';
-export { StoreRoot, storeRootLayer } from './config/root.store.ts';
+export {
+  maxConcurrent,
+  maxRuns,
+  SESSION_VARIABLES,
+  setting,
+  type Settings,
+  settingsOf,
+  StoreConfig,
+  verifiesRest,
+  wfRoot,
+} from './config/config.store.ts';
+export { StoreRoot, storeConfigLayer, storeRootLayer } from './config/root.store.ts';
 export {
   AGENT_FACING,
   CHECK_AFFECTING,
@@ -49,7 +59,8 @@ export {
   parseGlobs,
   touchedLines,
 } from './branches/index.ts';
-export { budgetWord, dollars, peakMark, readWords, rebuiltCache, sumUsage, usedLines } from './status/status.ts';
+export { budgetWord, dollars } from './money/money.ts';
+export { peakMark, readWords, rebuiltCache, sumUsage, usedLines } from './usage/usage.ts';
 export { answerIn, deniedWords, harnessWaitLine, isRepositoryRun, placeOf, waitingWords } from './run.ts';
 /**
  * The name the engine gives a task's session, which is the name `claude agents` lists it under: what a person is told to look for when
@@ -177,7 +188,6 @@ export {
 } from './inbox/index.ts';
 export type { CardRun, CardState, InboxListing, QueueStarted, MissedStart } from './inbox/index.ts';
 export {
-  DEFAULT_FACTORY,
   factoryLines,
   factoryNameRefusal,
   factoryRepo,
@@ -244,7 +254,10 @@ export {
 export type { DaemonFile, DaemonStanding, Identity, Liveness } from './daemon/daemon.ts';
 export { HOME, acceptFile, approvalFile, artifactsDir, askFile, inputsDir, roundAskFile, runId } from './record/record.store.ts';
 export { stepsOf } from './steps/steps.verb.ts';
-export { inboxDir, keptRuns, runStore } from './record/files.store.ts';
+export { inboxDir, keptRuns } from './record/files.store.ts';
+export { runsAtOnce } from './runs/runs.store.ts';
+/** The entry's former name of the Run door's synchronous face, kept for the e2e's world (apps/web) until it reads `runsAtOnce`. */
+export { runsAtOnce as runStore } from './runs/runs.store.ts';
 export { type RunStore, lackedOf } from './record/record.ts';
 export { alive } from './process/alive.store.ts';
 export {
@@ -266,6 +279,7 @@ export {
 } from './daemon/daemon.store.ts';
 export type { TakenStore } from './daemon/daemon.store.ts';
 export { holdUrl, runMain, up } from './daemon/up.verb.ts';
+export { withProposalsPass } from './apply/pass.verb.ts';
 export { ensureDaemon, liveDemandHost, type DemandHost } from './demand/demand.verb.ts';
 export { telemetryLayer } from './telemetry/telemetry.store.ts';
 export { addPass, breakdownLines, heaviest, PHASES, STATS_EVERY_MS, summaryDue, summaryLine } from './meter/index.ts';
@@ -316,23 +330,7 @@ export type { AgentFill, AgentPlace, AgentReading, AgentsRead, AgentUser, CardRe
 export type { AgentSource } from './sources/sources.ts';
 export type { SkillChange, SkillRead } from './skills/skills.store.ts';
 export { addToInbox, dropFromInbox, inboxNameAt, queueInInbox, readInbox } from './inbox/inbox.store.ts';
-export {
-  addFactory,
-  attachWorkflow,
-  defaultStartsAllowed,
-  detachWorkflow,
-  factoriesDir,
-  fireAgent,
-  hireAgent,
-  readFactories,
-  readFactory,
-  clearSchedule,
-  removeFactory,
-  setInstruction,
-  setSchedule,
-  startFactory,
-  templatedTree,
-} from './factory/factory.store.ts';
+export { factoriesDirAt, filedAtOnce, listedAtOnce, readFactoryAtOnce, startFactoryAtOnce } from './factory/door/factories.store.ts';
 export { EngineService, HARNESSES, asked, engine, engineOf, remoteAgents, runWith } from './runtime-client.ts';
 export { HARNESS_CHOICES } from 'agent-runtime/vocabulary';
 export { envNameOf } from './harness/a2a.store.ts';
@@ -461,7 +459,7 @@ export { decideRun, type Answered, type Decided } from './decide/decide.verb.ts'
 export { freshStatsMemo, statsRun, type StatsMemo } from './stats/stats.verb.ts';
 export { seriesMemo, type Health, type SeriesMemo, type SeriesRead } from './series/series.ts';
 export { statsLine, statsLines, statsQueryOf, type QueryKey, type Stats, type StatsQuery } from './stats/index.ts';
-export { list, pausedRead, runReading, unjudgedOf, type RunReading } from './list/list.verb.ts';
+export { list, listReading, pausedRead, unjudgedOf, type ListReading } from './list/list.verb.ts';
 export type { DecideCommand } from './decide/decide.ts';
 export type { RunsListed, Unjudged } from './list/list.ts';
 export { graphOf, runGraph, typedGraphOf, type GraphEdge, type RunGraph } from './summary/graph.ts';

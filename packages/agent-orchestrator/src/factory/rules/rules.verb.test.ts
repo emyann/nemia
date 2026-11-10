@@ -35,7 +35,7 @@ const door = doorFrom(FactoryDoor, memory);
 done(door.factories.create(aFactory('acme')));
 
 /** The command run with `args`, as the CLI and the api run it, over the memory door. */
-const run = (args: RulesInput) => runWith(engineOf(engine().layer), Effect.provide(FACTORY_RULES.handler(args, undefined, ROOT), memory));
+const run = (args: RulesInput) => runWith(engineOf(engine().layer), Effect.provide(FACTORY_RULES.handler(args), memory));
 
 test('REFUSED: `nemia factory rules`, nothing written', async (t) => {
   const rows: Array<[string, RulesInput, 'Conflict' | 'Missing' | 'Invalid', string[]]> = [
@@ -58,7 +58,7 @@ test('REFUSED: `nemia factory rules`, nothing written', async (t) => {
         names(err.message, ...facts);
         return true;
       });
-      assert.deepEqual(done(door.factories.list()), ['acme']);
+      assert.deepEqual(done(door.factories.list()), ['default', 'acme']);
       assert.equal(done(door.rules.read(FactoryName.read('acme'))).words, null);
     });
   await t.test('--file with --clear, by the check, before anything is read', () =>

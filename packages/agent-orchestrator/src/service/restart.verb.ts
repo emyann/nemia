@@ -8,6 +8,7 @@
  * its command, however it ends, lifted by the daemon's next pass where it was killed. A daemon started by hand is not the service's to
  * start again: it is named, with the take-over that hands it to the service. The command the CLI serves alone, beside the service's others.
  */
+import { StoreRoot } from '../config/root.store.ts';
 import { Effect } from 'effect';
 import type { Args } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
@@ -74,13 +75,15 @@ const PAUSE_STOOD = 'the pause that stood is left as it was: nemia resume lifts 
  * store (`Conflict`); and after, as the take-over refuses (`Conflict`): a daemon that does not stop, a service that does not tick the
  * store, or a first pass that fails — naming the log.
  */
-export const restartService = Effect.fn('restartService')(function* (args: Args, host: ServiceHost = liveHost()) {
+export const restartService = Effect.fn('restartService')(function* (args: Args, given?: ServiceHost) {
+  const home = yield* StoreRoot;
+  const host = given ?? liveHost(yield* StoreRoot);
   const { service, plan } = yield* tried(() => {
     const service = serviceAt(args, host);
     return { service, plan: planOf(service, host) };
   });
   if (plan.kind === 'start') {
-    const paused = yield* tried(() => readPause() !== null);
+    const paused = yield* tried(() => readPause(home) !== null);
     const pid = yield* startedPassed(host, service, BY, plan.old, paused ? PAUSE_STOOD : 'the store is as it was');
     const lines = [
       `started ${service.unit}, which ticks the store${pid ? ` as pid ${pid}` : ''} and has completed its first pass`,
@@ -119,7 +122,8 @@ const RESTART: Command<Restarted> = {
   writes: true,
   class: 'ask',
   only: { side: 'cli', why: "it restarts the person's login service, on the machine the command runs on" },
-  handler: (args, _env, home) => Effect.flatMap(timedHost(args, home, 'service restart'), (host) => restartService(args, host)),
+  handler: (args) =>
+    Effect.flatMap(StoreRoot, (home) => Effect.flatMap(timedHost(args, home, 'service restart'), (host) => restartService(args, host))),
   print: (data) => data.lines,
 };
 

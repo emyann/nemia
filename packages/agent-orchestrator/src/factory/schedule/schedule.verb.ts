@@ -3,6 +3,7 @@
  * and written by `nemia factory schedule` and `unschedule`, entries of the command table the api serves as a Schedule's writes,
  * `/api/namespaces/:namespace/schedules/:name`. No level is read here: a schedule is the daemon's, and starts at every level.
  */
+import { StoreRoot } from '../../config/root.store.ts';
 import path from 'node:path';
 import { Cause, Effect, Exit, Schema } from 'effect';
 import { ScheduleWrite } from 'objects';
@@ -11,8 +12,8 @@ import type { Command } from '../../command/entry.verb.ts';
 import type { Run } from '../../record/record.ts';
 import { isDue, schedulesRead, type Read } from './listed.store.ts';
 import { workflowFolder } from '../../folder/folder.store.ts';
-import { scheduleOf, scheduleRefused } from '../factory.store.ts';
-import { rooted, wire } from '../wiring/wire.verb.ts';
+import { scheduleOf, scheduleRefused } from '../door/factories.store.ts';
+import { wire } from '../wiring/wire.verb.ts';
 import { unscheduledRefusal } from '../factory.ts';
 import { Missing } from '../../refusal/refusal.ts';
 import type { Schedule } from '../factory.ts';
@@ -32,9 +33,9 @@ const oneLine = (err: unknown): string =>
  * The start of the schedule read `r` for its fire `due`, as a person's `nemia start --factory` is: its repository and folder first, the
  * factory's tree before the repository's `workflows/` when it is made from a template.
  */
-const started = (r: Read, due: string, daemonRepo: string) =>
+const started = (home: string, r: Read, due: string, daemonRepo: string) =>
   Effect.suspend(() => {
-    const repo = repoFor(r.factory.name, r.schedule.repo, daemonRepo);
+    const repo = repoFor(home, r.factory.name, r.schedule.repo, daemonRepo);
     return startRun({
       brief: r.schedule.brief,
       repo,
@@ -53,10 +54,11 @@ const started = (r: Read, due: string, daemonRepo: string) =>
  * same.
  */
 export const startDue = Effect.fn('startDue')(function* (repo: string, runs: readonly Run[], now: number = Date.now()) {
-  const due = schedulesRead(runs, now).find(isDue);
+  const home = yield* StoreRoot;
+  const due = schedulesRead(home, runs, now).find(isDue);
   if (!due) return undefined;
   const at = { factory: due.factory.name, workflow: due.workflow, due: new Date(due.fires.latest).toISOString() };
-  const exit = yield* Effect.exit(started(due, at.due, repo));
+  const exit = yield* Effect.exit(started(home, due, at.due, repo));
   const keep = (tried: ScheduleTry): void => {
     try {
       putScheduleTry(at.factory, at.workflow, tried);
@@ -144,16 +146,12 @@ export const FACTORY_SCHEDULE: Command<Scheduled, ScheduleInput> = {
     why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Schedule's `put`, whose handler calls this one by its `input`",
   },
   input: ScheduleInput,
-  handler: ({ factory, workflow, cron, brief, repo, tz }, _env, home) => {
+  handler: ({ factory, workflow, cron, brief, repo, tz }) => {
     const opts = { workflow, cron, brief, ...(repo ? { repo } : {}), ...(tz ? { tz } : {}) };
     const schedule = scheduleOf(opts);
-    return rooted(
-      home,
-      'factory schedule',
-      Effect.map(
-        wire(factory, { verb: 'schedule', workflow, schedule }, (named) => scheduleRefused(named, opts)),
-        ({ was, file }) => ({ file, schedule, replaced: was.schedules[workflow] ?? null }),
-      ),
+    return Effect.map(
+      wire(factory, { verb: 'schedule', workflow, schedule }, (named) => scheduleRefused(named, opts)),
+      ({ was, file }) => ({ file, schedule, replaced: was.schedules[workflow] ?? null }),
     );
   },
   print: ({ file, schedule, replaced }, { factory, workflow }) => [
@@ -186,18 +184,14 @@ export const FACTORY_UNSCHEDULE: Command<{ file: string; cleared: Schedule }, Un
     why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Schedule's `delete`, whose handler calls this one by its `input`",
   },
   input: UnscheduleInput,
-  handler: ({ factory, workflow }, _env, home) => {
-    return rooted(
-      home,
-      'factory unschedule',
-      Effect.gen(function* () {
-        const { was, file } = yield* wire(factory, { verb: 'unschedule', workflow });
-        const cleared = was.schedules[workflow];
-        if (cleared === undefined)
-          return yield* Effect.fail(new Missing({ message: unscheduledRefusal(factory, workflow, Object.keys(was.schedules)) }));
-        return { file, cleared };
-      }),
-    );
+  handler: ({ factory, workflow }) => {
+    return Effect.gen(function* () {
+      const { was, file } = yield* wire(factory, { verb: 'unschedule', workflow });
+      const cleared = was.schedules[workflow];
+      if (cleared === undefined)
+        return yield* Effect.fail(new Missing({ message: unscheduledRefusal(factory, workflow, Object.keys(was.schedules)) }));
+      return { file, cleared };
+    });
   },
   print: ({ file, cleared }, { factory, workflow }) => [`${factory}  ${workflow} no longer at ${cleared.cron}`, `unscheduled: ${file}`],
 };

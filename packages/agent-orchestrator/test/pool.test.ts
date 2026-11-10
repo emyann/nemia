@@ -1,8 +1,8 @@
 /**
- * Pools by subscription, at shipped defaults, through the client's `engine()`, which files every task `queued` and hands the runtime its
- * ceiling and pools, and `tick()`, whose engine pass admits. `WF_MAX_CONCURRENT` is unset, so the ceiling is 2 on every pass. `WF_ROOT`
- * is read as the module loads, so it is set before the import; `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo
- * of runs at rest, and a difference throws (`verifyRest` in tick.verb.ts).
+ * Pools by subscription, at shipped defaults, through the client's `engine(process.env)`, which files every task `queued` and hands the
+ * runtime its ceiling and pools, and `tick()`, whose engine pass admits. `WF_MAX_CONCURRENT` is unset, so the ceiling is 2 on every pass.
+ * `WF_ROOT` is read as the module loads, so it is set before the import; `WF_VERIFY_REST=1` judges in full every run a pass answers from
+ * its memo of runs at rest, and a difference throws (`verifyRest` in tick.verb.ts).
  *
  * A fake `claude` (`gatedJob`, the job's Claude Code) and `codex` first on PATH run until the test opens their gate — a file named for
  * the task's id, which is its brief — and `claude agents` prints a registry and counts itself. The tasks are filed straight through the
@@ -10,9 +10,9 @@
  * Claude Code session is a job, which it reads off its run file (`agents-calls.boundary.test.ts` has a run's steps and a restart).
  *
  * Told as one story on `story(t)`, its checkpoints the four things a pool does, each leaving the board drained for the next. Not on
- * `staged`: the stand-in engine admits into no pool, so this keeps the client's real `engine()` and the fakes. An admitted task starts
- * on the runtime's next pass, so a freed slot is taken one pass after it is admitted into: each checkpoint ticks once to admit and once
- * to start.
+ * `staged`: the stand-in engine admits into no pool, so this keeps the client's real `engine(process.env)` and the fakes. An admitted task
+ * starts on the runtime's next pass, so a freed slot is taken one pass after it is admitted into: each checkpoint ticks once to admit and
+ * once to start.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -77,7 +77,7 @@ ${runUntilGate('args.at(-1)')}
 };
 
 const fake = fakes();
-const e = engine();
+const e = engine(process.env);
 const cwd = scratch('wf-pool-cwd-');
 
 /**
@@ -276,11 +276,11 @@ test(
     );
 
     await s.test(
-      'REFUSED: `WF_MAX_CONCURRENT=abc` refuses the pass, and the engine `engine()` builds under it has no ceiling, so it admits nothing',
+      'REFUSED: `WF_MAX_CONCURRENT=abc` refuses the pass, and the engine `engine(process.env)` builds under it has no ceiling, so it admits nothing',
       async (t) => {
         process.env.WF_MAX_CONCURRENT = 'abc';
         try {
-          const refused = engine();
+          const refused = engine(process.env);
           await Effect.runPromise(refused.file({ id: 'r1', cwd, harness: 'claude', brief: 'r1' }));
           const err = await runWith(refused, tickRun()).then(
             () => assert.fail('a pass under a ceiling that does not read resolved'),

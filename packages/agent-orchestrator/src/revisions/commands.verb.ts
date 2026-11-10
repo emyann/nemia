@@ -5,7 +5,6 @@
 import { Effect, Schema } from 'effect';
 import { RunRefresh } from 'objects';
 import { stepsOf } from '../steps/steps.verb.ts';
-import { rooted } from '../factory/wiring/wire.verb.ts';
 import { checked, type Command } from '../command/entry.verb.ts';
 import { mergeRun } from '../merge/merge.verb.ts';
 import { mergeAskedLine } from '../merge/merge.ts';
@@ -88,10 +87,10 @@ export const REFRESH: Command<
   class: 'act',
   only: { side: 'cli', why: "the api serves it as the Run's `refresh` of `objects`' Api, calling this handler" },
   input: RefreshInput,
-  handler: Effect.fnUntraced(function* (input: RefreshInput, _env?: NodeJS.ProcessEnv, home?: string) {
+  handler: Effect.fnUntraced(function* (input: RefreshInput) {
     yield* checked(refreshRefusal(input));
     const { runId } = input;
-    if (input.base !== true) return { drift: yield* rooted(home, 'refresh', refreshRun(runId)) };
+    if (input.base !== true) return { drift: yield* refreshRun(runId) };
     const { run, ask, file } = yield* mergeRun(runId, input.step);
     const looping = (yield* stepsOf(run)).find((s) => s.name === ask.step);
     if (looping === undefined)

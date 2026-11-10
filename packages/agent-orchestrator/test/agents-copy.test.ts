@@ -18,12 +18,14 @@ import { aSkill } from './skill-walks.ts';
 import { teamCopy } from './team.ts';
 import { names } from './assessed.ts';
 import { staged, story } from './story.ts';
+import { configGiven } from './config-given.ts';
 
 const ROOT = scratch('wf-agents-copy-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 const { addFactoryAt } = await import('../src/factory/factory.store.ts');
-const { addFactory, attachWorkflow, hireAgent, runWith: runEngine, startRun } = await import('../src/runner.ts');
+const { runWith: runEngine, startRun } = await import('../src/runner.ts');
+const { addFactory, attachWorkflow, hireAgent } = await import('../testing.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');
 const { AGENTS_COPY } = await import('../src/sources/copy.verb.ts');
@@ -49,7 +51,7 @@ const FIXTURE = path.join(import.meta.dirname, 'fixtures', 'agents-copy', 'repo'
 
 /** The copy `args` asks for, into the library of the store `home`. */
 const copy = (args: { file: string; as?: string; keep?: readonly string[] }, home: string) =>
-  stage.runWith(stage.board().e, AGENTS_COPY.handler(args, undefined, home));
+  stage.runWith(stage.board().e, AGENTS_COPY.handler(args).pipe(Effect.provide(configGiven(home, process.env))));
 
 /** `nemia agents sources`' program over the store `home`, as its handler runs it: what it lists, or the refusal it fails with. */
 const sourcesAt = (ask: { at?: string; home: string }) =>
@@ -323,7 +325,7 @@ test('REFUSED: a copy the library or its source cannot take, by kind and exit 2 
       yield* skills.write(name, theirs, undefined, path.join(team, 'skills'), { anywhere: true });
       const ours = aSkill('review-a-change', { body: 'Our own way.' });
       yield* skills.write(name, ours, undefined, libraryOf(home).skills, { anywhere: true });
-      return yield* AGENTS_COPY.handler({ file: reviewer(team) }, undefined, home);
+      return yield* AGENTS_COPY.handler({ file: reviewer(team) }).pipe(Effect.provide(configGiven(home, process.env)));
     }).pipe(Effect.provide(skillDoorMemory()));
     await assert.rejects(
       stage.runWith(stage.board().e, program),

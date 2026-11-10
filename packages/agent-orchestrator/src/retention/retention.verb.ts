@@ -6,13 +6,13 @@
  * removes what a crashed upgrade left (`sweptLeftovers`, by `leftovers`' rule): a dead build's folder, a dead pointer link, an old
  * build log.
  */
+import { sweepLoop } from '../forget/prune/free.verb.ts';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Cause, Effect, type Duration } from 'effect';
+import { Effect, type Duration } from 'effect';
 import { StoreRoot } from '../config/root.store.ts';
 import type { LeaseRelease } from '../daemon/daemon.ts';
 import { alive } from '../process/alive.store.ts';
-import { firstPiece } from '../piece/piece.ts';
 import { asked, EngineService } from '../runtime-client.ts';
 import { sessionRelease, type Running } from '../release/release.ts';
 import {
@@ -149,23 +149,12 @@ export const retainOnce = Effect.fn('retainOnce')(function* (
 });
 
 /**
- * The retention, for as long as the daemon runs: a sweep (`retainOnce`) of the store `StoreRoot` names, then a rest of `RETAIN_EVERY`.
- * A sweep that fails is a warning, said once while its words stand, and the next is tried a rest later.
+ * The retention, for as long as the daemon runs: a sweep (`retainOnce`) of the store `StoreRoot` names, then a rest of `RETAIN_EVERY`
+ * (`sweepLoop`).
  */
 export const retain = (processes: readonly ProcessRelease[]) =>
   Effect.gen(function* () {
     const home = yield* StoreRoot;
     const memory = freshRetainMemory();
-    let failed: string | undefined;
-    const sweep = Effect.suspend(() => retainOnce(home, processes, memory)).pipe(
-      Effect.andThen(Effect.sync(() => void (failed = undefined))),
-      Effect.catchCause((cause) => {
-        const err = Cause.squash(cause);
-        const why = firstPiece(err instanceof Error ? err.message : String(err), '\n');
-        if (why === failed) return Effect.void;
-        failed = why;
-        return Effect.logWarning(`No release could be removed this sweep: ${why}`);
-      }),
-    );
-    return yield* Effect.forever(sweep.pipe(Effect.andThen(Effect.sleep(RETAIN_EVERY))));
+    return yield* sweepLoop(() => retainOnce(home, processes, memory), RETAIN_EVERY, 'No release could be removed this sweep');
   });

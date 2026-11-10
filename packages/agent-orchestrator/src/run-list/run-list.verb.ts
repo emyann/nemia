@@ -16,7 +16,8 @@ import { Effect } from 'effect';
 import { type Run as RunObject, type RunList, type RunState, type RunUnjudged } from 'objects';
 import type { Run } from '../run.ts';
 import type { Engine } from '../runtime-client.ts';
-import { finishedAtOf, kindOf, selectedRuns } from '../runlist/runlist.ts';
+import { finishedAtOf, kindOf } from '../run-state/run-state.ts';
+import { selectedRuns } from '../labels/labels.ts';
 import { framed, framePartsOf, unjudgedStateOf } from '../runlist/runlist.verb.ts';
 import { storeRunsListed, summaryOf, type SummaryHow } from '../summary/summary.verb.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
@@ -165,7 +166,7 @@ const objectsOf = (e: Engine, { home, memo }: SummaryHow, reads: RunReads, verif
           if (!isDeepStrictEqual(withDiskParts(kept, parts), fresh.answer))
             return yield* Effect.die(
               new Error(
-                `The informer served ${run.id}'s listed object differently from one built afresh (WF_VERIFY_REST): something it was built on is not watched — put it into what the informer checks, or into the parts read on every request (diskPartsOf).`,
+                `The informer served ${run.id}'s listed object differently from one built afresh (WF_VERIFY_REST): something it was built on is not watched — name it in RUN_INPUTS (src/rest/rest.ts) with what watches it, and give it to that watch.`,
               ),
             );
         }
@@ -178,11 +179,11 @@ const objectsOf = (e: Engine, { home, memo }: SummaryHow, reads: RunReads, verif
 };
 
 /** What a list asked by state reads through: the store's root, its judgement of many runs at once, the feed's filing times, the objects. */
-type ByStateReads<E, R> = {
+type ByStateReads<E, R, O = R> = {
   readonly home: string;
   readonly judging: (some: readonly Run[]) => Effect.Effect<Judgements, E, R>;
   readonly filed: Effect.Effect<ReadonlyMap<string, string>, E, R>;
-  readonly objectOf: (run: Run, judgement: Judgement, filed: ReadonlyMap<string, string>) => Effect.Effect<RunObjectAnswer, E, R>;
+  readonly objectOf: (run: Run, judgement: Judgement, filed: ReadonlyMap<string, string>) => Effect.Effect<RunObjectAnswer, E, O>;
 };
 
 /** A run a list asked by state keeps: its record, its judgement or why it has none, its state, and when it finished for a finished one. */
@@ -226,11 +227,11 @@ const statedOf = (run: Run, one: JudgedOrWhy, home: string): Stated => {
  * answers it, with the frame's parts laid on its status (`framePartsOf`), measured to `metadata.asOf`. A run left unjudged is named in
  * `unjudged` with its state.
  */
-const byState = Effect.fnUntraced(function* <E, R>(
+const byState = Effect.fnUntraced(function* <E, R, O>(
   all: readonly Run[],
   query: RunQuery,
   field: RunStateSelector,
-  reads: ByStateReads<E, R>,
+  reads: ByStateReads<E, R, O>,
 ) {
   const kept = keptOf(all, query);
   if (kept instanceof Invalid) return yield* Effect.fail(kept);

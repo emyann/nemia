@@ -4,15 +4,13 @@
  * workflow gates as it declares them; of a run, off the steps it is gated at, a gate added at its start among them, with what keeps each
  * rule that could approve one from doing so now, read as admission reads it (`seenOf`, `factsOf`). Any agent's: the name is the one given.
  */
+import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
 import { Cause, Effect } from 'effect';
 import type { Args } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { agentNameRefusal } from '../agents/agents.ts';
-import { rootGiven } from '../config/root.store.ts';
-import { rooted } from '../factory/wiring/wire.verb.ts';
-import { FactoryDoor } from '../factory/door/factories.store.ts';
-import { FactoryName } from '../factory/factory.model.ts';
+import { filedFactory } from '../factory/door/factories.store.ts';
 import { factoryRepo } from '../factory/factory.ts';
 import { workflowFolder } from '../folder/folder.store.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
@@ -77,7 +75,7 @@ const messageOf = (cause: Cause.Cause<unknown>): string => {
 
 /** Each workflow attached to `factory` read, or why it does not, at the store `home`: its gated steps' sites, or its refusal. */
 const factorySites = Effect.fnUntraced(function* (home: string, name: string) {
-  const factory = yield* (yield* FactoryDoor).factories.read(FactoryName.read(name));
+  const factory = yield* filedFactory(name, 'hire');
   const repo = factoryRepo(factory, undefined, process.cwd());
   const door = yield* WorkflowDoor;
   const sites: GateSite[] = [];
@@ -205,11 +203,6 @@ export const POLICY_REACH: Command<PolicyReach> = {
   writes: false,
   class: 'read',
   only: { side: 'cli', why: 'an agent reads it from its session; the board draws no part for it yet' },
-  handler: (args, _env, home) =>
-    rooted(
-      home,
-      'policy reach',
-      Effect.suspend(() => reachOf(rootGiven(home, 'policy reach'), args)),
-    ),
+  handler: (args) => Effect.flatMap(StoreRoot, (home) => Effect.suspend(() => reachOf(home, args))),
   print: reachLines,
 };

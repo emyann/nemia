@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Effect, Exit, type Duration } from 'effect';
-import { keepsWorktrees } from '../../config/config.store.ts';
+import { setting } from '../../config/config.store.ts';
 import { HOME } from '../../record/record.store.ts';
 import { firstPiece } from '../../piece/piece.ts';
 import { dropEmpty, freedByRepo, judging, resolved, sized, type Judged, type Sized } from './prune.verb.ts';
@@ -118,7 +118,7 @@ const saidOnce = Effect.fnUntraced(function* (left: ReadonlyArray<{ id: string; 
  * the store and the place say then.
  */
 export const freeOnce = Effect.fn('freeOnce')(function* (answers: readonly Answered[], memory: FreeMemory) {
-  if (keepsWorktrees()) return { freed: [], said: [] } satisfies Freed;
+  if (yield* setting('keepWorktrees')) return { freed: [], said: [] } satisfies Freed;
   const candidates = freeable(answers).filter((id) => fs.existsSync(path.join(HOME, 'worktrees', id)));
   forgotten(memory, candidates);
   const turn = freeTurn(candidates, memory.judged, FREE_A_SWEEP, memory.turn++);
@@ -137,21 +137,40 @@ export const freeOnce = Effect.fn('freeOnce')(function* (answers: readonly Answe
 });
 
 /**
- * The retention, for as long as the daemon runs: a sweep (`freeOnce`) over what `answers` gives then — the latest pass's runs — and a
- * rest of `FREE_EVERY`, which no caller shortens. A sweep that fails is a warning, said once while its words stand, and the next is
- * tried a rest later.
+ * A daemon's sweep for as long as it runs: `once()`, then a rest of `every`, for ever, which no caller shortens. A sweep that ends hands
+ * what it answered to `done`; one that fails calls `failed`, and is a warning — `words`, then its reason (`whyOf`) — said once while its
+ * reason stands; the next is tried a rest later. What free, the retention and the disk measure each run.
  */
-export const free = (answers: () => readonly Answered[]) => {
-  const memory = freshFreeMemory();
+export const sweepLoop = <A, E, R>(
+  once: () => Effect.Effect<A, E, R>,
+  every: Duration.Input,
+  words: string,
+  { done, failed: onFailed }: { done?: (answered: A) => void; failed?: () => void } = {},
+): Effect.Effect<never, never, R> => {
   let failed: string | undefined;
-  const sweep = Effect.suspend(() => freeOnce(answers(), memory)).pipe(
-    Effect.andThen(Effect.sync(() => void (failed = undefined))),
+  const sweep = Effect.suspend(once).pipe(
+    Effect.andThen((answered) =>
+      Effect.sync(() => {
+        failed = undefined;
+        done?.(answered);
+      }),
+    ),
     Effect.catchCause((cause) => {
+      onFailed?.();
       const why = whyOf(cause);
       if (why === failed) return Effect.void;
       failed = why;
-      return Effect.logWarning(`The worktrees of finished runs could not be freed this sweep: ${why}`);
+      return Effect.logWarning(`${words}: ${why}`);
     }),
   );
-  return Effect.forever(sweep.pipe(Effect.andThen(Effect.sleep(FREE_EVERY))));
+  return Effect.forever(sweep.pipe(Effect.andThen(Effect.sleep(every))));
+};
+
+/**
+ * The retention, for as long as the daemon runs: a sweep (`freeOnce`) over what `answers` gives then — the latest pass's runs — and a
+ * rest of `FREE_EVERY` (`sweepLoop`).
+ */
+export const free = (answers: () => readonly Answered[]) => {
+  const memory = freshFreeMemory();
+  return sweepLoop(() => freeOnce(answers(), memory), FREE_EVERY, 'The worktrees of finished runs could not be freed this sweep');
 };

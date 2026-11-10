@@ -23,11 +23,11 @@ import { isRunLine } from '../feed/index.ts';
 import { FeedDoor } from '../feed/feed.store.ts';
 import { followFeed } from '../feed/feed.verb.ts';
 import type { StepMoment } from '../following/following.ts';
-import { verifiesRest } from '../config/config.store.ts';
-import { HOME } from '../record/record.store.ts';
+import { setting } from '../config/config.store.ts';
+import { StoreRoot } from '../config/root.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { informerMemo, type InformerMemo } from '../rest/informer.verb.ts';
-import { kindOf } from '../runlist/runlist.ts';
+import { kindOf } from '../run-state/run-state.ts';
 import type { Filings } from '../summary/reads.verb.ts';
 import { runsSummarized } from '../summary/summary.verb.ts';
 import {
@@ -75,14 +75,12 @@ import {
 export type ChatPlace = { readonly task: string | undefined; readonly dir: string };
 
 /**
- * How the runs that wait on the person are read, as the board's list reads them: the store, the informer and the feed's
- * filing times its caller keeps, and the environment that says whether to verify them. Each defaults as a caller that keeps none.
+ * How the runs that wait on the person are read, as the board's list reads them: the informer and the feed's filing times its caller
+ * keeps, each defaulting as a caller that keeps none; the store and whether to verify them are the program's (`StoreRoot`, `StoreConfig`).
  */
 export type ChatReads = {
-  readonly home?: string;
   readonly runs?: InformerMemo;
   readonly filings?: Filings;
-  readonly env?: NodeJS.ProcessEnv;
 };
 
 /** A page of history: its events, oldest first, the id to ask `before` for the page older, the stream's cursor, and the presence. */
@@ -138,10 +136,10 @@ const waitingNow = (reads: ChatReads) =>
   Effect.gen(function* () {
     const e = yield* EngineService;
     const runs = yield* runsSummarized(e, {
-      home: reads.home ?? HOME,
+      home: yield* StoreRoot,
       memo: reads.runs ?? informerMemo(),
       filings: reads.filings ?? { filed: new Map(), cursor: 0 },
-      verify: reads.env ? verifiesRest(reads.env) : false,
+      verify: yield* setting('verifyRest'),
     });
     return runs.filter((run) => kindOf(run) === 'waiting').length;
   });

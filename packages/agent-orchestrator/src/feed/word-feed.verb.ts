@@ -11,14 +11,13 @@ import { listing } from '../list/list.ts';
 import { feedPhase, feedWords, LINE_WORDS, type FeedCloseout, type FeedDenial, type FeedWords, type Once } from './index.ts';
 import { closeoutOf, closeoutTold, saidCount, waitingOf } from '../views/views.verb.ts';
 import { engineWord, killedMemoryOf, parkedOf } from '../views/views-words.ts';
-import { runStore } from '../record/files.store.ts';
 import { denialText, type TaskView } from '../runtime-client.ts';
 import { taskTryOf, turnTryOf, type Run } from '../record/record.ts';
 import { holdsOf, type ParentRun, type Wait } from '../wait/wait.ts';
 import { runLabels, stepLabels } from '../telemetry/telemetry.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { CheckoutHold, RunSlot } from '../cap/cap.ts';
-import type { PassReads } from '../tick/told.verb.ts';
+import type { RunRead } from '../tick/told.verb.ts';
 import { driftWords } from '../revisions/revisions.ts';
 import type { Behind } from '../revisions/pin.verb.ts';
 
@@ -32,7 +31,7 @@ type Admitted = { waiting: Wait[]; held: RunSlot | undefined; parent: (id: strin
  */
 export function wordFeed(
   run: Run,
-  r: PassReads,
+  r: RunRead,
   assessed: Assessment,
   admission: Admitted,
   checkout: CheckoutHold | undefined,
@@ -43,20 +42,14 @@ export function wordFeed(
   return feedWords(
     listing({
       steps,
-      run,
+      read: { ...r, run, checkout },
+      assessed,
       phaseOf: (taskId) => feedPhase(engineWord(views)(taskId)),
       closeoutOf: (name) => closeoutOf(views, run, name),
-      askedCloseout: r.asked,
-      verdictOf: r.verdictOf,
-      asks: r.asks,
-      roundAsks: r.roundAsks,
-      answers: runStore.asks.answers(run.id),
+      answers: r.answers,
       waits: admission.waiting,
       saidTo: saidCount(views, run),
-      spendOf: r.spendOf,
       slot: admission.held,
-      standings: [],
-      checkout,
       waitingOf: waitingOf(views),
       parkedOf: (taskId) => parkedOf(views.get(taskId)),
       memoryOf: (taskId) => killedMemoryOf(views.get(taskId)),
@@ -87,7 +80,7 @@ export function wordFeed(
  * which is what tells one occurrence from another — the line's own `at` is the pass's, as a denial's is.
  *
  * Each fact is already on the record as the pass read it, composed on read from the person's own file and never written into the record
- * (`readRun`): so the feed keeps its one writer, the daemon, and no verb is touched. The hold is not here — it is answered by its put and
+ * (`runRecord`): so the feed keeps its one writer, the daemon, and no verb is touched. The hold is not here — it is answered by its put and
  * its lift together (`holdOnce`), off `FeedWords.held`, since `nemia hold --off` leaves only an absence to read.
  *
  * It is the whole of what a person has done, not what is new: the feed's own lines say which have been written already (`oncePast`), so
@@ -146,7 +139,7 @@ const FAULTS: Partial<Record<AttemptEnd, string>> = {
  * Two attempts of one try lost are two occurrences, told apart by being two and counted off the feed's own lines (`oncePast`), as a call
  * denied twice in one try is. Neither waits on a person, by the table (`REASONS`): the step's own status is what wakes you.
  */
-function faultsOf(run: Run, r: PassReads): Once[] {
+function faultsOf(run: Run, r: RunRead): Once[] {
   const out: Once[] = [];
   for (const step of r.steps) {
     const view = r.views.get(run.steps[step.name]?.taskId ?? '');
@@ -169,7 +162,7 @@ function faultsOf(run: Run, r: PassReads): Once[] {
  * task's denials were said on the passes it was the current one, and the try that filed the task is part of what counts them — the try
  * the task was filed for, never the try the step has since reached, or a recheck would say every denial of that task again.
  */
-function denialsOf(run: Run, r: PassReads): FeedDenial[] {
+function denialsOf(run: Run, r: RunRead): FeedDenial[] {
   const out: FeedDenial[] = [];
   for (const step of r.steps) {
     const view = r.views.get(run.steps[step.name]?.taskId ?? '');
@@ -189,7 +182,7 @@ function denialsOf(run: Run, r: PassReads): FeedDenial[] {
  * its try), so the pass carries nothing between passes and a restarted daemon logs a closeout neither again nor never. A try's turn gives
  * one closeout, and the pass that reads it before the step moves on is the pass that files what comes next, so none is passed over.
  */
-function closeoutsOf(run: Run, r: PassReads): FeedCloseout[] {
+function closeoutsOf(run: Run, r: RunRead): FeedCloseout[] {
   const out: FeedCloseout[] = [];
   for (const step of r.steps) {
     const told = closeoutTold(r.views, run, step.name);

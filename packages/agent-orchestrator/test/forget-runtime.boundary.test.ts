@@ -33,9 +33,9 @@ delete process.env.WF_MAX_RUNS;
 const { advanceRun, forgetRun, retryRun, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { runTasks } = await import('../src/record/record.ts');
-const { runStore } = await import('../src/record/files.store.ts');
+const { filesStore: runStore } = await import('../src/record/files.store.ts');
 const { tickRun } = await import('../src/tick/tick.verb.ts');
 const { filingsRead } = await import('../src/views/views.verb.ts');
 const { main } = await import('../src/cli/main.ts');
@@ -120,7 +120,7 @@ const sign = (taskId: string, n: number, closeout: object) => {
 /** What the daemon does: the engine's tick, then the run's pass. */
 const pass = async (id: string) => {
   await Effect.runPromise(e.tick());
-  return runWith(e, advanceRun(readRun(id)));
+  return runWith(e, advanceRun(runRecord(id)));
 };
 
 /** The ids of the tasks the engine has a record of. */
@@ -152,7 +152,7 @@ const finished = async () => {
   sessions.set(check, { ...sessions.get(check)!, state: 'completed', busy: false, exitCode: 0 });
   await pass(run.id);
   assert.equal((await pass(run.id)).status, 'succeeded');
-  const tasks = runTasks(readRun(run.id));
+  const tasks = runTasks(runRecord(run.id));
   assert.deepEqual(
     [...tasks].sort(),
     [`${run.id}-implement`, `${run.id}-implement-try2`, `${run.id}-implement-try2-check`],

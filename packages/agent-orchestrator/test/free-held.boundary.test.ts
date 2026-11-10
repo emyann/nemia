@@ -5,6 +5,7 @@
  *
  * `WF_KEEP_WORKTREES` is deleted at its head, so the rule is read at its shipped default.
  */
+import { configGiven, rootNow } from './config-given.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -16,7 +17,7 @@ import { asyncOps, asyncStore, plainEngine, type AsyncJournal, type AsyncRunner 
 import { scratch } from 'test-kit/scratch';
 import { runGiven } from './placed.ts';
 import type { PlaceRequests, PlaceVerb } from '../src/place/place.ts';
-import { storeRootLayer } from '../src/config/root.store.ts';
+import { storeConfigLayer } from '../src/config/root.store.ts';
 
 const ROOT = scratch('wf-free-held-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -26,9 +27,9 @@ process.env.WF_MAX_CONCURRENT = '50';
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_KEEP_WORKTREES;
-const { startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
+const { startRun, runWith: runEngine, gitPlaceLayer, withProposalsPass } = await import('../src/runner.ts');
 const runPlaced = runGiven(gitPlaceLayer);
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { tickRun, freshRestMemo } = await import('../src/tick/tick.verb.ts');
 const { PlaceService } = await import('../src/place/place.store.ts');
 const { builtinGitPlace } = await import('../src/place/builtin.store.ts');
@@ -130,7 +131,10 @@ const counting = (asked: Asked) =>
 const tick = (memo?: ReturnType<typeof freshRestMemo>) =>
   runEngine(
     e,
-    tickRun({ repo: ROOT, ...(memo ? { memo } : {}) }).pipe(Effect.provide(gitPlaceLayer), Effect.provide(storeRootLayer(process.env))),
+    withProposalsPass(tickRun({ repo: ROOT, ...(memo ? { memo } : {}) })).pipe(
+      Effect.provide(gitPlaceLayer),
+      Effect.provide(storeConfigLayer(process.env)),
+    ),
   );
 
 /** Passes until `ok` holds of one, a dozen at most. */
@@ -156,6 +160,7 @@ async function sweep(pass: Pass, ids: readonly string[], memory: Memory) {
   const done = await runEngine(
     e,
     freeOnce(answers, memory).pipe(
+      Effect.provide(configGiven(rootNow(), process.env)),
       Effect.provide(counting(asked)),
       Effect.provide(Logger.layer([keeper])),
       Effect.provideService(References.MinimumLogLevel, 'Info'),
@@ -169,7 +174,7 @@ async function sweep(pass: Pass, ids: readonly string[], memory: Memory) {
   return { ...done, logged, asked, verbs: asked.map((a) => a.verb) };
 }
 
-const lane = (id: string, step = 'work') => readRun(id).steps[step].workspace!;
+const lane = (id: string, step = 'work') => runRecord(id).steps[step].workspace!;
 const whole = (id: string) => fs.existsSync(lane(id)) && !fs.existsSync(path.join(ROOT, 'runs', `${id}.pruned`));
 const gone = (id: string) => !fs.existsSync(path.join(ROOT, 'worktrees', id));
 
@@ -194,7 +199,7 @@ async function worked(id: string, outcome: 'done' | 'blocked' = 'done') {
 async function merged(repo = aRepo()) {
   const run = await started(WORK, repo);
   await worked(run.id);
-  git(repo, 'merge', '-q', '--no-ff', '-m', `merge ${run.id}`, readRun(run.id).steps.work.branch!);
+  git(repo, 'merge', '-q', '--no-ff', '-m', `merge ${run.id}`, runRecord(run.id).steps.work.branch!);
   return run;
 }
 

@@ -95,13 +95,13 @@ function agentValues(agents: Agents): Record<string, Partial<WorkflowStepSpec>> 
 }
 
 /**
- * The harnesses a step may name: the package's, then each remote A2A agent the store declares, as `a2a:<name>` (`remoteAgents`, read
- * afresh). An entry the runtime refuses is not offered, and a file refused as it stands offers none of its agents — the form is still
- * drawn, a step already naming one keeps its word, and `nemia start` and `nemia up` say what is wrong with the file.
+ * The harnesses a step may name: the package's, then each remote A2A agent the store declares, as `a2a:<name>` (`remoteAgents`, read afresh
+ * under the store's root `home`). An entry the runtime refuses is not offered, and a file refused as it stands offers none of its agents —
+ * the form is still drawn, a step already naming one keeps its word, and `nemia start` and `nemia up` say what is wrong with the file.
  */
-function harnessChoices(): readonly string[] {
+function harnessChoices(home: string): readonly string[] {
   try {
-    return [...HARNESSES, ...[...remoteAgents().keys()].map((name) => `${REMOTE_PREFIX}${name}`)];
+    return [...HARNESSES, ...[...remoteAgents(home).keys()].map((name) => `${REMOTE_PREFIX}${name}`)];
   } catch {
     return [...HARNESSES];
   }
@@ -121,12 +121,12 @@ function harnessChoices(): readonly string[] {
  * off it (`REMOTE_REFUSED_KEYS`). The harness's `choices` offer each agent the store's `a2a-agents.json` declares beside the local
  * harnesses; `byHarness` has none of them, since a remote agent takes none of those words.
  */
-export const keyForm = (yours: YourAgents): KeyForm => ({
+export const keyForm = (yours: YourAgents, home: string): KeyForm => ({
   keys: STEP_KEYS.map((key) => ({
     key,
     meaning: STEP_KEY_MEANINGS[key],
     kind: STEP_KEY_FORM[key],
-    choices: key === 'harness' ? harnessChoices() : key === 'agent' ? [...yours.names] : (WORDS[key] ?? null),
+    choices: key === 'harness' ? harnessChoices(home) : key === 'agent' ? [...yours.names] : (WORDS[key] ?? null),
     byHarness: key === 'effort' || key === 'permissionMode' || key === 'sandbox' ? HARNESS_CHOICES[key] : null,
   })),
   defaultHarness: DEFAULT_HARNESS,
@@ -364,6 +364,7 @@ function heldAt(at: string): { text: string } | { unread: string } {
 export type Writing = {
   e: Served['e'];
   placeService: Served['placeService'];
+  config: Served['config'];
   trace: Served['trace'];
   name: string;
   dir: string;
@@ -387,7 +388,7 @@ export type Writing = {
  * a write that fails partway has changed the file all the same, so a schema counts as written before its write, not after it.
  */
 export async function write(
-  { e, placeService, trace, name, dir, repo, home, changes, inRequest }: Writing,
+  { e, placeService, config, trace, name, dir, repo, home, changes, inRequest }: Writing,
   steps: readonly StepDraft[],
   readme: string | undefined,
   schemas: readonly SchemaFile[] = [],
@@ -434,7 +435,7 @@ export async function write(
       ...(readme !== undefined && { readme }),
       ...(changes && { version: await inRequest(workflowVersion(dir, places)) }),
     };
-    result = await inRequest(WORKFLOWS_WRITE.handler(input, undefined, home));
+    result = await inRequest(WORKFLOWS_WRITE.handler(input));
   } catch (err) {
     putSchemasBack(dir, written);
     if (err instanceof WorkflowError) return refused(err.message);
@@ -446,7 +447,7 @@ export async function write(
       name,
       'yours',
       dir,
-      loadedAt(await loadedOf(e, { placeService, trace }, [dir], repo, home), dir),
+      loadedAt(await loadedOf(e, { placeService, config, trace }, [dir], repo, home), dir),
       await inRequest(workflowVersion(dir, places)),
     ),
     written: [...result.written, ...schemasWritten].sort(),

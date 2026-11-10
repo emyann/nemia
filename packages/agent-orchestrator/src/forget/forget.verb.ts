@@ -24,19 +24,21 @@ import {
   type BranchFate,
   type ForgetHow,
   type Forgot,
+  leftWhy,
 } from './forget.ts';
 import { HOME, lstatOf } from '../record/record.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { UnloadedFolder } from '../steps/steps.ts';
-import { runStore } from '../record/files.store.ts';
+import { runsAtOnce } from '../runs/runs.store.ts';
 import { PlaceService, readRunPlace, type Place, type RunPlaceRead } from '../place/place.store.ts';
 import { sayFilled, unansweredWords, type Held } from '../place/place.ts';
 import { standingsOf, type BranchReader } from '../branches/branches.store.ts';
 import { headsOver, NOTHING_READ, standingLive, standingReader } from '../standing/standing.verb.ts';
 import { statusMemo } from '../place/landing.store.ts';
-import { merging, resolved } from './prune/prune.verb.ts';
-import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRead } from '../views/views.verb.ts';
-import { adoptChecks, adoptRounds, adoptTries, unrecordedSteps } from '../tick/advance.verb.ts';
+import { merging, resolved, sayLeft } from './prune/prune.verb.ts';
+import { taskPhasesRead } from '../views/views.verb.ts';
+import { readAndAdopt } from '../adopt/run-adopt.verb.ts';
+import { readersOf } from '../tick/told.verb.ts';
 import { closeWaitingTasks } from '../tick/held.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { engineForgetting, forgetTasks } from './forgetting/forgetting.verb.ts';
@@ -83,8 +85,8 @@ type Worktrees = Pick<Forgot, 'removed' | 'handedOff' | 'gone' | 'left'>;
  * 3. **Its record, then every file under `WF_ROOT` keyed by its id** (`removeKeyed`): the record first, so the run is never read without
  *    the cancellation it had. A pass halfway through the run writes nothing back (`rewriteRun`).
  * 4. **Its tasks, through the engine** (`forgetTasks`): every task its record names (`runTasks`, the adopted ones among them) was written
- *    down once nothing refused (`runStore.forgetting`), before anything was removed, and the engine's `forget` removes each settled one's
- *    journal, feed lines and session files. A task just closed has not settled: it waits, with the marker, for the tick to forget it
+ *    down once nothing refused (the Run door's `forgetting`), before anything was removed, and the engine's `forget` removes each settled
+ *    one's journal, feed lines and session files. A task just closed has not settled: it waits, with the marker, for the tick to forget it
  *    (`finishForgetting`), or for `nemia rm` again. A run `held` lifts its marker and forgets nothing: it is still listed.
  *
  * A run whose record is gone is normal: what is left under its id, its files, is removed and named — never a worktree, since nothing says
@@ -129,7 +131,7 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
 /**
  * A run whose record is gone: what is left under its id removed and named, `worktrees/<id>` named as orphaned, never removed, with what
  * to do in the place's words (`orphans`), and the
- * engine's tasks a `nemia rm` cut short or left waiting wrote down (`runStore.forgetting`) forgotten now (`forgetTasks`).
+ * engine's tasks a `nemia rm` cut short or left waiting wrote down (the Run door's `forgetting`) forgotten now (`forgetTasks`).
  */
 const forgetMissing = Effect.fn('forgetMissing')(function* (id: string, dir: string) {
   const files = yield* tried(() => removeKeyed(id, undefined));
@@ -158,19 +160,14 @@ const frozenSteps = (run: Run): Effect.Effect<{ steps?: Workflow[]; unfrozen?: s
 const readForgetting = Effect.fn('readForgetting')(function* (e: Engine, id: string) {
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
   const { steps, unfrozen } = yield* frozenSteps(run);
-  const { views, phaseOf } = yield* taskPhasesRead(run).pipe(over(e));
-  const { asks, rounds } = yield* (yield* RunDoor).asks.read(RunId.read(id));
-  const reader = closeoutReader(views, run, steps);
-  const asked = closeoutAsked(views);
-  const verdictOf = exitVerdicts(views, run);
-  const spendOf = spendReader(views);
-  if (steps) {
-    yield* adoptRounds(e, run, steps, views, phaseOf, reader, asked, rounds, spendOf);
-    yield* adoptTries(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, spendOf);
-    yield* adoptChecks(e, run, steps, views, phaseOf, reader, asked, spendOf);
-    const unrecorded = yield* unrecordedSteps(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, rounds, spendOf);
-    for (const { name, taskId } of unrecorded) run.steps[name] = { ...run.steps[name], taskId };
+  if (!steps) {
+    const { views } = yield* taskPhasesRead(run).pipe(over(e));
+    const { asks, rounds } = yield* (yield* RunDoor).asks.read(RunId.read(id));
+    const { phaseOf, signedOff: reader, asked, verdictOf, spendOf } = readersOf(views, run, []);
+    return { run, steps, unfrozen, views, phaseOf, asks, rounds, reader, asked, verdictOf, spendOf };
   }
+  const { read } = yield* readAndAdopt(e, run, { steps, unrecorded: true });
+  const { views, phaseOf, signedOff: reader, asked, verdictOf, spendOf, asks, roundAsks: rounds } = read;
   return { run, steps, unfrozen, views, phaseOf, asks, rounds, reader, asked, verdictOf, spendOf };
 });
 
@@ -211,8 +208,8 @@ const asksStanding = (run: Run, steps: readonly Workflow[] | undefined): boolean
  */
 function refusalOf(id: string, f: Forgetting, git: BranchReader, place: Place): string | null {
   const { run, steps } = f;
-  const askAt = (a: AskName) => runStore.asks.where(id, a);
-  const others = runStore.runs.list().filter((o) => o.id !== id);
+  const askAt = (a: AskName) => runsAtOnce.asks.where(id, a);
+  const others = runsAtOnce.runs.list().filter((o) => o.id !== id);
   const standings = steps?.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run, steps, git) : [];
   const { phaseOf, reader, asked, verdictOf, asks, rounds, spendOf } = f;
   return forgetRefusal(
@@ -331,12 +328,12 @@ function deleteBranches(run: RepositoryRun, how: ForgetHow, place: RunPlaceRead,
 
 /**
  * Remove what is under `WF_ROOT` keyed by a run's id, and answer with each path removed, from `WF_ROOT`: what the run store keeps under it
- * first (`runStore.runs.forget`: its record, cancellation, pruning, hold, asks and own directory of inputs and artifacts), its check
+ * first (the Run door's `runs.forget`: its record, cancellation, pruning, hold, asks and own directory of inputs and artifacts), its check
  * logs (`checkLogsOf`, by the steps `names`, or without them any under its id that is no other stored run's), and `worktrees/<id>` once
  * it is empty. Nothing else, and never the engine's, which `forgetTasks` asks the engine to forget.
  */
 function removeKeyed(id: string, names: readonly string[] | undefined): string[] {
-  const removed = runStore.runs.forget(id);
+  const removed = runsAtOnce.runs.forget(id);
   const remove = (at: string) => {
     const st = lstatOf(at);
     if (!st) return;
@@ -347,12 +344,17 @@ function removeKeyed(id: string, names: readonly string[] | undefined): string[]
   let logs: string[] = [];
   try {
     logs = fs.readdirSync(checks);
-  } catch {}
-  const otherIds = names ? [] : runStore.runs.ids();
+  } catch (err) {
+    sayLeft(leftWhy(checks, err, ['ENOENT']));
+  }
+  const otherIds = names ? [] : runsAtOnce.runs.ids();
   for (const file of checkLogsOf(id, names, logs, otherIds)) remove(path.join(checks, file));
+  const worktrees = path.join(HOME, 'worktrees', id);
   try {
-    fs.rmdirSync(path.join(HOME, 'worktrees', id));
+    fs.rmdirSync(worktrees);
     removed.push(`worktrees/${id}/`);
-  } catch {}
+  } catch (err) {
+    sayLeft(leftWhy(worktrees, err, ['ENOENT', 'ENOTEMPTY', 'EEXIST']));
+  }
   return removed;
 }

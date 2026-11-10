@@ -27,7 +27,7 @@ delete process.env.WF_MAX_RUNS;
 const { main } = await import('../src/cli/main.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { advanceRun, runWith: runEngine } = await import('../src/runner.ts');
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { LINE_NAME } = await import('../src/run.ts');
 
 const stand = eachTest(testPlace);
@@ -35,7 +35,7 @@ const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, () => stand().layer);
 
 /** One pass over the run `id`, on this test's engine and place. */
-const advanced = (id: string) => runWith(engineOf(engine().layer), advanceRun(readRun(id)));
+const advanced = (id: string) => runWith(engineOf(engine().layer), advanceRun(runRecord(id)));
 
 /** `nemia`, typed with `argv` and handed this test's engine and place: the lines it printed. */
 async function typed(t: TestContext, ...argv: string[]): Promise<string[]> {
@@ -64,11 +64,11 @@ test('a run started, read and removed through `main` is answered by the place `m
   const base = world.repository(repo, { 'a.txt': 'one\n' });
 
   const id = (await typed(t, 'start', 'add a flag', '--workflows', oneStep(), '--repo', repo))[0].split(' ')[0];
-  assert.equal(readRun(id).baseRef, base, 'nemia start opened the place it was handed, which answered the commit the handle made');
+  assert.equal(runRecord(id).baseRef, base, 'nemia start opened the place it was handed, which answered the commit the handle made');
   assert.equal(fs.existsSync(path.join(repo, '.git')), false, 'and git made nothing there');
 
   await advanced(id);
-  const workspace = readRun(id).steps.implement.workspace!;
+  const workspace = runRecord(id).steps.implement.workspace!;
   assert.equal(world.tip(repo, `wf/${id}/${LINE_NAME}`), base, 'its workspace is cut on the same place');
   assert.equal(world.head(workspace), base);
 

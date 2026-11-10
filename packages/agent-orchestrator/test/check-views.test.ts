@@ -1,7 +1,7 @@
 /**
- * What a pass costs in `check` observes, at shipped defaults: the client's `engine()` with the shipped `check` harness, a pass through
- * `tick()`, and the views `taskPhases` makes of a run's tasks — every task of every run, each pass — counted on the runtime's meter, the
- * `observed, by harness` lines of `nemia up --stats`.
+ * What a pass costs in `check` observes, at shipped defaults: the client's `engine(process.env)` with the shipped `check` harness, a pass
+ * through `tick()`, and the views `taskPhases` makes of a run's tasks — every task of every run, each pass — counted on the runtime's
+ * meter, the `observed, by harness` lines of `nemia up --stats`.
  *
  * A view of a settled check is read off its record (`agent-runtime`'s `test/io.test.ts`), never by observing the check harness,
  * which lists every run file it ever ran: on a live store of 197 runs, one pass that observed it for each view listed 52976 of them in
@@ -32,7 +32,7 @@ const stand = eachTest(testPlace);
 const runWith = runOver(runEngine, () => stand().layer);
 const { taskPhasesRead } = await import('../src/views/views.verb.ts');
 
-const e = engine();
+const e = engine(process.env);
 const gates = scratch('wf-check-views-gates-');
 const calls = async () => (await Effect.runPromise(e.io())).observed.check?.calls ?? 0;
 

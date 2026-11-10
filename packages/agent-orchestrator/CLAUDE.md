@@ -20,13 +20,13 @@ too, which holds parity with this one until the in-process reads retire.
 - **A test beside its file reaches the package's helpers one folder further up** (`../../test/door-walks.ts`), and the shared ones by the
   test kit's entries (`test-kit/scratch`, `test-kit/checkpoints`), never by a path.
 - **The store's root is a service, `StoreRoot` (`src/config/root.store.ts`), given where a program is composed** —
-  `src/cli/main.ts` and the api's `app.ts`, each from `WF_ROOT` through `storeRootLayer(env)` — and a store function takes it as a
+  `src/cli/main.ts` and the api's `app.ts`, each from `WF_ROOT` through `storeConfigLayer(env)`, which gives the store's settings beside it (`StoreConfig`) — and a store function takes it as a
   required `home: string` with no default. `test/root-given.test.ts` refuses by name a new module-level root, a parameter defaulted to
   one, and a new line of a body that reads one — the shape most of the debt is in, since such a function takes no root at all;
   `test/global-roots.baseline.ts` counts the lines that still do, per file, and only shrinks.
 - **`src/factory/servers/` is the store that already takes its root by parameter**: `servers.store.ts`'s functions take a required
-  `home: string` first, threaded from `servers.verb.ts`'s handlers (`Command.handler`'s third argument, through `rootGiven`), from
-  `filedAt` and from the pass's `PassReads.home`, which `advanceRun` asks of `StoreRoot`. Copy it, not `level.store.ts`, for a new
+  `home: string` first, read from `StoreRoot` by `servers.verb.ts`'s handlers, which take their input alone, and by
+  the pass, which `advanceRun` hands to `filedAt` (`src/tick/told.verb.ts`). Copy it, not `level.store.ts`, for a new
   per-factory file: it is in no line of `test/global-roots.baseline.ts`, and the baseline only shrinks.
 - **Every test process starts with `WF_ROOT`, `AE_ROOT` and `HOME` pointed at throwaway folders** (`test/ambient.ts`, loaded with
   `--import`), and the throwaway home carries a test git identity: a module that pins a root as it loads pins a throwaway one, and
@@ -60,7 +60,7 @@ too, which holds parity with this one until the in-process reads retire.
   in `tools/guards/test/step-keys.test.ts`, which refuses any other list of the keys. A template places it too, or its export
   refuses it by name: `PLACED` and `stepOf` (`template/draft.ts`), `OVERRIDES` (`template/layout.ts`), `stepFile` (`factory/applied/render.ts`).
 - **A key renamed in `STEP_KEYS` is still read under its old name**: `FORMER_KEYS` (`former/former.ts`), which the agent's `keys` in
-  `FrozenStepSchema` read, `formerStepFields` (`folder/folder.store.ts`), `asNamed` in `readRun`, `keysWritten` in `src/roster/roster.ts`,
+  `FrozenStepSchema` read, `formerStepFields` (`folder/folder.store.ts`), `asNamed` in `runRecord`, `keysWritten` in `src/roster/roster.ts`,
   `formerKeyWritten` in the renders, `formerKeyLines` at `wf start`.
 - **An agent's own key renamed is read through `FORMER_OWN_KEYS`, and its words through `harnessPromptNamed`** (`former/former.ts`):
   in `parseAgent`, `asNamed`, `unreadReading` (`src/roster/roster.ts`) and `formerKeyLines`; `FORMER_KEYS` is typed
@@ -95,7 +95,7 @@ too, which holds parity with this one until the in-process reads retire.
 ## Runs, phases and asks
 
 - **The runtime's words stop here**: the orchestrator translates a runtime phase into its own status (`harnessBlocked`, `waitingOf`,
-  `settledOf` in `listing`, `phaseOfView`), and the api and the board read only the orchestrator's words: the board compares no
+  `blockedWord`, `phaseOfView`), and the listing reads a session's block off the run's one read (`sessionBlocked`, `RunRead`), and the api and the board read only the orchestrator's words: the board compares no
   `needs-human` (`apps/web/test/structure.test.ts` refuses one). A new runtime phase is translated in `listing` and
   `phaseOfView`; put a new word beside a phase (`waitingOf`), never into it.
 - **A new step status is `working` on the board until `stepState` knows it**.
@@ -115,7 +115,7 @@ too, which holds parity with this one until the in-process reads retire.
 - **A seeded finished step with a worktree on disk owes a hand-off until its record says `handedOff`** (`handOffOwed`).
 - **A run is read and written through the Run door (`RunDoor`, `src/runs/runs.store.ts`), a `Context.Reference` whose default is
   the files**: a test that only needs a run to exist gives its programs one `runDoorMemory()` (`src/runs/memory.store.ts`, imported
-  by path, after the file sets `WF_ROOT`) and plants the run through it; code still on `runStore` (`test/run-door.baseline.ts`) reads
+  by path, after the file sets `WF_ROOT`) and plants the run through it; code that reads the door at once (`runsAtOnce`) reads
   the files whatever door a program was given, so a test whose verb reaches it stays on files. A write breaking the model's `Run` is
   refused `Invalid`: build a fixture's task ids with `stepTaskId`. A run from a card is refused `Conflict` while another run from it
   stands: the files hold it by an exclusive claim, `<root>/started/<card>.json`, removed with the run that it names (`runs.forget`),
@@ -123,10 +123,10 @@ too, which holds parity with this one until the in-process reads retire.
   `takeBackRuns` does.
 - **A factory is read and written through the Factory door (`FactoryDoor`, `src/factory/door/factories.store.ts`), whose default is rooted**:
   it reads the files at the `StoreRoot` a program is given, and is refused `Invalid` where none was, so a handler that yields it is run
-  through `rooted(home, verb, program)` (`src/factory/wiring/wire.verb.ts`). A test that only needs a factory to exist gives its program one
-  `factoryDoorMemory()` (`src/factory/door/memory.store.ts`) and plants the factory through it (`aFactory`, `test/factory-walks.ts`); code
-  still on `factory.store.ts`'s spellings without a root (`test/factory-door.baseline.ts`) reads the module's root whatever door was
-  given. A change of a factory's wiring is judged by `wiringRefusal` (`src/factory/wiring/wiring.ts`), whose contract a new rule of the wiring
+  with `StoreRoot` given where its program is composed (`storeConfigLayer`). A test that only needs a factory to exist gives its program one
+  `factoryDoorMemory()` (`src/factory/door/memory.store.ts`) and plants the factory through it (`aFactory`, `test/factory-walks.ts`); no file
+  of `src` but the door's calls the stores it is over (`src/factory/door/factories.store.test.ts`, with no baseline); a synchronous caller
+  names its root (`doorAtOnce`). A change of a factory's wiring is judged by `wiringRefusal` (`src/factory/wiring/wiring.ts`), whose contract a new rule of the wiring
   is a law of, not a row of a test.
 - **A card is read and written through the Card door (`CardDoor`, `src/cards/cards.store.ts`), rooted as the Factory door is**: the
   inbox's verbs are programs that yield it, so a test runs one with its root given (`Effect.provideService(program, StoreRoot, root)`;
@@ -151,14 +151,14 @@ too, which holds parity with this one until the in-process reads retire.
   reading as drifted once: an `agent:` name `AgentName` refuses reads as missing, and an added skill whose `SKILL.md` is no regular
   file as null.
 - **An agent and a skill are read and written through the Agent and Skill doors (`AgentDoor`, `src/agents/agent-door.store.ts`;
-  `SkillDoor`, `src/skills/skill-door.store.ts`), rooted as the Factory door is**: a handler that yields one runs through `rooted`, and a
+  `SkillDoor`, `src/skills/skill-door.store.ts`), rooted as the Factory door is**: a handler that yields one is given `StoreRoot` where its program is composed, and a
   test that only needs an agent or a skill to exist gives its program `agentDoorMemory()` or `skillDoorMemory()` (`anAgent`,
   `test/agent-walks.ts`; `aSkill`, `test/skill-walks.ts`). No file of `src` calls their stores, which read the disk whatever door was
   given (`src/agents/agent-door.store.test.ts` refuses one). A new rule of which root wins is a law of `contracts/lookup.contract.ts`, and of a definition's version a
   law of `contracts/definition-version.contract.ts`, not a row of a test.
 - **A template is read and written through the Template door (`TemplateDoor`, `src/template/door/templates.store.ts`), whose default is
   rooted** as the Factory door's: a program that yields it — the template verbs, `nemia factory apply`, diff, upgrade and resolve, the
-  factory controller (`reconcileFactory`) — is given `StoreRoot`, a handler through `rooted`, and a test runs it with one
+  factory controller (`reconcileFactory`) — is given `StoreRoot`, and a test runs it with one
   (`test/templated.ts`) or gives `templateDoorMemory()` (`src/template/door/memory.store.ts`). The door checks a tree's name and paths
   (`TemplateTreeWrite`), never the template's lint: a verb that must refuse a template that does not pass checks it first (`checkedTree`).
   A `--template <name>` and a factory's recorded name are resolved by `templatePlace` at `BuiltinTemplates`, before the door: a test
@@ -191,9 +191,9 @@ too, which holds parity with this one until the in-process reads retire.
 - **A controller is a program over `EngineService`**, run by its caller with `runWith` (`runtime-client.ts`), and reads the engine with
   `asked`. `await e.view(id)` compiles and answers the Effect itself, unrun: only `typescript/await-thenable` in `npm run lint`
   refuses it.
-- **Admission is the runtime's**: the orchestrator files a task `queued` with its `priority` (`stepMomentum`, `MOMENTUM`), and `engine()`
-  hands the runtime the ceiling and the pools. A new engine verb goes into `ENGINE_PHASES`, and into `ENGINE_WRITES`, or `ENGINE_READS`
-  where it changes no task (`views/views.verb.ts`); an admitted task starts on the runtime's next pass.
+- **Admission is the runtime's**: the orchestrator files a task `queued` with its `priority` (`stepMomentum`, `MOMENTUM`), and `engine(env)`
+  hands the runtime the ceiling and the pools. A new engine verb is a row of `ENGINE_VERBS`, its phase and what it changes of a task
+  (`src/engine-verbs/engine-verbs.verb.ts`), which the typecheck demands; an admitted task starts on the runtime's next pass.
 - **Every test file that ticks a store sets `WF_VERIFY_REST=1`**, and a new input of a finished run's pass goes into `restStamps` (and
   into the informer's read of it, `informerRead` in `src/rest/informer.verb.ts`, whose `informedOf` decides): what the stamps miss is
   missed for good. The informer beside it (`src/rest/`) holds every

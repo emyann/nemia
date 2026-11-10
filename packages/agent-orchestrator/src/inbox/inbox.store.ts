@@ -8,6 +8,8 @@
  * package exports of it. A card's start — `startFromInbox`, and `startQueued`, the tick's — starts a run, and
  * is `inbox.verb.ts`'s, through `startRun`.
  */
+import { setting } from '../config/config.store.ts';
+import { DEFAULT_NAMESPACE } from 'objects';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Effect } from 'effect';
@@ -24,7 +26,7 @@ import {
   type InboxCard,
 } from './inbox.ts';
 import { queueFactoryRefusal } from './queue-factory.ts';
-import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
+import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { inheritedLabels, parseLabelEdits, type LeftOut } from '../labels/labels.ts';
@@ -36,7 +38,7 @@ import { WorkflowError } from '../step/step.ts';
 import { isFolderTeam } from '../workflow/index.ts';
 import { workflowFolder } from '../folder/folder.store.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
-import { defaultStartsAllowed, factoryNames, readFactories, treeOf } from '../factory/factory.store.ts';
+import { FactoryDoor, factoryOrNone } from '../factory/door/factories.store.ts';
 import type { Factory } from '../factory/factory.ts';
 import { HOME, isDirectory, runId, runsDir } from '../record/record.store.ts';
 import { keptRuns } from '../record/files.store.ts';
@@ -62,16 +64,36 @@ export const readInbox = Effect.fn('readInbox')(function* () {
   const tries = yield* door.tries.list();
   return cardsListed(
     entries,
-    keptRuns(undefined, (run) => ({ id: run.id, ...(run.from === undefined ? {} : { from: run.from }) })),
+    keptRuns(undefined, (run) => ({ id: run.id, ...(run.from === undefined ? {} : { from: run.from }) }), false),
     isDirectory,
     tries,
-    readableFactories(),
+    yield* readableFactories(),
   );
 });
 
-/** The store's factories that read, by name: what a queued card's repository is chosen from (`queueRepo`). One not read is none. */
-export const readableFactories = (): Map<string, Factory> =>
-  new Map(readFactories().flatMap((f) => ('error' in f ? [] : [[f.name, f] as const])));
+/**
+ * The store's factories that read, by name, as the Factory door lists them: what a queued card's repository is chosen from (`queueRepo`).
+ * One not read is none.
+ */
+export const readableFactories = (): Effect.Effect<Map<string, Factory>, Refusal> =>
+  Effect.map(
+    Effect.flatMap(FactoryDoor, (door) => door.factories.listed()),
+    (listed) => new Map(listed.flatMap((f) => ('error' in f ? [] : [[f.name, f] as const]))),
+  );
+
+/** The tree the factory `name` runs from, read through the door; none for no name, an untemplated one, and one that does not read. */
+const treeOfFactory = (name: string | undefined): Effect.Effect<string | undefined> =>
+  factoryOrNone(name).pipe(
+    Effect.map((factory) => factory?.tree),
+    Effect.catch(() => Effect.succeed(undefined)),
+  );
+
+/** The names of the factories filed, as the door lists them, the default left out: what a refusal names to choose from. */
+export const filedNames = (): Effect.Effect<string[], Refusal> =>
+  Effect.map(
+    Effect.flatMap(FactoryDoor, (door) => door.factories.list()),
+    (names) => names.filter((name) => name !== DEFAULT_NAMESPACE),
+  );
 
 /**
  * Why a card may not name a repository, or null: `repo:` is the repository a run started from the card works on, and a team whose every
@@ -97,8 +119,9 @@ const cardRepoRefusal = Effect.fn('cardRepoRefusal')(function* (opts: {
   const { workflow, repo } = opts;
   if (repo === undefined || workflow === undefined) return null;
   const door = yield* WorkflowDoor;
+  const tree = yield* treeOfFactory(opts.factory);
   const steps = yield* Effect.suspend(() =>
-    door.workflows.read(workflowFolder(workflow, opts.dir ?? process.cwd(), repo, treeOf(opts.factory)), { repo, home: HOME }),
+    door.workflows.read(workflowFolder(workflow, opts.dir ?? process.cwd(), repo, tree), { repo, home: HOME }),
   ).pipe(Effect.catchCause((cause) => (Cause.hasInterruptsOnly(cause) ? Effect.failCause(cause) : Effect.succeed(null))));
   if (steps === null || !isFolderTeam(steps)) return null;
   return (
@@ -184,14 +207,15 @@ const queueRefused = (why: string, card: InboxCard, startedAs: readonly string[]
 
 /**
  * Throws what refuses the queue of `card`, in `file`, on `workflow` when one is given: `queueRefusal`'s reasons by their kind
- * (`queueRefused`), then its factory's (`queueFactoryRefusal`), an `Invalid`, by the factories on file and `defaultStartsAllowed`.
+ * (`queueRefused`), then its factory's (`queueFactoryRefusal`), an `Invalid`, by the factories on file and `StoreConfig`'s
+ * `defaultFactoryStarts`.
  */
 const refuseQueue = Effect.fn('refuseQueue')(function* (card: InboxCard, file: string, workflow: string | undefined) {
   const listed = (yield* readInbox()).find((l) => l.name === card.name);
   const startedAs = listed?.startedAs ?? [];
   const why = queueRefusal(card, file, startedAs, listed?.queued?.place ?? null, workflow);
   if (why) throw queueRefused(why, card, startedAs);
-  const whyFactory = queueFactoryRefusal(card, file, factoryNames(), defaultStartsAllowed());
+  const whyFactory = queueFactoryRefusal(card, file, yield* filedNames(), yield* setting('defaultFactoryStarts'));
   if (whyFactory) throw new WorkflowError(whyFactory);
 });
 
@@ -205,10 +229,10 @@ const refuseQueue = Effect.fn('refuseQueue')(function* (card: InboxCard, file: s
  *
  * Refused by name, exit 2, before anything is written: a name that is not a card's (`inboxNameRefusal`), a name with no card (`Missing`) —
  * naming the cards there are — a card that does not read, and what `queueRefusal` refuses: a card a run's record names and one already
- * queued (`Conflict`), and one with no workflow and none given; then a card that names no factory, unless `defaultStartsAllowed`, or names
- * the default one (`refuseQueue`), which `off` never asks. A `workflow` given, queued or taken back, is written over the card's own,
- * and refused onto a folder team for a card that names a repository (`cardRepoRefusal`); with none given, the card's `repo:` is not judged.
- * `off` on a card not queued writes nothing, and says so.
+ * queued (`Conflict`), and one with no workflow and none given; then a card that names no factory, unless `StoreConfig`'s
+ * `defaultFactoryStarts`, or names the default one (`refuseQueue`), which `off` never asks. A `workflow` given, queued or taken back, is
+ * written over the card's own, and refused onto a folder team for a card that names a repository (`cardRepoRefusal`); with none given, the
+ * card's `repo:` is not judged. `off` on a card not queued writes nothing, and says so.
  */
 export const queueInInbox = Effect.fn('queueInInbox')(function* (name: string, how: { off?: boolean; workflow?: string } = {}) {
   const refused = inboxNameRefusal(name);

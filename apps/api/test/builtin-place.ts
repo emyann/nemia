@@ -6,10 +6,21 @@
  */
 import type { Effect } from 'effect';
 import { Effect as Eff } from 'effect';
-import { runWith as runEngine, builtin, storeRootLayer, type EngineService, type PlaceService, type StoreRoot } from 'agent-orchestrator';
+import {
+  runWith as runEngine,
+  builtin,
+  storeConfigLayer,
+  type EngineService,
+  type PlaceService,
+  type StoreConfig,
+  type StoreRoot,
+} from 'agent-orchestrator';
 
-/** `program` run over the engine `e`, given the package's git place and the store root this test process's `WF_ROOT` names. */
+/**
+ * `program` run over the engine `e`, given the package's git place and the store root and settings this test process's environment names
+ * (`WF_ROOT`, `storeConfigLayer`).
+ */
 export const runWith = <A, E>(
   e: Parameters<typeof runEngine>[0],
-  program: Effect.Effect<A, E, EngineService | PlaceService | StoreRoot>,
-): Promise<A> => runEngine(e, builtin(program.pipe(Eff.provide(storeRootLayer(process.env)))));
+  program: Effect.Effect<A, E, EngineService | PlaceService | StoreRoot | StoreConfig>,
+): Promise<A> => runEngine(e, builtin(program.pipe(Eff.provide(storeConfigLayer(process.env)))));

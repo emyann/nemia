@@ -12,7 +12,7 @@ import type { Workflow } from '../step/step.ts';
 import { assess } from '../tick/assess.ts';
 import { listing, type ListedPhase } from '../list/list.ts';
 import { admissionOrder, ceilingLines, heldRuns, runAdmitted, slotNeed, slotWord } from './cap.ts';
-import { phases, run, step, STEPS } from '../../test/assessed.ts';
+import { aRead, listingInput, phases, run, step, STEPS } from '../../test/assessed.ts';
 
 const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
 const signedDone = () => ({ outcome: 'done' as const, summary: 's', artifacts: [], needs: undefined });
@@ -27,7 +27,13 @@ const WATCHING = [{ name: 'supervise', after: [], body: 'x', slot: 'none' } as W
 
 /** What `r` asks of the cap with its tasks in `p`, as `steps` say (none: every run counted), the runs it waits on landed or not. */
 const need = (r: Run, p: Record<string, TaskPhase>, o: { landed?: boolean; steps?: readonly Workflow[]; wf?: Workflow[] } = {}) =>
-  slotNeed(r, phases(p), assess(o.wf ?? STEPS, r, phases(p), signedDone, asked), () => o.landed ?? true, o.steps);
+  slotNeed(
+    r,
+    phases(p),
+    assess(aRead(o.wf ?? STEPS, r, { phaseOf: phases(p), signedOff: signedDone, asked })),
+    () => o.landed ?? true,
+    o.steps,
+  );
 
 test('`slotNeed`: in flight while a task is filed and not settled, or a started run files something; wants a slot with nothing filed and a root ready', async (t) => {
   const fresh = run({ implement: null, review: null });
@@ -194,25 +200,27 @@ test('`listing` handed a run slot: the roots of a held run say `waiting for a ru
     (id: string): ListedPhase =>
       m[id] ?? 'unknown';
   const listed = (r: Run, p: Record<string, ListedPhase>, waits: Array<{ run: string }> = [], given = true) =>
-    listing({
-      steps: STEPS,
-      run: r,
-      phaseOf: shown(p),
-      closeoutOf: () => undefined,
-      askedCloseout: asked,
-      ...(given
-        ? {
-            verdictOf: () => undefined,
-            asks: [],
-            roundAsks: [],
-            answers: [],
-            waits,
-            saidTo: () => 0,
-            spendOf: () => undefined,
-            slot,
-          }
-        : {}),
-    });
+    listing(
+      listingInput({
+        steps: STEPS,
+        run: r,
+        phaseOf: shown(p),
+        closeoutOf: () => undefined,
+        askedCloseout: asked,
+        ...(given
+          ? {
+              verdictOf: () => undefined,
+              asks: [],
+              roundAsks: [],
+              answers: [],
+              waits,
+              saidTo: () => 0,
+              spendOf: () => undefined,
+              slot,
+            }
+          : {}),
+      }),
+    );
   const fresh = run({ implement: null, review: null });
   await t.test('held: its root waits for a slot, what waits on the root still says waiting', () => {
     const held = listed(fresh, {});

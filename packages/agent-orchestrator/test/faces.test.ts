@@ -56,11 +56,11 @@ const {
 } = await import('../src/runner.ts');
 const { stepsNow: stepsOf } = await import('./steps-now.ts');
 const { isRepositoryRun } = await import('../src/run.ts');
-const { cancelFile, readRun } = await import('../src/record/record.store.ts');
+const { cancelFile, runRecord } = await import('../src/record/record.store.ts');
 const { EngineService: Service, engineOf } = await import('../src/runtime-client.ts');
 const { Invalid, isRefusal } = await import('../src/refusal/refusal.ts');
 const { inputsDir, runsDir } = await import('../src/record/record.store.ts');
-const { runStore } = await import('../src/record/files.store.ts');
+const { filesStore: runStore } = await import('../src/record/files.store.ts');
 const { freshRestMemo } = await import('../src/tick/tick.verb.ts');
 const { PHASES } = await import('../src/meter/meter.ts');
 const { main } = await import('../src/cli/main.ts');
@@ -174,9 +174,9 @@ const onRound = (id: string, step: string, n: number) => (n === 1 ? `${id}-${ste
 /** Round `n` up to review's word: implement signs off, its check passes, then review signs off saying `again`. */
 const toReview = async (b: Board, id: string, n: number, again: boolean) => {
   b.settle(onRound(id, 'implement', n), 'succeeded', n === 1 ? SIGNED : ANSWERED);
-  assert.deepEqual((await runWith(b.e, advanceRun(readRun(id)))).checked, ['implement'], `round ${n}: implement's check`);
+  assert.deepEqual((await runWith(b.e, advanceRun(runRecord(id)))).checked, ['implement'], `round ${n}: implement's check`);
   b.settle(`${onRound(id, 'implement', n)}-check`, 'succeeded', undefined, 0);
-  assert.deepEqual((await runWith(b.e, advanceRun(readRun(id)))).filed, ['review'], `round ${n}: review`);
+  assert.deepEqual((await runWith(b.e, advanceRun(runRecord(id)))).filed, ['review'], `round ${n}: review`);
   b.settle(onRound(id, 'review', n), 'succeeded', reviewSays(again));
 };
 
@@ -192,16 +192,16 @@ const started = async (dir: string) =>
 const throughCheck = async (keys: string, phase: EnginePhase, exitCode?: number) => {
   const run = await started(folder(keys));
   const b = stage.board();
-  await runWith(b.e, advanceRun(readRun(run.id)));
+  await runWith(b.e, advanceRun(runRecord(run.id)));
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  await runWith(b.e, advanceRun(readRun(run.id)));
+  await runWith(b.e, advanceRun(runRecord(run.id)));
   b.settle(`${run.id}-implement-check`, phase, undefined, exitCode);
   return { run, b };
 };
 /** A run another waits on, on the board its child is ticked on, its step filed, started with worktrees. */
 const aParent = async (repo: string, b: Board) => {
   const run = repositoryRunOf(await runPlaced(startRun({ brief: 'the parent', repo, workflowDir: oneStep() })));
-  await runWith(b.e, advanceRun(readRun(run.id)));
+  await runWith(b.e, advanceRun(runRecord(run.id)));
   return { run };
 };
 /**
@@ -327,13 +327,13 @@ test("each verb's program, given its services, answers what its plain face answe
 
       const run = await started(loopedThenShip());
       const b = stage.board();
-      await runWith(b.e, advanceRun(readRun(run.id)));
+      await runWith(b.e, advanceRun(runRecord(run.id)));
       for (const n of [1, 2]) {
         await toReview(b, run.id, n, true);
-        assert.deepEqual((await runWith(b.e, advanceRun(readRun(run.id)))).looped, ['review'], `round ${n + 1}`);
+        assert.deepEqual((await runWith(b.e, advanceRun(runRecord(run.id)))).looped, ['review'], `round ${n + 1}`);
       }
       await toReview(b, run.id, 3, true);
-      await runWith(b.e, advanceRun(readRun(run.id)));
+      await runWith(b.e, advanceRun(runRecord(run.id)));
       await same(
         'nemia retry --round',
         () => over(b.e, roundRun(run.id)),
@@ -345,9 +345,9 @@ test("each verb's program, given its services, answers what its plain face answe
         () => over(b.e, acceptRun(run.id, undefined, ENOUGH)),
         () => runWith(b.e, acceptRun(run.id, undefined, ENOUGH)),
       );
-      assert.deepEqual((await runWith(b.e, advanceRun(readRun(run.id)))).filed, ['ship']);
+      assert.deepEqual((await runWith(b.e, advanceRun(runRecord(run.id)))).filed, ['ship']);
       b.settle(`${run.id}-ship`, 'succeeded', SIGNED);
-      await runWith(b.e, advanceRun(readRun(run.id)));
+      await runWith(b.e, advanceRun(runRecord(run.id)));
       await same(
         'nemia approve',
         () => over(b.e, approveRun(run.id, 'ship', 'land it')),
@@ -355,9 +355,9 @@ test("each verb's program, given its services, answers what its plain face answe
       );
 
       const failed = await started(folder());
-      await runWith(b.e, advanceRun(readRun(failed.id)));
+      await runWith(b.e, advanceRun(runRecord(failed.id)));
       b.settle(`${failed.id}-implement`, 'failed');
-      await runWith(b.e, advanceRun(readRun(failed.id)));
+      await runWith(b.e, advanceRun(runRecord(failed.id)));
       await same(
         'nemia retry',
         () => over(b.e, retryRun(failed.id, 'implement', { mode: 'fresh' })),
@@ -365,7 +365,7 @@ test("each verb's program, given its services, answers what its plain face answe
       );
 
       const running = await started(folder());
-      await runWith(b.e, advanceRun(readRun(running.id)));
+      await runWith(b.e, advanceRun(runRecord(running.id)));
       const taskId = `${running.id}-implement`;
       b.settle(taskId, 'working');
       const told = await over(b.e, sayRun(running.id, 'implement', 'Start with the parser.'));
@@ -399,7 +399,7 @@ test("each verb's program, given its services, answers what its plain face answe
       assert.match(await recovered(b.e, acceptRun('no-such-run', undefined, ENOUGH), 'Missing'), /no such run: no-such-run/);
 
       const run = await started(looped());
-      await runWith(b.e, advanceRun(readRun(run.id)));
+      await runWith(b.e, advanceRun(runRecord(run.id)));
       b.settle(`${run.id}-implement`, 'working');
       const refusals: Array<[string, EffectOf<unknown, Refusal, EngineService | PlaceService | StoreRoot>, Promise<unknown>]> = [
         ['nemia retry', retryRun(run.id, 'implement', { mode: 'fresh' }), runWith(b.e, retryRun(run.id, 'implement', { mode: 'fresh' }))],
@@ -440,7 +440,7 @@ test("each verb's program, given its services, answers what its plain face answe
     async () => {
       const b = stage.board();
       const run = await started(folder());
-      await runWith(b.e, advanceRun(readRun(run.id)));
+      await runWith(b.e, advanceRun(runRecord(run.id)));
       const boom = new Error('journal');
       const broken = { ...b.e, view: () => Effect.die(boom) };
       const verbs: Array<[string, EffectOf<unknown, Refusal, EngineService | PlaceService | StoreRoot>, () => Promise<unknown>]> = [
@@ -460,7 +460,7 @@ test("each verb's program, given its services, answers what its plain face answe
         assert.equal(uncaught, boom, `${what}: a defect, which no \`Effect.catch\` recovers`);
         assert.equal(await rejection(face(), what), boom, `${what}: its face rejects with the error itself`);
       }
-      assert.ok(!fs.existsSync(asksDir(run.id)) && !readRun(run.id).cancelledAt, 'nothing written');
+      assert.ok(!fs.existsSync(asksDir(run.id)) && !runRecord(run.id).cancelledAt, 'nothing written');
     },
   );
 
@@ -469,7 +469,7 @@ test("each verb's program, given its services, answers what its plain face answe
     async () => {
       const b = stage.board();
       const run = await started(folder());
-      await runWith(b.e, advanceRun(readRun(run.id)));
+      await runWith(b.e, advanceRun(runRecord(run.id)));
       const taskId = `${run.id}-implement`;
       const unheard = await recovered(b.e, sayRun(run.id, 'implement', 'Start with the parser.'), 'Conflict');
       assert.ok(unheard.startsWith(`say: \`${taskId}\``) && unheard.includes('has not started an attempt'), unheard);
@@ -489,11 +489,11 @@ test("each verb's program, given its services, answers what its plain face answe
     async () => {
       const b = stage.board();
       const run = await started(folder());
-      await runWith(b.e, advanceRun(readRun(run.id)));
+      await runWith(b.e, advanceRun(runRecord(run.id)));
       const refused = new Error('stop: the engine is not listening');
       const deaf = { ...b.e, stop: () => Effect.die(refused) };
       assert.equal(await rejection(runWith(deaf, cancelRun(run.id)), 'nemia cancel'), refused);
-      assert.equal(readRun(run.id).cancelledAt, undefined, 'not marked: asking again does both');
+      assert.equal(runRecord(run.id).cancelledAt, undefined, 'not marked: asking again does both');
       assert.ok((await runWith(b.e, cancelRun(run.id))).run.cancelledAt, 'asked again, it stops and marks');
     },
   );
@@ -504,15 +504,15 @@ test("each verb's program, given its services, answers what its plain face answe
       const v = await viewPrograms();
       const { run, b } = await throughCheck('check: npm test\nretries: 1', 'failed', 1);
       const e = b.e;
-      await runWith(e, advanceRun(readRun(run.id)));
+      await runWith(e, advanceRun(runRecord(run.id)));
       b.settle(`${run.id}-implement-try2`, 'succeeded', SIGNED);
-      await runWith(e, advanceRun(readRun(run.id)));
+      await runWith(e, advanceRun(runRecord(run.id)));
       const check = `${run.id}-implement-try2-check`;
       b.end(check, 'failed', {
         exitCode: 1,
         printed: { stdout: 'not ok 1 - parses a trailing comma\n# fail 1\n', stderr: 'npm error Test failed.\n' },
       });
-      const record = readRun(run.id);
+      const record = runRecord(run.id);
       const earlier = `${run.id}-implement`;
       assert.deepEqual(record.steps.implement.tries?.[0].taskId, earlier, 'an earlier try, whose task only every try reads');
 
@@ -567,7 +567,7 @@ test("each verb's program, given its services, answers what its plain face answe
         read.map((p) => p.landed),
         [true, false, false],
       );
-      const lookup = await v.over(b.e, v.parentsRead(readRun(child.id), git));
+      const lookup = await v.over(b.e, v.parentsRead(runRecord(child.id), git));
       assert.deepStrictEqual(ids.map(lookup), read);
     },
   );
@@ -578,12 +578,12 @@ test("each verb's program, given its services, answers what its plain face answe
       const v = await viewPrograms();
       const { run, b } = await throughCheck('check: npm test', 'failed', 1);
       const e = b.e;
-      const record = readRun(run.id);
+      const record = runRecord(run.id);
       const check = `${run.id}-implement-check`;
       const repo = aRepo();
       const parent = await aParent(repo, b);
       b.settle(`${parent.run.id}-implement`, 'succeeded', SIGNED);
-      const child = readRun((await runPlaced(startRun({ brief: 'the child', repo, workflowDir: folder(), after: [parent.run.id] }))).id);
+      const child = runRecord((await runPlaced(startRun({ brief: 'the child', repo, workflowDir: folder(), after: [parent.run.id] }))).id);
       const failed = (): TaskPhase => 'failed';
       const live = await v.live([parent.run.id]);
       const reads = (err: unknown) => {
@@ -632,13 +632,13 @@ test("each verb's program, given its services, answers what its plain face answe
   await t.test("`nemia decide`'s program, given the engine as a service, answers what its plain face answers", async () => {
     const run = await runPlaced(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false }));
     const b = stage.board();
-    await runWith(b.e, advanceRun(readRun(run.id)));
+    await runWith(b.e, advanceRun(runRecord(run.id)));
     b.settle(`${run.id}-implement`, 'succeeded', { outcome: 'blocked', summary: 'two readings', artifacts: [], needs: 'Rename --flag?' });
-    await runWith(b.e, advanceRun(readRun(run.id)));
+    await runWith(b.e, advanceRun(runRecord(run.id)));
     await runWith(b.e, retryRun(run.id, 'implement', { mode: 'continue', message: 'Keep it.' }));
-    await runWith(b.e, advanceRun(readRun(run.id)));
+    await runWith(b.e, advanceRun(runRecord(run.id)));
     b.settle(`${run.id}-implement-try2`, 'succeeded', SIGNED);
-    await runWith(b.e, advanceRun(readRun(run.id)));
+    await runWith(b.e, advanceRun(runRecord(run.id)));
 
     const face = await runWith(b.e, decideRun(run.id));
     const program = await runPlaced(decideRun(run.id).pipe(Effect.provide(Service.layer(b.e))));
@@ -685,8 +685,8 @@ test("each verb's program, given its services, answers what its plain face answe
       for (const [what, opts] of cases) {
         const ran = await Effect.runPromise(placed(startRun(opts)));
         const face = await runPlaced(startRun(opts));
-        assert.deepStrictEqual(written(ran), readRun(ran.id), `${what}: the program's run is on the record`);
-        assert.deepStrictEqual(written(face), readRun(face.id), `${what}: the face's run is on the record`);
+        assert.deepStrictEqual(written(ran), runRecord(ran.id), `${what}: the program's run is on the record`);
+        assert.deepStrictEqual(written(face), runRecord(face.id), `${what}: the face's run is on the record`);
         assert.deepStrictEqual(same(written(ran)), same(written(face)), what);
         assert.ok(fs.existsSync(path.join(inputsDir(ran), 'notes.md')), `${what}: its input copied`);
         assert.ok(fs.statSync(path.join(runsDir(), ran.id, 'agents')).isDirectory(), `${what}: its agents rendered`);

@@ -1,17 +1,14 @@
 /**
  * The factories on disk: `<home>/factories/<name>.json`, one file per factory, holding `{ "repos": [...], "workflows": [...], "hires":
  * {...} }` — read (`readFactoriesAt`, `readFactoryAt`), filed (`addFactoryAt`, `createFactoryAt`), written back (`rewriteFactoryAt`),
- * given workflows and relieved of them (`attachWorkflowAt`, `detachWorkflowAt`), hired into and fired from (`hireAgentAt`,
- * `fireAgentAt`), told where its instruction is kept (`setInstructionAt`) and whether its runs follow merged revisions
- * (`setRevisionsAt`), and removed (`removeFactoryAt`). Each takes the store's root, `home`, first: the Factory door's files layer
+ * given workflows (`attachWorkflowAt`), hired into and fired from (`hireAgentAt`, `fireAgentAt`), told where its instruction is kept
+ * (`setInstructionAt`), and removed (`removeFactoryAt`). Each takes the store's root, `home`, first: the Factory door's files layer
  * (`factories.store.ts`) is over them. A person's verbs are their one writer; the judgement is `factory.ts`'s words and `wiring.ts`'s
  * decision.
  *
- * The old spellings, which take no root (`readFactory`, `hireAgent`, …), are each the function `At` the module's root (`atHome`), for the
- * callers not yet on the Factory door (`test/factory-door.baseline.ts`).
- *
  * Beneath the controllers, beside `record.store.ts`, the one store file it imports; `runner.ts` re-exports what the package exports of it.
  */
+import { DEFAULT_NAMESPACE } from 'objects';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
@@ -24,7 +21,6 @@ import {
   unscheduledRefusal,
   defaultFactoryRefusal,
   defaultStartRefusal,
-  DEFAULT_FACTORY,
   factoriesHolding,
   factoryNameRefusal,
   hireRefusal,
@@ -38,13 +34,12 @@ import {
   type FactoryTemplate,
   type FactoryWrite,
   type InstructionAt,
-  type RevisionsPolicy,
   type Schedule,
   volumeEntry,
 } from './factory.ts';
 import { firesOf } from './schedule/schedule.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
-import { firstRefusal, HOME, isDirectory } from '../record/record.store.ts';
+import { firstRefusal, isDirectory } from '../record/record.store.ts';
 import { readStatusAt, readTreeWiringAt, treeDirAt, writeTreeWiringAt } from './applied/applied.store.ts';
 import { rewired, wiringRefusal, type WiringChange } from './wiring/wiring.ts';
 import { ownAgentRefusal } from './wiring/own-agent.store.ts';
@@ -124,7 +119,7 @@ function factoryFile(home: string, name: string): FileRead {
   const file = fileAt(home, name);
   const badName = factoryNameRefusal(name);
   if (badName) return { file, error: `${badName} Remove the file by hand.` };
-  if (name === DEFAULT_FACTORY)
+  if (name === DEFAULT_NAMESPACE)
     return {
       file,
       error: 'is no factory: the default factory is no file, and nemia factory rm does not take it. Remove this file by hand.',
@@ -231,7 +226,7 @@ export function factoryRepos(name: string, given: readonly string[]): string[] {
 export function refuseName(name: string, verb: FactoryWrite): void {
   const bad = factoryNameRefusal(name);
   if (bad) throw new Invalid({ message: bad });
-  if (name === DEFAULT_FACTORY) throw new Conflict({ message: defaultFactoryRefusal(verb) });
+  if (name === DEFAULT_NAMESPACE) throw new Conflict({ message: defaultFactoryRefusal(verb) });
 }
 
 /**
@@ -358,38 +353,21 @@ export function readFactoryAt(home: string, name: string, notDone = 'Nothing was
 }
 
 /**
- * The tree of the factory `name`, made from a template, for `who` to write into. Refused: the factory (`readFactory`); one not made from a
- * template (`Invalid`, naming yours); and a tree not rendered yet (`Conflict`, naming the daemon).
+ * The factory `name`, read as `factory`, with the tree `who` writes into: refused where there is none or it has no tree, made from no
+ * template (`Invalid`, naming yours), and where its tree is not rendered yet (`Conflict`, naming the daemon).
  */
-export function templatedTreeAt(home: string, name: string, who: string): string {
-  const factory = readFactoryAt(home, name, 'Nothing was written.');
-  if (factory.tree === undefined)
+export function treeChecked<F extends { tree?: string }>(name: string, factory: F | undefined, who: string): F & { tree: string } {
+  const tree = factory?.tree;
+  if (factory === undefined || tree === undefined)
     throw new Invalid({
       message: `${who}: the factory ${name} is not made from a template, so it has no tree to write; its workflows are its repositories' and yours. Write yours: \`${who} yours …\`. Nothing was written.`,
     });
-  if (!fs.existsSync(factory.tree))
+  if (!fs.existsSync(tree))
     throw new Conflict({
-      message: `${who}: ${name} is made from a template, and its tree is not rendered yet, at ${factory.tree}: start the daemon, nemia up, and try again once nemia factory ls shows it applied. Nothing was written.`,
+      message: `${who}: ${name} is made from a template, and its tree is not rendered yet, at ${tree}: start the daemon, nemia up, and try again once nemia factory ls shows it applied. Nothing was written.`,
     });
-  return factory.tree;
+  return { ...factory, tree };
 }
-
-/**
- * The tree the factory `name` runs from, where it is made from a template (`treeDir`): where a bare workflow name is looked for first.
- * None for no name, an untemplated factory, and one that is not there or does not read: what is wrong with it is the start's to say.
- */
-export function treeOfAt(home: string, name: string | undefined): string | undefined {
-  if (name === undefined || factoryNameRefusal(name)) return undefined;
-  const read = factoryFile(home, name);
-  return 'error' in read || read.content.template === undefined ? undefined : treeDirAt(home, name);
-}
-
-/**
- * Whether a start may go to the default factory when it names none and no factory holds its folder, or when it starts a card that names
- * none: only with `WF_DEFAULT_FACTORY_STARTS=1`, which the package's and the api's tests set for the starts they make in scratch folders.
- * Unset, by default, every such start is refused.
- */
-export const defaultStartsAllowed = (env: NodeJS.ProcessEnv = process.env): boolean => env.WF_DEFAULT_FACTORY_STARTS === '1';
 
 /** The store's factories that read, and the names of those whose file does not. */
 function readable(home: string): { factories: Factory[]; unread: string[] } {
@@ -404,24 +382,30 @@ function readable(home: string): { factories: Factory[]; unread: string[] } {
 export const factoryNamesAt = (home: string): string[] => readable(home).factories.map((f) => f.name);
 
 /**
- * The factory a start of a workflow is made in, and, when it was found from the folder, the repository there (`repo`): the factory
- * `named`, read as a run reads it (`readFactory`), else the one factory of the store a repository of which holds the folder `at`
- * (`factoriesHolding`), with that repository; none, the default factory, only when none holds it and `defaultStartsAllowed`. `fix` is the
- * start's words for naming one, `<name>` in them: `--factory <name>`, or `?factory=<name>`.
+ * The factory a start of a workflow is made in, and, when it was found from the folder, the repository there (`repo`): the factory `named`,
+ * read as a run reads it (`readFactory`), else the one factory of the store a repository of which holds the folder `at`
+ * (`factoriesHolding`), with that repository; none, the default factory, only when none holds it and `defaultStarts` (`StoreConfig`'s
+ * `defaultFactoryStarts`). `fix` is the start's words for naming one, `<name>` in them: `--factory <name>`, or `?factory=<name>`.
  *
  * Refused, `Invalid`, before anything is written: the default factory named, whatever the environment (`defaultStartRefusal`); two or more
  * factories holding the folder (`ambiguousFactoryRefusal`); and none holding it (`noFactoryRefusal`). A factory whose file does not read is
  * not looked at, and the refusal of none names it.
  */
-export function startFactoryAt(home: string, named: string | undefined, at: string, fix: string): { factory?: Factory; repo?: string } {
-  if (named === DEFAULT_FACTORY) throw new Invalid({ message: defaultStartRefusal(fix, factoryNamesAt(home)) });
+export function startFactoryAt(
+  home: string,
+  named: string | undefined,
+  at: string,
+  fix: string,
+  defaultStarts: boolean,
+): { factory?: Factory; repo?: string } {
+  if (named === DEFAULT_NAMESPACE) throw new Invalid({ message: defaultStartRefusal(fix, factoryNamesAt(home)) });
   if (named !== undefined) return { factory: readFactoryAt(home, named) };
   const { factories, unread } = readable(home);
   const holding = factoriesHolding(factories, at);
   const [only] = holding;
   if (holding.length === 1 && only !== undefined) return only;
   if (holding.length > 1) throw new Invalid({ message: ambiguousFactoryRefusal(at, holding, fix) });
-  if (defaultStartsAllowed()) return {};
+  if (defaultStarts) return {};
   throw new Invalid({
     message: noFactoryRefusal(
       at,
@@ -598,15 +582,6 @@ export function attachWorkflowAt(home: string, opts: { factory: string; workflow
 }
 
 /**
- * `nemia factory detach`: the workflow `workflow` taken from the factory `factory`, which then offers it no more; every other key kept.
- * Refused before anything is written: the name (`Invalid`), the factory (`toChange`), and what `wiringRefusal` refuses — a workflow it
- * has not attached (`Missing`), one it still hires into or schedules (`Invalid`) — so no hire nor schedule outlives its workflow.
- */
-export function detachWorkflowAt(home: string, opts: { factory: string; workflow: string }): { file: string } {
-  return { file: wiredAt(home, opts.factory, { verb: 'detach', workflow: opts.workflow }).file };
-}
-
-/**
  * `nemia factory instruction`: where the instruction of the factory `factory` is kept, written into its file — a path in its first folder,
  * kept as `path.normalize` spells it, or the store — or, `at` undefined, the key removed, so the factory reads `NEMIA.md` in its first
  * folder again. Every other key of the file is kept. Refused before anything is written: a path that is not one (`instructionPathRefusal`,
@@ -626,22 +601,6 @@ export function setInstructionAt(home: string, opts: { factory: string; at: Inst
   const { instruction: _was, ...rest } = factory;
   const kept = at === undefined ? undefined : 'path' in at ? { path: path.normalize(at.path) } : { store: true as const };
   return { file: rewriteFactoryAt(home, kept === undefined ? rest : { ...rest, instruction: kept }, 'Nothing was changed.') };
-}
-
-/**
- * `nemia factory revisions`: whether the runs of the factory `factory` follow merged revisions (`follow`) or keep what they resolved
- * until `nemia refresh` (`pinned`), written into its file, every other key kept; or, made from a template, into its tree's wiring
- * (`factory.json`), which is the person's once seeded, as its hires are. Read by every pass after, so a run in flight takes it at its
- * next filing. Refused before anything is written: the factory (`toChange`); a templated one whose tree is not rendered yet
- * (`Conflict`, naming the daemon) or whose wiring does not read (`Invalid`).
- */
-export function setRevisionsAt(
-  home: string,
-  opts: { factory: string; revisions: RevisionsPolicy },
-): { file: string; was: RevisionsPolicy | undefined } {
-  const factory = toChange(home, opts.factory, 'revisions');
-  const file = rewriteFactoryAt(home, { ...factory, revisions: opts.revisions }, 'Nothing was changed.');
-  return { file: factory.template === undefined ? file : wiringFileAt(home, factory), was: factory.revisions };
 }
 
 /**
@@ -709,48 +668,3 @@ export function clearScheduleAt(home: string, opts: { factory: string; workflow:
   if (cleared === undefined) throw new Missing({ message: unscheduledRefusal(opts.factory, opts.workflow, Object.keys(was.schedules)) });
   return { file, cleared };
 }
-
-/**
- * A function of this file taking the store's root first, as the old spelling that takes none: `at` the module's root, `HOME`. The one
- * line of this file that reads a root of its own (`test/global-roots.baseline.ts`); each spelling below is called by code not yet on the
- * Factory door (`test/factory-door.baseline.ts`).
- */
-const atHome =
-  <A extends unknown[], R>(at: (home: string, ...args: A) => R) =>
-  (...args: A): R =>
-    at(HOME, ...args);
-
-/** `factoriesDirAt` the module's root. */
-export const factoriesDir = atHome(factoriesDirAt);
-/** `readFactoriesAt` the module's root. */
-export const readFactories = atHome(readFactoriesAt);
-/** `addFactoryAt` the module's root. */
-export const addFactory = atHome(addFactoryAt);
-/** `removeFactoryAt` the module's root. */
-export const removeFactory = atHome(removeFactoryAt);
-/** `readFactoryAt` the module's root. */
-export const readFactory = atHome(readFactoryAt);
-/** `templatedTreeAt` the module's root. */
-export const templatedTree = atHome(templatedTreeAt);
-/** `treeOfAt` the module's root. */
-export const treeOf = atHome(treeOfAt);
-/** `factoryNamesAt` the module's root. */
-export const factoryNames = atHome(factoryNamesAt);
-/** `startFactoryAt` the module's root. */
-export const startFactory = atHome(startFactoryAt);
-/** `hireAgentAt` the module's root. */
-export const hireAgent = atHome(hireAgentAt);
-/** `fireAgentAt` the module's root. */
-export const fireAgent = atHome(fireAgentAt);
-/** `attachWorkflowAt` the module's root. */
-export const attachWorkflow = atHome(attachWorkflowAt);
-/** `detachWorkflowAt` the module's root. */
-export const detachWorkflow = atHome(detachWorkflowAt);
-/** `setInstructionAt` the module's root. */
-export const setInstruction = atHome(setInstructionAt);
-/** `setRevisionsAt` the module's root. */
-export const setRevisions = atHome(setRevisionsAt);
-/** `setScheduleAt` the module's root. */
-export const setSchedule = atHome(setScheduleAt);
-/** `clearScheduleAt` the module's root. */
-export const clearSchedule = atHome(clearScheduleAt);

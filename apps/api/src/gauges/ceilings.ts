@@ -22,7 +22,7 @@ export type { Ceilings, MetricRead };
  * `held` the runs it holds, each with `nemia ls`'s words on its roots (`slotWord`).
  */
 export async function ceilingsOf(s: Served): Promise<Ceilings> {
-  const { cap, inFlight, held } = await s.inRequest(CEILINGS.handler({}, s.env));
+  const { cap, inFlight, held } = await s.inRequest(CEILINGS.handler({}));
   return {
     last: lastCeilings() ?? null,
     cap,

@@ -1,5 +1,5 @@
 /**
- * The skill library as entries of the command table, each through the Skill door (`SkillDoor`, run `rooted` at the store's root the
+ * The skill library as entries of the command table, each through the Skill door (`SkillDoor`, run at the store's root (`StoreRoot`) the
  * handler is given): the skill folders the board lists, each read (`SKILLS_LIST`), and one skill read for its page (`SKILLS_READ`), on
  * the api alone; and a skill of yours written from its SKILL.md or form, or copied from Nemia's builtin skills (`SKILLS_WRITE`), served on
  * both sides. The api resolves which folders a read names, guards each write, and words the board's answer around what each entry
@@ -12,8 +12,7 @@ import { Invalid } from '../refusal/refusal.ts';
 import type { Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { cliPath, factoryFlag, FROM, versionFlag, writerSpec, yoursOrRefused } from '../yours/yours.ts';
-import { templatedTree } from '../factory/factory.store.ts';
-import { rooted } from '../factory/wiring/wire.verb.ts';
+import { templatedTreeOf } from '../factory/door/factories.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { SkillName } from '../agents/agents.model.ts';
 import { SkillDoor, type SkillPage } from './skill-door.store.ts';
@@ -45,21 +44,17 @@ export const SKILLS_LIST: Command<Record<string, SkillRead>, SkillsInput> = {
   class: 'read',
   only: { side: 'api', why: "the board's skill picker lists every skill by place; at the command line a person lists the folders" },
   input: SkillsInput,
-  handler: ({ skills: dirs = [] }, _env, home) =>
-    rooted(
-      home,
-      'skills',
-      Effect.gen(function* () {
-        const door = yield* SkillDoor;
-        const reads = yield* Effect.forEach(dirs, (dir) =>
-          Effect.map(
-            door.skills.read(SkillName.read(path.basename(dir)), path.dirname(dir)),
-            ({ text: _text, version: _version, ...read }) => [dir, read] as const,
-          ),
-        );
-        return Object.fromEntries(reads);
-      }),
-    ),
+  handler: ({ skills: dirs = [] }) =>
+    Effect.gen(function* () {
+      const door = yield* SkillDoor;
+      const reads = yield* Effect.forEach(dirs, (dir) =>
+        Effect.map(
+          door.skills.read(SkillName.read(path.basename(dir)), path.dirname(dir)),
+          ({ text: _text, version: _version, ...read }) => [dir, read] as const,
+        ),
+      );
+      return Object.fromEntries(reads);
+    }),
   print: () => [],
 };
 
@@ -89,15 +84,11 @@ export const SKILLS_READ: Command<SkillPage, SkillShowInput> = {
     why: "the board's skill page reads one skill with its form and its users; at the command line a person reads its SKILL.md",
   },
   input: SkillShowInput,
-  handler: ({ name, dir }, _env, home) =>
-    rooted(
-      home,
-      'skills show',
-      Effect.gen(function* () {
-        const door = yield* SkillDoor;
-        return yield* door.skills.read(SkillName.read(name), path.dirname(dir));
-      }),
-    ),
+  handler: ({ name, dir }) =>
+    Effect.gen(function* () {
+      const door = yield* SkillDoor;
+      return yield* door.skills.read(SkillName.read(name), path.dirname(dir));
+    }),
   print: () => [],
 };
 
@@ -163,29 +154,25 @@ export const SKILLS_WRITE: Command<SkillWritten | SkillCopied, SkillWriteInput> 
     why: "the api serves it as the Skill's `create`, `replace` and `copy` verb of `objects`' Api (`/api/namespaces/:namespace/skills`), which calls this entry's handler: no route of its own",
   },
   input: SkillWriteInput,
-  handler: ({ from, name, factory, version, change, copy, builtin = '' }, _env, home) =>
-    rooted(
-      home,
-      'skills write',
-      Effect.gen(function* () {
-        const root = yield* StoreRoot;
-        const library = yield* tried(() =>
-          yoursOrRefused('nemia skills write', 'skills', from, name ?? null, '', root, {
-            factory,
-            treeOf: (named) => templatedTree(named, 'nemia skills write'),
+  handler: ({ from, name, factory, version, change, copy, builtin = '' }) =>
+    Effect.gen(function* () {
+      const root = yield* StoreRoot;
+      const library = yield* tried(() =>
+        yoursOrRefused('nemia skills write', 'skills', from, name ?? null, '', root, {
+          factory,
+          treeOf: (named) => templatedTreeOf(root, named, 'nemia skills write'),
+        }),
+      );
+      const door = yield* SkillDoor;
+      if (copy !== undefined) return yield* door.skills.copy(SkillName.read(copy), builtin, library);
+      if (change === undefined)
+        return yield* Effect.fail(
+          new Invalid({
+            message: 'nemia skills write takes the skill to write, its SKILL.md: nemia skills write yours --file <SKILL.md>.',
           }),
         );
-        const door = yield* SkillDoor;
-        if (copy !== undefined) return yield* door.skills.copy(SkillName.read(copy), builtin, library);
-        if (change === undefined)
-          return yield* Effect.fail(
-            new Invalid({
-              message: 'nemia skills write takes the skill to write, its SKILL.md: nemia skills write yours --file <SKILL.md>.',
-            }),
-          );
-        return yield* door.skills.write(SkillName.read(change.name), change, version, library);
-      }),
-    ),
+      return yield* door.skills.write(SkillName.read(change.name), change, version, library);
+    }),
   print: writtenLines,
 };
 

@@ -1,7 +1,7 @@
 /**
- * The factories as objects (factory.verb.ts), off a listing as `nemia factory` reads it and the controller's status file in a scratch
- * store: the default factory listed first and got, a stray file listed with its error, the generation and the status read, and the
- * commands a person types for it. Their page and selection are `src/object/listed.verb.test.ts`'s.
+ * The factories as objects (factory.verb.ts), off a listing as `nemia factory` reads it, its file beside it, and the controller's status
+ * file in a scratch store: the default factory listed first and got, a stray file listed with its error, the generation and the status
+ * read, and the commands a person types for it. Their page and selection are `src/object/listed.verb.test.ts`'s.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -29,6 +29,8 @@ const acme: FactoryListing = {
 const stray: FactoryListing = { name: 'broken', file: path.join(home, 'factories', 'broken.json'), error: 'does not read as JSON' };
 
 fs.mkdirSync(path.join(home, 'factories', 'acme'), { recursive: true });
+const { name: _name, file: _file, ...filed } = acme;
+fs.writeFileSync(path.join(home, 'factories', 'acme.json'), JSON.stringify(filed));
 fs.writeFileSync(
   path.join(home, 'factories', 'acme', 'status.json'),
   JSON.stringify({

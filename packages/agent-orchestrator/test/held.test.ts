@@ -44,7 +44,7 @@ const {
 const stand = eachTest(testPlace);
 const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
-const { artifactsDir, readAsks, readRun, rewriteRun } = await import('../src/record/record.store.ts');
+const { artifactsDir, readAsks, runRecord, rewriteRun } = await import('../src/record/record.store.ts');
 const { phaseOfView } = await import('../src/views/views-words.ts');
 const { lackedOf } = await import('../src/record/record.ts');
 
@@ -142,14 +142,14 @@ const engine = () => {
   };
   const pass = async (id: string) => {
     await Effect.runPromise(e.tick());
-    return runWith(e, advanceRun(readRun(id)));
+    return runWith(e, advanceRun(runRecord(id)));
   };
   return { e, sign, pass, spawned, sessions, refusing };
 };
 
 /** Each step's line on `nemia ls`, by name. */
 const statuses = async (e: Engine, id: string): Promise<Record<string, string>> =>
-  Object.fromEntries((await runWith(e, list(e, readRun(id)))).steps.map((s) => [s.name, s.message]));
+  Object.fromEntries((await runWith(e, list(e, runRecord(id)))).steps.map((s) => [s.name, s.message]));
 
 /** What the runtime holds of a task. */
 const stateOf = async (e: Engine, taskId: string): Promise<TaskView> => Effect.runPromise(e.view(taskId));
@@ -176,7 +176,7 @@ test('an ungated step that signed off is closed on the pass that reads it waitin
   await pass(run.id);
   const settled = await stateOf(e, `${run.id}-plan`);
   assert.deepEqual([settled.phase, settled.state.settled], ['succeeded', 'succeeded'], 'the engine settles it as it signed');
-  assert.equal(readRun(run.id).steps.plan.taskId, `${run.id}-plan`);
+  assert.equal(runRecord(run.id).steps.plan.taskId, `${run.id}-plan`);
 });
 
 test("a step that signed off blocked stays open, and a person's answer — `nemia retry --message` — is its next turn: the same task, in the session that signed, nothing filed", async () => {
@@ -185,7 +185,7 @@ test("a step that signed off blocked stays open, and a person's answer — `nemi
   assert.deepEqual(signed.filed, []);
   assert.equal((await stateOf(e, plan)).phase, 'input-required', 'held open: it waits, and nothing runs');
   assert.equal((await stateOf(e, plan)).state.closed, false, 'not closed');
-  const listed = await runWith(e, list(e, readRun(run.id)));
+  const listed = await runWith(e, list(e, runRecord(run.id)));
   assert.equal(
     listed.steps.find((s) => s.name === 'plan')!.message,
     'input-required · BLOCKED',
@@ -201,7 +201,7 @@ test("a step that signed off blocked stays open, and a person's answer — `nemi
   assert.equal(view.state.inputs.length, 1, 'answered, once');
   assert.match(view.state.inputs[0].text, /the --dry-run flag/, "the person's words, in the turn's brief");
   assert.match(view.state.inputs[0].text, /This is the last try's session, continued/, 'the brief of a nudge that continues the session');
-  const record = readRun(run.id).steps.plan;
+  const record = runRecord(run.id).steps.plan;
   assert.equal(record.taskId, plan, 'the same task');
   assert.deepEqual(
     record.tries?.map((t) => [t.taskId, t.cause]),
@@ -254,7 +254,7 @@ test('a try of a waiting step that is not an answer — `--fresh`, `--model` —
   assert.match(fresh.state.brief, /start again from the README/);
   assert.equal(fresh.state.resumeFrom, undefined, 'a new session');
   assert.equal(fresh.state.holdOpen, true, 'itself held open');
-  assert.equal(readRun(run.id).steps.plan.taskId, `${run.id}-plan-try2`);
+  assert.equal(runRecord(run.id).steps.plan.taskId, `${run.id}-plan-try2`);
 });
 
 test("a held task whose job ended `done` with no statement (`closedOut: false`) waits as the runtime holds any `done` open, reads `unsigned`, and is closed: the run's sign-off nudge is a `-try2` task, never an answer to it — gated or not", async () => {
@@ -274,14 +274,14 @@ test("a held task whose job ended `done` with no statement (`closedOut: false`) 
     );
     assert.equal((await statuses(e, run.id)).plan, 'unsigned', `${JSON.stringify(keys)}: the run's word, not the engine's`);
 
-    const nudged = await runWith(e, advanceRun(readRun(run.id)));
+    const nudged = await runWith(e, advanceRun(runRecord(run.id)));
     assert.deepEqual(nudged.tried, ['plan'], `${JSON.stringify(keys)}: the sign-off nudge`);
     const old = await stateOf(e, plan);
     assert.deepEqual([old.state.closed, old.state.inputs.length], [true, 0], `${JSON.stringify(keys)}: closed, never answered`);
     const next = await stateOf(e, `${plan}-try2`);
     assert.match(next.state.brief, /StructuredOutput/, `${JSON.stringify(keys)}: filed as a task of its own, told to sign off`);
     assert.equal(next.state.resumeFrom, 'native-1', `${JSON.stringify(keys)}: continuing the session that ended`);
-    assert.equal(readRun(run.id).steps.plan.taskId, `${plan}-try2`);
+    assert.equal(runRecord(run.id).steps.plan.taskId, `${plan}-try2`);
   }
 });
 
@@ -293,20 +293,20 @@ test('a pass that answered and died before writing the run down is adopted: the 
   await Effect.runPromise(e.tick());
   assert.equal((await stateOf(e, plan)).phase, 'working', 'what the pass did before it died: the answer, and nothing on the record');
   const filedOn = ({ declared, closeoutHash }: { declared?: readonly string[]; closeoutHash?: string }) => ({ declared, closeoutHash });
-  const now = filedOn(readRun(run.id).steps.plan);
-  const stale = readRun(run.id);
+  const now = filedOn(runRecord(run.id).steps.plan);
+  const stale = runRecord(run.id);
   rewriteRun({ ...stale, steps: { ...stale.steps, plan: { ...stale.steps.plan, declared: ['stale'], closeoutHash: 'stale' } } });
-  const adopted = await runWith(e, advanceRun(readRun(run.id)));
+  const adopted = await runWith(e, advanceRun(runRecord(run.id)));
   assert.deepEqual([adopted.tried, adopted.filed], [[], []]);
   const view = await stateOf(e, plan);
   assert.deepEqual([view.state.inputs.length, view.state.stopRequested], [1, false], 'answered once, and not asked to stop');
   assert.deepEqual(
-    readRun(run.id).steps.plan.tries?.map((t) => t.taskId),
+    runRecord(run.id).steps.plan.tries?.map((t) => t.taskId),
     [plan],
     'written down as the turn it was',
   );
   assert.deepEqual(
-    filedOn(readRun(run.id).steps.plan),
+    filedOn(runRecord(run.id).steps.plan),
     now,
     'on what filing the turn writes, never on what the record held of the try before it',
   );
@@ -356,7 +356,7 @@ const triedAgain = async (h: Awaited<ReturnType<typeof answeredTurn>>, from: str
   assert.match(next.state.brief, /the --dry-run flag, again/, `${end}: a task of its own, with the answer in its brief`);
   assert.equal(next.state.holdOpen, true, `${end}: held open itself`);
   assert.equal(next.state.resumeFrom, from, `${end}: continuing ${from}`);
-  assert.equal(readRun(run.id).steps.plan.taskId, `${plan}-try3`, `${end}: the step's try now`);
+  assert.equal(runRecord(run.id).steps.plan.taskId, `${plan}-try3`, `${end}: the step's try now`);
   await pass(run.id);
   assert.deepEqual(
     [spawned.at(-1)!.name, spawned.at(-1)!.resumeFrom],
@@ -447,7 +447,7 @@ test('a gated step closed on its approval reads on `nemia ls` as it signed, in t
   assert.equal((await stateOf(e, plan)).state.settled, 'succeeded');
   assert.equal(between, (await statuses(e, run.id)).plan, 'the same line before the engine settles it and after');
   assert.doesNotMatch(between, /between-attempts|running/);
-  const listed = await runWith(e, list(e, readRun(run.id)));
+  const listed = await runWith(e, list(e, runRecord(run.id)));
   assert.deepEqual(listed.waitingOnYou, []);
 });
 
@@ -491,7 +491,7 @@ test("a send-back from a gate — `nemia retry --message` on a signed gated step
   );
 
   await runWith(e, approveRun(run.id, 'plan'));
-  assert.equal(readRun(run.id).steps.plan.tries?.length, 1);
+  assert.equal(runRecord(run.id).steps.plan.tries?.length, 1);
   assert.deepEqual((await pass(run.id)).filed, ['implement']);
   assert.equal((await stateOf(e, plan)).state.closed, true);
 });
@@ -517,25 +517,25 @@ test('`nemia cancel` closes a task that waits for a word — nothing runs, so no
 
 test('`nemia cancel` calls off a run whose step signed off blocked, with no gate: it writes the mark, closes the task without stopping it, and nothing waits on you', async () => {
   const { run, e } = await signedPlan({}, BLOCKED);
-  assert.deepEqual((await runWith(e, list(e, readRun(run.id)))).waitingOnYou, ['plan']);
-  const before = readRun(run.id).steps;
+  assert.deepEqual((await runWith(e, list(e, runRecord(run.id)))).waitingOnYou, ['plan']);
+  const before = runRecord(run.id).steps;
   const { plan } = await runWith(e, cancelRun(run.id));
   assert.deepEqual(plan, { kind: 'cancel', stop: [] }, 'a blocked run is not finished: a person is asked of it');
   const view = await stateOf(e, `${run.id}-plan`);
   assert.deepEqual([view.state.closed, view.state.stopRequested], [true, false]);
-  assert.ok(readRun(run.id).cancelledAt);
-  assert.deepEqual(readRun(run.id).steps, before, "the record's steps stand as they were");
-  assert.deepEqual((await runWith(e, list(e, readRun(run.id)))).waitingOnYou, []);
+  assert.ok(runRecord(run.id).cancelledAt);
+  assert.deepEqual(runRecord(run.id).steps, before, "the record's steps stand as they were");
+  assert.deepEqual((await runWith(e, list(e, runRecord(run.id)))).waitingOnYou, []);
   assert.equal((await runWith(e, decideRun(run.id))).decision.kind, 'cancelled');
 });
 
 test('`nemia cancel` reads a closeout that does not read as the run does: an unsigned step waiting on you, so the run is called off', async () => {
   const { run, e } = await signedPlan({}, ['not a closeout']);
   assert.deepEqual(await statuses(e, run.id), { plan: 'unsigned · closeout unreadable', implement: 'pending' });
-  assert.deepEqual((await runWith(e, list(e, readRun(run.id)))).waitingOnYou, ['plan']);
+  assert.deepEqual((await runWith(e, list(e, runRecord(run.id)))).waitingOnYou, ['plan']);
   const { plan } = await runWith(e, cancelRun(run.id));
   assert.deepEqual(plan, { kind: 'cancel', stop: [] });
-  assert.ok(readRun(run.id).cancelledAt);
+  assert.ok(runRecord(run.id).cancelledAt);
 });
 
 test('`nemia rm` of a run whose step waits for a word closes its task: no pass reads the run again to close it', async () => {
@@ -618,7 +618,7 @@ test('the files a task held open named are read once: one removed after its clos
     fs.rmSync(shot);
     for (let n = 0; n < 3; n++) {
       assert.deepEqual((await pass(run.id)).tried, [], `${how}: no nudge for a file gone since`);
-      assert.deepEqual(lackedOf(readRun(run.id).steps.plan), [], `${how}: and nothing is kept as lacked`);
+      assert.deepEqual(lackedOf(runRecord(run.id).steps.plan), [], `${how}: and nothing is kept as lacked`);
       assert.doesNotMatch((await statuses(e, run.id)).plan, /unsigned/, how);
     }
   }

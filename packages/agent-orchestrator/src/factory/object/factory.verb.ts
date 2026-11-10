@@ -15,6 +15,7 @@
 import { Effect } from 'effect';
 import {
   API_VERSION,
+  DEFAULT_NAMESPACE,
   type Factory as FactoryObject,
   type FactoryCommands,
   type FactoryList,
@@ -25,16 +26,15 @@ import { readStatusAt } from '../applied/applied.store.ts';
 import { commandLine } from '../../command/command.ts';
 import { COMMANDS } from '../../command/commands.verb.ts';
 import { generationOf } from '../door/generation.ts';
-import { DEFAULT_FACTORY, instructionAt, type FactoryListing } from '../factory.ts';
-import { instructionFileAt, readInstructionAt, type InstructionRead } from '../instruction.store.ts';
-import { readRules, rulesAtHome, type RulesRead } from '../rules/rules.store.ts';
-import { readFactoriesAt } from '../factory.store.ts';
-import { tried } from '../../runtime-client.ts';
+import type { FactoryListing } from '../factory.ts';
+import type { InstructionRead } from '../instruction.store.ts';
+import type { RulesRead } from '../rules/rules.store.ts';
+import { doorAt, doorAtOnce } from '../door/factories.store.ts';
+import { FactoryName, isDefaultFactory, type DefaultFactory } from '../factory.model.ts';
 import { untrustedPlaces } from '../../trust/trust.verb.ts';
 import type { Untrusted } from '../../trust/trust.ts';
 import { Invalid, Missing } from '../../refusal/refusal.ts';
 import type { Level } from '../../level/level.ts';
-import { readFactoryLevelAt } from '../../level/level.store.ts';
 import { factoryVolumesNamed } from '../volume/volume.ts';
 import { bornAt, objectsListed, versionOf, type ObjectQuery } from '../../object/listed.verb.ts';
 
@@ -82,10 +82,13 @@ const isBlank = (read: { words: string | null; error: string | null }): boolean 
  * its error is read.
  */
 const partsOf = (listing: Exclude<FactoryListing, { error: string }>, home: string): FactoryParts | undefined => {
-  const rules = readRules(rulesAtHome(home, listing));
+  const name = FactoryName.read(listing.name);
+  const { words, error } = doorAtOnce(home, (door) => door.rules.read(name));
+  const rules = { words, error };
   let instruction: InstructionRead;
   try {
-    instruction = readInstructionAt(instructionAt(listing, instructionFileAt(home, listing.name)));
+    const read = doorAtOnce(home, (door) => door.instruction.read(name));
+    instruction = { words: read.words, error: read.error };
   } catch (err) {
     instruction = { words: null, error: err instanceof Error ? err.message : String(err) };
   }
@@ -112,7 +115,7 @@ const objectOf = (
  */
 const ownLevel = (home: string, name: string): { level: Level } | { error: string } | {} => {
   try {
-    const own = readFactoryLevelAt(home, name)?.level;
+    const own = doorAtOnce(home, (door) => door.level.read(FactoryName.read(name)))?.level;
     return own === undefined ? {} : { level: own };
   } catch (err) {
     return { error: err instanceof Invalid ? err.message : String(err) };
@@ -168,7 +171,7 @@ export const filedOf = (listing: FactoryListing, home: string): FiledFactory => 
 /** The default factory's object: on `repo`, offering every workflow (no `workflows`), hiring no one, keeping no file. */
 export const defaultFactoryObject = (repo: string, home: string): FactoryObject =>
   objectOf(
-    { name: DEFAULT_FACTORY, creationTimestamp: bornAt(home) },
+    { name: DEFAULT_NAMESPACE, creationTimestamp: bornAt(home) },
     { repos: [repo], hires: {}, volumes: [] },
     { conditions: [], untrusted: [] },
   );
@@ -194,23 +197,34 @@ export const factoriesListed = Effect.fn('factoriesListed')(function* (
   home: string,
   placesOf: (listing: FactoryListing) => boolean = () => false,
 ) {
-  const factories = yield* tried(() => readFactoriesAt(home));
+  const factories = yield* doorAt(home, (door) => door.factories.listed());
   const listed: FactoryListed = { factories, untrusted: yield* untrustedPlaces(factories.filter(placesOf)) };
   return listed;
 });
 
 /**
+ * The record the Factory door reads under `name` at the store `home` where no listing of the store's has it: the default factory's, or
+ * `Missing` (`noFactory`) for a name no factory has.
+ */
+const unlisted = (home: string, name: string): Effect.Effect<DefaultFactory, Missing> =>
+  doorAt(home, (door) => door.factories.read(FactoryName.read(name))).pipe(
+    Effect.mapError(() => noFactory(name)),
+    Effect.flatMap((record) => (isDefaultFactory(record) ? Effect.succeed(record) : Effect.fail(noFactory(name)))),
+  );
+
+/**
  * The factory `name` as its parts read it (`filedOf`), the default on `repo`, read now at the store `home`, with its listing (none for
- * the default factory): `Missing` where none has the name. One read of the store's factories, and none of git or of a run.
+ * the default factory, which the door answers as its record): `Missing` where none has the name. One read of the store's factories, and
+ * none of git or of a run.
  */
 export const factoryFiled = Effect.fn('factoryFiled')(function* (home: string, repo: string, name: string) {
-  if (name === DEFAULT_FACTORY) {
-    const filed: Filed = { factory: defaultFactoryObject(repo, home), listing: undefined };
+  const listing = (yield* factoriesListed(home)).factories.find((l) => l.name === name);
+  if (listing !== undefined) {
+    const filed: Filed = { factory: filedOf(listing, home), listing };
     return filed;
   }
-  const listing = (yield* factoriesListed(home)).factories.find((l) => l.name === name);
-  if (listing === undefined) return yield* Effect.fail(noFactory(name));
-  const filed: Filed = { factory: filedOf(listing, home), listing };
+  yield* unlisted(home, name);
+  const filed: Filed = { factory: defaultFactoryObject(repo, home), listing: undefined };
   return filed;
 });
 
@@ -223,11 +237,11 @@ export const factoryList = Effect.fn('factoryList')(function* (home: string, rep
 
 /** The factory `name` as an object, the default on `repo`, read now at the store `home`; `Missing` where none has the name. */
 export const factoryObject = Effect.fn('factoryObject')(function* (home: string, repo: string, name: string) {
-  if (name === DEFAULT_FACTORY) return defaultFactoryObject(repo, home);
   const listed = yield* factoriesListed(home, (l) => l.name === name);
   const listing = listed.factories.find((l) => l.name === name);
-  if (listing === undefined) return yield* Effect.fail(noFactory(name));
-  return factoryObjectOf(listing, listed, home);
+  if (listing !== undefined) return factoryObjectOf(listing, listed, home);
+  yield* unlisted(home, name);
+  return defaultFactoryObject(repo, home);
 });
 
 /** The entry of the command table named `name`. */

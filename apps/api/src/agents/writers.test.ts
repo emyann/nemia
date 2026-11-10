@@ -15,7 +15,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { TEAM } from '../../test/team.ts';
-import { addFactory, COMMANDS, workflowTaken } from 'agent-orchestrator';
+import { COMMANDS, workflowTaken } from 'agent-orchestrator';
+import { addFactory } from 'agent-orchestrator/testing';
 import type { Workflow } from 'objects';
 import { app } from '../app.ts';
 
@@ -46,9 +47,9 @@ async function watched(
   const command = COMMANDS.find((c) => c.name === name)!;
   const handler = command.handler.bind(command);
   const handed: Args[] = [];
-  const watch = t.mock.method(command, 'handler', (args: Args, env?: never, home?: string) => {
+  const watch = t.mock.method(command, 'handler', (args: Args, kept?: never) => {
     handed.push(args);
-    return handler(args, env, home);
+    return handler(args, kept);
   });
   try {
     return { res: await request(), handed };

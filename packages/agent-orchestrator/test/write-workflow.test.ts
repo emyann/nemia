@@ -19,7 +19,8 @@ import { TEAM, TEAM_DEV } from './team.ts';
 const ROOT = scratch('wf-write-');
 process.env.WF_ROOT = ROOT;
 const { loadWorkflows } = await import('../src/workflows/workflows.store.ts');
-const { addFactory, writeWorkflow } = await import('../src/runner.ts');
+const { writeWorkflow } = await import('../src/runner.ts');
+const { addFactory } = await import('../testing.ts');
 
 const STORE = path.join(ROOT, 'workflows');
 fs.cpSync(path.join(TEAM, 'agents'), path.join(STORE, 'agents'), { recursive: true });

@@ -109,7 +109,7 @@ export const serviceDirs = (): { home: string; configHome: string } => {
 };
 
 /** The store the service is of, and the default one: a store not the default is given a service name of its own. */
-export const storeRoots = (): { root: string; defaultRoot: string } => ({ root: wfRoot(), defaultRoot: wfRoot({}) });
+export const storeRoots = (root: string): { root: string; defaultRoot: string } => ({ root, defaultRoot: wfRoot({}) });
 
 /** The service's file, or null where it is not installed. */
 export const readUnit = (file: string): string | null => textOf(file);

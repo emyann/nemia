@@ -75,18 +75,16 @@ export const serverHandlers = HttpApiBuilder.group(Api, 'server', (handlers) =>
     .handle('health', () => Effect.succeed({ ok: true } as const))
     .handle('version', () => Effect.succeed({ version: VERSION, release: RELEASE }))
     .handle('capabilities', () =>
-      answered(({ e, placeService, env, repo, home, mcp, inRequest, trace }) =>
-        capabilitiesWithSteps(repo, { e, placeService, trace, env, home, asker: mcp, inRequest }),
+      answered(({ e, placeService, config, env, repo, home, mcp, inRequest, trace }) =>
+        capabilitiesWithSteps(repo, { e, placeService, config, trace, env, home, asker: mcp, inRequest }),
       ),
     )
     .handle('repository', () => answered(async ({ repo }) => ({ repo })))
     .handle('store', () => answered(async ({ home }) => yourStore(home)))
     .handle('ceilings', () => answered(ceilingsOf))
-    .handle('passes', ({ query: { last } }) =>
-      answered((s) => s.inRequest(PASSES.handler(last === undefined ? {} : { last }, s.env, s.home))),
-    )
+    .handle('passes', ({ query: { last } }) => answered((s) => s.inRequest(PASSES.handler(last === undefined ? {} : { last }))))
     .handle('series', ({ query: { range } }) =>
-      answered((s) => s.inRequest(SERIES.handler(range === undefined ? {} : { range }, s.env, s.home, { series: s.memo.series }))),
+      answered((s) => s.inRequest(SERIES.handler(range === undefined ? {} : { range }, { series: s.memo.series }))),
     )
     .handle('metrics', () => answered(async (s) => metricsOf(await s.inRequest(Metric.snapshot))))
     .handle('daemon', () => answeredWrite(async () => readDaemon()))
@@ -94,12 +92,10 @@ export const serverHandlers = HttpApiBuilder.group(Api, 'server', (handlers) =>
       answered(({ e, env, quota }) => quota({ env, harness: DEFAULT_HARNESS, ask: () => engineRead('quota', e.quota(DEFAULT_HARNESS)) })),
     )
     .handle('stats', ({ query, request }) => answered((s) => statsOf({ ...query, selector: selectorsOf(request) }, s)))
-    .handle('paused', () => answered((s) => s.inRequest(PAUSED.handler({}, s.env, s.home))))
-    .handle('pauseNow', () =>
-      answered((s) => s.inRequest(PAUSE_NOW.handler({}, s.env, s.home, { records: { pause: s.memo.records.pause } }))),
-    )
-    .handle('pause', ({ payload }) => answeredWrite((s) => s.inRequest(PAUSE.handler(payload, s.env, s.home))))
-    .handle('resume', () => answeredWrite((s) => s.inRequest(RESUME.handler({}, s.env, s.home))))
+    .handle('paused', () => answered((s) => s.inRequest(PAUSED.handler({}))))
+    .handle('pauseNow', () => answered((s) => s.inRequest(PAUSE_NOW.handler({}, { records: { pause: s.memo.records.pause } }))))
+    .handle('pause', ({ payload }) => answeredWrite((s) => s.inRequest(PAUSE.handler(payload))))
+    .handle('resume', () => answeredWrite((s) => s.inRequest(RESUME.handler({}))))
     .handle('feed', ({ query, headers, request }) =>
       Effect.gen(function* () {
         const s = yield* ServedNow;

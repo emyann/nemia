@@ -21,6 +21,7 @@ import {
   nextQueued,
   noCardLine,
   noWorkflowRefusal,
+  cardOrWhy,
   parseInboxCard,
   queuedText,
   queueLine,
@@ -1117,4 +1118,18 @@ test('REFUSED: `queueFactoryRefusal` refuses a card that names no factory, namin
       names(got, ...facts);
       assert.equal(got!.includes('Nothing was started'), false, 'a queue says nothing of a start');
     });
+});
+
+test("cardOrWhy: a card that reads is answered, one that does not answers why in its refusal's words, naming the file", () => {
+  const file = 'cache-the-views-k2q9.md';
+  const good = cardOrWhy(file, '---\nworkflow: dev\n---\nCache the views.\n', isDirectory);
+  assert.ok('card' in good);
+  assert.equal(good.card.workflow, 'dev');
+  const bad = cardOrWhy(file, '---\nnot-a-key: x\n---\nCache the views.\n', isDirectory);
+  assert.ok('why' in bad);
+  assert.ok(bad.why.includes(file), bad.why);
+  assert.throws(
+    () => parseInboxCard(file, '---\nnot-a-key: x\n---\nCache the views.\n', isDirectory),
+    (err: unknown) => err instanceof Error && err.message === bad.why,
+  );
 });

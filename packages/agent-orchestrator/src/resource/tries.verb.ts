@@ -251,7 +251,7 @@ export const turnOfTry = (before: readonly EarlierTry[], at: EarlierTry): number
  * check, closeout and attempts the step already has — its check's verdict the step's alone, never a try's. Off the views already read
  * (`viewsOf`), with no observation of its own: an earlier refused check's stderr is read before (`refusedStderr`), and its stdout is not
  * read. What a person said to each try is off the answers the
- * request read (the answers `runStore` keeps).
+ * request read (the answers the Run door keeps).
  *
  * An earlier try is read on the turn of its task it was: a held task a person answered keeps each try they answered under its one id, and a
  * recheck replaces only the check, on the same task and turn, so it is no turn (as `turnsOf` counts them). Its status is `succeeded` for a
@@ -356,8 +356,8 @@ export function driftOf(run: Run, workflows: readonly Workflow[]): string | null
 /**
  * A step's gate (`StepGate`), or null for a step with none: whether it waits at it, by its reason (`AwaitingApproval`), and the approval of
  * the try it is on — or, for a looping step, the acceptance of that try as it stands (`acceptanceOf`), which `nemia approve` of a loop
- * writes, a gate of its own where the step has none. Off the record as `runStore` composes it, with each approval and acceptance its files
- * hold, the step's closeout (`closeoutOf`) and what its tries cost (`spendOf`): no read of its own.
+ * writes, a gate of its own where the step has none. Off the record as the Run door composes it, with each approval and acceptance its
+ * files hold, the step's closeout (`closeoutOf`) and what its tries cost (`spendOf`): no read of its own.
  */
 export function gateOf(
   run: Run,

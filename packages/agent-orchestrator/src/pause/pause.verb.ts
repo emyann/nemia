@@ -3,18 +3,20 @@
  * would cut, read off one view of every run's current tasks and never stored (`nowRead`), and the verb that puts the pause, or keeps the
  * one that stands, cuts its timeout to 0 so every session's call is cut and the session parked, then writes for each check at work the ask
  * that runs it again on the resume and asks the engine to stop it (`pauseNow`). A controller: it reaches the engine through the client,
- * and writes a person's files — the pause through `putPause` and `cutPause`, each ask through `runStore.asks.write` — never a run's
+ * and writes a person's files — the pause through `putPause` and `cutPause`, each ask through the Run door's `asks.write` — never a run's
  * record.
  */
+import { setting } from '../config/config.store.ts';
+import { StoreRoot } from '../config/root.store.ts';
 import { Effect } from 'effect';
 import { EngineService, asked, sessionsDrained, tried } from '../runtime-client.ts';
 import { tryOf, type Run } from '../record/record.ts';
-import { keptRuns, runStore } from '../record/files.store.ts';
+import { keptRuns } from '../record/files.store.ts';
+import { runsAtOnce } from '../runs/runs.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { stopAsked } from '../tick/held.verb.ts';
 import { cutPause, putPause, readPause } from './pause.store.ts';
 import { timeoutAt } from './pause-timeout.store.ts';
-import { rootGiven } from '../config/root.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import {
   currentTasks,
@@ -52,11 +54,11 @@ const runTasks = (run: Run): RunTasks => ({
  */
 const interruptsRead = Effect.fnUntraced(function* (memo?: PauseRuns) {
   const e = yield* EngineService;
-  const seen = keptRuns(memo, runTasks);
+  const seen = keptRuns(memo, runTasks, yield* setting('verifyRest'));
   const ids = [...new Set(seen.filter((run) => !run.cancelledAt).flatMap((run) => run.tasks))];
   const views = new Map((ids.length ? (yield* asked('list', e.list(ids))).views : []).map((v) => [v.id, v]));
   const runs = liveAmong(seen, (id) => views.get(id)).flatMap((id) => {
-    const run = runStore.runs.find(id);
+    const run = runsAtOnce.runs.find(id);
     return run ? [run] : [];
   });
   const steps = new Map(yield* Effect.forEach(runs, (run) => Effect.map(stepsOf(run), (s) => [run.id, s] as const)));
@@ -84,11 +86,11 @@ export const nowRead = Effect.fn('nowRead')(function* (memo?: PauseRuns) {
 export const pauseParked = Effect.fn('pauseParked')(function* (
   said: { why?: string; by?: string },
   given: string | undefined,
-  home: string | undefined,
+  home: string,
   now: Date = new Date(),
 ) {
-  const timeoutMs = yield* tried(() => (given === undefined ? timeoutAt(rootGiven(home, 'pause')).ms : timeoutGiven(given)));
-  const pause = yield* tried(() => putPause(said, now, timeoutMs));
+  const timeoutMs = yield* tried(() => (given === undefined ? timeoutAt(home).ms : timeoutGiven(given)));
+  const pause = yield* tried(() => putPause(home, said, now, timeoutMs));
   yield* sessionsDrained({ graceMs: timeoutMs });
   return pause;
 });
@@ -103,10 +105,11 @@ export const pauseParked = Effect.fn('pauseParked')(function* (
  * since it was read — is passed over: the tick sets its ask aside (`pauseAskVoid`).
  */
 export const pauseNow = Effect.fn('pauseNow')(function* (said: { why?: string; by?: string }, now: Date = new Date()) {
+  const home = yield* StoreRoot;
   const e = yield* EngineService;
-  const stands = readPause();
-  if (stands === null) yield* tried(() => putPause(said, now, 0));
-  const pause = yield* tried(() => cutPause());
+  const stands = readPause(home);
+  if (stands === null) yield* tried(() => putPause(home, said, now, 0));
+  const pause = yield* tried(() => cutPause(home));
   yield* sessionsDrained({ graceMs: 0 });
   const { runs, interrupts } = yield* interruptsRead();
   const interrupted: Interrupt[] = [];
@@ -122,7 +125,7 @@ export const pauseNow = Effect.fn('pauseNow')(function* (said: { why?: string; b
       continue;
     }
     const ask = { step: i.step, try: tryOf(run, i.step) + 1, mode: 'recheck' as const, interrupted: i.taskId, at: now.toISOString() };
-    if (!runStore.asks.write(i.run, { kind: 'retry', of: 'try', ask }).written) {
+    if (!runsAtOnce.asks.write(i.run, { kind: 'retry', of: 'try', ask }).written) {
       skipped.push(i);
       continue;
     }

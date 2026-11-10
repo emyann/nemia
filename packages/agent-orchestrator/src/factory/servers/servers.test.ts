@@ -14,10 +14,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
+import { storeGiven } from '../../../test/config-given.ts';
 
 const ROOT = scratch('wf-servers-');
 process.env.WF_ROOT = ROOT;
-const { DEFAULT_FACTORY } = await import('../factory.ts');
+const { DEFAULT_NAMESPACE } = await import('../factory.ts');
 const { factoryServerRefusal, factoryServersRefusal, serverNameRefusal, splitServers } = await import('./servers.ts');
 const { factoryServers, factoryServersFile, readFactoryServers, builtinServers, writeFactoryServers } = await import('./servers.store.ts');
 
@@ -114,9 +115,9 @@ test('REFUSED: a server record that does not read, naming the file, its wrong fi
 });
 
 test('the default factory is given a record of its own, while factories/default.json is never written', () => {
-  writeFactoryServers(ROOT, DEFAULT_FACTORY, { github: GITHUB });
-  assert.deepEqual(factoryServers(ROOT, DEFAULT_FACTORY), { github: GITHUB }, 'every run and card that names no factory runs in it');
-  assert.equal(factoryServersFile(ROOT, DEFAULT_FACTORY), path.join(ROOT, 'factories', 'default', 'servers.json'));
+  writeFactoryServers(ROOT, DEFAULT_NAMESPACE, { github: GITHUB });
+  assert.deepEqual(factoryServers(ROOT, DEFAULT_NAMESPACE), { github: GITHUB }, 'every run and card that names no factory runs in it');
+  assert.equal(factoryServersFile(ROOT, DEFAULT_NAMESPACE), path.join(ROOT, 'factories', 'default', 'servers.json'));
   assert.equal(fs.existsSync(path.join(ROOT, 'factories', 'default.json')), false, 'the default factory is still no file');
 });
 
@@ -182,17 +183,18 @@ test("a server's headers are served masked, and a mask sent back keeps the value
   const root = scratch('wf-servers-mask-');
   const add = async (server: string, ...headers: string[]) => {
     const sent = Object.fromEntries(headers.map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
-    const program = FACTORY_SERVER_ADD.handler(
-      { factory: DEFAULT_FACTORY, server, url: 'https://docs.example/mcp', headers: sent },
-      process.env,
+    const program = storeGiven(
       root,
+      process.env,
+    )(
+      FACTORY_SERVER_ADD.handler({ factory: DEFAULT_NAMESPACE, server, url: 'https://docs.example/mcp', headers: sent }),
     ) as unknown as import('effect').Effect.Effect<{ server: { headers?: Record<string, string> } }, { _tag?: string }>;
     return Effect.runPromise(program).then(
       (answer) => answer,
       (err: { _tag?: string }) => ({ refused: err._tag }),
     );
   };
-  const stored = () => factoryServers(root, DEFAULT_FACTORY);
+  const stored = () => factoryServers(root, DEFAULT_NAMESPACE);
   await t.test('a read masks every value', () => {
     assert.deepEqual(
       listedOf('docs', { type: 'http', url: 'https://docs.example/mcp', headers: { 'X-Key': 'secret' } }, undefined).headers,
@@ -211,9 +213,9 @@ test("a server's headers are served masked, and a mask sent back keeps the value
     assert.deepEqual(stored().docs?.headers, { 'X-Key': 'secret', 'X-Toolsets': 'actions' });
   });
   await t.test('REFUSED Invalid: a mask sent for a header the server holds no value of, and nothing is written', async () => {
-    const before = fs.readFileSync(factoryServersFile(root, DEFAULT_FACTORY), 'utf8');
+    const before = fs.readFileSync(factoryServersFile(root, DEFAULT_NAMESPACE), 'utf8');
     assert.deepEqual(await add('docs', 'X-Key=fresh', `X-New=${HEADER_MASK}`), { refused: 'Invalid' });
     assert.deepEqual(await add('other', `X-Key=${HEADER_MASK}`), { refused: 'Invalid' });
-    assert.equal(fs.readFileSync(factoryServersFile(root, DEFAULT_FACTORY), 'utf8'), before);
+    assert.equal(fs.readFileSync(factoryServersFile(root, DEFAULT_NAMESPACE), 'utf8'), before);
   });
 });

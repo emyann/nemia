@@ -3,6 +3,7 @@
  * table the CLI serves alone, since they change the person's machine. Each reaches the machine through its host (`ServiceHost`): the live
  * one at the command line, a fake in the tests, so no test starts a service.
  */
+import { StoreRoot } from '../config/root.store.ts';
 import { Effect } from 'effect';
 import type { Command } from '../command/entry.verb.ts';
 import type { Args, Flag } from '../command/command.ts';
@@ -13,7 +14,6 @@ import { Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
 import { asked, drained, EngineService, tried, type TaskView } from '../runtime-client.ts';
 import { DEFAULT_TIMEOUT_MS, timeoutOf, timeoutRefusal, type Finishing, type Pause } from '../pause/pause.ts';
 import { timeoutAt } from '../pause/pause-timeout.store.ts';
-import { rootGiven } from '../config/root.store.ts';
 import { pointedEntry } from '../release/release.ts';
 import { runningRelease } from '../release/version.verb.ts';
 import {
@@ -120,14 +120,8 @@ export const timeoutGiven = (args: Args, home: string, by: string): Effect.Effec
   });
 
 /** The live host of `nemia <verb>`, its take-over given the timeout `timeoutGiven` reads off `args` and the store at `home`. */
-export const timedHost = (args: Args, home: string | undefined, verb: string): Effect.Effect<ServiceHost, Refusal> =>
-  Effect.map(
-    Effect.flatMap(
-      tried(() => rootGiven(home, verb)),
-      (root) => timeoutGiven(args, root, `nemia ${verb}`),
-    ),
-    liveHost,
-  );
+export const timedHost = (args: Args, home: string, verb: string): Effect.Effect<ServiceHost, Refusal> =>
+  Effect.map(timeoutGiven(args, home, `nemia ${verb}`), (ms) => liveHost(home, ms));
 
 /**
  * The machine as it is: the process's node, the store's lease and pause, `systemctl` and `launchctl` themselves. The daemon an install
@@ -135,21 +129,21 @@ export const timedHost = (args: Args, home: string | undefined, verb: string): E
  * flight `timeoutMs` (`timeoutGiven`), ten minutes where none is given, and its pause names this process as its holder (`thisProcess`),
  * so the daemon's next pass lifts it once the command has ended.
  */
-export const liveHost = (timeoutMs: number = DEFAULT_TIMEOUT_MS): ServiceHost => ({
+export const liveHost = (root: string, timeoutMs: number = DEFAULT_TIMEOUT_MS): ServiceHost => ({
   machine: machineOf,
   dirs: serviceDirs,
-  roots: storeRoots,
+  roots: () => storeRoots(root),
   daemon: () => pointedEntry(daemonEntry(), runningRelease()),
   node: process.execPath,
   path: process.env.PATH ?? '',
   user: userOf,
   call: systemCall,
   linger: lingerOf,
-  standing: readPause,
+  standing: () => readPause(root),
   lease: () => daemonStanding(),
   signal: (pid) => process.kill(pid, 'SIGTERM'),
-  pause: (said) => putPause(said, new Date(), undefined, thisProcess()),
-  resume: resumePause,
+  pause: (said) => putPause(root, said, new Date(), undefined, thisProcess()),
+  resume: () => resumePause(root),
   calls: attachedCalls(engineList),
   drain: drained,
   say: (line) => console.error(line),
@@ -312,7 +306,8 @@ const lingerLines = (at: Placed, host: ServiceHost): string[] => {
  * or leaves it to the next login where another daemon holds the store — naming its pid and how to take over. With `--take-over <pid>`,
  * hands the store from that daemon to the service (`takeOver`).
  */
-export const installService = Effect.fn('installService')(function* (args: Args, host: ServiceHost = liveHost()) {
+export const installService = Effect.fn('installService')(function* (args: Args, given?: ServiceHost) {
+  const host = given ?? liveHost(yield* StoreRoot);
   const { at, spec, pid } = yield* tried(() => {
     const at = placed(args, host);
     const pid = pidOf(args.takeOver);
@@ -343,7 +338,8 @@ export type Uninstalled = { readonly name: string; readonly file: string; readon
  * Removes the service: stops it (SIGTERM, which writes `stoppedAt` where it held the store), disables it and deletes its file. A daemon
  * that is not the service is left alone. Refused (`Missing`): no service of that name installed.
  */
-export const uninstallService = Effect.fn('uninstallService')(function* (args: Args, host: ServiceHost = liveHost()) {
+export const uninstallService = Effect.fn('uninstallService')(function* (args: Args, given?: ServiceHost) {
+  const host = given ?? liveHost(yield* StoreRoot);
   return yield* tried(() => {
     const at = placed(args, host);
     if (readUnit(at.file) === null)
@@ -407,7 +403,8 @@ export function serviceAt(args: Args, host: ServiceHost): ServiceAt {
 }
 
 /** Reads the service and the lease, and names both: whether the service is installed and runs, what it runs, and who holds the store. */
-export const serviceStatus = Effect.fn('serviceStatus')(function* (args: Args, host: ServiceHost = liveHost()) {
+export const serviceStatus = Effect.fn('serviceStatus')(function* (args: Args, given?: ServiceHost) {
+  const host = given ?? liveHost(yield* StoreRoot);
   return yield* tried(() => {
     const at = placed(args, host);
     const unit = installedRead(at);
@@ -467,10 +464,12 @@ const INSTALL: Command<Installed> = {
   writes: true,
   class: 'ask',
   only: CLI_ONLY,
-  handler: (args, _env, home) =>
-    args.takeOver === undefined
-      ? installService(args)
-      : Effect.flatMap(timedHost(args, home, 'service install'), (host) => installService(args, host)),
+  handler: (args) =>
+    Effect.flatMap(StoreRoot, (home) =>
+      args.takeOver === undefined
+        ? installService(args)
+        : Effect.flatMap(timedHost(args, home, 'service install'), (host) => installService(args, host)),
+    ),
   print: (data) => data.lines,
 };
 

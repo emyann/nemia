@@ -540,8 +540,8 @@ function renamedFields(fields: object) {
  * the step would run unfenced, with nothing said; and its agent's harness prompt as `systemPrompt`, in a former word (`FORMER_OWN_KEYS`):
  * read so, `own` would be filed appended to Claude Code's prompt instead of in its place; and its place as `workspace: 'folder'`, which is
  * `place: 'folder'` now, and its agent's `keys` naming `workspace` for it; and its ending as `workspace: 'main'`, which is `workspace:
- * 'base'` now, so the run would end on no step (`endsOnBase`). Read by `readRun`, so no reader — the tick, `nemia ls`, the api — ever sees
- * a former name, and the next pass that writes the record back writes the new ones alone. A field under both names keeps the new one's
+ * 'base'` now, so the run would end on no step (`endsOnBase`). Read by `runRecord`, so no reader — the tick, `nemia ls`, the api — ever
+ * sees a former name, and the next pass that writes the record back writes the new ones alone. A field under both names keeps the new one's
  * value. A step with no former name is returned as it is. Pure.
  */
 export function asNamed(step: FrozenStep): Workflow {

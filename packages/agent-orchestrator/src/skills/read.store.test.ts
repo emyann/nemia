@@ -14,9 +14,11 @@ import { scratch } from 'test-kit/scratch';
 import { names } from '../../test/assessed.ts';
 import { WorkflowError } from '../step/step.ts';
 import { skillEntryOf } from './skills.ts';
+import { LOOKUP } from '../definition/served.ts';
 import {
   BUILTIN_SKILLS,
   copySkillFiles,
+  lookupRoots,
   oneFolder,
   PLACE_SKILLS,
   skillFiles,
@@ -394,4 +396,20 @@ test("Nemia's builtin skills share no name with the place's, and each reads as a
     const file = path.join(at, 'SKILL.md');
     assert.equal(skillEntryOf(file, name, fs.readFileSync(file, 'utf8')).id, name, at);
   }
+});
+
+test("the folders a workflow's definitions are looked for in follow the one lookup order the served definitions read", () => {
+  const at = scratch('wf-lookup-');
+  const workflow = path.join(at, 'tree', 'workflows', 'make');
+  const roots = lookupRoots(workflow, { repo: path.join(at, 'repo'), home: path.join(at, 'home') });
+  const origins = {
+    factory: path.join(at, 'tree', 'workflows'),
+    repo: path.join(at, 'repo', '.claude'),
+    yours: path.join(at, 'home', 'workflows'),
+  };
+  assert.deepEqual(
+    roots,
+    LOOKUP.flatMap((origin) => (origin === 'builtin' ? [] : [origins[origin]])),
+  );
+  assert.deepEqual(lookupRoots(workflow), [origins.factory], 'with no repository and no store, only its own');
 });

@@ -16,7 +16,8 @@ import {
   planStopped,
   repoFor,
   START,
-  startFactory,
+  settingsOf,
+  startFactoryAtOnce,
   startPlan,
   runWith,
   type Place,
@@ -36,20 +37,26 @@ const textOf = (args: Args, key: string): string | undefined => {
 };
 
 /**
- * Where a start of a workflow typed here is made (`startFactory`): the factory `--factory` names, else the one whose repository holds
+ * Where a start of a workflow typed here is made (`startFactoryAtOnce`): the factory `--factory` names, else the one whose repository holds
  * `--repo`, else the directory it is typed in; and its repository — the one that holds the folder, when the factory was found from it,
  * else `--repo`, else the factory's one repository, else here (`repoFor`); and its tree, where it is made from a template. Refused as
- * `startFactory` and `repoFor` refuse.
+ * `startFactoryAtOnce` and `repoFor` refuse.
  */
 function placeOfStart(args: Args): { factory?: string; repo: string; tree?: string } {
   const given = textOf(args, 'repo');
   const named = given === undefined ? undefined : path.resolve(given);
-  const found = startFactory(textOf(args, 'factory'), named ?? path.resolve('.'), '--factory <name>');
+  const found = startFactoryAtOnce(
+    wfRoot(process.env),
+    textOf(args, 'factory'),
+    named ?? path.resolve('.'),
+    '--factory <name>',
+    settingsOf(process.env).defaultFactoryStarts,
+  );
   const factory = found.factory?.name;
   const tree = found.factory?.tree;
   return {
     ...(factory !== undefined ? { factory } : {}),
-    repo: found.repo ?? repoFor(factory, named, path.resolve('.')),
+    repo: found.repo ?? repoFor(wfRoot(process.env), factory, named, path.resolve('.')),
     ...(tree !== undefined ? { tree } : {}),
   };
 }
@@ -118,7 +125,7 @@ export async function startRun(args: Args, e: Engine, place: Place): Promise<voi
       `nemia start was given ${arg}, which reads as a path, and there is no file nor plan folder at ${path.resolve(arg)}. Make the folder of cards and start it: nemia start <folder> --repo <r>; or give the file's path as it is, or the brief in words: nemia start "<brief>".`,
     );
   const asked = card !== null ? cardArgs(card, args) : briefArgs(arg, args);
-  const data = await runWith(e, placedIn(place, START.handler(asked, process.env, wfRoot(process.env))));
+  const data = await runWith(e, placedIn(place, START.handler(asked)));
   for (const line of START.print(data, asked)) console.log(line);
 }
 
@@ -169,7 +176,7 @@ export async function inboxAddRun(args: Args, e: Engine, place: Place): Promise<
     ...(factory === undefined ? {} : { factory }),
     label: Array.isArray(args.label) ? args.label.map(String) : [],
   };
-  const data = await runWith(e, placedIn(place, INBOX_ADD.handler(asked, process.env, wfRoot(process.env))));
+  const data = await runWith(e, placedIn(place, INBOX_ADD.handler(asked)));
   for (const line of INBOX_ADD.print(data, asked)) console.log(line);
 }
 
@@ -183,6 +190,6 @@ export async function inboxQueueRun(args: Args, e: Engine, place: Place): Promis
     ...(workflow === undefined ? {} : { workflow: workflowAt(workflow, process.cwd()) }),
     ...(args.off === true ? { off: true } : {}),
   };
-  const data = await runWith(e, placedIn(place, INBOX_QUEUE.handler(asked, process.env, wfRoot(process.env))));
+  const data = await runWith(e, placedIn(place, INBOX_QUEUE.handler(asked)));
   for (const line of INBOX_QUEUE.print(data, asked)) console.log(line);
 }

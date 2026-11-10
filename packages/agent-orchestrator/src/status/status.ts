@@ -1,14 +1,15 @@
 /**
  * Where one step of a run stands (`stepStatus`, `ownStatus`), and the facts it reads: a gate's (`hasGate`, `approvalOf`, `atGate`), an
  * ending's (`endsOnBase`, `landsOnCheck`, `resultOnBase`), what a step may spend (`taskSpend`, `overBudget`, `budgetRefusal`), and a
- * loop's (`roundOf`, `loopOf`, `owedFields`). And what a step consumed, in words (`sumUsage`, `readWords`, `usedLines`, `dollars`,
- * `durationWord`): `views.verb.ts` asks the engine (`consumption`). Pure, and read by nearly every other part of the run's judgement;
- * it reads the record alone.
+ * loop's (`roundOf`, `loopOf`, `owedFields`). What a step consumed, in words, is `usage/usage.ts`'s, a sum of
+ * money's `money/money.ts`'s, and a person's route for a try `route/person-route.ts`'s. Pure, and read by nearly every other part of the
+ * run's judgement; it reads the record alone.
  */
 import { onItsCheck, type Verdict } from '../check/check.ts';
 import { DEFAULT_ROUNDS, endsOnBase, JUDGE_ROUTE, LOOP_REPLIES, type Workflow } from '../step/step.ts';
 import { loopSpan } from '../workflow/index.ts';
 import { isJudge } from '../route/index.ts';
+import { budgetWord, dollars } from '../money/money.ts';
 import type { TaskClock } from '../timeline/index.ts';
 import { declaredOutput, isLoopTarget, type Closeout } from '../closeout/index.ts';
 import { filedOwed } from '../pinned/pinned.ts';
@@ -34,7 +35,6 @@ import {
 } from '../record/record.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
 import type { OwnStatus, WhereAStepStands } from '../../contracts/standing.contract.ts';
-import type { PeakMark } from 'objects';
 
 /**
  * Whether a step's closeout waits for a person before anything after it is filed: its own `gate: true`, or a gate the run was started with.
@@ -58,55 +58,6 @@ export const approvalOf = (run: Run, step: string): Approval | undefined =>
  * person's word to it is a try of its own. Never a check.
  */
 export const holdsOpenOn = (step: Pick<Workflow, 'harness'>): boolean => declarationOf(step.harness)?.can.includes('keepsOpen') === true;
-
-/** A person's route for a condition's try, as `readRun` reads it from its file (`routeAsk`): the route named, and when. */
-export type PersonRoute = { step: string; try: number; route: string; at: string };
-
-/** The name of a person's route file in a run's asks folder, `route-<step>-<n>`, beside its approvals: what `nemia route` writes. */
-export const routeAsk = (step: string, n: number): string => `route-${step}-${n}`;
-
-/**
- * The routes people named for a run's conditions (`routeAsk`), from the names in its asks folder `dir` and a reader of a file there: a file
- * that names no route, or no time it was given, routes nothing. Never consumed: read on every pass, as an approval is. Pure.
- */
-export function personRoutes(
-  dir: string,
-  names: readonly string[] | undefined,
-  read: (file: string) => { read: unknown } | { unreadable: string },
-): PersonRoute[] {
-  return (names ?? []).flatMap((name): PersonRoute[] => {
-    const [, step, n] = /^route-(.+)-(\d+)$/.exec(name) ?? [];
-    if (step === undefined || n === undefined) return [];
-    const held = read(`${dir}/${name}`);
-    const said = 'read' in held && typeof held.read === 'object' && held.read !== null ? (held.read as Record<string, unknown>) : {};
-    const { route, at } = said;
-    if (typeof route !== 'string' || !route.trim() || typeof at !== 'string' || Number.isNaN(Date.parse(at))) return [];
-    return [{ step, try: Number(n), route: route.trim(), at }];
-  });
-}
-
-/** The run with each person's route laid on its condition's record, for the try the condition is on: it wins over any other answer. */
-export const withRoutes = <R extends Pick<Run, 'steps'>>(run: R, routes: readonly PersonRoute[]): R => {
-  const steps = { ...run.steps };
-  for (const r of routes) {
-    const record = steps[r.step];
-    if (record && r.try === (record.tries?.length ?? 0) + 1)
-      steps[r.step] = { ...record, route: { route: r.route, try: r.try, by: 'person' } };
-  }
-  return { ...run, steps };
-};
-
-/** A record without a person's route on any step, which is their file's and never the record's: what a rewrite writes. Pure. */
-export const unrouted = <R extends Pick<Run, 'steps'>>(run: R): R => ({
-  ...run,
-  steps: Object.fromEntries(
-    Object.entries(run.steps).map(([name, record]): [string, StepRecord] => {
-      if (record.route?.by !== 'person') return [name, record];
-      const { route: _, ...rest } = record;
-      return [name, rest];
-    }),
-  ),
-});
 
 /**
  * The approvals a later try of their step has spent: each names a try the step is past. The tick consumes these, as it does a spent ask.
@@ -814,194 +765,6 @@ export const roundSpans = (steps: readonly Workflow[], rounds: readonly Round[])
       return looping ? loopSpan(steps, looping) : [];
     }),
   );
-
-/**
- * What a session consumed, as the engine's `Usage` carries it: a count nobody measured is absent, never 0. `costUsd` is the harness's own
- * figure, and `apiMs` and `toolMs` the time it counted waiting on the model and running tools — each read once a session has ended.
- */
-export type Consumed = {
-  responses?: number;
-  toolCalls?: number;
-  inputTokens?: number;
-  outputTokens?: number;
-  costUsd?: number;
-  apiMs?: number;
-  toolMs?: number;
-  /** The input in its three classes, which sum to `inputTokens` where the runner saw them: read from the cache, written to it, neither. */
-  cacheReadTokens?: number;
-  cacheWriteTokens?: number;
-  uncachedTokens?: number;
-  /** The largest context one response read. Of several attempts, the largest of theirs: a peak does not add up. */
-  peakContextTokens?: number;
-  /**
-   * One attempt's first response: the context it read and what of it was written to the cache (`rebuiltCache`). Not summed: several
-   * attempts have no one first response.
-   */
-  firstContextTokens?: number;
-  firstCacheWriteTokens?: number;
-  /** How many times its sessions compacted their conversation, which a session does short of its window. Absent where none was seen. */
-  compactions?: number;
-  /**
-   * How many of its attempts were resumed and wrote their parent's conversation to the cache again (`rebuiltCache`) — a reading of the
-   * counts above, not a count the engine made. Absent where none did.
-   */
-  rebuiltCaches?: number;
-};
-
-const FIELDS = [
-  'responses',
-  'toolCalls',
-  'inputTokens',
-  'outputTokens',
-  'costUsd',
-  'apiMs',
-  'toolMs',
-  'cacheReadTokens',
-  'cacheWriteTokens',
-  'uncachedTokens',
-] as const;
-
-/**
- * Several attempts' usage as one. A count is the sum only when every attempt measured it: a sum over
- * the attempts that happened to be counted would under-report, and read as the whole. The peak is the
- * largest, by the same rule: an attempt that measured none may have been the largest.
- */
-export function sumUsage(usages: ReadonlyArray<Consumed | null | undefined>): Consumed | undefined {
-  if (!usages.length) return undefined;
-  const sum: Consumed = {};
-  for (const field of FIELDS) {
-    const values = usages.map((u) => u?.[field]);
-    if (values.every((v): v is number => v !== undefined)) sum[field] = values.reduce((n, v) => n + v, 0);
-  }
-  const peaks = usages.map((u) => u?.peakContextTokens);
-  if (peaks.every((v): v is number => v !== undefined)) sum.peakContextTokens = Math.max(...peaks);
-  const rebuilt = usages.reduce((n, u) => n + (u?.rebuiltCaches ?? 0), 0);
-  if (rebuilt) sum.rebuiltCaches = rebuilt;
-  const compactions = usages.reduce((n, u) => n + (u?.compactions ?? 0), 0);
-  if (compactions) sum.compactions = compactions;
-  return Object.keys(sum).length ? sum : undefined;
-}
-
-/**
- * Whether a resumed attempt rebuilt its cache rather than read it: its first response wrote more than half the context it read to the
- * cache. A continuation's first response reads its parent's whole conversation, which a warm cache serves as reads; written again, it is
- * the same tokens at twenty times a read's price, and the one input count hides it. Judged on the first response alone, since the
- * attempt's writes in all grow with its work, warm or not. Never for an attempt that started cold, whose first writes are its cache, nor
- * one whose runner did not see its first response.
- */
-export const rebuiltCache = (u: Consumed | null | undefined, resumed: boolean): boolean =>
-  resumed &&
-  u?.firstCacheWriteTokens !== undefined &&
-  u.firstContextTokens !== undefined &&
-  u.firstCacheWriteTokens > u.firstContextTokens / 2;
-
-/** The peak context, in tokens, past which a step with no `context:` cap is marked `large` (`peakMark`). */
-export const LARGE_CONTEXT = 200_000;
-
-/**
- * Where a peak stands against a step's `context:` cap: `cap` once the session reached it — it compacted, which Claude Code does well short
- * of its window, or its peak got there — and `large` past `LARGE_CONTEXT` on a step with none. Null otherwise, and where nobody measured
- * either.
- */
-export function peakMark(u: Consumed | null | undefined, cap: number | undefined): PeakMark | null {
-  const peak = u?.peakContextTokens;
-  if (cap !== undefined) return u?.compactions || (peak !== undefined && peak >= cap) ? 'cap' : null;
-  return peak !== undefined && peak > LARGE_CONTEXT ? 'large' : null;
-}
-
-/** How often a session compacted, in words: `compacted`, `compacted twice`, `compacted 3 times`. */
-const compactedWords = (n: number): string => `compacted${n === 1 ? '' : n === 2 ? ' twice' : ` ${n} times`}`;
-
-/**
- * What a session read, by price, for a person at a glance: `read 21.4M · wrote 412k · peak 167k` — the cache's reads and writes, which
- * are nearly all of an attempt's input and priced twenty-fold apart, and the largest context it carried. The peak says where it reached
- * a step's `context:` cap — compacting says it did — or passed 200k with none, and a resumed attempt that rebuilt its cache says so. Empty
- * where nothing measured any of it: a runner that counted none says nothing, rather than 0.
- */
-export function readWords(u: Consumed | null | undefined, cap?: number): string {
-  if (!u) return '';
-  const mark = peakMark(u, cap);
-  const where = [
-    ...(u.compactions ? [compactedWords(u.compactions)] : []),
-    ...(mark === 'large' ? [`past ${count(LARGE_CONTEXT)} with no cap`] : []),
-  ].join(', ');
-  const reached = mark === 'cap' && cap !== undefined ? `${u.compactions ? `${where} ` : ''}at its ${count(cap)} cap` : where;
-  const peak =
-    u.peakContextTokens !== undefined ? `peak ${count(u.peakContextTokens)}${reached ? `, ${reached}` : ''}` : reached || undefined;
-  const rebuilt = u.rebuiltCaches
-    ? u.rebuiltCaches > 1
-      ? `${u.rebuiltCaches} resumed sessions wrote their context to the cache again instead of reading it`
-      : 'a resumed session wrote its context to the cache again instead of reading it'
-    : undefined;
-  return [
-    ...(u.cacheReadTokens !== undefined ? [`read ${count(u.cacheReadTokens)}`] : []),
-    ...(u.cacheWriteTokens !== undefined ? [`wrote ${count(u.cacheWriteTokens)}`] : []),
-    ...(peak ? [peak] : []),
-    ...(rebuilt ? [rebuilt] : []),
-  ].join(' · ');
-}
-
-/**
- * Dollars for a person: to the cent, and to three figures under one — a session's $0.004 rounded to "$0.00" is the zero these lines
- * refuse.
- */
-export const dollars = (usd: number): string => `$${usd > 0 && usd < 0.01 ? Number(usd.toPrecision(3)) : usd.toFixed(2)}`;
-
-/** A budget as its author writes one: `$3`, `$2.50`. */
-export const budgetWord = (usd: number): string => (Number.isInteger(usd) ? `$${usd}` : dollars(usd));
-
-/** A count for a person, to three figures: 112000 → 112k, 6350000 → 6.35M. */
-export function count(n: number): string {
-  for (const [of, unit] of [
-    [1e9, 'B'],
-    [1e6, 'M'],
-    [1e3, 'k'],
-  ] as const) {
-    if (n >= of * 0.9995) return `${Number((n / of).toPrecision(3))}${unit}`;
-  }
-  return String(n);
-}
-
-/** A duration for a person, as the operator measures one: `58s`, `19m42s`, `1h05m`, `2d03h`. */
-export function durationWord(ms: number): string {
-  const s = Math.floor(Math.max(0, ms) / 1000);
-  const two = (n: number) => String(n).padStart(2, '0');
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m${two(s % 60)}s`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h${two(m % 60)}m`;
-  return `${Math.floor(h / 24)}d${two(h % 24)}h`;
-}
-
-/**
- * What a step consumed, beside its check: `used` and `cost`. Unmeasured says so, never `0` — a zero
- * that means "nobody counted" reads as "cost nothing". Cost prints a number only where the engine measured
- * one: the harness's own figure, read once a session has ended (agent-runtime's README, *What an attempt consumed*).
- * The api and tool time go beside the counts once either was measured, and each says not measured where the
- * other was, and neither is said where nothing timed it. A measured time under a
- * second reads `<1s`, never `0s`.
- */
-export function usedLines(u: Consumed | undefined): string[] {
-  const read = readWords(u);
-  const cost = `cost  ${u?.costUsd !== undefined ? dollars(u.costUsd) : 'not measured'}${read ? ` · ${read}` : ''}`;
-  if (!u) return ['used  not measured', cost];
-  const said = (n: number | undefined, what: string, unmeasured: string) =>
-    n === undefined ? `${unmeasured} not measured` : `${count(n)} ${what}`;
-  const took = (ms: number | undefined, what: string) =>
-    ms === undefined ? `${what} not measured` : `${what} ${ms > 0 && ms < 1000 ? '<1s' : durationWord(ms)}`;
-  const timed = u.apiMs !== undefined || u.toolMs !== undefined ? [took(u.apiMs, 'api'), took(u.toolMs, 'tools')] : [];
-  return [
-    `used  ${[
-      said(u.responses, 'responses', 'responses'),
-      said(u.toolCalls, 'tool calls', 'tool calls'),
-      said(u.inputTokens, 'in', 'tokens in'),
-      said(u.outputTokens, 'out', 'tokens out'),
-      ...timed,
-    ].join(' · ')}`,
-    cost,
-  ];
-}
 
 /**
  * The try a refusal points a person to for a step that stopped, as `nemia retry` takes it: with `--budget <amount>` where the step reads

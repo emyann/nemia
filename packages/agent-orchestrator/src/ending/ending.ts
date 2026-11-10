@@ -378,3 +378,10 @@ export function gateRefusal(
   }
   return null;
 }
+
+/**
+ * Whether `name` is an ending at its gate that has not run: approved first (`approvedFirst`) and never filed. What `decision` and the
+ * listing read where the result git already has (`resultOnBase`) was merged by hand, so the ending's gate holds nothing.
+ */
+export const unrunEnding = (steps: readonly Workflow[], run: Run, name: string): boolean =>
+  !run.steps[name]?.taskId && steps.some((s) => s.name === name && approvedFirst(s, run));

@@ -22,16 +22,12 @@ import { Context, Effect, Layer, Schema } from 'effect';
 import { revisionNow, REVISION_KINDS, type Revision, type RevisionKind } from './revisions.ts';
 import { RevisionAppended, RevisionOnRead, type RevisionOf } from './revisions.model.ts';
 import { checked, doorOf, rootedDoor, type DoorOf } from '../door/door.store.ts';
-import { wfRoot } from '../config/config.store.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 export type { RevisionOf } from './revisions.model.ts';
 
-/** The store whose ledger this is, read once as the package loads, as `record.store.ts` reads its `HOME`. */
-const ROOT = wfRoot();
-
 /** Where the ledger lives: `$WF_ROOT/revisions`, beside `runs/`. */
-export const revisionsDir = (): string => path.join(ROOT, 'revisions');
+export const revisionsDir = (home: string): string => path.join(home, 'revisions');
 
 /**
  * What a run or one of its steps resolved of one kind and name (`Pin`), as a record keeps it: absent where nothing was resolved, and each
@@ -161,18 +157,19 @@ export const LedgerDoor = Context.Reference<LedgerDoorShape>('agent-orchestrator
 export const ledgerDoorFiles = (root: string): Layer.Layer<never> => Layer.succeed(LedgerDoor)(ledgerDoorOver(ledgerFiles(root)));
 
 /** An act of the door over the ledger at the module's root, run now: what it answers, or the refusal thrown. */
-const atModuleRoot = <A>(act: (door: LedgerDoorShape) => Effect.Effect<A, unknown>): A =>
-  Effect.runSync(act(ledgerDoorOver(ledgerIn(revisionsDir()))));
+const atModuleRoot = <A>(home: string, act: (door: LedgerDoorShape) => Effect.Effect<A, unknown>): A =>
+  Effect.runSync(act(ledgerDoorOver(ledgerIn(revisionsDir(home)))));
 
 /** The entries kept for `kind` and `name` at the module's root (`LedgerLayer['entries']['of']`): the door's synchronous spelling. */
-export const ledgerOf = (kind: RevisionKind, name: string): Revision[] => atModuleRoot((door) => door.entries.of({ kind, name }));
+export const ledgerOf = (home: string, kind: RevisionKind, name: string): Revision[] =>
+  atModuleRoot(home, (door) => door.entries.of({ kind, name }));
 
 /**
  * The revision `hash` stands at for `kind` and `name` at the module's root, appended when new (`LedgerLayer['entries']['append']`): the
  * door's synchronous spelling, refused as the door refuses.
  */
-export const appendRevision = (kind: RevisionKind, name: string, hash: string, at: string): Revision =>
-  atModuleRoot((door) => door.entries.append({ kind, name }, hash, at));
+export const appendRevision = (home: string, kind: RevisionKind, name: string, hash: string, at: string): Revision =>
+  atModuleRoot(home, (door) => door.entries.append({ kind, name }, hash, at));
 
 /**
  * The ledger's number for what a definition holds now, by its digest (`version`), read through the Ledger door and never appended: the

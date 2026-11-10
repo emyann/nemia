@@ -6,21 +6,14 @@
  */
 import os from 'node:os';
 import { Effect } from 'effect';
-import { type Hold, type Run } from '../record/record.ts';
+import { honoursAsks, type Hold, type Run } from '../record/record.ts';
 import { holdRefusal } from './wait.ts';
 import { idRefusal } from '../forget/forget.ts';
 import { assess } from '../tick/assess.ts';
-import { stepsOf } from '../steps/steps.verb.ts';
 import { standingLiveOf } from '../standing/standing.verb.ts';
-import {
-  closeoutAsked,
-  closeoutReader,
-  exitVerdicts,
-  harnessBlocked,
-  parentRead,
-  spendReader,
-  taskPhasesRead,
-} from '../views/views.verb.ts';
+import { parentRead } from '../views/views.verb.ts';
+import { readRun } from '../tick/told.verb.ts';
+import { EngineService } from '../runtime-client.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
@@ -69,24 +62,11 @@ export const hold = Effect.fn('hold')(function* (id: string, until: readonly str
     ),
   );
   let finished: 'landed' | 'succeeded' | undefined;
-  if (!run.cancelledAt && !run.pruned && !run.hold) {
+  if (honoursAsks(run)) {
     if ((yield* parentRead(id, git)).landed) finished = 'landed';
     else {
-      const steps = yield* stepsOf(run);
-      const { views, phaseOf } = yield* taskPhasesRead(run);
-      const { asks, rounds } = yield* (yield* RunDoor).asks.read(RunId.read(id));
-      const { status } = assess(
-        steps,
-        run,
-        phaseOf,
-        closeoutReader(views, run, steps),
-        closeoutAsked(views),
-        exitVerdicts(views, run),
-        asks,
-        rounds,
-        harnessBlocked(views),
-        spendReader(views),
-      );
+      const { read: runRead } = yield* readRun(yield* EngineService, run);
+      const { status } = assess(runRead);
       if (status === 'succeeded') finished = 'succeeded';
     }
   }
@@ -117,8 +97,8 @@ function osUser(): string | undefined {
 /**
  * Lift a person's hold by hand — `nemia hold <run> --off`: the run goes on at the next tick, and what its steps asked while it was held is
  * asked again. Fails, before anything is written: an id that is not a run's (`Invalid`), a run not there (`Missing`), a run nobody holds,
- * and a hold lifted and put again since it was read, which is a person's newer word and stays (`runStore.holds.lift` takes only the hold
- * read, by its `at`) — each a `Conflict`; dies of anything else the store throws. Reads no engine, so it requires nothing.
+ * and a hold lifted and put again since it was read, which is a person's newer word and stays (the Run door's `holds.lift` takes only the
+ * hold read, by its `at`) — each a `Conflict`; dies of anything else the store throws. Reads no engine, so it requires nothing.
  */
 export const unhold = Effect.fn('unhold')(function* (id: string) {
   const bad = idRefusal(id, 'hold');

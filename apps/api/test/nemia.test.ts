@@ -18,7 +18,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
-import { LEVEL, addFactory, engine } from 'agent-orchestrator';
+import { LEVEL, engine } from 'agent-orchestrator';
+import { addFactory } from 'agent-orchestrator/testing';
 import { runWith } from './builtin-place.ts';
 import { appOf, liveOf } from '../src/app.ts';
 import { Engine } from '../src/store.ts';
@@ -27,7 +28,7 @@ const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-orig
 
 /** An engine on which no task is filed, the app's and the command line's. */
 const e = {
-  ...engine(),
+  ...engine(process.env),
   view: (id: string) => Effect.succeed({ id, phase: 'pending', state: { settled: null, attempts: [] } }),
 } as never;
 

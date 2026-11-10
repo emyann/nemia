@@ -8,7 +8,6 @@ import { folderModel } from '../folder/folder.model.ts';
 import { inboxModel } from '../inbox/inbox.model.ts';
 import { factoryModel } from '../factory/factory.model.ts';
 import { templateModel } from '../template/door/templates.model.ts';
-import { placeModel } from '../place/place.model.ts';
 import { agentsModel } from '../agents/agents.model.ts';
 import { feedModel } from '../feed/feed.model.ts';
 import { revisionsModel } from '../revisions/revisions.model.ts';
@@ -20,7 +19,6 @@ const MODELS: readonly ErModel[] = [
   inboxModel,
   factoryModel,
   templateModel,
-  placeModel,
   agentsModel,
   feedModel,
   revisionsModel,

@@ -1,5 +1,5 @@
 /**
- * A run's check exports nothing to the daemon's collector: under the client's `engine()` in a process whose environment names a
+ * A run's check exports nothing to the daemon's collector: under the client's `engine(process.env)` in a process whose environment names a
  * collector, as the daemon's does, a check filed as a run files one, whose command starts a process that exports wherever its
  * environment says (`exporting-child.ts`), posts nothing, since that process is told of no collector. The same process told the
  * address by name posts its span, so the absence is the engine's doing. Against the real worker and a scratch collector.
@@ -43,7 +43,7 @@ after(async () => {
 const { engine } = await import('../src/runner.ts');
 const { sessionTelemetryOf } = await import('../src/telemetry/telemetry.ts');
 
-const e = engine();
+const e = engine(process.env);
 
 /** The exporting process as a shell line, its one span named `span`. */
 const exporting = (span: string): string =>

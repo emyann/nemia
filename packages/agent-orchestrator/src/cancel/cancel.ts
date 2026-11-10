@@ -1,13 +1,7 @@
 /** What cancelling a run has to do, and what to tell the person who asked (`cancelPlan`). Pure. */
 import { inFlight, type InFlight } from '../cap/cap.ts';
-import type { Workflow } from '../step/step.ts';
-import type { CloseoutAsked, Run, TaskPhase } from '../record/record.ts';
-import type { Closeout } from '../closeout/index.ts';
-import type { Verdict } from '../check/check.ts';
-import type { RetryAsk } from '../retry/index.ts';
 import { holdsTheRun } from '../phase/phase.ts';
-import { standing, type RoundAsk, type SpendOf } from '../status/status.ts';
-import { assess } from '../tick/assess.ts';
+import { assess, type Assessment, type AssessRead } from '../tick/assess.ts';
 import type { RunStatusWord } from 'objects';
 
 /**
@@ -48,37 +42,18 @@ export type CancelPlan =
  * ready and no check, try or round is due (`assess`), and no step waits on a person (`holdsTheRun`), the same rule by which `nemia ls`
  * says a step waits on you.
  *
- * @param spendOf What each task's sessions cost (`taskSpend`): a step over its budget has no try due, and nothing is filed for it.
+ * Off the one read of the run (`AssessRead`) and its assessment, so it says finished of what the pass says finished: a try or round due
+ * that the checkout or the store's pause holds back (`due`) still keeps the run going.
  */
-export function cancelPlan(
-  steps: readonly Workflow[],
-  run: Run,
-  phaseOf: (taskId: string) => TaskPhase,
-  closeoutOf: (step: string) => Closeout | undefined = () => undefined,
-  askedCloseout: (taskId: string) => CloseoutAsked = () => false,
-  verdictOf: (step: string) => Verdict | undefined = () => undefined,
-  asks: readonly RetryAsk[] = [],
-  roundAsks: readonly RoundAsk[] = [],
-  spendOf: SpendOf = () => undefined,
-): CancelPlan {
+export function cancelPlan(read: AssessRead, assessed: Assessment = assess(read)): CancelPlan {
+  const { run, phaseOf } = read;
   const stop = inFlight(run, phaseOf);
   if (run.cancelledAt) return { kind: 'already-cancelled', at: run.cancelledAt, stop };
   if (stop.length) return { kind: 'cancel', stop };
 
-  const { ready, check, retry, round, status } = assess(
-    steps,
-    run,
-    phaseOf,
-    closeoutOf,
-    askedCloseout,
-    verdictOf,
-    asks,
-    roundAsks,
-    () => false,
-    spendOf,
-  );
-  const waits = steps.some((s) => holdsTheRun(standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status));
-  if (!ready.length && !check.length && !retry.length && !round.length && !waits && (status === 'succeeded' || status === 'failed'))
-    return { kind: 'finished', status };
+  const { ready, check, due, waitingOnCheckout, waitingOnPause, status } = assessed;
+  const waits = [...assessed.stepWords.values()].some((w) => holdsTheRun(w.status));
+  const moving = [ready, check, due.retry, due.round, waitingOnCheckout, waitingOnPause?.steps ?? []].some((names) => names.length > 0);
+  if (!moving && !waits && (status === 'succeeded' || status === 'failed')) return { kind: 'finished', status };
   return { kind: 'cancel', stop: [] };
 }

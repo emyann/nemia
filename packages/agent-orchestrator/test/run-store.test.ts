@@ -12,6 +12,7 @@
  * functions from `record.store.ts`, or through `runner.ts`, is refused. `WF_ROOT` is set before the store is imported, since it is read as
  * the module loads.
  */
+import { rootNow } from './config-given.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -66,6 +67,32 @@ const door = doorFrom(RunDoor, runDoorFiles);
 
 for (const [name, body] of walksOn(RUN_WALKS, () => ({ door, root: ROOT, layer: 'files' }))) test(name, body);
 
+test('a record of an older shape reads through the door as the one Run type, and is written back with nothing refused or moved', () => {
+  const id = 'r-older-shape';
+  const older = {
+    ...aRun(id),
+    steps: {
+      implement: { taskId: `${id}-implement-try2`, tries: [{ taskId: `${id}-implement`, then: 'retries' }], workspace: '/w/implement' },
+      review: { taskId: null },
+    },
+    gatesTimed: [{ step: 'implement', try: 1 }],
+    deniedCounted: [{ task: `${id}-implement`, attempts: 2 }],
+    settlesCounted: [`${id}-implement`],
+    runTimed: true,
+    slotHeldAt: '2026-09-01T00:01:00.000Z',
+    keyNobodyNames: 'kept as it was',
+  };
+  fs.mkdirSync(runsDir(), { recursive: true });
+  fs.writeFileSync(runFile(id), JSON.stringify(older, null, 2));
+  const read = act(door.runs.read(RunId.read(id)));
+  assert.ok(!('refused' in read), 'an older record reads');
+  assert.equal(read.steps.implement?.tries?.[0]?.cause, 'retries', "a try's former `then` is read as its cause");
+  assert.deepEqual(read.gatesTimed, older.gatesTimed, 'a counter of the tick reads as the model names it');
+  assert.equal(act(door.runs.rewrite(read)), true, 'and is written back through the model with nothing refused');
+  const written = JSON.parse(fs.readFileSync(runFile(id), 'utf8')) as Record<string, unknown>;
+  assert.equal(written.keyNobodyNames, 'kept as it was');
+});
+
 test('a record in the store, read and written back through the door: what it holds is what it held', async (t) => {
   await t.test(
     'a record stored under an id runId would not mint still reads through the door, and is written back (RunId on read is nominal)',
@@ -111,17 +138,17 @@ test('a record in the store, read and written back through the door: what it hol
 test('whether a person called a run off: a pause, a hold and a record gone, as the store and the tick each read it', async (t) => {
   await t.test('every run is called off while the store is paused, and none once the pause is lifted', () => {
     const run = made('r-paused');
-    putPause({ by: 'ann' });
+    putPause(rootNow(), { by: 'ann' });
     try {
       assert.equal(filesStore.runs.calledOff(run.id), true);
     } finally {
-      resumePause();
+      resumePause(rootNow());
     }
     assert.equal(filesStore.runs.calledOff(run.id), false);
   });
   await t.test("the store's pause is composed onto every run read and listed, and written back into none", () => {
     const run = made('r-pause-read');
-    const pause = putPause({ why: 'merging by hand', by: 'ann' });
+    const pause = putPause(rootNow(), { why: 'merging by hand', by: 'ann' });
     try {
       const read = filesStore.runs.read(run.id);
       assert.deepEqual(read.pause, pause);
@@ -134,7 +161,7 @@ test('whether a person called a run off: a pause, a hold and a record gone, as t
       assert.equal(filesStore.runs.rewrite(read), true);
       assert.equal('pause' in JSON.parse(fs.readFileSync(runFile(run.id), 'utf8')), false, 'the pause is written into the record');
     } finally {
-      resumePause();
+      resumePause(rootNow());
     }
     assert.equal('pause' in filesStore.runs.read(run.id), false, 'lifted, no run reads it');
   });
@@ -259,7 +286,7 @@ test("a run forgotten loses its record and every person's file and its directory
 
 /** The functions of `record.store.ts` that read or write a run's record or a person's files beside it: `runStore` says each. */
 const GUARDED = [
-  'readRun',
+  'runRecord',
   'listRuns',
   'writeRun',
   'rewriteRun',
@@ -321,7 +348,7 @@ function refusals(sources: Record<string, string>): string[] {
   for (const [file, text] of Object.entries(sources)) {
     for (const [from, names] of importsFrom(text))
       out.push(
-        `${file} imports ${names.join(', ')} from ${from}: read and write through runStore (src/record/files.store.ts), adding ` +
+        `${file} imports ${names.join(', ')} from ${from}: read and write through the Run door (RunDoor, src/runs/runs.store.ts), adding ` +
           'the method to RunStore (src/record/record.ts)',
       );
   }
@@ -385,14 +412,14 @@ function refusedFor(said: readonly string[], ...imported: Array<[fn: string, fro
   assert.equal(said.length, imported.length, said.join('\n'));
   imported.forEach(([fn, from], i) => {
     assert.ok(said[i].startsWith(`src/new/new.verb.ts imports ${fn} from ${from}: `), said[i]);
-    assert.ok(said[i].includes('runStore (src/record/files.store.ts)'), said[i]);
+    assert.ok(said[i].includes('RunDoor, src/runs/runs.store.ts'), said[i]);
     assert.ok(said[i].includes('RunStore (src/record/record.ts)'), said[i]);
   });
 }
 
 test('a file that imports a run function from record.store.ts is refused, naming the file and the function', () => {
-  const sources = { 'src/new/new.verb.ts': "import { readRun, stepsOf } from '../record/record.store.ts';\n" };
-  refusedFor(refusals(sources), ['readRun', 'record.store.ts']);
+  const sources = { 'src/new/new.verb.ts': "import { runRecord, stepsOf } from '../record/record.store.ts';\n" };
+  refusedFor(refusals(sources), ['runRecord', 'record.store.ts']);
 });
 
 test('an import spread over lines is refused, as is a re-export, a namespace and a dynamic import', () => {
@@ -401,48 +428,91 @@ test('an import spread over lines is refused, as is a re-export, a namespace and
   assert.deepEqual(directImports("export {\n  listRuns,\n} from './record/record.store.ts';\n"), ['listRuns']);
   assert.deepEqual(directImports("import * as store from '../record/record.store.ts';\n"), ['*']);
   assert.deepEqual(directImports("const store = await import('../record/record.store.ts');\n"), ['*']);
-  assert.deepEqual(directImports("import { readRun } from '../other/other.store.ts';\nimport { stepsOf } from './record.store.ts';\n"), []);
+  assert.deepEqual(
+    directImports("import { runRecord } from '../other/other.store.ts';\nimport { stepsOf } from './record.store.ts';\n"),
+    [],
+  );
 });
 
 test('a run function imported through runner.ts is refused, naming runner.ts as the module it came from', () => {
-  const sources = { 'src/new/new.verb.ts': "import {\n  HOME,\n  readRun,\n} from '../runner.ts';\n" };
-  refusedFor(refusals(sources), ['readRun', 'runner.ts']);
+  const sources = { 'src/new/new.verb.ts': "import {\n  HOME,\n  runRecord,\n} from '../runner.ts';\n" };
+  refusedFor(refusals(sources), ['runRecord', 'runner.ts']);
   const both = {
     'src/new/new.verb.ts': "import { listRuns } from '../runner.ts';\nimport { readAsks } from '../record/record.store.ts';\n",
   };
   refusedFor(refusals(both), ['readAsks', 'record.store.ts'], ['listRuns', 'runner.ts']);
-  assert.deepEqual(directImports("import { readRun } from '../runners.ts';\nimport { stepsOf } from '../../runner.ts';\n"), []);
+  assert.deepEqual(directImports("import { runRecord } from '../runners.ts';\nimport { stepsOf } from '../../runner.ts';\n"), []);
 });
 
 test("no file of src but the store's own imports a run's functions from record.store.ts or through runner.ts", () => {
   assert.deepEqual(refusals(sourcesUnder(PKG, 'src', OWN)), []);
 });
 
-/** The run store's run groups as `src`'s code uses them, comment lines left out, by file: what `RUN_DOOR_DEBT` counts. */
-const SEAM_USE = /\brunStore\s*\.\s*(?:runs|asks|holds|refresh|forgetting)\b/g;
+/**
+ * A read of the run store past the Run door: its files store by name (`filesStore`), or the run store's former binding (`runStore.`).
+ * The binding itself is gone from `files.store.ts`, so the typecheck refuses an import of it; this refuses the files store named instead.
+ */
+const PAST_THE_DOOR = /\bfilesStore\b|\brunStore\s*\.\s*(?:runs|asks|holds|refresh|forgetting|labels)\b/g;
 
-/** What a break of the baseline says: a file it does not name or a count grown, a count fallen, a file with none left. */
-const inWords = ({ file, uses: n, owed, kind }: DebtBreak): string =>
-  kind === 'grown'
-    ? `${file} uses the run store ${n} time(s) where test/run-door.baseline.ts names ${owed}: yield RunDoor (src/runs/runs.store.ts) instead`
-    : kind === 'fallen'
-      ? `${file} uses the run store ${n} time(s): lower its count in test/run-door.baseline.ts to ${n}, which only shrinks`
-      : `${file} uses the run store no more: take its line out of test/run-door.baseline.ts`;
+/** The two files the rule leaves out: the files store, which defines it, and the Run door, its one reader. */
+const DOOR_AND_FILES = ['src/record/files.store.ts', 'src/runs/runs.store.ts'];
 
-test('no file of src uses the run store but as test/run-door.baseline.ts counts it, and the count only shrinks', async () => {
-  const { RUN_DOOR_DEBT } = await import('./run-door.baseline.ts');
-  assert.deepEqual(debtBreaks(seamUses(sourcesUnder(PKG, 'src', OWN), SEAM_USE), RUN_DOOR_DEBT).map(inWords), []);
+/** What a read past the door says: the file, how many uses, and the fix. */
+const pastTheDoor = (sources: Record<string, string>): string[] =>
+  [...seamUses(sources, PAST_THE_DOOR)].map(
+    ([file, n]) =>
+      `${file} reads the run store past the Run door ${n} time(s): yield RunDoor in a program, or read runsAtOnce (src/runs/runs.store.ts) in a plain function`,
+  );
+
+test('no file of src but the Run door reads the run store: every other reads RunDoor or runsAtOnce', () => {
+  assert.deepEqual(pastTheDoor(sourcesUnder(PKG, 'src', DOOR_AND_FILES)), []);
 });
 
-test('REFUSED: a converted file that uses the run store again, and a count the baseline holds above what is left', async () => {
+test('REFUSED: a file of src that reads the files store, or the run store by its former binding, is named', () => {
+  const sources = sourcesUnder(PKG, 'src', DOOR_AND_FILES);
+  const planted = {
+    ...sources,
+    'src/cancel/cancel.verb.ts': `${sources['src/cancel/cancel.verb.ts']}\nimport { filesStore } from '../record/files.store.ts';\nconst x = filesStore.runs.read('a');\n`,
+    'src/try/try.verb.ts': `${sources['src/try/try.verb.ts']}\nconst y = runStore.asks.read('a');\n`,
+  };
+  const said = pastTheDoor(planted);
+  assert.equal(said.length, 2, said.join('\n'));
+  assert.ok(said[0]?.startsWith('src/cancel/cancel.verb.ts reads the run store past the Run door 2 time(s)'), said[0]);
+  assert.ok(said[1]?.startsWith('src/try/try.verb.ts reads the run store past the Run door 1 time(s)'), said[1]);
+});
+
+/** A read of runs that a door given to the program does not see: `runsAtOnce`'s groups and `keptRuns`, what `RUN_DOOR_DEBT` counts. */
+const UNROOTED_READ = /\brunsAtOnce\s*\.|\bkeptRuns\s*\(/g;
+
+/** What a break of the count says: a file it does not name or a count grown, a count fallen, a file with none left. */
+const unrootedInWords = ({ file, uses: n, kind, owed }: DebtBreak): string =>
+  kind === 'grown'
+    ? `${file} reads runs past the door it is given ${n} time(s) where test/run-door.baseline.ts names ${owed}: yield RunDoor instead`
+    : kind === 'fallen'
+      ? `${file} reads runs past the door it is given ${n} time(s): lower its count in test/run-door.baseline.ts to ${n}, which only shrinks`
+      : `${file} reads runs past the door it is given no more: take its line out of test/run-door.baseline.ts`;
+
+test('no file of src reads runs past the door it is given but as test/run-door.baseline.ts counts it, and the count only shrinks', async () => {
   const { RUN_DOOR_DEBT } = await import('./run-door.baseline.ts');
-  const sources = sourcesUnder(PKG, 'src', OWN);
+  assert.deepEqual(debtBreaks(seamUses(sourcesUnder(PKG, 'src', DOOR_AND_FILES), UNROOTED_READ), RUN_DOOR_DEBT).map(unrootedInWords), []);
+});
+
+test('REFUSED: a new read through runsAtOnce in a file the count does not name, and a count held above what is left', async () => {
+  const { RUN_DOOR_DEBT } = await import('./run-door.baseline.ts');
+  const sources = sourcesUnder(PKG, 'src', DOOR_AND_FILES);
   const again = {
     ...sources,
-    'src/cancel/cancel.verb.ts': `${sources['src/cancel/cancel.verb.ts']}\nconst x = runStore.runs.read('a');\n`,
+    'src/cancel/cancel.verb.ts': `${sources['src/cancel/cancel.verb.ts']}\nconst z = runsAtOnce.runs.read('a');\n`,
   };
-  assert.equal(debtBreaks(seamUses(again, SEAM_USE), RUN_DOOR_DEBT).length, 1);
-  assert.equal(debtBreaks(seamUses(sources, SEAM_USE), { ...RUN_DOOR_DEBT, 'src/try/try.verb.ts': 2 }).length, 1);
+  assert.deepEqual(
+    debtBreaks(seamUses(again, UNROOTED_READ), RUN_DOOR_DEBT).map(({ file, kind }) => [file, kind]),
+    [['src/cancel/cancel.verb.ts', 'grown']],
+  );
+  const above = debtBreaks(seamUses(sources, UNROOTED_READ), { ...RUN_DOOR_DEBT, 'src/try/try.verb.ts': 2 });
+  assert.deepEqual(
+    above.map(({ file, kind }) => [file, kind]),
+    [['src/try/try.verb.ts', 'fallen']],
+  );
 });
 
 /** A run under `id` started out of the inbox's card `card`. */

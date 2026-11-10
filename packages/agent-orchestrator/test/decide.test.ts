@@ -8,6 +8,8 @@
  *
  * `WF_ROOT` is set before the runner is imported: it is read as the module loads.
  */
+import type { StoreRoot } from '../src/config/root.store.ts';
+import type { StoreConfig } from '../src/config/config.store.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -45,14 +47,14 @@ const {
   startRun,
   runWith,
 } = await import('../src/runner.ts');
-const { listRuns, readRun } = await import('../src/record/record.store.ts');
+const { listRuns, runRecord } = await import('../src/record/record.store.ts');
 const { passStanding } = await import('../src/standing/standing.verb.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');
 const stage = staged({ runWith, main, engineOf });
 
 /** One pass of the tick over the run `id`, on the stage's engine. */
-const tick = (id: string) => stage.runWith(stage.board().e, advanceRun(readRun(id)));
+const tick = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(id)));
 /** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `nemia ls` reads. */
 const aPass = () => stage.runWith(stage.board().e, passStanding(listRuns()));
 
@@ -146,7 +148,7 @@ const awaiting = async (implementKeys = '') => {
   const repo = aRepo();
   const run = await stage.runPlaced(startRun({ brief: 'add sub', repo, workflowDir: folder(implementKeys) }));
   await tick(run.id);
-  const work = readRun(run.id).steps.implement;
+  const work = runRecord(run.id).steps.implement;
   commitIn(work.workspace!, {
     'packages/x/src/add.ts': `${ADD}export const sub = (a, b) => a - b;\n`,
     'packages/x/test/add.test.ts': "import assert from 'node:assert';\nassert.ok(true);\n",
@@ -157,7 +159,7 @@ const awaiting = async (implementKeys = '') => {
   settle(`${run.id}-implement-check`, 'succeeded', { exitCode: 0 });
   await tick(run.id);
   settle(`${run.id}-review`, 'succeeded', { closeout: SIGNED });
-  const record = readRun(run.id);
+  const record = runRecord(run.id);
   return { run: repositoryRun(record), repo, branch: record.steps.review.branch! };
 };
 
@@ -436,7 +438,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
       'merged by hand, as a person lands a run with no ending step: the run reads landed, and there is nothing left to decide',
     );
 
-    const workspaces = Object.values(readRun(other.run.id).steps).flatMap((step) => (step.workspace ? [step.workspace] : []));
+    const workspaces = Object.values(runRecord(other.run.id).steps).flatMap((step) => (step.workspace ? [step.workspace] : []));
     const removed = stage
       .place()
       .place.askNow('remove', { repo: other.repo, workspaces: [...new Set(workspaces)], branches: [other.branch] });
@@ -454,11 +456,11 @@ test('a run waiting on you, read and landed: its screens, and what approving its
         startRun({ brief: 'add sub', repo: aRepo(), workflowDir: ending('ship', `${SHIP_IT}\n\nAbort on any failure.\n`) }),
       );
       await tick(run.id);
-      const work = readRun(run.id).steps.implement;
+      const work = runRecord(run.id).steps.implement;
       commitIn(work.workspace!, { 'packages/x/src/add.ts': `${ADD}export const sub = (a, b) => a - b;\n` }, 'add sub');
       settle(`${run.id}-implement`, 'succeeded', { closeout: SIGNED });
       await tick(run.id);
-      assert.equal(readRun(run.id).steps.ship.taskId, null, 'nothing of the ending is filed without a person');
+      assert.equal(runRecord(run.id).steps.ship.taskId, null, 'nothing of the ending is filed without a person');
 
       const lines = await screen(c, run.id);
       indexOf(
@@ -494,7 +496,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
       const working = async (file: string, text: string, settled: boolean) => {
         const run = await stage.runPlaced(startRun({ brief: `write ${file}`, repo, workflowDir: dir }));
         await tick(run.id);
-        const work = readRun(run.id).steps.implement;
+        const work = runRecord(run.id).steps.implement;
         commitIn(work.workspace!, { [file]: text }, `write ${file}`);
         if (settled) {
           settle(`${run.id}-implement`, 'succeeded', { closeout: SIGNED });
@@ -540,7 +542,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
         const run = await stage.runPlaced(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: ending('land', note, 'otto', team) }));
         await tick(run.id);
         commitIn(
-          readRun(run.id).steps.implement.workspace!,
+          runRecord(run.id).steps.implement.workspace!,
           { 'packages/x/src/add.ts': 'export const sub = (a, b) => a - b;\n' },
           'add sub',
         );
@@ -579,7 +581,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
       const run = await stage.runPlaced(startRun({ brief: 'add sub', repo, workflowDir: folder(), gates: ['review'] }));
       await tick(run.id);
       commitIn(
-        readRun(run.id).steps.implement.workspace!,
+        runRecord(run.id).steps.implement.workspace!,
         { 'packages/x/src/add.ts': `${ADD}export const sub = (a, b) => a - b;\n` },
         'add sub',
       );
@@ -588,7 +590,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
       settle(`${run.id}-implement-check`, 'succeeded', { exitCode: 0 });
       await tick(run.id);
       settle(`${run.id}-review`, 'succeeded', { closeout: SIGNED });
-      const branch = readRun(run.id).steps.review.branch!;
+      const branch = runRecord(run.id).steps.review.branch!;
 
       const held = await screen(c, run.id);
       indexOf(held, '  to decide  review has signed off and waits for your word:');
@@ -642,7 +644,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
       settle(`${run.id}-supervise`, 'succeeded', { closeout: blocked('Merge add-sub, or hold it?', 'add-sub is ready to merge.') });
       await tick(run.id);
       assert.equal(
-        readRun(run.id).steps.supervise?.branch,
+        runRecord(run.id).steps.supervise?.branch,
         'main',
         "the step worked in the repository's own checkout, so the record names the base branch, not a branch of the run's",
       );
@@ -651,7 +653,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
         'packages/x/test/add.test.ts': "import assert from 'node:assert';\nassert.ok(true);\n",
         'CLAUDE.md': 'a lesson somebody else wrote\n',
       });
-      const [{ radius: moved }] = changesOf(stage.place().place, repositoryRun(readRun(run.id)), ['main']);
+      const [{ radius: moved }] = changesOf(stage.place().place, repositoryRun(runRecord(run.id)), ['main']);
       assert.ok(
         !('error' in moved) && moved.changes.length === 2,
         `another run's merge moved main under the run, and that diff reads; what is refused is reading it as this run's work: ${JSON.stringify(moved)}`,
@@ -673,7 +675,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
       await tick(direct.id);
       settle(`${direct.id}-implement`, 'failed');
       const worked = await screen(c, direct.id);
-      assert.equal(readRun(direct.id).steps.review?.branch, undefined, 'the terminal step has no branch: the fallback is what answers');
+      assert.equal(runRecord(direct.id).steps.review?.branch, undefined, 'the terminal step has no branch: the fallback is what answers');
       const where = indexOf(worked, '  touched  main');
       assert.match(
         worked[where + 1],
@@ -845,9 +847,9 @@ test('a run on two branches, side by side: each read, each in full, the longer n
     fs.writeFileSync(path.join(dir, 'docs.md'), '---\nplace: git\n---\nwrite it down\n');
     id = (await stage.runPlaced(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: dir }))).id;
     assert.deepEqual((await tick(id)).filed.sort(), ['docs', 'implement']);
-    commitIn(readRun(id).steps.implement.workspace!, { 'sub.ts': 'export const sub = (a, b) => a - b;\n' }, 'add sub.ts');
+    commitIn(runRecord(id).steps.implement.workspace!, { 'sub.ts': 'export const sub = (a, b) => a - b;\n' }, 'add sub.ts');
     commitIn(
-      readRun(id).steps.docs.workspace!,
+      runRecord(id).steps.docs.workspace!,
       { 'NOTES.md': Array.from({ length: 123 }, (_, i) => `note ${i + 1}\n`).join('') },
       'add NOTES.md',
     );
@@ -897,7 +899,7 @@ test('a run on two branches, side by side: each read, each in full, the longer n
  */
 async function _decideProgramTypes() {
   const { Effect } = await import('effect');
-  void (decideRun('x') satisfies EffectOf<Decided, Refusal, EngineService | PlaceService>);
+  void (decideRun('x') satisfies EffectOf<Decided, Refusal, EngineService | PlaceService | StoreRoot | StoreConfig>);
   // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
   void (decideRun('x') satisfies EffectOf<Decided, never, EngineService>);
   // @ts-expect-error -- decideRun requires EngineService, and runPromise takes no requirement

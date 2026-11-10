@@ -16,6 +16,6 @@ export const CEILINGS: Command<Slots> = {
     side: 'api',
     why: 'the board says the run slots over its Factory; at the command line, nemia ls and nemia decide say a run held for one beside the run',
   },
-  handler: (_args, env) => slotsRead(env),
+  handler: (_args) => slotsRead(),
   print: () => [],
 };

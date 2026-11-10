@@ -23,6 +23,7 @@
  * `kept`, and the one `nemia subscribe` writes is dropped as its test ends, whatever their verdict, so a story on the files leaves no
  * subscription for the next one's deliverer to follow.
  */
+import { rootNow } from './config-given.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -55,7 +56,7 @@ const { DAEMON_STARTED, isRunLine, upgraded } = await import('../src/feed/feed.t
 const { FeedDoor, feedAt, feedDoorFiles } = await import('../src/feed/feed.store.ts');
 const { feedDoorMemory } = await import('../src/feed/memory.store.ts');
 const { emitFeed, FEED_FOLLOW_LINES, FEED_FOLLOWERS, feedHubLayer } = await import('../src/feed/feed.verb.ts');
-const { addFactory } = await import('../src/factory/factory.store.ts');
+const { addFactory } = await import('../testing.ts');
 const { writeFactoryLevel } = await import('../src/level/level.store.ts');
 const { levelFile, writeLevel } = await import('../src/nemia/level.store.ts');
 const { over, engineOf } = await import('../src/runtime-client.ts');
@@ -125,8 +126,8 @@ const typed = async (w: World, command: typeof SUBSCRIBE | typeof UNSUBSCRIBE, a
   assert.equal(command.check?.(args) ?? null, null, `${argv.join(' ')} is refused by no check`);
   const handled =
     command === SUBSCRIBE
-      ? SUBSCRIBE.handler(Schema.decodeUnknownSync(SUBSCRIBE.input)(args), process.env, ROOT)
-      : UNSUBSCRIBE.handler(Schema.decodeUnknownSync(UNSUBSCRIBE.input)(args), process.env, ROOT);
+      ? SUBSCRIBE.handler(Schema.decodeUnknownSync(SUBSCRIBE.input)(args))
+      : UNSUBSCRIBE.handler(Schema.decodeUnknownSync(UNSUBSCRIBE.input)(args));
   return runWith(stage.board().e, Effect.provide(handled, w.layer) as never);
 };
 
@@ -432,7 +433,7 @@ test(
     const task = await longLived('t-cut');
     let d: ReturnType<typeof delivering>;
     await s.test('a wake said, and the cursor kept at the end of the file', async () => {
-      assert.equal(deliveryAtModule('cut'), undefined, 'no file of the deliverer before the subscription');
+      assert.equal(deliveryAtModule(rootNow(), 'cut'), undefined, 'no file of the deliverer before the subscription');
       await stage.main(['subscribe', 'cut', task]);
       t.after(() => {
         if (listedIn(w).includes('cut')) dropSubscription(w, 'cut');
@@ -452,13 +453,13 @@ test(
       await d.clock.adjust('1 second');
       await held(t, () => toldTo(task).length === 2, 'the cut feed read again from its start');
       assert.deepEqual(fieldsOf(toldTo(task)[1]), ['r-10 build blocked']);
-      await held(t, () => deliveryAtModule('cut')?.cursor === feedSize(w), 'the cursor at the end of the new feed');
+      await held(t, () => deliveryAtModule(rootNow(), 'cut')?.cursor === feedSize(w), 'the cursor at the end of the new feed');
     });
     await s.test("unsubscribed through nemia, its file and the deliverer's gone from the files", async () => {
       await stage.main(['unsubscribe', 'cut']);
       assert.deepEqual(listedIn(w), [], 'its file removed');
       await d.clock.adjust('5 seconds');
-      await held(t, () => deliveryAtModule('cut') === undefined, 'the deliverer drops its file once it has stopped it');
+      await held(t, () => deliveryAtModule(rootNow(), 'cut') === undefined, 'the deliverer drops its file once it has stopped it');
     });
   },
 );
@@ -764,9 +765,9 @@ test(
         const from = feedSize(w);
         const manual = await longLived('t-manual');
         kept(t, w, 'manual', { task: manual, selectors: [...DEFAULT_SELECTORS], digestEvery: 60, from, scope: { atLeast: 'manual' } });
-        fs.mkdirSync(path.dirname(levelFile()), { recursive: true });
-        fs.writeFileSync(levelFile(), '{ not json');
-        t.after(() => fs.rmSync(levelFile(), { force: true }));
+        fs.mkdirSync(path.dirname(levelFile(rootNow())), { recursive: true });
+        fs.writeFileSync(levelFile(rootNow()), '{ not json');
+        t.after(() => fs.rmSync(levelFile(rootNow()), { force: true }));
         d.start();
         await d.quiet(3);
         const handed = () => Effect.runSync(Metric.value(FEED_FOLLOW_LINES)).count;
@@ -779,7 +780,7 @@ test(
         }
         assert.equal(toldTo(manual).length, 0, 'nothing said while the level does not read');
         assert.equal(readDelivery(w, 'manual')?.cursor ?? from, from, 'the cursor not kept past the lines');
-        writeLevel({ level: 'manual', since: '2026-10-06T08:00:00.000Z' });
+        writeLevel(rootNow(), { level: 'manual', since: '2026-10-06T08:00:00.000Z' });
         await d.clock.adjust('1 second');
         await held(t, () => toldTo(manual).length === 1, 'the line said once the level reads');
         assert.deepEqual(fieldsOf(toldTo(manual)[0]), ['r-hkb build awaiting approval'], 'the line of a run gone still passed over');

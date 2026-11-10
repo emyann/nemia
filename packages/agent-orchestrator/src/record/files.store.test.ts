@@ -14,7 +14,7 @@ import { scratch } from 'test-kit/scratch';
 
 const ROOT = scratch('wf-files-store-');
 process.env.WF_ROOT = ROOT;
-const { runStore, keptRuns, labelsFile, writeLabels } = await import('./files.store.ts');
+const { filesStore: runStore, keptRuns, labelsFile, writeLabels } = await import('./files.store.ts');
 const { runsDir, runFile, restStamps } = await import('./record.store.ts');
 const { recordMemo } = await import('../rest/index.ts');
 const { metered } = await import('../meter/tally.store.ts');
@@ -90,7 +90,7 @@ test('`runs.find`: one run by id, among the ids the store lists, never by a path
 
 /** Every run as `keptRuns` projects it here: its id and its brief, which a record alone says. */
 const briefs = (memo?: ReturnType<typeof recordMemo<{ id: string; brief: string }>>) =>
-  keptRuns(memo, (run) => ({ id: run.id, brief: run.brief }), { WF_VERIFY_REST: '0' });
+  keptRuns(memo, (run) => ({ id: run.id, brief: run.brief }), false);
 
 test('a warm read through a memo reads no record whose run has not moved, however many the store holds, and answers a cold read’s own', async () => {
   put('r-moving');
@@ -146,7 +146,7 @@ test("a run's labels are a person's file beside the record: composed on every re
       assert.deepEqual(runStore.runs.find('r-labelled')?.labels, labels);
       assert.deepEqual(runStore.runs.list(() => {}).find((r) => r.id === 'r-labelled')?.labels, labels);
       assert.deepEqual(
-        keptRuns(undefined, (r) => [r.id, r.labels]),
+        keptRuns(undefined, (r) => [r.id, r.labels], false),
         [
           ['r-labelled', labels],
           ['r-unlabelled', undefined],

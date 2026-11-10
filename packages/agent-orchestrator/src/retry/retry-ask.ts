@@ -76,8 +76,8 @@ export const TRY_CAUSES = [
 
 /**
  * A run record's tries under the name their cause has now: a try an older tick wrote with `then` holds it as `cause`, and no `then`, so
- * the record is written back with `cause` alone (`readRun`, before its schema reads it). Pure: a new value, `raw` untouched; what is not a
- * try is left as it is, for the schema to refuse.
+ * the record is written back with `cause` alone (`runRecord`, before its schema reads it). Pure: a new value, `raw` untouched; what is not
+ * a try is left as it is, for the schema to refuse.
  */
 export const upgradeTries = (raw: unknown): unknown => {
   const steps: unknown = isObject(raw) ? Reflect.get(raw, 'steps') : undefined;

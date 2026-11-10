@@ -3,6 +3,7 @@
  * and the custom instruction it read (`POLICY`); a proposal written, the agent's own (`POLICY_PROPOSE`); a rule confirmed or dropped, the
  * person's, asked of them every time an agent calls it (`POLICY_CONFIRM`, `POLICY_DROP`). Any agent's: the name is the one given.
  */
+import { StoreRoot } from '../config/root.store.ts';
 import { Effect, Schema } from 'effect';
 import { PolicyRuleConfirm } from 'objects';
 import { tried } from '../runtime-client.ts';
@@ -11,9 +12,7 @@ import type { Command } from '../command/entry.verb.ts';
 import { agentNameRefusal } from '../agents/agents.ts';
 import { AgentDoor } from '../agents/agent-door.store.ts';
 import { AgentName } from '../agents/agents.model.ts';
-import { HOME } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { rooted } from '../factory/wiring/wire.verb.ts';
 import {
   DEFAULT_POLICY,
   gateRules,
@@ -183,7 +182,7 @@ export const POLICY: Command<PolicyList, PolicyInput> = {
   class: 'read',
   only: { side: 'cli', why: "the api serves it as the nemia group's `policy` of `objects`' Api, calling this handler" },
   input: PolicyInput,
-  handler: ({ name }, _env, home = HOME) => Effect.andThen(agentNamed(name), rooted(home, 'policy', listed(home, name))),
+  handler: ({ name }) => Effect.flatMap(StoreRoot, (home) => Effect.andThen(agentNamed(name), listed(home, name))),
   print: listLines,
 };
 
@@ -260,10 +259,8 @@ export const POLICY_PROPOSE: Command<PolicyList> = {
   writes: true,
   class: 'act',
   only: { side: 'cli', why: 'the agent proposes from its own session; the board shows the proposal and confirms its rules' },
-  handler: (args, _env, home = HOME) =>
-    rooted(
-      home,
-      'policy propose',
+  handler: (args) =>
+    Effect.flatMap(StoreRoot, (home) =>
       Effect.gen(function* () {
         const agent = agentIn(args);
         const { rules, guidance } = yield* tried(() => proposalOf(String(args.words ?? '')));
@@ -333,12 +330,10 @@ export const POLICY_CONFIRM: Command<PolicyList, ConfirmInput> = {
   asksAlways: true,
   only: { side: 'cli', why: "the api serves it as the nemia group's `confirmRule` of `objects`' Api, calling this handler" },
   input: ConfirmInput,
-  handler: ({ name, id, words }, _env, home = HOME) =>
-    Effect.andThen(
-      agentNamed(name),
-      rooted(
-        home,
-        'policy confirm',
+  handler: ({ name, id, words }) =>
+    Effect.flatMap(StoreRoot, (home) =>
+      Effect.andThen(
+        agentNamed(name),
         Effect.gen(function* () {
           if (!words.trim()) return yield* Effect.fail(new Invalid({ message: confirmWordless(name) }));
           yield* withinDelegation(home, name, id);
@@ -362,12 +357,10 @@ export const POLICY_DROP: Command<PolicyList, RuleInput> = {
   asksAlways: true,
   only: { side: 'cli', why: "the api serves it as the nemia group's `dropRule` of `objects`' Api, calling this handler" },
   input: RuleInput,
-  handler: ({ name, id }, _env, home = HOME) =>
-    Effect.andThen(
-      agentNamed(name),
-      rooted(
-        home,
-        'policy rm',
+  handler: ({ name, id }) =>
+    Effect.flatMap(StoreRoot, (home) =>
+      Effect.andThen(
+        agentNamed(name),
         Effect.andThen(
           tried(() => dropRule(home, name, id, new Date())),
           listed(home, name),

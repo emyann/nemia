@@ -176,7 +176,7 @@ const STORE_SHARED: Record<string, readonly string[]> = {
     'src/agents/read.store.ts',
     'src/skills/read.store.ts',
     'src/folder/folder.store.ts',
-    'src/factory/factory.store.ts',
+    'src/factory/door/factories.store.ts',
   ],
   'src/folder/lookup.store.ts': ['src/record/record.store.ts', 'src/skills/read.store.ts'],
   'src/branches/branches.store.ts': [
@@ -199,7 +199,10 @@ const STORE_SHARED: Record<string, readonly string[]> = {
     'src/level/level.store.ts',
     'src/factory/rules/rules.store.ts',
     'src/factory/servers/servers.store.ts',
+    'src/factory/instruction.store.ts',
+    'src/config/root.store.ts',
   ],
+  'src/factory/instruction.store.ts': ['src/record/record.store.ts'],
   'src/cards/cards.store.ts': ['src/door/door.store.ts', 'src/record/record.store.ts', 'src/whole-file/whole-file.store.ts'],
   'src/folder/version.store.ts': [
     'src/door/door.store.ts',
@@ -415,8 +418,12 @@ function modelBreaks(sources: Sources): string[] {
 /**
  * A store file imports no runtime, no controller and not the client, and store files import each other only as the tree has it; outside
  * the store, only the client and the controllers beneath the CLI import a store file — never a bin or a file of `src/cli/`, which
- * reach the package through the root — and some one of them imports each.
+ * reach the package through the root — and some one of them imports each, or a door does: a store a door is over is its files layer's,
+ * read and written through it alone (a door's store file being one that imports `DOOR`).
  */
+/** The door every door of the store is made by (`doorOf`). */
+const DOOR = 'src/door/door.store.ts';
+
 function treeBreaks(sources: Sources): string[] {
   const { STORE: stores, CONTROLLER: controllers } = kinds(sources);
   const beneath = beneathCli(sources);
@@ -439,8 +446,9 @@ function treeBreaks(sources: Sources): string[] {
           out.push(`${user} imports ${file}, a stand-in: a test gives it to its program, and no file of src imports it`);
       continue;
     }
-    if (![CLIENT, ...beneath].some((user) => (sources[user] ?? []).includes(file)))
-      out.push(`${file} is imported by no controller and not by the client: a store file is the controllers' I/O`);
+    const doors = stores.filter((door) => door !== file && (sources[door] ?? []).includes(DOOR));
+    if (![CLIENT, ...beneath, ...doors].some((user) => (sources[user] ?? []).includes(file)))
+      out.push(`${file} is imported by no controller, no door and not by the client: a store file is the controllers' I/O`);
   }
   for (const [file, imports] of Object.entries(sources)) {
     if (stores.includes(file) || file === CLIENT || beneath.includes(file)) continue;
@@ -935,7 +943,7 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
     'src/agents/read.store.ts imports src/custom/custom.store.ts, which the tree does not let it: of the store it imports src/skills/read.store.ts',
   ]);
   assert.deepEqual(treeBreaks(adding('src/folder/write.store.ts', 'src/workspace/worktree.store.ts')), [
-    'src/folder/write.store.ts imports src/workspace/worktree.store.ts, which the tree does not let it: of the store it imports src/record/record.store.ts, src/agents/read.store.ts, src/skills/read.store.ts, src/folder/folder.store.ts, src/factory/factory.store.ts',
+    'src/folder/write.store.ts imports src/workspace/worktree.store.ts, which the tree does not let it: of the store it imports src/record/record.store.ts, src/agents/read.store.ts, src/skills/read.store.ts, src/folder/folder.store.ts, src/factory/door/factories.store.ts',
   ]);
   assert.deepEqual(treeBreaks(adding('src/factory/factory.store.ts', 'src/folder/write.store.ts')), [
     'src/factory/factory.store.ts imports src/folder/write.store.ts, which the tree does not let it: of the store it imports src/record/record.store.ts, src/factory/schedule/schedule.store.ts, src/factory/applied/applied.store.ts, src/factory/wiring/own-agent.store.ts, src/whole-file/whole-file.store.ts',
@@ -966,19 +974,22 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
     'src/agents/agents.store.ts is a store file and imports src/tick/tick.verb.ts, a controller: a cycle',
   ]);
   assert.deepEqual(treeBreaks(adding('src/agents/agents.store.ts', 'src/inbox/inbox.store.ts')), [
-    'src/agents/agents.store.ts imports src/inbox/inbox.store.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/skills/read.store.ts, src/meter/tally.store.ts, src/config/config.store.ts, src/whole-file/whole-file.store.ts, src/process/alive.store.ts, src/config/root.store.ts, src/agents/read.store.ts, src/folder/folder.store.ts, src/revisions/revisions.store.ts, src/record/record.store.ts, src/pause/pause.store.ts, src/factory/schedule/schedule.store.ts, src/factory/applied/applied.store.ts, src/factory/wiring/own-agent.store.ts, src/factory/factory.store.ts, src/record/files.store.ts, src/place/place.store.ts, src/workspace/worktree.store.ts, src/folder/write.store.ts, src/folder/lookup.store.ts, src/branches/branches.store.ts, src/branches/changes.store.ts, src/feed/feed.store.ts, src/standing/standing.store.ts, src/door/door.store.ts, src/runs/runs.store.ts, src/level/level.store.ts, src/factory/rules/rules.store.ts, src/factory/servers/servers.store.ts, src/factory/door/factories.store.ts, src/cards/cards.store.ts, src/folder/version.store.ts, src/workflows/workflows.store.ts, src/template/door/templates.store.ts, src/subscription/subscription.store.ts, src/skills/skills.store.ts, src/skills/skill-door.store.ts, src/agents/agent-door.store.ts, src/agents/agent-memory.store.ts, src/script/script.store.ts, src/proposal/proposal.store.ts, src/delegation/delegation.store.ts',
+    'src/agents/agents.store.ts imports src/inbox/inbox.store.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/skills/read.store.ts, src/meter/tally.store.ts, src/config/config.store.ts, src/whole-file/whole-file.store.ts, src/process/alive.store.ts, src/config/root.store.ts, src/agents/read.store.ts, src/folder/folder.store.ts, src/revisions/revisions.store.ts, src/record/record.store.ts, src/pause/pause.store.ts, src/factory/schedule/schedule.store.ts, src/factory/applied/applied.store.ts, src/factory/wiring/own-agent.store.ts, src/factory/factory.store.ts, src/record/files.store.ts, src/place/place.store.ts, src/workspace/worktree.store.ts, src/folder/write.store.ts, src/folder/lookup.store.ts, src/branches/branches.store.ts, src/branches/changes.store.ts, src/feed/feed.store.ts, src/standing/standing.store.ts, src/door/door.store.ts, src/runs/runs.store.ts, src/level/level.store.ts, src/factory/rules/rules.store.ts, src/factory/servers/servers.store.ts, src/factory/door/factories.store.ts, src/factory/instruction.store.ts, src/cards/cards.store.ts, src/folder/version.store.ts, src/workflows/workflows.store.ts, src/template/door/templates.store.ts, src/subscription/subscription.store.ts, src/skills/skills.store.ts, src/skills/skill-door.store.ts, src/agents/agent-door.store.ts, src/agents/agent-memory.store.ts, src/script/script.store.ts, src/proposal/proposal.store.ts, src/delegation/delegation.store.ts',
   ]);
   assert.deepEqual(treeBreaks(unimported('src/agents/agents.store.ts')), [
-    "src/agents/agents.store.ts is imported by no controller and not by the client: a store file is the controllers' I/O",
+    "src/agents/agents.store.ts is imported by no controller, no door and not by the client: a store file is the controllers' I/O",
   ]);
   assert.deepEqual(treeBreaks(unimported('src/skills/read.store.ts')), [
-    "src/skills/read.store.ts is imported by no controller and not by the client: a store file is the controllers' I/O",
+    "src/skills/read.store.ts is imported by no controller, no door and not by the client: a store file is the controllers' I/O",
   ]);
   assert.deepEqual(treeBreaks(unimported('src/agents/read.store.ts')), [
-    "src/agents/read.store.ts is imported by no controller and not by the client: a store file is the controllers' I/O",
+    "src/agents/read.store.ts is imported by no controller, no door and not by the client: a store file is the controllers' I/O",
+  ]);
+  assert.deepEqual(treeBreaks(unimported('src/level/level.store.ts')), [
+    "src/level/level.store.ts is imported by no controller, no door and not by the client: a store file is the controllers' I/O",
   ]);
   assert.deepEqual(treeBreaks(unimported('src/daemon/daemon.store.ts')), [
-    "src/daemon/daemon.store.ts is imported by no controller and not by the client: a store file is the controllers' I/O",
+    "src/daemon/daemon.store.ts is imported by no controller, no door and not by the client: a store file is the controllers' I/O",
   ]);
   assert.deepEqual(treeBreaks(adding('bin/wf.ts', 'src/branches/branches.store.ts')), [
     'bin/wf.ts imports src/branches/branches.store.ts, a store file: only the client and the controllers beneath the CLI import the store',
@@ -1060,6 +1071,9 @@ test(`the runtime is reached through one client: only ${CLIENT} imports agent-ru
   assert.deepEqual(clientBreaks(packageSources()), []);
 });
 
+/** The engine's verbs, a controller the views and the meter both read, which reaches the client itself. */
+const ENGINE_VERBS_FILE = 'src/engine-verbs/engine-verbs.verb.ts';
+
 test('REFUSED: a type imported from the runtime by a controller, a store file, a pure file or the CLI, a client that imports none, a controller that goes round it, and a client above a controller', () => {
   assert.deepEqual(clientBreaks(adding('src/tick/tick.verb.ts', 'agent-runtime')), [
     'src/tick/tick.verb.ts imports agent-runtime, and only src/runtime-client.ts may',
@@ -1096,14 +1110,21 @@ test('REFUSED: a type imported from the runtime by a controller, a store file, a
     'src/runtime-client.ts imports no agent-runtime: CLIENT names the wrong file',
   ]);
   assert.deepEqual(
-    clientBreaks(planted('src/views/views.verb.ts', (imports) => imports.filter((m) => m !== CLIENT && m !== 'src/steps/steps.verb.ts'))),
+    clientBreaks(
+      planted('src/views/views.verb.ts', (imports) =>
+        imports.filter((m) => m !== CLIENT && m !== 'src/steps/steps.verb.ts' && m !== ENGINE_VERBS_FILE),
+      ),
+    ),
     [
       'src/views/views.verb.ts is a controller and reaches src/runtime-client.ts through none of its imports: the controllers reach the runtime through the client',
     ],
   );
-  assert.deepEqual(clientBreaks(planted('src/meter/meter.verb.ts', (imports) => imports.filter((m) => m !== CLIENT))), [
-    'src/meter/meter.verb.ts is a controller and reaches src/runtime-client.ts through none of its imports: the controllers reach the runtime through the client',
-  ]);
+  assert.deepEqual(
+    clientBreaks(planted('src/meter/meter.verb.ts', (imports) => imports.filter((m) => m !== CLIENT && m !== ENGINE_VERBS_FILE))),
+    [
+      'src/meter/meter.verb.ts is a controller and reaches src/runtime-client.ts through none of its imports: the controllers reach the runtime through the client',
+    ],
+  );
   assert.deepEqual(clientBreaks(adding(CLIENT, 'src/tick/tick.verb.ts')), [
     'src/runtime-client.ts imports src/tick/tick.verb.ts, a controller: the client is beneath every controller',
   ]);

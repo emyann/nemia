@@ -27,20 +27,17 @@ const ROOT = scratch('wf-factory-rules-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 const {
-  addFactory,
-  attachWorkflow,
   FACTORY_INSTRUCT,
   FACTORY_RULES,
   factoryInstruction,
   factoryRules,
-  readFactory,
-  setInstruction,
   runWith: runEngine,
   startRun,
 } = await import('../src/runner.ts');
+const { addFactory, attachWorkflow, readFactory, setInstruction } = await import('../testing.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 const { WORKFLOWS_STEP } = await import('../src/workflows/workflows.verb.ts');
 const { clearRules, readRules, rulesAt, writeRules } = await import('../src/factory/rules/rules.store.ts');
@@ -77,7 +74,7 @@ const started = (here: { repo: string; dev: string }, brief: string, factory?: s
   runPlaced(startRun({ brief, repo: here.repo, workflowDir: here.dev, ...(factory !== undefined && { factory }) }));
 
 /** The steps a run froze at its start. */
-const frozen = (id: string): Workflow[] => readRun(id).workflow ?? [];
+const frozen = (id: string): Workflow[] => runRecord(id).workflow ?? [];
 
 /** The prompt rendered for a step of a run at its start. */
 const promptOf = (run: Parameters<typeof agentFilesDir>[0], step: string): string =>
@@ -87,8 +84,7 @@ const promptOf = (run: Parameters<typeof agentFilesDir>[0], step: string): strin
 const runsWritten = (): string[] => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')) : []);
 
 /** `nemia factory rules` run with `args`, as the CLI and the api run it. */
-const rulesOf = (args: Parameters<typeof FACTORY_RULES.handler>[0]) =>
-  stage.runWith(stage.board().e, FACTORY_RULES.handler(args, undefined, ROOT));
+const rulesOf = (args: Parameters<typeof FACTORY_RULES.handler>[0]) => stage.runWith(stage.board().e, FACTORY_RULES.handler(args));
 
 type Mocker = { mock: { method: (o: object, m: string, f: (...a: unknown[]) => void) => { mock: { restore: () => void } } } };
 
@@ -136,7 +132,7 @@ test("a factory's rules and its instruction, from none to cleared: told as their
     assert.ok(said.startsWith(`pipao: rules written to ${FILE}, `), said);
     assert.match(said, /told to every agent hired into it/);
     assert.match(said, /a run already started keeps/);
-    assert.deepEqual(factoryRules('pipao'), written);
+    assert.deepEqual(factoryRules(ROOT, 'pipao'), written);
     assert.deepEqual(FACTORY_RULES.print(written, { factory: 'pipao' }), [
       `pipao: rules kept in ${FILE}`,
       '',
@@ -204,7 +200,7 @@ test("a factory's rules and its instruction, from none to cleared: told as their
     async () => {
       const step = async (): Promise<Workflow> => {
         const args = { from: 'yours', name: 'dev', step: 'implement', dir: here.dev, factory: 'pipao' };
-        return (await stage.runWith(stage.board().e, WORKFLOWS_STEP.handler(args, undefined, ROOT))).step!;
+        return (await stage.runWith(stage.board().e, WORKFLOWS_STEP.handler(args))).step!;
       };
       clearRules({ name: 'pipao' });
       assert.equal((await step()).agent?.factoryRules, undefined);
@@ -230,7 +226,7 @@ test("a factory's rules and its instruction, from none to cleared: told as their
   await s.test(
     'the instruction, kept in the folder by default: NEMIA.md in its first folder, no words while no file is there',
     async (sub) => {
-      assert.deepEqual(factoryInstruction('pipao'), {
+      assert.deepEqual(factoryInstruction(ROOT, 'pipao'), {
         name: 'pipao',
         path: null,
         store: false,
@@ -240,7 +236,7 @@ test("a factory's rules and its instruction, from none to cleared: told as their
         stored: false,
       });
       fs.writeFileSync(path.join(here.repo, 'NEMIA.md'), 'Ship small.\n');
-      assert.equal(factoryInstruction('pipao').words, 'Ship small.\n');
+      assert.equal(factoryInstruction(ROOT, 'pipao').words, 'Ship small.\n');
       assert.deepEqual(await printedBy(sub, 'factory', 'instruction', 'pipao'), [
         `pipao: read from ${path.join(here.repo, 'NEMIA.md')}, in the factory's first folder`,
         '',
@@ -270,15 +266,15 @@ test("a factory's rules and its instruction, from none to cleared: told as their
     const source = path.join(ROOT, 'words.md');
     fs.writeFileSync(source, 'Be brief.\n');
     assert.deepEqual(await printedBy(sub, 'factory', 'instruct', 'pipao', '--file', source), [`pipao: instruction written to ${kept}`]);
-    assert.equal(factoryInstruction('pipao').words, 'Be brief.\n');
+    assert.equal(factoryInstruction(ROOT, 'pipao').words, 'Be brief.\n');
   });
 
   await s.test('moved out of the store, the stored words are kept unread; back, they are read', () => {
     setInstruction({ factory: 'pipao', at: undefined });
-    const moved = factoryInstruction('pipao');
+    const moved = factoryInstruction(ROOT, 'pipao');
     assert.deepEqual([moved.store, moved.words, moved.stored], [false, 'Ship small.\n', true], "the folder's file is read");
     setInstruction({ factory: 'pipao', at: { store: true } });
-    assert.equal(factoryInstruction('pipao').words, 'Be brief.\n');
+    assert.equal(factoryInstruction(ROOT, 'pipao').words, 'Be brief.\n');
   });
 
   await s.test(
@@ -286,7 +282,7 @@ test("a factory's rules and its instruction, from none to cleared: told as their
     async (sub) => {
       const kept = path.join(ROOT, 'factories', 'pipao', 'NEMIA.md');
       assert.deepEqual(await printedBy(sub, 'factory', 'instruct', 'pipao', '--clear'), [`pipao: instruction removed, ${kept}`]);
-      assert.equal(factoryInstruction('pipao').stored, false);
+      assert.equal(factoryInstruction(ROOT, 'pipao').stored, false);
       setInstruction({ factory: 'pipao', at: undefined });
       assert.ok(!('instruction' in JSON.parse(fs.readFileSync(record, 'utf8'))), 'the key removed, never null');
     },

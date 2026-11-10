@@ -32,7 +32,7 @@ process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 
 /** Each skill folder of `dirs` read through the table's `skills`, at the harness's root, as a request reads them. */
-const readSkills = (dirs: readonly string[]) => runWith(engine(), SKILLS_LIST.handler({ skills: dirs }, undefined, root));
+const readSkills = (dirs: readonly string[]) => runWith(engine(process.env), SKILLS_LIST.handler({ skills: dirs }));
 
 type SkillPlace = import('./skills.ts').SkillPlace;
 type SkillRow = import('./skills.ts').SkillRow;

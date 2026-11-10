@@ -5,6 +5,7 @@
  */
 import { Cause, Deferred, Effect, Exit, Fiber, Metric, type Scope } from 'effect';
 import type { StoreRoot } from '../config/root.store.ts';
+import { type Settings, StoreConfig } from '../config/config.store.ts';
 import type { PlaceService } from '../place/place.store.ts';
 import { over, quotaHarnesses, scopeRefusal, type Engine, type HarnessQuota } from '../runtime-client.ts';
 import { HOME } from '../record/record.store.ts';
@@ -263,8 +264,8 @@ const saidStarted = ({ held, replaced }: TakenStore): Effect.Effect<void> =>
  * test can stand another in — and the variable to unset. Every task it filed would be refused its start, so it refuses first, exit 2.
  * `undefined` where no limit is set, never probing, or where the host holds one; a value either variable refuses is thrown as it is.
  */
-export const limitRefusal = (scope: (parent?: string) => string | undefined = scopeRefusal): Invalid | undefined => {
-  const { memory, cgroupParent: parent } = ceilings();
+export const limitRefusal = (config: Settings, scope: (parent?: string) => string | undefined = scopeRefusal): Invalid | undefined => {
+  const { memory, cgroupParent: parent } = ceilings(config);
   if (memory === undefined) return undefined;
   const why = scope(parent);
   if (why === undefined) return undefined;
@@ -297,9 +298,10 @@ export const limitRefusal = (scope: (parent?: string) => string | undefined = sc
 export const up = (
   e: Engine,
   { every, repo, holder, series = [], onTaken, quota, scope }: UpOptions,
-): Effect.Effect<never, unknown, Scope.Scope | PlaceService | StoreRoot> =>
+): Effect.Effect<never, unknown, Scope.Scope | PlaceService | StoreRoot | StoreConfig> =>
   Effect.gen(function* () {
-    const unheld = yield* Effect.try({ try: () => limitRefusal(scope), catch: (err) => err });
+    const config = yield* StoreConfig;
+    const unheld = yield* Effect.try({ try: () => limitRefusal(config, scope), catch: (err) => err });
     if (unheld) return yield* Effect.fail(unheld);
     const taken = yield* Effect.acquireRelease(
       Effect.try({ try: () => takeStore({ every, cwd: repo, by: holder, release: leaseRelease(runningRelease()) }), catch: (err) => err }),

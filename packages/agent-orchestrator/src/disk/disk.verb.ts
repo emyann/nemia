@@ -4,13 +4,13 @@
  * read, what is free, and the runs that hold the most; `disk` is the loop the daemon forks. A controller: it reads the disk and the
  * engine on every sweep and decides on nothing it remembers.
  */
-import { Cause, Effect, Metric, type Duration } from 'effect';
-import { DEFAULT_FACTORY } from '../factory/factory.ts';
+import { sweepLoop } from '../forget/prune/free.verb.ts';
+import { runNamespace } from '../run-list/index.ts';
+import { Effect, Metric, type Duration } from 'effect';
 import { rootSpan } from '../meter/meter.verb.ts';
 import { runTasks } from '../record/record.ts';
 import { EngineService, HARNESSES, tried, type KeptReport } from '../runtime-client.ts';
 import { walk } from '../forget/prune/freed.store.ts';
-import { firstPiece } from '../piece/piece.ts';
 import type { Answered } from '../forget/prune/prune.ts';
 import { storeFree, storeRoots } from './disk.store.ts';
 import {
@@ -157,7 +157,7 @@ const keptAsked = Effect.gen(function* () {
 export const diskOnce = Effect.fn('diskOnce')(function* (answers: readonly Answered[], memory: DiskMemory, given?: readonly DiskRoot[]) {
   const kept = yield* keptAsked;
   const roots = given ?? (yield* tried(storeRoots));
-  const factories = new Map(answers.map((a) => [a.run.id, a.run.factory ?? DEFAULT_FACTORY]));
+  const factories = new Map(answers.map((a) => [a.run.id, runNamespace(a.run.factory)]));
   const runs = { ids: new Set(factories.keys()), factoryOf: (id: string) => factories.get(id) };
   const walking = roots.flatMap((root, k) => (root.own === undefined ? [{ root, k }] : []));
   const walked = yield* walk(
@@ -177,7 +177,7 @@ export const diskOnce = Effect.fn('diskOnce')(function* (answers: readonly Answe
     read.read[k] = walked.read[at] ?? false;
   }
   const at = new Date().toISOString();
-  const tasks = new Map(answers.flatMap((a) => runTasks(a.run).map((taskId) => [taskId, a.run.factory ?? DEFAULT_FACTORY])));
+  const tasks = new Map(answers.flatMap((a) => runTasks(a.run).map((taskId) => [taskId, runNamespace(a.run.factory)])));
   const walkedReading = readingOf(roots, read, runs, yield* tried(storeFree), at);
   const reading = { ...walkedReading, entries: withKept(walkedReading.entries, kept, (taskId) => tasks.get(taskId)) };
   const largest = largestOf(roots, read, runs);
@@ -187,34 +187,14 @@ export const diskOnce = Effect.fn('diskOnce')(function* (answers: readonly Answe
   return { reading, largest, names: walked.names, bursts: walked.bursts } satisfies Measured;
 });
 
-/** Why a sweep that failed did: its refusal's or its defect's own message, on one line. */
-const whyOf = (cause: Cause.Cause<unknown>): string => {
-  const err = Cause.squash(cause);
-  return firstPiece(err instanceof Error ? err.message : String(err), '\n');
-};
-
 /**
  * The measure, for as long as the daemon runs: a sweep (`diskOnce`) over what `answers` gives then, its reading handed to `keep`, and a
- * rest of `DISK_EVERY`. A sweep that fails hands `keep` no reading, so nothing stale is said for the store, and is a warning, said once
- * while its words stand; the next is tried a rest later.
+ * rest of `DISK_EVERY` (`sweepLoop`). A sweep that fails hands `keep` no reading, so nothing stale is said for the store.
  */
 export const disk = (answers: () => readonly Answered[], keep: (reading: DiskReading | undefined) => void) => {
   const memory = freshDiskMemory();
-  let failed: string | undefined;
-  const sweep = Effect.suspend(() => diskOnce(answers(), memory)).pipe(
-    Effect.andThen(({ reading }) =>
-      Effect.sync(() => {
-        failed = undefined;
-        keep(reading);
-      }),
-    ),
-    Effect.catchCause((cause) => {
-      keep(undefined);
-      const why = whyOf(cause);
-      if (why === failed) return Effect.void;
-      failed = why;
-      return Effect.logWarning(`What the store takes on the disk could not be measured this sweep: ${why}`);
-    }),
-  );
-  return Effect.forever(sweep.pipe(Effect.andThen(Effect.sleep(DISK_EVERY))));
+  return sweepLoop(() => diskOnce(answers(), memory), DISK_EVERY, 'What the store takes on the disk could not be measured this sweep', {
+    done: ({ reading }) => keep(reading),
+    failed: () => keep(undefined),
+  });
 };

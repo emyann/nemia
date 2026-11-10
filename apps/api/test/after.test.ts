@@ -128,7 +128,7 @@ writeRun('g-parents-landed', { after: ['a-landed'] });
 writeRun('h-gone-parent', { after: ['x-gone'] });
 working('t-i');
 writeRun('i-started', { after: ['b-running'], steps: { implement: { taskId: 't-i', workspace: repo, branch: 'wf/i-started/implement' } } });
-await runWith(engine(), passStanding(runStore.runs.list()));
+await runWith(engine(process.env), passStanding(runStore.runs.list()));
 
 const filedB = '2026-09-14T01:10:00.000Z';
 const filedI = '2026-09-14T01:40:30.000Z';
@@ -214,7 +214,7 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
     "the list's words and waits are `list`'s, run by run — and `advice` is `waitAdvice` over them, `word` `waitWord`",
     async () => {
       const runs = await listedRuns();
-      const e = engine();
+      const e = engine(process.env);
       for (const id of [
         'd-waits',
         'e-cancelled-parent',
@@ -310,7 +310,7 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
   );
   await s.test('the decision of a run waiting on runs is `waiting`, and nothing else: what `nemia decide` prints for it', async () => {
     const runs = await listedRuns();
-    const e = engine();
+    const e = engine(process.env);
     for (const id of ['d-waits', 'e-cancelled-parent', 'h-gone-parent']) {
       const res = await app.request(`/api/runs/${id}/decision`);
       assert.equal(res.status, 200);

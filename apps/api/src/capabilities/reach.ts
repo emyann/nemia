@@ -16,7 +16,8 @@
  * which reads no `.claude/settings.json`, and nothing of whose sessions was measured: its fence is its sandbox — has nothing else
  * claimed for it.
  */
-import { DEFAULT_FACTORY, FACTORY_SERVERS } from 'agent-orchestrator';
+import { DEFAULT_NAMESPACE } from 'objects';
+import { FACTORY_SERVERS } from 'agent-orchestrator';
 import { CLAUDE_RULES, DEFAULT_HARNESS, rulesOf, type ClaudeRules } from 'agent-orchestrator/workflow';
 import { type AskServer, capabilitiesOf, SETTINGS, type Capabilities, type DeniedRule, type McpServer } from './capabilities.ts';
 import { runPlaced, type Engine, type RunsOn } from '../store.ts';
@@ -369,9 +370,7 @@ function stepReach(
  */
 const statedByFactory = async (servers: readonly McpServer[], e: Engine['Service'], on: RunsOn, home: string): Promise<McpServer[]> => {
   if (!servers.length) return [...servers];
-  const listing = await runPlaced({ ...on, home }, e, FACTORY_SERVERS.handler({ factory: DEFAULT_FACTORY }, undefined, home)).catch(
-    () => undefined,
-  );
+  const listing = await runPlaced({ ...on, home }, e, FACTORY_SERVERS.handler({ factory: DEFAULT_NAMESPACE })).catch(() => undefined);
   const by = new Map((listing?.servers ?? []).map((s) => [s.name, s.state]));
   return servers.map((server) => ({ ...server, factoryState: by.get(server.name) ?? null }));
 };
@@ -387,6 +386,7 @@ export async function capabilitiesWithSteps(
     e,
     placeService,
     trace,
+    config,
     env,
     home,
     asker,
@@ -395,6 +395,7 @@ export async function capabilitiesWithSteps(
     e: Engine['Service'];
     placeService: PlaceService['Service'];
     trace: RunsOn['trace'];
+    config: RunsOn['config'];
     env: NodeJS.ProcessEnv;
     home: string;
     asker: AskServer;
@@ -402,10 +403,10 @@ export async function capabilitiesWithSteps(
   },
 ): Promise<CapabilitiesWithSteps> {
   const capabilities = await capabilitiesOf(repo, { env, asker });
-  capabilities.mcp = await statedByFactory(capabilities.mcp, e, { placeService, trace }, home);
+  capabilities.mcp = await statedByFactory(capabilities.mcp, e, { placeService, config, trace }, home);
   let workflows: WorkflowListing[] = [];
   try {
-    workflows = await listWorkflows(e, { placeService, trace }, repo, home, inRequest);
+    workflows = await listWorkflows(e, { placeService, config, trace }, repo, home, inRequest);
   } catch (err) {
     capabilities.warnings.push(`${err instanceof Error ? err.message : String(err)} What each step gets is not shown for any workflow.`);
   }

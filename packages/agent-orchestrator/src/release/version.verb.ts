@@ -4,6 +4,7 @@
  * The command the CLI serves alone, since the api answers its own release at `GET /api/version`. Also where the running code is found
  * (`runningRelease`), for the trial guard, the lease and the api.
  */
+import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
 import { Effect } from 'effect';
 import type { Command } from '../command/entry.verb.ts';
@@ -11,7 +12,6 @@ import type { LeaseRelease } from '../daemon/daemon.ts';
 import { daemonStanding } from '../daemon/daemon.store.ts';
 import { DEFAULT_HARNESS, remoteNameOf } from '../harness/harness.ts';
 import { asked, EngineService, tried, type TaskView } from '../runtime-client.ts';
-import { rootGiven } from '../config/root.store.ts';
 import { daemonEntry } from '../service/service.store.ts';
 import { VERSION as PACKAGE_VERSION } from '../version/version.store.ts';
 import { sessionCounts, sessionRanOn, versionLines, type Current, type Running, type SessionCount } from './release.ts';
@@ -79,7 +79,7 @@ export const versions = Effect.fn('versions')(function* (home: string) {
   const sessions = sessionsAtWork(listed.views, realReleasesDir(home));
   return yield* tried((): Versions => {
     const running = runningRelease();
-    const current = currentRelease();
+    const current = currentRelease(home);
     const lease = daemonStanding();
     const daemon = lease.kind === 'ticking' ? { pid: lease.file.pid, release: lease.file.release ?? null } : null;
     const lines = versionLines(PACKAGE_VERSION, running, current, lease, sessions);
@@ -106,7 +106,7 @@ const VERSION: Command<Versions> = {
   writes: false,
   class: 'read',
   only: { side: 'cli', why: 'it says which code the command runs from; the api answers its own at GET /api/version' },
-  handler: (_args, _env, home) => versions(rootGiven(home, 'version')),
+  handler: (_args) => Effect.flatMap(StoreRoot, (home) => versions(home)),
   print: (data, args) => {
     if (args.json !== true) return data.lines;
     const { lines: _lines, ...answer } = data;

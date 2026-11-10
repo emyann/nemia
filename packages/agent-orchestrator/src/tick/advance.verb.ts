@@ -1,26 +1,24 @@
 /**
  * One pass over one run (`advanceRun`, `advancePass`): read the world, adopt, stop a cancelled run's tasks, hand off, land an ending, lift
  * a hold, close the tasks held open, admit, and word the feed; then file through `file.verb.ts`, which holds the filings and the continue
- * that answers a task held open; then keep the tips and write the run's record, which this file alone writes. Beside it, the filings a
- * pass made and died before writing down, adopted onto the record (`adoptChecks`, `adoptTries`, `adoptRounds`, `unrecordedSteps`), the
- * steps owed a hand-off (`handOffOwed`). Those are here, and not beside the verbs
- * that call them first (`cancelRun`, `forgetRun`, `prune`), because they write the record by the tick's own judgement: those verbs import
- * this file, and it imports none of them. A controller, reaching the runtime through the client (`runtime-client.ts`).
+ * that answers a task held open; then keep the tips and write the run's record, which this file alone writes. It reads and adopts through
+ * `readAndAdopt` (adopt/run-adopt.verb.ts), as `nemia cancel`, `nemia rm` and `nemia prune` do. Beside it, the steps owed a hand-off
+ * (`handOffOwed`), which `prune` reads. A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
+import { StoreConfig } from '../config/config.store.ts';
 import fs from 'node:fs';
 import { endsOnBase } from '../step/step.ts';
 import { Effect } from 'effect';
-import { EngineService, asked as engineAsked, denialText, over, type Engine, type TaskView } from '../runtime-client.ts';
+import { EngineService, denialText, over, type Engine, type TaskView } from '../runtime-client.ts';
 import { wordFeed } from '../feed/word-feed.verb.ts';
-import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../workflow.ts';
 import { folderPlace } from '../record/places.store.ts';
 import { tipBranches, tipsSeen } from '../branches/index.ts';
 import { inFlight, runAdmitted, slotNeed, slotWord, takesNoSlot, type RunSlot } from '../cap/cap.ts';
 import { endingAsked } from '../ending/ending.ts';
 import { holdsOpen } from '../gate/gate.ts';
-import { checkTaskId, isRepositoryRun, stepTaskId, tryOf, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
-import { landsOnCheck, sentBack, stepStatus, type RoundAsk, type SpendOf } from '../status/status.ts';
+import { isRepositoryRun, type Run, type TaskPhase } from '../record/record.ts';
+import { landsOnCheck, stepStatus } from '../status/status.ts';
 import { hasStarted, runReady, waitedOn, waitsOf, type ParentRun, type Wait } from '../wait/wait.ts';
 import { behindNow, followPass, passRevisions, pinPass, pinsWritten, type PinnedPass } from '../revisions/pin.verb.ts';
 import { handOffDue } from '../workspace/workspace.ts';
@@ -28,11 +26,9 @@ import { filesDue } from '../artifacts/artifacts.ts';
 import { inParts } from '../brief/index.ts';
 import { assess, type Assessment } from './assess.ts';
 import type { FeedWords } from '../feed/index.ts';
-import { roundFiled, roundsDue } from '../round/round.ts';
-import type { Closeout } from '../closeout/index.ts';
-import { nextTry, pauseAsksVoid, retriesDue, turnsOf, type RetryAsk } from '../retry/index.ts';
+import { pauseAsksVoid } from '../retry/index.ts';
 import { runsDir } from '../record/record.store.ts';
-import { runStore } from '../record/files.store.ts';
+import { runsAtOnce } from '../runs/runs.store.ts';
 import { collectArtifacts, filesLacked, handCloseout } from '../artifacts/artifacts.store.ts';
 import {
   headsFor,
@@ -41,168 +37,24 @@ import {
   standingLive,
   standingNow,
   standingReader,
+  standingSnapshot,
   type PassStanding,
 } from '../standing/standing.verb.ts';
 import { restBlockers, type RestFacts } from '../rest/index.ts';
-import { answersIn, everyTryOf, keptParent, parentsRead, passParents, type Parents } from '../views/views.verb.ts';
+import { everyTryOf, keptParent, parentsRead, passParents, type Parents } from '../views/views.verb.ts';
 import { waitsForWord } from '../views/views-words.ts';
 import { withinEffect } from '../meter/tally.store.ts';
 import { PlaceService, type Place } from '../place/place.store.ts';
 import { onceFacts, roundsGranted, settledOnce, timelineFacts, type StepFact } from '../meter/index.ts';
 import { checkoutHold, landEnding } from '../ending/ending.verb.ts';
-import { statusMemo } from '../place/landing.store.ts';
+import { statusMemo, type StatusMemo } from '../place/landing.store.ts';
 import type { PassRead } from '../cap/cap.verb.ts';
-import { fileChecks, fileReady, fileRounds, fileTries, tryFiled, type Closer, type Filing, type Heads } from './file.verb.ts';
-import { readPass, recordNamed, type PassReads } from './told.verb.ts';
+import { fileChecks, fileReady, fileRounds, fileTries, type Closer, type Filing, type Heads } from './file.verb.ts';
+import { withStandings, type RunRead } from './told.verb.ts';
+import { readAndAdopt } from '../adopt/run-adopt.verb.ts';
 import { closeHeld, stopAsked } from './held.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
-
-/**
- * Checks a pass filed and never wrote down, put back on the record in memory — `advance` is the one writer of the run's json, and writes
- * it; `cancel` only needs them in view — and the steps they were adopted for.
- *
- * A pass that dies between `e.file` and `rewriteRun` leaves a check on the engine's board that the record does not name. It is looked for
- * under the id the run derives, for every step whose check is due and unrecorded, and before anything asks what is in flight: a run
- * cancelled in that window files no more checks, so one adopted only at filing time would never be stopped, and its suite would run on to
- * the deadline. A task the engine holds no brief for was not filed, and is left for the pass to file.
- */
-export const adoptChecks = Effect.fn('adoptChecks')(function* (
-  e: Engine,
-  run: Run,
-  steps: readonly Workflow[],
-  views: Map<string, TaskView>,
-  phaseOf: (taskId: string) => TaskPhase,
-  closeoutOf: (step: string) => Closeout | undefined,
-  asked: (taskId: string) => CloseoutAsked,
-  spendOf: SpendOf,
-) {
-  const adopted: string[] = [];
-  for (const step of steps) {
-    const record = run.steps[step.name];
-    if (!record || record.check || stepStatus(step, run, phaseOf, closeoutOf, asked, steps, spendOf) !== 'checking') continue;
-    const taskId = checkTaskId(run, step.name);
-    const view = yield* engineAsked('view', e.view(taskId));
-    if (!view.state.brief) continue;
-    views.set(taskId, view);
-    run.steps[step.name] = { ...record, check: { taskId } };
-    adopted.push(step.name);
-  }
-  return adopted;
-});
-
-/**
- * Tries a pass filed and never wrote down, put back on the record — in memory, as `adoptChecks` does, and before anything asks what is in
- * flight, for the same reason: a run cancelled in that window files no more tries, so a try filed in it would otherwise never be adopted,
- * nor stopped. A task the engine holds no brief for is left for the pass to file.
- *
- * Looked for only where a try is due (`retriesDue`, cancelled or not): an ask for the step's next try, or a refused check `retries:`
- * covers. A run waiting on a person with nothing asked costs no look.
- *
- * A continue a pass gave as an answer to the step's task held open, and died before writing down, shows as a task with more answers
- * than the record has turns (`answersIn`, `turnsOf`): the answered task reads running, so the ask reads as one to stop it first. It is
- * adopted as the turn it is, and nothing is stopped and nothing filed.
- *
- * Either way the try is recorded as filing it records it (`tryFiled`): on what the run's pins and frozen steps are now, never on what the
- * try behind it was filed on.
- */
-export const adoptTries = Effect.fn('adoptTries')(function* (
-  e: Engine,
-  run: Run,
-  steps: readonly Workflow[],
-  views: Map<string, TaskView>,
-  phaseOf: (taskId: string) => TaskPhase,
-  closeoutOf: (step: string) => Closeout | undefined,
-  asked: (taskId: string) => CloseoutAsked,
-  verdictOf: (step: string) => Verdict | undefined,
-  asks: readonly RetryAsk[],
-  spendOf: SpendOf,
-) {
-  const adopted: string[] = [];
-  const pins = { run, reads: { steps } };
-  for (const r of retriesDue(steps, run, phaseOf, closeoutOf, asked, verdictOf, asks, () => false, spendOf)) {
-    const held = run.steps[r.step];
-    const current = held?.taskId;
-    const step = steps.find((s) => s.name === r.step);
-    if (held && r.by === 'ask' && r.mode === 'continue' && current && answersIn(views.get(current)) > turnsOf(held)) {
-      run.steps[r.step] = tryFiled(pins, step, held, r, current);
-      adopted.push(r.step);
-      continue;
-    }
-    const taskId = r.mode === 'recheck' ? checkTaskId(run, r.step, r.try) : stepTaskId(run, r.step, r.try);
-    const view = yield* engineAsked('view', e.view(taskId));
-    if (!view.state.brief) continue;
-    views.set(taskId, view);
-    const record = recordNamed(run, r.step);
-    run.steps[r.step] = r.mode === 'recheck' ? { ...nextTry(record, r), check: { taskId } } : tryFiled(pins, step, record, r, taskId);
-    for (const b of r.back ?? []) run.steps[b] = sentBack(recordNamed(run, b));
-    adopted.push(r.step);
-  }
-  return adopted;
-});
-
-/**
- * Rounds a pass filed and never wrote down, put back on the record — in memory, and before anything asks what is in flight, as `adoptTries`
- * does and for its reason.
- *
- * Looked for only where a round is due (`roundsDue`, cancelled or not), under the target's next try's id. A pass that filed the round and
- * died left the looping step's `again: true` on the record, so the round reads due again; finding its task filed, this moves the loop on as
- * the pass would have (`roundFiled`), and nothing is filed twice. A task the engine holds no brief for is left for the pass to file.
- */
-export const adoptRounds = Effect.fn('adoptRounds')(function* (
-  e: Engine,
-  run: Run,
-  steps: readonly Workflow[],
-  views: Map<string, TaskView>,
-  phaseOf: (taskId: string) => TaskPhase,
-  closeoutOf: (step: string) => Closeout | undefined,
-  asked: (taskId: string) => CloseoutAsked,
-  asks: readonly RoundAsk[],
-  spendOf: SpendOf,
-) {
-  const adopted: string[] = [];
-  for (const r of roundsDue(steps, run, phaseOf, closeoutOf, asked, asks, spendOf)) {
-    const taskId = stepTaskId(run, r.target, tryOf(run, r.target) + 1);
-    const view = yield* engineAsked('view', e.view(taskId));
-    if (!view.state.brief) continue;
-    views.set(taskId, view);
-    Object.assign(run.steps, roundFiled(steps, run, r, taskId));
-    if (r.merge && isRepositoryRun(run)) run.baseRef = r.merge.sha;
-    adopted.push(r.step);
-  }
-  return adopted;
-});
-
-/**
- * Steps a pass filed and never wrote down: each step `assess` calls ready — blind to a cancellation, as a pass that read the run before it
- * was called off calls it — whose task, under the id that pass files it by, the engine holds. Looked up as `adoptChecks` looks up a check,
- * and put in `views`; it answers with them and changes nothing on the run. `forget` adopts them in memory, so a step being filed is in
- * flight, and `advance` stops them on a cancelled run, whose record would otherwise hide them from every stop.
- */
-export const unrecordedSteps = Effect.fn('unrecordedSteps')(function* (
-  e: Engine,
-  run: Run,
-  steps: readonly Workflow[],
-  views: Map<string, TaskView>,
-  phaseOf: (taskId: string) => TaskPhase,
-  closeoutOf: (step: string) => Closeout | undefined,
-  asked: (taskId: string) => CloseoutAsked,
-  verdictOf: (step: string) => Verdict | undefined,
-  asks: readonly RetryAsk[],
-  rounds: readonly RoundAsk[],
-  spendOf: SpendOf,
-) {
-  const { cancelledAt: _, ...live } = run;
-  const { ready } = assess(steps, live, phaseOf, closeoutOf, asked, verdictOf, asks, rounds, () => false, spendOf);
-  const found: Array<{ name: string; taskId: string }> = [];
-  for (const name of ready) {
-    const taskId = stepTaskId(run, name, tryOf(run, name));
-    const view = views.get(taskId) ?? (yield* engineAsked('view', e.view(taskId)));
-    if (!view.state.brief) continue;
-    views.set(taskId, view);
-    found.push({ name, taskId });
-  }
-  return found;
-});
+import { StoreRoot } from '../config/root.store.ts';
 
 /**
  * One pass's work: the steps it filed, the steps whose checks it filed, the steps it tried again, and where the run stands — and `notes`,
@@ -286,8 +138,8 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  * - writes when, on the first pass the cap holds the run (`slotHeldAt`), what its wait for a slot is counted from, and says so once.
  * - marks each approval at a gate whose wait it hands the metrics as timed (`gatesTimed`), on the pass that first reads it, and each
  *   session's attempts whose denied calls it hands them as counted (`deniedCounted`), both by `markedOnce`. A gate approved on a try
- *   that answered an earlier try's session is timed only while `runTimed` is `false`, which `markedOnce` reads before `timedOnce`
- *   writes it.
+ *   that answered an earlier try's session is timed only while `runTimed` is `false`: each mark is read off the run as the pass read it,
+ *   and the pass goes on with them as a new run value, so none is read after another is made.
  * - reads the files each step that just signed off named in its closeout, once a task, and keeps that it read them and those the run
  *   does not have (`readFiles`), so the step reads `unsigned` before any check of it is filed.
  * - marks each task whose settle it hands the metrics as counted (`settlesCounted`, `settledOnce`), on the pass that first reads it
@@ -331,9 +183,12 @@ export const advancePass = Effect.fn('advancePass')(
     yield* Effect.annotateCurrentSpan({ run: run.id });
     const revisions = pass?.revisions ?? (yield* passRevisions());
     const took = yield* pinPass(run, new Date().toISOString(), revisions);
-    const { reads, askNotes } = yield* readPass(e, run);
-    const { steps, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks } = reads;
-    const adopted = yield* adoptAll(e, run, reads);
+    const {
+      read: reads,
+      askNotes,
+      adopted,
+    } = yield* readAndAdopt(e, run, { earlierTries: 'budgeted', unrecorded: Boolean(run.cancelledAt) });
+    const { steps, phaseOf, signedOff, asked, verdictOf, spendOf, asks, roundAsks } = reads;
     if (run.cancelledAt) yield* stopCancelled(e, run, reads);
     const place = yield* PlaceService;
     const handed = yield* withinEffect('act', handOffAll(run, reads, place));
@@ -344,47 +199,54 @@ export const advancePass = Effect.fn('advancePass')(
     const parents = pass?.parents ?? passParents(readsOthers(run) ? yield* standingLive([run]) : standingReader(NOTHING_READ));
     const from = pass
       ? { read: pass, slot }
-      : { standing: standingNow(runStore.runs.list()).pipe(Effect.provideService(PlaceService, place)) };
-    const checkout = yield* checkoutHold(e, run, steps, from, process.env, memo, phaseOf);
+      : { standing: standingNow(runsAtOnce.runs.list()).pipe(Effect.provideService(PlaceService, place)) };
     const lift = yield* liftHold(e, run, parents);
-    const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf, [], checkout);
-    const settled = settledOf(run, reads);
-    const marked = markedOnce(run, reads);
-    const timed = yield* timedOnce(e, run, reads, assessed.status);
+    const { checkout, assessed } = yield* passAssessment(e, run, reads, from, memo, yield* standingOf(pass));
+    const { ran, settled, marked, timed } = yield* marksOf(e, run, reads, assessed.status);
     const closer = closerOf(e, reads.views);
-    const closeNotes = yield* closeHeldOpen(run, reads, closer);
-    const admission = yield* admit(e, run, slot, reads, assessed, parents);
+    const closeNotes = yield* closeHeldOpen(ran, reads, closer);
+    const admission = yield* admit(e, ran, slot, reads, assessed, parents);
     const feed = wordFeed(
-      run,
+      ran,
       reads,
       assessed,
       admission,
       checkout,
       lift.lifted,
-      yield* behindNow(run, assessed.status === 'succeeded', revisions),
+      yield* behindNow(ran, assessed.status === 'succeeded', revisions),
     );
-    const { followed, pinned, ...due } = yield* followedDue(run, took, assessed, admission, revisions);
+    const { followed, pinned, ...due } = yield* followedDue(ran, took, assessed, admission, revisions);
 
     const notes: string[] = [...askNotes, ...handed.collected, ...lacking.notes, ...landing.notes, ...lift.notes, ...closeNotes];
     notes.unshift(...took.notes);
     notes.push(...followed.notes);
-    const f: Filing = { e: { ...e, file: (spec) => e.file(inParts(spec)) }, run, reads, closer, mayFile: mayFileOf(run), notes, heads };
+    const home = yield* StoreRoot;
+    const f: Filing = {
+      e: { ...e, file: (spec) => e.file(inParts(spec)) },
+      run: ran,
+      reads,
+      closer,
+      mayFile: mayFileOf(ran),
+      notes,
+      heads,
+      home,
+    };
     const { tried, rechecked } = yield* fileTries(f, due.retry);
     const looped = yield* fileRounds(f, due.round);
     const checked = yield* fileChecks(f, [...assessed.check, ...rechecked]);
     const filed = yield* fileReady(f, { ready: due.ready, send: assessed.send }, admission.starting, parents.git);
     const heldFirst = holdFirst(f, admission.held, assessed.ready);
-    const { tipped, tips } = keepTips(run, steps, assessed.status, heads);
+    const { tipped, tips } = keepTips(ran, steps, assessed.status, heads);
     const wrote =
       [filed, checked, tried, looped, adopted].some((names) => names.length > 0) ||
       Boolean(tips || heldFirst || handed.marked || lacking.read || landing.landed || marked.length || timed) ||
       Boolean(settled.marks.settlesCounted);
-    yield* pinsWritten(run, pinned, wrote);
-    yield* (yield* RunDoor).asks.consume(run, asks, roundAsks, pauseAsksVoid(steps, run, asks, phaseOf, spendOf));
+    yield* pinsWritten(ran, pinned, wrote);
+    yield* (yield* RunDoor).asks.consume(ran, asks, roundAsks, pauseAsksVoid(steps, ran, asks, phaseOf, spendOf));
 
-    const facts = [...settled.facts, ...roundsGranted(run, steps, looped), ...marked, ...(timed ?? [])];
+    const facts = [...settled.facts, ...roundsGranted(ran, steps, looped), ...marked, ...(timed ?? [])];
     const done = { filed, checked, tried, looped, notes, feed, facts };
-    return answerOf(run, reads, assessed, admission, done, { acted: wrote || closer.closed.size > 0, tipped });
+    return answerOf(ran, reads, assessed, admission, done, { acted: wrote || closer.closed.size > 0, tipped });
   },
   (advanced, _e: Engine, run: Run, _slot?: RunSlot, _pass?: PassRead) => advanced.pipe(Effect.annotateLogs({ run: run.id })),
 );
@@ -413,11 +275,9 @@ const followedDue = Effect.fnUntraced(function* (
  * to the mark (`settlesCounted`) for the record this pass writes, as `markedOnce`'s are. A record with no mark counts none, and gets
  * no mark.
  */
-function settledOf(run: Run, r: PassReads): ReturnType<typeof settledOnce> {
+function settledOf(run: Run, r: RunRead): ReturnType<typeof settledOnce> {
   const statusOf = (step: Workflow) => stepStatus(step, run, r.phaseOf, r.signedOff, r.asked, r.steps, r.spendOf, r.verdictOf);
-  const once = settledOnce(run, r.steps, { views: r.views, spendOf: r.spendOf, signedOff: r.signedOff, statusOf });
-  Object.assign(run, once.marks);
-  return once;
+  return settledOnce(run, r.steps, { views: r.views, spendOf: r.spendOf, signedOff: r.signedOff, statusOf });
 }
 
 /**
@@ -426,10 +286,8 @@ function settledOf(run: Run, r: PassReads): ReturnType<typeof settledOnce> {
  * writes. The metrics record them once the pass is done, after that write (`tickRun`): a process that dies between the two loses them,
  * and never records one twice, a restart between passes included.
  */
-function markedOnce(run: Run, r: PassReads): StepFact[] {
-  const once = onceFacts(run, r.steps, r.views, denialText);
-  Object.assign(run, once.marks);
-  return once.facts;
+function markedOnce(run: Run, r: RunRead): ReturnType<typeof onceFacts> {
+  return onceFacts(run, r.steps, r.views, denialText);
 }
 
 /**
@@ -439,11 +297,45 @@ function markedOnce(run: Run, r: PassReads): StepFact[] {
  * any other pass, which reads nothing: a run still going or stopped short, a record with no mark, one already timed, and a run nothing
  * was ever filed of, which has no timeline and is left as it is.
  */
-const timedOnce = Effect.fnUntraced(function* (e: Engine, run: Run, r: PassReads, status: Assessment['status']) {
+const timedOnce = Effect.fnUntraced(function* (e: Engine, run: Run, r: RunRead, status: Assessment['status']) {
   if (run.runTimed !== false || !hasStarted(run) || (status !== 'succeeded' && status !== 'cancelled')) return undefined;
   const facts = timelineFacts(run, r.steps, yield* everyTryOf(e, run, r.views), status);
-  if (facts) run.runTimed = true;
   return facts ?? undefined;
+});
+
+/** The standing of the store's branches the pass reads (`PassRead`'s), or, for a one-off verb that hands none, the store's as it is now. */
+/**
+ * The pass's assessment of a run, the truth every other reader of it agrees with (`test/one-read.test.ts` reads it by this name): its one
+ * read (`reads`), the checkout another run's ending holds (`checkoutHold`, over `from` and `memo`), and where its branches stand
+ * (`withStandings`), judged by `assess`. Read after a hold the pass lifts, which `assess` reads off the run.
+ */
+export const passAssessment = Effect.fnUntraced(function* (
+  e: Engine,
+  run: Run,
+  reads: RunRead,
+  from: Parameters<typeof checkoutHold>[3],
+  memo: StatusMemo,
+  standing: PassStanding,
+) {
+  const checkout = yield* checkoutHold(e, run, reads.steps, from, yield* StoreConfig, memo, reads.phaseOf);
+  const read = withStandings({ ...reads, checkout }, standing);
+  return { checkout, read, assessed: assess(read) };
+});
+
+const standingOf = (pass: PassRead | undefined) => (pass ? Effect.succeed(pass.standing) : standingSnapshot());
+
+/**
+ * The run as the pass marks it (`ran`): the record it read with every mark of the metrics laid over it — the settled tasks counted
+ * (`settledOf`), the gate waits timed and the denials counted (`markedOnce`), the timeline taken (`timedOnce`) — a new value, each mark
+ * read off the run as the pass read it, so none depends on the order they are made in and the record read is left as it was. Beside it
+ * what each mark hands the metrics.
+ */
+const marksOf = Effect.fnUntraced(function* (e: Engine, run: Run, r: RunRead, status: Assessment['status']) {
+  const settled = settledOf(run, r);
+  const once = markedOnce(run, r);
+  const timed = yield* timedOnce(e, run, r, status);
+  const ran: Run = { ...run, ...settled.marks, ...once.marks, ...(timed ? { runTimed: true } : {}) };
+  return { ran, settled, marked: once.facts, timed };
 });
 
 /**
@@ -453,40 +345,16 @@ const timedOnce = Effect.fnUntraced(function* (e: Engine, run: Run, r: PassReads
  */
 export const mayFileOf = (run: Run): (() => boolean) => {
   let calledOff = false;
-  return () => !(calledOff ||= !runStore.runs.exists(run.id) || runStore.runs.calledOff(run.id));
+  return () => !(calledOff ||= !runsAtOnce.runs.exists(run.id) || runsAtOnce.runs.calledOff(run.id));
 };
 
 /**
- * Adopt what a pass before this one filed and never wrote down: its rounds, then its tries, then its checks. Answers with every step
- * adopted.
- */
-const adoptAll = Effect.fnUntraced(function* (e: Engine, run: Run, r: PassReads) {
-  const rounds = yield* adoptRounds(e, run, r.steps, r.views, r.phaseOf, r.signedOff, r.asked, r.roundAsks, r.spendOf);
-  const tries = yield* adoptTries(e, run, r.steps, r.views, r.phaseOf, r.signedOff, r.asked, r.verdictOf, r.asks, r.spendOf);
-  const checks = yield* adoptChecks(e, run, r.steps, r.views, r.phaseOf, r.signedOff, r.asked, r.spendOf);
-  return [...rounds, ...tries, ...checks];
-});
-
-/**
- * Stop a cancelled run's tasks in flight, those a pass filed and never wrote down included: none the engine was already asked to stop. A
+ * Stop a cancelled run's tasks in flight, those a pass filed and never wrote down included (`readAndAdopt` put them on the record): none
+ * the engine was already asked to stop. A
  * stop the engine refuses (`stopAsked`) is one of a task that settled or was asked to stop since this pass read it: nothing left to do.
  */
-const stopCancelled = Effect.fnUntraced(function* (e: Engine, run: Run, r: PassReads) {
-  const unrecorded = yield* unrecordedSteps(
-    e,
-    run,
-    r.steps,
-    r.views,
-    r.phaseOf,
-    r.signedOff,
-    r.asked,
-    r.verdictOf,
-    r.asks,
-    r.roundAsks,
-    r.spendOf,
-  );
-  const live = unrecorded.filter(({ taskId }) => ['pending', 'running'].includes(r.phaseOf(taskId)));
-  for (const { taskId } of [...inFlight(run, r.phaseOf), ...live]) {
+const stopCancelled = Effect.fnUntraced(function* (e: Engine, run: Run, r: RunRead) {
+  for (const { taskId } of inFlight(run, r.phaseOf)) {
     if (!r.views.get(taskId)?.state.stopRequested) yield* stopAsked(e, taskId);
   }
 });
@@ -497,11 +365,11 @@ const stopCancelled = Effect.fnUntraced(function* (e: Engine, run: Run, r: PassR
  * and with why a hand-off was not made, and whether a hand-off was marked on the record. A repository run's step is handed off by its
  * `handoff`, asked of `place`, and marked only on its answer: one refused or not heard is asked again on the next pass.
  */
-const handOffAll = Effect.fnUntraced(function* (run: Run, r: PassReads, place: Place) {
+const handOffAll = Effect.fnUntraced(function* (run: Run, r: RunRead, place: Place) {
   let marked = false;
   const collected: string[] = [];
   for (const name of handOffOwed(r.steps, run, r.phaseOf)) {
-    if (!runStore.runs.exists(run.id)) continue;
+    if (!runsAtOnce.runs.exists(run.id)) continue;
     const record = run.steps[name];
     if (!record?.taskId || !record.workspace) continue;
     const unhanded = isRepositoryRun(run) ? yield* handedOffBy(place, record.workspace, name) : folderPlace(runsDir()).handOff(run, name);
@@ -522,7 +390,7 @@ const handOffAll = Effect.fnUntraced(function* (run: Run, r: PassReads, place: P
  * (`StepRecord.filesRead`), which unsigns the step where there is one: so no later pass reads that task's files again. Answers how
  * many steps it read, each a write the record is owed, and a note for each whose closeout is not accepted.
  */
-function readFiles(run: Run, r: PassReads): { read: number; notes: string[] } {
+function readFiles(run: Run, r: RunRead): { read: number; notes: string[] } {
   const due = filesDue(r.steps, run, r.phaseOf, r.signedOff);
   const notes: string[] = [];
   for (const name of due) {
@@ -558,7 +426,7 @@ const liftHold = Effect.fnUntraced(function* (e: Engine, run: Run, parents: Pare
   if (!run.hold || run.cancelledAt || !run.hold.until.length) return nothing;
   let landed = true;
   for (const id of run.hold.until) if (!(landed = (yield* keptParent(id, parents.git, parents.read).pipe(over(e))).landed)) break;
-  if (!landed || !runStore.holds.lift(run.id, run.hold.at)) return nothing;
+  if (!landed || !runsAtOnce.holds.lift(run.id, run.hold.at)) return nothing;
   const { until, at } = run.hold;
   delete run.hold;
   return {
@@ -586,7 +454,7 @@ function closerOf(e: Engine, views: ReadonlyMap<string, TaskView>): PassCloser {
 }
 
 /** Close each step's task held open that waits for a word nobody is to give (`holdsOpen`): answers with the engine's refusals, worded. */
-const closeHeldOpen = Effect.fnUntraced(function* (run: Run, r: PassReads, closer: PassCloser) {
+const closeHeldOpen = Effect.fnUntraced(function* (run: Run, r: RunRead, closer: PassCloser) {
   const notes: string[] = [];
   for (const step of r.steps) {
     const taskId = run.steps[step.name]?.taskId;
@@ -619,7 +487,7 @@ const admit = Effect.fnUntraced(function* (
   e: Engine,
   run: Run,
   slot: RunSlot | undefined,
-  r: PassReads,
+  r: RunRead,
   assessed: Assessment,
   parents: Parents,
 ) {
@@ -684,7 +552,7 @@ type Done = Pick<Advanced, 'filed' | 'checked' | 'tried' | 'looped' | 'notes' | 
  */
 function answerOf(
   run: Run,
-  r: PassReads,
+  r: RunRead,
   assessed: Assessment,
   admission: Admission,
   done: Done,

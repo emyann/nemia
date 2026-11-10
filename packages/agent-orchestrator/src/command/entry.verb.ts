@@ -6,6 +6,8 @@
 import { Effect, type Schema } from 'effect';
 import type { PlaceService } from '../place/place.store.ts';
 import type { EngineService } from '../runtime-client.ts';
+import type { StoreRoot } from '../config/root.store.ts';
+import type { StoreConfig } from '../config/config.store.ts';
 import { Invalid, type Refusal } from '../refusal/refusal.ts';
 import type { StatsMemo } from '../stats/stats.verb.ts';
 import type { InformerMemo } from '../rest/informer.verb.ts';
@@ -16,7 +18,7 @@ import type { Filings } from '../summary/reads.verb.ts';
 import type { Args, CommandSpec, Flag } from './command.ts';
 import type { Run } from '../record/record.ts';
 import type { Labels } from '../labels/labels.ts';
-import { labelSegments, runLabelMap } from '../runlist/runlist.ts';
+import { labelSegments, runLabelMap } from '../labels/labels.ts';
 import { parseSelectors, selectorsRefusal, SELECTOR_FORM, type Selectors } from '../watch/selector.ts';
 
 /**
@@ -62,7 +64,7 @@ export type InputOf<I> = [Args] extends [I] ? { readonly input?: Schema.Decoder<
  */
 export type Command<D extends object = Readonly<Record<string, unknown>>, I = Args> = CommandSpec &
   InputOf<I> & {
-    handler(args: I, env?: NodeJS.ProcessEnv, home?: string, kept?: Kept): Effect.Effect<D, Refusal, EngineService | PlaceService>;
+    handler(args: I, kept?: Kept): Effect.Effect<D, Refusal, EngineService | PlaceService | StoreRoot | StoreConfig>;
     print(data: D, args: I): readonly string[];
     note?(data: D, args: I): readonly string[];
   };

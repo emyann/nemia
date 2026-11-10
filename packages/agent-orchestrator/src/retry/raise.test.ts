@@ -10,8 +10,8 @@ import { decision } from '../decide/decide.ts';
 import type { Run, TaskPhase } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import type { SpendOf } from '../status/status.ts';
-import { answerLines, overBudgetLine, stepRaise, type RaiseReads } from './retry.ts';
-import { phases, run, step } from '../../test/assessed.ts';
+import { answerLines, overBudgetLine, retryOffers, stepRaise, type RaiseReads } from './retry.ts';
+import { aRead, phases, run, step } from '../../test/assessed.ts';
 
 const asked = () => true;
 const nothingShipped = () => false;
@@ -37,7 +37,10 @@ test('decide names the raise the run page shows: one judgement, read by both', a
       name === 'implement' ? { outcome: 'blocked', summary: 's', artifacts: [], needs: 'which flag name ships' } : undefined;
     const raise = stepRaise(steps[0], r, steps, reads(settled, stuck), spent);
     assert.deepEqual(raise, { by: 'retry', above: 4, said: '$4.00', modes: ['continue', 'fresh'], own: 'blocked' });
-    const d = decision(steps, r, settled, nothingShipped, stuck, asked, undefined, undefined, undefined, () => false, spent);
+    const d = decision(
+      aRead(steps, r, { phaseOf: settled, signedOff: stuck, asked, sessionBlocked: () => false, spendOf: spent }),
+      nothingShipped,
+    );
     const line = answerLines(steps, r, d, settled, stuck, asked, spent).implement ?? '';
     assert.ok(line.includes(`its cap raised above ${raise?.said}:`), line);
   });
@@ -62,17 +65,17 @@ test('decide names the raise the run page shows: one judgement, read by both', a
     const raise = stepRaise(steps[1], r, steps, reads(all, said, 0), spent);
     assert.deepEqual(raise, { by: 'round', above: 4.25, said: '$4.25', modes: [], own: null });
     const d = decision(
-      steps,
-      r,
-      all,
+      aRead(steps, r, {
+        phaseOf: all,
+        signedOff: said,
+        asked,
+        verdictOf: () => 0,
+        asks: [],
+        roundAsks: [],
+        sessionBlocked: () => false,
+        spendOf: spent,
+      }),
       nothingShipped,
-      said,
-      asked,
-      () => 0,
-      [],
-      [],
-      () => false,
-      spent,
     );
     const line = overBudgetLine(steps, r, d, spent) ?? '';
     assert.ok(line.includes(`review (held: its round would file implement again, which has cost ${raise?.said} `), line);
@@ -87,7 +90,17 @@ test('decide names the raise the run page shows: one judgement, read by both', a
       { pruned: { at: '2026-09-17T01:00:00.000Z', worktrees: [] } },
       { hold: { at: '2026-01-01T01:00:00Z', until: ['r-0'] } },
     ];
-    for (const off of offs)
-      assert.equal(stepRaise(steps[0], run({ implement: 't1' }, off as object), steps, reads(settled, stuck), spent), null);
+    const d = decision(
+      aRead(steps, run({ implement: 't1' }), { phaseOf: settled, signedOff: stuck, asked, sessionBlocked: () => false, spendOf: spent }),
+      nothingShipped,
+    );
+    assert.equal(d.kind, 'awaiting', 'the run unmarked waits on the person');
+    for (const off of offs) {
+      const r = run({ implement: 't1' }, off as object);
+      assert.equal(stepRaise(steps[0], r, steps, reads(settled, stuck), spent), null);
+      assert.deepEqual(answerLines(steps, r, d, settled, stuck, asked, spent), {}, 'no answer line: the ask would not be honoured');
+      assert.deepEqual(retryOffers(steps, r, d, settled, stuck, asked, spent), [], 'no try offered: the ask would not be honoured');
+    }
+    assert.notDeepEqual(answerLines(steps, run({ implement: 't1' }), d, settled, stuck, asked, spent), {}, 'unmarked, it is answered');
   });
 });

@@ -107,7 +107,7 @@ test('POST /api/pause refuses, before the store is written: a body that is not a
 function appAtWork(working: string) {
   const stops: string[] = [];
   const own = {
-    ...engine(),
+    ...engine(process.env),
     list: (ids: string[]) =>
       Effect.succeed({
         views: ids

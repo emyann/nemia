@@ -3,33 +3,25 @@
  * prints (`costLine`, `runCostLines`). Pure.
  */
 import type { Workflow } from '../step/step.ts';
-import { isRepositoryRun, refusedCheck, tryOf, type CloseoutAsked, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
-import type { Closeout } from '../closeout/index.ts';
+import { isRepositoryRun, refusedCheck, tryOf, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
 import type { Verdict } from '../check/check.ts';
-import type { RetryAsk } from '../retry/index.ts';
 import {
-  approvedFirst,
   budgetOf,
   waitsOnCheckout,
   roundSpans,
   runSpend,
   sessionTasks,
   spentWord,
-  standing,
   stepSpend,
-  type RoundAsk,
   type SpendOf,
-  budgetWord,
-  dollars,
-  readWords,
   sendBackTo,
-  type Consumed,
 } from '../status/status.ts';
-import type { CheckoutHold } from '../cap/cap.ts';
-import { assess } from '../tick/assess.ts';
+import { budgetWord, dollars } from '../money/money.ts';
+import { readWords, type Consumed } from '../usage/usage.ts';
+import { assess, type Assessment, type AssessRead } from '../tick/assess.ts';
 import { resultSteps } from '../branches/index.ts';
 import { runWords } from '../route/routed/index.ts';
-import { merges } from '../ending/ending.ts';
+import { merges, unrunEnding } from '../ending/ending.ts';
 import type { DecideLabel, RunStatusWord } from 'objects';
 
 /**
@@ -156,43 +148,15 @@ function once(landed: (branch: string) => Landed): (branch: string) => Landed {
  * in `overBudget`, never in its place. A loop out of rounds, a cap reached and a call denied broke nothing: each makes the run `waiting`,
  * a person's call.
  *
- * @param verdictOf What each step's current check exited with: a refusal and a check that did not finish are told apart.
- * @param harnessBlocked Whether a task's session is blocked by its harness (`retryable`): a person's try of such a step is waited on too.
- * @param spendOf What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, is waited on by a person.
- * @param checkout The run whose `workspace: base` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in
- *   ending.verb.ts): what this run is still running for.
+ * Off the one read of the run (`AssessRead`) and its assessment (`assessed`, `assess` on that read where a caller has not judged it): each
+ * step's standing is the assessment's (`stepWords`), so `nemia decide` stands no step the pass does not.
  */
-export function decision(
-  steps: readonly Workflow[],
-  run: Run,
-  phaseOf: (taskId: string) => TaskPhase,
-  landed: (branch: string) => Landed,
-  closeoutOf: (step: string) => Closeout | undefined = () => undefined,
-  askedCloseout: (taskId: string) => CloseoutAsked = () => false,
-  verdictOf: (step: string) => Verdict | undefined = () => undefined,
-  asks: readonly RetryAsk[] = [],
-  roundAsks: readonly RoundAsk[] = [],
-  harnessBlocked: (taskId: string) => boolean = () => false,
-  spendOf: SpendOf = () => undefined,
-  checkout?: CheckoutHold,
-): Decision {
+export function decision(read: AssessRead, landed: (branch: string) => Landed, assessed: Assessment = assess(read)): Decision {
+  const { steps, run, phaseOf, signedOff: closeoutOf, asked: askedCloseout, verdictOf, spendOf, checkout } = read;
   if (run.cancelledAt) return { kind: 'cancelled', at: run.cancelledAt };
 
-  const { status, ready, retry, round } = assess(
-    steps,
-    run,
-    phaseOf,
-    closeoutOf,
-    askedCloseout,
-    verdictOf,
-    asks,
-    roundAsks,
-    harnessBlocked,
-    spendOf,
-    [],
-    checkout,
-  );
-  const standingOf = new Map(steps.map((s) => [s.name, standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
+  const { status, ready, retry, round } = assessed;
+  const standingOf = assessed.stepWords;
   const refiled = roundSpans(steps, round);
   const statusOf = new Map([...standingOf].map(([name, st]) => [name, refiled.has(name) ? st.own : st.status]));
   if (status === 'running') {
@@ -216,9 +180,12 @@ export function decision(
 
   const stands = once(landed);
   const atGate = waitingAtGates(steps, run, statusOf, runWords(steps, run, phaseOf, closeoutOf, askedCloseout, spendOf, verdictOf));
-  const unrunEnding = (name: string): boolean => !run.steps[name]?.taskId && steps.some((s) => s.name === name && approvedFirst(s, run));
   const byHand =
-    atGate.length > 0 && atGate.every(unrunEnding) && branches.length > 0 && !direct && branches.every((b) => stands(b) !== false);
+    atGate.length > 0 &&
+    atGate.every((name) => unrunEnding(steps, run, name)) &&
+    branches.length > 0 &&
+    !direct &&
+    branches.every((b) => stands(b) !== false);
   const awaitingApproval = byHand ? [] : atGate;
   const onBase = branches.length > 0 && !direct && !awaitingApproval.length && branches.every(stands);
   if (onBase && branches.every((b) => stands(b) === true)) return { kind: 'landed', branches };

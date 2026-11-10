@@ -45,7 +45,7 @@ function repoWithWorkflows(): string {
 
 /** `nemia policy reach` with `args`, read in the store, over the test's run door. */
 const reach = (args: Record<string, unknown>) =>
-  stage.runWith(stage.board().e, Effect.provide(POLICY_REACH.handler({ name: 'nemia', ...args }, undefined, ROOT), door()));
+  stage.runWith(stage.board().e, Effect.provide(POLICY_REACH.handler({ name: 'nemia', ...args }), door()));
 
 /** The kind a read is refused with. */
 const refusedKind = async (args: Record<string, unknown>): Promise<string> => {
@@ -91,10 +91,7 @@ test('`nemia policy reach`: which steps at their gate her rules can approve in a
     const tries = { id: 'tries', answer: 'retry' as const, steps: ['implement'], when: ['checked' as const] };
     writeProposed(ROOT, 'nemia', { at: '2026-11-05T00:00:00.000Z', rules: [tries], guidance: ['be kind'], digest: null });
     const read = await reach({ factory: 'f' });
-    await stage.runWith(
-      stage.board().e,
-      POLICY_PROPOSE.handler({ name: 'nemia', file: '-', words: JSON.stringify(read.proposal) }, undefined, ROOT),
-    );
+    await stage.runWith(stage.board().e, POLICY_PROPOSE.handler({ name: 'nemia', file: '-', words: JSON.stringify(read.proposal) }));
     const after = readProposed(ROOT, 'nemia');
     assert.deepEqual(after?.rules.map((r) => r.id).sort(), ['approve-draft', 'approve-ship', 'tries']);
     assert.deepEqual(after?.guidance, ['be kind']);

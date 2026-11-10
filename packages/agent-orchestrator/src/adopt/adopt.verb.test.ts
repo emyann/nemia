@@ -21,9 +21,9 @@ const FACTORIES = path.join(ROOT, 'factories');
 const INBOX = path.join(ROOT, 'inbox');
 const { templated: programsAt } = await import('../../test/templated.ts');
 const { exportTemplate, reconciled } = programsAt(ROOT);
-const { readFactory } = await import('../runner.ts');
+const { readFactory } = await import('../../testing.ts');
 const { appliedDir, treeDir } = await import('../factory/applied/applied.store.ts');
-const { readRun } = await import('../record/record.store.ts');
+const { runRecord } = await import('../record/record.store.ts');
 const { advanceRun, startRun } = await import('../runner.ts');
 const { main } = await import('../cli/main.ts');
 const { engineOf, runWith } = await import('../runtime-client.ts');
@@ -97,9 +97,9 @@ async function aFinished(repo: string, factory: string): Promise<string> {
   const { id } = await stage.runPlaced(startRun({ brief: 'Name it', repo, workflowDir: steps, isolate: false }));
   const file = path.join(ROOT, 'runs', `${id}.json`);
   fs.writeFileSync(file, `${JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), factory }, null, 2)}\n`);
-  await stage.runWith(board.e, advanceRun(readRun(id)));
+  await stage.runWith(board.e, advanceRun(runRecord(id)));
   board.settle(`${id}-work`, 'succeeded', { outcome: 'done', summary: 'named it', artifacts: [], needs: null });
-  await stage.runWith(board.e, advanceRun(readRun(id)));
+  await stage.runWith(board.e, advanceRun(runRecord(id)));
   return id;
 }
 
@@ -130,7 +130,7 @@ test('a hand-made factory taken over by a template: previewed, written, its card
       await printedBy(t, 'factory', 'instruction', 'crew', '--store');
       fs.writeFileSync(path.join(FACTORIES, 'crew.json'), `${JSON.stringify({ ...fileOf('crew'), later: { kept: true } }, null, 2)}\n`);
       run = (await printedBy(t, 'start', 'Cache the views', '--factory', 'crew', '--workflows', 'dev'))[0].split(' ')[0];
-      runBefore = JSON.stringify(readRun(run));
+      runBefore = JSON.stringify(runRecord(run));
       finished = await aFinished(repo, 'crew');
       cardFile = card('views', 'crew', 'dev');
     },
@@ -172,11 +172,11 @@ test('a hand-made factory taken over by a template: previewed, written, its card
 
   await s.test('the card filed before the takeover starts, on the workflow in the tree', async (t) => {
     const started = (await printedBy(t, 'start', cardFile))[0].split(' ')[0];
-    assert.ok(readRun(started).workflowDir.startsWith(treeDir('crew')), readRun(started).workflowDir);
+    assert.ok(runRecord(started).workflowDir.startsWith(treeDir('crew')), runRecord(started).workflowDir);
   });
 
   await s.test('the run in flight keeps its record as it was: its workflow folder and its frozen steps', () => {
-    assert.equal(JSON.stringify(readRun(run)), runBefore);
+    assert.equal(JSON.stringify(runRecord(run)), runBefore);
   });
 
   await s.test("the controller's next pass finds it applied, with no upgrade under way", () => {

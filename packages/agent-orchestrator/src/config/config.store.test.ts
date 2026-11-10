@@ -170,10 +170,10 @@ test('each WF_ variable reads its default unset, empty or blank, and the values 
       else process.env.WF_MAX_CONCURRENT = was;
     });
     process.env.WF_MAX_CONCURRENT = '7';
-    assert.equal(maxConcurrent(), 7);
+    assert.equal(maxConcurrent(process.env), 7);
     process.env.WF_MAX_CONCURRENT = '-3';
     assert.throws(
-      () => maxConcurrent(),
+      () => maxConcurrent(process.env),
       (err: unknown) => err instanceof Invalid && err.message.startsWith('WF_MAX_CONCURRENT=-3 '),
     );
   });

@@ -32,7 +32,7 @@ delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 const { advanceRun, artifactFiles, closeoutAsked, decideRun, list, missingArtifacts, phaseOfView, retryRun, startRun, runWith } =
   await import('../src/runner.ts');
-const { artifactsDir, asksDir, readRun, rewriteRun } = await import('../src/record/record.store.ts');
+const { artifactsDir, asksDir, runRecord, rewriteRun } = await import('../src/record/record.store.ts');
 const { SIGNOFF } = await import('../src/run.ts');
 const { lackedOf } = await import('../src/record/record.ts');
 const { RUN_LABELS, SESSION_TOKEN, STEP_FILES } = await import('../src/filed/filed.ts');
@@ -65,7 +65,7 @@ const twoSteps = (...implement: string[]) =>
 const started = async (dir: string) => stage.runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir }));
 
 /** One pass over the run `id` on the stage's engine: what it filed, checked and tried. */
-const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(readRun(id)));
+const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(id)));
 
 /** A run of `dir` started and passed once: its first step filed, the id of that step's task and its files directory. */
 const filed = async (dir = twoSteps('check: npm test')) => {
@@ -97,7 +97,7 @@ const askedOf = async (id: string) => {
 };
 /** `nemia ls` of the run `id`: each step's status, and who waits on you. */
 const listed = async (id: string) => {
-  const l = await stage.runWith(stage.board().e, list(stage.board().e, readRun(id)));
+  const l = await stage.runWith(stage.board().e, list(stage.board().e, runRecord(id)));
   return { statuses: l.steps.map((s) => s.message), onYou: l.waitingOnYou };
 };
 /** What `nemia decide` decides of the run `id`, where it awaits you. */
@@ -208,7 +208,7 @@ test('a declared output travels to the step that reads it', async (t) => {
       assert.deepEqual(filedWith.required, ['apiVersion', 'outcome', 'summary', 'body', 'artifacts', 'needs', 'findings']);
       assert.deepEqual(filedWith.properties.findings, FINDINGS.properties.findings, 'the folder rewritten after the first filing');
       assert.equal(filedWith.properties.verdict, undefined);
-      assert.deepEqual(readRun(id).workflow?.find((x) => x.name === 'review')?.output, { file: 'review.schema.json', schema: FINDINGS });
+      assert.deepEqual(runRecord(id).workflow?.find((x) => x.name === 'review')?.output, { file: 'review.schema.json', schema: FINDINGS });
       const brief = briefOf(reviewTask());
       assert.doesNotMatch(brief, /IMPLEMENTER-ACCOUNT|cut a corner/, 'the reviewer judges the change, not an account of it');
       assert.doesNotMatch(brief, /## From/);
@@ -237,7 +237,7 @@ test('a declared output travels to the step that reads it', async (t) => {
     async () => {
       await stage.runWith(stage.board().e, retryRun(id, 'review', { mode: 'fresh' }));
       assert.deepEqual((await pass(id)).tried, ['review']);
-      fs.writeFileSync(path.join(readRun(id).steps.review.workspace!, 'REVIEW-NOTES.md'), '# notes\n');
+      fs.writeFileSync(path.join(runRecord(id).steps.review.workspace!, 'REVIEW-NOTES.md'), '# notes\n');
       stage.board().settle(`${reviewTask()}-try2`, 'succeeded', {
         outcome: 'done',
         summary: 'REVIEWER-ACCOUNT',
@@ -279,7 +279,7 @@ test('an unsigned step is nudged once, then waits on you', async (t) => {
       assert.ok(taskOf(first()).spec.closeoutSchema, 'the run asked');
       assert.deepEqual([phaseOfView(await viewOf(first())), (await listed(id)).statuses[0]], ['pending', 'pending']);
       const lost = (await started(twoSteps())).id;
-      const record = readRun(lost);
+      const record = runRecord(lost);
       record.steps.implement = { ...record.steps.implement, taskId: `${lost}-implement` };
       rewriteRun(record);
       const lostView = await viewOf(`${lost}-implement`);
@@ -299,7 +299,7 @@ test('an unsigned step is nudged once, then waits on you', async (t) => {
   await s.test("the run nudges it once itself, continuing its session in the owner's words; nothing after it is filed", async () => {
     const p = await pass(id);
     assert.deepEqual([p.tried, p.filed], [['implement'], []]);
-    const nudge = readRun(id).steps.implement;
+    const nudge = runRecord(id).steps.implement;
     assert.equal(nudge.tries?.at(-1)?.cause, 'signoff');
     const spec = taskOf(nudge.taskId!).spec;
     assert.equal(spec.resumeFrom, `native-${first()}`, 'the session that ended unsigned is continued');
@@ -317,7 +317,7 @@ test('an unsigned step is nudged once, then waits on you', async (t) => {
   await s.test('a nudge a person asks for is told the last try ended without its closeout', async () => {
     await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'continue' }));
     assert.deepEqual((await pass(id)).tried, ['implement']);
-    const brief = briefOf(readRun(id).steps.implement.taskId!);
+    const brief = briefOf(runRecord(id).steps.implement.taskId!);
     assert.ok(brief.includes('The last try ended without the closeout the run asked for'), brief);
   });
 });
@@ -352,7 +352,7 @@ test('the run nudges no end that is not a missing statement', async (t) => {
     assert.deepEqual(await awaiting(id), { outcome: 'failed', unsigned: [], failed: ['implement'] });
     await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'continue' }));
     assert.deepEqual((await pass(id)).tried, ['implement']);
-    const brief = briefOf(readRun(id).steps.implement.taskId!);
+    const brief = briefOf(runRecord(id).steps.implement.taskId!);
     assert.ok(brief.includes("The last try's session ended `failed` before it signed off."), brief);
   });
   await t.test('a task filed with no closeout schema, as before closeouts, was never asked for one: it lists unverified', async () => {
@@ -372,12 +372,15 @@ test('files a closeout names', async (t) => {
   let gone = '';
   await s.test("implement is filed its files directory, made outside the workspace, in its session's env and in its brief", async () => {
     ({ id, files, task } = await filed());
-    const frozen = path.join(ROOT, 'runs', id, 'workflow', String(readRun(id).workflowFiles));
+    const frozen = path.join(ROOT, 'runs', id, 'workflow', String(runRecord(id).workflowFiles));
     const { [SESSION_TOKEN]: token, ...env } = taskOf(task).spec.config?.env ?? {};
     assert.deepEqual(env, { [STEP_FILES]: files, WF_WORKFLOW_FILES: frozen, [RUN_LABELS]: '{}' });
     assert.match(token ?? '', /^[A-Za-z0-9_-]{43}$/, 'beside them its session token (session-token.test.ts)');
     assert.ok(fs.statSync(files).isDirectory(), 'made before the step was filed');
-    assert.ok(!files.startsWith(readRun(id).steps.implement.workspace! + path.sep), 'not in the workspace, where it would ride the branch');
+    assert.ok(
+      !files.startsWith(runRecord(id).steps.implement.workspace! + path.sep),
+      'not in the workspace, where it would ride the branch',
+    );
     const brief = briefOf(task);
     const told = brief.indexOf('\n## Files for the steps after you\n');
     assert.ok(told >= 0, brief);
@@ -395,10 +398,10 @@ test('files a closeout names', async (t) => {
       assert.deepEqual(p.checked, [], 'no check is filed for a closeout the run does not accept');
       assert.deepEqual(p.tried, ['implement'], 'the run nudges the step itself');
       assert.equal(stage.board().tasks.has(`${task}-check`), false);
-      const record = readRun(id).steps.implement;
+      const record = runRecord(id).steps.implement;
       assert.equal(record.tries?.at(-1)?.cause, 'signoff');
       assert.equal(record.taskId, `${task}-try2`);
-      assert.equal(readRun(id).steps.review?.taskId ?? null, null, 'nothing that waits on it is filed');
+      assert.equal(runRecord(id).steps.review?.taskId ?? null, null, 'nothing that waits on it is filed');
       const brief = briefOf(`${task}-try2`);
       assert.ok(brief.includes(`- \`${gone}\`: it is not a file in \`${files}\`.`), brief);
       assert.ok(brief.includes(`There is \`${path.join(files, 'Shot-Dark.png')}\`.`), `the near name is said\n${brief}`);
@@ -414,7 +417,7 @@ test('files a closeout names', async (t) => {
       stage.board().settle(`${task}-try2`, 'succeeded', signed(gone));
       const p = await pass(id);
       assert.deepEqual([p.tried, p.checked, p.filed], [[], [], []], 'no second nudge in the round, no check, nothing after it');
-      assert.deepEqual(readRun(id).steps.implement.filesRead, { taskId: `${task}-try2`, lacked: { [gone]: 'missing' } });
+      assert.deepEqual(runRecord(id).steps.implement.filesRead, { taskId: `${task}-try2`, lacked: { [gone]: 'missing' } });
       for (let n = 0; n < 3; n++) assert.deepEqual((await pass(id)).tried, [], 'nor on a later pass');
       assert.equal(stage.board().tasks.has(`${task}-try3`), false);
       assert.equal(stage.board().tasks.has(`${task}-try2-check`), false);
@@ -436,7 +439,7 @@ test('files a closeout names', async (t) => {
       stage.board().settle(`${task}-try3`, 'succeeded', signed(kept(), removed()));
       const p = await pass(id);
       assert.deepEqual([p.checked, p.tried], [['implement'], []]);
-      assert.deepEqual(readRun(id).steps.implement.filesRead, { taskId: `${task}-try3`, lacked: {} });
+      assert.deepEqual(runRecord(id).steps.implement.filesRead, { taskId: `${task}-try3`, lacked: {} });
     },
   );
   await s.test(
@@ -452,7 +455,7 @@ test('files a closeout names', async (t) => {
         brief,
       );
       assert.ok(!brief.includes('removed-dark.png'), `a name with no file is handed to no one\n${brief}`);
-      assert.deepEqual(lackedOf(readRun(id).steps.implement), [], 'and the step that named it, verified since, is not unsigned for it');
+      assert.deepEqual(lackedOf(runRecord(id).steps.implement), [], 'and the step that named it, verified since, is not unsigned for it');
     },
   );
 });
@@ -462,14 +465,14 @@ test("what a run accepts of a closeout's files, and what it refuses", async (t) 
     'a v1 closeout of a 300-character summary naming a workspace file, collected, and a picture written where its env says, kept there',
     async () => {
       const { id, files, task } = await filed();
-      fs.writeFileSync(path.join(readRun(id).steps.implement.workspace!, 'report.md'), 'left in the workspace, and collected');
+      fs.writeFileSync(path.join(runRecord(id).steps.implement.workspace!, 'report.md'), 'left in the workspace, and collected');
       const picture = path.join(taskOf(task).spec.config?.env?.[STEP_FILES] ?? '', 'page-1.png');
       fs.writeFileSync(picture, 'png');
       stage.board().settle(task, 'succeeded', signedV1('done', 'word '.repeat(60), null, [{ path: 'report.md' }, { path: picture }]));
       const p = await pass(id);
       assert.deepEqual([p.checked, p.tried], [['implement'], []]);
-      assert.deepEqual(readRun(id).steps.implement.filesRead, { taskId: task, lacked: {} });
-      assert.equal(readRun(id).steps.implement.taskId, task);
+      assert.deepEqual(runRecord(id).steps.implement.filesRead, { taskId: task, lacked: {} });
+      assert.equal(runRecord(id).steps.implement.taskId, task);
       assert.deepEqual(fs.readdirSync(files).sort(), ['closeout.json', 'page-1.png', 'report.md'], 'the picture copied nowhere');
       assert.equal(fs.readFileSync(picture, 'utf8'), 'png');
     },
@@ -479,13 +482,13 @@ test("what a run accepts of a closeout's files, and what it refuses", async (t) 
     stage.board().settle(task, 'succeeded', signedV1('done', 'Line one.\nLine two.', ''));
     const p = await pass(id);
     assert.deepEqual([p.checked, p.tried], [['implement'], []]);
-    assert.equal(readRun(id).steps.implement.filesRead, undefined);
+    assert.equal(runRecord(id).steps.implement.filesRead, undefined);
   });
   await t.test(
     "closeout.json is written in the step's files directory on its hand-off: its summary cut, the files that are there",
     async () => {
       const { id, files, task } = await filed();
-      fs.writeFileSync(path.join(readRun(id).steps.implement.workspace!, 'report.md'), 'left in the workspace');
+      fs.writeFileSync(path.join(runRecord(id).steps.implement.workspace!, 'report.md'), 'left in the workspace');
       const summary = `${'word '.repeat(30)}and more`;
       stage.board().settle(task, 'succeeded', {
         apiVersion: 'nemia/v1',
@@ -529,7 +532,7 @@ test("what a run accepts of a closeout's files, and what it refuses", async (t) 
   for (const named of ['closeout.json', 'files'])
     await t.test(`REFUSED: a closeout naming closeout.json, the run's own name, is unsigned and asked again: from ${named}`, async () => {
       const { id, files, task } = await filed();
-      fs.writeFileSync(path.join(readRun(id).steps.implement.workspace!, 'closeout.json'), '{}');
+      fs.writeFileSync(path.join(runRecord(id).steps.implement.workspace!, 'closeout.json'), '{}');
       stage.board().settle(task, 'succeeded', signed(named === 'files' ? path.join(files, 'closeout.json') : 'closeout.json'));
       const p = await pass(id);
       assert.deepEqual([p.checked, p.tried], [[], ['implement']]);
@@ -542,8 +545,8 @@ test("what a run accepts of a closeout's files, and what it refuses", async (t) 
       stage.board().settle(task, 'succeeded', signedV1('done', 'Did it.', 'a person should look'));
       const p = await pass(id);
       assert.deepEqual([p.checked, p.tried], [[], ['implement']], 'no check, and the run nudges the step');
-      assert.equal(readRun(id).steps.implement.tries?.at(-1)?.cause, 'signoff');
-      assert.equal(readRun(id).steps.review?.taskId ?? null, null, 'nothing that waits on it is filed');
+      assert.equal(runRecord(id).steps.implement.tries?.at(-1)?.cause, 'signoff');
+      assert.equal(runRecord(id).steps.review?.taskId ?? null, null, 'nothing that waits on it is filed');
       assert.ok(briefOf(`${task}-try2`).includes('`needs` is set on a `done` closeout'));
       stage.board().settle(`${task}-try2`, 'succeeded', signedV1('done', 'Did it.', 'still'));
       const again = await pass(id);
@@ -557,19 +560,19 @@ test("what a run accepts of a closeout's files, and what it refuses", async (t) 
     await t.test(`a task an earlier pass read settled is not read back into a refusal: its settle ${counted}`, async () => {
       const { id, files, task } = await filed();
       stage.board().settle(task, 'succeeded', signed(path.join(files, 'gone.png')));
-      const record = readRun(id);
+      const record = runRecord(id);
       if (counted === 'counted') record.settlesCounted = [task];
       else delete record.settlesCounted;
       rewriteRun(record);
       const p = await pass(id);
       assert.deepEqual([p.checked, p.tried], [['implement'], []], 'it goes on to its check, as it would have');
-      assert.equal(readRun(id).steps.implement.filesRead, undefined);
+      assert.equal(runRecord(id).steps.implement.filesRead, undefined);
     });
   await t.test(
     'REFUSED: a file named through a folder a harness reads as its configuration is not collected, and the closeout not accepted',
     async () => {
       const { id, files, task } = await filed();
-      const workspace = readRun(id).steps.implement.workspace!;
+      const workspace = runRecord(id).steps.implement.workspace!;
       const named = ['.claude/skills/x/SKILL.md', 'notes/x.md'];
       for (const file of named) {
         fs.mkdirSync(path.dirname(path.join(workspace, file)), { recursive: true });
@@ -585,7 +588,7 @@ test("what a run accepts of a closeout's files, and what it refuses", async (t) 
       names(p.notes[2], 'implement:', 'try 2', 'sign off');
       assert.equal(fs.readFileSync(path.join(files, 'notes', 'x.md'), 'utf8'), '# notes/x.md\n', 'a file anywhere else is handed over');
       assert.ok(!fs.existsSync(path.join(files, '.claude')), 'nothing under the configuration folder reaches the files directory');
-      assert.deepEqual(missingArtifacts(stage.place().place, readRun(id), 'implement', closeout), [
+      assert.deepEqual(missingArtifacts(stage.place().place, runRecord(id), 'implement', closeout), [
         { path: '.claude/skills/x/SKILL.md', why: 'configuration' },
       ]);
     },
@@ -602,7 +605,7 @@ test("what a run accepts of a closeout's files, and what it refuses", async (t) 
       );
       const closeout = { outcome: 'done' as const, summary: 'did it', artifacts: declared };
       assert.deepEqual(
-        missingArtifacts(stage.place().place, readRun(id), 'implement', closeout),
+        missingArtifacts(stage.place().place, runRecord(id), 'implement', closeout),
         [
           { path: path.join(files, 'never-written.png'), why: 'missing' },
           { path: path.join(files, 'shots'), why: 'missing' },
@@ -637,7 +640,7 @@ test("what a run accepts of a closeout's files, and what it refuses", async (t) 
       (method) => sub.mock.method(fs, method as 'statSync'),
     );
     assert.deepEqual(
-      missingArtifacts(stage.place().place, readRun(id), 'implement', naming(outside)),
+      missingArtifacts(stage.place().place, runRecord(id), 'implement', naming(outside)),
       outside.map((p) => ({ path: p, why: 'outside' })),
       'each exists: looking would have found it',
     );
@@ -648,7 +651,7 @@ test("what a run accepts of a closeout's files, and what it refuses", async (t) 
     for (const spy of spies) spy.mock.restore();
     fs.symlinkSync(secret, path.join(files, 'link.txt'));
     assert.deepEqual(
-      missingArtifacts(stage.place().place, readRun(id), 'implement', naming([path.join(files, 'link.txt')])),
+      missingArtifacts(stage.place().place, runRecord(id), 'implement', naming([path.join(files, 'link.txt')])),
       [{ path: path.join(files, 'link.txt'), why: 'missing' }],
       'a link that leads out is as outside as where it leads',
     );
@@ -698,7 +701,7 @@ test('a run given inputs', async (t) => {
       ]);
       id = printed.split(' ')[0];
       dir = path.join(ROOT, 'runs', id, 'inputs');
-      assert.deepEqual(readRun(id).inputs, ['mock.png', 'brief notes.md'], 'by name, in the order given');
+      assert.deepEqual(runRecord(id).inputs, ['mock.png', 'brief notes.md'], 'by name, in the order given');
       assert.deepEqual(fs.readdirSync(dir).sort(), ['brief notes.md', 'mock.png']);
       assert.equal(fs.readFileSync(path.join(dir, 'mock.png'), 'utf8'), 'png bytes');
       assert.ok(printed.split('\n').includes(`inputs: mock.png, brief notes.md — copied into ${dir}`), printed);
@@ -931,7 +934,7 @@ test('REFUSED once a round: questions that do not read are unsigned, nudged nami
     stage.board().settle(`${id}-plan`, 'succeeded', said);
     const p = await pass(id);
     assert.deepEqual(p.tried, ['plan'], 'the run asks the session to sign off again');
-    assert.equal(readRun(id).steps.plan.tries?.at(-1)?.cause, 'signoff');
+    assert.equal(runRecord(id).steps.plan.tries?.at(-1)?.cause, 'signoff');
     names(briefOf(`${id}-plan-try2`), '`open`', 'question 2', '"retry, gate"');
     stage.board().settle(`${id}-plan-try2`, 'succeeded', said);
     assert.deepEqual((await pass(id)).tried, [], 'no second nudge in the round');

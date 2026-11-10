@@ -24,7 +24,7 @@ const yoursOn = async (on: typeof app): Promise<string[]> =>
 
 test("appOf: a mounted router reads the engine and the store's root of the app it was asked through, and an app keeps its reads of its own", async (t) => {
   await t.test("a mounted router's route reads the engine of the app it was asked through", async () => {
-    const live = engine();
+    const live = engine(process.env);
     let lists = 0;
     const counted: typeof live = {
       ...live,
@@ -52,14 +52,14 @@ test("appOf: a mounted router reads the engine and the store's root of the app i
     'an app keeps what its reads keep of its own: one over another engine starts with none, and reads the feed from its start',
     async () => {
       await Effect.runPromise(
-        engine().file({ id: 't-layer-filed', brief: 'Read me.', cwd: scratch('nemia-api-layer-cwd-'), harness: 'claude' }),
+        engine(process.env).file({ id: 't-layer-filed', brief: 'Read me.', cwd: scratch('nemia-api-layer-cwd-'), harness: 'claude' }),
       );
       const memoOf = (on: typeof runtime) => on.runPromise(ReadMemo.useSync((memo) => memo));
       assert.equal((await app.request(OPEN)).status, 200);
       const theProcess = await memoOf(runtime);
       assert.ok(theProcess.filings.filed.has('t-layer-filed'), "the process's app read the filing off the feed");
       assert.ok(theProcess.filings.cursor > 0, 'and holds where it stopped');
-      const { app: own, runtime: ownRuntime } = appOf(Layer.merge(liveOf(), Layer.succeed(Engine)(engine())));
+      const { app: own, runtime: ownRuntime } = appOf(Layer.merge(liveOf(), Layer.succeed(Engine)(engine(process.env))));
       const mine = await memoOf(ownRuntime);
       assert.notEqual(mine, theProcess, "an app's memo is its own");
       const informerOf = (on: typeof runtime) =>

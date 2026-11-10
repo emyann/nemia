@@ -4,12 +4,12 @@
  * agent calls it (`class: 'ask'`, `asksAlways`), and the CLI's alone while the board shows no list of speakers. The list is the chat's
  * own file (`speakers.json`, `chat.store.ts`), which `chatSay` reads to take an agent's words or refuse them.
  */
+import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import type { Args, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { rootGiven } from '../config/root.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { speakerNameRefusal, withSpeaker, withoutSpeaker } from './chat.ts';
 import { readSpeakers, writeSpeakers } from './chat.store.ts';
@@ -21,7 +21,7 @@ export type Speakers = { readonly allowed: readonly string[] };
 const ONLY = { side: 'cli', why: 'the board shows no speaker list yet: nemia chat allow writes it' } as const;
 
 /** Her chat's folder in the store at `home`. */
-const chatHome = (home: string | undefined, verb: string): string => path.join(rootGiven(home, verb), 'nemia');
+const chatHome = (home: string): string => path.join(home, 'nemia');
 
 /** The name under `name`, as the spec read it. */
 const nameIn = (args: Args): string => (typeof args.name === 'string' ? args.name : '');
@@ -35,11 +35,11 @@ const nameSpec = (verb: string): Spec => ({
 });
 
 /** The list after `change`, written where it changed: refused (`Invalid`) for a name no agent speaks under. */
-const changed = (home: string | undefined, verb: string, name: string, change: (allowed: readonly string[], name: string) => string[]) =>
+const changed = (home: string, verb: string, name: string, change: (allowed: readonly string[], name: string) => string[]) =>
   Effect.gen(function* () {
     const bad = speakerNameRefusal(name);
     if (bad !== undefined) return yield* Effect.fail(new Invalid({ message: bad }));
-    const dir = yield* tried(() => chatHome(home, `chat ${verb}`));
+    const dir = yield* tried(() => chatHome(home));
     const allowed = change(yield* tried(() => readSpeakers(dir)), name);
     yield* tried(() => writeSpeakers(dir, allowed));
     return { allowed };
@@ -58,10 +58,12 @@ export const CHAT_SPEAKERS: Command<Speakers> = {
   writes: false,
   class: 'read',
   only: ONLY,
-  handler: (_args, _env, home) =>
-    Effect.map(
-      tried(() => readSpeakers(chatHome(home, 'chat speakers'))),
-      (allowed) => ({ allowed }),
+  handler: (_args) =>
+    Effect.flatMap(StoreRoot, (home) =>
+      Effect.map(
+        tried(() => readSpeakers(chatHome(home))),
+        (allowed) => ({ allowed }),
+      ),
     ),
   print: listLines,
 };
@@ -80,7 +82,7 @@ export const CHAT_ALLOW: Command<Speakers> = {
   class: 'ask',
   asksAlways: true,
   only: ONLY,
-  handler: (args, _env, home) => changed(home, 'allow', nameIn(args), withSpeaker),
+  handler: (args) => Effect.flatMap(StoreRoot, (home) => changed(home, 'allow', nameIn(args), withSpeaker)),
   print: (list, args) => [`${nameIn(args)} may speak in her chat, as itself.`, ...listLines(list)],
 };
 
@@ -95,7 +97,7 @@ export const CHAT_DISALLOW: Command<Speakers> = {
   class: 'ask',
   asksAlways: true,
   only: ONLY,
-  handler: (args, _env, home) => changed(home, 'disallow', nameIn(args), withoutSpeaker),
+  handler: (args) => Effect.flatMap(StoreRoot, (home) => changed(home, 'disallow', nameIn(args), withoutSpeaker)),
   print: (list, args) => [`${nameIn(args)} may no longer speak in her chat.`, ...listLines(list)],
 };
 

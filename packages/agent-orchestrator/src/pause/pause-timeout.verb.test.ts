@@ -10,10 +10,11 @@ import { scratch } from 'test-kit/scratch';
 import { names } from '../../test/assessed.ts';
 import { timeoutFile } from './pause-timeout.store.ts';
 import { TIMEOUT } from './pause-timeout.verb.ts';
+import { storeGiven } from '../../test/config-given.ts';
 
 /** `nemia pause-timeout` given `args` at `home`: its answer, or its refusal thrown. */
 const timed = (home: string, args: Record<string, string> = {}) =>
-  Effect.runPromise(TIMEOUT.handler(args, undefined, home) as Effect.Effect<Effect.Success<ReturnType<typeof TIMEOUT.handler>>, unknown>);
+  Effect.runPromise(storeGiven(home)(TIMEOUT.handler(args)) as Effect.Effect<Effect.Success<ReturnType<typeof TIMEOUT.handler>>, unknown>);
 
 test('nemia pause-timeout: the default with no file, a timeout set and then read back, and refusals', async (t) => {
   const home = scratch('wf-timeout-verb-');

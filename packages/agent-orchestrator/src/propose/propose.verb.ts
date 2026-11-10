@@ -21,10 +21,10 @@ import {
   type Proposal,
   type ProposalChange,
   type ProposedObject,
+  DEFAULT_NAMESPACE,
 } from 'objects';
 import { Conflict, Forbidden, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
 import { brokenBy } from '../door/door.store.ts';
-import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { mayPropose } from '../approval/index.ts';
 import { accessChange, accessOf } from './access.ts';
 import { currentOf, type ProposalNeeds, type ProposalPlace } from './current.verb.ts';
@@ -220,7 +220,7 @@ export const proposeProgram = Effect.fn('proposeProgram')(function* (
         message: `a session of ${caller.kind === 'agent' ? (caller.factory ?? 'the store') : 'the person'} proposes in its own factory, not ${factory}: propose there, or ask the person.`,
       }),
     );
-  if (factory === DEFAULT_FACTORY)
+  if (factory === DEFAULT_NAMESPACE)
     return yield* Effect.fail(
       new Invalid({
         message: 'the default namespace holds your own library, which you write yourself: propose in a factory, -n <factory>.',

@@ -554,7 +554,7 @@
     },
     {
       "term": "Run door",
-      "meaning": "the run's door: its record, and the asks, holds, refresh asks and forgetting markers a person keeps beside it, by `RunId`; the files by default, the memory stand-in where a test gives it. A run from a card is created once: its create claims the card exclusively, in the store's started folder, and refuses a second run from it as `Conflict`. The run store (`RunStore`) is what is left of it outside: the callers still to move.",
+      "meaning": "the run's door: its record, and the asks, holds, refresh asks and forgetting markers a person keeps beside it, by `RunId`; the files by default, the memory stand-in where a test gives it. A run from a card is created once: its create claims the card exclusively, in the store's started folder, and refuses a second run from it as `Conflict`. A synchronous caller reads it at once (`runsAtOnce`), and no file of `src` but the door's reads the files store.",
       "type": "RunDoor"
     },
     {
@@ -821,6 +821,128 @@
       "term": "Proposing run",
       "meaning": "the run a proposal was made from, as the tick's proposals pass reads it (`proposingRunOf`, `packages/agent-orchestrator/src/apply/apply.ts`): a proposal that applies at run-end waits while its run goes or sits failed, since a failed run can be retried, applies once it succeeded, and is dropped once it is called off.",
       "type": "RunState"
+    },
+    {
+      "term": "Run read",
+      "meaning": "one read of a run, made once for a pass by `readRun` (`packages/agent-orchestrator/src/tick/told.verb.ts`) off the engine's views a pass read (`readersOf`), with each step's standing beside it where it is still open (`withStandings`): what `assess` judges and what a filing reads besides, the views themselves and every answer a person gave. Every phase of a pass reads the same one; a run adopted is read and adopted in one call (`readAndAdopt`, `packages/agent-orchestrator/src/adopt/run-adopt.verb.ts`). Not the run store's record read, which is `runRecord`.",
+      "type": "RunRead",
+      "retired": [
+        {
+          "spelling": "readPass",
+          "card": "run-core, one read of a run (A1): a pass reads a run once, `readRun`, and `assess` judges that one value"
+        },
+        {
+          "spelling": "PassReads",
+          "card": "run-core, one read of a run (A1): a pass reads a run once, `readRun`, and `assess` judges that one value"
+        }
+      ]
+    },
+    {
+      "term": "Assess read",
+      "meaning": "what `assess` judges, one value (`packages/agent-orchestrator/src/tick/assess.ts`): the run, its frozen steps, the readers made once of the engine's views (`readersOf`), a person's asks, where the result branches stand and who holds the checkout, taken whole as `assess(read)`.",
+      "type": "AssessRead"
+    },
+    {
+      "term": "Honours asks",
+      "meaning": "whether a run still answers a person's asks (`honoursAsks`, `packages/agent-orchestrator/src/record/record.ts`): it has not ended for good — cancelled or pruned (`endedForGood`) — and holds no hold. Proved by `packages/agent-orchestrator/contracts/honours-asks.contract.ts`.",
+      "type": "HonoursAsks"
+    },
+    {
+      "term": "List reading",
+      "meaning": "what the run list reads once of a run to list it (`listReading`, `packages/agent-orchestrator/src/list/list.verb.ts`): its listing, and whether a session's harness blocked it, read off the run's one read.",
+      "type": "ListReading",
+      "retired": [
+        {
+          "spelling": "ReadingHow",
+          "card": "run-core, one read of a run (A1): a pass reads a run once, `readRun`, and `assess` judges that one value"
+        }
+      ]
+    },
+    {
+      "term": "Run record",
+      "meaning": "a run's record read off the store, with what people own beside it composed onto it (`runRecord`, `packages/agent-orchestrator/src/record/record.store.ts`).",
+      "type": "Run"
+    },
+    {
+      "term": "Runs at once",
+      "meaning": "the Run door's synchronous face (`runsAtOnce`, `packages/agent-orchestrator/src/runs/runs.store.ts`): the door over the files run at once, so a plain synchronous caller — a page, a refusal's words, the command line — writes checked as the door checks.",
+      "type": "RunsLayer",
+      "retired": [
+        {
+          "spelling": "runStore",
+          "card": "run-core, one read of a run (A2): no file of src reads the run store but the Run door, and the engine's verbs are one table",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/runner.ts",
+              "why": "`runStore` is an entry alias of `runsAtOnce` until the api's tests and the board's e2e world read `runsAtOnce`; `RunStore` is the store's interface, exported beside it"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/record/record.ts",
+              "why": "`RunStore`, the store's interface, which the Run door's layers have the shape of: matched in any case, it is another word"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/record/files.store.ts",
+              "why": "`filesStore: RunStore`, the store's interface"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/runs/runs.store.ts",
+              "why": "`RunsLayer = RunStore`, the store's interface"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/rest/kept.ts",
+              "why": "names `RunStore.runs.find`, the interface's method"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "term": "Engine verbs",
+      "meaning": "every verb of the runtime's engine, once (`ENGINE_VERBS`, `packages/agent-orchestrator/src/engine-verbs/engine-verbs.verb.ts`): the meter's phase it is counted in and what it changes of a task, total over the engine's verbs, so a verb the runtime adds fails the typecheck until it is placed.",
+      "type": "VerbKind",
+      "retired": [
+        {
+          "spelling": "ENGINE_READS",
+          "card": "run-core, one read of a run (A2): no file of src reads the run store but the Run door, and the engine's verbs are one table"
+        },
+        {
+          "spelling": "ENGINE_WRITES",
+          "card": "run-core, one read of a run (A2): no file of src reads the run store but the Run door, and the engine's verbs are one table"
+        },
+        {
+          "spelling": "ENGINE_PHASES",
+          "card": "run-core, one read of a run (A2): no file of src reads the run store but the Run door, and the engine's verbs are one table",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/views/views-words.ts",
+              "why": "names objects' `ENGINE_PHASES`, the runtime's task phases, which is another word than the meter's table"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "term": "Sweep loop",
+      "meaning": "a daemon's sweep for as long as it runs (`sweepLoop`, `packages/agent-orchestrator/src/forget/prune/free.verb.ts`): one sweep, then a rest, for ever; a sweep that fails is a warning said once while its reason stands. What frees finished runs' worktrees, the retention and the disk measure each run on it."
+    },
+    {
+      "term": "Store config",
+      "meaning": "the store's settings a program is given where it is composed, with no default (`StoreConfig`, `packages/agent-orchestrator/src/config/config.store.ts`): each `WF_` setting read by its reader — `maxConcurrent`, `maxRuns`, `verifyRest`, `keepWorktrees`, `metricsMinuteDays`, `metricsHourDays`, `memoryLimit`, `cgroupParent`, `defaultFactoryStarts`. Given with the store's root, `StoreRoot`, from an environment by `storeConfigLayer(env)` (`packages/agent-orchestrator/src/config/root.store.ts`), at `packages/agent-orchestrator/src/cli/main.ts` and `apps/api/src/app.ts`; a handler takes its input alone and yields them.",
+      "type": "StoreConfig",
+      "retired": [
+        {
+          "spelling": "rootGiven",
+          "card": "run-core, one read of a run (C1): the store's root and its settings are services given where a program is composed"
+        },
+        {
+          "spelling": "defaultStartsAllowed",
+          "card": "run-core, one read of a run (C1): the store's root and its settings are services given where a program is composed"
+        }
+      ]
+    },
+    {
+      "term": "Session variables",
+      "meaning": "the daemon's per-session variables, declared once (`SESSION_VARIABLES`, `packages/agent-orchestrator/src/config/config.store.ts`): `WF_SESSION_TOKEN`, `WF_MEMORY_LIMIT`, `WF_CGROUP_PARENT`, which a test's seat drops."
     }
   ]
 }

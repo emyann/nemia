@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Result, Schema } from 'effect';
 import { HOME } from '../record/record.store.ts';
-import { cgroupParent, maxConcurrent, maxRuns, memoryLimit } from '../config/config.store.ts';
+import type { Settings } from '../config/config.store.ts';
 import {
   PHASES,
   RECENT_KEPT,
@@ -56,20 +56,20 @@ const Count = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 
 /**
- * The daemon's two ceilings, read from the environment when asked, and the memory limit beside them. `sessions` (`WF_MAX_CONCURRENT`,
- * `maxConcurrent`) is handed to the runtime, which admits under it (`engine()` in `runtime-client.ts`): sessions per pool at once, counted
- * apart for each — a check on the `check` harness is in a pool of its own, and a `dev` run's review competes with another run's
- * implement, both in the `claude` pool. `runs` (`WF_MAX_RUNS`, `maxRuns`) is the tick's: runs in flight at once, 0 — or unset — for no
- * cap. `memory` (`WF_MEMORY_LIMIT`, `memoryLimit`) and `cgroupParent` (`WF_CGROUP_PARENT`) are handed to the runtime too, the limit a
- * task with none of its own is filed under and the slice its scope is made in (`storeLimits`), each absent when unset. A refusal of any of
- * them is thrown, so the pass that reads them refuses itself, and so does the daemon's start.
+ * The daemon's two ceilings, read from the settings it is given (`StoreConfig`), and the memory limit beside them. `sessions`
+ * (`WF_MAX_CONCURRENT`, `maxConcurrent`) is handed to the runtime, which admits under it (`engine()` in `runtime-client.ts`): sessions per
+ * pool at once, counted apart for each — a check on the `check` harness is in a pool of its own, and a `dev` run's review competes with
+ * another run's implement, both in the `claude` pool. `runs` (`WF_MAX_RUNS`, `maxRuns`) is the tick's: runs in flight at once, 0 — or unset
+ * — for no cap. `memory` (`WF_MEMORY_LIMIT`, `memoryLimit`) and `cgroupParent` (`WF_CGROUP_PARENT`) are handed to the runtime too, the
+ * limit a task with none of its own is filed under and the slice its scope is made in (`storeLimits`), each absent when unset. A refusal of
+ * any of them is thrown, so the pass that reads them refuses itself, and so does the daemon's start.
  */
-export const ceilings = (): { sessions: number; runs: number; memory?: string; cgroupParent?: string } => {
-  const memory = memoryLimit();
-  const parent = cgroupParent();
+export const ceilings = (config: Settings): { sessions: number; runs: number; memory?: string; cgroupParent?: string } => {
+  const memory = config.memoryLimit;
+  const parent = config.cgroupParent;
   return {
-    sessions: maxConcurrent(),
-    runs: maxRuns(),
+    sessions: config.maxConcurrent,
+    runs: config.maxRuns,
     ...(memory === undefined ? {} : { memory }),
     ...(parent === undefined ? {} : { cgroupParent: parent }),
   };

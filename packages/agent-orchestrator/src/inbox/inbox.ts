@@ -38,9 +38,9 @@
  * (inbox.store.ts and inbox.verb.ts read them).
  */
 import path from 'node:path';
-import { CARD_KEY_MEANINGS, CARD_KEYS, CARD_STATES } from 'objects';
+import { CARD_KEY_MEANINGS, CARD_KEYS, CARD_STATES, DEFAULT_NAMESPACE } from 'objects';
 import { bodyOf, frontmatterKeys, type PlanFile } from '../plan/plan.ts';
-import { DEFAULT_FACTORY, factoryNameRefusal, type Factory } from '../factory/factory.ts';
+import { factoryNameRefusal, type Factory } from '../factory/factory.ts';
 import type { Run } from '../record/record.ts';
 import type { RunPhase } from '../phase/phase.ts';
 import { isReadme, splitFrontmatter, WorkflowError } from '../step/step.ts';
@@ -171,6 +171,19 @@ function fromRuns(file: string, from: string): string[] {
   const twice = runs.find((r, i) => runs.indexOf(r) !== i);
   if (twice !== undefined) refuse(`${file}: \`from: ${from}\` names ${twice} twice, and a run is handed another once. Name each run once.`);
   return runs;
+}
+
+/**
+ * One inbox card as `parseInboxCard` reads it, or why it does not read (`why`, the refusal's words, which name the file and the fix): what
+ * the inbox's listing shows a card it cannot read with. A failure that is no refusal is no reason a card gives, and is thrown.
+ */
+export function cardOrWhy(file: string, text: string, isDirectory: (at: string) => boolean): { card: InboxCard } | { why: string } {
+  try {
+    return { card: parseInboxCard(file, text, isDirectory) };
+  } catch (err) {
+    if (err instanceof WorkflowError) return { why: err.message };
+    throw err;
+  }
 }
 
 /** A card's `from:` line's value, written as `parseInboxCard` reads it back. */
@@ -425,8 +438,9 @@ export function cardsListed(
       }
       const name = file.slice(0, -'.md'.length);
       const startedAs = runs.filter((r) => r.from?.inbox === name).map((r) => r.id);
-      try {
-        const card = parseInboxCard(file, text, isDirectory);
+      const read = cardOrWhy(file, text, isDirectory);
+      if ('card' in read) {
+        const { card } = read;
         return {
           name,
           file,
@@ -442,28 +456,25 @@ export function cardsListed(
           error: null,
           ...(card.queued !== undefined ? { queued: { at: card.queued, place: null }, ...triedOf(name, text) } : {}),
         };
-      } catch (err) {
-        let lenient: InboxCard | undefined;
-        try {
-          lenient = parseInboxCard(file, text, () => true);
-        } catch {}
-        const queued = lenient?.queued;
-        const { workflow, repo, factory } = queuedKeys(lenient);
-        return {
-          name,
-          file,
-          title: null,
-          workflow,
-          repo,
-          factory,
-          from: [],
-          startedAs,
-          labels: {},
-          factoryRepo: factoryRepoOf({ repo, factory }, factories),
-          error: (err as Error).message,
-          ...(queued !== undefined ? { queued: { at: queued, place: null }, ...triedOf(name, text) } : {}),
-        };
       }
+      const loose = cardOrWhy(file, text, () => true);
+      const lenient = 'card' in loose ? loose.card : undefined;
+      const queued = lenient?.queued;
+      const { workflow, repo, factory } = queuedKeys(lenient);
+      return {
+        name,
+        file,
+        title: null,
+        workflow,
+        repo,
+        factory,
+        from: [],
+        startedAs,
+        labels: {},
+        factoryRepo: factoryRepoOf({ repo, factory }, factories),
+        error: read.why,
+        ...(queued !== undefined ? { queued: { at: queued, place: null }, ...triedOf(name, text) } : {}),
+      };
     });
   queueOrder(listed).forEach((l, i) => {
     if (l.queued) l.queued.place = i + 1;
@@ -640,7 +651,7 @@ const labelSegments = (map: Labels, show: LabelsShown): string =>
 export const cardLabels = (l: Pick<InboxListing, 'labels' | 'workflow' | 'factory'>): Labels => ({
   ...l.labels,
   ...(l.workflow ? { workflow: l.workflow } : {}),
-  factory: l.factory || DEFAULT_FACTORY,
+  factory: l.factory || DEFAULT_NAMESPACE,
 });
 
 /**
@@ -649,6 +660,19 @@ export const cardLabels = (l: Pick<InboxListing, 'labels' | 'workflow' | 'factor
  */
 const definedOf = (given: Partial<Record<FlatKey, string | undefined>>): Partial<Record<FlatKey, string>> =>
   Object.fromEntries(Object.entries(given).flatMap(([key, value]) => (value === undefined ? [] : [[key, value.trim()]])));
+
+/**
+ * An idea's text split at its frontmatter (`splitFrontmatter`), or undefined for a text that opens a rule it never closes: such a text is
+ * prose, filed whole. Any other failure is no idea's, and is thrown.
+ */
+function splitOrProse(from: string, text: string): { block: string | null; body: string } | undefined {
+  try {
+    return splitFrontmatter(from, text);
+  } catch (err) {
+    if (err instanceof WorkflowError) return undefined;
+    throw err;
+  }
+}
 
 /**
  * The file `nemia inbox add` writes for an idea, and its body — refused, naming `from`, as the card it writes would be refused
@@ -690,10 +714,7 @@ export function ideaCard(
     .replace(/^\uFEFF/, '')
     .replace(/\r\n/g, '\n')
     .trim();
-  let split: { block: string | null; body: string } | undefined;
-  try {
-    split = splitFrontmatter(from, text);
-  } catch {}
+  const split = splitOrProse(from, text);
   const block = split?.block ?? null;
   const entries = (block === null ? null : frontmatterOrNull(block))?.entries ?? [];
   const isCardKey = (key: string) => ([...INBOX_KEYS, 'after'] as string[]).includes(key);

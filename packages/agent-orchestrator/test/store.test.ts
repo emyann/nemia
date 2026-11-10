@@ -90,7 +90,7 @@ const commitsOf = (root: string, rev: string): string[] => {
 const subjects = (root: string, rev = world().head(root)): string[] =>
   commitsOf(root, rev).map((id) => world().read(root, id).message.split('\n')[0]);
 
-const { listRuns, markCancelled, readAnswers, readAsks, readRun } = await import('../src/record/record.store.ts');
+const { listRuns, markCancelled, readAnswers, readAsks, runRecord } = await import('../src/record/record.store.ts');
 
 /** A run record over `/repo`, without worktrees: a test of the record, not of git. */
 const aRun = (id: string, steps: Run['steps']): Run => ({
@@ -151,14 +151,14 @@ test('a cancel that lands mid-tick survives the tick', async () => {
     }),
   );
 
-  const tickHeldInFile = runWith(e, advanceRun(readRun(run.id)));
+  const tickHeldInFile = runWith(e, advanceRun(runRecord(run.id)));
   await new Promise((r) => setTimeout(r, 10));
   const { plan } = await runWith(e, cancelRun(run.id));
   assert.equal(plan.kind, 'cancel', 'a person cancels while the tick awaits `e.file`');
   release();
   await tickHeldInFile;
 
-  const after = readRun(run.id);
+  const after = runRecord(run.id);
   assert.ok(
     after.cancelledAt,
     'the cancellation is still there: the tick wrote back its copy from before it, and the mark is in its own file',
@@ -172,7 +172,7 @@ test('the next tick stops a step filed in the instant after the cancel, and file
   markCancelled(run.id);
 
   const { e, stopped } = engineWith({ t1: 'succeeded', 'r-heal-review': 'running' });
-  const pass = await runWith(e, advanceRun(readRun(run.id)));
+  const pass = await runWith(e, advanceRun(runRecord(run.id)));
 
   assert.deepEqual(
     stopped,
@@ -199,8 +199,8 @@ test('REFUSED by the engine: a stop of a task that settled, or was asked to stop
 
   const { plan } = await runWith(e, cancelRun(run.id));
   assert.equal(plan.kind, 'cancel');
-  assert.ok(readRun(run.id).cancelledAt, 'the run is called off: what the stop was for is met');
-  const pass = await runWith(e, advanceRun(readRun(run.id)));
+  assert.ok(runRecord(run.id).cancelledAt, 'the run is called off: what the stop was for is met');
+  const pass = await runWith(e, advanceRun(runRecord(run.id)));
   assert.equal(pass.status, 'cancelled', 'and the pass that asks again is refused, and goes on');
   assert.deepEqual(asked, ['t1', 't1']);
 });
@@ -389,29 +389,29 @@ const started = async (dir: string) =>
 test('a pass that filed a check and died before writing the run down is adopted, never filed twice', async () => {
   const run = await started(folder('check: npm test'));
   const { e, filings, settle } = board();
-  await runWith(e, advanceRun(readRun(run.id)));
+  await runWith(e, advanceRun(runRecord(run.id)));
   settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  const before = readRun(run.id);
-  await runWith(e, advanceRun(readRun(run.id)));
+  const before = runRecord(run.id);
+  await runWith(e, advanceRun(runRecord(run.id)));
   writeRun(before);
 
-  const again = await runWith(e, advanceRun(readRun(run.id)));
+  const again = await runWith(e, advanceRun(runRecord(run.id)));
   assert.equal(
     filings.filter((f) => f.endsWith('-check')).length,
     1,
     'the pass filed the check, and the record written back as it was before never says so',
   );
   assert.deepEqual(again.checked, [], 'adopted before the pass assessed anything, so there was nothing left to file');
-  assert.deepEqual(readRun(run.id).steps.implement?.check, { taskId: `${run.id}-implement-check` });
+  assert.deepEqual(runRecord(run.id).steps.implement?.check, { taskId: `${run.id}-implement-check` });
 });
 
 test('a check filed by a pass that died, on a run then cancelled, is found and stopped — by the verb, and by every pass', async () => {
   const run = await started(folder('check: npm test'));
   const { e, filings, stopped, settle } = board();
-  await runWith(e, advanceRun(readRun(run.id)));
+  await runWith(e, advanceRun(runRecord(run.id)));
   settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  const before = readRun(run.id);
-  await runWith(e, advanceRun(readRun(run.id)));
+  const before = runRecord(run.id);
+  await runWith(e, advanceRun(runRecord(run.id)));
   writeRun(before);
   const id = `${run.id}-implement-check`;
   settle(id, 'running');
@@ -422,11 +422,11 @@ test('a check filed by a pass that died, on a run then cancelled, is found and s
     { kind: 'cancel', stop: [{ name: 'implement (check)', taskId: id }] },
     'the verb finds the check a pass filed, on a record written back without it',
   );
-  assert.equal(readRun(run.id).steps.implement?.check, undefined, 'and does not write the run to do so');
+  assert.equal(runRecord(run.id).steps.implement?.check, undefined, 'and does not write the run to do so');
 
-  await runWith(e, advanceRun(readRun(run.id)));
+  await runWith(e, advanceRun(runRecord(run.id)));
   assert.deepEqual(stopped, [id, id], 'a cancelled run files no check, and still finds the one it filed');
-  assert.deepEqual(readRun(run.id).steps.implement?.check, { taskId: id }, 'the tick puts it on the record');
+  assert.deepEqual(runRecord(run.id).steps.implement?.check, { taskId: id }, 'the tick puts it on the record');
   assert.equal(filings.filter((f) => f === id).length, 1);
 });
 
@@ -453,9 +453,9 @@ const FOUND = [{ file: 'src/flag.ts', line: 12, what: 'the flag is read before i
 const throughCheck = async (keys: string, phase: TaskPhase, exitCode?: number) => {
   const run = await started(folder(keys));
   const b = board();
-  await runWith(b.e, advanceRun(readRun(run.id)));
+  await runWith(b.e, advanceRun(runRecord(run.id)));
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  await runWith(b.e, advanceRun(readRun(run.id)));
+  await runWith(b.e, advanceRun(runRecord(run.id)));
   b.settle(`${run.id}-implement-check`, phase, undefined, exitCode);
   return { run, ...b };
 };
@@ -479,12 +479,12 @@ const refusal = async (p: Promise<unknown>): Promise<string> => {
 
 test('a pass that filed try 2 and died before writing the run down is adopted, never filed twice — and a run cancelled in that window stops it', async () => {
   const { run, e, filings, stopped, settle } = await throughCheck('check: npm test\nretries: 1', 'failed', 1);
-  const before = readRun(run.id);
-  await runWith(e, advanceRun(readRun(run.id)));
+  const before = runRecord(run.id);
+  await runWith(e, advanceRun(runRecord(run.id)));
   writeRun(before);
   const try2 = `${run.id}-implement-try2`;
 
-  const again = await runWith(e, advanceRun(readRun(run.id)));
+  const again = await runWith(e, advanceRun(runRecord(run.id)));
   assert.deepEqual(
     again.tried,
     [],
@@ -492,7 +492,7 @@ test('a pass that filed try 2 and died before writing the run down is adopted, n
   );
   assert.equal(filings.filter((f) => f === try2).length, 1);
   assert.deepEqual(
-    [readRun(run.id).steps.implement?.taskId, readRun(run.id).steps.implement?.tries?.map((t) => t.cause)],
+    [runRecord(run.id).steps.implement?.taskId, runRecord(run.id).steps.implement?.tries?.map((t) => t.cause)],
     [try2, ['retries']],
   );
 
@@ -504,7 +504,7 @@ test('a pass that filed try 2 and died before writing the run down is adopted, n
     { kind: 'cancel', stop: [{ name: 'implement', taskId: try2 }] },
     'the verb finds it, the run called off in the same window',
   );
-  await runWith(e, advanceRun(readRun(run.id)));
+  await runWith(e, advanceRun(runRecord(run.id)));
   assert.deepEqual(stopped, [try2, try2], 'and so does every pass');
   assert.equal(filings.filter((f) => f === try2).length, 1);
 });
@@ -514,7 +514,7 @@ test('an ask file the run cannot read is not honoured, and not touched: the pass
   fs.mkdirSync(asksDir(run.id), { recursive: true });
   fs.writeFileSync(path.join(asksDir(run.id), 'retry-implement-2'), 'try harder');
   fs.writeFileSync(path.join(asksDir(run.id), 'retry-review-2'), JSON.stringify({ mode: 'harder' }));
-  const pass = await runWith(e, advanceRun(readRun(run.id)));
+  const pass = await runWith(e, advanceRun(runRecord(run.id)));
   assert.deepEqual(pass.tried, []);
   assert.ok(
     pass.notes.some((n) => /retry-implement-2: unreadable .* so it is not honoured/.test(n)),
@@ -557,9 +557,9 @@ const onRound = (id: string, step: string, n: number) => (n === 1 ? `${id}-${ste
  */
 const toReview = async (b: ReturnType<typeof board>, id: string, n: number, again: boolean) => {
   b.settle(onRound(id, 'implement', n), 'succeeded', n === 1 ? SIGNED : ANSWERED);
-  assert.deepEqual((await runWith(b.e, advanceRun(readRun(id)))).checked, ['implement'], `round ${n}: implement's check`);
+  assert.deepEqual((await runWith(b.e, advanceRun(runRecord(id)))).checked, ['implement'], `round ${n}: implement's check`);
   b.settle(`${onRound(id, 'implement', n)}-check`, 'succeeded', undefined, 0);
-  assert.deepEqual((await runWith(b.e, advanceRun(readRun(id)))).filed, ['review'], `round ${n}: review`);
+  assert.deepEqual((await runWith(b.e, advanceRun(runRecord(id)))).filed, ['review'], `round ${n}: review`);
   b.settle(onRound(id, 'review', n), 'succeeded', reviewSays(again));
 };
 const roundAsksOf = (id: string) => (fs.existsSync(asksDir(id)) ? fs.readdirSync(asksDir(id)).filter((f) => f.startsWith('round-')) : []);
@@ -574,7 +574,7 @@ const CHECK_SAID = "## What implement's check said";
 test('REFUSED silence: a check that did not finish says so, and one whose log cannot be read says why, in the brief of the step after it', async () => {
   const cut = await throughCheck('check: npm test', 'succeeded');
   cut.logs.set(`${cut.run.id}-implement-check`, `${PAGES_RUN}\nok 1 - builds\n`);
-  await runWith(cut.e, advanceRun(readRun(cut.run.id)));
+  await runWith(cut.e, advanceRun(runRecord(cut.run.id)));
   const unfinished = cut.tasks.get(`${cut.run.id}-review`)!.spec.brief;
   assert.match(
     unfinished,
@@ -602,7 +602,7 @@ test('REFUSED silence: a check that did not finish says so, and one whose log ca
   Object.assign(gone.e, {
     logs: (id: string) => (id === check ? Effect.fail(new Error(`no journal for ${id}`)) : logsOf(id)),
   });
-  assert.deepEqual((await runWith(gone.e, advanceRun(readRun(gone.run.id)))).filed, ['review'], 'the step is filed all the same');
+  assert.deepEqual((await runWith(gone.e, advanceRun(runRecord(gone.run.id)))).filed, ['review'], 'the step is filed all the same');
   assert.match(
     gone.tasks.get(`${gone.run.id}-review`)!.spec.brief,
     new RegExp(
@@ -624,13 +624,13 @@ const loopedThenDocs = () => {
 test('an acceptance a tick has acted on is not a file to delete: the round refuses with what there is instead — and refuses again if it is deleted anyway', async () => {
   const run = await started(loopedThenDocs());
   const b = board();
-  await runWith(b.e, advanceRun(readRun(run.id)));
+  await runWith(b.e, advanceRun(runRecord(run.id)));
   for (const n of [1, 2]) {
     await toReview(b, run.id, n, true);
-    await runWith(b.e, advanceRun(readRun(run.id)));
+    await runWith(b.e, advanceRun(runRecord(run.id)));
   }
   await toReview(b, run.id, 3, true);
-  assert.deepEqual((await runWith(b.e, advanceRun(readRun(run.id)))).filed, [], 'at the cap, nothing after the loop');
+  assert.deepEqual((await runWith(b.e, advanceRun(runRecord(run.id)))).filed, [], 'at the cap, nothing after the loop');
 
   const { file } = await runWith(b.e, acceptRun(run.id, undefined, ENOUGH));
   const early = await refusal(runWith(b.e, roundRun(run.id)));
@@ -641,7 +641,7 @@ test('an acceptance a tick has acted on is not a file to delete: the round refus
   );
 
   assert.deepEqual(
-    (await runWith(b.e, advanceRun(readRun(run.id)))).filed,
+    (await runWith(b.e, advanceRun(runRecord(run.id)))).filed,
     ['docs'],
     'the tick files what waited, as if review had said `again: false`',
   );
@@ -655,12 +655,12 @@ test('an acceptance a tick has acted on is not a file to delete: the round refus
 
   fs.rmSync(file);
   assert.equal(
-    readRun(run.id).acceptances,
+    runRecord(run.id).acceptances,
     undefined,
     'deleted anyway: an acceptance is level-triggered, unlike a round ask, so the loop reads out of rounds again',
   );
   assert.equal(
-    (await runWith(b.e, list(b.e, readRun(run.id)))).steps[1].message,
+    (await runWith(b.e, list(b.e, runRecord(run.id)))).steps[1].message,
     'rounds exhausted',
     'which is the standing a round is filed from',
   );
@@ -671,27 +671,27 @@ test('an acceptance a tick has acted on is not a file to delete: the round refus
   );
   assert.match(anyway, /deleting that acceptance does not delete docs\. See where the run stands, and what there is to do: nemia decide /);
   assert.deepEqual(roundAsksOf(run.id), [], 'and no ask is written');
-  assert.deepEqual((await runWith(b.e, advanceRun(readRun(run.id)))).looped, [], 'nor does a pass go round of its own accord');
+  assert.deepEqual((await runWith(b.e, advanceRun(runRecord(run.id)))).looped, [], 'nor does a pass go round of its own accord');
 });
 
 test('a pass that filed a round and died before writing the run down is adopted, never filed twice — and a run cancelled in that window stops it', async () => {
   const run = await started(looped());
   const b = board();
-  await runWith(b.e, advanceRun(readRun(run.id)));
+  await runWith(b.e, advanceRun(runRecord(run.id)));
   await toReview(b, run.id, 1, true);
-  const before = readRun(run.id);
-  await runWith(b.e, advanceRun(readRun(run.id)));
+  const before = runRecord(run.id);
+  await runWith(b.e, advanceRun(runRecord(run.id)));
   writeRun(before);
   const try2 = `${run.id}-implement-try2`;
 
-  const again = await runWith(b.e, advanceRun(readRun(run.id)));
+  const again = await runWith(b.e, advanceRun(runRecord(run.id)));
   assert.deepEqual(
     again.looped,
     [],
     'a pass filed round 2 and the record was written back without it: adopted before the pass assessed anything, nothing left to file',
   );
   assert.equal(b.filings.filter((f) => f === try2).length, 1);
-  const record = readRun(run.id).steps;
+  const record = runRecord(run.id).steps;
   assert.deepEqual([record.implement?.taskId, record.review?.taskId, record.review?.tries?.map((t) => t.cause)], [try2, null, ['round']]);
 
   writeRun(before);
@@ -702,8 +702,8 @@ test('a pass that filed a round and died before writing the run down is adopted,
     { kind: 'cancel', stop: [{ name: 'implement', taskId: try2 }] },
     'the verb finds it, the run called off in the same window',
   );
-  assert.equal(readRun(run.id).steps.implement?.taskId, `${run.id}-implement`, 'and does not write the run to do so');
-  await runWith(b.e, advanceRun(readRun(run.id)));
+  assert.equal(runRecord(run.id).steps.implement?.taskId, `${run.id}-implement`, 'and does not write the run to do so');
+  await runWith(b.e, advanceRun(runRecord(run.id)));
   assert.deepEqual(b.stopped, [try2, try2], 'and so does every pass');
   assert.equal(b.filings.filter((f) => f === try2).length, 1);
 });
@@ -721,7 +721,7 @@ test('REFUSED at read: an ask file whose message is not text, is empty, or rides
     ],
   } as const;
   for (const [name, [held]] of Object.entries(refused)) fs.writeFileSync(path.join(asksDir(run.id), name), JSON.stringify(held));
-  const pass = await runWith(e, advanceRun(readRun(run.id)));
+  const pass = await runWith(e, advanceRun(runRecord(run.id)));
   assert.deepEqual(pass.tried, []);
   for (const [name, [, why]] of Object.entries(refused)) {
     assert.ok(
@@ -741,7 +741,7 @@ test('REFUSED at read: an ask file whose message is not text, is empty, or rides
     'the shape `nemia retry` wrote before --message is read with no message, and honoured',
   );
   assert.deepEqual(readAnswers(run.id), []);
-  assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).tried, ['implement']);
+  assert.deepEqual((await runWith(e, advanceRun(runRecord(run.id)))).tried, ['implement']);
 });
 
 /** A workflow of one step, `implement`: its branch is the run's result. */
@@ -766,14 +766,14 @@ const aParent = async (
   }: { work?: string; signed?: boolean; workflowDir?: string; brief?: string } = {},
 ) => {
   const run = repositoryRunOf(await runPlaced(startRun({ brief, repo, workflowDir: workflowDir ?? oneStep() })));
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  const wt = readRun(run.id).steps.implement.workspace!;
+  await runWith(b.e, advanceRun(runRecord(run.id)));
+  const wt = runRecord(run.id).steps.implement.workspace!;
   if (work) {
     fs.writeFileSync(path.join(wt, work), `${work}\n`);
     world().commit(wt, `add ${work}`);
   }
   if (signed) b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  return { run, wt, branch: readRun(run.id).steps.implement.branch! };
+  return { run, wt, branch: runRecord(run.id).steps.implement.branch! };
 };
 
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
@@ -783,8 +783,8 @@ test("REFUSED by name at shipped defaults: a file at an ask's name that is not a
   const file = path.join(asksDir(run.id), 'retry-implement-2');
   fs.mkdirSync(asksDir(run.id), { recursive: true });
   fs.writeFileSync(file, '{}');
-  assert.equal((await runWith(e, list(e, readRun(run.id)))).steps[0].note, undefined, '`nemia ls` shows nothing asked');
-  assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).tried, [], 'and no pass honours it');
+  assert.equal((await runWith(e, list(e, runRecord(run.id)))).steps[0].note, undefined, '`nemia ls` shows nothing asked');
+  assert.deepEqual((await runWith(e, advanceRun(runRecord(run.id)))).tried, [], 'and no pass honours it');
   await assert.rejects(
     runWith(e, retryRun(run.id, 'implement', { mode: 'continue' })),
     refusedWith(
@@ -799,16 +799,16 @@ test("REFUSED by name at shipped defaults: a file at an ask's name that is not a
   fs.rmSync(file);
   await runWith(e, retryRun(run.id, 'implement', { mode: 'continue' }));
   assert.deepEqual(
-    (await runWith(e, advanceRun(readRun(run.id)))).tried,
+    (await runWith(e, advanceRun(runRecord(run.id)))).tried,
     ['implement'],
     'deleted, as the refusal says: the ask is written, and the next pass honours it',
   );
 
   const looping = await started(looped('rounds: 1\n'));
   const b = board();
-  await runWith(b.e, advanceRun(readRun(looping.id)));
+  await runWith(b.e, advanceRun(runRecord(looping.id)));
   await toReview(b, looping.id, 1, true);
-  assert.deepEqual((await runWith(b.e, advanceRun(readRun(looping.id)))).looped, [], 'out of rounds, on the first');
+  assert.deepEqual((await runWith(b.e, advanceRun(runRecord(looping.id)))).looped, [], 'out of rounds, on the first');
   const roundFile = path.join(asksDir(looping.id), 'round-review-2');
   fs.mkdirSync(asksDir(looping.id), { recursive: true });
   fs.writeFileSync(roundFile, '[]');
@@ -826,11 +826,11 @@ test("REFUSED by name at shipped defaults: a file at an ask's name that is not a
 test('a step whose harness blocked its session says what the harness waits for — on `nemia ls` and on `nemia decide`, read afresh each pass', async (t) => {
   const run = await started(folder());
   const b = board();
-  await runWith(b.e, advanceRun(readRun(run.id)));
+  await runWith(b.e, advanceRun(runRecord(run.id)));
   const taskId = `${run.id}-implement`;
   b.settle(taskId, 'needs-human' as TaskPhase);
   b.waiting.set(taskId, 'permission prompt');
-  const step = async () => (await runWith(b.e, list(b.e, readRun(run.id)))).steps[0];
+  const step = async () => (await runWith(b.e, list(b.e, runRecord(run.id)))).steps[0];
   const status = async () => shownStatus(await step());
   const printed: string[] = [];
   t.mock.method(console, 'log', (...args: unknown[]) => {
@@ -866,7 +866,7 @@ test('a step whose harness blocked its session says what the harness waits for �
 test("REFUSED by the engine: a try's stop of a session that settled since the pass read it is said, and the pass goes on — it files nothing, and the pass after it, reading it settled, files the try", async (t) => {
   const run = await started(folder());
   const b = board();
-  await runWith(b.e, advanceRun(readRun(run.id)));
+  await runWith(b.e, advanceRun(runRecord(run.id)));
   const taskId = `${run.id}-implement`;
   b.settle(taskId, 'needs-human' as TaskPhase);
   t.mock.method(console, 'log', () => {});
@@ -880,7 +880,7 @@ test("REFUSED by the engine: a try's stop of a session that settled since the pa
         Object.assign(new Error(`stop: \`${id}\` has settled (stopped): there is nothing left to stop.`), { exitCode: 2 }) as never,
       ),
   };
-  const first = await runWith(refusing, advanceRun(readRun(run.id)));
+  const first = await runWith(refusing, advanceRun(runRecord(run.id)));
   assert.deepEqual([first.tried, first.filed], [[], []], 'nothing filed on the read the refusal proved stale');
   assert.ok(
     first.notes.includes(
@@ -890,7 +890,7 @@ test("REFUSED by the engine: a try's stop of a session that settled since the pa
   );
 
   b.settle(taskId, 'stopped');
-  const filed = await runWith(refusing, advanceRun(readRun(run.id)));
+  const filed = await runWith(refusing, advanceRun(runRecord(run.id)));
   assert.deepEqual(filed.tried, ['implement'], 'settled, the try is filed');
 });
 
@@ -914,7 +914,7 @@ test("REFUSED at shipped defaults: a pass that read a run before `nemia rm` forg
         ),
       ),
   };
-  const pass = runWith(heldAfterReadingTheRun, advanceRun(readRun(p.run.id)));
+  const pass = runWith(heldAfterReadingTheRun, advanceRun(runRecord(p.run.id)));
   assert.equal((await runWith(b.e, forgetRun(p.run.id))).kind, 'forgotten');
   release();
   const after = await pass;
@@ -938,7 +938,7 @@ test("REFUSED at shipped defaults: a pass that read a run before `nemia rm` forg
     if (String(at).startsWith(asks)) fs.rmSync(asks, { recursive: true, force: true });
     return (mkdir as (...a: unknown[]) => unknown)(at, ...rest);
   });
-  await runWith(b.e, advanceRun(readRun(q.run.id)));
+  await runWith(b.e, advanceRun(runRecord(q.run.id)));
   (fs.mkdirSync as unknown as { mock: { restore: () => void } }).mock.restore();
   assert.ok(
     !fs.existsSync(asks),
@@ -962,7 +962,7 @@ test('REFUSED at shipped defaults: a pass that read a `--no-worktree` run before
   const repo = aRepo();
   const b = board();
   const run = await runPlaced(startRun({ brief: 'notes on the base itself', repo, workflowDir: oneStep(), isolate: false }));
-  await runWith(b.e, advanceRun(readRun(run.id)));
+  await runWith(b.e, advanceRun(runRecord(run.id)));
   fs.writeFileSync(path.join(repo, 'notes.md'), 'notes\n');
   b.settle(`${run.id}-implement`, 'succeeded', { ...SIGNED, artifacts: ['notes.md'] });
 
@@ -984,7 +984,7 @@ test('REFUSED at shipped defaults: a pass that read a `--no-worktree` run before
         }),
       ),
   };
-  const pass = runWith(slow, advanceRun(readRun(run.id)));
+  const pass = runWith(slow, advanceRun(runRecord(run.id)));
   await read;
   assert.equal((await runWith(b.e, forgetRun(run.id))).kind, 'forgotten');
   fs.writeFileSync(path.join(repo, 'later.txt'), "a person's edit, after the run was forgotten\n");
@@ -1006,7 +1006,7 @@ test('REFUSED at shipped defaults: a pass that read a run before it was cancelle
   const dir = oneStep();
   fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
   const run = await runPlaced(startRun({ brief: 'cancelled and forgotten with a follower due', repo, workflowDir: dir }));
-  await runWith(b.e, advanceRun(readRun(run.id)));
+  await runWith(b.e, advanceRun(runRecord(run.id)));
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
 
   let release!: () => void;
@@ -1027,7 +1027,7 @@ test('REFUSED at shipped defaults: a pass that read a run before it was cancelle
         }),
       ),
   };
-  const pass = runWith(slow, advanceRun(readRun(run.id)));
+  const pass = runWith(slow, advanceRun(runRecord(run.id)));
   await read;
   await runWith(b.e, cancelRun(run.id));
   assert.equal((await runWith(b.e, forgetRun(run.id))).kind, 'forgotten');
@@ -1062,9 +1062,9 @@ const verbPrograms = async () => {
   const { approveRun } = await import('../src/gate/gate.verb.ts');
   const { sayRun } = await import('../src/say/say.verb.ts');
   const { cancelRun } = await import('../src/cancel/cancel.verb.ts');
-  const { storeRootLayer } = await import('../src/config/root.store.ts');
+  const { storeConfigLayer } = await import('../src/config/root.store.ts');
   const over = <A, E>(e: Engine, program: EffectOf<A, E, EngineService | PlaceService | StoreRoot>): Promise<A> =>
-    Effect.runPromise(placed(program).pipe(Effect.provide(EngineService.layer(e)), Effect.provide(storeRootLayer(process.env))));
+    Effect.runPromise(placed(program).pipe(Effect.provide(EngineService.layer(e)), Effect.provide(storeConfigLayer(process.env))));
   return { Effect, EngineService, over, acceptRun, approveRun, cancelRun, retryRun, roundRun, sayRun };
 };
 
@@ -1175,7 +1175,7 @@ const startProgram = async () => {
   const { startRun } = await import('../src/start/start.verb.ts');
   const { Invalid, isRefusal } = await import('../src/refusal/refusal.ts');
   const { inputsDir, runsDir } = await import('../src/record/record.store.ts');
-  const { runStore } = await import('../src/record/files.store.ts');
+  const { filesStore: runStore } = await import('../src/record/files.store.ts');
   return { Effect, startRun, Invalid, isRefusal, inputsDir, runsDir, runStore };
 };
 
@@ -1186,7 +1186,7 @@ const startProgram = async () => {
 async function _startProgramTypes() {
   const s = await startProgram();
   const opts = { brief: 'x', repo: ROOT, workflowDir: WORKFLOW };
-  void (s.startRun(opts) satisfies EffectOf<Run, Refusal, PlaceService>);
+  void (s.startRun(opts) satisfies EffectOf<Run, Refusal, PlaceService | StoreRoot>);
   // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
   void (s.startRun(opts) satisfies EffectOf<Run, never, PlaceService>);
   // @ts-expect-error -- a program that asks the place is given none, and runSync takes no requirement

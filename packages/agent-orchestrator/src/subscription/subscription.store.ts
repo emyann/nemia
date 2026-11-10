@@ -23,7 +23,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Context, Effect, Layer, Result, Schema } from 'effect';
-import { wfRoot } from '../config/config.store.ts';
 import { firstRefusal } from '../record/record.store.ts';
 import { countRead } from '../meter/tally.store.ts';
 import { FeedLineSchema } from '../feed/feed.store.ts';
@@ -348,12 +347,9 @@ export const SubscriptionDoor = Context.Reference<SubscriptionDoorShape>('agent-
 export const subscriptionDoorFiles = (root: string): Layer.Layer<never> =>
   Layer.succeed(SubscriptionDoor)(subscriptionDoorOver(subscriptionFiles(root)));
 
-/** The store the module's spellings read, read once as the package loads, as `record.store.ts` reads its own. */
-const ROOT = wfRoot();
-
 /** An act of the door over the files at the module's root, run at once: a refusal is thrown as it is. */
-const atModule = <A>(act: (door: SubscriptionDoorShape) => Effect.Effect<A, unknown>): A =>
-  Effect.runSync(act(subscriptionDoorOver(subscriptionFiles(ROOT))));
+const atModule = <A>(home: string, act: (door: SubscriptionDoorShape) => Effect.Effect<A, unknown>): A =>
+  Effect.runSync(act(subscriptionDoorOver(subscriptionFiles(home))));
 
 const named = SubscriptionName.read;
 
@@ -361,32 +357,32 @@ const named = SubscriptionName.read;
  * The module's subscriptions, by name (`subscriptions.list`): the words of each file left out told to `said`, where one is given, and to
  * nothing where not.
  */
-export function listSubscriptions(said?: (line: string) => void): Listed[] {
-  const { listed, left } = atModule((door) => door.subscriptions.list());
+export function listSubscriptions(home: string, said?: (line: string) => void): Listed[] {
+  const { listed, left } = atModule(home, (door) => door.subscriptions.list());
   for (const one of left) said?.(one.words);
   return listed;
 }
 
 /** The names of the deliverer's files at the module's root (`deliveries.list`). */
-export const listDeliveries = (): string[] => atModule((door) => door.deliveries.list());
+export const listDeliveries = (home: string): string[] => atModule(home, (door) => door.deliveries.list());
 
 /** Puts a subscription at the module's root (`subscriptions.put`). */
-export const putSubscription = (name: string, subscription: Subscription): void =>
-  atModule((door) => door.subscriptions.put(named(name), subscription));
+export const putSubscription = (home: string, name: string, subscription: Subscription): void =>
+  atModule(home, (door) => door.subscriptions.put(named(name), subscription));
 
 /** Removes a subscription at the module's root (`subscriptions.drop`). */
-export const dropSubscription = (name: string): void => atModule((door) => door.subscriptions.drop(named(name)));
+export const dropSubscription = (home: string, name: string): void => atModule(home, (door) => door.subscriptions.drop(named(name)));
 
 /** Where the deliverer is with a subscription at the module's root, or undefined; a file that does not read told to `said`. */
-export function readDelivery(name: string, said?: (line: string) => void): KeptDelivery | undefined {
-  const read = atModule((door) => door.deliveries.read(named(name)));
+export function readDelivery(home: string, name: string, said?: (line: string) => void): KeptDelivery | undefined {
+  const read = atModule(home, (door) => door.deliveries.read(named(name)));
   if (read !== null && 'unread' in read) said?.(read.unread);
   return read !== null && 'kept' in read ? read.kept : undefined;
 }
 
 /** Writes where the deliverer is with a subscription at the module's root (`deliveries.write`). */
-export const writeDelivery = (name: string, delivery: KeptDelivery): void =>
-  atModule((door) => door.deliveries.write(named(name), delivery));
+export const writeDelivery = (home: string, name: string, delivery: KeptDelivery): void =>
+  atModule(home, (door) => door.deliveries.write(named(name), delivery));
 
 /** Removes the deliverer's file of a subscription at the module's root (`deliveries.drop`). */
-export const dropDelivery = (name: string): void => atModule((door) => door.deliveries.drop(named(name)));
+export const dropDelivery = (home: string, name: string): void => atModule(home, (door) => door.deliveries.drop(named(name)));

@@ -103,7 +103,7 @@ function sensitiveOf({ branch, inFull }: BranchChanges): SensitiveDiff {
  * Fails with `Missing` for a run the store does not have; a journal that does not read fails as the runtime fails it (`runDecision`
  * words it).
  */
-export const decisionRead = Effect.fn('decisionRead')(function* (id: string, env: NodeJS.ProcessEnv = process.env, how: DecisionHow = {}) {
+export const decisionRead = Effect.fn('decisionRead')(function* (id: string, how: DecisionHow = {}) {
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
   const none = { run, touched: [], results: [] };
   if (run.cancelledAt)
@@ -122,7 +122,7 @@ export const decisionRead = Effect.fn('decisionRead')(function* (id: string, env
   const settled = unasked.status === 'running' && !unasked.waitingOnYou.length;
   const git = yield* live.when(!settled);
   const judged = settled ? unasked : yield* judgedOver(git);
-  const decided = yield* decideRun(run.id, env, live).pipe(over(e));
+  const decided = yield* decideRun(run.id, live).pipe(over(e));
   if (decided.held) return { decision: { running: true, held: decided.held }, decided, ...none } satisfies DecisionRead;
   if (judged.status === 'running' && !judged.waitingOnYou.length)
     return { decision: { running: true }, decided, ...none } satisfies DecisionRead;
@@ -160,10 +160,10 @@ export const decisionRead = Effect.fn('decisionRead')(function* (id: string, env
  * those of the runs it waits on are read once, over one look at the harnesses (`viewsFor`), which
  * the decision reads them through.
  */
-export const runDecision = Effect.fn('runDecision')(function* (id: string, env: NodeJS.ProcessEnv = process.env, how: DecisionHow = {}) {
+export const runDecision = Effect.fn('runDecision')(function* (id: string, how: DecisionHow = {}) {
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
   const { unreadable, reader } = yield* viewsFor(yield* EngineService, [run]);
-  const read = yield* judgedUnlessUnreadable(run, unreadable, () => decisionRead(id, env, how).pipe(over(reader)));
+  const read = yield* judgedUnlessUnreadable(run, unreadable, () => decisionRead(id, how).pipe(over(reader)));
   const answer: { decision: RunDecision } | { unjudged: string } =
     'unreadable' in read ? { unjudged: read.unreadable } : { decision: read.judged.decision };
   return answer;

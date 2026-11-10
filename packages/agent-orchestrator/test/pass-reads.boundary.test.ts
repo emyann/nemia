@@ -2,7 +2,7 @@
  * What one pass of the tick reads, counted on a store of runs not at rest: each task's view once a pass (`reportedEngine`), the cap's slots
  * once a pass and only where a claim on a repository's checkout waits on one (`passRead`, `checkoutHold`), each run another waits on once a
  * pass (`Parents`), one `standing` for each repository, place and base branch (`passStanding`), and a run's asks folder listed once a read
- * (`readAsks`, `readRun`). Identities on the reads, never a time.
+ * (`readAsks`, `runRecord`). Identities on the reads, never a time.
  *
  * The store: on one repository, three runs whose ending ended failed, a run whose ending works in the checkout, two whose approved endings
  * wait for it, two runs started `--after` the first of those and a run held until it, a run at its third try, and ten finished runs. The
@@ -14,6 +14,8 @@
  * `WF_ROOT` is set before the runner is imported: the module reads it as it loads. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo of runs at rest; each pass here is handed a fresh memo, so none is.
  */
+import { configGiven, rootNow } from './config-given.ts';
+import { settingsOf } from '../src/config/config.store.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -52,7 +54,7 @@ const {
 } = await import('../src/runner.ts');
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
-const { acceptFile, askFile, asksDir, pruneFile, readAsks, readRun, roundAskFile } = await import('../src/record/record.store.ts');
+const { acceptFile, askFile, asksDir, pruneFile, readAsks, runRecord, roundAskFile } = await import('../src/record/record.store.ts');
 const { stepsNow: stepsOf } = await import('./steps-now.ts');
 const { passRead } = await import('../src/cap/cap.verb.ts');
 const { passRevisions } = await import('../src/revisions/pin.verb.ts');
@@ -62,7 +64,7 @@ const aPassRevisions = () => Effect.runSync(passRevisions().pipe(Effect.provideS
 const { checkoutHold } = await import('../src/ending/ending.verb.ts');
 const { passParents, reportedEngine } = await import('../src/views/views.verb.ts');
 const { metered } = await import('../src/meter/tally.store.ts');
-const { runStore } = await import('../src/record/files.store.ts');
+const { filesStore: runStore } = await import('../src/record/files.store.ts');
 const { freshRestMemo } = await import('../src/tick/tick.verb.ts');
 const { readStanding, standingFile } = await import('../src/standing/standing.store.ts');
 const { runsListed } = await import('../src/list/list.verb.ts');
@@ -174,23 +176,23 @@ const board = () => {
 /** A run of `implement → ship` on `repo`, implement committed and signed: at the ending's gate. */
 const atTheGate = async (b: ReturnType<typeof board>, repo: string): Promise<Run> => {
   const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: shipFolder }));
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  const work = readRun(run.id).steps.implement;
+  await runWith(b.e, advanceRun(runRecord(run.id)));
+  const work = runRecord(run.id).steps.implement;
   fs.appendFileSync(path.join(work.workspace!, 'add.ts'), `export const sub${run.id.slice(-4)} = 1;\n`);
   git(work.workspace!, 'add', '-A');
   git(work.workspace!, 'commit', '-q', '-m', 'add sub');
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  return readRun(run.id);
+  await runWith(b.e, advanceRun(runRecord(run.id)));
+  return runRecord(run.id);
 };
 
 /** A run of one step on `repo`, filed and settled `phase`. */
 const settledOne = async (b: ReturnType<typeof board>, repo: string, phase: TaskPhase): Promise<Run> => {
   const run = await runPlaced(startRun({ brief: 'one', repo, workflowDir: oneStep }));
-  await runWith(b.e, advanceRun(readRun(run.id)));
+  await runWith(b.e, advanceRun(runRecord(run.id)));
   b.settle(`${run.id}-implement`, phase, phase === 'succeeded' ? SIGNED : undefined);
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  return readRun(run.id);
+  await runWith(b.e, advanceRun(runRecord(run.id)));
+  return runRecord(run.id);
 };
 
 /** Two runs started `--after` `parent`, and one held until it. */
@@ -207,14 +209,14 @@ const store = async () => {
   for (let i = 0; i < 3; i++) {
     const failed = await atTheGate(b, repo);
     await runWith(b.e, approveRun(failed.id, 'ship'));
-    assert.deepEqual((await runWith(b.e, advanceRun(readRun(failed.id)))).filed, ['ship'], 'the checkout is free for it');
+    assert.deepEqual((await runWith(b.e, advanceRun(runRecord(failed.id)))).filed, ['ship'], 'the checkout is free for it');
     b.settle(`${failed.id}-ship`, 'failed');
-    await runWith(b.e, advanceRun(readRun(failed.id)));
+    await runWith(b.e, advanceRun(runRecord(failed.id)));
   }
   const working = await atTheGate(b, repo);
   await runWith(b.e, approveRun(working.id, 'ship'));
   assert.deepEqual(
-    (await runWith(b.e, advanceRun(readRun(working.id)))).filed,
+    (await runWith(b.e, advanceRun(runRecord(working.id)))).filed,
     ['ship'],
     "its ending is filed into the repository's checkout",
   );
@@ -226,8 +228,8 @@ const store = async () => {
   const trying = await settledOne(b, repo, 'failed');
   for (const n of [2, 3]) {
     await runWith(b.e, retryRun(trying.id, 'implement', { mode: 'fresh' }));
-    await runWith(b.e, advanceRun(readRun(trying.id)));
-    if (n === 2) b.settle(readRun(trying.id).steps.implement.taskId!, 'failed');
+    await runWith(b.e, advanceRun(runRecord(trying.id)));
+    if (n === 2) b.settle(runRecord(trying.id).steps.implement.taskId!, 'failed');
   }
   for (let i = 0; i < 10; i++) await settledOne(b, repo, 'succeeded');
   return { b, repo, waiting, second };
@@ -261,7 +263,7 @@ const STANDING: Rows = [];
 row(ONCE, "a pass reads each task's view once, and once more after a write of the pass names it", async () => {
   const { b, waiting } = await theStore();
   await onePass(b);
-  assert.equal(readRun(waiting.id).steps.ship?.taskId ?? undefined, undefined, 'the approved ending still waits for the checkout');
+  assert.equal(runRecord(waiting.id).steps.ship?.taskId ?? undefined, undefined, 'the approved ending still waits for the checkout');
   assert.ok(b.reads.size > 20, `the pass read the store's tasks (${b.reads.size})`);
   const over = [...b.reads].filter(([id, n]) => n > 1 + (b.writes.get(id) ?? 0));
   assert.deepEqual(over, [], 'no task is read twice with no write of the pass naming it between');
@@ -269,7 +271,7 @@ row(ONCE, "a pass reads each task's view once, and once more after a write of th
 
 row(ONCE, "the cap's slots are read once for the pass, however many claims ask", async () => {
   const { b } = await theStore();
-  const read = passRead(b.e, runStore.runs.list(), process.env, NOTHING_READ, aPassRevisions());
+  const read = passRead(b.e, runStore.runs.list(), settingsOf(process.env), NOTHING_READ, aPassRevisions());
   b.lists.calls = 0;
   const first = await Effect.runPromise(read.slots);
   const second = await Effect.runPromise(read.slots);
@@ -297,7 +299,7 @@ row(ONCE, 'a pass resolves one workflow folder once, however many runs wait on i
 row(ONCE, 'a one-off verb, handed no pass, resolves the folder for itself', async () => {
   const { b, repo } = await theStore();
   const run = await runPlaced(startRun({ brief: 'resolved for itself', repo, workflowDir: oneStep }));
-  const { tallies } = await metered(() => runWith(b.e, advanceRun(readRun(run.id))));
+  const { tallies } = await metered(() => runWith(b.e, advanceRun(runRecord(run.id))));
   assert.ok(tallies, 'the verb was metered');
   assert.ok(
     tallies.kinds.revisions.calls > 0,
@@ -307,7 +309,7 @@ row(ONCE, 'a one-off verb, handed no pass, resolves the folder for itself', asyn
 
 row(ONCE, "a run's own claim on the checkout reads the slot its pass gave it, and the cap for no one", async () => {
   const { b, waiting } = await theStore();
-  const run = readRun(waiting.id);
+  const run = runRecord(waiting.id);
   let asked = 0;
   const slots = Effect.sync(() => {
     asked++;
@@ -328,9 +330,9 @@ row(ONCE, "a run's own claim on the checkout reads the slot its pass gave it, an
         },
         slot: undefined,
       },
-      process.env,
+      settingsOf(process.env),
       statusMemo(() => undefined, builtinGitPlace),
-    ),
+    ).pipe(Effect.provide(configGiven(rootNow(), process.env))),
   );
   assert.equal(hold, undefined, 'no other run claims the checkout in what the pass listed');
   assert.equal(asked, 0, "the cap's slots are not read for the run's own claim");
@@ -374,7 +376,7 @@ row(
     const { value: git, tallies } = await metered(() => runWith(b.e, standingSnapshot().pipe(Effect.map(standingReader))));
     for (const r of [done, handed, until, pruned]) {
       const branch = r.steps.implement.branch!;
-      assert.equal(git.unread(readRun(r.id) as never, branch), undefined, `${r.id}'s ${branch} answered off the pass`);
+      assert.equal(git.unread(runRecord(r.id) as never, branch), undefined, `${r.id}'s ${branch} answered off the pass`);
     }
     assert.equal(
       Object.values(tallies!.kinds).reduce((n, k) => n + k.spawned, 0),
@@ -414,7 +416,7 @@ row(GIT, "a run's asks are listed once a read, and each file in them read once",
   assert.equal(files, 4, 'an approval, an acceptance, a retry and a round');
   const asks = (await metered(async () => readAsks(id))).tallies!.kinds.asks;
   assert.deepEqual({ calls: asks.calls, reads: asks.reads }, { calls: 1, reads: files }, 'one walk of the folder, each file read once');
-  const record = (await metered(async () => readRun(id))).tallies!.kinds.asks;
+  const record = (await metered(async () => runRecord(id))).tallies!.kinds.asks;
   assert.deepEqual({ calls: record.calls, reads: record.reads }, { calls: 1, reads: 2 }, 'the approval and the acceptance, off one walk');
 });
 
@@ -554,16 +556,16 @@ row(
     git(repo, 'merge', '-q', '--no-ff', '-m', 'land it', parent.steps.implement.branch!);
     const unread = standingUnread('the standing broke');
     const held = await runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provide(unread)));
-    assert.equal(readRun(child.id).steps.implement.taskId ?? undefined, undefined, 'nothing of it filed while its parent reads unread');
+    assert.equal(runRecord(child.id).steps.implement.taskId ?? undefined, undefined, 'nothing of it filed while its parent reads unread');
     assert.deepEqual(held.runs.find((r) => r.run.id === child.id)?.waiting, [
       { run: parent.id, unread: 'the place was not heard: the standing broke' },
     ]);
     const places = readStanding()?.places ?? [];
     assert.ok(places.length > 0 && places.every((p) => 'unread' in p), JSON.stringify(places));
     await runWith(b.e, tickRun({ memo: freshRestMemo() }));
-    assert.ok(readRun(child.id).steps.implement.taskId, 'filed once its parent reads landed');
+    assert.ok(runRecord(child.id).steps.implement.taskId, 'filed once its parent reads landed');
     assert.equal(
-      readRun(child.id).baseRef,
+      runRecord(child.id).baseRef,
       git(repo, 'rev-parse', 'main').trim(),
       'cut from the base as the pass read it, the merge on it',
     );
@@ -599,14 +601,14 @@ row(
   async () => {
     const { b, repo } = await theStore();
     const run = await runPlaced(startRun({ brief: 'left uncommitted', repo, workflowDir: oneStep }));
-    await runWith(b.e, advanceRun(readRun(run.id)));
-    const work = readRun(run.id).steps.implement;
+    await runWith(b.e, advanceRun(runRecord(run.id)));
+    const work = runRecord(run.id).steps.implement;
     fs.writeFileSync(path.join(work.workspace!, 'left.ts'), 'export const left = 1;\n');
     b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
     await runWith(b.e, tickRun({ memo: freshRestMemo() }));
     const tip = git(repo, 'rev-parse', work.branch!).trim();
-    assert.notEqual(tip, readRun(run.id).baseRef, 'the hand-off committed the work on its branch');
-    assert.deepEqual(readRun(run.id).tips, { [work.branch!]: tip }, 'the tip kept is the one git has after the hand-off');
+    assert.notEqual(tip, runRecord(run.id).baseRef, 'the hand-off committed the work on its branch');
+    assert.deepEqual(runRecord(run.id).tips, { [work.branch!]: tip }, 'the tip kept is the one git has after the hand-off');
   },
 );
 
@@ -629,9 +631,9 @@ row(
       }),
     );
     await runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provide(headless)));
-    assert.ok(readRun(child.id).steps.implement.taskId, 'filed: its parent reads landed');
+    assert.ok(runRecord(child.id).steps.implement.taskId, 'filed: its parent reads landed');
     assert.notEqual(git(repo, 'rev-parse', 'main').trim(), child.baseRef, 'the base moved past where the child was started');
-    assert.equal(readRun(child.id).baseRef, child.baseRef, 'and the child keeps the base it was started on: the pass read no head of it');
+    assert.equal(runRecord(child.id).baseRef, child.baseRef, 'and the child keeps the base it was started on: the pass read no head of it');
   },
 );
 

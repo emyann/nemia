@@ -11,7 +11,7 @@ import { repoAllows } from '../trust/allows.verb.ts';
 import { PlaceService, openPlace } from '../place/place.store.ts';
 import { isFolderTeam } from '../workflow/index.ts';
 import { placesOf } from '../folder/lookup.store.ts';
-import { readFactory } from '../factory/factory.store.ts';
+import { factoryOrNone } from '../factory/door/factories.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { tried as lifted } from '../runtime-client.ts';
 
@@ -37,14 +37,14 @@ export type PlanStarted = {
  * that refuses after that, part-way, stops the plan: the runs already started stand, and `stopped` says which card refused and which are
  * left. The option `start` is `startRun`, unless a test hands it one of its own.
  *
- * `factory` names the factory every card's run is started in, as `nemia start --factory` names it: read first (`readFactory`), and each
- * card's workflow is judged in it before the first run, a workflow it has not attached or a step its hires leave unfilled among what is
- * refused. Left out, each run is started with none, the default factory's.
+ * `factory` names the factory every card's run is started in, as `nemia start --factory` names it: read first, through the Factory door
+ * (`factoryOrNone`), and each card's workflow is judged in it before the first run, a workflow it has not attached or a step its hires
+ * leave unfilled among what is refused. Left out, or the default, each run is started with none, the default factory's.
  */
 export const startPlan = Effect.fn('startPlan')(function* (opts: { dir: string; repo: string; factory?: string; start?: typeof startRun }) {
   const place = yield* PlaceService;
   const cards = readPlan(opts.dir);
-  const factory = opts.factory === undefined ? undefined : readFactory(opts.factory);
+  const factory = yield* factoryOrNone(opts.factory);
   const folders = new Map<string, string>();
   let onRepo = false;
   for (const card of cards) {

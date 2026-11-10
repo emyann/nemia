@@ -1,7 +1,7 @@
 import { Cell, Column, Row, Table, TableBody, TableHeader, Tag } from '@/components/ui/ds';
 import type { ListedRun } from '@/lib/api/runs';
 import { judged, type UnjudgedRun } from '@/lib/api/judged';
-import { factoryOf } from '@/lib/factories';
+import { namespaceOf } from '@/lib/factories';
 import { titleOf } from '@/lib/factory';
 import { LabelTags } from '../field/Labels';
 import { ink } from '@/lib/meaning';
@@ -48,8 +48,8 @@ function UnjudgedRow({ run, room }: { run: UnjudgedRun; room: number }) {
           </TextLink>
           <span className="flex items-center gap-2">
             <CopyId id={run.id} room={room} />
-            <span data-factory={factoryOf(run)} className="text-label-small uppercase text-on-surface-variant">
-              {factoryOf(run)}
+            <span data-factory={namespaceOf(run.factory)} className="text-label-small uppercase text-on-surface-variant">
+              {namespaceOf(run.factory)}
             </span>
           </span>
         </span>
@@ -113,8 +113,8 @@ export function FlightTable({ runs, asOf }: { runs: readonly (ListedRun | Unjudg
                       </TextLink>
                       <span className="flex items-center gap-2">
                         <CopyId id={run.id} room={room} />
-                        <span data-factory={factoryOf(run)} className="text-label-small uppercase text-on-surface-variant">
-                          {factoryOf(run)}
+                        <span data-factory={namespaceOf(run.factory)} className="text-label-small uppercase text-on-surface-variant">
+                          {namespaceOf(run.factory)}
                         </span>
                         <LabelTags labels={run.labels} />
                       </span>

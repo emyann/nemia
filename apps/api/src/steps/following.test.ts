@@ -71,7 +71,7 @@ type Task = {
 function engineOver(tasks: Map<string, Task>) {
   const follows: string[] = [];
   const closed: string[] = [];
-  const real = engine();
+  const real = engine(process.env);
   const e = {
     ...real,
     view: (id: string) =>

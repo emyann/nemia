@@ -31,7 +31,7 @@ import { stepsAmong } from '../steps/steps.verb.ts';
 import type { Workflow } from '../workflow.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { ceilings, identify, recordCeilings, recordPassCost, recordRecentPass } from '../daemon/daemon.store.ts';
-import { verifiesRest } from '../config/config.store.ts';
+import { type Settings, setting, StoreConfig } from '../config/config.store.ts';
 import { feedFile } from '../feed/feed.store.ts';
 import { emitFeed } from '../feed/feed.verb.ts';
 import { levelsNow } from '../level/levels.verb.ts';
@@ -145,10 +145,10 @@ type PassOptions = { repo: string; memo: RestMemo; verify: boolean };
  * The series kept from the ring after a pass (`keepSeries`), and the time it took, which is measuring's. A failure costs the series, never
  * the pass: it is said on stderr.
  */
-const seriesKept = (ring: readonly RecentPass[]): number => {
+const seriesKept = (ring: readonly RecentPass[], config: Settings): number => {
   const t0 = performance.now();
   try {
-    keepSeries(ring);
+    keepSeries(ring, config);
   } catch (err) {
     process.stderr.write(`nemia: the series were not kept on this pass: ${err instanceof Error ? err.message : String(err)}\n`);
   }
@@ -205,10 +205,11 @@ export type TickOptions = {
  */
 export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, quota, disk }: TickOptions = {}) {
   const e = yield* EngineService;
+  const config = yield* StoreConfig;
   const options: PassOptions = {
     repo: repo ?? process.cwd(),
     memo: memo ?? restMemo(e),
-    verify: verifyRest ?? (yield* tried(() => verifiesRest())),
+    verify: verifyRest ?? (yield* setting('verifyRest')),
   };
   const { io0, value, ms, tallies, io1 } = yield* talliedIn(
     e,
@@ -228,7 +229,7 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
   };
   const written = yield* tried(() => {
     const recent = recordRecentPass(cost, RECENT_KEPT, { quota: quota?.(), checks: tallies.checks, disk: disk?.() });
-    return recordPassCost(cost) + recent.ms + seriesKept(recent.kept);
+    return recordPassCost(cost) + recent.ms + seriesKept(recent.kept, config);
   });
   yield* recordPassMetrics(cost);
   return { ...value, cost: { ...cost, overheadMs: cost.overheadMs + written } };
@@ -265,6 +266,7 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
  * their own: a pass traces what it does, as many spans over many runs at rest as over few.
  */
 const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }: PassOptions) {
+  const home = yield* StoreRoot;
   const informer = yield* Informer;
   if (informer) passStarted(informer);
   yield* liftedLapsed();
@@ -273,26 +275,27 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   noteSeen({ ...sessionsOf(report, Date.now()), load: loadNow() });
   const e = reportedEngine(engine, report.views ?? []);
   const resting = yield* restingPass(e, memo, verify);
-  const ran = yield* tried(() => ceilings());
+  const config = yield* StoreConfig;
+  const ran = yield* tried(() => ceilings(config));
   yield* tried(() => within('act', () => recordCeilings(ran)));
   const runs = yield* (yield* RunDoor).runs.list(undefined, resting && keptOf(resting));
   if (resting) forgotten(memo, runs);
   noteSeen({ runs: runs.length });
-  const pause = yield* tried(() => readPause());
+  const pause = yield* tried(() => readPause(home));
   const levels = yield* levelsNow().pipe(Effect.orElseSucceed(() => undefined));
   const judging: Judging = { done: new Map(), unjudged: new Map() };
   const standing = yield* passStanding(runs, memo.standing);
-  const read: PassRead = passRead(e, runs, process.env, standing, yield* passRevisions());
+  const read: PassRead = passRead(e, runs, config, standing, yield* passRevisions());
   for (const run of runs.filter(hasStarted)) yield* judged(e, judging, read, run, resting);
   const counted = yield* waitingJudged(e, judging, read, resting, ran.runs);
   if (informer) yield* informed(e, informer, runs, judging, verify);
   yield* withinEffect('act', (yield* ProposalsAct)(repo, runs, judging.done));
   const queue =
-    slotFree({ inFlight: counted, cap: ran.runs }) && !(yield* tried(() => readPause()))
+    slotFree({ inFlight: counted, cap: ran.runs }) && !(yield* tried(() => readPause(home)))
       ? yield* withinEffect('act', startQueued(repo, runs))
       : undefined;
   const scheduled =
-    !(queue && 'run' in queue) && slotFree({ inFlight: counted, cap: ran.runs }) && !(yield* tried(() => readPause()))
+    !(queue && 'run' in queue) && slotFree({ inFlight: counted, cap: ran.runs }) && !(yield* tried(() => readPause(home)))
       ? yield* withinEffect('act', startDue(repo, runs))
       : undefined;
   const forgetting = yield* withinEffect('act', finishForgetting().pipe(over(e)));
@@ -320,7 +323,8 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
  * absence as any resume. A person's pause, which names no process, is never lifted here.
  */
 const liftedLapsed = Effect.fnUntraced(function* () {
-  const lifted = yield* tried(() => liftLapsedPause(identify));
+  const home = yield* StoreRoot;
+  const lifted = yield* tried(() => liftLapsedPause(home, identify));
   if (lifted)
     yield* Effect.logWarning(
       `the store's pause put by ${lifted.pause.by || 'a take-over'} is lifted: its command, pid ${lifted.heldBy.pid}, runs no more, so the store is resumed (nemia pause puts one again)`,
@@ -335,8 +339,9 @@ const liftedLapsed = Effect.fnUntraced(function* () {
  * left as it is.
  */
 const drainFromPause = Effect.fnUntraced(function* (engine: Engine) {
+  const home = yield* StoreRoot;
   if (typeof engine.drainSessions !== 'function') return;
-  const pause = yield* tried(() => readPause());
+  const pause = yield* tried(() => readPause(home));
   if (pause === null) yield* asked('drainSessions', engine.drainSessions(null));
   else if (pause.timeoutMs !== undefined) yield* asked('drainSessions', engine.drainSessions({ graceMs: pause.timeoutMs }));
 });
@@ -587,7 +592,7 @@ const fullPass = Effect.fnUntraced(function* (e: Engine, run: Run, pass: PassRea
  * files in the store stamp the same, the pass was handed the memo's own run for it (`keptOf`), nothing of its tasks is on the feed since
  * (`restingPass`), and every result branch it would read the tip of is where its record says (`tipsSeen`, off the heads the pass's one
  * `standing` a repository read, `tipsHold`). Otherwise a full pass (`advancePass`), kept in the memo if the run is at rest after it and the
- * pass left the run as it read.
+ * pass left the run as it read: the run it advanced, with its marks laid over it (`advanced.run`), reads as the record did.
  *
  * Answered from memory, it costs no journal read, no observe and no git process of its own, and is counted (`rested`). With `verify`, it is
  * judged in full as well (`verified`), and a difference is died of: a change the memo missed is a bug in what it watches. Untraced: a run
@@ -614,7 +619,7 @@ const advanceResting = Effect.fnUntraced(function* (e: Engine, run: Run, pass: P
   memo.runs.delete(run.id);
   const record = JSON.stringify(run);
   const { advanced, rest } = yield* fullPass(e, run, pass, slot);
-  if (rest && stamp !== undefined && JSON.stringify(run) === record) {
+  if (rest && stamp !== undefined && JSON.stringify(advanced.run) === record) {
     const { run: _, facts: __, ...answered } = advanced;
     memo.runs.set(run.id, { stamp, run, tipped: rest.tipped, advanced: answered });
   }
@@ -649,15 +654,15 @@ const verified = Effect.fn('verified')(function* (
     return yield* Effect.die(
       new Error(
         `the tick answered ${run.id} from its memo of runs at rest, and its record reads otherwise than the memo's run: ` +
-          `an input of the run changed that its stamp does not watch (restStamps), or the memo's run was changed in memory`,
+          `an input of the run changed that its stamp does not watch — name it in RUN_INPUTS (src/rest/rest.ts) with what watches it — or the memo's run was changed in memory`,
       ),
     );
   const {
-    advanced: { run: _, ...judged },
+    advanced: { run: after, ...judged },
     blockers,
     rest,
   } = yield* fullPass(e, fresh, pass, slot);
-  if (rest && isDeepStrictEqual(judged, kept) && JSON.stringify(fresh) === record) return;
+  if (rest && isDeepStrictEqual(judged, kept) && JSON.stringify(after) === record) return;
   return yield* Effect.die(
     new Error(
       `the tick answered ${run.id} from its memo of runs at rest, and a full pass ${rest ? 'answers otherwise' : `finds it not at rest (${blockers.join(', ')})`}: ` +

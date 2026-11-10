@@ -74,7 +74,7 @@ test("REFUSED: a run's detail says why one step's session alone could not be rea
   assert.ok(words?.includes('`ae/t-build/1`'), `the runtime's words, naming the session: ${words}`);
   assert.ok(words?.includes('"yesterday"'), `naming what did not decode: ${words}`);
   assert.equal(unread.get('review')?.sessionUnread, null, 'the step read beside it says nothing');
-  assert.equal((await Effect.runPromise(engine().view('t-build'))).unreadWhy, words, "the engine's own words");
+  assert.equal((await Effect.runPromise(engine(process.env).view('t-build'))).unreadWhy, words, "the engine's own words");
 
   write(`${jobOf('t-build')}.log`, jsonl([result(0.02)]));
   assert.equal((await stepsOf()).get('build')?.sessionUnread, null, 'the first request whose look reads it says nothing: none is kept');

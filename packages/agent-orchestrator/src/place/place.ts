@@ -340,12 +340,6 @@ export function unknownHoles(say: PlaceSay): readonly { readonly key: SayKey; re
   });
 }
 
-/** Why a `say` template of `file` names a hole the code does not fill for its key (`unknownHoles`), with the fix. Pure. */
-export function unknownHoleRefusal(file: string, key: SayKey, hole: string): string {
-  const allowed = SAY_HOLES[key].length ? SAY_HOLES[key].map((h) => `{${h}}`).join(', ') : 'no hole';
-  return `${file}: \`say.${key}\` names {${hole}}, a hole the code does not fill: ${key} may name ${allowed}; write the rest as the place's own words`;
-}
-
 /**
  * The sections of a place skill's SKILL.md a brief sends a step to where it is handed no `say`: how to read what a step's work changed
  * (`read`), and how to merge the base into it when a person asks (`merge`).

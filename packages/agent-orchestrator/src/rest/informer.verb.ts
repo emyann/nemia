@@ -5,7 +5,7 @@
  * that gives none (`nemia show`, `nemia ls`, a test) judges each run on demand, as before.
  *
  * A cache of a pure function, never a source of truth, keyed by what the run was judged on — its files in the store (its stamp in
- * `runStore`, the record and every marker and ask a person writes beside it), each of its tasks' journals (a line on the engine's feed,
+ * the Run door, the record and every marker and ask a person writes beside it), each of its tasks' journals (a line on the engine's feed,
  * `followedFeed`), and the tips of the branches git was asked about for it with its base branch, as the read's `git` gives them
  * (`BranchReader.heads`) — and by whether it was at rest when judged and by which pass: whether an entry is served is `informedOf`'s
  * (rest.ts). A run at rest is served across passes while its inputs hold; a run still moving only within the pass that judged it, since
@@ -25,11 +25,11 @@ import { isDeepStrictEqual } from 'node:util';
 import { Context, Effect, Layer } from 'effect';
 import type { Engine } from '../runtime-client.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
-import { runStore } from '../record/files.store.ts';
+import { runsAtOnce } from '../runs/runs.store.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { type Judgements, type Judgement, type JudgedOrWhy, judgementsOf, restingOf } from '../summary/judgement.verb.ts';
 import { followedFeed } from './rest.verb.ts';
-import { evictedBy, informedOf } from './rest.ts';
+import { evictedBy, informedOf, type Watch } from './rest.ts';
 import type { Run as RunObject } from '../object/run.model.ts';
 
 /**
@@ -171,6 +171,15 @@ const committed = <T, O>(e: Engine, memo: InformerMemo<T, O>, held: ReadonlyMap<
   });
 
 /**
+ * What the informer checks before it serves a run from memory, by each watch of `RUN_INPUTS` but `request`: the run's stamp
+ * (`stampHeld`), the feed (`quiet`) and the tips (`tipsHeld`). A watch added there fails the typecheck here until the informer checks it.
+ */
+const INFORMER_CHECKS = { stamp: 'stampHeld', feed: 'quiet', tips: 'tipsHeld' } as const satisfies Record<
+  Exclude<Watch, 'request'>,
+  string
+>;
+
+/**
  * The informer brought up to the engine's feed (`followedFeed`) and the store stamped: made before the read takes a record, so what
  * changes between the two is read as changed on the next read, never missed. A read made while the feed cannot be read serves and keeps
  * nothing. The feed is read through `e`, `verify` is `WF_VERIFY_REST` as the caller's environment gives it, the tips a kept value is
@@ -185,7 +194,7 @@ export const informerRead = Effect.fn('informerRead')(function* <T, O = unknown>
 ) {
   const fed = yield* followedFeed(e, memo);
   const readTo = memo.cursor;
-  const stamps = runStore.runs.stamps();
+  const stamps = runsAtOnce.runs.stamps();
   const heads = new Map<string, ReadonlyMap<string, string>>();
   const now = (repo: string) => {
     const at = path.resolve(repo);
@@ -203,9 +212,10 @@ export const informerRead = Effect.fn('informerRead')(function* <T, O = unknown>
       const entry = memo.runs.get(run.id);
       if (!entry) return undefined;
       const verdict = informedOf({
-        stampHeld: entry.stamp === stamps.get(run.id) && (entry.run === run || JSON.stringify(entry.run) === JSON.stringify(run)),
-        quiet: fed,
-        tipsHeld: isDeepStrictEqual(tipsOf(run, Object.keys(entry.tips), now), entry.tips),
+        [INFORMER_CHECKS.stamp]:
+          entry.stamp === stamps.get(run.id) && (entry.run === run || JSON.stringify(entry.run) === JSON.stringify(run)),
+        [INFORMER_CHECKS.feed]: fed,
+        [INFORMER_CHECKS.tips]: isDeepStrictEqual(tipsOf(run, Object.keys(entry.tips), now), entry.tips),
         atRest: entry.atRest,
         samePass: entry.pass !== undefined && entry.pass === memo.pass,
       });

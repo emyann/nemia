@@ -50,7 +50,7 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   OpenAPI routes and the 404. A route is added to the `Api` and handled in its group's folder (`runs/`, `steps/`, `decide/`, `server/`,
   `nemia/`, `workflows/`, `agents/`, `skills/`, `factory/`, `proposals/`, `src/objects/` for the runs and cards), never on Hono:
   `test/served.test.ts` derives what is served from the `Api`. A handler reads the request's services (`ServedNow`, the app's informer
-  among them), never a layer of its own, and calls the package's verbs by type (`ENTRY.handler(input, env, home)` through `inRequest`),
+  among them), never a layer of its own, and calls the package's verbs by type (`ENTRY.handler(input)` through `inRequest`, which gives it `StoreRoot` and `StoreConfig`),
   each request of a namespaced kind placed in its namespace's factory (`placeFor`, `answeredIn`), a write of yours taken in `default`
   alone. A refusal's status is its class's, said once (`refusedAs`, `statusOf`, `src/objects/refused.ts`).
 - **Who a request is from is resolved before any router** (`callerGate`, `src/caller/caller.ts`): a handler reads `caller` off `Served`,
@@ -76,7 +76,7 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   environment and the askers are the app's services, and a test gives its own with `appOf(Layer.merge(liveOf(), …))`
   (`test/layer.test.ts`). What a read keeps between requests is the app's too (`ReadMemo`, an asker's closure): a test wanting a fresh
   one builds an app. `StoreRoot` is the package's own service (`orchestrator/StoreRoot`), given by the app's layer from `WF_ROOT`
-  (`storeRootLayer(env)` in `app.ts`) and re-exported by `store.ts` so a route has one import site; what the package still reads off a
+  with the store's settings, `StoreConfig` (`storeConfigLayer(env)` in `app.ts`, beside `Engine.live(env)`), and re-exported by `store.ts` so a route has one import site; what the package still reads off a
   root of its own as it loads is counted in the orchestrator's `test/global-roots.baseline.ts`, so a test that means to move those
   sets `WF_ROOT` before it imports the package, as `test/harness.ts` does.
 - **A handler's body stays a plain `async` function inside `served`**: a failure yielded in `Effect.gen` never reaches a `try` around

@@ -19,7 +19,7 @@ process.env.WF_ROOT = ROOT;
 const { startRun } = await import('../src/runner.ts');
 const { loadWorkflows } = await import('../src/workflows/workflows.store.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const stand = eachTest(testPlace);
 const runPlaced = runGiven(() => stand().layer);
 
@@ -115,7 +115,7 @@ test('a skill named with its folder is given to each agent that adds it, and a s
     );
   const run = await runPlaced(startRun({ brief: 'change the board', repo, workflowDir: dev }));
   for (const [name, agent] of KIT_STEPS) {
-    const step = (readRun(run.id).workflow ?? []).find((s) => s.name === name)!;
+    const step = (runRecord(run.id).workflow ?? []).find((s) => s.name === name)!;
     assert.deepEqual(
       (step.agent?.skills ?? []).filter((skill) => skill.includes(':')),
       KIT_GIVEN,

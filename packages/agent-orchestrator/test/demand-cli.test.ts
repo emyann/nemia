@@ -3,6 +3,7 @@
  * holds, asks the host `main` is handed to start one, once, before it runs; no read does; and the store keeps no `daemon.log` and no lease,
  * since the host's spawn starts nothing. A start that went around the host would leave both, or the reaper's process, and fail here.
  */
+import { rootNow } from './config-given.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -54,7 +55,7 @@ const READS = [['ls'], ['version'], ['show', 'no-run'], ['inbox'], ['logs', 'no-
 function hostOf(): { host: () => DemandHost; spawns: string[] } {
   const spawns: string[] = [];
   const host: DemandHost = {
-    ...liveDemandHost(),
+    ...liveDemandHost(rootNow()),
     machine: () => ({ platform: 'linux', wsl: false, systemd: false }),
     call: (argv) => assert.fail(`ran ${argv.join(' ')}`),
     daemon: () => ({ checkout: NOWHERE, entry: path.join(NOWHERE, 'main.ts'), cwd: NOWHERE }),

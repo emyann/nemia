@@ -70,14 +70,14 @@ function schemaBeside(file: string, text: string): { file: string; text: string 
  * `nemia agents write`'s runner: the agent's file `--file` names read into its draft (`agentDraftOf`), named by the file, with the result
  * schema its `output:` names read beside it (`schemaBeside`).
  */
-export async function agentsWriteRun(args: Args, e: Engine, place: Place, home: string): Promise<void> {
+export async function agentsWriteRun(args: Args, e: Engine, place: Place): Promise<void> {
   const command = AGENTS_WRITE;
   const file = pathOf(args, 'file', command, "the agent's file to write, named <name>.md");
   const text = textOf(file, command);
   const draft = readOf(file, () => agentDraftOf(path.basename(file, '.md'), text, (named) => besideOf(file, named)));
   const schema = schemaBeside(file, text);
   const asked = inputFor(command, { ...args, draft, ...(schema !== undefined && { schema }) });
-  const data = await runWith(e, placedIn(place, command.handler(asked, undefined, home)));
+  const data = await runWith(e, placedIn(place, command.handler(asked)));
   for (const line of command.print(data, asked)) console.log(line);
 }
 
@@ -85,7 +85,7 @@ export async function agentsWriteRun(args: Args, e: Engine, place: Place, home: 
  * `nemia skills write`'s runner: the SKILL.md `--file` names read into its form (`skillDraftOf`), the skill named by its `name:`, else by
  * its folder; refused where a skill named to change (`<name>`) is not the file's.
  */
-export async function skillsWriteRun(args: Args, e: Engine, place: Place, home: string): Promise<void> {
+export async function skillsWriteRun(args: Args, e: Engine, place: Place): Promise<void> {
   const command = SKILLS_WRITE;
   const file = pathOf(args, 'file', command, "the skill's SKILL.md to write");
   const text = textOf(file, command);
@@ -94,7 +94,7 @@ export async function skillsWriteRun(args: Args, e: Engine, place: Place, home: 
     usage(`nemia skills write was asked to change ${args.name}, and ${path.resolve(file)} is the skill ${name}: name the skill it is.`);
   const change = readOf(file, () => skillDraftOf(file, name, text));
   const asked = inputFor(command, { ...args, change });
-  const data = await runWith(e, placedIn(place, command.handler(asked, undefined, home)));
+  const data = await runWith(e, placedIn(place, command.handler(asked)));
   for (const line of command.print(data, asked)) console.log(line);
 }
 
@@ -119,7 +119,7 @@ function carriedOf(folder: string, command: Writer): { path: string; text: strin
 
 /**
  * `nemia workflows write`'s runner: the draft folder `--folder` names read as a start reads a folder, its agents looked for beside it
- * and in yours, through the Workflow door (`draftSteps`), or in the tree written for the place `factory` (`templatedTree`) and its
+ * and in yours, through the Workflow door (`draftSteps`), or in the tree written for the place `factory` (`templatedTreeOf`) and its
  * repository, filled with its hires (`factoryDraftOf`), into the
  * steps the builder sends, its README where it has one, and the other files it carries (`carriedOf`).
  */
@@ -142,6 +142,6 @@ export async function workflowsWriteRun(args: Args, e: Engine, place: Place, hom
     ...(readme !== undefined && { readme: textOf(path.join(folder, readme), command) }),
     ...(files.length > 0 && { files }),
   };
-  const data = await runWith(e, placedIn(place, command.handler(asked, undefined, home)));
+  const data = await runWith(e, placedIn(place, command.handler(asked)));
   for (const line of command.print(data, asked)) console.log(line);
 }

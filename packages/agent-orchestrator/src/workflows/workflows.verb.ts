@@ -1,27 +1,28 @@
 /**
- * The workflow folders as entries of the command table, each through the Workflow door (`WorkflowDoor`, run `rooted` at the store's root
- * its handler is given): a folder of yours written from its steps (`WORKFLOWS_WRITE`) and removed (`WORKFLOWS_REMOVE`), each checked
- * against the version it was read at, served on both sides — the command line reads a draft folder (`cli/writers.ts`), the builder sends
- * its steps; and one step of a folder (`WORKFLOWS_STEP`), on the api alone. The folders the board lists are loaded by the program the
+ * The workflow folders as entries of the command table, each through the Workflow door (`WorkflowDoor`, run at the store's root
+ * (`StoreRoot`) its handler is given): a folder of yours written from its steps (`WORKFLOWS_WRITE`) and removed (`WORKFLOWS_REMOVE`), each
+ * checked against the version it was read at, served on both sides — the command line reads a draft folder (`cli/writers.ts`), the builder
+ * sends its steps; and one step of a folder (`WORKFLOWS_STEP`), on the api alone. The folders the board lists are loaded by the program the
  * api runs itself (`foldersLoaded`), handed its factory whole. The api resolves which folder a read names, and words the board's answer
  * around what each answers.
  */
+import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
 import { Cause, Effect, Exit, Schema } from 'effect';
 import { tried } from '../runtime-client.ts';
-import { rooted } from '../factory/wiring/wire.verb.ts';
 import { WorkflowDoor, type CarriedFile } from './workflows.store.ts';
 import type { WorkflowDir } from '../folder/folder.model.ts';
 import type { Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { cliPath, factoryFlag, FROM, versionFlag, writerSpec, yoursOrRefused } from '../yours/yours.ts';
 import { workflowNameRefusal } from '../factory/factory.ts';
-import { readFactories, readFactory, readFactoryAt, templatedTree, templatedTreeAt } from '../factory/factory.store.ts';
+import { FactoryDoor, factoryOrNone, templatedAtOnce, templatedTreeOf } from '../factory/door/factories.store.ts';
 import { factoryFills } from '../factory/rules/rules.store.ts';
 import type { Factory } from '../factory/factory.ts';
 import { readInbox } from '../inbox/inbox.store.ts';
-import { inboxDir, runStore } from '../record/files.store.ts';
-import { HOME, isDirectory } from '../record/record.store.ts';
+import { inboxDir } from '../record/files.store.ts';
+import { runsAtOnce } from '../runs/runs.store.ts';
+import { isDirectory } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import type { Workflow } from '../step/step.ts';
 import type { StepDraft } from '../workflow/index.ts';
@@ -49,20 +50,14 @@ const placesOf = ({ repo }: Pick<Where, 'repo'>, home: string | undefined): Plac
   ...(home !== undefined && { home }),
 });
 
-/** The factory the arguments name, read once from the store; none where they name none. */
-function factoryIn({ factory }: Pick<Where, 'factory'>): Factory | undefined {
-  return factory === undefined ? undefined : readFactory(factory);
-}
-
 /**
  * How a write of the workflow `workflow` into the tree of the templated factory `name`, in the store `home`, is judged, as a run of it
  * would read it: its agents and skills looked for in the factory's repository, the one a run of it works on — its tree where it names
  * none — and in `home`, and its steps filled with the factory's hires into them and its rules (`factoryFills`). Refused as
- * `templatedTreeAt` refuses the factory.
+ * `templatedTreeOf` refuses the factory.
  */
 export function factoryWriteOf(home: string, name: string, workflow: string): { places: Places; fills: Fills } {
-  const tree = templatedTreeAt(home, name, 'nemia workflows write');
-  const factory = readFactoryAt(home, name, 'Nothing was written.');
+  const { factory, tree } = templatedAtOnce(home, name, 'nemia workflows write');
   return { places: { repo: factory.repos[0] ?? tree, home }, fills: factoryFills(factory, workflow).fills };
 }
 
@@ -73,7 +68,7 @@ export function factoryWriteOf(home: string, name: string, workflow: string): { 
  */
 export function factoryDraftOf(home: string, name: string, workflow: string): { places: Places; fills: Fills } {
   const { places, fills } = factoryWriteOf(home, name, workflow);
-  return { places: { ...places, home: templatedTreeAt(home, name, 'nemia workflows write') }, fills };
+  return { places: { ...places, home: templatedTreeOf(home, name, 'nemia workflows write') }, fills };
 }
 
 /** Where a write's folder looks for its agents and skills, and the hires it is filled with: for the place `factory`, `factoryWriteOf`. */
@@ -91,7 +86,7 @@ const writeJudgedOf = (where: Where, home: string): { places: Places; fills?: Fi
 function yoursWorkflowDir(who: string, { from = '', name, repo = '', factory }: Where, home: string): WorkflowDir {
   const yours = yoursOrRefused(who, 'workflows', from, name, repo, home, {
     factory,
-    treeOf: (factory) => templatedTree(factory, who),
+    treeOf: (factory) => templatedTreeOf(home, factory, who),
   });
   const badName = workflowNameRefusal(name);
   if (badName) throw new Invalid({ message: `${who}: ${badName}` });
@@ -179,10 +174,8 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }, Wor
     why: "the api serves it as the Workflow's `create` and `replace` verb of `objects`' Api (`/api/namespaces/:namespace/workflows`), which calls this entry's handler: no route of its own",
   },
   input: WorkflowWriteInput,
-  handler: ({ draft: steps, readme, files, version, ...where }, _env, home = HOME) =>
-    rooted(
-      home,
-      'nemia workflows write',
+  handler: ({ draft: steps, readme, files, version, ...where }) =>
+    Effect.flatMap(StoreRoot, (home) =>
       Effect.gen(function* () {
         const dir = yield* tried(() => yoursWorkflowDir('nemia workflows write', where, home));
         const { places, fills } = yield* tried(() => writeJudgedOf(where, home));
@@ -211,14 +204,14 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }, Wor
  */
 const usersOf = Effect.fn('usersOf')(function* (dir: string) {
   const name = path.basename(dir);
-  const runs = runStore.runs
+  const runs = runsAtOnce.runs
     .list(() => {})
     .filter((run) => run.workflow === undefined && path.resolve(run.workflowDir) === dir)
     .map((run) => stillNeeded.run(run.id, dir));
   const cards = (yield* readInbox())
     .filter((card) => card.queued?.place != null && card.workflow !== null && path.resolve(inboxDir(), card.workflow) === dir)
     .map((card) => stillNeeded.card(card.name, dir));
-  const factories = readFactories().flatMap((factory) => {
+  const factories = (yield* (yield* FactoryDoor).factories.listed()).flatMap((factory) => {
     if ('error' in factory || !factory.workflows.includes(name)) return [];
     if (factory.repos.some((repo) => isDirectory(path.join(repo, 'workflows', name)))) return [];
     const hires = Object.keys(factory.hires).filter((step) => step.startsWith(`${name}/`));
@@ -249,10 +242,8 @@ export const WORKFLOWS_REMOVE: Command<WorkflowRemoved, WorkflowRemoveInput> = {
     why: "the api serves it as the Workflow's `delete` verb of `objects`' Api (`/api/namespaces/:namespace/workflows`), which calls this entry's handler: no route of its own",
   },
   input: WorkflowRemoveInput,
-  handler: ({ version, ...where }, _env, home = HOME) =>
-    rooted(
-      home,
-      'nemia workflows rm',
+  handler: ({ version, ...where }) =>
+    Effect.flatMap(StoreRoot, (home) =>
       Effect.gen(function* () {
         const dir = yield* tried(() => yoursWorkflowDir('nemia workflows rm', where, home));
         const users = yield* usersOf(dir);
@@ -316,16 +307,12 @@ export const WORKFLOWS_STEP: Command<{ step: Workflow | null; steps: string[] },
     why: "the board's page of a step reads it as the builder shows it, through the Workflow's `step` verb of `objects`' Api; at the command line a person reads the step's file",
   },
   input: WorkflowStepInput,
-  handler: (where, _env, home) =>
-    rooted(
-      home,
-      'workflows step',
+  handler: (where) =>
+    Effect.flatMap(StoreRoot, (home) =>
       Effect.gen(function* () {
         const dir = yield* tried(() => workflowDirAt(path.resolve(where.dir)));
-        const fills = yield* tried(() => {
-          const factory = factoryIn(where);
-          return factory && factoryFills(factory, where.name).fills;
-        });
+        const factory = yield* factoryOrNone(where.factory);
+        const fills = yield* tried(() => factory && factoryFills(factory, where.name).fills);
         const door = yield* WorkflowDoor;
         const steps = yield* door.workflows.read(dir, placesOf(where, home), fills);
         return { step: steps.find((s) => s.name === where.step) ?? null, steps: steps.map((s) => s.name) };

@@ -22,6 +22,10 @@
  *
  * A kind of `objects` is read through `lib/api/objects.ts`, never a schema of the board's: no file under `src/lib/api` is generated
  * (`*.gen.ts`), and no file of `src` declares a Schema named as a kind (`kindSchemaBreaks`).
+ *
+ * The default factory is objects' `DEFAULT_NAMESPACE`, never a name of the board's: no file declares or names a constant of its own for
+ * it, says `'default'` for a factory or a namespace, or converts null to that name or back but `src/lib/api/namespace.ts`, its two
+ * converters, which `src/lib/factories.ts` re-exports (`defaultFactoryBreaks`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -700,4 +704,91 @@ test('REFUSED: a state word spelled outside the table, a retired phrasing, and a
   );
   assert.equal(hover.length, 1, 'a title is refused; a comment and a literal off hover pass');
   assert.match(hover[0], /^src\/components\/X\.tsx says 'the engine filed' on hover/);
+});
+
+/**
+ * The one file that converts the default factory between the api's form and its name, `DEFAULT_NAMESPACE` of objects: a leaf of `lib/api`,
+ * so the api's files reach it (`api-files.test.ts`), which `src/lib/factories.ts` re-exports to the rest of the board.
+ */
+const CONVERTERS = 'src/lib/api/namespace.ts';
+
+/** A quoted `default` in code: a factory's name spelled by the board, where it names one. */
+const DEFAULT_WORD = /(['"`])default\1/;
+
+/** A board-own constant of the default factory: objects' `DEFAULT_NAMESPACE` respelled, or declared again. */
+const DEFAULT_CONST = /\b(?:const|let|var|function)\s+(DEFAULT|DEFAULT_NAME|DEFAULT_FACTORY|DEFAULT_NAMESPACE)\b/;
+
+/** A conversion between the api's form of a factory (null for the default) and its name, written by hand. */
+const CONVERSIONS = [/(?:\?\?|\|\|)\s*DEFAULT_NAMESPACE\b/, /DEFAULT_NAMESPACE\s*\?\s*null\b/, /\?\s*DEFAULT_NAMESPACE\s*:/];
+
+/** A board-own name of the default factory, used: the constant `DEFAULT_CONST` declares under a name of its own. */
+const DEFAULT_RESPELLED = /\b(DEFAULT_NAME|DEFAULT_FACTORY)\b/;
+
+/** A type's pick of a field named `default`, `Pick<Factory, 'default'>`: a key, never a factory's name. */
+const PICKED = /\b(?:Pick|Omit)<[^>]*>/g;
+
+/**
+ * Each line of the board that spells the default factory itself or converts it by hand: a constant of its own for it, anywhere; and,
+ * outside `CONVERTERS`, a quoted `default` on a line naming a factory or a namespace, or a conversion of null to its name or back.
+ * Objects' `DEFAULT_NAMESPACE` is its one name, and `CONVERTERS`' `namespaceOf` and `factoryIn` its two converters.
+ */
+function defaultFactoryBreaks(texts: ReadonlyMap<string, string>): string[] {
+  const out: string[] = [];
+  for (const [file, text] of texts) {
+    if (KIT.test(file)) continue;
+    withoutComments(text)
+      .split('\n')
+      .forEach((line, i) => {
+        const at = `${file}:${i + 1}`;
+        const constant = DEFAULT_CONST.exec(line) ?? DEFAULT_RESPELLED.exec(line);
+        if (constant) out.push(`${at} names ${constant[1]}: import DEFAULT_NAMESPACE from 'objects', the default factory's one name`);
+        if (file === CONVERTERS) return;
+        if (!constant && DEFAULT_WORD.test(line.replace(PICKED, '')) && /factory|namespace/i.test(line))
+          out.push(`${at} spells the default factory 'default': compare with DEFAULT_NAMESPACE from 'objects'`);
+        if (CONVERSIONS.some((pattern) => pattern.test(line)))
+          out.push(`${at} converts the default factory by hand: call namespaceOf or factoryIn of src/lib/factories.ts`);
+      });
+  }
+  return out;
+}
+
+/** How many of `CONVERSIONS` the text holds, each counted once per line. */
+const conversionsIn = (text: string): number =>
+  withoutComments(text)
+    .split('\n')
+    .filter((line) => CONVERSIONS.some((pattern) => pattern.test(line))).length;
+
+test(`the board spells the default factory as objects' DEFAULT_NAMESPACE, and converts it in ${CONVERTERS} alone`, () => {
+  const texts = sourceTexts();
+  assert.deepEqual(defaultFactoryBreaks(texts), []);
+  assert.equal(conversionsIn(texts.get(CONVERTERS)!), 2, `${CONVERTERS} holds one converter each way, namespaceOf and factoryIn`);
+});
+
+test('REFUSED: a board-own default-factory literal or constant, and a second converter; a variant and a comment are let through', () => {
+  const planted = (text: string): string[] => defaultFactoryBreaks(new Map([...sourceTexts(), ['src/lib/x.ts', text]]));
+  const fixture = [
+    "const DEFAULT = 'default';",
+    "export const here = (place: { factory: string }) => place.factory === 'default';",
+    'export const nameOf = (factory: string | null) => factory ?? DEFAULT_NAMESPACE;',
+    'export const fieldOf = (name: string) => (name === DEFAULT_NAMESPACE ? null : name);',
+    'export const shown = (row: { factory: string | null }) => row.factory || DEFAULT_NAMESPACE;',
+  ].join('\n');
+  assert.deepEqual(
+    planted(fixture).map((line) => line.split(' ')[0]),
+    ['src/lib/x.ts:1', 'src/lib/x.ts:2', 'src/lib/x.ts:3', 'src/lib/x.ts:4', 'src/lib/x.ts:5'],
+  );
+  assert.deepEqual(
+    planted(
+      "/** The factory 'default', named in a comment. */\nexport const v = { variant: 'default' };\nexport const n = { namespace: DEFAULT_NAMESPACE };\n",
+    ),
+    [],
+  );
+  assert.deepEqual(defaultFactoryBreaks(new Map([['src/components/ui/x.tsx', "const DEFAULT = 'default'; // factory\n"]])), []);
+  assert.deepEqual(planted("export type P = Pick<Factory, 'name' | 'default'>;\n"), [], "a pick of a factory's field default");
+  assert.equal(planted("import { DEFAULT_NAME } from './factories.ts';\n").length, 1, 'a respelled name, imported');
+  assert.equal(
+    defaultFactoryBreaks(new Map([[CONVERTERS, "export const DEFAULT_NAME = 'default';\n"]])).length,
+    1,
+    `a constant of its own in ${CONVERTERS} too`,
+  );
 });

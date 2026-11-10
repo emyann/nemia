@@ -9,7 +9,7 @@ import { tryOf, type Approval, type Run } from '../record/record.ts';
 import { approvedFirst } from '../status/status.ts';
 import { approvalRefusal } from './gate.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
-import { runStore } from '../record/files.store.ts';
+import { runsAtOnce } from '../runs/runs.store.ts';
 import { standingsOf } from '../branches/branches.store.ts';
 import { standingLive } from '../standing/standing.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRead } from '../views/views.verb.ts';
@@ -27,8 +27,8 @@ export type Approved = { run: Run; approval: Approval; file: string; caps: StepB
 /**
  * Approve a step waiting at its gate — `nemia approve` — by writing the approval, and nothing else: `runs/<id>.asks/approve-<step>-<try>`,
  * whole and exclusively, beside the retry asks, with the time and the words given (`message`). The next tick reads it with the run
- * (`readRun`) and files what waits on the step, handing each step after the gate the words under `## Approved`. Like a retry ask it is the
- * person's own file, and the verb never writes the run's json.
+ * (`runRecord`) and files what waits on the step, handing each step after the gate the words under `## Approved`. Like a retry ask it is
+ * the person's own file, and the verb never writes the run's json.
  *
  * Refused before anything is written, exit 2, with what to do instead: a run not there; and what `approvalRefusal` refuses — empty words, a
  * step the run does not have, a cancelled run, a step not gated, not signed off yet, or already approved, a send-back already asked for,
@@ -71,7 +71,7 @@ export const approveRun = Effect.fn('approve')(function* (
       closeoutReader(views, now, steps),
       closeoutAsked(views),
       exitVerdicts(views, now),
-      runStore.asks.read(id).asks,
+      runsAtOnce.asks.read(id).asks,
       spendReader(views),
       standings,
     );
@@ -103,7 +103,7 @@ export const approveRun = Effect.fn('approve')(function* (
     const { stray } = written;
     const why = yield* tried(
       () =>
-        refusal(runStore.runs.read(id)) ??
+        refusal(runsAtOnce.runs.read(id)) ??
         (stray !== null
           ? `try ${approval.try} of ${stepName} cannot be approved: ${file} is already there, and it is not an approval — ${stray}. It opens no gate, and no tick moves it, so waiting would be for ever. Delete it (rm ${file}), then approve again: nemia approve ${id} ${stepName}.`
           : `try ${approval.try} of ${stepName} is already approved. What waits on it is filed on the next tick: nemia ls ${id}.`),

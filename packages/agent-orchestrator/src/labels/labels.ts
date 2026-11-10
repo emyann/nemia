@@ -1,14 +1,18 @@
 /**
  * A person's labels, whole and pure: free `key=value` pairs in Kubernetes' spelling with no prefix, put on inbox cards and runs and
  * changed at any time. What a label may be spelled (`labelRefusal`), kubectl's edits of a map (`parseLabelEdits`, `labelEdits`), and
- * what a start copies once, at creation (`inheritedLabels`). No Effect: every caller wraps a refusal in the package's `Invalid`.
+ * what a start copies once, at creation (`inheritedLabels`); and a run's labels as a selection reads them (`runLabelMap`, `selectedRuns`,
+ * `labelSegments`). No Effect: every caller wraps a refusal in the package's `Invalid`.
  *
  * **One map, beside the closed keys.** A run's and a card's labels sit in one map with `factory` and `workflow`, which Nemia gives
  * itself and a person may not set (`CLOSED_LABEL_KEYS`). Nor may a label take a key a feed line or a selector already gives a meaning
  * to (`RESERVED_LABEL_KEYS`): a label named `reason` would decide what `-l reason=…` selects.
  */
 import type { LabelEdits } from '../../contracts/labels.contract.ts';
-import { LABEL_KEYS, RESERVED_KEYS } from '../watch/selector.ts';
+import path from 'node:path';
+import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
+import type { Run } from '../record/record.ts';
+import { LABEL_KEYS, RESERVED_KEYS, selectsLabels, type Selectors } from '../watch/selector.ts';
 
 /** A person's labels: a key to its value, Kubernetes' `map[string]string`. */
 export type Labels = Readonly<Record<string, string>>;
@@ -183,3 +187,27 @@ export const metadataLabels = (of: { readonly workflow: string; readonly factory
   workflow: of.workflow,
   factory: of.factory,
 });
+
+/**
+ * The run's whole map, as a selector reads it and a list's row carries it: the person's keys, `workflow`, and `factory` (`default` for the
+ * default one).
+ */
+export const runLabelMap = (run: Pick<Run, 'workflowDir' | 'factory' | 'labels'>): Labels =>
+  metadataLabels({ workflow: path.basename(run.workflowDir), factory: run.factory ?? DEFAULT_NAMESPACE, labels: run.labels });
+
+/**
+ * The runs of `runs` whose whole map `selectors` takes (`selectsLabels`), in their order: every one where none is given. The lists select
+ * off the composed record before they judge a run (`runsSummarized`, `runsListed`), and the stats before they sum a run's facts.
+ */
+export const selectedRuns = <R extends Pick<Run, 'workflowDir' | 'factory' | 'labels'>>(
+  runs: readonly R[],
+  selectors: Selectors = [],
+): readonly R[] => (selectors.length ? runs.filter((run) => selectsLabels(selectors, runLabelMap(run))) : runs);
+
+/**
+ * What a printer appends to a line of `map`'s, as `nemia ls` its runs' head lines and `nemia inbox` its cards': with `--show-labels`,
+ * `  labels: <the map>` (`labelsText`); then, for each `-L <key>` in the order given, `  <key>: <its value>`, `<none>` where the map has
+ * none. Nothing with neither, so the line is as it was. Pure.
+ */
+export const labelSegments = (map: Labels, shown: { readonly all: boolean; readonly columns: readonly string[] }): string =>
+  `${shown.all ? `  labels: ${labelsText(map)}` : ''}${shown.columns.map((key) => `  ${key}: ${map[key] ?? '<none>'}`).join('')}`;

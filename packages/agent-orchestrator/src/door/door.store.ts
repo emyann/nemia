@@ -47,6 +47,21 @@ export function doorOf<T extends Record<string, Record<string, (...args: never[]
 }
 
 /**
+ * A door as a layer's plain value again: each method runs the door's Effect at once, its refusal thrown and a defect thrown as it was.
+ * What a synchronous caller that no program yields yet reads a door through, its writes checked as the door checks them.
+ */
+export function atOnce<T, I extends string>(door: DoorOf<T, I>): T {
+  return Object.fromEntries(
+    Object.entries(door as Record<string, Record<string, (...args: never[]) => Effect.Effect<unknown, Refusal>>>).map(
+      ([group, methods]) => [
+        group,
+        Object.fromEntries(Object.entries(methods).map(([name, method]) => [name, (...args: never[]) => Effect.runSync(method(...args))])),
+      ],
+    ),
+  ) as T;
+}
+
+/**
  * Why `value` breaks `schema`: the words of its first issue, the check's own where a check refused it (each says its fix), or null when
  * it decodes. What a layer refuses a write by.
  */

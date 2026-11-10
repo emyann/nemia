@@ -27,7 +27,7 @@ delete process.env.WF_MAX_RUNS;
 const { advanceRun, approveRun, isRepositoryRun, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { stagedHere } = await import('../src/place/landing.store.ts');
 
 /** A run this file started on a repository, as `isLanded` reads one: a repository run. */
@@ -147,13 +147,13 @@ async function atTheGate(given: Given = {}) {
   const repo = given.repo ?? aRepo();
   const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: given.dir ?? folder() }));
   const { e, tasks, filings, settle } = given.board ?? board();
-  await runWith(e, advanceRun(readRun(run.id)));
-  const work = readRun(run.id).steps.implement;
+  await runWith(e, advanceRun(runRecord(run.id)));
+  const work = runRecord(run.id).steps.implement;
   (given.work ?? addSub)(work.workspace!);
   git(work.workspace!, 'add', '-A');
   git(work.workspace!, 'commit', '-q', '-m', 'add sub');
   settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  const pass = await runWith(e, advanceRun(readRun(run.id)));
+  const pass = await runWith(e, advanceRun(runRecord(run.id)));
   return { repo, id: run.id, branch: work.branch!, e, tasks, filings, settle, pass, base: git(repo, 'rev-parse', 'HEAD') };
 }
 
@@ -166,33 +166,33 @@ const MESSAGE = 'Add sub\n\nadd.ts exports sub beside add.\nThe run, its branch:
 async function stagedAndSigned(given: Given & { message?: string; artifacts?: string[] } = {}) {
   const at = await atTheGate(given);
   await runWith(at.e, approveRun(at.id, 'ship', 'Merge it.'));
-  assert.deepEqual((await runWith(at.e, advanceRun(readRun(at.id)))).filed, ['ship']);
+  assert.deepEqual((await runWith(at.e, advanceRun(runRecord(at.id)))).filed, ['ship']);
   git(at.repo, 'merge', '--no-ff', '--no-commit', at.branch);
   at.settle(`${at.id}-ship`, 'succeeded', { ...SIGNED, artifacts: given.artifacts ?? [], message: given.message ?? MESSAGE });
-  const signed = await runWith(at.e, advanceRun(readRun(at.id)));
+  const signed = await runWith(at.e, advanceRun(runRecord(at.id)));
   return { ...at, signed, checkId: `${at.id}-ship-check` };
 }
 
 test('an ending lands through its place, end to end: open names the staged-merge file, a stat reads the merge staged, a passing check commits it and a refusing one aborts it, and the checkout is clean both ways', async () => {
   const passing = await stagedAndSigned();
-  const run = repositoryRun(readRun(passing.id));
+  const run = repositoryRun(runRecord(passing.id));
   assert.equal(run.stagedFile, path.join(passing.repo, '.git', 'MERGE_HEAD'), 'open named the file at `nemia start`, on the record');
   assert.equal(stagedHere(run), true, 'the merge the shipper staged is read by a stat');
   passing.settle(passing.checkId, 'succeeded', undefined, 0);
-  await runWith(passing.e, advanceRun(readRun(passing.id)));
+  await runWith(passing.e, advanceRun(runRecord(passing.id)));
   const head = git(passing.repo, 'rev-parse', 'HEAD');
   assert.notEqual(head, passing.base, 'committed');
   assert.equal(git(passing.repo, 'log', '-1', '--format=%B'), MESSAGE.trim(), 'with its message');
-  assert.deepEqual(readRun(passing.id).steps.ship.landed, { commit: head });
+  assert.deepEqual(runRecord(passing.id).steps.ship.landed, { commit: head });
   assert.equal(git(passing.repo, 'status', '--porcelain'), '');
-  assert.equal(stagedHere(repositoryRun(readRun(passing.id))), false, 'and the stat reads no merge staged');
+  assert.equal(stagedHere(repositoryRun(runRecord(passing.id))), false, 'and the stat reads no merge staged');
 
   const refusing = await stagedAndSigned();
-  assert.equal(stagedHere(repositoryRun(readRun(refusing.id))), true);
+  assert.equal(stagedHere(repositoryRun(runRecord(refusing.id))), true);
   refusing.settle(refusing.checkId, 'failed', undefined, 1);
-  await runWith(refusing.e, advanceRun(readRun(refusing.id)));
+  await runWith(refusing.e, advanceRun(runRecord(refusing.id)));
   assert.equal(git(refusing.repo, 'rev-parse', 'HEAD'), refusing.base, 'nothing committed');
   assert.equal(git(refusing.repo, 'status', '--porcelain'), '', 'the merge taken back');
-  assert.equal(stagedHere(repositoryRun(readRun(refusing.id))), false);
-  assert.deepEqual(readRun(refusing.id).steps.ship.landed, { aborted: 'its check refused the merge (exit 1)', refusedOn: refusing.base });
+  assert.equal(stagedHere(repositoryRun(runRecord(refusing.id))), false);
+  assert.deepEqual(runRecord(refusing.id).steps.ship.landed, { aborted: 'its check refused the merge (exit 1)', refusedOn: refusing.base });
 });

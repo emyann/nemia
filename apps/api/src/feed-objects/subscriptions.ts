@@ -32,13 +32,13 @@ export const subscriptionsHandlers = HttpApiBuilder.group(Api, 'subscriptions', 
     .handle('subscribe', ({ params: { name }, payload }) =>
       Effect.andThen(
         misnamed(name),
-        answeredWrite((s) => s.inRequest(SUBSCRIBE.handler({ ...payload, name }, s.env, s.home))),
+        answeredWrite((s) => s.inRequest(SUBSCRIBE.handler({ ...payload, name }))),
       ),
     )
     .handle('unsubscribe', ({ params: { name } }) =>
       Effect.andThen(
         misnamed(name),
-        answeredWrite((s) => s.inRequest(UNSUBSCRIBE.handler({ name }, s.env, s.home))),
+        answeredWrite((s) => s.inRequest(UNSUBSCRIBE.handler({ name }))),
       ),
     ),
 );

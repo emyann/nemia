@@ -6,7 +6,7 @@
 import { Effect, Exit } from 'effect';
 import type { Engine } from '../runtime-client.ts';
 import type { Run } from '../record/record.ts';
-import { runStore } from '../record/files.store.ts';
+import { runsAtOnce } from '../runs/runs.store.ts';
 import { keysOf, type RunFact, type TryFact } from '../stats/index.ts';
 import { factsRead } from '../stats/stats.verb.ts';
 import { viewedOnce } from '../views/views.verb.ts';
@@ -20,7 +20,7 @@ import { costsOf, RECENT_RUNS } from './costs.ts';
 export const costsRead = Effect.fn('costsRead')(function* (e: Engine, run: Run) {
   const of = keysOf(run);
   const viewed = viewedOnce(e);
-  const candidates = runStore.runs
+  const candidates = runsAtOnce.runs
     .list(() => {})
     .filter((other) => {
       const keys = keysOf(other);

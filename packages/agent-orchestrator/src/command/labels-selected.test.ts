@@ -20,8 +20,8 @@ delete process.env.WF_MAX_CONCURRENT;
 const { COMMANDS } = await import('./commands.verb.ts');
 const { parseArgv } = await import('./command.ts');
 const { advanceRun, startRun, runWith: runEngine } = await import('../runner.ts');
-const { readRun } = await import('../record/record.store.ts');
-const { runStore } = await import('../record/files.store.ts');
+const { runRecord } = await import('../record/record.store.ts');
+const { filesStore: runStore } = await import('../record/files.store.ts');
 const { Invalid } = await import('../refusal/refusal.ts');
 const { engineOf } = await import('../runtime-client.ts');
 const stand = eachTest(testPlace);
@@ -49,7 +49,7 @@ const started = async (brief: string) => {
 /** What `nemia ls <argv>` prints, its arguments parsed as the CLI parses them. */
 const printed = async (...argv: string[]): Promise<string[]> => {
   const args = parseArgv(LS.spec, argv) ?? {};
-  return [...LS.print(await runWith(noEngine(), LS.handler(args, undefined, ROOT)), args)];
+  return [...LS.print(await runWith(noEngine(), LS.handler(args)), args)];
 };
 
 /** The head line of the run `id` among `lines`. */
@@ -86,24 +86,21 @@ test('REFUSED by kind: nemia ls -l of no selector, before anything is read', asy
   const check = LS.check?.({ selector: ['no/pe=x'] });
   assert.ok(check, 'the command line refuses it');
   names(check, 'no/pe');
-  await assert.rejects(
-    runWith(noEngine(), LS.handler({ selector: ['no/pe=x'] }, undefined, ROOT)),
-    (err: Error & { exitCode?: number }) => {
-      assert.ok(err instanceof Invalid, String(err));
-      assert.equal(err.exitCode, 2);
-      names(err.message, 'no/pe');
-      return true;
-    },
-  );
+  await assert.rejects(runWith(noEngine(), LS.handler({ selector: ['no/pe=x'] })), (err: Error & { exitCode?: number }) => {
+    assert.ok(err instanceof Invalid, String(err));
+    assert.equal(err.exitCode, 2);
+    names(err.message, 'no/pe');
+    return true;
+  });
 });
 
 test('nemia stats -l sums the facts of the runs the selector takes alone', async () => {
   fs.rmSync(path.join(ROOT, 'runs'), { recursive: true, force: true });
   const ended = async (brief: string) => {
     const run = await started(brief);
-    await runWith(noEngine(), advanceRun(readRun(run.id)));
+    await runWith(noEngine(), advanceRun(runRecord(run.id)));
     engine().settle(`${run.id}-implement`, 'succeeded', { closeout: { outcome: 'done', summary: 'did it', artifacts: [], needs: null } });
-    await runWith(noEngine(), advanceRun(readRun(run.id)));
+    await runWith(noEngine(), advanceRun(runRecord(run.id)));
     return run;
   };
   const core = await ended('the core one');

@@ -24,8 +24,8 @@ const ROOT = scratch('wf-factory-');
 const FACTORIES = path.join(ROOT, 'factories');
 
 process.env.WF_ROOT = ROOT;
-const { addFactory, attachWorkflow, detachWorkflow, fireAgent, hireAgent, readFactories, readFactory, setSchedule } =
-  await import('../runner.ts');
+const { addFactory, attachWorkflow, fireAgent, hireAgent, readFactories, readFactory, setSchedule } = await import('../../testing.ts');
+const { detached } = await import('../../test/factory-planted.ts');
 const { main } = await import('../cli/main.ts');
 
 const { engineOf } = await import('../runtime-client.ts');
@@ -315,7 +315,8 @@ test('REFUSED: `nemia factory hire` and `fire`, nothing written', async (t) => {
 
 test('REFUSED: `nemia factory attach` and `detach`, nothing written', async (t) => {
   for (const verb of ['attach', 'detach'] as const) {
-    const change = verb === 'attach' ? attachWorkflow : detachWorkflow;
+    const change = (workflow: string, factory = 'pipao') =>
+      verb === 'attach' ? attachWorkflow({ factory, workflow }) : detached(ROOT, factory, workflow);
     await t.test(`${verb} in the default factory is a Conflict`, async () => {
       pipao();
       await assert.rejects(
@@ -331,7 +332,7 @@ test('REFUSED: `nemia factory attach` and `detach`, nothing written', async (t) 
       await t.test(`${verb} of ${JSON.stringify(workflow)}, which is no workflow's name, is Invalid`, () => {
         pipao();
         const before = bytesOf('pipao');
-        assert.throws(() => change({ factory: 'pipao', workflow }), refused('Invalid', workflow));
+        assert.throws(() => change(workflow), refused('Invalid', workflow));
         assert.deepEqual(bytesOf('pipao'), before);
         assert.deepEqual(filed(), ['pipao.json']);
       });
@@ -344,7 +345,7 @@ test('REFUSED: `nemia factory attach` and `detach`, nothing written', async (t) 
     hireAgent({ factory: 'pipao', agent: 'otto', step: 'builder/x' });
     const before = bytesOf('pipao');
     assert.throws(
-      () => detachWorkflow({ factory: 'pipao', workflow: 'build' }),
+      () => detached(ROOT, 'pipao', 'build'),
       refused(
         'Invalid',
         'pipao',
@@ -356,7 +357,7 @@ test('REFUSED: `nemia factory attach` and `detach`, nothing written', async (t) 
     assert.deepEqual(bytesOf('pipao'), before);
     fireAgent({ factory: 'pipao', step: 'build/implement' });
     fireAgent({ factory: 'pipao', step: 'build/review' });
-    detachWorkflow({ factory: 'pipao', workflow: 'build' });
+    detached(ROOT, 'pipao', 'build');
     assert.deepEqual(
       fileOf('pipao'),
       { repos: [repo], workflows: ['builder'], hires: { 'builder/x': 'otto' }, generation: 9 },
@@ -466,7 +467,7 @@ test('a factory file that does not read: listed with why, the others still liste
               () => hireAgent({ factory: 'bent', agent: 'ada', step: 'build/implement' }),
               () => fireAgent({ factory: 'bent', step: 'build/implement' }),
             ]
-          : [() => attachWorkflow({ factory: 'bent', workflow: 'build' }), () => detachWorkflow({ factory: 'bent', workflow: 'build' })];
+          : [() => attachWorkflow({ factory: 'bent', workflow: 'build' }), () => detached(ROOT, 'bent', 'build')];
       for (const act of acts) assert.throws(act, refused('Invalid', 'bent'));
       assert.deepEqual(bytesOf('bent'), before);
       assert.throws(() => readFactory('nope'), refused('Missing', 'nope', 'bent'));

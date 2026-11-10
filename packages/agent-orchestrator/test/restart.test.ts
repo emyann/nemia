@@ -2,7 +2,7 @@
  * A daemon restarted onto a store an engine that knew no admission left: filings with no `queued` key, which that engine admitted
  * itself under its own ceiling, beside two Claude Code sessions at work. The new engine reads a filing with no key as queued, so nothing
  * starts that it has not admitted, and it admits in the order the old engine did — the filed `priority`, filing time, id — per pool,
- * under the `WF_MAX_CONCURRENT` that `engine()` read when it was built, counting the sessions already at work.
+ * under the `WF_MAX_CONCURRENT` that `engine(process.env)` read when it was built, counting the sessions already at work.
  *
  * An admitted task starts on the engine's next pass: a store's first pass admits, and its second starts, one pass (about 4 s) later than
  * when the old engine admitted and started in one. At the shipped ceiling of 2 the two at work fill claude's pool, and the restarted
@@ -17,8 +17,8 @@
  * momentum, each filed with `priority: 1`, two of them filed in one millisecond, the later id first on disk; a run's first step
  * and an id no run names, which carry none whenever they were filed; and six codex tasks, in a pool of their own.
  *
- * `WF_ROOT` is set before the runner is imported, which reads it as the module loads; `WF_MAX_CONCURRENT` is read by `engine()`. Every
- * run a pass answers from its memo of runs at rest is judged in full as well, and a difference throws (`WF_VERIFY_REST`).
+ * `WF_ROOT` is set before the runner is imported, which reads it as the module loads; `WF_MAX_CONCURRENT` is read by `engine(process.env)`.
+ * Every run a pass answers from its memo of runs at rest is judged in full as well, and a difference throws (`WF_VERIFY_REST`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -40,10 +40,13 @@ const place = testPlace();
 const stand = () => place;
 const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { rewriteRun } = await import('../src/record/record.store.ts');
 
-/** The engine's journals, one file a task, where `engine()` keeps them (`$WF_ROOT/engine`); `scratch` reaps what is left after the file. */
+/**
+ * The engine's journals, one file a task, where `engine(process.env)` keeps them (`$WF_ROOT/engine`); `scratch` reaps what is left after
+ * the file.
+ */
 const TASKS = path.join(ROOT, 'engine', 'tasks');
 const T0 = Date.parse('2026-09-25T08:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
@@ -129,7 +132,7 @@ const runNaming = async (record: { taskId: string; tries?: Array<{ taskId: strin
   const repo = scratch('wf-restart-repo-');
   stand().world.repository(repo, {});
   const run = await runPlaced(startRun({ brief: 'restart', repo, workflowDir: solo, isolate: false }));
-  assert.ok(rewriteRun({ ...readRun(run.id), steps: { solo: record } }));
+  assert.ok(rewriteRun({ ...runRecord(run.id), steps: { solo: record } }));
   return run.id;
 };
 /** An earlier try, failed: what a try's task was filed after. */
@@ -142,7 +145,7 @@ const failed = (id: string, s: number) =>
     { kind: 'settled', at: at(s + 4), outcome: 'failed' },
   ]);
 
-let e = engine();
+let e = engine(process.env);
 const admission = async (id: string) => (await Effect.runPromise(e.view(id))).admission;
 const attempts = async (id: string) => (await Effect.runPromise(e.view(id))).state.attempts.length;
 /** One pass of the restarted daemon, the jobs at work beaten first as their workers beat every 5 s. */
@@ -193,7 +196,7 @@ test("REFUSED at shipped defaults: the two sessions at work fill claude's pool, 
 
 test('restarted under a raised ceiling, a fresh engine admits in the old order — priority, filing, id — a pass before it starts, and one more per session ended', async () => {
   process.env.WF_MAX_CONCURRENT = '5';
-  e = engine();
+  e = engine(process.env);
   await pass();
   for (const id of CLAUDE) assert.equal(await attempts(id), 0, `${id} started on the pass that admitted it`);
   assert.deepEqual(

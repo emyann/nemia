@@ -32,7 +32,7 @@ delete process.env.WF_MAX_RUNS;
 const { advanceRun, forgetRun, forgetLine: forgetLineOf, startRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
-const { markCancelled, readRun } = await import('../src/record/record.store.ts');
+const { markCancelled, runRecord } = await import('../src/record/record.store.ts');
 
 /** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
@@ -208,15 +208,15 @@ const aParent = async (
   }: { work?: string; signed?: boolean; workflowDir?: string; brief?: string } = {},
 ) => {
   const run = repositoryRunOf(await runPlaced(startRun({ brief, repo, workflowDir: workflowDir ?? oneStep() })));
-  await runWith(b.e, advanceRun(readRun(run.id)));
-  const wt = readRun(run.id).steps.implement.workspace!;
+  await runWith(b.e, advanceRun(runRecord(run.id)));
+  const wt = runRecord(run.id).steps.implement.workspace!;
   if (work) {
     fs.writeFileSync(path.join(wt, work), `${work}\n`);
     gitIn(wt, 'add', '-A');
     gitIn(wt, 'commit', '-q', '-m', `add ${work}`);
   }
   if (signed) b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  return { run, wt, branch: readRun(run.id).steps.implement.branch! };
+  return { run, wt, branch: runRecord(run.id).steps.implement.branch! };
 };
 
 const worktreesOf = (repo: string) =>
@@ -259,7 +259,7 @@ test("REFUSED at shipped defaults: a locked worktree — git will not remove it,
     `${locked.run.id}  not forgotten: ${locked.wt} is held (a person holds it), and the place will not remove it — let it go if nothing needs it: git -C ${repo} worktree unlock ${locked.wt}. Its record, files and branches are kept until every worktree is gone: nemia rm ${locked.run.id} again then.`,
   ]);
   assert.ok(fs.existsSync(path.join(locked.wt, 'locked.txt')) && worktreesOf(repo).includes(locked.wt));
-  assert.ok(readRun(locked.run.id).cancelledAt, 'the record is read with its cancellation, still');
+  assert.ok(runRecord(locked.run.id).cancelledAt, 'the record is read with its cancellation, still');
 
   gitIn(repo, 'worktree', 'unlock', locked.wt);
   assert.equal((await runWith(b.e, forgetRun(locked.run.id))).kind, 'forgotten');

@@ -4,7 +4,8 @@
  * per rule a step's skills declare, a row per day and count a step declares (`tally:`), and the one line the morning recap quotes. A
  * number with nothing measured under it reads `—`, never 0. Pure.
  */
-import { dollars, durationWord } from '../status/status.ts';
+import { dollars } from '../money/money.ts';
+import { durationWord } from '../usage/usage.ts';
 import type { Health } from '../series/series.ts';
 import type { Group, Headline, SlowLanding, Stats, StepRow } from './stats.ts';
 import type { Mark } from './marks.ts';

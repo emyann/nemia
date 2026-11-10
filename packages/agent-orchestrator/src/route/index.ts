@@ -5,3 +5,5 @@ export { routeWritten, routingOf } from './route-keys.ts';
 export { routeRefusal } from './route-load.ts';
 export { isJudge, judgeRefusal, judgeSection } from './judge.ts';
 export type { JudgeFence } from './judge.ts';
+export { personRoutes, routeAsk, unrouted, withRoutes } from './person-route.ts';
+export type { PersonRoute } from './person-route.ts';

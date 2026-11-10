@@ -2,8 +2,8 @@
  * The agents of the two places, read through the Agent and Skill doors (`AgentDoor`, `SkillDoor`), as `nemia agents` prints them and the
  * api answers them: the places (`agentPlaces`), where an agent's skills are found (`agentSkillsFound`), one agent by name (`findAgent`),
  * one agent read (`agentRead`), every agent of both places (`listAgents`, `agentsRead`), and one agent's card in the shape of an A2A Agent
- * Card (`agentCardRead`). Each but the places is a program, run where the store's root is given (`rooted`, the api's `inRequest`) or over
- * the doors' memory; yours are read in the store `home` it is given. What a reading holds and how it is printed is `roster.ts`'s.
+ * Card (`agentCardRead`). Each but the places is a program, run where the store's root is given (`StoreRoot`, the api's `inRequest`) or
+ * over the doors' memory; yours are read in the store `home` it is given. What a reading holds and how it is printed is `roster.ts`'s.
  */
 import fs from 'node:fs';
 import path from 'node:path';

@@ -5,14 +5,13 @@
  * (`--end`), written for the keeper (`keep.verb.ts`) to act on at its next beat. The api serves the read and the write as the nemia group's
  * `level` and `setLevel` (`objects`' Api), each calling its handler by type (`LevelInput`).
  */
+import { StoreRoot } from '../config/root.store.ts';
 import { Effect } from 'effect';
-import { NemiaLevelSet } from 'objects';
+import { NemiaLevelSet, DEFAULT_NAMESPACE } from 'objects';
 import type { Args } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
-import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
-import { DEFAULT_FACTORY } from '../factory/factory.ts';
-import { factoryNames } from '../factory/factory.store.ts';
+import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
 import {
   durationOf,
   durationRefusal,
@@ -23,13 +22,12 @@ import {
   type FactoryLevel,
   type FactoryLevelFile,
 } from '../level/level.ts';
-import { readFactoryLevel } from '../level/level.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
 import { FactoryDoor } from '../factory/door/factories.store.ts';
-import { rooted } from '../factory/wiring/wire.verb.ts';
 import { levelsNow } from '../level/levels.verb.ts';
 import { EngineService, asked, tried, trustedFolder, type Engine } from '../runtime-client.ts';
-import { dollars, taskSpend, type Spend } from '../status/status.ts';
+import { taskSpend, type Spend } from '../status/status.ts';
+import { dollars } from '../money/money.ts';
 import { bridgeOf, type Bridge } from '../views/views.verb.ts';
 import type { EnginePhase } from '../views/views-words.ts';
 import { nemiaDir, promptAllows, readLevel, writeLevel } from './level.store.ts';
@@ -62,7 +60,7 @@ export type NemiaLevel = {
  * The command a person runs once to trust her folder, which her session's harness refuses to start in until they do: accepted at its
  * prompt and exited, it is the one approval her harness asks; it offers no program a way to give it.
  */
-export const trustCommand = (): string => `mkdir -p ${nemiaDir()} && cd ${nemiaDir()} && ${DEFAULT_HARNESS}`;
+export const trustCommand = (home: string): string => `mkdir -p ${nemiaDir(home)} && cd ${nemiaDir(home)} && ${DEFAULT_HARNESS}`;
 
 /**
  * How a person reaches her session `sessionId`: attached on this machine, then through its web link (`bridge`) where it is up, or why it
@@ -84,7 +82,8 @@ const spendOf = (view: Parameters<typeof taskSpend>[0]): Spend | null => {
 /** Where she is, off the level files and her task's view. */
 const levelNow = (e: Engine) =>
   Effect.gen(function* () {
-    const file = yield* tried(readLevel);
+    const home = yield* StoreRoot;
+    const file = yield* tried(() => readLevel(home));
     const factories = yield* levelsNow();
     const above = factories.some((row) => row.level !== 'manual');
     const view = file?.task === undefined ? undefined : yield* asked('view', e.view(file.task));
@@ -102,9 +101,9 @@ const levelNow = (e: Engine) =>
       bridge,
       stopped: above && filed && (Boolean(view.state.settled) || view.state.stopRequested),
       spend: filed ? spendOf(view) : null,
-      allows: yield* tried(promptAllows),
+      allows: yield* tried(() => promptAllows(home)),
       factories,
-      trust: trustedFolder(DEFAULT_HARNESS, nemiaDir()) === false ? trustCommand() : null,
+      trust: trustedFolder(DEFAULT_HARNESS, nemiaDir(home)) === false ? trustCommand(home) : null,
     } satisfies NemiaLevel;
   });
 
@@ -123,22 +122,19 @@ function storeAsked(level: Level, storeSet: boolean, above: boolean, now: NemiaL
 }
 
 /** The factory's file a person's write asks for at `at`, or refused: no such factory (`Missing`), no raise to end, a raise of nothing. */
-function factoryFileAsked(ask: FactoryAsk, store: Level, at: Date): FactoryLevelFile {
-  if (!factoryNames().includes(ask.factory))
-    throw new Missing({
-      message: `no factory is named ${ask.factory}: nemia factory ls lists the store's factories. Nothing was written.`,
-    });
-  let current: FactoryLevelFile | undefined;
-  try {
-    current = readFactoryLevel(ask.factory);
-  } catch {
-    current = undefined;
-  }
-  const asked = factoryAsked(ask, current, store, at);
-  if ('conflict' in asked) throw new Conflict({ message: `${asked.conflict} Nothing was written.` });
-  if ('invalid' in asked) throw new Invalid({ message: `${asked.invalid} Nothing was written.` });
-  return asked.file;
-}
+const factoryFileAsked = (ask: FactoryAsk, store: Level, at: Date): Effect.Effect<FactoryLevelFile, Refusal> =>
+  Effect.gen(function* () {
+    const door = yield* FactoryDoor;
+    if (!(yield* door.factories.list()).includes(ask.factory))
+      return yield* Effect.fail(
+        new Missing({ message: `no factory is named ${ask.factory}: nemia factory ls lists the store's factories. Nothing was written.` }),
+      );
+    const current = yield* door.level.read(FactoryName.read(ask.factory)).pipe(Effect.catch(() => Effect.succeed(undefined)));
+    const asked = factoryAsked(ask, current, store, at);
+    if ('conflict' in asked) return yield* Effect.fail(new Conflict({ message: `${asked.conflict} Nothing was written.` }));
+    if ('invalid' in asked) return yield* Effect.fail(new Invalid({ message: `${asked.invalid} Nothing was written.` }));
+    return asked.file;
+  });
 
 /** What `nemia level` takes: the store's level, or a factory's, raised for a stretch or its raise ended (`objects`' `NemiaLevelSet`). */
 export type LevelInput = typeof NemiaLevelSet.Type;
@@ -159,7 +155,7 @@ const factoryAskOf = (args: LevelInput): FactoryAsk | undefined =>
  * refuses, so a caller that runs no `check` is refused the same. Her task is named in the store's file first, then
  * the factory's file written: a failure between them leaves a task named and nothing above `manual`, which the keeper leaves alone.
  */
-const levelBy = (args: LevelInput, home?: string) =>
+const levelBy = (args: LevelInput, home: string) =>
   Effect.gen(function* () {
     const wrong = factoryArgsRefusal(args);
     if (wrong !== null) return yield* Effect.fail(new Invalid({ message: wrong }));
@@ -171,17 +167,13 @@ const levelBy = (args: LevelInput, home?: string) =>
     if (factory === undefined && !storeSet) return now;
     const at = new Date();
     const store = asked ?? now.level;
-    const file = factory === undefined ? undefined : yield* tried(() => factoryFileAsked(factory, now.level, at));
+    const file = factory === undefined ? undefined : yield* factoryFileAsked(factory, now.level, at);
     const changed = factory === undefined || file === undefined ? undefined : { factory: factory.factory, file };
-    const above = levelsAfter(now.factories, store, changed, at.getTime(), DEFAULT_FACTORY).some((row) => row.level !== 'manual');
+    const above = levelsAfter(now.factories, store, changed, at.getTime(), DEFAULT_NAMESPACE).some((row) => row.level !== 'manual');
     const storeFile = yield* tried(() => storeAsked(store, storeSet, above, now, at.toISOString()));
-    if (storeFile !== undefined) yield* tried(() => writeLevel(storeFile));
+    if (storeFile !== undefined) yield* tried(() => writeLevel(home, storeFile));
     if (changed !== undefined)
-      yield* rooted(
-        home,
-        'level',
-        Effect.flatMap(FactoryDoor, (door) => door.level.write(FactoryName.read(changed.factory), changed.file)),
-      );
+      yield* Effect.flatMap(FactoryDoor, (door) => door.level.write(FactoryName.read(changed.factory), changed.file));
     return yield* levelNow(e);
   });
 
@@ -198,7 +190,7 @@ function levelLines(data: NemiaLevel): string[] {
   const head = `Nemia: the store at ${data.level}${data.since === null ? '' : ` since ${data.since}`}`;
   const factories = [
     'factories (a raise ends by itself, read as it passes):',
-    ...data.factories.map((row) => `  ${factoryLevelWords(row, DEFAULT_FACTORY)}`),
+    ...data.factories.map((row) => `  ${factoryLevelWords(row, DEFAULT_NAMESPACE)}`),
   ];
   const session =
     data.task === null
@@ -232,7 +224,7 @@ function factoryArgsRefusal(args: Args): string | null {
     return `--for takes the level the factory is raised to: nemia level semi-auto --factory ${String(args.factory)} --for ${String(args.for)}.`;
   if (args.end === true && level)
     return `--end takes no level, it ends the raise in force: nemia level --factory ${String(args.factory)} --end.`;
-  if (args.factory === DEFAULT_FACTORY)
+  if (args.factory === DEFAULT_NAMESPACE)
     return `the default factory's level is the store's own, set with no --factory: nemia level ${level ? String(args.level) : '<level>'}.`;
   return given ? (durationRefusal(String(args.for)) ?? null) : null;
 }
@@ -275,6 +267,6 @@ export const LEVEL: Command<NemiaLevel, LevelInput> = {
   class: { bare: 'read', sets: 'ask', setsBy: [...LEVELS, '--factory', '--for', '--end'] },
   only: { side: 'cli', why: "the api serves it as the nemia group's `level` and `setLevel` of `objects`' Api, calling this handler" },
   input: NemiaLevelSet,
-  handler: (args, _env, home) => levelBy(args, home),
+  handler: (args) => Effect.flatMap(StoreRoot, (home) => levelBy(args, home)),
   print: levelLines,
 };

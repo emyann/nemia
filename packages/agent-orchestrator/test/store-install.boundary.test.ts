@@ -31,7 +31,7 @@ delete process.env.WF_MAX_RUNS;
 const { advanceRun, cancelRun, forgetRun, startRun, startPlan, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
-const { readRun } = await import('../src/record/record.store.ts');
+const { runRecord } = await import('../src/record/record.store.ts');
 const { LINE_NAME } = await import('../src/run.ts');
 
 /** A repository with one commit, so `nemia start` has a base to record. */
@@ -229,8 +229,8 @@ test("a step's worktree gets what .worktreeinclude lists from the main checkout 
   const run = await isolated(repo);
   fs.appendFileSync(path.join(repo, '.worktreeinclude'), `../${path.basename(outside)}/secret\n`);
   const { e, tasks } = board();
-  const pass = await runWith(e, advanceRun(readRun(run.id)));
-  const wt = readRun(run.id).steps.implement.workspace!;
+  const pass = await runWith(e, advanceRun(runRecord(run.id)));
+  const wt = runRecord(run.id).steps.implement.workspace!;
   assert.equal(wt, path.join(ROOT, 'worktrees', run.id, LINE_NAME), 'a worktree, as shipped');
 
   assert.equal(
@@ -286,8 +286,8 @@ test("a worktree whose main packages could only be linked — its store on anoth
     throw Object.assign(new Error("EXDEV: cross-device link not permitted, link 'a' -> 'b'"), { code: 'EXDEV', syscall: 'link' });
   });
   const { e } = board();
-  const pass = await runWith(e, advanceRun(readRun(run.id)));
-  const wt = readRun(run.id).steps.implement.workspace!;
+  const pass = await runWith(e, advanceRun(runRecord(run.id)));
+  const wt = runRecord(run.id).steps.implement.workspace!;
   assert.ok(fs.lstatSync(path.join(wt, 'node_modules/third')).isSymbolicLink());
   assert.deepEqual(pass.notes, [
     "implement: node_modules: main's packages linked, not hardlinked — EXDEV: cross-device link not permitted, link 'a' -> 'b'; a fenced step's reads under it leave its worktree and are denied",
@@ -344,8 +344,8 @@ test('a worktree whose lockfile asks for what the main checkout has not installe
 
   const run = await isolated(repo);
   const { e, tasks } = board();
-  const pass = await runWith(e, advanceRun(readRun(run.id)));
-  const wt = readRun(run.id).steps.implement.workspace!;
+  const pass = await runWith(e, advanceRun(runRecord(run.id)));
+  const wt = runRecord(run.id).steps.implement.workspace!;
   assert.equal(
     fs.readFileSync(path.join(wt, 'package-lock.json'), 'utf8'),
     fs.readFileSync(path.join(repo, 'package-lock.json'), 'utf8'),
@@ -378,13 +378,13 @@ test('a pass that dies after cutting a worktree does not wedge every pass after 
       throw new Error('the tick died here');
     },
   });
-  await assert.rejects(runWith(dying, advanceRun(readRun(run.id))), /the tick died here/);
+  await assert.rejects(runWith(dying, advanceRun(runRecord(run.id))), /the tick died here/);
   const wt = path.join(ROOT, 'worktrees', run.id, LINE_NAME);
   assert.ok(fs.existsSync(path.join(wt, '.git')), 'the worktree and its branch were made');
 
-  const pass = await runWith(e, advanceRun(readRun(run.id)));
+  const pass = await runWith(e, advanceRun(runRecord(run.id)));
   assert.deepEqual([pass.filed, filings], [['implement'], [`${run.id}-implement`]]);
-  assert.equal(readRun(run.id).steps.implement?.workspace, wt, 'in the worktree that pass cut');
+  assert.equal(runRecord(run.id).steps.implement?.workspace, wt, 'in the worktree that pass cut');
 });
 
 /** Git in a checkout, as a person types it there. */
@@ -457,7 +457,7 @@ const heldInNpmCi = async (t: TestContext, b: ReturnType<typeof board>, brief: s
     fs.writeFileSync(let_go, '');
   });
   const run = await runPlaced(startRun({ brief, repo, workflowDir: folder() }));
-  const pass = runWith(b.e, advanceRun(readRun(run.id)));
+  const pass = runWith(b.e, advanceRun(runRecord(run.id)));
   while (!fs.existsSync(started)) await new Promise((r) => setTimeout(r, 10));
   const wt = path.join(ROOT, 'worktrees', run.id, LINE_NAME);
   assert.ok(worktreesOf(repo).includes(wt), 'the pass has cut the worktree, and not filed the step');
@@ -489,7 +489,7 @@ test("REFUSED at shipped defaults: a pass still cutting a step's worktree when `
   await runWith(b.e, cancelRun(run.id));
   const pass = await release();
   assert.deepEqual([pass.filed, b.filings, b.stopped], [[], [], []], 'nothing filed, so nothing to stop');
-  assert.equal(readRun(run.id).steps.implement.taskId, null);
+  assert.equal(runRecord(run.id).steps.implement.taskId, null);
   const forgot = await runWith(b.e, forgetRun(run.id));
   assert.deepEqual([forgot.kind, forgot.removed], ['forgotten', [wt]]);
 });

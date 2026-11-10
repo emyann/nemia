@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { assess } from '../tick/assess.ts';
-import { names } from '../../test/assessed.ts';
+import { aRead, names } from '../../test/assessed.ts';
 import type { RepositoryRun, TaskPhase } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import {
@@ -53,9 +53,9 @@ test('`assess` under the pause: nothing is due that would start new work, each n
     () => {
       const steps = [step('implement', [], { check: 'npm test' }), step('review', ['implement']), step('docs')];
       const r = run({ implement: { taskId: 't1' }, review: { taskId: null }, docs: { taskId: null } });
-      const free = assess(steps, r, phases({ t1: 'succeeded' }), signed, asked);
+      const free = assess(aRead(steps, r, { phaseOf: phases({ t1: 'succeeded' }), signedOff: signed, asked }));
       assert.deepEqual([free.check, free.ready], [['implement'], ['docs']], 'without it, the check and docs are due');
-      const held = assess(steps, { ...r, pause: PAUSE }, phases({ t1: 'succeeded' }), signed, asked);
+      const held = assess(aRead(steps, { ...r, pause: PAUSE }, { phaseOf: phases({ t1: 'succeeded' }), signedOff: signed, asked }));
       assert.deepEqual(held, {
         ...free,
         ready: [],
@@ -68,9 +68,9 @@ test('`assess` under the pause: nothing is due that would start new work, each n
     const steps = [step('implement'), step('review', ['implement'])];
     const r = run({ implement: { taskId: 't1' }, review: { taskId: null } });
     const ask = { step: 'implement', try: 2, mode: 'fresh' as const, at: '2026-10-04T12:00:00.000Z' };
-    const free = assess(steps, r, phases({ t1: 'failed' }), signed, asked, undefined, [ask]);
+    const free = assess(aRead(steps, r, { phaseOf: phases({ t1: 'failed' }), signedOff: signed, asked, asks: [ask] }));
     assert.equal(free.retry.length, 1, 'without it, the try is due');
-    const held = assess(steps, { ...r, pause: PAUSE }, phases({ t1: 'failed' }), signed, asked, undefined, [ask]);
+    const held = assess(aRead(steps, { ...r, pause: PAUSE }, { phaseOf: phases({ t1: 'failed' }), signedOff: signed, asked, asks: [ask] }));
     assert.deepEqual(held, { ...free, retry: [], waitingOnPause: { steps: ['implement'], checks: [] } });
     assert.equal(held.status, 'running', 'a run asked to go on is not failed while it waits for the lift');
   });
@@ -78,13 +78,15 @@ test('`assess` under the pause: nothing is due that would start new work, each n
     const steps = [step('implement'), step('review', ['implement'], { loop: 'implement', rounds: 3 })];
     const r = run({ implement: { taskId: 't1' }, review: { taskId: 't2' } });
     const again = (name: string) => (name === 'review' ? { ...signed(), output: { again: true } } : signed());
-    const free = assess(steps, r, phases({ t1: 'succeeded', t2: 'succeeded' }), again, asked);
+    const free = assess(aRead(steps, r, { phaseOf: phases({ t1: 'succeeded', t2: 'succeeded' }), signedOff: again, asked }));
     assert.deepEqual(
       free.round.map((d) => [d.step, d.target]),
       [['review', 'implement']],
       'without it, the round is due',
     );
-    const held = assess(steps, { ...r, pause: PAUSE }, phases({ t1: 'succeeded', t2: 'succeeded' }), again, asked);
+    const held = assess(
+      aRead(steps, { ...r, pause: PAUSE }, { phaseOf: phases({ t1: 'succeeded', t2: 'succeeded' }), signedOff: again, asked }),
+    );
     assert.deepEqual(held, { ...free, round: [], waitingOnPause: { steps: ['review'], checks: [] } });
     assert.equal(held.status, 'running', 'a run whose loop goes round again is not over while it waits for the lift');
   });
@@ -92,8 +94,8 @@ test('`assess` under the pause: nothing is due that would start new work, each n
     const steps = [step('implement')];
     const r = run({ implement: { taskId: 't1' } });
     assert.deepEqual(
-      assess(steps, { ...r, pause: PAUSE }, phases({ t1: 'running' }), signed, asked),
-      assess(steps, r, phases({ t1: 'running' }), signed, asked),
+      assess(aRead(steps, { ...r, pause: PAUSE }, { phaseOf: phases({ t1: 'running' }), signedOff: signed, asked })),
+      assess(aRead(steps, r, { phaseOf: phases({ t1: 'running' }), signedOff: signed, asked })),
     );
   });
 });

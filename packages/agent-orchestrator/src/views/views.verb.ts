@@ -27,16 +27,18 @@ import { attemptIn, scriptCloseouts } from '../script/script.store.ts';
 import { resultSteps } from '../branches/index.ts';
 import { isRepositoryRun, stepTasks, type CloseoutAsked, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
 import type { Said } from '../say/say.ts';
-import { taskSpend, type SpendOf, type Consumed } from '../status/status.ts';
+import { taskSpend, type SpendOf } from '../status/status.ts';
+import { type Consumed } from '../usage/usage.ts';
 import { waitedOn, type ParentRun } from '../wait/wait.ts';
 import { decision } from '../decide/decide.ts';
 import { parseCloseout, type Closeout } from '../closeout/index.ts';
 import { taskUsage } from '../timeline/index.ts';
-import { stepsOf } from '../steps/steps.verb.ts';
+import { stepsOrWhy } from '../steps/steps.verb.ts';
 import { landedOf, type BranchReader } from '../branches/branches.store.ts';
 import { parentRecord } from '../steps/steps.verb.ts';
 import { continuesFrom } from '../retry/index.ts';
-import { currentTurn, killedMemoryOf, phaseOfView, unsignedEnd, wordOfView, type EnginePhase } from './views-words.ts';
+import { verbOf } from '../engine-verbs/engine-verbs.verb.ts';
+import { blockedWord, currentTurn, killedMemoryOf, phaseOfView, unsignedEnd, wordOfView, type EnginePhase } from './views-words.ts';
 import { outOfMemory } from '../out-of-memory/out-of-memory.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
@@ -119,7 +121,7 @@ export function reportedEngine(e: Engine, views: readonly TaskView[]): Engine {
           ? list(args[0] as string[])
           : (e.list as (...a: unknown[]) => unknown)(...args)) as Engine['list'],
     },
-    (key) => ENGINE_READS.has(key),
+    changesNone,
   );
 }
 
@@ -130,7 +132,7 @@ type TaskList = Effect.Success<ReturnType<Engine['list']>>;
  * The engine a command reads — `nemia ls`, `nemia decide` — whose `view` of a task is read once for the whole command: `nemia ls` views a
  * run's tasks, and again each run another waits on, and `nemia decide` its current tries and then every try. A view is the engine's word at
  * the moment it was read, and a command is one moment; nothing is kept past the command. A verb that changes a task drops what was read of
- * it, as `reportedEngine` does, and a pass — a `tick`, an `up` or a `start` — drops all of it, so a command that acts reads the engine's
+ * it, as `reportedEngine` does, and a pass — a `tick` or an `up` — drops all of it, so a command that acts reads the engine's
  * word after its act. A view that failed is not kept: the next read asks the engine again. Two reads of one task at once share the one
  * read.
  */
@@ -156,13 +158,13 @@ export function viewedOnce(e: Engine): Engine {
           );
         }),
     },
-    (key) => ENGINE_READS.has(key) && key !== 'tick' && key !== 'up' && key !== 'start',
+    (key) => verbOf(key)?.changes === 'none',
   );
 }
 
 /**
  * `e` with `own` in place of its verbs of the same name, and every other verb that changes a task dropping what a wrapper kept of it,
- * when the Effect runs: the tasks `ENGINE_WRITES` names for it (`dropped`), else everything (`dropAll`). A verb `passes` is `e`'s own.
+ * when the Effect runs: the tasks its row of `ENGINE_VERBS` names (`dropped`), else everything (`dropAll`). A verb `passes` is `e`'s own.
  */
 function droppingOnWrite(
   e: Engine,
@@ -176,8 +178,8 @@ function droppingOnWrite(
     if (verb in own || typeof value !== 'function' || passes(verb)) continue;
     wrapped[verb] = (...args: unknown[]) =>
       Effect.suspend(() => {
-        const named = ENGINE_WRITES[verb];
-        if (named) for (const taskId of named(args)) dropped(taskId);
+        const changes = verbOf(verb)?.changes;
+        if (typeof changes === 'function') for (const taskId of changes(args)) dropped(taskId);
         else dropAll();
         return (value as (...a: unknown[]) => Effect.Effect<unknown, unknown>).apply(e, args);
       });
@@ -185,40 +187,10 @@ function droppingOnWrite(
   return wrapped as Engine;
 }
 
-/** The engine's verbs that change no task. */
-const ENGINE_READS = new Set([
-  'tick',
-  'list',
-  'logs',
-  'output',
-  'transcript',
-  'path',
-  'feed',
-  'watch',
-  'io',
-  'tallied',
-  'up',
-  'start',
-  'sweep',
-  'kept',
-  'removeBody',
-  'mcpState',
-  'mcpSignIn',
-  'mcpSignInState',
-  'mcpSignOut',
-  'drain',
-  'drainSessions',
-]);
-
-/** The engine's verbs that change a task, each with the tasks it names: a filing names the task it files, which a read may have kept. */
-const ENGINE_WRITES: Readonly<Record<string, (args: unknown[]) => readonly unknown[]>> = {
-  file: ([spec]) => [(spec as { id?: unknown } | undefined)?.id],
-  admit: ([ids]) => (Array.isArray(ids) ? ids : []),
-  answer: ([id]) => [id],
-  stop: ([id]) => [id],
-  close: ([id]) => [id],
-  say: ([id]) => [id],
-  forget: ([ids]) => (Array.isArray(ids) ? ids : []),
+/** Whether the engine's verb `key` changes no task a call's reads name: a read, or a pass of the runtime (`ENGINE_VERBS`). */
+const changesNone = (key: string): boolean => {
+  const changes = verbOf(key)?.changes;
+  return changes === 'none' || changes === 'pass';
 };
 
 /**
@@ -288,7 +260,7 @@ export const closeoutAsked =
 export const harnessBlocked =
   (views: ReadonlyMap<string, TaskView>) =>
   (taskId: string): boolean =>
-    views.get(taskId)?.phase === 'needs-human';
+    blockedWord(views.get(taskId)?.phase);
 
 /**
  * What the harness says a task's blocked session waits for, in its own words (`TaskView.waitingFor`), off views already read — as a remote
@@ -635,15 +607,16 @@ export const closeoutReader = (
  * never asks (`gated`). Where `git` read the parent's branches once for the pass and could not (`unread`), it has not landed, and says
  * why.
  *
- * A parent whose frozen steps cannot be read has not landed: that is its answer, neither a failure nor a defect. Fails with a refusal a
- * read of the store, git or the engine failed with; dies of anything else.
+ * A parent whose unfrozen folder does not load has not landed, and says why (`unread`): that is its answer, neither a failure nor a defect.
+ * Fails with a refusal a read of the store, git or the engine failed with; dies of anything else.
  */
 export const parentRead = Effect.fn('parentOf')(function* (id: string, git: BranchReader) {
   const known = yield* parentRecord(id, git);
   const { record } = known;
   if (!record || record.cancelledAt || known.gone) return { ...known, landed: false } satisfies ParentRun;
-  const steps = yield* Effect.orElseSucceed(stepsOf(record), (): Workflow[] | undefined => undefined);
-  if (!steps) return { ...known, landed: false } satisfies ParentRun;
+  const frozen = yield* stepsOrWhy(record);
+  if ('unloaded' in frozen) return { ...known, landed: false, unread: frozen.unloaded } satisfies ParentRun;
+  const { steps } = frozen;
   const branches = resultSteps(steps)
     .map((s) => record.steps[s.name]?.branch)
     .filter((b): b is string => Boolean(b));
@@ -653,19 +626,21 @@ export const parentRead = Effect.fn('parentOf')(function* (id: string, git: Bran
   if (!onBase) return { ...known, landed: false } satisfies ParentRun;
   const { views, phaseOf } = yield* taskPhasesRead(record);
   const { asks, rounds } = yield* (yield* RunDoor).asks.read(RunId.read(id));
-  const said = decision(
+  const read = {
     steps,
-    record,
+    run: record,
     phaseOf,
-    landedOf(record, git),
-    closeoutReader(views, record, steps),
-    closeoutAsked(views),
-    exitVerdicts(views, record),
+    signedOff: closeoutReader(views, record, steps),
+    asked: closeoutAsked(views),
+    verdictOf: exitVerdicts(views, record),
+    sessionBlocked: harnessBlocked(views),
+    spendOf: spendReader(views),
     asks,
-    rounds,
-    () => false,
-    spendReader(views),
-  );
+    roundAsks: rounds,
+    standings: [],
+    checkout: undefined,
+  };
+  const said = decision(read, landedOf(record, git));
   return { ...known, landed: said.kind === 'landed' } satisfies ParentRun;
 });
 

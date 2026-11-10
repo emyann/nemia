@@ -14,6 +14,7 @@ import { readKeys } from '../former/former.ts';
 import { splitFrontmatter, WorkflowError } from '../step/step.ts';
 import { FRONTMATTER_REWRITE, rewriteFolders, rewrittenLines, storeFolders, type Rewritten } from './frontmatter.verb.ts';
 import { parseAgent, parseWorkflow } from '../workflow.ts';
+import { storeGiven } from '../../test/config-given.ts';
 
 const FORMER = fs.readFileSync(path.join(import.meta.dirname, '../../test/fixtures/former-frontmatter/build-land.md'), 'utf8');
 const TAIL = '---\ncheck: npm test # every file\nbudget: 2\n---\nThe body.\n';
@@ -35,7 +36,7 @@ const keysOf = (file: string, text: string) => readKeys(file, splitFrontmatter(f
 
 /** The command's handler run on `argv`'s arguments over the store `home`: its answer, or how it failed and the exit code it carries. */
 async function rewrite(home: string, args: { folders?: string[]; check?: true }) {
-  const exit = await Effect.runPromiseExit(FRONTMATTER_REWRITE.handler(args, {}, home) as Effect.Effect<Rewritten, unknown>);
+  const exit = await Effect.runPromiseExit(storeGiven(home)(FRONTMATTER_REWRITE.handler(args)) as Effect.Effect<Rewritten, unknown>);
   if (Exit.isSuccess(exit)) return { found: exit.value, failed: undefined };
   const failed = Cause.squash(exit.cause) as Error & { exitCode?: number };
   return { found: undefined, failed };

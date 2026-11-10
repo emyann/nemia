@@ -21,7 +21,7 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { app } from '../app.ts';
 import { everyOrigin, workflowsListed } from '../../test/definitions.ts';
-import { addFactory, attachWorkflow, hireAgent } from 'agent-orchestrator';
+import { addFactory, attachWorkflow, hireAgent } from 'agent-orchestrator/testing';
 
 type LibraryAgent = import('./agents.ts').LibraryAgent;
 type WorkflowListing = import('../workflows/workflows.ts').WorkflowListing;

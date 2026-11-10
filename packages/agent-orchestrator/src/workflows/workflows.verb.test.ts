@@ -14,6 +14,7 @@ import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
+import { storeGiven } from '../../test/config-given.ts';
 
 const ROOT = scratch('wf-workflows-root-');
 process.env.WF_ROOT = ROOT;
@@ -23,14 +24,14 @@ const { engineOf } = await import('../runtime-client.ts');
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, () => stand().layer);
-const { runStore } = await import('../record/files.store.ts');
+const { filesStore: runStore } = await import('../record/files.store.ts');
 const { workflowVersion } = await import('../folder/version.store.ts');
 const { removeWorkflowAt } = await import('../folder/write.store.ts');
 const verbs = await import('../inbox/inbox.store.ts');
 const { StoreRoot } = await import('../config/root.store.ts');
-/** `nemia inbox queue`'s verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
+/** `nemia inbox queue`'s verb run at this test's store root and settings, as `nemia` gives them: its answer, or its refusal thrown. */
 const queueInInbox = (...args: Parameters<typeof verbs.queueInInbox>) =>
-  Effect.runSync(Effect.provideService(verbs.queueInInbox(...args), StoreRoot, ROOT));
+  Effect.runSync(storeGiven(ROOT, process.env)(verbs.queueInInbox(...args)));
 const { Conflict, Invalid, Missing } = await import('../refusal/refusal.ts');
 const { workflowDoorMemory } = await import('./memory.store.ts');
 const { AgentDoor } = await import('../agents/agent-door.store.ts');
@@ -71,7 +72,7 @@ test('a folder written from its steps through the entry is the folder its list a
     { name: 'plan', after: [], place: 'git' as const, body: 'Plan it.' },
     { name: 'build', after: ['plan'], place: 'git' as const, body: 'Build it.' },
   ];
-  const done = await runWith(e(), onMemory(WORKFLOWS_WRITE.handler({ from: 'yours', name: 'written', draft }, undefined, ROOT)));
+  const done = await runWith(e(), onMemory(WORKFLOWS_WRITE.handler({ from: 'yours', name: 'written', draft })));
   assert.deepEqual(done.written, ['build.md', 'plan.md']);
   assert.equal(fs.existsSync(dir), false, 'written to the memory layer, not the disk');
   const listed = await runWith(e(), onMemory(listedOf([dir])));
@@ -84,7 +85,7 @@ test('a folder written from its steps through the entry is the folder its list a
       ['build', ['plan']],
     ],
   );
-  const read = await runWith(e(), onMemory(WORKFLOWS_STEP.handler({ name: 'written', step: 'build', dir }, undefined, ROOT)));
+  const read = await runWith(e(), onMemory(WORKFLOWS_STEP.handler({ name: 'written', step: 'build', dir })));
   assert.equal(read.step?.body, 'Build it.');
   assert.deepEqual(read.steps, ['plan', 'build']);
 });
@@ -93,8 +94,8 @@ test('a step the folder does not have is none, with the names of those it has', 
   const onMemory = memoryOver();
   const dir = path.join(ROOT, 'workflows', 'one-step');
   const draft = [{ name: 'only', after: [], place: 'git' as const, body: 'Do it.' }];
-  await runWith(e(), onMemory(WORKFLOWS_WRITE.handler({ from: 'yours', name: 'one-step', draft }, undefined, ROOT)));
-  const read = await runWith(e(), onMemory(WORKFLOWS_STEP.handler({ name: 'one-step', step: 'other', dir }, undefined, ROOT)));
+  await runWith(e(), onMemory(WORKFLOWS_WRITE.handler({ from: 'yours', name: 'one-step', draft })));
+  const read = await runWith(e(), onMemory(WORKFLOWS_STEP.handler({ name: 'one-step', step: 'other', dir })));
   assert.deepEqual(read, { step: null, steps: ['only'] });
 });
 
@@ -113,7 +114,7 @@ test("REFUSED: a draft the model's Workflow refuses is thrown as the door's Inva
     { name: 'plan', after: [], place: 'git' as const, body: 'Plan it.' },
     { name: 'plan', after: [], place: 'git' as const, body: 'Plan it again.' },
   ];
-  await assert.rejects(runWith(e(), WORKFLOWS_WRITE.handler({ from: 'yours', name: 'twice', draft }, undefined, ROOT)), (err: Error) => {
+  await assert.rejects(runWith(e(), WORKFLOWS_WRITE.handler({ from: 'yours', name: 'twice', draft })), (err: Error) => {
     assert.deepEqual([(err as { _tag?: string })._tag, (err as { exitCode?: number }).exitCode], ['Invalid', 2]);
     assert.ok(err.message.includes('plan.md'), err.message);
     return true;
@@ -130,10 +131,7 @@ function versionAt(dir: string): { version?: string } {
 
 /** The folder of yours `dir` removed through the entry, by its name, at the version it is at, as the api hands it. */
 const remove = (dir: string) =>
-  runWith(
-    e(),
-    WORKFLOWS_REMOVE.handler({ from: 'yours', name: path.relative(path.join(ROOT, 'workflows'), dir), ...versionAt(dir) }, undefined, ROOT),
-  );
+  runWith(e(), WORKFLOWS_REMOVE.handler({ from: 'yours', name: path.relative(path.join(ROOT, 'workflows'), dir), ...versionAt(dir) }));
 
 /** That removing `dir` is refused as `kind`, in exactly `message`, and the folder is still on disk. */
 async function refused(dir: string, kind: new (...args: never[]) => Error, message: string): Promise<void> {
@@ -198,7 +196,7 @@ test("REFUSED: a repository's workflow is not removed here, nor a folder nested 
   fs.mkdirSync(theirs, { recursive: true });
   fs.writeFileSync(path.join(theirs, 'only.md'), '---\nplace: git\n---\nDo it.\n');
   const yours = path.join(ROOT, 'workflows');
-  const fromRepo = WORKFLOWS_REMOVE.handler({ from: 'repo', name: 'shared', version: 'v1', repo }, undefined, ROOT);
+  const fromRepo = WORKFLOWS_REMOVE.handler({ from: 'repo', name: 'shared', version: 'v1', repo });
   await assert.rejects(runWith(e(), fromRepo), (err: Error) => {
     assert.ok(err instanceof Invalid, `${err.name}: ${err.message}`);
     assert.ok(err.message.startsWith(`nemia workflows rm refuses `), err.message);

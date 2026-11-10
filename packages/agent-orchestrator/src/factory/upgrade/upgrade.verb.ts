@@ -13,10 +13,7 @@ import { leftOut, type Args, type Flag, type Spec } from '../../command/command.
 import type { Command } from '../../command/entry.verb.ts';
 import { Conflict, Invalid, Missing } from '../../refusal/refusal.ts';
 import { StoreRoot } from '../../config/root.store.ts';
-import { readFactory } from '../factory.store.ts';
-import { FactoryName } from '../factory.model.ts';
-import { FactoryDoor } from '../door/factories.store.ts';
-import { rooted } from '../wiring/wire.verb.ts';
+import { FactoryDoor, filedFactory } from '../door/factories.store.ts';
 import { templatePlace } from '../../template/door/templates.store.ts';
 import { nameOfSource, sourceGiven } from '../../template/door/templates.ts';
 import { Effect } from 'effect';
@@ -118,15 +115,15 @@ const setsGiven = (args: Args): string[] => (Array.isArray(args.sets) ? args.set
 const VERSION = /^\d+\.\d+\.\d+$/;
 
 /**
- * The templated factory `name`, rendered once: its base, the version it holds where its status names it, and the status. Refused: the
- * factory, one made from no template, one not rendered.
+ * The templated factory `factory`, read through the door, rendered once: its base, the version it holds where its status names it, and
+ * the status. Refused: one made from no template, one not rendered.
  */
 function rendered(
-  name: string,
+  factory: Factory,
   verb: string,
   notDone: string,
 ): { factory: Templated; from: string | undefined; base: Entry[]; status: Status | undefined } {
-  const factory = readFactory(name, notDone);
+  const name = factory.name;
   if (factory.template === undefined)
     throw new Invalid({
       message: `${verb}: ${name} is not made from a template, so it has none to upgrade; to put one onto it in place, nemia factory diff ${name} --template <name|folder|archive> previews the takeover, then nemia factory adopt. ${notDone}`,
@@ -194,7 +191,8 @@ const judgedTo = Effect.fn('judgedTo')(function* (
  * base holds, any `--to` is taken: the controller checks it against the base.
  */
 const upgradeAsked = Effect.fn('upgradeAsked')(function* (args: Args, verb: string, notDone: string, downgrades = true) {
-  const { factory, from, base, status } = yield* tried(() => rendered(textOf(args, 'factory') ?? '', verb, notDone));
+  const filed = yield* filedFactory(textOf(args, 'factory') ?? '', 'upgrade');
+  const { factory, from, base, status } = yield* tried(() => rendered(filed, verb, notDone));
   const to = textOf(args, 'to');
   if (to === undefined || !VERSION.test(to))
     return yield* Effect.fail(
@@ -389,24 +387,20 @@ export const FACTORY_PLAN: Command<Planned | AdoptPreview> = {
   writes: false,
   class: 'read',
   only: HERE,
-  handler: (args, _env, home) =>
-    rooted(
-      home,
-      'factory diff',
-      Effect.gen(function* () {
-        const verb = 'nemia factory diff';
-        const notDone = 'Nothing was written.';
-        const name = textOf(args, 'factory') ?? '';
-        const now = yield* (yield* FactoryDoor).factories.read(FactoryName.read(name));
-        if (now.template === undefined) return yield* adoptPreview(args);
-        const home = yield* StoreRoot;
-        const asked = yield* upgradeAsked(args, verb, notDone, false);
-        const { factory, from, to, render, base, switched } = asked;
-        const merge = yield* tried(() => mergeOf(factory.name, base, render, switched));
-        const next = yield* tried(() => nextOf(home, asked, args));
-        return { kind: 'upgrade', name: factory.name, from, to, merge, next, ...(switched ? { switched } : {}) } satisfies Planned;
-      }),
-    ),
+  handler: (args) =>
+    Effect.gen(function* () {
+      const verb = 'nemia factory diff';
+      const notDone = 'Nothing was written.';
+      const name = textOf(args, 'factory') ?? '';
+      const now = yield* filedFactory(name, 'upgrade');
+      if (now.template === undefined) return yield* adoptPreview(args);
+      const home = yield* StoreRoot;
+      const asked = yield* upgradeAsked(args, verb, notDone, false);
+      const { factory, from, to, render, base, switched } = asked;
+      const merge = yield* tried(() => mergeOf(factory.name, base, render, switched));
+      const next = yield* tried(() => nextOf(home, asked, args));
+      return { kind: 'upgrade', name: factory.name, from, to, merge, next, ...(switched ? { switched } : {}) } satisfies Planned;
+    }),
   print: (planned) =>
     planned.kind === 'adopt'
       ? adoptLines(planned.plan, planned.digest, planned.line)
@@ -467,24 +461,20 @@ export const FACTORY_UPGRADE: Command<Upgraded> = {
   class: 'ask',
   asksAlways: true,
   only: HERE,
-  handler: (args, _env, home) =>
-    rooted(
-      home,
-      'factory upgrade',
-      Effect.gen(function* () {
-        const verb = 'nemia factory upgrade';
-        const notDone = 'Nothing was upgraded.';
-        const home = yield* StoreRoot;
-        const asked = yield* upgradeAsked(args, verb, notDone);
-        const { factory, from, to, source, render, base, switched } = yield* tried(() => planHeld(home, asked, args, verb, notDone));
-        const conflicts = yield* tried(() => mergeOf(factory.name, base, render, switched).conflicts.length);
-        const door = yield* FactoryDoor;
-        const now = yield* door.factories.read(FactoryName.read(factory.name));
-        const template = now.template ?? factory.template;
-        const file = yield* door.factories.rewrite({ ...now, template: { ...template, version: to, source, params: render.params } });
-        return { name: factory.name, from, to, file, dropped: render.dropped, conflicts };
-      }),
-    ),
+  handler: (args) =>
+    Effect.gen(function* () {
+      const verb = 'nemia factory upgrade';
+      const notDone = 'Nothing was upgraded.';
+      const home = yield* StoreRoot;
+      const asked = yield* upgradeAsked(args, verb, notDone);
+      const { factory, from, to, source, render, base, switched } = yield* tried(() => planHeld(home, asked, args, verb, notDone));
+      const conflicts = yield* tried(() => mergeOf(factory.name, base, render, switched).conflicts.length);
+      const door = yield* FactoryDoor;
+      const now = yield* filedFactory(factory.name, 'upgrade');
+      const template = now.template ?? factory.template;
+      const file = yield* door.factories.rewrite({ ...now, template: { ...template, version: to, source, params: render.params } });
+      return { name: factory.name, from, to, file, dropped: render.dropped, conflicts };
+    }),
   print: ({ name, from, to, file, dropped, conflicts }) => [
     from === to ? `${name}: its parameters at ${to}` : `${name}: ${from ?? UNKNOWN} → ${to}`,
     `filed: ${file}`,
@@ -544,7 +534,8 @@ type Resolved = { name: string; at: string; to: string; file: string; left: stri
 const resolved = Effect.fn('resolved')(function* (args: Args) {
   const verb = 'nemia factory resolve';
   const notDone = 'Nothing was resolved.';
-  const { factory, from, base, status } = yield* tried(() => rendered(textOf(args, 'factory') ?? '', verb, notDone));
+  const filed = yield* filedFactory(textOf(args, 'factory') ?? '', 'upgrade');
+  const { factory, from, base, status } = yield* tried(() => rendered(filed, verb, notDone));
   const to = factory.template.version;
   if (from === undefined)
     return yield* Effect.fail(
@@ -614,7 +605,7 @@ export const FACTORY_RESOLVE: Command<Resolved> = {
   class: 'ask',
   asksAlways: true,
   only: HERE,
-  handler: (args, _env, home) => rooted(home, 'factory resolve', resolved(args)),
+  handler: (args) => resolved(args),
   print: ({ name, at, to, file, left }) => [
     `${name}: ${at} resolved for the upgrade to ${to} — ${file}`,
     left.length

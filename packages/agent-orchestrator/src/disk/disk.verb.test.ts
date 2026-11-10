@@ -27,7 +27,7 @@ const BASE = scratch('wf-disk-');
 const ROOT = path.join(BASE, 'store');
 process.env.WF_ROOT = ROOT;
 const { walk, WALK_BURST } = await import('../forget/prune/freed.store.ts');
-const { DEFAULT_FACTORY } = await import('../factory/factory.ts');
+const { DEFAULT_NAMESPACE } = await import('../factory/factory.ts');
 const { samplesOf } = await import('../series/series.ts');
 const { PHASES } = await import('../meter/meter.ts');
 const { storeRoots } = await import('./disk.store.ts');
@@ -201,7 +201,7 @@ test('a disk sweep: a store of known sizes across factories read by part, kind a
         { part: 'runs', bytes: alone('runs') + held('runs/forgotten'), unread: 0 },
         { part: 'runs', factory: 'nemia', bytes: held('runs/a') + held('runs/a.json') + held('runs/a.asks'), unread: 0 },
         { part: 'runs', factory: 'pipao', bytes: held('runs/b'), unread: 0 },
-        { part: 'runs', factory: DEFAULT_FACTORY, bytes: held('runs/c.json'), unread: 0 },
+        { part: 'runs', factory: DEFAULT_NAMESPACE, bytes: held('runs/c.json'), unread: 0 },
         { part: 'engine', bytes: held('engine'), unread: 0 },
         { part: 'checks', bytes: held('checks'), unread: 0 },
         { part: 'series', bytes: held('metrics'), unread: 0 },
@@ -542,10 +542,10 @@ test('a disk sweep: a store of known sizes across factories read by part, kind a
           { part: 'engine', kind: 'bodies', factory: 'nemia', bytes: 2000, unread: 0 },
           { part: 'engine', kind: 'check-output', factory: 'pipao', bytes: 200, unread: 0 },
           { part: 'engine', kind: 'journals', factory: 'pipao', bytes: 300, unread: 0 },
-          { part: 'engine', kind: 'session-files', factory: DEFAULT_FACTORY, bytes: 64, unread: 0 },
+          { part: 'engine', kind: 'session-files', factory: DEFAULT_NAMESPACE, bytes: 64, unread: 0 },
           { part: 'sessions', kind: 'harness-records', bytes: 7000, unread: 0 },
           { part: 'sessions', kind: 'harness-records', factory: 'nemia', bytes: 60_000, unread: 0 },
-          { part: 'sessions', kind: 'harness-records', factory: DEFAULT_FACTORY, bytes: 128, unread: 0 },
+          { part: 'sessions', kind: 'harness-records', factory: DEFAULT_NAMESPACE, bytes: 128, unread: 0 },
         ],
       );
       assert.equal(
@@ -561,7 +561,7 @@ test('a disk sweep: a store of known sizes across factories read by part, kind a
           { s: 'disk.bytes', l: { part: 'engine', kind: 'journals', factory: 'pipao' }, v: 300 },
           { s: 'disk.bytes', l: { part: 'sessions', kind: 'harness-records' }, v: 7000 },
           { s: 'disk.bytes', l: { part: 'sessions', kind: 'harness-records', factory: 'nemia' }, v: 60_000 },
-          { s: 'disk.bytes', l: { part: 'sessions', kind: 'harness-records', factory: DEFAULT_FACTORY }, v: 128 },
+          { s: 'disk.bytes', l: { part: 'sessions', kind: 'harness-records', factory: DEFAULT_NAMESPACE }, v: 128 },
         ],
       );
       const bytes = await gauges(registry, 'disk.bytes');

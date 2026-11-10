@@ -192,7 +192,20 @@ function factsOf(f: Forgetting, others: readonly Run[]): Facts {
   const judged =
     !run.cancelledAt && steps
       ? {
-          a: assess(steps, free, f.phaseOf, f.closeoutOf, f.askedCloseout, f.verdictOf, f.asks, f.roundAsks, () => false, f.spendOf),
+          a: assess({
+            steps,
+            run: free,
+            phaseOf: f.phaseOf,
+            signedOff: f.closeoutOf,
+            asked: f.askedCloseout,
+            verdictOf: f.verdictOf,
+            sessionBlocked: () => false,
+            spendOf: f.spendOf,
+            asks: f.asks,
+            roundAsks: f.roundAsks,
+            standings: [],
+            checkout: undefined,
+          }),
           steps,
         }
       : undefined;
@@ -699,3 +712,14 @@ function leftWord(id: string, l: Forgot['left'][number]): string {
   if (l.orphaned) return `${l.path} is still there, and with no record nemia rm cannot say whose worktrees are in it${fix(' — ')}`;
   return `${l.path} is not a worktree git knows, and nemia rm removes worktrees only through git — look in it, and remove it yourself if nothing there is wanted`;
 }
+
+/**
+ * Why a read or a removal of a path under the store failed, where it failed for more than the path's being gone or not empty — `codes`,
+ * what the caller expects, `ENOENT` among them — in words naming the path; null for an expected one. What `nemia rm` and `nemia prune`
+ * say of what they leave behind, rather than nothing. Pure.
+ */
+export const leftWhy = (at: string, err: unknown, codes: readonly string[]): string | null => {
+  const code = typeof err === 'object' && err !== null && 'code' in err ? String(err.code) : undefined;
+  if (code !== undefined && codes.includes(code)) return null;
+  return `${at} was left as it is: ${err instanceof Error ? err.message : String(err)}; mend what the error names, and run the command again`;
+};

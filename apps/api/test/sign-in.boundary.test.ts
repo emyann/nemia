@@ -11,7 +11,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
-import { addFactory, BUILTIN_SERVERS, engine } from 'agent-orchestrator';
+import { BUILTIN_SERVERS, engine } from 'agent-orchestrator';
+import { addFactory } from 'agent-orchestrator/testing';
 import { Engine as RuntimeEngine } from 'agent-runtime';
 import { testEngine } from 'agent-runtime/testing';
 import { appOf, liveOf } from '../src/app.ts';
@@ -36,7 +37,7 @@ const appWith = () => {
   const signing = Effect.runSync(Effect.provide(Effect.service(RuntimeEngine), stand.layer));
   const handed: string[] = [];
   const e = {
-    ...engine(),
+    ...engine(process.env),
     mcpSignIn: (name: string, server: Parameters<typeof signing.mcpSignIn>[1], secret?: string) => {
       if (secret !== undefined) handed.push(secret);
       return signing.mcpSignIn(name, server, secret);

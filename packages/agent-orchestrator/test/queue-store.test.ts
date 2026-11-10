@@ -12,6 +12,7 @@
  * runs at rest, and a difference throws (`verifyRest` in tick.verb.ts). The stage's engine keeps no pass of its own: `ticking` hands it
  * one that reports nothing, so a pass reads each task off the stand-in as a person settled it.
  */
+import { settingsOf } from '../src/config/config.store.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -35,9 +36,7 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
 const {
-  addFactory,
   advanceRun,
-  attachWorkflow,
   cancelRun,
   decideRun,
   retryRun,
@@ -51,11 +50,12 @@ const {
   runningRelease,
   ...verbs
 } = await import('../src/runner.ts');
+const { addFactory, attachWorkflow } = await import('../testing.ts');
 /** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
 const atRoot = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
 const addToInbox = (opts: Parameters<typeof verbs.addToInbox>[0]) => atRoot(verbs.addToInbox(opts));
 const readInbox = () => atRoot(verbs.readInbox());
-const { listRuns, readRun } = await import('../src/record/record.store.ts');
+const { listRuns, runRecord } = await import('../src/record/record.store.ts');
 const { main: cli } = await import('../src/cli/main.ts');
 const { cardFiles } = await import('../src/cards/cards.store.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
@@ -148,7 +148,7 @@ const started = async (
   );
   const file = path.join(RUNS, `${run.id}.json`);
   fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), createdAt }, null, 2));
-  return readRun(run.id);
+  return runRecord(run.id);
 };
 const at = (minute: number) => `2026-09-16T09:${String(minute).padStart(2, '0')}:00.000Z`;
 const runsWritten = () => fs.readdirSync(RUNS).filter((f) => f.endsWith('.json')).length;
@@ -246,8 +246,8 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
       assert.deepEqual(b.filings, [task(one), task(two)]);
       for (const held of [younger, older]) assert.ok(ticked.includes(`${held.id}  running  ${HELD}`), ticked.join('\n'));
       assert.ok(ticked.includes(`   implement: ${HELD} — filed once a run in flight settles`), ticked.join('\n'));
-      assert.ok(readRun(older.id).slotHeldAt, 'the pass that held it wrote when');
-      assert.deepEqual(readRun(one.id).slotHeldAt, undefined, 'a run the cap never held has no time written');
+      assert.ok(runRecord(older.id).slotHeldAt, 'the pass that held it wrote when');
+      assert.deepEqual(runRecord(one.id).slotHeldAt, undefined, 'a run the cap never held has no time written');
 
       const listed = await printedBy(c, ['ls']);
       assert.ok(
@@ -267,9 +267,9 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
   await s.test(
     'the next pass holds them again, files nothing, and writes nothing: the time stands, and the note is said once',
     async () => {
-      const heldAt = readRun(older.id).slotHeldAt;
+      const heldAt = runRecord(older.id).slotHeldAt;
       const { runs: again } = await runWith(b.e, tickRun());
-      assert.deepEqual([b.filings.length, readRun(older.id).slotHeldAt], [2, heldAt]);
+      assert.deepEqual([b.filings.length, runRecord(older.id).slotHeldAt], [2, heldAt]);
       assert.deepEqual(again.find((a) => a.run.id === older.id)!.notes, []);
       assert.deepEqual(
         [
@@ -329,7 +329,9 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
         'the work beside it waits as before, listed by id: the watcher took no slot',
       );
       const held = async () =>
-        [...(await runWith(b.e, runSlots(b.e, listRuns(), process.env, noParents())))].map(([id]) => id).sort((x, y) => x.localeCompare(y));
+        [...(await runWith(b.e, runSlots(b.e, listRuns(), settingsOf(process.env), noParents())))]
+          .map(([id]) => id)
+          .sort((x, y) => x.localeCompare(y));
       assert.deepEqual(await held(), [younger.id, older.id], 'between passes too');
 
       b.settle(`${watcher.id}-supervise`, 'succeeded', {
@@ -451,7 +453,7 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
           pass.filter((a) => a.held),
           [],
         );
-        assert.ok(runs.every((r) => readRun(r.id).slotHeldAt === undefined));
+        assert.ok(runs.every((r) => runRecord(r.id).slotHeldAt === undefined));
       }
       await started('fourth', at(10));
       process.env.WF_MAX_RUNS = '1';
@@ -495,7 +497,7 @@ test('a run keeps its momentum: its first steps are filed with none, and everyth
         .filter((task) => task.startsWith(`${id}-`))
         .map((task) => [task.slice(id.length + 1), b.tasks.get(task)!.spec.priority ?? 'none']),
     );
-  const advanced = async (id: string) => runWith(b.e, advanceRun(readRun(id)));
+  const advanced = async (id: string) => runWith(b.e, advanceRun(runRecord(id)));
 
   await s.test('every step that waits on nothing has no momentum, and the step that joins them has 1', async () => {
     const dir = folderOf({ left: '', right: '', join: 'after: left, right' });
@@ -1048,7 +1050,7 @@ test('REFUSED by name at shipped defaults: `nemia inbox queue` of a name with no
   const x = await started('x', at(1));
   fs.writeFileSync(
     path.join(RUNS, 'started-already-zz99.json'),
-    JSON.stringify({ ...readRun(x.id), id: 'started-already-zz99', from: { inbox: 'kept-a1b2' } }),
+    JSON.stringify({ ...runRecord(x.id), id: 'started-already-zz99', from: { inbox: 'kept-a1b2' } }),
   );
   const cards = () => Object.fromEntries(fs.readdirSync(INBOX).map((f) => [f, fs.readFileSync(path.join(INBOX, f), 'utf8')]));
   const before = cards();

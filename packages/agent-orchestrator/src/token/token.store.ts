@@ -8,6 +8,7 @@
  * Rooted: every function takes the store's root as `home`, and the door (`TokenDoor`) reads the root the program is given (`StoreRoot`).
  * And the minting of a step's token as its try is filed (`stepToken`), which the tick's filings spread into the config they file.
  */
+import { runNamespace } from '../run-list/index.ts';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,7 +16,6 @@ import { Context, Layer, Result, Schema } from 'effect';
 import { doorOf, rootedDoor, type DoorOf } from '../door/door.store.ts';
 import type { Run } from '../record/record.ts';
 import type { Workflow } from '../workflow.ts';
-import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import type { TokenRecord } from './token.ts';
 
 /**
@@ -120,7 +120,7 @@ export const stepToken = (
 ): { sessionToken: string } => ({
   sessionToken: mintToken(home, {
     agent: step.agent?.name ?? step.name,
-    factory: run.factory ?? DEFAULT_FACTORY,
+    factory: runNamespace(run.factory),
     run: run.id,
     step: step.name,
     attempt,

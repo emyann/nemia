@@ -9,6 +9,7 @@
  * A raise's end is the wall's, so the story steers `Date` with node's mock timers, and passes the hour by moving them. `WF_ROOT` is set
  * before the import, since the module reads it as it loads.
  */
+import { rootNow } from './config-given.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -23,7 +24,8 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-const { addFactory, tickRun, runWith, readFeed } = await import('../src/runner.ts');
+const { tickRun, runWith, readFeed } = await import('../src/runner.ts');
+const { addFactory } = await import('../testing.ts');
 const { recordFeed, freshFeedMemo } = await import('../src/feed/feed.store.ts');
 const { levelsNow } = await import('../src/level/levels.verb.ts');
 const { readPause } = await import('../src/pause/pause.store.ts');
@@ -120,8 +122,8 @@ test("a factory's level said on the feed: each change of the level in force is o
     );
   });
   await s.test('a daemon restarted, with no fold of its own, writes no level line again', async () => {
-    const levels = await Effect.runPromise(levelsNow());
-    assert.deepEqual(recordFeed(new Map(), { memo: freshFeedMemo(), pause: readPause(), levels }).lines, []);
+    const levels = await stage.runPlaced(levelsNow());
+    assert.deepEqual(recordFeed(new Map(), { memo: freshFeedMemo(), pause: readPause(rootNow()), levels }).lines, []);
   });
   await s.test('a factory left at manual, and the default factory, are never said', async () => {
     assert.deepEqual([...new Set(levelSaid().map((l) => l[0]))], ['acme']);

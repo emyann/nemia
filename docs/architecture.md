@@ -214,7 +214,7 @@ counts as attributes on the span that skipped them (`rested` on `pass`, `kept` o
 exporter: the daemon's provides `telemetryLayer` (`src/telemetry/telemetry.store.ts`), its lines always, OTLP only when
 `OTEL_EXPORTER_OTLP_ENDPOINT` is set — its traces, its logs and every metric in its registry, the pass's and the steps' (`STEP_METRICS`,
 recorded by the tick off what it already read, by factory, workflow, step, agent and outcome alone). A session exports to the same
-collector: the orchestrator hands the runtime the endpoint (`engine()`), with `toolDetails` when the daemon's `NEMIA_TOOL_DETAILS` is
+collector: the orchestrator hands the runtime the endpoint (`engine(env)`), with `toolDetails` when the daemon's `NEMIA_TOOL_DETAILS` is
 `1`, which the runtime says to a harness that can export its tools' inputs, and files a step's task with its run and step as labels
 (`stepLabels`); the runtime, which alone knows how a harness is told, hands each session it starts the collector, those labels and its
 `task`, and the filing's trace context, and a command none (`agent-runtime/src/harness/telemetry.ts`, `test/telemetry.test.ts`). A test's seat drops the address
@@ -364,13 +364,14 @@ core is `decide` (`packages/agent-runtime/src/core/domain.ts`) and the shell is 
 `decide` reads a state off the journal and an event off the pass's observation, and asks a statechart
 (`src/core/lifecycle.ts`, XState used as a pure transition function, never run) for the edge: an event with no edge is
 refused and reported on the pass, never guessed at. In the orchestrator, the
-core is `assess` (`packages/agent-orchestrator/src/tick/assess.ts`) and the shell is the controllers `src/runner.ts` re-exports. The core is tested as
-data. The shell reads the world, asks the core, and applies one decision; an `if` that judges belongs in the core.
+core is `assess` (`packages/agent-orchestrator/src/tick/assess.ts`), which judges one value (`AssessRead`) cut from the pass's one read of
+a run (`RunRead`, built by `readRun` in `src/tick/told.verb.ts`), and the shell is the controllers `src/runner.ts` re-exports. The core is
+tested as data. The shell reads the world, asks the core, and applies one decision; an `if` that judges belongs in the core.
 
 Two facts a program needs are services with no default, given where the program is composed and by nothing else, so a program that
 asks for one and is given none does not compile: the place a run's work lives in (`PlaceService`, `src/place/place.store.ts`) and the
-store's root (`StoreRoot`, `src/config/root.store.ts`, read from `WF_ROOT` by `storeRootLayer` at `src/cli/main.ts` and at
-`apps/api/src/app.ts`). A store function takes the root as a required `home: string` with no default. What a store module still reads
+store's root (`StoreRoot`, `src/config/root.store.ts`, read from `WF_ROOT` by `storeConfigLayer` at `src/cli/main.ts` and at
+`apps/api/src/app.ts`, which gives the store's settings beside it, `StoreConfig`, `src/config/config.store.ts`). A store function takes the root as a required `home: string` with no default. What a store module still reads
 as it loads is a debt, counted line by line in `packages/agent-orchestrator/test/global-roots.baseline.ts` and held from growing by
 `test/root-given.test.ts`, which refuses a new binding, a new defaulted parameter and a new body that reads one by name: a module that
 pins a root as it loads gives the live store to a caller that named none, which is how a run of the src tests in one shared process
@@ -391,9 +392,11 @@ aggregate, for the doors after it. Unlike `PlaceService` and `StoreRoot`, the do
 default value is the files door, so a program given none reads today's records and one given the memory layer reads that, and no
 program's requirements change while the run store's callers move onto it. A default here departs from the rule above on purpose:
 `RunDoor` is no fact of where a program runs, as the place and the root are, and requiring it would have changed the type of every
-controller and of each of their callers at once. What still calls the run store's run groups (`runStore.runs`, `.asks`, `.holds`,
-`.refresh`, `.forgetting`) — synchronous callers, the stats, the run list, the pages, the command line — is a debt counted per file in
-`test/run-door.baseline.ts`, which only shrinks. A run from a card is created once: on the files the create writes the record `wx`,
+controller and of each of their callers at once. A synchronous caller — the stats, the run list, the pages, the command line — reads
+through the door at once (`runsAtOnce`, the same file), so its writes are checked as the door checks them; no file of `src` but the
+door's reads the files store (`filesStore`), which `test/run-store.test.ts` refuses with no baseline. The door is not rooted yet:
+`runsAtOnce` and `keptRuns` read the files at the module's root whatever door or `StoreRoot` a program is given, a debt counted per
+file in `packages/agent-orchestrator/test/run-door.baseline.ts`, which only shrinks. A run from a card is created once: on the files the create writes the record `wx`,
 then claims the card with a `wx` create of `<root>/started/<card>.json` naming the run — outside `runs/`, so no listing, prune or sweep
 of runs reads it — and a loser forgets its own record and is refused `Conflict` (`cardStartedTwice`). Forgetting a run (`runs.forget`,
 `nemia rm`) removes the claim that names it, so a store keeps no claim of a run it no longer has; a claim whose run has no record all the
@@ -405,7 +408,8 @@ its map. It is the Run door's to hold, not the Card door's: only this door can t
 (`factoryDoorOver`), the files (`factoryFiles(home)`, over `factory.store.ts`, `level.store.ts`, `rules.store.ts` and
 `servers.store.ts`, so a file keeps its bytes and a key the model does not name) and a memory stand-in (`factoryDoorMemory`,
 `src/factory/door/memory.store.ts`, in `STAND_INS`), held to one table of walks (`test/factory-walks.ts`). A new factory's name is checked
-as `FactoryName.OnCreate` checks it, the default factory is `Conflict`, and a factory written decodes through the model's `Factory`,
+as `FactoryName.OnCreate` checks it, the default factory is a record the door serves (`DefaultFactory`, `src/factory/factory.model.ts`)
+whose writes are `Conflict`, and a factory written decodes through the model's `Factory`,
 whose checks are its invariants (one repository at least, hires and schedules only into a workflow it offers), or is `Invalid`. A
 person's change of a factory's wiring — attach, detach, hire, fire, schedule, unschedule — is read, judged by a pure function
 (`wiringRefusal` and `rewired`, `src/factory/wiring/wiring.ts`, whose contract proves a change that would break that invariant refused) and
@@ -414,9 +418,9 @@ verb's. Its default departs from the Run door's on one point, which the pattern 
 (`rootedDoor`, `src/door/door.store.ts`), the door over the files at the `StoreRoot` the program is given, read when a method runs,
 and `Invalid`, naming the fix, where none was given — a new door may read no root of its own module's (rule 4's `root-given`), and a
 required service would change every controller's type at once. The Run door keeps its module-root default until its files store takes
-a root. What still calls the stores the door is over — a start, a plan, the inbox, the level read on every beat, the instruction, the
-upgrade — is counted per file in `test/factory-door.baseline.ts`, which only shrinks; `factory.store.ts`'s functions each take the
-store's root first (`readFactoryAt`, …), its old spellings the same functions at the module's root, for those callers.
+a root. No file of `src` but the door's imports the stores it is over or calls one, with no baseline (`src/factory/door/factories.store.test.ts`);
+a synchronous caller names its root and reads through the door at once (`readFactoryAtOnce`, `filedAtOnce`, `listedAtOnce`,
+`startFactoryAtOnce`, `doorAtOnce`).
 
 **The Card door.** A card of the inbox, and the tick's tries of a queued one, are read and written through `CardDoor`
 (`packages/agent-orchestrator/src/cards/cards.store.ts`), rooted as the Factory door is: two layers built the one way (`cardDoorOver`),
@@ -425,7 +429,7 @@ stand-in (`cardDoorMemory`, `src/cards/memory.store.ts`, in `STAND_INS`), held t
 name is checked as `CardName.OnCreate` checks it, its text read as a card by `parseInboxCard` — the reader the model's `Card` says holds
 its invariants — a name taken is `Conflict` (the files' `wx`, so `nemia inbox add` draws another), a card written back that is not there
 `Missing`, and a try is decoded through the model's `MissedStart`. The inbox's verbs (`src/inbox/inbox.store.ts`, `inbox.verb.ts`) are
-programs that yield it, and its handlers run through `rooted`; no file of `src` but the door's calls `cardFiles` by hand
+programs that yield it, and its handlers yield the `StoreRoot` their program is given; no file of `src` but the door's calls `cardFiles` by hand
 (`src/cards/cards.store.test.ts`). The run store holds no inbox.
 
 **The Workflow door.** A workflow — its folder of markdown, its steps and its README — is read and written through `WorkflowDoor`
@@ -629,7 +633,7 @@ folders by the rule every package keeps, *Folders, in every package* below: here
 from outside its concept through the part's face; a store, a verb or a model is imported by its own path, and `src/cli/` has no face.
 
 **3. The runtime is reached through one client.** Of the orchestrator's files, `src/runtime-client.ts` alone imports
-agent-runtime, a type included (`CLIENT` in test/boundary.test.ts). It creates the runtime (`engine()`, `HARNESSES`): the
+agent-runtime, a type included (`CLIENT` in test/boundary.test.ts). It creates the runtime (`engine(env)`, `HARNESSES`): the
 runtime's `Engine` service from `agent-runtime`, built once, each verb an Effect a controller's program reads with `asked`
 (`engineOf`, which a test hands a layer of its own); a caller runs a program over it with `runWith`. It passes the runtime's surface through rather than wrapping it. Every controller beneath the CLI reaches it, itself or
 through a controller it imports, but the feed's verb, which reaches no runtime (`DOORED_ONLY`), and it imports no controller. The runtime's behaviour comes through the client; its vocabulary through

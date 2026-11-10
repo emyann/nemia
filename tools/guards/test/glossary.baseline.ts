@@ -1,128 +1,12 @@
 /**
- * The spellings the glossary tables retire, still said in the code, counted per file (`glossary.test.ts`), each count only shrinking.
- *
- * `RETIRED_COUNTS`: each retired spelling, lower-cased, and each file under the paths of a table that retires it that says it, whole and
- * in any case, by its path from the repository root, with the times it says it. A table's paths take in the contexts nested in them,
- * so the run core's `wf` is counted in the whole of `packages/agent-orchestrator`; where two tables retire one spelling, its files are
- * counted once, under that spelling, over the paths of both — the run core's and the api's `wf`, the api's source saying none today.
- *
- * `wf`, on the day the guard was written: 47 words in 19 files of the orchestrator, every one of them on the card that renames the
- * command (`slice-4: the command table and the rename to nemia`). Some are a value stored and read back as it was written (a daemon
- * file's `by: 'wf up'`), the check's marker `wf <name>:`, the alias's own words, the run's branches `wf/<run>/<step>` and git's identity
- * `user.name=wf`; that card says which of them go.
- *
- * `workspace: main`, `checkout`, `heads` and `staged`, on the day decision 9 retired them (the Ending row in the run core's table; Repo,
- * Branch / tip and In progress in the place's, whose paths are the port, `src/place`, alone: the adapters speak git by design).
- * What `workspace: main` has left is its former spelling kept on purpose (`baseSpelled`, `baseLine`, `baseWritten`, `FrozenStepSchema`
- * and the renders that read it); what the place's words have left is the port's own inner names (`landing.store.ts`'s memo of a
- * checkout's `status` and its `heads`, the record's `stagedFile`), off the contract, which `place-contract.test.ts` holds. The same
- * card moved the run's branch prefix, `wf/<run>/`, out of the core into the place that names it (`runBranch` in `place/git/git.ts`, and
- * its mirror in the test place's `place/memory/reads.ts`): one count each there, against sixteen the core no longer says, and the
- * prefix keeps its spelling until slice 4 renames it.
- *
- * It only shrinks: a change that takes a retired spelling out of a file lowers its count here in the same commit, and takes the entry
- * off where none is left; a new retired row in a table adds the counts of its files the day it lands. A count is never raised, nor a
- * file added for an old spelling.
- *
- * `stated`, `unsigned` and `checkoutMcp`, on the day the runtime retired them: each a stored key or literal an older runtime's journal
- * holds, read by `upgrade` and named in its doc (`journal.ts`), the stored schema (`event-schema.ts`) and the filing door's
- * `RENAMED_ARGS` (`args.ts`). They stay while a journal on disk may hold them.
- *
- * `NeedsHuman`, `RoundsExhausted`, `WaitingForSlot`, `WaitingForCheckout`, `WaitingForPause` and `CheckDenied`, on the day the feed
- * retired them (a wait on a person said by the `Awaiting*` codes, a wait on a thing by `Waiting` and `on`): each a key of
- * `FORMER_REASONS` in `former-reason.ts`, which reads a line on disk and a stored selector that still names one. They stay while a feed
- * or a subscription on disk may hold them.
- *
- * `shipped` and `ships`, on the day decision 13a retired them (`Landed` in the run core's, the api's and the board's tables): the run's
- * sense, a run's result on its base, says `landed` everywhere since that card; the product's sense, what comes with Nemia (its git place,
- * the skills, servers and rules it lists), says `builtin` since decision 13b (its Builtin row in the same three tables). The last count,
- * the api's redirect from `/api/skills/shipped/<name>`, went with the per-kind skill routes (resource-objects: the Skill object).
- *
- * `accept`, on the day decision 7 retired it (`Approve` in the run core's table): `nemia accept` is `nemia approve` of a loop out of
- * rounds. What is left is the former spelling kept on purpose (`RENAMED`, read by admission and named in its doc), the record's names
- * for what a loop's end writes (`acceptRun`, `acceptAsk`, the `accept-<step>-<n>` file), and the word's other senses (a trust accepted,
- * a level's words). The decision's `accept` offer label is `approve` since slice B, as its `merge` is `refresh`.
- *
- * `nudge`, on the day decision 7's slice C retired it (`Try` in the run core's table): a retry's mode and a try's cause are `continue`.
- * What is left is the former spelling kept on purpose — `FORMER_MODES` (`retry-ask.ts`), through which a record and an ask file read, and
- * `RENAMED_FLAGS` and `RENAMED_VALUES` (`command.ts`), through which `nemia retry --nudge` and an api body's `"mode": "nudge"` are
- * taken with a hint. It stays while a record, an ask file or a caller may still say it. The runtime's own `nudge` is another sense,
- * outside the table's paths.
- *
- * `agents remove`, `workflows remove`, `policy drop`, `agents try`, `template check` and `factory plan`, on the day decision 8 retired them
- * (its rows Rm, Run an agent, Lint and Diff in the run core's table): each is left once, as its own row of `RENAMED` (`command.ts`), which
- * still runs a line that says it, with a hint naming the new spelling. They stay until a later card removes the former spellings.
- *
- * `claude-detached` and `claude-bg`, on the day every Claude Code session moved onto the Agent SDK: each a harness name a former
- * runtime took, said now only by the refusal that names the fix to a task or an engine still giving it (`harness-refusal.ts`,
- * `options.ts`). They stay while a caller may still write them.
- *
- * `selector` in the objects' table, on the day lists took `labelSelector` (labelSelector): the query of a list in `api.ts` still reads
- * `?selector=` the same, its retired spelling, so a link written before still selects; it goes when the list query is narrowed.
- *
- * `cordon`, on the day the leftover words were settled (the Pause row in the run core's table): the store's pause file keeps its name,
- * `PAUSE_FILE` (`pause.store.ts`), so a pause put before the verbs were renamed still stands and is lifted; and `readRun` drops the key a
- * record of that time may hold (`record.store.ts`). They stay while a store or a record on disk may say it.
- *
- * `checkout` in the objects' table too, on the day P7 renamed what a step waits on to `base` (Wait on): its two counts in `run.ts` are
- * another word, the release a session ran on (`SessionRelease`, an install's tag or a checkout's folder), not a wait. `accepted`, `/round`,
- * `/accept` and `/merge`, retired the same day (Approval in the objects' table, Ask route in the api's), are said by no file of theirs.
+ * The renames still in flight: each spelling a glossary table retires that a file under its paths still says, lower-cased, with each
+ * such file and the times it says it (`glossary.test.ts`). A count only shrinks: a change that takes the spelling out of a file lowers
+ * its count in the same commit, and takes the entry off where none is left. Why each spelling is retired is its row's card; where an
+ * old spelling stays on purpose, its row says so as a `kept` path with why, and it is not counted here.
  */
 export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
-  'agents remove': {
-    'packages/agent-orchestrator/src/command/command.ts': 1,
-  },
-  'agents try': {
-    'packages/agent-orchestrator/src/command/command.ts': 1,
-  },
-  'factory plan': {
-    'packages/agent-orchestrator/src/command/command.ts': 1,
-  },
-  'policy drop': {
-    'packages/agent-orchestrator/src/command/command.ts': 1,
-  },
-  'template check': {
-    'packages/agent-orchestrator/src/command/command.ts': 1,
-  },
-  'workflows remove': {
-    'packages/agent-orchestrator/src/command/command.ts': 1,
-  },
-  accept: {
-    'packages/agent-orchestrator/src/admission/admission.ts': 1,
-    'packages/agent-orchestrator/src/brief/brief-sections.ts': 2,
-    'packages/agent-orchestrator/src/command/command.ts': 2,
-    'packages/agent-orchestrator/src/gate/commands.verb.ts': 2,
-    'packages/agent-orchestrator/src/gate/form.verb.ts': 1,
-    'packages/agent-orchestrator/src/gate/gate.ts': 1,
-    'packages/agent-orchestrator/src/nemia/level.verb.ts': 1,
-    'packages/agent-orchestrator/src/record/record.store.ts': 4,
-    'packages/agent-orchestrator/src/record/record.ts': 3,
-    'packages/agent-orchestrator/src/round/round.ts': 7,
-    'packages/agent-orchestrator/src/round/round.verb.ts': 2,
-    'packages/agent-orchestrator/src/status/status.ts': 1,
-    'packages/agent-orchestrator/src/trust/trust.ts': 1,
-  },
-  nudge: {
-    'packages/agent-orchestrator/src/command/command.ts': 4,
-    'packages/agent-orchestrator/src/retry/retry-ask.ts': 2,
-  },
-  needshuman: {
-    'packages/agent-orchestrator/src/former-reason/former-reason.ts': 2,
-  },
-  roundsexhausted: {
-    'packages/agent-orchestrator/src/former-reason/former-reason.ts': 1,
-  },
-  waitingforslot: {
-    'packages/agent-orchestrator/src/former-reason/former-reason.ts': 1,
-  },
-  waitingforcheckout: {
-    'packages/agent-orchestrator/src/former-reason/former-reason.ts': 1,
-  },
-  waitingforpause: {
-    'packages/agent-orchestrator/src/former-reason/former-reason.ts': 1,
-  },
-  checkdenied: {
-    'packages/agent-orchestrator/src/former-reason/former-reason.ts': 1,
+  selector: {
+    'packages/objects/src/api-errors.ts': 2,
   },
   wf: {
     'packages/agent-orchestrator/place/git/git.ts': 1,
@@ -140,51 +24,5 @@ export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, num
     'packages/agent-orchestrator/src/start/store-root.ts': 1,
     'packages/agent-orchestrator/src/status/status.ts': 1,
     'packages/agent-orchestrator/src/workspace/worktree.store.ts': 1,
-  },
-  'workspace: main': {
-    'packages/agent-orchestrator/src/factory/applied/render.ts': 1,
-    'packages/agent-orchestrator/src/folder/folder.store.ts': 1,
-    'packages/agent-orchestrator/src/former/former.ts': 7,
-    'packages/agent-orchestrator/src/step/step.ts': 1,
-    'packages/agent-orchestrator/src/template/draft.ts': 1,
-    'packages/agent-orchestrator/src/workflow/step-file.ts': 1,
-  },
-  checkout: {
-    'packages/agent-orchestrator/src/place/landing.store.ts': 15,
-    'packages/agent-orchestrator/src/place/place.ts': 1,
-    'packages/objects/src/run.ts': 2,
-  },
-  heads: {
-    'packages/agent-orchestrator/src/place/landing.store.ts': 13,
-    'packages/agent-orchestrator/src/place/place.store.ts': 6,
-  },
-  staged: {
-    'packages/agent-orchestrator/src/place/landing.store.ts': 4,
-  },
-  stated: {
-    'packages/agent-runtime/src/core/engine/journal.ts': 3,
-    'packages/agent-runtime/src/core/event-schema.ts': 1,
-  },
-  unsigned: {
-    'packages/agent-runtime/src/core/engine/journal.ts': 1,
-    'packages/agent-runtime/src/core/event-schema.ts': 1,
-  },
-  checkoutmcp: {
-    'packages/agent-runtime/src/core/engine/journal.ts': 1,
-    'packages/agent-runtime/src/core/event-schema.ts': 1,
-    'packages/agent-runtime/src/harness/args.ts': 1,
-  },
-  'claude-detached': {
-    'packages/agent-runtime/src/service/harness-refusal.ts': 3,
-  },
-  'claude-bg': {
-    'packages/agent-runtime/src/service/options.ts': 3,
-  },
-  selector: {
-    'packages/objects/src/api-errors.ts': 2,
-  },
-  cordon: {
-    'packages/agent-orchestrator/src/pause/pause.store.ts': 1,
-    'packages/agent-orchestrator/src/record/record.store.ts': 1,
   },
 };

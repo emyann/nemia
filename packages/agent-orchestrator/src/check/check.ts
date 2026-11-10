@@ -110,6 +110,11 @@ export type CheckEnv = {
    */
   WF_WORKFLOW_FILES?: string;
   /**
+   * The run's own copy of the carried folder beside its workflow's (`carriedFilesDir`), the files its workflows share, taken with the
+   * workflow's copy: absent where the record names none, no `carried/` having stood beside the workflow's folder.
+   */
+  WF_CARRIED_FILES?: string;
+  /**
    * The run's labels (`area`, `work`, …) as a JSON object of strings, `{}` where it has none: what Kubernetes' Downward API gives a
    * container of its own Pod's labels, so a check can act on what its run is, such as labelling the pull request it pushes.
    */
@@ -120,12 +125,12 @@ export type CheckEnv = {
  * What a step's check is told (`CheckEnv`): its run, its step, the workspace it judges and the step's artifacts folder (`t.files`), the
  * run's base commit where the step works on a branch of a repository run, the file of the step's closeout (`t.closeout`) where it
  * signed off one, the run's copy of its workflow folder (`t.workflowFiles`) wherever the record names one — a repository run's step
- * and ending and a folder run's alike — and the run's labels.
+ * and ending and a folder run's alike — and of its carried files (`t.carriedFiles`) the same way, and the run's labels.
  */
 export const checkEnvOf = (
   run: Run,
   step: Pick<Workflow, 'name' | 'workspace'>,
-  t: { workspace: string; files: string; closeout: string | undefined; workflowFiles?: string },
+  t: { workspace: string; files: string; closeout: string | undefined; workflowFiles?: string; carriedFiles?: string },
 ): CheckEnv => ({
   WF_RUN: run.id,
   WF_STEP: step.name,
@@ -134,6 +139,7 @@ export const checkEnvOf = (
   WF_ARTIFACTS: t.files,
   ...(t.closeout ? { WF_CLOSEOUT: t.closeout } : {}),
   ...(t.workflowFiles ? { WF_WORKFLOW_FILES: t.workflowFiles } : {}),
+  ...(t.carriedFiles ? { WF_CARRIED_FILES: t.carriedFiles } : {}),
   WF_LABELS: JSON.stringify(run.labels ?? {}),
 });
 

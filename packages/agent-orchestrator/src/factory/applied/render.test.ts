@@ -416,3 +416,49 @@ test('what a render refuses by name, with nothing of it to write', async (t) => 
     assert.ok(said('workflows/dev/workflow.yaml, step implement: `codex:`', ...block), out.refusals.join('\n'));
   });
 });
+
+test("a template's carried folder and its shared lines, as the render writes them into the factory's tree", async (t) => {
+  await t.test('carried/ is copied byte for byte to workflows/carried/, at any depth', () => {
+    const { dir } = exported();
+    const bytes = Buffer.from([0x23, 0x21, 0x00, 0xff, 0x0a, 0x7f]);
+    fs.mkdirSync(path.join(dir, 'carried/deep'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'carried/deep/land.ts'), bytes);
+    fs.writeFileSync(path.join(dir, 'carried/notes.md'), 'Read me ${{ parameters.check }} as I am.\n');
+    const { tree, out } = rendered(dir, ['check=npm test']);
+    assert.deepEqual(out.refusals, []);
+    assert.deepEqual(fs.readFileSync(path.join(tree, 'workflows/carried/deep/land.ts')), bytes);
+    assert.equal(
+      fs.readFileSync(path.join(tree, 'workflows/carried/notes.md'), 'utf8'),
+      'Read me ${{ parameters.check }} as I am.\n',
+      'a carried file is no text the render writes: its expressions stay as they are',
+    );
+  });
+
+  await t.test("a fence list's { path } items are written as the file's lines, each line once, in their places", () => {
+    const { dir } = exported();
+    fs.mkdirSync(path.join(dir, 'fences'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'fences/read.yaml'), '# what a reader may run\n- Bash(git log:*)  # reads history\n- Bash(ls:*)\n');
+    edit(dir, 'agents/reviewer/agent.yaml', (spec) => {
+      spec.claude.fence.allowedTools = ['Bash(git diff:*)', { path: 'fences/read.yaml' }, 'Bash(ls:*)', 'Bash(wc:*)'];
+    });
+    const { tree, out } = rendered(dir);
+    assert.deepEqual(out.refusals, []);
+    assert.match(
+      fs.readFileSync(path.join(tree, 'workflows/agents/reviewer.md'), 'utf8'),
+      /^ {4}allowedTools: Bash\(git diff:\*\), Bash\(git log:\*\), Bash\(ls:\*\), Bash\(wc:\*\)$/m,
+    );
+  });
+
+  await t.test('a workflow named carried is refused by name, since carried/ beside the workflows is the carried folder', () => {
+    const { dir } = exported();
+    fs.cpSync(path.join(dir, 'workflows/triage'), path.join(dir, 'workflows/carried'), { recursive: true });
+    const doc = parse(fs.readFileSync(path.join(dir, 'workflows/carried/workflow.yaml'), 'utf8'));
+    doc.metadata.name = 'carried';
+    fs.writeFileSync(path.join(dir, 'workflows/carried/workflow.yaml'), stringify(doc, { lineWidth: 0 }));
+    const { out } = rendered(dir);
+    assert.ok(
+      out.refusals.some((r) => r.startsWith('workflows/carried/workflow.yaml: ')),
+      out.refusals.join('\n'),
+    );
+  });
+});

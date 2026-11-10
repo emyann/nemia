@@ -1,7 +1,8 @@
 /**
  * A page cites only what is there: a path in backticks is a file or a folder from the repository's root, or a package's entry, and a
- * name in backticks is one the code has. The code's names are read as `comments.test.ts` reads them: every identifier and every word
- * of a string in the TypeScript under packages/, apps/, lint/ and tools/, and a string's whole text for a word with hyphens. The
+ * name in backticks is one the code has. The code's names are read by the scanner `comments.test.ts` reads them with (`namesOf` of
+ * `test-kit/words`): every identifier and every word of a string in the TypeScript under packages/, apps/, lint/ and tools/, and a
+ * string's whole text for a word with hyphens. The
  * contexts' glossary tables are held as a page is: the Glossary page is drawn from their texts, each context's `about` and each term's
  * `meaning`.
  */
@@ -13,6 +14,7 @@ import path from 'node:path';
 import ts from 'typescript';
 import { tablesIn } from '../src/glossary.ts';
 import { scratch } from 'test-kit/scratch';
+import { namesOf } from 'test-kit/words';
 
 const APP = path.join(import.meta.dirname, '..');
 const ROOT = path.join(APP, '..', '..');
@@ -74,20 +76,6 @@ const staleCitations = (file: string, text: string, known: Known): string[] =>
     const stale = staleOf(span, known);
     return stale ? [`${file}:${line} cites \`${span}\`, ${stale}`] : [];
   });
-
-/** Every name a piece of code has: its identifiers, the words of its strings, and each string's whole text. */
-const namesOf = (source: ts.SourceFile, into: Set<string>): Set<string> => {
-  const visit = (node: ts.Node) => {
-    if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node)) into.add(node.text.replace(/^#/, ''));
-    else if (ts.isStringLiteralLike(node) || ts.isTemplateLiteralToken(node) || ts.isJsxText(node)) {
-      into.add(node.text);
-      for (const word of node.text.match(/[A-Za-z_$][\w$-]*/g) ?? []) for (const part of [word, ...word.split('-')]) into.add(part);
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(source);
-  return into;
-};
 
 /** Every name the TypeScript of `files`, by path from `root`, has: the docs' own tests left out, whose fixtures cite stale names. */
 const namesIn = (root: string, files: string[]): Set<string> =>

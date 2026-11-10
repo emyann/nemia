@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { debtBreaks, seamUses, sourcesUnder, type DebtBreak } from 'test-kit/debt';
+import { seamUses as usesOf, sourcesUnder } from 'test-kit/debt';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { act, done, doorFrom, walksOn } from '../../test/door-walks.ts';
@@ -106,52 +106,56 @@ const OWN = [
 
 const PKG = path.join(import.meta.dirname, '..', '..');
 
+/** Every file of `src` but the tests and the stores, by its path from the package. */
+const sourcesOfSrc = (): Record<string, string> => sourcesUnder(PKG, 'src', OWN);
+
 /**
  * A call of a `SEAM` name, not a method of the same name (`x.loadAgents(`). `src`'s count passes over a spread call too
  * (`[...loadAgents(dir)]`), as its baseline was counted; the api's (`SPREAD_TOO`) counts one, its debt being none.
  */
-const SEAM_CALL = new RegExp(`(?<![\\w$.])(?:${SEAM.join('|')})\\s*\\(`, 'g');
-const SPREAD_TOO = new RegExp(`(?<![\\w$]|[^.]\\.)(?:${SEAM.join('|')})\\s*\\(`, 'g');
+const SEAM_CALL = `(?<![\\w$.])(?:${SEAM.join('|')})\\s*\\(`;
+const SPREAD_TOO = `(?<![\\w$]|[^.]\\.)(?:${SEAM.join('|')})\\s*\\(`;
 
-/** What a break of the baseline says: a file it does not name or a count grown, a count fallen, a file with none left. */
-const inWords = ({ file, uses: n, owed, kind }: DebtBreak): string =>
-  kind === 'grown'
-    ? `${file} calls the agent and skill stores ${n} time(s) where test/agent-door.baseline.ts names ${owed}: yield AgentDoor or SkillDoor instead`
-    : kind === 'fallen'
-      ? `${file} calls the agent and skill stores ${n} time(s): lower its count in test/agent-door.baseline.ts to ${n}, which only shrinks`
-      : `${file} calls the agent and skill stores no more: take its line out of test/agent-door.baseline.ts`;
+/**
+ * Each file of `sources` that calls the agent and skill stores rather than yielding the doors, with how many times: a refusal, since every
+ * caller is converted and none may come back.
+ */
+function seamRefusals(sources: Record<string, string>, calls = SEAM_CALL): string[] {
+  return [...usesOf(sources, new RegExp(calls, 'g'))].map(
+    ([file, n]) => `${file} calls the agent and skill stores ${n} time(s): yield AgentDoor or SkillDoor instead`,
+  );
+}
 
-test('no file of src calls the agent and skill stores but as test/agent-door.baseline.ts counts it, and the count only shrinks', async () => {
-  const { AGENT_DOOR_DEBT } = await import('../../test/agent-door.baseline.ts');
-  assert.deepEqual(debtBreaks(seamUses(sourcesUnder(PKG, 'src', OWN), SEAM_CALL), AGENT_DOOR_DEBT).map(inWords), []);
+test('no file of src calls the agent and skill stores: every caller yields AgentDoor or SkillDoor', () => {
+  assert.deepEqual(seamRefusals(sourcesOfSrc()), []);
 });
 
-test('REFUSED: a converted file that calls a store again, and a count the baseline holds above what is left', async () => {
-  const { AGENT_DOOR_DEBT } = await import('../../test/agent-door.baseline.ts');
-  const sources = sourcesUnder(PKG, 'src', OWN);
+test('REFUSED: a file that calls a store again', () => {
+  const sources = sourcesOfSrc();
   const again = { ...sources, 'src/skills/skills.verb.ts': `${sources['src/skills/skills.verb.ts']}\nconst x = skillsFor('a');\n` };
-  assert.equal(debtBreaks(seamUses(again, SEAM_CALL), AGENT_DOOR_DEBT).length, 1);
-  const [first = 'src/skills/skills.verb.ts'] = Object.keys(AGENT_DOOR_DEBT);
-  assert.equal(debtBreaks(seamUses(sources, SEAM_CALL), { ...AGENT_DOOR_DEBT, [first]: (AGENT_DOOR_DEBT[first] ?? 0) + 1 }).length, 1);
+  assert.equal(seamRefusals(again).length, 1);
 });
 
 const API = path.join(PKG, '..', '..', 'apps', 'api');
 
+/** Every file of the api's `src` but its tests, by its path from the api. */
+const sourcesOfApi = (): Record<string, string> => sourcesUnder(API, 'src');
+
 test("no file of the api's src calls the agent and skill stores: its handlers read them through AgentDoor and SkillDoor, its debt none", () => {
-  assert.deepEqual(debtBreaks(seamUses(sourcesUnder(API, 'src'), SPREAD_TOO), {}).map(inWords), []);
+  assert.deepEqual(seamRefusals(sourcesOfApi(), SPREAD_TOO), []);
 });
 
 test("REFUSED: a file of the api's src that calls an agent store is one break", () => {
-  const sources = sourcesUnder(API, 'src');
+  const sources = sourcesOfApi();
   const again = {
     ...sources,
     'src/workflows/builder.ts': `${sources['src/workflows/builder.ts']}\nconst x = loadAgents('a');\n`,
   };
-  assert.equal(debtBreaks(seamUses(again, SPREAD_TOO), {}).length, 1);
+  assert.equal(seamRefusals(again, SPREAD_TOO).length, 1);
   const spread = { ...sources, 'src/agents/skills.ts': `${sources['src/agents/skills.ts']}\nconst y = [...skillsFor('a')];\n` };
-  assert.equal(debtBreaks(seamUses(spread, SPREAD_TOO), {}).length, 1, 'a call spread into a list is a call');
+  assert.equal(seamRefusals(spread, SPREAD_TOO).length, 1, 'a call spread into a list is a call');
   const method = { ...sources, 'src/agents/skills.ts': `${sources['src/agents/skills.ts']}\nconst z = door.loadAgents('a');\n` };
-  assert.deepEqual(debtBreaks(seamUses(method, SPREAD_TOO), {}).map(inWords), [], 'a method of the same name is no call of the store');
+  assert.deepEqual(seamRefusals(method, SPREAD_TOO), [], 'a method of the same name is no call of the store');
 });
 
 test("an agent's version counts the skills its reader found (`AgentAt.skills`), else those beside its own folder", async () => {

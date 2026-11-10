@@ -37,7 +37,17 @@
       "retired": [
         {
           "spelling": "checkout",
-          "card": "decision 9: the place speaks its own words; git's stay in the adapter"
+          "card": "decision 9: the place speaks its own words; git's stay in the adapter",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/place/landing.store.ts",
+              "why": "the port's own inner names, off the contract, which `place-contract.test.ts` holds"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/place/place.ts",
+              "why": "the port's own inner names, off the contract, which `place-contract.test.ts` holds"
+            }
+          ]
         }
       ]
     },
@@ -51,7 +61,17 @@
         },
         {
           "spelling": "heads",
-          "card": "decision 9: the place speaks its own words; git's stay in the adapter"
+          "card": "decision 9: the place speaks its own words; git's stay in the adapter",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/place/landing.store.ts",
+              "why": "the port's memo of a repository's heads, off the contract, which `place-contract.test.ts` holds"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/place/place.store.ts",
+              "why": "the port's own inner names, off the contract, which `place-contract.test.ts` holds"
+            }
+          ]
         }
       ]
     },
@@ -72,7 +92,13 @@
       "retired": [
         {
           "spelling": "staged",
-          "card": "decision 9: the place speaks its own words; git's stay in the adapter"
+          "card": "decision 9: the place speaks its own words; git's stay in the adapter",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/place/landing.store.ts",
+              "why": "the record's `stagedFile`, the port's own inner name, off the contract"
+            }
+          ]
         }
       ]
     },

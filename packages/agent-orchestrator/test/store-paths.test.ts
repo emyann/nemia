@@ -66,10 +66,11 @@ const EXCEPTIONS: Readonly<Record<string, Exception>> = {
       "person's file nor the inbox, which are runStore's",
   },
   'packages/agent-orchestrator/src/frozen/frozen.store.ts': {
-    through: ['workflowFilesDir'],
+    through: ['workflowFilesDir', 'carriedFilesDir'],
     why:
-      "a run's copy of its workflow folder, runs/<id>/workflow/<hex>, is written once per content at nemia start and where its pins " +
-      "move, and read by its checks and sessions as WF_WORKFLOW_FILES: neither its record, a person's file nor the inbox",
+      "a run's copies of its workflow folder and of the carried folder beside it, runs/<id>/workflow/<hex> and runs/<id>/carried/<hex>, " +
+      'are written once per content at nemia start and where its pins move, and read by its checks and sessions as WF_WORKFLOW_FILES ' +
+      "and WF_CARRIED_FILES: neither its record, a person's file nor the inbox",
   },
 };
 

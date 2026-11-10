@@ -1,9 +1,10 @@
 /**
  * `node pull-request.ts <verb>` — the one door through which a run's change reaches GitHub: the push of this run's own branch, and the pull
  * request CI judges. A Bash prefix rule cannot tell `git push origin wf/…` from `git push origin main`, and no agent may type either, so
- * the act is this script, read from the run's frozen workflow files (`$WF_WORKFLOW_FILES`) as `probe.ts` is, and `gh` is denied whole to
- * the agents that run it. It imports `node:child_process` and its sibling `ci-log.ts`, the pure rules of a failing job's log and of how a
- * check reads, and no other: a run freezes its workflow's whole folder, so the sibling is beside it wherever it runs.
+ * the act is this script, read from the run's frozen carried files (`$WF_CARRIED_FILES`) as `probe.ts` is, and `gh` is denied whole to
+ * the agents that run it. It imports its siblings `ci-log.ts`, the pure rules of a failing job's log and of how a check reads, and
+ * `exec.ts`, how a command is run and CI waited on, and no other: a run freezes the carried folder whole, so they are beside it wherever
+ * it runs.
  *
  * - `open --title <t> --body-file <f> --labels "<rules>"`, which the engineer types once a round after merging the base: it pushes her
  *   branch to `origin` and opens the pull request with the title and body she wrote, or updates the one that is open, never a draft and
@@ -63,11 +64,8 @@
  * the base's. A hint, never a verdict: a read that fails, or a base pending, green or unreported, adds nothing, and the refusal stays
  * the work's, never the person's because of it. A green head's wait asks nothing of the base.
  */
-import { spawnSync } from 'node:child_process';
-import { PASSED, type Seen, checkKey, failures, latest, linkOf, nameOf, pending, seenOf, verdict } from './ci-log.ts';
-
-/** A reason the verb is refused: said on stderr, exit 1. */
-class Refusal extends Error {}
+import { PASSED, type Seen, JOBS, checkKey, failures, latest, linkOf, listing, nameOf, pending, seenOf, verdict } from './ci-log.ts';
+import { POLL_SECONDS, Refusal, START_SECONDS, WHOLE_SECONDS, authed, base, git, noGh, run, type Ran, seconds, sleep } from './exec.ts';
 
 /**
  * A refusal only a person can answer — the machine, the repository on GitHub, the factory's rules, or CI that never judged — which no
@@ -83,20 +81,6 @@ const NOT_THE_WORK = 'not the work: a person answers this refusal, as it says; a
 class Unlabelled extends PersonsRefusal {}
 
 /**
- * How long the CI context has to be reported at all, in seconds: a queue longer than this is a refusal, answered by a `--recheck`.
- * `WF_CI_START_SECONDS` lowers it for a test, on its own, so the two stages of the wait are told apart by a fixture.
- */
-const START_SECONDS = 1800;
-
-/**
- * How long the whole wait may take, in seconds, the start and the one re-run of a red included: the re-run adds no time, sharing this
- * one clock. `WF_CI_WAIT_SECONDS` lowers it for a test. It must stay well under
- * the round check's own deadline, which is the whole of the clauses before it as well: a wait longer than what is left of that
- * deadline would be killed by the engine, and the person would get no refusal in words.
- */
-const WHOLE_SECONDS = 2400;
-
-/**
  * How long, in seconds, the wait reads the pull request's `mergeable` again while GitHub answers `UNKNOWN`, which it does while it
  * computes, before it waits on CI all the same; `WF_PR_MERGEABLE_SECONDS` lowers it for a test. A `CONFLICTING` head is refused at
  * once: GitHub runs no `pull_request` workflow on it, so no CI would come.
@@ -105,9 +89,6 @@ const MERGEABLE_SECONDS = 15;
 
 /** How long the wait sleeps between two reads of `mergeable`, in seconds; `WF_PR_MERGEABLE_POLL_SECONDS` lowers it for a test. */
 const MERGEABLE_POLL_SECONDS = 3;
-
-/** How long the wait sleeps between two polls, in seconds. */
-const POLL_SECONDS = 15;
 
 /**
  * How long, in seconds, the push reads the pull request's head again for before it refuses one that is not `HEAD`: GitHub moves the head
@@ -122,57 +103,37 @@ const HEAD_POLL_SECONDS = 3;
 /** The most lines the refusal prints of all the failing jobs' logs together. */
 const LOG_LINES = 200;
 
-/** The most failing jobs the refusal names. */
-const JOBS = 10;
-
 /**
  * The step the `nemia retry` line names where the check's own environment does not say (`WF_STEP`, `src/check/check.ts`): the pushing step
  * of both `build` and `quick`. The branch cannot say it — a run's line of work is named for the run, not for the step that cut it.
  */
 const STEP = 'implement';
 
-/** How long a call of `git` or `gh` may take, in milliseconds. */
-const BOUND = 120_000;
-
 /**
  * An entry of a head's check rollup, as `gh pr view --json statusCheckRollup` gives one: a check run, or a status context, each field
  * absent where gh exports none. `startedAt` is when a check run started; Go's zero time (`0001-01-01T00:00:00Z`) for one still queued.
+ * Apart from `landing.ts`'s on purpose: a re-run of a red is asked by its workflow, so this one reads `workflowName`.
  */
 type Entry = Partial<Record<EntryField, string>>;
 type EntryField = 'name' | 'context' | 'status' | 'state' | 'conclusion' | 'detailsUrl' | 'targetUrl' | 'workflowName' | 'startedAt';
 
-/** A pull request as this script reads one: what it is and what it is on, then what `pulls` reads of it besides. */
+/**
+ * A pull request as this script reads one: what it is and what it is on, then what `pulls` reads of it besides. Apart from
+ * `landing.ts`'s, which reads a state and a merge commit, never labels.
+ */
 type Pr = Opened & { mergeable?: string; labels?: { name: string }[] };
 type Opened = { number: number; url: string; isDraft: boolean; baseRefName: string; headRefOid: string };
 
-/** What a command printed: its exit, its streams, and whether there was no such command on the PATH. */
-type Ran = { status: number | null; out: string; err: string; missing: boolean };
+/** The act this script needs `gh` for, which a refusal names where there is none, whichever call finds it out. */
+const OPENING = 'opening the pull request';
 
-/** The most bytes a command may print before it is cut off: a test job's whole log runs past `spawnSync`'s default of 1 MiB. */
-const OUTPUT_BYTES = 64 * 1024 * 1024;
-
-/** Run `cmd` with `args`, bounded, reading nothing from stdin. */
-function run(cmd: string, args: string[]): Ran {
-  const r = spawnSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: BOUND, maxBuffer: OUTPUT_BYTES });
-  const missing = r.error !== undefined && 'code' in r.error && r.error.code === 'ENOENT';
-  return { status: r.status, out: r.stdout ?? '', err: (r.stderr ?? '').trim() || (r.error?.message ?? ''), missing };
-}
-
-/** What git printed for `args`, trimmed; refuses, saying what could not be told, when git fails. */
-function git(what: string, ...args: string[]): string {
-  const ran = run('git', args);
-  if (ran.status !== 0) throw new Refusal(`cannot tell ${what}, since \`git ${args.join(' ')}\` failed: ${ran.err}`);
-  return ran.out.trim();
-}
-
-/** The refusal where there is no `gh`, whichever call finds it out. */
-const NO_GH =
-  "no `gh` on the PATH, and the pull request is GitHub's CLI's to open. Install it (https://cli.github.com) and run `gh auth login`";
-
-/** What `gh` printed for `args`, trimmed; refuses, naming what it was asked, when `gh` fails or is not there. */
+/**
+ * What `gh` printed for `args`, trimmed; refuses, naming what it was asked, when `gh` fails or is not there. Apart from
+ * `landing.ts`'s on purpose: a missing `gh` here is a person's refusal, which tells a retried try to change nothing.
+ */
 function gh(...args: string[]): string {
   const ran = run('gh', args);
-  if (ran.missing) throw new PersonsRefusal(NO_GH);
+  if (ran.missing) throw new PersonsRefusal(noGh(OPENING));
   if (ran.status !== 0) throw new Refusal(`\`gh ${args.join(' ')}\` failed: ${ran.err}`);
   return ran.out.trim();
 }
@@ -180,7 +141,7 @@ function gh(...args: string[]): string {
 /** Whatever `gh` printed for `args`, failure included: for a read whose failure is said in words, never thrown. */
 const read = (...args: string[]): Ran => run('gh', args);
 
-/** `text` parsed as JSON; refuses, naming what was read and what it said, when it does not parse. */
+/** `text` parsed as JSON; refuses, naming what was read and what it said, when it does not parse. Apart: it shares `hinted` with reads. */
 function parsed<T>(what: string, text: string): T {
   const said = hinted<T>(text);
   if (said === undefined) throw new Refusal(`cannot read ${what}, which is no JSON: ${text.trim().slice(0, 200)}`);
@@ -215,14 +176,7 @@ function branchOf(): { branch: string; run: string; leaf: string } {
   return { branch, run: named[1], leaf: named[2] };
 }
 
-/** `gh auth status` passing; refuses with the one command a person types when it does not. */
-function authed(): void {
-  const status = read('auth', 'status');
-  if (status.missing) throw new PersonsRefusal(NO_GH);
-  if (status.status !== 0) throw new PersonsRefusal(`\`gh\` is not authenticated here: run \`gh auth login\`. It said: ${status.err}`);
-}
-
-/** The remote `origin`'s address; refuses, naming the read, where there is none. */
+/** The remote `origin`'s address; refuses, naming the read, where there is none. Apart from `landing.ts`'s: this one returns it. */
 function origin(): string {
   const remote = run('git', ['remote', 'get-url', 'origin']);
   if (remote.status !== 0)
@@ -233,18 +187,10 @@ function origin(): string {
   return remote.out.trim();
 }
 
-/** The remote's default branch, which every pull request of a run is based on. */
-function base(): string {
-  const view = gh('repo', 'view', '--json', 'defaultBranchRef');
-  const name = parsed<{ defaultBranchRef?: { name?: string } }>("the remote's default branch", view).defaultBranchRef?.name;
-  if (!name) throw new Refusal('`gh repo view --json defaultBranchRef` named no default branch: the base of the pull request is unknown');
-  return name;
-}
-
 /** The commit `HEAD` is on. */
 const head = (): string => git('what commit HEAD is', 'rev-parse', 'HEAD');
 
-/** The open pull requests whose head is `branch`. */
+/** The open pull requests whose head is `branch`; apart from `landing.ts`'s, which reads every state of the run's branches. */
 function pulls(branch: string): Pr[] {
   const fields = 'number,url,isDraft,baseRefName,headRefOid,mergeable,labels';
   return parsed<Pr[]>(`the pull requests of ${branch}`, gh('pr', 'list', '--head', branch, '--state', 'open', '--json', fields));
@@ -252,13 +198,16 @@ function pulls(branch: string): Pr[] {
 
 /** The line the engineer types to open the pull request, for a refusal that asks for one. */
 const OPEN_LINE =
-  'node "$WF_WORKFLOW_FILES/pull-request.ts" open --title "<the card\'s line>" --body-file "$WF_STEP_FILES/pr-body.md" ' +
+  'node "$WF_CARRIED_FILES/pull-request.ts" open --title "<the card\'s line>" --body-file "$WF_STEP_FILES/pr-body.md" ' +
   '--labels "<the rules your step\'s note gives>"';
 
 /** The `gh api` form of an edit of a pull request's own fields, for a refusal that asks a person to type one. */
 const API_LINE = (n: number, field: string) => `gh api -X PATCH repos/{owner}/{repo}/pulls/${n} -f ${field}`;
 
-/** The one open pull request of `open`, read as this script requires one; refuses a draft, another base, none, or two. */
+/**
+ * The one open pull request of `open`, read as this script requires one; refuses a draft, another base, none, or two. Apart from
+ * `landing.ts`'s, which tells a merged pull request from an open one instead.
+ */
 function sole(open: readonly Pr[], branch: string, onto: string): Pr {
   if (open.length === 0)
     throw new Refusal(
@@ -310,7 +259,7 @@ function labelRules(args: readonly string[]): LabelRule[] {
   if (flag !== '--labels' || given === undefined || rest.length)
     throw new PersonsRefusal(
       'push takes `--labels "<rules>"` and nothing else, each rule `<key>=<value>:<label>` and the rules apart by spaces: give it ' +
-        'as the step\'s check gives it, `node "$WF_WORKFLOW_FILES/pull-request.ts" push --labels "<rules>"`',
+        'as the step\'s check gives it, `node "$WF_CARRIED_FILES/pull-request.ts" push --labels "<rules>"`',
     );
   return given
     .split(/\s+/)
@@ -405,30 +354,11 @@ function rollup(number: number): Entry[] {
   return parsed<{ statusCheckRollup?: Entry[] }>(`the checks of #${number}`, text).statusCheckRollup ?? [];
 }
 
-/** The number of seconds `name` holds, or `fallback` where it holds no number. */
-function seconds(name: string, fallback: number): number {
-  const said = Number(process.env[name]);
-  return Number.isFinite(said) && said >= 0 ? said : fallback;
-}
-
-/** Sleep `secs` seconds, the thread held, so the poll is one process and no timer outlives it. */
-function sleep(secs: number): void {
-  if (secs <= 0) return;
-  const held = new Int32Array(new SharedArrayBuffer(4));
-  Atomics.wait(held, 0, 0, secs * 1000);
-}
-
 /** The job GitHub's own URL names for `entry` (`…/actions/runs/<run>/job/<id>`); none where its URL names no job. */
 const jobIdOf = (entry: Entry): string | undefined => /\/job\/(\d+)/.exec(linkOf(entry))?.[1];
 
 /** The workflow run GitHub's own URL names for `entry` (`…/actions/runs/<run>/job/<id>`); none where it is no job of an Actions run. */
 const runIdOf = (entry: Entry): string | undefined => /\/actions\/runs\/(\d+)\/job\/\d+/.exec(linkOf(entry))?.[1];
-
-/** `failed` by name and verdict with its URL, one a line, at most `JOBS` of them. */
-const listing = (failed: readonly Entry[]): string[] => [
-  ...failed.slice(0, JOBS).map((entry) => `  ${nameOf(entry)}: ${verdict(entry) || 'no verdict'} ${linkOf(entry)}`.trimEnd()),
-  ...(failed.length > JOBS ? [`  … and ${failed.length - JOBS} more`] : []),
-];
 
 /**
  * Why CI went red, for the next try to read: each entry of `entries` that did not pass, by name and verdict with its URL; then, for each
@@ -485,8 +415,8 @@ function openArgs(args: string[]): { title: string; bodyFile: string; rules: Lab
 function placed(): { branch: string; run: string; leaf: string; onto: string } {
   const named = branchOf();
   origin();
-  authed();
-  const onto = base();
+  authed(OPENING, PersonsRefusal);
+  const onto = base('the pull request', gh);
   if (named.branch === onto)
     throw new Refusal(
       `HEAD is on \`${onto}\`, the remote's default branch, and this script never pushes the base: switch to the run's own branch ` +
@@ -572,14 +502,15 @@ function push(args: string[]): string[] {
  */
 const judgedRed = (entry: Entry): boolean => !pending(entry) && ![PASSED, 'CANCELLED', 'SKIPPED', 'NEUTRAL'].includes(verdict(entry));
 
-/** A check run or a status context as REST gives one (`commits/<sha>/check-runs`, `commits/<sha>/status`). */
+/** A check run or a status context as REST gives one (`commits/<sha>/check-runs`, `commits/<sha>/status`); apart: it is spread whole. */
 type Rest = Partial<Record<string, string>>;
 
 /**
  * A commit's check runs and status contexts as `Entry`s, read over REST. Check runs come lower-case, a conclusion null until one is
  * over, which `pending` and `verdict` read as they read the rollup's, upper-casing; only where a person reads each is named as the
  * rollup names it. The combined status's own `state` is never read: a repository whose CI is all check runs answers `pending` with no
- * status at all. Each read goes through `read`, so a failure is no throw: a read that fails gives no entries.
+ * status at all. Each read goes through `read`, so a failure is no throw: a read that fails gives no entries. Apart from `landing.ts`'s
+ * on purpose: the base's red here is a hint, never a verdict.
  */
 function entriesAt(sha: string): Entry[] {
   const at = `repos/{owner}/{repo}/commits/${sha}`;
@@ -738,7 +669,7 @@ function checkOf(args: readonly string[]): string {
   if (flag !== '--check' || !name || name.startsWith('--') || rest.length)
     throw new PersonsRefusal(
       'wait takes `--check <name>`, the CI context branch protection requires of the base branch, and nothing else: give it as ' +
-        'the step\'s check gives it, `node "$WF_WORKFLOW_FILES/pull-request.ts" wait --check <name>`',
+        'the step\'s check gives it, `node "$WF_CARRIED_FILES/pull-request.ts" wait --check <name>`',
     );
   return name;
 }

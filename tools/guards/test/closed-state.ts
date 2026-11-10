@@ -15,7 +15,8 @@
  * A field is keyed `<file>#<Owner>.<path>.<prop>`: the file that declares the named type it sits in, from the root, that type's name,
  * and the way down to it (`[]` an array's or a tuple's element, `{}` an index signature's value). No line, so moving code moves no key.
  *
- * Run as a program it prints today's hits as the baseline's entries: `node tools/guards/test/closed-state.ts` from the root.
+ * Run as a program it prints today's open fields, each with the line that declares it: `node tools/guards/test/closed-state.ts` from the
+ * root.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -187,5 +188,5 @@ export const openStates = (files: readonly string[], root: string): { hits: Hit[
 export const repositoryHits = (): { hits: Hit[]; visited: string[] } => openStates(doors(), REPO);
 
 if (import.meta.main) {
-  for (const { key, file, line } of repositoryHits().hits) console.log(`  '${key}': { card: '' }, // ${file}:${line}`);
+  for (const { key, file, line } of repositoryHits().hits) console.log(`${key} ${file}:${line}`);
 }

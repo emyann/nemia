@@ -4,7 +4,7 @@
  * jobs that did not pass as a refusal lists them — for that script's wait and `landing.ts`'s, and what `landing.ts`'s receipt says of
  * its wait at the merge: pure,
  * reading no process and calling nothing. It sits beside the scripts rather than in them so each stays within its size, and it travels
- * with them: a run freezes its workflow's whole folder (`$WF_WORKFLOW_FILES`), so a script reads it there, as it is read here. It
+ * with them: a run freezes the carried folder whole (`$WF_CARRIED_FILES`), so a script reads it there, as it is read here. It
  * imports nothing.
  */
 
@@ -157,8 +157,8 @@ export const NOT_FAILED: ReadonlySet<string> = new Set([PASSED, 'SKIPPED', 'NEUT
 /** The entries of `entries` named `check`. */
 export const named = <T extends Check>(entries: readonly T[], check: string): T[] => entries.filter((entry) => nameOf(entry) === check);
 
-/** The most jobs that did not pass a refusal names. */
-const JOBS = 10;
+/** The most jobs that did not pass a refusal names, and whose log `pull-request.ts` reads. */
+export const JOBS = 10;
 
 /** `listed` by name and verdict, or state where it has none yet, with its URL, one a line, at most `JOBS` of them. */
 export const listing = (listed: readonly Check[]): string[] => [

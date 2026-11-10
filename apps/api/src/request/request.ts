@@ -9,6 +9,7 @@ import { Effect } from 'effect';
 import type { Context, MiddlewareHandler } from 'hono';
 import { matchedRoutes } from 'hono/route';
 import type { ApiEnv } from '../layer.ts';
+import { routeAt } from '../objects/endpoints.ts';
 
 /**
  * What a request's line and its span both carry, as OpenTelemetry names them: the method, the path asked for, the status answered, and
@@ -27,14 +28,20 @@ const WILDCARD = '/*';
 
 /**
  * The route the router matched the request to, as its pattern (`/api/runs/:runId`), or undefined where nothing but the middleware's own
- * wildcard matched, which is what OTel asks of a request that reached no route. The last of the matched routes, not Hono's own helper for
- * the request's route, which reads the one at the index the dispatcher moves as it runs each handler: what that index names depends on
- * when it is read, while the last line matched is the route whichever handler is running.
+ * wildcard matched, which is what OTel asks of a request that reached no route. Read off every line the request matched, not Hono's own
+ * helper for the request's route, which reads the one at the index the dispatcher moves as it runs each handler: what that index names
+ * depends on when it is read. The first route matched is the one that answered, or handed it on to the mount, whichever handler is
+ * running; a request only the mount serves is said under its endpoint's path (`routeAt`, objects/endpoints.ts), never the mount's
+ * wildcard, which every path under `/api/` matches.
  */
-const routeOf = (c: Context<ApiEnv>): string | undefined => {
-  const path = matchedRoutes(c).at(-1)?.path;
-  return path === undefined || path === WILDCARD ? undefined : path;
-};
+export const routeOf = (c: Context<ApiEnv>): string | undefined =>
+  routeAt(
+    matchedRoutes(c)
+      .map((route) => route.path)
+      .filter((path) => path !== WILDCARD),
+    c.req.method,
+    pathOf(c),
+  );
 
 /** The HTTP attributes of `c` once it is answered: its method, its path, its status, and its route where one matched. */
 export const attributesOf = (c: Context<ApiEnv>): RequestAttributes => {

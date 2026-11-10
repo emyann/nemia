@@ -4,7 +4,8 @@
  * does; hired into and fired from, which the api serves as a Hire's writes, `/api/namespaces/:namespace/hires/<workflow>.<step>`; and
  * its instruction's two verbs (instruction.verb.ts), which the api serves. Their handlers answer data, and the CLI prints it.
  */
-import { Effect } from 'effect';
+import { Effect, Schema } from 'effect';
+import { HireWrite } from 'objects';
 import { tried } from '../runtime-client.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
@@ -394,8 +395,16 @@ const HIRE_SPEC = stepSpec(
   'nemia factory hire takes the factory, then the agent: nemia factory hire <factory> <agent> --step <workflow>/<step>. Nothing was hired.',
 );
 
+/** What `nemia factory hire` takes: the factory, the agent (the Hire's write, `objects`' `HireWrite`), and the step it is hired into. */
+export const HireInput = Schema.Struct({ ...HireWrite.fields, factory: Schema.String, step: Schema.String });
+export type HireInput = typeof HireInput.Type;
+
+/** What `nemia factory fire` takes: the factory, and the step whose hire is taken back. */
+export const FireInput = Schema.Struct({ factory: Schema.String, step: Schema.String });
+export type FireInput = typeof FireInput.Type;
+
 /** `nemia factory hire`: one agent hired into one step, and the agent it replaced, if any. */
-const FACTORY_HIRE: Command<{ file: string; replaced: string | null }> = {
+export const FACTORY_HIRE: Command<{ file: string; replaced: string | null }, HireInput> = {
   name: 'factory hire',
   usage: '<factory> <agent> --step <workflow>/<step>',
   help: ["hire an agent into a workflow's step: one a step, a second replaces it"],
@@ -404,24 +413,20 @@ const FACTORY_HIRE: Command<{ file: string; replaced: string | null }> = {
   writes: true,
   class: 'ask',
   only: { side: 'cli', why: "the api serves it as the Hire's `put` of `objects`' Api, calling this handler" },
-  handler: (args, _env, home) => {
-    const step = textOf(args, 'step');
-    const agent = textOf(args, 'agent');
-    return rooted(
+  input: HireInput,
+  handler: ({ factory: named, agent, step }, _env, home) =>
+    rooted(
       home,
       'factory hire',
       Effect.gen(function* () {
         const root = yield* StoreRoot;
-        const { was, file } = yield* wire(textOf(args, 'factory'), { verb: 'hire', step, agent }, (factory) =>
-          ownAgentRefusal(root, factory, step),
-        );
+        const { was, file } = yield* wire(named, { verb: 'hire', step, agent }, (factory) => ownAgentRefusal(root, factory, step));
         const replaced = was.hires[step];
         return { file, replaced: replaced !== undefined && replaced !== agent ? replaced : null };
       }),
-    );
-  },
-  print: ({ file, replaced }, args) => [
-    `${textOf(args, 'factory')}  ${textOf(args, 'step')} ← ${textOf(args, 'agent')}${replaced === null ? '' : ` (was ${replaced})`}`,
+    ),
+  print: ({ file, replaced }, { factory, step, agent }) => [
+    `${factory}  ${step} ← ${agent}${replaced === null ? '' : ` (was ${replaced})`}`,
     `hired: ${file}`,
   ],
 };
@@ -433,7 +438,7 @@ const FIRE_SPEC = stepSpec(
 );
 
 /** `nemia factory fire`: one step's hire taken back. */
-const FACTORY_FIRE: Command<{ file: string; fired: string }> = {
+export const FACTORY_FIRE: Command<{ file: string; fired: string }, FireInput> = {
   name: 'factory fire',
   usage: '<factory> --step <workflow>/<step>',
   help: ["take a step's hire back"],
@@ -442,21 +447,19 @@ const FACTORY_FIRE: Command<{ file: string; fired: string }> = {
   writes: true,
   class: 'ask',
   only: { side: 'cli', why: "the api serves it as the Hire's `delete` of `objects`' Api, calling this handler" },
-  handler: (args, _env, home) => {
-    const step = textOf(args, 'step');
-    return rooted(
+  input: FireInput,
+  handler: ({ factory, step }, _env, home) =>
+    rooted(
       home,
       'factory fire',
       Effect.gen(function* () {
-        const { was, file } = yield* wire(textOf(args, 'factory'), { verb: 'fire', step });
+        const { was, file } = yield* wire(factory, { verb: 'fire', step });
         const fired = was.hires[step];
-        if (fired === undefined)
-          return yield* Effect.fail(new Missing({ message: unhiredFireRefusal(textOf(args, 'factory'), step, was.hires) }));
+        if (fired === undefined) return yield* Effect.fail(new Missing({ message: unhiredFireRefusal(factory, step, was.hires) }));
         return { file, fired };
       }),
-    );
-  },
-  print: ({ file, fired }, args) => [`${textOf(args, 'factory')}  ${textOf(args, 'step')}  fired ${fired}`, `fired: ${file}`],
+    ),
+  print: ({ file, fired }, { factory, step }) => [`${factory}  ${step}  fired ${fired}`, `fired: ${file}`],
 };
 
 /**

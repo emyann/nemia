@@ -1,9 +1,8 @@
 /**
- * A factory's Proposals and Delegations served (src/proposals/), and who calls (src/caller/caller.ts): a forged bearer, or a header that
- * is not one, refused 401 on any route; a live session's token naming its agent, run and step in the proposal it files; the person's
- * approval applying the proposal into the factory's tree; a delegation written by the person and refused an agent's session (403); each
- * write refused 403 for another site and 415 for a body that is not JSON before it is read. Kinds, statuses and reasons are asserted,
- * never a sentence.
+ * A factory's Proposals and Delegations served (src/proposals/), and who calls (src/caller/caller.ts): a forged bearer, or a header that is
+ * not one, refused 401 on any route; a live session's token naming its agent, run and step in the proposal it files; the person's approval
+ * applying the proposal into the factory's tree; a delegation written by the person and refused an agent's session (403). The guard before
+ * every write is `test/guarded.test.ts`'s. Kinds, statuses and reasons are asserted, never a sentence.
  *
  * On the stand-ins: the runtime's test engine, the session's task filed on it and left working, and the test place; the factory `pmill`
  * made from a template, its tree written by hand, and the run its session's token names planted as a record (`pr-run`, its one step
@@ -19,7 +18,6 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
 import type { Delegation, Proposal, ProposedObject } from 'objects';
-import { PROPOSAL_WRITES } from './routes.ts';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
 
 const stand = eachTest(testPlace);
@@ -206,27 +204,4 @@ test("a delegation is the person's: written, read, listed and removed by them, a
   assert.equal(removed.status, 200);
   assert.equal(((await removed.json()) as Delegation).metadata.name, 'implementer', 'the removal answers what it removed');
   assert.equal((await ask(`${ns}/delegations/implementer`, 'DELETE', {})).status, 404, 'none is there to remove');
-});
-
-/** Each write of the two kinds, by its method and its path in `pmill`. */
-const WRITES = [
-  ['POST', `${ns}/proposals`, PROPOSAL_WRITES.createProposal(FACTORY)],
-  ['POST', `${ns}/proposals/p-1/approve`, PROPOSAL_WRITES.approveProposal(FACTORY, 'p-1')],
-  ['POST', `${ns}/proposals/p-1/decline`, PROPOSAL_WRITES.declineProposal(FACTORY, 'p-1')],
-  ['PUT', `${ns}/delegations/implementer`, PROPOSAL_WRITES.putDelegation(FACTORY, 'implementer')],
-  ['DELETE', `${ns}/delegations/implementer`, PROPOSAL_WRITES.deleteDelegation(FACTORY, 'implementer')],
-] as const;
-
-test('REFUSED: each write is 403 for a page on another site and 415 for a body that is not JSON, before it is read', async () => {
-  for (const [method, url, words] of WRITES) {
-    assert.equal(words.route, `${method} ${url}`, 'the guard names the route it stands in front of');
-    const site = await app().request(url, {
-      method,
-      headers: { 'content-type': 'application/json', 'sec-fetch-site': 'cross-site' },
-      body: '{}',
-    });
-    assert.equal(site.status, 403, `${method} ${url}: another site`);
-    const type = await app().request(url, { method, headers: { 'content-type': 'text/plain' }, body: '{}' });
-    assert.equal(type.status, 415, `${method} ${url}: not JSON`);
-  }
 });

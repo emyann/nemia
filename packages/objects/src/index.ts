@@ -303,4 +303,10 @@ export {
   type ProposalRefusal,
   TOKEN_REFUSALS,
   type TokenRefusal,
+  GUARD_REFUSALS,
+  type GuardRefusal,
+  TABLE_COLUMN_TYPES,
+  type TableColumnType,
 } from './words.ts';
+export { UnsupportedMediaType } from './api-errors.ts';
+export { Table, TABLE_ACCEPT, TableColumnDefinition, TableRow } from './table.ts';

@@ -28,7 +28,7 @@ import { type Agent, type AgentSpec, Api, API_VERSION, Invalid } from 'objects';
 import type { Served } from '../layer.ts';
 import { agentDraftOf, listingOf, saved, type AgentDraftBody, type LibraryAgent } from '../agents/agents.ts';
 import { queryOf } from '../factory/parts/index.ts';
-import { answeredWrite as answered } from '../objects/refused.ts';
+import { answeredWriteIn } from '../objects/refused.ts';
 import { markdownNamesIn } from '../workflows/builder.ts';
 import { commandNamed, runPlaced } from '../store.ts';
 import { listed, originAsked, servedNamed, servedOf, thereOf, writeGoes, writtenAt, type Held, type Origin } from './served.ts';
@@ -184,14 +184,16 @@ const A2A_WHY = (name: string) =>
 export const agentsHandlers = HttpApiBuilder.group(Api, 'agents', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
-      answered(async (s) => {
+      answeredWriteIn(namespace, async (s) => {
         const { origin, ...page } = query;
         return listed('Agent', await agentObjectsOf(s, servedOf(await heldIn(s), originAsked(origin)), namespace), queryOf(page));
       }),
     )
-    .handle('get', ({ params: { namespace, name }, query }) => answered((s) => agentAt(s, namespace, name, originAsked(query.origin))))
+    .handle('get', ({ params: { namespace, name }, query }) =>
+      answeredWriteIn(namespace, (s) => agentAt(s, namespace, name, originAsked(query.origin))),
+    )
     .handle('create', ({ params: { namespace }, payload }) =>
-      answered(async (s) => {
+      answeredWriteIn(namespace, async (s) => {
         const route = `POST /api/namespaces/${namespace}/agents`;
         const name = named(route, payload.metadata.name);
         writeGoes(namespace, 'create', thereOf(await heldIn(s), name));
@@ -201,7 +203,7 @@ export const agentsHandlers = HttpApiBuilder.group(Api, 'agents', (handlers) =>
       }),
     )
     .handle('replace', ({ params: { namespace, name }, payload }) =>
-      answered(async (s) => {
+      answeredWriteIn(namespace, async (s) => {
         const route = `PUT /api/namespaces/${namespace}/agents/${name}`;
         writeGoes(namespace, 'replace', thereOf(await heldIn(s), name));
         const version = versioned(route, payload.metadata.resourceVersion);
@@ -212,7 +214,7 @@ export const agentsHandlers = HttpApiBuilder.group(Api, 'agents', (handlers) =>
       }),
     )
     .handle('delete', ({ params: { namespace, name }, query }) =>
-      answered(async (s) => {
+      answeredWriteIn(namespace, async (s) => {
         const route = `DELETE /api/namespaces/${namespace}/agents/${name}`;
         writeGoes(namespace, 'remove', thereOf(await heldIn(s), name));
         const version = versioned(route, query.resourceVersion);
@@ -222,7 +224,7 @@ export const agentsHandlers = HttpApiBuilder.group(Api, 'agents', (handlers) =>
       }),
     )
     .handle('try', ({ params: { namespace, name }, payload }) =>
-      answered(async (s) => {
+      answeredWriteIn(namespace, async (s) => {
         const route = `POST /api/namespaces/${namespace}/agents/${name}/try`;
         const held = await heldIn(s);
         const there = thereOf(held, name);
@@ -239,7 +241,7 @@ export const agentsHandlers = HttpApiBuilder.group(Api, 'agents', (handlers) =>
       }),
     )
     .handle('card', ({ params: { namespace, name }, query }) =>
-      answered(async (s) => {
+      answeredWriteIn(namespace, async (s) => {
         const served = servedNamed(await heldIn(s), name, originAsked(query.origin), listPath(namespace));
         if (served.item.error !== null) throw new Invalid({ error: served.item.error });
         if (served.origin === 'factory')

@@ -181,10 +181,6 @@ test('the Hire writes: what a hire or a fire refuses, the factory file as it was
     const said = await refused(() => send('PUT', HIRE, '{agent'), 400);
     assert.ok(said.includes('PUT /api/namespaces/mill/hires/make.code'), said);
   });
-  await t.test('a body sent as another type is a 415, and a write from another site a 403', async () => {
-    await refused(() => send('PUT', HIRE, JSON.stringify({ agent: 'implementer' }), { 'content-type': 'text/plain' }), 415);
-    await refused(() => send('PUT', HIRE, { agent: 'implementer' }, { ...json, 'sec-fetch-site': 'cross-site' }), 403);
-  });
   await t.test("a name that is no factory's is a 422", async () => {
     await refused(() => send('PUT', '/api/namespaces/Not%20One/hires/make.code', { agent: 'implementer' }), 422);
   });

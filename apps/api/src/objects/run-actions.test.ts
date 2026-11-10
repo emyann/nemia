@@ -2,11 +2,10 @@
  * The run's named actions as endpoints of `objects`' one `Api` (src/objects/runs.ts), each served in the run's namespace through the
  * pipeline a route of the command table runs (`commandAnswered`, commands/routes.ts).
  *
- * First, each action's body in the `Api` (`RunRetry`, `RunApprove`, …) holds the keys the command takes on the api (`bodySchema`), each
- * as optional as the pipeline takes it — the one known difference said by name. Then the statuses each answers on its namespaced path: its
- * success, a run or a step it lacks and a run addressed in another namespace (404), the command's `Conflict` (409) and its check (422), and
- * the guard's 403 and 415 before any body is read; a former `mode` still answered with a `hint`. Last, the Hono routes they replace answer
- * 404, and `GET /api/runs` is no array.
+ * First, each action's body in the `Api` (`RunRetry`, `RunApprove`, …) holds the keys the command takes on the api (`bodySchema`), each as
+ * optional as the pipeline takes it — the one known difference said by name. Then the statuses each answers on its namespaced path: its
+ * success, a run or a step it lacks and a run addressed in another namespace (404), the command's `Conflict` (409) and its check (422); a
+ * former `mode` still answered with a `hint`. Last, the Hono routes they replace answer 404, and `GET /api/runs` is no array.
  *
  * On the stand-ins: the runtime's test engine, each step's task filed and left where this file says, and the test place, under the run
  * records this file seeds. The successes of a removal, a prune and a start, which need a try, git worktrees or a workflow folder, are
@@ -241,16 +240,6 @@ test("each action answers its status on the run's namespaced path, and refuses a
       assert.equal(notJson.status, 400, JSON.stringify(notJson.body));
     },
   );
-  await t.test('REFUSED: another site is a 403 and a body that is not JSON a 415, before the run or the body is read', async () => {
-    for (const address of [`${run('ra-none')}/steps/plan/retry`, `${run()}/hold`, '/api/namespaces/default/runs']) {
-      const site = await send('POST', address, { mode: 'continue' }, { ...BOARD, 'sec-fetch-site': 'cross-site' });
-      assert.equal(site.status, 403, address);
-      const typed = await send('POST', address, 'mode=continue', { ...BOARD, 'content-type': 'text/plain' });
-      assert.equal(typed.status, 415, address);
-    }
-    const lift = await send('DELETE', `${run()}/hold`, undefined, { ...BOARD, 'sec-fetch-site': 'cross-site' });
-    assert.equal(lift.status, 403, 'a lift too');
-  });
   await t.test('REFUSED: a start with no brief is a 422, one sent a card a 400 pointing at the Card', async () => {
     const briefless = await answered(await send('POST', '/api/namespaces/default/runs', { workflow: 'no-such-workflow' }));
     assert.ok([404, 422].includes(briefless.status), JSON.stringify(briefless.body));

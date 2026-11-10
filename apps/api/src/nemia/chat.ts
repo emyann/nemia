@@ -25,7 +25,6 @@ import {
   type ChatSent,
 } from 'agent-orchestrator';
 import { NotBlank, readBody, type Words } from '../body.ts';
-import { refusedBeforeReading, type Guarded } from '../guard.ts';
 import { type ApiEnv, served, type Served } from '../layer.ts';
 import { runPlaced } from '../store.ts';
 
@@ -45,7 +44,6 @@ export type ChatReadAnswer = Effect.Success<ReturnType<typeof chatRead>>;
 const SEND_SHAPE =
   '`{ "text": "<what you write to Nemia>" }` from the board, or `{ "text": "<words>", "from": { "kind": "agent", "name": "<a name the person allowed>" } }` from anywhere else';
 const READ_SHAPE = '`{ "through": "<the id of the last event you saw>" }`';
-const STOP_SHAPE = '`{}`';
 const ANSWER_SHAPE = '`{ "id": "<the question\'s id>", "picks": [{ "question": "<its words>", "labels": ["<a choice>"] }] }`';
 
 const SEND_BODY = Schema.Struct({
@@ -64,17 +62,6 @@ const PICK_BODY = Schema.Struct({
   words: Schema.optional(Schema.String),
 });
 const ANSWER_BODY = Schema.Struct({ id: NotBlank, picks: Schema.Array(PICK_BODY) });
-
-/** A write of the person's to her chat, in the words its guard refuses it in. */
-const guarded = (route: string, does: string, shape: string): Guarded => ({
-  route,
-  does,
-  forAnother: 'write to her as you',
-  why: 'what the person writes to Nemia is said to her as theirs',
-  reach: 'write it on the board',
-  instead: 'Write it on the board',
-  shape,
-});
 
 /** Why a body is not one a chat write takes: not an object, or its one key wrong. */
 const wordsOf =
@@ -165,7 +152,7 @@ async function written(stream: SSEStreamingApi, x: ChatSent, shown: string): Pro
  *   404 for an event her chat does not hold.
  * - `POST /api/nemia/chat/stop` — the turn she is answering ended, her session left open to hear the next words: 200 with the stop
  *   `{ at, attempt }`, which her history draws as a quiet `Stopped` marker. It says nothing of itself, so its body is `{}`, sent as
- *   `application/json` like every other write of the person's, which its guard asks for. 409 where she is not answering — no session
+ *   `application/json` as the write guard asks of every write (guard.ts). 409 where she is not answering — no session
  *   of hers is filed, her turn is over, or her harness cannot end a turn without ending its session.
  */
 export const nemiaChat = new Hono<ApiEnv>()
@@ -201,13 +188,6 @@ export const nemiaChat = new Hono<ApiEnv>()
   .post('/api/nemia/chat/send', (c) =>
     served(c, async (s) => {
       const route = 'POST /api/nemia/chat/send';
-      const refused = refusedBeforeReading(
-        guarded(route, 'sends words to Nemia', SEND_SHAPE),
-        c.req.header('host'),
-        c.req.header('sec-fetch-site'),
-        c.req.header('content-type'),
-      );
-      if (refused) return c.json({ error: refused.error }, refused.status);
       const read = await readBody(c.req, SEND_BODY, `${route} takes a JSON body: ${SEND_SHAPE}.`, sendWords(route));
       if ('status' in read) return c.json({ error: read.error }, read.status);
       const via = c.req.header('sec-fetch-site') === 'same-origin' ? 'board' : 'elsewhere';
@@ -215,29 +195,10 @@ export const nemiaChat = new Hono<ApiEnv>()
       return c.json(await runPlaced(s, s.e, chatSay(nemiaChatPlace(), read.body.text, speaker, via)), 201);
     }),
   )
-  .post('/api/nemia/chat/stop', (c) =>
-    served(c, async (s) => {
-      const route = 'POST /api/nemia/chat/stop';
-      const refused = refusedBeforeReading(
-        guarded(route, 'stops the turn Nemia is answering', STOP_SHAPE),
-        c.req.header('host'),
-        c.req.header('sec-fetch-site'),
-        c.req.header('content-type'),
-      );
-      if (refused) return c.json({ error: refused.error }, refused.status);
-      return c.json(await runPlaced(s, s.e, chatStop(nemiaChatPlace())));
-    }),
-  )
+  .post('/api/nemia/chat/stop', (c) => served(c, async (s) => c.json(await runPlaced(s, s.e, chatStop(nemiaChatPlace())))))
   .post('/api/nemia/chat/answer', (c) =>
     served(c, async (s) => {
       const route = 'POST /api/nemia/chat/answer';
-      const refused = refusedBeforeReading(
-        guarded(route, "answers a question of Nemia's", ANSWER_SHAPE),
-        c.req.header('host'),
-        c.req.header('sec-fetch-site'),
-        c.req.header('content-type'),
-      );
-      if (refused) return c.json({ error: refused.error }, refused.status);
       const read = await readBody(c.req, ANSWER_BODY, `${route} takes a JSON body: ${ANSWER_SHAPE}.`, wordsOf(route, 'id', ANSWER_SHAPE));
       if ('status' in read) return c.json({ error: read.error }, read.status);
       return c.json(await runPlaced(s, s.e, chatAnswer(nemiaChatPlace(), read.body)));
@@ -246,13 +207,6 @@ export const nemiaChat = new Hono<ApiEnv>()
   .post('/api/nemia/chat/read', (c) =>
     served(c, async (s) => {
       const route = 'POST /api/nemia/chat/read';
-      const refused = refusedBeforeReading(
-        guarded(route, 'marks what you read of Nemia', READ_SHAPE),
-        c.req.header('host'),
-        c.req.header('sec-fetch-site'),
-        c.req.header('content-type'),
-      );
-      if (refused) return c.json({ error: refused.error }, refused.status);
       const read = await readBody(c.req, READ_BODY, `${route} takes a JSON body: ${READ_SHAPE}.`, wordsOf(route, 'through', READ_SHAPE));
       if ('status' in read) return c.json({ error: read.error }, read.status);
       return c.json(await runPlaced(s, s.e, chatRead(nemiaChatPlace(), read.body.through)));

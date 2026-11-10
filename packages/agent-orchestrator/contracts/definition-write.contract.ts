@@ -5,7 +5,7 @@
  * served in `default`, and a write there is a write of every namespace that resolves it, so a write of yours is taken in `default` alone.
  * A factory's own definitions — its tree, origin `factory` — change the factory's way, never through this path: a proposal, `nemia
  * propose -f <file> -n <factory>`, which the person approves, or an agent within its delegation at auto. So a refusal says which way
- * the definition changes (`way`): through `default`, or the factory's. Its kind is the api's answer (`REFUSAL_STATUS`); its words are
+ * the definition changes (`way`): through `default`, or the factory's. Its kind is the api's answer (its `refusedAs`); its words are
  * nobody's law. A version's judgement stays `definitionVersionRefusal`'s and `workflowVersionRefusal`'s, after this one lets a write
  * through.
  */

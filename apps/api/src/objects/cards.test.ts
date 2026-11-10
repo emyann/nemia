@@ -1,7 +1,7 @@
 /**
  * The cards group served (src/objects): a page walked by `continue` answers each card once, in name order, its `remainingItemCount`
  * counting down, and refuses a limit or a token that is not one; the namespaces are the cards' factories, `default` those that name none;
- * `labelSelector` and its retired spelling select alike; and every write is guarded before its body is read.
+ * `labelSelector` and its retired spelling select alike. The guard before every write is `test/guarded.test.ts`'s.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
@@ -77,31 +77,6 @@ test('?labelSelector= and the retired ?selector= select the same cards, and a ma
     by,
   );
   assert.equal((await app.request('/api/cards?labelSelector=team%20in%20(core')).status, 422);
-});
-
-/** Each write of the cards group, by its method and path. */
-const WRITES = [
-  ['POST', '/api/namespaces/default/cards'],
-  ['DELETE', '/api/namespaces/default/cards/c-1'],
-  ['POST', '/api/namespaces/default/cards/c-1/start'],
-  ['POST', '/api/namespaces/default/cards/c-1/queue'],
-  ['POST', '/api/namespaces/default/cards/c-1/unqueue'],
-  ['POST', '/api/namespaces/default/cards/c-1/labels'],
-  ['PUT', '/api/namespaces/default/cards/c-1'],
-] as const;
-
-test('each write of the cards group is 403 for another site and 415 for a body that is not JSON, the card left as it was', async () => {
-  for (const [method, url] of WRITES) {
-    const site = await app.request(url, {
-      method,
-      headers: { 'content-type': 'application/json', 'sec-fetch-site': 'cross-site' },
-      body: '{}',
-    });
-    assert.equal(site.status, 403, `${method} ${url} from another site`);
-    const form = await app.request(url, { method, headers: { 'content-type': 'text/plain' }, body: 'labels=team-' });
-    assert.equal(form.status, 415, `${method} ${url} sent as text`);
-  }
-  assert.ok(fs.existsSync(path.join(inbox, 'c-1.md')), 'the card is there still');
 });
 
 test('a card filed, labelled, queued, taken off and dropped through the verbs is the object read after each', async () => {

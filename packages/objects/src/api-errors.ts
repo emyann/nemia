@@ -3,7 +3,7 @@
  * the query every list of the `Api` takes. Shared by every group (`api.ts`, `run-api.ts`).
  */
 import { Schema } from 'effect';
-import { PROPOSAL_REFUSALS, TOKEN_REFUSALS, WRITE_WAYS } from './words.ts';
+import { GUARD_REFUSALS, PROPOSAL_REFUSALS, TOKEN_REFUSALS, WRITE_WAYS } from './words.ts';
 
 /** Nothing by that name, or not in that namespace: a 404. */
 export class Missing extends Schema.Class<Missing>('Missing')({ error: Schema.String }, { httpApiStatus: 404 }) {}
@@ -26,10 +26,11 @@ export class Invalid extends Schema.Class<Invalid>('Invalid')(
 
 /**
  * A caller the api knows, refused what it asks: an approval its standing does not reach, a proposal in another factory, a write only the
- * person makes — a 403, with its reason (`PROPOSAL_REFUSALS`).
+ * person makes — a 403, with its reason (`PROPOSAL_REFUSALS`); or a write the api's guard refuses before its body is read, addressed to
+ * another host or made by a page on another site (`GUARD_REFUSALS`).
  */
 export class Forbidden extends Schema.Class<Forbidden>('Forbidden')(
-  { error: Schema.String, reason: Schema.optionalKey(Schema.Literals(PROPOSAL_REFUSALS)) },
+  { error: Schema.String, reason: Schema.optionalKey(Schema.Literals([...PROPOSAL_REFUSALS, ...GUARD_REFUSALS])) },
   { httpApiStatus: 403 },
 ) {}
 
@@ -42,8 +43,20 @@ export class Unauthorized extends Schema.Class<Unauthorized>('Unauthorized')(
 /** A write the package let through and the disk then refused (a file that is a folder, one read-only): a 500, saying what failed. */
 export class Failed extends Schema.Class<Failed>('Failed')({ error: Schema.String }, { httpApiStatus: 500 }) {}
 
-/** A request the api reads and refuses before the package is asked — a body that is no JSON, a name no run can have: a 400. */
-export class BadRequest extends Schema.Class<BadRequest>('BadRequest')({ error: Schema.String }, { httpApiStatus: 400 }) {}
+/**
+ * A request the api reads and refuses before the package is asked — a body that is no JSON, a name no run can have, a key its endpoint's
+ * Schema does not decode: a 400, with the key refused (`field`, as `payload.spec.steps` or `query.limit`) where a decode refused one.
+ */
+export class BadRequest extends Schema.Class<BadRequest>('BadRequest')(
+  { error: Schema.String, field: Schema.optionalKey(Schema.String) },
+  { httpApiStatus: 400 },
+) {}
+
+/** A write whose body is not sent as `application/json`, which any page can send without the browser asking first: a 415. */
+export class UnsupportedMediaType extends Schema.Class<UnsupportedMediaType>('UnsupportedMediaType')(
+  { error: Schema.String },
+  { httpApiStatus: 415 },
+) {}
 
 /**
  * A run's action the package began and something under it then failed — the engine, git, a harness that did not take the words: a 502,

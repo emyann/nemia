@@ -737,7 +737,7 @@ test("a hold put on the board is put as `nemia hold --until --why --by` puts it,
   });
 });
 
-test('POST /api/namespaces/:namespace/runs/:runId/hold refuses, writing nothing: arguments `nemia hold` refuses a 422, a body it does not take a 400, a run the store has not a 404, a hold `hold` refuses a 409, the guard before any read', async (t) => {
+test('POST /api/namespaces/:namespace/runs/:runId/hold refuses, writing nothing: arguments `nemia hold` refuses a 422, a body it does not take a 400, a run the store has not a 404, a hold `hold` refuses a 409', async (t) => {
   await t.test(
     'REFUSED at shipped defaults: a hold whose arguments `nemia hold` refuses — a why over 200 characters, a blank by — is a 422 in its words, before the run is read, and nothing is written',
     async () => {
@@ -805,14 +805,6 @@ test('POST /api/namespaces/:namespace/runs/:runId/hold refuses, writing nothing:
         assert.ok(error.includes(words), error);
         assert.deepEqual(filesOf(id), before, id);
       }
-    },
-  );
-  await t.test(
-    'REFUSED at shipped defaults: the guard answers a hold before any run is read — a run the store has none of is not a 404 yet',
-    async () => {
-      const res = await put('h-nope', { until: ['p-live'] }, { ...BOARD, 'sec-fetch-site': 'cross-site' });
-      assert.equal(res.status, 403);
-      assert.match(((await res.json()) as { error: string }).error, /^POST \/api\/namespaces\/default\/runs\/h-nope\/hold /);
     },
   );
 });

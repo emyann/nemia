@@ -1,21 +1,26 @@
 /**
- * The api's one answer to an error a route threw (`answerError`, app.ts): a refusal of the orchestrator's by its kind, from
- * `REFUSAL_STATUS` — `Missing` 404, `Conflict` 409, `Invalid` 422, and a caller refused, `Forbidden` 403 and `Unauthorized` 401, with its
- * reason — in its own words, and anything else a 500. A router mounted as app.ts
- * mounts its routers throws to it, and the api's own app answers with it.
+ * The api's one map from a refusal to what it answers (`refusedAs`, src/objects/refused.ts): a refusal of the orchestrator's by its tag
+ * as `objects`' class of the same name, at that class's own status (`httpApiStatus`) — `Missing` 404, `Conflict` 409, `Invalid` 422,
+ * `Forbidden` 403 — and the api's own refusal of a session token, `Unauthorized` 401, each with its reason, in its own words; anything else
+ * a 500. Hono's routes answer with it (`answerError`, app.ts), a router mounted as app.ts mounts its routers throwing to it, and so do the
+ * `Api`'s handlers; a status the api's own readers refuse with is the class of that status (`declaredAs`), none folded into another.
  */
 import './harness.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import { answerError, app, REFUSAL_STATUS } from '../src/app.ts';
+import { Schema } from 'effect';
+import * as objects from 'objects';
+import { answerError, app } from '../src/app.ts';
 import { Conflict, Forbidden, Invalid, Missing } from 'agent-orchestrator';
 import { Unauthorized } from '../src/caller/caller.ts';
+import { declaredAs } from '../src/objects/refused.ts';
 import { WorkflowError } from 'agent-orchestrator/workflow';
 
-type Refusal = import('agent-orchestrator').Refusal;
+/** The status `objects`' class `tag` declares (`httpApiStatus`). */
+const declared = (tag: 'Missing' | 'Conflict' | 'Invalid' | 'Forbidden' | 'Unauthorized'): unknown =>
+  Schema.resolveAnnotations(objects[tag])?.httpApiStatus;
 
 /** A router that throws `thrown`, mounted on an app that answers with `answerError`, as app.ts mounts its routers and answers. */
 const answered = async (thrown: unknown): Promise<{ status: number; body: unknown }> => {
@@ -45,19 +50,31 @@ test('REFUSED: each kind thrown in a mounted router is answered its status, in i
 });
 
 test('answerError: what each thrown thing is answered with, a refusal by its kind and anything else a 500', async (t) => {
-  await t.test(
-    'REFUSAL_STATUS answers every kind of refusal, each once (each status is held by what a thrown kind of it is answered)',
-    () => {
-      const kinds = [
-        new Missing({ message: 'm' }),
-        new Conflict({ message: 'c' }),
-        new Invalid({ message: 'i' }),
-        new Forbidden({ message: 'f', reason: 'person-only' }),
-        new Unauthorized({ message: 'u', reason: 'unknown-token' }),
-      ].map((r) => r._tag);
-      assert.deepEqual(Object.keys(REFUSAL_STATUS).sort(), [...kinds].sort());
-    },
-  );
+  await t.test("every kind of refusal is answered at the status objects' class of its name declares, and no other", async () => {
+    const kinds = [
+      new Missing({ message: 'm' }),
+      new Conflict({ message: 'c' }),
+      new Invalid({ message: 'i' }),
+      new Forbidden({ message: 'f', reason: 'person-only' }),
+      new Unauthorized({ message: 'u', reason: 'unknown-token' }),
+    ];
+    for (const thrown of kinds) assert.equal((await answered(thrown)).status, declared(thrown._tag), thrown._tag);
+    assert.deepEqual(
+      kinds.map((k) => declared(k._tag)),
+      [404, 409, 422, 403, 401],
+    );
+  });
+  await t.test("a status the api's own readers refuse with is the class of that status: a 400 stays 400 and a 403 stays 403", () => {
+    const kinds = [objects.BadRequest, objects.Forbidden, objects.Missing, objects.Conflict, objects.Invalid, objects.UnsupportedMediaType];
+    for (const status of [400, 403, 404, 409, 415, 422]) {
+      const refused = declaredAs(kinds, { status, error: 'e' });
+      assert.equal(Schema.resolveAnnotations(refused.constructor as typeof objects.Missing)?.httpApiStatus, status, String(status));
+    }
+    assert.throws(
+      () => declaredAs([objects.Missing], { status: 403, error: 'e' }),
+      'a status its endpoint declares no class of is a fault',
+    );
+  });
   await t.test('a caller refused is answered by its kind, its reason beside its words: Forbidden 403, Unauthorized 401', async () => {
     const forbidden = await answered(new Forbidden({ message: 'f', reason: 'person-only' }));
     assert.equal(forbidden.status, 403);
@@ -65,11 +82,6 @@ test('answerError: what each thrown thing is answered with, a refusal by its kin
     const unauthorized = await answered(new Unauthorized({ message: 'u', reason: 'session-ended' }));
     assert.equal(unauthorized.status, 401);
     assert.equal((unauthorized.body as { reason?: string }).reason, 'session-ended');
-  });
-  await t.test('a table that leaves out a kind is refused by the compiler', () => {
-    // @ts-expect-error -- REFUSED by the compiler: a table that leaves out a kind, as REFUSAL_STATUS is checked
-    const partial = { Missing: 404, Conflict: 409 } as const satisfies Record<Refusal['_tag'], ContentfulStatusCode>;
-    void partial;
   });
   await t.test('a Conflict that names the steps holding what is asked of is answered 409 with them, as `users`', async () => {
     const thrown = new Conflict({ message: 'agents/reviewer.md is named by a step beside it.', users: ['dev/review'] });

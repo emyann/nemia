@@ -1,30 +1,19 @@
 /**
- * The guard on the board's writes, read as the pure function it is (`refusedBeforeReading`): the near misses of each of its three
- * headers, which the walk over every writing route (`src/commands/routes.test.ts`) reads one value of. The walk owns the enumeration
- * of routes, from the command table; this file owns the values of a header. A refusal's words are nobody's to check (root
- * CLAUDE.md), so each case says the status alone. One table, its rows each header's values.
+ * The guard on every write, read as the pure function it is (`writeRefused`): the near misses of each of its three headers. Which
+ * refusal a request meets, and in what order, is the contract's (`apps/api/contracts/write-guard.contract.ts`), proved; which spellings
+ * of a name or a media type the two patterns take (`loopback`, `saysJson`), which the contract declares and does not read, is held here.
+ * The middleware that applies it to every write is held by `test/guarded.test.ts`, over every endpoint of the `Api`.
  */
 import '../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { refusedBeforeReading, type Guarded } from './guard.ts';
+import { writeRefused } from './guard.ts';
 
-/** A write as its refusals say it: the words stand for any route's. */
-const WRITE: Guarded = {
-  route: 'POST /api/namespaces/default/runs',
-  does: 'starts a run',
-  forAnother: 'start one',
-  why: 'a run acts on this repository',
-  reach: 'start it with `nemia start`',
-  instead: 'Start it from the board',
-  shape: '`{ "workflow": "<name>" }`',
-};
-
-/** `refusedBeforeReading` over `WRITE`, as the board sends a write but for what each case names. */
+/** `writeRefused` of a POST, as the board sends a write but for what each case names. */
 const refused = (host: string | undefined, site: string | undefined, type: string | undefined) =>
-  refusedBeforeReading(WRITE, host, site, type);
+  writeRefused({ method: 'POST', host, site, contentType: type });
 
-test('refusedBeforeReading: which of its three headers refuses a write, and in what order', async (t) => {
+test('writeRefused: which of its three headers refuses a write, and in what order', async (t) => {
   await t.test(
     'a write the board sends is refused on none of the three: JSON, same-origin, and this machine under any of its names and ports',
     () => {
@@ -46,7 +35,7 @@ test('refusedBeforeReading: which of its three headers refuses a write, and in w
         '172.23.196.168:8787',
         '127.0.0.1.evil.example',
       ])
-        assert.deepEqual(refused(host, 'same-origin', 'application/json')?.status, 403, host);
+        assert.equal(refused(host, 'same-origin', 'application/json'), 'host', host);
     },
   );
 
@@ -54,7 +43,7 @@ test('refusedBeforeReading: which of its three headers refuses a write, and in w
     'REFUSED 403: a page on another site — anything the browser says but same-origin, another port on localhost included',
     () => {
       for (const site of ['cross-site', 'same-site', 'none', 'Same-Origin'])
-        assert.deepEqual(refused('127.0.0.1:8787', site, 'application/json')?.status, 403, site);
+        assert.equal(refused('127.0.0.1:8787', site, 'application/json'), 'site', site);
     },
   );
 
@@ -70,16 +59,17 @@ test('refusedBeforeReading: which of its three headers refuses a write, and in w
         undefined,
         '',
       ])
-        assert.deepEqual(refused('127.0.0.1:8787', 'same-origin', type)?.status, 415, String(type));
+        assert.equal(refused('127.0.0.1:8787', 'same-origin', type), 'media', String(type));
     },
   );
 
   await t.test(
-    'the name is read before the site, and the site before the body: a request wrong in all three is refused on its name',
+    'the name is read before the site, and the site before the body: a request wrong in all three is refused on its name, and a read on none',
     () => {
-      assert.equal(refused('evil.example', 'cross-site', 'text/plain')?.status, 403);
-      assert.equal(refused('evil.example', 'cross-site', 'text/plain')?.error.includes('addressed to evil.example'), true);
-      assert.equal(refused('127.0.0.1', 'cross-site', 'text/plain')?.error.includes('another site'), true);
+      assert.equal(refused('evil.example', 'cross-site', 'text/plain'), 'host');
+      assert.equal(refused('127.0.0.1', 'cross-site', 'text/plain'), 'site');
+      for (const method of ['GET', 'HEAD'])
+        assert.equal(writeRefused({ method, host: 'evil.example', site: 'cross-site', contentType: undefined }), null, method);
     },
   );
 });

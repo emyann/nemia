@@ -1,274 +1,151 @@
 /**
- * Every route the api serves is accounted for by the command table, both ways: an entry of the table declares it — a command of the
- * CLI's on its route, or one the api serves alone (`only: api`, with its why) — or `OWN` says why it is the api's own and no command of
- * the orchestrator's: the server answering, a stream, a read of the machine or of the request. `servedBreaks` refuses a route neither
- * names, an `OWN` line the api no longer serves, an `OWN` line an entry declares, and an `OWN` line with no why. The other way, that each
- * route the table declares is served, is `src/commands/routes.test.ts`'s.
+ * Every route the api serves is read off `objects`' `Api`, and every other is named here, both ways. Each endpoint of the `Api` is served
+ * by the mount (`mount`, src/objects/serve.ts): asked with its names filled in, it answers something other than the api's 404 for a path no
+ * route serves (`noRoute`) and other than a 500 with no words, so an endpoint the `Api` gains with no handler, or one a Hono route before
+ * the mount shadows, is refused here with nothing to list. The routes Hono serves itself are exactly the three of the OpenAPI document
+ * (`META`, kept outside the `Api` as Kubernetes keeps `/openapi/v3` out of its own) and the routes not moved onto the `Api` yet
+ * (`NOT_YET_IN_API`), each part of the change that moves one deleting its row, until the list is empty and goes.
  */
 import './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Hono } from 'hono';
-import { COMMANDS, routeList } from 'agent-orchestrator';
+import { Api } from 'objects';
 import { app } from '../src/app.ts';
 
-/** The routes the api serves that are its own, each with why no entry of the command table declares it. */
-/** Why a definition's path is the api's own. */
-const DEFINITION =
-  "served by the objects' handler from `objects`' Api (definitions/): a namespace's Workflows, Agents and Skills as its factory resolves them, which the table's entries they replace say `only`";
+/** The OpenAPI document, its page and the page's script: served by Hono beside the mount, outside the `Api` they describe. */
+const META = ['GET /openapi/v3/nemia/v1', 'GET /openapi', 'GET /openapi/scalar.js'] as const;
 
-/** Why a proposal's or a delegation's path is the api's own. */
-const PROPOSAL =
-  "served by the objects' handler from `objects`' Api (src/proposals/): a factory's Proposals and Delegations, each judged by who calls, which `nemia propose` and `nemia proposals` reach through the api";
+/**
+ * The routes still served by Hono and not yet declared on the `Api`, each a line of app.ts before the mount. Transitional: each later part
+ * of the change that moves a route onto the `Api` deletes its row here and its line there; the list ends empty, and goes with this note.
+ * `GET /api/runs/:runId` is the runs' own route for `?raw=` and `?view=` alone, which hands the run object on to the mount (`next()`) until
+ * the record moves to `GET /api/runs/:name/record`.
+ */
+const NOT_YET_IN_API = [
+  'GET /api/health',
+  'GET /api/version',
+  'GET /api/capabilities',
+  'GET /api/repository',
+  'GET /api/workflows/:from/:name/:step',
+  'GET /api/workflows/keys',
+  'GET /api/store',
+  'GET /api/agents/sources',
+  'GET /api/custom-instructions/:name',
+  'GET /api/runs/:runId',
+  'GET /api/runs/:runId/lines',
+  'GET /api/runs/:runId/decision',
+  'GET /api/runs/:runId/concluded',
+  'GET /api/listing',
+  'GET /api/listing/:runId',
+  'GET /api/stats',
+  'GET /api/ceilings',
+  'GET /api/passes',
+  'GET /api/series',
+  'GET /api/metrics',
+  'GET /api/pause',
+  'GET /api/pause/now',
+  'GET /api/daemon',
+  'GET /api/quota',
+  'PUT /api/custom-instructions/:name',
+  'DELETE /api/custom-instructions/:name',
+  'POST /api/agents/yours/copy',
+  'POST /api/pause',
+  'DELETE /api/pause',
+  'POST /api/subscriptions/:name',
+  'DELETE /api/subscriptions/:name',
+  'PUT /api/level',
+  'PUT /api/policy/:name/rules/:id',
+  'DELETE /api/policy/:name/rules/:id',
+  'GET /api/runs/:runId/steps/:step/log',
+  'GET /api/runs/:runId/steps/:step/artifacts/:name',
+  'GET /api/runs/:runId/steps/:step/files/:name',
+  'GET /api/runs/:runId/steps/:step/path',
+  'GET /api/runs/:runId/steps/:step/transcript',
+  'GET /api/runs/:runId/steps/:step/transcript/stream',
+  'GET /api/feed/stream',
+  'GET /api/level',
+  'GET /api/nemia/memory',
+  'GET /api/nemia/memory/:fact',
+  'GET /api/policy/:name',
+  'GET /api/nemia/chat',
+  'GET /api/nemia/chat/stream',
+  'POST /api/nemia/chat/send',
+  'POST /api/nemia/chat/stop',
+  'POST /api/nemia/chat/answer',
+  'POST /api/nemia/chat/read',
+] as const;
 
-/** Why a template's path is the api's own. */
-const TEMPLATE =
-  "served by the objects' handler from `objects`' Api (src/template-objects/templates.ts): the builtin templates and their documents as objects, which no command reads";
-
-/** Why a subscription's read is the api's own. */
-const SUBSCRIPTION =
-  "served by the objects' handler from `objects`' Api (src/feed-objects/subscriptions.ts): a subscription read as an object, beside the subscribe and unsubscribe commands";
-
-/** Why an event's path is the api's own. */
-const EVENT =
-  "served by the objects' handler from `objects`' Api (src/feed-objects/events.ts): the feed's lines as Events, a page of the feed `nemia watch` streams";
-
-/** Why the runs as objects are the api's own: the `RunList` and one run in its namespace, which no entry of the table serves. */
-const RUN_LIST =
-  "the runs as objects, a RunList and one run in its namespace, served by the objects' handler from `objects`' Api (src/objects/runs.ts)";
-
-const OWN: Readonly<Record<string, string>> = {
-  'GET /api':
-    "discovery, served by the objects' handler from `objects`' Api (src/discovery/discovery.ts): every resource the api serves, which no command reads",
-  'GET /api/templates': TEMPLATE,
-  'GET /api/templates/:name': TEMPLATE,
-  'GET /api/templates/:name/:plural{workflows|agents|skills}': TEMPLATE,
-  'GET /api/templates/:name/:plural{workflows|agents|skills}/:doc': TEMPLATE,
-  'GET /api/subscriptions': SUBSCRIPTION,
-  'GET /api/subscriptions/:name': SUBSCRIPTION,
-  'GET /api/events': EVENT,
-  'GET /api/events/:name': EVENT,
-  'GET /api/namespaces/:namespace/events': EVENT,
-  'GET /api/namespaces/:namespace/events/:name': EVENT,
-  'GET /api/health': 'the server answering at all, which no command of the orchestrator asks',
-  'GET /api/runs': RUN_LIST,
-  'GET /api/namespaces/:namespace/runs': RUN_LIST,
-  'GET /api/namespaces/:namespace/runs/:runId': RUN_LIST,
-  'GET /api/cards': "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
-  'GET /api/cards/:name':
-    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
-  'PUT /api/namespaces/:namespace/cards/:name':
-    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
-  'GET /api/namespaces/:namespace/cards':
-    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
-  'GET /api/namespaces/:namespace/cards/:name':
-    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
-  'POST /api/namespaces/:namespace/cards':
-    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
-  'DELETE /api/namespaces/:namespace/cards/:name':
-    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
-  'POST /api/namespaces/:namespace/cards/:name/start':
-    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
-  'POST /api/namespaces/:namespace/cards/:name/queue':
-    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
-  'POST /api/namespaces/:namespace/cards/:name/unqueue':
-    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
-  'POST /api/namespaces/:namespace/cards/:name/labels':
-    "the Card's verbs, served by the objects' handler from `objects`' Api (src/objects/cards.ts) over the inbox's entries",
-  'GET /openapi/v3/nemia/v1': "the objects' OpenAPI document, `OpenApi.fromApi(Api)`, which no command asks",
-  'GET /openapi': "the page to browse the OpenAPI document, a view of the api's own document, which no command asks",
-  'GET /openapi/scalar.js': "the OpenAPI page's viewer script, served from the installed package so the page reaches no other host",
-  'GET /api/nemia/chat': "Nemia's chat paged, a program of the package's chat and no command, as its writes are none",
-  'GET /api/nemia/chat/stream': "Nemia's chat followed, a stream",
-  'POST /api/nemia/chat/send':
-    "the person's words, or an allowed agent's, to Nemia, a program of the package's chat and no command: a command would enter her fence, a second writer",
-  'POST /api/nemia/chat/answer':
-    "the person's answer to a question of Nemia's, a program of the package's chat and no command: the answer is theirs, written out of her fence",
-  'POST /api/nemia/chat/read': "the person's read mark of Nemia's chat, a program of the package's chat and no command, as the send",
-  'POST /api/nemia/chat/stop':
-    "the turn Nemia is answering stopped, a program of the package's chat and no command: the stop is the person's record of it, written out of her fence",
-  'GET /api/store': "your store's folders as the api reads them, under its store root, which no command of the orchestrator answers",
-  'GET /api/version': "the api's build, as the board's bottom bar says it",
-  'GET /api/capabilities': "the machine's harnesses and MCP servers, asked by the app's asker, which it keeps between requests",
-  'GET /api/daemon': "the daemon's standing, read off its lease file: whether anything ticks the store at all",
-  'GET /api/quota': "the harness's quota, asked by the app's asker, which it keeps between requests",
-  'GET /api/feed/stream': "a stream of the feed, held open for as long as the board reads it: the api's counterpart of nemia watch",
-  'GET /api/runs/:runId/lines':
-    "a run's command lines and its workflow page's address, built off the command table and the run's record: an api address and command text, no command's answer",
-  'GET /api/runs/:runId/steps/:step/transcript/stream': "a stream of a step's transcript, held open for as long as the board reads it",
-  'GET /api/workflows/keys': "the keys a step may set and what each means, the builder's form: no run, no store",
-  'GET /api/repository': 'the repository the request is served on, as the request names it',
-  'GET /api/factories':
-    "the Factory's verbs, served by the objects' handler from `objects`' Api (src/factory/factories.ts) over the factories' entries",
-  'GET /api/factories/:name':
-    "the Factory's verbs, served by the objects' handler from `objects`' Api (src/factory/factories.ts) over the factories' entries",
-  'GET /api/factories/:name/commands':
-    "the Factory's verbs, served by the objects' handler from `objects`' Api (src/factory/factories.ts) over the factories' entries",
-  'GET /api/factories/:name/rules':
-    "the Factory's verbs, served by the objects' handler from `objects`' Api (src/factory/factories.ts) over the factories' entries",
-  'PUT /api/factories/:name/rules':
-    "the Factory's verbs, served by the objects' handler from `objects`' Api (src/factory/factories.ts) over the factories' entries",
-  'DELETE /api/factories/:name/rules':
-    "the Factory's verbs, served by the objects' handler from `objects`' Api (src/factory/factories.ts) over the factories' entries",
-  'GET /api/factories/:name/instruction':
-    "the Factory's verbs, served by the objects' handler from `objects`' Api (src/factory/factories.ts) over the factories' entries",
-  'PUT /api/factories/:name/instruction':
-    "the Factory's verbs, served by the objects' handler from `objects`' Api (src/factory/factories.ts) over the factories' entries",
-  'DELETE /api/factories/:name/instruction':
-    "the Factory's verbs, served by the objects' handler from `objects`' Api (src/factory/factories.ts) over the factories' entries",
-  'PUT /api/factories/:name/instruction/words':
-    "the Factory's verbs, served by the objects' handler from `objects`' Api (src/factory/factories.ts) over the factories' entries",
-  'DELETE /api/factories/:name/instruction/words':
-    "the Factory's verbs, served by the objects' handler from `objects`' Api (src/factory/factories.ts) over the factories' entries",
-  'GET /api/namespaces/:namespace/proposals': PROPOSAL,
-  'GET /api/namespaces/:namespace/proposals/:name': PROPOSAL,
-  'POST /api/namespaces/:namespace/proposals': PROPOSAL,
-  'POST /api/namespaces/:namespace/proposals/:name/approve': PROPOSAL,
-  'POST /api/namespaces/:namespace/proposals/:name/decline': PROPOSAL,
-  'GET /api/namespaces/:namespace/delegations': PROPOSAL,
-  'GET /api/namespaces/:namespace/delegations/:name': PROPOSAL,
-  'PUT /api/namespaces/:namespace/delegations/:name': PROPOSAL,
-  'DELETE /api/namespaces/:namespace/delegations/:name': PROPOSAL,
-  'GET /api/namespaces/:namespace/workflows': DEFINITION,
-  'GET /api/namespaces/:namespace/workflows/:name': DEFINITION,
-  'POST /api/namespaces/:namespace/workflows': DEFINITION,
-  'PUT /api/namespaces/:namespace/workflows/:name': DEFINITION,
-  'DELETE /api/namespaces/:namespace/workflows/:name': DEFINITION,
-  'GET /api/namespaces/:namespace/agents': DEFINITION,
-  'GET /api/namespaces/:namespace/agents/:name': DEFINITION,
-  'POST /api/namespaces/:namespace/agents': DEFINITION,
-  'PUT /api/namespaces/:namespace/agents/:name': DEFINITION,
-  'DELETE /api/namespaces/:namespace/agents/:name': DEFINITION,
-  'POST /api/namespaces/:namespace/agents/:name/try': DEFINITION,
-  'GET /api/namespaces/:namespace/agents/:name/card': DEFINITION,
-  'GET /api/namespaces/:namespace/skills': DEFINITION,
-  'GET /api/namespaces/:namespace/skills/:name': DEFINITION,
-  'POST /api/namespaces/:namespace/skills': DEFINITION,
-  'PUT /api/namespaces/:namespace/skills/:name': DEFINITION,
-  'POST /api/namespaces/:namespace/skills/:name/copy': DEFINITION,
-  'GET /api/namespaces/:namespace/skills/:name/files': DEFINITION,
-  'GET /api/builtin/mcpservers':
-    "Nemia's builtin MCP servers, served by the objects' handler from `objects`' Api (src/factory/parts/mcp-servers.ts) off the package's folder",
-  'GET /api/namespaces/:namespace/mcpservers':
-    "the McpServer's verbs, served by the objects' handler from `objects`' Api (src/factory/parts/mcp-servers.ts) over the servers' entries",
-  'GET /api/namespaces/:namespace/mcpservers/:name':
-    "the McpServer's verbs, served by the objects' handler from `objects`' Api (src/factory/parts/mcp-servers.ts) over the servers' entries",
-  'PUT /api/namespaces/:namespace/mcpservers/:name':
-    "the McpServer's verbs, served by the objects' handler from `objects`' Api (src/factory/parts/mcp-servers.ts) over the servers' entries",
-  'DELETE /api/namespaces/:namespace/mcpservers/:name':
-    "the McpServer's verbs, served by the objects' handler from `objects`' Api (src/factory/parts/mcp-servers.ts) over the servers' entries",
-  'GET /api/namespaces/:namespace/mcpservers/:name/sign-in':
-    "a sign-in a person makes in their browser, held by the engine until they approve, served by the objects' handler (src/factory/parts/mcp-servers.ts): a CLI verb would wait on a browser in its own process",
-  'POST /api/namespaces/:namespace/mcpservers/:name/sign-in':
-    "a sign-in a person makes in their browser, held by the engine until they approve, served by the objects' handler (src/factory/parts/mcp-servers.ts): a CLI verb would wait on a browser in its own process",
-  'DELETE /api/namespaces/:namespace/mcpservers/:name/sign-in':
-    "a sign-in a person makes in their browser, held by the engine until they approve, served by the objects' handler (src/factory/parts/mcp-servers.ts): a CLI verb would wait on a browser in its own process",
-  'GET /api/namespaces/:namespace/schedules':
-    "the Schedule's verbs, served by the objects' handler from `objects`' Api (src/factory/parts/schedules.ts) over the schedules' entries",
-  'GET /api/namespaces/:namespace/schedules/:name':
-    "the Schedule's verbs, served by the objects' handler from `objects`' Api (src/factory/parts/schedules.ts) over the schedules' entries",
-  'PUT /api/namespaces/:namespace/schedules/:name':
-    "the Schedule's verbs, served by the objects' handler from `objects`' Api (src/factory/parts/schedules.ts) over the schedules' entries",
-  'DELETE /api/namespaces/:namespace/schedules/:name':
-    "the Schedule's verbs, served by the objects' handler from `objects`' Api (src/factory/parts/schedules.ts) over the schedules' entries",
-  'GET /api/namespaces/:namespace/hires':
-    "the Hire's verbs, served by the objects' handler from `objects`' Api (src/factory/parts/hires.ts) over the hire's entries",
-  'GET /api/namespaces/:namespace/hires/:name':
-    "the Hire's verbs, served by the objects' handler from `objects`' Api (src/factory/parts/hires.ts) over the hire's entries",
-  'PUT /api/namespaces/:namespace/hires/:name':
-    "the Hire's verbs, served by the objects' handler from `objects`' Api (src/factory/parts/hires.ts) over the hire's entries",
-  'DELETE /api/namespaces/:namespace/hires/:name':
-    "the Hire's verbs, served by the objects' handler from `objects`' Api (src/factory/parts/hires.ts) over the hire's entries",
-  'GET /api/namespaces/:namespace/volumes':
-    "the Volume's reads, served by the objects' handler from `objects`' Api (src/factory/parts/volumes.ts) off the factory's file and the informer",
-  'GET /api/namespaces/:namespace/volumes/:name':
-    "the Volume's reads, served by the objects' handler from `objects`' Api (src/factory/parts/volumes.ts) off the factory's file and the informer",
-  'GET /api/metrics': "the api process's own metrics, kept in its memory: the command line runs in another process, which has none of them",
-};
-
-type Table = readonly Parameters<typeof routeList>[0][];
-type Named = { readonly name: string };
-
-/** Each route as `METHOD path`, once, but middleware (`ALL`), which serves no route of its own. */
+/** Each route Hono serves as `METHOD path`, once, but middleware and the mount (`ALL`), which serve no route of their own. */
 const routesOf = (routes: readonly { method: string; path: string }[]): string[] => [
   ...new Set(routes.filter((r) => r.method !== 'ALL').map((r) => `${r.method} ${r.path}`)),
 ];
 
-/** The entry of `table` that declares each route it routes, by `METHOD path`. */
-const declaredBy = (table: readonly (Table[number] & Named)[]): Map<string, string> =>
-  new Map(table.flatMap((c) => routeList(c).map((r) => [`${r.method} ${r.path}`, c.name] as const)));
-
-/**
- * Where the routes the api serves and the table disagree, a sentence each naming the fix: a route no entry declares and `own` does not
- * list; an `own` line the api does not serve, one an entry declares, and one with no why.
- */
-function servedBreaks(
-  routes: readonly { method: string; path: string }[],
-  table: readonly (Table[number] & Named)[],
-  own: Readonly<Record<string, string>>,
-): string[] {
+/** Where the routes Hono serves and the two lists disagree, a sentence each naming the fix. */
+function outsideBreaks(routes: readonly { method: string; path: string }[], notYet: readonly string[]): string[] {
   const served = routesOf(routes);
-  const declared = declaredBy(table);
-  const breaks: string[] = [];
-  for (const at of served.filter((r) => !declared.has(r) && !(r in own)))
-    breaks.push(
-      `${at} is served by no entry of the command table, and OWN does not list it: declare it on an entry (only: api, with its why), or say why it is the api's own in OWN.`,
-    );
-  for (const [at, why] of Object.entries(own)) {
-    if (!served.includes(at)) breaks.push(`OWN lists ${at}, which the api does not serve: take it off OWN.`);
-    if (declared.has(at)) breaks.push(`OWN lists ${at}, which ${declared.get(at)} declares: take it off OWN.`);
-    if (!why.trim()) breaks.push(`OWN lists ${at} and says no why: say why it is the api's own.`);
-  }
-  return breaks;
+  const named = new Set<string>([...META, ...notYet]);
+  return [
+    ...served
+      .filter((r) => !named.has(r))
+      .map(
+        (r) =>
+          `${r} is served by Hono and is no route of the Api: declare it on objects' Api with its handler and take its line out of app.ts, or it is one of META.`,
+      ),
+    ...[...named]
+      .filter((r) => !served.includes(r))
+      .map((r) => `${r} is listed, and Hono serves no such route: take it off NOT_YET_IN_API, its route moved.`),
+  ];
 }
 
-test('every route the api serves is declared by an entry of the command table, or is its own with a why', () => {
-  assert.deepEqual(servedBreaks(app.routes, COMMANDS, OWN), []);
+/** Every endpoint of the `Api`: its group, its name, its method and its path. */
+const ENDPOINTS = Object.values(Api.groups).flatMap((group) =>
+  Object.values(group.endpoints).map((e) => ({ group: group.identifier, name: e.name, method: e.method, path: e.path })),
+);
+
+/** `path` with every name filled in by one no object has, so a read finds nothing and a write refuses. */
+const filled = (path: string): string => path.replace(/:[A-Za-z]+/g, 'nothing-here');
+
+/** Whether `body` is the api's 404 for a path no route serves (`noRoute`), by the words it says that in. */
+const saysNoRoute = (body: unknown): boolean =>
+  typeof body === 'object' && body !== null && 'error' in body && String(body.error).includes('is no route of this api');
+
+test('every endpoint of the Api is served by the mount: neither the 404 for no route nor a 500 with no words', async () => {
+  assert.ok(ENDPOINTS.length >= 100, `${ENDPOINTS.length} endpoints read off the Api`);
+  const unserved: string[] = [];
+  for (const { group, name, method, path } of ENDPOINTS) {
+    const url = filled(path);
+    const res = await app.request(
+      url,
+      method === 'GET' ? {} : { method, headers: { 'content-type': 'application/json' }, body: method === 'DELETE' ? undefined : '{}' },
+    );
+    const text = await res.text();
+    const body: unknown = text === '' ? undefined : JSON.parse(text);
+    if ((res.status === 404 && saysNoRoute(body)) || (res.status >= 500 && body === undefined))
+      unserved.push(`${group}.${name}: ${method} ${url} answered ${res.status}`);
+  }
+  assert.deepEqual(unserved, []);
 });
 
-test('the Machines page retired with its two routes: GET /api/machines and GET /api/machines/:name answer 404', async () => {
-  assert.equal((await app.request('/api/machines')).status, 404);
-  assert.equal((await app.request('/api/machines/lifecycle')).status, 404);
+test('the routes Hono serves outside the Api are the three of the OpenAPI document and the ones not moved yet, and no other', () => {
+  assert.deepEqual(outsideBreaks(app.routes, NOT_YET_IN_API), []);
 });
 
-test("the runs' list is the RunList, the objects' own; the entries runs, runs open and runs finished are retired with it; ls's answer, which nemia prints, is ls's own, on /api/listing", () => {
-  const ls = COMMANDS.find((c) => c.name === 'ls');
-  assert.equal(declaredBy(COMMANDS).get('GET /api/runs'), undefined, 'no entry declares the list');
-  assert.ok(OWN['GET /api/runs'], "the RunList is the api's own, with its why");
-  assert.deepEqual(
-    COMMANDS.filter((c) => ['runs', 'runs open', 'runs finished'].includes(c.name)),
-    [],
-    "the board's three reads of the list retired with their entries",
-  );
-  assert.equal(declaredBy(COMMANDS).get('GET /api/listing'), 'ls', 'every run, as nemia ls lists them');
-  assert.equal(declaredBy(COMMANDS).get('GET /api/listing/:runId'), 'ls', 'the one named');
-  assert.equal(ls?.only, undefined, 'ls is served on both sides');
-});
-
-test('REFUSED: a route no entry declares and OWN does not list, matched whole; middleware and a route mounted twice are none', () => {
+test('REFUSED: a route Hono serves that no list names, and a listed route Hono does not serve', () => {
   const extra = new Hono().get('/api/x', (c) => c.text('x'));
-  const more = new Hono()
-    .use(async (_c, next) => next())
-    .route('/', app)
-    .route('/', extra)
-    .route('/', extra);
-  assert.deepEqual(servedBreaks(more.routes, COMMANDS, OWN), [
-    "GET /api/x is served by no entry of the command table, and OWN does not list it: declare it on an entry (only: api, with its why), or say why it is the api's own in OWN.",
-  ]);
-  const { 'GET /api/health': _health, ...rest } = OWN;
-  assert.deepEqual(servedBreaks(app.routes, COMMANDS, rest), [
-    "GET /api/health is served by no entry of the command table, and OWN does not list it: declare it on an entry (only: api, with its why), or say why it is the api's own in OWN.",
-  ]);
+  const more = new Hono().route('/', app).route('/', extra).route('/', extra);
+  assert.deepEqual(
+    outsideBreaks(more.routes, NOT_YET_IN_API).map((b) => b.split(' is ')[0]),
+    ['GET /api/x'],
+    'one break, the route no list names, however often it is mounted',
+  );
+  assert.deepEqual(
+    outsideBreaks(app.routes, [...NOT_YET_IN_API, 'GET /api/gone']).map((b) => b.split(' is ')[0]),
+    ['GET /api/gone'],
+  );
 });
 
-test('REFUSED: an OWN line the api does not serve, one an entry declares, and one with no why', () => {
-  assert.deepEqual(servedBreaks(app.routes, COMMANDS, { ...OWN, 'GET /api/gone': 'a route since removed' }), [
-    'OWN lists GET /api/gone, which the api does not serve: take it off OWN.',
-  ]);
-  assert.deepEqual(servedBreaks(app.routes, COMMANDS, { ...OWN, 'GET /api/listing': 'the runs' }), [
-    'OWN lists GET /api/listing, which ls declares: take it off OWN.',
-  ]);
-  assert.deepEqual(servedBreaks(app.routes, COMMANDS, { ...OWN, 'GET /api/health': ' ' }), [
-    "OWN lists GET /api/health and says no why: say why it is the api's own.",
-  ]);
+test("a path no route serves is the api's own 404, the Machines page's retired routes among them, whichever side missed it", async () => {
+  for (const url of ['/api/machines', '/api/machines/lifecycle', '/api/namespaces/default/nothing', '/nothing'])
+    assert.ok(saysNoRoute(await (await app.request(url)).json()), url);
 });

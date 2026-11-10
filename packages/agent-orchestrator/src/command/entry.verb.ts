@@ -2,7 +2,7 @@
  * The two shapes of an entry of the command table: a command whole, which a handler serves on either side (`Command`), and one the CLI
  * serves alone and runs itself, with no handler (`Ran`).
  */
-import type { Effect } from 'effect';
+import type { Effect, Schema } from 'effect';
 import type { PlaceService } from '../place/place.store.ts';
 import type { EngineService } from '../runtime-client.ts';
 import type { Conflict, Missing, Refusal } from '../refusal/refusal.ts';
@@ -37,22 +37,32 @@ export type KeptRecords = {
 };
 
 /**
- * A command whole: its spec, `handler`, which is the Effect of calling one package verb with the arguments, answering data — never printed
- * lines — and requiring the engine as a service (`EngineService`), run by a caller with `runWith`, and `print`, the lines the CLI prints
- * of that data. The api answers the data as JSON, or only its `apiKeys` where the CLI prints more of it than the api answers; or, where
- * `apiRefusal` makes one of the data, throws that refusal in its place: a verb that answers what it would not do as data, a line on the
- * CLI, is refused by its kind on the api. A handler reads its settings (`WF_MAX_RUNS`) from `env`, and a person's own files from the store
- * `home`: the process's own at the command line, the app's on the api; and what a caller that lives long keeps between its calls from
- * `kept` — the api's memos of the stats and of the runs at rest, and the feed's filing times it read — which the command line, calling
- * once, hands none of. `note` is what the CLI says of the data on stderr, beside what it prints.
+ * What an entry's handler takes: where it is the CLI's parsed `Args` themselves, an entry may say nothing of it (`input` left out); where
+ * it is a shape of its own (`I`), the entry carries `input`, the effect Schema of exactly the keys its handler takes, which the CLI decodes
+ * its parsed `Args` through before it calls the handler, and the api calls the handler with the keys typed: a key renamed or reshaped is a
+ * type error at the api's call, never a request that fails.
  */
-export type Command<D extends object = Readonly<Record<string, unknown>>> = CommandSpec & {
-  handler(args: Args, env?: NodeJS.ProcessEnv, home?: string, kept?: Kept): Effect.Effect<D, Refusal, EngineService | PlaceService>;
-  print(data: D, args: Args): readonly string[];
-  note?(data: D, args: Args): readonly string[];
-  readonly apiKeys?: readonly (keyof D & string)[];
-  apiRefusal?(data: D, args: Args): Missing | Conflict | null;
-};
+export type InputOf<I> = [Args] extends [I] ? { readonly input?: Schema.Decoder<I> } : { readonly input: Schema.Decoder<I> };
+
+/**
+ * A command whole: its spec, `input`, the keys its handler takes where they are its own (`InputOf`), `handler`, which is the Effect of
+ * calling one package verb with the arguments, answering data — never printed lines — and requiring the engine as a service
+ * (`EngineService`), run by a caller with `runWith`, and `print`, the lines the CLI prints of that data. The api answers the data as JSON,
+ * or only its `apiKeys` where the CLI prints more of it than the api answers; or, where `apiRefusal` makes one of the data, throws that
+ * refusal in its place: a verb that answers what it would not do as data, a line on the CLI, is refused by its kind on the api. A handler
+ * reads its settings (`WF_MAX_RUNS`) from `env`, and a person's own files from the store `home`: the process's own at the command line, the
+ * app's on the api; and what a caller that lives long keeps between its calls from `kept` — the api's memos of the stats and of the runs at
+ * rest, and the feed's filing times it read — which the command line, calling once, hands none of. `note` is what the CLI says of the data
+ * on stderr, beside what it prints.
+ */
+export type Command<D extends object = Readonly<Record<string, unknown>>, I = Args> = CommandSpec &
+  InputOf<I> & {
+    handler(args: I, env?: NodeJS.ProcessEnv, home?: string, kept?: Kept): Effect.Effect<D, Refusal, EngineService | PlaceService>;
+    print(data: D, args: I): readonly string[];
+    note?(data: D, args: I): readonly string[];
+    readonly apiKeys?: readonly (keyof D & string)[];
+    apiRefusal?(data: D, args: I): Missing | Conflict | null;
+  };
 
 /**
  * A command the CLI serves alone and runs itself, by its runner (`RUNS` in `cli/main.ts`): its spec, and no handler. A runner may run a

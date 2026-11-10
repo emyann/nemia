@@ -130,12 +130,13 @@ test('the rules routes: what a read or a write refuses, writing nothing', async 
     await answered(send('DELETE', URL, {}));
   });
   await t.test(
-    'words left out, words that are no string, and a body that is not JSON are a 400 naming the route and its shape',
+    'words left out, words that are no string, and a body that is not JSON are a 400 naming the route, the key refused, and the document',
     async () => {
       for (const body of [{}, { words: 7 }, 'not json']) {
         const said = await refused(() => send('PUT', URL, body), 400);
         assert.ok(said.startsWith('PUT /api/factories/mill/rules'), said);
-        assert.ok(said.includes('`{ "words": "<the factory\'s rules>" }`'), said);
+        assert.ok(said.includes('GET /openapi/v3/nemia/v1'), said);
+        if (typeof body === 'object') assert.ok(said.includes('`payload.words`'), said);
       }
     },
   );

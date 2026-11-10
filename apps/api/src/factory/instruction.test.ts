@@ -130,7 +130,7 @@ test('the instruction routes: what a read or a write refuses, changing nothing',
     assert.equal(fs.existsSync(path.join(STORE, 'NEMIA.md')), false, 'no store file is written for words refused');
   });
   await t.test(
-    "a path out of the folder or an absolute one is a 422 in the package's words, and none at all a 400 naming the shape",
+    "a path out of the folder or an absolute one is a 422 in the package's words, and none at all a 400 naming the document",
     async () => {
       const out = await refused(() => send('PUT', '/api/factories/mill/instruction', { path: '../NEMIA.md' }), 422);
       assert.equal(
@@ -140,7 +140,7 @@ test('the instruction routes: what a read or a write refuses, changing nothing',
       const absolute = await refused(() => send('PUT', '/api/factories/mill/instruction', { path: '/etc/passwd' }), 422);
       assert.ok(absolute.includes('is absolute'), absolute);
       const none = await refused(() => send('PUT', '/api/factories/mill/instruction', {}), 400);
-      assert.ok(none.includes('`{ "store": true }`'), none);
+      assert.ok(none.includes('GET /openapi/v3/nemia/v1'), none);
     },
   );
   await t.test('blank words for the store are a 422', async () => {

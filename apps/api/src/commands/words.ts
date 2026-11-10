@@ -1,5 +1,5 @@
 /**
- * The api's own words for each command it serves, keyed by the command's name: the write guard's (guard.ts), the body its route takes,
+ * The api's own words for each command it serves, keyed by the command's name: the body its route takes,
  * why a body is not one (400), and what a failure that is not a refusal answers (502).
  */
 import type { BodyIssue, Words } from '../body.ts';
@@ -28,7 +28,7 @@ export type Named = {
 export const runPath = ({ namespace, runId }: Pick<Named, 'namespace' | 'runId'>): string => `/api/namespaces/${namespace}/runs/${runId}`;
 
 /**
- * A routed command's words: `shape`, its body as a refusal shows it; `guard`, `issue` and `failed`, each said of what it names; `strict`,
+ * A routed command's words: `shape`, its body as a refusal shows it; `issue` and `failed`, each said of what it names; `strict`,
  * where its body is refused a key its schema does not have, named before any it does; `named`, the refusal of a name in its path, 400,
  * before its body is read; `bodyless`, where its route reads no body but none or `{}`, the refusal of the text it was sent, 400; `notJson`,
  * the refusal of a body that is not JSON, 400, where it has words of its own. A route with no `failed` lets a failure that is no refusal
@@ -36,7 +36,8 @@ export const runPath = ({ namespace, runId }: Pick<Named, 'namespace' | 'runId'>
  */
 export type RouteWords = {
   readonly shape: string;
-  readonly guard: (at: Named) => Guarded;
+  /** No longer read: the write guard is `writeGuard`'s (guard.ts). Left optional for the label edit's words (labels/words.ts). */
+  readonly guard?: (at: Named) => Guarded;
   readonly issue: (at: Named) => Words;
   readonly failed?: (at: Named, said: string) => string;
   readonly strict?: true;
@@ -82,35 +83,17 @@ const retryWords = ({ path: [key], input }: BodyIssue): string => {
   return `POST …/retry takes a JSON object: ${RETRY_SHAPE}.`;
 };
 
-/** Another try of a step, as the guard's refusals word it, its body and its failures. */
+/** Another try of a step: its body and its failures. */
 const RETRY: RouteWords = {
   shape: RETRY_SHAPE,
-  guard: ({ runId, step, namespace }) => ({
-    route: `POST ${runPath({ namespace, runId })}/steps/${step}/retry`,
-    does: 'asks for another try of a step',
-    forAnother: 'ask for one',
-    why: 'the next tick files the try a person asks for, and the answer it carries goes into the brief an agent acts on in this repository',
-    reach: "answer the step from the run's page on the board",
-    instead: `Answer it from the run's page on the board, or with \`nemia retry ${runId} ${step}\``,
-    shape: RETRY_SHAPE,
-  }),
   issue: () => retryWords,
   failed: ({ runId, step }, said) =>
     `Could not ask for another try of step '${step}': ${said}. \`nemia retry ${runId} ${step}\` asks the same way from the command line.`,
 };
 
-/** An approval of a step waiting at its gate, as the guard's refusals word it, its body and its failures. */
+/** An approval of a step waiting at its gate: its body and its failures. */
 const APPROVE: RouteWords = {
   shape: APPROVE_SHAPE,
-  guard: ({ runId, step, namespace }) => ({
-    route: `POST ${runPath({ namespace, runId })}/steps/${step}/approve`,
-    does: 'approves a step waiting at its gate',
-    forAnother: 'approve one',
-    why: 'the next tick files what waits on a step a person approves, and the words given with it go into the brief of every step after the gate, which an agent acts on in this repository',
-    reach: "approve it from the run's page on the board",
-    instead: `Approve it from the run's page on the board, or with \`nemia approve ${runId} ${step}\``,
-    shape: APPROVE_SHAPE,
-  }),
   issue:
     ({ runId, step }) =>
     ({ path: [key], input }) => {
@@ -124,18 +107,9 @@ const APPROVE: RouteWords = {
     `Could not approve step '${step}': ${said}. \`nemia approve ${runId} ${step}\` approves the same way from the command line.`,
 };
 
-/** A run told to take the new revisions of the kinds it resolved, as the guard's refusals word it, its body and its failures. */
+/** A run told to take the new revisions of the kinds it resolved: its body and its failures. */
 const REFRESH: RouteWords = {
   shape: REFRESH_SHAPE,
-  guard: ({ runId, namespace }) => ({
-    route: `POST ${runPath({ namespace, runId })}/refresh`,
-    does: 'tells a run to take the new revisions of the kinds it resolved',
-    forAnother: 'refresh one',
-    why: "every filing after it — a new step, a retry, a round — is filed on the newest revision of the run's workflow, its agents, their skills and its factory's rules, which an agent acts on in this repository",
-    reach: `take them with \`nemia refresh ${runId}\``,
-    instead: `Take them with \`nemia refresh ${runId}\`: the run's page on the board shows the drift and prints that verb, and has no button for it`,
-    shape: REFRESH_SHAPE,
-  }),
   issue:
     ({ runId, namespace }) =>
     ({ path: [key], input }) =>
@@ -148,18 +122,9 @@ const REFRESH: RouteWords = {
     `Could not refresh ${runId}: ${said}. \`nemia refresh ${runId}\` takes the new revisions the same way from the command line.`,
 };
 
-/** Words for a step's running session, as the guard's refusals word them, and its body; words the harness did not take are its own. */
+/** Words for a step's running session: and its body; words the harness did not take are its own. */
 const SAY: RouteWords = {
   shape: SAY_SHAPE,
-  guard: ({ runId, step, namespace }) => ({
-    route: `POST ${runPath({ namespace, runId })}/steps/${step}/say`,
-    does: "hands a person's words to a step's running session",
-    forAnother: 'hand it any',
-    why: "the words go into the session of a step at work in this repository, as a person's, and its agent acts on them",
-    reach: "say it from the step's session page on the board",
-    instead: `Say it from the step's session page on the board, or with \`nemia say ${runId} ${step} "<words>"\``,
-    shape: SAY_SHAPE,
-  }),
   issue:
     ({ runId, step }) =>
     ({ path: [key], input }) =>
@@ -199,31 +164,11 @@ const holdWords =
   };
 
 /**
- * A person's hold put (`POST`) or lifted (`DELETE`), as the guard's refusals word each, its body — the put's strict, every key it does not
+ * A person's hold put (`POST`) or lifted (`DELETE`): its body — the put's strict, every key it does not
  * take named; the lift's none — and a failure that is no refusal, naming the `nemia hold` that does the same.
  */
 const HOLD: RouteWords = {
   shape: HOLD_PUT_SHAPE,
-  guard: ({ runId, method, namespace }) =>
-    method === 'DELETE'
-      ? {
-          route: `DELETE ${runPath({ namespace, runId })}/hold`,
-          does: "lifts a run's hold",
-          forAnother: 'lift one',
-          why: 'a hold lifted lets the run go on at the next tick, its steps filed and what they asked asked again',
-          reach: "lift it on the board's run page",
-          instead: "Lift it on the board's run page, or with `nemia hold <run> --off`",
-          shape: '`{}`',
-        }
-      : {
-          route: `POST ${runPath({ namespace, runId })}/hold`,
-          does: 'holds a run until other runs land',
-          forAnother: 'hold one',
-          why: 'a held run has nothing more of it filed, and nothing of it asked of a person, until every run it waits on has landed',
-          reach: "put it on the board's run page",
-          instead: "Put it on the board's run page, or with `nemia hold <run> --until <runId>`",
-          shape: HOLD_PUT_SHAPE,
-        },
   issue: ({ runId, method, namespace }) =>
     method === 'DELETE' ? () => 'DELETE …/hold takes no body: `{}`.' : holdWords({ namespace, runId }),
   failed: ({ runId, method, namespace }, said) =>
@@ -245,18 +190,9 @@ const pauseKeyWords = (key: unknown, input: unknown): string => {
   return `POST /api/pause takes a JSON object: ${PAUSE_SHAPE}.`;
 };
 
-/** The store paused, as the guard's refusals word it, its body and its failures; a pause that stands is the package's 409. */
+/** The store paused: its body and its failures; a pause that stands is the package's 409. */
 const PAUSE: RouteWords = {
   shape: PAUSE_SHAPE,
-  guard: () => ({
-    route: 'POST /api/pause',
-    does: 'pauses the store',
-    forAnother: 'pause it',
-    why: 'a pause stops every pass from starting new work in every repository the store runs in, until a person resumes it, and a pause at once stops what is at work',
-    reach: "pause it from the board's bottom bar",
-    instead: 'Pause it from the board\'s bottom bar, or with `nemia pause --why "<words>"`',
-    shape: PAUSE_SHAPE,
-  }),
   issue:
     () =>
     ({ path: [key], input }) =>
@@ -264,34 +200,16 @@ const PAUSE: RouteWords = {
   failed: (_at, said) => `POST /api/pause: the store was not paused — ${said}. Pause it with \`nemia pause\`.`,
 };
 
-/** The store resumed, as the guard's refusals word it; it takes no body, and none standing is the package's 404. */
+/** The store resumed; it takes no body, and none standing is the package's 404. */
 const RESUME: RouteWords = {
   shape: '`{}`',
-  guard: () => ({
-    route: 'DELETE /api/pause',
-    does: 'resumes the store',
-    forAnother: 'resume it',
-    why: 'a store resumed lets the next pass file every step, try and check that waits, in every repository the store runs in',
-    reach: "resume it from the board's bottom bar",
-    instead: "Resume it from the board's bottom bar, or with `nemia resume`",
-    shape: '`{}`',
-  }),
   issue: () => () => 'DELETE /api/pause takes no body: `{}`.',
   failed: (_at, said) => `DELETE /api/pause: the store was not resumed — ${said}. Resume it with \`nemia resume\`.`,
 };
 
-/** A try's run removed, as the guard's refusals word it; it takes no body, and a failure that is no refusal names `nemia rm`. */
+/** A try's run removed; it takes no body, and a failure that is no refusal names `nemia rm`. */
 const RM: RouteWords = {
   shape: '`{}`',
-  guard: ({ runId, namespace }) => ({
-    route: `DELETE ${runPath({ namespace, runId })}`,
-    does: 'removes a run',
-    forAnother: 'remove one',
-    why: "a run removed takes its record, every folder it worked in and the engine's journals and session files of its tasks with it, and nothing brings them back",
-    reach: "remove it on the board's run page",
-    instead: "Remove it on the board's run page, or with `nemia rm`",
-    shape: '`{}`',
-  }),
   issue: () => () => 'DELETE /api/namespaces/:namespace/runs/:runId takes no body: `{}`.',
   failed: ({ runId, namespace }, said) =>
     `DELETE ${runPath({ namespace, runId })}: ${runId} was not removed — ${said}. Remove it with \`nemia rm ${runId}\`.`,
@@ -315,20 +233,11 @@ function pruneWords({ path: [key], kind, input }: BodyIssue, body: unknown): str
 }
 
 /**
- * A finished run pruned, as the guard's refusals word it, its body — strict, every key it does not take named — and a failure that is no
+ * A finished run pruned: its body — strict, every key it does not take named — and a failure that is no
  * refusal, naming `nemia prune`.
  */
 const PRUNE: RouteWords = {
   shape: PRUNE_SHAPE,
-  guard: ({ runId, namespace }) => ({
-    route: `POST ${runPath({ namespace, runId })}/prune`,
-    does: 'prunes a run',
-    forAnother: 'prune one',
-    why: 'a run pruned has its worktrees removed, and its files with `artifacts`, and none of its steps can be tried again, sent round or approved',
-    reach: "prune it on the board's run page",
-    instead: "Prune it on the board's run page, or with `nemia prune <run>`",
-    shape: PRUNE_SHAPE,
-  }),
   issue: () => pruneWords,
   failed: ({ runId, namespace }, said) =>
     `POST ${runPath({ namespace, runId })}/prune: ${runId} was not pruned — ${said}. Prune it with \`nemia prune ${runId}\`.`,

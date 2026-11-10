@@ -9,6 +9,7 @@
  * namespace's. `?labelSelector=` and its retired spelling `?selector=` are read the same, each given again for another (OR); a `limit`,
  * a token or a selector the package refuses is its `Invalid`, a 422.
  */
+import { Effect } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
 import {
   cardList,
@@ -18,18 +19,15 @@ import {
   inboxNameRefusal,
   informerMemo,
   Invalid as Refused,
-  Missing as Absent,
-  Conflict as Held,
   type SummaryHow,
   verifiesRest,
 } from 'agent-orchestrator';
 import { Api, DEFAULT_NAMESPACE, type LabelEdit } from 'objects';
-import type { Refusal } from '../guard.ts';
 import { filingOf } from '../inbox/inbox.ts';
 import type { Served } from '../layer.ts';
 import { commandNamed, runPlaced } from '../store.ts';
 import { cardStart } from '../workflows/workflows.ts';
-import { answered, orFailed } from './refused.ts';
+import { answered, locatedAt, orFailed, readerRefused } from './refused.ts';
 
 /** The entries the verbs write through. */
 const INBOX_RM = commandNamed('inbox rm');
@@ -69,13 +67,6 @@ const page = (namespace: string | undefined, query: ListQuery) =>
       }),
     ),
   );
-
-/** A refusal of the api's own (`{ status, error }`) thrown as the package's, so that `answered` answers it by its kind. */
-const thrown = ({ status, error }: Refusal): never => {
-  if (status === 404) throw new Absent({ message: error });
-  if (status === 409) throw new Held({ message: error });
-  throw new Refused({ message: error });
-};
 
 /**
  * The card `name` of `namespace` (any namespace, for none), read now with its file as written (`status.source`), after its name is one a
@@ -122,7 +113,7 @@ export const cardsHandlers = HttpApiBuilder.group(Api, 'cards', (handlers) =>
             message: "`workflow` is a workflow folder's name, with no `/`: send one, or leave it out. Nothing was filed.",
           });
         const asked = filingOf({ ...payload, ...(factory === undefined ? {} : { factory }) }, s.repo, s.home);
-        if ('status' in asked) return thrown(asked);
+        if ('status' in asked) throw readerRefused(asked);
         const { card } = await runPlaced(
           s,
           s.e,
@@ -147,11 +138,11 @@ export const cardsHandlers = HttpApiBuilder.group(Api, 'cards', (handlers) =>
         orFailed(async (s) => {
           await cardIn(s, namespace, name);
           const started = await cardStart(s, name, payload, factoryOf(namespace) ?? s.factory?.name);
-          if ('status' in started) return thrown(started);
+          if ('status' in started) throw readerRefused(started);
           const { id, card, ignoredRepo } = started;
           return { id, card, ...(ignoredRepo !== undefined ? { ignoredRepo } : {}) };
         }),
-      ),
+      ).pipe(Effect.tap((started) => ('id' in started ? locatedAt(started.id) : Effect.void))),
     )
     .handle('queue', ({ params: { namespace, name } }) => queued(namespace, name, false))
     .handle('unqueue', ({ params: { namespace, name } }) => queued(namespace, name, true))

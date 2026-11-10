@@ -495,6 +495,24 @@ export const PROPOSAL_REFUSALS = [
 /** One of `PROPOSAL_REFUSALS`. */
 export type ProposalRefusal = (typeof PROPOSAL_REFUSALS)[number];
 
+/**
+ * Why the api's write guard refuses a write before its body is read (a 403, `Forbidden`'s `reason`): addressed to a name that is not this
+ * machine (`host`), or made by a page on another site (`site`). A body not sent as JSON is the 415's, which needs no word.
+ */
+export const GUARD_REFUSALS = ['host', 'site'] as const;
+
+/** One of `GUARD_REFUSALS`. */
+export type GuardRefusal = (typeof GUARD_REFUSALS)[number];
+
+/**
+ * The types a `Table`'s column says its cells are, as Kubernetes' server-side printing names them (`meta.k8s.io/v1`
+ * `TableColumnDefinition.type`, the OpenAPI types).
+ */
+export const TABLE_COLUMN_TYPES = ['string', 'integer', 'number', 'boolean', 'date'] as const;
+
+/** One of `TABLE_COLUMN_TYPES`. */
+export type TableColumnType = (typeof TABLE_COLUMN_TYPES)[number];
+
 /** Why a presented session token is refused (a 401): the store never minted it, or its session's try is no longer live. */
 export const TOKEN_REFUSALS = ['unknown-token', 'session-ended'] as const;
 

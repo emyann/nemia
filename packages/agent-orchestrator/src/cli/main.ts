@@ -3,7 +3,7 @@
  * others beside.
  */
 import path from 'node:path';
-import { Effect, Layer, Stream, type Duration } from 'effect';
+import { Effect, Layer, Schema, Stream, type Duration } from 'effect';
 import {
   breakdownLines,
   ceilingLines,
@@ -402,9 +402,21 @@ async function commanded(command: Command | Ran, rest: string[], e: Engine, dema
   if (runner) return runner(args, e, place);
   if (command.handler === undefined)
     throw new Error(`${command.name} has neither a runner nor a handler: give it one in RUNS or its entry`);
-  const data = await runWith(e, placedIn(place, command.handler(args, process.env, wfRoot(process.env))));
-  for (const line of command.print(data, args)) console.log(line);
-  for (const line of command.note?.(data, args) ?? []) console.error(line);
+  const given = inputOf(command, args);
+  const data = await runWith(e, placedIn(place, command.handler(given, process.env, wfRoot(process.env))));
+  for (const line of command.print(data, given)) console.log(line);
+  for (const line of command.note?.(data, given) ?? []) console.error(line);
+}
+
+/**
+ * The arguments `command`'s handler takes: the parsed `args` as they are, or decoded through its `input` where it says one, a key its
+ * handler takes that the parse left out or gave another type refused, exit 2, before anything is read.
+ */
+function inputOf(command: Command, args: Args): Args {
+  if (command.input === undefined) return args;
+  const decoded = Schema.decodeUnknownExit(command.input)(args);
+  if (decoded._tag === 'Success') return decoded.value;
+  return usage(`nemia ${command.name} was given arguments its handler does not take: nemia ${command.name} ${command.usage}.`);
 }
 
 /** The names `nemia` takes, its commands' and its verbs', a name of two words among them: `agents card`. */

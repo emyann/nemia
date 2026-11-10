@@ -18,7 +18,7 @@ import { definitionRevision, foldersIn, typedGraphOf, workflowStale, workflowVer
 import { Api, API_VERSION, Conflict, Invalid, type Workflow, type WorkflowStep } from 'objects';
 import type { Served } from '../layer.ts';
 import { queryOf } from '../factory/parts/index.ts';
-import { answeredWrite as answered, statusRefused } from '../objects/refused.ts';
+import { answeredWriteIn, readerRefused } from '../objects/refused.ts';
 import { commandNamed, runPlaced } from '../store.ts';
 import { draftOf, isRoleKey, schemasOf, write, type StepBody } from '../workflows/builder.ts';
 import { workflowNameRefusal } from '../workflows/words.ts';
@@ -174,7 +174,7 @@ export async function workflowAt(s: Served, namespace: string, name: string, ask
 const draftsOf = (steps: readonly WorkflowStep[], route: string) =>
   steps.map((step, i) => {
     const draft = draftOf(stepBodyOf(step), `step ${i + 1}`, route, SHAPE);
-    if ('status' in draft) throw statusRefused(draft);
+    if ('status' in draft) throw readerRefused(draft);
     return draft;
   });
 
@@ -199,15 +199,17 @@ const builderRefused = (saved: Awaited<ReturnType<typeof write>>): void => {
 export const workflowsHandlers = HttpApiBuilder.group(Api, 'workflows', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
-      answered(async (s) => {
+      answeredWriteIn(namespace, async (s) => {
         const { origin, ...page } = query;
         const items = await workflowObjectsOf(s, servedOf(heldIn(s), originAsked(origin)), namespace);
         return listed('Workflow', items, queryOf(page));
       }),
     )
-    .handle('get', ({ params: { namespace, name }, query }) => answered((s) => workflowAt(s, namespace, name, originAsked(query.origin))))
+    .handle('get', ({ params: { namespace, name }, query }) =>
+      answeredWriteIn(namespace, (s) => workflowAt(s, namespace, name, originAsked(query.origin))),
+    )
     .handle('create', ({ params: { namespace }, payload }) =>
-      answered(async (s) => {
+      answeredWriteIn(namespace, async (s) => {
         const { name } = payload.metadata;
         const route = `POST /api/namespaces/${namespace}/workflows`;
         writeGoes(namespace, 'create', thereOf(heldIn(s), name));
@@ -221,12 +223,12 @@ export const workflowsHandlers = HttpApiBuilder.group(Api, 'workflows', (handler
       }),
     )
     .handle('replace', ({ params: { namespace, name }, payload }) =>
-      answered(async (s) => {
+      answeredWriteIn(namespace, async (s) => {
         const route = `PUT /api/namespaces/${namespace}/workflows/${name}`;
         writeGoes(namespace, 'replace', thereOf(heldIn(s), name));
         const steps = draftsOf(payload.spec.steps, route);
         const schemas = schemasOf(payload.schemas, route, SHAPE);
-        if ('status' in schemas) throw statusRefused(schemas);
+        if ('status' in schemas) throw readerRefused(schemas);
         const given = payload.metadata?.resourceVersion;
         if (given === undefined)
           throw new Invalid({
@@ -240,7 +242,7 @@ export const workflowsHandlers = HttpApiBuilder.group(Api, 'workflows', (handler
       }),
     )
     .handle('delete', ({ params: { namespace, name }, query }) =>
-      answered(async (s) => {
+      answeredWriteIn(namespace, async (s) => {
         const route = `DELETE /api/namespaces/${namespace}/workflows/${name}`;
         writeGoes(namespace, 'remove', thereOf(heldIn(s), name));
         const version = query.resourceVersion;

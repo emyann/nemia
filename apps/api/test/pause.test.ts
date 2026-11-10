@@ -82,7 +82,7 @@ test('POST /api/pause refuses, before the store is written: a body that is not a
       name: 'a pause asked by a page on another site: 403',
       ask: () => asked('POST', {}, { ...BOARD, 'sec-fetch-site': 'cross-site' }),
       status: 403,
-      facts: ['another site'],
+      facts: [],
     },
     {
       name: 'a lift asked by a page on another site: 403',

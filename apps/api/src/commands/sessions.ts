@@ -3,7 +3,6 @@
  * keeper acts on.
  */
 import { subscriptionNameRefusal } from 'agent-orchestrator';
-import type { Guarded } from '../guard.ts';
 import type { RouteWords } from './words.ts';
 
 /** The body `POST /api/subscriptions/:name` takes: `nemia subscribe`'s task and flags, as JSON. */
@@ -26,23 +25,9 @@ const subscribeKeyWords = (key: unknown, input: unknown): string => {
   return `POST /api/subscriptions/:name takes a JSON object: ${SUBSCRIBE_SHAPE}.`;
 };
 
-/** A subscription to the feed, the guard's words of the route at `name`. */
-const subscriptionGuard = (name: string, off: boolean): Guarded => ({
-  route: `${off ? 'DELETE' : 'POST'} /api/subscriptions/${name}`,
-  does: off ? 'takes a subscription away' : 'gives a task a subscription to the feed',
-  forAnother: off ? 'take one away' : 'give one',
-  why: off
-    ? 'a subscription taken away leaves its task told nothing more of the feed, and where its deliverer was is lost'
-    : "a subscription says the feed's lines to a long-lived task's session, which acts on what it is told",
-  reach: off ? 'take it away with `nemia unsubscribe`' : 'give it with `nemia subscribe`',
-  instead: off ? `Take it away with \`nemia unsubscribe ${name}\`` : `Give it with \`nemia subscribe ${name} <task>\``,
-  shape: off ? '`{}`' : SUBSCRIBE_SHAPE,
-});
-
-/** A subscription given, as the guard's refusals word it, and its body; a name that names no file of its own is refused before it. */
+/** A subscription given: and its body; a name that names no file of its own is refused before it. */
 export const SUBSCRIBE: RouteWords = {
   shape: SUBSCRIBE_SHAPE,
-  guard: ({ name }) => subscriptionGuard(name, false),
   issue:
     () =>
     ({ path: [key], input }) =>
@@ -50,10 +35,9 @@ export const SUBSCRIBE: RouteWords = {
   named: ({ name }) => subscriptionNameRefusal(name) ?? null,
 };
 
-/** A subscription taken away, as the guard's refusals word it; it takes no body. */
+/** A subscription taken away; it takes no body. */
 export const UNSUBSCRIBE: RouteWords = {
   shape: '`{}`',
-  guard: ({ name }) => subscriptionGuard(name, true),
   issue: () => () => 'DELETE /api/subscriptions/:name takes no body: `{}`.',
   named: ({ name }) => subscriptionNameRefusal(name) ?? null,
 };
@@ -61,18 +45,9 @@ export const UNSUBSCRIBE: RouteWords = {
 /** The body `PUT /api/level` takes: `nemia level`'s level, as JSON. */
 const LEVEL_SHAPE = '`{ "level": "manual" | "semi-auto" | "auto" }`';
 
-/** Nemia's level set, as the guard's refusals word it, and its body; a level that is none is the package's 422. */
+/** Nemia's level set: and its body; a level that is none is the package's 422. */
 export const LEVEL: RouteWords = {
   shape: LEVEL_SHAPE,
-  guard: () => ({
-    route: 'PUT /api/level',
-    does: "sets Nemia's level",
-    forAnother: 'set it',
-    why: "at semi-auto Nemia's session is kept, reading every factory's folders and told the feed's waits on a person; at auto she also gives the answers the person's confirmed list allows; at manual it is stopped",
-    reach: 'set it with `nemia level`',
-    instead: 'Set it with `nemia level auto`, `nemia level semi-auto` or `nemia level manual`',
-    shape: LEVEL_SHAPE,
-  }),
   issue:
     () =>
     ({ input }) =>

@@ -8,10 +8,24 @@ import { Stream } from 'effect';
 import { eventKept, followFeed } from 'agent-orchestrator';
 import type { Follow } from '../watch/watch.ts';
 
+/**
+ * The namespace a path of the Event lists names, `/api/namespaces/<ns>/events`, or none for `/api/events`: read off the path, which the
+ * mount serves on one wildcard (`.all('/api/*')`) that names no parameter.
+ */
+const namespaceOf = (url: string): string | undefined => {
+  const named = /^\/api\/namespaces\/([^/]+)\//.exec(new URL(url).pathname)?.[1];
+  if (named === undefined) return undefined;
+  try {
+    return decodeURIComponent(named);
+  } catch {
+    return named;
+  }
+};
+
 /** The Events a watch of `/api/events` or `/api/namespaces/<ns>/events` follows, from byte `from` of the feed. */
 export const eventsFollowed: Follow = (c, from, beat: Duration.Input | undefined) => {
   const kept = eventKept({
-    namespace: c.req.param('namespace'),
+    namespace: namespaceOf(c.req.url),
     labelSelector: [...(c.req.queries('labelSelector') ?? []), ...(c.req.queries('selector') ?? [])],
   });
   const at = { cursor: from };

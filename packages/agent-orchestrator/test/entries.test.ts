@@ -58,6 +58,8 @@ const PINNED: Record<string, string[]> = {
     'DEFAULT_FACTORY',
     'DEFAULT_SELECTORS',
     'ENGINE_REASON',
+    'FACTORY_FIRE',
+    'FACTORY_HIRE',
     'FACTORY_INSTRUCT',
     'FACTORY_INSTRUCTION',
     'FACTORY_RULES',

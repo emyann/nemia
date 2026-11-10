@@ -28,7 +28,7 @@ import {
   type SkillRow,
 } from '../agents/skills.ts';
 import { queryOf } from '../factory/parts/index.ts';
-import { answeredWrite as answered, statusRefused } from '../objects/refused.ts';
+import { answeredWriteIn, readerRefused } from '../objects/refused.ts';
 import { filesUnder, skillFoldersIn, skillTextOf } from '../workflows/builder.ts';
 import { commandNamed, runPlaced } from '../store.ts';
 import { listed, originAsked, servedNamed, servedOf, thereOf, writeGoes, writtenAt, type Held, type Origin } from './served.ts';
@@ -155,21 +155,23 @@ async function skillAt(s: Served, namespace: string, name: string, asked?: Origi
 /** A spec as the draft the package writes, named `name`; refused as `skillDraftFrom` refuses it. */
 const draftOf = (spec: SkillSpec, name: string, route: string): SkillDraft => {
   const draft = skillDraftFrom({ ...spec, name }, route, SHAPE);
-  if ('status' in draft) throw statusRefused(draft);
+  if ('status' in draft) throw readerRefused(draft);
   return draft;
 };
 
 export const skillsHandlers = HttpApiBuilder.group(Api, 'skills', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
-      answered(async (s) => {
+      answeredWriteIn(namespace, async (s) => {
         const { origin, ...page } = query;
         return listed('Skill', await skillObjectsOf(s, servedOf(await heldIn(s), originAsked(origin)), namespace), queryOf(page));
       }),
     )
-    .handle('get', ({ params: { namespace, name }, query }) => answered((s) => skillAt(s, namespace, name, originAsked(query.origin))))
+    .handle('get', ({ params: { namespace, name }, query }) =>
+      answeredWriteIn(namespace, (s) => skillAt(s, namespace, name, originAsked(query.origin))),
+    )
     .handle('create', ({ params: { namespace }, payload }) =>
-      answered(async (s) => {
+      answeredWriteIn(namespace, async (s) => {
         const route = `POST /api/namespaces/${namespace}/skills`;
         const name = payload.metadata.name;
         if (name === undefined || !('spec' in payload))
@@ -180,7 +182,7 @@ export const skillsHandlers = HttpApiBuilder.group(Api, 'skills', (handlers) =>
       }),
     )
     .handle('replace', ({ params: { namespace, name }, payload }) =>
-      answered(async (s) => {
+      answeredWriteIn(namespace, async (s) => {
         const route = `PUT /api/namespaces/${namespace}/skills/${name}`;
         writeGoes(namespace, 'replace', thereOf(await heldIn(s), name));
         const version = payload.metadata.resourceVersion;
@@ -198,14 +200,14 @@ export const skillsHandlers = HttpApiBuilder.group(Api, 'skills', (handlers) =>
       }),
     )
     .handle('copy', ({ params: { namespace, name } }) =>
-      answered(async (s) => {
+      answeredWriteIn(namespace, async (s) => {
         writeGoes(namespace, 'act', thereOf(await heldIn(s), name));
         await runPlaced(s, s.e, WRITE.handler({ from: 'yours', copy: name, builtin: BUILTIN_SKILLS }, undefined, s.home));
         return skillAt(s, namespace, name, 'yours');
       }),
     )
     .handle('files', ({ params: { namespace, name }, query }) =>
-      answered(async (s) => ({
+      answeredWriteIn(namespace, async (s) => ({
         paths: filesUnder(servedNamed(await heldIn(s), name, originAsked(query.origin), listPath(namespace)).item.dir),
       })),
     ),

@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import { Layer, ManagedRuntime, Metric } from 'effect';
-import { type Context, type ErrorHandler, Hono } from 'hono';
+import { type ErrorHandler, Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import {
@@ -13,9 +13,8 @@ import {
   telemetryLayer,
   VERSION,
 } from 'agent-orchestrator';
-import { Forbidden, isRefusal, type Refusal } from 'agent-orchestrator';
 import { DEFAULT_HARNESS } from 'agent-orchestrator/workflow';
-import { callerGate, Unauthorized } from './caller/caller.ts';
+import { callerGate } from './caller/caller.ts';
 import { agents } from './agents/index.ts';
 import { customInstructions } from './custom/custom.ts';
 import { commands } from './commands/index.ts';
@@ -23,7 +22,8 @@ import { capabilitiesWithSteps, McpAsker } from './capabilities/index.ts';
 import { ceilingsOf, metricsOf, passesOf, seriesOf, pauseNowOf, pauseOf, feed, QuotaAsker, readDaemon } from './gauges/index.ts';
 import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Services } from './layer.ts';
 import { nemia, nemiaChat } from './nemia/index.ts';
-import { objectsRoutes } from './objects/index.ts';
+import { bodyOf, MOUNT, mount, noRoute, refusedAs, statusOf } from './objects/index.ts';
+import { writeGuard } from './guard.ts';
 import { runs } from './runs/runs.ts';
 import { openapi, REFERENCE_BUNDLE, referenceOf } from './openapi/index.ts';
 import { saidRequest } from './request/request.ts';
@@ -34,28 +34,15 @@ import { engineRead, Engine } from './store.ts';
 import { builder, workflows, yours } from './workflows/index.ts';
 
 /**
- * The status each kind of the orchestrator's refusal answers, whichever route it came through: what is asked of is not there (404), the
- * state of a run or of the store forbids it (409), what is given is wrong (422); and who asks: a caller who may not do what it asks of a
- * proposal or a delegation (the orchestrator's `Forbidden`, 403), and a session token the api refuses (`Unauthorized`, caller/caller.ts,
- * 401). A kind left out is refused by the compiler.
- */
-export const REFUSAL_STATUS = { Missing: 404, Conflict: 409, Invalid: 422, Forbidden: 403, Unauthorized: 401 } as const satisfies Record<
-  Refusal['_tag'] | Forbidden['_tag'] | Unauthorized['_tag'],
-  ContentfulStatusCode
->;
-
-/**
- * What the api answers an error a route threw: a refusal of the orchestrator's (`isRefusal`, by its class) its status in `REFUSAL_STATUS`,
- * `{ error }` in its words, and `users` beside it where a `Conflict` names the steps that hold what was asked of; a caller refused
- * (`Forbidden`, `Unauthorized`) its status there too, `{ error, reason }`; an `HTTPException` its
- * own response; anything else a 500, `{ error }` its message, said on stderr — an `Error` carrying `exitCode` 2 by hand among them, since
- * only a kind says what a refusal is.
+ * What the api answers an error a route on Hono threw: a refusal — the orchestrator's by its tag, the api's own refusal of a session token
+ * (`Unauthorized`, caller/caller.ts), an error of `objects`' — as the `Api` answers it (`refusedAs`, objects/refused.ts, the one map), at
+ * its class's status (`statusOf`), `{ error }` and its class's other keys (a `Conflict`'s `users`, a `Forbidden`'s `reason`); an
+ * `HTTPException` its own response; anything else a 500, `{ error }` its message, said on stderr — an `Error` carrying `exitCode` 2 by hand
+ * among them, since only a kind says what a refusal is.
  */
 export const answerError: ErrorHandler = (err, c) => {
-  if (isRefusal(err))
-    return c.json({ error: err.message, ...(err._tag === 'Conflict' && err.users && { users: err.users }) }, REFUSAL_STATUS[err._tag]);
-  if (err instanceof Forbidden || err instanceof Unauthorized)
-    return c.json({ error: err.message, ...(err.reason !== undefined && { reason: err.reason }) }, REFUSAL_STATUS[err._tag]);
+  const refused = refusedAs(err);
+  if (refused !== undefined) return c.json(bodyOf(refused), statusOf(refused) as ContentfulStatusCode);
   if (err instanceof HTTPException) return err.getResponse();
   console.error(err);
   return c.json({ error: err.message }, 500);
@@ -114,10 +101,9 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  * - `GET /api/version` — `{ version, release }`, the orchestrator's package version (`VERSION`) and the code the api runs (`RELEASE`), a
  *   checkout or an install: what the board's bottom bar says.
  * - factory/factories.ts, and factory/parts/: mcp-servers.ts, schedules.ts, hires.ts, volumes.ts — the factories as objects, and their
- *   servers, schedules, hires and volumes in each factory's namespace, served through `objects`' Api (objects/serve.ts, through
- *   factory/index.ts). Every route is answered in the factory and on the repository its query names (`?factory=`, `?repo=`), resolved
- *   before its handler runs, and refused when it names a repository no factory has (`placeFor`, factory/place.ts); a request naming
- *   neither is answered on the api's own.
+ *   servers, schedules, hires and volumes in each factory's namespace, served through `objects`' Api by the mount (objects/serve.ts,
+ *   the handlers through factory/index.ts). A handler of a namespaced kind is answered in its namespace's factory and on the repository
+ *   `?repo=` names (`answeredIn`, objects/refused.ts), refused when it names a repository no factory has (`placeFor`, factory/place.ts).
  * - `GET /api/capabilities` — what the repository offers a step, read from the checkout on each request (capabilities/capabilities.ts), and
  *   what each step of each workflow gets of it (capabilities/reach.ts). Each MCP server the settings enable is started and asked for its
  *   tools once while the app runs (`McpAsker`); one that fails is an `error` on its entry, never a failed request.
@@ -178,8 +164,13 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  *   level is set on the route the table generates from `nemia level`.
  * - nemia/chat.ts — Nemia's chat: her history paged and followed, the person's words sent, and their read mark moved.
  *
- * A route lets the orchestrator's refusals through, and `onError` answers each from `REFUSAL_STATUS`, `{ error }` in its words
- * (`answerError`). Any other error is a 500 there: a route that has better words for one, or a truer status, answers it itself.
+ * A route lets the orchestrator's refusals through, and `onError` answers each as the one map says (`refusedAs`, objects/refused.ts), at
+ * its class's status, `{ error }` in its words (`answerError`). Any other error is a 500 there: a route that has better words for one, or
+ * a truer status, answers it itself.
+ *
+ * Every write under `/api/` meets the one guard first (`writeGuard`, guard.ts), whatever route serves it. After the routes still on Hono,
+ * the mount hands every other request under `/api/` to the web handler of `objects`' `Api` (`.all(MOUNT, mount(runtime))`,
+ * objects/serve.ts); a path neither serves is the api's own 404 (`noRoute`).
  *
  * Every request, whichever route answers it, says one line and is traced as a server span: `saidRequest` (request/request.ts), registered
  * after the runtime's middleware and before every router, on the runtime the request carries. Then who it is from (`callerGate`,
@@ -195,6 +186,9 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     })
     .use(saidRequest)
     .use(callerGate)
+    .use(writeGuard)
+    .route('/', openapi)
+    .route('/', referenceOf(viewerScript))
     .get('/api/health', (c) => c.json({ ok: true }))
     .get('/api/version', (c) => c.json({ version: VERSION, release: RELEASE }))
     .get('/api/capabilities', (c) =>
@@ -208,10 +202,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', yours)
     .route('/', agents)
     .route('/', customInstructions)
-    .route('/', objectsRoutes(runtime))
     .route('/', runs)
-    .route('/', openapi)
-    .route('/', referenceOf(viewerScript))
     .route('/', stats)
     .get('/api/ceilings', (c) => served(c, async (s) => c.json(await ceilingsOf(s))))
     .get('/api/passes', (c) =>
@@ -243,22 +234,10 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', feed)
     .route('/', nemia)
     .route('/', nemiaChat)
+    .all(MOUNT, mount(runtime))
     .notFound(noRoute)
     .onError(answerError);
   return { app, runtime };
-}
-
-/**
- * A path no route serves, a retired one among them (`/api/factories/:factory/servers`, `…/hires/:step`, `…/schedules/:workflow`), in the
- * api's words: a 404 naming the restart that makes a client and the api one build, and where the paths it serves are listed.
- */
-function noRoute(c: Context<ApiEnv>): Response {
-  return c.json(
-    {
-      error: `${c.req.method} ${new URL(c.req.url).pathname} is no route of this api, which a client of another build may still ask: restart the daemon with \`nemia service restart\` so the two are one build, or ask a path GET /openapi/v3/nemia/v1 lists.`,
-    },
-    404,
-  );
 }
 
 /** The api the process serves (main.ts), over the live services and `process.env`, and its runtime. */

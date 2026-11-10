@@ -4,15 +4,12 @@
  * from it (`factory fire`). A name two steps join to is read and written by neither: `Conflict`, naming both and the fix.
  */
 import { HttpApiBuilder } from 'effect/http-api';
-import { hireList, hireObject } from 'agent-orchestrator';
+import { FACTORY_FIRE, FACTORY_HIRE, hireList, hireObject } from 'agent-orchestrator';
 import { Api } from 'objects';
 import type { Served } from '../../layer.ts';
-import { commandNamed, runPlaced } from '../../store.ts';
+import { runPlaced } from '../../store.ts';
 import { defaultRepo, factoryNamed, queryOf } from './parts.ts';
 import { answered } from '../../objects/refused.ts';
-
-const HIRE = commandNamed('factory hire');
-const FIRE = commandNamed('factory fire');
 
 /** The Hire `name` of `namespace`, read now. */
 const hireIn = (s: Served, namespace: string, name: string) => runPlaced(s, s.e, hireObject(s.home, defaultRepo(s), namespace, name));
@@ -36,7 +33,7 @@ export const hiresHandlers = HttpApiBuilder.group(Api, 'hires', (handlers) =>
         factoryNamed(`PUT /api/namespaces/${namespace}/hires/${name}`, namespace);
         const { spec } = await hireIn(s, namespace, name);
         const step = `${spec.workflow}/${spec.step}`;
-        await runPlaced(s, s.e, HIRE.handler({ factory: namespace, agent: payload.agent, step }, s.env, s.home));
+        await s.inRequest(FACTORY_HIRE.handler({ factory: namespace, agent: payload.agent, step }, s.env, s.home));
         return hireIn(s, namespace, name);
       }),
     )
@@ -44,7 +41,7 @@ export const hiresHandlers = HttpApiBuilder.group(Api, 'hires', (handlers) =>
       answered(async (s) => {
         factoryNamed(`DELETE /api/namespaces/${namespace}/hires/${name}`, namespace);
         const { spec } = await hireIn(s, namespace, name);
-        await runPlaced(s, s.e, FIRE.handler({ factory: namespace, step: `${spec.workflow}/${spec.step}` }, s.env, s.home));
+        await s.inRequest(FACTORY_FIRE.handler({ factory: namespace, step: `${spec.workflow}/${spec.step}` }, s.env, s.home));
         return hireIn(s, namespace, name);
       }),
     ),

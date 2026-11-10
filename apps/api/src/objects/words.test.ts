@@ -1,6 +1,6 @@
 /**
  * What HttpApi answers on its own, in the api's words (src/objects/serve.ts, `inApiWords`): a body its decoding refuses — not JSON, or
- * JSON of another shape — and a query it refuses are each a 400 whose body is `{ error }`, a sentence naming what the route takes; a
+ * JSON of another shape — and a query it refuses are each a 400 whose body is `{ error, field }`, the key refused (`decodeRefused`); a
  * path the routes hand it and it serves nothing on is a 404 `{ error }` naming where the paths are listed. Its own refusals keep their
  * status and words. A write whose body is over `OBJECT_BODY_LIMIT` is a 413 `{ error }` naming the limit, and one under it is filed as
  * before. And the inbox's routes the Card's verbs replaced answer 404, so a client still reading them fails.
@@ -26,24 +26,26 @@ const inboxAsIs = (): Array<[string, string]> =>
     .sort()
     .map((name) => [name, fs.readFileSync(path.join(inbox, name), 'utf8')]);
 
-/** The status and the `error` of a response, which must be a JSON object. */
-const refusal = async (res: Response): Promise<{ status: number; error: unknown }> => {
+/** The status, the `error` and the `field` of a response, which must be a JSON object. */
+const refusal = async (res: Response): Promise<{ status: number; error: unknown; field: unknown }> => {
   assert.match(res.headers.get('content-type') ?? '', /application\/json/, `${res.status}: answered as JSON`);
-  return { status: res.status, error: ((await res.json()) as { error?: unknown }).error };
+  const body = (await res.json()) as { error?: unknown; field?: unknown };
+  return { status: res.status, error: body.error, field: body.field };
 };
 
-test('REFUSED: a card verb sent a body HttpApi does not decode — not JSON, or another shape — is a 400 `{ error }` naming what it takes, and nothing is written', async () => {
+test('REFUSED: a card verb sent a body HttpApi does not decode — not JSON, or another shape — is a 400 `{ error, field }` naming the key refused and the document, and nothing is written', async () => {
   const before = inboxAsIs();
-  for (const [route, body, takes] of [
-    ['/api/namespaces/default/cards', 'not json', 'body'],
-    ['/api/namespaces/default/cards', '{"body":42}', 'body'],
-    ['/api/namespaces/default/cards', '[]', 'body'],
-    ['/api/namespaces/default/cards/kept-card/labels', '{"labels":"team=core"}', 'labels'],
-    ['/api/namespaces/default/cards/kept-card/start', '{}', 'workflow'],
+  for (const [route, body, field] of [
+    ['/api/namespaces/default/cards', 'not json', 'payload'],
+    ['/api/namespaces/default/cards', '{"body":42}', 'payload.body'],
+    ['/api/namespaces/default/cards', '[]', 'payload'],
+    ['/api/namespaces/default/cards/kept-card/labels', '{"labels":"team=core"}', 'payload.labels'],
+    ['/api/namespaces/default/cards/kept-card/start', '{}', 'payload.workflow'],
   ] as const) {
-    const { status, error } = await refusal(await app.request(route, { method: 'POST', headers: JSON_TYPE, body }));
-    assert.equal(status, 400, `${route} ${body}`);
-    names(error, route, takes);
+    const refused = await refusal(await app.request(route, { method: 'POST', headers: JSON_TYPE, body }));
+    assert.equal(refused.status, 400, `${route} ${body}`);
+    assert.equal(refused.field, field, `${route} ${body}`);
+    names(refused.error, route, `\`${field}\``, '/openapi/v3/nemia/v1');
   }
   assert.deepEqual(inboxAsIs(), before);
 });
@@ -75,11 +77,15 @@ test('a write whose body is at the limit is answered as before: the card is file
   for (const [name] of filed) fs.rmSync(path.join(inbox, name));
 });
 
-test('REFUSED: a list asked with a query of the wrong shape — a limit given twice — is a 400 `{ error }` naming the query it takes', async () => {
-  for (const at of ['/api/cards?limit=1&limit=2', '/api/namespaces/default/cards?continue=a&continue=b']) {
-    const { status, error } = await refusal(await app.request(at));
-    assert.equal(status, 400, at);
-    names(error, 'limit', 'labelSelector');
+test('REFUSED: a list asked with a query of the wrong shape — a key given twice — is a 400 `{ error, field }` naming the key refused', async () => {
+  for (const [at, field] of [
+    ['/api/cards?limit=1&limit=2', 'query.limit'],
+    ['/api/namespaces/default/cards?continue=a&continue=b', 'query.continue'],
+  ] as const) {
+    const refused = await refusal(await app.request(at));
+    assert.equal(refused.status, 400, at);
+    assert.equal(refused.field, field, at);
+    names(refused.error, `\`${field}\``, '/openapi/v3/nemia/v1');
   }
 });
 

@@ -5,8 +5,8 @@
  */
 import { Effect } from 'effect';
 import { API_VERSION, PROPOSABLE_KINDS, RESOURCE_PLURALS, type Delegation, type DelegationWrite } from 'objects';
-import { Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
-import { Forbidden, type ProposalCaller } from '../caller/index.ts';
+import { Forbidden, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
+import type { ProposalCaller } from '../caller/index.ts';
 import { DelegationDoor, type DelegationRecord } from './delegation.store.ts';
 
 /** A delegation's `resourceVersion`: a position, not a digest — when it was last written, which a write moves on. */
@@ -60,7 +60,7 @@ export const delegationPut = Effect.fn('delegationPut')(function* (
   factory: string,
   agent: string,
   spec: DelegationWrite,
-): Effect.fn.Return<Delegation, Refusal | Forbidden> {
+): Effect.fn.Return<Delegation, Refusal> {
   if (caller.kind !== 'person') return yield* Effect.fail(personOnly(factory, agent));
   const unknown = undelegable(spec);
   if (unknown.length > 0)
@@ -78,7 +78,7 @@ export const delegationRemove = Effect.fn('delegationRemove')(function* (
   caller: ProposalCaller,
   factory: string,
   agent: string,
-): Effect.fn.Return<boolean, Refusal | Forbidden> {
+): Effect.fn.Return<boolean, Refusal> {
   if (caller.kind !== 'person') return yield* Effect.fail(personOnly(factory, agent));
   return yield* (yield* DelegationDoor).delegations.remove(factory, agent);
 });

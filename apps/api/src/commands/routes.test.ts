@@ -1,7 +1,8 @@
 /**
  * The routes generated from the package's command table: a command asked on its route writes what the same entry writes asked as `nemia`
  * parses it, every route that writes is guarded, a key another command takes on the api alone is refused, and the table asks the api for
- * nothing it lacks — words for each routed command, and an extension for each key a command takes on the api alone — and serves each route.
+ * nothing it lacks — words for each routed command, and an extension for each key a command takes on the api alone — and serves each route,
+ * on a route of Hono's before the mount or an endpoint of objects' `Api` the mount serves, the table's `:runId` the `Api`'s `:name`.
  *
  * Three tables and the walk: a command on its route answers what its `nemia` entry answers; what a route refuses or ignores of its
  * body, and the removals the board will not do; and the table asking the api for nothing it lacks. The walk over every writing route is
@@ -15,6 +16,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { Api } from 'objects';
 import { app } from '../app.ts';
 import { approvalFile, COMMANDS, engine, parseArgv, routeList, triesDir } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
@@ -331,9 +333,10 @@ test('a command on its route answers what its `nemia` entry answers: the same fi
 });
 
 /**
- * The three branches `refusedBeforeReading` (src/guard.ts) refuses a write on, each a header the board would never send: the words of
- * each route's own refusal are the package's and nobody's to check (root CLAUDE.md), so the walk reads the status and that the route
- * names itself. `src/guard.test.ts` reads the near misses of each header.
+ * The three branches the write guard refuses a write on (`writeRefused`, src/guard.ts), each a header the board would never send: the
+ * words of each refusal are nobody's to check (root CLAUDE.md), so the walk reads the status and that the refusal names the route. It
+ * holds the table's routes still on Hono until they move onto the `Api`, whose writes `test/guarded.test.ts` walks; `src/guard.test.ts`
+ * reads the near misses of each header.
  */
 const GUARD_LEGS = [
   ['a page on another site', { 'sec-fetch-site': 'cross-site' }, 403],
@@ -486,11 +489,15 @@ test('the command table asks the api for nothing it lacks, and the api serves ev
   await t.test(
     'every command the table routes is served by the api on its method and path: the posts the table generates, and the reads the api answers',
     () => {
-      const served = new Set(app.routes.map((r) => `${r.method} ${r.path}`));
+      const unnamed = (method: string, at: string) => `${method} ${at.replace(/:[A-Za-z]+/g, ':')}`;
+      const served = new Set([
+        ...app.routes.filter((r) => r.method !== 'ALL').map((r) => unnamed(r.method, r.path)),
+        ...Object.values(Api.groups).flatMap((g) => Object.values(g.endpoints).map((e) => unnamed(e.method, e.path))),
+      ]);
       assert.deepEqual(
         COMMANDS.flatMap((c) =>
           routeList(c)
-            .filter((r) => !served.has(`${r.method} ${r.path}`))
+            .filter((r) => !served.has(unnamed(r.method, r.path)))
             .map((r) => `${c.name} ${r.method}`),
         ),
         [],
@@ -501,10 +508,10 @@ test('the command table asks the api for nothing it lacks, and the api serves ev
   await t.test('REFUSED: a routed command the api has no words for, and a key taken on the api alone that no extension folds', () => {
     const route = { method: 'POST', path: '/api/runs/:runId/sing', status: 202 } as const;
     assert.deepEqual(wordBreaks([{ name: 'sing', route }]), [
-      'sing is routed on the api, and words.ts has no words for it: give it its guard, its shape and its refusals there',
+      'sing is routed on the api, and words.ts has no words for it: give it its shape and its refusals there',
     ]);
     assert.deepEqual(wordBreaks([{ name: 'hush', route: { method: 'DELETE', path: '/api/runs/:runId/song', status: 200 } }]), [
-      'hush is routed on the api, and words.ts has no words for it: give it its guard, its shape and its refusals there',
+      'hush is routed on the api, and words.ts has no words for it: give it its shape and its refusals there',
     ]);
     assert.deepEqual(wordBreaks([{ name: 'sing' }]), [], 'a command served on the command line alone needs no words');
     assert.deepEqual(extensionBreaks([{ name: 'accept', apiTakes: ['answers'] }]), [

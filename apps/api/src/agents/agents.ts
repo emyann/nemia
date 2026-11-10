@@ -22,7 +22,6 @@ import {
 } from 'agent-orchestrator';
 import { agentNameRefusal, type AgentCardShape, type AgentDraft } from 'agent-orchestrator/workflow';
 
-import { type Guarded } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import type { Engine, RunsOn } from '../store.ts';
 import { givenSkills, type GivenSkill } from './skills.ts';
@@ -115,31 +114,6 @@ export type AgentDraftBody = Omit<typeof POST_BODY.Type, 'name'>;
 
 /** What a try answers with: the run it started, which the board follows on the run's page. */
 export type AgentTried = { id: string };
-
-/** A try, as the guard's refusals word it (guard.ts). */
-/** What a try sends, said by its guard. */
-const TRY_SHAPE = '`{ "brief": "<what the agent is asked to do>" }`';
-
-export const tryGuard = (route: string): Guarded => ({
-  route,
-  does: 'tries an agent',
-  forAnother: 'try one',
-  why: 'a try starts a run of the agent, which spends up to its budget once a tick files it',
-  reach: "try it on the board's agent page",
-  instead: "Try it on the board's agent page",
-  shape: TRY_SHAPE,
-});
-
-/** A write of yours, as the guard's refusals word it (guard.ts). */
-export const agentGuard = (route: string, shape: string): Guarded => ({
-  route,
-  does: 'writes an agent',
-  forAnother: 'write one',
-  why: "an agent's file is what every step that names it is told and runs with, once a run of its workflow starts",
-  reach: "edit it on the board's Agents page",
-  instead: "Edit it on the board's Agents page, or edit its file",
-  shape,
-});
 
 /** A draft off a decoded body, each line trimmed, and one with nothing in it unset. */
 export function agentDraftOf(body: AgentDraftBody, name: string): { draft: AgentDraft; schema: AgentSchema | null } {

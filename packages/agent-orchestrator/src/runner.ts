@@ -35,7 +35,7 @@ export { leaseRelease, trialRefusal, checkoutPromiseLine, type Running } from '.
 export type { SessionHarness, SessionRelease } from './release/release.ts';
 export { currentRelease } from './release/release.store.ts';
 export { runningRelease } from './release/version.verb.ts';
-export { Conflict, Invalid, isRefusal, Missing, type Refusal } from './refusal/refusal.ts';
+export { Conflict, Forbidden, Invalid, isRefusal, Missing, type Refusal } from './refusal/refusal.ts';
 export { maxConcurrent, maxRuns, verifiesRest, wfRoot } from './config/config.store.ts';
 export { StoreRoot, storeRootLayer } from './config/root.store.ts';
 export {
@@ -483,7 +483,11 @@ export { serverSignIn, serverSignInState, serverSignOut } from './factory/server
 export type { ServerSignInStarted, ServerSignInState } from './factory/servers/sign-in.verb.ts';
 export { AGENTS_CUSTOM } from './custom/custom.verb.ts';
 export { POLICY_PROPOSE } from './auto/auto.verb.ts';
-export type { Command, Ran } from './command/entry.verb.ts';
+export type { Command, InputOf, Ran } from './command/entry.verb.ts';
+/**
+ * The table's entries the api calls by type, each with its `input` (`Command<D, I>`): `factory hire` and `factory fire`, the Hire's writes.
+ */
+export { FACTORY_FIRE, FACTORY_HIRE } from './factory/factory.verb.ts';
 export { CLI, CLI_VERBS, commandBreaks, commandLine, generated, helpOf, leftOut, parseArgv, routeList } from './command/command.ts';
 export { renamedIn, renamedValues } from './command/command.ts';
 export type { Args, CommandSpec, Flag, Positional, Route, Spec } from './command/command.ts';
@@ -551,7 +555,7 @@ export { RunModel, RunObject };
 
 export { callerOf, liveSession, sessionCaller, SESSION_TOKEN, TokenDoor, tokenDigest, tokenDoorFiles } from './token/caller.verb.ts';
 export type { CallerOf, TokenDoorShape, TokenFiled, TokenRecord } from './token/caller.verb.ts';
-export { Forbidden, PERSON, type Caller, type ProposalCaller } from './caller/index.ts';
+export { PERSON, type Caller, type ProposalCaller } from './caller/index.ts';
 export { proposeProgram, undoProgram } from './propose/propose.verb.ts';
 export type { ProposalNeeds, ProposalPlace } from './propose/current.verb.ts';
 export { approveProgram, declineProgram, proposalGet, proposalsList } from './approval/approve.verb.ts';

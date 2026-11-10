@@ -1,6 +1,6 @@
 /**
- * Nemia on the api, through the entries of the package's command table and the package's refusals (`REFUSAL_STATUS`): `GET /api/level`
- * says where she is, `manual` where no level was ever set; `PUT /api/level` sets `semi-auto` while her folder is not trusted, the one act
+ * Nemia on the api, through the entries of the package's command table and the package's refusals (`refusedAs`): `GET /api/level` says
+ * where she is, `manual` where no level was ever set; `PUT /api/level` sets `semi-auto` while her folder is not trusted, the one act
  * `nemia level semi-auto` takes, both answering the command that trusts it (`trust`), null once it is; refuses a word that is no level
  * with a 422, before anything is written; it raises a factory for a stretch and ends the raise, and refuses `for` with no factory with a
  * 422; `GET /api/level` lists each factory's level, the default factory first; `GET /api/nemia/memory` lists her facts, and `/:fact`

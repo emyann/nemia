@@ -1,7 +1,7 @@
 /**
  * The orchestrator's commands as routes, generated from its table (`COMMANDS`): each routed command on its path, its body derived from its
- * spec, guarded as a start is (guard.ts) where it writes, refused in the api's words (words.ts) and extended where the api does more
- * (extend.ts), then handed to the command's own handler — the one `nemia` runs. The pipeline after the guard (`commandAnswered`) is the
+ * spec, refused in the api's words (words.ts) and extended where the api does more
+ * (extend.ts), then handed to the command's own handler — the one `nemia` runs. The pipeline (`commandAnswered`) is the
  * run's named actions' too, which the objects' handlers serve in the run's namespace (objects/runs.ts).
  */
 import { Schema } from 'effect';
@@ -21,7 +21,7 @@ import {
 } from 'agent-orchestrator';
 import { isRefusal } from 'agent-orchestrator';
 import { decodeBody, NotBlank } from '../body.ts';
-import { type Refusal, refusedBeforeReading } from '../guard.ts';
+import type { Refusal } from '../guard.ts';
 import { type ApiEnv, type Served, served } from '../layer.ts';
 import { findRun, noSuchRun, taskOfStep, runPlaced } from '../store.ts';
 import { EXTENSIONS, type FoldAt } from './extend.ts';
@@ -240,7 +240,7 @@ export type CommandAnswer = { readonly data: Readonly<Record<string, unknown>>; 
 export type CommandRefusal = Refusal | { readonly status: 502; readonly error: string };
 
 /**
- * A routed command's pipeline, after its guard: a name its path names (400), its arguments (`argsOf`), its check (422), and its handler's
+ * A routed command's pipeline: a name its path names (400), its arguments (`argsOf`), its check (422), and its handler's
  * data in the keys the api answers — with a `hint` naming what to send now where the body said a former value (`renamedValues`) —, the
  * app's memos of the runs each read projects handed with it (`ReadMemo.records`), so a read that polls — the factories' listing — answers
  * a run whose record has not moved from memory — or, where the command throws a refusal in place of data that did nothing
@@ -280,17 +280,13 @@ export async function commandAnswered(
 }
 
 /**
- * A routed command's handler on Hono: the guard where it writes, then the command's pipeline (`commandAnswered`), its answer at its
+ * A routed command's handler on Hono, behind the write guard every write meets (`writeGuard`, guard.ts): the command's pipeline
+ * (`commandAnswered`), its answer at its
  * route's status with its `hint` beside it, its refusals in `{ error }`; a refusal of the package's it throws is answered by `app.onError`.
  */
 const route = (command: Command, at: Route) => (c: Context<ApiEnv>) =>
   served(c, async (s) => {
     const named = namedBy(c);
-    if (command.writes) {
-      const guard = wordsAt(command.name).guard(named);
-      const refused = refusedBeforeReading(guard, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
-      if (refused) return c.json({ error: refused.error }, refused.status);
-    }
     const answered = await commandAnswered(command, at, named, c.req.param(), () => c.req.text(), s);
     if ('status' in answered) return c.json({ error: answered.error }, answered.status);
     return c.json(answered.hint === undefined ? answered.data : { ...answered.data, hint: answered.hint }, at.status);
@@ -320,15 +316,15 @@ export function routesOf(table: readonly Command[]): Hono<ApiEnv> {
 export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]): string[] =>
   table
     .filter((c) => routeList(c).some(generated) && !Object.hasOwn(WORDS, c.name))
-    .map((c) => `${c.name} is routed on the api, and words.ts has no words for it: give it its guard, its shape and its refusals there`);
+    .map((c) => `${c.name} is routed on the api, and words.ts has no words for it: give it its shape and its refusals there`);
 
 /**
  * The board's writes for a person's asks of a run and the store's own, each a route of a command of the package's table, one path per
  * command, in its words (`wordsAt`), each through the one pipeline (`commandAnswered`). The run's named actions — the paths under
  * `/api/namespaces/:namespace/runs/:runId` below — are served in the run's namespace by the objects' handlers (objects/runs.ts), which find
- * the run there first, a run of another namespace a 404 as one the store does not have, and are guarded by the route that hands them on
- * (objects/serve.ts); the rest are the routes generated here (`routesOf(COMMANDS)`): a round is `retry`'s with `round`, a merge of the base
- * `refresh`'s with `base`, an acceptance of a loop `approve`'s. Each route is guarded as a start is (guard.ts), answers 404 for a run or a
+ * the run there first, a run of another namespace a 404 as one the store does not have, and are guarded as every write is (`writeGuard`,
+ * guard.ts); the rest are the routes generated here (`routesOf(COMMANDS)`): a round is `retry`'s with `round`, a merge of the base
+ * `refresh`'s with `base`, an acceptance of a loop `approve`'s. Each route answers 404 for a run or a
  * step it does not have, 400 for a body that is not an ask and 422 for a key another command takes on the api alone (`foreignKey`), refuses
  * with 422 what the command's `check` refuses — the same words `nemia` prints — and writes through the command's own handler, the package's
  * verb, whose refusals it lets through to `app.onError` (app.ts), which answers each by its kind, verbatim: 404 for a run gone since the

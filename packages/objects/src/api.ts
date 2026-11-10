@@ -117,8 +117,8 @@ const namespaceParams = { namespace: Schema.String };
 /** A factory, by its name. */
 const factoryParams = { name: Schema.String };
 
-/** What a card's verbs refuse with. */
-const cardErrors = [Missing, Conflict, Invalid];
+/** What a card's verbs refuse with: a request its reader refuses before the package is asked (400) among them. */
+const cardErrors = [BadRequest, Missing, Conflict, Invalid];
 
 /** The inbox's cards as objects. */
 export class CardsGroup extends HttpApiGroup.make('cards').add(

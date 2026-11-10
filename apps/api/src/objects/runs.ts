@@ -28,6 +28,9 @@ import {
 } from 'agent-orchestrator';
 import {
   Api,
+  BadRequest,
+  Conflict,
+  Invalid,
   type Labelled,
   Missing,
   type RunAsked,
@@ -38,13 +41,14 @@ import {
   type RunRemoved,
   type RunSaid,
   Unjudged,
+  WriteFailed,
 } from 'objects';
 import { commandAnswered, type Params } from '../commands/routes.ts';
 import { type Named, runPath } from '../commands/words.ts';
 import type { Served } from '../layer.ts';
 import { commandNamed, findRun, noSuchRun, runPlaced } from '../store.ts';
 import { runStart } from '../workflows/workflows.ts';
-import { actionAnswered, actionRefused, answered, orFailed } from './refused.ts';
+import { answered, answeredIn, declaredAs, locatedAt, orFailed } from './refused.ts';
 
 /**
  * `program` over the app's informer of each run's judgement (`Informer`, the package's), which the store's daemon's pass fills: what the
@@ -135,6 +139,9 @@ const routeOf = (command: Command, method: Route['method'], path: string): Route
   return found;
 };
 
+/** What a run's named action refuses with, as its endpoints declare it (`objects`' `runActionErrors`). */
+const ACTION_ERRORS = [BadRequest, Missing, Conflict, Invalid, WriteFailed] as const;
+
 /** A named action: its command, and the route of it the endpoint serves. */
 type Action = { readonly command: Command; readonly route: Route };
 
@@ -182,11 +189,11 @@ const sentBy = (request: HttpServerRequest.HttpServerRequest): Effect.Effect<str
 /**
  * The named action `act` on the run `at` names, in its namespace: the run found (`Missing` where none is, or it is in another namespace),
  * then the command's pipeline (`commandAnswered`) over the path's names by the table's route and the body `text`; its answer with its
- * `hint`, or its refusal as the `Api`'s error by its status (`actionRefused`). A refusal of the package's it throws is answered by its
- * kind.
+ * `hint`, or its refusal as the `Api`'s error its endpoint declares of its status (`declaredAs`). A refusal of the package's it throws is
+ * answered by its kind.
  */
 const acted = <A>({ command, route }: Action, at: At, method: string, text: string | undefined) =>
-  actionAnswered(async (s): Promise<A> => {
+  answered(async (s): Promise<A> => {
     const run = findRun(at.name);
     if (!run) throw new Missing({ error: noSuchRun(at.name) });
     await Effect.runPromise(runIn(run, at.namespace));
@@ -201,7 +208,7 @@ const acted = <A>({ command, route }: Action, at: At, method: string, text: stri
       path: `${runPath({ namespace: at.namespace, runId: at.name })}${route.path.slice(RUN.length).replace(':step', at.step ?? '')}`,
     };
     const answer = await commandAnswered(command, route, named, params, async () => text ?? Promise.reject(new Error('no body')), s);
-    if ('status' in answer) throw actionRefused(answer);
+    if ('status' in answer) throw declaredAs(ACTION_ERRORS, answer);
     return asJson(answer.hint === undefined ? answer.data : { ...answer.data, hint: answer.hint }) as A;
   });
 
@@ -218,13 +225,14 @@ export const runsHandlers = HttpApiBuilder.group(Api, 'runs', (handlers) =>
     .handle('get', ({ params: { namespace, name } }) => one(name, namespace))
     .handleRaw('create', ({ params: { namespace }, request }) =>
       Effect.flatMap(sentBy(request), (text) =>
-        actionAnswered(
+        answeredIn(
+          namespace,
           orFailed(async (s) => {
             const started = await runStart(s, namespace, text);
-            if ('status' in started) throw actionRefused(started);
+            if ('status' in started) throw declaredAs(ACTION_ERRORS, started);
             return started;
           }),
-        ),
+        ).pipe(Effect.tap((started) => ('id' in started && typeof started.id === 'string' ? locatedAt(started.id) : Effect.void))),
       ),
     )
     .handle('delete', ({ params, request }) => acted<RunRemoved>(ACTIONS.delete, params, request.method, undefined))

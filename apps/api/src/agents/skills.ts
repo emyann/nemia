@@ -45,7 +45,7 @@ import {
   type SkillDraft,
   type SkillsFound,
 } from 'agent-orchestrator/workflow';
-import { type Guarded, type Refusal } from '../guard.ts';
+import type { Refusal } from '../guard.ts';
 
 import type { Engine, RunsOn } from '../store.ts';
 import { placesOf, type InRequest } from '../workflows/workflows.ts';
@@ -294,17 +294,6 @@ const SKILL_KEYS = {
 
 /** A skill as a request sends it, a key no skill has kept, so it is refused once every key a skill has is read (`skillDraftFrom`). */
 export const SKILL_DRAFT = Schema.StructWithRest(Schema.Struct(SKILL_KEYS), [Schema.Record(Schema.String, Schema.Unknown)]);
-
-/** A write of a skill, as the guard's refusals word it (guard.ts). */
-export const skillGuard = (route: string, method: 'POST' | 'PUT', shape: string): Guarded => ({
-  route,
-  does: method === 'POST' ? 'writes a skill into your library' : 'changes a skill in your library',
-  forAnother: 'write one',
-  why: 'a skill in your library is what every agent of yours that gives it is told, once a run of a workflow naming that agent starts',
-  reach: 'write it on the board',
-  instead: 'Write it on the board, or its folder in your library by hand',
-  shape,
-});
 
 /** An agent that gives a skill: its place — the factory's own, in its tree, besides the two — and its name. */
 export type SkillUser = { from: AgentPlace | 'factory'; name: string };

@@ -6,6 +6,7 @@
  * and `test/refusal.test.ts` pins how many modules they load. A reader of `exitCode === 2` needs no change, since each class carries it.
  */
 import { TaggedError } from 'effect/Data';
+import type { ProposalRefusal } from 'objects';
 
 /** What is asked of is not there: no run by that id. */
 export class Missing extends TaggedError('Missing')<{ readonly message: string }> {
@@ -25,8 +26,18 @@ export class Invalid extends TaggedError('Invalid')<{ readonly message: string }
   readonly exitCode = 2;
 }
 
+/**
+ * Who asks may not do what it asks of a proposal or a delegation: a session proposing in another factory, an agent approving what the
+ * machinery does not let it (`proposalApproval`'s reason), an agent declining or writing a delegation, which are the person's alone
+ * (`person-only`). Its `reason` is the one `objects`' `Forbidden` answers with.
+ */
+export class Forbidden extends TaggedError('Forbidden')<{ readonly message: string; readonly reason: ProposalRefusal }> {
+  readonly exitCode = 2;
+}
+
 /** Every refusal the orchestrator throws, by its kind. */
-export type Refusal = Missing | Conflict | Invalid;
+export type Refusal = Missing | Conflict | Invalid | Forbidden;
 
 /** Whether `err` is one of the orchestrator's refusals, by its class: a plain `Error` carrying `exitCode` 2 is not. */
-export const isRefusal = (err: unknown): err is Refusal => err instanceof Missing || err instanceof Conflict || err instanceof Invalid;
+export const isRefusal = (err: unknown): err is Refusal =>
+  err instanceof Missing || err instanceof Conflict || err instanceof Invalid || err instanceof Forbidden;

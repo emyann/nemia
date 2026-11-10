@@ -3,24 +3,23 @@
  * directory where Claude Code keeps its sessions and transcripts (`CLAUDE_CONFIG_DIR`). The api reads through the package's `engine()`,
  * whose `claude` harness is the engine's own — every session on the Agent SDK, a job or an attached one, and the Agent SDK's query the
  * quota is asked through — and that harness runs `claude` from PATH: the harness a test hands the api is that `claude`, as the engine's
- * own tests hand theirs. What it is called with as a flag it hands to `fixtures/stand-in-claude.ts`, which answers the Agent SDK as
- * Claude Code does. So the runner itself — the run files it reads, the transcripts it reads, the flags it spawns with — is what the api's
- * tests exercise, and not a stand-in for it. It sets
- * `WF_VERIFY_REST=1`: every answer the informer of each run's judgement gives (`Informer`) is
+ * own tests hand theirs. What it is called with as a flag it hands to `fixtures/stand-in-claude.ts`, which answers the Agent SDK as Claude
+ * Code does. So the runner itself — the run files it reads, the transcripts it reads, the flags it spawns with — is what the api's tests
+ * exercise, and not a stand-in for it. It sets `WF_VERIFY_REST=1`: every answer the informer of each run's judgement gives (`Informer`) is
  * judged afresh too, and a difference fails the request. And the store is a scratch folder too (`root`, `WF_ROOT`), never this machine's.
  * It sets the daemon's two ceilings, `WF_MAX_RUNS` and `WF_MAX_CONCURRENT`, to `set-it-in-the-test`, which the package refuses by name: a
  * run's check inherits the daemon's environment, so a test that reads a ceiling sets or deletes it itself. It sets
  * `WF_DEFAULT_FACTORY_STARTS=1`, so a start made in a scratch repository no factory holds, or of a card that names no factory, goes to the
  * default factory: a test of the refusal those starts meet by default deletes it first. And it sets `NEMIA_DAEMON_START=off`, so a `nemia`
- * a test spawns, or a command that ticks it types, starts no daemon of this checkout. And it deletes `OTEL_EXPORTER_OTLP_ENDPOINT`: the api
- * is the daemon, and one a test starts would post its spans to the collector the shell names; a test that exports sets the address of a
- * collector it made itself. And it deletes the daemon's per-session variables (`DAEMON_ONLY`): `WF_SESSION_TOKEN`, minted for each
- * session, which a `nemia` a test spawns would send to an api that never minted it, and `WF_MEMORY_LIMIT` and `WF_CGROUP_PARENT`, the
- * daemon unit's, which a test that files through the real engine would inherit; CI sets none, and a test that means one sets it in its
- * own scope. And neither store is the person's and neither is their home: it points `WF_ROOT`, `AE_ROOT` and `HOME` each at
- * a scratch folder (`root`, `engineRoot`, `away`), so a module that pins a root as it loads pins a throwaway one and `os.homedir()`
- * answers a throwaway too — the engine's store and `~/.claude.json` with it. A test that needs something of the person's own `$HOME`
- * reads it from `realHome`.
+ * a test spawns, or a command that ticks it types, starts no daemon of this checkout. And it deletes `OTEL_EXPORTER_OTLP_ENDPOINT`: the
+ * api is the daemon, and one a test starts would post its spans to the collector the shell names; a test that exports sets the address of
+ * a collector it made itself. And it deletes the daemon's per-session variables (`SESSION_VARIABLES`, the package's one list):
+ * `WF_SESSION_TOKEN`, minted for each session, which a `nemia` a test spawns would send to an api that never minted it, and
+ * `WF_MEMORY_LIMIT` and `WF_CGROUP_PARENT`, the daemon unit's, which a test that files through the real engine would inherit; CI sets
+ * none, and a test that means one sets it in its own scope. And neither store is the person's and neither is their home: it points
+ * `WF_ROOT`, `AE_ROOT` and `HOME` each at a scratch folder (`root`, `engineRoot`, `away`), so a module that pins a root as it loads pins a
+ * throwaway one and `os.homedir()` answers a throwaway too — the engine's store and `~/.claude.json` with it. A test that needs something
+ * of the person's own `$HOME` reads it from `realHome`.
  *
  * Installed as this module loads. The api's test script loads it with `--import` before any test file, and `node --test` loads that in
  * each test file's process and not in its own; each test file imports it first as well, by its path from the file, so a file run by hand
@@ -62,9 +61,6 @@ process.env.WF_MAX_CONCURRENT = 'set-it-in-the-test';
 process.env.WF_DEFAULT_FACTORY_STARTS = '1';
 process.env.NEMIA_DAEMON_START = 'off';
 delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
-/** The daemon's per-session variables, which no api test starts with: a test that means one sets it itself. */
-export const DAEMON_ONLY = ['WF_SESSION_TOKEN', 'WF_MEMORY_LIMIT', 'WF_CGROUP_PARENT'] as const;
-for (const name of DAEMON_ONLY) delete process.env[name];
 
 fs.writeFileSync(calls, '');
 fs.writeFileSync(answer, recorded('plan'));
@@ -95,7 +91,7 @@ process.env.CLAUDE_CONFIG_DIR = config;
 /** The person's own home, read before this file moved it: what a test that truly needs it asks for, by name. */
 export const realHome = os.homedir();
 
-/** The store's root, `WF_ROOT`: the package fixes its root (`HOME`) as its modules load. */
+/** The store's root, `WF_ROOT`: a scratch folder, never this machine's store. */
 export const root = scratch('nemia-api-store-');
 process.env.WF_ROOT = root;
 
@@ -106,6 +102,13 @@ process.env.AE_ROOT = engineRoot;
 /** What `os.homedir()` answers in an api test: a throwaway, so a root that still falls back to home falls into scratch. */
 export const away = scratch('nemia-api-home-');
 process.env.HOME = away;
+
+/**
+ * No api test starts with a per-session variable of the daemon's (`SESSION_VARIABLES`): a test that means one sets it itself. The
+ * package is imported here, after every variable above is set, since its modules read some as they load (`CLAUDE_CONFIG_DIR`).
+ */
+const { SESSION_VARIABLES } = await import('agent-orchestrator');
+for (const name of SESSION_VARIABLES) delete process.env[name];
 
 /** How many calls of `verb` the fake has answered. */
 const callsOf = (verb: string): number =>

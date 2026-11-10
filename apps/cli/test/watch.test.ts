@@ -15,6 +15,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
+import { Effect, Layer, Logger } from 'effect';
+import { emitFeed, type FeedWords, freshFeedMemo, StoreRoot } from 'agent-orchestrator';
 import { ambient } from './ambient.ts';
 
 const CLI = path.join(import.meta.dirname, '..');
@@ -22,12 +24,7 @@ const NEMIA = path.join(CLI, 'bin', 'nemia.ts');
 const API = path.join(CLI, '..', 'api');
 
 const SCRATCH = scratch('nemia-cli-watch-');
-process.env.WF_ROOT = path.join(SCRATCH, 'unused');
 
-const { emitFeed, freshFeedMemo, StoreRoot } = await import('agent-orchestrator');
-const { Effect, Layer, Logger } = await import('effect');
-
-type FeedWords = import('agent-orchestrator').FeedWords;
 type FeedPause = Parameters<typeof emitFeed>[1] extends infer O ? (O extends { pause?: infer P } ? P : never) : never;
 
 let stores = 0;

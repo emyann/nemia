@@ -26,7 +26,7 @@ import { eachTest } from '../../test/placed.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { engineOf } from '../runtime-client.ts';
 import { howOf } from '../summary/how.verb.ts';
-import { cardList, cardListOf, cardObject, cardObjectOf, type CardQuery } from './card.verb.ts';
+import { cardList, cardListOf, cardObject, cardObjectOf, type CardQuery, cardTable } from './card.verb.ts';
 
 const engine = eachTest(testEngine);
 const stand = eachTest(testPlace);
@@ -194,6 +194,31 @@ test("cardList and cardObject read the inbox as nemia inbox reads it now, throug
   assert.equal(page.metadata.remainingItemCount, 1);
   assert.equal(valueOf(over(five, cardObject(e, how, 'delta', 'beta'))).metadata.namespace, 'beta');
   assert.equal(kindOf(over(five, cardObject(e, how, 'delta', 'default'))), 'Missing');
+});
+
+test("cardTable says the repository a card naming no factory was tried on only where the store's StoreConfig lets it start", () => {
+  const e = engineOf(engine().layer);
+  const how = Effect.runSync(howOf().pipe(Effect.provide(configGiven(rootNow()))));
+  const text = aCard('Echo', { workflow: 'build', queued: '2026-11-01T00:00:00.000Z' });
+  const tried = (env: Readonly<Record<string, string>>) =>
+    valueOf(
+      over(
+        { echo: text },
+        Effect.gen(function* () {
+          const door = yield* CardDoor;
+          yield* door.tries.put(CardName.read('echo'), {
+            at: '2026-11-02T00:00:00.000Z',
+            text,
+            repo: '/the/daemon/repo',
+            why: 'refused',
+            refused: true,
+          });
+          return yield* cardTable(e, how, {}).pipe(Effect.provide(configGiven(rootNow(), env)));
+        }),
+      ),
+    ).rows.map((row) => String(row.cells[7]));
+  assert.match(tried({ WF_DEFAULT_FACTORY_STARTS: '1' }).join(), /\/the\/daemon\/repo/);
+  assert.doesNotMatch(tried({}).join(), /\/the\/daemon\/repo/);
 });
 
 test('REFUSED: a card of another namespace and a card not there are Missing; a bad limit, token or selector is Invalid', () => {

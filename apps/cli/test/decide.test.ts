@@ -14,6 +14,7 @@ import { PassThrough } from 'node:stream';
 import { scratch } from 'test-kit/scratch';
 import { decide, type DecideIo } from '../src/objects/decide.ts';
 import { Refused } from '../src/refused.ts';
+import { ambient } from './ambient.ts';
 
 const used = {
   usage: null,
@@ -87,9 +88,8 @@ after(() => {
 const root = path.join(scratch('nemia-decide-'), 'store');
 fs.mkdirSync(root, { recursive: true });
 fs.writeFileSync(path.join(root, 'daemon.json'), JSON.stringify({ url: `http://127.0.0.1:${(stub.address() as AddressInfo).port}` }));
-process.env.WF_ROOT = root;
-process.env.NEMIA_DAEMON_START = 'off';
-delete process.env.WF_SESSION_TOKEN;
+/** What `decide` reads the store by: the stub's, no daemon started, and none of the daemon's per-session variables (`ambient`). */
+const env = { ...ambient(), WF_ROOT: root, NEMIA_DAEMON_START: 'off' };
 
 /** An io whose output is kept, its input the lines given, and every command run recorded. */
 function ioOf(interactive: boolean, lines: readonly string[] = []) {
@@ -113,7 +113,7 @@ function ioOf(interactive: boolean, lines: readonly string[] = []) {
 
 test('off a terminal, the screen of the decision is printed off the api read, its commands numbered, and nothing is run', async () => {
   const { io, ran, said } = ioOf(false);
-  assert.equal(await decide(['r-1'], io.run, io), 0);
+  assert.equal(await decide(['r-1'], io.run, io, env), 0);
   assert.ok(asked.includes('/api/runs/r-1/decision'), 'it read the decision of the api');
   const out = said();
   assert.match(out, /^r-1$/m);
@@ -129,23 +129,23 @@ test('off a terminal, the screen of the decision is printed off the api read, it
 
 test('at a terminal, the command picked runs as the client runs that verb, its placeholder asked first', async () => {
   const { io, ran } = ioOf(true, ['2', 'too broad']);
-  assert.equal(await decide(['r-1'], io.run, io), 0);
+  assert.equal(await decide(['r-1'], io.run, io, env), 0);
   assert.deepEqual(ran, [['retry', 'r-1', 'plan', '--message', 'too broad']]);
 });
 
 test('at a terminal, a git command picked is printed for the person and never run; Enter runs none', async () => {
   const git = ioOf(true, ['3']);
-  assert.equal(await decide(['r-1'], git.io.run, git.io), 0);
+  assert.equal(await decide(['r-1'], git.io.run, git.io, env), 0);
   assert.deepEqual(git.ran, []);
   assert.match(git.said(), /yours to type: git -C \/repo merge/);
   const none = ioOf(true, ['']);
-  assert.equal(await decide(['r-1'], none.io.run, none.io), 0);
+  assert.equal(await decide(['r-1'], none.io.run, none.io, env), 0);
   assert.deepEqual(none.ran, []);
 });
 
 test('a run waiting on another says what it waits on, and offers nothing', async () => {
   const { io, ran, said } = ioOf(true, ['1']);
-  assert.equal(await decide(['r-2'], io.run, io), 0);
+  assert.equal(await decide(['r-2'], io.run, io, env), 0);
   assert.match(said(), /waiting on r-1/);
   assert.match(said(), /nothing to decide yet/);
   assert.deepEqual(ran, []);
@@ -153,7 +153,7 @@ test('a run waiting on another says what it waits on, and offers nothing', async
 
 test("--sensitive <globs> is sent as the read's ?sensitive=, as typed", async () => {
   const { io } = ioOf(false);
-  assert.equal(await decide(['r-1', '--sensitive', 'src/**,*.json'], io.run, io), 0);
+  assert.equal(await decide(['r-1', '--sensitive', 'src/**,*.json'], io.run, io, env), 0);
   const read = [...asked].reverse().find((url) => url.startsWith('/api/runs/r-1/decision'));
   assert.equal(new URL(read ?? '', 'http://x').searchParams.get('sensitive'), 'src/**,*.json');
 });
@@ -162,11 +162,11 @@ test('REFUSED: --local, --sensitive with no glob or twice, no run and an unknown
   const before = asked.length;
   for (const args of [['r-1', '--local'], ['r-1', '--sensitive'], ['r-1', '--sensitive', 'a', '--sensitive=b'], []]) {
     const { io } = ioOf(false);
-    await assert.rejects(decide(args, io.run, io), (err: unknown) => err instanceof Refused && err.code === 2, args.join(' '));
+    await assert.rejects(decide(args, io.run, io, env), (err: unknown) => err instanceof Refused && err.code === 2, args.join(' '));
   }
   assert.equal(asked.length, before, 'refused before any read');
   const { io } = ioOf(false);
-  await assert.rejects(decide(['r-9'], io.run, io), (err: unknown) => {
+  await assert.rejects(decide(['r-9'], io.run, io, env), (err: unknown) => {
     assert.ok(err instanceof Refused, String(err));
     assert.equal(err.code, 2);
     assert.match(err.message, /nemia ls/, "the api's words, naming the command");

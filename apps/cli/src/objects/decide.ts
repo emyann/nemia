@@ -188,8 +188,16 @@ function sensitiveOf(args: readonly string[]): { rest: string[]; sensitive?: str
   return sensitive === undefined ? { rest } : { rest, sensitive };
 }
 
-/** `nemia decide <args>`: the screen of a run's decision, then, at a terminal, the command a person picks run. Answers its exit code. */
-export async function decide(args: readonly string[], run: DecideIo['run'], io: DecideIo = terminal(run)): Promise<number> {
+/**
+ * `nemia decide <args>`: the screen of a run's decision, asked of the store `env` names, then, at a terminal, the command a person picks
+ * run. Answers its exit code.
+ */
+export async function decide(
+  args: readonly string[],
+  run: DecideIo['run'],
+  io: DecideIo = terminal(run),
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<number> {
   if (args.includes('--local')) throw noLocal('decide');
   if (args.includes('--help')) {
     io.output.write(`${DECIDE_HELP}\n`);
@@ -199,8 +207,10 @@ export async function decide(args: readonly string[], run: DecideIo['run'], io: 
   const [runId, ...more] = rest;
   if (runId === undefined || runId === '' || runId.startsWith('-') || more.length)
     throw new Refused(`nemia decide takes the run alone, and --sensitive <globs>: nemia decide <runId> (nemia decide --help)`);
-  const decision = await asked('decide', (client) =>
-    client.runs.decision({ params: { runId }, query: sensitive === undefined ? {} : { sensitive } }),
+  const decision = await asked(
+    'decide',
+    (client) => client.runs.decision({ params: { runId }, query: sensitive === undefined ? {} : { sensitive } }),
+    env,
   );
   for (const line of decisionLines(runId, decision)) io.output.write(`${line}\n`);
   const commands = 'commands' in decision ? decision.commands : [];

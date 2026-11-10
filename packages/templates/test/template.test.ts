@@ -5,9 +5,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { scratch } from 'test-kit/scratch';
+import { SESSION_VARIABLES } from 'agent-orchestrator';
 import { storeEnv } from './template.ts';
 
-const DAEMONS = {
+/** The daemon's per-session variables, each as a session would carry it (`SESSION_VARIABLES`), and its collector. */
+const DAEMONS: Record<(typeof SESSION_VARIABLES)[number] | 'OTEL_EXPORTER_OTLP_ENDPOINT', string> = {
   OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9',
   WF_SESSION_TOKEN: 'a-token-no-test-minted',
   WF_MEMORY_LIMIT: '6Gi',

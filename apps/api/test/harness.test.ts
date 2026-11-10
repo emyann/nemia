@@ -3,20 +3,7 @@
  * `--import` before every test file, under `test/` or beside the code in `src/`, every test file imports it first too, and the `claude` the
  * api's engine runs is the harness's.
  */
-import {
-  askEnded,
-  asks,
-  away,
-  bin,
-  DAEMON_ONLY,
-  engineRoot,
-  recorded,
-  realHome,
-  root,
-  scriptUnharnessed,
-  unharnessed,
-  usageAnswer,
-} from './harness.ts';
+import { askEnded, asks, away, bin, engineRoot, recorded, realHome, root, scriptUnharnessed, unharnessed, usageAnswer } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
@@ -26,7 +13,7 @@ import path from 'node:path';
 import ts from 'typescript';
 import { machineTempDir, scratch } from 'test-kit/scratch';
 import { app } from '../src/app.ts';
-import { engine, tickRun, withProposalsPass } from 'agent-orchestrator';
+import { engine, SESSION_VARIABLES, tickRun, withProposalsPass } from 'agent-orchestrator';
 import { runWith } from './builtin-place.ts';
 
 /** What a file's text loads with `import()`, each as its call is written: never one in a string, a comment or a type (`import('…').T`). */
@@ -179,7 +166,7 @@ test("REFUSED under the daemon's per-session variables: a test file run under th
   const out = path.join(dir, 'probe.json');
   const daemons = { WF_SESSION_TOKEN: 'a-token-no-test-minted', WF_MEMORY_LIMIT: '6Gi', WF_CGROUP_PARENT: 'sessions.slice' };
   const names = Object.keys(daemons);
-  assert.deepEqual(names, [...DAEMON_ONLY]);
+  assert.deepEqual(names, [...SESSION_VARIABLES]);
   fs.writeFileSync(
     path.join(dir, 'probe.test.mjs'),
     [
@@ -238,13 +225,22 @@ test('no api test file loads a module with import(): the harness sets the store 
   assert.ok(files.includes('test/app.test.ts') && files.includes('test/harness.ts'), "and this is looking at the api's tests");
   assert.ok(files.includes('src/runs/prune.test.ts'), 'and at the ones beside the code');
   assert.deepEqual(
-    files.flatMap((file) =>
-      importCalls(fs.readFileSync(path.join(API, file), 'utf8')).map(
-        (call) => `${file} loads a module with ${call}: import it statically, after './harness.ts', which gives the store (\`root\`)`,
+    files
+      .filter((file) => file !== 'test/harness.ts')
+      .flatMap((file) =>
+        importCalls(fs.readFileSync(path.join(API, file), 'utf8')).map(
+          (call) => `${file} loads a module with ${call}: import it statically, after './harness.ts', which gives the store (\`root\`)`,
+        ),
       ),
-    ),
     [],
   );
+});
+
+test("the harness loads the package with its one import(), after the last variable it sets, since the package's modules read some as they load", () => {
+  const text = fs.readFileSync(path.join(API, 'test', 'harness.ts'), 'utf8');
+  assert.deepEqual(importCalls(text), ["import('agent-orchestrator')"]);
+  const lastSet = Math.max(...[...text.matchAll(/^process\.env\.\w+ = /gm)].map((m) => m.index));
+  assert.ok(text.indexOf("await import('agent-orchestrator')") > lastSet, 'the import follows every process.env.X = … of the harness');
 });
 
 test('REFUSED: a file that loads the api or the package with import() is named; a type import and a string are not', () => {

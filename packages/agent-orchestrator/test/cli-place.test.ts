@@ -3,7 +3,7 @@
  * `nemia rm`, typed in this process over the test place, on a repository git never made. No file of `src/cli` names the git place but
  * `main`, once, as the place it takes when it is handed none (`placeNamed`), which holds the commands this file does not type.
  *
- * `WF_ROOT` is set before the runner is imported, which reads it as it loads. The file sets what its starts depend on itself: a run on a
+ * The test's store is its own, at `ROOT`, given as `ENV`. The file sets what its starts depend on itself: a run on a
  * repository no factory holds goes to the default factory (`WF_DEFAULT_FACTORY_STARTS`), and a command that ticks starts no daemon.
  */
 import { test, type TestContext } from 'node:test';
@@ -14,29 +14,32 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runOver } from './placed.ts';
 import { scratch } from 'test-kit/scratch';
-import { rootNow } from './config-given.ts';
+import { main } from '../src/cli/main.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import { advanceRun, runWith as runEngine } from '../src/runner.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import { LINE_NAME } from '../src/run.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-cli-place-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-process.env.WF_DEFAULT_FACTORY_STARTS = '1';
-process.env.NEMIA_DAEMON_START = 'off';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { main } = await import('../src/cli/main.ts');
-const { engineOf } = await import('../src/runtime-client.ts');
-const { advanceRun, runWith: runEngine } = await import('../src/runner.ts');
-const { runRecord } = await import('../src/record/record.store.ts');
-const { LINE_NAME } = await import('../src/run.ts');
+const ENV: Env = {
+  ...process.env,
+  WF_ROOT: ROOT,
+  WF_VERIFY_REST: '1',
+  WF_DEFAULT_FACTORY_STARTS: '1',
+  WF_MAX_CONCURRENT: undefined,
+  WF_MAX_RUNS: undefined,
+  NEMIA_DAEMON_START: 'off',
+};
 
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
-const runWith = runOver(runEngine, () => stand().layer);
+const runWith = runOver(runEngine, () => stand().layer, ENV);
 
 /** One pass over the run `id`, on this test's engine and place. */
-const advanced = (id: string) => runWith(engineOf(engine().layer), advanceRun(runRecord(rootNow(), id)));
+const advanced = (id: string) => runWith(engineOf(engine().layer), advanceRun(runRecord(ROOT, id)));
 
 /** `nemia`, typed with `argv` and handed this test's engine and place: the lines it printed. */
 async function typed(t: TestContext, ...argv: string[]): Promise<string[]> {
@@ -45,7 +48,7 @@ async function typed(t: TestContext, ...argv: string[]): Promise<string[]> {
     printed.push(args.join(' '));
   });
   try {
-    await main(argv, engineOf(engine().layer), undefined, stand().place);
+    await main(argv, engineOf(engine().layer), undefined, stand().place, ENV);
   } finally {
     log.mock.restore();
   }
@@ -65,15 +68,11 @@ test('a run started, read and removed through `main` is answered by the place `m
   const base = world.repository(repo, { 'a.txt': 'one\n' });
 
   const id = (await typed(t, 'start', 'add a flag', '--workflows', oneStep(), '--repo', repo))[0].split(' ')[0];
-  assert.equal(
-    runRecord(rootNow(), id).baseRef,
-    base,
-    'nemia start opened the place it was handed, which answered the commit the handle made',
-  );
+  assert.equal(runRecord(ROOT, id).baseRef, base, 'nemia start opened the place it was handed, which answered the commit the handle made');
   assert.equal(fs.existsSync(path.join(repo, '.git')), false, 'and git made nothing there');
 
   await advanced(id);
-  const workspace = runRecord(rootNow(), id).steps.implement.workspace!;
+  const workspace = runRecord(ROOT, id).steps.implement.workspace!;
   assert.equal(world.tip(repo, `wf/${id}/${LINE_NAME}`), base, 'its workspace is cut on the same place');
   assert.equal(world.head(workspace), base);
 

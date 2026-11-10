@@ -5,7 +5,7 @@
  * of them; then a codex step's trust and sandbox, a run frozen under the former names, a step continuing another's window, and a step
  * at shipped defaults, which names none. What each key reads as is `src/workflow/step-file.test.ts`.
  *
- * `WF_ROOT` is set before the runner is imported, which reads it as it loads, and `WF_DEFAULT_FACTORY_STARTS` beside it: its runs start
+ * The test's store is its own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` in it: its runs start
  * in repositories no factory holds.
  */
 import { test } from 'node:test';
@@ -15,21 +15,24 @@ import path from 'node:path';
 import type { RepositoryRun, Run } from '../src/run.ts';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
-import { rootNow } from './config-given.ts';
+import { advanceRun, retryRun, startRun, runWith } from '../src/runner.ts';
+import { listRuns, runRecord } from '../src/record/record.store.ts';
+import { isRepositoryRun } from '../src/run.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import { main } from '../src/cli/main.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-filing-keys-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-process.env.WF_DEFAULT_FACTORY_STARTS = '1';
-const { advanceRun, retryRun, startRun, runWith } = await import('../src/runner.ts');
-const { listRuns, runRecord } = await import('../src/record/record.store.ts');
-const { isRepositoryRun } = await import('../src/run.ts');
-const { engineOf } = await import('../src/runtime-client.ts');
-const { main } = await import('../src/cli/main.ts');
-const stage = staged({ runWith, main, engineOf });
+const ENV: Env = {
+  ...process.env,
+  WF_ROOT: ROOT,
+  WF_VERIFY_REST: '1',
+  WF_MAX_CONCURRENT: undefined,
+  WF_MAX_RUNS: undefined,
+  WF_DEFAULT_FACTORY_STARTS: '1',
+};
+const stage = staged({ runWith, main, engineOf, env: ENV });
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 /** A strict `findings` schema and `again`, as the tests' team's `test/fixtures/team/agents/review.schema.json` declares them. */
@@ -56,7 +59,7 @@ const reviewSays = (again: boolean) => ({ ...SIGNED, findings: FOUND, again });
 const ANSWERED = { ...SIGNED, replies: REPLIES };
 
 /** One pass of the tick over the run `id`, on the stage's engine. */
-const tick = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(rootNow(), id)));
+const tick = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
 /** What the engine was filed with for the task `id`. */
 const specOf = (id: string) => {
   const task = stage.board().tasks.get(id);
@@ -161,7 +164,7 @@ test('every key a step sets reaches the runtime, on every filing — and a check
     });
     await stage.main(['start', 'add a flag', '--workflows', 'keys', '--repo', repo]);
     id = printed[0].split(' ')[0];
-    assert.equal(runRecord(rootNow(), id).workflowDir, dir);
+    assert.equal(runRecord(ROOT, id).workflowDir, dir);
   });
 
   await s.test('REFUSED: a name the repository does not have, naming both places and the workflows it has', async () => {
@@ -310,12 +313,12 @@ test('every key a step sets reaches the runtime, on every filing — and a check
       }));
       fs.writeFileSync(recordAt(run.id), JSON.stringify(record, null, 2));
       assert.doesNotMatch(fs.readFileSync(recordAt(run.id), 'utf8'), /"(disallowed|allowed)Tools":/, 'the fixture holds no new name');
-      const read = runRecord(rootNow(), run.id).workflow?.find((s) => s.name === 'implement');
+      const read = runRecord(ROOT, run.id).workflow?.find((s) => s.name === 'implement');
       assert.deepEqual([read?.disallowedTools, read?.allowedTools], [['SendMessage'], ['Edit(**)', 'Bash(npm test)']]);
       assert.equal(Object.hasOwn(read ?? {}, 'allow') || Object.hasOwn(read ?? {}, 'disallow'), false);
       assert.deepEqual(
-        listRuns(rootNow()).find((r) => r.id === run.id)?.workflow,
-        runRecord(rootNow(), run.id).workflow,
+        listRuns(ROOT).find((r) => r.id === run.id)?.workflow,
+        runRecord(ROOT, run.id).workflow,
         'listed as the tick reads it',
       );
       await tick(run.id);
@@ -340,7 +343,7 @@ test('every key a step sets reaches the runtime, on every filing — and a check
       }));
       fs.writeFileSync(recordAt(run.id), JSON.stringify(record, null, 2));
       assert.doesNotMatch(fs.readFileSync(recordAt(run.id), 'utf8'), /"sandbox":/, 'the fixture holds no `sandbox`');
-      const read = runRecord(rootNow(), run.id).workflow?.find((s) => s.name === 'implement');
+      const read = runRecord(ROOT, run.id).workflow?.find((s) => s.name === 'implement');
       assert.deepEqual([read?.permissionMode, read?.sandbox], [word, undefined], 'read as it was frozen');
       await tick(run.id);
       assert.equal(specOf(`${run.id}-implement`).config?.permissionMode, word, "not Codex's default");

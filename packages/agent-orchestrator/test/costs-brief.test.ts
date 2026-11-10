@@ -10,7 +10,7 @@
  * Told on the engine's stand-in: the finished runs before it are planted by hand, their records as `nemia start` writes one and their
  * tasks filed and settled measured on the stand-in, as the stats read them; the run that reads them is the tick's. The stage's engine
  * is read through `tapped`, which notes each task viewed and fails the view of a spoiled task as a journal that does not read fails it.
- * `WF_ROOT` is set before the runner is imported: it is read as the module loads.
+ * The test's store is its own, at `ROOT`, given as `ENV`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,20 +20,17 @@ import { Effect } from 'effect';
 import { JournalError } from 'agent-runtime';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
-import { rootNow } from './config-given.ts';
+import { advanceRun, approveRun, retryRun, startRun, runWith } from '../src/runner.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import { RECENT_RUNS } from '../src/costs/index.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import { main } from '../src/cli/main.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-costs-brief-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { advanceRun, approveRun, retryRun, startRun, runWith } = await import('../src/runner.ts');
-const { runRecord } = await import('../src/record/record.store.ts');
-const { RECENT_RUNS } = await import('../src/costs/index.ts');
-const { engineOf } = await import('../src/runtime-client.ts');
-const { main } = await import('../src/cli/main.ts');
-const stage = staged({ runWith, main, engineOf });
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
+const stage = staged({ runWith, main, engineOf, env: ENV });
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 const SECTION = '## What runs of this workflow cost';
@@ -58,9 +55,9 @@ const tapped = () => {
 };
 
 /** The engine's pass is the stand-in's to make; the run's, as the daemon makes it, over the tapped engine. */
-const tick = (id: string) => stage.runWith(tapped(), advanceRun(runRecord(rootNow(), id)));
+const tick = (id: string) => stage.runWith(tapped(), advanceRun(runRecord(ROOT, id)));
 /** The task the record names for `step` now. */
-const taskOf = (id: string, step: string): string => runRecord(rootNow(), id).steps[step].taskId!;
+const taskOf = (id: string, step: string): string => runRecord(ROOT, id).steps[step].taskId!;
 /** The brief the task `taskId` was filed with. */
 const briefOf = (taskId: string): string => stage.board().tasks.get(taskId)!.spec.brief;
 /** The tasks viewed since the mark that belong to no run but `id`. */

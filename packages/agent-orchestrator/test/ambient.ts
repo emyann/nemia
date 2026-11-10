@@ -24,11 +24,10 @@
  * in the harness's own file, which a test must never write on the person's machine. A test of a trust sets a folder of its own.
  *
  * And `WF_ROOT`, `AE_ROOT` and `HOME` each set to a scratch folder of this process's (`STORE`, `ENGINE`, `AWAY`), before any test file's
- * top level runs. A store module that pins a root as it loads pins a throwaway one, and `os.homedir()` answers a throwaway too, so a
- * default root still left somewhere lands in scratch rather than on the person's store: in one shared process each store module is
- * evaluated once, by the first file that imports it, and a module first loaded with `WF_ROOT` unset pins itself to the live root, so
- * every later file's start, remove and forget acts on the person's own runs. A test file that sets its own root is unaffected — it sets
- * it after this — and nothing here protects a file that forgets, but what it forgets is now a throwaway.
+ * top level runs. A test that names no store of its own reads this one, and `os.homedir()` answers a throwaway too, so a default root a
+ * test forgets to name lands in scratch rather than on the person's store. A test with a store of its own hands it on as an environment
+ * record (`{ ...process.env, WF_ROOT: ROOT }`); no module of `src` reads a root as it loads (`test/root-given.test.ts`), and this is the
+ * one file of the package's tests that writes a `WF_` variable as it loads (`tools/guards/test/env-given.test.ts`).
  *
  * Moving `HOME` moves `os.homedir()` for this process and every child it spawns, git's global configuration and `~/.claude.json` with it.
  * So the throwaway home is given a `.gitconfig` of its own with a test identity (`GIT_IDENTITY`): a commit a test makes through a script

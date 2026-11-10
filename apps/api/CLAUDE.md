@@ -76,9 +76,10 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   environment and the askers are the app's services, and a test gives its own with `appOf(Layer.merge(liveOf(), …))`
   (`test/layer.test.ts`). What a read keeps between requests is the app's too (`ReadMemo`, an asker's closure): a test wanting a fresh
   one builds an app. `StoreRoot` is the package's own service (`orchestrator/StoreRoot`), given by the app's layer from `WF_ROOT`
-  with the store's settings, `StoreConfig` (`storeConfigLayer(env)` in `app.ts`, beside `Engine.live(env)`), and re-exported by `store.ts` so a route has one import site; what the package still reads off a
-  root of its own as it loads is counted in the orchestrator's `test/global-roots.baseline.ts`, so a test that means to move those
-  sets `WF_ROOT` before it imports the package, as `test/harness.ts` does.
+  with the store's settings, `StoreConfig` (`storeConfigLayer(env)` in `app.ts`, beside `Engine.live(env)`), and re-exported by `store.ts` so a route has one import site; no module of the package reads a
+  root as it loads, so a test imports it at its head and hands the store it means as an environment record (`liveOf(ENV)`,
+  `engine(ENV)`, `storeConfigLayer(ENV)`): only `test/harness.ts` sets the process's `WF_ROOT`, and
+  `tools/guards/test/env-given.test.ts` refuses any other test file that writes a `WF_` variable as it loads.
 - **A handler's body stays a plain `async` function inside `served`**: a failure yielded in `Effect.gen` never reaches a `try` around
   it, and the routes catch what they word themselves; `runPromise` rejects with the failure itself, so `app.onError` sees its kind.
   A package's program runs over the request's engine and the app's place with `runPlaced(placeService, e, …)`, a verb of the engine itself with `engineRead` (store.ts).

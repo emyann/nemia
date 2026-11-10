@@ -324,9 +324,10 @@ as a `RunId` and answer Effects that fail with a refusal (`Missing`, `Conflict`,
 on disk, and a memory stand-in a test gives its program with `Effect.provide(program, runDoorMemory())`. Every write is checked
 first: a new run, or one written back, that breaks an invariant of the run's model (`src/record/record.model.ts`) is refused
 `Invalid` and nothing is written, and a new run at an id that has a record is refused `Conflict`. A program given no door reads the
-files. A synchronous caller reads through it at once (`runsAtOnce`), and no file of `src` but the door's reads the files store
-(`test/run-store.test.ts`). `runsAtOnce` and `keptRuns` read the files at the module's root whatever door a program is given: a debt
-counted per file in `test/run-door.baseline.ts`, which only shrinks, until the door is rooted.
+files at the root it is given (`StoreRoot`), and is refused `Invalid` given none. A synchronous caller reads through it at once
+(`runsAtOnce(home)`), and no file of `src` but the door's reads the files store (`test/run-store.test.ts`). `runsAtOnce(home)` and
+`keptRuns(home, …)` read the files at the root they are handed whatever door a program is given: a debt counted per file in
+`test/run-door.baseline.ts`, which only shrinks.
 
 ## The Factory door
 

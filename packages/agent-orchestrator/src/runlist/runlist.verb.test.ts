@@ -16,6 +16,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { scratch } from 'test-kit/scratch';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
+import { rootNow } from '../../test/config-given.ts';
 
 const ROOT = scratch('wf-runlist-');
 const RUNS_DIR = path.join(ROOT, 'runs');
@@ -68,12 +69,12 @@ const started = async (steps: Record<string, string | null>, gates: string[] = [
   const repo = scratch('wf-runlist-repo-');
   stand().world.repository(repo, {});
   const run = await runPlaced(startRun({ brief: 'list me', repo, workflowDir: folder(steps), isolate, gates }));
-  await runWith(e(), advanceRun(runRecord(run.id)));
+  await runWith(e(), advanceRun(runRecord(rootNow(), run.id)));
   return run.id;
 };
 
 /** One more pass over the run `id`. */
-const advanced = (id: string) => runWith(e(), advanceRun(runRecord(id)));
+const advanced = (id: string) => runWith(e(), advanceRun(runRecord(rootNow(), id)));
 
 /** A run of one step that signed off: finished. */
 const aFinished = async () => {
@@ -158,7 +159,7 @@ test('each selector takes exactly the runs kindOf puts in its state; the counts 
         judgedNow(
           e(),
           ROOT,
-          all.map((id) => runRecord(id)),
+          all.map((id) => runRecord(rootNow(), id)),
         ),
       )
     ).map((s) => [s.id, kindOf(s)]),
@@ -345,7 +346,7 @@ test('a run that waits on a run which never lands, held until one that will, wai
   seeded(t);
   const parent = await started({ work: null }, [], true);
   const lands = await anInFlight();
-  const { repo } = runRecord(parent) as { repo: string };
+  const { repo } = runRecord(rootNow(), parent) as { repo: string };
   const child = await runPlaced(startRun({ brief: 'after it', repo, workflowDir: folder({ work: null }), after: [parent] }));
   cancelled(parent, T0 + MIN);
   fs.writeFileSync(

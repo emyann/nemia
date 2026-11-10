@@ -15,6 +15,7 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { Effect, type Layer } from 'effect';
 import type { Decidable, DecideCommand, RunDecision } from 'objects';
+import { rootNow } from '../../test/config-given.ts';
 
 const root = scratch('wf-decision-');
 process.env.WF_ROOT = root;
@@ -23,7 +24,7 @@ const { builtinGitPlace, gitPlaceLayer } = await import('../place/builtin.store.
 const { PlaceService } = await import('../place/place.store.ts');
 const { storeConfigLayer } = await import('../config/root.store.ts');
 const { standingWhen } = await import('../standing/standing.verb.ts');
-const { filesStore: runStore } = await import('../record/files.store.ts');
+const runStore = (await import('../record/files.store.ts')).filesStoreAt(rootNow());
 const { Missing, isRefusal } = await import('../refusal/refusal.ts');
 const { runDecision, diffFiles, DIFF_LINES } = await import('./decision.verb.ts');
 type Place = import('../place/place.store.ts').Place;

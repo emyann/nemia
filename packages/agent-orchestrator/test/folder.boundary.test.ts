@@ -34,7 +34,7 @@ import type { Engine } from '../src/runtime-client.ts';
 import { decideScreen } from './screens.ts';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
-import { storeGiven } from './config-given.ts';
+import { storeGiven, rootNow } from './config-given.ts';
 import type { StoreRoot } from '../src/config/root.store.ts';
 import type { StoreConfig } from '../src/config/config.store.ts';
 
@@ -207,7 +207,7 @@ const rejection = async (fn: () => Promise<unknown>): Promise<{ message: string;
 
 test('a folder team starts from a directory that is no repository, and its record has a place and no git', async () => {
   const run = await runPlaced(startRun({ brief: 'a note on tides', repo: NOT_A_REPO, workflowDir: TEAM }));
-  const record = runRecord(run.id);
+  const record = runRecord(rootNow(), run.id);
   assert.deepEqual(record.place, { kind: 'folder' });
   assert.equal(record.workspace, path.join(ROOT, 'runs', run.id, 'work'));
   for (const key of ['repo', 'baseRef', 'branch', 'isolate'] as const)
@@ -260,7 +260,7 @@ test("a folder team whose agent is given one of Nemia's builtin skills starts: i
   fs.writeFileSync(path.join(ROOT, 'workflows', 'agents', 'asker.md'), '---\ndescription: Asks.\nskills: grilling\n---\nAsk.\n');
   fs.writeFileSync(path.join(team, 'ask.md'), '---\nworkspace: folder\nagent: asker\n---\nask about the note\n');
   const run = await runPlaced(startRun({ brief: 'x', repo: NOT_A_REPO, workflowDir: team }));
-  assert.ok(runRecord(run.id), 'started: a skill no place had would refuse the start');
+  assert.ok(runRecord(rootNow(), run.id), 'started: a skill no place had would refuse the start');
   assert.deepEqual(gitAsked(), []);
 });
 
@@ -277,7 +277,7 @@ test('a folder run advances, is decided and is forgotten with no git: each step 
   const run = await runPlaced(startRun({ brief: 'a note on tides', repo: NOT_A_REPO, workflowDir: TEAM }));
   const { e, tasks, settle } = board();
 
-  assert.deepEqual((await runWith(e, advanceRun(runRecord(run.id)))).filed, ['write']);
+  assert.deepEqual((await runWith(e, advanceRun(runRecord(rootNow(), run.id)))).filed, ['write']);
   const write = tasks.get(`${run.id}-write`)!.spec;
   const writeFolder = path.join(ROOT, 'runs', run.id, 'work', 'write');
   assert.equal(write.cwd, writeFolder);
@@ -291,22 +291,22 @@ test('a folder run advances, is decided and is forgotten with no git: each step 
   fs.writeFileSync(path.join(writeFolder, 'note.md'), '# Tides\n');
 
   settle(`${run.id}-write`, 'succeeded', SIGNED);
-  assert.deepEqual((await runWith(e, advanceRun(runRecord(run.id)))).filed, ['review']);
+  assert.deepEqual((await runWith(e, advanceRun(runRecord(rootNow(), run.id)))).filed, ['review']);
   assert.equal(
     fs.readFileSync(path.join(ROOT, 'runs', run.id, 'artifacts', 'write', 'note.md'), 'utf8'),
     '# Tides\n',
     "collected at the hand-off, as on a repository run, into the step's own files directory",
   );
   assert.equal(tasks.get(`${run.id}-review`)!.spec.cwd, writeFolder, "a chain continues its parent's folder");
-  assert.equal(runRecord(run.id).steps.review?.branch, undefined);
+  assert.equal(runRecord(rootNow(), run.id).steps.review?.branch, undefined);
 
   settle(`${run.id}-review`, 'succeeded', { ...SIGNED, artifacts: [] });
-  await runWith(e, advanceRun(runRecord(run.id)));
+  await runWith(e, advanceRun(runRecord(rootNow(), run.id)));
   const decided = await runWith(e, decideRun(run.id));
   assert.equal(decided.decision.kind, 'awaiting');
   assert.deepEqual(decided.decision.kind === 'awaiting' && [decided.decision.branches, decided.decision.direct], [[], false]);
   assert.deepEqual([decided.standings, decided.toDecide], [[], undefined]);
-  const listed = await runWith(e, list(e, runRecord(run.id)));
+  const listed = await runWith(e, list(e, runRecord(rootNow(), run.id)));
   assert.deepEqual(
     listed.steps.map((s) => s.branch),
     [null, null],
@@ -342,18 +342,18 @@ test('a folder run advances, is decided and is forgotten with no git: each step 
 test("a folder run's folder outlives its end: a run that ended blocked is tried again in the folder its step left, with the step's work still in it", async () => {
   const run = await runPlaced(startRun({ brief: 'a note on tides', repo: NOT_A_REPO, workflowDir: TEAM }));
   const { e, tasks, settle } = board();
-  assert.deepEqual((await runWith(e, advanceRun(runRecord(run.id)))).filed, ['write']);
+  assert.deepEqual((await runWith(e, advanceRun(runRecord(rootNow(), run.id)))).filed, ['write']);
   const writeFolder = path.join(ROOT, 'runs', run.id, 'work', 'write');
   fs.writeFileSync(path.join(writeFolder, 'note.md'), '# Tides\n');
 
   settle(`${run.id}-write`, 'succeeded', { ...SIGNED, outcome: 'blocked', needs: 'which tides?' });
-  await runWith(e, advanceRun(runRecord(run.id)));
+  await runWith(e, advanceRun(runRecord(rootNow(), run.id)));
   const ended = (await runWith(e, decideRun(run.id))).decision;
   assert.deepEqual(ended.kind === 'awaiting' && ended.outcome, 'waiting', JSON.stringify(ended));
 
   await runWith(e, retryRun(run.id, 'write', { mode: 'continue', message: 'the ocean ones' }));
-  assert.deepEqual((await runWith(e, advanceRun(runRecord(run.id)))).tried, ['write']);
-  const again = tasks.get(stepTaskId(runRecord(run.id), 'write', 2));
+  assert.deepEqual((await runWith(e, advanceRun(runRecord(rootNow(), run.id)))).tried, ['write']);
+  const again = tasks.get(stepTaskId(runRecord(rootNow(), run.id), 'write', 2));
   assert.ok(again, 'the try is filed');
   assert.equal(again.spec.cwd, writeFolder, 'in the folder the first try worked in');
   assert.equal(fs.readFileSync(path.join(writeFolder, 'note.md'), 'utf8'), '# Tides\n', 'which still holds what it wrote');
@@ -366,7 +366,7 @@ test('nemia start from a directory that is no repository: a folder team starts, 
   try {
     const out = await printed(['start', 'a note on tides', '--workflows', TEAM]);
     const id = out[0].split(' ')[0];
-    assert.equal(runRecord(id).place?.kind, 'folder');
+    assert.equal(runRecord(rootNow(), id).place?.kind, 'folder');
     assert.ok(
       out.includes(`workspace: ${path.join(ROOT, 'runs', id, 'work')} — a folder per step, made as each is filed, with no git repository`),
       out.join('\n'),
@@ -421,7 +421,7 @@ test('an inbox card of a folder team: --repo named at its start is refused, as o
     );
     assert.ok(fs.existsSync(file), 'refused before anything is written: the card is still in the inbox');
     const out = await printed(['start', file]);
-    const run = runRecord(out[0].split(' ')[0]);
+    const run = runRecord(rootNow(), out[0].split(' ')[0]);
     assert.deepEqual(
       [run.place?.kind, run.from?.inbox, 'repo' in run],
       ['folder', 'a-note-on-tides-old', false],
@@ -455,7 +455,7 @@ test("a queued card of a folder team, started by a tick: its repo: is not looked
     const named = card('a-note-queued', `repo: ${NOT_A_REPO}\n`);
     const started = (await runPlaced(startQueued(NOT_A_REPO)))!;
     assert.ok('run' in started, JSON.stringify(started));
-    const run = runRecord(started.run);
+    const run = runRecord(rootNow(), started.run);
     assert.deepEqual([run.place?.kind, run.from?.inbox, 'repo' in run], ['folder', named, false], 'the run looked at no repository');
     assert.equal(started.ignoredRepo, NOT_A_REPO, "the tick's start carries the card's repo, which the run looked at none of");
     assert.equal(
@@ -498,7 +498,7 @@ test('a folder team with a fan-in, given files at its start: what each brief tel
   const { e, tasks, settle } = board();
   const work = path.join(ROOT, 'runs', run.id, 'work');
 
-  assert.deepEqual((await runWith(e, advanceRun(runRecord(run.id)))).filed, ['a', 'b']);
+  assert.deepEqual((await runWith(e, advanceRun(runRecord(rootNow(), run.id)))).filed, ['a', 'b']);
   for (const name of ['a', 'b']) {
     const folder = path.join(work, name);
     assert.deepEqual(
@@ -514,7 +514,7 @@ test('a folder team with a fan-in, given files at its start: what each brief tel
   fs.symlinkSync(path.join(ROOT, 'somewhere'), path.join(work, 'b', 'out'));
 
   for (const name of ['a', 'b']) settle(`${run.id}-${name}`, 'succeeded', WROTE_NONE);
-  assert.deepEqual((await runWith(e, advanceRun(runRecord(run.id)))).filed, ['c']);
+  assert.deepEqual((await runWith(e, advanceRun(runRecord(rootNow(), run.id)))).filed, ['c']);
   const c = path.join(work, 'c');
   assert.equal(tasks.get(`${run.id}-c`)!.spec.cwd, c, 'a fan-in gets a folder of its own');
   assert.equal(fs.readFileSync(path.join(c, 'given', 'from', 'a', 'side-a.md'), 'utf8'), '# a\n');
@@ -536,7 +536,7 @@ test('a folder team with a fan-in, given files at its start: what each brief tel
   );
 
   settle(`${run.id}-c`, 'succeeded', WROTE_NONE);
-  assert.deepEqual((await runWith(e, advanceRun(runRecord(run.id)))).filed, ['d']);
+  assert.deepEqual((await runWith(e, advanceRun(runRecord(rootNow(), run.id)))).filed, ['d']);
   assert.equal(tasks.get(`${run.id}-d`)!.spec.cwd, c, 'd continues c where it left off');
   assert.equal(
     fs.existsSync(path.join(c, 'given', 'from', 'a')),
@@ -561,7 +561,7 @@ test('a folder team with a fan-in, given files at its start: what each brief tel
   }
   assert.deepEqual(
     tasks.get(`${run.id}-c`)!.spec.config?.mounts?.map((m) => path.basename(m.path)),
-    ['c', 'a', 'b', String(runRecord(run.id).workflowFiles)],
+    ['c', 'a', 'b', String(runRecord(rootNow(), run.id).workflowFiles)],
     "c is filed its own files folder, read-only, a's and b's artifacts folders and the run's copy of its workflow folder, so its brief is held to naming them",
   );
   assert.match(tasks.get(`${run.id}-c`)!.spec.brief, /- a: `given\/from\/a`\n- b: `given\/from\/b`/);
@@ -641,21 +641,21 @@ test("a fan-in filed a second time is given its parent's folder as it stands the
   const work = path.join(ROOT, 'runs', run.id, 'work');
   const givenA = path.join(work, 'c', 'given', 'from', 'a');
 
-  await runWith(e, advanceRun(runRecord(run.id)));
+  await runWith(e, advanceRun(runRecord(rootNow(), run.id)));
   fs.writeFileSync(path.join(work, 'a', 'keep.md'), '# kept\n');
   fs.writeFileSync(path.join(work, 'a', 'gone.md'), '# only the first time\n');
   for (const name of ['a', 'b']) settle(`${run.id}-${name}`, 'succeeded', WROTE_NONE);
-  assert.deepEqual((await runWith(e, advanceRun(runRecord(run.id)))).filed, ['c']);
+  assert.deepEqual((await runWith(e, advanceRun(runRecord(rootNow(), run.id)))).filed, ['c']);
   assert.deepEqual(fs.readdirSync(givenA).sort(), ['gone.md', 'keep.md'], 'what a had made when c was first filed');
   settle(`${run.id}-c`, 'succeeded', WROTE_NONE);
 
-  const record = runRecord(run.id);
+  const record = runRecord(rootNow(), run.id);
   record.steps.c = sentBack(record.steps.c);
   fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(record, null, 2));
   fs.rmSync(path.join(work, 'a', 'gone.md'));
   fs.writeFileSync(path.join(work, 'a', 'said.md'), '# what it says now\n');
 
-  const again = await runWith(e, advanceRun(runRecord(run.id)));
+  const again = await runWith(e, advanceRun(runRecord(rootNow(), run.id)));
   assert.deepEqual(again.filed, ['c'], again.notes.join('\n'));
   assert.equal(tasks.get(`${run.id}-c-try2`)!.spec.cwd, path.join(work, 'c'), 'the folder it had, since a send-back keeps it');
   assert.deepEqual(
@@ -672,10 +672,10 @@ test("a parent's regular file called `given` is its work, and reaches the step a
   const run = await runPlaced(startRun({ brief: 'two sides, one of them fond of a name', repo: NOT_A_REPO, workflowDir: FAN }));
   const { e, settle } = board();
   const work = path.join(ROOT, 'runs', run.id, 'work');
-  await runWith(e, advanceRun(runRecord(run.id)));
+  await runWith(e, advanceRun(runRecord(rootNow(), run.id)));
   fs.writeFileSync(path.join(work, 'b', 'given'), 'what b was given to understand\n');
   for (const name of ['a', 'b']) settle(`${run.id}-${name}`, 'succeeded', WROTE_NONE);
-  assert.deepEqual((await runWith(e, advanceRun(runRecord(run.id)))).filed, ['c']);
+  assert.deepEqual((await runWith(e, advanceRun(runRecord(rootNow(), run.id)))).filed, ['c']);
   assert.equal(
     fs.readFileSync(path.join(work, 'c', 'given', 'from', 'b', 'given'), 'utf8'),
     'what b was given to understand\n',
@@ -688,10 +688,10 @@ test("REFUSED: a step's given/ that is a link is never followed — filed again,
   const run = await runPlaced(startRun({ brief: 'two sides, then a second look', repo: NOT_A_REPO, workflowDir: FAN }));
   const { e, settle } = board();
   const work = path.join(ROOT, 'runs', run.id, 'work');
-  await runWith(e, advanceRun(runRecord(run.id)));
+  await runWith(e, advanceRun(runRecord(rootNow(), run.id)));
   fs.writeFileSync(path.join(work, 'a', 'side-a.md'), '# a\n');
   for (const name of ['a', 'b']) settle(`${run.id}-${name}`, 'succeeded', WROTE_NONE);
-  assert.deepEqual((await runWith(e, advanceRun(runRecord(run.id)))).filed, ['c']);
+  assert.deepEqual((await runWith(e, advanceRun(runRecord(rootNow(), run.id)))).filed, ['c']);
   settle(`${run.id}-c`, 'succeeded', WROTE_NONE);
 
   const outside = path.join(ROOT, 'outside-the-run');
@@ -700,13 +700,13 @@ test("REFUSED: a step's given/ that is a link is never followed — filed again,
   fs.rmSync(path.join(work, 'c', 'given'), { recursive: true });
   fs.symlinkSync(outside, path.join(work, 'c', 'given'));
 
-  const record = runRecord(run.id);
+  const record = runRecord(rootNow(), run.id);
   record.steps.c = sentBack(record.steps.c);
   fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(record, null, 2));
   let said = '';
   let filed: string[] = [];
   try {
-    const pass = await runWith(e, advanceRun(runRecord(run.id)));
+    const pass = await runWith(e, advanceRun(runRecord(rootNow(), run.id)));
     filed = pass.filed;
     said = pass.notes.join('\n');
   } catch (err) {
@@ -731,12 +731,12 @@ test("REFUSED: a step's given/ that is a link is never followed — filed again,
 test('the whole screen of a folder run: where the work is, and the one command there is', async (t) => {
   const run = await runPlaced(startRun({ brief: 'a note on tides', repo: NOT_A_REPO, workflowDir: TEAM }));
   const { e, settle } = board();
-  await runWith(e, advanceRun(runRecord(run.id)));
+  await runWith(e, advanceRun(runRecord(rootNow(), run.id)));
   fs.writeFileSync(path.join(ROOT, 'runs', run.id, 'work', 'write', 'note.md'), '# Tides\n');
   settle(`${run.id}-write`, 'succeeded', SIGNED);
-  await runWith(e, advanceRun(runRecord(run.id)));
+  await runWith(e, advanceRun(runRecord(rootNow(), run.id)));
   settle(`${run.id}-review`, 'succeeded', { ...SIGNED, artifacts: [] });
-  await runWith(e, advanceRun(runRecord(run.id)));
+  await runWith(e, advanceRun(runRecord(rootNow(), run.id)));
   assert.deepEqual(await decideScreen(t, e, [run.id], { '<id>': run.id, '<root>': ROOT }), [
     '<id>  a note on tides',
     '',

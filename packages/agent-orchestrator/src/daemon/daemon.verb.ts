@@ -10,6 +10,7 @@ import { DEMAND_POLL_MS, DEMAND_WAIT_MS } from '../demand/demand.ts';
 import { tried } from '../runtime-client.ts';
 import { daemonLine, type DaemonStanding, type HolderKind } from './daemon.ts';
 import { daemonStanding } from './daemon.store.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /** Where the store's daemon stands: the lease's state (`DaemonStanding`'s kind), and its holder's kind and pid where it names them, and
  * the url it serves at while it ticks: a lease that stopped or whose process is gone serves nothing. */
@@ -22,7 +23,7 @@ export type DaemonAnswer = {
 };
 
 /** The lease read now. */
-const standingNow = tried(() => daemonStanding());
+const standingNow = Effect.flatMap(StoreRoot, (home) => tried(() => daemonStanding(home)));
 
 /** Whether `s` is an api that ticks and has not yet written where it listens: its url comes once it listens. */
 const listening = (s: DaemonStanding): boolean => s.kind === 'ticking' && s.file.by === 'api' && s.file.url === undefined;

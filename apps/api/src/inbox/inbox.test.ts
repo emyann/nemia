@@ -22,7 +22,7 @@ import { Effect } from 'effect';
 import type { Card, CardList } from 'objects';
 
 /** `program`, one of the package's inbox verbs, run on the harness's store (`root`): its refusal thrown as itself. */
-const onStore = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, root));
+const onStore = <A, E>(program: Effect.Effect<A, E, StoreRoot>): A => Effect.runSync(Effect.provideService(program, StoreRoot, root));
 const repo = scratch('nemia-api-inbox-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
@@ -90,7 +90,7 @@ const filedFrom = async (res: Response): Promise<Filed> => {
   const c = (await res.json()) as Card;
   return {
     name: c.metadata.name,
-    file: path.join(inboxDir(), `${c.metadata.name}.md`),
+    file: path.join(inboxDir(root), `${c.metadata.name}.md`),
     workflow: c.spec.workflow ?? null,
     repo: c.spec.repo ?? null,
     factory: factoryOf(c),
@@ -175,7 +175,7 @@ test('a person starts a card: the run carries where it came from, and the card s
       assert.deepEqual(answered, { id: answered.id, card: card.name }, 'the answer says no removal: the card is kept');
       assert.equal(res.headers.get('location'), `/api/runs/${answered.id}`);
 
-      const run = runStore.runs.read(answered.id);
+      const run = runStore(root).runs.read(answered.id);
       assert.deepEqual(
         { from: run.from, brief: run.brief, workflowDir: run.workflowDir, repo: run.repo, after: run.after },
         {
@@ -199,7 +199,7 @@ test('a person starts a card: the run carries where it came from, and the card s
       const { card: plain } = onStore(addToInbox({ text: 'Keep the brief\n\nAs the card says it.' }));
       const bodied = await startCard({ workflow: 'mine', card: plain.name });
       assert.equal(bodied.status, 201, await bodied.clone().text());
-      const bodiedRun = runStore.runs.read(((await bodied.json()) as CardStarted).id);
+      const bodiedRun = runStore(root).runs.read(((await bodied.json()) as CardStarted).id);
       assert.deepEqual(
         [bodiedRun.brief, bodiedRun.workflowDir, bodiedRun.from],
         ['Keep the brief\n\nAs the card says it.', mine, { inbox: plain.name }],
@@ -221,7 +221,7 @@ test('a person starts a card: the run carries where it came from, and the card s
       const lines = await linesOf(app, id);
       assert.equal(
         lines.fromNote,
-        fromNote(runStore.runs.read(id)),
+        fromNote(runStore(root).runs.read(id)),
         "`nemia decide`'s sentence is the lines read's alone: the object leaves it out",
       );
       assert.equal(lines.fromNote, `from inbox card ${card.name}`);
@@ -434,7 +434,7 @@ test("a person files cards, in a factory and out of one, lists them, opens a car
       assert.match(filed.name, /^cache-the-views-between-pass-[a-z0-9]+$/);
       assert.deepEqual(filed, {
         name: filed.name,
-        file: path.join(inboxDir(), `${filed.name}.md`),
+        file: path.join(inboxDir(root), `${filed.name}.md`),
         workflow: null,
         repo: null,
         factory: null,
@@ -532,7 +532,7 @@ test("a person files cards, in a factory and out of one, lists them, opens a car
       const started = await startCard({ workflow: 'dev', card: name });
       assert.equal(started.status, 201, await started.clone().text());
       assert.equal(
-        runStore.runs.read(((await started.json()) as CardStarted).id).repo,
+        runStore(root).runs.read(((await started.json()) as CardStarted).id).repo,
         repo,
         'started, the run names the repository as the api does, so the board lists it with the runs on it',
       );

@@ -21,6 +21,7 @@ import { anAgent } from '../../test/agent-walks.ts';
 import { Cause, Effect, Exit } from 'effect';
 import type { StoreRoot as Root } from '../config/root.store.ts';
 import { packArchive } from '../archive/archive.ts';
+import { rootNow } from '../../test/config-given.ts';
 
 const ROOT = scratch('wf-template-');
 process.env.WF_ROOT = ROOT;
@@ -318,7 +319,7 @@ test('what export writes from a repository and a factory, read back as it was wr
       const none = target();
       exportTemplate({ dir: none, from: repo, factory: 'ruled' });
       assert.equal(fs.existsSync(path.join(none, 'RULES.md')), false, 'a factory with no rules writes none');
-      const kept = writeRules({ name: 'ruled' }, 'Never push on a Friday.');
+      const kept = writeRules(rootNow(), { name: 'ruled' }, 'Never push on a Friday.');
       const dir = target();
       const { from } = exportTemplate({ dir, from: repo, factory: 'ruled' });
       assert.deepEqual(checkTemplateAt(dir), []);

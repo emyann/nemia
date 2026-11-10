@@ -91,11 +91,9 @@ export const judgedUnlessUnreadable = Effect.fnUntraced(function* <T, E, R>(
  * A request reads the journals of the runs it judges and of their parents, once, and no other: never every journal in the store
  * (`everyView`), and never a run waited on a `view` a task, its journal once more.
  */
-export const viewsFor = Effect.fn('viewsFor')(function* (
-  e: Engine,
-  runs: readonly Run[],
-  store: () => readonly Run[] = () => runsAtOnce.runs.list(),
-) {
+export const viewsFor = Effect.fn('viewsFor')(function* (e: Engine, runs: readonly Run[], given?: () => readonly Run[]) {
+  const home = yield* StoreRoot;
+  const store = given ?? (() => runsAtOnce(home).runs.list());
   const parents = new Set(runs.flatMap((run) => [...(run.after ?? []), ...(run.hold && !run.cancelledAt ? run.hold.until : [])]));
   const read = parents.size ? [...runs, ...store().filter((run) => parents.has(run.id))] : runs;
   const listed = yield* asked('list', e.list(read.flatMap(runTasks)));
@@ -129,7 +127,7 @@ function factoryRead(run: Run, home: string): { fills?: Fills; unread?: { name: 
   const name = runNamespace(run.factory);
   try {
     const record = Effect.runSync(doorAt(home, (door) => door.factories.read(FactoryName.read(name))));
-    return isDefaultFactory(record) ? {} : { fills: factoryFills(record, path.basename(path.resolve(run.workflowDir))).fills };
+    return isDefaultFactory(record) ? {} : { fills: factoryFills(home, record, path.basename(path.resolve(run.workflowDir))).fills };
   } catch (err) {
     if (!isRefusal(err)) throw err;
     return { unread: { name, gone: err instanceof Missing } };

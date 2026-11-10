@@ -21,6 +21,7 @@ import type { Closeout } from '../closeout/index.ts';
 import type { StepRecord } from '../record/record.ts';
 import type { StepSpec } from '../step/step.ts';
 import { names } from '../../test/assessed.ts';
+import { rootNow } from '../../test/config-given.ts';
 
 /** A run whose step `build` works in `workspace`, with its files directory made: the run, and that directory. */
 function aRun(workspace: string | undefined): { run: Run; dir: string } {
@@ -92,7 +93,7 @@ test('the artifact path rules: artifactPlace, fileIn and filesLacked', async (t)
     const dir = path.join(ROOT, 'runs', 'r-1', 'artifacts', 'build');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'shot.png'), 'png');
-    assert.equal(artifactFile({ id: 'r-1' }, 'build', 'shot.png')?.toString(), 'png');
+    assert.equal(artifactFile(rootNow(), { id: 'r-1' }, 'build', 'shot.png')?.toString(), 'png');
     assert.equal(fileIn(dir, 'shot.png')?.toString(), 'png');
     assert.equal(fileIn(dir, 'gone.png'), null);
   });
@@ -118,6 +119,7 @@ test('the artifact path rules: artifactPlace, fileIn and filesLacked', async (t)
       fs.mkdirSync(path.join(workspace, 'shots'));
       fs.symlinkSync(path.join(beside, 'secret.txt'), path.join(workspace, 'link.txt'));
       const lacked = filesLacked(
+        rootNow(),
         run,
         'build',
         naming(
@@ -157,16 +159,19 @@ test('the artifact path rules: artifactPlace, fileIn and filesLacked', async (t)
       fs.writeFileSync(path.join(workspace, 'uncopied.md'), 'in the workspace');
       fs.mkdirSync(path.join(dir, 'blocked.md'));
       fs.writeFileSync(path.join(workspace, 'blocked.md'), 'its copy is refused by a directory in its place');
-      assert.deepEqual(filesLacked(run, 'build', naming(path.join(dir, 'shot.png'), 'collected.md', 'uncopied.md', 'blocked.md')), []);
-      assert.deepEqual(filesLacked(run, 'build', naming()), []);
-      assert.deepEqual(filesLacked(run, 'build', undefined), []);
+      assert.deepEqual(
+        filesLacked(rootNow(), run, 'build', naming(path.join(dir, 'shot.png'), 'collected.md', 'uncopied.md', 'blocked.md')),
+        [],
+      );
+      assert.deepEqual(filesLacked(rootNow(), run, 'build', naming()), []);
+      assert.deepEqual(filesLacked(rootNow(), run, 'build', undefined), []);
     },
   );
   await t.test(
     'filesLacked: a path from the workspace root is not judged where there is no workspace to read, none on the record or none on disk',
     () => {
-      assert.deepEqual(filesLacked(aRun(undefined).run, 'build', naming('gone.md')), []);
-      assert.deepEqual(filesLacked(aRun(path.join(scratch('wf-lacked-ws-'), 'removed')).run, 'build', naming('gone.md')), []);
+      assert.deepEqual(filesLacked(rootNow(), aRun(undefined).run, 'build', naming('gone.md')), []);
+      assert.deepEqual(filesLacked(rootNow(), aRun(path.join(scratch('wf-lacked-ws-'), 'removed')).run, 'build', naming('gone.md')), []);
     },
   );
 });
@@ -178,12 +183,13 @@ test('filesHanded', async (t) => {
     fs.mkdirSync(path.join(dir, 'notes'));
     fs.writeFileSync(path.join(dir, 'notes', 'a.md'), 'collected');
     const handed = filesHanded(
+      rootNow(),
       run,
       'build',
       naming(path.join(dir, 'shot.png'), 'notes/a.md', path.join(dir, 'gone.png'), 'gone.md', '/etc/hosts'),
     );
     assert.deepEqual(handed, { there: [path.join(dir, 'shot.png'), path.join(dir, 'notes', 'a.md')], gone: 3 });
-    assert.deepEqual(filesHanded(run, 'build', undefined), { there: [], gone: 0 });
+    assert.deepEqual(filesHanded(rootNow(), run, 'build', undefined), { there: [], gone: 0 });
   });
 });
 

@@ -11,6 +11,7 @@ import { execFileSync } from 'node:child_process';
 import { scratch } from 'test-kit/scratch';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
+import { rootNow } from './config-given.ts';
 
 const REAL = scratch('wf-linked-');
 const ROOT = path.join(scratch('wf-link-'), 'store');
@@ -60,8 +61,8 @@ test("REFUSED before, now forgotten: a store under a link — git lists each wor
   });
 
   const run = await runPlaced(startRun({ brief: 'under a link', repo, workflowDir: folder }));
-  await runWith(e, advanceRun(runRecord(run.id)));
-  const wt = runRecord(run.id).steps.implement.workspace!;
+  await runWith(e, advanceRun(runRecord(rootNow(), run.id)));
+  const wt = runRecord(rootNow(), run.id).steps.implement.workspace!;
   assert.ok(wt.startsWith(ROOT), 'the record names it through the link');
   assert.match(
     git(repo, 'worktree', 'list', '--porcelain'),

@@ -17,6 +17,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { scratch } from 'test-kit/scratch';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
+import { rootNow } from '../../test/config-given.ts';
 
 const ROOT = scratch('wf-runlist-informed-');
 const RUNS_DIR = path.join(ROOT, 'runs');
@@ -77,7 +78,7 @@ const started = async (front = 'place: git', gates: string[] = []): Promise<{ id
   const repo = scratch('wf-runlist-repo-');
   stand().world.repository(repo, {});
   const run = await runPlaced(startRun({ brief: 'list me', repo, workflowDir: dir, gates }));
-  await runWith(e(), advanceRun(runRecord(run.id)));
+  await runWith(e(), advanceRun(runRecord(rootNow(), run.id)));
   return { id: run.id, dir };
 };
 
@@ -85,7 +86,7 @@ const started = async (front = 'place: git', gates: string[] = []): Promise<{ id
 const signed = async (front?: string, gates: string[] = []) => {
   const run = await started(front, gates);
   engine().settle(`${run.id}-work`, 'succeeded', { closeout: SIGNED, startedAt: AT, spawnedAt: AT });
-  await runWith(e(), advanceRun(runRecord(run.id)));
+  await runWith(e(), advanceRun(runRecord(rootNow(), run.id)));
   return run;
 };
 
@@ -154,7 +155,11 @@ const ROWS: Row[] = [
     plant: (run) => runWith(e(), cancelRun(run.id)),
     pass: true,
   },
-  { name: 'the labels file, as nemia label run writes it', make: () => resting(), plant: (run) => writeLabels(run.id, { team: 'core' }) },
+  {
+    name: 'the labels file, as nemia label run writes it',
+    make: () => resting(),
+    plant: (run) => writeLabels(rootNow(), run.id, { team: 'core' }),
+  },
   {
     name: 'an ask written by another process, no informer told: the gate approved',
     make: () => signed(undefined, ['work']),
@@ -164,7 +169,7 @@ const ROWS: Row[] = [
     name: 'a prune from the CLI: its marker written, its worktrees removed',
     make: () => resting(),
     plant: (run) => {
-      fs.writeFileSync(pruneFile(run.id), JSON.stringify({ at: AT, worktrees: [] }));
+      fs.writeFileSync(pruneFile(rootNow(), run.id), JSON.stringify({ at: AT, worktrees: [] }));
       fs.rmSync(path.join(ROOT, 'worktrees', run.id), { recursive: true, force: true });
     },
   },
@@ -199,16 +204,16 @@ const ROWS: Row[] = [
     name: 'its files folder removed',
     make: async () => {
       const run = await resting();
-      fs.mkdirSync(artifactsDir(runRecord(run.id), 'work'), { recursive: true });
+      fs.mkdirSync(artifactsDir(rootNow(), runRecord(rootNow(), run.id), 'work'), { recursive: true });
       return run;
     },
-    plant: (run) => fs.rmSync(path.dirname(artifactsDir(runRecord(run.id), '_')), { recursive: true, force: true }),
+    plant: (run) => fs.rmSync(path.dirname(artifactsDir(rootNow(), runRecord(rootNow(), run.id), '_')), { recursive: true, force: true }),
   },
   {
     name: "a folder run's step folder gaining a file",
     make: () => signed('place: folder'),
     plant: (run) => {
-      const dir = runRecord(run.id).steps.work?.workspace;
+      const dir = runRecord(rootNow(), run.id).steps.work?.workspace;
       assert.ok(dir, 'a folder run works in a folder of its own');
       fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(path.join(dir, 'made.txt'), 'made\n');
@@ -247,9 +252,9 @@ test('each input that changes a run object, planted, is served fresh', async (t)
 test('an object built on a check output the engine did not give is not kept: the next read serves the output once it reads', async () => {
   const run = await started('place: git\ncheck: false');
   engine().settle(`${run.id}-work`, 'succeeded', { closeout: SIGNED, startedAt: AT, spawnedAt: AT });
-  await runWith(e(), advanceRun(runRecord(run.id)));
+  await runWith(e(), advanceRun(runRecord(rootNow(), run.id)));
   engine().settle(`${run.id}-work-check`, 'failed', { exitCode: 1, startedAt: AT, spawnedAt: AT });
-  await runWith(e(), advanceRun(runRecord(run.id)));
+  await runWith(e(), advanceRun(runRecord(rootNow(), run.id)));
   const memo = informerMemo();
   outputRefused = true;
   const first = itemOf(await unverified(() => listOf(memo)), run.id);

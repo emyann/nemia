@@ -17,6 +17,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { eachTest, runGiven, runOver } from './placed.ts';
 import { scratch } from 'test-kit/scratch';
 import { teamCopy } from './team.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-quick-run-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -67,7 +68,7 @@ async function toTheCheck(dir: string) {
   const e = engineOf(b.layer);
   const run = await runPlaced(startRun({ brief: 'remove the dividers', repo: repository(), workflowDir: dir }));
   assert.deepEqual(
-    (runRecord(run.id).workflow ?? []).map((step) => [step.name, step.agent?.name, step.gate === true]),
+    (runRecord(rootNow(), run.id).workflow ?? []).map((step) => [step.name, step.agent?.name, step.gate === true]),
     [
       ['implement', 'implementer', false],
       ['review', 'reviewer', false],
@@ -75,12 +76,12 @@ async function toTheCheck(dir: string) {
     ],
     'implement, then a review that can send it back, then a landing nobody gates',
   );
-  assert.deepEqual((await runWith(e, advanceRun(runRecord(run.id)))).filed, ['implement']);
-  const work = runRecord(run.id).steps.implement.workspace!;
+  assert.deepEqual((await runWith(e, advanceRun(runRecord(rootNow(), run.id)))).filed, ['implement']);
+  const work = runRecord(rootNow(), run.id).steps.implement.workspace!;
   fs.appendFileSync(path.join(work, 'a.ts'), 'export const b = 2;\n');
   stand().world.commit(work, 'add b');
   b.settle(`${run.id}-implement`, 'succeeded', { closeout: SIGNED });
-  assert.deepEqual((await runWith(e, advanceRun(runRecord(run.id)))).checked, ['implement']);
+  assert.deepEqual((await runWith(e, advanceRun(runRecord(rootNow(), run.id)))).checked, ['implement']);
   return { id: run.id, b, e };
 }
 
@@ -90,11 +91,11 @@ const REVIEWED = (again: boolean) => ({ outcome: 'done', summary: 'read it', art
 test("a quick run whose check passes reaches its review, and the review's pass files the landing with nobody's approval", async () => {
   const { id, b, e } = await toTheCheck(quickFolder());
   b.settle(`${id}-implement-check`, 'succeeded', { exitCode: 0 });
-  assert.deepEqual((await runWith(e, advanceRun(runRecord(id)))).filed, ['review'], 'the review is filed, not the landing');
+  assert.deepEqual((await runWith(e, advanceRun(runRecord(rootNow(), id)))).filed, ['review'], 'the review is filed, not the landing');
 
   b.settle(`${id}-review`, 'succeeded', { closeout: REVIEWED(false) });
-  assert.deepEqual((await runWith(e, advanceRun(runRecord(id)))).filed, ['land'], 'and its pass files the landing');
-  const run = runRecord(id);
+  assert.deepEqual((await runWith(e, advanceRun(runRecord(rootNow(), id)))).filed, ['land'], 'and its pass files the landing');
+  const run = runRecord(rootNow(), id);
   assert.deepEqual(run.approvals ?? [], [], 'with nothing approved');
   assert.deepEqual(
     endingSteps(run.workflow ?? [], run).map((step) => step.name),
@@ -108,22 +109,22 @@ test("a quick run whose check passes reaches its review, and the review's pass f
 test("a quick review that asks again files implement again on the run's branch, and files no land", async () => {
   const { id, b, e } = await toTheCheck(quickFolder());
   b.settle(`${id}-implement-check`, 'succeeded', { exitCode: 0 });
-  await runWith(e, advanceRun(runRecord(id)));
-  const branch = runRecord(id).steps.implement.branch;
+  await runWith(e, advanceRun(runRecord(rootNow(), id)));
+  const branch = runRecord(rootNow(), id).steps.implement.branch;
 
   b.settle(`${id}-review`, 'succeeded', { closeout: REVIEWED(true) });
-  const round = await runWith(e, advanceRun(runRecord(id)));
+  const round = await runWith(e, advanceRun(runRecord(rootNow(), id)));
   assert.deepEqual([round.filed, round.looped], [[], ['review']], "the review's loop goes round again, and no land is filed");
   assert.equal(b.filings.at(-1), `${id}-implement-try2`, `implement is filed again: ${b.filings.join(', ')}`);
   assert.ok(!b.filings.includes(`${id}-land`), b.filings.join(', '));
-  assert.equal(runRecord(id).steps.implement.branch, branch, 'on the branch the work is on');
+  assert.equal(runRecord(rootNow(), id).steps.implement.branch, branch, 'on the branch the work is on');
 });
 
 test('REFUSED: a quick run whose check refuses files no land and no second try; a copy given retries: files one', async () => {
   const { id, b, e } = await toTheCheck(quickFolder());
   b.settle(`${id}-implement-check`, 'failed', { exitCode: 1 });
   for (let pass = 0; pass < 3; pass += 1) {
-    const { filed, tried } = await runWith(e, advanceRun(runRecord(id)));
+    const { filed, tried } = await runWith(e, advanceRun(runRecord(rootNow(), id)));
     assert.deepEqual([filed, tried], [[], []]);
   }
   assert.deepEqual(b.filings, [`${id}-implement`, `${id}-implement-check`]);
@@ -140,6 +141,6 @@ test('REFUSED: a quick run whose check refuses files no land and no second try; 
   });
   const again = await toTheCheck(retried);
   again.b.settle(`${again.id}-implement-check`, 'failed', { exitCode: 1 });
-  assert.deepEqual((await runWith(again.e, advanceRun(runRecord(again.id)))).tried, ['implement']);
+  assert.deepEqual((await runWith(again.e, advanceRun(runRecord(rootNow(), again.id)))).tried, ['implement']);
   assert.equal(again.b.filings.at(-1), `${again.id}-implement-try2`);
 });

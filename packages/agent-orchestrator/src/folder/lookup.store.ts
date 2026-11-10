@@ -5,11 +5,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { AGENTS_FOLDER, CARRIED_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
-import { HOME } from '../record/record.store.ts';
 import type { Places } from '../skills/read.store.ts';
 
-/** Where a run on `repo` looks for its steps' agents and skills beside its folder's own (`lookupRoots`): the repository, then the store. */
-export const placesOf = (repo: string | undefined): Places => ({ ...(repo ? { repo } : {}), home: HOME });
+/**
+ * Where a run on `repo` looks for its steps' agents and skills beside its folder's own (`lookupRoots`): the repository, then the store at
+ * `home`.
+ */
+export const placesOf = (home: string, repo: string | undefined): Places => ({ ...(repo ? { repo } : {}), home });
 
 /**
  * The folders directly in `dir`, sorted, a link to one included. None when `dir` is not there. A hidden folder is not a

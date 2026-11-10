@@ -17,6 +17,7 @@ import { stepsOf } from '../steps/steps.verb.ts';
 import { routeAsk } from '../route/index.ts';
 import { writerText as textOf } from '../yours/yours.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /** The follower of a condition already filed or sent its card, which settles its route; undefined while none is. */
 export const settledBy = (condition: string, run: Run, steps: readonly StepSpec[]): string | undefined =>
@@ -79,6 +80,7 @@ export const ROUTE: Command<{ step: string; try: number; route: string; at: stri
   class: 'act',
   only: { side: 'cli', why: 'the board offers no route control yet: nemia route writes the file' },
   handler: Effect.fnUntraced(function* (args: Args) {
+    const home = yield* StoreRoot;
     const id = textOf(args, 'runId') ?? '';
     const step = textOf(args, 'step') ?? '';
     const route = textOf(args, 'route') ?? '';
@@ -90,8 +92,8 @@ export const ROUTE: Command<{ step: string; try: number; route: string; at: stri
     if (refused) return yield* Effect.fail(refused);
     const n = tryOf(run, step);
     const at = new Date().toISOString();
-    const file = path.join(asksDir(id), routeAsk(step, n));
-    fs.mkdirSync(asksDir(id), { recursive: true });
+    const file = path.join(asksDir(home, id), routeAsk(step, n));
+    fs.mkdirSync(asksDir(home, id), { recursive: true });
     writeWhole(file, `${JSON.stringify({ route, at })}\n`);
     return { step, try: n, route, at, file };
   }),

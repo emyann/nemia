@@ -21,6 +21,7 @@ import { asyncOps, asyncStore, type AsyncJournal, type AsyncRunner } from './pro
 import { runGiven } from './placed.ts';
 import { story } from './story.ts';
 import { testPlace } from '../place/memory/index.ts';
+import { rootNow } from './config-given.ts';
 
 const place = testPlace();
 const stand = () => place;
@@ -35,7 +36,7 @@ const { startRun } = await import('../src/runner.ts');
 const runPlaced = runGiven(() => stand().layer);
 const { tickRun } = await import('../src/tick/tick.verb.ts');
 const { EngineService, engineOf } = await import('../src/runtime-client.ts');
-const { filesStore: runStore } = await import('../src/record/files.store.ts');
+const runStore = (await import('../src/record/files.store.ts')).filesStoreAt(rootNow());
 
 const REPO = fs.mkdtempSync(path.join(ROOT, 'repo-'));
 stand().world.repository(REPO, {});

@@ -15,6 +15,7 @@ import { directoryFence } from '../src/workflow/fence.ts';
 import { renderedFlags } from '../src/agents/agents.ts';
 import { scratch } from 'test-kit/scratch';
 import { names } from './assessed.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-fence-');
 process.env.WF_ROOT = ROOT;
@@ -186,7 +187,7 @@ test("a step may narrow its agent's fence and never widen it, key by key, as a f
     fs.writeFileSync(file, '---\nplace: git\nagent: builder\n---\n');
     const step = { name: 'build', after: [], place: 'git' as const, agent: 'builder', tools: ['Read', 'Bash'], body: '' };
     holds(
-      refusal(() => writeWorkflow(path.join(dir, 'dev'), [step], undefined, { anywhere: true })),
+      refusal(() => writeWorkflow(rootNow(), path.join(dir, 'dev'), [step], undefined, { anywhere: true })),
       'tools: Read, Bash',
       '`Bash`',
       'builder',

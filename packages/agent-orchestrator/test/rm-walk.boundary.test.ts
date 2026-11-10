@@ -16,6 +16,7 @@ import type { Run, TaskPhase } from '../src/run.ts';
 import { scratch } from 'test-kit/scratch';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-store-');
 const WORKFLOW = path.join(ROOT, 'workflow');
@@ -241,11 +242,11 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
   const repo = anIgnoringRepo();
   const b = board();
   const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: folder() }));
-  await runWith(b.e, advanceRun(runRecord(run.id)));
-  const wt = runRecord(run.id).steps.implement.workspace!;
+  await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
+  const wt = runRecord(rootNow(), run.id).steps.implement.workspace!;
   assert.equal(wt, path.join(ROOT, 'worktrees', run.id, LINE_NAME));
   b.settle(`${run.id}-implement`, 'failed');
-  await runWith(b.e, advanceRun(runRecord(run.id)));
+  await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
 
   fs.writeFileSync(path.join(wt, 'fix.ts'), 'export const fixed = true;\n');
   const outside = fs.mkdtempSync(path.join(ROOT, 'outside-'));
@@ -295,7 +296,7 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
     "the engine is asked to forget the run's task, once, and stops or files nothing",
   );
   assert.throws(
-    () => runRecord(run.id),
+    () => runRecord(rootNow(), run.id),
     (err: Error) => err.message.startsWith('no such run: '),
   );
 

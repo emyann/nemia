@@ -20,6 +20,7 @@ import { scratch } from 'test-kit/scratch';
 import { Effect } from 'effect';
 import { plainEngine } from '../../test/promised.ts';
 import { runGiven, runOver } from '../../test/placed.ts';
+import { rootNow } from '../../test/config-given.ts';
 
 const ROOT = scratch('wf-pass-processes-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -165,7 +166,7 @@ const finish = async (blocking: readonly string[] = []): Promise<PassCost> => {
     await verified();
     h.signAll(inFlight, (name) => (blocking.some((id) => name.startsWith(`ae/${id}-`)) ? BLOCKED : undefined));
     const pass = await measured();
-    const finished = listRuns().filter((r) => !inFlight.some((f) => f.id === r.id)).length;
+    const finished = listRuns(rootNow()).filter((r) => !inFlight.some((f) => f.id === r.id)).length;
     if (pass.rested === finished) return pass;
   }
   assert.fail('the store did not come to rest in twelve passes');

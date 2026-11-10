@@ -9,6 +9,7 @@ import path from 'node:path';
 import type { DaemonFile, DaemonStanding } from '../daemon/daemon.ts';
 import { feedChanges, feedLineWords, foldFeed, freshFold, startedLine, upgraded, type FeedLine, type FeedWords } from './feed.ts';
 import { scratch } from 'test-kit/scratch';
+import { rootNow } from '../../test/config-given.ts';
 
 const ROOT = scratch('wf-daemon-line-');
 process.env.WF_ROOT = ROOT;
@@ -92,16 +93,16 @@ test('the store appends a daemon’s line after a torn one, reads it back, and a
   fs.rmSync(FEED, { force: true });
   fs.writeFileSync(FEED, '{"at":"x","run":"r-torn","wo');
   const line = startedLine(5151, { kind: 'none' }, AT, NOW);
-  const appended = recordDaemonLine(line);
+  const appended = recordDaemonLine(rootNow(), line);
   assert.equal(appended.leading, '\n', 'the torn line is ended first');
   assert.deepEqual(appended.lines, [line]);
   assert.equal(appended.after, fs.statSync(FEED).size);
-  assert.deepEqual(readFeed(0).lines, [line]);
+  assert.deepEqual(readFeed(rootNow(), 0).lines, [line]);
 
   const memo = freshFeedMemo();
   const running: FeedWords = { run: { word: 'running' }, steps: [] };
   const ran = upgraded({ at: AT, run: 'r-1', word: 'running' });
-  assert.deepEqual(recordFeed(new Map([['r-1', running]]), { at: AT, memo }).lines, [ran]);
-  assert.deepEqual(recordFeed(new Map([['r-1', running]]), { at: AT, memo }).lines, [], 'a daemon line read back owes nothing');
-  assert.deepEqual(readFeed(0).lines, [line, ran]);
+  assert.deepEqual(recordFeed(rootNow(), new Map([['r-1', running]]), { at: AT, memo }).lines, [ran]);
+  assert.deepEqual(recordFeed(rootNow(), new Map([['r-1', running]]), { at: AT, memo }).lines, [], 'a daemon line read back owes nothing');
+  assert.deepEqual(readFeed(rootNow(), 0).lines, [line, ran]);
 });

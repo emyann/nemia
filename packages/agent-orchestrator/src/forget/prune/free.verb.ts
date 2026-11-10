@@ -8,10 +8,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Effect, Exit, type Duration } from 'effect';
 import { setting } from '../../config/config.store.ts';
-import { HOME } from '../../record/record.store.ts';
 import { firstPiece } from '../../piece/piece.ts';
 import { dropEmpty, freedByRepo, judging, resolved, sized, type Judged, type Sized } from './prune.verb.ts';
 import { freeable, freedLine, freeSaid, freeTurn, pruneLines, type Answered, type Pruning } from './prune.ts';
+import { StoreRoot } from '../../config/root.store.ts';
 
 /** The sweep's pace when it is given none. */
 export const FREE_EVERY: Duration.Input = '5 seconds';
@@ -42,9 +42,9 @@ const whyOf = (cause: Cause.Cause<unknown>): string => {
 };
 
 /** What is to be said of a run the judgement left: nothing of one with nothing listed, whose empty folder goes; else `freeSaid`. */
-function leftWords(id: string, judged: Exclude<Judged, { ready: unknown }>): string | null {
+function leftWords(home: string, id: string, judged: Exclude<Judged, { ready: unknown }>): string | null {
   if (judged.pruning.kind === 'nothing') {
-    dropEmpty(resolved(path.join(HOME, 'worktrees', id)));
+    dropEmpty(resolved(path.join(home, 'worktrees', id)));
     return null;
   }
   return freeSaid(judged.facts, judged.pruning.refusal ?? pruneLines(judged.pruning).join(' '));
@@ -52,10 +52,11 @@ function leftWords(id: string, judged: Exclude<Judged, { ready: unknown }>): str
 
 /** One candidate judged as `nemia prune <id>` judges it, and sized when it is ready; a judgement that failed is its words. */
 const swept = Effect.fnUntraced(function* (id: string) {
+  const home = yield* StoreRoot;
   const exit = yield* Effect.exit(
     Effect.gen(function* () {
       const judged = yield* judging(id);
-      const done: Swept = 'ready' in judged ? { id, ready: yield* sized(judged.ready) } : { id, words: leftWords(id, judged) };
+      const done: Swept = 'ready' in judged ? { id, ready: yield* sized(judged.ready) } : { id, words: leftWords(home, id, judged) };
       return done;
     }),
   );
@@ -118,8 +119,9 @@ const saidOnce = Effect.fnUntraced(function* (left: ReadonlyArray<{ id: string; 
  * the store and the place say then.
  */
 export const freeOnce = Effect.fn('freeOnce')(function* (answers: readonly Answered[], memory: FreeMemory) {
+  const home = yield* StoreRoot;
   if (yield* setting('keepWorktrees')) return { freed: [], said: [] } satisfies Freed;
-  const candidates = freeable(answers).filter((id) => fs.existsSync(path.join(HOME, 'worktrees', id)));
+  const candidates = freeable(answers).filter((id) => fs.existsSync(path.join(home, 'worktrees', id)));
   forgotten(memory, candidates);
   const turn = freeTurn(candidates, memory.judged, FREE_A_SWEEP, memory.turn++);
   const judged = yield* Effect.forEach(turn, swept, { concurrency: FREE_A_SWEEP });

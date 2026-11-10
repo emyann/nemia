@@ -29,6 +29,7 @@ import { scratch } from 'test-kit/scratch';
 import { Effect } from 'effect';
 import { testPlace } from '../place/memory/index.ts';
 import { runGiven, runOver } from './placed.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-restart-');
 process.env.WF_ROOT = ROOT;
@@ -132,7 +133,7 @@ const runNaming = async (record: { taskId: string; tries?: Array<{ taskId: strin
   const repo = scratch('wf-restart-repo-');
   stand().world.repository(repo, {});
   const run = await runPlaced(startRun({ brief: 'restart', repo, workflowDir: solo, isolate: false }));
-  assert.ok(rewriteRun({ ...runRecord(run.id), steps: { solo: record } }));
+  assert.ok(rewriteRun(rootNow(), { ...runRecord(rootNow(), run.id), steps: { solo: record } }));
   return run.id;
 };
 /** An earlier try, failed: what a try's task was filed after. */

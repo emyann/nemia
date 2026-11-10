@@ -16,6 +16,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { scratch } from 'test-kit/scratch';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-run-object-');
 const RUNS_DIR = path.join(ROOT, 'runs');
@@ -71,11 +72,11 @@ const started = async (steps: Record<string, string | null>, gates: string[] = [
   const repo = scratch('wf-run-object-repo-');
   stand().world.repository(repo, {});
   const run = await runPlaced(startRun({ brief: 'object me', repo, workflowDir: folder(steps), gates }));
-  await runWith(e(), advanceRun(runRecord(run.id)));
+  await runWith(e(), advanceRun(runRecord(rootNow(), run.id)));
   return run.id;
 };
 
-const advanced = (id: string) => runWith(e(), advanceRun(runRecord(id)));
+const advanced = (id: string) => runWith(e(), advanceRun(runRecord(rootNow(), id)));
 
 /** Runs in three phases: in flight, finished, and waiting at a gate. */
 const threeRuns = async () => {
@@ -92,7 +93,7 @@ const threeRuns = async () => {
 
 /** The object of the run `id`, given the store's root. */
 const object = async (id: string) =>
-  await runWith(e(), Effect.provideService(runObject(runRecord(id), { memo: { said: new Map() } }), StoreRoot, ROOT));
+  await runWith(e(), Effect.provideService(runObject(runRecord(rootNow(), id), { memo: { said: new Map() } }), StoreRoot, ROOT));
 
 const handled = <D>(entry: { handler: (...a: never[]) => unknown }, args: Record<string, string>): Promise<D> =>
   runWith(e(), (entry.handler as (a: Record<string, string>, env: NodeJS.ProcessEnv, home: string) => never)(args, process.env, ROOT));

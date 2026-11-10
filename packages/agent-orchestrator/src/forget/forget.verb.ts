@@ -26,7 +26,7 @@ import {
   type Forgot,
   leftWhy,
 } from './forget.ts';
-import { HOME, lstatOf } from '../record/record.store.ts';
+import { lstatOf } from '../record/record.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { UnloadedFolder } from '../steps/steps.ts';
 import { runsAtOnce } from '../runs/runs.store.ts';
@@ -45,6 +45,7 @@ import { engineForgetting, forgetTasks } from './forgetting/forgetting.verb.ts';
 import { forgettingOf, uncountedWords, type EngineForgetting } from './forgetting/forgetting.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /** A run's answer when nothing of its worktrees or branches was touched, afresh on each call. */
 const nothing = (): Omit<Forgot, 'id' | 'kind'> => ({ removed: [], handedOff: [], gone: [], left: [], branches: [], files: [] });
@@ -95,17 +96,18 @@ type Worktrees = Pick<Forgot, 'removed' | 'handedOff' | 'gone' | 'left'>;
  * (`tried`, `awaited`).
  */
 export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetHow = {}) {
+  const home = yield* StoreRoot;
   const e = yield* EngineService;
   const refusedId = idRefusal(id);
   if (refusedId) return yield* Effect.fail(new Invalid({ message: refusedId }));
-  const dir = path.join(HOME, 'worktrees', id);
+  const dir = path.join(home, 'worktrees', id);
   if (!(yield* (yield* RunDoor).runs.exists(RunId.read(id)))) return yield* forgetMissing(id, dir);
   const f = yield* readForgetting(e, id);
   const { run, steps, unfrozen } = f;
   const said = { id, repo: run.repo, base: run.branch, isolate: run.isolate, ...(unfrozen ? { unfrozen } : {}) };
   const git = asksStanding(f.run, f.steps) ? yield* standingLive([f.run]) : standingReader(NOTHING_READ);
   const asked = yield* PlaceService;
-  const refusal = yield* tried(() => refusalOf(id, f, git, asked));
+  const refusal = yield* tried(() => refusalOf(home, id, f, git, asked));
   if (refusal) return { ...said, kind: 'refused', refusal, ...nothing() } satisfies Forgot;
   const read = isRepositoryRun(run) ? yield* tried(() => readRunPlace(run, asked, dir)) : undefined;
   if (isRepositoryRun(run) && read && !('inventory' in read))
@@ -115,7 +117,7 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
   yield* (yield* RunDoor).forgetting.write(RunId.read(id), taskIds);
   yield* closeWaitingTasks(e, run, f.views);
   if (!isRepositoryRun(run) || !place) {
-    const files = yield* tried(() => removeKeyed(id, Object.keys(run.steps)));
+    const files = yield* tried(() => removeKeyed(home, id, Object.keys(run.steps)));
     return { ...said, folder: true, kind: 'forgotten', ...nothing(), files, engine: yield* forgetTasks(id, taskIds) } satisfies Forgot;
   }
   const worktrees = yield* tried(() => removeWorktrees(run, steps, dir, place));
@@ -124,7 +126,7 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
     return { ...said, kind: 'held', ...worktrees, branches: [], files: [] } satisfies Forgot;
   }
   const branches = yield* tried(() => deleteBranches(run, how, place, worktrees.handedOff));
-  const files = yield* tried(() => removeKeyed(id, Object.keys(run.steps)));
+  const files = yield* tried(() => removeKeyed(home, id, Object.keys(run.steps)));
   return { ...said, kind: 'forgotten', ...worktrees, branches, files, engine: yield* forgetTasks(id, taskIds) } satisfies Forgot;
 });
 
@@ -134,7 +136,8 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
  * engine's tasks a `nemia rm` cut short or left waiting wrote down (the Run door's `forgetting`) forgotten now (`forgetTasks`).
  */
 const forgetMissing = Effect.fn('forgetMissing')(function* (id: string, dir: string) {
-  const files = yield* tried(() => removeKeyed(id, undefined));
+  const home = yield* StoreRoot;
+  const files = yield* tried(() => removeKeyed(home, id, undefined));
   const { declared } = yield* PlaceService;
   const left: Forgot['left'] = lstatOf(dir) ? [{ path: dir, orphaned: true, fix: declared.say.orphans }] : [];
   const taskIds = yield* (yield* RunDoor).forgetting.read(RunId.read(id));
@@ -206,10 +209,12 @@ const asksStanding = (run: Run, steps: readonly StepSpec[] | undefined): boolean
  * Why `nemia rm` will not forget the run `id`, read (`forgetRefusal`), or null: judged against the store's other runs, where its result
  * stands for an ending that has not run, and a merge the ending staged, as `git` reads them.
  */
-function refusalOf(id: string, f: Forgetting, git: BranchReader, place: Place): string | null {
+function refusalOf(home: string, id: string, f: Forgetting, git: BranchReader, place: Place): string | null {
   const { run, steps } = f;
-  const askAt = (a: AskName) => runsAtOnce.asks.where(id, a);
-  const others = runsAtOnce.runs.list().filter((o) => o.id !== id);
+  const askAt = (a: AskName) => runsAtOnce(home).asks.where(id, a);
+  const others = runsAtOnce(home)
+    .runs.list()
+    .filter((o) => o.id !== id);
   const standings = steps?.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run, steps, git) : [];
   const { phaseOf, reader, asked, verdictOf, asks, rounds, spendOf } = f;
   return forgetRefusal(
@@ -332,24 +337,24 @@ function deleteBranches(run: RepositoryRun, how: ForgetHow, place: RunPlaceRead,
  * logs (`checkLogsOf`, by the steps `names`, or without them any under its id that is no other stored run's), and `worktrees/<id>` once
  * it is empty. Nothing else, and never the engine's, which `forgetTasks` asks the engine to forget.
  */
-function removeKeyed(id: string, names: readonly string[] | undefined): string[] {
-  const removed = runsAtOnce.runs.forget(id);
+function removeKeyed(home: string, id: string, names: readonly string[] | undefined): string[] {
+  const removed = runsAtOnce(home).runs.forget(id);
   const remove = (at: string) => {
     const st = lstatOf(at);
     if (!st) return;
     fs.rmSync(at, { recursive: true, force: true });
-    removed.push(`${path.relative(HOME, at)}${st.isDirectory() ? '/' : ''}`);
+    removed.push(`${path.relative(home, at)}${st.isDirectory() ? '/' : ''}`);
   };
-  const checks = path.join(HOME, 'checks');
+  const checks = path.join(home, 'checks');
   let logs: string[] = [];
   try {
     logs = fs.readdirSync(checks);
   } catch (err) {
     sayLeft(leftWhy(checks, err, ['ENOENT']));
   }
-  const otherIds = names ? [] : runsAtOnce.runs.ids();
+  const otherIds = names ? [] : runsAtOnce(home).runs.ids();
   for (const file of checkLogsOf(id, names, logs, otherIds)) remove(path.join(checks, file));
-  const worktrees = path.join(HOME, 'worktrees', id);
+  const worktrees = path.join(home, 'worktrees', id);
   try {
     fs.rmdirSync(worktrees);
     removed.push(`worktrees/${id}/`);

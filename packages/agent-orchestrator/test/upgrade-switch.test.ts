@@ -19,6 +19,7 @@ import { parse, stringify } from 'yaml';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { teamCopy } from './team.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-upgrade-switch-');
 process.env.WF_ROOT = ROOT;
@@ -130,7 +131,7 @@ function templates(): { team: string; other: string; repo: string } {
 test('a switch onto another template: previewed with no common base, held to its plan, waited on, resolved, merged', async (t) => {
   const s = story(t);
   let dirs = { team: '', other: '', repo: '' };
-  const tree = () => treeDir('crew');
+  const tree = () => treeDir(rootNow(), 'crew');
   let plan = '';
   let conflicts: string[] = [];
   let applied: Record<string, string> = {};
@@ -141,7 +142,7 @@ test('a switch onto another template: previewed with no common base, held to its
     const status = reconciled(factory('crew'));
     assert.deepEqual([status.conditions[0]?.reason, status.template, status.version], ['Rendered', 'team', '0.1.0']);
     assert.ok(fs.existsSync(path.join(tree(), ALMA)), 'the tree holds the agent only team has');
-    applied = bytesUnder(appliedDir('crew'));
+    applied = bytesUnder(appliedDir(rootNow(), 'crew'));
   });
 
   await s.test(
@@ -165,7 +166,7 @@ test('a switch onto another template: previewed with no common base, held to its
       );
       const theirsOf = (at: string) => printed.slice(printed.indexOf(`  ${at}`)).find((line) => line.startsWith('    theirs'));
       assert.equal(theirsOf(ALMA), '    theirs: none', "the agent only the tree holds: the template's side is none");
-      const tree = entriesIn(treeDir('crew')).map((e) => e.path);
+      const tree = entriesIn(treeDir(rootNow(), 'crew')).map((e) => e.path);
       for (const line of cleanIn(printed)) {
         const [at, from] = line.split('  ');
         assert.equal(from, 'from the template', `nothing the tree holds is taken silently: ${line}`);
@@ -194,7 +195,7 @@ test('a switch onto another template: previewed with no common base, held to its
     const before = bytesUnder(tree());
     const waiting = reconciled(factory('crew'));
     assert.deepEqual(bytesUnder(tree()), before, 'the tree is left as it is');
-    assert.deepEqual(bytesUnder(appliedDir('crew')), applied, 'and the base');
+    assert.deepEqual(bytesUnder(appliedDir(rootNow(), 'crew')), applied, 'and the base');
     assert.deepEqual([waiting.version, waiting.template, waiting.conditions[0]?.reason], ['0.1.0', 'team', 'UpgradePending']);
     assert.match(waiting.conditions[0]?.message ?? '', /team.*other.*no common base/);
     assert.deepEqual(
@@ -218,7 +219,7 @@ test('a switch onto another template: previewed with no common base, held to its
             : ['--theirs'];
       await printedBy(t, 'factory', 'resolve', 'crew', at, ...choice);
     }
-    const resolutions = JSON.parse(fs.readFileSync(resolutionsFile('crew'), 'utf8'));
+    const resolutions = JSON.parse(fs.readFileSync(resolutionsFile(rootNow(), 'crew'), 'utf8'));
     assert.deepEqual([resolutions.to, resolutions.template], ['1.0.0', 'other'], 'the choices are for other at 1.0.0');
   });
 
@@ -228,8 +229,8 @@ test('a switch onto another template: previewed with no common base, held to its
     assert.ok(textIn(tree(), ALMA).includes('You are Alma; run npm run md3 before you sign off.'), 'the agent the tree alone held, kept');
     assert.equal(JSON.parse(textIn(tree(), 'factory.json')).hires['dev/implement'], 'reviewer', "the template's hire");
     assert.ok(textIn(tree(), RULES).includes('Never touch the database.\n'), 'the rule written by hand');
-    assert.ok(!fs.existsSync(path.join(appliedDir('crew'), ALMA)), 'the base is the new render, which holds no alma');
-    assert.equal(digestOf(entriesIn(appliedDir('crew'))), merged.digest);
+    assert.ok(!fs.existsSync(path.join(appliedDir(rootNow(), 'crew'), ALMA)), 'the base is the new render, which holds no alma');
+    assert.equal(digestOf(entriesIn(appliedDir(rootNow(), 'crew'))), merged.digest);
   });
 
   await s.test('after it, other at 1.1.0 from another folder of the same name merges three ways: a tree edit kept', async (t) => {
@@ -259,9 +260,9 @@ test('a base whose status names no template is refused a switch until a pass nam
   reconciled(factory('later'));
   const diff = ['factory', 'diff', 'later', '--to', '1.0.0', '--template', dirs.other];
   const unnamed = (change: (status: Record<string, unknown>) => void = () => {}) => {
-    const { template: _named, ...status } = JSON.parse(fs.readFileSync(statusFile('later'), 'utf8'));
+    const { template: _named, ...status } = JSON.parse(fs.readFileSync(statusFile(rootNow(), 'later'), 'utf8'));
     change(status);
-    fs.writeFileSync(statusFile('later'), JSON.stringify(status));
+    fs.writeFileSync(statusFile(rootNow(), 'later'), JSON.stringify(status));
   };
   unnamed();
   const before = bytesUnder(FACTORIES);
@@ -279,7 +280,7 @@ test('a base whose status names no template is refused a switch until a pass nam
   });
   const underWay = await printedBy(t, ...diff);
   assert.equal(underWay[0], 'later: 0.1.0 → 1.0.0', 'an upgrade under way, its base unnamed, is previewed three ways');
-  assert.equal(readStatus('later')?.template, undefined);
+  assert.equal(readStatus(rootNow(), 'later')?.template, undefined);
 });
 
 test('a base unnamed whose template cannot be read is named by no pass, and the refusal says to put the template back', async (t) => {
@@ -287,8 +288,8 @@ test('a base unnamed whose template cannot be read is named by no pass, and the 
   const dirs = templates();
   await stage.main(['factory', 'apply', 'moved', '--template', dirs.team, '--repo', dirs.repo]);
   reconciled(factory('moved'));
-  const { template: _named, ...status } = JSON.parse(fs.readFileSync(statusFile('moved'), 'utf8'));
-  fs.writeFileSync(statusFile('moved'), JSON.stringify(status));
+  const { template: _named, ...status } = JSON.parse(fs.readFileSync(statusFile(rootNow(), 'moved'), 'utf8'));
+  fs.writeFileSync(statusFile(rootNow(), 'moved'), JSON.stringify(status));
   const aside = path.join(scratch('wf-upgrade-switch-aside-'), 'team');
   fs.renameSync(dirs.team, aside);
   const gone = reconciled(factory('moved'));
@@ -312,8 +313,8 @@ test('a factory whose template changed under its version is named after that tem
   await stage.main(['factory', 'apply', 'kit', '--template', dirs.team, '--repo', dirs.repo]);
   reconciled(factory('kit'));
   rewrite(dirs.team, RULES, 'Never push.', 'Never push to main.');
-  const { template: _named, ...status } = JSON.parse(fs.readFileSync(statusFile('kit'), 'utf8'));
-  fs.writeFileSync(statusFile('kit'), JSON.stringify(status));
+  const { template: _named, ...status } = JSON.parse(fs.readFileSync(statusFile(rootNow(), 'kit'), 'utf8'));
+  fs.writeFileSync(statusFile(rootNow(), 'kit'), JSON.stringify(status));
   const changed = reconciled(factory('kit'));
   assert.deepEqual([changed.conditions[0]?.reason, changed.template], ['ContentChanged', 'team']);
   const before = bytesUnder(FACTORIES);

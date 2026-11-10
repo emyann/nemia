@@ -16,6 +16,7 @@ import { scratch } from 'test-kit/scratch';
 import { isRepositoryRun } from '../src/run.ts';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-after-elsewhere-');
 const WORKFLOW = path.join(ROOT, 'workflow');
@@ -221,8 +222,8 @@ const aParent = async (
   }: { work?: string; signed?: boolean; workflowDir?: string; brief?: string } = {},
 ) => {
   const run = repositoryRunOf(await runPlaced(startRun({ brief, repo, workflowDir: workflowDir ?? oneStep() })));
-  await runWith(b.e, advanceRun(runRecord(run.id)));
-  const wt = runRecord(run.id).steps.implement.workspace!;
+  await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
+  const wt = runRecord(rootNow(), run.id).steps.implement.workspace!;
   if (work) {
     fs.writeFileSync(path.join(wt, work), `${work}\n`);
     gitIn(wt, 'add', '-A');
@@ -241,7 +242,7 @@ test("REFUSED at `nemia start`, before a run is written: --after an unknown run,
   const p = await aParent(repo, b, { work: 'parent.txt' });
   const other = await aParent(aRepo(), b, { work: 'other.txt' });
   const called = await aParent(repo, b, { work: 'called.txt' });
-  markCancelled(called.run.id);
+  markCancelled(rootNow(), called.run.id);
   const direct = await runPlaced(startRun({ brief: 'the direct parent', repo, workflowDir: oneStep(), isolate: false }));
   const before = runsWritten();
   const starting =
@@ -301,7 +302,7 @@ test("REFUSED at `nemia start`, before a run is written: --after an unknown run,
   const second = await aParent(repo, b, { work: 'second.txt' });
   await typed('--after', p.run.id, `--after=${second.run.id}`);
   const id = printed[0].split(' ')[0];
-  assert.deepEqual(runRecord(id).after, [p.run.id, second.run.id], '--after is allowed as often as there are runs to wait on');
+  assert.deepEqual(runRecord(rootNow(), id).after, [p.run.id, second.run.id], '--after is allowed as often as there are runs to wait on');
   assert.match(
     printed.join('\n'),
     new RegExp(

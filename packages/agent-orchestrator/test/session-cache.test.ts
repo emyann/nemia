@@ -28,6 +28,7 @@ import { TEAM } from './team.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-cache-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -131,7 +132,7 @@ async function walk(
     id === `${run.id}-${step}` ? 1 : Number(new RegExp(`^${run.id}-${step}-try(\\d+)$`).exec(id)?.[1] ?? NaN);
 
   for (let pass = 0; pass < 60; pass++) {
-    const p = await runWith(b.e, advanceRun(runRecord(run.id)));
+    const p = await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
     const pending = [...b.tasks.entries()].filter(([, t]) => t.phase === 'pending');
     if (!pending.length && !p.looped.length && !p.tried.length) break;
     for (const [id, t] of pending) {
@@ -353,7 +354,7 @@ for (const name of LOOPED) {
     const first = `${run.id}-${target}`;
     const nudge = `${first}-try2`;
     for (let pass = 0; pass < 20 && !b.tasks.has(nudge); pass++) {
-      await runWith(b.e, advanceRun(runRecord(run.id)));
+      await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
       for (const [id, t] of b.tasks) {
         if (t.phase !== 'pending' || id === nudge) continue;
         order.push(id);
@@ -375,6 +376,6 @@ for (const name of LOOPED) {
     const filed = [...order, nudge].map((id) => b.tasks.get(id)!.spec);
     assert.equal(b.tasks.get(nudge)!.spec.resumeFrom, `native-${first}`, 'the same session, continued');
     assert.deepEqual(chainDifferences(filed), []);
-    assert.equal(runRecord(run.id).steps[target]?.tries?.at(-1)?.cause, 'signoff');
+    assert.equal(runRecord(rootNow(), run.id).steps[target]?.tries?.at(-1)?.cause, 'signoff');
   });
 }

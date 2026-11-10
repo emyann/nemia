@@ -14,6 +14,7 @@ import { scratch } from 'test-kit/scratch';
 import { teamCopy } from './team.ts';
 import { names } from './assessed.ts';
 import { staged, story } from './story.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-agent-session-');
 process.env.WF_ROOT = ROOT;
@@ -75,14 +76,14 @@ function customFor(agent: string, text: string): void {
 
 /** The run `id`'s pass on the stage's engine, and the spec each task it filed was filed with, by its step. */
 async function tick(id: string): Promise<{ filed: string[]; spec: (step: string) => ReturnType<typeof specOf> }> {
-  const { filed } = await stage.runWith(stage.board().e, advanceRun(runRecord(id)));
+  const { filed } = await stage.runWith(stage.board().e, advanceRun(runRecord(rootNow(), id)));
   return { filed, spec: (step) => specOf(`${id}-${step}`) };
 }
 const specOf = (id: string) => stage.board().specs.find((s) => s.id === id) ?? assert.fail(`${id} was never filed`);
 
 /** The run `id`'s step `name` as its start froze it. */
 const frozen = (id: string, name: string) =>
-  (runRecord(id).workflow ?? []).find((s) => s.name === name) ?? assert.fail(`${name} not frozen`);
+  (runRecord(rootNow(), id).workflow ?? []).find((s) => s.name === name) ?? assert.fail(`${name} not frozen`);
 
 test('hire an agent and render its session: frozen at the start, rendered for Claude Code, filed with its flags, an edit reaching only a later run', async (t) => {
   const s = story(t);
@@ -149,7 +150,7 @@ test('hire an agent and render its session: frozen at the start, rendered for Cl
   await s.test(
     "Claude Code's prompt is rendered under runs/<id>/agents/<step>/: instructions, custom instructions, skills by name, a preload whole",
     () => {
-      at = agentFilesDir(runRecord(id), 'write');
+      at = agentFilesDir(rootNow(), runRecord(rootNow(), id), 'write');
       prompt = fs.readFileSync(path.join(at, 'prompt.md'), 'utf8');
       assert.equal(
         prompt,
@@ -169,7 +170,7 @@ test('hire an agent and render its session: frozen at the start, rendered for Cl
     assert.ok(fs.existsSync(path.join(at, 'nemia-scribe', 'skills', 'mind-the-tone', 'SKILL.md')), "the repository's skill, copied");
     assert.equal(JSON.parse(fs.readFileSync(path.join(at, 'nemia-scribe', '.claude-plugin', 'plugin.json'), 'utf8')).name, 'nemia-scribe');
     assert.equal(fs.readFileSync(path.join(at, 'nemia-scribe', 'output-styles', 'no-coding.md'), 'utf8'), noCodingStyle('scribe'));
-    assert.equal(fs.existsSync(agentFilesDir(runRecord(id), 'code')), false);
+    assert.equal(fs.existsSync(agentFilesDir(rootNow(), runRecord(rootNow(), id), 'code')), false);
   });
 
   await s.test(
@@ -225,9 +226,9 @@ test('hire an agent and render its session: frozen at the start, rendered for Cl
     const later = await stage.runPlaced(startRun({ brief: 'the later words', repo: HERE, workflowDir: dir }));
     const write = frozen(later.id, 'write');
     assert.deepEqual([write.agent?.instructions, write.agent?.customInstructions], ['Something else.', 'After: German.']);
-    assert.ok(fs.readFileSync(path.join(agentFilesDir(later, 'write'), 'prompt.md'), 'utf8').includes('After: German.'));
+    assert.ok(fs.readFileSync(path.join(agentFilesDir(rootNow(), later, 'write'), 'prompt.md'), 'utf8').includes('After: German.'));
     assert.match(
-      fs.readFileSync(path.join(agentFilesDir(later, 'write'), 'nemia-scribe', 'skills', 'write-a-note', 'SKILL.md'), 'utf8'),
+      fs.readFileSync(path.join(agentFilesDir(rootNow(), later, 'write'), 'nemia-scribe', 'skills', 'write-a-note', 'SKILL.md'), 'utf8'),
       /Edited later/,
     );
     fs.rmSync(CUSTOM, { recursive: true });
@@ -246,7 +247,7 @@ test('a step whose rendered folder is gone is told its layers and its skills who
     async () => {
       const dir = storeTeam('lost', { write: `---\nagent: scribe\n${FOLDER}---\nWrite about tides.\n` });
       const run = await stage.runPlaced(startRun({ brief: 'a note on tides', repo: HERE, workflowDir: dir }));
-      fs.rmSync(agentFilesDir(run, 'write'), { recursive: true });
+      fs.rmSync(agentFilesDir(rootNow(), run, 'write'), { recursive: true });
       const write = (await tick(run.id)).spec('write');
       assert.equal(write.config?.claude, undefined);
       assert.ok(
@@ -279,7 +280,7 @@ test('a step whose rendered folder is gone is told its layers and its skills who
         plain: `---\nagent: plain\n${FOLDER}---\nWrite plainly.\n`,
       });
       const run = await stage.runPlaced(startRun({ brief: 'a note on tides', repo: HERE, workflowDir: dir }));
-      const at = agentFilesDir(run, 'write');
+      const at = agentFilesDir(rootNow(), run, 'write');
       fs.renameSync(path.join(at, pluginOf('scribe')), path.join(at, 'before-scribe'));
       const { spec } = await tick(run.id);
       const write = spec('write');
@@ -291,8 +292,8 @@ test('a step whose rendered folder is gone is told its layers and its skills who
       assert.match(write.brief, /\n## Skill `write-a-note`\n\nHow to write a note\./);
       assert.deepEqual(write.config?.enabledSkills, [], 'given no skill to load: none is there');
       const plain = spec('plain');
-      assert.deepEqual(plain.config?.claude, { appendSystemPromptFile: path.join(agentFilesDir(run, 'plain'), 'prompt.md') });
-      assert.equal(fs.readdirSync(agentFilesDir(run, 'plain')).join(), 'prompt.md', 'its folder holds no plugin');
+      assert.deepEqual(plain.config?.claude, { appendSystemPromptFile: path.join(agentFilesDir(rootNow(), run, 'plain'), 'prompt.md') });
+      assert.equal(fs.readdirSync(agentFilesDir(rootNow(), run, 'plain')).join(), 'prompt.md', 'its folder holds no plugin');
       assert.deepEqual(plain.config?.enabledSkills, [], 'a step that names no skill is given none');
     },
   );
@@ -305,7 +306,7 @@ test('a step whose rendered folder is gone is told its layers and its skills who
     stage.place().world.repository(repo, { '.claude/skills/mind-the-tone/SKILL.md': tone });
     const dir = storeTeam('lost-git', { write: '---\nplace: git\nagent: scribe\n---\nWrite about tides.\n' });
     const run = await stage.runPlaced(startRun({ brief: 'a note on tides', repo, workflowDir: dir, isolate: false }));
-    fs.rmSync(agentFilesDir(run, 'write'), { recursive: true });
+    fs.rmSync(agentFilesDir(rootNow(), run, 'write'), { recursive: true });
     const write = (await tick(run.id)).spec('write');
     assert.equal(write.config?.claude, undefined);
     assert.match(write.brief, /\n## Skill `mind-the-tone`\n\nIn this repository, how to mind the tone\.\n/);
@@ -326,7 +327,7 @@ test('a step whose rendered folder is gone is told its layers and its skills who
     const dir = storeTeam('lost-nested', { write: '---\nplace: git\nagent: scribe\nskills: app:y\n---\nWrite about tides.\n' });
     const told = async (gone?: () => void): Promise<string> => {
       const run = await stage.runPlaced(startRun({ brief: 'a note on tides', repo, workflowDir: dir, isolate: false }));
-      fs.rmSync(agentFilesDir(run, 'write'), { recursive: true });
+      fs.rmSync(agentFilesDir(rootNow(), run, 'write'), { recursive: true });
       gone?.();
       return (await tick(run.id)).spec('write').brief;
     };

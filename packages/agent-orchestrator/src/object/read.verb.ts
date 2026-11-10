@@ -135,18 +135,18 @@ export const raiseReads = (run: Run, views: Views, steps: readonly StepSpec[]): 
 });
 
 /** The step `name`'s current try as judged: its codes and word, its check, its closeout or why it does not read, and its attempts. */
-export const currentOf = ({ run, source, steps, views, judged, checks, releases }: StepsReading, name: string) => {
+export const currentOf = (home: string, { run, source, steps, views, judged, checks, releases }: StepsReading, name: string) => {
   const taskId = run.steps[name]?.taskId ?? null;
   const step = source?.find((s) => s.name === name);
   return {
     ...stepSaid(judged, name),
     check: checks.get(name) ?? null,
-    closeout: closeoutIn(run, name, step ?? bare(name), taskId, views, steps),
+    closeout: closeoutIn(home, run, name, step ?? bare(name), taskId, views, steps),
     unreadable: unreadableIn(taskId, views),
     attempts: attemptsIn(taskId, views, releases),
   };
 };
 
 /** The step `name`'s tries, earliest first, the current one last (`triesOf`), with its current try as judged (`currentOf`). */
-export const triesIn = (at: StepsReading, name: string, current = currentOf(at, name)): StepTry[] =>
-  triesOf(at.run, name, at.steps, at.views, current, at.judged.answers, at.stderr, at.releases);
+export const triesIn = (home: string, at: StepsReading, name: string, current = currentOf(home, at, name)): StepTry[] =>
+  triesOf(home, at.run, name, at.steps, at.views, current, at.judged.answers, at.stderr, at.releases);

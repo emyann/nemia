@@ -18,6 +18,7 @@ import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
 import { names } from '../../test/assessed.ts';
+import { rootNow } from '../../test/config-given.ts';
 
 const ROOT = scratch('wf-instruction-');
 const FACTORIES = path.join(ROOT, 'factories');
@@ -115,7 +116,7 @@ test('REFUSED: `nemia factory instruct`, nothing written', async (t) => {
   );
   await t.test('blank words', () => {
     filed({ instruction: { store: true } });
-    assert.throws(() => writeInstructionText('pipao', ' \n'), refused('Invalid', 'pipao'));
+    assert.throws(() => writeInstructionText(rootNow(), 'pipao', ' \n'), refused('Invalid', 'pipao'));
     assert.ok(!fs.existsSync(path.join(storeFolder('pipao'), 'NEMIA.md')));
   });
 });
@@ -146,7 +147,7 @@ test('a rules or instruction file that cannot be told is read with why, and neve
     const linked = readRules(RULES);
     assert.equal(linked.words, null);
     names(linked.error, 'RULES.md', 'link');
-    writeRules({ name: 'pipao' }, 'Our own words.');
+    writeRules(rootNow(), { name: 'pipao' }, 'Our own words.');
     assert.equal(fs.lstatSync(RULES).isSymbolicLink(), false);
     assert.equal(fs.readFileSync(outside, 'utf8'), 'Words from elsewhere.\n', 'never written through');
     assert.deepEqual(readRules(RULES), { words: 'Our own words.', error: null });
@@ -155,7 +156,7 @@ test('a rules or instruction file that cannot be told is read with why, and neve
     filed();
     fs.mkdirSync(RULES, { recursive: true });
     names(readRules(RULES).error, 'RULES.md', 'not a file');
-    assert.equal(clearRules({ name: 'pipao' }), true);
+    assert.equal(clearRules(rootNow(), { name: 'pipao' }), true);
     assert.equal(fs.existsSync(RULES), false);
   });
   await t.test('instruction in the store: a link is read with why, and a write replaces it without touching what it pointed at', () => {
@@ -163,7 +164,7 @@ test('a rules or instruction file that cannot be told is read with why, and neve
     fs.mkdirSync(storeFolder('pipao'), { recursive: true });
     fs.symlinkSync(outside, path.join(storeFolder('pipao'), 'NEMIA.md'));
     names(factoryInstruction(ROOT, 'pipao').error, 'link');
-    writeInstructionText('pipao', 'mine');
+    writeInstructionText(rootNow(), 'pipao', 'mine');
     assert.equal(fs.readFileSync(outside, 'utf8'), 'Words from elsewhere.\n');
     assert.ok(!fs.lstatSync(path.join(storeFolder('pipao'), 'NEMIA.md')).isSymbolicLink());
   });

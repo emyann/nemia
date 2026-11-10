@@ -145,18 +145,19 @@ const EXPORT_SPEC: Spec = {
 type Exported = { dir: string; from: ReadonlyArray<{ part: string; from: string }> };
 
 /** The instruction of `factory`, read where it keeps it, with the file it is read from. */
-export function instructionOf(factory: Factory): { words: string | null; error: string | null; file: string } {
-  const at = instructionAt(factory, instructionFile(factory.name));
+export function instructionOf(home: string, factory: Factory): { words: string | null; error: string | null; file: string } {
+  const at = instructionAt(factory, instructionFile(home, factory.name));
   return { ...readInstructionAt(at), file: at.file };
 }
 
 /** The factory `name`'s parts an export holds, read through the Factory door: the factory, its file, its instruction and its rules. */
 const factoryParts = Effect.fn('factoryParts')(function* (name: string) {
+  const home = yield* StoreRoot;
   const door = yield* FactoryDoor;
   const factory = yield* filedFactory(name, 'rules');
   const rules = yield* door.rules.read(FactoryName.read(name));
   const file = path.join(factoriesDirAt(yield* StoreRoot), `${name}.json`);
-  return { factory, file, instruction: instructionOf(factory), rules } satisfies FactoryParts;
+  return { factory, file, instruction: instructionOf(home, factory), rules } satisfies FactoryParts;
 });
 
 /**
@@ -164,7 +165,8 @@ const factoryParts = Effect.fn('factoryParts')(function* (name: string) {
  * (`lookupsOf`): each folder of agents' names, each read or the refusal of it (a name the door refuses among them), and the skills found.
  */
 const exportFound = Effect.fnUntraced(function* (from: string) {
-  const { workflowDir, places, agentDirs } = lookupsOf(from);
+  const home = yield* StoreRoot;
+  const { workflowDir, places, agentDirs } = lookupsOf(home, from);
   const { agents } = yield* AgentDoor;
   const found: Array<ExportFound['agents'][number]> = [];
   for (const dir of agentDirs) {

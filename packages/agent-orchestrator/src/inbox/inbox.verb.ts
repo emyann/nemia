@@ -47,6 +47,7 @@ import { placesOf } from '../folder/lookup.store.ts';
 import { factoryOrNone } from '../factory/door/factories.store.ts';
 import { defaultStartRefusal, factoryRepo } from '../factory/factory.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /** How to start an inbox card (`startFromInbox`): the card, and what its start says over it or beside it. */
 export type InboxStart = {
@@ -103,6 +104,7 @@ export type InboxStarted = { run: StartedRun; card: InboxCard; ignoredRepo?: str
  * and none from either, naming the repository's.
  */
 function cardWorkflow(
+  home: string,
   opts: Pick<InboxStart, 'workflow' | 'from'>,
   card: InboxCard,
   file: string,
@@ -112,7 +114,7 @@ function cardWorkflow(
   if (opts.workflow !== undefined) return workflowFolder(opts.workflow, opts.from ?? process.cwd(), repo, tree);
   if (card.workflow === undefined) throw new WorkflowError(noWorkflowRefusal(card, file, repo, workflowsIn(path.join(repo, 'workflows'))));
   try {
-    return workflowFolder(card.workflow, inboxDir(), repo, tree);
+    return workflowFolder(card.workflow, inboxDir(home), repo, tree);
   } catch (err) {
     throw new WorkflowError(`${card.file}: \`workflow: ${card.workflow}\` — ${(err as Error).message}`);
   }
@@ -160,6 +162,7 @@ const cardFactory = Effect.fn('cardFactory')(function* (
  * the workflow or does not work on the repository.
  */
 export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: InboxStart) {
+  const home = yield* StoreRoot;
   const refused = inboxNameRefusal(opts.name);
   if (refused) return yield* Effect.fail(new WorkflowError(refused));
   const door = yield* CardDoor;
@@ -181,7 +184,7 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
   const factory = yield* cardFactory(opts, card.factory, file);
   const filed = yield* factoryOrNone(factory);
   const repo = factoryRepo(filed, opts.repo ?? card.repo, opts.callerRepo);
-  const workflowDir = cardWorkflow(opts, card, file, repo, filed?.tree);
+  const workflowDir = cardWorkflow(home, opts, card, file, repo, filed?.tree);
   if (opts.brief !== undefined && !opts.brief.trim()) {
     throw new WorkflowError(
       `${card.file}: the brief given in place of the card's body is empty. Give what the run is asked to do, or leave it out, and the run is asked what the card says.`,
@@ -235,8 +238,9 @@ const takeQueueOff = (name: CardName, file: string): Effect.Effect<string | unde
  * its workflow's steps read through the Workflow door the program is given.
  */
 const cardGates = Effect.fn('cardGates')(function* (card: InboxCard, flags: readonly string[], workflowDir: WorkflowDir, repo: string) {
+  const home = yield* StoreRoot;
   if (card.gate !== undefined) {
-    const steps = yield* (yield* WorkflowDoor).workflows.read(workflowDir, placesOf(repo));
+    const steps = yield* (yield* WorkflowDoor).workflows.read(workflowDir, placesOf(home, repo));
     const refusedGate = gateRefusal([card.gate], steps, (step) => `${card.file}: \`gate: ${step}\``);
     if (refusedGate) return yield* Effect.fail(new WorkflowError(`${refusedGate} Correct the line, or delete it.`));
   }

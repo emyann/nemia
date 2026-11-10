@@ -191,7 +191,7 @@ const prunedOf = (run: Run): RunStatus['pruned'] =>
 
 /** What of a run `nemia prune` would find on disk: two stats, and no git. */
 function onDiskOf(run: Run, home: string): RunStatus['onDisk'] {
-  const files = path.dirname(artifactsDir(run, '_'));
+  const files = path.dirname(artifactsDir(home, run, '_'));
   return { worktrees: isRepositoryRun(run) && fs.existsSync(path.join(home, 'worktrees', run.id)), files: fs.existsSync(files) };
 }
 
@@ -244,11 +244,12 @@ const asksOf = (judged: RunReading['judged'], name: string): Pick<RunStepStatus,
  * One more observation for a blocked session's last line (`lastLineOf`).
  */
 const stepStatusOf = Effect.fnUntraced(function* (name: string, at: StepAt) {
+  const home = yield* StoreRoot;
   const { e, run, steps, views, judged, used, clock, said: memoSaid, listed } = at;
   const taskId = run.steps[name]?.taskId ?? null;
   const judgedContext = steps.find((s) => s.name === name)?.context;
-  const current = currentOf(at, name);
-  const tries = triesIn(at, name, current);
+  const current = currentOf(home, at, name);
+  const tries = triesIn(home, at, name, current);
   const latest = tries.find((t) => t.current);
   const lastLine = !listed && atHarness(current) ? yield* Effect.promise(() => lastLineOf(e, views, taskId, memoSaid)) : null;
   const status: RunStepStatus = {
@@ -464,14 +465,16 @@ const tryIn = (runId: string, step: string, tries: readonly StepTry[], asked: st
 
 /** A step's tries, earliest first, the current one last (`StepTries`). */
 export const stepTries = Effect.fn('stepTries')(function* (runId: string, step: string) {
+  const home = yield* StoreRoot;
   const at = yield* stepRead(runId, step);
-  return { tries: triesIn(at, step) };
+  return { tries: triesIn(home, at, step) };
 });
 
 /** One try of a step (`StepTry`): `asked`, or its latest. */
 export const stepTry = Effect.fn('stepTry')(function* (runId: string, step: string, asked?: string) {
+  const home = yield* StoreRoot;
   const at = yield* stepRead(runId, step);
-  return yield* tryIn(runId, step, triesIn(at, step), asked);
+  return yield* tryIn(runId, step, triesIn(home, at, step), asked);
 });
 
 export type { TryCloseout };

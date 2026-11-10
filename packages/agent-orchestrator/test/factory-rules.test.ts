@@ -22,6 +22,7 @@ import { scratch } from 'test-kit/scratch';
 import { teamCopy } from './team.ts';
 import { names } from './assessed.ts';
 import { staged, story } from './story.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-factory-rules-');
 process.env.WF_ROOT = ROOT;
@@ -74,11 +75,11 @@ const started = (here: { repo: string; dev: string }, brief: string, factory?: s
   runPlaced(startRun({ brief, repo: here.repo, workflowDir: here.dev, ...(factory !== undefined && { factory }) }));
 
 /** The steps a run froze at its start. */
-const frozen = (id: string): StepSpec[] => runRecord(id).workflow ?? [];
+const frozen = (id: string): StepSpec[] => runRecord(rootNow(), id).workflow ?? [];
 
 /** The prompt rendered for a step of a run at its start. */
-const promptOf = (run: Parameters<typeof agentFilesDir>[0], step: string): string =>
-  fs.readFileSync(path.join(agentFilesDir(run, step), 'prompt.md'), 'utf8');
+const promptOf = (run: Parameters<typeof agentFilesDir>[1], step: string): string =>
+  fs.readFileSync(path.join(agentFilesDir(rootNow(), run, step), 'prompt.md'), 'utf8');
 
 /** The runs written under the store. */
 const runsWritten = (): string[] => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')) : []);
@@ -115,7 +116,7 @@ test("a factory's rules and its instruction, from none to cleared: told as their
   let told = none;
 
   await s.test('a factory with no rules reads none, and a run started in it is told none: no key on a step', async () => {
-    assert.equal(rulesAt({ name: 'pipao' }), FILE);
+    assert.equal(rulesAt(rootNow(), { name: 'pipao' }), FILE);
     assert.deepEqual(readRules(FILE), { words: null, error: null }, 'no file: no rules, and nothing wrong');
     const read = await rulesOf({ factory: 'pipao' });
     assert.deepEqual(read, { name: 'pipao', file: FILE, words: null, error: null });
@@ -159,7 +160,7 @@ test("a factory's rules and its instruction, from none to cleared: told as their
   });
 
   await s.test('an edit, then a clear, after the start reach no step of the run started', async () => {
-    writeRules({ name: 'pipao' }, 'After: push whenever.');
+    writeRules(rootNow(), { name: 'pipao' }, 'After: push whenever.');
     for (const when of ['after an edit', 'after a removal']) {
       for (const step of frozen(told.id)) {
         assert.equal(step.agent?.factoryRules, 'Before: never push on a Friday.', `${step.name}, ${when}`);
@@ -177,7 +178,7 @@ test("a factory's rules and its instruction, from none to cleared: told as their
   });
 
   await s.test('a run started after them is told the rules written since', async () => {
-    writeRules({ name: 'pipao' }, 'After: push whenever.');
+    writeRules(rootNow(), { name: 'pipao' }, 'After: push whenever.');
     const later = await started(here, 'the later rules', 'pipao');
     for (const step of frozen(later.id)) assert.equal(step.agent?.factoryRules, 'After: push whenever.', step.name);
     assert.ok(promptOf(later, 'implement').includes('After: push whenever.'));
@@ -202,9 +203,9 @@ test("a factory's rules and its instruction, from none to cleared: told as their
         const args = { from: 'yours', name: 'dev', step: 'implement', dir: here.dev, factory: 'pipao' };
         return (await stage.runWith(stage.board().e, WORKFLOWS_STEP.handler(args))).step!;
       };
-      clearRules({ name: 'pipao' });
+      clearRules(rootNow(), { name: 'pipao' });
       assert.equal((await step()).agent?.factoryRules, undefined);
-      writeRules({ name: 'pipao' }, RULES);
+      writeRules(rootNow(), { name: 'pipao' }, RULES);
       const loaded = await step();
       assert.equal(loaded.agent?.factoryRules, RULES);
       assert.ok(at(loaded.body, 'Make the change you were asked for') < at(loaded.body, RULES), loaded.body);
@@ -220,7 +221,7 @@ test("a factory's rules and its instruction, from none to cleared: told as their
     const read = await rulesOf({ factory: 'pipao' });
     names(read.error, 'frontmatter');
     assert.match(FACTORY_RULES.print(read, { factory: 'pipao' })[1], /^they cannot be told: /);
-    assert.equal(clearRules({ name: 'pipao' }), true);
+    assert.equal(clearRules(rootNow(), { name: 'pipao' }), true);
   });
 
   await s.test(

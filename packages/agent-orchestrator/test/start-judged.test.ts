@@ -20,6 +20,7 @@ import { Effect, Layer } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { names } from './assessed.ts';
 import { staged, story } from './story.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = path.join(scratch('wf-start-judged-'), 'First (Last)');
 fs.mkdirSync(ROOT);
@@ -37,7 +38,7 @@ const { anAgent } = await import('./agent-walks.ts');
 const { loadWorkflows } = await import('../src/workflows/workflows.store.ts');
 const { configRefusal, engineOf } = await import('../src/runtime-client.ts');
 const { main } = await import('../src/cli/main.ts');
-const { filesStore: runStore } = await import('../src/record/files.store.ts');
+const runStore = (await import('../src/record/files.store.ts')).filesStoreAt(rootNow());
 const stage = staged({ runWith, main, engineOf });
 type ConfigRefused = import('../src/start/start.verb.ts').ConfigRefused;
 type Workflow = import('../src/step/step.ts').StepSpec;
@@ -205,14 +206,14 @@ test("configRefused: the runtime asked of each local step's first filing, refuse
 
   await t.test("REFUSED: a step's value its harness refuses, named by the line it comes from and the field it is filed as", () => {
     names(
-      configRefused(over('implement', { effort: 'ultra' }), PLACES, [], DENIED),
+      configRefused(rootNow(), over('implement', { effort: 'ultra' }), PLACES, [], DENIED),
       'implement: `effort: ultra` (filed as `effort`): ',
       configRefusal('claude', { effort: 'ultra' })!,
     );
   });
 
   await t.test('REFUSED: an ending on a harness that cannot be denied the commit it lands, named by the step alone', () => {
-    const why = configRefused(over('ship', { harness: 'codex' }), PLACES, [], DENIED);
+    const why = configRefused(rootNow(), over('ship', { harness: 'codex' }), PLACES, [], DENIED);
     names(why, `ship: ${configRefusal('codex', { disallowedTools: [...DENIED] })}`);
   });
 
@@ -221,19 +222,26 @@ test("configRefused: the runtime asked of each local step's first filing, refuse
     () => {
       const ungated = over('ship', { harness: 'codex', gate: undefined });
       assert.match(
-        configRefused(ungated, PLACES, [], DENIED)!,
+        configRefused(rootNow(), ungated, PLACES, [], DENIED)!,
         /^ship: .*is a deny list/,
         'an ungated ending lands on its check all the same',
       );
-      assert.match(configRefused(ungated, PLACES, ['ship'], DENIED)!, /^ship: .*is a deny list/, 'a gate given at start changes nothing');
-      assert.equal(configRefused(over('ship', { harness: 'codex', gate: undefined, check: undefined }), PLACES, [], DENIED), undefined);
+      assert.match(
+        configRefused(rootNow(), ungated, PLACES, ['ship'], DENIED)!,
+        /^ship: .*is a deny list/,
+        'a gate given at start changes nothing',
+      );
+      assert.equal(
+        configRefused(rootNow(), over('ship', { harness: 'codex', gate: undefined, check: undefined }), PLACES, [], DENIED),
+        undefined,
+      );
     },
   );
 
   await t.test('a step on a remote agent is asked nothing, and a folder whose every step its harness takes is no refusal', () => {
     const [implement] = loadWorkflows(lone('taken', 'effort: high'), PLACES);
-    assert.equal(configRefused([implement], PLACES, [], DENIED), undefined);
-    assert.equal(configRefused([{ ...implement, harness: 'a2a:reviewer', effort: 'ultra' }], PLACES, [], DENIED), undefined);
+    assert.equal(configRefused(rootNow(), [implement], PLACES, [], DENIED), undefined);
+    assert.equal(configRefused(rootNow(), [{ ...implement, harness: 'a2a:reviewer', effort: 'ultra' }], PLACES, [], DENIED), undefined);
   });
 
   await t.test('stepsToStart asks the same of a folder it lets through, the gates beside the workflow', () => {
@@ -247,7 +255,7 @@ test("configRefused: the runtime asked of each local step's first filing, refuse
           DENIED,
           undefined,
           ['implement'],
-          (_s, _p, gates) => void asked.push(gates),
+          (_h, _s, _p, gates) => void asked.push(gates),
         ),
         StoreRoot,
         ROOT,
@@ -282,7 +290,7 @@ test("REFUSED at nemia start, before a run is written: a step's first filing its
     const asked: (readonly string[])[] = [];
     started(lone('gates-asked', 'effort: high'), {
       gates: ['implement'],
-      refused: (_steps: unknown, _places: unknown, gates: readonly string[]) => void asked.push(gates),
+      refused: (_home: unknown, _steps: unknown, _places: unknown, gates: readonly string[]) => void asked.push(gates),
     });
     assert.deepEqual(asked, [['implement']]);
   });
@@ -295,10 +303,10 @@ test("REFUSED at nemia start, before a run is written: a step's first filing its
     fs.mkdirSync(path.join(ROOT, 'factories'), { recursive: true });
     const file = { repos: [repo], workflows: ['settings-asked'], harnessSettings };
     fs.writeFileSync(path.join(ROOT, 'factories', 'settled.json'), JSON.stringify(file));
-    started(dir, { repo, factory: 'settled', refused: (...args: unknown[]) => void asked.push(args[5]) });
+    started(dir, { repo, factory: 'settled', refused: (...args: unknown[]) => void asked.push(args[6]) });
     assert.deepEqual(asked, [harnessSettings]);
     const steps = loadWorkflows(dir, PLACES);
-    assert.equal(configRefused(steps, PLACES, [], [], {}, harnessSettings), undefined, 'and the runtime takes that filing');
+    assert.equal(configRefused(rootNow(), steps, PLACES, [], [], {}, harnessSettings), undefined, 'and the runtime takes that filing');
   });
 
   await t.test(
@@ -408,7 +416,7 @@ test("REFUSED at nemia start: a store whose path holds a `(`, which no permissio
       }).pipe(Effect.provide(Layer.mergeAll(stage.place().layer, agentDoorMemory())), Effect.provideService(StoreRoot, ROOT)),
     );
     assert.equal(fs.existsSync(path.join(at.dir, 'scribe.md')), false, 'the agent is on no disk');
-    const prompt = fs.readFileSync(path.join(agentFilesDir(run, 'implement'), 'prompt.md'), 'utf8');
+    const prompt = fs.readFileSync(path.join(agentFilesDir(rootNow(), run, 'implement'), 'prompt.md'), 'utf8');
     assert.ok(prompt.includes('Write the notes, scribe.'), 'its instructions are rendered from the memory');
     assert.deepEqual(run.pinned?.find((p) => p.kind === 'agent')?.hash, version, "its pin carries the Agent door's version of it");
   });

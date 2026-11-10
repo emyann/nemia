@@ -189,8 +189,8 @@ test('an action on its endpoint answers what its `nemia` entry answers: the same
       const answered = (await res.json()) as { try: number; at: string; message: string; file: string };
       assert.deepEqual(Object.keys(answered).sort(), ['at', 'file', 'message', 'step', 'try']);
       assert.equal(answered.try, typed.try);
-      assert.equal(answered.file, approvalFile('r-api-gate', 'plan', 1));
-      assert.equal(typed.file, approvalFile('r-cli-gate', 'plan', 1));
+      assert.equal(answered.file, approvalFile(root, 'r-api-gate', 'plan', 1));
+      assert.equal(typed.file, approvalFile(root, 'r-cli-gate', 'plan', 1));
       assert.deepEqual(written(answered.file), written(String(typed.file)));
       assert.deepEqual(asked('r-api-gate'), asked('r-cli-gate'));
     },

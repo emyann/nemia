@@ -217,7 +217,7 @@ holdOn(CANCELLED, ['p-live']);
 const AFTER = 'h-after';
 writeRun(AFTER, [implement], { implement: { taskId: null } }, { after: ['p-live'] });
 holdOn(AFTER, ['p-landed', 'p-live']);
-await runWith(engine(process.env), passStanding(runStore.runs.list()));
+await runWith(engine(process.env), passStanding(runStore(root).runs.list()));
 
 /** What the board sends, through vite's proxy: JSON, same-origin, and Host rewritten to the api's. */
 const BOARD = {
@@ -278,7 +278,7 @@ test('a person holds a run until another lands: the list, the page and the decis
       const e = engine(process.env);
       for (const id of HELD) {
         const api = runs.get(id)!;
-        const run = runStore.runs.read(id);
+        const run = runStore(root).runs.read(id);
         const cli = await runWith(e, list(e, run));
         assert.deepEqual(api.holdUntil, run.hold!.until, id);
         assert.ok(api.holding, id);
@@ -488,7 +488,7 @@ test('a person holds a run until another lands: the list, the page and the decis
     const status = await detail(CANCELLED);
     assert.deepEqual([status.holdUntil, status.holding], [[], null]);
     assert.deepEqual(await decisionOf(CANCELLED), { nothing: `cancelled at ${at(40)} — nothing to decide` });
-    assert.equal((await runWith(engine(process.env), list(engine(process.env), runStore.runs.read(CANCELLED)))).holding, undefined);
+    assert.equal((await runWith(engine(process.env), list(engine(process.env), runStore(root).runs.read(CANCELLED)))).holding, undefined);
   });
   await s.test(
     'a run waiting on runs and held as well is both, as `nemia decide` says both: its decision carries the wait and the hold',
@@ -668,7 +668,7 @@ test("a hold put on the board is put as `nemia hold --until --why --by` puts it,
     async () => {
       holdOn(SAID, ['p-live'], { why: 'merge conflicts in five files', by: 'operator' });
       const words = 'held until p-live lands (why: merge conflicts in five files; by operator)';
-      const run = runStore.runs.read(SAID);
+      const run = runStore(root).runs.read(SAID);
       const cli = await runWith(engine(process.env), list(engine(process.env), run));
       const api = (await listed()).get(SAID)!;
       assert.equal(api.holding?.word, words);
@@ -701,7 +701,7 @@ test("a hold put on the board is put as `nemia hold --until --why --by` puts it,
       assert.deepEqual(answer, { id: PUT, lifted: false, hold: { at: answer.hold.at, until: ['p-live'], why: 'merge conflicts', by } });
       assert.deepEqual(JSON.parse(fs.readFileSync(holdFile(PUT), 'utf8')), answer.hold, 'the file is the hold the answer says');
       const words = `held until p-live lands (why: merge conflicts; by ${by})`;
-      const run = runStore.runs.read(PUT);
+      const run = runStore(root).runs.read(PUT);
       assert.equal(
         holdWord((await runWith(engine(process.env), list(engine(process.env), run))).holding!, run.hold),
         words,

@@ -16,6 +16,7 @@ import { scratch } from 'test-kit/scratch';
 import { promised } from '../../test/promised.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
+import { rootNow } from '../../test/config-given.ts';
 
 const ROOT = scratch('wf-main-');
 process.env.WF_ROOT = ROOT;
@@ -23,7 +24,7 @@ const stand = eachTest(testPlace);
 const { advanceRun, CLI, TABLE, startRun, runWith: runEngine } = await import('../runner.ts');
 const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
-const { runRecord } = await import('../record/record.store.ts');
+const { runRecord, writeRun } = await import('../record/record.store.ts');
 const { aliased, main, VERBS } = await import('./main.ts');
 const { HELP, WF_HINT } = await import('./flags.ts');
 const { offLine } = await import('../demand/demand.ts');
@@ -163,6 +164,32 @@ test('a read is run against the root the process names when it is typed, not one
   }
 });
 
+test('main reads the environment it is handed, not the process’s: `ls` lists the run planted under the WF_ROOT it is given', async (t) => {
+  const b = board();
+  const run = await runPlaced(startRun({ brief: 'planted elsewhere', repo: aRepo(), workflowDir: oneStep() }));
+  const given = scratch('wf-main-given-');
+  const planted = { ...runRecord(rootNow(), run.id), id: `${run.id}-given` };
+  writeRun(given, planted);
+  const elsewhere = scratch('wf-main-process-');
+  const was = process.env.WF_ROOT;
+  const out: string[] = [];
+  const log = t.mock.method(console, 'log', (...a: unknown[]) => out.push(a.join(' ')));
+  const error = t.mock.method(console, 'error', () => {});
+  try {
+    process.env.WF_ROOT = elsewhere;
+    await main(['ls'], b.e, undefined, stand().place, { WF_ROOT: given });
+  } finally {
+    process.env.WF_ROOT = was;
+    log.mock.restore();
+    error.mock.restore();
+  }
+  assert.ok(
+    out.some((line) => line.includes(planted.id)),
+    `the run under the root main was handed is listed: ${JSON.stringify(out)}`,
+  );
+  assert.ok(!out.some((line) => line.includes(`${run.id} `)), `and not the one under the test's own root: ${JSON.stringify(out)}`);
+});
+
 test('the verbs the help names are the verbs main runs, and no other', () => {
   const lines = [...HELP.matchAll(new RegExp(`^ {2}${CLI} (.+)$`, 'gm'))].map((m) => m[1]);
   const served = TABLE.filter((c) => c.only?.side !== 'api').map((c) => c.name);
@@ -217,21 +244,21 @@ test('nemia cancel: a run with a step in flight, the same run again, and a run a
   const b = board();
   const repo = aRepo();
   const run = await runPlaced(startRun({ brief: 'still going', repo, workflowDir: oneStep() }));
-  await runWith(b.e, advanceRun(runRecord(run.id)));
+  await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
   assert.deepEqual(await typed(t, b.e, 'cancel', run.id), {
     out: [`${run.id}  cancelled`, `   asked to stop: implement  (the engine stops it on its next tick)`],
     err: [offLine(ROOT)],
   });
-  const at = runRecord(run.id).cancelledAt;
+  const at = runRecord(rootNow(), run.id).cancelledAt;
   assert.deepEqual(await typed(t, b.e, 'cancel', run.id), {
     out: [`${run.id}  already cancelled at ${at}`, `   asked to stop: implement  (the engine stops it on its next tick)`],
     err: [offLine(ROOT)],
   });
 
   const done = await runPlaced(startRun({ brief: 'done', repo, workflowDir: oneStep() }));
-  await runWith(b.e, advanceRun(runRecord(done.id)));
+  await runWith(b.e, advanceRun(runRecord(rootNow(), done.id)));
   b.settle(`${done.id}-implement`, 'succeeded', SIGNED);
-  await runWith(b.e, advanceRun(runRecord(done.id)));
+  await runWith(b.e, advanceRun(runRecord(rootNow(), done.id)));
   assert.deepEqual(await typed(t, b.e, 'cancel', done.id), {
     out: [`${done.id}  already succeeded — nothing to stop`],
     err: [offLine(ROOT)],
@@ -254,7 +281,7 @@ test('nemia show --raw prints the record as JSON, the brief and each step body c
   const { out, err } = await typed(t, b.e, 'show', run.id, '--raw');
   assert.deepEqual(err, []);
   assert.equal(out.length, 1);
-  const record = runRecord(run.id);
+  const record = runRecord(rootNow(), run.id);
   const workflow = record.workflow?.map(({ body, ...keys }) => ({ ...keys, body: `${body.slice(0, 60)}…` }));
   assert.equal(out[0], JSON.stringify({ ...record, brief: `${brief.slice(0, 120)}…`, workflow }, null, 2));
   assert.equal((JSON.parse(out[0]) as { workflow: { body: string }[] }).workflow[0].body, 'implement it…');
@@ -264,7 +291,7 @@ test('nemia logs: a step that has not run, and the output of one that has, from 
   const b = board();
   const run = await runPlaced(startRun({ brief: 'go', repo: aRepo(), workflowDir: oneStep() }));
   assert.deepEqual(await typed(t, b.e, 'logs', run.id, 'implement'), { out: ['implement has not run yet'], err: [] });
-  await runWith(b.e, advanceRun(runRecord(run.id)));
+  await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
   assert.deepEqual(await typed(t, b.e, 'logs', run.id, 'implement'), { out: [`the output of ${run.id}-implement`], err: [] });
   assert.deepEqual(
     await typed(t, b.e, 'logs', run.id, 'deploy'),
@@ -302,7 +329,7 @@ test('REFUSED at shipped defaults, through main: a word or a flag where a verb t
         return true;
       }),
     );
-  await t.test('nothing cancelled', () => assert.equal(runRecord(run.id).cancelledAt, undefined));
+  await t.test('nothing cancelled', () => assert.equal(runRecord(rootNow(), run.id).cancelledAt, undefined));
 });
 
 test('nemia inbox --help, nemia factory --help and nemia start --help print their own help', async (t) => {
@@ -318,15 +345,15 @@ test('nemia inbox --help, nemia factory --help and nemia start --help print thei
 test('nemia approve of a loop out of rounds: what it accepted, and the file it wrote', async (t) => {
   const b = board();
   const loop = await runPlaced(startRun({ brief: 'a loop', repo: aRepo(), workflowDir: looping() }));
-  await runWith(b.e, advanceRun(runRecord(loop.id)));
+  await runWith(b.e, advanceRun(runRecord(rootNow(), loop.id)));
   b.settle(`${loop.id}-implement`, 'succeeded', SIGNED);
-  await runWith(b.e, advanceRun(runRecord(loop.id)));
+  await runWith(b.e, advanceRun(runRecord(rootNow(), loop.id)));
   b.settle(`${loop.id}-review`, 'succeeded', { ...SIGNED, again: true });
-  await runWith(b.e, advanceRun(runRecord(loop.id)));
-  b.settle(runRecord(loop.id).steps.implement.taskId!, 'succeeded', SIGNED);
-  await runWith(b.e, advanceRun(runRecord(loop.id)));
-  b.settle(runRecord(loop.id).steps.review.taskId!, 'succeeded', { ...SIGNED, again: true });
-  await runWith(b.e, advanceRun(runRecord(loop.id)));
+  await runWith(b.e, advanceRun(runRecord(rootNow(), loop.id)));
+  b.settle(runRecord(rootNow(), loop.id).steps.implement.taskId!, 'succeeded', SIGNED);
+  await runWith(b.e, advanceRun(runRecord(rootNow(), loop.id)));
+  b.settle(runRecord(rootNow(), loop.id).steps.review.taskId!, 'succeeded', { ...SIGNED, again: true });
+  await runWith(b.e, advanceRun(runRecord(rootNow(), loop.id)));
   const { out, err } = await typed(t, b.e, 'approve', loop.id, '--message', 'as it stands');
   assert.deepEqual(err, [offLine(ROOT)]);
   assert.equal(out.length, 2, out.join('\n'));

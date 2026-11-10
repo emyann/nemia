@@ -93,8 +93,8 @@ const started = (brief: string, dir = FOLDER, more: { after?: string[]; isolate?
 
 /** The run's record as an early tick wrote it: no workflow frozen on it, its steps read off `dir` on every pass. */
 const unfrozen = (id: string, dir: string): void => {
-  const { workflow: _, ...record } = JSON.parse(fs.readFileSync(runFile(id), 'utf8')) as Record<string, unknown>;
-  fs.writeFileSync(runFile(id), `${JSON.stringify({ ...record, workflowDir: dir }, null, 2)}\n`);
+  const { workflow: _, ...record } = JSON.parse(fs.readFileSync(runFile(rootNow(), id), 'utf8')) as Record<string, unknown>;
+  fs.writeFileSync(runFile(rootNow(), id), `${JSON.stringify({ ...record, workflowDir: dir }, null, 2)}\n`);
 };
 
 const LEFT_OUT = (id: string) => `${id} is not advanced while its workflow folder does not load: run ${id}: it froze no workflow`;
@@ -130,7 +130,7 @@ const unreadableLine = (block: readonly string[]) =>
   block.find((l) => l.startsWith('   → unreadable: '))?.slice('   → unreadable: '.length);
 
 /** Whether the feed says `id` was removed. */
-const saidRemoved = (id: string) => readFeed().lines.some((l) => 'run' in l && l.run === id && l.word === REMOVED);
+const saidRemoved = (id: string) => readFeed(rootNow()).lines.some((l) => 'run' in l && l.run === id && l.word === REMOVED);
 
 test('one broken run does not stop the others: each left out and said once, the others filed, and mended, it goes on', async (t) => {
   const s = story(t);
@@ -168,26 +168,26 @@ test('one broken run does not stop the others: each left out and said once, the 
     assert.equal(said.length, 1, JSON.stringify(first.unreadable));
     assert.match(said[0], /work: says no `place:`/);
     assert.match(said[0], new RegExp(`or nemia rm ${runs.unplaced}\\.$`));
-    assert.equal(runRecord(runs.unplaced).steps.work?.taskId ?? null, null, 'nothing of it filed');
+    assert.equal(runRecord(rootNow(), runs.unplaced).steps.work?.taskId ?? null, null, 'nothing of it filed');
 
     b.settle(`${runs.checked}-work`, 'succeeded', SIGNED);
     b.settle(`${runs.tried}-work`, 'failed');
     await pass();
     await stage.runWith(e, retryRun(runs.tried, 'work', { mode: 'fresh' }));
     await pass();
-    const check = runRecord(runs.checked).steps.work.check?.taskId;
+    const check = runRecord(rootNow(), runs.checked).steps.work.check?.taskId;
     assert.ok(check, 'the checked run filed its check');
-    assert.equal(runRecord(runs.tried).steps.work.tries?.length, 1, 'the retried run holds an earlier try');
+    assert.equal(runRecord(rootNow(), runs.tried).steps.work.tries?.length, 1, 'the retried run holds an earlier try');
   });
 
   await s.test(
     'a journal no runtime wrote, a folder gone and a torn record leave their runs out, each said once, while a run beside them files',
     async (c) => {
-      spoil(runRecord(runs.journal).steps.work.taskId!);
-      spoil(runRecord(runs.checked).steps.work.check!.taskId);
-      spoil(runRecord(runs.tried).steps.work.tries![0].taskId);
+      spoil(runRecord(rootNow(), runs.journal).steps.work.taskId!);
+      spoil(runRecord(rootNow(), runs.checked).steps.work.check!.taskId);
+      spoil(runRecord(rootNow(), runs.tried).steps.work.tries![0].taskId);
       unfrozen(runs.gone, path.join(ROOT, 'no-such-folder'));
-      fs.writeFileSync(runFile('torn'), '{ "id": "torn", "repo"');
+      fs.writeFileSync(runFile(rootNow(), 'torn'), '{ "id": "torn", "repo"');
       runs.good = (await started('the good one')).id;
 
       const wrote: string[] = [];
@@ -204,7 +204,7 @@ test('one broken run does not stop the others: each left out and said once, the 
           undefined,
           `${id} is not judged`,
         );
-      const journal = spoiled.get(runRecord(runs.journal).steps.work.taskId!)!;
+      const journal = spoiled.get(runRecord(rootNow(), runs.journal).steps.work.taskId!)!;
       assert.ok(
         now.unreadable?.some((w) => w.startsWith(`${JOURNAL_OUT(runs.journal)}${journal}`)),
         JSON.stringify(now.unreadable),
@@ -245,8 +245,8 @@ test('one broken run does not stop the others: each left out and said once, the 
     const { out: lines, threw } = await printedBy(c, ['ls'], e);
     assert.equal(threw, undefined);
     for (const [id, task] of [
-      [runs.checked, runRecord(runs.checked).steps.work.check!.taskId],
-      [runs.tried, runRecord(runs.tried).steps.work.tries![0].taskId],
+      [runs.checked, runRecord(rootNow(), runs.checked).steps.work.check!.taskId],
+      [runs.tried, runRecord(rootNow(), runs.tried).steps.work.tries![0].taskId],
     ]) {
       const block = blockOf(lines, id);
       const said = unreadableLine(block);
@@ -292,7 +292,7 @@ test('one broken run does not stop the others: each left out and said once, the 
   await s.test(
     "the board answers an unfrozen run unjudged and running, in the folder's words alone, its steps off its record",
     async () => {
-      const [one] = await stage.runWith(e, judgedNow(e, ROOT, [runRecord(runs.unplaced)]));
+      const [one] = await stage.runWith(e, judgedNow(e, ROOT, [runRecord(rootNow(), runs.unplaced)]));
       assert.equal(one.status, 'running');
       assert.ok(
         one.unreadable?.startsWith(`${runs.unplaced}'s workflow folder does not load, so the board does not judge the run`),
@@ -304,7 +304,7 @@ test('one broken run does not stop the others: each left out and said once, the 
         ['work'],
       );
 
-      const run = runRecord(runs.unplaced);
+      const run = runRecord(rootNow(), runs.unplaced);
       const loaded = (() => {
         try {
           loadWorkflows(UNPLACED, { repo: run.repo, home: ROOT });
@@ -361,7 +361,7 @@ test('one broken run does not stop the others: each left out and said once, the 
 
   await s.test('mended, each run goes on at the next pass, with nothing remembered', async () => {
     fs.writeFileSync(path.join(UNPLACED, 'work.md'), PLACED);
-    spoiled.delete(runRecord(runs.journal).steps.work.taskId!);
+    spoiled.delete(runRecord(rootNow(), runs.journal).steps.work.taskId!);
     const mended = await pass();
     assert.deepEqual(mended.runs.find((a) => a.run.id === runs.unplaced)?.filed, ['work']);
     assert.ok(

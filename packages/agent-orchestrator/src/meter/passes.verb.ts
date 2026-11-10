@@ -2,13 +2,14 @@
  * `nemia passes`, and `GET /api/passes`: what the recent passes of the tick cost (`PassesRead`), read off the store's `tick-recent.json`
  * (`recentPasses`), so the command line and the api answer the same, whichever process ticks. A controller: an entry of the command table.
  */
-import { Schema } from 'effect';
+import { Effect, Schema } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { recentPasses } from '../daemon/daemon.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import type { Args } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { passesLines, passesRead, type PassesRead } from './meter.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /** A text argument's value, or undefined where it was not given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -32,9 +33,9 @@ export const lastOf = (args: Args): number => {
 };
 
 /** The recent passes `args` asks for, oldest first, and of them the histogram, the parts and the summary. */
-export const passesOf = (args: Args): PassesRead => {
+export const passesOf = (home: string, args: Args): PassesRead => {
   const n = lastOf(args);
-  const recent = recentPasses();
+  const recent = recentPasses(home);
   return passesRead(Number.isFinite(n) ? recent.slice(-n) : recent);
 };
 
@@ -65,6 +66,6 @@ export const PASSES: Command<PassesRead, PassesInput> = {
   writes: false,
   class: 'read',
   input: PassesInput,
-  handler: (input) => tried(() => passesOf(input)),
+  handler: (input) => Effect.flatMap(StoreRoot, (home) => tried(() => passesOf(home, input))),
   print: (read, args) => (args.json === true ? [JSON.stringify(read, null, 2)] : passesLines(read)),
 };

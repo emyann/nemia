@@ -145,10 +145,10 @@ type PassOptions = { repo: string; memo: RestMemo; verify: boolean };
  * The series kept from the ring after a pass (`keepSeries`), and the time it took, which is measuring's. A failure costs the series, never
  * the pass: it is said on stderr.
  */
-const seriesKept = (ring: readonly RecentPass[], config: Settings): number => {
+const seriesKept = (home: string, ring: readonly RecentPass[], config: Settings): number => {
   const t0 = performance.now();
   try {
-    keepSeries(ring, config);
+    keepSeries(home, ring, config);
   } catch (err) {
     process.stderr.write(`nemia: the series were not kept on this pass: ${err instanceof Error ? err.message : String(err)}\n`);
   }
@@ -204,6 +204,7 @@ export type TickOptions = {
  * Fails with the refusal a read threw (`Refusal`: the ceilings, `WF_VERIFY_REST`, a record); dies of anything else.
  */
 export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, quota, disk }: TickOptions = {}) {
+  const home = yield* StoreRoot;
   const e = yield* EngineService;
   const config = yield* StoreConfig;
   const options: PassOptions = {
@@ -228,8 +229,8 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
     ...(value.unobserved ? { unobserved: value.unobserved } : {}),
   };
   const written = yield* tried(() => {
-    const recent = recordRecentPass(cost, RECENT_KEPT, { quota: quota?.(), checks: tallies.checks, disk: disk?.() });
-    return recordPassCost(cost) + recent.ms + seriesKept(recent.kept, config);
+    const recent = recordRecentPass(home, cost, RECENT_KEPT, { quota: quota?.(), checks: tallies.checks, disk: disk?.() });
+    return recordPassCost(home, cost) + recent.ms + seriesKept(home, recent.kept, config);
   });
   yield* recordPassMetrics(cost);
   return { ...value, cost: { ...cost, overheadMs: cost.overheadMs + written } };
@@ -277,7 +278,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   const resting = yield* restingPass(e, memo, verify);
   const config = yield* StoreConfig;
   const ran = yield* tried(() => ceilings(config));
-  yield* tried(() => within('act', () => recordCeilings(ran)));
+  yield* tried(() => within('act', () => recordCeilings(home, ran)));
   const runs = yield* (yield* RunDoor).runs.list(undefined, resting && keptOf(resting));
   if (resting) forgotten(memo, runs);
   noteSeen({ runs: runs.length });
@@ -285,7 +286,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   const levels = yield* levelsNow().pipe(Effect.orElseSucceed(() => undefined));
   const judging: Judging = { done: new Map(), unjudged: new Map() };
   const standing = yield* passStanding(runs, memo.standing);
-  const read: PassRead = passRead(e, runs, config, standing, yield* passRevisions());
+  const read: PassRead = passRead(home, e, runs, config, standing, yield* passRevisions());
   for (const run of runs.filter(hasStarted)) yield* judged(e, judging, read, run, resting);
   const counted = yield* waitingJudged(e, judging, read, resting, ran.runs);
   if (informer) yield* informed(e, informer, runs, judging, verify);
@@ -301,7 +302,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   const forgetting = yield* withinEffect('act', finishForgetting().pipe(over(e)));
   yield* Effect.annotateCurrentSpan({ runs: runs.length, rested: resting?.rested ?? 0 });
   return {
-    ...passOf(report, runs, judging, queue, yield* feedErrorOf(runs, judging, pause, levels)),
+    ...passOf(report, runs, judging, queue, yield* feedErrorOf(home, runs, judging, pause, levels)),
     ...(scheduled ? { scheduled } : {}),
     ...(forgetting.length ? { forgetting } : {}),
     ...(pause
@@ -455,6 +456,7 @@ const feedOf = <F>(id: string, judged: { feed: F } | undefined): (readonly [stri
  * they did not read, and nothing is said of them), or undefined once it was: never the pass's failure.
  */
 const feedErrorOf = (
+  home: string,
   runs: readonly Run[],
   { done, unjudged }: Judging,
   pause: Pause | null,
@@ -470,7 +472,7 @@ const feedErrorOf = (
     Effect.map((written) =>
       Exit.isSuccess(written)
         ? undefined
-        : `the feed (${feedFile()}) was not written on this pass: ${(Cause.squash(written.cause) as Error).message}`,
+        : `the feed (${feedFile(home)}) was not written on this pass: ${(Cause.squash(written.cause) as Error).message}`,
     ),
   );
 

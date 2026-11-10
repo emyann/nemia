@@ -14,6 +14,7 @@ import { placesOf } from '../folder/lookup.store.ts';
 import { factoryOrNone } from '../factory/door/factories.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { tried as lifted } from '../runtime-client.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /**
  * What `startPlan` did: the cards it started, in order; the workflow folder each card's `workflow:` was found at; and, when a start
@@ -42,6 +43,7 @@ export type PlanStarted = {
  * leave unfilled among what is refused. Left out, or the default, each run is started with none, the default factory's.
  */
 export const startPlan = Effect.fn('startPlan')(function* (opts: { dir: string; repo: string; factory?: string; start?: typeof startRun }) {
+  const home = yield* StoreRoot;
   const place = yield* PlaceService;
   const cards = readPlan(opts.dir);
   const factory = yield* factoryOrNone(opts.factory);
@@ -53,7 +55,7 @@ export const startPlan = Effect.fn('startPlan')(function* (opts: { dir: string; 
       const steps = yield* stepsToStart(
         folder,
         true,
-        placesOf(opts.repo),
+        placesOf(home, opts.repo),
         place.declared.denyWhileLanding,
         factory,
         [],

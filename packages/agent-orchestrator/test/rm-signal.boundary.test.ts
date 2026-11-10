@@ -13,6 +13,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { nodeChild } from './child.ts';
 import { scratch } from 'test-kit/scratch';
 import { runGiven } from './placed.ts';
+import { rootNow } from './config-given.ts';
 
 const DIR = scratch('wf-rm-signal-');
 const STORE = path.join(DIR, 'store');
@@ -69,7 +70,7 @@ async function aCancelledRun() {
   const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir }));
   const wt = path.join(STORE, 'worktrees', run.id, LINE_NAME);
   git(repo, 'worktree', 'add', '-q', '-b', `wf/${run.id}/${LINE_NAME}`, wt);
-  markCancelled(run.id);
+  markCancelled(rootNow(), run.id);
   return { id: run.id, repo, wt };
 }
 

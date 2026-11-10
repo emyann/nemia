@@ -23,6 +23,7 @@ import { scratch } from 'test-kit/scratch';
 import { eachTest } from '../../test/placed.ts';
 import { names } from '../../test/assessed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
+import { rootNow } from '../../test/config-given.ts';
 
 const ROOT = scratch('wf-watch-');
 process.env.WF_ROOT = ROOT;
@@ -211,7 +212,7 @@ test(
       printed.ring();
     });
     t.mock.method(console, 'error', (...a: unknown[]) => err.push(a.join(' ')));
-    const watch = watchPrinted(0, { json: true }, { selectors: parseSelectors(['waits=person']) });
+    const watch = watchPrinted(rootNow(), 0, { json: true }, { selectors: parseSelectors(['waits=person']) });
     try {
       assert.deepEqual(err, ['watching from 0, ^C to stop']);
       const text = [ROUTINE[0], WAKES[0]].map((l) => `${JSON.stringify(l)}\n`).join('');
@@ -246,7 +247,7 @@ test(
     const lines = async (how: Watched) => {
       out.length = 0;
       err.length = 0;
-      const fiber = Effect.runFork(watching(0, how, () => ({ kind: 'none' })));
+      const fiber = Effect.runFork(watching(rootNow(), 0, how, () => ({ kind: 'none' })));
       try {
         await until(t, () => out.length + err.length === 2, 'the banner and the liveness', { bell: printed });
       } finally {
@@ -284,7 +285,7 @@ test(
     t.mock.method(console, 'error', () => {});
     const ada = upgraded({ at: AT, run: 'r-1', step: 'implement', word: 'running', labels: { run: 'r-1', agent: 'ada' } });
     const agora = upgraded({ at: AT, run: 'r-2', step: 'review', word: 'running', labels: { run: 'r-2', agent: 'agora' } });
-    const watch = watchPrinted(0, {}, { selectors: parseSelectors(['agent=ada']), cursorFile: file });
+    const watch = watchPrinted(rootNow(), 0, {}, { selectors: parseSelectors(['agent=ada']), cursorFile: file });
     try {
       const text = [agora, ada, agora].map((l) => `${JSON.stringify(l)}\n`).join('');
       fs.appendFileSync(FEED, text);
@@ -315,9 +316,10 @@ test('a watch that has fallen silent bookmarks its cursor at its cadence, and wr
   t.mock.method(console, 'error', () => {});
   const steered = steeredClock();
   const fiber = Effect.runFork(
-    watching(0, { json: true }, () => ({ kind: 'none' }), { selectors: parseSelectors(['reason=Failed']), cursorFile: file }).pipe(
-      Effect.provide(steered.layer),
-    ),
+    watching(rootNow(), 0, { json: true }, () => ({ kind: 'none' }), {
+      selectors: parseSelectors(['reason=Failed']),
+      cursorFile: file,
+    }).pipe(Effect.provide(steered.layer)),
   );
   try {
     await until(t, () => steered.asked.includes(30_000), 'the bookmark’s rest asked', { bell: steered.bell });

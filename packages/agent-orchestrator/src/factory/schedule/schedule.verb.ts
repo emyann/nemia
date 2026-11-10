@@ -61,7 +61,7 @@ export const startDue = Effect.fn('startDue')(function* (repo: string, runs: rea
   const exit = yield* Effect.exit(started(home, due, at.due, repo));
   const keep = (tried: ScheduleTry): void => {
     try {
-      putScheduleTry(at.factory, at.workflow, tried);
+      putScheduleTry(home, at.factory, at.workflow, tried);
     } catch {}
   };
   if (Exit.isSuccess(exit)) {

@@ -11,10 +11,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
+import { rootNow } from '../../test/config-given.ts';
 
 const ROOT = scratch('wf-files-store-');
 process.env.WF_ROOT = ROOT;
-const { filesStore: runStore, keptRuns, labelsFile, writeLabels } = await import('./files.store.ts');
+const { filesStoreAt, keptRuns, labelsFile, writeLabels } = await import('./files.store.ts');
+const runStore = filesStoreAt(rootNow());
 const { runsDir, runFile, restStamps } = await import('./record.store.ts');
 const { recordMemo } = await import('../rest/index.ts');
 const { metered } = await import('../meter/tally.store.ts');
@@ -31,11 +33,11 @@ const aRecord = (id: string) => ({
 });
 
 const put = (id: string, record: unknown = aRecord(id)): void =>
-  fs.writeFileSync(runFile(id), typeof record === 'string' ? record : JSON.stringify(record, null, 2));
+  fs.writeFileSync(runFile(rootNow(), id), typeof record === 'string' ? record : JSON.stringify(record, null, 2));
 
 beforeEach(() => {
-  fs.rmSync(runsDir(), { recursive: true, force: true });
-  fs.mkdirSync(runsDir(), { recursive: true });
+  fs.rmSync(runsDir(rootNow()), { recursive: true, force: true });
+  fs.mkdirSync(runsDir(rootNow()), { recursive: true });
 });
 
 test('`runs.find`: one run by id, among the ids the store lists, never by a path made of the id', async (t) => {
@@ -90,7 +92,7 @@ test('`runs.find`: one run by id, among the ids the store lists, never by a path
 
 /** Every run as `keptRuns` projects it here: its id and its brief, which a record alone says. */
 const briefs = (memo?: ReturnType<typeof recordMemo<{ id: string; brief: string }>>) =>
-  keptRuns(memo, (run) => ({ id: run.id, brief: run.brief }), false);
+  keptRuns(rootNow(), memo, (run) => ({ id: run.id, brief: run.brief }), false);
 
 test('a warm read through a memo reads no record whose run has not moved, however many the store holds, and answers a cold read’s own', async () => {
   put('r-moving');
@@ -111,7 +113,7 @@ test('a run whose record is rewritten is read again, and one removed leaves the 
   const memo = recordMemo<{ id: string; brief: string }>();
   briefs(memo);
   put('r-edit', { ...aRecord('r-edit'), brief: 'edited' });
-  fs.rmSync(runFile('r-go'));
+  fs.rmSync(runFile(rootNow(), 'r-go'));
   const after = (await metered(async () => briefs(memo))).tallies?.records;
   assert.equal(after, 1, 'the record that was rewritten, and no other');
   assert.deepEqual(briefs(memo), [{ id: 'r-edit', brief: 'edited' }]);
@@ -139,14 +141,14 @@ test("a run's labels are a person's file beside the record: composed on every re
     () => {
       put('r-labelled');
       put('r-unlabelled');
-      assert.equal(labelsFile('r-labelled'), path.join(runsDir(), 'r-labelled.labels'));
-      fs.writeFileSync(labelsFile('r-labelled'), JSON.stringify({ team: 'core', tier: 'gold' }));
+      assert.equal(labelsFile(rootNow(), 'r-labelled'), path.join(runsDir(rootNow()), 'r-labelled.labels'));
+      fs.writeFileSync(labelsFile(rootNow(), 'r-labelled'), JSON.stringify({ team: 'core', tier: 'gold' }));
       const labels = { team: 'core', tier: 'gold' };
       assert.deepEqual(runStore.runs.read('r-labelled').labels, labels);
       assert.deepEqual(runStore.runs.find('r-labelled')?.labels, labels);
       assert.deepEqual(runStore.runs.list(() => {}).find((r) => r.id === 'r-labelled')?.labels, labels);
       assert.deepEqual(
-        keptRuns(undefined, (r) => [r.id, r.labels], false),
+        keptRuns(rootNow(), undefined, (r) => [r.id, r.labels], false),
         [
           ['r-labelled', labels],
           ['r-unlabelled', undefined],
@@ -158,7 +160,7 @@ test("a run's labels are a person's file beside the record: composed on every re
 
   await t.test('a run the memo keeps is listed as the very run given, its labels not read again', () => {
     put('r-kept');
-    fs.writeFileSync(labelsFile('r-kept'), JSON.stringify({ team: 'core' }));
+    fs.writeFileSync(labelsFile(rootNow(), 'r-kept'), JSON.stringify({ team: 'core' }));
     const kept = { ...runStore.runs.read('r-kept'), brief: 'kept' };
     const listed = runStore.runs.list(
       () => {},
@@ -172,9 +174,9 @@ test("a run's labels are a person's file beside the record: composed on every re
 
   await t.test('`rewrite` writes no `labels` key into the record, and a `labels` key the record carries is not read as labels', () => {
     put('r-labelled');
-    writeLabels('r-labelled', { team: 'core' });
+    writeLabels(rootNow(), 'r-labelled', { team: 'core' });
     assert.ok(runStore.runs.rewrite({ ...runStore.runs.read('r-labelled'), brief: 'changed' }));
-    const written = JSON.parse(fs.readFileSync(runFile('r-labelled'), 'utf8')) as Record<string, unknown>;
+    const written = JSON.parse(fs.readFileSync(runFile(rootNow(), 'r-labelled'), 'utf8')) as Record<string, unknown>;
     assert.equal(written.brief, 'changed');
     assert.equal('labels' in written, false);
     assert.deepEqual(runStore.runs.read('r-labelled').labels, { team: 'core' });
@@ -186,14 +188,14 @@ test("a run's labels are a person's file beside the record: composed on every re
     put('r-labelled');
     runStore.labels.put('r-labelled', { a: '1', b: '2' });
     runStore.labels.put('r-labelled', { b: '3' });
-    assert.deepEqual(JSON.parse(fs.readFileSync(labelsFile('r-labelled'), 'utf8')), { b: '3' });
+    assert.deepEqual(JSON.parse(fs.readFileSync(labelsFile(rootNow(), 'r-labelled'), 'utf8')), { b: '3' });
     assert.deepEqual(runStore.runs.read('r-labelled').labels, { b: '3' });
     runStore.labels.put('r-labelled', {});
-    assert.equal(fs.existsSync(labelsFile('r-labelled')), false);
+    assert.equal(fs.existsSync(labelsFile(rootNow(), 'r-labelled')), false);
     assert.equal('labels' in runStore.runs.read('r-labelled'), false);
     runStore.labels.put('r-labelled', {});
-    assert.equal(fs.existsSync(labelsFile('r-labelled')), false, 'removing none is no refusal');
-    assert.deepEqual(fs.readdirSync(runsDir()), ['r-labelled.json']);
+    assert.equal(fs.existsSync(labelsFile(rootNow(), 'r-labelled')), false, 'removing none is no refusal');
+    assert.deepEqual(fs.readdirSync(runsDir(rootNow())), ['r-labelled.json']);
   });
 
   await t.test(
@@ -205,11 +207,11 @@ test("a run's labels are a person's file beside the record: composed on every re
         ['r-labels-number', '{"team": 3}'],
       ] as const) {
         put(id);
-        fs.writeFileSync(labelsFile(id), text);
+        fs.writeFileSync(labelsFile(rootNow(), id), text);
         const { lines, value } = stderrOf(() => runStore.runs.read(id));
         assert.equal('labels' in value, false, id);
         assert.equal(lines.length, 1, `${id} said once: ${lines.join('\n')}`);
-        assert.ok(lines[0].includes(labelsFile(id)), lines[0]);
+        assert.ok(lines[0].includes(labelsFile(rootNow(), id)), lines[0]);
         assert.ok(lines[0].includes(`nemia label run ${id}`), lines[0]);
       }
     },
@@ -217,11 +219,11 @@ test("a run's labels are a person's file beside the record: composed on every re
 
   await t.test("the run's rest stamp moves when its labels are written, and again when they are removed", () => {
     put('r-labels-stamp');
-    const before = restStamps().get('r-labels-stamp');
+    const before = restStamps(rootNow()).get('r-labels-stamp');
     runStore.labels.put('r-labels-stamp', { team: 'core' });
-    const written = restStamps().get('r-labels-stamp');
+    const written = restStamps(rootNow()).get('r-labels-stamp');
     runStore.labels.put('r-labels-stamp', {});
-    const removed = restStamps().get('r-labels-stamp');
+    const removed = restStamps(rootNow()).get('r-labels-stamp');
     assert.ok(before);
     assert.notEqual(written, before);
     assert.notEqual(removed, written);
@@ -231,6 +233,6 @@ test("a run's labels are a person's file beside the record: composed on every re
     put('r-labels-rm');
     runStore.labels.put('r-labels-rm', { team: 'core' });
     assert.ok(runStore.runs.forget('r-labels-rm').includes(path.join('runs', 'r-labels-rm.labels')));
-    assert.equal(fs.existsSync(labelsFile('r-labels-rm')), false);
+    assert.equal(fs.existsSync(labelsFile(rootNow(), 'r-labels-rm')), false);
   });
 });

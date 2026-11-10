@@ -268,6 +268,7 @@ const upgradeDue = (
  * base for the render, then the status. A pass that stops between them composes the same tree on the next.
  */
 function upgradePass(
+  home: string,
   factory: Factory & { template: FactoryTemplate },
   now: RenderedAt,
   base: Entry[],
@@ -275,12 +276,12 @@ function upgradePass(
   at: string,
 ) {
   const { name, template } = factory;
-  const ours = entriesIn(treeDir(name));
+  const ours = entriesIn(treeDir(home, name));
   const switched =
     last.template !== undefined && mergeBaseOf(last.template, now.name) === 'none' ? { from: last.template, to: now.name } : undefined;
   const merge = switched === undefined ? mergeTrees(base, ours, now.entries) : switchTrees(ours, now.entries);
   const merging = { from: last.version, to: template.version, template: now.name, base: digestOf(base) };
-  const composed = compose(merge, choicesFor(readResolutions(name), merging));
+  const composed = compose(merge, choicesFor(readResolutions(home, name), merging));
   if ('pending' in composed) {
     const status: Status = {
       version: last.version,
@@ -290,10 +291,10 @@ function upgradePass(
       conditions: waiting(factory, last.version, composed.pending, switched),
       upgrade: { from: last.version, to: template.version, conflicts: composed.pending.map((c) => conflictCut(c)) },
     };
-    return statusWritten(factory, stamped(status, last, at, factory));
+    return statusWritten(home, factory, stamped(status, last, at, factory));
   }
-  if (!swapTree(name, composed.entries, digestOf(ours))) return last;
-  replaceBase(name, now.entries);
+  if (!swapTree(home, name, composed.entries, digestOf(ours))) return last;
+  replaceBase(home, name, now.entries);
   const status: Status = {
     version: now.version,
     template: now.name,
@@ -301,7 +302,7 @@ function upgradePass(
     params: template.params,
     conditions: upgraded(factory, now.version),
   };
-  return statusWritten(factory, stamped(status, last, at, factory));
+  return statusWritten(home, factory, stamped(status, last, at, factory));
 }
 
 /**
@@ -319,8 +320,8 @@ function stamped(status: Status, last: Status | undefined, at: string, factory: 
 }
 
 /** `status` written as the status of `factory`, where it changed; the status. */
-const statusWritten = (factory: Pick<Factory, 'name'>, status: Status): Status => {
-  writeStatus(factory.name, status);
+const statusWritten = (home: string, factory: Pick<Factory, 'name'>, status: Status): Status => {
+  writeStatus(home, factory.name, status);
   return status;
 };
 
@@ -347,10 +348,11 @@ const cameByUpgrade = (last: Status | undefined, version: string): boolean =>
  * wherever the base is its render, else the one last written, else unknown, said by its own condition. The status it observed.
  */
 export const reconcileFactory = Effect.fn('reconcileFactory')(function* (factory: Factory & { template: FactoryTemplate }) {
+  const home = yield* StoreRoot;
   const { now, named } = yield* templateNow(factory);
-  const recorded = yield* recordedOf(factory, now, readStatus(factory.name));
+  const recorded = yield* recordedOf(factory, now, readStatus(home, factory.name));
   const at = new Date(yield* Clock.currentTimeMillis).toISOString();
-  return reconciledWith(factory, now, named, at, recorded);
+  return reconciledWith(home, factory, now, named, at, recorded);
 });
 
 /**
@@ -391,20 +393,21 @@ const namedBase = (
  * template its file names where it was read (`reconcileFactory`). The status names the template the base holds (`baseTemplateOf`).
  */
 function reconciledWith(
+  home: string,
   factory: Factory & { template: FactoryTemplate },
   now: RenderedAt | Condition,
   named: string | undefined,
   at: string,
   recorded: string | undefined,
 ): Status {
-  const last = readStatus(factory.name);
-  if (!('type' in now)) stageFolder(appliedDir(factory.name), now.entries, true);
-  const base = entriesIn(appliedDir(factory.name));
-  if (base.length && !fs.existsSync(treeDir(factory.name))) stageFolder(treeDir(factory.name), base, false);
+  const last = readStatus(home, factory.name);
+  if (!('type' in now)) stageFolder(appliedDir(home, factory.name), now.entries, true);
+  const base = entriesIn(appliedDir(home, factory.name));
+  if (base.length && !fs.existsSync(treeDir(home, factory.name))) stageFolder(treeDir(home, factory.name), base, false);
   const digest = base.length ? digestOf(base) : null;
   if (!('type' in now) && digest !== null && upgradeDue(factory, now, digest, last, recorded))
-    return upgradePass(factory, now, base, last as Status & { version: string }, at);
-  return observed(factory, now, base, digest, last, named, at);
+    return upgradePass(home, factory, now, base, last as Status & { version: string }, at);
+  return observed(home, factory, now, base, digest, last, named, at);
 }
 
 /**
@@ -412,6 +415,7 @@ function reconciledWith(
  * parameters and its conditions (`reconciledWith`).
  */
 function observed(
+  home: string,
   factory: Factory & { template: FactoryTemplate },
   now: RenderedAt | Condition,
   base: readonly Entry[],
@@ -433,7 +437,7 @@ function observed(
         ? upgraded(factory, now.version)
         : [observedOf(factory, now, digest, version, last), NO_CONFLICTS],
   };
-  return statusWritten(factory, stamped(status, last, at, factory));
+  return statusWritten(home, factory, stamped(status, last, at, factory));
 }
 
 /** One pass: every factory of the store made from a template, reconciled (`reconcileFactory`). The factories reconciled, by name. */
@@ -457,7 +461,7 @@ export const RECONCILE_EVERY: Duration.Input = '5 seconds';
  * The controller, for as long as it runs: a pass each `RECONCILE_EVERY`; a pass that fails is a warning, and the next is tried a pass
  * later.
  */
-export const reconcile = (): Effect.Effect<never> => {
+export const reconcile = (): Effect.Effect<never, never, StoreRoot> => {
   const pass = Effect.suspend(() => reconcileOnce()).pipe(
     Effect.catchCause((cause) => Effect.logWarning(`The factories could not be reconciled this pass: ${Cause.pretty(cause)}`)),
   );

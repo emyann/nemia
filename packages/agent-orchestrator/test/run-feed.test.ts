@@ -51,7 +51,7 @@ const { addFactory, attachWorkflow } = await import('../testing.ts');
 const { recordFeed } = await import('../src/feed/feed.store.ts');
 const { isRunLine } = await import('../src/feed/feed.ts');
 const { runRecord, rewriteRun } = await import('../src/record/record.store.ts');
-const { filesStore: runStore } = await import('../src/record/files.store.ts');
+const runStore = (await import('../src/record/files.store.ts')).filesStoreAt(rootNow());
 const { stepsNow: stepsOf } = await import('./steps-now.ts');
 const { tryOf } = await import('../src/record/record.ts');
 const { freshRestMemo } = await import('../src/tick/tick.verb.ts');
@@ -149,7 +149,7 @@ const started = (brief: string, workflowDir = GATED, isolate = false): Promise<R
   stage.runPlaced(startRun({ brief, repo: aRepo(), workflowDir, isolate }));
 
 /** Every line of a run in the feed, read off the file as a reader with cursor 0 would. */
-const lines = (): RunLine[] => readFeed(0).lines.filter(isRunLine);
+const lines = (): RunLine[] => readFeed(rootNow(), 0).lines.filter(isRunLine);
 const size = (): number => fs.statSync(FEED, { throwIfNoEntry: false })?.size ?? 0;
 /**
  * The words of a run's own lines, or of one step's, in order — but each `closed out`: a closeout read is a one-shot of its own, read with
@@ -225,7 +225,7 @@ test(
           1,
           "one read per task filed, the plan's, per pass: what `advance` reads for its own judgement, and nothing for the feed",
         );
-        assert.equal(feedFile(), FEED);
+        assert.equal(feedFile(rootNow()), FEED);
       },
     );
     await s.test("a step's live word moving writes nothing: the feed says running, once", async () => {
@@ -252,7 +252,7 @@ test(
         const pass = await tick();
         const before = fs.readFileSync(FEED, 'utf8');
         assert.deepEqual(
-          recordFeed(judged(pass), { memo: freshFeedMemo() }).lines,
+          recordFeed(rootNow(), judged(pass), { memo: freshFeedMemo() }).lines,
           [],
           'a restarted daemon, with nothing in memory and the same world, folds the feed from the start on its first pass and owes it no line',
         );
@@ -268,7 +268,7 @@ test(
         const after = size();
         assert.ok(after > before, 'the pass wrote the gate');
         assert.deepEqual(
-          recordFeed(judged(moved), { memo: freshFeedMemo() }).lines,
+          recordFeed(rootNow(), judged(moved), { memo: freshFeedMemo() }).lines,
           [],
           'the same after the world did change, then was written: the new process said what changed, once, and a second new one nothing',
         );
@@ -293,7 +293,7 @@ test(
         const pass = await tick();
         const kept = fs.readFileSync(FEED);
         fs.rmSync(FEED);
-        assert.ok(recordFeed(judged(pass), { memo: freshFeedMemo() }).lines.length > 0);
+        assert.ok(recordFeed(rootNow(), judged(pass), { memo: freshFeedMemo() }).lines.length > 0);
         fs.writeFileSync(FEED, kept);
       },
     );
@@ -345,7 +345,7 @@ test(
             .map((l) => l.step),
         );
         for (const l of parsed)
-          assert.equal(feedCursorRefusal(l.cursor), undefined, `${l.step} ${l.word}: its cursor is one the feed takes`);
+          assert.equal(feedCursorRefusal(rootNow(), l.cursor), undefined, `${l.step} ${l.word}: its cursor is one the feed takes`);
         assert.equal(
           said.some((l) => !l.startsWith('{')),
           false,
@@ -383,7 +383,7 @@ test(
       assert.equal(resumed.at(-1), `cursor: ${size()}`);
       assert.equal(
         resumed.length - 1,
-        readFeed(at).lines.length,
+        readFeed(rootNow(), at).lines.length,
         'the cursor file resumes the watch where it was: the lines since, and no other',
       );
       assert.equal(fs.readFileSync(file, 'utf8'), `${size()}\n`);
@@ -402,16 +402,16 @@ test(
         wrote.mock.restore();
       }
       assert.equal(out.at(-1), `cursor: ${size()}`, 'it read the feed there is now, from its start');
-      assert.equal(out.length, readFeed(0).lines.length + 1, 'every line of it');
+      assert.equal(out.length, readFeed(rootNow(), 0).lines.length + 1, 'every line of it');
       assert.equal(err.length, 1, 'said once');
       names(err[0], stale, String(size() + 900), 'said again');
       assert.equal(fs.readFileSync(stale, 'utf8'), `${size()}\n`, 'and it kept its place, as any watch does');
     });
     await s.test('REFUSED: a cursor inside a line, past the end or not a number, by the read, by nemia watch and by a watch', async () => {
-      const { cursor } = readFeed(0);
+      const { cursor } = readFeed(rootNow(), 0);
       assert.equal(cursor, size());
       const inside = cursor - 2;
-      assert.throws(() => readFeed(inside), refusedNaming(`cursor ${inside}`, 'inside a line'));
+      assert.throws(() => readFeed(rootNow(), inside), refusedNaming(`cursor ${inside}`, 'inside a line'));
       const log = t.mock.method(console, 'log', () => {});
       try {
         await assert.rejects(stage.main(['watch', String(inside)]), refusedNaming(String(inside), 'inside a line'));
@@ -419,18 +419,18 @@ test(
       } finally {
         log.mock.restore();
       }
-      assert.throws(() => watchFeed({ from: inside, onLine: () => {} }), refusedNaming('inside a line'));
+      assert.throws(() => watchFeed(rootNow(), { from: inside, onLine: () => {} }), refusedNaming('inside a line'));
       const past = cursor + 10;
       const [named, sized] = [`cursor ${past} `, `(${cursor} bytes, `];
-      assert.throws(() => readFeed(past), refusedNaming(named, sized, 'nemia watch --once 0'));
+      assert.throws(() => readFeed(rootNow(), past), refusedNaming(named, sized, 'nemia watch --once 0'));
       await assert.rejects(stage.main(['watch', 'twelve']), refusedNaming('nemia watch', 'one cursor at most', 'a whole number of bytes'));
       await assert.rejects(stage.main(['watch', '0', '1']), refusedNaming('nemia watch does not take 1', 'nemia watch [cursor]'));
-      assert.throws(() => readFeed(-1), refusedNaming('a whole number of bytes'));
+      assert.throws(() => readFeed(rootNow(), -1), refusedNaming('a whole number of bytes'));
       let at = 0;
       for (const line of fs.readFileSync(FEED, 'utf8').split('\n').slice(0, -1)) {
         at += Buffer.byteLength(line) + 1;
         assert.doesNotThrow(
-          () => readFeed(at),
+          () => readFeed(rootNow(), at),
           `every cursor a read hands out is one the next read takes: 0, each line's end (${at}), the end`,
         );
       }
@@ -460,7 +460,7 @@ test(
       const got: FeedLine[] = [];
       const arrived = bell();
       const from = size();
-      const watch = watchFeed({
+      const watch = watchFeed(rootNow(), {
         from,
         intervalMs: 20,
         onLine: (l) => {
@@ -477,14 +477,14 @@ test(
           () => `two lines handed by the watch; it handed ${got.length}`,
           { bell: arrived },
         );
-        assert.deepEqual(got, readFeed(from).lines.slice(0, got.length), 'the lines, in order, as the feed has them');
+        assert.deepEqual(got, readFeed(rootNow(), from).lines.slice(0, got.length), 'the lines, in order, as the feed has them');
       } finally {
         watch.stop();
       }
       const stopped = got.length;
       const after: FeedLine[] = [];
       const heard = bell();
-      const other = watchFeed({
+      const other = watchFeed(rootNow(), {
         from: size(),
         intervalMs: 20,
         onLine: (l) => {
@@ -513,7 +513,7 @@ test(
     });
     await s.test('a feed not written yet reads as nothing, at 0', () => {
       emptyStore();
-      assert.deepEqual(readFeed(0), { lines: [], cursor: 0 });
+      assert.deepEqual(readFeed(rootNow(), 0), { lines: [], cursor: 0 });
     });
   },
 );
@@ -565,7 +565,7 @@ test("a person's acts and the runtime's faults on a run, each said once off the 
   await s.test("the hold a person put is read off the record's own composed fact, once, as the person's deed", async () => {
     await stage.runWith(stage.board().e, hold(run.id, [other.id], { why: 'it waits on the other run', by: 'operator' }));
     await ticks(3);
-    put = runRecord(run.id).hold!.at;
+    put = runRecord(rootNow(), run.id).hold!.at;
     assert.deepEqual(
       said(run.id, 'HoldPut').map((l) => [l.word, l.note, l.source]),
       [['hold put', `since ${put}`, 'person']],
@@ -589,7 +589,7 @@ test("a person's acts and the runtime's faults on a run, each said once off the 
       await ticks(3);
       await stage.runWith(stage.board().e, approveRun(run.id, 'plan'));
       await ticks(3);
-      const approval = runRecord(run.id).approvals![0];
+      const approval = runRecord(rootNow(), run.id).approvals![0];
       assert.deepEqual(
         said(run.id, 'Approved').map((l) => [l.step, l.word, l.note, l.try, l.source]),
         [['plan', 'approved', `try ${approval.try} · at ${approval.at}`, approval.try, 'person']],
@@ -601,7 +601,7 @@ test("a person's acts and the runtime's faults on a run, each said once off the 
     await ticks(3);
     assert.deepEqual(
       said(run.id, 'CancelAsked').map((l) => [l.word, l.note, l.source]),
-      [['cancel asked', `at ${runRecord(run.id).cancelledAt}`, 'person']],
+      [['cancel asked', `at ${runRecord(rootNow(), run.id).cancelledAt}`, 'person']],
     );
     assert.deepEqual(
       words(run.id).filter((w) => w === 'cancelled'),
@@ -617,7 +617,7 @@ test("a person's acts and the runtime's faults on a run, each said once off the 
   await s.test("a pruned run's word says so, once: `nemia prune`'s marker is a person's fact, and the run's line gains it", async () => {
     fs.writeFileSync(path.join(RUNS, `${other.id}.pruned`), JSON.stringify({ at: '2026-09-22T10:00:00.000Z', worktrees: [] }));
     await ticks(3);
-    assert.equal(runRecord(other.id).pruned !== undefined, true);
+    assert.equal(runRecord(rootNow(), other.id).pruned !== undefined, true);
     assert.deepEqual(
       words(other.id).filter((w) => w.endsWith('(pruned)')),
       ['running (pruned)'],
@@ -635,7 +635,11 @@ test("a person's acts and the runtime's faults on a run, each said once off the 
       [[other.id, undefined, 'removed']],
       "`nemia rm` removes the record, and the feed keeps the run's lines: the next pass says it is gone, once",
     );
-    assert.deepEqual(recordFeed(judged(await tick()), { memo: freshFeedMemo() }).lines, [], 'a restarted daemon reads it as gone');
+    assert.deepEqual(
+      recordFeed(rootNow(), judged(await tick()), { memo: freshFeedMemo() }).lines,
+      [],
+      'a restarted daemon reads it as gone',
+    );
   });
 });
 
@@ -754,7 +758,7 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
     settle(task(run, 'plan'), 'working');
     deny(task(run, 'plan'), [{ tool: 'Bash', what: 'git push' }]);
     await tick();
-    const record = runRecord(run.id);
+    const record = runRecord(rootNow(), run.id);
     const plan = stepsOf(record).find((st) => st.name === 'plan')!;
     assert.deepEqual(stepLabels(record, plan), {
       run: run.id,
@@ -782,7 +786,7 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
       await tick();
       settle(task(run, 'plan'), 'working');
       await tick();
-      const record = runRecord(run.id);
+      const record = runRecord(rootNow(), run.id);
       const plan = stepsOf(record).find((st) => st.name === 'plan')!;
       const before = lines().filter((l) => l.run === run.id);
       const ofPlan = before.filter((l) => l.step === 'plan');
@@ -819,10 +823,13 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
       [[1, 'try 1']],
       'the denial was written once, on the try its task was filed for',
     );
-    const before = runRecord(run.id);
+    const before = runRecord(rootNow(), run.id);
     const plan = before.steps.plan;
-    rewriteRun({ ...before, steps: { ...before.steps, plan: { ...plan, tries: [{ taskId: plan.taskId!, cause: 'recheck' }] } } });
-    assert.equal(tryOf(runRecord(run.id), 'plan'), 2, 'the step is on a second try, on the task it was already on');
+    rewriteRun(rootNow(), {
+      ...before,
+      steps: { ...before.steps, plan: { ...plan, tries: [{ taskId: plan.taskId!, cause: 'recheck' }] } },
+    });
+    assert.equal(tryOf(runRecord(rootNow(), run.id), 'plan'), 2, 'the step is on a second try, on the task it was already on');
     await ticks(3);
     assert.deepEqual(
       denied(run).map((l) => [l.try, l.note]),
@@ -924,7 +931,7 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
         'each run finished, and the feed said so',
       );
     for (const r of runs) deny(task(r, 'plan'), [{ tool: 'Bash', what: 'git push' }]);
-    for (const r of runs) rewriteRun({ ...runRecord(r.id), deniedCounted: [{ task: task(r, 'plan'), attempts: 1 }] });
+    for (const r of runs) rewriteRun(rootNow(), { ...runRecord(rootNow(), r.id), deniedCounted: [{ task: task(r, 'plan'), attempts: 1 }] });
     const quiet = lines().filter((l) => l.reason !== 'ToolDenied').length;
     for (let i = 0; i < 2; i++) {
       const pass = await tick({ memo: freshRestMemo() });
@@ -975,7 +982,7 @@ test('a step whose session was killed at its memory limit says so in its note, r
     const pass = await tick();
     await ticks(2);
     assert.equal(size(), before);
-    assert.deepEqual(recordFeed(judged(pass), { memo: freshFeedMemo() }).lines, []);
+    assert.deepEqual(recordFeed(rootNow(), judged(pass), { memo: freshFeedMemo() }).lines, []);
     assert.equal(noted(run).length, 1);
   });
 });
@@ -992,7 +999,7 @@ test("a step's closeout read is a one-shot `closed out` of its step and try, sai
     settle(task(run, 'plan'), 'succeeded', SAID);
     await ticks(3);
     assert.deepEqual(closed(run), [['plan', 'closed out', 'try 1', 1, 'Normal']]);
-    const record = runRecord(run.id);
+    const record = runRecord(rootNow(), run.id);
     const line = lines().find((l) => l.run === run.id && l.reason === 'ClosedOut')!;
     assert.deepEqual(
       line.labels,
@@ -1014,15 +1021,18 @@ test("a step's closeout read is a one-shot `closed out` of its step and try, sai
   });
   await s.test('a restarted daemon, folding the feed afresh, writes no closeout again', async () => {
     assert.deepEqual(
-      recordFeed(judged(await tick()), { memo: freshFeedMemo() }).lines.filter((l) => l.reason === 'ClosedOut'),
+      recordFeed(rootNow(), judged(await tick()), { memo: freshFeedMemo() }).lines.filter((l) => l.reason === 'ClosedOut'),
       [],
     );
   });
   await s.test('REFUSED: a recheck says no closeout again — its turn, and its closeout, are the try before it', async () => {
-    const before = runRecord(run.id);
+    const before = runRecord(rootNow(), run.id);
     const plan = before.steps.plan;
-    rewriteRun({ ...before, steps: { ...before.steps, plan: { ...plan, tries: [{ taskId: plan.taskId!, cause: 'recheck' }] } } });
-    assert.equal(tryOf(runRecord(run.id), 'plan'), 2, 'the step is on a second try, on the task it was already on');
+    rewriteRun(rootNow(), {
+      ...before,
+      steps: { ...before.steps, plan: { ...plan, tries: [{ taskId: plan.taskId!, cause: 'recheck' }] } },
+    });
+    assert.equal(tryOf(runRecord(rootNow(), run.id), 'plan'), 2, 'the step is on a second try, on the task it was already on');
     await ticks(3);
     assert.deepEqual(closed(run), [['plan', 'closed out', 'try 1', 1, 'Normal']]);
   });
@@ -1051,7 +1061,7 @@ test('a run waiting on a person says what it waits on, never failed: an ending a
     const repo = aRepo();
     const run = await stage.runPlaced(startRun({ brief: 'the ship gate', repo, workflowDir: ENDING }));
     await tick();
-    const branch = runRecord(run.id).steps.implement.branch!;
+    const branch = runRecord(rootNow(), run.id).steps.implement.branch!;
     stage.place().world.branch(repo, branch, { 'work.txt': 'the work\n' });
     settle(task(run, 'implement'), 'succeeded', SIGNED);
     await ticks(3);
@@ -1154,7 +1164,7 @@ test(
       run = await started('the cut');
       await tick();
       const from = size();
-      watch = watchPrinted(from, {}, { cursorFile: file });
+      watch = watchPrinted(rootNow(), from, {}, { cursorFile: file });
       assert.deepEqual(out, [`watching from ${from}, ^C to stop`]);
     });
     await s.test('truncated to nothing: said once, its cursor file at 0, and the gate reached after the cut delivered', async () => {
@@ -1211,7 +1221,7 @@ test("the store's pause and resume, each one line of the store's, said once by t
   fs.rmSync(pauseFile(rootNow()), { force: true });
   t.after(() => fs.rmSync(pauseFile(rootNow()), { force: true }));
   const storeSaid = () =>
-    readFeed(0)
+    readFeed(rootNow(), 0)
       .lines.filter((l) => 'store' in l)
       .map((l) => [l.involved, l.reason, l.word, l.note, l.source]);
   const STORE = { kind: 'Store', name: 'store' };
@@ -1221,7 +1231,7 @@ test("the store's pause and resume, each one line of the store's, said once by t
     at = readPause(rootNow())!.at;
     await ticks(3);
     assert.deepEqual(storeSaid(), [[STORE, 'StorePaused', 'store paused', `since ${at}`, 'person']]);
-    const [put] = readFeed(0).lines.filter((l) => 'store' in l);
+    const [put] = readFeed(rootNow(), 0).lines.filter((l) => 'store' in l);
     const by = readPause(rootNow())!.by;
     assert.deepEqual(
       [put && 'by' in put ? put.by : undefined, put && 'why' in put ? put.why : undefined],
@@ -1236,7 +1246,7 @@ test("the store's pause and resume, each one line of the store's, said once by t
     assert.equal(storeSaid().length, 1);
   });
   await s.test('a second daemon, with no fold of its own, reading the same store writes the put neither again nor never', async () => {
-    assert.deepEqual(recordFeed(judged(await tick()), { memo: freshFeedMemo(), pause: readPause(rootNow()) }).lines, []);
+    assert.deepEqual(recordFeed(rootNow(), judged(await tick()), { memo: freshFeedMemo(), pause: readPause(rootNow()) }).lines, []);
   });
   await s.test('nemia resume, then passes, is one `store resumed`, read off the put the feed holds', async () => {
     await printedBy(t, 'resume');
@@ -1246,7 +1256,7 @@ test("the store's pause and resume, each one line of the store's, said once by t
       [STORE, 'StoreResumed', 'store resumed', `since ${at}`, 'person'],
     ]);
     assert.deepEqual(
-      recordFeed(judged(await tick()), { memo: freshFeedMemo(), pause: readPause(rootNow()) }).lines,
+      recordFeed(rootNow(), judged(await tick()), { memo: freshFeedMemo(), pause: readPause(rootNow()) }).lines,
       [],
       'and a restart none',
     );

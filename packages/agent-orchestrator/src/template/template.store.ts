@@ -206,9 +206,9 @@ function workflowSources(root: string, names: readonly string[], factory: string
  * Where an export of the repository `from` looks for the agents and skills its workflows name, as a workflow of its `workflows/` looks:
  * a workflow folder of it (`workflowDir`, a name no workflow has), its places, and each folder of agents, first root first.
  */
-export function lookupsOf(from: string): { workflowDir: string; places: Places; agentDirs: string[] } {
+export function lookupsOf(home: string, from: string): { workflowDir: string; places: Places; agentDirs: string[] } {
   const workflowDir = path.join(path.resolve(from), 'workflows', '_');
-  const places = placesOf(path.resolve(from));
+  const places = placesOf(home, path.resolve(from));
   return { workflowDir, places, agentDirs: lookupRoots(workflowDir, places).map((r) => path.join(r, 'agents')) };
 }
 

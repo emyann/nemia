@@ -85,8 +85,8 @@ function fileIn(dir: string, name: string): fs.Stats | undefined {
  * A path a closeout named, as the board shows it (`StepArtifact`). Once the step's artifacts directory is pruned, a file anywhere under it
  * is pruned with it, one in a directory beneath it included.
  */
-export function artifactOf(run: Pick<Run, 'id' | 'pruned'>, step: string, file: string): StepArtifact {
-  const dir = artifactsDir(run, step);
+export function artifactOf(home: string, run: Pick<Run, 'id' | 'pruned'>, step: string, file: string): StepArtifact {
+  const dir = artifactsDir(home, run, step);
   const files = run.pruned?.artifacts;
   if (artifactPlace(file, dir) !== 'files') return { path: file };
   if (files && !fs.existsSync(dir)) return { path: file, pruned: filesPrunedWords(files), prunedAt: files.at };

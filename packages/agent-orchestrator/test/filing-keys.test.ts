@@ -15,6 +15,7 @@ import path from 'node:path';
 import type { RepositoryRun, Run } from '../src/run.ts';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-filing-keys-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -55,7 +56,7 @@ const reviewSays = (again: boolean) => ({ ...SIGNED, findings: FOUND, again });
 const ANSWERED = { ...SIGNED, replies: REPLIES };
 
 /** One pass of the tick over the run `id`, on the stage's engine. */
-const tick = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(id)));
+const tick = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(rootNow(), id)));
 /** What the engine was filed with for the task `id`. */
 const specOf = (id: string) => {
   const task = stage.board().tasks.get(id);
@@ -160,7 +161,7 @@ test('every key a step sets reaches the runtime, on every filing — and a check
     });
     await stage.main(['start', 'add a flag', '--workflows', 'keys', '--repo', repo]);
     id = printed[0].split(' ')[0];
-    assert.equal(runRecord(id).workflowDir, dir);
+    assert.equal(runRecord(rootNow(), id).workflowDir, dir);
   });
 
   await s.test('REFUSED: a name the repository does not have, naming both places and the workflows it has', async () => {
@@ -309,10 +310,14 @@ test('every key a step sets reaches the runtime, on every filing — and a check
       }));
       fs.writeFileSync(recordAt(run.id), JSON.stringify(record, null, 2));
       assert.doesNotMatch(fs.readFileSync(recordAt(run.id), 'utf8'), /"(disallowed|allowed)Tools":/, 'the fixture holds no new name');
-      const read = runRecord(run.id).workflow?.find((s) => s.name === 'implement');
+      const read = runRecord(rootNow(), run.id).workflow?.find((s) => s.name === 'implement');
       assert.deepEqual([read?.disallowedTools, read?.allowedTools], [['SendMessage'], ['Edit(**)', 'Bash(npm test)']]);
       assert.equal(Object.hasOwn(read ?? {}, 'allow') || Object.hasOwn(read ?? {}, 'disallow'), false);
-      assert.deepEqual(listRuns().find((r) => r.id === run.id)?.workflow, runRecord(run.id).workflow, 'listed as the tick reads it');
+      assert.deepEqual(
+        listRuns(rootNow()).find((r) => r.id === run.id)?.workflow,
+        runRecord(rootNow(), run.id).workflow,
+        'listed as the tick reads it',
+      );
       await tick(run.id);
       const filed = keysOf(`${run.id}-implement`);
       assert.deepEqual([filed.disallowedTools, filed.allowedTools], [['SendMessage'], ['Edit(**)', 'Bash(npm test)']], 'none is dropped');
@@ -335,7 +340,7 @@ test('every key a step sets reaches the runtime, on every filing — and a check
       }));
       fs.writeFileSync(recordAt(run.id), JSON.stringify(record, null, 2));
       assert.doesNotMatch(fs.readFileSync(recordAt(run.id), 'utf8'), /"sandbox":/, 'the fixture holds no `sandbox`');
-      const read = runRecord(run.id).workflow?.find((s) => s.name === 'implement');
+      const read = runRecord(rootNow(), run.id).workflow?.find((s) => s.name === 'implement');
       assert.deepEqual([read?.permissionMode, read?.sandbox], [word, undefined], 'read as it was frozen');
       await tick(run.id);
       assert.equal(specOf(`${run.id}-implement`).config?.permissionMode, word, "not Codex's default");

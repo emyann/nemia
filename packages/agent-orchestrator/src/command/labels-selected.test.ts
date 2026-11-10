@@ -12,6 +12,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
 import { names } from '../../test/assessed.ts';
+import { rootNow } from '../../test/config-given.ts';
 
 const ROOT = scratch('wf-ls-labels-');
 process.env.WF_ROOT = ROOT;
@@ -21,7 +22,7 @@ const { COMMANDS } = await import('./commands.verb.ts');
 const { parseArgv } = await import('./command.ts');
 const { advanceRun, startRun, runWith: runEngine } = await import('../runner.ts');
 const { runRecord } = await import('../record/record.store.ts');
-const { filesStore: runStore } = await import('../record/files.store.ts');
+const runStore = (await import('../record/files.store.ts')).filesStoreAt(rootNow());
 const { Invalid } = await import('../refusal/refusal.ts');
 const { engineOf } = await import('../runtime-client.ts');
 const stand = eachTest(testPlace);
@@ -98,9 +99,9 @@ test('nemia stats -l sums the facts of the runs the selector takes alone', async
   fs.rmSync(path.join(ROOT, 'runs'), { recursive: true, force: true });
   const ended = async (brief: string) => {
     const run = await started(brief);
-    await runWith(noEngine(), advanceRun(runRecord(run.id)));
+    await runWith(noEngine(), advanceRun(runRecord(rootNow(), run.id)));
     engine().settle(`${run.id}-implement`, 'succeeded', { closeout: { outcome: 'done', summary: 'did it', artifacts: [], needs: null } });
-    await runWith(noEngine(), advanceRun(runRecord(run.id)));
+    await runWith(noEngine(), advanceRun(runRecord(rootNow(), run.id)));
     return run;
   };
   const core = await ended('the core one');

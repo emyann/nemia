@@ -16,6 +16,7 @@ import { scratch } from 'test-kit/scratch';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runOver } from './placed.ts';
 import type { ProposedObject } from 'objects';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-proposals-');
 process.env.WF_ROOT = ROOT;
@@ -76,7 +77,7 @@ function factory(name: string, level: 'manual' | 'semi-auto' | 'auto' = 'manual'
     path.join(tree, 'workflows', 'agents', 'implementer.md'),
     '---\nrole: Architect\nallowedTools: Read\n---\nDesign the change.\n',
   );
-  writeFactoryLevel(name, { level, since: '2026-11-01T00:00:00.000Z' });
+  writeFactoryLevel(rootNow(), name, { level, since: '2026-11-01T00:00:00.000Z' });
   return tree;
 }
 

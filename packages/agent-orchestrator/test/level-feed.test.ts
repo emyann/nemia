@@ -54,7 +54,7 @@ const typed = async (t: TestContext, ...argv: string[]): Promise<void> => {
 
 /** The feed's level lines: the factory each is labelled with, its reason, its source and its note. */
 const levelSaid = () =>
-  readFeed(0)
+  readFeed(rootNow(), 0)
     .lines.filter((l) => l.reason === 'LevelChanged')
     .map((l) => [l.labels?.factory, l.involved, l.source, l.note]);
 
@@ -76,7 +76,7 @@ test("a factory's level said on the feed: each change of the level in force is o
     await typed(sub, 'level', 'auto', '--factory', 'acme');
     await pass();
     assert.deepEqual(levelSaid(), [['acme', STORE, 'person', 'acme is at auto']]);
-    const [line] = readFeed(0).lines.filter((l) => l.reason === 'LevelChanged');
+    const [line] = readFeed(rootNow(), 0).lines.filter((l) => l.reason === 'LevelChanged');
     assert.ok(line !== undefined && line.message?.includes('acme is at auto'), line?.message);
     assert.equal(selects(parseSelectors([...NEMIA_SELECTORS]), line), true, 'her selectors wake her on it');
   });
@@ -123,7 +123,7 @@ test("a factory's level said on the feed: each change of the level in force is o
   });
   await s.test('a daemon restarted, with no fold of its own, writes no level line again', async () => {
     const levels = await stage.runPlaced(levelsNow());
-    assert.deepEqual(recordFeed(new Map(), { memo: freshFeedMemo(), pause: readPause(rootNow()), levels }).lines, []);
+    assert.deepEqual(recordFeed(rootNow(), new Map(), { memo: freshFeedMemo(), pause: readPause(rootNow()), levels }).lines, []);
   });
   await s.test('a factory left at manual, and the default factory, are never said', async () => {
     assert.deepEqual([...new Set(levelSaid().map((l) => l[0]))], ['acme']);

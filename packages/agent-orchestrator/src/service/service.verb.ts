@@ -140,7 +140,7 @@ export const liveHost = (root: string, timeoutMs: number = DEFAULT_TIMEOUT_MS): 
   call: systemCall,
   linger: lingerOf,
   standing: () => readPause(root),
-  lease: () => daemonStanding(),
+  lease: () => daemonStanding(root),
   signal: (pid) => process.kill(pid, 'SIGTERM'),
   pause: (said) => putPause(root, said, new Date(), undefined, thisProcess()),
   resume: () => resumePause(root),

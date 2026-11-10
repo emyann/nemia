@@ -368,11 +368,11 @@ test('A factory raised for a stretch keeps her, the store at manual; its end pas
     assert.deepEqual(await beat(), ['file']);
     assert.deepEqual(await beat(), ['subscribe']);
     assert.deepEqual(await beat(), []);
-    const written = [levelFile(rootNow()), factoryLevelFile('pipao')].map((f) => fs.readFileSync(f, 'utf8'));
+    const written = [levelFile(rootNow()), factoryLevelFile(rootNow(), 'pipao')].map((f) => fs.readFileSync(f, 'utf8'));
     t.mock.timers.setTime(Date.parse('2026-10-06T10:00:00.000Z'));
     assert.deepEqual(await beat(), ['stop', 'drop'], 'none above manual once the raise has passed');
     assert.deepEqual(
-      [levelFile(rootNow()), factoryLevelFile('pipao')].map((f) => fs.readFileSync(f, 'utf8')),
+      [levelFile(rootNow()), factoryLevelFile(rootNow(), 'pipao')].map((f) => fs.readFileSync(f, 'utf8')),
       written,
       'level-triggered: the raise reads as gone, with no write',
     );
@@ -386,7 +386,7 @@ test('A factory raised for a stretch keeps her, the store at manual; its end pas
     const ended = await level({ factory: 'pipao', end: true });
     assert.equal(ended.task, raised.task, 'the task stays named, for the keeper to stop');
     assert.deepEqual(ended.factories.find((row) => row.factory === 'pipao')?.raise, null);
-    assert.equal(fs.existsSync(factoryLevelFile('pipao')), false, 'a factory with no level of its own follows the store');
+    assert.equal(fs.existsSync(factoryLevelFile(rootNow(), 'pipao')), false, 'a factory with no level of its own follows the store');
     assert.deepEqual(await beat(), ['stop']);
     t.mock.timers.tick(1);
     await level({ factory: 'pipao', level: 'semi-auto' });
@@ -399,7 +399,7 @@ test('A factory raised for a stretch keeps her, the store at manual; its end pas
     "a factory's raise or default above manual while her folder is not trusted is written, and files her only once it is",
     async () => {
       fs.rmSync(levelFile(rootNow()), { force: true });
-      fs.rmSync(factoryLevelFile('pipao'), { force: true });
+      fs.rmSync(factoryLevelFile(rootNow(), 'pipao'), { force: true });
       trust(false);
       const b = stage.board();
       const asks: Record<string, string>[] = [
@@ -410,7 +410,7 @@ test('A factory raised for a stretch keeps her, the store at manual; its end pas
         t.mock.timers.tick(1);
         const set = await level(ask);
         assert.equal(set.factories.find((row) => row.factory === 'pipao')?.level, 'semi-auto', JSON.stringify(ask));
-        assert.ok(fs.existsSync(factoryLevelFile('pipao')), `${JSON.stringify(ask)} writes the factory's file`);
+        assert.ok(fs.existsSync(factoryLevelFile(rootNow(), 'pipao')), `${JSON.stringify(ask)} writes the factory's file`);
         assert.equal(readLevel(rootNow())?.task, set.task, `${JSON.stringify(ask)} names her task`);
         assert.equal(set.trust, `mkdir -p ${nemiaDir(rootNow())} && cd ${nemiaDir(rootNow())} && ${DEFAULT_HARNESS}`);
         const filings = b.filings.length;
@@ -593,7 +593,7 @@ test("Kept, she is told what changed: the person's custom words once, never by a
 
 test('`nemia level` refuses a level that is none, a factory write that names no factory or the default one, a raise of nothing and an end of none', async (t) => {
   withPipao();
-  fs.rmSync(factoryLevelFile('pipao'), { force: true });
+  fs.rmSync(factoryLevelFile(rootNow(), 'pipao'), { force: true });
   const check = (args: Record<string, string | boolean>) => LEVEL.check?.(args) ?? null;
   for (const [args, facts] of [
     [{ level: 'on' }, ['"on" is no level']],
@@ -628,6 +628,6 @@ test('`nemia level` refuses a level that is none, a factory write that names no 
     },
   );
   await t.test('nothing is written of a write refused', () => {
-    assert.equal(fs.existsSync(factoryLevelFile('pipao')), false, 'nothing written');
+    assert.equal(fs.existsSync(factoryLevelFile(rootNow(), 'pipao')), false, 'nothing written');
   });
 });

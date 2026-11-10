@@ -17,6 +17,7 @@ process.env.WF_ROOT = scratch('wf-refusal-store-');
 const { Conflict, Invalid, Missing, isRefusal } = await import('../src/refusal/refusal.ts');
 const { maxRuns } = await import('../src/config/config.store.ts');
 const { unhold } = await import('../src/wait/wait.verb.ts');
+const { rootNow, storeGiven } = await import('./config-given.ts');
 const { WorkflowError } = await import('../src/workflow.ts');
 
 const PKG = path.join(import.meta.dirname, '..');
@@ -69,7 +70,12 @@ test('each refusal is an Error of its kind with its words and exit code 2, an Ef
   };
   for (const [row, made, Kind, fixes] of [
     ['unhold of no run id', () => Effect.runPromise(unhold('Not An Id')), Invalid, ['"Not An Id"', "a run's id"]],
-    ['unhold of a run the store has not', () => Effect.runPromise(unhold('r-nope')), Missing, ['r-nope', 'nemia hold <runId> --off']],
+    [
+      'unhold of a run the store has not',
+      () => Effect.runPromise(storeGiven(rootNow())(unhold('r-nope'))),
+      Missing,
+      ['r-nope', 'nemia hold <runId> --off'],
+    ],
     ['WF_MAX_RUNS that is no count', () => maxRuns({ WF_MAX_RUNS: 'two' }), Invalid, ['WF_MAX_RUNS=two', 'not a count']],
   ] as const)
     await t.test(`REFUSED: a verb throws the kind of what it refuses — ${row}`, async () => {

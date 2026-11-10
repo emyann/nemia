@@ -56,6 +56,7 @@ import { doorAtOnce } from '../factory/door/factories.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
 import type { FactoryServers } from '../factory/servers/index.ts';
 import { inboxDir } from '../record/files.store.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /**
  * A step as the tick tells it and files it: with its agent's instructions in Claude Code's prompt and its skills in a plugin, where
@@ -73,7 +74,8 @@ import { inboxDir } from '../record/files.store.ts';
  * arguments (`own`), which the first filing, a try and a round each spread into its `config`.
  */
 export const toldOf = Effect.fnUntraced(function* (run: Run, step: StepSpec) {
-  const dir = agentFilesDir(run, step.name);
+  const home = yield* StoreRoot;
+  const dir = agentFilesDir(home, run, step.name);
   const told: StepSpec =
     rendersAgent(step) && !renderedIn(dir, step) ? unrendered(step, step.agent?.skills?.length ? yield* skillsTold(step, run) : []) : step;
   return {
@@ -88,8 +90,9 @@ export const toldOf = Effect.fnUntraced(function* (run: Run, step: StepSpec) {
  * started, since the copy `nemia start` froze went with the folder; asked of the door, so a program given its memory tells what it holds.
  */
 const skillsTold = Effect.fnUntraced(function* (step: StepSpec, run: Run) {
+  const home = yield* StoreRoot;
   const door = (yield* SkillDoor).skills;
-  const found = yield* door.found({ dir: run.workflowDir, places: placesOf(run.repo) });
+  const found = yield* door.found({ dir: run.workflowDir, places: placesOf(home, run.repo) });
   const told: SkillAgain[] = [];
   for (const name of step.agent?.skills ?? []) {
     const from = found.at.get(name);
@@ -198,13 +201,14 @@ export function placeTold(
  * reads, which asks for no server; `filedAt` is what a filing takes.
  */
 export const filedFoldersAt = (
+  home: string,
   run: Pick<Run, 'id' | 'inputs' | 'workflowFiles' | 'carriedFiles'>,
 ): { runArtifacts: string; inbox: string; inputs?: string; workflowFiles?: string; carriedFiles?: string } => ({
-  runArtifacts: path.dirname(artifactsDir(run, 'step')),
-  inbox: inboxDir(),
-  ...(run.inputs?.length ? { inputs: inputsDir(run) } : {}),
-  ...(run.workflowFiles === undefined ? {} : { workflowFiles: workflowFilesDir(run, run.workflowFiles) }),
-  ...(run.carriedFiles === undefined ? {} : { carriedFiles: carriedFilesDir(run, run.carriedFiles) }),
+  runArtifacts: path.dirname(artifactsDir(home, run, 'step')),
+  inbox: inboxDir(home),
+  ...(run.inputs?.length ? { inputs: inputsDir(home, run) } : {}),
+  ...(run.workflowFiles === undefined ? {} : { workflowFiles: workflowFilesDir(home, run, run.workflowFiles) }),
+  ...(run.carriedFiles === undefined ? {} : { carriedFiles: carriedFilesDir(home, run, run.carriedFiles) }),
 });
 
 /**
@@ -223,7 +227,7 @@ export const filedAt = (
   carriedFiles?: string;
   servers: FactoryServers;
 } => ({
-  ...filedFoldersAt(run),
+  ...filedFoldersAt(home, run),
   servers: recordedServers(run.factory, home),
 });
 
@@ -258,11 +262,11 @@ export function briefNow(step: StepSpec, run: Run, steps: readonly StepSpec[], p
  * The files the closeout of the try that ended named that the run did not have (`lackedOf`), as its next try is told them: a line each,
  * with a near name off what the step's files directory holds now (`lackLines`). Nothing for a try that lacked none.
  */
-export const lacksTold = (run: Run, name: string, record: StepRecord): Pick<RetryBriefing, 'lacks'> => {
+export const lacksTold = (home: string, run: Run, name: string, record: StepRecord): Pick<RetryBriefing, 'lacks'> => {
   const lacked = lackedOf(record);
   if (!lacked.length) return {};
-  const there = artifactFiles(run, name).map((file) => file.path);
-  return { lacks: lackLines(lacked, artifactsDir(run, name), there) };
+  const there = artifactFiles(home, run, name).map((file) => file.path);
+  return { lacks: lackLines(lacked, artifactsDir(home, run, name), there) };
 };
 
 /**
@@ -271,18 +275,19 @@ export const lacksTold = (run: Run, name: string, record: StepRecord): Pick<Retr
  * are there now (`filesHanded`): the brief lists those, and hands on no name with no file.
  */
 export const foldersTold = (
+  home: string,
   run: Run,
   reads: { steps: readonly StepSpec[]; signedOff: (step: string) => Closeout | undefined },
   step: StepSpec,
   caller: readonly Mount[] = [],
 ): FiledFolders => {
-  const folders = filedFolders(step, reads.steps, { ...filedFoldersAt(run), caller });
-  const closeouts = folders.handed.filter((m) => holdsCloseout(run, path.basename(m.path))).map((m) => m.path);
+  const folders = filedFolders(step, reads.steps, { ...filedFoldersAt(home, run), caller });
+  const closeouts = folders.handed.filter((m) => holdsCloseout(home, run, path.basename(m.path))).map((m) => m.path);
   const named = folders.handed
     .filter((m) => !closeouts.includes(m.path))
     .map((m) => {
       const from = path.basename(m.path);
-      return [m.path, filesHanded(run, from, reads.signedOff(from))] as const;
+      return [m.path, filesHanded(home, run, from, reads.signedOff(from))] as const;
     });
   return { ...folders, named: Object.fromEntries(named), closeouts };
 };
@@ -338,6 +343,7 @@ const endingSaid = (f: TriedReads, ending: StepSpec): EndingStopped => {
  * to it, how the try before it ended, what its check refused, what was denied it, and the ending it was sent back from.
  */
 export const tryTold = (
+  home: string,
   f: TriedReads,
   r: Retry,
   record: StepRecord,
@@ -355,7 +361,7 @@ export const tryTold = (
   status: t.status,
   ...(t.refusal ? { refusal: t.refusal } : {}),
   ...(t.status === 'denied' ? { denied: (record.taskId === null ? undefined : f.reads.spendOf(record.taskId))?.denied ?? [] } : {}),
-  ...(t.status === 'unsigned' ? lacksTold(f.run, r.step, record) : {}),
+  ...(t.status === 'unsigned' ? lacksTold(home, f.run, r.step, record) : {}),
   ...(t.status === 'unsigned' ? refusedTold(stepNamed(f, r.step), f.reads.signedOff(r.step), f.reads.steps) : {}),
   ...(r.back?.[0] !== undefined ? { ending: endingSaid(f, stepNamed(f, r.back[0])) } : {}),
 });

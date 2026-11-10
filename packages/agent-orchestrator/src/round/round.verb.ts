@@ -16,6 +16,7 @@ import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRea
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 export type RoundAsked = { run: Run; ask: RoundAsk; file: string };
 
@@ -89,6 +90,7 @@ export type Accepted = { run: Run; acceptance: Acceptance; file: string };
  * Fails with a refusal, the verb's or one a read threw; dies of anything else (`tried`).
  */
 export const acceptRun = Effect.fn('accept')(function* (id: string, stepName?: string, message?: string) {
+  const home = yield* StoreRoot;
   if (!(yield* (yield* RunDoor).runs.exists(RunId.read(id))))
     return yield* Effect.fail(
       new Missing({
@@ -121,7 +123,7 @@ export const acceptRun = Effect.fn('accept')(function* (id: string, stepName?: s
   if (!written.written) {
     const { stray } = written;
     const why = yield* tried(() =>
-      acceptedAlready(file, stray, acceptance, answer(runsAtOnce.runs.read(id), runsAtOnce.asks.read(id).rounds), id),
+      acceptedAlready(file, stray, acceptance, answer(runsAtOnce(home).runs.read(id), runsAtOnce(home).asks.read(id).rounds), id),
     );
     return yield* Effect.fail(new Conflict({ message: why }));
   }

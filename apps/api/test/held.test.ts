@@ -110,7 +110,7 @@ test('a step whose task is held open reads as waiting on a person, never as a se
         'input-required',
         "the seed is the engine's held task, waiting",
       );
-      const listed = await runWith(engine(), list(engine(), runStore.runs.read('h-blocked')));
+      const listed = await runWith(engine(), list(engine(), runStore(root).runs.read('h-blocked')));
       for (const run of [await detail('h-blocked'), await summary('h-blocked')]) {
         assert.deepEqual(
           run.steps.map(({ name, message, needs }) => ({ name, message, needs })),

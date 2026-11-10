@@ -4,11 +4,10 @@
  * `runMain` runs either as the process's command, a signal letting go of the lease before the process exits.
  */
 import { Cause, Deferred, Effect, Exit, Fiber, Metric, type Scope } from 'effect';
-import type { StoreRoot } from '../config/root.store.ts';
+import { StoreRoot } from '../config/root.store.ts';
 import { type Settings, StoreConfig } from '../config/config.store.ts';
 import type { PlaceService } from '../place/place.store.ts';
 import { over, quotaHarnesses, scopeRefusal, type Engine, type HarnessQuota } from '../runtime-client.ts';
-import { HOME } from '../record/record.store.ts';
 import { queueLine } from '../inbox/index.ts';
 import { scheduleLine } from '../factory/schedule/schedule.ts';
 import { addPass, summaryDue, summaryLine, type Interval, type Reading } from '../meter/index.ts';
@@ -301,16 +300,20 @@ export const up = (
 ): Effect.Effect<never, unknown, Scope.Scope | PlaceService | StoreRoot | StoreConfig> =>
   Effect.gen(function* () {
     const config = yield* StoreConfig;
+    const home = yield* StoreRoot;
     const unheld = yield* Effect.try({ try: () => limitRefusal(config, scope), catch: (err) => err });
     if (unheld) return yield* Effect.fail(unheld);
     const taken = yield* Effect.acquireRelease(
-      Effect.try({ try: () => takeStore({ every, cwd: repo, by: holder, release: leaseRelease(runningRelease()) }), catch: (err) => err }),
-      ({ held }) => Effect.sync(() => releaseStore(held)),
+      Effect.try({
+        try: () => takeStore(home, { every, cwd: repo, by: holder, release: leaseRelease(runningRelease()) }),
+        catch: (err) => err,
+      }),
+      ({ held }) => Effect.sync(() => releaseStore(home, held)),
     );
     const served = yield* e.hold();
-    if (served) yield* Effect.sync(() => heldServes(served.cards));
+    if (served) yield* Effect.sync(() => heldServes(home, served.cards));
     yield* seriesBorn([...DAEMON_SERIES, ...series]);
-    yield* Effect.forkScoped(Effect.forever(Effect.sleep(every).pipe(Effect.andThen(Effect.sync(() => beat(taken.held))))));
+    yield* Effect.forkScoped(Effect.forever(Effect.sleep(every).pipe(Effect.andThen(Effect.sync(() => beat(home, taken.held))))));
     let reading: Reading = {};
     yield* Effect.forkScoped(
       Effect.forever(
@@ -343,10 +346,10 @@ export const up = (
     if (onTaken) yield* onTaken(taken);
     let said = NOTHING_SAID;
     for (;;) {
-      const by = stillHeld(taken.held);
-      if (by) return yield* Effect.fail(new Error(takenFromLine(by, HOME, holder)));
+      const by = stillHeld(home, taken.held);
+      if (by) return yield* Effect.fail(new Error(takenFromLine(by, home, holder)));
       const pass = yield* withProposalsPass(tickRun({ repo, quota: () => reading, disk: () => measured })).pipe(over(e));
-      passed(taken.held);
+      passed(home, taken.held);
       rested = pass.runs;
       yield* Deferred.succeed(answered, undefined);
       said = yield* logPass(pass, said);
@@ -355,10 +358,10 @@ export const up = (
   });
 
 /**
- * The api's word once it listens: `url`, where it serves the board, written into the lease this process holds, so `nemia ls`, `/api/daemon`
- * and a refused daemon name it. Answers whether it was written: not when the lease is another's, or let go.
+ * The api's word once it listens: `url`, where it serves the board, written into the lease this process holds at the store `home`, so
+ * `nemia ls`, `/api/daemon` and a refused daemon name it. Answers whether it was written: not when the lease is another's, or let go.
  */
-export const holdUrl = (url: string): boolean => heldUrl(url);
+export const holdUrl = (home: string, url: string): boolean => heldUrl(home, url);
 
 /**
  * The signals that stop a command, each with the code the process exits with once the command has let go of what it held: 128 + its number.

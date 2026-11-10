@@ -24,7 +24,7 @@ import { repoOf } from './capabilities/capabilities.ts';
 import { argsOf, HOST, portOf } from './port.ts';
 import { STEP_FOLLOWS } from './steps/following.ts';
 import { daemonQuota, QuotaAsker } from './gauges/quota.ts';
-import { Engine, engineRead } from './store.ts';
+import { Engine, engineRead, StoreRoot } from './store.ts';
 
 /** Prints `err`'s message and exits with its code: 2 for a refusal, 1 for anything else. */
 function fail(err: unknown): never {
@@ -89,6 +89,6 @@ else
       holder: 'api',
       series: [STEP_FOLLOWS],
       quota: (name) => Effect.promise(() => daemonQuota(asker, name, () => engineRead('quota', e.quota(name)))()),
-      onTaken: () => Effect.map(listening, (served) => void holdUrl(`http://${HOST}:${served.port}`)),
+      onTaken: () => Effect.map(listening, (served) => void holdUrl(Context.get(services, StoreRoot), `http://${HOST}:${served.port}`)),
     }).pipe(Effect.scoped, Effect.provideContext(services), Effect.ensuring(runtime.disposeEffect)),
   ).catch(fail);

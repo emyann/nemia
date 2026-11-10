@@ -66,9 +66,9 @@ test('nemia daemon is served on the command line alone and starts the daemon as 
 });
 
 test('nemia daemon --json, on a store whose lease holds a url, prints the url and the pid, and starts nothing', async (t) => {
-  const { held } = takeStore({ every: 4000, cwd: ROOT, by: 'api' });
-  t.after(() => releaseStore(held));
-  assert.equal(heldUrl('http://127.0.0.1:65530'), true);
+  const { held } = takeStore(rootNow(), { every: 4000, cwd: ROOT, by: 'api' });
+  t.after(() => releaseStore(rootNow(), held));
+  assert.equal(heldUrl(rootNow(), 'http://127.0.0.1:65530'), true);
   const { host, spawns } = hostOf();
   const answer: unknown = JSON.parse(await printed(t, ['daemon', '--json'], host));
   assert.deepEqual(answer, { state: 'ticking', by: 'api', pid: process.pid, url: 'http://127.0.0.1:65530' });

@@ -14,6 +14,7 @@ import { Informer, informerRead } from '../rest/informer.verb.ts';
 import { sameJudgement } from '../summary/judgement.verb.ts';
 import { passParents } from '../views/views.verb.ts';
 import { standingReader, standingSnapshot } from '../standing/standing.verb.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /**
  * The run slots (`slotsOf`) of every run in the store, read through the engine in the context, the runs they wait on off the tick's last
@@ -25,14 +26,15 @@ import { standingReader, standingSnapshot } from '../standing/standing.verb.ts';
  * left out that is judged in flight or wanting a slot dies, naming it (`slotsOf`'s `settled`).
  */
 export const slotsRead = Effect.fn('slotsRead')(function* () {
+  const home = yield* StoreRoot;
   const config = yield* StoreConfig;
   const git = standingReader(yield* standingSnapshot());
   const parents = passParents(git);
   const e = yield* EngineService;
   const informer = yield* Informer;
-  if (!informer || (lastCeilings()?.runs ?? config.maxRuns) <= 0) return yield* slotsOf(e, undefined, config, parents);
+  if (!informer || (lastCeilings(home)?.runs ?? config.maxRuns) <= 0) return yield* slotsOf(e, undefined, config, parents);
   const read = yield* informerRead(e, informer, yield* tried(() => config.verifyRest), git, sameJudgement);
-  const all = storeRunsGiven(read.given);
+  const all = storeRunsGiven(home, read.given);
   read.only(all.map((run) => run.id));
   const settled = new Set(all.filter((run) => slotSettled(read.kept(run)?.judged)).map((run) => run.id));
   if (read.verify) return yield* slotsOf(e, all, config, parents, settled);

@@ -187,6 +187,7 @@ const attemptsOn = (state: TaskView['state'] | undefined, turn?: number): TaskVi
  * current try's `missing` are of the fields it was filed with (`filedOwed`): one its step declares since a revision followed is not.
  */
 export function closeoutIn(
+  home: string,
   run: Run,
   name: string,
   step: StepSpec,
@@ -210,7 +211,7 @@ export function closeoutIn(
     summary: c.summary,
     body: c.body ?? null,
     needs: c.needs ?? null,
-    artifacts: c.artifacts.map((file) => artifactOf(run, name, file)),
+    artifacts: c.artifacts.map((file) => artifactOf(home, run, name, file)),
     values: (c.values ?? []).map(valueOf),
     refused: closeoutRefusals(step, c, steps),
     output: given,
@@ -260,6 +261,7 @@ export const turnOfTry = (before: readonly EarlierTry[], at: EarlierTry): number
  * on that try, the tries behind it: `answerOf` reads a step's current try.
  */
 export function triesOf(
+  home: string,
   run: Run,
   name: string,
   steps: readonly StepSpec[],
@@ -296,7 +298,7 @@ export function triesOf(
       ...earlierSaid(t, i),
       attempts: attemptsIn(t.taskId, views, releases, turnAt(t, i)),
       check: step.check ? checkIn(step.check, t.check?.taskId, views, stderr) : null,
-      closeout: closeoutIn(run, name, step, t.taskId, views, steps, turnAt(t, i)),
+      closeout: closeoutIn(home, run, name, step, t.taskId, views, steps, turnAt(t, i)),
       unreadable: unreadableIn(t.taskId, views, turnAt(t, i)),
       answer: answerAt(i + 1),
     })),

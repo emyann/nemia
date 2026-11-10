@@ -36,13 +36,14 @@ type OnBranch = (rel: string) => 'file' | 'directory' | 'absent' | { readonly un
  * at (`artifactPlace`), as is a path through a folder a harness reads as its own configuration, which is never collected.
  */
 export function missingArtifacts(
+  home: string,
   place: Place,
   run: Run,
   stepName: string,
   closeout: Closeout | { error: string } | undefined,
 ): MissingArtifact[] {
   if (!closeout || 'error' in closeout) return [];
-  const dir = artifactsDir(run, stepName);
+  const dir = artifactsDir(home, run, stepName);
   const onBranch = branchOf(
     place,
     run,
@@ -77,9 +78,9 @@ function placedWhy(file: string, dir: string): 'outside' | 'escapes' | 'configur
  * judged where the record names no workspace or the workspace is not on disk. In a workspace that is there, a path with nothing at it is
  * `not there`, a directory is `directory`, and a link that leads out is `escapes`.
  */
-export function filesLacked(run: Run, stepName: string, closeout: Closeout | undefined): LackedFile[] {
+export function filesLacked(home: string, run: Run, stepName: string, closeout: Closeout | undefined): LackedFile[] {
   if (!closeout) return [];
-  const dir = artifactsDir(run, stepName);
+  const dir = artifactsDir(home, run, stepName);
   const { workspace } = run.steps[stepName] ?? {};
   const lacked: LackedFile[] = [];
   for (const file of closeout.artifacts) {
@@ -104,14 +105,14 @@ function workspaceLacks(workspace: string | undefined, rel: string, dir: string)
  * on the pass that hands the step off, after it collected what the closeout named, so it holds the current try's closeout. A link a step
  * left at that name is taken away first, and never written through. Answers a note when the write failed; it never throws.
  */
-export function handCloseout(run: Run, step: StepSpec, said: Closeout | undefined): string[] {
+export function handCloseout(home: string, run: Run, step: StepSpec, said: Closeout | undefined): string[] {
   if (!said) return [];
-  const dir = artifactsDir(run, step.name);
+  const dir = artifactsDir(home, run, step.name);
   const file = path.join(dir, HANDED_CLOSEOUT);
   try {
     if (lstatOf(file)?.isSymbolicLink()) fs.unlinkSync(file);
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(file, `${JSON.stringify(handedCloseout(step, said, filesHanded(run, step.name, said).there), null, 2)}\n`);
+    fs.writeFileSync(file, `${JSON.stringify(handedCloseout(step, said, filesHanded(home, run, step.name, said).there), null, 2)}\n`);
     return [];
   } catch (e) {
     return [`${step.name}: ${HANDED_CLOSEOUT} not written — ${(e as Error).message}`];
@@ -119,16 +120,16 @@ export function handCloseout(run: Run, step: StepSpec, said: Closeout | undefine
 }
 
 /** Whether step `stepName`'s files directory holds the closeout the tick writes there (`handCloseout`): a file, never a link. */
-export const holdsCloseout = (run: Pick<Run, 'id'>, stepName: string): boolean =>
-  lstatOf(path.join(artifactsDir(run, stepName), HANDED_CLOSEOUT))?.isFile() ?? false;
+export const holdsCloseout = (home: string, run: Pick<Run, 'id'>, stepName: string): boolean =>
+  lstatOf(path.join(artifactsDir(home, run, stepName), HANDED_CLOSEOUT))?.isFile() ?? false;
 
 /**
  * Which of the files a step's closeout named are in its files directory now, each by its absolute path there, and how many are not: what
  * the brief of a step filed after it lists (`mountsLine`), so it is handed no name with no file behind it. A path from the workspace
  * root is looked for where the run collected it.
  */
-export function filesHanded(run: Pick<Run, 'id'>, stepName: string, closeout: Closeout | undefined): HandedFiles {
-  const dir = artifactsDir(run, stepName);
+export function filesHanded(home: string, run: Pick<Run, 'id'>, stepName: string, closeout: Closeout | undefined): HandedFiles {
+  const dir = artifactsDir(home, run, stepName);
   const there: string[] = [];
   let gone = 0;
   for (const file of closeout?.artifacts ?? []) {
@@ -219,10 +220,10 @@ function inWorkspace(
  * is written through a link in the files directory, which a step may have made. It never throws, as a hand-off does not. The pass's note
  * names what was copied.
  */
-export function collectArtifacts(run: Run, stepName: string, closeout: Closeout | undefined): string[] {
+export function collectArtifacts(home: string, run: Run, stepName: string, closeout: Closeout | undefined): string[] {
   const workspace = run.steps[stepName]?.workspace;
   if (!closeout || !workspace) return [];
-  const dir = artifactsDir(run, stepName);
+  const dir = artifactsDir(home, run, stepName);
   const copied: string[] = [];
   for (const file of closeout.artifacts) {
     if (artifactPlace(file, dir) !== 'workspace') continue;
@@ -284,9 +285,9 @@ function isFileIn(file: string, dir: string): boolean {
  * listed because something inside it points there. Not the closeout the run wrote there (`HANDED_CLOSEOUT`), which is no file the step
  * handed over.
  */
-export function artifactFiles(run: Pick<Run, 'id'>, stepName: string): ArtifactFile[] {
+export function artifactFiles(home: string, run: Pick<Run, 'id'>, stepName: string): ArtifactFile[] {
   const found: ArtifactFile[] = [];
-  const top = artifactsDir(run, stepName);
+  const top = artifactsDir(home, run, stepName);
   const walk = (dir: string): void => {
     let entries;
     try {
@@ -322,12 +323,13 @@ export const LANDED_PICTURES = 'e2e-pictures.txt';
  * removes the rest. Nothing to remove writes nothing.
  */
 export function dropLandedPictures(
+  home: string,
   run: Pick<Run, 'id'>,
   stepName: string,
   closeout: Closeout | undefined,
   said: { commit: string; checkTaskId?: string },
 ): { removed: string[]; bytes: number } {
-  const dir = artifactsDir(run, stepName);
+  const dir = artifactsDir(home, run, stepName);
   const named = new Set(
     (closeout?.artifacts ?? []).map((file) => (path.isAbsolute(file) ? path.normalize(file) : path.join(dir, path.normalize(file)))),
   );
@@ -402,4 +404,5 @@ export function fileIn(dir: string, name: string): Buffer | null {
 }
 
 /** The file `name` of the files directory of `step` in `run` (`artifactsDir`), read as `fileIn` reads it. */
-export const artifactFile = (run: Pick<Run, 'id'>, step: string, name: string): Buffer | null => fileIn(artifactsDir(run, step), name);
+export const artifactFile = (home: string, run: Pick<Run, 'id'>, step: string, name: string): Buffer | null =>
+  fileIn(artifactsDir(home, run, step), name);

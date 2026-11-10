@@ -15,6 +15,7 @@ import { eachTest } from '../../test/placed.ts';
 import { TEAM } from '../../test/team.ts';
 import type { Run } from '../record/record.ts';
 import type { WordedRule } from './reach.verb.ts';
+import { rootNow } from '../../test/config-given.ts';
 
 const ROOT = scratch('wf-policy-reach-');
 process.env.WF_ROOT = ROOT;
@@ -61,7 +62,7 @@ test('`nemia policy reach`: which steps at their gate her rules can approve in a
   const repo = repoWithWorkflows();
   createFactoryAt(ROOT, { name: 'f', repos: [repo], workflows: [], hires: {}, schedules: {} });
   for (const workflow of ['dev', 'plain']) attachWorkflowAt(ROOT, { factory: 'f', workflow });
-  writeFactoryLevel('f', { level: 'auto', since: '2026-11-05T00:00:00.000Z' });
+  writeFactoryLevel(rootNow(), 'f', { level: 'auto', since: '2026-11-05T00:00:00.000Z' });
 
   let suggested: WordedRule[] = [];
   await t.test('nothing confirmed: the default reaches neither step, each said why, and a rule suggested for each', async () => {

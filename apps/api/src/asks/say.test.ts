@@ -202,7 +202,7 @@ test("a person's words to a working session: the package's `sayRun` hands them t
       for (const other of steps.filter((s) => s.name !== 'implement'))
         assert.deepEqual(other.said, [], `${other.name}: nobody told it anything`);
       assert.equal(
-        (await runWith(engine(), list(engine(), runStore.runs.read(R)))).steps.find((s) => s.name === 'implement')!.note,
+        (await runWith(engine(), list(engine(), runStore(root).runs.read(R)))).steps.find((s) => s.name === 'implement')!.note,
         'said to 1×',
         "`nemia ls`'s words",
       );

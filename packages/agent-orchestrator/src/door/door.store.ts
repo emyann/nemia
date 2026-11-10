@@ -6,8 +6,7 @@
  * same way whichever layer holds the records. The walks that hold the layers to one table are the tests' (`test/door-walks.ts`).
  *
  * A door whose files are under the store's root is rooted (`rootedDoor`): its default reads the root the program is given, `StoreRoot`,
- * when a method runs, and is refused where none was given, so a door never reads a root of its own module's. The Run door's default is
- * not rooted yet: its files store still reads the module's (`test/global-roots.baseline.ts`).
+ * when a method runs, and is refused where none was given, so a door never reads a root of its own module's.
  *
  * A store file by its name, as the kinds go (`test/boundary.test.ts`): it touches no disk, and a pure file loads no Effect but
  * `effect/Data`. The client builds `tried` on `fromThrow`, so a controller's read and a door's act fail and die alike.

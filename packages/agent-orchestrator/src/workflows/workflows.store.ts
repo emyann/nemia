@@ -32,14 +32,7 @@ import { workflowVersionRefusal, type Fills, type Found, type WorkflowThere } fr
 import { StepName, Workflow, WorkflowDir, WorkflowName } from '../folder/folder.model.ts';
 import { formerKeyLines, loadWorkflowsWith, workflowDirAt, workflowsIn } from '../folder/folder.store.ts';
 import { versionDigest, versionGathered, versionNamed, type VersionGathered } from '../folder/version.store.ts';
-import {
-  atHome,
-  placesAroundAt,
-  removeWorkflowAt,
-  writeWorkflowAt,
-  type WorkflowRemoved,
-  type WorkflowWritten,
-} from '../folder/write.store.ts';
+import { placesAroundAt, removeWorkflowAt, writeWorkflowAt, type WorkflowRemoved, type WorkflowWritten } from '../folder/write.store.ts';
 import { AgentDoor, agentDoorOver, agentFiles, type AgentDoorShape } from '../agents/agent-door.store.ts';
 import { SkillDoor, skillDoorOver, skillFiles, type SkillDoorShape } from '../skills/skill-door.store.ts';
 
@@ -334,8 +327,8 @@ const writeWorkflowOnDisk = (
     found: foundOnDisk(home, path.resolve(dir), places ?? placesAroundAt(home, dir)),
   });
 
-/** `writeWorkflowOnDisk` the module's root (`atHome`). */
-export const writeWorkflow = atHome(writeWorkflowOnDisk);
+/** `writeWorkflowOnDisk`, under the name the package exports: the store's root first. */
+export const writeWorkflow = writeWorkflowOnDisk;
 
 /**
  * The steps of the draft folder `folder`, a plain path, read through the Workflow door the program is given with its agents and skills

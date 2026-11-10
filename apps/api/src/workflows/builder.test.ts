@@ -1382,7 +1382,7 @@ test('PUT /api/workflows/yours/:name: a save the package refuses, or of a folder
           after: s.spec.after ?? [],
         }));
         assert.throws(
-          () => writeWorkflow(dir, drafts),
+          () => writeWorkflow(root, dir, drafts),
           (e: Error) => e.message === error,
           `${what}: the package's sentence, word for word, as writeWorkflow throws it for the same steps: ${error}`,
         );

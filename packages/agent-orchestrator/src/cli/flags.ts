@@ -11,6 +11,7 @@ import {
   helpOf,
   storeConfigLayer,
   type Args,
+  type Env,
   type engine,
   type StoreConfig,
   type StoreRoot,
@@ -21,18 +22,22 @@ import {
 export type Engine = ReturnType<typeof engine>;
 
 /**
- * `program` given `place`, and the store's root and settings from the process's environment (`storeConfigLayer`: `StoreRoot`,
- * `StoreConfig`), and still to be run: how a command gives its program the place `main` was handed, the root a read of the store asks (a
- * run's unfrozen steps among them) and the settings a verb reads (`WF_MAX_RUNS`). The one place the CLI reads `process.env` for them.
+ * `program` given `place`, and the store's root and settings from `env`, the environment `main` composes from (`storeConfigLayer`:
+ * `StoreRoot`, `StoreConfig`), and still to be run: how a command gives its program the place `main` was handed, the root a read of the
+ * store asks (a run's unfrozen steps among them) and the settings a verb reads (`WF_MAX_RUNS`).
  */
 export const placedIn = <A, E, R>(
+  env: Env,
   place: Place,
   program: Effect.Effect<A, E, R>,
 ): Effect.Effect<A, E, Exclude<Exclude<R, PlaceService>, StoreRoot | StoreConfig>> =>
-  Effect.provide(Effect.provide(program, PlaceService.layer(place)), storeConfigLayer(process.env));
+  Effect.provide(Effect.provide(program, PlaceService.layer(place)), storeConfigLayer(env));
 
-/** A verb: it takes what follows it on the command line, the engine and the place, and prints what it did, or throws a refusal. */
-export type Verb = (rest: string[], e: Engine, place: Place) => void | Promise<void>;
+/**
+ * A verb: it takes the environment `main` composes from, what follows it on the command line, the engine and the place, and prints what
+ * it did, or throws a refusal.
+ */
+export type Verb = (env: Env, rest: string[], e: Engine, place: Place) => void | Promise<void>;
 
 /** What `wf`, the alias of `nemia`, prints on stderr before it runs the command it is given, one line naming what to type next. */
 export const WF_HINT = 'wf is now nemia: type `nemia <args>`; wf stays an alias until a later release removes it.';

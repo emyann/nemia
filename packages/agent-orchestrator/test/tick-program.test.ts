@@ -31,6 +31,7 @@ import type { PlaceService } from '../src/place/place.store.ts';
 import type { StoreRoot } from '../src/config/root.store.ts';
 import type { StoreConfig } from '../src/config/config.store.ts';
 import type { ProposalsAct } from '../src/apply/act.verb.ts';
+import { rootNow } from './config-given.ts';
 
 const place = testPlace();
 const stand = () => place;
@@ -125,6 +126,7 @@ function _tickProgramTypes(e: Engine) {
 test('a pass whose series cannot be written keeps its own cost and says so: the series are lost, never the pass; the quota read rides on it', async (t) => {
   const old = new Date(Date.now() - 3_600_000).toISOString();
   recordRecentPass(
+    rootNow(),
     passCost({
       at: old,
       ms: 5,
@@ -153,7 +155,7 @@ test('a pass whose series cannot be written keeps its own cost and says so: the 
     said.some((x) => x.startsWith('nemia: the series were not kept on this pass: ')),
     said.join(''),
   );
-  const last = recentPasses().at(-1)!;
+  const last = recentPasses(rootNow()).at(-1)!;
   assert.deepEqual([last.at, last.quota], [pass.cost.at, { h: { w: 12 } }]);
 });
 
@@ -168,7 +170,7 @@ test('a pass handed a reading of the disk keeps it as it is and measures nothing
     ],
   };
   const pass = await runWith(e, tickRun({ repo: ROOT, disk: () => reading }));
-  const kept = recentPasses().at(-1)!;
+  const kept = recentPasses(rootNow()).at(-1)!;
   assert.deepEqual([kept.at, kept.disk], [pass.cost!.at, reading], 'read back off the store, typed');
   assert.deepEqual(Object.keys(kept.phases), [...PHASES], 'the pass has the phases it had');
   assert.deepEqual(
@@ -176,7 +178,7 @@ test('a pass handed a reading of the disk keeps it as it is and measures nothing
     [],
   );
   await runWith(e, tickRun({ repo: ROOT, disk: () => undefined }));
-  assert.equal('disk' in recentPasses().at(-1)!, false, 'a pass handed no reading keeps none');
+  assert.equal('disk' in recentPasses(rootNow()).at(-1)!, false, 'a pass handed no reading keeps none');
   const imports = importsIn(fs.readFileSync(path.join(import.meta.dirname, '..', 'src', 'tick', 'tick.verb.ts'), 'utf8'));
   assert.ok(
     imports.some((i) => i.spec === '../meter/meter.verb.ts'),
@@ -196,23 +198,23 @@ test('a check filed by a pass is kept with its labels among the recent passes, a
   const folder = fs.mkdtempSync(path.join(ROOT, 'checked-'));
   fs.writeFileSync(path.join(folder, 'work.md'), '---\nplace: git\nharness: codex\ncheck: node -e 0\n---\nwork it\n');
   const run = await runPlaced(startRun({ brief: 'a checked run', repo: REPO, workflowDir: folder }));
-  const before = recentPasses().length;
-  for (let k = 0; k < 8 && !runRecord(run.id).steps.work?.check; k++) {
+  const before = recentPasses(rootNow()).length;
+  for (let k = 0; k < 8 && !runRecord(rootNow(), run.id).steps.work?.check; k++) {
     await runWith(e, tickRun({ repo: ROOT }));
     signAll();
   }
-  assert.ok(runRecord(run.id).steps.work?.check, 'the pass filed the check');
-  const labels = { factory: DEFAULT_NAMESPACE, workflow: path.basename(runRecord(run.id).workflowDir), step: 'work', agent: '' };
-  const kept = recentPasses().slice(before);
+  assert.ok(runRecord(rootNow(), run.id).steps.work?.check, 'the pass filed the check');
+  const labels = { factory: DEFAULT_NAMESPACE, workflow: path.basename(runRecord(rootNow(), run.id).workflowDir), step: 'work', agent: '' };
+  const kept = recentPasses(rootNow()).slice(before);
   assert.deepEqual(
     kept.flatMap((p) => p.checks ?? []),
     [labels],
     'the pass that filed it carries its labels',
   );
   const later = Date.now() + 120_000;
-  keepSeries(recentPasses(), settingsOf(process.env), later);
+  keepSeries(rootNow(), recentPasses(rootNow()), settingsOf(process.env), later);
   assert.deepEqual(
-    seriesRead('24h', undefined, later)
+    seriesRead(rootNow(), '24h', undefined, later)
       .series.filter((x) => x.s === 'check.load')
       .map((x) => x.l),
     [labels],

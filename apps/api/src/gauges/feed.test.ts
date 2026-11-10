@@ -34,6 +34,7 @@ import {
   readFeed,
   type Selectors,
 } from 'agent-orchestrator';
+import { root } from '../../test/harness.ts';
 
 type FeedWords = import('agent-orchestrator').FeedWords;
 
@@ -45,20 +46,20 @@ const STREAM = '/api/feed/stream';
  * one written as another process writes it (`elsewhere`), with no hub, whose lines a stream reads from the file alone.
  */
 const emptyFeed = () => {
-  fs.rmSync(feedFile(), { force: true });
+  fs.rmSync(feedFile(root), { force: true });
   const memo = freshFeedMemo();
   const written = (runs: Record<string, FeedWords>) =>
     emitFeed(new Map(Object.entries(runs)), { memo }).pipe(Effect.provide(Logger.layer([])));
   return Object.assign((runs: Record<string, FeedWords>) => runtime.runPromise(written(runs)), {
     elsewhere: (runs: Record<string, FeedWords>) =>
-      Effect.runPromise(written(runs).pipe(Effect.provide(StoreRoot.layer(path.dirname(feedFile()))))),
+      Effect.runPromise(written(runs).pipe(Effect.provide(StoreRoot.layer(path.dirname(feedFile(root)))))),
   });
 };
 const planAt = (word: string, note?: string): FeedWords => ({
   run: { word: 'running' },
   steps: [{ name: 'plan', word, ...(note ? { note } : {}) }],
 });
-const end = () => readFeed(0).cursor;
+const end = () => readFeed(root, 0).cursor;
 /** A run running, at each step named, all at `running`: the words a pass hands the feed for it. */
 const steps = (...named: readonly string[]): FeedWords => ({
   run: { word: 'running' },
@@ -199,9 +200,9 @@ test(
       async (t) => {
         const pass = emptyFeed();
         await pass({ 'r-1': planAt('running') });
-        assert.equal(readFeed(0).lines.length, 2);
+        assert.equal(readFeed(root, 0).lines.length, 2);
         await pass({ 'r-1': planAt('succeeded') });
-        const lines = readFeed(0).lines;
+        const lines = readFeed(root, 0).lines;
         assert.equal(lines.length, 3);
 
         const first = await open();
@@ -214,7 +215,7 @@ test(
         assert.equal(all[2].id, String(end()));
         for (const [i, b] of all.entries())
           assert.deepEqual(
-            readFeed(Number(b.id)).lines,
+            readFeed(root, Number(b.id)).lines,
             lines.slice(i + 1),
             `event ${i}: its id is where a read takes up after that line, and no other`,
           );
@@ -287,8 +288,8 @@ test(
         const pass = emptyFeed();
         await pass({ 'r-1': planAt('running') });
         const v0 = { at: '2026-10-07T12:00:00.000Z', daemon: 4242, word: 'daemon started', note: 'first daemon on this store' };
-        fs.appendFileSync(feedFile(), `${JSON.stringify(v0)}\n`);
-        const lines = readFeed(0).lines;
+        fs.appendFileSync(feedFile(root), `${JSON.stringify(v0)}\n`);
+        const lines = readFeed(root, 0).lines;
         const daemon = lines.at(-1)!;
         assert.deepEqual(
           {
@@ -323,7 +324,7 @@ test(
         const at = '2026-10-23T06:00:00.000Z';
         for (const pause of [{ at }, null])
           await runtime.runPromise(emitFeed(new Map([['r-1', planAt('running')]]), { memo, pause }).pipe(Effect.provide(Logger.layer([]))));
-        const lines = readFeed(0).lines;
+        const lines = readFeed(root, 0).lines;
         const opened = await open();
         const all = await readUntil(t, opened.reader, opened.text, (s) => s.length >= 4);
         await opened.reader.cancel();
@@ -494,8 +495,8 @@ test('a feed truncated under the stream ends it: `unreadable`, not tried again, 
   await pass({ 'r-1': planAt('failed') });
   await readUntil(t, reader, text, (s) => s.length >= 1);
 
-  const first = fs.readFileSync(feedFile(), 'utf8').split('\n')[0];
-  fs.writeFileSync(feedFile(), `${first}\n`);
+  const first = fs.readFileSync(feedFile(root), 'utf8').split('\n')[0];
+  fs.writeFileSync(feedFile(root), `${first}\n`);
   const said = await readUntil(t, reader, text, () => false);
   const last = said.at(-1)!;
   assert.equal(
@@ -551,9 +552,9 @@ test(
         source: 'tick',
         message: 'succeeded',
       };
-      fs.chmodSync(feedFile(), 0o200);
+      fs.chmodSync(feedFile(root), 0o200);
       try {
-        fs.appendFileSync(feedFile(), `${JSON.stringify(line)}\n`);
+        fs.appendFileSync(feedFile(root), `${JSON.stringify(line)}\n`);
         const failed = await readUntil(t, reader, text, (s) => s.length >= 1);
         assert.equal(failed[0].event, 'unreadable');
         const { error, retrying } = JSON.parse(failed[0].data!);
@@ -561,7 +562,7 @@ test(
         assert.match(error, /EACCES/);
         await new Promise((r) => setTimeout(r, FAILING_FOR_MS));
       } finally {
-        fs.chmodSync(feedFile(), 0o644);
+        fs.chmodSync(feedFile(root), 0o644);
       }
       const cleared = await readUntil(t, reader, text, (s) => s.length >= 3);
       assert.deepEqual(
@@ -658,11 +659,11 @@ test(
  */
 const everySent = (): { line: FeedLine; sent: { data: string; id: string } }[] => {
   const raw = fs
-    .readFileSync(feedFile(), 'utf8')
+    .readFileSync(feedFile(root), 'utf8')
     .split('\n')
     .filter((l) => l.trim());
   let cursor = 0;
-  return readFeed(0).lines.map((line, i) => {
+  return readFeed(root, 0).lines.map((line, i) => {
     cursor += Buffer.byteLength(raw[i], 'utf8') + 1;
     return { line, sent: { data: JSON.stringify(line), id: String(cursor) } };
   });
@@ -895,10 +896,10 @@ test(
         await pass({ 'r-a': planAt('running') });
         await pass({ 'r-a': planAt('succeeded') });
         const every = everySent();
-        const size = fs.statSync(feedFile()).size;
+        const size = fs.statSync(feedFile(root)).size;
         const { reader, text } = await open('?until=end');
         await pass({ 'r-a': planAt('failed') });
-        assert.ok(fs.statSync(feedFile()).size > size, 'a line was written after the stream opened');
+        assert.ok(fs.statSync(feedFile(root)).size > size, 'a line was written after the stream opened');
         const said = await readUntil(t, reader, text, () => false);
         assert.deepEqual(
           said.map((b) => [b.event, b.id]),
@@ -912,7 +913,7 @@ test(
       const pass = emptyFeed();
       await pass({ 'r-a': planAt('running') });
       await pass({ 'r-a': planAt('running'), 'r-b': planAt('running') });
-      const size = fs.statSync(feedFile()).size;
+      const size = fs.statSync(feedFile(root)).size;
       const mine = everySent().filter((l) => labelOf(l.line, 'run') === 'r-a');
       const { reader, text } = await open('?until=end&selector=run%3Dr-a');
       const said = await readUntil(t, reader, text, () => false);
@@ -925,7 +926,7 @@ test(
     await s.test('`from=end` with `until=end` sends the bookmark alone; `after` at the end does the same', async (t) => {
       const pass = emptyFeed();
       await pass({ 'r-a': planAt('running') });
-      const size = String(fs.statSync(feedFile()).size);
+      const size = String(fs.statSync(feedFile(root)).size);
       for (const query of ['?from=end&until=end', `?after=${size}&until=end`]) {
         const { reader, text } = await open(query);
         const said = await readUntil(t, reader, text, () => false);

@@ -17,6 +17,7 @@ import { promised } from '../../test/promised.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
 import { storeConfigLayer } from '../config/root.store.ts';
+import { rootNow } from '../../test/config-given.ts';
 
 const ROOT = scratch('wf-meter-');
 const RUNS = path.join(ROOT, 'runs');
@@ -239,7 +240,7 @@ counts('a pass on a fixture store counts the run records it read: twice as many 
   assert.equal(perRun, Math.round(perRun), `a whole number of reads a run (${two.records} for two)`);
 
   await started(2);
-  const recordBytes = listRuns().reduce((n, r) => n + fs.statSync(path.join(RUNS, `${r.id}.json`)).size, 0);
+  const recordBytes = listRuns(rootNow()).reduce((n, r) => n + fs.statSync(path.join(RUNS, `${r.id}.json`)).size, 0);
   const four = (await runWith(e, tickRun())).cost!;
   assert.equal(four.records, perRun * 4, `four runs are read ${perRun} times each, as two were`);
   assert.ok(
@@ -296,10 +297,10 @@ counts('an engine that keeps no totals is still metered, with no harness named',
 
 writes("the last pass's cost is written to the store and read back; a file that does not read as one reads as none", async () => {
   emptyStore();
-  assert.equal(lastPassCost(), undefined, 'no pass, no cost');
+  assert.equal(lastPassCost(rootNow()), undefined, 'no pass, no cost');
   await started(1);
   const { cost } = await runWith(fake(), tickRun());
-  const read = lastPassCost();
+  const read = lastPassCost(rootNow());
   assert.ok(read && cost);
   assert.equal(read.at, cost.at);
   assert.equal(read.ms, cost.ms);
@@ -311,7 +312,7 @@ writes("the last pass's cost is written to the store and read back; a file that 
     'no temporary file is left',
   );
   fs.writeFileSync(STATS, '{"at":"2026-09-25T10:00:00.000Z","ms":');
-  assert.equal(lastPassCost(), undefined);
+  assert.equal(lastPassCost(rootNow()), undefined);
 });
 
 writes(
@@ -321,9 +322,9 @@ writes(
     await started(1);
     const unobserved = ['harness `claude`: claude agents: timed out'];
     await runWith(fake({ unobserved }), tickRun());
-    assert.deepEqual(lastPassCost()?.unobserved, unobserved);
+    assert.deepEqual(lastPassCost(rootNow())?.unobserved, unobserved);
     await runWith(fake(), tickRun());
-    const read = lastPassCost();
+    const read = lastPassCost(rootNow());
     assert.ok(read);
     assert.equal(Object.hasOwn(read, 'unobserved'), false);
   },
@@ -334,9 +335,9 @@ whose('outside a pass the readers count nothing, and a pass inside a metered cal
   const [run] = await started(1);
   const outside = await metered(async () => 'none');
   assert.equal(outside.tallies!.records, 0);
-  runRecord(run.id);
+  runRecord(rootNow(), run.id);
   const outer = await metered(async () => {
-    runRecord(run.id);
+    runRecord(rootNow(), run.id);
     within('act', () => busy(2));
     const inner = await runWith(fake(), tickRun());
     assert.equal(inner.cost, undefined, "a pass inside another's meter carries no cost of its own");
@@ -367,7 +368,7 @@ whose(
     const alone = await Effect.runPromise(
       meteredPass(
         Effect.sync(() => {
-          runRecord(run.id);
+          runRecord(rootNow(), run.id);
           within('act', () => busy(2));
           return 'read';
         }),
@@ -379,7 +380,7 @@ whose(
     assert.ok(alone.tallies.kinds.act.ms >= 2 && alone.ms >= alone.tallies.kinds.act.ms, 'act charged, within the pass');
     assert.equal(metering(), false, 'the meter closed with the pass');
     const outer = await metered(async () => {
-      const inner = await Effect.runPromise(meteredPass(Effect.sync(() => runRecord(run.id))));
+      const inner = await Effect.runPromise(meteredPass(Effect.sync(() => runRecord(rootNow(), run.id))));
       assert.equal(inner.tallies, undefined, "a program inside another's meter carries no counts of its own");
       assert.equal(metering(), true, 'and leaves the outer meter open');
       return 'done';
@@ -415,7 +416,7 @@ whose(
     const [run] = await started(1);
     let go!: () => void;
     const waiting = new Promise<void>((resolve) => (go = resolve));
-    const own = Effect.sync(() => runRecord(run.id));
+    const own = Effect.sync(() => runRecord(rootNow(), run.id));
     const pass = Effect.runPromise(
       meteredPass(
         Effect.andThen(
@@ -426,10 +427,10 @@ whose(
     );
     const promised = metered(async () => {
       await waiting;
-      runRecord(run.id);
+      runRecord(rootNow(), run.id);
     });
-    await Effect.runPromise(Effect.sync(() => runRecord(run.id)));
-    runRecord(run.id);
+    await Effect.runPromise(Effect.sync(() => runRecord(rootNow(), run.id)));
+    runRecord(rootNow(), run.id);
     assert.equal(metering(), false, 'no pass is open to a caller beside them');
     go();
     assert.deepEqual([(await pass).tallies?.records, (await promised).tallies?.records], [1, 1], 'each pass its own read alone');
@@ -468,17 +469,17 @@ counts(
   'a pass keeps what it saw: the runs listed, the tasks, the sessions queued and at work; and the recent passes grow by it',
   async () => {
     emptyStore();
-    fs.rmSync(recentFile(), { force: true });
+    fs.rmSync(recentFile(rootNow()), { force: true });
     await started(2);
     const first = (await runWith(fake({ queued: ['t-q'], running: { claude: 1 } }), tickRun())).cost!;
     assert.deepEqual(
       { runs: first.runs, tasks: first.tasks, queued: first.queued, admitted: first.admitted },
       { runs: 2, tasks: 1, queued: 1, admitted: 1 },
     );
-    assert.equal(recentPasses().length, 1);
+    assert.equal(recentPasses(rootNow()).length, 1);
     await started(1);
     await runWith(fake(), tickRun());
-    const kept = recentPasses();
+    const kept = recentPasses(rootNow());
     assert.deepEqual(
       kept.map((p) => [p.runs, p.queued]),
       [

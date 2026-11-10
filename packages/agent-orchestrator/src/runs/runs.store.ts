@@ -4,18 +4,19 @@
  * Effect failing with a refusal. Its shape is the run store's (`RunStore`, `record/record.ts`); the inbox is the Card door's
  * (`src/cards/cards.store.ts`).
  *
- * Two layers: the files (`runDoorFiles`, over `filesStore`, so a record is the very bytes it was), which `runWith` gives a program that
- * was given none, and the memory stand-in (`runDoorMemory`, `memory.store.ts`), which a test gives its program. Both are built by
- * `runDoorOver`, so each write is checked the one way on both: a new run decodes through the model's `Run` (`record/record.model.ts`)
- * with its id as `RunId.OnCreate` checks it, and a run written back through `Run`, its invariants among it — each try named by its
- * step and number, no run waiting on itself, a landing with one outcome — or `Invalid` names the check broken and nothing is written.
- * A record already at a new run's id is `Conflict`, and so is a run from a card another run from it stands for (`cardStartedTwice`;
- * the files hold it across processes by the card's claim, `claimCard`). The walks of `test/run-walks.ts` hold both layers to one table.
+ * Two layers: the files (`runDoorFiles`, over `filesStoreAt`, so a record is the very bytes it was), which the default gives a program at
+ * the root it is given (`StoreRoot`), and the memory stand-in (`runDoorMemory`, `memory.store.ts`), which a test gives its program. Both
+ * are built by `runDoorOver`, so each write is checked the one way on both: a new run decodes through the model's `Run`
+ * (`record/record.model.ts`) with its id as `RunId.OnCreate` checks it, and a run written back through `Run`, its invariants among it —
+ * each try named by its step and number, no run waiting on itself, a landing with one outcome — or `Invalid` names the check broken and
+ * nothing is written. A record already at a new run's id is `Conflict`, and so is a run from a card another run from it stands for
+ * (`cardStartedTwice`; the files hold it across processes by the card's claim, `claimCard`). The walks of `test/run-walks.ts` hold both
+ * layers to one table.
  */
 import { Context, Effect, Layer } from 'effect';
-import { atOnce, doorOf, checked, type DoorOf } from '../door/door.store.ts';
+import { atOnce, doorOf, checked, rootedDoor, type DoorOf } from '../door/door.store.ts';
 import { Conflict } from '../refusal/refusal.ts';
-import { claimCard, filesStore } from '../record/files.store.ts';
+import { claimCard, filesStoreAt } from '../record/files.store.ts';
 import { Run as RunModel, RunId } from '../record/record.model.ts';
 import type { Run, RunStore } from '../record/record.ts';
 
@@ -63,43 +64,51 @@ export const cardStartedTwice = (card: string, run: string): Conflict =>
     message: `card ${card} was started already as run ${run}: read it with nemia show ${run}, or forget it with nemia rm ${run} and start the card again`,
   });
 
-/** The run store's files, a new run's record refused as `runTaken` when one is there: what the files layer is over. */
-const files = filesStore;
-const filesRuns: RunsLayer = {
-  ...files,
-  runs: {
-    ...files.runs,
-    create: (run) => {
-      try {
-        files.runs.create(run);
-      } catch (err) {
-        throw (err as NodeJS.ErrnoException).code === 'EEXIST' ? runTaken(run.id) : err;
-      }
-      const card = run.from?.inbox;
-      if (card === undefined) return;
-      const claim = claimCard(card, run.id);
-      if ('by' in claim) {
-        files.runs.forget(run.id);
-        throw cardStartedTwice(card, claim.by);
-      }
+/**
+ * The run store's files at the store's root `home`, a new run's record refused as `runTaken` when one is there: what the files layer is
+ * over.
+ */
+const filesRuns = (home: string): RunsLayer => {
+  const files = filesStoreAt(home);
+  return {
+    ...files,
+    runs: {
+      ...files.runs,
+      create: (run) => {
+        try {
+          files.runs.create(run);
+        } catch (err) {
+          throw (err as NodeJS.ErrnoException).code === 'EEXIST' ? runTaken(run.id) : err;
+        }
+        const card = run.from?.inbox;
+        if (card === undefined) return;
+        const claim = claimCard(home, card, run.id);
+        if ('by' in claim) {
+          files.runs.forget(run.id);
+          throw cardStartedTwice(card, claim.by);
+        }
+      },
     },
-  },
+  };
 };
 
 /**
- * The Run door, as the service a program yields: a reference whose default is the door over the store's files, so a program given no
- * door reads and writes today's records, and one given another — a test's `runDoorMemory()` — reads and writes that one. A default
- * where `StoreRoot` and the place have none, so that no program's requirements and no caller change while the run store's callers move
- * onto the door (`docs/architecture.md`, *The Run door*).
+ * The Run door, as the service a program yields: a reference whose default is rooted (`rootedDoor`) — the door over the files at the
+ * store's root the program is given, refused `Invalid` where it was given none — so no program's requirements change while the run
+ * store's callers move onto the door, and a test gives `runDoorMemory()` with no root at all (`docs/architecture.md`, *The Run door*).
  */
-export const RunDoor = Context.Reference<RunDoorShape>('agent-orchestrator/RunDoor', { defaultValue: () => runDoorOver(filesRuns) });
-
-/** The Run door over the store's files, as a layer: what the default already gives, for a program that names it. */
-export const runDoorFiles: Layer.Layer<never> = Layer.succeed(RunDoor)(runDoorOver(filesRuns));
+export const RunDoor = Context.Reference<RunDoorShape>('agent-orchestrator/RunDoor', {
+  defaultValue: () => rootedDoor((root) => runDoorOver(filesRuns(root)), 'Run door'),
+});
 
 /**
- * The Run door over the store's files, each method run at once (`atOnce`): what a plain synchronous function reads and writes a run
- * through — a page's, a refusal's words, the command line's — until a program yields `RunDoor` in its place. Never the files store
+ * The Run door over the store's files at `home`, as a layer: what the default gives at the root a program is given, for one that names it.
+ */
+export const runDoorFiles = (home: string): Layer.Layer<never> => Layer.succeed(RunDoor)(runDoorOver(filesRuns(home)));
+
+/**
+ * The Run door over the store's files at `home`, each method run at once (`atOnce`): what a plain synchronous function reads and writes
+ * a run through — a page's, a refusal's words, the command line's — until a program yields `RunDoor` in its place. Never the files store
  * itself: a run written here is checked as the door checks it.
  */
-export const runsAtOnce: RunsLayer = atOnce<RunsLayer, RunId>(runDoorOver(filesRuns));
+export const runsAtOnce = (home: string): RunsLayer => atOnce<RunsLayer, RunId>(runDoorOver(filesRuns(home)));

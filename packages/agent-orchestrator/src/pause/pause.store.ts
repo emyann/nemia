@@ -19,7 +19,6 @@ import { Conflict, Missing } from '../refusal/refusal.ts';
 import type { Identity } from '../daemon/daemon.ts';
 import { pauseLapsed, RESUME_LINE, type Pause, type PauseHolder } from './pause.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
-import { wfRoot } from '../config/config.store.ts';
 
 /**
  * The name of the pause's file in the store. The store keeps the name it had before the verbs became `nemia pause` and `nemia resume`,
@@ -87,17 +86,6 @@ export function readPauseFile(home: string): PauseFileRead | null {
 
 /** The store's pause, or null when none stands (`readPauseFile`, its holder left in the file). */
 export const readPause = (home: string): Pause | null => readPauseFile(home)?.pause ?? null;
-
-/** The store's root as this module loaded, as `record.store.ts` reads its `HOME`: what `files.store.ts`'s run store still reads by. */
-const MODULE_ROOT = wfRoot(process.env);
-
-/**
- * The pause of the store at the module's root, and its file: for the run store of `files.store.ts` alone, which still reads that root as
- * it loads (`test/global-roots.baseline.ts`). Every other caller names its root.
- */
-export const pauseAtModuleRoot = (): Pause | null => readPause(MODULE_ROOT);
-/** The pause's file at the module's root (`pauseAtModuleRoot`). */
-export const pauseFileAtModuleRoot = (): string => pauseFile(MODULE_ROOT);
 
 /** Who the machine says runs this process, or undefined where it cannot say. */
 function osUser(): string | undefined {

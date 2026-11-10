@@ -444,7 +444,7 @@ const packageHeld = async (): Promise<Ceilings['held']> => {
   const git = standingReader(await runWith(engine(process.env), standingSnapshot()));
   const held = await runWith(
     engine(process.env),
-    runSlots(engine(process.env), runStore.runs.list(), settingsOf(process.env), { git, read: new Map() }),
+    runSlots(engine(process.env), runStore(root).runs.list(), settingsOf(process.env), { git, read: new Map() }),
   );
   return [...held].map(([run, slot]) => ({ run, ...slot, word: slotWord(slot) }));
 };

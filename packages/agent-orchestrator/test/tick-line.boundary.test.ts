@@ -19,6 +19,7 @@ import { Effect } from 'effect';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
 import type { EnginePhase } from '../src/views/views-words.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-tick-line-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -53,7 +54,7 @@ test('`nemia tick` prints `awaiting approval` for a run at its gate and `blocked
     const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
     stand().world.repository(repo, {});
     const run = await runPlaced(startRun({ brief: 'plan the flag', repo, workflowDir: planned(), isolate: false, gates }));
-    await runWith(e, advanceRun(runRecord(run.id)));
+    await runWith(e, advanceRun(runRecord(rootNow(), run.id)));
     b.settle(`${run.id}-plan`, phase, closeout === undefined ? {} : { closeout });
     return run.id;
   };

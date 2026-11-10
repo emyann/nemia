@@ -154,6 +154,8 @@ const START_SPEC: Spec = {
 type Started = {
   id: string;
   run: StartedRun;
+  /** The store's root the run was started in, where its inputs and its copies of its workflow's files are. */
+  home: string;
   card?: string;
   queueLeft?: string;
   ignoredRepo?: string;
@@ -270,7 +272,7 @@ const fromLines = ({ run, card, queueLeft }: Started): string[] =>
  * the store is paused (`pausedWords`), that nothing of it is filed until it resumes; and a card's `repo:` not taken.
  */
 function startedLines(started: Started): string[] {
-  const { run } = started;
+  const { run, home } = started;
   const steps = startedSteps(run);
   return [
     `${run.id}  ${steps.length} step(s): ${steps.map((s) => (s.agent ? `${s.name} (${s.agent.name})` : s.name)).join(' → ')}`,
@@ -278,9 +280,9 @@ function startedLines(started: Started): string[] {
     ...(run.factory ? [`factory: ${run.factory}${isRepositoryRun(run) ? `, on ${run.repo}` : ''}`] : []),
     ...mountLines(started),
     `workspace: ${run.workspace}${isRepositoryRun(run) ? '' : ' — a folder per step, made as each is filed, with no git repository'}`,
-    ...(run.inputs?.length ? [`inputs: ${run.inputs.join(', ')} — copied into ${inputsDir(run)}`] : []),
-    ...(run.workflowFiles === undefined ? [] : [`workflow files: copied into ${workflowFilesDir(run, run.workflowFiles)}`]),
-    ...(run.carriedFiles === undefined ? [] : [`carried files: copied into ${carriedFilesDir(run, run.carriedFiles)}`]),
+    ...(run.inputs?.length ? [`inputs: ${run.inputs.join(', ')} — copied into ${inputsDir(home, run)}`] : []),
+    ...(run.workflowFiles === undefined ? [] : [`workflow files: copied into ${workflowFilesDir(home, run, run.workflowFiles)}`]),
+    ...(run.carriedFiles === undefined ? [] : [`carried files: copied into ${carriedFilesDir(home, run, run.carriedFiles)}`]),
     ...(run.after?.length
       ? [`waits on: ${run.after.join(', ')} — nothing is filed until nemia decide says each has landed on ${run.branch}`]
       : []),
@@ -324,6 +326,7 @@ const cardStart = Effect.fnUntraced(function* (card: string, given: StartInput) 
   return {
     id: started.run.id,
     run: started.run,
+    home: yield* StoreRoot,
     card: started.card.name,
     ...(started.queueLeft !== undefined ? { queueLeft: started.queueLeft } : {}),
     ...(started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {}),
@@ -472,10 +475,11 @@ export const CONCLUDED: Command<Concluded, typeof ConcludedInput.Type> = {
   class: 'read',
   input: ConcludedInput,
   handler: Effect.fnUntraced(function* (args: typeof ConcludedInput.Type) {
+    const home = yield* StoreRoot;
     const id = args.runId;
     const notId = idRefusal(id, 'read', 'nemia concluded');
     if (notId) throw new Invalid({ message: notId });
-    if (!runsAtOnce.runs.exists(id))
+    if (!runsAtOnce(home).runs.exists(id))
       throw new Missing({ message: `nemia concluded ${id}: the store has no run ${id}. It takes a run by its id — nemia ls lists them.` });
     const git = yield* standingLive([yield* (yield* RunDoor).runs.read(RunId.read(id))]);
     const [parent] = yield* parentCloseouts(yield* EngineService, [id], 'read', git);
@@ -503,7 +507,7 @@ const startOf = Effect.fnUntraced(function* (given: StartInput) {
     labels: { edits: [...(given.label ?? [])] },
     ...(factory !== undefined ? { factory } : {}),
   });
-  return { id: run.id, run } satisfies Started;
+  return { id: run.id, run, home: yield* StoreRoot } satisfies Started;
 });
 
 /** The flags of `nemia start` that `nemia start <folder>` refuses, each with why the folder says it instead. */

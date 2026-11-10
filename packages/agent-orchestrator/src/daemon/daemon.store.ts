@@ -9,7 +9,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Result, Schema } from 'effect';
-import { HOME } from '../record/record.store.ts';
 import type { Settings } from '../config/config.store.ts';
 import {
   PHASES,
@@ -81,7 +80,7 @@ export const ceilings = (config: Settings): { sessions: number; runs: number; me
  * `WF_MAX_CONCURRENT=4 WF_MAX_RUNS=2 nemia up` sets the cap on the daemon alone, and read from the shell, a run the daemon holds read as
  * plain `waiting`.
  */
-const tickFile = (): string => path.join(HOME, 'tick.json');
+const tickFile = (home: string): string => path.join(home, 'tick.json');
 
 /** `tick.json` as the tick writes it: the sessions a pool admits, and the runs in flight at once, a whole number (0 for no cap). */
 const isCeilings = Schema.is(Schema.Struct({ sessions: Schema.Finite, runs: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) }));
@@ -89,10 +88,10 @@ const isCeilings = Schema.is(Schema.Struct({ sessions: Schema.Finite, runs: Sche
 /**
  * The ceilings the last pass ran with (`tickFile`), or undefined before any pass has written them, or when the file does not read as them.
  */
-export function lastCeilings(): { sessions: number; runs: number } | undefined {
+export function lastCeilings(home: string): { sessions: number; runs: number } | undefined {
   let text: string;
   try {
-    text = fs.readFileSync(tickFile(), 'utf8');
+    text = fs.readFileSync(tickFile(home), 'utf8');
   } catch {
     return undefined;
   }
@@ -105,12 +104,12 @@ export function lastCeilings(): { sessions: number; runs: number } | undefined {
  * hidden file renamed over it, so a reader never reads half of it. A store that cannot be written loses only this: a reader falls back to
  * its own environment, and the pass goes on.
  */
-export function recordCeilings(c: { sessions: number; runs: number }): void {
-  const last = lastCeilings();
+export function recordCeilings(home: string, c: { sessions: number; runs: number }): void {
+  const last = lastCeilings(home);
   if (last && last.sessions === c.sessions && last.runs === c.runs) return;
   try {
-    fs.mkdirSync(HOME, { recursive: true });
-    writeWhole(tickFile(), JSON.stringify({ sessions: c.sessions, runs: c.runs }, null, 2));
+    fs.mkdirSync(home, { recursive: true });
+    writeWhole(tickFile(home), JSON.stringify({ sessions: c.sessions, runs: c.runs }, null, 2));
   } catch {}
 }
 
@@ -118,7 +117,7 @@ export function recordCeilings(c: { sessions: number; runs: number }): void {
  * What the last pass cost, phase by phase: `$WF_ROOT/tick-stats.json`, written by the pass that measured it, `nemia up`'s or `nemia
  * tick`'s, and read by `nemia up --stats` and the api. One pass's numbers, replaced by the next's: nothing reads it to decide.
  */
-export const statsFile = (): string => path.join(HOME, 'tick-stats.json');
+export const statsFile = (home: string): string => path.join(home, 'tick-stats.json');
 
 const PhaseCostSchema = Schema.StructWithRest(Schema.Struct({ ms: Count, calls: Count, bytes: Count, reads: Count, spawned: Count }), Rest);
 const HarnessCostSchema = Schema.StructWithRest(
@@ -159,10 +158,10 @@ export const parsePassCost = (text: string): PassCostRead | undefined => {
 };
 
 /** The last pass's cost (`statsFile`), or undefined before any pass has written one, or when the file does not read as one. */
-export function lastPassCost(): PassCostRead | undefined {
+export function lastPassCost(home: string): PassCostRead | undefined {
   let text: string;
   try {
-    text = fs.readFileSync(statsFile(), 'utf8');
+    text = fs.readFileSync(statsFile(home), 'utf8');
   } catch {
     return undefined;
   }
@@ -174,17 +173,17 @@ export function lastPassCost(): PassCostRead | undefined {
  * written loses only this, which the next pass writes again, and the pass goes on. Answers with the time the write took, which is
  * measuring's too.
  */
-export function recordPassCost(cost: PassCost): number {
+export function recordPassCost(home: string, cost: PassCost): number {
   const t0 = performance.now();
   try {
-    fs.mkdirSync(HOME, { recursive: true });
-    writeWhole(statsFile(), JSON.stringify(cost, null, 2));
+    fs.mkdirSync(home, { recursive: true });
+    writeWhole(statsFile(home), JSON.stringify(cost, null, 2));
   } catch {}
   return performance.now() - t0;
 }
 
 /** `$WF_ROOT/daemon.json`: the store taken by one daemon, the api or a `nemia up`, written by it alone (`daemon.ts`). */
-export const daemonFile = (): string => path.join(HOME, DAEMON_FILE);
+export const daemonFile = (home: string): string => path.join(home, DAEMON_FILE);
 
 const When = Schema.String.check(Schema.makeFilter((at: string) => !Number.isNaN(Date.parse(at))));
 
@@ -245,9 +244,9 @@ export function parseDaemonFile(text: string): DaemonFile | undefined {
  * The file's text, or undefined when there is none. Any other failure to read it is thrown: a store that cannot be read cannot be judged
  * free.
  */
-function readDaemonText(): string | undefined {
+function readDaemonText(home: string): string | undefined {
   try {
-    return fs.readFileSync(daemonFile(), 'utf8');
+    return fs.readFileSync(daemonFile(home), 'utf8');
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw err;
@@ -255,8 +254,8 @@ function readDaemonText(): string | undefined {
 }
 
 /** The file read: its text and what it holds, or undefined when there is none. */
-function readDaemon(): DaemonRead | undefined {
-  const text = readDaemonText();
+function readDaemon(home: string): DaemonRead | undefined {
+  const text = readDaemonText(home);
   return text === undefined ? undefined : { text, file: parseDaemonFile(text) };
 }
 
@@ -336,11 +335,12 @@ function stamped(file: DaemonFile, stamp: keyof typeof MONO_OF, now: Instant): D
 }
 
 /** Where the store stands now: who holds it, and whether it ticks (`daemonStanding` in daemon.ts, off the file and the process table). */
-export const daemonStanding = (now: Instant = instantNow()): DaemonStanding => standingOf(readDaemon(), { now, identify });
+export const daemonStanding = (home: string, now: Instant = instantNow()): DaemonStanding =>
+  standingOf(readDaemon(home), { now, identify });
 
 /** The file written whole, through a hidden file renamed over it, so a reader never reads half of it. */
-function writeDaemon(file: DaemonFile): void {
-  writeWhole(daemonFile(), daemonText(file));
+function writeDaemon(home: string, file: DaemonFile): void {
+  writeWhole(daemonFile(home), daemonText(file));
 }
 
 /** What `takeStore` took: the file this daemon now holds the store by, and where the store stood before it. */
@@ -369,33 +369,36 @@ function leaseOf(every: number, cwd: string, by: HolderKind, now: Instant, relea
  * the loser judges again. A file already there is replaced by a rename; two takeovers of one stale file both rename, and the loser learns
  * it at its first pass (`stillHeld`).
  */
-export function takeStore({
-  every,
-  cwd,
-  by,
-  release,
-  now = instantNow(),
-}: {
-  every: number;
-  cwd: string;
-  by: HolderKind;
-  release?: LeaseRelease;
-  now?: Instant;
-}): TakenStore {
-  fs.mkdirSync(HOME, { recursive: true });
+export function takeStore(
+  home: string,
+  {
+    every,
+    cwd,
+    by,
+    release,
+    now = instantNow(),
+  }: {
+    every: number;
+    cwd: string;
+    by: HolderKind;
+    release?: LeaseRelease;
+    now?: Instant;
+  },
+): TakenStore {
+  fs.mkdirSync(home, { recursive: true });
   const held = leaseOf(every, cwd, by, now, release);
   for (let tries = 0; ; tries++) {
-    const replaced = daemonStanding(now);
+    const replaced = daemonStanding(home, now);
     const holder = holderAgainst(replaced, process.pid);
-    if (holder) throw new Conflict({ message: holdRefusal(holder, by === 'api' ? 'api' : 'up', HOME, now.at) });
+    if (holder) throw new Conflict({ message: holdRefusal(holder, by === 'api' ? 'api' : 'up', home, now.at) });
     if (replaced.kind !== 'none') {
-      writeDaemon(held);
+      writeDaemon(home, held);
       return { held, replaced };
     }
-    const hidden = path.join(HOME, `.${DAEMON_FILE}.${process.pid}`);
+    const hidden = path.join(home, `.${DAEMON_FILE}.${process.pid}`);
     fs.writeFileSync(hidden, daemonText(held));
     try {
-      fs.linkSync(hidden, daemonFile());
+      fs.linkSync(hidden, daemonFile(home));
       return { held, replaced };
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== 'EEXIST' || tries >= 2) throw err;
@@ -409,8 +412,8 @@ export function takeStore({
  * Whether the store is still this daemon's, read at the start of each pass: undefined when it is — the file names this process, or there is
  * no file or none that reads, which the next write puts right — or the file of whoever took it over.
  */
-export function stillHeld(held: DaemonFile): DaemonFile | undefined {
-  const file = readDaemon()?.file;
+export function stillHeld(home: string, held: DaemonFile): DaemonFile | undefined {
+  const file = readDaemon(home)?.file;
   return file && file.pid !== held.pid ? file : undefined;
 }
 
@@ -419,11 +422,11 @@ export function stillHeld(held: DaemonFile): DaemonFile | undefined {
  * holder is that holder's to write. Stamped on the file as it stands when it names this daemon, so what was written since it took the
  * store — its url, its beat — stays. Answers the file as it now stands.
  */
-export function passed(held: DaemonFile, now: Instant = instantNow()): DaemonFile {
-  const file = readDaemon()?.file;
+export function passed(home: string, held: DaemonFile, now: Instant = instantNow()): DaemonFile {
+  const file = readDaemon(home)?.file;
   if (file && file.pid !== held.pid) return stamped(held, 'passedAt', now);
   const next = stamped(file ?? held, 'passedAt', now);
-  writeDaemon(next);
+  writeDaemon(home, next);
   return next;
 }
 
@@ -431,10 +434,10 @@ export function passed(held: DaemonFile, now: Instant = instantNow()): DaemonFil
  * Write down where the api serves, `url`, into the file this process holds the store by — only while it names this process and has not
  * let the store go: a file of another holder, or none, is not this process's to write. Answers whether it was written.
  */
-export function heldUrl(url: string): boolean {
-  const file = readDaemon()?.file;
+export function heldUrl(home: string, url: string): boolean {
+  const file = readDaemon(home)?.file;
   if (file?.pid !== process.pid || file.stoppedAt) return false;
-  writeDaemon({ ...file, url });
+  writeDaemon(home, { ...file, url });
   return true;
 }
 
@@ -446,10 +449,10 @@ export function heldUrl(url: string): boolean {
  * The cards carry nothing secret, and this file is no place for one: the token a viewer needs is the holder engine's own, kept 0600
  * in its store, and asked for there (`holderTokenOf`).
  */
-export function heldServes(cards: Record<string, Record<string, unknown>>): boolean {
-  const file = readDaemon()?.file;
+export function heldServes(home: string, cards: Record<string, Record<string, unknown>>): boolean {
+  const file = readDaemon(home)?.file;
   if (file?.pid !== process.pid || file.stoppedAt) return false;
-  writeDaemon({ ...file, serves: cards });
+  writeDaemon(home, { ...file, serves: cards });
   return true;
 }
 
@@ -462,8 +465,8 @@ export function heldServes(cards: Record<string, Record<string, unknown>>): bool
  * this process's own port, which it must never dial — it answers that follow off its own engine, and a viewer that dialled itself
  * would ask its own port for a session it already holds.
  */
-export function servesOnStore(now: Instant = instantNow()): Record<string, Record<string, unknown>> | undefined {
-  const standing = daemonStanding(now);
+export function servesOnStore(home: string, now: Instant = instantNow()): Record<string, Record<string, unknown>> | undefined {
+  const standing = daemonStanding(home, now);
   if (standing.kind !== 'ticking' || standing.file.pid === process.pid) return undefined;
   return standing.file.serves;
 }
@@ -473,10 +476,10 @@ export function servesOnStore(now: Instant = instantNow()): Record<string, Recor
  * pass is doing — only while the file names this daemon, as it took the store, and it has not let it go; a file gone or unreadable is the
  * next pass's to write. Never thrown: it runs on a timer, where a throw would end the process mid-pass.
  */
-export function beat(held: DaemonFile, now: Instant = instantNow()): void {
+export function beat(home: string, held: DaemonFile, now: Instant = instantNow()): void {
   try {
-    const file = readDaemon()?.file;
-    if (file?.pid === held.pid && file.startedAt === held.startedAt && !file.stoppedAt) writeDaemon(stamped(file, 'beatAt', now));
+    const file = readDaemon(home)?.file;
+    if (file?.pid === held.pid && file.startedAt === held.startedAt && !file.stoppedAt) writeDaemon(home, stamped(file, 'beatAt', now));
   } catch {}
 }
 
@@ -485,10 +488,10 @@ export function beat(held: DaemonFile, now: Instant = instantNow()): void {
  * this daemon. Never thrown: it runs as the process stops, on a signal or a failure, and a store that cannot be written is read free anyway
  * once the process is gone.
  */
-export function releaseStore(held: DaemonFile, at = new Date().toISOString()): void {
+export function releaseStore(home: string, held: DaemonFile, at = new Date().toISOString()): void {
   try {
-    const file = readDaemon()?.file;
-    if (file?.pid === held.pid && !file.stoppedAt) writeDaemon({ ...file, stoppedAt: at });
+    const file = readDaemon(home)?.file;
+    if (file?.pid === held.pid && !file.stoppedAt) writeDaemon(home, { ...file, stoppedAt: at });
   } catch {}
 }
 
@@ -496,9 +499,9 @@ export function releaseStore(held: DaemonFile, at = new Date().toISOString()): v
  * Why a pass by hand may not run now — a daemon of either kind ticks the store, named — or undefined when it may. A `nemia tick` never
  * writes the file.
  */
-export function storeRefusal(verb: 'tick', now: Instant = instantNow()): string | undefined {
-  const holder = holderAgainst(daemonStanding(now), process.pid);
-  return holder ? holdRefusal(holder, verb, HOME, now.at) : undefined;
+export function storeRefusal(home: string, verb: 'tick', now: Instant = instantNow()): string | undefined {
+  const holder = holderAgainst(daemonStanding(home, now), process.pid);
+  return holder ? holdRefusal(holder, verb, home, now.at) : undefined;
 }
 
 /**
@@ -506,7 +509,7 @@ export function storeRefusal(verb: 'tick', now: Instant = instantNow()): string 
  * them, and read by `nemia passes` and the api. Kept on disk, so a restarted daemon and the command line read what the daemon's passes
  * cost; nothing reads it to decide.
  */
-export const recentFile = (): string => path.join(HOME, 'tick-recent.json');
+export const recentFile = (home: string): string => path.join(home, 'tick-recent.json');
 
 /** A pass as `recordRecentPass` keeps it (`RecentPass`): a key it does not name is kept, as a newer `nemia` may write one. */
 const isRecentPass = Schema.is(
@@ -558,9 +561,9 @@ export const parseRecentPasses = (text: string): { passes: RecentPass[]; unread:
 };
 
 /** The file's text, or undefined where there is none yet. */
-const recentText = (): string | undefined => {
+const recentText = (home: string): string | undefined => {
   try {
-    return fs.readFileSync(recentFile(), 'utf8');
+    return fs.readFileSync(recentFile(home), 'utf8');
   } catch {
     return undefined;
   }
@@ -570,11 +573,11 @@ const recentText = (): string | undefined => {
  * The recent passes (`recentFile`), oldest first: none before any pass kept one, or for a file that is not a list. An entry that does not
  * read as a pass is left out, and the file named once on stderr with how many; the next pass writes the file without them.
  */
-export function recentPasses(): RecentPass[] {
-  const text = recentText();
+export function recentPasses(home: string): RecentPass[] {
+  const text = recentText(home);
   if (text === undefined) return [];
   const { passes, unread } = parseRecentPasses(text);
-  if (unread) process.stderr.write(`${recentFile()}: ${unread} of its passes did not read as one and were left out.\n`);
+  if (unread) process.stderr.write(`${recentFile(home)}: ${unread} of its passes did not read as one and were left out.\n`);
   return passes;
 }
 
@@ -583,13 +586,18 @@ export function recentPasses(): RecentPass[] {
  * the file holds and the oldest left out past `keep`, written through a hidden file renamed over the last, as `recordPassCost` writes. A
  * store that cannot be written loses only this. Answers with the time it took, which is measuring's, and the passes kept, oldest first.
  */
-export function recordRecentPass(cost: PassCost, keep = RECENT_KEPT, also: AlsoKept = {}): { ms: number; kept: RecentPass[] } {
+export function recordRecentPass(
+  home: string,
+  cost: PassCost,
+  keep = RECENT_KEPT,
+  also: AlsoKept = {},
+): { ms: number; kept: RecentPass[] } {
   const t0 = performance.now();
-  const text = recentText();
+  const text = recentText(home);
   const kept = [...(text === undefined ? [] : parseRecentPasses(text).passes), recentOf(cost, also)].slice(-keep);
   try {
-    fs.mkdirSync(HOME, { recursive: true });
-    writeWhole(recentFile(), JSON.stringify(kept));
+    fs.mkdirSync(home, { recursive: true });
+    writeWhole(recentFile(home), JSON.stringify(kept));
   } catch {}
   return { ms: performance.now() - t0, kept };
 }

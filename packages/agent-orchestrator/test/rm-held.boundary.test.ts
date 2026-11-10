@@ -17,6 +17,7 @@ import { scratch } from 'test-kit/scratch';
 import { isRepositoryRun } from '../src/run.ts';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-rm-held-');
 const WORKFLOW = path.join(ROOT, 'workflow');
@@ -208,15 +209,15 @@ const aParent = async (
   }: { work?: string; signed?: boolean; workflowDir?: string; brief?: string } = {},
 ) => {
   const run = repositoryRunOf(await runPlaced(startRun({ brief, repo, workflowDir: workflowDir ?? oneStep() })));
-  await runWith(b.e, advanceRun(runRecord(run.id)));
-  const wt = runRecord(run.id).steps.implement.workspace!;
+  await runWith(b.e, advanceRun(runRecord(rootNow(), run.id)));
+  const wt = runRecord(rootNow(), run.id).steps.implement.workspace!;
   if (work) {
     fs.writeFileSync(path.join(wt, work), `${work}\n`);
     gitIn(wt, 'add', '-A');
     gitIn(wt, 'commit', '-q', '-m', `add ${work}`);
   }
   if (signed) b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  return { run, wt, branch: runRecord(run.id).steps.implement.branch! };
+  return { run, wt, branch: runRecord(rootNow(), run.id).steps.implement.branch! };
 };
 
 const worktreesOf = (repo: string) =>
@@ -248,7 +249,7 @@ test("REFUSED at shipped defaults: a locked worktree — git will not remove it,
   const b = board();
   const locked = await aParent(repo, b, { work: 'locked.txt' });
   gitIn(repo, 'worktree', 'lock', '--reason', 'a person holds it', locked.wt);
-  markCancelled(locked.run.id);
+  markCancelled(rootNow(), locked.run.id);
 
   const held = await rmTyped(t, b.e, locked.run.id);
   assert.deepEqual(
@@ -259,7 +260,7 @@ test("REFUSED at shipped defaults: a locked worktree — git will not remove it,
     `${locked.run.id}  not forgotten: ${locked.wt} is held (a person holds it), and the place will not remove it — let it go if nothing needs it: git -C ${repo} worktree unlock ${locked.wt}. Its record, files and branches are kept until every worktree is gone: nemia rm ${locked.run.id} again then.`,
   ]);
   assert.ok(fs.existsSync(path.join(locked.wt, 'locked.txt')) && worktreesOf(repo).includes(locked.wt));
-  assert.ok(runRecord(locked.run.id).cancelledAt, 'the record is read with its cancellation, still');
+  assert.ok(runRecord(rootNow(), locked.run.id).cancelledAt, 'the record is read with its cancellation, still');
 
   gitIn(repo, 'worktree', 'unlock', locked.wt);
   assert.equal((await runWith(b.e, forgetRun(locked.run.id))).kind, 'forgotten');

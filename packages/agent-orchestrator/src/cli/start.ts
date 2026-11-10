@@ -24,10 +24,9 @@ import {
   workflowAt,
   workflowFolder,
   type Args,
-  StoreRoot,
   wfRoot,
+  type Env,
 } from '../runner.ts';
-import { Effect } from 'effect';
 import { usage, placedIn, type Engine } from './flags.ts';
 
 /** The text under `key`, or undefined where none was given. */
@@ -42,21 +41,21 @@ const textOf = (args: Args, key: string): string | undefined => {
  * else `--repo`, else the factory's one repository, else here (`repoFor`); and its tree, where it is made from a template. Refused as
  * `startFactoryAtOnce` and `repoFor` refuse.
  */
-function placeOfStart(args: Args): { factory?: string; repo: string; tree?: string } {
+function placeOfStart(env: Env, args: Args): { factory?: string; repo: string; tree?: string } {
   const given = textOf(args, 'repo');
   const named = given === undefined ? undefined : path.resolve(given);
   const found = startFactoryAtOnce(
-    wfRoot(process.env),
+    wfRoot(env),
     textOf(args, 'factory'),
     named ?? path.resolve('.'),
     '--factory <name>',
-    settingsOf(process.env).defaultFactoryStarts,
+    settingsOf(env).defaultFactoryStarts,
   );
   const factory = found.factory?.name;
   const tree = found.factory?.tree;
   return {
     ...(factory !== undefined ? { factory } : {}),
-    repo: found.repo ?? repoFor(wfRoot(process.env), factory, named, path.resolve('.')),
+    repo: found.repo ?? repoFor(wfRoot(env), factory, named, path.resolve('.')),
     ...(tree !== undefined ? { tree } : {}),
   };
 }
@@ -80,16 +79,16 @@ function cardArgs(card: string, args: Args): Args {
  * A brief's arguments: a file that opens with a frontmatter block of keys is a plan's card, or refused by the key a plan's card lacks
  * (`cardToStart`); any other file is the whole brief; and a card's own `workflow:` is found from its plan folder.
  */
-function briefArgs(arg: string, args: Args): Args {
+function briefArgs(env: Env, arg: string, args: Args): Args {
   if (args.instead !== undefined)
     usage(
-      `nemia start takes --brief only for a card of the inbox, in place of its body: nemia start ${path.join(inboxDir(), '<name>.md')} --brief "<brief>". Anywhere else the brief is its first argument: nemia start "<brief>".`,
+      `nemia start takes --brief only for a card of the inbox, in place of its body: nemia start ${path.join(inboxDir(wfRoot(env)), '<name>.md')} --brief "<brief>". Anywhere else the brief is its first argument: nemia start "<brief>".`,
     );
   const after = Array.isArray(args.after) ? args.after : [];
   const text = fs.existsSync(arg) ? fs.readFileSync(arg, 'utf8') : undefined;
   const card = text === undefined ? null : cardToStart(arg, text, after);
   const workflows = textOf(args, 'workflows');
-  const { factory, repo, tree } = placeOfStart(args);
+  const { factory, repo, tree } = placeOfStart(env, args);
   return {
     ...args,
     brief: card ? card.body : (text?.trim() ?? arg),
@@ -115,17 +114,17 @@ const pathLike = (arg: string): boolean => !/\s/.test(arg) && (/^[./~\\]/.test(a
  * path (`pathLike`) and names nothing here, nor a card of the inbox, is refused rather than started as words: it is a file or a plan folder
  * mistyped, or not made yet, as the former spelling of a plan's start only ever meant a folder.
  */
-export async function startRun(args: Args, e: Engine, place: Place): Promise<void> {
+export async function startRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const arg = textOf(args, 'brief') ?? '';
   const at = fs.statSync(arg, { throwIfNoEntry: false });
-  if (at?.isDirectory()) return folderRun(arg, args, e, place);
-  const card = inboxNameAt(wfRoot(process.env), arg);
+  if (at?.isDirectory()) return folderRun(env, arg, args, e, place);
+  const card = inboxNameAt(wfRoot(env), arg);
   if (at === undefined && card === null && pathLike(arg))
     usage(
       `nemia start was given ${arg}, which reads as a path, and there is no file nor plan folder at ${path.resolve(arg)}. Make the folder of cards and start it: nemia start <folder> --repo <r>; or give the file's path as it is, or the brief in words: nemia start "<brief>".`,
     );
-  const asked = card !== null ? cardArgs(card, args) : briefArgs(arg, args);
-  const data = await runWith(e, placedIn(place, START.handler(asked)));
+  const asked = card !== null ? cardArgs(card, args) : briefArgs(env, arg, args);
+  const data = await runWith(e, placedIn(env, place, START.handler(asked)));
   for (const line of START.print(data, asked)) console.log(line);
 }
 
@@ -134,17 +133,14 @@ export async function startRun(args: Args, e: Engine, place: Place): Promise<voi
  * would be (`placeOfStart`); refused for a flag the folder says instead (`folderRefusal`); a card that did not start stops the rest, and
  * fails with what it was told.
  */
-async function folderRun(folder: string, args: Args, e: Engine, place: Place): Promise<void> {
+async function folderRun(env: Env, folder: string, args: Args, e: Engine, place: Place): Promise<void> {
   const refused = folderRefusal(args);
   if (refused !== undefined) usage(refused);
-  const { factory, repo } = placeOfStart(args);
+  const { factory, repo } = placeOfStart(env, args);
   const plan = { dir: path.resolve(folder), repo: path.resolve(repo) };
   const { started, stopped, folderOf } = await runWith(
     e,
-    placedIn(
-      place,
-      Effect.provideService(startPlan({ ...plan, ...(factory !== undefined ? { factory } : {}) }), StoreRoot, wfRoot(process.env)),
-    ),
+    placedIn(env, place, startPlan({ ...plan, ...(factory !== undefined ? { factory } : {}) })),
   );
   for (const line of planLines(started)) console.log(line);
   if (stopped) {
@@ -158,7 +154,7 @@ async function folderRun(folder: string, args: Args, e: Engine, place: Place): P
  * `nemia inbox add`: an idea, the words or a file's text, filed as a card (`INBOX_ADD`), with a `--workflow` path read from where it is
  * typed (`workflowAt`); a directory is refused.
  */
-export async function inboxAddRun(args: Args, e: Engine, place: Place): Promise<void> {
+export async function inboxAddRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const idea = textOf(args, 'idea') ?? '';
   const at = fs.statSync(idea, { throwIfNoEntry: false });
   if (at?.isDirectory())
@@ -176,20 +172,20 @@ export async function inboxAddRun(args: Args, e: Engine, place: Place): Promise<
     ...(factory === undefined ? {} : { factory }),
     label: Array.isArray(args.label) ? args.label.map(String) : [],
   };
-  const data = await runWith(e, placedIn(place, INBOX_ADD.handler(asked)));
+  const data = await runWith(e, placedIn(env, place, INBOX_ADD.handler(asked)));
   for (const line of INBOX_ADD.print(data, asked)) console.log(line);
 }
 
 /**
  * `nemia inbox queue`: a card queued or taken back (`INBOX_QUEUE`), with a `--workflow` path read from where it is typed (`workflowAt`).
  */
-export async function inboxQueueRun(args: Args, e: Engine, place: Place): Promise<void> {
+export async function inboxQueueRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const workflow = textOf(args, 'workflow');
   const asked = {
     name: textOf(args, 'name') ?? '',
     ...(workflow === undefined ? {} : { workflow: workflowAt(workflow, process.cwd()) }),
     ...(args.off === true ? { off: true } : {}),
   };
-  const data = await runWith(e, placedIn(place, INBOX_QUEUE.handler(asked)));
+  const data = await runWith(e, placedIn(env, place, INBOX_QUEUE.handler(asked)));
   for (const line of INBOX_QUEUE.print(data, asked)) console.log(line);
 }

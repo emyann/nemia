@@ -19,6 +19,7 @@ import { scratch } from 'test-kit/scratch';
 import { until, WAITED, type Waiter } from 'agent-runtime/testing';
 import { Effect } from 'effect';
 import { runGiven, runOver } from './placed.ts';
+import { rootNow } from './config-given.ts';
 
 const ROOT = scratch('wf-agents-calls-');
 process.env.WF_ROOT = ROOT;
@@ -86,7 +87,7 @@ let memo = freshRestMemo();
 const pass = () => runWith(e, tickRun({ repo: ROOT, memo }));
 
 /** The task a run's one step is filed as. */
-const taskOf = (runId: string) => runRecord(runId).steps.work.taskId!;
+const taskOf = (runId: string) => runRecord(rootNow(), runId).steps.work.taskId!;
 
 /** Passes in test `t`, every 50ms, until the run's step is at work, as its harness lists it; answers its task. */
 const atWork = (t: Waiter, runId: string) =>
@@ -94,7 +95,7 @@ const atWork = (t: Waiter, runId: string) =>
     t,
     async () => {
       await pass();
-      const taskId = runRecord(runId).steps.work?.taskId;
+      const taskId = runRecord(rootNow(), runId).steps.work?.taskId;
       if (!taskId) return undefined;
       return (await Effect.runPromise(e.view(taskId))).phase === 'working' && taskId;
     },

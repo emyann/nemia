@@ -18,6 +18,7 @@ import type { Closeout } from '../closeout/index.ts';
 import { artifactsDir } from '../record/record.store.ts';
 import { carriedFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
 import { attemptIn, isScript, scriptRead } from './script.store.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /** The files a script condition is handed in its artifacts folder: the request it reads, and the answer it writes. */
 export const REQUEST_FILE = 'route-request.json';
@@ -93,6 +94,7 @@ export const fileScripts = Effect.fn('fileScripts')(function* (f: ScriptFiling, 
 
 /** File one script condition, or adopt the task a pass before this one filed under its id: answers with whether it is on the record. */
 const fileScript = Effect.fnUntraced(function* (f: ScriptFiling, step: StepSpec & { routes: string[] }) {
+  const home = yield* StoreRoot;
   const { e, run } = f;
   const script = step.route?.kind === 'script' ? step.route.script : '';
   if (run.workflowFiles === undefined) {
@@ -103,7 +105,7 @@ const fileScript = Effect.fnUntraced(function* (f: ScriptFiling, step: StepSpec 
   }
   const taskId = stepTaskId(run, step.name, tryOf(run, step.name));
   if (!(yield* asked('view', e.view(taskId))).state.brief) {
-    const files = path.resolve(artifactsDir(run, step.name));
+    const files = path.resolve(artifactsDir(home, run, step.name));
     fs.mkdirSync(files, { recursive: true });
     const request = path.join(files, REQUEST_FILE);
     const answer = path.join(files, ANSWER_FILE);
@@ -112,7 +114,7 @@ const fileScript = Effect.fnUntraced(function* (f: ScriptFiling, step: StepSpec 
     fs.rmSync(answer, { force: true });
     const parent = [...step.after].sort()[0];
     const workspace = (parent === undefined ? undefined : run.steps[parent]?.workspace) ?? run.workspace;
-    const workflowFiles = workflowFilesDir(run, run.workflowFiles);
+    const workflowFiles = workflowFilesDir(home, run, run.workflowFiles);
     const command = ['node', path.join(workflowFiles, script)];
     const env = {
       ...checkEnvOf(run, step, {
@@ -120,7 +122,7 @@ const fileScript = Effect.fnUntraced(function* (f: ScriptFiling, step: StepSpec 
         files,
         closeout: undefined,
         workflowFiles,
-        ...(run.carriedFiles === undefined ? {} : { carriedFiles: carriedFilesDir(run, run.carriedFiles) }),
+        ...(run.carriedFiles === undefined ? {} : { carriedFiles: carriedFilesDir(home, run, run.carriedFiles) }),
       }),
       WF_REQUEST: request,
       WF_ANSWER: answer,

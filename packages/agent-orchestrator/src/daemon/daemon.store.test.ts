@@ -206,7 +206,7 @@ test(
   'a pass that runs long is heard from: the beat is written while the pass awaits, and the store reads as ticking throughout',
   WAITED,
   async (t) => {
-    assert.equal(daemonFile(), FILE);
+    assert.equal(daemonFile(rootNow()), FILE);
     clear();
     seeded(t);
     const beats: string[] = [];
@@ -222,7 +222,7 @@ test(
           const f = read();
           assert.equal(f.passedAt, null, 'no pass completed: the beat is not a pass');
           if (f.beatAt && f.beatAt !== beats.at(-1)) beats.push(f.beatAt);
-          kinds.add(daemonStanding().kind);
+          kinds.add(daemonStanding(rootNow()).kind);
           t.mock.timers.tick(1);
           return beats.length >= 2;
         },
@@ -356,9 +356,9 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
       const self = { pid: process.pid, by: 'up' as const, startedAt: minutesAgo(1), cwd: '/here', every: 4000, passedAt: minutesAgo(0.5) };
       fs.writeFileSync(FILE, JSON.stringify(self));
       const mono = monoAgo(0);
-      beat(self, { at: Date.parse('2026-09-22T12:00:00.000Z'), mono });
+      beat(rootNow(), self, { at: Date.parse('2026-09-22T12:00:00.000Z'), mono });
       assert.deepEqual(read(), { ...self, beatAt: '2026-09-22T12:00:00.000Z', beatMono: mono }, 'its own file beats, its last pass kept');
-      beat(self, { at: Date.parse('2026-09-22T12:00:04.000Z') });
+      beat(rootNow(), self, { at: Date.parse('2026-09-22T12:00:04.000Z') });
       assert.deepEqual(
         read(),
         { ...self, beatAt: '2026-09-22T12:00:04.000Z' },
@@ -370,11 +370,11 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
         ['an earlier start of this pid', { startedAt: minutesAgo(5) }],
       ] as const) {
         const text = holdBy(process.pid, { ...self, ...over });
-        beat(self);
+        beat(rootNow(), self);
         assert.equal(fs.readFileSync(FILE, 'utf8'), text, name);
       }
       clear();
-      beat(self);
+      beat(rootNow(), self);
       assert.equal(fs.existsSync(FILE), false, 'no file is not written by a beat');
     },
   );
@@ -382,16 +382,16 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
   await s.test('the lease names the release its daemon runs: as it takes the store, through a pass, a beat and its stop', async () => {
     clear();
     const release = { kind: 'install', root: path.join(ROOT, 'releases', 'v1'), tag: 'v1', commit: 'abcdef1234567890' } as const;
-    const { held } = takeStore({ every: 4000, cwd: '/here', by: 'api', release });
+    const { held } = takeStore(rootNow(), { every: 4000, cwd: '/here', by: 'api', release });
     assert.deepEqual(read().release, release, 'as it takes the store');
-    const next = passed(held);
+    const next = passed(rootNow(), held);
     assert.deepEqual(read().release, release, 'after a pass');
-    beat(next);
+    beat(rootNow(), next);
     assert.deepEqual(read().release, release, 'after a beat');
-    releaseStore(next);
+    releaseStore(rootNow(), next);
     assert.deepEqual(parseDaemonFile(fs.readFileSync(FILE, 'utf8'))?.release, release, 'after its stop, as the reader decodes it');
     clear();
-    takeStore({ every: 4000, cwd: '/here', by: 'api' });
+    takeStore(rootNow(), { every: 4000, cwd: '/here', by: 'api' });
     assert.equal('release' in read(), false, 'a daemon given no release writes none');
     clear();
   });
@@ -613,7 +613,7 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
       });
       const listening = Effect.sync(() => {
         assert.equal(read().url, undefined, 'no url before it listens');
-        assert.equal(holdUrl('http://127.0.0.1:8787'), true);
+        assert.equal(holdUrl(rootNow(), 'http://127.0.0.1:8787'), true);
       });
       const threw = await runPlaced(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api', onTaken: () => listening }))).then(
         () => assert.fail('the daemon returned'),
@@ -630,7 +630,7 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
       );
       const stopped = read();
       assert.ok(stopped.stoppedAt, 'let go as its scope closed');
-      assert.equal(holdUrl('http://127.0.0.1:9999'), false, 'a lease let go takes no url');
+      assert.equal(holdUrl(rootNow(), 'http://127.0.0.1:9999'), false, 'a lease let go takes no url');
       assert.equal(read().url, 'http://127.0.0.1:8787');
       clear();
     },
@@ -698,20 +698,20 @@ const CARDS = { claude: { name: 'claude', supportedInterfaces: [{ url: 'http://1
 test('what the lease serves: written by its holder alone, read back, and answered only of another live process', async (t) => {
   await t.test('written by the holding process, and read back key for key through the schema', async () => {
     clear();
-    const { held } = takeStore({ every: 4000, cwd: '/here', by: 'api' });
-    assert.equal(heldServes(CARDS), true, 'the process that holds the lease writes it');
+    const { held } = takeStore(rootNow(), { every: 4000, cwd: '/here', by: 'api' });
+    assert.equal(heldServes(rootNow(), CARDS), true, 'the process that holds the lease writes it');
     assert.deepEqual(read().serves, CARDS, 'on the file');
     assert.deepEqual(
       parseDaemonFile(fs.readFileSync(FILE, 'utf8'))?.serves,
       CARDS,
       'and back through the schema, which names the key — a key it does not name is dropped on the next write',
     );
-    const next = passed(held);
+    const next = passed(rootNow(), held);
     assert.deepEqual(read().serves, CARDS, 'and a pass of its own daemon keeps it');
-    beat(next);
+    beat(rootNow(), next);
     assert.deepEqual(read().serves, CARDS, 'as does its beat');
     clear();
-    takeStore({ every: 4000, cwd: '/here', by: 'api' });
+    takeStore(rootNow(), { every: 4000, cwd: '/here', by: 'api' });
     assert.equal('serves' in read(), false, 'a daemon that writes none names none');
     clear();
   });
@@ -719,7 +719,7 @@ test('what the lease serves: written by its holder alone, read back, and answere
     for (const over of [{ holder: CARDS }, { by: 'wf up', holder: CARDS }, { by: 'up', serves: CARDS }]) {
       const held = parseDaemonFile(holdBy(process.pid, over));
       assert.deepEqual([held?.by, held?.serves], ['up', CARDS], JSON.stringify(over));
-      beat(held!);
+      beat(rootNow(), held!);
       const { by, serves, holder, beatAt } = read();
       assert.deepEqual({ by, serves, holder, beat: beatAt !== undefined }, { by: 'up', serves: CARDS, holder: undefined, beat: true });
     }
@@ -732,30 +732,30 @@ test('what the lease serves: written by its holder alone, read back, and answere
       ['stopped', { stoppedAt: minutesAgo(0.1) }],
     ] as const) {
       const text = holdBy(process.pid, over);
-      assert.equal(heldServes(CARDS), false, `${name}: it answers it wrote nothing`);
+      assert.equal(heldServes(rootNow(), CARDS), false, `${name}: it answers it wrote nothing`);
       assert.equal(fs.readFileSync(FILE, 'utf8'), text, `${name}: and the file is byte for byte as it was`);
     }
     clear();
-    assert.equal(heldServes(CARDS), false, 'no lease is no lease of this process’s');
+    assert.equal(heldServes(rootNow(), CARDS), false, 'no lease is no lease of this process’s');
     assert.equal(fs.existsSync(FILE), false, 'and nothing is written');
   });
   await t.test('servesOnStore answers another live process alone: never its own, never a lease nobody ticks', async () => {
     clear();
-    assert.equal(servesOnStore(), undefined, 'no lease serves nothing');
+    assert.equal(servesOnStore(rootNow()), undefined, 'no lease serves nothing');
     holdBy(LIVE, { serves: CARDS });
-    assert.deepEqual(servesOnStore(), CARDS, 'a ticking lease of another live process names what it serves');
+    assert.deepEqual(servesOnStore(rootNow()), CARDS, 'a ticking lease of another live process names what it serves');
     holdBy(process.pid, { serves: CARDS });
-    assert.equal(servesOnStore(), undefined, 'a lease this process holds serves nothing to it: a viewer never dials itself');
+    assert.equal(servesOnStore(rootNow()), undefined, 'a lease this process holds serves nothing to it: a viewer never dials itself');
     holdBy(LIVE, { serves: CARDS, stoppedAt: minutesAgo(0.1) });
-    assert.equal(servesOnStore(), undefined, 'a lease let go names a port no one listens on');
+    assert.equal(servesOnStore(rootNow()), undefined, 'a lease let go names a port no one listens on');
     holdBy(GONE, { serves: CARDS });
-    assert.equal(servesOnStore(), undefined, 'nor does one whose process is gone');
+    assert.equal(servesOnStore(rootNow()), undefined, 'nor does one whose process is gone');
     holdBy(LIVE, { serves: CARDS, passedAt: minutesAgo(30), startedAt: minutesAgo(40) });
-    assert.equal(servesOnStore(), undefined, 'nor one that has gone silent past its window');
+    assert.equal(servesOnStore(rootNow()), undefined, 'nor one that has gone silent past its window');
     holdBy(LIVE);
-    assert.equal(servesOnStore(), undefined, 'a ticking lease that serves nothing answers none');
+    assert.equal(servesOnStore(rootNow()), undefined, 'a ticking lease that serves nothing answers none');
     fs.writeFileSync(FILE, 'not json');
-    assert.equal(servesOnStore(), undefined, 'and a file that does not read as a lease answers none');
+    assert.equal(servesOnStore(rootNow()), undefined, 'and a file that does not read as a lease answers none');
     clear();
   });
 });
@@ -1038,31 +1038,31 @@ test('what a pass kept reads back: its cost, the recent passes, the ceilings; RE
     async (t) => {
       const errors: string[] = [];
       t.mock.method(process.stderr, 'write', (line: string) => errors.push(line) > 0);
-      fs.rmSync(recentFile(), { force: true });
+      fs.rmSync(recentFile(rootNow()), { force: true });
       try {
-        assert.deepEqual(recentPasses(), [], 'none before any pass kept one');
-        for (const ms of [1, 2, 3, 4, 5]) recordRecentPass({ ...COST, ms }, 3);
+        assert.deepEqual(recentPasses(rootNow()), [], 'none before any pass kept one');
+        for (const ms of [1, 2, 3, 4, 5]) recordRecentPass(rootNow(), { ...COST, ms }, 3);
         assert.deepEqual(
-          recentPasses().map((r) => r.ms),
+          recentPasses(rootNow()).map((r) => r.ms),
           [3, 4, 5],
         );
-        assert.equal(recentPasses()[0].runs, 40);
-        const kept = JSON.parse(fs.readFileSync(recentFile(), 'utf8')) as unknown[];
-        fs.writeFileSync(recentFile(), JSON.stringify([kept[0], { ...(kept[1] as object), ms: 'slow' }, kept[2], 7]));
+        assert.equal(recentPasses(rootNow())[0].runs, 40);
+        const kept = JSON.parse(fs.readFileSync(recentFile(rootNow()), 'utf8')) as unknown[];
+        fs.writeFileSync(recentFile(rootNow()), JSON.stringify([kept[0], { ...(kept[1] as object), ms: 'slow' }, kept[2], 7]));
         assert.deepEqual(
-          recentPasses().map((r) => r.ms),
+          recentPasses(rootNow()).map((r) => r.ms),
           [3, 5],
         );
         assert.equal(errors.length, 1, errors.join(''));
-        assert.ok(errors[0].startsWith(`${recentFile()}: 2 of its passes`), errors[0]);
-        recordRecentPass({ ...COST, ms: 6 }, 3);
+        assert.ok(errors[0].startsWith(`${recentFile(rootNow())}: 2 of its passes`), errors[0]);
+        recordRecentPass(rootNow(), { ...COST, ms: 6 }, 3);
         assert.deepEqual(
-          recentPasses().map((r) => r.ms),
+          recentPasses(rootNow()).map((r) => r.ms),
           [3, 5, 6],
           'the next pass writes the file without them',
         );
       } finally {
-        fs.rmSync(recentFile(), { force: true });
+        fs.rmSync(recentFile(rootNow()), { force: true });
       }
     },
   );
@@ -1077,9 +1077,9 @@ test('what a pass kept reads back: its cost, the recent passes, the ceilings; RE
         entries: [{ part: 'runs', ...(kind === undefined ? {} : { kind }), factory: 'nemia', bytes: 40, unread: 0 }],
       });
       const kept = (kind?: string) => {
-        fs.rmSync(recentFile(), { force: true });
-        recordRecentPass({ ...COST, ms: 1 }, 3);
-        const [pass] = JSON.parse(fs.readFileSync(recentFile(), 'utf8')) as object[];
+        fs.rmSync(recentFile(rootNow()), { force: true });
+        recordRecentPass(rootNow(), { ...COST, ms: 1 }, 3);
+        const [pass] = JSON.parse(fs.readFileSync(recentFile(rootNow()), 'utf8')) as object[];
         return parseRecentPasses(JSON.stringify([{ ...pass, disk: disk(kind) }]));
       };
       try {
@@ -1087,7 +1087,7 @@ test('what a pass kept reads back: its cost, the recent passes, the ceilings; RE
         assert.deepEqual(kept().passes[0].disk, disk(), 'a pass kept before the kinds');
         assert.deepEqual([kept('photos').passes.length, kept('photos').unread], [0, 1]);
       } finally {
-        fs.rmSync(recentFile(), { force: true });
+        fs.rmSync(recentFile(rootNow()), { force: true });
       }
     },
   );
@@ -1096,13 +1096,13 @@ test('what a pass kept reads back: its cost, the recent passes, the ceilings; RE
     const file = path.join(ROOT, 'tick.json');
     try {
       fs.writeFileSync(file, JSON.stringify({ sessions: 4, runs: 2 }));
-      assert.deepEqual(lastCeilings(), { sessions: 4, runs: 2 });
+      assert.deepEqual(lastCeilings(rootNow()), { sessions: 4, runs: 2 });
       for (const bad of [{ sessions: 4, runs: -1 }, { sessions: 4, runs: 1.5 }, { sessions: '4', runs: 2 }, { sessions: 4 }, [4, 2]]) {
         fs.writeFileSync(file, JSON.stringify(bad));
-        assert.equal(lastCeilings(), undefined, JSON.stringify(bad));
+        assert.equal(lastCeilings(rootNow()), undefined, JSON.stringify(bad));
       }
       fs.writeFileSync(file, '{"sessions": 4');
-      assert.equal(lastCeilings(), undefined, 'half a file');
+      assert.equal(lastCeilings(rootNow()), undefined, 'half a file');
     } finally {
       fs.rmSync(file, { force: true });
     }
@@ -1111,17 +1111,17 @@ test('what a pass kept reads back: its cost, the recent passes, the ceilings; RE
   await t.test(
     'a recent pass keeps its quota and checks, a ring an older tick wrote without them reads, and REFUSED: a quota not a number',
     async () => {
-      fs.rmSync(recentFile(), { force: true });
+      fs.rmSync(recentFile(rootNow()), { force: true });
       try {
         const check = { factory: 'nemia', workflow: 'build', step: 'implement', agent: 'ada' };
-        const { kept } = recordRecentPass(COST, 3, { quota: { h: { w: 12.5 } }, checks: [check] });
+        const { kept } = recordRecentPass(rootNow(), COST, 3, { quota: { h: { w: 12.5 } }, checks: [check] });
         assert.deepEqual([kept.at(-1)?.quota, kept.at(-1)?.checks], [{ h: { w: 12.5 } }, [check]]);
-        assert.deepEqual(recentPasses(), kept, 'read back as kept');
+        assert.deepEqual(recentPasses(rootNow()), kept, 'read back as kept');
         const { waitMs: _w, load: _l, quota: _q, checks: _c, ...older } = kept[0];
-        fs.writeFileSync(recentFile(), JSON.stringify([older, { ...kept[0], quota: { h: { w: 'most' } } }]));
-        assert.deepEqual(recentPasses(), [older], 'the older reads; the quota that is no number is left out');
+        fs.writeFileSync(recentFile(rootNow()), JSON.stringify([older, { ...kept[0], quota: { h: { w: 'most' } } }]));
+        assert.deepEqual(recentPasses(rootNow()), [older], 'the older reads; the quota that is no number is left out');
       } finally {
-        fs.rmSync(recentFile(), { force: true });
+        fs.rmSync(recentFile(rootNow()), { force: true });
       }
     },
   );
@@ -1172,7 +1172,7 @@ test('`up` writes the feed a daemon started line once it holds the store, before
   fs.rmSync(path.join(ROOT, 'feed.jsonl'), { force: true });
   const { up } = await import('./up.verb.ts');
   const { Effect } = await import('effect');
-  const daemonLines = () => readFeed(0).lines.filter((l) => 'daemon' in l);
+  const daemonLines = () => readFeed(rootNow(), 0).lines.filter((l) => 'daemon' in l);
   const started: Array<ReturnType<typeof daemonLines>[number] | undefined> = [];
   const serving = Effect.sync(() => started.push(daemonLines().at(-1)));
   const once = () =>
@@ -1285,15 +1285,15 @@ test("the daemon asks each harness's quota and hands its reading to the passes; 
   });
   assert.deepEqual(last, { b: { week: 5 }, c: { week: 6 }, d: { week: 7 } }, 'the last reading is not changed in place');
 
-  fs.rmSync(recentFile(), { force: true });
+  fs.rmSync(recentFile(rootNow()), { force: true });
   const e = engineOf((n) => {
-    if (recentPasses().at(-1)?.quota || n > 500) throw STOP;
+    if (recentPasses(rootNow()).at(-1)?.quota || n > 500) throw STOP;
   });
   Object.assign(e, {
     quota: () => Effect.succeed({ kind: 'windows', limits: [{ key: 'w', usedPercentage: 12, resetsAt: null }], subscription: null }),
   });
   await assert.rejects(runPlaced(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api' }))), (err) => err === STOP);
-  const quota = recentPasses().at(-1)?.quota ?? {};
+  const quota = recentPasses(rootNow()).at(-1)?.quota ?? {};
   assert.ok(Object.keys(quota).length > 0, 'a pass kept the reading');
   for (const windows of Object.values(quota)) assert.deepEqual(windows, { w: 12 });
   clear();
@@ -1344,8 +1344,13 @@ test('the daemon delivers the subscriptions: a wake line written to the feed is 
   const { Effect } = await import('effect');
   const { dropSubscription, putSubscription } = await import('../subscription/subscription.store.ts');
   const { feedFile, feedSize } = await import('../feed/feed.store.ts');
-  putSubscription(rootNow(), 'daemon', { task: 'nemia', selectors: ['reason=AwaitingApproval'], digestEvery: 60, from: feedSize() });
-  fs.appendFileSync(feedFile(), `${JSON.stringify({ at: at(0), run: 'r-1', step: 'plan', word: 'awaiting approval' })}\n`);
+  putSubscription(rootNow(), 'daemon', {
+    task: 'nemia',
+    selectors: ['reason=AwaitingApproval'],
+    digestEvery: 60,
+    from: feedSize(rootNow()),
+  });
+  fs.appendFileSync(feedFile(rootNow()), `${JSON.stringify({ at: at(0), run: 'r-1', step: 'plan', word: 'awaiting approval' })}\n`);
   const told: string[] = [];
   const e = engineOf((n) => {
     if (told.length || n > 2000) throw STOP;

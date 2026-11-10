@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { Missing } from '../refusal/refusal.ts';
+import { rootNow } from '../../test/config-given.ts';
 
 process.env.WF_ROOT = scratch('wf-merge-root-');
 const { mergesOf } = await import('./merges.verb.ts');
@@ -63,11 +64,11 @@ test('a branch merges cleanly, then conflicts once main writes its file otherwis
   commit('src/a.ts', 'export const a = 1;\n', 'implement');
   git('checkout', '-q', 'main');
   runOn('r-1', repo);
-  assert.deepEqual(mergesOf(builtinGitPlace, 'r-1', ['wf/r-1/implement']), {
+  assert.deepEqual(mergesOf(rootNow(), builtinGitPlace, 'r-1', ['wf/r-1/implement']), {
     'wf/r-1/implement': { clean: true, said: 'merges cleanly onto main' },
   });
   commit('src/a.ts', 'export const a = 2;\n', 'main writes a.ts too');
-  assert.deepEqual(mergesOf(builtinGitPlace, 'r-1', ['wf/r-1/implement']), {
+  assert.deepEqual(mergesOf(rootNow(), builtinGitPlace, 'r-1', ['wf/r-1/implement']), {
     'wf/r-1/implement': { clean: false, conflicts: ['src/a.ts'], said: 'conflicts with main in 1 file: src/a.ts' },
   });
   assert.equal(git('status', '--porcelain'), '', "a trial in git's object store alone");
@@ -76,14 +77,14 @@ test('a branch merges cleanly, then conflicts once main writes its file otherwis
 test("a branch git does not have is neither clean nor conflicted: it carries git's own word for why it cannot say", () => {
   const { repo } = repoOf();
   runOn('r-2', repo);
-  const gone = mergesOf(builtinGitPlace, 'r-2', ['wf/no-such-run/implement'])['wf/no-such-run/implement'];
+  const gone = mergesOf(rootNow(), builtinGitPlace, 'r-2', ['wf/no-such-run/implement'])['wf/no-such-run/implement'];
   assert.ok('error' in gone && /no-such-run/.test(gone.error), JSON.stringify(gone));
   assert.match(gone.said, /^whether it merges onto main is not known: .*no-such-run/);
 });
 
 test('REFUSED: the merge check of a run the store does not have is `Missing`, naming the run', () => {
   assert.throws(
-    () => mergesOf(builtinGitPlace, 'r-none', ['wf/r-none/implement']),
+    () => mergesOf(rootNow(), builtinGitPlace, 'r-none', ['wf/r-none/implement']),
     (err: Error) => err instanceof Missing && /r-none/.test(err.message),
   );
 });

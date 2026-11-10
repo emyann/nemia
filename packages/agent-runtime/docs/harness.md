@@ -38,6 +38,10 @@ the orchestrator's code holds a fact today, it is named beside it.
 - **A job never waits on a prompt** (`permissionPrompts: 'none'`, measured on `claude -p`, M1); a `--bg` session in a folder nobody
   opened blocked in any mode that can ask, and the modes that ask nobody are this package's answer (`unasking` in `fenceReach`,
   `src/harness/reach.ts`).
+- **`auto` on haiku is `auto`** (the SDK's Claude Code 2.1.316, `claude-haiku-5-5`, 2026-11-09): a job filed at the runtime's
+  default mode ran in `auto` (its transcript's `permissionMode`), and the classifier allowed a write outside its folder, a `curl`
+  and a fetch, where on 2.1.280 haiku ran `auto` as `default` and was denied all three. A job meant to be denied by asking is
+  filed in `default` (`test/live.test.ts`, M1 and M7).
 - **A session reads neither user settings nor `settings.local.json`** (`settingSources: ['project']`): what a step needs goes on the step, its
   agent or the checkout's `.claude/settings.json`.
 - **A tool's error is exact in the log events, not the spans** (2.1.296, 2026-10-11): `tool_result` with `success="false"` carries

@@ -776,8 +776,8 @@ dontAsk, default and manual 1; acceptEdits 2; auto 3; bypassPermissions 4 — re
 the word a task naming none runs in (`given`: `auto`, `workspace-write`), the lowest rank that writes unasked (`writes`), the mode
 a session held to its directory runs in (`held`: `dontAsk`), the modes a session nobody attends runs in without stopping to ask a
 person (`unasking`: `dontAsk`, `bypassPermissions`; none on Codex), and the words dropped on `model` (`dropped`: `auto` on a model of
-`CLAUDE_AUTO_DROPPED`). It is `undefined` for any other harness. The runtime refuses none of these itself: `{ model: 'haiku' }` is
-filed in `auto` and runs in `default`, as the measure above says. `unruledIn(harness, path)` gives the first character of `path`
+`CLAUDE_AUTO_DROPPED`). It is `undefined` for any other harness. The runtime refuses none of these itself: `{ model: 'claude-haiku-4-5' }`
+is filed in `auto` and runs in `default` (measured on Claude Code 2.1.316, where the `haiku` alias, now `claude-haiku-5-5`, keeps `auto`). `unruledIn(harness, path)` gives the first character of `path`
 that a permission rule of the harness cannot carry, the set its mounts are refused by (`CLAUDE_UNRULED`), and `undefined` for a path
 every rule carries or a harness whose fence takes no rule naming a path, so a caller that builds a rule from a path refuses it in its
 own words first.

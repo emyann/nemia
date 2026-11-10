@@ -434,8 +434,8 @@ test('retryRefusal: what `nemia retry` refuses, and what it says to do instead',
   });
   await t.test('a `--model` an `auto` step would drop', () => {
     names(
-      refusalOf(failedRun(), { t1: 'failed' }, { mode: 'continue', model: 'haiku' }, [], 'implement', 'unfinished', STEPS),
-      '`--model haiku`',
+      refusalOf(failedRun(), { t1: 'failed' }, { mode: 'continue', model: 'claude-haiku-4-5' }, [], 'implement', 'unfinished', STEPS),
+      '`--model claude-haiku-4-5`',
       'no `permissionMode:`',
       'nemia retry r-1 implement --model sonnet',
       '`permissionMode: acceptEdits`',

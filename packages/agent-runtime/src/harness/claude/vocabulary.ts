@@ -81,10 +81,11 @@ const CLAUDE_UNASKING_MODES: readonly string[] = [CLAUDE_HELD_MODE, 'bypassPermi
 
 /**
  * The models on which Claude Code drops `auto`: the session starts in `auto` and says `default` from its first turn. Each matches the
- * name as given or with a `-` suffix after it (`claude-haiku-4-5-20251001`). Measured on Claude Code 2.1.282; a model not listed is let
- * through, since the list is what is known to fail. The runtime refuses none of them: it answers the fact (`fenceReach`).
+ * name as given or with a `-` suffix after it (`claude-haiku-4-5-20251001`). Measured on Claude Code 2.1.316, the Agent SDK's, by the
+ * `permissionMode` of the session's `init` line: `haiku`, now `claude-haiku-5-5`, keeps `auto` and is not listed. A model not listed is
+ * let through, since the list is what is known to fail. The runtime refuses none of them: it answers the fact (`fenceReach`).
  */
-export const CLAUDE_AUTO_DROPPED: readonly string[] = ['haiku', 'claude-haiku-4-5', 'claude-sonnet-4-5'];
+export const CLAUDE_AUTO_DROPPED: readonly string[] = ['claude-haiku-4-5', 'claude-sonnet-4-5'];
 
 /**
  * The efforts Claude Code takes. Refused here rather than left to the CLI, because the CLI does not

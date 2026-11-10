@@ -1,10 +1,12 @@
 /**
- * Nemia on the api, through the entries of the package's command table and the package's refusals (`refusedAs`): `GET /api/level` says
- * where she is, `manual` where no level was ever set; `PUT /api/level` sets `semi-auto` while her folder is not trusted, the one act
- * `nemia level semi-auto` takes, both answering the command that trusts it (`trust`), null once it is; refuses a word that is no level
- * with a 422, before anything is written; it raises a factory for a stretch and ends the raise, and refuses `for` with no factory with a
+ * Nemia on the api, the nemia group of `objects`' Api calling the entries of the package's command table by type, and the package's
+ * refusals (`refusedAs`): `GET /api/level` says where she is, `manual` where no level was ever set; `PUT /api/level` sets `semi-auto`
+ * while her folder is not trusted, the one act `nemia level semi-auto` takes, both answering the command that trusts it (`trust`), null
+ * once it is; refuses a word that is no level with a 400 naming `level` (its body's Schema, `NemiaLevelSet`), before anything is
+ * written; it raises a factory for a stretch and ends the raise, and refuses `for` with no factory with a
  * 422; `GET /api/level` lists each factory's level, the default factory first; `GET /api/nemia/memory` lists her facts, and `/:fact`
- * prints one, a fact she does not keep its 404.
+ * prints one, a fact she does not keep its 404; `/api/nemia/instructions` reads her custom instructions, none at first, writes them
+ * (blank words refused 422, nothing written) and clears them.
  *
  * At shipped defaults, over the harness's scratch store (`root`) and its Claude Code folder (`config`), and an engine of the test's on
  * which no task is filed.
@@ -16,7 +18,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
-import { COMMANDS, addFactory, engine } from 'agent-orchestrator';
+import { LEVEL, addFactory, engine } from 'agent-orchestrator';
 import { runWith } from './builtin-place.ts';
 import { appOf, liveOf } from '../src/app.ts';
 import { Engine } from '../src/store.ts';
@@ -30,9 +32,6 @@ const e = {
 } as never;
 
 const app = appOf(Layer.merge(liveOf(), Layer.succeed(Engine)(e))).app;
-
-/** `nemia level`'s entry of the package's table, the command line's door. */
-const LEVEL = COMMANDS.find((c) => c.name === 'level')!;
 
 /** Her folder in the store, and the file her level is kept in. */
 const NEMIA = path.join(root, 'nemia');
@@ -53,10 +52,10 @@ test('A person sets where Nemia is: manual by default, a word that is no level r
     assert.equal(read.body.task, null);
     assert.equal(read.body.spend, null);
   });
-  await s.test('REFUSED: a word that is no level is a 422, and nothing is written', async () => {
+  await s.test('REFUSED: a word that is no level is a 400 naming the key, and nothing is written', async () => {
     const none = await asked('PUT', '/api/level', { level: 'on' });
-    assert.equal(none.status, 422);
-    assert.match(String(none.body.error), /^"on" is no level/);
+    assert.equal(none.status, 400);
+    assert.equal(none.body.field, 'payload.level');
     assert.equal(fs.existsSync(LEVEL_FILE), false, 'nothing written');
   });
   await s.test(
@@ -75,7 +74,7 @@ test('A person sets where Nemia is: manual by default, a word that is no level r
       assert.equal((await asked('GET', '/api/level')).body.trust, words);
       assert.equal((await asked('PUT', '/api/level', { level: 'manual' })).status, 200);
       fs.rmSync(LEVEL_FILE);
-      const cli = (await runWith(e, LEVEL.handler({ level: 'semi-auto' }))) as { level: string; task: string; trust: string | null };
+      const cli = await runWith(e, LEVEL.handler({ level: 'semi-auto' }));
       assert.equal(cli.level, 'semi-auto');
       assert.equal(cli.trust, words, 'the same words at the command line');
       const byCli = level();
@@ -129,6 +128,27 @@ test('A person sets where Nemia is: manual by default, a word that is no level r
       const none = await asked('GET', '/api/nemia/memory/pending');
       assert.equal(none.status, 404);
       assert.match(String(none.body.error), /no fact named pending: she keeps feed-cursor/);
+    },
+  );
+  await s.test(
+    'her custom instructions: none at first, written to her file and read back, blank words a 422 writing nothing, and cleared',
+    async () => {
+      const file = path.join(root, 'custom-instructions', 'nemia.md');
+      const none = await asked('GET', '/api/nemia/instructions');
+      assert.equal(none.status, 200);
+      assert.deepEqual(none.body, { name: 'nemia', file, words: null, error: null });
+      const written = await asked('PUT', '/api/nemia/instructions', { words: 'Answer in French.' });
+      assert.equal(written.status, 200, String(written.body.error));
+      assert.equal(written.body.words, 'Answer in French.');
+      assert.equal(fs.readFileSync(file, 'utf8'), 'Answer in French.\n');
+      assert.equal((await asked('GET', '/api/nemia/instructions')).body.words, 'Answer in French.');
+      const blank = await asked('PUT', '/api/nemia/instructions', { words: '   ' });
+      assert.equal(blank.status, 422);
+      assert.equal(fs.readFileSync(file, 'utf8'), 'Answer in French.\n', 'a refused write leaves her words as they were');
+      const cleared = await asked('DELETE', '/api/nemia/instructions');
+      assert.equal(cleared.status, 200);
+      assert.deepEqual(cleared.body, { name: 'nemia', file, removed: true });
+      assert.equal(fs.existsSync(file), false);
     },
   );
 });

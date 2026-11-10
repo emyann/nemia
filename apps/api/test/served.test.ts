@@ -1,10 +1,11 @@
 /**
  * Every route the api serves is read off `objects`' `Api`, and every other is named here, both ways. Each endpoint of the `Api` is served
  * by the mount (`mount`, src/objects/serve.ts): asked with its names filled in, it answers something other than the api's 404 for a path no
- * route serves (`noRoute`) and other than a 500 with no words, so an endpoint the `Api` gains with no handler, or one a Hono route before
- * the mount shadows, is refused here with nothing to list. The routes Hono serves itself are exactly the three of the OpenAPI document
- * (`META`, kept outside the `Api` as Kubernetes keeps `/openapi/v3` out of its own) and the routes not moved onto the `Api` yet
- * (`NOT_YET_IN_API`), each part of the change that moves one deleting its row, until the list is empty and goes.
+ * route serves (`noRoute`) and other than a 500 with no words — a stream it opens (`text/event-stream`) is served, and let go unread — so
+ * an endpoint the `Api` gains with no handler, or one a Hono route before the mount shadows, is refused here with nothing to list. The
+ * routes Hono serves itself are exactly the three of the OpenAPI document (`META`, kept outside the `Api` as Kubernetes keeps
+ * `/openapi/v3` out of its own) and the routes not moved onto the `Api` yet (`NOT_YET_IN_API`), each part of the change that moves one
+ * deleting its row, until the list is empty and goes.
  */
 import './harness.ts';
 import { test } from 'node:test';
@@ -28,19 +29,6 @@ const NOT_YET_IN_API = [
   'PUT /api/custom-instructions/:name',
   'DELETE /api/custom-instructions/:name',
   'POST /api/agents/yours/copy',
-  'PUT /api/level',
-  'PUT /api/policy/:name/rules/:id',
-  'DELETE /api/policy/:name/rules/:id',
-  'GET /api/level',
-  'GET /api/nemia/memory',
-  'GET /api/nemia/memory/:fact',
-  'GET /api/policy/:name',
-  'GET /api/nemia/chat',
-  'GET /api/nemia/chat/stream',
-  'POST /api/nemia/chat/send',
-  'POST /api/nemia/chat/stop',
-  'POST /api/nemia/chat/answer',
-  'POST /api/nemia/chat/read',
 ] as const;
 
 /** Each route Hono serves as `METHOD path`, once, but middleware and the mount (`ALL`), which serve no route of their own. */

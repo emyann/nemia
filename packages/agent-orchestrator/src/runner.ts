@@ -492,6 +492,10 @@ export type { Command, InputOf, Ran } from './command/entry.verb.ts';
 export { FACTORY_FIRE, FACTORY_HIRE } from './factory/factory.verb.ts';
 export { LS, REFRESH, RefreshInput, RETRY, RetryInput, SAY, SayInput } from './command/commands.verb.ts';
 export { APPROVE, ApproveInput } from './gate/commands.verb.ts';
+/** Nemia's entries the api calls by type (the nemia group of `objects`' Api): her level, her memory, and an agent's rules for auto. */
+export { LEVEL } from './nemia/level.verb.ts';
+export { MEMORY } from './nemia/memory.verb.ts';
+export { POLICY, POLICY_CONFIRM, POLICY_DROP } from './auto/auto.verb.ts';
 export { CLI, CLI_VERBS, commandBreaks, commandLine, generated, helpOf, leftOut, parseArgv, routeList } from './command/command.ts';
 export { renamedIn, renamedValues } from './command/command.ts';
 export type { Args, CommandSpec, Flag, Positional, Route, Spec } from './command/command.ts';
@@ -574,5 +578,4 @@ export { PAUSE, PAUSE_NOW, PAUSED, RESUME } from './command/runs.verb.ts';
 export { PASSES } from './meter/passes.verb.ts';
 export { SERIES } from './command/reads.verb.ts';
 export { SUBSCRIBE, UNSUBSCRIBE } from './subscription/subscription.verb.ts';
-export { LEVEL } from './nemia/level.verb.ts';
 export { FACTORY_ADD } from './factory/factory.verb.ts';

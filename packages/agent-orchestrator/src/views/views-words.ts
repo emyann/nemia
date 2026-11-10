@@ -6,7 +6,7 @@
 import { type TaskPhase } from '../record/record.ts';
 import { signedAndHeld, type AttemptClock, type AttemptReason, type EngineOutcome, type TaskClock } from '../timeline/index.ts';
 import type { AttemptMemory, KilledAtLimit } from '../../contracts/out-of-memory.contract.ts';
-import type { AttemptEnd } from 'objects';
+import type { AttemptEnd, EnginePhase } from 'objects';
 
 export type { AttemptMemory, AttemptReason, EngineOutcome, KilledAtLimit };
 
@@ -18,24 +18,12 @@ export type { AttemptMemory, AttemptReason, EngineOutcome, KilledAtLimit };
 export type { AttemptEnd };
 
 /**
- * The runtime's task phases, written out because a pure file imports no runtime, a type included: the closed set a task's view stands
- * in. Held equal to the runtime's `TaskPhase` by a type-level check in `runtime-client.ts`, so a word added or dropped there fails the
- * typecheck here. Named apart from the orchestrator's own `TaskPhase` (`record/record.ts`), which is what a run makes of it.
+ * The runtime's task phases, the closed set a task's view stands in: objects' words (`ENGINE_PHASES`), since a pure file imports no
+ * runtime, a type included. Held equal to the runtime's `TaskPhase` by a type-level check in `runtime-client.ts`, so a word added or
+ * dropped there fails the typecheck here. Named apart from the orchestrator's own `TaskPhase` (`record/record.ts`), which is what a run
+ * makes of it.
  */
-export type EnginePhase =
-  | 'pending'
-  | 'starting'
-  | 'working'
-  | 'quiescent'
-  | 'needs-human'
-  | 'input-required'
-  | 'idle'
-  | 'restarting'
-  | 'between-attempts'
-  | 'ending'
-  | 'succeeded'
-  | 'failed'
-  | 'stopped';
+export type { EnginePhase };
 
 /**
  * An attempt as the words read it: its clock (`AttemptClock`), how it ended, whether the statement its task asked for came

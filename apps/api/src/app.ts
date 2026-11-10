@@ -11,7 +11,6 @@ import { commands } from './commands/index.ts';
 import { McpAsker } from './capabilities/index.ts';
 import { QuotaAsker } from './gauges/index.ts';
 import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, type Services } from './layer.ts';
-import { nemia, nemiaChat } from './nemia/index.ts';
 import { bodyOf, MOUNT, mount, noRoute, refusedAs, statusOf } from './objects/index.ts';
 import { writeGuard } from './guard.ts';
 import { openapi, REFERENCE_BUNDLE, referenceOf } from './openapi/index.ts';
@@ -167,8 +166,6 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', builder)
     .route('/', agents)
     .route('/', customInstructions)
-    .route('/', nemia)
-    .route('/', nemiaChat)
     .route('/', commands)
     .all(MOUNT, mount(runtime))
     .notFound(noRoute)

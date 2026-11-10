@@ -3,7 +3,8 @@
  * and the custom instruction it read (`POLICY`); a proposal written, the agent's own (`POLICY_PROPOSE`); a rule confirmed or dropped, the
  * person's, asked of them every time an agent calls it (`POLICY_CONFIRM`, `POLICY_DROP`). Any agent's: the name is the one given.
  */
-import { Effect } from 'effect';
+import { Effect, Schema } from 'effect';
+import { PolicyRuleConfirm } from 'objects';
 import { tried } from '../runtime-client.ts';
 import type { Args, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
@@ -59,11 +60,26 @@ export type PolicyList = {
 /** The agent's name in `args`. */
 const agentIn = (args: Args): string => String(args.name ?? '');
 
-/** The rule's id in `args`. */
-const idIn = (args: Args): string => String(args.id ?? '');
-
 /** The words of the rule the person read in `args`. */
 const wordsIn = (args: Args): string => String(args.words ?? '');
+
+/** What `nemia policy` takes: the agent whose rules to read. */
+export const PolicyInput = Schema.Struct({ name: Schema.String });
+export type PolicyInput = typeof PolicyInput.Type;
+
+/** What `nemia policy rm` takes: the agent, and the id of the rule taken out of force. */
+export const RuleInput = Schema.Struct({ name: Schema.String, id: Schema.String });
+export type RuleInput = typeof RuleInput.Type;
+
+/** What `nemia policy confirm` takes: the agent, the rule's id, and its words as the person read them (`objects`' `PolicyRuleConfirm`). */
+export const ConfirmInput = Schema.Struct({ ...PolicyRuleConfirm.fields, name: Schema.String, id: Schema.String });
+export type ConfirmInput = typeof ConfirmInput.Type;
+
+/** The refusal (`Invalid`) of a name that is no agent's, or nothing: what `check` says, for a caller that runs none. */
+const agentNamed = (name: string) => {
+  const wrong = agentNameRefusal(name);
+  return wrong === undefined ? Effect.void : Effect.fail(new Invalid({ message: wrong }));
+};
 
 /** A rule with its words. */
 const worded = <R extends PolicyRule>(rule: R): WordedRule<R> => ({ ...rule, words: ruleWords(rule) });
@@ -153,7 +169,7 @@ const ruleSpec = (name: string): Spec => ({
 });
 
 /** `nemia policy <agent>`: an agent's rules for `auto`, the list in force beside its proposal and its custom instruction. */
-export const POLICY: Command<PolicyList> = {
+export const POLICY: Command<PolicyList, PolicyInput> = {
   name: 'policy',
   usage: '<agent>',
   help: [
@@ -165,8 +181,9 @@ export const POLICY: Command<PolicyList> = {
   check: (args) => agentNameRefusal(agentIn(args)) ?? null,
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/policy/:name', status: 200 },
-  handler: (args, _env, home = HOME) => rooted(home, 'policy', listed(home, agentIn(args))),
+  only: { side: 'cli', why: "the api serves it as the nemia group's `policy` of `objects`' Api, calling this handler" },
+  input: PolicyInput,
+  handler: ({ name }, _env, home = HOME) => Effect.andThen(agentNamed(name), rooted(home, 'policy', listed(home, name))),
   print: listLines,
 };
 
@@ -279,11 +296,15 @@ const withinDelegation = Effect.fnUntraced(function* (home: string, agent: strin
   );
 });
 
+/** The refusal of a confirm with no words. */
+const confirmWordless = (agent: string): string =>
+  `nemia policy confirm takes the rule's words as you read them, so what is confirmed is what you read: --words '<words>', printed by nemia policy ${agent}.`;
+
 /**
  * `nemia policy confirm <agent> <id> --words <words>`: a rule the agent proposed put in force as the person read it, the person's; asked of
  * them every time an agent calls it. Refused: a confirm with no words.
  */
-export const POLICY_CONFIRM: Command<PolicyList> = {
+export const POLICY_CONFIRM: Command<PolicyList, ConfirmInput> = {
   name: 'policy confirm',
   usage: "<agent> <id> --words '<words>'",
   help: [
@@ -306,30 +327,31 @@ export const POLICY_CONFIRM: Command<PolicyList> = {
     unknown: (arg) =>
       `nemia policy confirm takes an agent's name, a rule's id and --words '<words>', not ${arg}: nemia policy confirm <agent> <id> --words '<words>'.`,
   },
-  check: (args) =>
-    agentNameRefusal(agentIn(args)) ??
-    (wordsIn(args).trim()
-      ? null
-      : `nemia policy confirm takes the rule's words as you read them, so what is confirmed is what you read: --words '<words>', printed by nemia policy ${agentIn(args) || '<agent>'}.`),
+  check: (args) => agentNameRefusal(agentIn(args)) ?? (wordsIn(args).trim() ? null : confirmWordless(agentIn(args) || '<agent>')),
   writes: true,
   class: 'ask',
   asksAlways: true,
-  route: { method: 'PUT', path: '/api/policy/:name/rules/:id', status: 200 },
-  handler: (args, _env, home = HOME) =>
-    rooted(
-      home,
-      'policy confirm',
-      Effect.gen(function* () {
-        yield* withinDelegation(home, agentIn(args), idIn(args));
-        yield* tried(() => confirmRule(home, agentIn(args), idIn(args), wordsIn(args), new Date()));
-        return yield* listed(home, agentIn(args));
-      }),
+  only: { side: 'cli', why: "the api serves it as the nemia group's `confirmRule` of `objects`' Api, calling this handler" },
+  input: ConfirmInput,
+  handler: ({ name, id, words }, _env, home = HOME) =>
+    Effect.andThen(
+      agentNamed(name),
+      rooted(
+        home,
+        'policy confirm',
+        Effect.gen(function* () {
+          if (!words.trim()) return yield* Effect.fail(new Invalid({ message: confirmWordless(name) }));
+          yield* withinDelegation(home, name, id);
+          yield* tried(() => confirmRule(home, name, id, words, new Date()));
+          return yield* listed(home, name);
+        }),
+      ),
     ),
-  print: (list, args) => [`${list.agent}: the rule ${idIn(args)} is in force at auto.`, ...listLines(list)],
+  print: (list, { id }) => [`${list.agent}: the rule ${id} is in force at auto.`, ...listLines(list)],
 };
 
 /** `nemia policy rm <agent> <id>`: a rule taken out of force, the default among them, the person's; asked of them every time. */
-export const POLICY_DROP: Command<PolicyList> = {
+export const POLICY_DROP: Command<PolicyList, RuleInput> = {
   name: 'policy rm',
   usage: '<agent> <id>',
   help: ['take a rule out of force, the default among them: what it allowed is', 'asked of you again. Asked of you every time'],
@@ -338,17 +360,21 @@ export const POLICY_DROP: Command<PolicyList> = {
   writes: true,
   class: 'ask',
   asksAlways: true,
-  route: { method: 'DELETE', path: '/api/policy/:name/rules/:id', status: 200 },
-  handler: (args, _env, home = HOME) =>
-    rooted(
-      home,
-      'policy rm',
-      Effect.andThen(
-        tried(() => dropRule(home, agentIn(args), idIn(args), new Date())),
-        listed(home, agentIn(args)),
+  only: { side: 'cli', why: "the api serves it as the nemia group's `dropRule` of `objects`' Api, calling this handler" },
+  input: RuleInput,
+  handler: ({ name, id }, _env, home = HOME) =>
+    Effect.andThen(
+      agentNamed(name),
+      rooted(
+        home,
+        'policy rm',
+        Effect.andThen(
+          tried(() => dropRule(home, name, id, new Date())),
+          listed(home, name),
+        ),
       ),
     ),
-  print: (list, args) => [`${list.agent}: the rule ${idIn(args)} is out of force; what it allowed is asked again.`, ...listLines(list)],
+  print: (list, { id }) => [`${list.agent}: the rule ${id} is out of force; what it allowed is asked again.`, ...listLines(list)],
 };
 
 /** The entries of `nemia policy`, in the order `nemia`'s help lists them. */

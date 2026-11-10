@@ -54,6 +54,7 @@ import { BadRequest, Conflict, Failed, Forbidden, Invalid, listQuery, Missing, U
 import { DelegationsGroup, ProposalsGroup } from './proposal-api.ts';
 import { RunsGroup } from './run-api.ts';
 import { StepsGroup } from './step-api.ts';
+import { NemiaGroup } from './nemia-api.ts';
 import { Subscription, SubscriptionList } from './subscription.ts';
 import { Event, EventList } from './event.ts';
 import { KINDS, type Kind } from './words.ts';
@@ -609,4 +610,5 @@ export const Api = HttpApi.make('nemia')
   .add(ProposalsGroup)
   .add(DelegationsGroup)
   .add(DiscoveryGroup)
-  .add(ServerGroup);
+  .add(ServerGroup)
+  .add(NemiaGroup);

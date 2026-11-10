@@ -3,8 +3,7 @@
  * why a body is not one (400), and what a failure that is not a refusal answers (502).
  */
 import type { Words } from '../body.ts';
-import { AGENTS_COPY, AGENTS_CUSTOM, POLICY_CONFIRM, POLICY_DROP } from './library.ts';
-import { LEVEL } from './sessions.ts';
+import { AGENTS_COPY, AGENTS_CUSTOM } from './library.ts';
 
 /**
  * What a route's path names: the run and the step — `step` empty on a route that names none, `runId` on a route of the store's own, where
@@ -40,9 +39,6 @@ export type RouteWords = {
 };
 
 export const WORDS: Readonly<Record<string, RouteWords>> = {
-  level: LEVEL,
-  'policy confirm': POLICY_CONFIRM,
-  'policy rm': POLICY_DROP,
   'agents custom': AGENTS_CUSTOM,
   'agents copy': AGENTS_COPY,
 };

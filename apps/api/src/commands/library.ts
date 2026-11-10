@@ -1,8 +1,6 @@
 /**
- * The words of the routes that write a person's agents: an agent's custom instructions written or cleared, an agent file copied into
- * the library, and an agent's rule for auto put in force and taken out (`nemia policy confirm`, `nemia policy rm`), the person's, from
- * the board. A confirm takes the rule's words as the person read them, and a drop no body but none or `{}`; a name that is no agent's
- * is refused before either.
+ * The words of the routes that write a person's agents: an agent's custom instructions written or cleared, and an agent file copied
+ * into the library.
  */
 import { agentNameRefusal } from 'agent-orchestrator/workflow';
 import { valueAt } from '../body.ts';
@@ -52,41 +50,4 @@ export const AGENTS_COPY: RouteWords = {
       return `POST /api/agents/yours/copy takes a JSON object: ${COPY_SHAPE}.`;
     },
   strict: true,
-};
-
-/** The body a confirm takes: the rule's words, as the person read them. */
-const CONFIRM_SHAPE = '`{ "words": "<the rule\'s words, as read>" }`';
-
-/** Why the text `text` a rule's route `at` was sent is no body it reads, or null for none or `{}`. */
-function noBody(at: Named, text: string): string | null {
-  if (!text.trim()) return null;
-  try {
-    const body: unknown = JSON.parse(text);
-    if (typeof body === 'object' && body !== null && !Array.isArray(body) && Object.keys(body).length === 0) return null;
-  } catch {
-    return `${at.method} ${at.path} takes no body but \`{}\`, and this request's body is not JSON.`;
-  }
-  return `${at.method} ${at.path} takes no body but \`{}\`: the agent and the rule are in its path.`;
-}
-
-/** The refusal of a path naming no agent, 400. */
-const agentNamed = (at: Named): string | null => {
-  const wrong = agentNameRefusal(at.name);
-  return wrong === undefined ? null : `${at.method} ${at.path}: ${wrong}`;
-};
-
-/** A rule for auto put in force: and its body: the rule's words, as the person read them. */
-export const POLICY_CONFIRM: RouteWords = {
-  shape: CONFIRM_SHAPE,
-  issue: (at) => () => `${at.method} ${at.path} takes the rule's words as you read them, and no other key: ${CONFIRM_SHAPE}.`,
-  named: agentNamed,
-  strict: true,
-};
-
-/** A rule for auto taken out of force. */
-export const POLICY_DROP: RouteWords = {
-  shape: '`{}`',
-  issue: (at) => () => `${at.method} ${at.path} takes no body but \`{}\`.`,
-  named: agentNamed,
-  bodyless: noBody,
 };

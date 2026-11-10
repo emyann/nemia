@@ -283,6 +283,53 @@ export const LEVELS = ['manual', 'semi-auto', 'auto'] as const;
 /** One of `LEVELS`. */
 export type Level = (typeof LEVELS)[number];
 
+/**
+ * The runtime's task phases, as Nemia's level says her session's (`NemiaLevel.phase`): the closed set a task's view stands in, held
+ * equal to the runtime's `TaskPhase` by the orchestrator's typecheck (`runtime-client.ts`).
+ */
+export const ENGINE_PHASES = [
+  'pending',
+  'starting',
+  'working',
+  'quiescent',
+  'needs-human',
+  'input-required',
+  'idle',
+  'restarting',
+  'between-attempts',
+  'ending',
+  'succeeded',
+  'failed',
+  'stopped',
+] as const;
+
+/** One of `ENGINE_PHASES`. */
+export type EnginePhase = (typeof ENGINE_PHASES)[number];
+
+/** The answers a rule at a gate may give unasked: a step approved at its gate, and a step tried again. */
+export const RULE_ANSWERS = ['approve', 'retry'] as const;
+
+/** One of `RULE_ANSWERS`. */
+export type RuleAnswer = (typeof RULE_ANSWERS)[number];
+
+/** Where a rule for auto came from: the builtin default, or an agent's proposal the person confirmed. */
+export const RULE_ORIGINS = ['default', 'proposed'] as const;
+
+/** One of `RULE_ORIGINS`. */
+export type RuleOrigin = (typeof RULE_ORIGINS)[number];
+
+/** Who a message of a chat is from: the task's agent, the person, the keeper's quiet marker, or another agent the person allowed. */
+export const CHAT_FROM = ['agent', 'person', 'keeper', 'peer'] as const;
+
+/** One of `CHAT_FROM`. */
+export type ChatFrom = (typeof CHAT_FROM)[number];
+
+/** Where a tool call of a chat stands: done, at work, failed, not begun, or waiting on the person. */
+export const CALL_STATES = ['done', 'running', 'error', 'pending', 'waits'] as const;
+
+/** One of `CALL_STATES`. */
+export type CallState = (typeof CALL_STATES)[number];
+
 /** Whether a factory's runs follow the revisions merged since they started (`follow`) or keep those they started on (`pinned`). */
 export const REVISIONS_POLICIES = ['follow', 'pinned'] as const;
 

@@ -296,6 +296,11 @@ export const Daemon = Schema.Struct({
   identity: OrNull(Schema.Literals(DAEMON_IDENTITIES)),
   line: Schema.String,
   unobserved: Schema.Array(Schema.String),
+  /**
+   * The line `nemia ls` says of where the result branches stand: how long ago the tick's last pass read them, where that is older than
+   * `staleAfterMs` or nothing ticks, or that no pass has; null where a ticking daemon read them lately. Left out by an older api.
+   */
+  branchesLine: Schema.optionalKey(OrNull(Schema.String)),
 });
 export type Daemon = typeof Daemon.Type;
 

@@ -8,8 +8,6 @@
 import { Context, Effect, Layer, Tracer } from 'effect';
 import {
   asked,
-  type Command,
-  COMMANDS,
   engine,
   engineOf,
   runsAtOnce,
@@ -80,16 +78,6 @@ export async function everyView(e: Reader): Promise<{ views: Views; unreadable: 
     views: new Map(listed.views.map((view) => [view.id, view])),
     unreadable: new Map(listed.unreadable.map(({ taskId, why }) => [taskId, why])),
   };
-}
-
-/**
- * The command of the orchestrator's table (`COMMANDS`) named `name`, which a route serves: thrown as the module that names it loads when
- * the table holds none by that name, so a name the table renamed is a failed start, not a route that fails as it is asked.
- */
-export function commandNamed(name: string): Command {
-  const command = COMMANDS.find((c) => c.name === name);
-  if (command === undefined) throw new Error(`No command '${name}' in the orchestrator's table (COMMANDS): name one it holds.`);
-  return command;
 }
 
 /** Found among the ids the store lists (`runs.find`), not read by path, so no id can name a file outside it. */

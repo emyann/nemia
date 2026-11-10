@@ -10,8 +10,11 @@ import {
   holderName,
   type Identity,
   lastPassCost,
+  type ListedStanding,
+  listedStanding,
   type PassCostRead,
   staleAfterMs,
+  standingLine,
 } from 'agent-orchestrator';
 
 /** How a person starts the store's daemon where none ticks: the api's own process, which serves the board as it ticks. */
@@ -26,7 +29,8 @@ export const START = 'npm start in apps/api';
  * as a line says it: `api` or `nemia up` (`holderName`), and `url` where an api holder serves the board, null for a `nemia
  * up`. `start` is how a person starts one (`START`). A file that does not read has no fields.
  * `unobserved` is why the daemon's last pass could not read a harness, in the runtime's words (`PassCost.unobserved`): said only while it
- * ticks and of a pass since it started, empty otherwise.
+ * ticks and of a pass since it started, empty otherwise. `branchesLine` is `nemia ls`'s line on how old what it shows of where the result
+ * branches stand (`standingLine`), null where a ticking daemon read them lately.
  */
 export type Daemon = {
   kind: DaemonStanding['kind'];
@@ -45,14 +49,22 @@ export type Daemon = {
   identity: Identity | null;
   line: string;
   unobserved: readonly string[];
+  branchesLine: string | null;
 };
 
 /**
  * The standing as the board reads it, at `now`: pure. `pass` is the last pass's cost as the store kept it (`lastPassCost`), null where
- * none reads; its `unobserved` is the daemon's only while it ticks and the pass is not older than its start.
+ * none reads; its `unobserved` is the daemon's only while it ticks and the pass is not older than its start. `branches` is when the
+ * tick's last pass read where the branches stand (`listedStanding`), worded as `nemia ls` words it (`standingLine`).
  */
-export function daemonOf(standing: DaemonStanding, now: number, pass: PassCostRead | null = null): Daemon {
+export function daemonOf(
+  standing: DaemonStanding,
+  now: number,
+  pass: PassCostRead | null = null,
+  branches: ListedStanding = { none: true },
+): Daemon {
   const line = daemonLine(standing, now);
+  const branchesLine = standingLine(branches, standing, now) ?? null;
   if (standing.kind === 'none' || standing.kind === 'unreadable') {
     return {
       kind: standing.kind,
@@ -71,6 +83,7 @@ export function daemonOf(standing: DaemonStanding, now: number, pass: PassCostRe
       identity: null,
       line,
       unobserved: [],
+      branchesLine,
     };
   }
   const { file } = standing;
@@ -92,12 +105,13 @@ export function daemonOf(standing: DaemonStanding, now: number, pass: PassCostRe
     line,
     unobserved:
       standing.kind === 'ticking' && pass && Date.parse(pass.at) >= Date.parse(file.startedAt) ? [...(pass.unobserved ?? [])] : [],
+    branchesLine,
   };
 }
 
 /**
  * Whether a daemon ticks the store now: the file read and the process table asked, as `nemia ls` asks them, the package reading both
- * clocks, with the last pass's cost; `now` is the wall time its ages are worded at. Throws what the package throws of a file that is
- * there and cannot be read — a store that cannot be read cannot be said to tick or not.
+ * clocks, with the last pass's cost and when it last read where the branches stand; `now` is the wall time its ages are worded at.
+ * Throws what the package throws of a file that is there and cannot be read — a store that cannot be read cannot be said to tick or not.
  */
-export const readDaemon = (now = Date.now()): Daemon => daemonOf(daemonStanding(), now, lastPassCost() ?? null);
+export const readDaemon = (now = Date.now()): Daemon => daemonOf(daemonStanding(), now, lastPassCost() ?? null, listedStanding());

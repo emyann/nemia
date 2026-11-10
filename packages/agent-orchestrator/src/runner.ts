@@ -460,7 +460,9 @@ export { seriesMemo, type Health, type SeriesMemo, type SeriesRead } from './ser
 export { statsLine, statsLines, statsQueryOf, type QueryKey, type Stats, type StatsQuery } from './stats/index.ts';
 export { list, listReading, pausedRead, unjudgedOf, type ListReading } from './list/list.verb.ts';
 export type { DecideCommand } from './decide/decide.ts';
-export type { RunsListed, Unjudged } from './list/list.ts';
+export type { ListedStanding, RunsListed, Unjudged } from './list/list.ts';
+export { standingLine } from './list/list.ts';
+export { listedStanding } from './standing/standing.store.ts';
 export { graphOf, runGraph, typedGraphOf, type GraphEdge, type RunGraph } from './summary/graph.ts';
 export {
   bare,

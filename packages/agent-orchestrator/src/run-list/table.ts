@@ -9,6 +9,7 @@
  * api answers it to a list asked for a `Table` (`TABLE_ACCEPT`), so no client keeps a printer of the runs. Pure.
  */
 import type { Run, RunList, RunStepStatus, RunUnjudged, Table, TableColumnDefinition } from 'objects';
+import { ranOnWords } from '../release/release.ts';
 
 /** How much of a brief's first line a row shows, as `nemia ls` cuts it. */
 const BRIEF_WIDTH = 56;
@@ -37,7 +38,8 @@ export const RUN_COLUMNS: readonly TableColumnDefinition[] = [
     name: 'Waits',
     type: 'string',
     format: '',
-    description: 'What waits on you and the command that answers it: what to decide, the steps waiting on you, a hold; empty for nothing.',
+    description:
+      'What waits on you and the command that answers it: what to decide, the steps waiting on you, a hold, and the result branches; empty for nothing.',
     priority: 0,
   },
   { name: 'Labels', type: 'string', format: '', description: "The run's labels, key=value, comma-separated.", priority: 1 },
@@ -94,8 +96,16 @@ const holdWords = (name: string, holding: NonNullable<Run['status']['holding']>)
 };
 
 /**
+ * Whether no result branch is left to name: none at all, or what to decide names every one already — it names only those ahead of the
+ * base, so a result branch that is not is still named.
+ */
+const resultNamed = ({ result = [], toDecide }: Run['status']): boolean =>
+  result.every((branch) => toDecide?.kind === 'result' && toDecide.branches.includes(branch));
+
+/**
  * What waits on you, as `nemia ls` said it under a run (`asksLines`): what to decide with its command, the steps waiting on you (an
- * approval named once) with `nemia decide`, a run waited on that never lands with what to do, and a hold with what lifts it.
+ * approval named once) with `nemia decide`, a run waited on that never lands with what to do, a hold with what lifts it, and where its
+ * work ended up (`result`), landed or not, unless what to decide names those branches already.
  */
 const waitsCell = ({ metadata: { name }, status }: Run): string => {
   const { toDecide, waiting, holding } = status;
@@ -105,14 +115,28 @@ const waitsCell = ({ metadata: { name }, status }: Run): string => {
     ...(asked.length ? [`waiting on you: ${asked.join(', ')} — nemia decide ${name}`] : []),
     ...(waiting?.waitingOnYou ? [`waiting on you: ${waiting.advice}`] : []),
     ...(holding ? [holdWords(name, holding)] : []),
+    ...(resultNamed(status) ? [] : [`result: ${(status.result ?? []).join(', ')} — nemia decide ${name}`]),
   ].join('; ');
 };
 
-/** Each step in its word, its cost, its branch and its note, as `nemia ls` printed a line per step. */
+/**
+ * What the session of a step at work runs on (`ranOnWords`): `on v1.2.0, <harness> <version>`, off its current try's latest attempt while
+ * that has not ended; nothing for one that ended, or recorded neither.
+ */
+const ranOnOf = ({ attempts: { latest } }: RunStepStatus): string | undefined =>
+  latest && latest.ended === null ? (ranOnWords(latest.release, latest.harness) ?? undefined) : undefined;
+
+/** How many questions a step's closeout asks of you, as `nemia ls` notes it; nothing where it asks none. */
+const asksWords = ({ asks }: RunStepStatus): string | undefined => (asks ? `asks ${asks} question${asks === 1 ? '' : 's'}` : undefined);
+
+/**
+ * Each step in its word, its cost, its branch and its note — its own, the questions it asks, what it runs on and what it was denied — as
+ * `nemia ls` printed a line per step.
+ */
 const stepsCell = ({ status }: Run): string =>
   status.steps
     .map((step) => {
-      const note = [step.note, step.denied?.words].filter(Boolean).join(' · ');
+      const note = [step.note, asksWords(step), ranOnOf(step), step.denied?.words].filter(Boolean).join(' · ');
       const said = [step.name, stepWordOf(step), step.spent?.said, step.branch].filter(Boolean).join(' ');
       return note ? `${said} · ${note}` : said;
     })
@@ -133,8 +157,21 @@ export const runCells = (run: Run): readonly unknown[] => [
   stepsCell(run),
 ];
 
-/** The cells of a run that could not be judged: its name, and why, as its note. */
-const unjudgedCells = (run: RunUnjudged): readonly unknown[] => [run.name, '', '', '', `unreadable: ${run.error}`, '', '', ''];
+/** The steps of a run that could not be judged, each in its word off the run's record and its branch, as `nemia ls` printed them. */
+const unjudgedStepsCell = ({ steps = [] }: RunUnjudged): string =>
+  steps.map((step) => [step.name, step.message, step.branch].filter(Boolean).join(' ')).join('; ');
+
+/** The cells of a run that could not be judged: its name, why as its note, and its steps as its record says them. */
+const unjudgedCells = (run: RunUnjudged): readonly unknown[] => [
+  run.name,
+  '',
+  '',
+  '',
+  `unreadable: ${run.error}`,
+  '',
+  '',
+  unjudgedStepsCell(run),
+];
 
 /** `list` as a table: its page's place (`continue`), `RUN_COLUMNS`, and a row per run of the page, the judged first. */
 export const runTable = (list: RunList): Table => ({

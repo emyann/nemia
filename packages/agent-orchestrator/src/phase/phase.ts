@@ -287,6 +287,12 @@ const stoppedOn = (step: CodedStep): QualifiedRun =>
  * `via`) of its first step, in the order `steps` gives them (the workflow's), whose phase is `waiting` and that is no gate — a run is
  * `waiting` when some stop is not a gate, so a gate before it does not say why; every such reason is a run's too; `AwaitingAnswer` with
  * no `via` where none is. Every other status is `RUN_REASON_OF`'s. Pure.
+ *
+ * It does not read `waitsOnYou`, the one decider of whether a run waits on a person, and need not: the codes say where the run is in its
+ * life, off `assess`'s status and the hold, and are built for feed lines that carry neither the runs waited on nor whether a hold needs a
+ * person, so they cannot judge it. Where they part, it is on purpose: a running run that waits on a run that never lands without a
+ * person, or is held until one, is `Running` or `Waiting` on `run` here and waits on you there. A screen that asks whether a person has
+ * to act reads `waitsOnYou`, never `phase === 'waiting'`.
  */
 export function runCodes(status: RunStatus, holding: readonly unknown[] | null, steps: readonly CodedStep[] = []): CodedRun {
   const stop = status === 'waiting' ? steps.find((s) => s.phase === 'waiting' && s.reason !== 'AwaitingApproval') : undefined;

@@ -303,7 +303,6 @@ const timedOnce = Effect.fnUntraced(function* (e: Engine, run: Run, r: RunRead, 
   return facts ?? undefined;
 });
 
-/** The standing of the store's branches the pass reads (`PassRead`'s), or, for a one-off verb that hands none, the store's as it is now. */
 /**
  * The pass's assessment of a run, the truth every other reader of it agrees with (`test/one-read.test.ts` reads it by this name): its one
  * read (`reads`), the checkout another run's ending holds (`checkoutHold`, over `from` and `memo`), and where its branches stand
@@ -322,6 +321,10 @@ export const passAssessment = Effect.fnUntraced(function* (
   return { checkout, read, assessed: assess(read) };
 });
 
+/**
+ * The standing of the store's branches the pass reads (`PassRead`'s), or, for a one-off verb that hands none, what the last
+ * pass wrote of it (`standingSnapshot`).
+ */
 const standingOf = (pass: PassRead | undefined) => (pass ? Effect.succeed(pass.standing) : standingSnapshot());
 
 /**

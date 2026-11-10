@@ -74,6 +74,15 @@ export function readStanding(): StandingFile | undefined {
 }
 
 /**
+ * When the tick's last pass read where the branches stand (`at`, `readStanding`'s), or that no pass has (`none`): what `nemia ls` words
+ * how old what it shows of them is by (`standingLine`). Refused as `readStanding` refuses a file that does not read.
+ */
+export const listedStanding = (): { at: string } | { none: true } => {
+  const file = readStanding();
+  return file ? { at: file.at } : { none: true };
+};
+
+/**
  * What a pass read of where the branches stand written down, through a hidden file renamed over the last, so a reader never reads half of
  * it. Throws node's error where the store cannot be written.
  */

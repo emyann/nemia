@@ -10,8 +10,8 @@ const STEP = 'implement';
 
 /**
  * What a step's session ran on, in its inspector's facts: the DIAMOND's running step, whose attempt recorded an image under the store's
- * `releases/<tag>/` and Claude Code's version, says the tag and the version, and the mode its harness ran it in, filed with another; its top, whose attempt recorded neither, says `not recorded`
- * on its Details tab, a finished step's inspector opening on its Output.
+ * `releases/<tag>/` and Claude Code's version, says the tag and the version, and the mode its harness ran it in, filed with another;
+ * its top, whose attempt recorded neither, says `not recorded` on its Details tab, a finished step's inspector opening on its Output.
  */
 export default {
   name: 'step-ran-on',

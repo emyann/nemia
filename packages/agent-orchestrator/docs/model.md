@@ -80,10 +80,24 @@ erDiagram
     object tips "optional"
     string cancelledAt "optional"
     object labels "optional"
+    string slotHeldAt "optional"
+    list gatesTimed "optional"
+    list deniedCounted "optional"
+    list settlesCounted "optional"
+    boolean runTimed "optional"
+    list approvals "optional"
+    list acceptances "optional"
+    object pruned "optional"
+    object hold "optional"
+    object pause "optional"
+    list pinned "optional"
     string createdAt
   }
   Step {
     TaskId taskId FK
+    object route "optional"
+    object sent "optional"
+    list pinned "optional"
     string workspace "optional"
     string branch "optional"
     object check "optional"

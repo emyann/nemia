@@ -324,7 +324,8 @@ as a `RunId` and answer Effects that fail with a refusal (`Missing`, `Conflict`,
 on disk, and a memory stand-in a test gives its program with `Effect.provide(program, runDoorMemory())`. Every write is checked
 first: a new run, or one written back, that breaks an invariant of the run's model (`src/record/record.model.ts`) is refused
 `Invalid` and nothing is written, and a new run at an id that has a record is refused `Conflict`. A program given no door reads the
-files. What has not moved onto it yet is counted in `test/run-door.baseline.ts`.
+files. A synchronous caller reads through it at once (`runsAtOnce`), and no file of `src` but the door's reads the files store
+(`test/run-store.test.ts`).
 
 ## The Factory door
 
@@ -335,8 +336,8 @@ factoryDoorMemory())`. A new factory under a name that is no slug, or under `def
 `Factory` — no repository, a hire or a schedule into a workflow it does not offer — are refused, and nothing is written. A person's
 attach, detach, hire, fire, schedule and unschedule are judged by one pure function (`wiringRefusal`, `src/factory/wiring/wiring.ts`), whose
 refusals `contracts/wiring.contract.ts` proves, then written back through the door, which decodes what it writes. Unlike the Run door, a program given no door reads the files at
-the store's root it was given (`StoreRoot`), and is refused where it was given none. What has not moved onto it yet is counted in
-`test/factory-door.baseline.ts`.
+the store's root it was given (`StoreRoot`), and is refused where it was given none. The default factory is a record the door serves (`DefaultFactory`), whose
+writes are refused. No file of `src` but the door's calls the stores it is over (`src/factory/door/factories.store.test.ts`).
 
 ## Where this stops
 
@@ -3742,7 +3743,7 @@ with its `run`, and one about a step with its `step` too; the runtime's journal 
   to release and a harness that reports no quota make no span; `pass` counts the runs it listed and answered from memory (`runs`,
   `rested`), and the runtime's `tick` its tasks and those it kept (`tasks`, `kept`). The metrics are every one in the process's registry (the pass's and the steps', below),
   cumulative, posted every 10 s and once more as the process ends. A collector that does not answer costs a failed post, never a pass.
-- **Each step's session exports too, to the same endpoint.** `engine()` hands the runtime the collector (`telemetry: { endpoint }`), and
+- **Each step's session exports too, to the same endpoint.** `engine(env)` hands the runtime the collector (`telemetry: { endpoint }`), and
   a ready step, a try and a round are filed with their run and step as labels (`stepLabels`): the runtime starts each session exporting
   its metrics, logs and traces with `run`, `step` and its `task` on every signal, in the trace of the filing that started it where its
   harness takes one. A check is filed with no labels, and the runtime hands a check's command no telemetry at all; without an endpoint, no
@@ -3975,7 +3976,7 @@ Then the record, and every file under `WF_ROOT` keyed by the run's id (the table
 
 **Then the engine's tasks of it, through the runtime's `forget`.** Every task the record names — each
 step's, its earlier tries and its checks (`runTasks`) — is written down once nothing refuses, before
-anything is removed, in `forgetting/<id>.json` (`runStore.forgetting`). Once the record is gone, the
+anything is removed, in `forgetting/<id>.json` (the Run door's `forgetting`). Once the record is gone, the
 engine's `forget` removes each settled task's journal, its session files and its feed lines in one call,
 and the marker is lifted; the line says how many tasks went, and the bytes and lines with them. A task
 `wf rm` has just closed, held open for a word, has not settled yet: the line says it waits, and the
@@ -4094,7 +4095,7 @@ After a `y` at the prompt, time has passed, so each run of a turn is judged agai
 turn's removal, and one no longer ready says why and is kept.
 
 **A run's mark is written on the file as it reads.** A prune marks a run before it removes anything and
-again once the removal is over, each time over the mark the file holds then (`runStore.runs.pruned`),
+again once the removal is over, each time over the mark the file holds then (the Run door's `runs.pruned`),
 never the one it judged: a worktree a mark lists is never dropped, and a prune that removed nothing
 takes its own mark back only while a worktree it listed still stands. So a person's prune and the
 daemon's sweep of the same run leave it marked with every worktree either removed, and a `remove` that
@@ -4271,7 +4272,7 @@ holding a concurrency slot forever.
 | `src/plan/plan.ts` | a plan — pure: parse a folder of cards, and refuse a key a card does not have, a card with no workflow or no brief, and an `after:` that dangles or goes round; the order `wf start <folder>` starts the cards in, and what it prints |
 | `src/inbox/inbox.ts` | the inbox — pure: an inbox card, and refuse a key it does not have, a key set to nothing, a `repo:` that is not an absolute directory and a `queued:` that is not a time or has no workflow; the card `wf inbox add` writes, and the one `wf inbox queue` writes (`queuedText`, `queueRefusal`); a name that would leave the folder; what `wf inbox` lists, `started as` composed from the records and a queued card's place and refusal; the queue's order (`queueOrder`, `nextQueued`); and which path is a card of the inbox |
 | `src/inbox/queue-factory.ts` | the factory a queued card asks for — pure: why `wf inbox queue` refuses a card that names no factory, or `default`, as its start would be (`queueFactoryRefusal`) |
-| `src/factory/factory.ts` | a factory — pure: its name, a lowercase slug (`FACTORY_NAME`, `factoryNameRefusal`), the one default factory, which is no file and is read, never written (`DEFAULT_FACTORY`, `defaultFactoryRefusal`), what `wf factory ls` prints (`factoryLines`, `noFactoryLine`), the workflows it offers: a workflow's name (`workflowNameRefusal`) and a start of one not attached (`unattachedRefusal`), and its hires: their shape (`hireRefusal`), one workflow's (`fillsOf`), and the steps they leave unfilled (`unfilledRefusal`) |
+| `src/factory/factory.ts` | a factory — pure: its name, a lowercase slug (`FACTORY_NAME`, `factoryNameRefusal`), the one default factory, which is no file and is read, never written (`defaultFactoryRefusal`; its record is `DefaultFactory`, `src/factory/factory.model.ts`), what `wf factory ls` prints (`factoryLines`, `noFactoryLine`), the workflows it offers: a workflow's name (`workflowNameRefusal`) and a start of one not attached (`unattachedRefusal`), and its hires: their shape (`hireRefusal`), one workflow's (`fillsOf`), and the steps they leave unfilled (`unfilledRefusal`) |
 | `src/run.ts` | the entry `agent-orchestrator/run` — pure: each name it exports re-exported by name from the folders below, and nothing else |
 | `src/tick/assess.ts` | **`assess`** — pure: which steps are ready, due a check, another try or another round, blocked, done, off each step's standing (`stepStatus`, `status/status.ts`), and the run's one word (`status`): `failed` where a step broke, `awaiting approval` or `waiting` where only a person stops it (`stoppedOnWord`) |
 | `src/round/round.ts` | a loop's rounds — pure: those due (`roundsDue`) and the steps once one is filed (`roundFiled`), what `nemia retry --round` and `nemia approve` of a loop ask and refuse (`roundAsk`, `acceptAsk`), and what `wf ls` and `wf decide` say of a loop (`roundDueNote`, `roundLines`) |
@@ -4286,7 +4287,11 @@ holding a concurrency slot forever.
 | `src/brief/handed.ts` | what a run is handed of another — pure: its `## From run <id>` section, labelled waited on, or read as context landed or not landed, not judged (`handedSection`, `contextSection`), and a task split into its parts (`handedParts`) |
 | `src/brief/handed.verb.ts` | what a run's roots are handed of other runs, read off their records and the engine (`parentCloseouts`, `handedOf`) |
 | `src/record/record.ts` | a run's record, as data — pure: its shape (`Run`, `RepositoryRun`, `FolderRun`, `placeOf`), the facts a person files beside it (`Hold`, `Approval`, `Acceptance`, `Pruned`), a step's status words and its own record (`StepStatus`, `StepRecord`, `refusedCheck`), the task ids a run files (`stepTaskId`, `checkTaskId`, `stepTasks`, `runTasks`), the try a step is on (`tryOf`), why a run is left unjudged (`unjudgedWords`), and the small words the run's judgement shares (`andList`, `fenced`, `oneLine`); `record.store.ts` reads and writes it |
-| `src/status/status.ts` | where one step stands — pure: **`stepStatus`** and `ownStatus`, a gate's facts (`hasGate`, `approvalOf`, `atGate`), an ending's (`landsOnCheck`, `resultOnBase`), what a step may spend (`taskSpend`, `overBudget`, `budgetRefusal`), its momentum (`stepMomentum`), and a loop's (`roundOf`, `loopOf`, `owedFields`); and what a step consumed, in words (`sumUsage`, `readWords`, `usedLines`, `dollars`, `durationWord`) |
+| `src/status/status.ts` | where one step stands — pure: **`stepStatus`** and `ownStatus`, a gate's facts (`hasGate`, `approvalOf`, `atGate`), an ending's (`landsOnCheck`, `resultOnBase`), what a step may spend (`taskSpend`, `overBudget`, `budgetRefusal`), its momentum (`stepMomentum`), and a loop's (`roundOf`, `loopOf`, `owedFields`) |
+| `src/usage/usage.ts` | what a step consumed — pure: summed (`sumUsage`) and in words (`readWords`, `usedLines`, `durationWord`) |
+| `src/money/money.ts` | dollars in words (`dollars`) and a budget as its author writes one (`budgetWord`) — pure |
+| `src/run-state/run-state.ts` | a listed run's state — pure: waiting on a person, in flight or finished (`kindOf`), its wall time and outcome, and the factory a read keeps (`runInFactory`) |
+| `src/engine-verbs/engine-verbs.verb.ts` | every verb of the runtime's engine once (`ENGINE_VERBS`): the meter's phase it is counted in and what it changes of a task |
 | `src/step-machine/step-machine.ts` | a step's lifecycle as a machine — pure: **`stepMove`**, whether two words read on two passes are a move it draws (`STEP_EDGES`), and its drawing (`stepMachineGraph`, `stepDiagram`); it decides nothing, held to `stepStatus` by its replay |
 | `src/wait/wait.ts` | what a run waits on before its steps are filed — pure: **`runReady`**, whether a run's roots may be filed yet (`--after`, `waitsOf`), the holds a person put on it (`holdsOf`), their words and advice, and what they refuse (`holdRefusal`, `afterRefusal`) |
 | `src/artifacts/artifacts.ts` | the files a step leaves — pure: what its brief says of them (`artifactsContract`), where one it names is found (`artifactPlace`), and the lines that list them (`artifactLines`); `artifacts/artifacts.store.ts` copies them |
@@ -4305,7 +4310,7 @@ holding a concurrency slot forever.
 | `src/rest/rest.ts` | a finished run a pass may answer from memory — pure: what makes a run at rest (`atRest`), and which runs a task on the runtime's feed takes out of the tick's memo (`evictedBy`); the memo is `tick/tick.verb.ts`'s |
 | `src/check/check.ts` | the check — pure: the command the run files on the command harness, the verdict, the contract |
 | `src/workspace/workspace.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told; where a step works and what a folder step is given (`workspacePlan`, `givenPlan`), and which finished steps hand their work off on a pass (`handOffDue`) |
-| `src/record/record.store.ts` | the run store under `WF_ROOT`: a run's id (`runId`), its record read and written (`readRun`, `listRuns`), the files a person owns beside it — a cancellation, a pruning, each ask, approval and acceptance — and where a check's stderr, a step's artifacts and a run's inputs are kept |
+| `src/record/record.store.ts` | the run store under `WF_ROOT`: a run's id (`runId`), its record read and written (`runRecord`, `listRuns`), the files a person owns beside it — a cancellation, a pruning, each ask, approval and acceptance — and where a check's stderr, a step's artifacts and a run's inputs are kept |
 | `src/agents/agents.store.ts` | a run's agent files: where a step's agent is rendered under `runs/<id>/agents/<step>` (`agentFilesDir`), the render at `wf start` (`writeAgentFiles`), and what the board's Agents page writes: an agent and its files (`writeAgent`, `removeAgent`, refused as `Missing`, `Conflict` — with the steps that still name the agent as `users` — or `Invalid`), and the agents it lists (`agentPlaces`, `listAgents`, `findAgent`) |
 | `src/agents/read.store.ts` | the agents read: every agent a workflow's steps may name, in its own folder and its places (`agentsFor`), the agents of one folder (`loadAgents`) and an agent's version (`agentVersion`), with a person's custom instructions for each (`customInstructionsFile`, `readCustomInstructions`); one level above the bottom of the store's tree, on the skills read alone |
 | `src/daemon/daemon.store.ts` | `tick.json` (the two ceilings, `ceilings` and `lastCeilings`), `tick-stats.json` (what the last pass cost, `recordPassCost` and `lastPassCost`), `tick-recent.json` (the recent passes, `recordRecentPass` and `recentPasses`) and `daemon.json` read, judged by `src/daemon/daemon.ts`, and written: the store taken, held, beaten and let go (`takeStore`, `beat`, `releaseStore`), each stamp with its monotonic reading (`instantNow`) |
@@ -4329,7 +4334,7 @@ holding a concurrency slot forever.
 | `src/plan/plan.store.ts` | a plan folder's cards read from disk (`readPlan`) |
 | `src/config/config.store.ts` | the `WF_` environment, each variable an Effect `Config` with its default, read by a plain reader that refuses a value the variable does not take by name, exit 2 (`wfRoot`, `maxConcurrent`, `maxRuns`, `verifiesRest`); at the bottom of the store's tree, and reads no disk |
 | `src/inbox/inbox.store.ts` | the inbox's cards read, filed, queued, dropped (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`) through `runStore.inbox`, and a path named as a card (`inboxNameAt`, which asks `runStore.inbox.nameAt`) |
-| `src/factory/factory.store.ts` | the factories on disk (`factoriesDir`): read, a file that does not decode listed with why (`readFactories`), one read for a start (`readFactory`), filed through a hidden file linked onto its name (`addFactory`), given workflows and relieved of them, hired into and fired from, the file rewritten whole (`attachWorkflow`, `detachWorkflow`, `hireAgent`, `fireAgent`), removed (`removeFactory`) |
+| `src/factory/factory.store.ts` | the factories on disk (`factoriesDirAt`): read, a file that does not decode listed with why (`readFactoriesAt`), one read for a start (`readFactoryAt`), filed through a hidden file linked onto its name (`addFactoryAt`), given workflows and relieved of them, hired into and fired from, the file rewritten whole (`attachWorkflowAt`, `hireAgentAt`, `fireAgentAt`), removed (`removeFactoryAt`), each taking the store's root first, called by the Factory door alone |
 | `src/factory/rules/rules.ts`, `rules.store.ts`, `rules.verb.ts` | a factory's rules — the file's name and where it is kept (`FACTORY_RULES_FILE`, `rulesFile`) and what it may not open with (`factoryRulesRefusal`), pure; read without throwing, written whole and removed (`readRules`, `writeRules`, `clearRules`), store; and `nemia factory rules` (`FACTORY_RULES`, `factoryRules`), controller |
 | `src/runtime-client.ts` | the runtime client, the one file that imports agent-runtime: the engine (`engine`, over the runtime's `Engine` service as a layer; `engineOf` over any such layer, as `testEngine` of `agent-runtime/testing` gives one to a test), which files every task `queued` and is built with no ceiling, the harnesses it runs (`HARNESSES`), `nameFor`, the lifecycle as data the board draws (`lifecycleGraph`), and the runtime's types, passed through |
 | `src/views/views.verb.ts` | the programs `taskPhasesRead`, `checkReportsRead`, `refusalRead`, `parentRead`, `parentsRead` and `filingsRead`; what the engine's views of a run's tasks say: whether its closeout was asked and signed (`closeoutAsked`), its check's exit (`exitVerdicts`), what it consumed (`consumption`), its closeout (`closeoutOf`), a parent run (`parentRead`), and when each task was filed (`filingsRead`) — what a consumer that words a step as `wf ls` does uses off the views it already has, with no `logs` call |

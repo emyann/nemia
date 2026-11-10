@@ -224,7 +224,6 @@ test("the run a routed card starts mounts the caller's artifacts and inputs read
   const inputs = inputsDir(ROOT, runRecord(ROOT, id));
   let routed = '';
 
-  /** The step `name` of the routed run, as the pass filed it: its config reaches the caller's input and plan's closeout, its brief names both folders. */
   const handedTo = (name: string) => {
     const spec = stage.board().specs.find((x) => x.id === `${routed}-${name}`);
     assert.ok(spec, `${name} is filed`);

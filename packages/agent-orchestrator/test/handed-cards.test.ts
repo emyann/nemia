@@ -111,7 +111,6 @@ test('nemia start --card hands the run inbox cards: copied at start, mounted rea
     assert.ok(printed.includes(cardsDir(ROOT, run)), 'the start says where it copied them');
   });
 
-  /** The step `name` as the pass filed it: it reads both cards, writes neither, and its brief names both. */
   const handed = (name: string) => {
     const spec = stage.board().specs.find((x) => x.id === `${id}-${name}`);
     assert.ok(spec, `${name} is filed`);

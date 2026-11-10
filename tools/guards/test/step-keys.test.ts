@@ -35,7 +35,6 @@ const OWNERS = ['packages/objects/src/', 'packages/agent-orchestrator/src/', 'pa
  */
 const DEBT: Readonly<Record<string, number>> = {
   'apps/web/src/lib/builder.ts': 1,
-  'apps/web/src/lib/api/library.ts': 3,
   'apps/web/src/lib/agents.ts': 1,
   'apps/web/src/lib/api/agents.ts': 1,
 };

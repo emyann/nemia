@@ -5,12 +5,12 @@
  * run's status, what a person has to decide, the steps waiting on you, and the tries and rounds due, and where two of them say a fact,
  * they say it alike. The pass's reading is the truth: a row reads every other reader against it.
  *
- * Told on the test place and the engine's stand-in (`story.ts`). `WF_ROOT` is set before the runner is imported: it is read as the
- * module loads. Beside the table: the tables' empty read is `readersOf`'s, and the engine's `needs-human` is compared in `src/views/`
+ * Told on the test place and the engine's stand-in (`story.ts`), over the file's own store at `ROOT`, given as
+ * `ENV`. Beside the table: the tables' empty read is `readersOf`'s, and the engine's `needs-human` is compared in `src/views/`
  * alone (`blockedWord`, `harnessBlocked`), so no reader judges a blocked session by a word of its own.
  */
-import { settingsOf, StoreConfig } from '../src/config/config.store.ts';
-import { rootNow } from './config-given.ts';
+import { settingsOf, StoreConfig, type Env } from '../src/config/config.store.ts';
+import type { Run } from '../src/run.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -18,39 +18,34 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { staged } from './story.ts';
+import { advanceRun, cancelRun, decideRun, list, retryRun, runObject, startRun, runWith } from '../src/runner.ts';
+import { listRuns, runRecord } from '../src/record/record.store.ts';
+import { passStanding, standingSnapshot, headsOver, standingReader } from '../src/standing/standing.verb.ts';
+import { filesStoreAt } from '../src/record/files.store.ts';
+import { readRun as theRead } from '../src/tick/told.verb.ts';
+import { passAssessment } from '../src/tick/advance.verb.ts';
+import { cancelPlan } from '../src/cancel/cancel.ts';
+import { statusMemo } from '../src/place/landing.store.ts';
+import { PlaceService } from '../src/place/place.store.ts';
+import { judging } from '../src/forget/prune/prune.verb.ts';
+import { hold } from '../src/wait/wait.verb.ts';
+import { putPause, resumePause } from '../src/pause/pause.store.ts';
+import { StoreRoot } from '../src/config/root.store.ts';
+import { engineOf, type Engine } from '../src/runtime-client.ts';
+import { main } from '../src/cli/main.ts';
 
 const ROOT = scratch('wf-one-read-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { advanceRun, cancelRun, decideRun, list, retryRun, runObject, startRun, runWith } = await import('../src/runner.ts');
-const { listRuns, runRecord } = await import('../src/record/record.store.ts');
-const runStore = (await import('../src/record/files.store.ts')).filesStoreAt(rootNow());
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
+const stage = staged({ runWith, main, engineOf, env: ENV });
+const files = filesStoreAt(ROOT);
 /** The run `id` as a reader is given it, the store's pause composed onto it (`runs.read`). */
-const theRun = (id: string) => runStore.runs.read(id);
-const { passStanding, standingSnapshot } = await import('../src/standing/standing.verb.ts');
-const { readRun: theRead } = await import('../src/tick/told.verb.ts');
-const { passAssessment } = await import('../src/tick/advance.verb.ts');
-const { cancelPlan } = await import('../src/cancel/cancel.ts');
-const { headsOver, standingReader } = await import('../src/standing/standing.verb.ts');
-const { statusMemo } = await import('../src/place/landing.store.ts');
-const { PlaceService } = await import('../src/place/place.store.ts');
-type Engine = import('../src/runtime-client.ts').Engine;
-type Run = import('../src/run.ts').Run;
-const { judging } = await import('../src/forget/prune/prune.verb.ts');
-const { hold } = await import('../src/wait/wait.verb.ts');
-const { putPause, resumePause } = await import('../src/pause/pause.store.ts');
-const { StoreRoot } = await import('../src/config/root.store.ts');
-const { engineOf } = await import('../src/runtime-client.ts');
-const { main } = await import('../src/cli/main.ts');
-const stage = staged({ runWith, main, engineOf });
+const theRun = (id: string) => files.runs.read(id);
 
 /** One pass of the tick over the run `id`, on the stage's engine. */
-const tick = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(rootNow(), id)));
+const tick = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
 /** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `nemia ls` reads. */
-const aPass = () => stage.runWith(stage.board().e, passStanding(listRuns(rootNow())));
+const aPass = () => stage.runWith(stage.board().e, passStanding(listRuns(ROOT)));
 
 /**
  * The run as the tick's pass reads and assesses it: its one read (`readRun`), then the pass's own assessment (`passAssessment`, which
@@ -62,7 +57,7 @@ const tickRead = (e: Engine, run: Run) =>
     const snapshot = yield* standingSnapshot();
     const memo = statusMemo(headsOver(standingReader(snapshot)), yield* PlaceService);
     const { read, assessed } = yield* passAssessment(e, run, reads, { standing: Effect.succeed(snapshot) }, memo, snapshot).pipe(
-      Effect.provide(StoreConfig.layer(settingsOf(process.env))),
+      Effect.provide(StoreConfig.layer(settingsOf(ENV))),
     );
     return {
       ...assessed,
@@ -287,11 +282,11 @@ test('one read of a run: the tick, nemia ls, nemia decide, nemia prune and the r
     stage.board().settle(`${id}-implement`, 'failed');
     await tick(id);
     await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'fresh' }));
-    putPause(rootNow(), { why: 'a release' });
+    putPause(ROOT, { why: 'a release' });
     try {
       agree(await readers(id));
     } finally {
-      resumePause(rootNow());
+      resumePause(ROOT);
     }
   });
 

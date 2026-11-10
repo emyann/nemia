@@ -12,7 +12,6 @@
  * lease it steps, a signal and a start it logs — and whose pause, resume and calls are the live host's, over the stage's engine. A line
  * the take-over says of waiting on the landing throws, so a take-over that waits on it fails at once rather than hanging the story.
  */
-import { rootNow } from './config-given.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -24,21 +23,19 @@ import type { FeedLine } from '../src/feed/feed.ts';
 import { scratch } from 'test-kit/scratch';
 import { staged, story, type Board } from './story.ts';
 import { nodeChild } from './child.ts';
+import { approveRun, startRun, tickRun, runWith, readFeed } from '../src/runner.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import { readPause, readPauseFile } from '../src/pause/pause.store.ts';
+import { liveHost } from '../src/service/service.verb.ts';
+import { takeOver } from '../src/service/takeover.verb.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import { main } from '../src/cli/main.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-restart-pause-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-process.env.WF_MAX_RUNS = '100';
-delete process.env.WF_MAX_CONCURRENT;
-const { approveRun, startRun, tickRun, runWith, readFeed } = await import('../src/runner.ts');
-const { runRecord } = await import('../src/record/record.store.ts');
-const { readPause, readPauseFile } = await import('../src/pause/pause.store.ts');
-const { liveHost } = await import('../src/service/service.verb.ts');
-const { takeOver } = await import('../src/service/takeover.verb.ts');
-const { engineOf } = await import('../src/runtime-client.ts');
-const { main } = await import('../src/cli/main.ts');
-const stage = staged({ runWith, main, engineOf });
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_RUNS: '100', WF_MAX_CONCURRENT: undefined };
+const stage = staged({ runWith, main, engineOf, env: ENV });
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 /** What the engine's own pass answers here: nothing admitted, nothing started, no view — every task is read off the stand-in. */
@@ -56,7 +53,7 @@ const ticking = (): Board => {
 };
 
 /** The store's lines of the feed whose reason is `reason`. */
-const storeLines = (reason: string): FeedLine[] => readFeed(rootNow(), 0).lines.filter((l) => 'store' in l && l.reason === reason);
+const storeLines = (reason: string): FeedLine[] => readFeed(ROOT, 0).lines.filter((l) => 'store' in l && l.reason === reason);
 
 /**
  * A take-over's process: a child of this test, on its `WF_ROOT`, that puts the store's pause through the live host's `pause` and then
@@ -65,7 +62,7 @@ const storeLines = (reason: string): FeedLine[] => readFeed(rootNow(), 0).lines.
 const takeOverProcess = async (t: TestContext) => {
   const child = nodeChild(
     `const m = await import(${JSON.stringify(SERVICE_VERB)}); m.liveHost(${JSON.stringify(ROOT)}).pause({ by: ${JSON.stringify(BY)}, why: 'restarting the daemon at pid ${OLD}' }); process.stdout.write('paused\\n'); setInterval(() => {}, 60_000);`,
-    { ...process.env, WF_ROOT: ROOT },
+    ENV,
   );
   t.after(() => void child.child.kill('SIGKILL'));
   await child.until(() => child.out().includes('paused'), 'the take-over process put its pause');
@@ -80,9 +77,9 @@ test("a restart killed while it waits leaves the store paused no longer than the
 
   await s.test('the take-over pauses the store naming its own process, and a pass while it runs leaves the pause standing', async () => {
     child = await takeOverProcess(t);
-    assert.equal(readPauseFile(rootNow())?.heldBy?.pid, child.child.pid, 'the pause names the process that put it');
+    assert.equal(readPauseFile(ROOT)?.heldBy?.pid, child.child.pid, 'the pause names the process that put it');
     await pass();
-    assert.equal(readPause(rootNow())?.by, BY, 'a pause whose process runs stands');
+    assert.equal(readPause(ROOT)?.by, BY, 'a pause whose process runs stands');
     assert.equal(storeLines('StorePaused').length, 1, 'the feed says the store paused');
   });
 
@@ -90,9 +87,9 @@ test("a restart killed while it waits leaves the store paused no longer than the
     assert.ok(child);
     child.child.kill('SIGKILL');
     assert.equal((await child.closed).signal, 'SIGKILL');
-    assert.ok(readPause(rootNow()) !== null, 'the pause outlives the killed command until a pass reads it');
+    assert.ok(readPause(ROOT) !== null, 'the pause outlives the killed command until a pass reads it');
     await pass();
-    assert.equal(readPause(rootNow()), null, 'the pass lifted the pause of a process gone');
+    assert.equal(readPause(ROOT), null, 'the pass lifted the pause of a process gone');
     assert.equal(storeLines('StoreResumed').length, 1, 'the feed says the store resumed');
   });
 });
@@ -107,12 +104,12 @@ test("a restart with only a landing's check running restarts at once, and the ch
   fs.writeFileSync(path.join(dir, 'work.md'), '---\nplace: git\n---\nwork it\n');
   fs.writeFileSync(path.join(dir, 'ship.md'), '---\nplace: git\nafter: work\ngate: true\nworkspace: base\ncheck: "true"\n---\nship it\n');
   let id = '';
-  const shipOf = () => runRecord(rootNow(), id).steps.ship;
+  const shipOf = () => runRecord(ROOT, id).steps.ship;
 
   await s.test("a run's ending signed off, its landing check filed and running", async () => {
     id = (await stage.runPlaced(startRun({ brief: 'restart', repo, workflowDir: dir, isolate: true }))).id;
     await pass();
-    const work = runRecord(rootNow(), id).steps.work;
+    const work = runRecord(ROOT, id).steps.work;
     fs.writeFileSync(path.join(work.workspace!, 'work.txt'), 'work\n');
     b.settle(work.taskId!, 'succeeded', SIGNED);
     await pass();
@@ -132,7 +129,7 @@ test("a restart with only a landing's check running restarts at once, and the ch
     let lease: DaemonStanding = leaseOf(OLD);
     const later: DaemonStanding[] = [];
     let unitPid: number | null = OLD;
-    const live = liveHost(rootNow());
+    const live = liveHost(ROOT);
     const host = {
       ...live,
       lease: () => {
@@ -171,7 +168,7 @@ test("a restart with only a landing's check running restarts at once, and the ch
       ['pause', `signal ${OLD}`, 'start', 'resume'],
       'nothing is waited for between the pause and the signal',
     );
-    assert.equal(readPause(rootNow()), null);
+    assert.equal(readPause(ROOT), null);
   });
 
   await s.test("the check ends on its worker, and the new daemon's pass records the landing", async () => {

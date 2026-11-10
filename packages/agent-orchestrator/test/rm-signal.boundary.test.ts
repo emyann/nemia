@@ -3,7 +3,7 @@
  * `nemia rm` ends it and is not passed on to that group, which outlives it: a `git worktree remove` a person's ^C reached would stop
  * halfway. Once that group is gone, `nemia rm` again forgets the run: what the first left is read again by the place's inventory. The run
  * is started in this process on a scratch store, then forgotten by the CLI in a child whose `git` hangs on `worktree remove` alone.
- * `WF_ROOT` is set before the import, since the module reads it as it loads.
+ * The run's store is the test's own, at `STORE`, given as `ENV`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,16 +13,16 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { nodeChild } from './child.ts';
 import { scratch } from 'test-kit/scratch';
 import { runGiven } from './placed.ts';
-import { rootNow } from './config-given.ts';
+import { startRun } from '../src/start/start.verb.ts';
+import { gitPlaceLayer } from '../src/place/builtin.store.ts';
+import { markCancelled } from '../src/record/record.store.ts';
+import { LINE_NAME } from '../src/run.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const DIR = scratch('wf-rm-signal-');
 const STORE = path.join(DIR, 'store');
-process.env.WF_ROOT = STORE;
-const { startRun } = await import('../src/start/start.verb.ts');
-const { gitPlaceLayer } = await import('../src/place/builtin.store.ts');
-const runPlaced = runGiven(gitPlaceLayer);
-const { markCancelled } = await import('../src/record/record.store.ts');
-const { LINE_NAME } = await import('../src/run.ts');
+const ENV: Env = { ...process.env, WF_ROOT: STORE };
+const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 const BIN = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 
@@ -70,7 +70,7 @@ async function aCancelledRun() {
   const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir }));
   const wt = path.join(STORE, 'worktrees', run.id, LINE_NAME);
   git(repo, 'worktree', 'add', '-q', '-b', `wf/${run.id}/${LINE_NAME}`, wt);
-  markCancelled(rootNow(), run.id);
+  markCancelled(STORE, run.id);
   return { id: run.id, repo, wt };
 }
 

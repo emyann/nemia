@@ -34,7 +34,6 @@ import { scratch } from 'test-kit/scratch';
 import { names } from './assessed.ts';
 
 const ROOT = scratch('wf-render-');
-process.env.WF_ROOT = ROOT;
 
 /** A tree of files under a fresh directory, each written from `files` by its path from it; the directory. */
 function tree(files: Record<string, string>): string {

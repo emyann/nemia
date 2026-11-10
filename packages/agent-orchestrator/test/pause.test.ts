@@ -17,10 +17,9 @@
  *
  * The tick is the store's pass (`tickRun`), on the stage's engine given a pass of its own that does nothing and no tally, as
  * `queue-store.test.ts` gives it. A schedule's `now` is the wall's, so the story steers `Date` with node's mock timers, at the fire's
- * instant written as a literal. `WF_ROOT` is set before the import, since the module reads it as it loads, and the run cap high, so the
+ * instant written as a literal. The store is the file's own, at `ROOT`, given as `ENV`, and the run cap high, so the
  * schedule's fire is held by the pause alone.
  */
-import { rootNow } from './config-given.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -32,28 +31,32 @@ import { scratch } from 'test-kit/scratch';
 import { TEAM } from './team.ts';
 import { staged, story, type Board } from './story.ts';
 import { names } from './assessed.ts';
+import { approveRun, startRun, tickRun, runWith } from '../src/runner.ts';
+import { addFactoryAt, attachWorkflowAt, setScheduleAt } from '../src/factory/factory.store.ts';
+import { askFile, asksDir, listRuns, markCancelled, runRecord } from '../src/record/record.store.ts';
+import { pauseFile, readPause } from '../src/pause/pause.store.ts';
+import { nowRead } from '../src/pause/pause.verb.ts';
+import { pausedRead } from '../src/list/list.verb.ts';
+import { pauseSaid } from '../src/daemon/up.verb.ts';
+import { currentTasks, pausedWords, RESUMED } from '../src/pause/pause.ts';
+import { freshRestMemo } from '../src/tick/tick.verb.ts';
+import { recordMemo } from '../src/rest/index.ts';
+import { metered } from '../src/meter/tally.store.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import { main } from '../src/cli/main.ts';
 
 const ROOT = scratch('wf-pause-story-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-process.env.WF_MAX_RUNS = '100';
-process.env.WF_DEFAULT_FACTORY_STARTS = '1';
-delete process.env.WF_MAX_CONCURRENT;
-const { approveRun, startRun, tickRun, runWith } = await import('../src/runner.ts');
-const { addFactory, attachWorkflow, setSchedule } = await import('../testing.ts');
-const { askFile, asksDir, listRuns, markCancelled, runRecord } = await import('../src/record/record.store.ts');
-const { pauseFile, readPause } = await import('../src/pause/pause.store.ts');
-const { nowRead } = await import('../src/pause/pause.verb.ts');
-const { pausedRead } = await import('../src/list/list.verb.ts');
-const { pauseSaid } = await import('../src/daemon/up.verb.ts');
-const { currentTasks, pausedWords, RESUMED } = await import('../src/pause/pause.ts');
-const { freshRestMemo } = await import('../src/tick/tick.verb.ts');
-const { recordMemo } = await import('../src/rest/index.ts');
-const { metered } = await import('../src/meter/tally.store.ts');
-const { engineOf } = await import('../src/runtime-client.ts');
-const { main } = await import('../src/cli/main.ts');
-const stage = staged({ runWith, main, engineOf });
+/** The file's store and settings; a test that times a cold read turns the full judgement of runs at rest off on it. */
+const ENV: Record<string, string | undefined> = {
+  ...process.env,
+  WF_ROOT: ROOT,
+  WF_VERIFY_REST: '1',
+  WF_MAX_RUNS: '100',
+  WF_DEFAULT_FACTORY_STARTS: '1',
+  WF_MAX_CONCURRENT: undefined,
+};
+const stage = staged({ runWith, main, engineOf, env: ENV });
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 /** What the engine's own pass answers here: nothing admitted, nothing started, no view — every task is read off the stand-in. */
@@ -109,11 +112,10 @@ const printedBy = async (t: TestContext, run: () => unknown): Promise<string[]> 
   return lines.join('\n').split('\n');
 };
 /** The asks of `run` no pass has set aside. */
-const asksOf = (id: string) =>
-  fs.existsSync(asksDir(rootNow(), id)) ? fs.readdirSync(asksDir(rootNow(), id)).filter((f) => f !== 'done') : [];
-const askOf = (id: string, step: string, n: number) => JSON.parse(fs.readFileSync(askFile(rootNow(), id, step, n), 'utf8'));
+const asksOf = (id: string) => (fs.existsSync(asksDir(ROOT, id)) ? fs.readdirSync(asksDir(ROOT, id)).filter((f) => f !== 'done') : []);
+const askOf = (id: string, step: string, n: number) => JSON.parse(fs.readFileSync(askFile(ROOT, id, step, n), 'utf8'));
 /** The runs a schedule started: the fire each was started for. */
-const scheduledDues = (): string[] => listRuns(rootNow()).flatMap((r) => (r.scheduled ? [r.scheduled.due] : []));
+const scheduledDues = (): string[] => listRuns(ROOT).flatMap((r) => (r.scheduled ? [r.scheduled.due] : []));
 
 test("the store paused, then paused at once, then resumed: nothing new starts, each session stops at its tool call's end, and what the pause stopped is tried again", async (t) => {
   const s = story(t);
@@ -122,28 +124,27 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
   const b = ticking(parked);
   const pass = () => stage.runWith(b.e, tickRun());
   const repo = aRepo();
-  addFactory({ name: 'solo', repos: [repo] });
-  attachWorkflow({ factory: 'solo', workflow: 'dev' });
-  setSchedule({ factory: 'solo', workflow: 'dev', cron: '0 9 * * 1', tz: 'America/Montreal', brief: 'Read the stats' });
+  addFactoryAt(ROOT, { name: 'solo', repos: [repo] });
+  attachWorkflowAt(ROOT, { factory: 'solo', workflow: 'dev' });
+  setScheduleAt(ROOT, { factory: 'solo', workflow: 'dev', cron: '0 9 * * 1', tz: 'America/Montreal', brief: 'Read the stats' });
   const ONE = folder(['work']);
   const CHECKED = folder(['work'], () => 'check: "true"\n');
   const SHIP = folder(['work', 'ship'], (name) => (name === 'ship' ? 'gate: true\nworkspace: base\ncheck: "true"\n' : ''));
   const begun = (workflowDir: string, more: Partial<Parameters<typeof startRun>[0]> = {}) =>
     stage.runPlaced(startRun({ brief: 'paused', repo, workflowDir, isolate: false, ...more }));
   const runs: Record<'session' | 'checking' | 'asked' | 'ended' | 'landing' | 'called', Run> = {} as never;
-  const task = (name: keyof typeof runs, step = 'work') => runRecord(rootNow(), runs[name].id).steps[step].taskId!;
-  const checkOf = (name: keyof typeof runs) => runRecord(rootNow(), runs[name].id).steps.work.check!.taskId;
+  const task = (name: keyof typeof runs, step = 'work') => runRecord(ROOT, runs[name].id).steps[step].taskId!;
+  const checkOf = (name: keyof typeof runs) => runRecord(ROOT, runs[name].id).steps.work.check!.taskId;
   const stops: { taskId: string; askOnDisk: boolean }[] = [];
   const stopping = {
     ...b.e,
     stop: (taskId: string) =>
       Effect.suspend(() => {
-        const run = Object.values(runs).find((r) => JSON.stringify(runRecord(rootNow(), r.id).steps).includes(`"${taskId}"`));
+        const run = Object.values(runs).find((r) => JSON.stringify(runRecord(ROOT, r.id).steps).includes(`"${taskId}"`));
         stops.push({
           taskId,
           askOnDisk:
-            run !== undefined &&
-            asksOf(run.id).some((f) => fs.readFileSync(path.join(asksDir(rootNow(), run.id), f), 'utf8').includes(taskId)),
+            run !== undefined && asksOf(run.id).some((f) => fs.readFileSync(path.join(asksDir(ROOT, run.id), f), 'utf8').includes(taskId)),
         });
         if (taskId !== task('ended')) return b.e.stop(taskId);
         return Effect.promise(async () => {
@@ -164,14 +165,11 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
   await s.test(
     'a store with nothing at work: `nemia pause --now --yes` puts the pause, stopping nothing; a folder run started under it is filed nothing, and the pause reads Paused, nothing finishing',
     async (sub) => {
-      assert.deepEqual([readPause(rootNow()), listRuns(rootNow()).flatMap(currentTasks)], [null, []], 'no run of the store has a task yet');
+      assert.deepEqual([readPause(ROOT), listRuns(ROOT).flatMap(currentTasks)], [null, []], 'no run of the store has a task yet');
       const said = await printedBy(sub, () => stage.main(['pause', '--now', '--yes', '--why', 'quiet', '--by', 'ann'], stopping));
       names(said[0], 'paused at once', 'by ann: quiet', 'nemia resume');
       names(said[1], 'nothing was stopped');
-      assert.deepEqual(
-        [readPause(rootNow())?.why, readPause(rootNow())?.by, readPause(rootNow())?.timeoutMs, stops],
-        ['quiet', 'ann', 0, []],
-      );
+      assert.deepEqual([readPause(ROOT)?.why, readPause(ROOT)?.by, readPause(ROOT)?.timeoutMs, stops], ['quiet', 'ann', 0, []]);
       assert.deepEqual(b.sessionDrains.at(-1), { graceMs: 0 }, "the sessions' drain put at no timeout: every call in flight is cut");
       const team = fs.mkdtempSync(path.join(ROOT, 'wf-'));
       fs.writeFileSync(path.join(team, 'work.md'), '---\nplace: folder\n---\nwork it\n');
@@ -185,9 +183,9 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       assert.match(pausedWords(standing) ?? '', /^Paused since /);
       const feed = await printedBy(sub, () => stage.main(['watch', '--once']));
       assert.equal(feed[0], pausedWords(standing), feed.join('\n'));
-      markCancelled(rootNow(), loose.id);
+      markCancelled(ROOT, loose.id);
       assert.deepEqual(await printedBy(sub, () => stage.main(['resume'])), [RESUMED]);
-      assert.equal(readPause(rootNow()), null);
+      assert.equal(readPause(ROOT), null);
       assert.equal(b.sessionDrains.at(-1), null, "the sessions' drain lifted");
     },
   );
@@ -203,20 +201,20 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
     await pass();
     for (const name of ['session', 'asked', 'ended', 'landing', 'called'] as const) b.settle(task(name), 'working');
     b.settle(task('checking'), 'succeeded', SIGNED);
-    fs.writeFileSync(path.join(runRecord(rootNow(), runs.landing.id).steps.work.workspace!, 'work.txt'), 'work\n');
+    fs.writeFileSync(path.join(runRecord(ROOT, runs.landing.id).steps.work.workspace!, 'work.txt'), 'work\n');
     b.settle(task('landing'), 'succeeded', SIGNED);
     await pass();
     b.settle(checkOf('checking'), 'working');
     await stage.runWith(b.e, approveRun(runs.landing.id, 'ship'));
     await pass();
     b.settle(task('landing', 'ship'), 'working');
-    fs.mkdirSync(asksDir(rootNow(), runs.asked.id), { recursive: true });
+    fs.mkdirSync(asksDir(ROOT, runs.asked.id), { recursive: true });
     fs.writeFileSync(
-      askFile(rootNow(), runs.asked.id, 'work', 2),
+      askFile(ROOT, runs.asked.id, 'work', 2),
       JSON.stringify({ step: 'work', try: 2, mode: 'fresh', at: '2026-10-04T12:00:00Z' }),
     );
-    markCancelled(rootNow(), runs.called.id);
-    assert.equal(readPause(rootNow()), null);
+    markCancelled(ROOT, runs.called.id);
+    assert.equal(readPause(ROOT), null);
   });
   await s.test(
     '`nemia pause --now` alone says what it would stop, at what cost, and the line that acts — and writes and stops nothing',
@@ -237,7 +235,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       assert.ok(preview.includes(`   ${runs.session.id}'s work: its session, its call cut, going on as the same try`), preview.join('\n'));
       assert.ok(preview.includes(`   ${runs.checking.id}'s work: its check, run again`), preview.join('\n'));
       assert.equal(preview.at(-1), 'nemia pause --now --yes does it.');
-      assert.equal(fs.existsSync(pauseFile(rootNow())), false);
+      assert.equal(fs.existsSync(pauseFile(ROOT)), false);
       assert.deepEqual([asksOf(runs.session.id), asksOf(runs.checking.id), stops], [[], [], []]);
     },
   );
@@ -245,10 +243,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
     "`nemia pause --yes` pauses as a plain pause does, stopping nothing and parking every session within the store's timeout; a plain pause again is refused, naming --now",
     async (sub) => {
       await printedBy(sub, () => stage.main(['pause', '--yes', '--why', 'lunch', '--by', 'ann'], stopping));
-      assert.deepEqual(
-        [readPause(rootNow())?.why, readPause(rootNow())?.by, readPause(rootNow())?.timeoutMs, stops],
-        ['lunch', 'ann', 600_000, []],
-      );
+      assert.deepEqual([readPause(ROOT)?.why, readPause(ROOT)?.by, readPause(ROOT)?.timeoutMs, stops], ['lunch', 'ann', 600_000, []]);
       assert.deepEqual(b.sessionDrains.at(-1), { graceMs: 600_000 }, "the sessions' drain put at the store's timeout, 10m by default");
       await assert.rejects(stage.main(['pause', '--why', 'other'], stopping), (err: Error & { exitCode?: number; _tag?: string }) => {
         assert.deepEqual([err._tag, err.exitCode], ['Conflict', 2], err.message);
@@ -265,7 +260,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       filings = [...b.filings];
       const paused = await pass();
       assert.deepEqual([paused.scheduled, scheduledDues(), b.filings], [undefined, [], filings]);
-      assert.deepEqual(paused.pause?.pause, readPause(rootNow()), 'the pass says the pause it read');
+      assert.deepEqual(paused.pause?.pause, readPause(ROOT), 'the pass says the pause it read');
       const standing = await stage.runWith(b.e, pausedRead());
       assert.match(
         pausedWords(standing) ?? '',
@@ -294,10 +289,10 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
   await s.test(
     "`nemia pause --now --yes` keeps the pause as it was put, its timeout cut to 0, and asks each check at work to stop, its ask on disk first; a session is asked no try and no stop, the sessions' drain cutting its call",
     async (sub) => {
-      const pause = readPause(rootNow());
+      const pause = readPause(ROOT);
       const said = await printedBy(sub, () => stage.main(['pause', '--now', '--yes', '--why', 'other'], stopping));
       names(said[0], "the store's pause stands as it was put", 'by ann: lunch', 'now what runs is cut');
-      assert.deepEqual(readPause(rootNow()), { ...pause, timeoutMs: 0 }, 'the pause stands as it was, its timeout cut');
+      assert.deepEqual(readPause(ROOT), { ...pause, timeoutMs: 0 }, 'the pause stands as it was, its timeout cut');
       assert.deepEqual(b.sessionDrains.at(-1), { graceMs: 0 }, "the sessions' drain put at no timeout");
       assert.ok(said.includes(`   ${runs.session.id}'s work: its session, its call cut, going on as the same try`), said.join('\n'));
       assert.deepEqual(
@@ -319,7 +314,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
         [],
         'a landing is asked no try',
       );
-      assert.equal(fs.existsSync(asksDir(rootNow(), runs.called.id)), false, 'a run called off is left alone');
+      assert.equal(fs.existsSync(asksDir(ROOT, runs.called.id)), false, 'a run called off is left alone');
       for (const name of ['session', 'ended', 'called'] as const) parked.add(task(name));
     },
   );
@@ -397,13 +392,13 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       assert.equal(b.sessionDrains.at(-1), null, "the sessions' drain lifted by the resume");
       parked.clear();
       await pass();
-      const resumed = runRecord(rootNow(), runs.session.id).steps.work;
+      const resumed = runRecord(ROOT, runs.session.id).steps.work;
       assert.deepEqual([resumed.taskId, resumed.tries], [before, undefined], 'the session goes on as the same try: none is filed');
       const checked = stops.find((x) => x.taskId.startsWith(`${runs.checking.id}-`))!.taskId;
-      const rechecked = runRecord(rootNow(), runs.checking.id).steps.work;
+      const rechecked = runRecord(ROOT, runs.checking.id).steps.work;
       assert.notEqual(rechecked.check?.taskId, checked, 'its check filed again');
       assert.deepEqual(rechecked.tries?.at(-1), { taskId: rechecked.taskId, check: { taskId: checked }, cause: 'recheck', paused: true });
-      assert.equal(runRecord(rootNow(), runs.ended.id).steps.work?.tries, undefined, 'no other session is tried either');
+      assert.equal(runRecord(ROOT, runs.ended.id).steps.work?.tries, undefined, 'no other session is tried either');
       assert.deepEqual(scheduledDues(), [MONDAY], 'the fire held by the pause starts on the pass after the resume');
       const feed = await printedBy(sub, () => stage.main(['watch', '--once']));
       assert.equal(
@@ -457,9 +452,9 @@ test("a warm read of what a pause at once would stop reads the live runs' record
   await Effect.runPromise(b.e.file({ id: 'live-1', brief: 'b', cwd: ROOT }));
   b.settle('live-1', 'working');
   const memo = recordMemo<RunTasks>();
-  process.env.WF_VERIFY_REST = '0';
+  ENV.WF_VERIFY_REST = '0';
   t.after(() => {
-    process.env.WF_VERIFY_REST = '1';
+    ENV.WF_VERIFY_REST = '1';
   });
   await stage.runWith(b.e, nowRead(memo));
   const records = (await metered(async () => await stage.runWith(b.e, nowRead(memo)))).tallies?.records;

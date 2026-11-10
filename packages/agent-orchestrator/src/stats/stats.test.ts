@@ -10,6 +10,7 @@ import type { Run } from '../record/record.ts';
 import type { EarlierTry } from '../retry/index.ts';
 import type { Workflow } from '../step/step.ts';
 import { timeline, type TaskClock } from '../timeline/timeline.ts';
+import { filedViews } from '../../test/filed.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import {
   dayOf,
@@ -144,7 +145,7 @@ function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Tr
   return {
     run,
     steps,
-    timeline: timeline(run, views, filed, steps),
+    timeline: timeline(run, filedViews(views, filed), steps),
     succeeded: (taskId: string) => views.get(taskId)?.phase === 'succeeded',
     verdictOf: (taskId: string) => verdicts.get(taskId) ?? null,
     deniedOf: (taskId: string) => denied.get(taskId) ?? [],

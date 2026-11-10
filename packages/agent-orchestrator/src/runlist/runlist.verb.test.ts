@@ -101,20 +101,15 @@ const aWaiting = async () => {
 /** A person's cancellation of the run `id`, written beside its record as `nemia cancel` writes it. */
 const cancelled = (id: string, at: number): void => fs.writeFileSync(path.join(RUNS_DIR, `${id}.cancelled`), new Date(at).toISOString());
 
-/** What a list keeps between requests: the informer and the feed's filing times; a fresh one for each read where none is given. */
-type Kept = { runs: import('../rest/informer.verb.ts').InformerMemo; filings: { filed: Map<string, string>; cursor: number } };
-const cold = (): Kept => ({ runs: informerMemo(), filings: { filed: new Map(), cursor: 0 } });
+/** What a list keeps between requests: the informer; a fresh one for each read where none is given. */
+type Kept = { runs: import('../rest/informer.verb.ts').InformerMemo };
+const cold = (): Kept => ({ runs: informerMemo() });
 
 /** The RunList `query` asks, read through `kept`, verified as `env` says. */
 const list = async (query: RunQuery = {}, kept = cold(), env = process.env): Promise<RunList> =>
   await runWith(
     e(),
-    runList(
-      e(),
-      { home: ROOT, memo: kept.runs, filings: kept.filings, verify: env.WF_VERIFY_REST === '1' },
-      { memo: { filings: kept.filings, said: new Map() } },
-      query,
-    ),
+    runList(e(), { home: ROOT, memo: kept.runs, verify: env.WF_VERIFY_REST === '1' }, { memo: { said: new Map() } }, query),
   );
 
 /** A run of a list as a row: its name as `id`, its creation as `createdAt`, and its status. */

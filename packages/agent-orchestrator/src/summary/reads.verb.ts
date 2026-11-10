@@ -1,13 +1,12 @@
 /**
  * The store as the board's reading of a run stands on it: the engine's views of a run's tasks, read once for a request, the workflow a run
- * is judged by and the steps it shows, the feed's filing times read on from where the last read stopped, and whether a run is an agent's
- * try. A controller: it reads the engine through the client (`runtime-client.ts`), the runs through the Run door, and a workflow folder off
- * disk, and writes nothing.
+ * is judged by and the steps it shows, and whether a run is an agent's try. A controller: it reads the engine through the client
+ * (`runtime-client.ts`), the runs through the Run door, and a workflow folder off disk, and writes nothing.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';
-import { asked, over, type Engine, type TaskView, unreadableJournal } from '../runtime-client.ts';
+import { asked, type Engine, type TaskView, unreadableJournal } from '../runtime-client.ts';
 import { doorAt } from '../factory/door/factories.store.ts';
 import { FactoryName, isDefaultFactory } from '../factory/factory.model.ts';
 import { runNamespace } from '../run-list/index.ts';
@@ -22,7 +21,6 @@ import { type Run, runTasks, unjudgedWords, unloadedWords } from '../record/reco
 import { unloadedOf } from '../steps/steps.verb.ts';
 import { triesDir } from '../try/try.store.ts';
 import type { Workflow } from '../step/step.ts';
-import { filingsRead } from '../views/views.verb.ts';
 
 export type { TaskView };
 export type Views = ReadonlyMap<string, TaskView>;
@@ -222,24 +220,6 @@ export const judgedSteps = (run: Run, folder: readonly Workflow[] | null): reado
 
 /** A step nothing defines: all the record says of it is its name, with no `after`, `check:` or `output:`. */
 export const bare = (name: string): Workflow => ({ name, after: [], body: '' });
-
-/**
- * When each task was filed, off the engine's feed (`filingsRead`), and where the last read of it stopped: a task's view carries no filing
- * time, and the wait for a slot is filing → first attempt, and a run starts at its first filing (`runStartedAt`). Read on from the cursor
- * on each detail and each list — a filing is written once and never changes — so a page polled every five seconds reads what was appended
- * since. A read's cache, one for a caller that lives long, of its engine's feed: a fresh one reads the feed from the start.
- */
-export type Filings = { filed: Map<string, string>; cursor: number };
-
-/**
- * Every task's filing time `e`'s feed has, read on from where the last read into `filings` stopped. A feed that cannot be read this time
- * leaves what was read before: the queue times of tasks filed since say `not known` until a read works.
- */
-export const filedTimes = Effect.fn('filedTimes')(function* (e: Engine, filings: Filings) {
-  const read = yield* Effect.exit(filingsRead(filings.cursor, filings.filed).pipe(over(e)));
-  if (Exit.isSuccess(read)) filings.cursor = read.value.cursor;
-  return filings.filed;
-});
 
 /** The agent a run tried, when it is a try: started from a folder directly under `tries/`. Null for every other run. */
 export function tryOf(run: Pick<Run, 'workflowDir'>, home: string): { agent: string } | null {

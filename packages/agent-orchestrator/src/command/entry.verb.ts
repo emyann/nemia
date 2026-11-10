@@ -14,7 +14,6 @@ import type { InformerMemo } from '../rest/informer.verb.ts';
 import type { ScheduleRuns } from '../factory/schedule/listed.store.ts';
 import type { PauseRuns } from '../pause/pause.ts';
 import type { SeriesMemo } from '../series/series.ts';
-import type { Filings } from '../summary/reads.verb.ts';
 import type { Args, CommandSpec, Flag } from './command.ts';
 import type { Run } from '../record/record.ts';
 import type { Labels } from '../labels/labels.ts';
@@ -23,14 +22,13 @@ import { parseSelectors, selectorsRefusal, SELECTOR_FORM, type Selectors } from 
 
 /**
  * What a caller that lives long keeps between its calls of the table's handlers: the stats' memo of each run's facts (`stats`), the
- * informer of each run's judgement (`runs`), the feed's filing times (`filings`), the series' days read (`series`), and `records`, a memo
- * per read that wants a little of every run (`keptRecords`), each keyed by the run's stamp alone.
+ * informer of each run's judgement (`runs`), the series' days read (`series`), and `records`, a memo per read that wants a little of
+ * every run (`keptRecords`), each keyed by the run's stamp alone.
  */
 export type Kept = {
   readonly stats?: StatsMemo;
   readonly series?: SeriesMemo;
   readonly runs?: InformerMemo;
-  readonly filings?: Filings;
   readonly records?: KeptRecords;
 };
 
@@ -59,7 +57,7 @@ export type InputOf<I> = [Args] extends [I] ? { readonly input?: Schema.Decoder<
  * shape its endpoint's success Schema says. A handler
  * reads its settings (`WF_MAX_RUNS`) from `env`, and a person's own files from the store `home`: the process's own at the command line, the
  * app's on the api; and what a caller that lives long keeps between its calls from `kept` — the api's memos of the stats and of the runs at
- * rest, and the feed's filing times it read — which the command line, calling once, hands none of. `note` is what the CLI says of the data
+ * rest — which the command line, calling once, hands none of. `note` is what the CLI says of the data
  * on stderr, beside what it prints.
  */
 export type Command<D extends object = Readonly<Record<string, unknown>>, I = Args> = CommandSpec &

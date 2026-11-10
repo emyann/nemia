@@ -1,7 +1,7 @@
 /**
  * One read of a run, shared by its object (`runObject`) and its sub-resources (the tries, a try, its closeout, what a
- * step was told): the views of its tasks over one look at the harnesses, what the run is judged as off them, its checks, the feed's filing
- * times and its clock — each read once, and each step's current try and its tries judged off them alike.
+ * step was told): the views of its tasks over one look at the harnesses, each saying when it was filed, what the run is judged as off
+ * them, its checks and its clock — each read once, and each step's current try and its tries judged off them alike.
  */
 import { Effect } from 'effect';
 import { timeline, type Timeline } from '../timeline/index.ts';
@@ -10,7 +10,7 @@ import { phaseOfView } from '../views/views-words.ts';
 import { type Engine, EngineService } from '../runtime-client.ts';
 import { realReleasesDir } from '../release/release.store.ts';
 import type { RaiseReads } from '../retry/index.ts';
-import { bare, filedTimes, type Filings, type Views, workflowsOf } from '../summary/reads.verb.ts';
+import { bare, type Views, workflowsOf } from '../summary/reads.verb.ts';
 import { stepSaid } from '../summary/judged.verb.ts';
 import { type JudgedOrWhy, type Judgement, judgementsOf, sameJudgement } from '../summary/judgement.verb.ts';
 import { informedJudgements, Informer, informerRead } from '../rest/informer.verb.ts';
@@ -54,8 +54,8 @@ export type StepsReading = Judgement & {
   readonly releases: string;
 };
 
-/** What `runReading` read once of a run: its steps (`StepsReading`), and its timeline off the feed's filing times. */
-export type RunReading = StepsReading & { readonly clock: Timeline; readonly filed: ReadonlyMap<string, string> };
+/** What `runReading` read once of a run: its steps (`StepsReading`), and its timeline off their views. */
+export type RunReading = StepsReading & { readonly clock: Timeline };
 
 /**
  * Where what a page shows of a step's workflow is read from: the workflow the run froze at `nemia start`, which the tick
@@ -105,20 +105,22 @@ export const readFailed = ({ checks, stderr }: StepsReading): boolean =>
   [...stderr.values()].some((said) => typeof said === 'string') || [...checks.values()].some((check) => check.refused?.unreadable != null);
 
 /**
- * The run read once (`RunReading`): its steps (`stepsReading`), then its timeline, off the feed's filing times read on from `filings`
- * (`filedTimes`); or why it is not judged (`{ unjudged }`).
+ * The run read once (`RunReading`): its steps (`stepsReading`), then its timeline off their views; or why it is not judged
+ * (`{ unjudged }`).
  */
-export const runReading = Effect.fnUntraced(function* (run: Run, filings: Filings) {
+export const runReading = Effect.fnUntraced(function* (run: Run) {
   const steps = yield* stepsReading(run);
   if ('unjudged' in steps) return steps;
-  return runReadingOf(steps, yield* filedTimes(steps.e, filings));
+  return runReadingOf(steps);
 });
 
-/** The run read once (`RunReading`) off its steps read (`StepsReading`) and the feed's filing times `filed`, read already. */
-export const runReadingOf = (steps: StepsReading, filed: ReadonlyMap<string, string>): RunReading => ({
+/**
+ * The run read once (`RunReading`) off its steps read (`StepsReading`): its timeline off the judgement's views, which hold every try's
+ * task and check (`viewsFor`), each saying when it was filed.
+ */
+export const runReadingOf = (steps: StepsReading): RunReading => ({
   ...steps,
-  clock: timeline(steps.run, steps.views, filed, steps.steps),
-  filed,
+  clock: timeline(steps.run, steps.views, steps.steps),
 });
 
 /**

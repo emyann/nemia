@@ -106,11 +106,11 @@ const asIs: Wrap = (program) => program;
 
 /** The run `id` as one object, through `informer`. */
 const objectOf = (id: string, informer: InformerMemo | undefined, wrap: Wrap = asIs) =>
-  runWith(e(), wrap(informed(runObject(runRecord(id), { memo: { filings: { filed: new Map(), cursor: 0 }, said: new Map() } }), informer)));
+  runWith(e(), wrap(informed(runObject(runRecord(id), { memo: { said: new Map() } }), informer)));
 
 /** Every run's row, through `informer`. */
 const listOf = (informer: InformerMemo, wrap: Wrap = asIs) =>
-  runWith(e(), wrap(runsSummarized(e(), { home: ROOT, memo: informer, filings: { filed: new Map(), cursor: 0 }, verify: false })));
+  runWith(e(), wrap(runsSummarized(e(), { home: ROOT, memo: informer, verify: false })));
 
 /** `f` with `WF_VERIFY_REST` off: what the informer alone answers, no answer judged afresh beside it. */
 async function unverified<T>(f: () => Promise<T>): Promise<T> {

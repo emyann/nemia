@@ -138,10 +138,7 @@ const readers = async (id: string): Promise<Record<string, Said>> => {
     Effect.flatMap(standingSnapshot(), (standing) => list(e, theRun(id), undefined, standing)),
   );
   const decided = await stage.runWith(e, decideRun(id));
-  const object = await stage.runWith(
-    e,
-    Effect.provideService(runObject(theRun(id), { memo: { filings: { filed: new Map(), cursor: 0 }, said: new Map() } }), StoreRoot, ROOT),
-  );
+  const object = await stage.runWith(e, Effect.provideService(runObject(theRun(id), { memo: { said: new Map() } }), StoreRoot, ROOT));
   const pruned = await stage.runWith(e, judging(id));
   const said: Record<string, Said> = {
     tick: {

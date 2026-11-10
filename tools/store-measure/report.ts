@@ -377,7 +377,7 @@ async function chatMeasured(orch: Orchestrator, place: Place, fence: Fence, repe
   const root = orch.wfRoot(process.env);
   const fresh = (): ChatOver => ({
     e: passEngine(orch.engine(process.env), fence),
-    reads: { runs: orch.informerMemo(), filings: { filed: new Map(), cursor: 0 } },
+    reads: { runs: orch.informerMemo() },
   });
   const history = (at: ChatOver) =>
     orch.runWith(at.e, orch.chatHistory(orch.nemiaChatPlace(root), {}, at.reads).pipe(Effect.provide(placed)));

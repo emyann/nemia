@@ -28,7 +28,6 @@ import {
   commandLine,
   engine,
   list,
-  filingsRead,
   prunedKept,
   prunedWords,
   runTokens,
@@ -250,8 +249,8 @@ const r2 = {
 };
 
 /**
- * The timeline of a step whose one task settled as `settledTask` journals it — filed, spawned and ended all at `at` — in a store that keeps
- * no feed, so its filing, and the queue, is not known: never 0. What its session used is nobody's count.
+ * The timeline of a step whose one task settled as `settledTask` journals it — filed, spawned and ended all at `at` — its filing read off
+ * its view (`State.filedAt`), so it queued 0s, as it did. What its session used is nobody's count.
  */
 const settledTimeline = (taskId: string) => [
   {
@@ -262,13 +261,13 @@ const settledTimeline = (taskId: string) => [
     session: {
       taskId,
       at: 'ended',
-      filedAt: null,
+      filedAt: at,
       spawnedAt: at,
       endedAt: at,
       attempts: 1,
-      queuedMs: null,
+      queuedMs: 0,
       ranMs: 0,
-      queued: 'not known',
+      queued: '0s',
       ran: '0s',
     },
     used: {
@@ -286,8 +285,8 @@ const settledTimeline = (taskId: string) => [
 ];
 
 /**
- * The run's time over that one task, in a workflow with no loop: no round is totalled, and the run is, with a queue and a wall nobody can
- * know.
+ * The run's time over that one task, in a workflow with no loop: no round is totalled, and the run is, its queue and its wall 0s, the
+ * task filed, spawned and ended at one instant.
  */
 const oneTaskTotals = () => ({
   rounds: [],
@@ -298,10 +297,10 @@ const oneTaskTotals = () => ({
     inFlight: 0,
     queuedMs: 0,
     ranMs: 0,
-    wallMs: null,
-    queued: 'not known',
+    wallMs: 0,
+    queued: '0s',
     ran: '0s',
-    wall: 'not known',
+    wall: '0s',
     cost: null,
   },
   slot: null,
@@ -423,7 +422,7 @@ test("a store's runs read on the list and on a run's page: each summarized with 
           agents: [undefined, undefined],
         },
         status: {
-          /** Started, and none of its filings on the feed (there is none here): when it was created. */
+          /** Started, and no view of its tasks says a filing (the engine holds none of them): when it was created. */
           startedAt: '2026-09-12T00:00:00.000Z',
           cancelledAt: '2026-09-12T01:00:00.000Z',
           /** Nobody pruned it: no mark beside its status. */
@@ -537,7 +536,8 @@ test("a store's runs read on the list and on a run's page: each summarized with 
     assert.deepEqual(
       { ...run.status, steps: undefined },
       {
-        startedAt: '2026-09-12T02:00:00.000Z',
+        /** Its first filing, as its one task's view says it: the fixture's one instant, `at`, whatever the record's `createdAt`. */
+        startedAt: at,
         cancelledAt: null,
         pruned: null,
         onDisk: { worktrees: false, files: false },
@@ -2862,16 +2862,9 @@ const ranTask = (
 test("where a run's time and tokens went, on its list line and its page, and the calls its attempts were denied", async (t) => {
   const s = story(t);
   await s.test(
-    "the detail carries where each step's time went — per try and per check, filed off the engine's feed — and the run's, in the package's words",
+    "the detail carries where each step's time went — per try and per check, filed when each task's view says — and the run's, in the package's words",
     async () => {
       const T = (m: number, s = 0) => new Date(Date.UTC(2026, 8, 13, 9, m, s)).toISOString();
-      const feed = path.join(root, 'engine', 'feed.jsonl');
-      const fileOnFeed = (taskId: string, at: string) =>
-        fs.appendFileSync(
-          feed,
-          `${JSON.stringify({ taskId, event: { kind: 'filed', at, brief: filedBrief(taskId), cwd: '/code/app', harness: 'codex' } })}\n`,
-        );
-
       ranTask('r-60-implement', 'codex', T(0), T(0, 12), {
         at: T(19, 54),
         outcome: 'succeeded',
@@ -2880,13 +2873,6 @@ test("where a run's time and tokens went, on its list line and its page, and the
       ranTask('r-60-implement-check', 'check', T(19, 56), T(19, 57), { at: T(20, 55), outcome: 'failed', more: { exitCode: 1 } });
       ranTask('r-60-implement-try2', 'codex', T(21), T(21, 3), { at: T(26, 38), outcome: 'succeeded', more: { closeout: done } });
       ranTask('r-60-implement-try2-check', 'check', T(26, 40), T(26, 41));
-      for (const [taskId, at] of [
-        ['r-60-implement', T(0)],
-        ['r-60-implement-check', T(19, 56)],
-        ['r-60-implement-try2', T(21)],
-        ['r-60-implement-try2-check', T(26, 40)],
-      ] as const)
-        fileOnFeed(taskId, at);
       const record = {
         ...r2,
         id: 'r-60',
@@ -2895,7 +2881,7 @@ test("where a run's time and tokens went, on its list line and its page, and the
           { name: 'implement', after: [], body: 'Implement it.', check: 'npm test', retries: 1 },
           { name: 'review', after: ['implement'], body: 'Review it.' },
         ],
-        /** implement's check refused try 1, and try 2's check is still running. The feed has each filing; a task's view has none. */
+        /** implement's check refused try 1, and try 2's check is still running. Each task's journal has its filing; the feed has none. */
         steps: {
           implement: {
             taskId: 'r-60-implement-try2',
@@ -2966,13 +2952,16 @@ test("where a run's time and tokens went, on its list line and its page, and the
 
       const e = engine(process.env);
       const views = new Map((await Effect.runPromise(e.list())).views.map((view) => [view.id, view]));
-      const { filed } = await runWith(e, filingsRead());
-      const theirs = timeline(runStore.runs.read('r-60'), views, filed);
+      const fedFilings = (await Effect.runPromise(e.feed(0))).entries.filter(
+        ({ taskId, event }) => event.kind === 'filed' && taskId.startsWith('r-60-'),
+      );
+      assert.deepEqual(fedFilings, [], "the feed holds no filing of the run: each one read is its view's");
+      const theirs = timeline(runStore.runs.read('r-60'), views);
       const lessCost = ({ cost, ...total }: { cost: unknown }) => (assert.equal(cost, null, 'nobody priced these sessions'), total);
       assert.deepEqual(
         { rounds: run.timeline.rounds.map(lessCost), run: lessCost(run.timeline.run) },
         JSON.parse(JSON.stringify({ rounds: theirs.rounds, run: theirs.run })),
-        "the package's timeline over the engine's own views and the feed's filings, word for word, less the cost the totals carry beside it",
+        "the package's timeline over the engine's own views, word for word, less the cost the totals carry beside it",
       );
       const lessUsed = (tries: ReadonlyArray<{ used?: unknown }>) => JSON.parse(JSON.stringify(tries.map(({ used: _, ...x }) => x)));
       assert.deepEqual(
@@ -2982,7 +2971,6 @@ test("where a run's time and tokens went, on its list line and its page, and the
       );
 
       ranTask('r-60-implement-try3', 'codex', T(40), T(40, 7));
-      fileOnFeed('r-60-implement-try3', T(40));
       writeRun({
         ...record,
         steps: {
@@ -3007,7 +2995,7 @@ test("where a run's time and tokens went, on its list line and its page, and the
           queued: '7s',
           ran: 'still running, no end yet',
         },
-        'a try filed later is read on from where the last read of the feed stopped: its filing is known on the next poll, not "not known"',
+        'a try filed later is known on the next poll by its view\'s filing, not "not known"',
       );
     },
   );

@@ -223,11 +223,7 @@ const viewPrograms = async () => {
   const views = await import('../src/views/views.verb.ts');
   const { standingLiveOf } = await import('../src/standing/standing.verb.ts');
   const live = (ids: readonly string[]) => runPlaced(standingLiveOf(ids));
-  const fed = (e: Engine, entries: Effect.Success<ReturnType<Engine['feed']>>['entries']) => ({
-    ...e,
-    feed: (after = 0) => Effect.succeed({ entries: entries.slice(after), cursor: entries.length }),
-  });
-  return { over, fed, live, ...views };
+  return { over, live, ...views };
 };
 
 /** The tick's program, given `engine` as the service, run to a Promise as the face runs it. */
@@ -534,27 +530,6 @@ test("each verb's program, given its services, answers what its plain face answe
       });
       await v.over(e, v.refusalRead('npm test', check));
 
-      const at = '2026-09-30T08:00:00.000Z';
-      const told = v.fed(e, [
-        { taskId: 'a', event: { kind: 'filed', at, brief: 'a', cwd: '/repo' } },
-        { taskId: 'a', event: { kind: 'admitted', at: '2026-09-30T08:01:00.000Z' } },
-        { taskId: 'b', event: { kind: 'filed', at: '2026-09-30T08:02:00.000Z', brief: 'b', cwd: '/repo' } },
-      ]);
-      assert.deepStrictEqual(await v.over(told, v.filingsRead(0, new Map([['c', at]]))), {
-        filed: new Map([
-          ['c', at],
-          ['a', at],
-          ['b', '2026-09-30T08:02:00.000Z'],
-        ]),
-        cursor: 3,
-        forgotten: 0,
-      });
-      assert.deepStrictEqual(
-        await v.over(told, v.filingsRead(1)),
-        { filed: new Map([['b', '2026-09-30T08:02:00.000Z']]), cursor: 3, forgotten: 0 },
-        'from a cursor',
-      );
-
       const repo = aRepo();
       const landed = await aParent(repo, b);
       b.settle(`${landed.run.id}-implement`, 'succeeded', SIGNED);
@@ -594,7 +569,6 @@ test("each verb's program, given its services, answers what its plain face answe
           ['refusalOf', 'logs', v.refusalRead('npm test', check), { ...e, logs: refuse }],
           ['parentOf', 'view', v.parentRead(parent.run.id, live), { ...e, view: refuse }],
           ['parentsOf', 'view', v.parentsRead(child, live), { ...e, view: refuse }],
-          ['readFilings', 'feed', v.filingsRead(), { ...e, feed: refuse }],
         ] as unknown as Array<[string, string, EffectOf<unknown, Refusal, EngineService>, Engine]>;
       };
 

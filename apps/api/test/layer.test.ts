@@ -15,7 +15,7 @@ import { ReadMemo } from '../src/layer.ts';
 import { Engine, StoreRoot } from '../src/store.ts';
 import { engine, Informer } from 'agent-orchestrator';
 
-/** The board's list of the runs not finished: the RunList asked by state, which reads the tasks and the feed's filings. */
+/** The board's list of the runs not finished: the RunList asked by state, which reads the tasks. */
 const OPEN = '/api/runs?fieldSelector=status.state!%3Dfinished';
 
 /** The names of the workflows `GET /api/namespaces/default/workflows?origin=yours` lists as yours, through `on`. */
@@ -48,33 +48,21 @@ test("appOf: a mounted router reads the engine and the store's root of the app i
     assert.deepEqual(await yoursOn(own), ['elsewhere'], "yours, read under the layer's root");
     assert.deepEqual(await yoursOn(app), [], "the process's app reads yours under WF_ROOT, which has none");
   });
-  await t.test(
-    'an app keeps what its reads keep of its own: one over another engine starts with none, and reads the feed from its start',
-    async () => {
-      await Effect.runPromise(
-        engine(process.env).file({ id: 't-layer-filed', brief: 'Read me.', cwd: scratch('nemia-api-layer-cwd-'), harness: 'claude' }),
+  await t.test('an app keeps what its reads keep of its own: one over another engine starts with none', async () => {
+    const memoOf = (on: typeof runtime) => on.runPromise(ReadMemo.useSync((memo) => memo));
+    assert.equal((await app.request(OPEN)).status, 200);
+    const theProcess = await memoOf(runtime);
+    const { app: own, runtime: ownRuntime } = appOf(Layer.merge(liveOf(), Layer.succeed(Engine)(engine(process.env))));
+    const mine = await memoOf(ownRuntime);
+    assert.notEqual(mine, theProcess, "an app's memo is its own");
+    const informerOf = (on: typeof runtime) =>
+      on.runPromise(
+        Effect.gen(function* () {
+          return yield* Informer;
+        }),
       );
-      const memoOf = (on: typeof runtime) => on.runPromise(ReadMemo.useSync((memo) => memo));
-      assert.equal((await app.request(OPEN)).status, 200);
-      const theProcess = await memoOf(runtime);
-      assert.ok(theProcess.filings.filed.has('t-layer-filed'), "the process's app read the filing off the feed");
-      assert.ok(theProcess.filings.cursor > 0, 'and holds where it stopped');
-      const { app: own, runtime: ownRuntime } = appOf(Layer.merge(liveOf(), Layer.succeed(Engine)(engine(process.env))));
-      const mine = await memoOf(ownRuntime);
-      assert.notEqual(mine, theProcess, "an app's memo is its own");
-      const informerOf = (on: typeof runtime) =>
-        on.runPromise(
-          Effect.gen(function* () {
-            return yield* Informer;
-          }),
-        );
-      assert.notEqual(await informerOf(ownRuntime), await informerOf(runtime), "an app's informer is its own");
-      assert.deepEqual(
-        [mine.filings.cursor, mine.filings.filed.size, (await informerOf(ownRuntime))?.runs.size, mine.said.size],
-        [0, 0, 0, 0],
-      );
-      assert.equal((await own.request(OPEN)).status, 200);
-      assert.ok(mine.filings.filed.has('t-layer-filed'), "read from the feed's start, not from where the process's app stopped");
-    },
-  );
+    assert.notEqual(await informerOf(ownRuntime), await informerOf(runtime), "an app's informer is its own");
+    assert.deepEqual([(await informerOf(ownRuntime))?.runs.size, mine.said.size], [0, 0]);
+    assert.equal((await own.request(OPEN)).status, 200);
+  });
 });

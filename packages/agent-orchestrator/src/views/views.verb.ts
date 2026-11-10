@@ -1,12 +1,11 @@
 /**
  * What the runtime's views of a run's tasks say, read into the words the pure functions take: a step's closeout and whether it was asked
  * for one, what its sessions cost, what its check exited with and said, and what the checks of the steps it follows said, what was said
- * to it, what the runs it waits on concluded (`parentOf`), what each step consumed, and when each task was filed. A task's phase and the
- * engine's word for it are `views-words.ts`'s. A controller: it reads the runtime through the client (`runtime-client.ts`), and the
- * store's files beneath it, and files nothing — the tick (`tick.verb.ts`), the verbs and the screens read through it. Each read of the
- * engine is an Effect program that requires the engine as a service (`EngineService`) — `taskPhasesRead`, `checkReportsRead`,
- * `refusalRead`, `checksHandedRead`, `landingSaidRead`, `parentRead`, `parentsRead`, `filingsRead` — and fails with a refusal and dies
- * of anything else.
+ * to it, what the runs it waits on concluded (`parentOf`), and what each step consumed. A task's phase and the engine's word for it are
+ * `views-words.ts`'s. A controller: it reads the runtime through the client (`runtime-client.ts`), and the store's files beneath it, and
+ * files nothing — the tick (`tick.verb.ts`), the verbs and the screens read through it. Each read of the engine is an Effect program
+ * that requires the engine as a service (`EngineService`) — `taskPhasesRead`, `checkReportsRead`, `refusalRead`, `checksHandedRead`,
+ * `landingSaidRead`, `parentRead`, `parentsRead` — and fails with a refusal and dies of anything else.
  * What reads only views already read is plain.
  */
 import { Cause, Deferred, Effect, Exit } from 'effect';
@@ -693,17 +692,3 @@ export function consumption(views: ReadonlyMap<string, TaskView>, run: Run): Rec
   }
   return used;
 }
-
-/**
- * When each task was filed, off the engine's feed from `after`, added to `into`: the one record of a filing time, since a task's view
- * carries none — and the time between filing and a first attempt is the wait for a slot (`timeline`). A filing is written once and never
- * changes, so a reader that keeps `into` and the cursor reads on from where it stopped; `forgotten` counts the lines after `after` of
- * tasks the engine has forgotten since (`nemia rm`), which are read as gone. Never fails: the feed's refusal it dies of in the
- * runtime's words (`asked`), and of anything else as it was thrown.
- */
-export const filingsRead = Effect.fn('readFilings')(function* (after = 0, into = new Map<string, string>()) {
-  const e = yield* EngineService;
-  const { entries, cursor, forgotten } = yield* asked('feed', e.feed(after));
-  for (const { taskId, event } of entries) if (event.kind === 'filed') into.set(taskId, event.at);
-  return { filed: into, cursor, forgotten: forgotten ?? 0 };
-});

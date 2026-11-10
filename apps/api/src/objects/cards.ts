@@ -36,11 +36,10 @@ import { cardStart } from '../runs/start.ts';
 import { answered, locatedAt, orFailed, readerRefused } from './refused.ts';
 import { wantsTable } from './table.ts';
 
-/** How a read of the cards judges a started card's run: off the app's informer and its feed's filing times, verified as the env says. */
+/** How a read of the cards judges a started card's run: off the app's informer, verified as the env says. */
 const howOf = (s: Served): SummaryHow => ({
   home: s.home,
   memo: s.informer ?? informerMemo(),
-  filings: s.memo.filings,
   verify: verifiesRest(s.env),
 });
 

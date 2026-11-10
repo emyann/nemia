@@ -59,7 +59,6 @@ const { verifiesRest } = await import('../config/config.store.ts');
 const { metered } = await import('../meter/tally.store.ts');
 const { informerMemo, informerRead } = await import('../rest/informer.verb.ts');
 const { NOTHING_READ, standingReader } = await import('../standing/standing.verb.ts');
-const { filingsRead } = await import('../views/views.verb.ts');
 const made = testPlace();
 /** The file's test place, each question of it counted as the pass's `place` phase, as the shipped place counts its own. */
 const place = { ...made, place: meteredPlace(made.place), layer: PlaceService.layer(meteredPlace(made.place)) };
@@ -262,20 +261,15 @@ const reads = (c: PassCost) => ({
 });
 /** The names of `spans`, sorted: what a pass traced, whatever order its fibers ended in. */
 const namesOf = (spans: readonly Tracer.NativeSpan[]): string[] => spans.map((s) => s.name).sort();
-/** What a RunList keeps between requests: the informer and the feed's filing times. */
-type Kept = { runs: import('../rest/informer.verb.ts').InformerMemo; filings: { filed: Map<string, string>; cursor: number } };
+/** What a RunList keeps between requests: the informer. */
+type Kept = { runs: import('../rest/informer.verb.ts').InformerMemo };
 /** A fresh memo, as a cold read has it. */
-const cold = (): Kept => ({ runs: informerMemo(), filings: { filed: new Map(), cursor: 0 } });
+const cold = (): Kept => ({ runs: informerMemo() });
 /** The RunList asked by `fieldSelector`, read through `kept`, verified as `env` says. */
 const byState = (e: Parameters<typeof runWith>[0], fieldSelector: string, kept = cold(), env = process.env, more = {}) =>
   runWith(
     e,
-    runList(
-      e,
-      { home: ROOT, memo: kept.runs, filings: kept.filings, verify: verifiesRest(env) },
-      { memo: { filings: kept.filings, said: new Map() } },
-      { fieldSelector, ...more },
-    ),
+    runList(e, { home: ROOT, memo: kept.runs, verify: verifiesRest(env) }, { memo: { said: new Map() } }, { fieldSelector, ...more }),
   );
 /** The board's frame of the runs not finished, as the api answers it, read cold. */
 const open = (e: Parameters<typeof runWith>[0]) => byState(e, 'status.state!=finished');
@@ -559,7 +553,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
       const besideIt = pass();
       await held.waiting;
       const io0 = Effect.runSync(e.io());
-      await runWith(e, filingsRead(0));
+      await Effect.runPromise(e.feed(0));
       for (const run of listRuns().filter((r) => inFlight.some((f) => f.id === r.id)))
         await Effect.runPromise(e.view(run.steps.work.taskId!));
       const io1 = Effect.runSync(e.io());

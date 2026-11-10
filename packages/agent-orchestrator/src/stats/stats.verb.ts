@@ -57,12 +57,11 @@ const frozenRun = (run: Run, steps: readonly Workflow[]): RunFrozen =>
 const runFacts = Effect.fnUntraced(function* (e: Engine, run: Run, steps: Workflow[]) {
   const { views } = yield* taskPhasesRead(run).pipe(over(e));
   const everyTry = yield* everyTryOf(e, run, views);
-  const filed = new Map([...everyTry].flatMap(([taskId, v]) => (v.state.filedAt ? [[taskId, v.state.filedAt] as const] : [])));
   const settled = [...everyTry.values()].every((v) => Boolean(v.state.settled));
   const of = factsOf({
     run,
     steps,
-    timeline: timeline(run, everyTry, filed, steps),
+    timeline: timeline(run, everyTry, steps),
     succeeded: (taskId) => phaseOfView(everyTry.get(taskId)) === 'succeeded',
     verdictOf: (taskId) => verdictOf(everyTry.get(taskId)),
     closeoutOf: closeoutReader(views, run, steps),

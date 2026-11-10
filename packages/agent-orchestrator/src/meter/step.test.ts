@@ -148,9 +148,6 @@ const CLOCKED = new Map([
   ['r-1-work-try2-check', clocked('10:05', '10:06', '10:09', 'failed', 1)],
 ]);
 
-/** Each task's filing, as the timeline is handed it off the feed. */
-const filedOf = (views: ReadonlyMap<string, FactView>) => new Map([...views].map(([id, v]) => [id, v.state.filedAt!]));
-
 const PLAN = { name: 'plan', gate: true, after: [] } as unknown as Workflow;
 const BUILD = { name: 'build', after: ['plan'] } as unknown as Workflow;
 const GATED = {
@@ -423,7 +420,7 @@ test("`queueWait`, `checkWait` and `settledWaits`: a session's queue and a check
       { metric: 'wait', wait: 'queue', attributes: attrs('blocked'), run: 'r-1', try: 2, from: at('10:00'), to: at('10:04'), ms: 240_000 },
       { metric: 'wait', wait: 'check', attributes: attrs('refused'), run: 'r-1', try: 2, from: at('10:06'), to: at('10:09'), ms: 180_000 },
     ]);
-    const tl = timeline({ ...RUN, createdAt: at('09:49') }, CLOCKED, filedOf(CLOCKED), [WORK, REVIEW]);
+    const tl = timeline({ ...RUN, createdAt: at('09:49') }, CLOCKED, [WORK, REVIEW]);
     const [first, second] = tl.steps.work;
     assert.deepEqual(
       waits.map((w) => w.ms),
@@ -450,9 +447,7 @@ test("`queueWait`, `checkWait` and `settledWaits`: a session's queue and a check
       };
       assert.deepEqual(queueWait(retried), { from: `${DAY}T10:00:00.000Z`, to: `${DAY}T10:04:00.000Z`, ms: 240_000 });
       const views = new Map([['r-1-work', retried]]);
-      const tl = timeline({ ...RUN, steps: { work: { status: 'done', taskId: 'r-1-work' } } } as unknown as Run, views, filedOf(views), [
-        WORK,
-      ]);
+      const tl = timeline({ ...RUN, steps: { work: { status: 'done', taskId: 'r-1-work' } } } as unknown as Run, views, [WORK]);
       assert.equal(queueWait(retried)?.ms, tl.steps.work[0].session?.queuedMs, "the timeline's own");
     },
   );
@@ -496,7 +491,7 @@ test("`gateWaits`: a gate's wait from its try's end to its approval, once, as `g
       ms: 1_200_000,
     });
     assert.deepEqual(others, [], 'build is no gate, though approved');
-    const tl = timeline(GATED, GATED_VIEWS, new Map(), [PLAN, BUILD]);
+    const tl = timeline(GATED, GATED_VIEWS, [PLAN, BUILD]);
     assert.equal(wait.ms, gateWaitOf(GATED, tl, PLAN, tl.steps.plan[0]));
     const gatedByRun = gateWaits({ ...GATED, gates: ['build'] }, [PLAN, BUILD], GATED_VIEWS);
     assert.deepEqual(
@@ -524,7 +519,7 @@ test("`gateWaits`: a gate's wait from its try's end to its approval, once, as `g
           ms: 2_100_000,
         },
       ]);
-      const tl = timeline(PRE_APPROVED, PRE_APPROVED_VIEWS, new Map(), [UNGATED_PLAN, SHIP]);
+      const tl = timeline(PRE_APPROVED, PRE_APPROVED_VIEWS, [UNGATED_PLAN, SHIP]);
       assert.equal(waits[0].ms, gateWaitOf(PRE_APPROVED, tl, SHIP, tl.steps.ship[0]));
     },
   );
@@ -651,8 +646,7 @@ test("`timelineFacts`: a finished run's timeline as facts, each a row of `timeli
     () => {
       const facts = timelineFacts(TL_RUN, TL_STEPS, TL_VIEWS, 'succeeded');
       assert.ok(facts, 'a run with nothing in flight');
-      const filed = new Map([...TL_VIEWS].map(([id, v]) => [id, v.state.filedAt!]));
-      const rows = timelineRows(TL_RUN, timeline(TL_RUN, TL_VIEWS, filed, TL_STEPS), TL_STEPS);
+      const rows = timelineRows(TL_RUN, timeline(TL_RUN, TL_VIEWS, TL_STEPS), TL_STEPS);
       assert.deepEqual(
         facts.map((f) => [f.of, f.row, f.part, f.value, f.try ?? null]),
         rows.map((r) => [r.of, r.row, r.part, r.value, r.try]),

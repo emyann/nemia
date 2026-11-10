@@ -9,8 +9,8 @@ export default {
   /**
    * The run page of the seeded run: its header and step graph, the gate that asks and the check that refused, the calls its harness
    * denied, the Decide section read out of the run's real repository, what each session used and the mode it runs in, the timeline off
-   * the engine's attempts and the filings on its feed, and the step inspector's Details, Activity and Output tabs. It ends with tokens'
-   * Output open for the photograph, its image served as a PNG never cached and opened full-size in a tab of its own.
+   * the engine's attempts and the filing each task's view carries, and the step inspector's Details, Activity and Output tabs. It ends
+   * with tokens' Output open for the photograph, its image served as a PNG never cached and opened full-size in a tab of its own.
    *
    * The revisions band is photographed where it is read, before any sheet is open: the step sheet the page ends on covers the right third
    * of the page, so the whole-page picture shows neither the band's last tag nor its step-level line.

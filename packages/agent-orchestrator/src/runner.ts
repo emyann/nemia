@@ -345,7 +345,6 @@ export {
   harnessBlocked,
   parentRead,
   parentsRead,
-  filingsRead,
   taskPhasesRead,
   spendReader,
   viewedOnce,
@@ -465,7 +464,6 @@ export type { RunsListed, Unjudged } from './list/list.ts';
 export { graphOf, runGraph, typedGraphOf, type GraphEdge, type RunGraph } from './summary/graph.ts';
 export {
   bare,
-  filedTimes,
   judgedSteps,
   judgedUnlessUnreadable,
   seenBy,
@@ -475,7 +473,7 @@ export {
   viewsOf,
   workflowsOf,
 } from './summary/reads.verb.ts';
-export type { Filings, TaskView, Unreadable, Views } from './summary/reads.verb.ts';
+export type { TaskView, Unreadable, Views } from './summary/reads.verb.ts';
 export { judge, needsOf, spentOf, stepSaid, wordOf } from './summary/judged.verb.ts';
 export { atHarness } from './summary/judged.verb.ts';
 export type { RunHolding, RunStatus, RunToDecide, RunWaiting, Spent, StepNeeds } from './summary/judged.verb.ts';

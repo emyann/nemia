@@ -15,7 +15,6 @@ import {
   type SeriesMemo,
   type Factory,
   type StatsMemo,
-  type Filings,
   Informer,
   type InformerMemo,
   recordMemo,
@@ -50,17 +49,16 @@ export class ApiConfig extends Context.Service<ApiConfig, { readonly env: NodeJS
 
 /**
  * What an app's reads keep between requests, each read through its engine, beside its informer of each run's judgement (`Informer`, given
- * in `liveOf`): the stats' memo of each run's facts (`stats`, the package's `StatsMemo`), the feed's filing times (`filings`,
- * `filedTimes`), where each blocked session's conversation was last read (`said`), the series' days read (`series`, the
- * package's `SeriesMemo`), and `records`, one memo per read that wants a little of every run (the package's `RecordMemo`, keyed by the
- * run's stamp alone): the factories' schedules, the pause's current tasks and a step's recent runs. One for an app,
- * built with its runtime (`live`), so an app over another engine starts with none. A cache: nothing is decided by it.
+ * in `liveOf`): the stats' memo of each run's facts (`stats`, the package's `StatsMemo`), where each blocked session's conversation was
+ * last read (`said`), the series' days read (`series`, the package's `SeriesMemo`), and `records`, one memo per read that wants a little
+ * of every run (the package's `RecordMemo`, keyed by the run's stamp alone): the factories' schedules, the pause's current tasks and a
+ * step's recent runs. One for an app, built with its runtime (`live`), so an app over another engine starts with none. A cache: nothing
+ * is decided by it.
  */
 export class ReadMemo extends Context.Service<
   ReadMemo,
   {
     readonly stats: StatsMemo;
-    readonly filings: Filings;
     readonly said: LastSaid;
     readonly series: SeriesMemo;
     readonly records: {
@@ -72,7 +70,6 @@ export class ReadMemo extends Context.Service<
 >()('api/ReadMemo') {
   static readonly live: Layer.Layer<ReadMemo> = Layer.sync(ReadMemo)(() => ({
     stats: freshStatsMemo(),
-    filings: { filed: new Map(), cursor: 0 },
     said: new Map(),
     series: seriesMemo(),
     records: { factories: recordMemo(), pause: recordMemo(), step: recordMemo() },

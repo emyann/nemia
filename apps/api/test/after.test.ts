@@ -7,10 +7,10 @@
  * The runs: `a-landed`, the diamond's top, its step signed off and its result branch merged into main; `b-running`, started after it and
  * still working, its branch not merged; `c-cancelled`, called off before anything of it was filed; `x-gone`, signed off on a branch deleted
  * unmerged before any tick recorded its tip. Their children, none filed: `d-waits`, `e-cancelled-parent`, `f-no-such-parent`,
- * `g-parents-landed`, `h-gone-parent`; and `i-started`, a child that started, whose parents are never read again. On the engine's feed,
- * `b-running` and `i-started` were filed an hour and more after they were created, as a run started `--after` runs is once they land;
- * `a-landed`'s and `x-gone`'s filings are not on it, as in a store whose feed does not record them. A pass has read where their branches
- * stand (`passStanding`), which the list reads off `standing.json`.
+ * `g-parents-landed`, `h-gone-parent`; and `i-started`, a child that started, whose parents are never read again. Their tasks' journals,
+ * which the engine's views read, say `b-running` and `i-started` were filed an hour and more after they were created, as a run started
+ * `--after` runs is once they land, and `a-landed` and `x-gone` when they were created; the engine's feed holds none of it. A pass has
+ * read where their branches stand (`passStanding`), which the list reads off `standing.json`.
  */
 import { root } from './harness.ts';
 import { test } from 'node:test';
@@ -60,7 +60,10 @@ const journal = (taskId: string, events: object[]) => {
   fs.mkdirSync(path.join(root, 'engine', 'tasks'), { recursive: true });
   fs.writeFileSync(path.join(root, 'engine', 'tasks', `${taskId}.jsonl`), events.map((e) => `${JSON.stringify(e)}\n`).join(''));
 };
-const filed = () => ({ kind: 'filed', at, brief: 'Implement it.', cwd: repo, maxAttempts: 1, harness: 'codex' });
+/** When `b-running`'s and `i-started`'s tasks were filed: an hour and more after their runs were created, once what they wait on landed. */
+const filedB = '2026-09-14T01:10:00.000Z';
+const filedI = '2026-09-14T01:40:30.000Z';
+const filed = (when = at) => ({ kind: 'filed', at: when, brief: 'Implement it.', cwd: repo, maxAttempts: 1, harness: 'codex' });
 const signedOff = (taskId: string) =>
   journal(taskId, [
     filed(),
@@ -77,7 +80,9 @@ const signedOff = (taskId: string) =>
     },
     { kind: 'settled', at, outcome: 'succeeded' },
   ]);
-const working = (taskId: string) => journal(taskId, [filed(), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
+/** A task filed at `when`, `at` unless given, and at work since. */
+const working = (taskId: string, when = at) =>
+  journal(taskId, [filed(when), { kind: 'starting', at: when, attempt: 1 }, { kind: 'spawned', at: when, attempt: 1 }]);
 
 /** One step, frozen on the record as `nemia start` freezes it: its branch is the run's result. */
 const workflow = [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }];
@@ -115,7 +120,7 @@ branch('wf/a-landed/implement', true);
 signedOff('t-a');
 writeRun('a-landed', { steps: { implement: { taskId: 't-a', workspace: repo, branch: 'wf/a-landed/implement' } } });
 branch('wf/b-running/implement', false);
-working('t-b');
+working('t-b', filedB);
 writeRun('b-running', { after: ['a-landed'], steps: { implement: { taskId: 't-b', workspace: repo, branch: 'wf/b-running/implement' } } });
 writeRun('c-cancelled', { cancelledAt });
 signedOff('t-x');
@@ -126,21 +131,9 @@ writeRun('e-cancelled-parent', { after: ['c-cancelled'] });
 writeRun('f-no-such-parent', { after: ['no-such-run'] });
 writeRun('g-parents-landed', { after: ['a-landed'] });
 writeRun('h-gone-parent', { after: ['x-gone'] });
-working('t-i');
+working('t-i', filedI);
 writeRun('i-started', { after: ['b-running'], steps: { implement: { taskId: 't-i', workspace: repo, branch: 'wf/i-started/implement' } } });
 await runWith(engine(process.env), passStanding(runStore.runs.list()));
-
-const filedB = '2026-09-14T01:10:00.000Z';
-const filedI = '2026-09-14T01:40:30.000Z';
-fs.writeFileSync(
-  path.join(root, 'engine', 'feed.jsonl'),
-  [
-    ['t-b', filedB],
-    ['t-i', filedI],
-  ]
-    .map(([taskId, at]) => `${JSON.stringify({ taskId, event: { ...filed(), at } })}\n`)
-    .join(''),
-);
 
 /** A run as the RunList (`GET /api/runs`) has it: its `status`, with the runs it froze to wait on and when it was made. */
 type Listed = Run['status'] & { after: readonly string[]; createdAt: string };
@@ -286,17 +279,13 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
     }
   });
   await s.test(
-    "a run started when its first task was filed, off the engine's feed, not when it was created — on the list and the detail alike; nothing filed, not started",
+    "a run started when its first task was filed, as its task's view says, not when it was created — on the list and the detail alike; nothing filed, not started",
     async () => {
       const runs = await listedRuns();
       const started = (id: string) => [runs.get(id)!.createdAt, runs.get(id)!.startedAt];
       assert.deepEqual(started('b-running'), [at, filedB], 'waited on a-landed for an hour: that hour is not time at work');
       assert.deepEqual(started('i-started'), [at, filedI]);
-      assert.deepEqual(
-        started('a-landed'),
-        [at, at],
-        'started, and its filing not on the feed: when it was created, the only time there is',
-      );
+      assert.deepEqual(started('a-landed'), [at, at], 'started, filed when it was created');
       for (const id of ['d-waits', 'e-cancelled-parent', 'g-parents-landed', 'c-cancelled'])
         assert.equal(
           runs.get(id)!.startedAt,

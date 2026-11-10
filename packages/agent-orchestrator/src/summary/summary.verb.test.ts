@@ -130,7 +130,7 @@ test('`cardRuns`: each run started from a card with its phase as the list judges
   const fromCard = await started('cache-the-views-k2q9');
   const loose = await started();
   const memo = informerMemo();
-  const how = { home: ROOT, memo, filings: { filed: new Map(), cursor: 0 }, verify: false };
+  const how = { home: ROOT, memo, verify: false };
   passStarted(memo);
   await runWith(e(), RUNS.handler({}, { runs: memo }));
   assert.ok(memo.runs.has(loose), 'the list, within a pass, kept the run from no card');
@@ -147,4 +147,28 @@ test('`cardRuns`: each run started from a card with its phase as the list judges
     ['succeeded'],
     'its run settled, the phase moves with it: nothing was written on the card',
   );
+});
+
+test("a run's start and its queue time are each task's filing as its view says it (`State.filedAt`), on an engine whose feed holds no filing", async () => {
+  const { rewriteRun } = await import('../record/record.store.ts');
+  const { runObject } = await import('../object/run.verb.ts');
+  const { StoreRoot } = await import('../config/root.store.ts');
+  const id = await started();
+  rewriteRun({ ...runRecord(id), createdAt: '2026-10-14T08:00:00.000Z' });
+  const filedAt = async (step: string): Promise<string> => {
+    const at = (await RunsEffect.runPromise(e().view(`${id}-${step}`))).state.filedAt;
+    assert.ok(at, `the stand-in filed ${step}, and its view says when`);
+    return at;
+  };
+  const [build, notes] = [await filedAt('build'), await filedAt('notes')];
+  const spawned = (at: string, ms: number) => new Date(Date.parse(at) + ms).toISOString();
+  engine().settle(`${id}-build`, 'working', { startedAt: spawned(build, 1000), spawnedAt: spawned(build, 1000) });
+  engine().settle(`${id}-notes`, 'working', { startedAt: spawned(notes, 3000), spawnedAt: spawned(notes, 3000) });
+
+  const list: RunSummary[] = await runWith(e(), RUNS.handler({}));
+  assert.equal(list.find((r) => r.id === id)?.startedAt, [build, notes].sort()[0], "the list's start is the first filing, not `createdAt`");
+  const object = await runWith(e(), RunsEffect.provideService(runObject(runRecord(id), { memo: { said: new Map() } }), StoreRoot, ROOT));
+  assert.ok(!('unjudged' in object), 'the run is judged');
+  assert.equal(object.status.startedAt, [build, notes].sort()[0], "the object's start is the first filing");
+  assert.equal(object.status.timeline.run.queuedMs, 4000, 'each task queued from its filing to its spawn, summed');
 });

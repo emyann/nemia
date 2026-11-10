@@ -115,7 +115,6 @@ export const adoptPreview = Effect.fn('adoptPreview')(function* (args: Args) {
   const summaries = yield* runsSummarized(yield* EngineService, {
     home,
     memo: informerMemo(),
-    filings: { filed: new Map(), cursor: 0 },
     verify: false,
   });
   const open = summaries.filter((r) => runInFactory(factory.name)(r) && kindOf(r) !== 'finished').map((r) => r.id);

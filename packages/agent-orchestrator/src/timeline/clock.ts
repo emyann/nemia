@@ -2,9 +2,9 @@
  * Where a run's wall time went, in five parts that add up to it (`RunClock`): sessions at work, checks running, a wait on a person, a
  * wait for a slot, and the rest.
  *
- * Pure, as `took.ts` is: a run, the views of its tasks and their filing times in, the parts out. Each instant of the wall belongs to the
- * first part that covers it, in that order, so two sessions side by side count once, and a session at work while another step waits at its
- * gate is a session at work. `TimelineTotal` sums durations instead, and a fan-out's sum is more than its wall.
+ * Pure, as `took.ts` is: a run and the views of its tasks, each saying when it was filed, in, the parts out. Each instant of the wall
+ * belongs to the first part that covers it, in that order, so two sessions side by side count once, and a session at work while another
+ * step waits at its gate is a session at work. `TimelineTotal` sums durations instead, and a fan-out's sum is more than its wall.
  */
 import { runTasks, type Run } from '../record/record.ts';
 import { hasGate, sessionTasks } from '../status/status.ts';
@@ -106,8 +106,8 @@ const slotWaits = (run: Run, tl: Timeline): Ran[] => {
 /**
  * A run's clock (`RunClock`) from its creation to `until`, never before it.
  *
- * @param views The engine's view of every task of the run (`runTasks`); a task it does not hold ran nothing.
- * @param filed Each task's filing time, off the engine's feed; a task without one waited for no slot that is known.
+ * @param views The engine's view of every task of the run (`runTasks`), each saying when it was filed (`State.filedAt`); a task it does
+ *   not hold ran nothing, and one whose view says no filing waited for no slot that is known.
  * @param steps The workflow the run is judged by: whose gates and whose `after` the waits on a person read.
  * @param waiting The steps that wait on a person now (`waitingOnYou`), each an open wait.
  * @param until The instant the clock is read at, in epoch milliseconds.
@@ -115,14 +115,13 @@ const slotWaits = (run: Run, tl: Timeline): Ran[] => {
 export function clockOf(
   run: Run,
   views: ReadonlyMap<string, TaskClock>,
-  filed: ReadonlyMap<string, string>,
   steps: readonly Workflow[],
   waiting: readonly string[],
   until: number,
 ): RunClock {
   const from = Date.parse(run.createdAt);
   const wall = { from, to: Math.max(from, until) };
-  const tl = timeline(run, views, filed, steps);
+  const tl = timeline(run, views, steps);
   const sessionIds = new Set(Object.values(run.steps).flatMap((record) => sessionTasks(record)));
   const checkIds = [...new Set(runTasks(run))].filter((id) => !sessionIds.has(id));
   const sessions = clipped(ranOf([...sessionIds], views), wall);
@@ -150,7 +149,6 @@ export function clockOf(
  * record dates none of what does.
  *
  * @param views The engine's view of every task of the run, as `clockOf` takes them.
- * @param filed Each task's filing time, as `clockOf` takes them.
  * @param steps The workflow the run is judged by.
  * @param waiting The steps that wait on a person now (`waitingOnYou`).
  * @param held When a hold that only a person lifts was placed, null for a run with none.
@@ -158,11 +156,10 @@ export function clockOf(
 export function waitingSinceOf(
   run: Run,
   views: ReadonlyMap<string, TaskClock>,
-  filed: ReadonlyMap<string, string>,
   steps: readonly Workflow[],
   waiting: readonly string[],
   held: string | null,
 ): string | null {
-  const starts = [...openWaits(timeline(run, views, filed, steps), steps, waiting), ...spanOf(held, null)].map((wait) => wait.from);
+  const starts = [...openWaits(timeline(run, views, steps), steps, waiting), ...spanOf(held, null)].map((wait) => wait.from);
   return starts.length ? new Date(Math.min(...starts)).toISOString() : null;
 }

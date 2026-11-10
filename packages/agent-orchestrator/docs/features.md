@@ -2937,7 +2937,7 @@ What was built, the cap:
   in place of `still running`. `wf up` prints both ceilings in words when it starts (`ceilingLines`).
 - **The wait on the timeline.** The first pass that holds a run writes `slotHeldAt` on its record, and says so once in its notes. `timeline`
   then counts `createdAt` → first filing as the run's `slot` (`SlotWait`) and in its total's `queued`, on a `run slot` row of `wf decide`'s
-  timeline: `still waiting` while nothing is filed, `not known` where the feed has no filing.
+  timeline: `still waiting` while nothing is filed, `not known` where no view of its tasks says a filing.
 
 What was built, the cards:
 
@@ -2995,7 +2995,7 @@ What was measured:
   admitting below it, at cap 0, with no slot and for a started run; `heldRuns` oldest first with ties by id, a run in flight counted, a run
   waiting on runs neither counted nor held, and none with no cap; `listing` on a held run's roots and followers, and not on one started,
   called off, or waiting on a run; `ceilingLines`; the timeline's slot wait — measured, from the hold on a run that waited on runs, `not
-  known` with no feed, `still waiting` with nothing filed, and none on a run never held.
+  known` with no filing on its views, `still waiting` with nothing filed, and none on a run never held.
 - `test/queue-store.test.ts` (6, a file of its own since `tick` reads every run under `WF_ROOT`), over a fake engine that settles a stop on
   its tick: at a cap of 2, a third run not filed, and `wf tick`, `wf ls`, `wf ls <run>` and `wf decide` saying so, the hold written once; at a
   cap of 1, a run finishing and a run cancelled each freeing a slot on the next pass, taken by the run held longest, whose `wf decide`

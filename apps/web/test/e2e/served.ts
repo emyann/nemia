@@ -129,8 +129,9 @@ export const tails = (): string =>
 
 /**
  * Seeds `root`, an empty directory, as the pages read it. The seed writes the diamond after the checkout's files, which its base commits;
- * then the run with no repository anywhere in it, newest of them all; then the feed, over every journal the seed wrote, where the api
- * reads when each task was filed. Refuses a directory that is not empty: it may be another worker's store, or a person's.
+ * then the run with no repository anywhere in it, newest of them all; then the feed, over every journal the seed wrote, each journal
+ * opening with the filing the api reads off its task's view. Refuses a directory that is not empty: it may be another worker's store, or
+ * a person's.
  */
 export function seedStore(root: string): void {
   if (!fs.existsSync(root) || fs.readdirSync(root).length)

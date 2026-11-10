@@ -120,8 +120,7 @@ const pageRows = (id: string) =>
       const run = runRecord(id);
       const steps = stepsOf(run);
       const everyTry = yield* everyTryOf(yield* EngineService, run, (yield* taskPhasesRead(run)).views);
-      const filed = new Map([...everyTry].flatMap(([taskId, v]) => (v.state.filedAt ? [[taskId, v.state.filedAt] as const] : [])));
-      return timelineRows(run, timeline(run, everyTry, filed, steps), steps);
+      return timelineRows(run, timeline(run, everyTry, steps), steps);
     }),
   );
 
@@ -420,11 +419,10 @@ test('A measured run, end to end: a gate answered, two tries with checks, a loop
         return yield* everyTryOf(yield* EngineService, run, (yield* taskPhasesRead(run)).views);
       }),
     );
-    const filed = new Map([...views].flatMap(([taskId, v]) => (v.state.filedAt ? [[taskId, v.state.filedAt] as const] : [])));
-    const clock = clockOf(run, views, filed, runSteps, [], Date.now());
+    const clock = clockOf(run, views, runSteps, [], Date.now());
     assert.deepEqual(clock, { wallMs: 75 * MIN, sessionsMs: 34 * MIN, checksMs: 7 * MIN, personMs: 22 * MIN, slotMs: 12 * MIN, restMs: 0 });
     assert.equal(clock.sessionsMs + clock.checksMs + clock.personMs + clock.slotMs + clock.restMs, clock.wallMs);
-    const tl = timeline(run, views, filed, runSteps);
+    const tl = timeline(run, views, runSteps);
     const planStep = runSteps.find((x) => x.name === 'plan')!;
     assert.equal(gateWaitOf(run, tl, planStep, tl.steps.plan[1]), 9 * MIN, "K17: the timeline's gate wait from the answer's end");
   });

@@ -93,9 +93,9 @@ test('a task on the feed takes out the run whose id and a dash begin it — a st
 /** The stores that name a run's files in `runs/`, by their path from this folder. */
 const STORES = ['../record/record.store.ts', '../record/files.store.ts'];
 
-/** Each suffix a store names a run's file by, `runsDir()` joined with `${id}.<suffix>`, across `texts`. */
+/** Each suffix a store names a run's file by, `runsDir(home)` joined with `${id}.<suffix>`, across `texts`. */
 const namedSuffixes = (texts: readonly string[]): string[] =>
-  [...new Set(texts.flatMap((text) => [...text.matchAll(/runsDir\(\),\s*`\$\{id\}\.(\w+)`/g)].map((m) => m[1] ?? '')))].sort();
+  [...new Set(texts.flatMap((text) => [...text.matchAll(/runsDir\(\w+\),\s*`\$\{id\}\.(\w+)`/g)].map((m) => m[1] ?? '')))].sort();
 
 /** What breaks the list against `texts`: a file the stores name that is no stamped input, and a stamped input no store names. */
 const listBreaks = (texts: readonly string[]): string[] => {
@@ -116,7 +116,7 @@ test('every file the store names for a run is a stamped input of RUN_INPUTS, and
 
 test('REFUSED: a marker a store names that the list does not, and a stamped input no store names', () => {
   const texts = storeTexts();
-  const planted = [...texts, 'export const laterFile = (id: string) => path.join(runsDir(), `${id}.later`);'];
+  const planted = [...texts, 'export const laterFile = (home: string, id: string) => path.join(runsDir(home), `${id}.later`);'];
   assert.deepEqual(
     listBreaks(planted).map((b) => b.split(' ')[0]),
     ['runs/<id>.later'],

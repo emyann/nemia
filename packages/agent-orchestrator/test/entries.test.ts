@@ -93,7 +93,6 @@ const PINNED: Record<string, string[]> = {
     'FACTORY_UNSCHEDULE',
     'HARNESSES',
     'HARNESS_CHOICES',
-    'HOME',
     'INBOX',
     'INBOX_ADD',
     'INBOX_QUEUE',

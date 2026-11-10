@@ -133,7 +133,12 @@ export async function visitAll(
   const shots: string[] = [];
   const timings: PageTiming[] = [];
   for (const theme of themes) {
-    const context = await browser.newContext({ colorScheme: theme, viewport: { width: 1280, height: 800 } });
+    const now = Date.now();
+    const timezoneId = middayZone(now);
+    const context = await browser.newContext({ colorScheme: theme, viewport: { width: 1280, height: 800 }, timezoneId });
+    console.log(
+      `e2e: the ${theme} theme's browser is in ${timezoneId}, where it is ${middayClock(now)}: its day began hours before the seed`,
+    );
     context.on('page', track);
     try {
       for (const spec of pages) {
@@ -155,6 +160,21 @@ export async function visitAll(
   }
   return { shots, timings };
 }
+
+/**
+ * The zone a browser of the e2e is placed in: the whole-hour zone (`Etc/GMT±N`, whose sign POSIX inverts) where `now` reads between
+ * noon and one, whatever the machine's own zone and hour. The seed dates its runs minutes to an hour before the instant it seeds, and a
+ * page that reads "today" from the browser's midnight (the overview strip's Spent) counts them only once that midnight is behind them:
+ * in the first hour after the machine's own midnight they fell on the day before. Placed at midday,
+ * the browser's day began twelve hours before the seed, and the visits have eleven hours before it ends, at every hour of the run.
+ */
+export function middayZone(now: number): string {
+  const offset = 12 - new Date(now).getUTCHours();
+  return offset === 0 ? 'Etc/GMT' : `Etc/GMT${offset > 0 ? '-' : '+'}${Math.abs(offset)}`;
+}
+
+/** The time of day `now` reads in its midday zone, `12:01`, as the e2e says where its browser is. */
+const middayClock = (now: number): string => `12:${String(new Date(now).getUTCMinutes()).padStart(2, '0')}`;
 
 /** The kind of scroll bar a browser of the e2e draws: one that takes room beside what scrolls, or one that floats over it. */
 export type Bars = 'classic' | 'overlay';

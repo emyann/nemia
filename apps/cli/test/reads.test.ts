@@ -133,6 +133,10 @@ write(path.join(root, 'inbox', 'tidy-the-docs.md'), '---\nlabels:\n  team: docs\
 write(path.join(root, 'inbox', 'notes.txt'), 'not a card\n');
 write(path.join(root, 'inbox', 'hold-the-reads.md'), 'Hold the reads to the old path.\n');
 write(path.join(root, 'inbox', 'called-off.md'), '---\nlabels:\n  team: gone\n---\nCalled off.\n');
+write(
+  path.join(root, 'factories', 'nightly.json'),
+  JSON.stringify({ repos: [root], schedules: { tidy: { cron: '0 3 * * *', brief: 'Tidy the docs.', since: at(0) } } }),
+);
 
 /** How a child ended, and what it said on each stream. */
 type Said = { code: number | null; out: string; err: string };
@@ -198,17 +202,44 @@ test("`nemia ls` prints the server's table of the runs: its columns of priority 
   const before = api.said().length;
   const listed = await nemia(['ls']);
   assert.equal(listed.code, 0, listed.err);
-  assert.match(listed.out, /^NAME +BRIEF +COST +NOTE$/m, "the server's columns, each name in capitals");
-  assert.match(listed.out, /^r-parity +Hold the reads to the old path$/m, "a run's row: its name and its brief's first line");
-  assert.match(listed.out, /^r-cancelled +The run r-cancelled +cancelled$/m, 'a run called off says so in its note');
+  assert.match(listed.out, /^NAME +STATUS +BRIEF +COST +NOTE +WAITS$/m, "the server's columns, each name in capitals");
+  assert.match(listed.out, /^r-parity .* Hold the reads to the old path /m, "a run's row: its name and its brief's first line");
+  assert.match(listed.out, /^r-cancelled +cancelled +The run r-cancelled +cancelled$/m, 'a run called off says so in its note');
   assert.doesNotMatch(listed.out, /LABELS/, 'the labels are a column of priority 1, shown when asked');
   assert.match(api.said().slice(before), /\/api\/runs\b/, 'it asked the runs list');
+});
+
+test('`nemia ls` says what waits on you: a step blocked in its word, with `nemia decide <run>`; a hold with what lifts it', async () => {
+  const listed = await nemia(['ls']);
+  assert.equal(listed.code, 0, listed.err);
+  const row = listed.out.split('\n').find((line) => line.startsWith('r-parity '));
+  assert.ok(row, listed.out);
+  assert.match(row, /review succeeded · BLOCKED/, "the blocked step in its word, in the run's status");
+  assert.match(row, /waiting on you: review — nemia decide r-parity/, 'what waits on you, and the command that answers it');
+  assert.match(listed.out, /^r-held .*held until r-parity lands.*nemia hold r-held --off/m, 'a hold, and what lifts it');
+  assert.match(listed.out, /^r-after .*waiting on you: .*r-missing/m, 'a run waited on that never lands');
+  const wide = await nemia(['ls', '-o', 'wide']);
+  assert.match(wide.out, /^NAME .* WAITS +LABELS +STEPS$/m, 'wide, each step');
+  assert.match(wide.out, /^r-parity .*build unverified · done.*; review succeeded · BLOCKED/m, 'each step in its word');
+});
+
+test('`nemia ls` says the pause first, and after the runs a line per schedule and the daemon last', async () => {
+  const listed = await nemia(['ls']);
+  assert.equal(listed.code, 0, listed.err);
+  const lines = listed.out.trimEnd().split('\n');
+  assert.match(lines[0] ?? '', /^Paus.* by operator: a release; .*nemia resume/, 'the pause, first');
+  assert.match(lines[1] ?? '', /^ {3}r-working's build is finishing/, 'each task finishing under it');
+  assert.ok(lines.indexOf(lines.find((l) => l.startsWith('NAME ')) ?? '') > 0, 'the table after it');
+  const scheduled = lines.findIndex((l) => /^scheduled {2}nightly\/tidy {2}0 3 \* \* \* {2}next .* {2}last none$/.test(l));
+  assert.ok(scheduled > 0, `a line per schedule: ${listed.out}`);
+  assert.ok(lines.findIndex((l) => l.startsWith('r-')) < scheduled, 'after the runs');
+  assert.match(lines.at(-1) ?? '', /^daemon: /, 'the daemon, last');
 });
 
 test('`nemia ls -l <selector> --show-labels -L <key>`: the runs a selector takes, with their labels column and a column of the key', async () => {
   const listed = await nemia(['ls', '-l', 'team=core', '--show-labels', '-L', 'team']);
   assert.equal(listed.code, 0, listed.err);
-  assert.match(listed.out, /^NAME +BRIEF +COST +NOTE +LABELS +TEAM$/m);
+  assert.match(listed.out, /^NAME +STATUS +BRIEF +COST +NOTE +WAITS +LABELS +TEAM$/m);
   assert.match(listed.out, /^r-parity .*factory=default,team=core,workflow=no-such-workflow +core$/m, "the run's labels, and its team");
   assert.doesNotMatch(listed.out, /^r-held /m, 'a run the selector does not take is not listed: it reached the api');
   const none = await nemia(['ls', '-l', 'team=nope']);

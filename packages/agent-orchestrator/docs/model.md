@@ -53,8 +53,8 @@ The diagram below is printed by the code (`src/model/diagram.model.ts`, through 
 <!-- diagram:orchestrator-model:begin — generated, from the repository's root: node -e "import('./packages/agent-orchestrator/src/model/diagram.model.ts').then((m) => console.log(m.orchestratorModelDiagram()))" -->
 ```mermaid
 erDiagram
-  Run {
-    RunId id PK
+  RepositoryRun {
+    RunId id FK
     string workspace
     string brief
     WorkflowDir workflowDir FK
@@ -70,13 +70,6 @@ erDiagram
     list mounts "optional"
     list volumes "optional"
     object harnessSettings "optional"
-    object place "optional"
-    string repo "optional"
-    string baseRef "optional"
-    string branch "optional"
-    boolean isolate "optional"
-    object placeSkill "optional"
-    string stagedFile "optional"
     object tips "optional"
     string cancelledAt "optional"
     object labels "optional"
@@ -92,6 +85,53 @@ erDiagram
     object pause "optional"
     list pinned "optional"
     string createdAt
+    unknown place "optional"
+    string repo
+    string baseRef
+    string branch
+    boolean isolate
+    object placeSkill "optional"
+    string stagedFile "optional"
+  }
+  FolderRun {
+    RunId id FK
+    string workspace
+    string brief
+    WorkflowDir workflowDir FK
+    list after FK "optional"
+    list context FK "optional"
+    list inputs "optional"
+    string workflowFiles "optional"
+    string carriedFiles "optional"
+    object from "optional"
+    object scheduled "optional"
+    list gates FK "optional"
+    FactoryName factory FK "optional"
+    list mounts "optional"
+    list volumes "optional"
+    object harnessSettings "optional"
+    object tips "optional"
+    string cancelledAt "optional"
+    object labels "optional"
+    string slotHeldAt "optional"
+    list gatesTimed "optional"
+    list deniedCounted "optional"
+    list settlesCounted "optional"
+    boolean runTimed "optional"
+    list approvals "optional"
+    list acceptances "optional"
+    object pruned "optional"
+    object hold "optional"
+    object pause "optional"
+    list pinned "optional"
+    string createdAt
+    object place
+    unknown repo "optional"
+    unknown baseRef "optional"
+    unknown branch "optional"
+    unknown isolate "optional"
+    unknown placeSkill "optional"
+    unknown stagedFile "optional"
   }
   Step {
     TaskId taskId FK
@@ -288,13 +328,22 @@ erDiagram
     string hash
     string at
   }
-  Workflow ||--o{ Run : workflowDir
-  Run ||--o{ WorkflowStep : workflow
-  Run ||--o{ Run : after
-  Run ||--o{ Run : context
-  WorkflowStep ||--o{ Run : gates
-  Factory ||--o{ Run : factory
-  Run ||--o{ Step : steps
+  Run ||--o{ RepositoryRun : id
+  Workflow ||--o{ RepositoryRun : workflowDir
+  RepositoryRun ||--o{ WorkflowStep : workflow
+  Run ||--o{ RepositoryRun : after
+  Run ||--o{ RepositoryRun : context
+  WorkflowStep ||--o{ RepositoryRun : gates
+  Factory ||--o{ RepositoryRun : factory
+  RepositoryRun ||--o{ Step : steps
+  Run ||--o{ FolderRun : id
+  Workflow ||--o{ FolderRun : workflowDir
+  FolderRun ||--o{ WorkflowStep : workflow
+  Run ||--o{ FolderRun : after
+  Run ||--o{ FolderRun : context
+  WorkflowStep ||--o{ FolderRun : gates
+  Factory ||--o{ FolderRun : factory
+  FolderRun ||--o{ Step : steps
   TaskId ||--o{ Step : taskId
   Step ||--o{ Try : tries
   TaskId ||--o{ Step : handedOff

@@ -1,5 +1,8 @@
 import type { ReactNode } from 'react';
-import type { Bridge, Collisions, PeakMark, StepCheck, StepLog, StepUsed } from '../../lib/api';
+import type { Bridge } from '../../lib/api/bridge.ts';
+import type { Collisions } from '../../lib/api/decision.ts';
+import type { PeakMark, StepUsed } from '../../lib/api/usage.ts';
+import type { StepCheck, StepLog } from '../../lib/api/tries.ts';
 import type { StepFiledView, StepSpecView, StepView } from '../../lib/runView';
 import { stepAnchor } from '../../lib/asks';
 import { contextText } from '../../lib/builder';

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { ReadOnlyCommands, StepReach } from '../../lib/api';
+import type { ReadOnlyCommands, StepReach } from '../../lib/api/capabilities.ts';
 import { container, dashed } from '../../lib/meaning';
 
 export const CHIP = 'inline-flex items-center rounded px-1.5 py-0.5 font-mono text-body-small leading-none whitespace-nowrap';

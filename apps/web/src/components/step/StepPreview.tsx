@@ -2,7 +2,9 @@ import { useContext, useEffect, useId, useMemo, useRef, useState, type KeyboardE
 import { Button, PopoverContext } from 'react-aria-components';
 import { useQuery } from '@tanstack/react-query';
 import { BottomSheet, PreviewCard, PreviewTrigger } from '@/components/ui/ds';
-import { agentsQuery, type RunSummary, type WaitOn } from '@/lib/api';
+import { agentsQuery } from '@/lib/api/agents';
+import { type RunSummary } from '@/lib/api/runs';
+import { type WaitOn } from 'objects';
 import { useRunRead } from '@/lib/runView';
 import { barSaid } from '@/lib/runWords';
 import type { StepState } from '@/lib/status';

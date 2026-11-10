@@ -1,4 +1,5 @@
-import type { RunSummary, WaitOn } from '@/lib/api';
+import type { RunSummary } from '@/lib/api/runs';
+import type { WaitOn } from 'objects';
 import { Fragment, type CSSProperties, type ReactNode } from 'react';
 import { filled, ink, paint } from '@/lib/meaning';
 import { railSaid, railStates } from '@/lib/runWords';

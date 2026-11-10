@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Decidable } from '../src/lib/api.ts';
+import type { Decidable } from '../src/lib/api/decision.ts';
 import { awaitingOf, firstChoice, prunable, pruneOffer, pruneQuestion, type Awaiting } from '../src/lib/prune.ts';
 
 type Prunable = Parameters<typeof pruneOffer>[0];

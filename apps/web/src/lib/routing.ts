@@ -5,7 +5,7 @@
  * (<condition>: <route>)` on a node off the route, `sent → <card>` on a workflow node, and `· proposes <route>` after a gated condition's
  * word. Its state is never read from there: that is the codes' (`status.ts`). Pure.
  */
-import type { GraphNode, RunGraph } from './api';
+import type { GraphNode, RunGraph } from './api/graph.ts';
 import type { Frozen } from './frozen.ts';
 
 /** What a step's sentence says of its routing: the route its condition answered or proposes, the card a workflow node sent. */

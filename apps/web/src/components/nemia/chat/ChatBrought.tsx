@@ -6,7 +6,7 @@
  * Her words above it are hers; nothing here is a copy of what the step asks.
  */
 import type { ReactNode } from 'react';
-import { readGone } from '@/lib/api';
+import { readGone } from '@/lib/api/gone';
 import { offersOf, askedOf, type Answer } from '@/lib/asks';
 import { broughtFacts, broughtPart, type BroughtPart } from '@/lib/brought';
 import { titleOf } from '@/lib/factory';

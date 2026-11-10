@@ -4,7 +4,9 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { KeyField, KeyForm, ListedStep, StepWritten, WorkflowListing, WorkflowStepSpec } from '../src/lib/api.ts';
+import type { KeyField, KeyForm } from '../src/lib/api/builder.ts';
+import type { ListedStep, StepWritten, WorkflowListing } from '../src/lib/api/workflows.ts';
+import type { WorkflowStepSpec } from '../src/lib/api/library.ts';
 import {
   addStep,
   connect,
@@ -82,8 +84,8 @@ test('draftOf, connect, disconnect, addStep, removeStep, setKey, setSchema: a wo
     assert.deepEqual(unsavedSteps(draft, folder), []);
     assert.deepEqual(toPut(draft), written(folder.steps));
     setKey(draft, 'implement', 'model', 'opus');
-    draft[0].spec.after.push('x');
-    assert.deepEqual(folder.steps[0].spec.after, [], 'the draft is a copy: it changes, and the listing does not');
+    assert.notEqual(draft[0].spec.after, folder.steps[0].spec.after, 'the draft is a copy: its lists are its own');
+    assert.deepEqual(folder.steps[0].spec.after, []);
   });
   await t.test(
     'an edge drawn from A to B writes `after: A` on B; drawn from the loop handle, `loop: B` on A with the default rounds; a second time, or to itself, nothing',
@@ -247,8 +249,7 @@ test('orderOf, listUnsetWords, listOf, numberOf, listedWith, readmeSent: the ste
       const named = { steps: [listed('look', { mcp: ['docs'] })] };
       const draft = draftOf(named);
       assert.deepEqual(toPut(draft)[0].spec.mcp, ['docs']);
-      draft[0].spec.mcp.push('other');
-      assert.deepEqual(named.steps[0].spec.mcp, ['docs'], 'the draft is a copy');
+      assert.notEqual(draft[0].spec.mcp, named.steps[0].spec.mcp, 'the draft is a copy: its lists are its own');
       assert.deepEqual(specOf(addStep(draftOf(named), 'ship', 'Ship it.'), 'ship').mcp, [], 'a new step names none');
     },
   );

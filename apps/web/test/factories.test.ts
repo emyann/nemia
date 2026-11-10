@@ -6,7 +6,9 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Factory, InboxEntry, RunSummary } from '../src/lib/api.ts';
+import type { Factory } from '../src/lib/api/factories.ts';
+import type { InboxEntry } from '../src/lib/api/inbox.ts';
+import type { RunSummary } from '../src/lib/api/runs.ts';
 import {
   conditionAmiss,
   blockOf,

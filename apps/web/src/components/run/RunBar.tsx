@@ -2,7 +2,7 @@
  * The frame's floating bar for a run: what a person needs to see of it without leaving the floor — what it asks of them, its steps and
  * their statuses, and its brief — read from the run's record, which a read again keeps current. Its page, which Open visits, has the rest.
  */
-import { readGone } from '@/lib/api';
+import { readGone } from '@/lib/api/gone';
 import { useRunRead, type RunView } from '@/lib/runView';
 import { titleOf } from '@/lib/factory';
 import { useBar } from '@/lib/useBar';

@@ -46,12 +46,12 @@ const { Chips, DecideSection, DiffFileView, GroupBar, LessonChip, TouchedBranch 
 const { OFFERS } = await import('../src/lib/words.ts');
 const { instantWhole } = await import('../src/lib/instant.ts');
 type RunView = import('../src/lib/runView.ts').RunView;
-type Decidable = import('../src/lib/api.ts').Decidable;
+type Decidable = import('../src/lib/api/decision.ts').Decidable;
 const { TryCloseouts } = await import('../src/components/step/Closeout.tsx');
 const facts = await import('../src/components/step/Facts.tsx');
-type StepCloseout = import('../src/lib/api.ts').StepCloseout;
+type StepCloseout = import('../src/lib/api/tries.ts').StepCloseout;
 const { RecommendButton } = await import('../src/components/gate/Questions.tsx');
-type Question = import('../src/lib/api.ts').Question;
+type Question = import('../src/lib/api/tries.ts').Question;
 const Answering = await import('../src/components/gate/Decide.tsx');
 const { NeedsBanner, ToDecideBanner } = await import('../src/components/gate/Needs.tsx');
 const { container, hairline, ringed } = await import('../src/lib/meaning.ts');

@@ -1,5 +1,5 @@
 import { Card, Tag } from '@/components/ui/ds';
-import type { WaitingRun } from '@/lib/api';
+import type { WaitingRun } from '@/lib/api/runs';
 import { clockBreakdown, costBreakdown, tokensBreakdown, tokensSaid } from '@/lib/breakdown';
 import { factoryOf } from '@/lib/factories';
 import { titleOf } from '@/lib/factory';

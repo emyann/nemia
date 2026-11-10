@@ -1,6 +1,8 @@
 import { useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { readGone, runsQuery, tryAgent, type AgentListing } from '../../lib/api';
+import { readGone } from '../../lib/api/gone.ts';
+import { runsQuery } from '../../lib/api/runs.ts';
+import { tryAgent, type AgentListing } from '../../lib/api/agents.ts';
 import { useRunRead } from '../../lib/runView';
 import { latestTryOf, TRY_FENCE, TRY_TERMS, tryHeld } from '../../lib/agents';
 import { costText } from '../../lib/cost';

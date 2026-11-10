@@ -7,7 +7,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { RouteLink } from '@/components/agent/AgentParts';
 import { TEXT_LINK } from '@/components/look';
-import { proposalsQuery } from '@/lib/api';
+import { proposalsQuery } from '@/lib/api/proposals';
 import { proposalsInOrder } from '@/lib/proposals';
 import { cn } from '@/lib/utils';
 import { ProposalTags } from '@/components/gate/ProposalTags';

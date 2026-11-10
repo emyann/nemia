@@ -8,10 +8,10 @@ import {
   type DiffFile,
   type Group,
   type Lesson,
-  type RetryMode,
   type SensitiveDiff,
   type Touched,
-} from '../../lib/api';
+} from '../../lib/api/decision.ts';
+import { type RetryMode } from '../../lib/api/asks.ts';
 import type { RunView, StepView } from '../../lib/runView';
 import { answersOf, askedOf, askedSaid, type Answer } from '../../lib/asks';
 import { barOf, changeOf, decidableRun, decisionStamp, diffLine, isDecidable, mostLines, type DiffLine } from '../../lib/decide';

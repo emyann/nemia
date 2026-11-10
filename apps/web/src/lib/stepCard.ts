@@ -4,7 +4,7 @@
  * action, `Read and approve` at an approval's gate. Pure, so that each state is proven without a browser; `StepCard` draws it.
  */
 import type { AgentListing } from './api/agents.ts';
-import type { StepPhase } from './api/reasons.ts';
+import type { StepPhase } from 'objects';
 import type { RunView, StepView } from './runView.ts';
 import type { RunSummary } from './api/runs.ts';
 import { meaningOf } from './meaning.ts';

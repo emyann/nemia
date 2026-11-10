@@ -1,3 +1,4 @@
+import type * as RunObject from 'objects';
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import {
@@ -22,7 +23,10 @@ import { routeLink } from '@/components/nav/routeLink';
 import { Button, LinkButton } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { ceilingsQuery, inboxQuery, runObjectQuery, type RunObject, type RunSummary } from '@/lib/api';
+import { ceilingsQuery } from '@/lib/api/ceilings';
+import { inboxQuery } from '@/lib/api/inbox';
+import { runObjectQuery } from '@/lib/api/run';
+import { type RunSummary } from '@/lib/api/runs';
 import {
   forgetFactoryLayout,
   forgetFactoryOpen,

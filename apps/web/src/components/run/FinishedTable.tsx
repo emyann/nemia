@@ -1,6 +1,8 @@
 import { Cell, Column, Row, Table, TableBody, TableHeader } from '@/components/ui/ds';
 import { useQuery } from '@tanstack/react-query';
-import { FINISHED_SIZE, runLinesQuery, workflowNameOf, type FinishedPage } from '@/lib/api';
+import { FINISHED_SIZE, type FinishedPage } from '@/lib/api/runs';
+import { runLinesQuery } from '@/lib/api/run';
+import { workflowNameOf } from '@/lib/api/workflows';
 import { factoryOf } from '@/lib/factories';
 import { titleOf } from '@/lib/factory';
 import { ink } from '@/lib/meaning';

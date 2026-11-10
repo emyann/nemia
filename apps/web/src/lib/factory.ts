@@ -2,7 +2,8 @@
  * What the Factory works out about the runs, without React Flow: which are in flight, what a card
  * says, where a card goes, and how many cells an open card takes. Pure.
  */
-import type { AtWork, RunSummary, RunToDecide } from './api';
+import type { AtWork, RunToDecide } from './api/judged.ts';
+import type { RunSummary } from './api/runs.ts';
 import type { EdgeState } from './canvas.ts';
 import { durationWords } from './duration.ts';
 import type { Flow } from './flow.ts';

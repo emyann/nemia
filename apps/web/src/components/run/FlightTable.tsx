@@ -1,5 +1,5 @@
 import { Cell, Column, Row, Table, TableBody, TableHeader, Tag } from '@/components/ui/ds';
-import type { ListedRun } from '@/lib/api';
+import type { ListedRun } from '@/lib/api/runs';
 import { factoryOf } from '@/lib/factories';
 import { titleOf } from '@/lib/factory';
 import { LabelTags } from '../field/Labels';

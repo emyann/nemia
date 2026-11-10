@@ -1,8 +1,9 @@
+import type * as RunObject from 'objects';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { photograph, reachClock, themeOf, rowsAnswered } from '../board.ts';
 import { expectCount, expectNone, expectVisible, idle, Refused } from '../checks.ts';
-import type { RunLines, RunObject } from '../../../src/lib/api.ts';
+import type { RunLines } from '../../../src/lib/api/run.ts';
 import { agentViewOf } from '../../../src/lib/api/agents.ts';
 import { runViewOf } from '../../../src/lib/runView.ts';
 import { stepCardOf, type StepCardFacts } from '../../../src/lib/stepCard.ts';

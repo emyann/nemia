@@ -1,12 +1,14 @@
 /**
- * What the repository offers a step, and what each step gets (`GET /api/capabilities`, apps/api/src/capabilities/capabilities.ts and
- * reach.ts).
+ * What the repository offers a step, and what each step gets (`GET /api/capabilities`), read through the objects' client. A copy that
+ * stays: `objects`' `CapabilitiesWithSteps` carries each list as JSON (the api's reach of each step, which no other client reads), so
+ * the board decodes the keys its Capabilities page draws here, and refuses an answer that leaves one out.
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
-import { MCP_TRANSPORTS, type DefinitionOrigin, type McpTransport } from 'objects';
+import { CapabilitiesWithSteps, MCP_TRANSPORTS, type DefinitionOrigin, type McpTransport } from 'objects';
 import { decodes } from './decodes.ts';
-import { get } from './read.ts';
+import { decoded } from './read.ts';
+import { call, read } from './objects.ts';
 
 /** A list of strings, as a decoded answer holds it: mutable, as the plain types say. */
 const Strings = Schema.mutable(Schema.Array(Schema.String));
@@ -14,7 +16,7 @@ const Strings = Schema.mutable(Schema.Array(Schema.String));
 /** A list of `item`, as a decoded answer holds it. */
 const List = <S extends Schema.Top>(item: S) => Schema.mutable(Schema.Array(item));
 
-/** Mirrors `Described` in apps/api/src/capabilities/capabilities.ts: a skill or an agent, and the file it was read from. */
+/** Copies `Described` in apps/api/src/capabilities/capabilities.ts: a skill or an agent, and the file it was read from. */
 export type Described = { name: string; description: string | null; source: string };
 
 /** Decodes a `Described`. */
@@ -26,7 +28,7 @@ const DescribedSchema = decodes<Described>()(
   }),
 );
 
-/** Mirrors `McpServer` in apps/api/src/capabilities/capabilities.ts: a server as `.mcp.json` declares it, and what it answered. */
+/** Copies `McpServer` in apps/api/src/capabilities/capabilities.ts: a server as `.mcp.json` declares it, and what it answered. */
 export type McpServer = {
   name: string;
   source: string;
@@ -69,13 +71,13 @@ const ReachedServerSchema = decodes<McpServer>()(
 );
 
 /** A permission rule, and where it was read: the settings' file, or a step's `disallowedTools:`. */
-export type Rule = { rule: string; source: string };
+type Rule = { rule: string; source: string };
 
 /** Decodes a `Rule`. */
 const RuleSchema = decodes<Rule>()(Schema.Struct({ rule: Schema.String, source: Schema.String }));
 
 /**
- * Mirrors `MEASURED_TOOLS` in apps/api/src/capabilities/capabilities.ts: what a Claude Code step with no `tools:` has, as measured on
+ * Copies `MEASURED_TOOLS` in apps/api/src/capabilities/capabilities.ts: what a Claude Code step with no `tools:` has, as measured on
  * `measuredAt` with `version` — data, never claimed current.
  */
 export type MeasuredTools = {
@@ -104,7 +106,7 @@ const MeasuredToolsSchema = decodes<MeasuredTools>()(
 );
 
 /**
- * Mirrors `READ_ONLY_COMMANDS` in apps/api/src/capabilities/capabilities.ts: the Bash commands Claude Code runs without a rule in every
+ * Copies `READ_ONLY_COMMANDS` in apps/api/src/capabilities/capabilities.ts: the Bash commands Claude Code runs without a rule in every
  * mode, unless a deny names them — `measured` running so on `measuredAt` with `version`, the rest only `documented` — data, never claimed
  * current.
  */
@@ -133,7 +135,7 @@ const ReadOnlyCommandsSchema = decodes<ReadOnlyCommands>()(
 );
 
 /**
- * Mirrors `StepReach` in apps/api/src/capabilities/reach.ts: what a step of a workflow gets — its fence as its file declares it, and, on
+ * Copies `StepReach` in apps/api/src/capabilities/reach.ts: what a step of a workflow gets — its fence as its file declares it, and, on
  * Claude Code, the built-in tools it has (`declared` or `measured`, less what a deny rule takes), the skills it can load, each enabled
  * server's tools; the deny rules that hold for it, and what the settings allow it, `bash` their commands and `dontAsk` whether the rest is
  * denied without a prompt.
@@ -170,7 +172,7 @@ export type StepReach = {
   /** The settings' ask rules: what asks whatever an allow says, and in dontAsk, or on a job, is denied. None off Claude Code. */
   asked: Rule[];
   /**
-   * Mirrors `AllowedFor`: the allow rules that stand, those a deny takes back, those an ask rule takes back, and of a tool the step does
+   * Copies `AllowedFor`: the allow rules that stand, those a deny takes back, those an ask rule takes back, and of a tool the step does
    * not have; the Bash rules that stand, each with the narrower denies that still refuse some of it and the narrower ask rules that make
    * some of it ask; and why there is no Bash command, for a step with no Bash.
    */
@@ -191,7 +193,7 @@ export type StepReach = {
     why: string | null;
   };
   /**
-   * Mirrors `ReadOnlyCommand`: Claude Code's read-only commands, each measured or documented; the ask rule that makes it ask, when no deny
+   * Copies `ReadOnlyCommand`: Claude Code's read-only commands, each measured or documented; the ask rule that makes it ask, when no deny
    * refuses it; and the rule that refuses it — a deny, or that ask rule where `askDenier` says what asks is denied. None without Bash, null
    * off Claude Code.
    */
@@ -273,10 +275,7 @@ const StepReachSchema = decodes<StepReach>()(
   }),
 );
 
-/**
- * Mirrors `CapabilitiesWithSteps` in apps/api/src/capabilities/reach.ts: what the repository the api runs in offers a step, and what each
- * step gets.
- */
+/** What the repository the api runs in offers a step, and what each step gets: `objects`' `CapabilitiesWithSteps`, read by its keys. */
 export type Capabilities = {
   repo: string;
   skills: Described[];
@@ -293,10 +292,10 @@ export type Capabilities = {
   steps: StepReach[];
 };
 
-/** Decodes `Capabilities`. */
+/** Decodes `Capabilities`: `objects`' `CapabilitiesWithSteps`, each of its lists it carries as JSON read by its keys. */
 const CapabilitiesSchema = decodes<Capabilities>()(
   Schema.Struct({
-    repo: Schema.String,
+    ...CapabilitiesWithSteps.fields,
     skills: List(DescribedSchema),
     agents: List(DescribedSchema),
     mcp: List(ReachedServerSchema),
@@ -316,5 +315,8 @@ const CapabilitiesSchema = decodes<Capabilities>()(
  */
 export const capabilitiesQuery = queryOptions({
   queryKey: ['capabilities'],
-  queryFn: () => get('/api/capabilities', CapabilitiesSchema),
+  queryFn: () =>
+    call((c) => c.server.capabilities({ query: {} }), read(CapabilitiesWithSteps)).then((answer) =>
+      decoded('GET /api/capabilities', CapabilitiesSchema, answer),
+    ),
 });

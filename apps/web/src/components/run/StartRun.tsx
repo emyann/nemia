@@ -1,16 +1,9 @@
 import { useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import {
-  repositoryQuery,
-  runsQuery,
-  startCard,
-  startRun,
-  type Place,
-  type RunSummary,
-  type Started,
-  type WorkflowListing,
-} from '../../lib/api';
+import { repositoryQuery, startRun, type Place, type Started, type WorkflowListing } from '../../lib/api/workflows.ts';
+import { runsQuery, type RunSummary } from '../../lib/api/runs.ts';
+import { startCard } from '../../lib/api/inbox.ts';
 import { standingOf, titleOf } from '../../lib/factory';
 import { afterFor, ignoredRepoNote } from '../../lib/inbox';
 import { ContextPicker } from '../agent/ContextPicker';

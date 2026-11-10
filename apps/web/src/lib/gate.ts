@@ -6,7 +6,8 @@
  * sentences joining them are the board's, so a person reads what approving does without knowing the package: the CLI's `ls` prints the
  * command.
  */
-import type { Collision, Collisions, Decidable, RunSummary } from './api';
+import type { Collision, Collisions, Decidable } from './api/decision.ts';
+import type { RunSummary } from './api/runs.ts';
 import type { RunView, StepView } from './runView';
 import { askedSaid, needsOf, stepAnchor, type Need } from './asks.ts';
 import { touchedSummary } from './decide.ts';

@@ -5,7 +5,10 @@
  */
 import { useId, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { factoriesQuery, factoryWorkflowsQuery, storeQuery, type InboxEntry, type Place, type Started } from '../../lib/api';
+import { factoriesQuery } from '../../lib/api/factories.ts';
+import { factoryWorkflowsQuery, type Place, type Started } from '../../lib/api/workflows.ts';
+import { storeQuery } from '../../lib/api/store.ts';
+import { type InboxEntry } from '../../lib/api/inbox.ts';
 import { cardPlace, factoriesOffered, presetOf, startPlace, workflowKey, type CardPlace } from '../../lib/inbox';
 import { StartRun } from '../run/StartRun';
 import { FIELD, WorkflowOptions, WorkflowsUnread } from '../workflow/WorkflowOptions';

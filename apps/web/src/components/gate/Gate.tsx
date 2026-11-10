@@ -1,6 +1,8 @@
 import { useId, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { decisionQuery, type Question, type QuestionAnswer, type RetryMode, type StepCloseout } from '../../lib/api';
+import { decisionQuery } from '../../lib/api/decision.ts';
+import { type Question, type StepCloseout } from '../../lib/api/tries.ts';
+import { type QuestionAnswer, type RetryMode } from '../../lib/api/asks.ts';
 import type { RunView, StepView } from '../../lib/runView';
 import { askedSaid } from '../../lib/asks';
 import { decidableRun, decisionStamp, isDecidable } from '../../lib/decide';

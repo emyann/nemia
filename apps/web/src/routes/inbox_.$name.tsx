@@ -5,7 +5,9 @@ import { Instant } from '../components/time/Instant';
 import { StartedAs } from '../components/inbox/InboxParts';
 import { Markdown } from '../components/markdown/Markdown';
 import { Labels } from '../components/field/Labels';
-import { cardQuery, labelCard, workflowNameOf } from '../lib/api';
+import { cardQuery } from '../lib/api/inbox.ts';
+import { labelCard } from '../lib/api/labels.ts';
+import { workflowNameOf } from '../lib/api/workflows.ts';
 import { startedCard } from '../lib/inbox';
 
 /** The page of an inbox card, at /inbox/$name: `inbox_` draws it on its own, not inside the Inbox page, which has no outlet for it. */

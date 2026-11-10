@@ -17,7 +17,8 @@ import {
   readLink,
   takenLine,
 } from '../src/lib/gate.ts';
-import type { Collision, Collisions, Decidable, RunSummary } from '../src/lib/api.ts';
+import type { Collision, Collisions, Decidable } from '../src/lib/api/decision.ts';
+import type { RunSummary } from '../src/lib/api/runs.ts';
 import type { RunView } from '../src/lib/runView.ts';
 
 type Step = RunView['steps'][number];

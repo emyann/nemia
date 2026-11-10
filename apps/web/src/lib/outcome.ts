@@ -1,5 +1,5 @@
 import type { Outcome as SignedOff } from 'objects';
-import type { StepArtifact, StepTry } from './api';
+import type { StepArtifact, StepTry } from './api/tries.ts';
 import type { AttemptEnd } from './api/tries.ts';
 import type { Frozen } from './frozen.ts';
 

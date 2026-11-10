@@ -4,7 +4,8 @@
  * run's step to this page (`StepPageLink`).
  */
 import { Badge } from '@/components/ui/badge';
-import type { PagePlace, WorkflowPageAddress, WorkflowStepPage } from '../../lib/api';
+import type { PagePlace, WorkflowStepPage } from '../../lib/api/workflows.ts';
+import type { WorkflowPageAddress } from '../../lib/api/address.ts';
 import { stepAnchor } from '../../lib/asks';
 import { SOURCE_BADGES } from '../../lib/skills';
 import { titleOf } from '../../lib/factory';

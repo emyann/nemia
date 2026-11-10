@@ -12,7 +12,7 @@ import {
   type MeasuredTools,
   type ReadOnlyCommands,
   type StepReach,
-} from '../lib/api';
+} from '../lib/api/capabilities.ts';
 import { container, hairline } from '../lib/meaning';
 
 export const Route = createFileRoute('/capabilities')({

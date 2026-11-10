@@ -8,7 +8,10 @@ import { CardFrom } from '../components/inbox/CardFrom';
 import { Instant } from '../components/time/Instant';
 import { SelectorField } from '../components/field/SelectorField';
 import { Segment, SegmentedButton } from '../components/ui/ds/components/SegmentedButton';
-import { dropCard, factoriesQuery, inboxAllQuery, labelSearch, queueCard, type InboxEntry, type Started } from '../lib/api';
+import { dropCard, inboxAllQuery, queueCard, type InboxEntry } from '../lib/api/inbox.ts';
+import { factoriesQuery } from '../lib/api/factories.ts';
+import { labelSearch } from '../lib/api/labels.ts';
+import { type Started } from '../lib/api/workflows.ts';
 import { factorySearch, keptBy, shownIn } from '../lib/factories';
 import {
   cardLines,

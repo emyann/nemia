@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react';
 import { Background, BackgroundVariant, MarkerType, ReactFlow } from '@xyflow/react';
-import type { MachineGraph } from '../../lib/api';
+import type { MachineGraph } from '../../lib/api/steps.ts';
 import { FLOOR_BOX } from '../../lib/classes';
 import { drawMachine, type Drawing } from '../../lib/machine';
 import { useFrameSize } from '../../lib/useFrameSize';

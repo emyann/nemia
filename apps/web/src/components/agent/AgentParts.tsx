@@ -4,15 +4,9 @@ import type { Expression } from 'blobatar';
 import type { ReactNode } from 'react';
 import { useRouterState } from '@tanstack/react-router';
 import { Link as AriaLink } from 'react-aria-components';
-import {
-  sourceOf,
-  type AgentListing,
-  type AgentSkill,
-  type AgentUser,
-  type GivenSkill,
-  type PagePlace,
-  type SkillSource,
-} from '../../lib/api';
+import { sourceOf, type AgentSkill, type GivenSkill, type SkillSource } from '../../lib/api/library.ts';
+import { type AgentListing, type AgentUser } from '../../lib/api/agents.ts';
+import { type PagePlace } from '../../lib/api/workflows.ts';
 import { costWords, SOURCE_BADGES } from '../../lib/skills';
 import { cn } from '../../lib/utils';
 import { routeLink } from '../nav/routeLink';

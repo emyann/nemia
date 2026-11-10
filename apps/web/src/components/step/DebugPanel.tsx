@@ -4,7 +4,7 @@ import { Button as AriaButton, Slider, SliderThumb, SliderTrack, ToggleButton, T
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Sheet, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { stepPathQuery, type LifecycleTransition, type MachineGraph, type StepPath } from '@/lib/api';
+import { stepPathQuery, type LifecycleTransition, type MachineGraph, type StepPath } from '@/lib/api/steps';
 import type { RunView, StepView } from '@/lib/runView';
 import { byPerson, centredScroll, litAt, pathPoll, stepStamp, takenRoutes } from '@/lib/lifecyclePath';
 import { clockWord } from '@/lib/quota';

@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ChatPanel } from '@/components/nemia/chat/ChatPanel';
 import { ScanLines } from '@/components/look';
 import { frameRunsQuery } from '@/components/nav/nav';
-import { levelQuery } from '@/lib/api';
+import { levelQuery } from '@/lib/api/nemia';
 import { presenceOf } from '@/lib/chatFollowing';
 import { atWork } from '@/lib/footer';
 import { useNemiaChat } from '@/lib/useNemiaChat';

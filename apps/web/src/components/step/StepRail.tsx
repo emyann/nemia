@@ -1,5 +1,6 @@
+import type * as RunObject from 'objects';
 import { Button as AriaButton } from 'react-aria-components';
-import type { RunObject, RunSummary } from '../../lib/api';
+import type { RunSummary } from '../../lib/api/runs.ts';
 import { needNodeText, needOf, needText, type Need } from '../../lib/asks';
 import { attemptLine, edgeLine, edgeStroke, isLive } from '../../lib/canvas';
 import { costText, pastBudget } from '../../lib/cost';

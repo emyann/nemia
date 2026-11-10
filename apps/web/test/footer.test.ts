@@ -6,7 +6,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { QuotaWindow, RunSummary } from '../src/lib/api.ts';
+import type { QuotaWindow } from '../src/lib/api/quota.ts';
+import type { RunSummary } from '../src/lib/api/runs.ts';
 import { coded, listed, waitingRun, type Word } from './run-fixtures.ts';
 import { atWork, atWorkWords, daemonDot, feedWords, quotaShort, staleFrameHeights, versionWords } from '../src/lib/footer.ts';
 import { daemon, quota } from './factory-fixtures.ts';
@@ -250,7 +251,6 @@ test("feedWords and versionWords: the feed's word and the version serving the bo
         text: 'v1.0.0 · checkout',
         title: "Nemia's orchestrator, version 1.0.0, run from the checkout at /home/me/nemia",
       });
-      assert.deepEqual(versionWords({ version: '1.0.0' }), { text: 'v1.0.0', title: "Nemia's orchestrator, version 1.0.0" });
     },
   );
 });

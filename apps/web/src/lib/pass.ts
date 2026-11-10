@@ -3,7 +3,7 @@
  * `a pass takes 212 ms`, and the breakdown the CLI's `up --stats` prints, as its title. Pure: the time and the time zone are handed in, the
  * browser's own on the page.
  */
-import type { PassCost, PassPhase } from './api';
+import type { PassCost, PassPhase } from './api/ceilings.ts';
 import { clockWord } from './quota.ts';
 
 /** The phases in the order the package prints them (`PHASES` in agent-orchestrator's meter.ts). */

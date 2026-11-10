@@ -37,7 +37,7 @@ import {
   saveLayout,
   type EdgeStep,
 } from '../src/lib/canvas.ts';
-import type { GraphEdge, RunGraph } from '../src/lib/api.ts';
+import type { GraphEdge, RunGraph } from '../src/lib/api/graph.ts';
 import type { StepState } from '../src/lib/status.ts';
 
 const after = (from: string, to: string): GraphEdge => ({ from, to, kind: 'after' });

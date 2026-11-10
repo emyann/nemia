@@ -6,7 +6,7 @@
  * package's and the engine's. What is said where there is nobody to say anything to is the board's: the composer is not drawn at all,
  * and the stopped band carries these words, which point at where a person can act instead (`components/step/session/SessionBand.tsx`).
  */
-import type { Said } from './api';
+import type { Said } from './api/asks.ts';
 import type { RunView, StepView } from './runView.ts';
 import { stepState } from './status.ts';
 

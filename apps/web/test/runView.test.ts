@@ -4,9 +4,10 @@
  * edge. And the stamp a step's tries and told are keyed by (`stepStamp`, `src/lib/lifecyclePath.ts`), which moves when the step moves
  * and with nothing else.
  */
+import type * as RunObject from 'objects';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { RunObject } from '../src/lib/api.ts';
+
 import type { RunLines } from '../src/lib/api/run.ts';
 import { runViewOf } from '../src/lib/runView.ts';
 import { stepStamp } from '../src/lib/lifecyclePath.ts';

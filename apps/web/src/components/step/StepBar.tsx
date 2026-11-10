@@ -2,7 +2,7 @@
  * The frame's floating bar for one step of a run: the step's tabs (`StepTabs`), read from the run's record, which a read again keeps
  * current.
  */
-import { readGone } from '@/lib/api';
+import { readGone } from '@/lib/api/gone';
 import { useRunRead, type RunView } from '@/lib/runView';
 import { titleOf } from '@/lib/factory';
 import { FloatingBar } from '../frame/FloatingBar';

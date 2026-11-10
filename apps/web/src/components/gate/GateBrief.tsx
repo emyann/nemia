@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { decisionQuery } from '../../lib/api';
+import { decisionQuery } from '../../lib/api/decision.ts';
 import type { RunView, StepView } from '../../lib/runView';
 import { askedIn, needOf, stepAnchor } from '../../lib/asks';
 import { decidableRun, decisionStamp, isDecidable } from '../../lib/decide';

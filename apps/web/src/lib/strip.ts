@@ -3,7 +3,10 @@
  * work and when the quota runs out. Pure: the instant, the day's start and the time zone are handed in, the browser's own on the page.
  */
 import type { RunOutcome } from 'objects';
-import type { Ceilings, Factory, QuotaWindow, RunSummary } from './api';
+import type { Ceilings } from './api/ceilings.ts';
+import type { Factory } from './api/factories.ts';
+import type { QuotaWindow } from './api/quota.ts';
+import type { RunSummary } from './api/runs.ts';
 import type { TokenCounts } from './breakdown.ts';
 import { keptBy } from './factories.ts';
 import { inFlight, titleOf, waitsOnYou } from './factory.ts';

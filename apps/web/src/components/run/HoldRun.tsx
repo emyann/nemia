@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { putHold, runsQuery, type RunSummary } from '../../lib/api';
+import { putHold, runsQuery, type RunSummary } from '../../lib/api/runs.ts';
 import { useRunNamespace } from '@/lib/runNamespace';
 import type { RunView } from '../../lib/runView';
 import { titleOf } from '../../lib/factory';

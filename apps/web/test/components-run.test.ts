@@ -29,7 +29,7 @@ const { clockBreakdown } = await import('../src/lib/breakdown.ts');
 const { instantWhole } = await import('../src/lib/instant.ts');
 const { timeToTheSecond } = await import('../src/lib/timeOfDay.ts');
 type RunView = import('../src/lib/runView.ts').RunView;
-type StepUsed = import('../src/lib/api.ts').StepUsed;
+type StepUsed = import('../src/lib/api/usage.ts').StepUsed;
 const { Timeline } = await import('../src/components/run/Timeline.tsx');
 
 test('a run visited by its address that the store does not have is said gone by its id, and where the runs are listed', () => {

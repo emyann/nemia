@@ -2,7 +2,7 @@
  * The waiting bar's rows, without React: the runs that wait on a person across every factory, as the api answers them, each with its
  * factory, what it waits for and the step at whose gate it waits. Pure.
  */
-import type { RunSummary } from './api';
+import type { RunSummary } from './api/runs.ts';
 import { stepAnchor } from './asks.ts';
 import { factoryOf } from './factories.ts';
 import { byAge, titleOf } from './factory.ts';

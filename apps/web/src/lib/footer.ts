@@ -3,7 +3,10 @@
  * the quota in short; the pause says its own (`pauseWords`). Each short form fits one line, and its whole sentence is its `title`. Pure:
  * the time is handed in, the browser's own on the page.
  */
-import type { Daemon, OpenRuns, Quota, Version } from './api';
+import type { Daemon } from './api/daemon.ts';
+import type { OpenRuns } from './api/runs.ts';
+import type { Quota } from './api/quota.ts';
+import type { Version } from './api/version.ts';
 import { daemonSentence, daemonWords } from './daemon.ts';
 import { openRows } from './factory.ts';
 import type { FeedStatus } from './feed.ts';

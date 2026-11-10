@@ -4,16 +4,13 @@
  * namespace.
  */
 import { queryOptions } from '@tanstack/react-query';
-import { Schema } from 'effect';
 import { DEFAULT_NAMESPACE, type Run, type RunHeld, type RunList, type RunRemoved, type RunUnjudged } from 'objects';
-import type { RunClock, RunOutcome, StepCost } from 'objects';
-import { decodes } from './decodes.ts';
+import { Concluded as ConcludedAnswer, type RunClock, type RunOutcome, type StepCost } from 'objects';
 import { pace } from '../feed.ts';
 import { selectorKey } from './selector.ts';
-import { get } from './read.ts';
-import { runs, type RunListQuery } from './objects.ts';
+import { call, read, runs, type RunListQuery } from './objects.ts';
 import type { RunGraph } from './graph.ts';
-import type { AnswerVia, CheckVerdict, RunPhase, RunReason, StepPhase, StepReason, WaitOn } from './reasons.ts';
+import type { AnswerVia, RunPhase, RunReason, StepCheck, StepPhase, StepReason, WaitOn } from 'objects';
 import type { AtWork, PlaceKind, RunHolding, RunStatus, RunToDecide, RunTokens, RunWaiting, Spent, StepNeeds } from './judged.ts';
 
 export type { RunClock, RunOutcome, StepCost } from 'objects';
@@ -103,7 +100,7 @@ export type RunSummary = {
       on: WaitOn | null;
       via: AnswerVia | null;
       message: string;
-      verdict: CheckVerdict | null;
+      verdict: StepCheck['verdict'];
       note: string | null;
       roundDue: boolean;
       agent: string | null;
@@ -140,7 +137,7 @@ type RowStep = RunSummary['steps'][number];
  * When the step's task still at work started: the earliest `spawnedAt` of a session or check of its tries that has not ended, as the
  * orchestrator's `atWork` of the step alone says it; null while none runs.
  */
-export function sinceOf(step: Pick<Run['status']['steps'][number], 'timeline'>): string | null {
+function sinceOf(step: Pick<Run['status']['steps'][number], 'timeline'>): string | null {
   const open = step.timeline
     .flatMap((t) => [t.session, t.check])
     .flatMap((span) => (span && span.spawnedAt !== null && span.endedAt === null ? [span.spawnedAt] : []));
@@ -375,7 +372,7 @@ export const openRunsQuery = (factory?: string, selector?: string) =>
  * A finished run's row: when its work stopped (`finishedAt`), its wall time from its creation until then (`wallMs`), how it ended
  * (`outcome`), and where that wall time went (`clock`), read where its work stopped and so standing still.
  */
-export type FinishedRun = RunSummary & { wallMs: number; finishedAt: string; outcome: RunOutcome; clock: RunClock | null };
+type FinishedRun = RunSummary & { wallMs: number; finishedAt: string; outcome: RunOutcome; clock: RunClock | null };
 
 /**
  * One page of the finished runs, newest finished first, measured to `asOf`: `total` finished in all (the list's count), the rows of this
@@ -424,26 +421,11 @@ export const finishedRunsQuery = (factory: string | undefined, older: readonly s
   });
 };
 
-/**
- * What a run started now with this one as context would be handed of it, as the CLI's `concluded` prints it: the run, whether it has
- * landed, and its section, in the words the run's steps would read.
- */
-export type Concluded = { run: string; landed: boolean; section: string };
-
-/** Decodes a `Concluded`. */
-const ConcludedSchema = decodes<Concluded>()(
-  Schema.Struct({
-    run: Schema.String,
-    landed: Schema.Boolean,
-    section: Schema.String,
-  }),
-);
-
 /** What a run would hand as context now (`GET /api/runs/:runId/concluded`): read again with the runs, since a source in flight moves on. */
 export const concludedQuery = (id: string) =>
   queryOptions({
     queryKey: ['runs', id, 'concluded'],
-    queryFn: () => get(`/api/runs/${encodeURIComponent(id)}/concluded`, ConcludedSchema),
+    queryFn: () => call((c) => c.runs.concluded({ params: { name: id } }), read(ConcludedAnswer)),
   });
 
 /**
@@ -476,7 +458,7 @@ export const putHold = (namespace: string, id: string, until: readonly string[],
 export type PruneHow = { artifacts: boolean; unmerged: boolean };
 
 /** What a prune did, as the board says it: the CLI `prune`'s lines, and how many places it could not remove (`left`), which they name. */
-export type Pruned = { id: string; pruned: true; lines: string[]; left: number };
+type Pruned = { id: string; pruned: true; lines: string[]; left: number };
 
 /**
  * Prune a finished run, as the CLI's `prune <run> --yes` does: its worktrees removed, and its files with `artifacts`; a run nobody merged

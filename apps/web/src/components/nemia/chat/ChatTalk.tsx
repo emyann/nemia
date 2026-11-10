@@ -7,7 +7,7 @@
  * the family's.
  */
 import { chatItems, drawnAsk, newFrom, readableFrom, type ChatAsk as Ask, type ChatOwn } from '@/lib/chatFollowing';
-import type { AskPick, ChatEvent } from '@/lib/api';
+import type { AskPick, ChatEvent } from '@/lib/api/chat';
 import { Talk } from '@/components/conversation/Talk';
 import { ChatAsk } from './ChatAsk';
 import { ChatAskMany } from './ChatAskMany';

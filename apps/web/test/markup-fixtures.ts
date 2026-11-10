@@ -12,11 +12,11 @@ import './tsx.ts';
 const { createElement } = await import('react');
 const { renderToStaticMarkup } = await import('react-dom/server');
 type RunView = import('../src/lib/runView.ts').RunView;
-type StepAttempts = import('../src/lib/api.ts').StepAttempts;
-type StepUsed = import('../src/lib/api.ts').StepUsed;
-type StepTry = import('../src/lib/api.ts').StepTry;
-type StepCloseout = import('../src/lib/api.ts').StepCloseout;
-type Question = import('../src/lib/api.ts').Question;
+type StepAttempts = import('../src/lib/api/tries.ts').StepAttempts;
+type StepUsed = import('../src/lib/api/usage.ts').StepUsed;
+type StepTry = import('../src/lib/api/tries.ts').StepTry;
+type StepCloseout = import('../src/lib/api/tries.ts').StepCloseout;
+type Question = import('../src/lib/api/tries.ts').Question;
 const Answering = await import('../src/components/gate/Decide.tsx');
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
 type Answer = import('../src/lib/asks.ts').Answer;
@@ -505,7 +505,10 @@ export async function pagedWith(
 }
 
 /** A factory as the api lists it, for the switcher: on one repository, offering one workflow; `extra` puts keys over it. */
-export const filed = (name: string, extra: Partial<import('../src/lib/api.ts').Factory> = {}): import('../src/lib/api.ts').Factory => ({
+export const filed = (
+  name: string,
+  extra: Partial<import('../src/lib/api/factories.ts').Factory> = {},
+): import('../src/lib/api/factories.ts').Factory => ({
   name,
   default: false,
   repos: ['/code/nemia'],

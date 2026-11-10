@@ -6,7 +6,7 @@
  */
 import { format, formatDistanceStrict, isSameDay, isSameYear } from 'date-fns';
 import type { RunSummary } from './api/runs.ts';
-import type { WaitOn } from './api/reasons.ts';
+import type { WaitOn } from 'objects';
 import { stepState, type StepState } from './status.ts';
 import { timeOfDay, unreadable, UNREADABLE, zoneOf } from './timeOfDay.ts';
 import { durationWords } from './duration.ts';

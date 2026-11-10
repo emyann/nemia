@@ -5,7 +5,9 @@ import { FactoryTags } from '../components/factory/FactoryTag';
 import { Markdown } from '../components/markdown/Markdown';
 import { NewWorkflow } from '../components/workflow/NewWorkflow';
 import { FromBadge, Unplaced, YoursFolder } from '../components/workflow/WorkflowParts';
-import { factoriesQuery, storeQuery, workflowsInQuery, workflowsQuery, type PagePlace, type Place, type WorkflowListing } from '../lib/api';
+import { factoriesQuery } from '../lib/api/factories.ts';
+import { storeQuery } from '../lib/api/store.ts';
+import { workflowsInQuery, workflowsQuery, type PagePlace, type Place, type WorkflowListing } from '../lib/api/workflows.ts';
 import { listPlace, pagePlaceOf, workflowFactories } from '../lib/factories';
 import { loadWorkflowsIn } from '../lib/placed';
 

@@ -4,7 +4,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { clearCustomInstructions, customInstructionsQuery, writeCustomInstructions, type CustomInstructions as Words } from '../../lib/api';
+import {
+  clearCustomInstructions,
+  customInstructionsQuery,
+  writeCustomInstructions,
+  type CustomInstructions as Words,
+} from '../../lib/api/agents.ts';
 import { AgentRefused } from '../agent/AgentParts';
 
 /**

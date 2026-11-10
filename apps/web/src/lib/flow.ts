@@ -9,7 +9,8 @@
  *
  * Opened, the card grows to the right and holds every step as a tile (`tilesOf`), on the same layering with nothing folded.
  */
-import type { RunGraph, RunSummary } from './api';
+import type { RunGraph } from './api/graph.ts';
+import type { RunSummary } from './api/runs.ts';
 import { edgesOf, loopPath, movingInto, type EdgeState, type EdgeStep } from './canvas.ts';
 import { layers, stepsOf, type Point } from './layout.ts';
 import { waitsAtGate, settledState, stepState, type StepState } from './status.ts';

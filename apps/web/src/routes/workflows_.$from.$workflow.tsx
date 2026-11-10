@@ -9,17 +9,9 @@ import { StepRows } from '../components/step/StepRows';
 import { WorkflowBuilder } from '../components/workflow/WorkflowBuilder';
 import { WorkflowCanvas } from '../components/workflow/WorkflowCanvas';
 import { FromBadge, NoBuilder, Unplaced } from '../components/workflow/WorkflowParts';
-import {
-  factoriesQuery,
-  fromMatches,
-  storeQuery,
-  workflowsInQuery,
-  workflowsQuery,
-  type Factory,
-  type PagePlace,
-  type Place,
-  type WorkflowListing,
-} from '../lib/api';
+import { factoriesQuery, type Factory } from '../lib/api/factories.ts';
+import { fromMatches, workflowsInQuery, workflowsQuery, type PagePlace, type Place, type WorkflowListing } from '../lib/api/workflows.ts';
+import { storeQuery } from '../lib/api/store.ts';
 import { specStep, barOf } from '../lib/bar';
 import { listPlace, pagePlaceOf, whyNotStarted, workflowFactories } from '../lib/factories';
 import { loadWorkflowsIn } from '../lib/placed';

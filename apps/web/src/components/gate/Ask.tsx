@@ -3,7 +3,7 @@
  * ask itself through the api (`useAsk`), and the api's refusal of it, verbatim (`Refusal`); and the ask of a loop's round (`useRound`).
  */
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { askRound, askTry, type QuestionAnswer, type RetryMode } from '../../lib/api';
+import { askRound, askTry, type QuestionAnswer, type RetryMode } from '../../lib/api/asks.ts';
 import { runsMoved } from '@/lib/runWrites';
 import { useRunNamespace } from '@/lib/runNamespace';
 

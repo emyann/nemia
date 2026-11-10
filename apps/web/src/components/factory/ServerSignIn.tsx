@@ -11,7 +11,7 @@ import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CutPress, TEXT_LINK } from '@/components/look';
 import { Instant } from '../time/Instant';
-import { factoryServersQuery, signInServer, signInStateQuery, signOutServer, type SignInState } from '../../lib/api';
+import { factoryServersQuery, signInServer, signInStateQuery, signOutServer, type SignInState } from '../../lib/api/factories.ts';
 
 /** Where a sign-in stands on the board, as its view draws it. */
 export type SignInShown =

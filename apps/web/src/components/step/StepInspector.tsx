@@ -1,6 +1,6 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import type { StepTry } from '../../lib/api';
+import type { StepTry } from '../../lib/api/tries.ts';
 import type { RunView, StepView } from '../../lib/runView';
 import { isLive } from '../../lib/canvas';
 import { durationWords } from '../../lib/duration';

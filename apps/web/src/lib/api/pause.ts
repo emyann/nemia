@@ -1,129 +1,26 @@
 /**
  * The store's pause (`GET`, `POST` and `DELETE /api/pause`, the package's `paused`, `pause` and `resume`), and what a pause at once would
- * stop (`GET /api/pause/now`, the package's `pause now`).
+ * stop (`GET /api/pause/now`, the package's `pause now`), read through the objects' client as `objects` says them (`Paused`, `Pause`,
+ * `Interrupt`, `PauseNowRead`, `PauseAnswer`, `Resumed`).
  */
 import { queryOptions } from '@tanstack/react-query';
+import { PauseAnswer, PauseNowRead, Paused, Resumed } from 'objects';
 import { pace } from '../feed.ts';
-import { Schema } from 'effect';
-import { decodes } from './decodes.ts';
-import { get, send } from './read.ts';
+import { call, read, write } from './objects.ts';
 
-/**
- * Mirrors the package's `Pause`: since when (ISO), by whom, and why, when a reason was given, empty where its file no longer says; and
- * the timeout a tool call in flight is given before it is cut (`timeoutMs`), absent on a pause that parks no session.
- */
-export type Pause = { at: string; by: string; why?: string; timeoutMs?: number };
+export type { Interrupt, Pause, PauseAnswer, Paused, PauseNowRead } from 'objects';
 
-/**
- * Mirrors the package's `Parked`: `run`'s `step`, a session the pause has parked at a tool call's end, held `after` its call to that
- * tool where its harness kept it, or with its call to `cut` cut once the timeout ran out.
- */
-export type Parked = { run: string; step: string; after?: string; cut?: string };
+/** A task still at work under the pause: a session, a check, or a landing's check; `stopping`, `resumed` and `calling` as it is. */
+export type Finishing = Paused['finishing'][number];
 
-/** Mirrors the package's `PauseStaged`: a run whose ending has its merge staged in `repo`'s checkout, its check held by the pause. */
-export type PauseStaged = { run: string; step: string; repo: string };
+/** A session the pause has parked at a tool call's end, `after` its call or with its call `cut`. */
+export type Parked = Paused['parked'][number];
 
-/** Mirrors the package's `PauseHeld`: a run whose step signed off, its check held by the pause, its merge not staged. */
-export type PauseHeld = { run: string; step: string };
+/** A run whose ending has its merge staged in `repo`'s checkout, its check held by the pause. */
+export type PauseStaged = Paused['staged'][number];
 
-/**
- * Mirrors the package's `Finishing`: `run`'s `step`, still at work under the pause, as a session, a check, or a landing's check;
- * `stopping` once it was asked to stop, and `resumed` while a pause at once's ask names it, which tries it again on the resume;
- * `calling`, the tool a session is in a call to, which a restart of the daemon waits for.
- */
-export type Finishing = {
-  run: string;
-  step: string;
-  kind: 'session' | 'check' | 'landing';
-  stopping?: true;
-  resumed?: true;
-  calling?: string;
-};
-
-/** Mirrors the package's `Interrupt`: `run`'s `step`, its session at work or its check, which a pause at once stops, and its task. */
-export type Interrupt = { run: string; step: string; kind: 'session' | 'check'; taskId: string };
-
-/** What `GET /api/pause/now` answers: each task a pause at once would stop, and what an interrupted step costs, in the package's words. */
-export type PauseNowRead = { interrupts: readonly Interrupt[]; cost: string };
-
-/** What a pause or a lift answers: the pause put, kept or lifted; and, for a pause at once, whether it was kept and what it stopped. */
-export type PauseAnswer = { pause: Pause; kept?: boolean; interrupted?: readonly Interrupt[] };
-
-/**
- * Mirrors the package's `Paused`: the pause, null where none stands; each task still finishing under it, none once it is Paused; each
- * session it has parked; each landing it holds with its merge staged; and each other check it holds.
- */
-export type Paused = {
-  pause: Pause | null;
-  finishing: readonly Finishing[];
-  parked: readonly Parked[];
-  staged: readonly PauseStaged[];
-  held: readonly PauseHeld[];
-};
-
-/** Decodes a `Pause`. */
-const PauseSchema = decodes<Pause>()(
-  Schema.Struct({
-    at: Schema.String,
-    by: Schema.String,
-    why: Schema.optional(Schema.String),
-    timeoutMs: Schema.optional(Schema.Number),
-  }),
-);
-
-/** Decodes a `Paused`. */
-const PausedSchema = decodes<Paused>()(
-  Schema.Struct({
-    pause: Schema.NullOr(PauseSchema),
-    finishing: Schema.Array(
-      Schema.Struct({
-        run: Schema.String,
-        step: Schema.String,
-        kind: Schema.Literals(['session', 'check', 'landing']),
-        stopping: Schema.optional(Schema.Literal(true)),
-        resumed: Schema.optional(Schema.Literal(true)),
-        calling: Schema.optional(Schema.String),
-      }),
-    ),
-    parked: Schema.Array(
-      Schema.Struct({
-        run: Schema.String,
-        step: Schema.String,
-        after: Schema.optional(Schema.String),
-        cut: Schema.optional(Schema.String),
-      }),
-    ),
-    staged: Schema.Array(Schema.Struct({ run: Schema.String, step: Schema.String, repo: Schema.String })),
-    held: Schema.Array(Schema.Struct({ run: Schema.String, step: Schema.String })),
-  }),
-);
-
-/** Decodes an `Interrupt`. */
-const InterruptSchema = decodes<Interrupt>()(
-  Schema.Struct({
-    run: Schema.String,
-    step: Schema.String,
-    kind: Schema.Literals(['session', 'check']),
-    taskId: Schema.String,
-  }),
-);
-
-/** Decodes a `PauseNowRead`. */
-const PauseNowSchema = decodes<PauseNowRead>()(
-  Schema.Struct({
-    interrupts: Schema.Array(InterruptSchema),
-    cost: Schema.String,
-  }),
-);
-
-/** Decodes a `PauseAnswer`. */
-const PauseAnswerSchema = decodes<PauseAnswer>()(
-  Schema.Struct({
-    pause: PauseSchema,
-    kept: Schema.optional(Schema.Boolean),
-    interrupted: Schema.optional(Schema.Array(InterruptSchema)),
-  }),
-);
+/** A run whose step signed off, its check held by the pause, its merge not staged. */
+export type PauseHeld = Paused['held'][number];
 
 /**
  * Whether the store is paused, and what finishes under it: read again on the feed's `store` event, the pause put or lifted (`keysOf`), and
@@ -131,7 +28,7 @@ const PauseAnswerSchema = decodes<PauseAnswer>()(
  */
 export const pauseQuery = queryOptions({
   queryKey: ['pause'],
-  queryFn: () => get('/api/pause', PausedSchema),
+  queryFn: () => call((c) => c.server.paused(), read(Paused)),
   refetchInterval: () => pace(5_000),
 });
 
@@ -141,7 +38,7 @@ export const pauseQuery = queryOptions({
  */
 export const pauseNowQuery = queryOptions({
   queryKey: ['pause', 'now'],
-  queryFn: (): Promise<PauseNowRead> => get('/api/pause/now', PauseNowSchema),
+  queryFn: (): Promise<PauseNowRead> => call((c) => c.server.pauseNow(), read(PauseNowRead)),
   gcTime: 0,
 });
 
@@ -152,19 +49,19 @@ export const pauseNowQuery = queryOptions({
  * refusal in full — the package's words for a store already paused — or its own about the request.
  */
 export const putPause = (why?: string, now?: boolean): Promise<PauseAnswer> =>
-  send('POST', '/api/pause', PauseAnswerSchema, {
-    body: { ...(why ? { why } : {}), ...(now ? { now: true } : {}) },
-    may: now
-      ? 'The store may be paused and what ran asked to stop: read the board again before pausing it again.'
-      : 'The store may be paused: read the board again before pausing it again.',
-  });
+  call(
+    (c) => c.server.pause({ payload: { ...(why ? { why } : {}), ...(now ? { now: true } : {}) } }),
+    write(
+      PauseAnswer,
+      now
+        ? 'The store may be paused and what ran asked to stop: read the board again before pausing it again.'
+        : 'The store may be paused: read the board again before pausing it again.',
+    ),
+  );
 
 /**
  * Resumes the store, as the package's `resume` does: the next pass files what waits. Rejects as `putPause` does, for a store none stands
  * on.
  */
-export const resumePause = (): Promise<{ pause: Pause }> =>
-  send('DELETE', '/api/pause', PauseAnswerSchema, {
-    body: {},
-    may: 'The store may be resumed: read the board again before resuming it again.',
-  });
+export const resumePause = (): Promise<Resumed> =>
+  call((c) => c.server.resume(), write(Resumed, 'The store may be resumed: read the board again before resuming it again.'));

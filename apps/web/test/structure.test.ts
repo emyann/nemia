@@ -4,7 +4,7 @@
  * relative path that leaves `apps/web` (`importBreaks`); the lint block for `apps/web/src` in
  * `.oxlintrc.json` refuses the same packages as they are typed. Only `lib/useFeed.ts` and `lib/useStepTranscript.ts` open an
  * `EventSource`, the api's two streams (`eventSourceBreaks`), and only `components/markdown/Markdown.tsx` imports a markdown renderer
- * (`rendererBreaks`). Its reads go through `lib/api/read.ts` (`unschemedReads`, `read.test.ts`).
+ * (`rendererBreaks`). Its reads go through `lib/api/objects.ts` (`clientBreaks`, `api-files.test.ts`).
  *
  * The frame, what the root route mounts on every page, never asks for the whole list of the runs: no file the root reaches names
  * `runsQuery` (`wholeListBreaks`), but the pickers a person opens (`OPENED`), a list that only shrinks.

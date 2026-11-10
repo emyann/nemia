@@ -29,7 +29,7 @@ async function refusedMarkup(
   status: number | null,
 ): Promise<{ head: string; reread: boolean; said: string }> {
   const { SaveRefused } = await import('../src/components/workflow/WorkflowBuilder.tsx');
-  const { BuildRefusal } = await import('../src/lib/api.ts');
+  const { BuildRefusal } = await import('../src/lib/api/workflows.ts');
   const html = renderToStaticMarkup(
     createElement(SaveRefused, {
       refusal: new BuildRefusal(message, steps, status),

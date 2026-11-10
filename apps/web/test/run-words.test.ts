@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { RunSummary } from '../src/lib/api.ts';
+import type { RunSummary } from '../src/lib/api/runs.ts';
 import type { StepState } from '../src/lib/status.ts';
 import { ENDED, PAUSED, PERSON } from '../src/lib/words.ts';
 import {

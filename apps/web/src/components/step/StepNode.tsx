@@ -1,5 +1,6 @@
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
-import type { GraphNode, WorkflowStepSpec } from '../../lib/api';
+import type { GraphNode } from '../../lib/api/graph.ts';
+import type { WorkflowStepSpec } from '../../lib/api/library.ts';
 import type { StepView } from '../../lib/runView';
 import { deniedNodeText, needNodeText, needOf, needText, type Need } from '../../lib/asks';
 import { gateNodeLine } from '../../lib/gate';

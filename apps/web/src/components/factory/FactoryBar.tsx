@@ -7,7 +7,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { TriangleAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { factoriesQuery, openRunsQuery, type Factory } from '@/lib/api';
+import { factoriesQuery, type Factory } from '@/lib/api/factories';
+import { openRunsQuery } from '@/lib/api/runs';
 import { offerOf, openBlockOf, runsOf, type FactoryBlock } from '@/lib/factories';
 import { FloatingBar } from '../frame/FloatingBar';
 import { FactoryTrust } from './FactoryTrust';

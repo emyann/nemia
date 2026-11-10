@@ -1,7 +1,7 @@
 /**
  * The Factory's and the inbox's reads decode the api's answers where they enter (`get`): the inbox and a card's page, what the repository
  * offers, the quota, the cap and the last pass, and the daemon: a key the board does not read is dropped, and one the api leaves out stays
- * out; a refusal of the api's stays in its words. Which keys each answer has is `test/wire.test.ts`'s. A factory and its parts are read as
+ * out; a refusal of the api's stays in its words. Which keys each answer has is `objects`' own. A factory and its parts are read as
  * objects, and made the board's view of a factory in one place (`factoryViewOf`); a hire is written to its `Hire`, by its joined name.
  */
 import { test } from 'node:test';

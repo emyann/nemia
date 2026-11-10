@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { RunView } from '../src/lib/runView.ts';
 import { kindOf, stepCardOf, type StepCardFacts, type StepKind } from '../src/lib/stepCard.ts';
-import type { StepPhase } from '../src/lib/api/reasons.ts';
+import type { StepPhase } from 'objects';
 import type { StepState } from '../src/lib/status.ts';
 import { PERSON } from '../src/lib/words.ts';
 import { aCardOpen, CARD_REACH, cardOpened, previewSide } from '../src/lib/useSheetPreview.ts';

@@ -1,5 +1,5 @@
 import { Button } from 'react-aria-components';
-import type { ListedRun } from '@/lib/api';
+import type { ListedRun } from '@/lib/api/runs';
 import { tokensBreakdown } from '@/lib/breakdown';
 import { cn, focusRing } from '@/components/ui/ds/utils';
 import { BreakdownPreview } from '../look';

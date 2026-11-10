@@ -1,7 +1,8 @@
+import type * as RunObject from 'objects';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import type { Parked, Paused } from '../../../src/lib/api/pause.ts';
-import type { RunObject } from '../../../src/lib/api.ts';
+
 import { parkedSentence } from '../../../src/lib/pause.ts';
 import { PERSON } from '../../../src/lib/words.ts';
 import { photograph, themeOf } from '../board.ts';

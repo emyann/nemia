@@ -77,24 +77,24 @@ const { AllowedReach } = await import('../src/components/step/Reach.tsx');
 const { PERSON } = await import('../src/lib/words.ts');
 const { StepBody, StepPolicy, Told } = await import('../src/components/step/Told.tsx');
 type RunView = import('../src/lib/runView.ts').RunView;
-type StepReach = import('../src/lib/api.ts').StepReach;
-type ReadOnlyCommands = import('../src/lib/api.ts').ReadOnlyCommands;
-type StepAttempts = import('../src/lib/api.ts').StepAttempts;
-type GraphEdge = import('../src/lib/api.ts').GraphEdge;
-type RunSummary = import('../src/lib/api.ts').RunSummary;
-type StepLayers = import('../src/lib/api.ts').StepLayers;
-type TaskPart = import('../src/lib/api.ts').TaskPart;
+type StepReach = import('../src/lib/api/capabilities.ts').StepReach;
+type ReadOnlyCommands = import('../src/lib/api/capabilities.ts').ReadOnlyCommands;
+type StepAttempts = import('../src/lib/api/tries.ts').StepAttempts;
+type GraphEdge = import('../src/lib/api/graph.ts').GraphEdge;
+type RunSummary = import('../src/lib/api/runs.ts').RunSummary;
+type StepLayers = import('../src/lib/api/layers.ts').StepLayers;
+type TaskPart = import('../src/lib/api/layers.ts').TaskPart;
 type StateFlowEdge = import('../src/components/step/StateEdge.tsx').StateFlowEdge;
 type EdgeMarker = import('@xyflow/react').EdgeMarker;
 const { SessionOwn } = await import('../src/components/step/session/SessionOwn.tsx');
 const { SessionTalk } = await import('../src/components/step/session/SessionTalk.tsx');
 const { foldTranscript, tailStart } = await import('../src/lib/transcript.ts');
 const { sessionItems } = await import('../src/lib/sessionItems.ts');
-type TranscriptEvent = import('../src/lib/api.ts').TranscriptEvent;
-type WorkflowStepSpec = import('../src/lib/api.ts').WorkflowStepSpec;
+type TranscriptEvent = import('../src/lib/api/steps.ts').TranscriptEvent;
+type WorkflowStepSpec = import('../src/lib/api/library.ts').WorkflowStepSpec;
 const { Artifacts, TryCloseouts } = await import('../src/components/step/Closeout.tsx');
 const facts = await import('../src/components/step/Facts.tsx');
-type StepCloseout = import('../src/lib/api.ts').StepCloseout;
+type StepCloseout = import('../src/lib/api/tries.ts').StepCloseout;
 type StepSpec = import('../src/lib/runView.ts').StepSpecView;
 type StepFiled = import('../src/lib/runView.ts').StepFiledView;
 const { answersFrom, chosenDraft, recommendedDraft, unanswered } = await import('../src/components/gate/Questions.tsx');
@@ -2160,7 +2160,7 @@ test("the inspector's Details say what every try cost of its cap — `spent`, re
 });
 
 test("a step past its budget is offered a raise: its word with the amounts, a box started above what it cost with no floor of the board's, and Raise the budget and try again — answer, for a step that asks; its check again, where one did not pass; go round again, for its loop", () => {
-  type RetryMode = import('../src/lib/api.ts').RetryMode;
+  type RetryMode = import('../src/lib/api/asks.ts').RetryMode;
   const checkRaise = {
     by: 'retry' as const,
     above: 4.25,
@@ -2834,7 +2834,7 @@ test("a workflow's step is marked as inspected only while the bar shows it, and 
 });
 
 /** The bar's body for the step `step` of `listing`, as the bar for a workflow's step draws it. */
-async function specBodyMarkup(listing: import('../src/lib/api.ts').WorkflowListing, step: string): Promise<string> {
+async function specBodyMarkup(listing: import('../src/lib/api/workflows.ts').WorkflowListing, step: string): Promise<string> {
   const { SpecBody } = await import('../src/components/step/SpecBar.tsx');
   return renderToStaticMarkup(createElement(SpecBody, { listing, step }));
 }

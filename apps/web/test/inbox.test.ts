@@ -1,7 +1,7 @@
 /**
  * The inbox page's arithmetic (src/lib/inbox.ts) — the cards in order, the workflow a card's start is preset to, and the queue as the page
- * and the Factory say it — and what the board sends the api for it (src/lib/api.ts): a card filed, dropped, started, queued and taken off
- * the queue. `npm run e2e` looks at the page itself.
+ * and the Factory say it — and what the board sends the api for it (src/lib/api/inbox.ts): a card filed, dropped, started, queued and
+ * taken off the queue. `npm run e2e` looks at the page itself.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,12 +18,11 @@ import {
   inboxQuery,
   queueCard,
   startCard,
-  startRun,
   type CardState,
-  type Factory,
   type InboxEntry,
-  type WorkflowListing,
-} from '../src/lib/api.ts';
+} from '../src/lib/api/inbox.ts';
+import { startRun, type WorkflowListing } from '../src/lib/api/workflows.ts';
+import { type Factory } from '../src/lib/api/factories.ts';
 import {
   afterFor,
   capLine,

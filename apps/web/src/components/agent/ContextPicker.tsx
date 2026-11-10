@@ -1,7 +1,7 @@
 import { useId } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
-import { concludedQuery, runsQuery, type RunSummary } from '../../lib/api';
+import { concludedQuery, runsQuery, type RunSummary } from '../../lib/api/runs.ts';
 import { standingOf, titleOf } from '../../lib/factory';
 import { Markdown } from '../markdown/Markdown';
 

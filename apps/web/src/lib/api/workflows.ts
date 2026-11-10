@@ -5,24 +5,11 @@
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Option, Schema } from 'effect';
-import type { DefinitionOrigin, Workflow, WorkflowStep, WorkflowStepStatus } from 'objects';
-import { decodes } from './decodes.ts';
-import { get } from './read.ts';
+import { RepositoryAnswer, type DefinitionOrigin, type Workflow, type WorkflowStep, type WorkflowStepStatus } from 'objects';
 import type { GraphEdge, RunGraph } from './graph.ts';
-import { StepLayersSchema, type StepLayers } from './layers.ts';
-import { namespaceOf, runs, workflows as served, type Refuse } from './objects.ts';
-import {
-  AgentSkillSchema,
-  KeyRowSchema,
-  sourceOf,
-  type AgentSkill,
-  type KeyRow,
-  type SchemaFile,
-  StepKeySchema,
-  WorkflowStepSpecSchema,
-  type StepKey,
-  type WorkflowStepSpec,
-} from './library.ts';
+import type { StepLayers } from './layers.ts';
+import { call, namespaceOf, read, runs, workflows as served, type Refuse } from './objects.ts';
+import { sourceOf, type SchemaFile, StepKeySchema, WorkflowStepSpecSchema, type StepKey, type WorkflowStepSpec } from './library.ts';
 
 /** The namespace of the api's repository and your library, where the board writes yours. */
 const DEFAULT = 'default';
@@ -49,7 +36,7 @@ export type ListedStep = {
 export type StepWritten = Omit<ListedStep, 'hired' | 'layers' | 'mcp'>;
 
 /** The keys a step with an agent sets itself — the rest are its agent's — and its own note. */
-export type StepOwn = { keys: StepKey[]; body: string };
+type StepOwn = { keys: StepKey[]; body: string };
 
 /**
  * A workflow as the board reads it, off its Workflow object: its name, where it is read from (`from`, the object's `status.origin`: the
@@ -190,128 +177,30 @@ export const factoryWorkflowsQuery = (place: Place) =>
  */
 export const workflowsInQuery = (place: Place | null) => (place === null ? workflowsQuery : factoryWorkflowsQuery(place));
 
-export { sourceOf };
-
 /**
  * Whether a workflow read from `from` is the one an address naming `named` means: the same origin, or, where the address is a route's kept
  * on Hono, which names the factory's own tree `repo` (`sourceOf`), the same word there.
  */
 export const fromMatches = (from: DefinitionOrigin, named: string): boolean => from === named || sourceOf(from) === named;
 
-/** Mirrors `RecentRun` in apps/api/src/step/step.ts: one of a step's newest runs, and whether the step was filed in it. */
-export type RecentRun = { id: string; brief: string; createdAt: string; factory: string | null; filed: boolean };
-
-/**
- * Mirrors `SkillFrom` in apps/api/src/step/step.ts: a skill a step's layers give, named as its line writes it, and where its page is
- * (`from`), null where it has none; and then where this repository has it (`foundIn`), null for one found nowhere.
- */
-export type SkillFrom = { name: string; from: Extract<DefinitionOrigin, 'yours' | 'repo' | 'builtin'> | null; foundIn: string | null };
-
-/**
- * Mirrors `Hiring` in apps/api/src/step/step.ts: why no agent can be hired into a step in the factory it is read in, null where one can;
- * and the agents beside its workflow that can be, by name, each with its description — none where it is refused.
- */
-export type Hiring = { refused: string | null; agents: Array<{ name: string; description: string | null }> };
-
-/**
- * Mirrors `WorkflowStepPage` in apps/api/src/step/step.ts: one step of a workflow — its body, its file as written, and every key a step
- * may set, in the package's order, with its value as the loader read it; and, read now in the request's factory (`factory`, null for the
- * default), what a run of it would be told (`layers`), the agent the factory hires into it (`hired`), the factories that hire into it when
- * none is named (`hiredIn`), whether one can be hired into it and whom (`hiring`), where each skill of its layers is found (`skillsFrom`)
- * and its newest runs (`recentRuns`).
- */
-export type WorkflowStepPage = {
-  workflow: string;
-  from: Extract<DefinitionOrigin, 'repo' | 'yours'>;
-  dir: string;
-  step: string;
-  body: string;
-  source: string;
-  keys: KeyRow[];
-  /**
-   * What the agent this step names says it can do, read beside the workflow — null for a step with no agent, or one whose skills do not
-   * read.
-   */
-  agentSkills: AgentSkill[] | null;
-  factory: string | null;
-  layers: StepLayers;
-  hired: string | null;
-  hiredIn: Array<{ factory: string; agent: string }>;
-  hiring: Hiring;
-  skillsFrom: SkillFrom[];
-  recentRuns: RecentRun[];
-};
-
-/** Where the step page says a workflow is read from: the repository's `workflows/`, the factory's own tree among them, or yours. */
-const WorkflowSourceSchema = Schema.Literals(['repo', 'yours']);
-
-/** Decodes a `WorkflowStepPage`. */
-const WorkflowStepPageSchema = decodes<WorkflowStepPage>()(
-  Schema.Struct({
-    workflow: Schema.String,
-    from: WorkflowSourceSchema,
-    dir: Schema.String,
-    step: Schema.String,
-    body: Schema.String,
-    source: Schema.String,
-    keys: Schema.mutable(Schema.Array(KeyRowSchema)),
-    agentSkills: Schema.NullOr(Schema.mutable(Schema.Array(AgentSkillSchema))),
-    factory: Schema.NullOr(Schema.String),
-    layers: StepLayersSchema,
-    hired: Schema.NullOr(Schema.String),
-    hiredIn: Schema.mutable(Schema.Array(Schema.Struct({ factory: Schema.String, agent: Schema.String }))),
-    hiring: Schema.Struct({
-      refused: Schema.NullOr(Schema.String),
-      agents: Schema.mutable(Schema.Array(Schema.Struct({ name: Schema.String, description: Schema.NullOr(Schema.String) }))),
-    }),
-    skillsFrom: Schema.mutable(
-      Schema.Array(
-        Schema.Struct({
-          name: Schema.String,
-          from: Schema.NullOr(Schema.Literals(['yours', 'repo', 'builtin'])),
-          foundIn: Schema.NullOr(Schema.String),
-        }),
-      ),
-    ),
-    recentRuns: Schema.mutable(
-      Schema.Array(
-        Schema.Struct({
-          id: Schema.String,
-          brief: Schema.String,
-          createdAt: Schema.String,
-          factory: Schema.NullOr(Schema.String),
-          filed: Schema.Boolean,
-        }),
-      ),
-    ),
-  }),
-);
+export type { WorkflowStepPage } from 'objects';
 
 /** The place a workflow's or a step's page is read in, as its address carries it: a factory, and a repository where one is named. */
 export type PagePlace = { factory?: string; repo?: string };
 
-/** The query naming `place` on a page's read: each of its keys that is set, the factory first. */
-export const pagePlaceQuery = (place: PagePlace = {}): string => {
-  const keys = [
-    ...(place.factory ? [`factory=${encodeURIComponent(place.factory)}`] : []),
-    ...(place.repo ? [`repo=${encodeURIComponent(place.repo)}`] : []),
-  ];
-  return keys.length ? `?${keys.join('&')}` : '';
-};
-
 /**
  * A step of a workflow, for its page, read in `place`: the factory picked and its repository. Read again on each visit, as the Workflows
- * page is: a person edits the folder, and a factory's hires. `from` is the origin the page's address names; the route, kept on Hono, reads
+ * page is: a person edits the folder, and a factory's hires. `from` is the origin the page's address names; the api reads
  * it as `sourceOf` says.
  */
 export const stepQuery = (from: string, workflow: string, step: string, place: PagePlace = {}) =>
   queryOptions({
     queryKey: ['workflows', from, workflow, step, place.factory ?? null, place.repo ?? null],
     queryFn: () =>
-      get(
-        `/api/workflows/${sourceOf(from)}/${encodeURIComponent(workflow)}/${encodeURIComponent(step)}${pagePlaceQuery(place)}`,
-        WorkflowStepPageSchema,
-      ),
+      served.step(namespaceOf(place.factory), workflow, step, {
+        origin: sourceOf(from),
+        ...(place.repo ? { repo: place.repo } : {}),
+      }),
   });
 
 /** A workflow by name, as the Workflows page lists it: the last segment of its folder. */
@@ -324,7 +213,7 @@ export const workflowNameOf = (workflowDir: string): string =>
 /** The repository a start runs in, as the api resolved it: what the start form lists the runs of. Read once a visit. */
 export const repositoryQuery = queryOptions({
   queryKey: ['repository'],
-  queryFn: () => get('/api/repository', Schema.Struct({ repo: Schema.String })),
+  queryFn: () => call((c) => c.server.repository({ query: {} }), read(RepositoryAnswer)),
 });
 
 /** What a start answers: the new run. An inbox card started stays in the inbox, listed as `started`. */

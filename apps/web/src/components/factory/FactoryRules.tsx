@@ -4,7 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Textarea } from '@/components/ui/textarea';
-import { clearRules, factoryRulesQuery, writeRules, type FactoryRules as Rules } from '../../lib/api';
+import { clearRules, factoryRulesQuery, writeRules, type FactoryRules as Rules } from '../../lib/api/factories.ts';
 
 /** What a person asks of a factory's rules: their words saved, or the rules removed. */
 type Change = { kind: 'save'; words: string } | { kind: 'clear' };

@@ -2,7 +2,8 @@
  * What the board works out from a run's decision, without React: when to ask for it, the Factory card's line, a group's
  * bar, and what a line of a diff is. Pure. The words themselves are the api's, which are the CLI `decide`'s.
  */
-import type { Decidable, Group, RunDecision, RunSummary, Touched } from './api';
+import type { Decidable, Group, RunDecision, Touched } from './api/decision.ts';
+import type { RunSummary } from './api/runs.ts';
 import { stepState } from './status.ts';
 import type { Frozen } from './frozen.ts';
 

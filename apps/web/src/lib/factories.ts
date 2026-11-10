@@ -5,18 +5,11 @@
  * with no factory is in, and where the address's place reads a list of
  * workflows. A run or a card belongs to the factory it names, and one naming none to the default factory. Pure.
  */
-import type {
-  Factory,
-  FactoryCondition,
-  FactoryUntrusted,
-  InboxEntry,
-  OpenRuns,
-  PagePlace,
-  Place,
-  RunSummary,
-  WorkflowListing,
-  WorkflowPageAddress,
-} from './api.ts';
+import type { Factory, FactoryCondition, FactoryUntrusted } from './api/factories.ts';
+import type { InboxEntry } from './api/inbox.ts';
+import type { OpenRuns, RunSummary } from './api/runs.ts';
+import type { PagePlace, Place, WorkflowListing } from './api/workflows.ts';
+import type { WorkflowPageAddress } from './api/address.ts';
 import { inFlight, repoName, waitsOnYou } from './factory.ts';
 
 /** What the blocks read of a run: the factory it names, and what `inFlight` and `waitsOnYou` read. */

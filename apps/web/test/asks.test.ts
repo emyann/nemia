@@ -20,7 +20,8 @@ import {
   stepAnchor,
   type Need,
 } from '../src/lib/asks.ts';
-import type { RetryMode, RunToDecide } from '../src/lib/api.ts';
+import type { RetryMode } from '../src/lib/api/asks.ts';
+import type { RunToDecide } from '../src/lib/api/judged.ts';
 import type { RunView } from '../src/lib/runView.ts';
 import { coded, EXIT_1, UNFINISHED, type Word } from './run-fixtures.ts';
 

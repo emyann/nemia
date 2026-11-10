@@ -1,5 +1,5 @@
 import { TriangleAlert } from 'lucide-react';
-import type { Daemon } from '@/lib/api';
+import type { Daemon } from '@/lib/api/daemon';
 import { daemonWords } from '@/lib/daemon';
 import { useNow } from '@/lib/useNow';
 

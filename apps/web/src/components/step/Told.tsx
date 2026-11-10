@@ -12,7 +12,7 @@
  */
 import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
-import type { StepLayers, TaskPart } from '../../lib/api';
+import type { StepLayers, TaskPart } from '../../lib/api/layers.ts';
 import { RouteLink } from '../agent/AgentParts';
 import { Markdown } from '../markdown/Markdown';
 import type { Frozen } from '../../lib/frozen';

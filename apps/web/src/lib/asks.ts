@@ -6,7 +6,9 @@
  * engine's. The words that join the first two to a step, `asks` and `blocked by the harness`, are the board's: the package has none for
  * them.
  */
-import type { Question, RunSummary, RunToDecide, StepCloseout } from './api';
+import type { Question, StepCloseout } from './api/tries.ts';
+import type { RunSummary } from './api/runs.ts';
+import type { RunToDecide } from './api/judged.ts';
 import type { RunView, StepView } from './runView';
 import { stepState } from './status.ts';
 import { decidableRun } from './decide.ts';

@@ -1,29 +1,13 @@
-/** Your store, as the api reads it (`GET /api/store`, apps/api/src/workflows/yours.ts). */
+/** Your store, as the api reads it (`GET /api/store`), read through the objects' client as `objects` says it (`YourStore`). */
 import { queryOptions } from '@tanstack/react-query';
-import { Schema } from 'effect';
-import { decodes } from './decodes.ts';
-import { get } from './read.ts';
+import { YourStore } from 'objects';
+import { call, read } from './objects.ts';
 
-/**
- * Mirrors `YourStore` in apps/api/src/workflows/yours.ts: the folders your workflows, agents and skills are written to, each absolute,
- * `fileFactory`, the line that files a factory in your store, and `turnOnNemia`, the line that turns Nemia on, as the board's switch does.
- */
-export type YourStore = { workflows: string; agents: string; skills: string; fileFactory: string; turnOnNemia: string };
+export type { YourStore } from 'objects';
 
-/** Decodes a `YourStore`. */
-const YourStoreSchema = decodes<YourStore>()(
-  Schema.Struct({
-    workflows: Schema.String,
-    agents: Schema.String,
-    skills: Schema.String,
-    fileFactory: Schema.String,
-    turnOnNemia: Schema.String,
-  }),
-);
-
-/** Your store, read once a page: it moves only when the api restarts on another root. */
+/** Your store's folders and lines: read once, since they change only when the api restarts. */
 export const storeQuery = queryOptions({
   queryKey: ['store'],
-  queryFn: () => get('/api/store', YourStoreSchema),
+  queryFn: () => call((c) => c.server.store(), read(YourStore)),
   staleTime: Number.POSITIVE_INFINITY,
 });

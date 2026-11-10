@@ -12,7 +12,7 @@ import {
   resetInstructionPlace,
   writeInstruction,
   type FactoryInstruction as Instruction,
-} from '../../lib/api';
+} from '../../lib/api/factories.ts';
 import { Markdown } from '../markdown/Markdown';
 
 /** What a person asks of a factory's instruction: its words saved or cleared in the store, or the place it is read from changed. */

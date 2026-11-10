@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { setCardFrom, type InboxEntry } from '../../lib/api';
+import { setCardFrom, type InboxEntry } from '../../lib/api/inbox.ts';
 import type { CardRefusal } from '../../lib/inbox';
 import { ContextPicker } from '../agent/ContextPicker';
 import { BUTTON_OUTLINED } from '../../lib/classes';

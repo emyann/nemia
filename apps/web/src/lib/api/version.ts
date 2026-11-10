@@ -1,39 +1,14 @@
-/** The version of what serves the board (`GET /api/version`, apps/api/src/app.ts). */
+/** The version of what serves the board (`GET /api/version`), read through the objects' client as `objects` says it (`VersionAnswer`). */
 import { queryOptions } from '@tanstack/react-query';
-import { Schema } from 'effect';
-import { decodes } from './decodes.ts';
-import { get } from './read.ts';
+import { VersionAnswer } from 'objects';
+import { call, read } from './objects.ts';
 
-/**
- * The code the api runs, as its lease records it: an install, with its tag and commit, or a checkout; `root` is its folder. Absent from an
- * api that answers no release.
- */
-export type VersionRelease = { kind: 'checkout' | 'install'; root: string; tag?: string; commit?: string };
+/** The version the api serves, and the code it runs, as its lease records it, where it answers one. */
+export type Version = VersionAnswer;
 
-/** Mirrors the api's answer: `version`, the orchestrator's package version (`VERSION` in agent-orchestrator), and the code it runs. */
-export type Version = { version: string; release?: VersionRelease };
-
-/** Decodes a `VersionRelease`. */
-const VersionReleaseSchema = decodes<VersionRelease>()(
-  Schema.Struct({
-    kind: Schema.Literals(['checkout', 'install']),
-    root: Schema.String,
-    tag: Schema.optional(Schema.String),
-    commit: Schema.optional(Schema.String),
-  }),
-);
-
-/** Decodes a `Version`. */
-const VersionSchema = decodes<Version>()(
-  Schema.Struct({
-    version: Schema.String,
-    release: Schema.optional(VersionReleaseSchema),
-  }),
-);
-
-/** The version, read once a page: it changes only when the api restarts on another, and a page loaded since reads that one. */
+/** The api's version: read once, since it changes only when the api restarts. */
 export const versionQuery = queryOptions({
   queryKey: ['version'],
-  queryFn: () => get('/api/version', VersionSchema),
+  queryFn: () => call((c) => c.server.version(), read(VersionAnswer)),
   staleTime: Number.POSITIVE_INFINITY,
 });

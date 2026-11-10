@@ -3,18 +3,13 @@
  * steps from `step`), the reads it is composed from (`readsOf`), a run's row in a list (`summary`), its decision (`decidable`), a step's
  * conversation (`transcript`) and its try's path (`stepPath`). Each takes keys to put over its own.
  */
-import type {
-  Decidable,
-  ListedRun,
-  MachineGraph,
-  RunSummary,
-  WaitingRun,
-  StepPath,
-  StepTranscript,
-  StepTry,
-  StepUsed,
-} from '../src/lib/api.ts';
-import type { RunObject } from '../src/lib/api.ts';
+import type * as RunObject from 'objects';
+import type { Decidable } from '../src/lib/api/decision.ts';
+import type { ListedRun, RunSummary, WaitingRun } from '../src/lib/api/runs.ts';
+import type { MachineGraph, StepPath, StepTranscript } from '../src/lib/api/steps.ts';
+import type { StepTry } from '../src/lib/api/tries.ts';
+import type { StepUsed } from '../src/lib/api/usage.ts';
+
 import type { RunLines } from '../src/lib/api/run.ts';
 import type { RunView, StepView } from '../src/lib/runView.ts';
 import { stepStamp } from '../src/lib/lifecyclePath.ts';

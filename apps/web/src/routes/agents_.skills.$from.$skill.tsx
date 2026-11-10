@@ -5,7 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { AgentLink, SkillRefused, SkillSourceBadge } from '../components/agent/AgentParts';
 import { SkillForm } from '../components/agent/SkillForm';
-import { saveSkill, SkillRefusal, skillQuery, switchPreload, type SkillDetail, type SkillDraft, type SkillSaved } from '../lib/api';
+import {
+  saveSkill,
+  SkillRefusal,
+  skillQuery,
+  switchPreload,
+  type SkillDetail,
+  type SkillDraft,
+  type SkillSaved,
+} from '../lib/api/skills.ts';
 import { costWords, drawnSkill, preloadWords, reachWords } from '../lib/skills';
 import { invalidateSkills } from '../lib/agentWrites';
 import { FACTORY_WAY, pagePlaceOf } from '../lib/factories';

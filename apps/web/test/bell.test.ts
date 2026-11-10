@@ -5,7 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { RunSummary } from '../src/lib/api.ts';
+import type { RunSummary } from '../src/lib/api/runs.ts';
 import { coded } from './run-fixtures.ts';
 import { bellHash, bellRows } from '../src/lib/bell.ts';
 import { waitsOnYou } from '../src/lib/factory.ts';

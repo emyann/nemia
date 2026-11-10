@@ -6,7 +6,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { RunSummary } from '../src/lib/api.ts';
+import type { RunSummary } from '../src/lib/api/runs.ts';
 import { coded, type Word } from './run-fixtures.ts';
 import {
   byAge,

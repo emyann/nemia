@@ -6,7 +6,7 @@
  * another place, a copy over it refused, and the files' own refusals — a card that does not read, a link, a place the board does not
  * list — each with the library as it was. A skill made, changed at its version, made twice, a stale or gone version and a description
  * refused are the Skill door's walks (`test/skill-walks.ts`); what a SKILL.md is rendered and switched to, line by line, is the table
- * beside its code (`src/skills/skills.test.ts`). `WF_ROOT` is set before the modules are imported, since they read it as they load.
+ * beside its code (`src/skills/skills.test.ts`). Its store is its own at `ROOT`, given as `ENV`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,19 +19,19 @@ import { TEAM } from './team.ts';
 import { names } from './assessed.ts';
 import { staged, story } from './story.ts';
 import { Effect } from 'effect';
-import { settingsOf, StoreConfig } from '../src/config/config.store.ts';
+import { settingsOf, StoreConfig, type Env } from '../src/config/config.store.ts';
+import { isRefusal, runWith as runEngine } from '../src/runner.ts';
+import { addFactoryAt } from '../src/factory/factory.store.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import { main } from '../src/cli/main.ts';
+import { SKILLS_LIST, SKILLS_READ, SKILLS_WRITE } from '../src/skills/skills.verb.ts';
+import { copySkill, writeSkill } from '../src/skills/skills.store.ts';
+import { preloads, skillsFor, skillVersion } from '../src/skills/read.store.ts';
+import { agentVersion } from '../src/agents/read.store.ts';
 
 const ROOT = scratch('wf-skill-life-');
-process.env.WF_ROOT = ROOT;
-const { isRefusal, runWith: runEngine } = await import('../src/runner.ts');
-const { addFactory } = await import('../testing.ts');
-const { engineOf } = await import('../src/runtime-client.ts');
-const { main } = await import('../src/cli/main.ts');
-const { SKILLS_LIST, SKILLS_READ, SKILLS_WRITE } = await import('../src/skills/skills.verb.ts');
-const { copySkill, writeSkill } = await import('../src/skills/skills.store.ts');
-const { preloads, skillsFor, skillVersion } = await import('../src/skills/read.store.ts');
-const { agentVersion } = await import('../src/agents/read.store.ts');
-const stage = staged({ runWith: runEngine, main, engineOf });
+const ENV: Env = { ...process.env, WF_ROOT: ROOT };
+const stage = staged({ runWith: runEngine, main, engineOf, env: ENV });
 type Refusal = import('../src/refusal/refusal.ts').Refusal;
 
 const LIBRARY = path.join(ROOT, 'workflows', 'skills');
@@ -144,7 +144,7 @@ test("a library skill's life: written as Nemia ships one, given, switched, mende
       assert.equal(listed[dir]?.entry?.id, 'tidy-notes');
       const unrooted = SKILLS_LIST.handler({ skills: [dir] }).pipe(
         Effect.provide(stage.place().layer),
-        Effect.provide(StoreConfig.layer(settingsOf(process.env))),
+        Effect.provide(StoreConfig.layer(settingsOf(ENV))),
       );
       // @ts-expect-error -- a read that asks the store root is given none
       await assert.rejects(runEngine(e, unrooted), (err: { _tag?: string }) => err._tag === 'Invalid');
@@ -272,7 +272,7 @@ test("a library skill's life: written as Nemia ships one, given, switched, mende
     const library = path.join(checkout, 'workflows', 'skills');
     refuses(() => writeSkill(ROOT, library, DRAFT, { version: null }), 'Invalid', library, 'nemia factory add <name> --repo <repo>');
     assert.equal(fs.existsSync(path.join(library, DRAFT.name)), false, 'a .git beside it makes no repository known');
-    addFactory({ name: 'skill-known', repos: [checkout] });
+    addFactoryAt(ROOT, { name: 'skill-known', repos: [checkout] });
     writeSkill(ROOT, library, DRAFT, { version: null });
     assert.ok(fs.existsSync(path.join(library, DRAFT.name, 'SKILL.md')), "a factory's repository");
   });

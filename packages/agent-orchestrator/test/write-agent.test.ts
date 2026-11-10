@@ -4,7 +4,7 @@
  * saves, its result schema travelling with it. And a table: each write or removal the store refuses, by its kind and what it names, the
  * store left as it was. The render alone, `renderAgent`, is a table of `src/agents/agents.test.ts`.
  *
- * `WF_ROOT` is set before the modules are imported, since they read it as they load. With `repo`, a version read one way and checked
+ * Its store is its own at `ROOT`, given as `ENV`. With `repo`, a version read one way and checked
  * the other is refused as stale though nothing changed, and an edit of the SKILL.md between the read and the write is a change.
  */
 import { test } from 'node:test';
@@ -19,18 +19,19 @@ import { scratch } from 'test-kit/scratch';
 import { TEAM } from './team.ts';
 import { names } from './assessed.ts';
 import { staged, story } from './story.ts';
+import { loadWorkflows } from '../src/workflows/workflows.store.ts';
+import { agentSkillsFound, isRefusal, runWith as runEngine, StoreRoot } from '../src/runner.ts';
+import { addFactoryAt } from '../src/factory/factory.store.ts';
+import { removeAgent, writeAgent } from '../src/agents/agents.store.ts';
+import { AGENTS_READ, AGENTS_REMOVE, AGENTS_WRITE } from '../src/agents/library.verb.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import { main } from '../src/cli/main.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-agent-');
-process.env.WF_ROOT = ROOT;
-const { loadWorkflows } = await import('../src/workflows/workflows.store.ts');
-const { agentSkillsFound, isRefusal, runWith: runEngine, StoreRoot } = await import('../src/runner.ts');
-const { addFactory } = await import('../testing.ts');
-const { removeAgent, writeAgent } = await import('../src/agents/agents.store.ts');
-const { AGENTS_READ, AGENTS_REMOVE, AGENTS_WRITE } = await import('../src/agents/library.verb.ts');
-const { engineOf } = await import('../src/runtime-client.ts');
-const { main } = await import('../src/cli/main.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 type Refusal = import('../src/refusal/refusal.ts').Refusal;
-const stage = staged({ runWith: runEngine, main, engineOf });
+const stage = staged({ runWith: runEngine, main, engineOf, env: ENV });
 
 const STORE = path.join(ROOT, 'workflows');
 const AGENTS = path.join(STORE, 'agents');
@@ -366,7 +367,7 @@ test('REFUSED: a write or a removal the store will not make, by its kind and wha
       writeAgent(ROOT, agents, scribe, { version: null, repo: checkout });
       assert.ok(fs.existsSync(path.join(agents, 'scribe.md')), 'the repository the caller names');
       fs.rmSync(path.join(agents, 'scribe.md'));
-      addFactory({ name: 'agent-known', repos: [checkout] });
+      addFactoryAt(ROOT, { name: 'agent-known', repos: [checkout] });
       writeAgent(ROOT, agents, scribe, v);
       assert.ok(fs.existsSync(path.join(agents, 'scribe.md')), "a factory's repository");
     },

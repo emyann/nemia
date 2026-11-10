@@ -7,8 +7,8 @@
  * nothing, which files; and a look that failed, which refuses nothing at all. And the read is one ask of the engine for a factory's
  * whole record, however many steps name it, which is the owner's answer about the probe's cost made into a test.
  *
- * A store of its own, since `WF_ROOT` is read as the package loads; the servers store itself takes this file's root by parameter,
- * as every caller of it does.
+ * A store of its own at `ROOT`; the servers store itself takes this file's root by parameter, as every caller of it
+ * does.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,12 +17,11 @@ import path from 'node:path';
 import { testEngine } from 'agent-runtime/testing';
 import { scratch } from 'test-kit/scratch';
 import { eachTest } from './placed.ts';
+import { engineOf, runWith } from '../src/runtime-client.ts';
+import { serversBefore } from '../src/factory/servers/servers.verb.ts';
+import { writeFactoryServers } from '../src/factory/servers/servers.store.ts';
 
 const ROOT = scratch('wf-servers-before-');
-process.env.WF_ROOT = ROOT;
-const { engineOf, runWith } = await import('../src/runtime-client.ts');
-const { serversBefore } = await import('../src/factory/servers/servers.verb.ts');
-const { writeFactoryServers } = await import('../src/factory/servers/servers.store.ts');
 
 const engine = eachTest(testEngine);
 

@@ -3,7 +3,7 @@
  * under its bare name, told by that name, and refused by name once its folder is renamed, with no run left: on a copy of the tests' team
  * (`teamCopy`) whose implementer and reviewer each add two skills of the repository's nested folder `apps/x`, as a board's kit does. A
  * skill named with its folder at a start, of any folder, is told in the story of `step-skills.test.ts`; the reader's rule beside its code
- * (`src/skills/read.store.test.ts`). `WF_ROOT` is set before the modules are imported, since they read it as they load.
+ * (`src/skills/read.store.test.ts`). Its store is its own at `ROOT`, given as `ENV`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,16 +13,16 @@ import { scratch } from 'test-kit/scratch';
 import { teamCopy } from './team.ts';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven } from './placed.ts';
-import { rootNow } from './config-given.ts';
+import { startRun } from '../src/runner.ts';
+import { loadWorkflows } from '../src/workflows/workflows.store.ts';
+import { agentFilesDir } from '../src/agents/agents.store.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-skill-folders-');
-process.env.WF_ROOT = ROOT;
-const { startRun } = await import('../src/runner.ts');
-const { loadWorkflows } = await import('../src/workflows/workflows.store.ts');
-const { agentFilesDir } = await import('../src/agents/agents.store.ts');
-const { runRecord } = await import('../src/record/record.store.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 const stand = eachTest(testPlace);
-const runPlaced = runGiven(() => stand().layer);
+const runPlaced = runGiven(() => stand().layer, ENV);
 
 const RUNS = path.join(ROOT, 'runs');
 
@@ -33,7 +33,7 @@ const runsNow = (): string[] => (fs.existsSync(RUNS) ? fs.readdirSync(RUNS).sort
 const nested = (repo: string, folder: string, name: string): string => path.join(repo, folder, '.claude', 'skills', name);
 /** The folder of skills the run froze for its step `step`, whose agent is `agent`. */
 const frozen = (run: { id: string }, step = 'implement', agent = 'implementer'): string =>
-  path.join(agentFilesDir(rootNow(), run, step), `nemia-${agent}`, 'skills');
+  path.join(agentFilesDir(ROOT, run, step), `nemia-${agent}`, 'skills');
 
 /** The files of `dir`, by name, each with its text. */
 const filesOf = (dir: string): Record<string, string> =>
@@ -116,7 +116,7 @@ test('a skill named with its folder is given to each agent that adds it, and a s
     );
   const run = await runPlaced(startRun({ brief: 'change the board', repo, workflowDir: dev }));
   for (const [name, agent] of KIT_STEPS) {
-    const step = (runRecord(rootNow(), run.id).workflow ?? []).find((s) => s.name === name)!;
+    const step = (runRecord(ROOT, run.id).workflow ?? []).find((s) => s.name === name)!;
     assert.deepEqual(
       (step.agent?.skills ?? []).filter((skill) => skill.includes(':')),
       KIT_GIVEN,
@@ -127,7 +127,7 @@ test('a skill named with its folder is given to each agent that adds it, and a s
       assert.deepEqual(filesOf(path.join(frozen(run, name, agent), bare)), filesOf(nested(repo, 'apps/x', bare)), `${name}: ${bare}`);
     }
     assert.ok(Object.keys(filesOf(path.join(frozen(run, name, agent), 'kit-spec'))).includes('reader.mjs'), `${name}: the reader's script`);
-    const prompt = fs.readFileSync(path.join(agentFilesDir(rootNow(), run, name), 'prompt.md'), 'utf8');
+    const prompt = fs.readFileSync(path.join(agentFilesDir(ROOT, run, name), 'prompt.md'), 'utf8');
     for (const bare of ['kit-build', 'kit-spec']) assert.ok(prompt.includes(`\`nemia-${agent}:${bare}\``), prompt);
     assert.ok(!prompt.includes('apps/x:kit-'), prompt);
   }

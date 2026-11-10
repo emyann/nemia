@@ -6,7 +6,7 @@
  *
  * The same cuts read in-process, with the watch's cursor file, are `test/run-feed.test.ts`'s; the watch's races with the file
  * `src/feed/feed.test.ts`'s. The runs' transitions are written by the tick on the stage (`story.ts`): the child reads only the feed.
- * `WF_ROOT` is set before the runner is imported, which reads it as it loads; `WF_VERIFY_REST=1` judges in full every run a pass answers
+ * Its store is its own at `ROOT`, given as `ENV`, and to the child; `WF_VERIFY_REST=1` judges in full every run a pass answers
  * from its memo of runs at rest.
  */
 import { test } from 'node:test';
@@ -19,18 +19,16 @@ import { nodeChild } from './child.ts';
 import { scratch } from 'test-kit/scratch';
 import { staged } from './story.ts';
 import { names } from './assessed.ts';
+import { approveRun, startRun, tickRun, runWith } from '../src/runner.ts';
+import { main } from '../src/cli/main.ts';
+import { engineOf } from '../src/runtime-client.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-watch-cut-');
 const RUNS = path.join(ROOT, 'runs');
 const FEED = path.join(ROOT, 'feed.jsonl');
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_RUNS;
-delete process.env.WF_MAX_CONCURRENT;
-const { approveRun, startRun, tickRun, runWith } = await import('../src/runner.ts');
-const { main } = await import('../src/cli/main.ts');
-const { engineOf } = await import('../src/runtime-client.ts');
-const stage = staged({ runWith, main, engineOf });
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_RUNS: undefined, WF_MAX_CONCURRENT: undefined };
+const stage = staged({ runWith, main, engineOf, env: ENV });
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 

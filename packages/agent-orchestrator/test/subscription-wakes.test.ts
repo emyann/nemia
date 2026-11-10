@@ -17,13 +17,12 @@
  * (`inMemory`), given to the deliverer, to `nemia subscribe` and `nemia unsubscribe` and to the hub's writer, and read and written by the
  * story through the same doors. The feed cut under its reader alone is told on the files (`onFiles`): a cut is a file written shorter
  * under a cursor, and nothing cuts a feed in memory. That story subscribes and unsubscribes through `nemia` itself (`stage.main`),
- * whose store is the files, and reads the deliverer's file by the module's spelling. Its files are at `ROOT`, which is the module's
- * root (`WF_ROOT`, read as the module loads) and the `StoreRoot` every deliverer is given, so the module and the program never name
- * two stores; the factories and their levels a floor reads are on those files too. Every subscription a story puts goes through
- * `kept`, and the one `nemia subscribe` writes is dropped as its test ends, whatever their verdict, so a story on the files leaves no
- * subscription for the next one's deliverer to follow.
+ * whose store is the files, and reads the deliverer's file by the module's spelling. Its files are at `ROOT`, which is the root `nemia` is
+ * given (`ENV`) and the `StoreRoot` every deliverer is given, so the command and the program never name two stores; the factories and
+ * their levels a floor reads are on those files too. Every subscription a story puts goes through `kept`, and the one `nemia subscribe`
+ * writes is dropped as its test ends, whatever their verdict, so a story on the files leaves no subscription for the next one's
+ * deliverer to follow.
  */
-import { rootNow } from './config-given.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -37,34 +36,31 @@ import type { KeptDelivery, Subscription } from '../src/subscription/subscriptio
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
+import { SUBSCRIPTION_DIGEST_CHECKS, deliver } from '../src/subscription/deliver.verb.ts';
+import { SubscriptionDoor, subscriptionDoorFiles, readDelivery as deliveryAtModule } from '../src/subscription/subscription.store.ts';
+import { subscriptionDoorMemory } from '../src/subscription/memory.store.ts';
+import { SUBSCRIBE, UNSUBSCRIBE } from '../src/subscription/subscription.verb.ts';
+import { SubscriptionName } from '../src/feed/feed.model.ts';
+import { parseArgv } from '../src/command/command.ts';
+import { StoreRoot } from '../src/config/root.store.ts';
+import { DEFAULT_SELECTORS } from '../src/subscription/subscription.ts';
+import { DAEMON_STARTED, isRunLine, upgraded } from '../src/feed/feed.ts';
+import { FeedDoor, feedAt, feedDoorFiles } from '../src/feed/feed.store.ts';
+import { feedDoorMemory } from '../src/feed/memory.store.ts';
+import { emitFeed, FEED_FOLLOW_LINES, FEED_FOLLOWERS, feedHubLayer } from '../src/feed/feed.verb.ts';
+import { addFactoryAt } from '../src/factory/factory.store.ts';
+import { writeFactoryLevel } from '../src/level/level.store.ts';
+import { levelFile, writeLevel } from '../src/nemia/level.store.ts';
+import { over, engineOf } from '../src/runtime-client.ts';
+import { RunDoor } from '../src/runs/runs.store.ts';
+import { runDoorMemory } from '../src/runs/memory.store.ts';
+import { runWith } from '../src/runner.ts';
+import { main } from '../src/cli/main.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-subscription-wakes-');
-process.env.WF_ROOT = ROOT;
-const { SUBSCRIPTION_DIGEST_CHECKS, deliver } = await import('../src/subscription/deliver.verb.ts');
-const {
-  SubscriptionDoor,
-  subscriptionDoorFiles,
-  readDelivery: deliveryAtModule,
-} = await import('../src/subscription/subscription.store.ts');
-const { subscriptionDoorMemory } = await import('../src/subscription/memory.store.ts');
-const { SUBSCRIBE, UNSUBSCRIBE } = await import('../src/subscription/subscription.verb.ts');
-const { SubscriptionName } = await import('../src/feed/feed.model.ts');
-const { parseArgv } = await import('../src/command/command.ts');
-const { StoreRoot } = await import('../src/config/root.store.ts');
-const { DEFAULT_SELECTORS } = await import('../src/subscription/subscription.ts');
-const { DAEMON_STARTED, isRunLine, upgraded } = await import('../src/feed/feed.ts');
-const { FeedDoor, feedAt, feedDoorFiles } = await import('../src/feed/feed.store.ts');
-const { feedDoorMemory } = await import('../src/feed/memory.store.ts');
-const { emitFeed, FEED_FOLLOW_LINES, FEED_FOLLOWERS, feedHubLayer } = await import('../src/feed/feed.verb.ts');
-const { addFactory } = await import('../testing.ts');
-const { writeFactoryLevel } = await import('../src/level/level.store.ts');
-const { levelFile, writeLevel } = await import('../src/nemia/level.store.ts');
-const { over, engineOf } = await import('../src/runtime-client.ts');
-const { RunDoor } = await import('../src/runs/runs.store.ts');
-const { runDoorMemory } = await import('../src/runs/memory.store.ts');
-const { runWith } = await import('../src/runner.ts');
-const { main } = await import('../src/cli/main.ts');
-const stage = staged({ runWith, main, engineOf });
+const ENV: Env = { ...process.env, WF_ROOT: ROOT };
+const stage = staged({ runWith, main, engineOf, env: ENV });
 
 /**
  * A story's store: the layer of its Subscription and Feed doors, given to every program of the story, and the two doors themselves, which
@@ -433,7 +429,7 @@ test(
     const task = await longLived('t-cut');
     let d: ReturnType<typeof delivering>;
     await s.test('a wake said, and the cursor kept at the end of the file', async () => {
-      assert.equal(deliveryAtModule(rootNow(), 'cut'), undefined, 'no file of the deliverer before the subscription');
+      assert.equal(deliveryAtModule(ROOT, 'cut'), undefined, 'no file of the deliverer before the subscription');
       await stage.main(['subscribe', 'cut', task]);
       t.after(() => {
         if (listedIn(w).includes('cut')) dropSubscription(w, 'cut');
@@ -453,13 +449,13 @@ test(
       await d.clock.adjust('1 second');
       await held(t, () => toldTo(task).length === 2, 'the cut feed read again from its start');
       assert.deepEqual(fieldsOf(toldTo(task)[1]), ['r-10 build blocked']);
-      await held(t, () => deliveryAtModule(rootNow(), 'cut')?.cursor === feedSize(w), 'the cursor at the end of the new feed');
+      await held(t, () => deliveryAtModule(ROOT, 'cut')?.cursor === feedSize(w), 'the cursor at the end of the new feed');
     });
     await s.test("unsubscribed through nemia, its file and the deliverer's gone from the files", async () => {
       await stage.main(['unsubscribe', 'cut']);
       assert.deepEqual(listedIn(w), [], 'its file removed');
       await d.clock.adjust('5 seconds');
-      await held(t, () => deliveryAtModule(rootNow(), 'cut') === undefined, 'the deliverer drops its file once it has stopped it');
+      await held(t, () => deliveryAtModule(ROOT, 'cut') === undefined, 'the deliverer drops its file once it has stopped it');
     });
   },
 );
@@ -678,8 +674,8 @@ test(
     await s.test(
       'REFUSED: a subscription scoped by a floor is told nothing of a run whose factory is below it; one unscoped is told of both',
       async () => {
-        for (const name of ['pipao', 'hkb']) addFactory({ name, repos: [fs.mkdtempSync(path.join(ROOT, `${name}-`))] });
-        writeFactoryLevel(rootNow(), 'hkb', { level: 'semi-auto', since: '2026-10-06T08:00:00.000Z' });
+        for (const name of ['pipao', 'hkb']) addFactoryAt(ROOT, { name, repos: [fs.mkdtempSync(path.join(ROOT, `${name}-`))] });
+        writeFactoryLevel(ROOT, 'hkb', { level: 'semi-auto', since: '2026-10-06T08:00:00.000Z' });
         await plantRun(door, 'r-pipao', 'pipao');
         await plantRun(door, 'r-hkb', 'hkb');
         const from = feedSize(w);
@@ -765,9 +761,9 @@ test(
         const from = feedSize(w);
         const manual = await longLived('t-manual');
         kept(t, w, 'manual', { task: manual, selectors: [...DEFAULT_SELECTORS], digestEvery: 60, from, scope: { atLeast: 'manual' } });
-        fs.mkdirSync(path.dirname(levelFile(rootNow())), { recursive: true });
-        fs.writeFileSync(levelFile(rootNow()), '{ not json');
-        t.after(() => fs.rmSync(levelFile(rootNow()), { force: true }));
+        fs.mkdirSync(path.dirname(levelFile(ROOT)), { recursive: true });
+        fs.writeFileSync(levelFile(ROOT), '{ not json');
+        t.after(() => fs.rmSync(levelFile(ROOT), { force: true }));
         d.start();
         await d.quiet(3);
         const handed = () => Effect.runSync(Metric.value(FEED_FOLLOW_LINES)).count;
@@ -780,7 +776,7 @@ test(
         }
         assert.equal(toldTo(manual).length, 0, 'nothing said while the level does not read');
         assert.equal(readDelivery(w, 'manual')?.cursor ?? from, from, 'the cursor not kept past the lines');
-        writeLevel(rootNow(), { level: 'manual', since: '2026-10-06T08:00:00.000Z' });
+        writeLevel(ROOT, { level: 'manual', since: '2026-10-06T08:00:00.000Z' });
         await d.clock.adjust('1 second');
         await held(t, () => toldTo(manual).length === 1, 'the line said once the level reads');
         assert.deepEqual(fieldsOf(toldTo(manual)[0]), ['r-hkb build awaiting approval'], 'the line of a run gone still passed over');

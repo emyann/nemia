@@ -11,7 +11,7 @@
  * - the refusal is said as the client builds the shipped engine.
  *
  * The labels a step's task is filed with are read off the engine's stand-in, in the measured run's story. The test place does not
- * model the shipped engine nor a process. `WF_ROOT` is set before the client is imported: it is read as the module loads.
+ * model the shipped engine nor a process. Its store is its own at `ROOT`, given to each engine the client builds.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,14 +20,15 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { until, WAITED } from 'agent-runtime/testing';
+import { engine as clientEngine } from '../src/runtime-client.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-step-labels-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_CONCURRENT;
-delete process.env.WF_MAX_RUNS;
-const { engine: clientEngine } = await import('../src/runtime-client.ts');
+/** The file's store and the settings it means, given to every engine the client builds here. */
+const STORE: Env = { WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
+/** The client's engine over the file's store, in the environment the test has set now (`withEnv`), with `vars` beside it. */
+const engineNow = (vars: Env = {}) => clientEngine({ ...process.env, ...STORE, ...vars });
 
 /** The engine the client builds, as this file's helpers hand it about. */
 type ClientEngine = ReturnType<typeof clientEngine>;
@@ -50,7 +51,7 @@ const exportingTo = (t: TestContext, endpoint: string) => withEnv(t, { OTEL_EXPO
 
 /** A task the client's engine files on the shipped `check` harness, never started, and the trace context it was journalled with. */
 const filedTrace = async () => {
-  const e = clientEngine(process.env);
+  const e = engineNow();
   const id = await Effect.runPromise(
     e.file({ brief: 'b', cwd: ROOT, harness: 'check', config: { command: ['true'] } }).pipe(Effect.withSpan('the pass')),
   );
@@ -94,9 +95,8 @@ require('node:fs').writeFileSync(${JSON.stringify(seen)}, JSON.stringify(env));
     AE_CLAUDE_EXECUTABLE: path.join(bin, 'claude'),
     OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9',
     NEMIA_TOOL_DETAILS: details,
-    WF_MAX_CONCURRENT: '1',
   });
-  const e = clientEngine(process.env);
+  const e = engineNow({ WF_MAX_CONCURRENT: '1' });
   const id = await Effect.runPromise(e.file({ brief: 'b', cwd: scratch('wf-step-labels-cwd-'), harness: 'claude' }));
   stoppedAfter(t, e, id);
   await until(
@@ -144,7 +144,7 @@ const HANDED: Row[] = [
     check: async (t) => {
       withEnv(t, { OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9', NEMIA_TOOL_DETAILS: 'true' });
       const said = t.mock.method(console, 'error', () => {});
-      clientEngine(process.env);
+      engineNow();
       const lines = said.mock.calls.map((c) => String(c.arguments[0])).filter((line) => line.includes('NEMIA_TOOL_DETAILS'));
       assert.equal(lines.length, 1, lines.join('\n'));
       assert.ok(lines[0].startsWith('nemia: ') && lines[0].includes('"true"'), lines[0]);

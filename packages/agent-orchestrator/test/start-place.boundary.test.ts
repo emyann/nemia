@@ -2,7 +2,7 @@
  * `nemia start` opens a repository run's place (`openPlace`), the one its program is given (`PlaceService`). Its `open` answers the
  * record's base, branch and repository, and the record names no place: a record written when it named one (`placeSkill`) still reads. A
  * place that refuses the start refuses it in its words, and nothing is written. A SIGINT to `nemia start` is not passed on to the
- * process group of the git `open` runs, which outlives it. `WF_ROOT` is set before the import, since the module reads it as it loads.
+ * process group of the git `open` runs, which outlives it. Its store is its own at `ROOT`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,17 +14,16 @@ import { nodeChild } from './child.ts';
 import { scratch } from 'test-kit/scratch';
 import { teamCopy } from './team.ts';
 import { placeOver } from './place-over.ts';
-import { rootNow } from './config-given.ts';
+import { startRun } from '../src/start/start.verb.ts';
+import { StoreRoot } from '../src/config/root.store.ts';
+import { PlaceService } from '../src/place/place.store.ts';
+import { gitPlaceLayer, builtinGitPlace } from '../src/place/builtin.store.ts';
+import { runFile } from '../src/record/record.store.ts';
+import { Invalid } from '../src/refusal/refusal.ts';
+import { filesStoreAt } from '../src/record/files.store.ts';
 
 const ROOT = scratch('wf-start-place-');
-process.env.WF_ROOT = ROOT;
-const { startRun } = await import('../src/start/start.verb.ts');
-const { StoreRoot } = await import('../src/config/root.store.ts');
-const { PlaceService } = await import('../src/place/place.store.ts');
-const { gitPlaceLayer, builtinGitPlace } = await import('../src/place/builtin.store.ts');
-const { runFile } = await import('../src/record/record.store.ts');
-const runStore = (await import('../src/record/files.store.ts')).filesStoreAt(rootNow());
-const { Invalid } = await import('../src/refusal/refusal.ts');
+const rooted = filesStoreAt(ROOT);
 
 const BIN = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 
@@ -58,7 +57,7 @@ function aRepo(): string {
 const written = (): { runs: string[]; dirs: string[] } => {
   const runs = path.join(ROOT, 'runs');
   return {
-    runs: runStore.runs.list().map((r) => r.id),
+    runs: rooted.runs.list().map((r) => r.id),
     dirs: fs.existsSync(runs) ? fs.readdirSync(runs).filter((f) => fs.statSync(path.join(runs, f)).isDirectory()) : [],
   };
 };
@@ -95,15 +94,15 @@ test("a start opens the place it is given: the record's base, branch and reposit
   assert.equal(run.branch, 'trunk');
   assert.equal(run.repo, repo);
   assert.equal(run.workspace, repo);
-  assert.ok(!('placeSkill' in run) && !('placeSkill' in runStore.runs.read(run.id)), 'no place is named on a new record');
+  assert.ok(!('placeSkill' in run) && !('placeSkill' in rooted.runs.read(run.id)), 'no place is named on a new record');
 });
 
 test('a record written when a run named its place still reads, the name kept as it was written', () => {
   const run = started(PLAIN, aRepo());
-  const file = runFile(rootNow(), run.id);
+  const file = runFile(ROOT, run.id);
   const named = { skill: 'git', version: 'a'.repeat(64) };
   fs.writeFileSync(file, JSON.stringify({ ...(JSON.parse(fs.readFileSync(file, 'utf8')) as object), placeSkill: named }));
-  const read = runStore.runs.read(run.id);
+  const read = rooted.runs.read(run.id);
   assert.deepEqual([read.id, read.placeSkill], [run.id, named]);
 });
 

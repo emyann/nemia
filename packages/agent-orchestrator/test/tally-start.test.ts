@@ -1,7 +1,7 @@
 /**
  * `nemia start` of a folder whose step declares a `tally:`: one the step's closeout cannot hold is refused with exit 2, naming the step's
  * file, its schema's and the field, and no run is written; one it can hold is frozen on the run record with the step, which is what
- * `nemia stats` counts the run by. `WF_ROOT` is set before the import, since the module reads it as it loads.
+ * `nemia stats` counts the run by. Its store is its own at `ROOT`, given as `ENV`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,17 +9,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { Invalid } from '../src/refusal/refusal.ts';
-import { rootNow } from './config-given.ts';
+import { runRecord } from '../src/record/record.store.ts';
+import { main } from '../src/cli/main.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-tally-start-');
-process.env.WF_ROOT = ROOT;
-process.env.WF_VERIFY_REST = '1';
-delete process.env.WF_MAX_RUNS;
 const BIN = scratch('wf-tally-start-bin-');
 for (const name of ['claude', 'codex']) fs.writeFileSync(path.join(BIN, name), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
 process.env.PATH = `${BIN}${path.delimiter}${process.env.PATH}`;
-const { runRecord } = await import('../src/record/record.store.ts');
-const { main } = await import('../src/cli/main.ts');
+const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_RUNS: undefined };
 
 /** A folder of one step `triage`, closing out the issues it sorted, that declares `tally`. */
 function triage(name: string, tally: string): string {
@@ -55,7 +53,7 @@ async function started(dir: string): Promise<string> {
   console.error = () => undefined;
   process.chdir(ROOT);
   try {
-    await main(['start', 'sort the issues', '--workflows', dir]);
+    await main(['start', 'sort the issues', '--workflows', dir], undefined, undefined, undefined, ENV);
   } finally {
     process.chdir(cwd);
     Object.assign(console, { log, error });
@@ -84,6 +82,6 @@ test('nemia start of a step that declares a tally: refused where its closeout ca
 
   await t.test('a tally its closeout holds is frozen with the step on the run record', async () => {
     const id = await started(triage('held', 'issues, issues.open'));
-    assert.deepEqual(runRecord(rootNow(), id).workflow?.find((s) => s.name === 'triage')?.tally, ['issues', 'issues.open']);
+    assert.deepEqual(runRecord(ROOT, id).workflow?.find((s) => s.name === 'triage')?.tally, ['issues', 'issues.open']);
   });
 });

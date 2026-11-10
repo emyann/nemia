@@ -230,8 +230,12 @@ const TimelineTotal = Schema.Struct({
   cost: Schema.NullOr(Spent),
 });
 
-/** A check's stream as a person reads it: its last lines, and whether there were more (`StepLog`, checks.verb.ts). */
-const StepLog = Schema.Struct({ lines: Strings, truncated: Schema.Boolean });
+/**
+ * A stream as a person reads it — a check's, a step's session output: its last lines, and whether there were more (`StepLog`,
+ * checks.verb.ts).
+ */
+export const StepLog = Schema.Struct({ lines: Strings, truncated: Schema.Boolean });
+export type StepLog = typeof StepLog.Type;
 
 /** A step's check: its command, its task, its verdict and, refused, what it said (`StepCheck`, checks.verb.ts). */
 export const StepCheck = Schema.Struct({

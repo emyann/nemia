@@ -5,7 +5,7 @@
  * made of its id, and a file by its name, never by a path. The api resolves the task a request names, words the answer for what is not
  * there, and judges what it is handed.
  */
-import { Effect } from 'effect';
+import { Effect, Schema } from 'effect';
 import { EngineService, asked, tried, type Engine } from '../runtime-client.ts';
 import type { Args, Flag, Positional, Spec } from './command.ts';
 import type { Command, Kept } from './entry.verb.ts';
@@ -79,12 +79,6 @@ export const selectorFlag = (command: string): Flag => ({
   takes: `${command} -l takes a selector of the runs' labels: ${SELECTOR_FORM}`,
 });
 
-/** The text under `key`, or undefined where none was given. */
-const textOf = (args: Args, key: string): string | undefined => {
-  const value = args[key];
-  return typeof value === 'string' ? value : undefined;
-};
-
 /** A text flag under `key`, as the api hands it. */
 const keyed = (key: string): Flag => ({ flag: `--${key}`, kind: 'text', key });
 
@@ -98,8 +92,17 @@ const stepSpec = (more: readonly Positional[], keys: readonly string[]): Spec =>
 /** The file's name, as the api's path names it. */
 const NAME: readonly Positional[] = [{ key: 'name', takes: 'required', kind: 'name' }];
 
-/** The run `id` names, found among the ids the store lists (`runs.find`); undefined for one it does not have. */
-const runOf = (args: Args): Run | undefined => runStore.runs.find(textOf(args, 'runId') ?? '');
+/** What a read of a step's file takes: the run's id, the step's name and the file's, never a path. */
+export const StepFileInput = Schema.Struct({ runId: Schema.String, step: Schema.String, name: Schema.String });
+export type StepFileInput = typeof StepFileInput.Type;
+
+/** What a read of a step's task takes: the run's id, the step's name, and the task the api resolved for it. */
+export const StepTaskInput = Schema.Struct({ runId: Schema.String, step: Schema.String, task: Schema.String });
+export type StepTaskInput = typeof StepTaskInput.Type;
+
+/** What a read of a step's conversation takes: its task's, and the cursor to read from, none for the start. */
+export const StepTranscriptInput = Schema.Struct({ ...StepTaskInput.fields, after: Schema.optionalKey(Schema.String) });
+export type StepTranscriptInput = typeof StepTranscriptInput.Type;
 
 /**
  * How a read of the list reads, as the inbox's do: the informer and the feed's filing times its caller keeps, verified as its
@@ -113,19 +116,19 @@ export const howOf = (env?: NodeJS.ProcessEnv, home?: string, kept?: Kept): Summ
 });
 
 /** The file `name` of the files directory of the step `step` of the run `id` (`artifactFile`), or null where there is none. */
-export const STEP_ARTIFACT: Command<{ file: Buffer | null }> = {
+export const STEP_ARTIFACT: Command<{ file: Buffer | null }, StepFileInput> = {
   name: 'step artifact',
   usage: '<runId> <step> <name>',
   help: ["one file of a step's files directory"],
   spec: stepSpec(NAME, []),
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/runs/:runId/steps/:step/artifacts/:name', status: 200 },
   only: { side: 'api', why: "the board links each file a step's closeout named; at the command line a person opens the file" },
-  handler: (args) =>
+  input: StepFileInput,
+  handler: ({ runId, step, name }) =>
     tried(() => {
-      const run = runOf(args);
-      return { file: run ? artifactFile(run, textOf(args, 'step') ?? '', textOf(args, 'name') ?? '') : null };
+      const run = runStore.runs.find(runId);
+      return { file: run ? artifactFile(run, step, name) : null };
     }),
   print: () => [],
 };
@@ -134,20 +137,20 @@ export const STEP_ARTIFACT: Command<{ file: Buffer | null }> = {
  * The folder the step `step` of the run `id` works in — null for a step of a repository run, which works on a branch, and for one not filed
  * yet — and its file `name` (`fileIn`), or null where there is none.
  */
-export const STEP_FILE: Command<{ folder: string | null; file: Buffer | null }> = {
+export const STEP_FILE: Command<{ folder: string | null; file: Buffer | null }, StepFileInput> = {
   name: 'step file',
   usage: '<runId> <step> <name>',
   help: ["one file of a folder step's own folder"],
   spec: stepSpec(NAME, []),
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/runs/:runId/steps/:step/files/:name', status: 200 },
   only: { side: 'api', why: "the board links each file a folder step's folder holds; at the command line a person opens the folder" },
-  handler: (args) =>
+  input: StepFileInput,
+  handler: ({ runId, step, name }) =>
     tried(() => {
-      const run = runOf(args);
-      const folder = run && !isRepositoryRun(run) ? (run.steps[textOf(args, 'step') ?? '']?.workspace ?? null) : null;
-      return { folder, file: folder === null ? null : fileIn(folder, textOf(args, 'name') ?? '') };
+      const run = runStore.runs.find(runId);
+      const folder = run && !isRepositoryRun(run) ? (run.steps[step]?.workspace ?? null) : null;
+      return { folder, file: folder === null ? null : fileIn(folder, name) };
     }),
   print: () => [],
 };
@@ -156,18 +159,18 @@ export const STEP_FILE: Command<{ folder: string | null; file: Buffer | null }> 
 export type LifecycleTransition = Effect.Success<ReturnType<Engine['path']>>[number];
 
 /** The path through the runtime's lifecycle of the task `task` — a try of the step `step` of the run `id`, as the api resolved it. */
-export const STEP_PATH: Command<{ path: LifecycleTransition[] }> = {
+export const STEP_PATH: Command<{ path: LifecycleTransition[] }, StepTaskInput> = {
   name: 'step path',
   usage: '<runId> <step>',
   help: ["the path of a step's task through the runtime's lifecycle"],
   spec: stepSpec([], ['task']),
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/runs/:runId/steps/:step/path', status: 200 },
   only: { side: 'api', why: "the board draws each try of a step on the lifecycle's diagram; at the command line, nemia ls says its state" },
-  handler: Effect.fnUntraced(function* (args: Args) {
+  input: StepTaskInput,
+  handler: Effect.fnUntraced(function* ({ task }: StepTaskInput) {
     const e = yield* EngineService;
-    return { path: [...(yield* asked('path', e.path(textOf(args, 'task') ?? '')))] };
+    return { path: [...(yield* asked('path', e.path(task)))] };
   }),
   print: () => [],
 };
@@ -179,21 +182,21 @@ export type ConversationEvent = Effect.Success<ReturnType<Engine['transcript']>>
  * One read of the conversation of the task `task` — the current one of the step `step` of the run `id`, as the api resolved it — from
  * the cursor `after`, none for the start: the engine's events, and the cursor to read on from.
  */
-export const STEP_TRANSCRIPT: Command<{ events: ConversationEvent[]; cursor: string }> = {
+export const STEP_TRANSCRIPT: Command<{ events: ConversationEvent[]; cursor: string }, StepTranscriptInput> = {
   name: 'step transcript',
   usage: '<runId> <step>',
   help: ["a read of a step's conversation"],
   spec: stepSpec([], ['task', 'after']),
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/runs/:runId/steps/:step/transcript', status: 200 },
   only: {
     side: 'api',
     why: "the board reads a step's conversation as it goes; at the command line, nemia logs reads what its session printed",
   },
-  handler: Effect.fnUntraced(function* (args: Args) {
+  input: StepTranscriptInput,
+  handler: Effect.fnUntraced(function* ({ task, after }: StepTranscriptInput) {
     const e = yield* EngineService;
-    const { events, cursor } = yield* asked('transcript', e.transcript(textOf(args, 'task') ?? '', textOf(args, 'after')));
+    const { events, cursor } = yield* asked('transcript', e.transcript(task, after));
     return { events: [...events], cursor };
   }),
   print: () => [],

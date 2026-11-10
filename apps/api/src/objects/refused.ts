@@ -15,8 +15,10 @@ import {
   Conflict,
   Failed,
   Forbidden,
+  Gone,
   Invalid,
   Missing,
+  ReadFailed,
   Unauthorized,
   Unjudged,
   UnsupportedMediaType,
@@ -41,6 +43,8 @@ const API_ERRORS = [
   Failed,
   WriteFailed,
   Unjudged,
+  ReadFailed,
+  Gone,
 ] as const;
 
 /** One of the classes the api answers with. */
@@ -95,7 +99,7 @@ export const statusOf = (error: ApiError): number => {
  * errors its endpoint declares — whose status it is: no status folded into another. One whose status no class of `kinds` answers is a
  * fault of the reader's, thrown as such.
  */
-export const declaredAs = <K extends ApiErrorClass>(
+export const declaredAs = <K extends Exclude<ApiErrorClass, typeof Gone>>(
   kinds: readonly K[],
   { status, error }: { status: number; error: string },
 ): ApiError => {

@@ -1,7 +1,7 @@
 /**
  * The Run's group of the `Api` (`RunsGroup`): the run object, listed across namespaces and in one — as a `RunList`, or as a `Table` asked
  * for — read in its namespace and across all by its name, what is read beside it (its lines, what it concludes, its record, `nemia ls`'s
- * listing), its four sub-resources, and its named actions in its namespace alone, each body a Schema that decodes. Served by the api's
+ * listing), and its named actions in its namespace alone, each body a Schema that decodes. Served by the api's
  * runs handlers (`apps/api/src/objects/runs.ts`).
  */
 import { Schema } from 'effect';
@@ -10,8 +10,7 @@ import { BadRequest, Conflict, Invalid, listQuery, Missing, Unjudged, WriteFaile
 import { Table } from './table.ts';
 import { Concluded, RunLines, RunRecord, RunsListed } from './run-reads.ts';
 import { LabelEdit, Labelled } from './labels.ts';
-import { Run, RunList, StepTries, StepTry, TryCloseout } from './run.ts';
-import { StepTold } from './run-told.ts';
+import { Run, RunList } from './run.ts';
 import {
   RunApprove,
   RunApproved,
@@ -52,12 +51,6 @@ const { limit: _limit, continue: _continue, watch: _watch, ...listingQuery } = l
 /** A namespace, for a list in it. */
 const namespaceParams = { namespace: Schema.String };
 
-/** A run's step, named in the path. */
-const stepParams = { runId: Schema.String, step: Schema.String };
-
-/** A step's try, by its number as the path says it. */
-const tryParams = { ...stepParams, try: Schema.String };
-
 /** What a run's reads refuse with: none by that name, a query the package refuses, a run not judged. */
 const runReadErrors = [Missing, Invalid, Unjudged];
 
@@ -78,7 +71,7 @@ const takenLater = <S extends Schema.Top>(answer: S) => answer.pipe(Schema.annot
 
 /**
  * The run object, listed across namespaces (`/api/runs`) and in one, read in one and across all by its name (`/api/runs/:name`), what is
- * read beside it, and its sub-resources; and its named actions, each in its namespace alone: started, removed — a try alone, a run started
+ * read beside it; and its named actions, each in its namespace alone: started, removed — a try alone, a run started
  * from an agent's page, any other being `nemia rm`'s — refreshed, pruned, its labels edited, held and its hold lifted, and a step of it
  * tried again, approved and said words to. A run's namespace is its factory, `default` for one that names none: a run addressed under
  * another is `Missing`. A start is placed on the repository `?repo=` names, else the api's own.
@@ -165,25 +158,5 @@ export class RunsGroup extends HttpApiGroup.make('runs').add(
     query: listingQuery,
     success: RunsListed,
     error: [Missing, Invalid],
-  }),
-  HttpApiEndpoint.get('tries', '/api/runs/:runId/steps/:step/tries', {
-    params: stepParams,
-    success: StepTries,
-    error: [Missing, Invalid, Unjudged],
-  }),
-  HttpApiEndpoint.get('try', '/api/runs/:runId/steps/:step/tries/:try', {
-    params: tryParams,
-    success: StepTry,
-    error: [Missing, Invalid, Unjudged],
-  }),
-  HttpApiEndpoint.get('closeout', '/api/runs/:runId/steps/:step/tries/:try/closeout', {
-    params: tryParams,
-    success: TryCloseout,
-    error: [Missing, Invalid, Unjudged],
-  }),
-  HttpApiEndpoint.get('told', '/api/runs/:runId/steps/:step/told', {
-    params: stepParams,
-    success: StepTold,
-    error: [Missing, Invalid, Unjudged],
   }),
 ) {}

@@ -46,7 +46,7 @@ test('nemia closeout prints the whole closeout a person reads: its question, its
     questions: [],
     raw: {},
   };
-  const lines = CLOSEOUT.print?.({ try: 2, closeout, unreadable: null }, { step: 'implement' }) ?? [];
+  const lines = CLOSEOUT.print?.({ try: 2, closeout, unreadable: null }, { runId: 'r-1', step: 'implement' }) ?? [];
   const text = lines.join('\n');
   for (const said of ['blocked', 'Stopped at the flag.', 'Two names would do.', 'which flag name ships', 'notes.md', 'pull request']) {
     assert.ok(text.includes(said), `the print carries ${said}`);
@@ -56,7 +56,7 @@ test('nemia closeout prints the whole closeout a person reads: its question, its
   const reply = lines.findIndex((l) => l.includes('the flag is unnamed'));
   assert.ok(lines[reply + 1]?.includes('the spec names it in the next card'), "each reply's why is on the line under it");
   assert.deepEqual(
-    CLOSEOUT.print?.({ try: 2, closeout: null, unreadable: null }, { step: 'implement' }).length,
+    CLOSEOUT.print?.({ try: 2, closeout: null, unreadable: null }, { runId: 'r-1', step: 'implement' }).length,
     1,
     'a try with no closeout yet says so in one line',
   );

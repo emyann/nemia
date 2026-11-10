@@ -454,6 +454,7 @@ export { COMMANDS, TABLE } from './command/commands.verb.ts';
 export { admitted } from './admission/admit.verb.ts';
 export { HOLD, HoldInput, PRUNE, PruneInput, RM, RmInput } from './command/runs.verb.ts';
 export { CLOSEOUT, LOGS, SHOW, STATS, TOLD, TRIES, TRY } from './command/reads.verb.ts';
+export { STEP_ARTIFACT, STEP_FILE, STEP_PATH, STEP_TRANSCRIPT } from './command/pages.verb.ts';
 export { runObject, type RunObjectAnswer, type TryCloseout } from './object/run.verb.ts';
 export { runLines, type RunLines, type StepCommands } from './object/lines.verb.ts';
 export { cardList, cardObject, cardWriteRefusal, replaceCard, type CardQuery, type CardReplaced } from './object/card.verb.ts';

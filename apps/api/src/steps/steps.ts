@@ -1,64 +1,81 @@
 /**
- * A step's own reads: its session output, the files it wrote, its conversation, read once from a cursor or followed, and its task's path
- * through the runtime's lifecycle.
+ * The `steps` group's handlers (`objects`' `Api`, `StepsGroup`): a run's step's reads — its tries, one try, a try's closeout and what it
+ * was told, the run object's sub-resources; the end of its session output, the files it wrote, its conversation read once from a cursor
+ * or followed, and its task's path through the runtime's lifecycle. Each calls the orchestrator's entry by its name (`TRIES`, `LOGS`,
+ * `STEP_TRANSCRIPT`, …) with its typed input, through the request's services (`inRequest`).
  */
-import { Effect, Stream } from 'effect';
-import { Hono } from 'hono';
-import { type SSEMessage, type SSEStreamingApi, streamSSE } from 'hono/streaming';
-import { LOGS, lifecycleGraph, phaseOfView, refusedName, type StepLog, tailOf, type TaskView, typeOf } from 'agent-orchestrator';
+import { type Context, Effect, Queue, Stream } from 'effect';
+import { HttpApiBuilder, HttpApiSchema } from 'effect/http-api';
+import {
+  CLOSEOUT,
+  type EngineService,
+  LOGS,
+  lifecycleGraph,
+  phaseOfView,
+  refusedName,
+  STEP_ARTIFACT,
+  STEP_FILE,
+  STEP_PATH,
+  STEP_TRANSCRIPT,
+  tailOf,
+  type TaskView,
+  TOLD,
+  TRIES,
+  TRY,
+  typeOf,
+} from 'agent-orchestrator';
 import { filesPrunedWords } from 'agent-orchestrator/run';
-import { type LifecycleTransition, pathToTurn, type StepPath, tryOfStep } from './path.ts';
-import type { Followings, Relayed } from './following.ts';
-import { type ApiEnv, type ApiRuntime, served } from '../layer.ts';
-import { commandNamed, engineRead, type Engine, type Placed, taskOfStep, runPlaced } from '../store.ts';
-
-/**
- * The board's reads of a step in the package's table, each served on the api alone: a file of its files directory (`step artifact`) and of
- * its own folder (`step file`), the path of one of its tasks (`step path`), and a read of its conversation (`step transcript`).
- */
-const ARTIFACT = commandNamed('step artifact');
-const FILE = commandNamed('step file');
-const PATH = commandNamed('step path');
-const TRANSCRIPT = commandNamed('step transcript');
-
-/** One read of the conversation of `task`, a task of the step `step` of the run `id`, from `after` (`step transcript`). */
-const transcriptOf = async (e: Engine['Service'], at: Placed, id: string, step: string, task: string, after?: string) =>
-  (await runPlaced(at, e, TRANSCRIPT.handler({ runId: id, step, task, ...(after !== undefined && { after }) }))) as Omit<Read, 'live'>;
+import {
+  Api,
+  BadRequest,
+  Gone,
+  Missing,
+  ReadFailed,
+  type StepLog,
+  type StepPath,
+  type StepStreamEvent,
+  type StepTranscript,
+} from 'objects';
+import { pathToTurn, tryOfStep } from './path.ts';
+import type { Followings, Relayed, TranscriptEvent } from './following.ts';
+import type { Served, Services } from '../layer.ts';
+import { engineRead, taskOfStep } from '../store.ts';
+import { answered } from '../objects/refused.ts';
 
 /** How much of a step's output the board is given: the end of it, which is where a running step is. */
 const LOG_LINES = 200;
 
-/** How a file a step wrote is served: never cached, never sniffed, and — an agent's text on the board's origin — never run. */
-const servedAs = (type: string) => ({
-  'Content-Type': type,
-  'Cache-Control': 'no-store',
-  'X-Content-Type-Options': 'nosniff',
-  /** An SVG or an HTML file opened in a tab runs no script of its own. */
-  'Content-Security-Policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox",
-});
-
-/** One of the engine's events in a session's conversation, as `transcript` gives it (`TranscriptEvent` in agent-runtime). */
-export type TranscriptEvent = Effect.Success<ReturnType<Engine['Service']['transcript']>>['events'][number];
-
-/**
- * A read of a step's conversation: the engine's events from the cursor asked with, where to ask again, whether something of the task runs
- * or is to (`live`), and whether it may yet say more (`open`).
- */
-export type StepTranscript = {
-  events: TranscriptEvent[];
-  /** The engine's cursor, to pass as `after` on the next read. Null for a step with no task to read. */
-  cursor: string | null;
-  /** Whether something of the step's task runs or is to, so the conversation is being written while it is read. */
-  live: boolean;
-  /**
-   * Whether the task has not settled — one held open on a person's word among them — so it may yet say more. A settled task says
-   * nothing ever again, and the stream of one is a request nobody is served by: a reader follows an open task alone.
-   */
-  open: boolean;
+/** The step `step` of the run `id` and its current task (null for one not filed yet), or `Missing` for a run or a step it lacks. */
+const stepOf = (s: Served, id: string, step: string) => {
+  const found = taskOfStep(id, step, s.home);
+  if ('error' in found) throw new Missing({ error: found.error });
+  return found;
 };
 
-/** A read as the stream takes it: a cursor always. */
-type Read = StepTranscript & { cursor: string };
+/**
+ * The file `name` a step wrote, as the `Api`'s `StepFile` serves it: never cached, never sniffed, and — an agent's text on the board's
+ * origin — never run.
+ */
+const servedFile = (name: string, file: Buffer) =>
+  HttpApiSchema.withHeaders({
+    body: new Uint8Array(file),
+    headers: {
+      'content-type': typeOf(name).type,
+      'cache-control': 'no-store' as const,
+      'x-content-type-options': 'nosniff' as const,
+      'content-security-policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox",
+    },
+  });
+
+/** A request's reads of the engine: the engine, and the request's services a program of the package's runs over. */
+type Reader = Pick<Served, 'e' | 'inRequest'>;
+
+/** One read of the conversation of `task`, a task of the step `step` of the run `id`, from `after` (`STEP_TRANSCRIPT`). */
+const transcriptOf = (r: Reader, id: string, step: string, task: string, after?: string) =>
+  r.inRequest(STEP_TRANSCRIPT.handler({ runId: id, step, task, ...(after !== undefined && { after }) }));
+
+/** A read as the stream takes it: the engine's events, as the `Api`'s `StepTranscript` serves them, and a cursor always. */
+type Read = Omit<StepTranscript, 'events' | 'cursor'> & { events: TranscriptEvent[]; cursor: string };
 
 /** Why a step's conversation was not read, with the status that says whose it is to fix. */
 class Unread extends Error {
@@ -68,6 +85,16 @@ class Unread extends Error {
     this.status = status;
   }
 }
+
+/** `err` as the `Api`'s error of its status where it is an `Unread`, as it is otherwise. */
+const unreadAs = (err: unknown): unknown =>
+  !(err instanceof Unread)
+    ? err
+    : err.status === 400
+      ? new BadRequest({ error: err.message })
+      : err.status === 404
+        ? new Missing({ error: err.message })
+        : new ReadFailed({ error: err.message });
 
 /**
  * One read of a step's conversation from `after`: the events and cursor as the engine's `transcript` gives them, whether the task has not
@@ -86,17 +113,10 @@ class Unread extends Error {
  * refused read from a cursor is asked again from the start, which refuses only the harness: the words of the engine's refusal are the
  * engine's to change, and are never parsed.
  */
-async function readTranscript(
-  e: Engine['Service'],
-  at: Placed,
-  id: string,
-  step: string,
-  taskId: string,
-  after: string | undefined,
-): Promise<Read> {
+async function readTranscript(r: Reader, id: string, step: string, taskId: string, after: string | undefined): Promise<Read> {
   let view: TaskView;
   try {
-    view = await engineRead('view', e.view(taskId));
+    view = await engineRead('view', r.e.view(taskId));
   } catch (err) {
     const why = err instanceof Error ? err.message : String(err);
     throw new Unread(
@@ -112,7 +132,7 @@ async function readTranscript(
     );
   }
   try {
-    const { events, cursor } = await transcriptOf(e, at, id, step, taskId, after);
+    const { events, cursor } = await transcriptOf(r, id, step, taskId, after);
     return { events, cursor, live: phase === 'running' || phase === 'pending', open: view.state.settled === null };
   } catch (err) {
     const why = err instanceof Error ? err.message : String(err);
@@ -124,7 +144,7 @@ async function readTranscript(
     }
     if (
       after !== undefined &&
-      (await transcriptOf(e, at, id, step, taskId).then(
+      (await transcriptOf(r, id, step, taskId).then(
         () => true,
         () => false,
       ))
@@ -142,24 +162,70 @@ async function readTranscript(
 }
 
 /**
- * A read's events on the stream, an SSE `transcript` event each, with the read's cursor as the id of the last.
+ * Where a step's stream writes, as its body is read: each event in turn (`write`, waiting while the reader is behind), whether the reader
+ * has gone (`gone`), and a wait of the stream's beat that ends early once it has (`sleep`).
+ */
+type Writer = {
+  readonly gone: AbortSignal;
+  readonly write: (event: StepStreamEvent) => Promise<void>;
+  readonly sleep: (ms: number) => Promise<void>;
+};
+
+/**
+ * The body of a step's stream: what `run` writes, as the `Api`'s `StepStreamEvent`s, a few held while the reader is behind; ended once
+ * `run` returns, and `run` told the reader has gone (`Writer.gone`) once the response is let go. Its wait (`sleep`) is the beat's alone:
+ * `readAgain` is its one caller.
+ */
+const streamOf = (run: (stream: Writer) => Promise<void>): Stream.Stream<StepStreamEvent> =>
+  Stream.callback<StepStreamEvent>(
+    (queue) =>
+      Effect.gen(function* () {
+        const gone = new AbortController();
+        yield* Effect.addFinalizer(() => Effect.sync(() => gone.abort()));
+        const stream: Writer = {
+          gone: gone.signal,
+          write: (event) =>
+            gone.signal.aborted
+              ? Promise.resolve()
+              : Effect.runPromise(Queue.offer(queue, event), { signal: gone.signal }).then(
+                  () => undefined,
+                  () => undefined,
+                ),
+          sleep: (ms) =>
+            new Promise<void>((resolve) => {
+              const over = AbortSignal.any([gone.signal, AbortSignal.timeout(ms)]);
+              if (over.aborted) resolve();
+              else over.addEventListener('abort', () => resolve(), { once: true });
+            }),
+        };
+        yield* Effect.tryPromise(() => run(stream)).pipe(
+          Effect.catch((err) => Effect.logError('a step stream stopped on a failure', err.cause)),
+          Effect.ensuring(Queue.end(queue)),
+          Effect.forkScoped,
+        );
+      }),
+    { bufferSize: 64, strategy: 'suspend' },
+  );
+
+/**
+ * A read's events on the stream, a `transcript` event each, with the read's cursor as the id of the last.
  *
  * Of the last only: a reader cut off partway through a read keeps the previous read's cursor as its Last-Event-ID, so it
  * reconnects from before the events it did not get and is sent the read again, rather than past them. Sent twice, an event
  * is still one event to a reader: it is unique by its `id` and `kind`.
  */
-async function send(stream: SSEStreamingApi, read: Read): Promise<void> {
+async function send(stream: Writer, read: Read): Promise<void> {
   for (const [i, event] of read.events.entries()) {
-    if (stream.aborted) return;
+    if (stream.gone.aborted) return;
     const last = i === read.events.length - 1;
-    await stream.writeSSE({ event: 'transcript', data: JSON.stringify(event), ...(last ? { id: read.cursor } : {}) });
+    await stream.write({ event: 'transcript', data: event, ...(last ? { id: read.cursor } : {}) });
   }
 }
 
 /** The end of the stream of a task that has settled: `read`'s events, then `settled`. */
-async function settledFrom(stream: SSEStreamingApi, read: Read): Promise<void> {
+async function settledFrom(stream: Writer, read: Read): Promise<void> {
   await send(stream, read);
-  if (!stream.aborted) await stream.writeSSE({ event: 'settled', data: JSON.stringify({ cursor: read.cursor }), id: read.cursor });
+  if (!stream.gone.aborted) await stream.write({ event: 'settled', data: { cursor: read.cursor }, id: read.cursor });
 }
 
 /** An event as it is unique: by its `kind` and `id` together. */
@@ -172,29 +238,29 @@ const markOf = (event: TranscriptEvent) => `${event.kind} ${event.id}`;
  * (`moved`, after which its events are sent again from the start) and the step finished (`settled`). A state, and an upstream that
  * failed (`ended`), are sent nothing: a failed upstream's words are said by the beat that takes over from it (`readAgain`).
  */
-function messagesOf(m: Relayed, sent: Set<string>, at: { cursor: string }): SSEMessage[] {
-  if (m.kind === 'streamed') return [{ event: 'following', data: JSON.stringify({ streamed: m.yes }) }];
-  if (m.kind === 'partial') return [{ event: 'partial', data: JSON.stringify({ key: m.key, delta: m.text, last: m.last }) }];
+function messagesOf(m: Relayed, sent: Set<string>, at: { cursor: string }): StepStreamEvent[] {
+  if (m.kind === 'streamed') return [{ event: 'following', data: { streamed: m.yes } }];
+  if (m.kind === 'partial') return [{ event: 'partial', data: { key: m.key, delta: m.text, last: m.last } }];
   if (m.kind === 'moved') {
     sent.clear();
-    return [{ event: 'moved', data: JSON.stringify({ taskId: m.taskId }) }];
+    return [{ event: 'moved', data: { taskId: m.taskId } }];
   }
-  if (m.kind === 'settled') return [{ event: 'settled', data: JSON.stringify({ cursor: at.cursor }), id: at.cursor }];
+  if (m.kind === 'settled') return [{ event: 'settled', data: { cursor: at.cursor }, id: at.cursor }];
   if (m.kind !== 'events') return [];
   at.cursor = m.cursor;
   const fresh = m.events.filter((ev) => !sent.has(markOf(ev)));
   for (const ev of fresh) sent.add(markOf(ev));
-  return fresh.map((ev, i) => ({ event: 'transcript', data: JSON.stringify(ev), ...(i === fresh.length - 1 ? { id: m.cursor } : {}) }));
+  return fresh.map((ev, i) => ({ event: 'transcript', data: ev, ...(i === fresh.length - 1 ? { id: m.cursor } : {}) }));
 }
 
 /**
- * What a step's stream follows and reads with: the app's runtime and its registry of followings, the engine and its place, and the step.
+ * What a step's stream follows and reads with: the app's registry of followings and the request's services it follows over (`context`,
+ * which the upstream it opens is forked with), the request's reads, and the step.
  */
 type Reading = {
-  runtime: ApiRuntime;
   followings: Followings['Service'];
-  e: Engine['Service'];
-  at: Placed;
+  context: Context.Context<Services | EngineService>;
+  reader: Reader;
   id: string;
   step: string;
   /** How long `readAgain` waits between two reads: the served `Beats.step`, `STEP_BEAT_MS` unless a test gives another. */
@@ -206,33 +272,23 @@ type Stopped = { taskId: string; error: string | null };
 
 /**
  * The step `step` of the run `id` followed on the app's registry (`Followings`), relayed as `messagesOf` says, `read` sent after
- * `following` and what the follower read since (`caught`) after it, and `live` called once the relay is pushed. Run on the app's
- * `runtime`, interrupted as the reader goes. Answers why the following stopped short of `settled` (`Stopped`) — the step's session not
- * pushed, or its upstream failed — so the stream takes to reading the conversation again on a beat; else `null`: the task settled, or
- * nobody reads.
+ * `following` and what the follower read since (`caught`) after it, and `live` called once the relay is pushed. Interrupted as the reader
+ * goes. Answers why the following stopped short of `settled` (`Stopped`) — the step's session not pushed, or its upstream failed — so the
+ * stream takes to reading the conversation again on a beat; else `null`: the task settled, or nobody reads.
  */
-async function followed(
-  stream: SSEStreamingApi,
-  r: Reading,
-  taskId: string,
-  read: Read,
-  live?: () => Promise<void>,
-): Promise<Stopped | null> {
-  const gone = new AbortController();
-  stream.onAbort(() => gone.abort());
-  if (stream.aborted) gone.abort();
+async function followed(stream: Writer, r: Reading, taskId: string, read: Read, live?: () => Promise<void>): Promise<Stopped | null> {
   const sent = new Set(read.events.map(markOf));
   const at = { cursor: read.cursor };
   let stopped: Stopped | null = null;
   let followedTask = taskId;
-  const caught = Effect.tryPromise(() => readTranscript(r.e, r.at, r.id, r.step, taskId, read.cursor)).pipe(
+  const caught = Effect.tryPromise(() => readTranscript(r.reader, r.id, r.step, taskId, read.cursor)).pipe(
     Effect.map((got): Relayed => ({ kind: 'events', events: got.events, cursor: got.cursor })),
     Effect.orElseSucceed(() => undefined),
   );
-  const relayed = r.followings.follow(r.e, { kind: 'step', runId: r.id, step: r.step }, caught).pipe(
+  const relayed = r.followings.follow(r.reader.e, { kind: 'step', runId: r.id, step: r.step }, caught).pipe(
     Stream.runForEach((m) =>
       Effect.promise(async () => {
-        for (const message of messagesOf(m, sent, at)) if (!stream.aborted) await stream.writeSSE(message);
+        for (const message of messagesOf(m, sent, at)) if (!stream.gone.aborted) await stream.write(message);
         if (m.kind === 'moved') followedTask = m.taskId;
         if (m.kind === 'ended') stopped = { taskId: followedTask, error: m.error };
         if (m.kind !== 'streamed') return;
@@ -242,8 +298,8 @@ async function followed(
       }),
     ),
   );
-  await r.runtime.runPromiseExit(relayed, { signal: gone.signal });
-  return stopped !== null && !stream.aborted ? stopped : null;
+  await Effect.runPromiseExitWith(r.context)(relayed, { signal: stream.gone });
+  return stopped !== null && !stream.gone.aborted ? stopped : null;
 }
 
 /** The words a step's stream says of a session its harness will not push as it is written, read again on the beat instead. */
@@ -264,7 +320,7 @@ export const STEP_BEAT_MS = 5_000;
  * nothing else: no road here gives up.
  */
 async function readAgain(
-  stream: SSEStreamingApi,
+  stream: Writer,
   r: Reading,
   from: { task: string; after: string | undefined; error: string | null },
 ): Promise<void> {
@@ -275,14 +331,13 @@ async function readAgain(
   const say = async (next: string | null) => {
     if (next === said) return;
     said = next;
-    const data = next === null ? '{}' : JSON.stringify({ error: next, retrying: true });
-    await stream.writeSSE({ event: next === null ? 'readable' : 'unreadable', data });
+    await stream.write(next === null ? { event: 'readable', data: {} } : { event: 'unreadable', data: { error: next, retrying: true } });
   };
-  while (!stream.aborted) {
+  while (!stream.gone.aborted) {
     await say(words);
     let read: Read | undefined;
     try {
-      read = await readTranscript(r.e, r.at, r.id, r.step, task, after);
+      read = await readTranscript(r.reader, r.id, r.step, task, after);
     } catch (err) {
       words = err instanceof Error ? err.message : String(err);
     }
@@ -302,28 +357,133 @@ async function readAgain(
   }
 }
 
+/** The end of the step's session output (`LOGS`), or `ReadFailed` naming the command that reads it whole. */
+const logOf = (runId: string, step: string) =>
+  answered(async (s): Promise<StepLog> => {
+    const { taskId } = stepOf(s, runId, step);
+    try {
+      const { output } = await s.inRequest(LOGS.handler({ runId, step }, s.env, s.home));
+      return output === undefined ? { lines: [], truncated: false } : tailOf(output, LOG_LINES);
+    } catch (err) {
+      const why = err instanceof Error ? err.message : String(err);
+      throw new ReadFailed({
+        error: `Could not read the output of step '${step}' (task ${taskId}): ${why}. \`nemia logs ${runId} ${step}\` reads it the same way from the command line, with the error in full.`,
+      });
+    }
+  });
+
+/** The file `name` of the step's files directory (`STEP_ARTIFACT`): `BadRequest` for a path, `Gone` once pruned, `Missing` where none. */
+const artifactOf = (runId: string, step: string, name: string) =>
+  answered(async (s) => {
+    const { run } = stepOf(s, runId, step);
+    const refused = refusedName(name);
+    if (refused) throw new BadRequest({ error: refused });
+    const { file } = await s.inRequest(STEP_ARTIFACT.handler({ runId, step, name }));
+    const pruned = run.pruned?.artifacts;
+    if (!file && pruned) {
+      throw new Gone({
+        error: `Step '${step}' of run '${runId}' has no file '${name}': ${filesPrunedWords(pruned)}. Its record, its closeouts and its branches are kept; \`nemia decide ${runId}\` reads them.`,
+        pruned: pruned.at,
+      });
+    }
+    if (!file) {
+      throw new Missing({
+        error: `Step '${step}' of run '${runId}' has no file '${name}' in its files directory. GET /api/runs/${runId} gives the \`url\` of each file a step's closeout named that the api serves.`,
+      });
+    }
+    return servedFile(name, file);
+  });
+
+/** The file `name` of a folder step's own folder (`STEP_FILE`): `BadRequest` for a path, `Missing` for a branch step or none there. */
+const fileOf = (runId: string, step: string, name: string) =>
+  answered(async (s) => {
+    stepOf(s, runId, step);
+    const refused = refusedName(name);
+    if (refused) throw new BadRequest({ error: refused });
+    const { folder, file } = await s.inRequest(STEP_FILE.handler({ runId, step, name }));
+    if (!folder) {
+      throw new Missing({
+        error: `Step '${step}' of run '${runId}' works on a branch, not in a folder: it has no files to read here. GET /api/runs/${runId} gives the \`url\` of each file its closeout named, under \`artifacts\`.`,
+      });
+    }
+    if (!file) {
+      throw new Missing({
+        error: `Step '${step}' of run '${runId}' has no file '${name}' in its folder. GET /api/runs/${runId} gives the \`url\` of every file the step's folder holds, under \`files\`.`,
+      });
+    }
+    return servedFile(name, file);
+  });
+
+/** The path of the task of the step's try `tried` (`STEP_PATH`), the current one's for none, cut to that try's turn (`pathToTurn`). */
+const pathOf = (runId: string, step: string, tried: string | undefined) =>
+  answered(async (s): Promise<StepPath> => {
+    const { run } = stepOf(s, runId, step);
+    const asked = tryOfStep(run, step, tried);
+    if ('error' in asked) throw asked.status === 400 ? new BadRequest({ error: asked.error }) : new Missing({ error: asked.error });
+    if (!asked.taskId) return { taskId: null, try: asked.try, path: [], lifecycle: lifecycleGraph() };
+    try {
+      const whole = await s.inRequest(STEP_PATH.handler({ runId: run.id, step, task: asked.taskId }));
+      return { taskId: asked.taskId, try: asked.try, path: pathToTurn(whole.path, asked.turn), lifecycle: lifecycleGraph() };
+    } catch (err) {
+      const why = err instanceof Error ? err.message : String(err);
+      throw new ReadFailed({
+        error: `Could not read the journal of task ${asked.taskId} (step '${step}', try ${asked.try}): ${why}. \`nemia ls\` reads the same record from the command line.`,
+      });
+    }
+  });
+
+/** The step's conversation read once from `after` (`readTranscript`), nothing for a step not filed yet. */
+const transcriptAt = (runId: string, step: string, after: string | undefined) =>
+  answered(async (s): Promise<StepTranscript> => {
+    const { taskId } = stepOf(s, runId, step);
+    if (!taskId) return { events: [], cursor: null, live: false, open: false };
+    return readTranscript(s, runId, step, taskId, after).catch((err: unknown) => Promise.reject(unreadAs(err)));
+  });
+
+/** The step's conversation followed from `after`: read once before the stream opens, so its refusals are statuses, then streamed. */
+const followedFrom = (runId: string, step: string, after: string | undefined) =>
+  answered(async (s) => {
+    const { beats, followings } = s;
+    const { taskId } = stepOf(s, runId, step);
+    if (!taskId) {
+      throw new Missing({
+        error: `Step '${step}' of run '${runId}' is not filed yet, so it has no session to follow. GET /api/runs/${runId} gives its task once a tick files it.`,
+      });
+    }
+    const read = await readTranscript(s, runId, step, taskId, after).catch((err: unknown) => Promise.reject(unreadAs(err)));
+    const context = await s.inRequest(Effect.context<Services | EngineService>());
+    const r: Reading = { followings, context, reader: s, id: runId, step, beatMs: beats.step ?? STEP_BEAT_MS };
+    const body = streamOf(async (stream) => {
+      if (!read.open) return settledFrom(stream, read);
+      const stopped = await followed(stream, r, taskId, read);
+      if (stopped === null) return;
+      const same = stopped.taskId === taskId;
+      if (same) await send(stream, read);
+      await readAgain(stream, r, { task: stopped.taskId, after: same ? read.cursor : undefined, error: stopped.error });
+    });
+    return HttpApiSchema.withHeaders({ body, headers: { 'cache-control': 'no-cache' as const } });
+  });
+
 /**
- * A step's own reads. Each answers 404 for a run or a step the run does not have.
+ * A run's step's reads. Each answers `Missing` (404) for a run or a step the run does not have.
  *
- * - `GET /api/runs/:runId/steps/:step/log` — the end of the step's session output as text (`LOG_LINES`), read by `nemia logs`' entry
- *   (`LOGS`), which reads it whole; empty for a step not filed yet; 502 when the engine could not read it. The board reads the
- *   conversation from the transcript routes.
- * - `GET /api/runs/:runId/steps/:step/artifacts/:name` — one file of the step's files directory, by name and never by path
- *   (`step artifact`),
- *   as its closeout's `artifacts` link it; read on each request and never kept, since a step that runs again writes its files again.
- *   400 for a name that is not one; 410 for a file gone because `nemia prune --artifacts` removed the run's files, leaving its record,
- *   closeouts and branches; 404 for a file the directory does not have.
- * - `GET /api/runs/:runId/steps/:step/files/:name` — one file of a folder step's own folder, by name and never by path (`step file`), as
- *   `files` on the step links it: what the step made, named in its closeout or not. Read on each request and never kept: the folder is
- *   the step's, and it may write in it again. 400 for a name that is not one; 404 for a step that works on a branch, or a file the folder
- *   does not have.
- * - `GET /api/runs/:runId/steps/:step/transcript` — the step's conversation read once from the cursor `after` (an empty one is none, read
- *   from the start): the engine's events for the step's current task, whether it is live and whether it may yet say more (`open`), read
- *   through `step transcript`. A step not filed yet has nothing to read, is neither live nor open, and nothing of it moves until a tick
- *   files it. Refusals are `readTranscript`'s.
- * - `GET /api/runs/:runId/steps/:step/transcript/stream` — the same conversation followed, as server-sent events. It starts after the
- *   Last-Event-ID an EventSource sends when it reconnects, else after `after`. The first read is made before the stream opens, so a refused
- *   cursor or a lost task is an answer with a status (`readTranscript`'s), not an event; a step not filed yet is 404.
+ * - `tries`, `try`, `closeout`, `told` — the run object's sub-resources: the entries of the same names, off the app's informer.
+ * - `log` — the end of the step's session output as text (`LOG_LINES`), read by `nemia logs`' entry (`LOGS`), which reads it whole; empty
+ *   for a step not filed yet; `ReadFailed` (502) when the engine could not read it. The board reads the conversation from the transcript.
+ * - `artifact` — one file of the step's files directory, by name and never by path (`STEP_ARTIFACT`), as its closeout's `artifacts` link
+ *   it; read on each request and never kept, since a step that runs again writes its files again. `BadRequest` (400) for a name that is
+ *   not one; `Gone` (410) for a file gone because `nemia prune --artifacts` removed the run's files, leaving its record, closeouts and
+ *   branches; `Missing` for a file the directory does not have.
+ * - `file` — one file of a folder step's own folder, by name and never by path (`STEP_FILE`), as `files` on the step links it: what the
+ *   step made, named in its closeout or not. `BadRequest` for a name that is not one; `Missing` for a step that works on a branch, or a
+ *   file the folder does not have.
+ * - `transcript` — the step's conversation read once from the cursor `after` (an empty one is none, read from the start): the engine's
+ *   events for the step's current task, whether it is live and whether it may yet say more (`open`), read through `STEP_TRANSCRIPT`. A
+ *   step not filed yet has nothing to read, is neither live nor open, and nothing of it moves until a tick files it. Refusals are
+ *   `readTranscript`'s.
+ * - `transcriptStream` — the same conversation followed, as server-sent events. It starts after the Last-Event-ID an EventSource sends
+ *   when it reconnects, else after `after`. The first read is made before the stream opens, so a refused cursor or a lost task is an
+ *   answer with a status (`readTranscript`'s), not an event; a step not filed yet is `Missing`.
  *   A step whose task has not settled is followed live on the app's registry (`Followings`), one upstream a step whoever follows it: first
  *   `following` with `streamed`, whether its harness pushes the session; then, pushed, the read's events and each new one as `transcript`,
  *   the message being written as `partial` (`key`, `delta`, `last`: a follower who joins mid-message is handed the text so far as one
@@ -334,184 +494,24 @@ async function readAgain(
  *   `retrying: true` and reads the conversation again every `STEP_BEAT_MS` (`readAgain`), asking to follow it again each beat, so a
  *   harness that starts pushing resumes the live relay and `readable` clears what was said. It gives up on no step: it ends on a settled
  *   task, or when nobody reads.
- * - `GET /api/runs/:runId/steps/:step/path` — the path of the task of the step's try `try` through the runtime's lifecycle (`StepPath`,
- *   through `step path`), the current try's by default: each state its journal says, the entry that moved it and when, from the filing to
- *   now, replayed off the journal alone, so it asks no harness. An earlier try of a task held open, which later tries share, runs to the
- *   answer that opened the next turn (`pathToTurn`). A step not filed yet has an empty path. Each answer carries the lifecycle the path
- *   walks, read off the runtime's code (`lifecycleGraph`), which the board draws it on. Refusals are `tryOfStep`'s; 502 when the journal
- *   could not be read.
+ * - `path` — the path of the task of the step's try `try` through the runtime's lifecycle (`StepPath`, through `STEP_PATH`), the current
+ *   try's by default: each state its journal says, the entry that moved it and when, from the filing to now, replayed off the journal
+ *   alone, so it asks no harness. An earlier try of a task held open, which later tries share, runs to the answer that opened the next
+ *   turn (`pathToTurn`). A step not filed yet has an empty path. Each answer carries the lifecycle the path walks, read off the runtime's
+ *   code (`lifecycleGraph`), which the board draws it on. Refusals are `tryOfStep`'s; `ReadFailed` when the journal could not be read.
  */
-export const steps = new Hono<ApiEnv>()
-  .get('/api/runs/:runId/steps/:step/log', (c) =>
-    served(c, async ({ e, placeService, env, home, trace }) => {
-      const id = c.req.param('runId');
-      const step = c.req.param('step');
-      const found = taskOfStep(id, step, home);
-      if ('error' in found) return c.json({ error: found.error }, 404);
-      const { taskId } = found;
-      try {
-        const { output } = await runPlaced({ placeService, home, trace }, e, LOGS.handler({ runId: id, step }, env, home));
-        return c.json(output === undefined ? ({ lines: [], truncated: false } satisfies StepLog) : tailOf(output, LOG_LINES));
-      } catch (err) {
-        const why = err instanceof Error ? err.message : String(err);
-        return c.json(
-          {
-            error: `Could not read the output of step '${step}' (task ${taskId}): ${why}. \`nemia logs ${id} ${step}\` reads it the same way from the command line, with the error in full.`,
-          },
-          502,
-        );
-      }
-    }),
-  )
-  .get('/api/runs/:runId/steps/:step/artifacts/:name', (c) =>
-    served(c, async ({ e, placeService, home, trace }) => {
-      const id = c.req.param('runId');
-      const step = c.req.param('step');
-      const name = c.req.param('name');
-      const found = taskOfStep(id, step, home);
-      if ('error' in found) return c.json({ error: found.error }, 404);
-      const refused = refusedName(name);
-      if (refused) return c.json({ error: refused }, 400);
-      const { file } = (await runPlaced({ placeService, home, trace }, e, ARTIFACT.handler({ runId: id, step, name }))) as {
-        file: Buffer | null;
-      };
-      const pruned = found.run.pruned?.artifacts;
-      if (!file && pruned) {
-        return c.json(
-          {
-            error: `Step '${step}' of run '${id}' has no file '${name}': ${filesPrunedWords(pruned)}. Its record, its closeouts and its branches are kept; \`nemia decide ${id}\` reads them.`,
-            pruned: pruned.at,
-          },
-          410,
-        );
-      }
-      if (!file) {
-        return c.json(
-          {
-            error: `Step '${step}' of run '${id}' has no file '${name}' in its files directory. GET /api/runs/${id} gives the \`url\` of each file a step's closeout named that the api serves.`,
-          },
-          404,
-        );
-      }
-      return c.body(new Uint8Array(file), 200, servedAs(typeOf(name).type));
-    }),
-  )
-  .get('/api/runs/:runId/steps/:step/files/:name', (c) =>
-    served(c, async ({ e, placeService, home, trace }) => {
-      const id = c.req.param('runId');
-      const step = c.req.param('step');
-      const name = c.req.param('name');
-      const found = taskOfStep(id, step, home);
-      if ('error' in found) return c.json({ error: found.error }, 404);
-      const refused = refusedName(name);
-      if (refused) return c.json({ error: refused }, 400);
-      const { folder, file } = (await runPlaced({ placeService, home, trace }, e, FILE.handler({ runId: id, step, name }))) as {
-        folder: string | null;
-        file: Buffer | null;
-      };
-      if (!folder) {
-        return c.json(
-          {
-            error: `Step '${step}' of run '${id}' works on a branch, not in a folder: it has no files to read here. GET /api/runs/${id} gives the \`url\` of each file its closeout named, under \`artifacts\`.`,
-          },
-          404,
-        );
-      }
-      if (!file) {
-        return c.json(
-          {
-            error: `Step '${step}' of run '${id}' has no file '${name}' in its folder. GET /api/runs/${id} gives the \`url\` of every file the step's folder holds, under \`files\`.`,
-          },
-          404,
-        );
-      }
-      return c.body(new Uint8Array(file), 200, servedAs(typeOf(name).type));
-    }),
-  )
-  .get('/api/runs/:runId/steps/:step/path', (c) =>
-    served(c, async ({ e, placeService, home, trace }) => {
-      const step = c.req.param('step');
-      const found = taskOfStep(c.req.param('runId'), step, home);
-      if ('error' in found) return c.json({ error: found.error }, 404);
-      const asked = tryOfStep(found.run, step, c.req.query('try'));
-      if ('error' in asked) return c.json({ error: asked.error }, asked.status);
-      if (!asked.taskId) return c.json({ taskId: null, try: asked.try, path: [], lifecycle: lifecycleGraph() } satisfies StepPath);
-      try {
-        const whole = (await runPlaced(
-          { placeService, home, trace },
-          e,
-          PATH.handler({ runId: found.run.id, step, task: asked.taskId }),
-        )) as {
-          path: LifecycleTransition[];
-        };
-        const path = pathToTurn(whole.path, asked.turn);
-        return c.json({ taskId: asked.taskId, try: asked.try, path, lifecycle: lifecycleGraph() } satisfies StepPath);
-      } catch (err) {
-        const why = err instanceof Error ? err.message : String(err);
-        return c.json(
-          {
-            error: `Could not read the journal of task ${asked.taskId} (step '${step}', try ${asked.try}): ${why}. \`nemia ls\` reads the same record from the command line.`,
-          },
-          502,
-        );
-      }
-    }),
-  )
-  .get('/api/runs/:runId/steps/:step/transcript', (c) =>
-    served(c, async ({ e, placeService, home, trace }) => {
-      const id = c.req.param('runId');
-      const step = c.req.param('step');
-      const found = taskOfStep(id, step, home);
-      if ('error' in found) return c.json({ error: found.error }, 404);
-      if (!found.taskId) return c.json({ events: [], cursor: null, live: false, open: false } satisfies StepTranscript);
-      try {
-        const read = await readTranscript(e, { placeService, home, trace }, id, step, found.taskId, c.req.query('after') || undefined);
-        return c.json(read satisfies StepTranscript);
-      } catch (err) {
-        if (err instanceof Unread) return c.json({ error: err.message }, err.status);
-        throw err;
-      }
-    }),
-  )
-  .get('/api/runs/:runId/steps/:step/transcript/stream', (c) =>
-    served(c, async ({ e, placeService, home, followings, beats, trace }) => {
-      const id = c.req.param('runId');
-      const step = c.req.param('step');
-      const found = taskOfStep(id, step, home);
-      if ('error' in found) return c.json({ error: found.error }, 404);
-      const { taskId } = found;
-      if (!taskId) {
-        return c.json(
-          {
-            error: `Step '${step}' of run '${id}' is not filed yet, so it has no session to follow. GET /api/runs/${id} gives its task once a tick files it.`,
-          },
-          404,
-        );
-      }
-      const after = c.req.header('Last-Event-ID') || c.req.query('after') || undefined;
-      let read: Read;
-      try {
-        read = await readTranscript(e, { placeService, home, trace }, id, step, taskId, after);
-      } catch (err) {
-        if (err instanceof Unread) return c.json({ error: err.message }, err.status);
-        throw err;
-      }
-      return streamSSE(c, async (stream) => {
-        if (!read.open) return settledFrom(stream, read);
-        const r: Reading = {
-          runtime: c.var.runtime,
-          followings,
-          e,
-          at: { placeService, home, trace },
-          id,
-          step,
-          beatMs: beats.step ?? STEP_BEAT_MS,
-        };
-        const stopped = await followed(stream, r, taskId, read);
-        if (stopped === null) return;
-        const same = stopped.taskId === taskId;
-        if (same) await send(stream, read);
-        await readAgain(stream, r, { task: stopped.taskId, after: same ? read.cursor : undefined, error: stopped.error });
-      });
-    }),
-  );
+export const stepsHandlers = HttpApiBuilder.group(Api, 'steps', (handlers) =>
+  handlers
+    .handle('tries', ({ params: { runId, step } }) => answered((s) => s.inRequest(TRIES.handler({ runId, step }, s.env, s.home))))
+    .handle('try', ({ params }) => answered((s) => s.inRequest(TRY.handler(params, s.env, s.home))))
+    .handle('closeout', ({ params }) => answered((s) => s.inRequest(CLOSEOUT.handler(params, s.env, s.home))))
+    .handle('told', ({ params: { runId, step } }) => answered((s) => s.inRequest(TOLD.handler({ runId, step }, s.env, s.home))))
+    .handle('log', ({ params: { runId, step } }) => logOf(runId, step))
+    .handle('artifact', ({ params: { runId, step, file } }) => artifactOf(runId, step, file))
+    .handle('file', ({ params: { runId, step, file } }) => fileOf(runId, step, file))
+    .handle('path', ({ params: { runId, step }, query }) => pathOf(runId, step, query.try))
+    .handle('transcript', ({ params: { runId, step }, query }) => transcriptAt(runId, step, query.after || undefined))
+    .handle('transcriptStream', ({ params: { runId, step }, query, headers }) =>
+      followedFrom(runId, step, headers['last-event-id'] || query.after || undefined),
+    ),
+);

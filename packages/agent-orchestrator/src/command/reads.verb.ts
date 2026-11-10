@@ -78,8 +78,17 @@ export const SHOW: Command = {
       : [`nemia show prints the run as one object; \`nemia show --raw ${textOf(args, 'runId') ?? '<runId>'}\` prints its record.`],
 };
 
-/** The run and the step a sub-resource names. */
-const stepNamed = (args: Args): [string, string] => [textOf(args, 'runId') ?? '', textOf(args, 'step') ?? ''];
+/** What a read of a run's step takes: the run's id and the step's name, as the CLI's positionals and the api's path name them. */
+export const StepInput = Schema.Struct({ runId: Schema.String, step: Schema.String });
+export type StepInput = typeof StepInput.Type;
+
+/** What a read of one try of a step takes: the step's, and the try's number as the path or the command line says it. */
+export const TryInput = Schema.Struct({ ...StepInput.fields, try: Schema.String });
+export type TryInput = typeof TryInput.Type;
+
+/** What `nemia closeout` takes: the step's, and the try's number, none for its latest. */
+export const CloseoutInput = Schema.Struct({ ...StepInput.fields, try: Schema.optionalKey(Schema.String) });
+export type CloseoutInput = typeof CloseoutInput.Type;
 
 /** The positionals of a step's sub-resource: the run's id and the step's name. */
 const RUN_STEP = [
@@ -90,8 +99,8 @@ const RUN_STEP = [
 /** What the sub-resources the api alone serves say of the command line. */
 const API_ONLY = 'a sub-resource of the run object, for a client; at the command line `nemia show <run>` prints the run whole';
 
-/** `GET /api/runs/:runId/steps/:step/tries`: a step's tries, earliest first, the current one last (`StepTry`). */
-export const TRIES: Command<{ tries: StepTry[] }> = {
+/** A step's tries, earliest first, the current one last (`StepTry`): the api's `steps` group serves it (`tries`). */
+export const TRIES: Command<{ tries: StepTry[] }, StepInput> = {
   name: 'tries',
   usage: '<runId> <step>',
   help: ["a step's tries"],
@@ -99,13 +108,13 @@ export const TRIES: Command<{ tries: StepTry[] }> = {
   writes: false,
   class: 'read',
   only: { side: 'api', why: API_ONLY },
-  route: { method: 'GET', path: '/api/runs/:runId/steps/:step/tries', status: 200 },
-  handler: (args, _env, home) => rooted(home, 'tries', stepTries(...stepNamed(args))),
+  input: StepInput,
+  handler: ({ runId, step }, _env, home) => rooted(home, 'tries', stepTries(runId, step)),
   print: (data) => [JSON.stringify(data, null, 2)],
 };
 
-/** `GET /api/runs/:runId/steps/:step/tries/:try`: one try of a step (`StepTry`). */
-export const TRY: Command<StepTry> = {
+/** One try of a step (`StepTry`): the api's `steps` group serves it (`try`). */
+export const TRY: Command<StepTry, TryInput> = {
   name: 'try',
   usage: '<runId> <step> <try>',
   help: ['one try of a step'],
@@ -117,8 +126,8 @@ export const TRY: Command<StepTry> = {
   writes: false,
   class: 'read',
   only: { side: 'api', why: API_ONLY },
-  route: { method: 'GET', path: '/api/runs/:runId/steps/:step/tries/:try', status: 200 },
-  handler: (args, _env, home) => rooted(home, 'try', stepTry(...stepNamed(args), textOf(args, 'try'))),
+  input: TryInput,
+  handler: ({ runId, step, try: n }, _env, home) => rooted(home, 'try', stepTry(runId, step, n)),
   print: (data) => [JSON.stringify(data, null, 2)],
 };
 
@@ -145,10 +154,10 @@ const closeoutLines = (n: number, c: StepCloseout): string[] => [
 ];
 
 /**
- * `nemia closeout <run> <step> [--try n]`, `GET /api/runs/:runId/steps/:step/tries/:try/closeout`: what a try of a step signed off with,
- * its latest by default (`TryCloseout`).
+ * `nemia closeout <run> <step> [--try n]`: what a try of a step signed off with, its latest by default (`TryCloseout`); the api's `steps`
+ * group serves it too (`closeout`), calling this handler.
  */
-export const CLOSEOUT: Command<TryCloseout> = {
+export const CLOSEOUT: Command<TryCloseout, CloseoutInput> = {
   name: 'closeout',
   usage: '<runId> <step> [--try <n>]',
   help: ["what a step's try signed off with: its latest, or --try <n>"],
@@ -159,18 +168,17 @@ export const CLOSEOUT: Command<TryCloseout> = {
   },
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/runs/:runId/steps/:step/tries/:try/closeout', status: 200 },
-  handler: (args, _env, home) => rooted(home, 'closeout', stepCloseout(...stepNamed(args), textOf(args, 'try'))),
-  print: ({ try: n, closeout, unreadable }, args) =>
+  only: { side: 'cli', why: "the api serves it as the `closeout` of `objects`' steps group, calling this handler" },
+  input: CloseoutInput,
+  handler: ({ runId, step, try: n }, _env, home) => rooted(home, 'closeout', stepCloseout(runId, step, n)),
+  print: ({ try: n, closeout, unreadable }, { step }) =>
     closeout
       ? closeoutLines(n, closeout)
-      : [
-          `try ${n} of ${textOf(args, 'step') ?? ''}: ${unreadable ? `its closeout does not read: ${unreadable.error}` : 'no closeout yet'}`,
-        ],
+      : [`try ${n} of ${step}: ${unreadable ? `its closeout does not read: ${unreadable.error}` : 'no closeout yet'}`],
 };
 
-/** `GET /api/runs/:runId/steps/:step/told`: what a step was told, its brief by layer and its task by part (`toldOf`). */
-export const TOLD: Command<Effect.Success<ReturnType<typeof stepTold>>> = {
+/** What a step was told, its brief by layer and its task by part (`toldOf`): the api's `steps` group serves it (`told`). */
+export const TOLD: Command<Effect.Success<ReturnType<typeof stepTold>>, StepInput> = {
   name: 'told',
   usage: '<runId> <step>',
   help: ['what a step was told'],
@@ -178,16 +186,16 @@ export const TOLD: Command<Effect.Success<ReturnType<typeof stepTold>>> = {
   writes: false,
   class: 'read',
   only: { side: 'api', why: API_ONLY },
-  route: { method: 'GET', path: '/api/runs/:runId/steps/:step/told', status: 200 },
-  handler: (args, _env, home) => rooted(home, 'told', stepTold(...stepNamed(args))),
+  input: StepInput,
+  handler: ({ runId, step }, _env, home) => rooted(home, 'told', stepTold(runId, step)),
   print: (data) => [JSON.stringify(data, null, 2)],
 };
 
 /**
  * `nemia logs`: the session output of a step's current task, read from the engine whole, or nothing for a step with no task filed — one not
- * run yet, or one the run does not have.
+ * run yet, or one the run does not have. The api's `steps` group serves its end (`log`), calling this handler.
  */
-export const LOGS: Command<{ taskId?: string; output?: string }> = {
+export const LOGS: Command<{ taskId?: string; output?: string }, StepInput> = {
   name: 'logs',
   usage: '<runId> <step>',
   help: ["that step's session output"],
@@ -201,13 +209,14 @@ export const LOGS: Command<{ taskId?: string; output?: string }> = {
   },
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/runs/:runId/steps/:step/log', status: 200 },
-  handler: Effect.fnUntraced(function* (args: Args) {
+  only: { side: 'cli', why: "the api serves its end as the `log` of `objects`' steps group, calling this handler" },
+  input: StepInput,
+  handler: Effect.fnUntraced(function* ({ runId, step }: StepInput) {
     const e = yield* EngineService;
-    const taskId = runStore.runs.read(textOf(args, 'runId') ?? '').steps[textOf(args, 'step') ?? '']?.taskId;
+    const taskId = runStore.runs.read(runId).steps[step]?.taskId;
     return taskId ? { taskId, output: yield* asked('logs', e.logs(taskId)) } : {};
   }),
-  print: ({ output }, args) => [output ?? `${textOf(args, 'step') ?? ''} has not run yet`],
+  print: ({ output }, { step }) => [output ?? `${step} has not run yet`],
 };
 
 /** The value flags `nemia stats` takes, by the query key each sets, and what each takes. */

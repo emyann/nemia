@@ -18,7 +18,6 @@ import { Effect } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
 import {
   APPROVE,
-  type Command,
   CONCLUDED,
   dropInformed,
   HOLD,
@@ -43,7 +42,7 @@ import {
 import { Api, Missing, type RunApprove, type RunPrune, type RunRefresh, type RunRetry, type RunSay, Unjudged, WriteFailed } from 'objects';
 import type { Served } from '../layer.ts';
 import { workflowPageOf } from '../step/step.ts';
-import { commandNamed, findRun, noSuchRun, runPlaced, taskOfStep } from '../store.ts';
+import { findRun, noSuchRun, taskOfStep } from '../store.ts';
 import { runStart } from '../runs/index.ts';
 import { answered, answeredIn, locatedAt, refusedAs, ServedNow } from './refused.ts';
 import { wantsTable } from './table.ts';
@@ -54,16 +53,6 @@ import { wantsTable } from './table.ts';
  */
 export const informed = <A, E, R>({ informer }: Served, program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
   Effect.provideService(program, Informer, informer);
-
-/** The run object's sub-resources, each a read of the package's table. */
-const TRIES = commandNamed('tries');
-const TRY = commandNamed('try');
-const CLOSEOUT = commandNamed('closeout');
-const TOLD = commandNamed('told');
-
-/** What a sub-resource's entry answers for the path's parameters, bound to the argument keys of the same names, as the CLI's flags. */
-export const subResource = <A>(command: Command, params: Record<string, string>) =>
-  answered(async (s) => (await runPlaced(s, s.e, informed(s, command.handler(params, s.env, s.home)))) as A);
 
 /** How a list of the runs judges each: off the app's informer and its feed's filing times, verified as the env says. */
 const howOf = (s: Served): SummaryHow => ({
@@ -294,9 +283,5 @@ export const runsHandlers = HttpApiBuilder.group(Api, 'runs', (handlers) =>
     )
     .handle('listingOne', ({ params: { name }, query }) =>
       answered(async (s) => asJson(await s.inRequest(informed(s, LS.handler({ runId: name, ...selected(query) }, s.env, s.home))))),
-    )
-    .handle('tries', ({ params }) => subResource(TRIES, params))
-    .handle('try', ({ params }) => subResource(TRY, params))
-    .handle('closeout', ({ params }) => subResource(CLOSEOUT, params))
-    .handle('told', ({ params }) => subResource(TOLD, params)),
+    ),
 );

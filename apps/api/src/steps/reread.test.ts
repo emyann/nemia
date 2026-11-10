@@ -4,9 +4,9 @@
  * `STEP_BEAT_MS` by default) for as long as a reader is there. Everywhere else it is read once a request: a session the runtime pushes
  * is relayed as it is written, and is never put on a timer.
  *
- * `timers` names what in a source of `src/steps/` reads again on its own — a sleep, `setInterval`, `setTimeout`, an Effect `Schedule` —
- * and `loopsAround` counts the loops whose body calls a function. These tests hold the folder to the one beat and no other, and refuse a
- * second one.
+ * `timers` names what in a source of `src/steps/` reads again on its own — a sleep, `setInterval`, `setTimeout`, an Effect `Schedule`,
+ * an `AbortSignal.timeout` — and `loopsAround` counts the loops whose body calls a function. These tests hold the folder to the one beat
+ * and no other, and refuse a second one.
  */
 import '../../test/harness.ts';
 import { test } from 'node:test';
@@ -21,6 +21,7 @@ const TIMERS: readonly [RegExp, string][] = [
   [/\bsetInterval\s*\(/, 'setInterval'],
   [/\bsetTimeout\s*\(/, 'setTimeout'],
   [/\bSchedule\s*\./, 'an Effect Schedule'],
+  [/\bAbortSignal\.timeout\s*\(/, 'an AbortSignal timeout'],
 ];
 
 /** The index past the bracket that closes the one opened at `from` (`open`, then `close`), or the text's end. */
@@ -77,8 +78,17 @@ test('the beat is the folder’s one timer, and it waits the served beat, `STEP_
   assert.match(routes, /export const STEP_BEAT_MS = /, 'the beat is a constant of its own, the served one by default');
   for (const file of sources) {
     const text = fs.readFileSync(path.join(STEPS, file), 'utf8');
-    assert.deepEqual(timers(text), file === 'steps.ts' ? ['a sleep'] : [], `${file}: no timer but the beat's own sleep`);
+    assert.deepEqual(
+      timers(text),
+      file === 'steps.ts' ? ['a sleep', 'an AbortSignal timeout'] : [],
+      `${file}: no timer but the beat's own sleep, and the wait that sleep is made of`,
+    );
   }
+  assert.equal(routes.match(/\bAbortSignal\.timeout\s*\(/g)?.length, 1, "one wait, the stream's `sleep`, which the beat alone calls");
+  assert.match(
+    routes,
+    /sleep: \(ms\) =>\s*new Promise<void>\(\(resolve\) => \{\s*const over = AbortSignal\.any\(\[gone\.signal, AbortSignal\.timeout\(ms\)\]\)/,
+  );
   assert.deepEqual(
     sleepsOf(routes),
     ['r.beatMs', 'r.beatMs'],
@@ -107,6 +117,7 @@ test('REFUSED: a second beat — a loop around `readTranscript` beside the one �
   );
   assert.deepEqual(timers('const t = setInterval(() => readTranscript(e, id, step, taskId), 1_000);'), ['setInterval']);
   assert.deepEqual(timers('setTimeout(again, 1_000);'), ['setTimeout']);
+  assert.deepEqual(timers('AbortSignal.timeout(1_000).onabort = again;'), ['an AbortSignal timeout']);
   assert.deepEqual(timers('Effect.repeat(read, Schedule.spaced("1 second"))'), ['an Effect Schedule']);
   assert.deepEqual(timers('await stream.sleep(r.beatMs);'), ['a sleep']);
   assert.notDeepEqual(

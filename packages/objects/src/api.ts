@@ -53,6 +53,7 @@ import { Template, TemplateList } from './template.ts';
 import { BadRequest, Conflict, Failed, Forbidden, Invalid, listQuery, Missing, Unauthorized, Unjudged, WriteFailed } from './api-errors.ts';
 import { DelegationsGroup, ProposalsGroup } from './proposal-api.ts';
 import { RunsGroup } from './run-api.ts';
+import { StepsGroup } from './step-api.ts';
 import { Subscription, SubscriptionList } from './subscription.ts';
 import { Event, EventList } from './event.ts';
 import { KINDS, type Kind } from './words.ts';
@@ -576,6 +577,7 @@ export const RESOURCE_PLURALS = {
 /** Everything the api serves as objects. */
 export const Api = HttpApi.make('nemia')
   .add(RunsGroup)
+  .add(StepsGroup)
   .add(CardsGroup)
   .add(FactoriesGroup)
   .add(McpServersGroup)

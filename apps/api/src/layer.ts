@@ -25,10 +25,10 @@ import {
   PlaceService,
   type ProposalCaller,
   EngineService,
+  type LastSaid,
 } from 'agent-orchestrator';
 import { McpAsker } from './capabilities/capabilities.ts';
 import { routeOf } from './request/request.ts';
-import type { LastSaid } from './steps/logs.ts';
 import { type Place, placeFor } from './factory/place.ts';
 import { QuotaAsker } from './gauges/quota.ts';
 import { Followings } from './steps/following.ts';

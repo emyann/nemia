@@ -29,7 +29,7 @@ import { openapi, REFERENCE_BUNDLE, referenceOf } from './openapi/index.ts';
 import { saidRequest } from './request/request.ts';
 import { stats } from './stats/stats.ts';
 import { step } from './step/step.ts';
-import { Followings, steps } from './steps/index.ts';
+import { Followings } from './steps/index.ts';
 import { engineRead, Engine } from './store.ts';
 import { builder, workflows, yours } from './workflows/index.ts';
 
@@ -156,7 +156,6 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  * - commands/routes.ts — the routes the package's table generates, each through one pipeline: the store's pause put and lifted,
  *   `nemia pause` and `nemia resume`'s routes; an agent's custom instructions
  *   written and cleared; and a factory's instruction put where it is kept, and written and cleared.
- * - steps/steps.ts — a step's own reads: its output, its files, and its conversation, once or followed.
  * - gauges/feed.ts — the workflow feed followed, as server-sent events.
  * - nemia/nemia.ts — Nemia, the store's own agent: where she is (`nemia level`'s read), and the facts she keeps (`nemia memory`). Her
  *   level is set on the route the table generates from `nemia level`.
@@ -228,7 +227,6 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
       }),
     )
     .route('/', commands)
-    .route('/', steps)
     .route('/', feed)
     .route('/', nemia)
     .route('/', nemiaChat)

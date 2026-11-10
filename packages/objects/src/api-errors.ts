@@ -67,6 +67,18 @@ export class WriteFailed extends Schema.Class<WriteFailed>('WriteFailed')({ erro
 /** A run one of whose tasks does not read, so it is not judged: a 502, in the words the list says it with. */
 export class Unjudged extends Schema.Class<Unjudged>('Unjudged')({ error: Schema.String }, { httpApiStatus: 502 }) {}
 
+/**
+ * A read of the package's the api made and that failed under it — a step's session output, its task's journal, its conversation, which
+ * the engine or a harness could not read: a 502, naming the command that reads the same thing from the command line.
+ */
+export class ReadFailed extends Schema.Class<ReadFailed>('ReadFailed')({ error: Schema.String }, { httpApiStatus: 502 }) {}
+
+/**
+ * A thing that was there and was removed on purpose, its record kept — a step's file `nemia prune --artifacts` removed: a 410, with when
+ * it was removed (`pruned`), so a client tells it from one that never was (a 404).
+ */
+export class Gone extends Schema.Class<Gone>('Gone')({ error: Schema.String, pruned: Schema.String }, { httpApiStatus: 410 }) {}
+
 /** One label query, or several given again, OR'd. */
 const LabelQuery = Schema.optionalKey(Schema.Union([Schema.String, Schema.Array(Schema.String)]));
 

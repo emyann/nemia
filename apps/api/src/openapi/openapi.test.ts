@@ -209,8 +209,15 @@ test("the document holds the RunList, a run in its namespace, and each of the ru
   }
 });
 
-/** The component each read of the runs group answers with, by its endpoint's name. */
-const ANSWERS = { show: 'Run', tries: 'StepTries', try: 'StepTry', closeout: 'TryCloseout', told: 'StepTold' } as const;
+/** The component each read of a run and of its steps answers with, by its endpoint's group and name. */
+const ANSWERS = {
+  'runs.show': 'Run',
+  'steps.tries': 'StepTries',
+  'steps.try': 'StepTry',
+  'steps.closeout': 'TryCloseout',
+  'steps.told': 'StepTold',
+  'steps.transcript': 'StepTranscript',
+} as const;
 
 test("each read of a run's path names its answer's component, which imports back and decodes what the route answers", async () => {
   const doc = (await (await app().request('/openapi/v3/nemia/v1')).json()) as {
@@ -219,8 +226,8 @@ test("each read of a run's path names its answer's component, which imports back
   };
   const asked = { name: R, runId: R, step: 'design', try: '1' };
   for (const [operation, name] of Object.entries(ANSWERS)) {
-    const found = Object.entries(doc.paths).find(([, { get }]) => get?.operationId === `runs.${operation}`);
-    assert.ok(found, `the document has the runs group's ${operation}`);
+    const found = Object.entries(doc.paths).find(([, { get }]) => get?.operationId === operation);
+    assert.ok(found, `the document has ${operation}`);
     const [path, { get }] = found;
     assert.deepEqual(
       get?.responses['200']?.content,

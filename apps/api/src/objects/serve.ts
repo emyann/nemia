@@ -39,6 +39,7 @@ import { delegationsHandlers, proposalsHandlers } from '../proposals/index.ts';
 import { endpointOf } from './endpoints.ts';
 import { ServedNow } from './refused.ts';
 import { runsHandlers } from './runs.ts';
+import { stepsHandlers } from '../steps/index.ts';
 import { type Listed, watchable } from '../watch/watch.ts';
 import { discoveryHandlers } from '../discovery/discovery.ts';
 import { eventsFollowed, eventsHandlers, subscriptionsHandlers } from '../feed-objects/index.ts';
@@ -143,6 +144,7 @@ export const objectsHandler = (runtime: ApiRuntime) =>
     HttpApiBuilder.layer(Api).pipe(
       Layer.provide([
         runsHandlers,
+        stepsHandlers,
         cardsHandlers,
         factoriesHandlers,
         mcpServersHandlers,

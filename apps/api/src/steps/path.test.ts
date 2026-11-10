@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { lifecycleGraph } from 'agent-orchestrator';
 import { app } from '../app.ts';
-import type { StepPath } from './path.ts';
+import { LIFECYCLE_STATES, type StepPath } from 'objects';
 
 const T0 = Date.parse('2026-09-29T08:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
@@ -171,4 +171,8 @@ test("A person reads a step's path, try by try: none before it is filed, the cur
     const current = (await get('/api/runs/r-held/steps/implement/path')).body;
     assert.deepEqual([current.try, words(current).slice(-2)], [4, ['submitted <- input', 'starting <- starting']]);
   });
+});
+
+test("objects' words for a task's lifecycle states are the runtime's, in its table's order: the `Api`'s StepPath says no other", () => {
+  assert.deepEqual([...LIFECYCLE_STATES], lifecycleGraph().states);
 });

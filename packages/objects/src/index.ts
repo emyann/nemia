@@ -311,3 +311,25 @@ export {
 export { UnsupportedMediaType } from './api-errors.ts';
 export { Table, TABLE_ACCEPT, TableColumnDefinition, TableRow } from './table.ts';
 export { Concluded, RunLines, RunRecord, RunsListed, StepCommands, WorkflowPageAddress } from './run-reads.ts';
+export { Gone, ReadFailed } from './api-errors.ts';
+export {
+  LifecycleEdge,
+  LifecycleGraph,
+  LifecycleTransition,
+  LifecycleVerb,
+  StepFile,
+  StepPath,
+  StepsGroup,
+  StepStreamEvent,
+  StepTranscript,
+  TranscriptEvent,
+} from './step-api.ts';
+export { StepLog } from './run.ts';
+export {
+  LIFECYCLE_STATES,
+  type LifecycleState,
+  TRANSCRIPT_ORIGINS,
+  type TranscriptOrigin,
+  TRANSCRIPT_ROLES,
+  type TranscriptRole,
+} from './words.ts';

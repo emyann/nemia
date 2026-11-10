@@ -538,3 +538,48 @@ export const KINDS = [
   'Delegation',
 ] as const;
 export type Kind = (typeof KINDS)[number];
+
+/**
+ * The states of a task's lifecycle, the runtime's (`STATES`, agent-runtime's lifecycle.ts), in its table's order: what a step's path says
+ * a task was in at each entry of its journal. Held equal to the runtime's by the api's step reads' test.
+ */
+export const LIFECYCLE_STATES = [
+  'submitted',
+  'starting',
+  'working',
+  'input-required',
+  'stopping',
+  'ending',
+  'completed',
+  'failed',
+  'canceled',
+] as const;
+
+/** One of `LIFECYCLE_STATES`. */
+export type LifecycleState = (typeof LIFECYCLE_STATES)[number];
+
+/** Who said an event of a session's conversation (`TranscriptEvent['role']`, agent-runtime's seam.ts): a tool's result is `user`. */
+export const TRANSCRIPT_ROLES = ['assistant', 'user', 'system'] as const;
+
+/** One of `TRANSCRIPT_ROLES`. */
+export type TranscriptRole = (typeof TRANSCRIPT_ROLES)[number];
+
+/**
+ * Where a `user` event's words came from, as the harness said it: the runtime's `ORIGIN_KINDS` (agent-runtime's seam.ts, the Agent SDK's
+ * words) and `unknown`, which the runtime reads a word it has not named as (`originOf`).
+ */
+export const TRANSCRIPT_ORIGINS = [
+  'human',
+  'channel',
+  'peer',
+  'task-notification',
+  'coordinator',
+  'unclassified',
+  'observer',
+  'auto-continuation',
+  'observer-activity',
+  'unknown',
+] as const;
+
+/** One of `TRANSCRIPT_ORIGINS`. */
+export type TranscriptOrigin = (typeof TRANSCRIPT_ORIGINS)[number];

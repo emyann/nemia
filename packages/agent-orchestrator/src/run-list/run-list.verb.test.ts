@@ -28,7 +28,7 @@ const judgeOf = (broken: readonly string[] = []) => {
     Effect.sync((): RunObjectAnswer => {
       asked.push(run.id);
       return broken.includes(run.id)
-        ? { unjudged: 'its journal does not read' }
+        ? { unjudged: 'its journal does not read', steps: [{ name: 'build', message: 'unreadable', branch: null }] }
         : ({ apiVersion: 'nemia/v1', kind: 'Run', metadata: { name: run.id } } as unknown as RunObject);
     });
   return { asked, judge };

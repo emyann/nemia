@@ -2,8 +2,9 @@
  * `nemia ls [-l <selector>]... [--show-labels] [-L <key>]... [-o wide]`, read from the api: the runs, those a selector takes (sent as
  * `labelSelector`, given again for another), as the server prints them — the runs list asked for its `Table` (`TABLE_ACCEPT`), printed by
  * `tableLines`, each run's status and what waits on you among its columns — with the pause first (`GET /api/pause`, `pausedLines`), and
- * after the table how old what it shows of where the result branches stand is, where the server says so (`Daemon.branchesLine`), a line per schedule of each factory (`GET /api/namespaces/<factory>/schedules`, `scheduleLines`) and the daemon's
- * line last, the server's own (`GET /api/daemon`). Any other words go to the old path: `nemia ls <run>` among them.
+ * after the table how old what it shows of where the result branches stand is, where the server says so (`Daemon.branchesLine`), a
+ * line per schedule of each factory (`GET /api/namespaces/<factory>/schedules`, `scheduleLines`) and the daemon's line last, the
+ * server's own (`GET /api/daemon`). Any other words go to the old path: `nemia ls <run>` among them.
  */
 import { Effect } from 'effect';
 import { spawned } from '../local.ts';

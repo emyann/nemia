@@ -125,7 +125,11 @@ journal('t-working', [
     harnessVersion: '0.200.0',
   },
 ]);
-/** A run of the one step `build`, its task `taskId` and its branch `branch` where given, its workflow folder `workflowDir` or none. */
+/**
+ * A run of the one step `build`, its task `taskId`, with `more` on its record and `step` on its step's: the seed of `nemia ls`'s lines
+ * around and under its table — `standing.json` read long ago, a finished run's result branch, a run whose journal does not read, and a
+ * step blocked asking two questions its folder's `output:` declares a field of.
+ */
 const oneStepRun = (id: string, taskId: string, more: object = {}, step: object = {}) =>
   write(
     path.join(root, 'runs', `${id}.json`),
@@ -141,15 +145,11 @@ const oneStepRun = (id: string, taskId: string, more: object = {}, step: object 
       ...more,
     }),
   );
-/** Where the result branches stand, as the tick's last pass read them long ago: `nemia ls` says how long. */
 write(path.join(root, 'standing.json'), JSON.stringify({ v: 1, at: at(0), places: [] }));
-/** A run that finished, its result step's branch left where nothing is to decide: `nemia ls` names it. */
 oneStepRun('r-landed', 't-landed', {}, { branch: 'wf/r-landed/build' });
 settled('t-landed', { outcome: 'done', summary: 'Built it.', needs: null, artifacts: [] }, 210);
-/** A run a task journal of which does not read: `nemia ls -o wide` says its steps off its record. */
 oneStepRun('r-unread', 't-unread', {}, { branch: 'wf/r-unread/build' });
 write(path.join(root, 'engine', 'tasks', 't-unread.jsonl'), '{ this is no journal\n');
-/** A run whose step signed off blocked asking two questions, a field of questions its folder's `output:` declares. */
 const asker = path.join(root, 'asker');
 write(path.join(asker, 'plan.md'), '---\nworkspace: folder\nharness: codex\noutput: plan.schema.json\n---\nPlan it.\n');
 write(

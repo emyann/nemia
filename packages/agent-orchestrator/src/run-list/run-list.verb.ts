@@ -208,6 +208,15 @@ const framedList = (
   return { ...list, metadata: { ...list.metadata, ...frame }, ...(unjudged.length ? { unjudged } : {}) };
 };
 
+/** A run of a list asked by state left unjudged: its name, namespace and state, and why with its steps where its answer says. */
+const unjudgedOf = (one: Stated, answer: RunObjectAnswer): RunUnjudged => ({
+  name: one.name,
+  namespace: runNamespace(one.run.factory),
+  error: 'unjudged' in answer ? answer.unjudged : '',
+  ...('unjudged' in answer ? { steps: [...answer.steps] } : {}),
+  state: one.state,
+});
+
 /** How many of `stated` are in each state. */
 const countsOf = (stated: readonly Stated[]) => {
   const counts = { waiting: 0, inFlight: 0, finished: 0 };
@@ -251,14 +260,7 @@ const byState = Effect.fnUntraced(function* <E, R, O>(
   const unjudged: RunUnjudged[] = [];
   for (const one of page.items) {
     const answer = 'judgement' in one.one ? yield* reads.objectOf(one.run, one.one.judgement, filed) : one.one;
-    if ('unjudged' in answer || one.summary === undefined || !('judgement' in one.one))
-      unjudged.push({
-        name: one.name,
-        namespace: runNamespace(one.run.factory),
-        error: 'unjudged' in answer ? answer.unjudged : '',
-        ...('unjudged' in answer ? { steps: [...answer.steps] } : {}),
-        state: one.state,
-      });
+    if ('unjudged' in answer || one.summary === undefined || !('judgement' in one.one)) unjudged.push(unjudgedOf(one, answer));
     else items.push(framed(answer, framePartsOf(one.summary, one.one.judgement, filed, now)));
   }
   return framedList(page, items, unjudged, { counts, asOf: new Date(now).toISOString() });

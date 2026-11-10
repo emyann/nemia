@@ -12,6 +12,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { Cause, Effect, Exit, Result } from 'effect';
 import { EngineService, denialText, over, unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
 import { refusedCheck, type Run } from '../record/record.ts';
+import { attemptVerdict } from '../check/check.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import type { Workflow } from '../step/step.ts';
 import { timeline } from '../timeline/index.ts';
@@ -30,13 +31,15 @@ import { deniedCallsOf, filesTouchedOf, skillsLoadedOf } from './discipline.ts';
 import { selectedRuns } from '../labels/labels.ts';
 import type { Selectors } from '../watch/selector.ts';
 
-/** How a check's task ended (`CheckVerdict`): passed, refused (it ran to its end and exited non-zero, `refusedCheck`), or unfinished. */
+/**
+ * How a check's task ended (`CheckVerdict`): passed, refused (its exit code a verdict, `attemptVerdict`, and non-zero, `refusedCheck`), or
+ * unfinished.
+ */
 function verdictOf(view: TaskView | undefined): CheckVerdict {
   const phase = phaseOfView(view);
   if (phase === 'succeeded') return 'passed';
-  const last = view?.state.attempts.at(-1);
-  const code = typeof last?.exitCode === 'number' && last.reason !== 'deadline' && last.reason !== 'operator' ? last.exitCode : undefined;
-  return refusedCheck(phase, code) ? 'refused' : 'unfinished';
+  const verdict = attemptVerdict(view?.state.attempts.at(-1));
+  return refusedCheck(phase, verdict === 'unfinished' ? undefined : verdict) ? 'refused' : 'unfinished';
 }
 
 /**

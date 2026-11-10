@@ -129,6 +129,15 @@ test('attemptVerdict: the exit code an attempt recorded, else unfinished', async
     ['cut short by an operator', { exitCode: 1, reason: 'operator' }],
   ];
   for (const [name, attempt] of unfinished) await t.test(`unfinished: ${name}`, () => assert.equal(attemptVerdict(attempt), 'unfinished'));
+  await t.test('the one judgement: no other source reads an end cut short by its reason', () => {
+    const src = path.resolve(import.meta.dirname, '..');
+    const cut = /reason\s*!==?=?\s*'(?:deadline|operator)'/;
+    const reading = fs
+      .readdirSync(src, { recursive: true, encoding: 'utf8' })
+      .filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts'))
+      .filter((file) => cut.test(fs.readFileSync(path.join(src, file), 'utf8')));
+    assert.deepEqual(reading, [path.join('check', 'check.ts')], 'call attemptVerdict (src/check/check.ts) instead');
+  });
 });
 
 test('refusedCheck: only a check that failed with an exit code read refused the work', async (t) => {

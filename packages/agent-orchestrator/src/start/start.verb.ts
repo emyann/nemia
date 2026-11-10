@@ -33,7 +33,7 @@ import { contextRefusal } from './context.ts';
 import { cardsRefusal, inputRefusal, type InputFile } from './inputs.ts';
 import { CardDoor } from '../cards/cards.store.ts';
 import { CardName } from '../inbox/inbox.model.ts';
-import { inboxNameRefusal } from '../inbox/inbox.ts';
+import { inboxNameRefusal } from '../inbox/index.ts';
 import { inboxDir } from '../record/files.store.ts';
 import { runsAtOnce } from '../runs/runs.store.ts';
 import { storeRootRefusal } from './store-root.ts';

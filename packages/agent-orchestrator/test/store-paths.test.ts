@@ -72,6 +72,12 @@ const EXCEPTIONS: Readonly<Record<string, Exception>> = {
       'are written once per content at nemia start and where its pins move, and read by its checks and sessions as WF_WORKFLOW_FILES ' +
       "and WF_CARRIED_FILES: neither its record, a person's file nor the inbox",
   },
+  'packages/agent-orchestrator/src/tick/told.verb.ts': {
+    through: ['handedFolderAt'],
+    why:
+      "the folders of a run another is handed, runs/<id>/artifacts and runs/<id>/inputs, are looked for at each filing, to be mounted " +
+      "read-only where each is a directory now: neither its record, a person's file nor the inbox",
+  },
 };
 
 /** `node` without the parentheses, `as`, `satisfies` and `!` around it. */

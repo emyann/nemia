@@ -132,7 +132,7 @@ test('a step given skills from four places: frozen as files under bare names, na
   const review = fs.readFileSync(path.join(dev, 'review.md'), 'utf8');
   fs.writeFileSync(path.join(dev, 'review.md'), review.replace('agent: reviewer\n', 'agent: reviewer\nskills: y\n'));
   let run: { id: string } = { id: '' };
-  let record: StepSpec[] = [];
+  let record: readonly StepSpec[] = [];
   let files: Record<string, string> = {};
 
   await s.test("the folder's check gives implement its agent's skills, then its step's, each once, the step's own line kept apart", () => {

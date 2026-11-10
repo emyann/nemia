@@ -118,8 +118,8 @@ const specOf = (run: Run, at: RunReading): RunSpec => ({
   work: isRepositoryRun(run) ? null : run.workspace,
   workflowDir: run.workflowDir,
   try: tryOf(run, at.home),
-  after: run.after ?? [],
-  context: run.context ?? [],
+  after: [...(run.after ?? [])],
+  context: [...(run.context ?? [])],
   from: run.from ? { inbox: run.from.inbox } : null,
 });
 
@@ -303,7 +303,7 @@ const restOf = (run: Run, at: RunReading, kinds: readonly Drift[]) => {
     cancelledAt: run.cancelledAt ?? null,
     pruned: prunedOf(run),
     onDisk: { worktrees: false, files: false },
-    holdUntil: judged.holding && run.hold ? run.hold.until : [],
+    holdUntil: judged.holding && run.hold ? [...run.hold.until] : [],
     read: runRead(at),
     waitingOnYou: judged.waitingOnYou,
     waitingOnYouWords: judged.waitingOnYouWords,

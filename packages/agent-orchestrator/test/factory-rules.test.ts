@@ -74,7 +74,7 @@ const started = (here: { repo: string; dev: string }, brief: string, factory?: s
   runPlaced(startRun({ brief, repo: here.repo, workflowDir: here.dev, ...(factory !== undefined && { factory }) }));
 
 /** The steps a run froze at its start. */
-const frozen = (id: string): StepSpec[] => runRecord(id).workflow ?? [];
+const frozen = (id: string): readonly StepSpec[] => runRecord(id).workflow ?? [];
 
 /** The prompt rendered for a step of a run at its start. */
 const promptOf = (run: Parameters<typeof agentFilesDir>[0], step: string): string =>
@@ -103,7 +103,7 @@ const printedBy = async (t: Mocker, ...argv: string[]): Promise<string[]> => {
 };
 
 /** A step's keys, its words and its rules set aside: what the rules must not move. */
-const keysOf = (steps: StepSpec[]) =>
+const keysOf = (steps: readonly StepSpec[]) =>
   steps.map(({ body: _b, agent, ...keys }) => ({ ...keys, agent: { ...agent, factoryRules: undefined } }));
 
 test("a factory's rules and its instruction, from none to cleared: told as their own layer, frozen at the start, reaching later runs", async (t) => {

@@ -661,8 +661,8 @@ test("a run waiting on you, on git: its whole screens, what its branches touched
       b.logs.set(`${run.id}-implement-check`, '# pass 1\n');
       await runWith(b.e, advanceRun(runRecord(run.id)));
       b.settle(`${run.id}-review`, 'succeeded', SIGNED);
-      const record = runRecord(run.id);
-      for (const step of Object.values(record.steps)) step.branch = branch;
+      const read = runRecord(run.id);
+      const record = { ...read, steps: Object.fromEntries(Object.entries(read.steps).map(([name, step]) => [name, { ...step, branch }])) };
       fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(record, null, 2));
       a = { run, repo, branch, b };
 

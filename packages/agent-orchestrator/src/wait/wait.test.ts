@@ -194,8 +194,7 @@ test("a pass records the tips of a finished run's result branches — `tipBranch
   const fan = [step('a'), step('b'), step('c', ['a', 'b'])];
   const branched = (rest: Partial<RepositoryRun> = {}): Run => {
     const r = run({ a: 't1', b: 't2', c: 't3' }, rest);
-    for (const name of ['a', 'b', 'c']) r.steps[name].branch = `wf/r-1/${name}`;
-    return r;
+    return { ...r, steps: Object.fromEntries(Object.entries(r.steps).map(([name, s]) => [name, { ...s, branch: `wf/r-1/${name}` }])) };
   };
   await t.test('the result branch of a run succeeded or failed, or stopped on a person, and no other', () => {
     for (const status of ['succeeded', 'failed', 'awaiting approval', 'waiting'] as const)
@@ -204,13 +203,15 @@ test("a pass records the tips of a finished run's result branches — `tipBranch
   await t.test('none of a run running or cancelled, --no-worktree, or that worked on its base branch', () => {
     assert.deepEqual([tipBranches(branched(), fan, 'running'), tipBranches(branched(), fan, 'cancelled')], [[], []]);
     assert.deepEqual(tipBranches(branched({ isolate: false }), fan, 'succeeded'), []);
-    const onBase = branched();
-    onBase.steps.c.branch = 'main';
+    const branches = branched();
+    const onBase = { ...branches, steps: { ...branches.steps, c: { taskId: 't3', branch: 'main' } } };
     assert.deepEqual(tipBranches(onBase, fan, 'succeeded'), []);
   });
   await t.test('a chain on one line: its one branch', () => {
-    const chain = run({ implement: 't1', review: 't2' });
-    chain.steps.implement.branch = chain.steps.review.branch = 'wf/r-1/implement';
+    const chain = run(
+      { implement: 't1', review: 't2' },
+      { steps: { implement: { taskId: 't1', branch: 'wf/r-1/implement' }, review: { taskId: 't2', branch: 'wf/r-1/implement' } } },
+    );
     assert.deepEqual(tipBranches(chain, STEPS, 'succeeded'), ['wf/r-1/implement']);
   });
   await t.test('`tipsSeen` writes what moved, nothing when none did, and keeps a tip once its branch is gone', () => {

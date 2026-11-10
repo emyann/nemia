@@ -9,12 +9,11 @@ import type { Verdict } from '../check/check.ts';
 import type { StepSpec } from '../step/step.ts';
 import type { EarlierTry, RetryAsk } from '../retry/index.ts';
 import type { MergeOf, RoundAsk } from '../status/status.ts';
-import type { Pause } from '../pause/pause.ts';
 import type { Pin } from '../revisions/revisions.ts';
 import type { Labels } from '../labels/labels.ts';
-import type { HarnessSettings } from '../harness-settings/harness-settings.ts';
 import type { PlaceKind, StepStatusWord } from 'objects';
 import type { EndedForGood, HonoursAsks } from '../../contracts/honours-asks.contract.ts';
+import type { FolderRun as FolderRunModel, RepositoryRun as RepositoryRunModel } from './record.model.ts';
 
 /**
  * A folder a step may reach beyond its workspace, as the runtime takes it (`config.mounts`): an absolute path, and whether the step may
@@ -35,41 +34,20 @@ export type CloseoutAsked = boolean | 'unsigned';
 /**
  * A run record: a repository run (`RepositoryRun`), whose steps work on branches of one repository, or a folder run (`FolderRun`), whose
  * steps work in folders the run makes and which needs no repository. Which is `place`, frozen at start: absent on a repository run, as
- * on any record that names no kind, and `{ kind: 'folder' }` on a folder run, an object so that another kind can say which workspace it is.
+ * on any record that names no kind, and `{ kind: 'folder' }` on a folder run. The record as stored: the model's encoded side
+ * (`record.model.ts`), whose keys say what each field means. Imported for its type alone, so this file loads no Effect.
  */
 export type Run = RepositoryRun | FolderRun;
+export type RepositoryRun = Held<typeof RepositoryRunModel.Encoded>;
+export type FolderRun = Held<typeof FolderRunModel.Encoded>;
 
-export type RepositoryRun = RunBase & {
-  place?: undefined;
-  /** The repository the work is about. */
-  repo: string;
-  /** The commit the workspace started from, so a reviewer can diff against it. */
-  baseRef: string;
-  /** The repository's branch when the run started. */
-  branch: string;
-  /** Whether each step gets a worktree of its own. False only for `--no-worktree`. */
-  isolate: boolean;
-  /**
-   * The place skill a run named when a record said which place its verbs ran from, by name and digest. Read and kept, never written: a
-   * run asks the place its program is given.
-   */
-  placeSkill?: { skill: string; version: string };
-  /**
-   * The file whose presence says a merge is staged in the repository's checkout, as the place's `open` named it at `nemia start`, read
-   * with a `stat` (`stagedHere`). Absent for a run started before the place named one, whose checkout is read through `status`.
-   */
-  stagedFile?: string;
-};
-
-/** A run of a team whose every step says `place: folder`: no repository, no base, no branch, no worktrees. */
-export type FolderRun = RunBase & {
-  place: { kind: 'folder' };
-  repo?: undefined;
-  baseRef?: undefined;
-  branch?: undefined;
-  isolate?: undefined;
-  placeSkill?: undefined;
-  stagedFile?: undefined;
+/**
+ * A record as its reader holds it: a copy of its own, read off the disk, whose fields and steps a pass sets in place before it writes the
+ * record back once (`rewriteRun`) — every helper of the pass reads the one copy, so a field set by one is read by the next. The model's
+ * encoded side with its own fields and its `steps` writable; the arrays it holds stay read-only.
+ */
+type Held<R extends { readonly steps: object }> = {
+  -readonly [K in keyof R]: K extends 'steps' ? Record<string, R['steps'][keyof R['steps']]> : R[K];
 };
 
 /**
@@ -87,214 +65,11 @@ export const placeOf = (run: Pick<Run, 'place'>): PlaceKind => run.place?.kind ?
 /** Whether a run is a repository run: what reading its repository, base and branches needs. */
 export const isRepositoryRun = (run: Run): run is RepositoryRun => placeOf(run) === 'git';
 
-type RunBase = {
-  id: string;
-  /**
-   * Where the run's first step works: its repository's checkout, or a folder run's own folder. Later steps inherit, fork or merge from it.
-   */
-  workspace: string;
-  /** What the person actually asked for. This travels to EVERY step; it is the spec. */
-  brief: string;
-  workflowDir: string;
-  /**
-   * The workflow as it was when the run started, read once by `nemia start` and never again.
-   *
-   * A fence, not a cache. The folder is a path anybody can edit — with `--no-worktree` a step works
-   * in the very checkout it lives in — and a `check:` is the command that judges a step: one the step
-   * could rewrite would be a step marking its own homework. Every pass reads this. Absent, the folder
-   * is read.
-   */
-  workflow?: StepSpec[];
-  /**
-   * The runs this one waits on (`nemia start --after`), frozen at start like the workflow: none of its steps is filed until
-   * every one of them has landed (`runReady`). Absent on a run that waits on none.
-   */
-  after?: string[];
-  /**
-   * The runs this one is handed as context (`nemia start --from`, a card's `from:`), frozen at start: what each concluded is read once, on
-   * the pass that files the roots, and none is ever waited on. Absent on a run handed none.
-   */
-  context?: string[];
-  /**
-   * The files `nemia start --input` copied into the run's own `inputs/` directory (`inputsDir` in record.store.ts), by name, in the order
-   * given. Named on every step's brief that carries what was asked for (`inputsLine`), and under the run's line in `nemia decide`. Absent
-   * on a run given none.
-   */
-  inputs?: string[];
-  /**
-   * The digest's hex of the run's own copy of its workflow folder (`workflowFilesDir` in frozen.store.ts), which its next filings take:
-   * every check and session is told the folder as `WF_WORKFLOW_FILES`. Taken at `nemia start` (`freezeWorkflowFiles`) and again wherever
-   * the run's pins move (`renderAgain`), so a check line and the scripts it runs are the one revision. Absent on a run started before
-   * the copy was taken.
-   */
-  workflowFiles?: string;
-  /**
-   * The digest's hex of the run's own copy of the carried folder beside its workflow's (`carriedFilesDir` in frozen.store.ts): every check
-   * and session is told it as `WF_CARRIED_FILES`. Taken with `workflowFiles`, at `nemia start` and wherever the run's pins move
-   * (`renderAgain`); absent where no `carried/` stands beside the workflow's folder.
-   */
-  carriedFiles?: string;
-  /**
-   * Where the run came from, when it was not typed at `nemia start`: `{ inbox: <name> }` for a card started out of the inbox
-   * (`startFromInbox` in inbox.verb.ts), which keeps the card. The inbox's listing reads it to give the card its state, `started` while
-   * this record stands, and `nemia inbox` to say it was `started as` this run, and `nemia decide` names the card under the run's line.
-   * Absent on a run started any other way.
-   */
-  from?: { inbox: string };
-  /**
-   * The schedule that started the run, when the tick did (`startDue` in schedule.verb.ts): the factory, the workflow, and the fire it was
-   * started for (`due`). The schedule's last run is read off it. Absent on a run started any other way.
-   */
-  scheduled?: { factory: string; workflow: string; due: string };
-  /**
-   * The steps this run is gated at beyond those its workflow gates (`gate: true`), frozen at start: `nemia start --gate <step>`, and an
-   * inbox card's `gate:`. Each such step's closeout waits for a person — `nemia approve` — before anything after it is filed (`hasGate`).
-   * Absent on a run given none.
-   */
-  gates?: string[];
-  /**
-   * The factory the run was started in (`nemia start --factory`), frozen at start: its hires filled the steps, and a repository run's
-   * `repo` is one of its repositories. Absent on a run in the default factory, which is every record written before a run named its
-   * factory.
-   */
-  factory?: string;
-  /**
-   * The folders beyond its workspace each local step may read, frozen at start from the factory (`factoryMounts`): its repositories but
-   * the run's own, each read-only, left out when it was no directory at start. Filed with every local step (`filedConfig`), named on its
-   * brief (`mountsLine`), so a later change to the factory changes no run started. Absent: none.
-   */
-  mounts?: Mount[];
-  /**
-   * The factory's volumes, frozen at start from its file (`factoryVolumes`): folders of the person's machine apart from its
-   * repositories, each marked as the factory named it, left out when it was no directory at start. Filed with every local step beside
-   * `mounts` (`volumeMounts`), a writable one writable only where the step's fence writes, and named on its brief. Kept apart from
-   * `mounts` so that `writable:` never widens one by its folder's name. A writable volume is not the run's workspace: nothing commits,
-   * lands or reverts what a step writes there. Absent: none.
-   */
-  volumes?: Mount[];
-  /**
-   * The factory's harness settings, frozen at start from its file once judged (`harnessSettingsRefusal`): the settings of a harness each
-   * step of the run on it is given on top of the repository's own, its own agent's laid over them (`filedConfig`), so a later change to
-   * the factory changes no run started. Read as the record holds it, among the keys the store keeps unnamed, and judged again key by key
-   * at each filing (`filedSettings`), so a hand-edited record files no key a factory may not set. Absent: none, and in the
-   * default factory.
-   */
-  harnessSettings?: HarnessSettings;
-  /**
-   * What people approved at a gate (`nemia approve`), each in a file of its own beside the retry asks —
-   * `runs/<id>.asks/approve-<step>-<try>` — composed on read, as `cancelledAt` is (`runRecord` in record.store.ts), and never written into
-   * the record: the tick owns the record, a person owns their word. An approval opens a gate for the try it names (`approvalOf`), and one
-   * for an earlier try is spent. Absent when there are none.
-   */
-  approvals?: Approval[];
-  /**
-   * What people accepted at a loop out of rounds (`nemia approve`), each in a file of its own beside the approvals —
-   * `runs/<id>.asks/accept-<step>-<try>` — composed on read like them, and never written into the record. An acceptance ends the loop on a
-   * person's word where the looping step asked for another round it has no rounds left for: what waits on it is filed as if it had said
-   * `again: false`, with its findings still on the record (`acceptanceOf`). One for an earlier try is spent. Absent when there are none.
-   */
-  acceptances?: Acceptance[];
-  /**
-   * When the cap on runs in flight (`WF_MAX_RUNS`) first held this run, with nothing of it filed: written once, by the pass that held it.
-   * What says the time before its first filing was a wait for a run slot (`timeline`). Absent on a run the cap never held.
-   */
-  slotHeldAt?: string;
-  /**
-   * The approvals whose gate wait the tick has put into the metrics (`gateWaits`), by step and try: each written by the pass that read the
-   * approval first, so a pass after a restart, which reads the same approval, emits none again. `[]` on a run started with it; absent on a
-   * record written before it, whose gates are never timed. A gate approved on a try that answered an earlier try's session is timed only
-   * while `runTimed` is `false`.
-   */
-  gatesTimed?: Array<{ step: string; try: number }>;
-  /**
-   * The sessions whose denied calls the tick has handed the metrics (`deniedCalls`), by task: how many of its attempts, from the first, are
-   * counted. Written by the pass that counts them, so a pass after a restart, which reads the same attempts, counts none again. `[]` on a
-   * run started with it; absent on a record written before it, whose denied calls are never counted.
-   */
-  deniedCounted?: Array<{ task: string; attempts: number }>;
-  /**
-   * The tasks whose settle the tick has handed the metrics (`settlesDue`), a session's and a check's alike: each written by the pass that
-   * first reads it settled, so a pass after a restart, which reads the same task settled, counts none again, and a task that settled
-   * while no daemon read is counted by the first that does. `[]` on a run started with it; absent on a record written before it, whose
-   * settles are never counted.
-   */
-  settlesCounted?: string[];
-  /**
-   * Whether the tick has handed the run's timeline to the metrics (`timelineFacts`): `false` on a run started with it, `true` once the
-   * pass that read the run over, with nothing of it in flight, has written it, so a pass after a restart hands none again. Absent on a
-   * record written before it, whose timeline is never handed over.
-   */
-  runTimed?: boolean;
-  /**
-   * Each result branch's commit, as this run's own tick last saw it once the run had finished (`tipsSeen`): what `nemia decide` offers to
-   * land. Kept so that once a person has deleted the branch after the merge, git can still be asked whether that commit is on the base
-   * (the place's `standing`, `standingNow`) — by this run's own `nemia decide`, and by a run that waits on it. Absent until the run has
-   * finished.
-   */
-  tips?: Record<string, string>;
-  /**
-   * When somebody called the run off, if they did.
-   *
-   * On the run rather than on a step, because that is what it is about: stopping the step in
-   * flight is one consequence of it, and "file nothing further" is the other, and no step's task
-   * can hold the second one.
-   */
-  cancelledAt?: string;
-  /**
-   * When `nemia prune` removed the run's worktrees, and which, with what each held on disk — composed on read from a file of its own,
-   * `runs/<id>.pruned`, as `cancelledAt` is (`runRecord` in record.store.ts), and never written into the record. A pruned run is read as it
-   * was, off its record, its branches and its files directory, and nothing more of it is filed: every verb that would work in a worktree
-   * refuses it (`prunedRefusal`), and so does every pass (`advance`). Absent on a run nobody pruned.
-   */
-  pruned?: Pruned;
-  /**
-   * That a person holds the run until other runs land (`nemia hold <run> --until <run>…`), and since when — composed on read from a file of
-   * its own, `runs/<id>.hold`, as `cancelledAt` is, and never written into the record. While it stands the run files nothing new, and no
-   * verb offers or takes an approval, a try, a round or an acceptance (`heldRefusal`): what is in flight runs on, and what a step asks
-   * stays on its record, to be asked once the hold lifts. The tick lifts it once every run it names has landed, as `--after` reads
-   * landed (`removeHold`); `nemia hold <run> --off` lifts it by hand. Absent on a run nobody holds.
-   */
-  hold?: Hold;
-  /**
-   * A person's labels on the run (`nemia label run`, and what `nemia start` copied once, at creation): free `key=value` pairs, never a
-   * closed key (`factory`, `workflow`), which the run's whole map adds itself (`metadataLabels`). Composed onto every read of the store
-   * from a file of its own, `runs/<id>.labels` (`labelled` in files.store.ts), never written into the record, and removed by `nemia rm`
-   * with the run. Absent on a run nobody labelled.
-   */
-  labels?: Labels;
-  /**
-   * What this run resolved of each kind it reads — its workflow folder, each step's agent, each skill and its factory's rules — with the
-   * revision of each (`Pin`): written by the pass that resolves them, which is every pass while the run has filed nothing, and again by
-   * the pass that takes a person's refresh. Never re-read from the folder for a run that has filed: `stepsOf` reads the frozen workflow,
-   * and these say which revision that copy is. Absent on a record written before revisions, which pinned nothing.
-   */
-  pinned?: readonly Pin[];
-  /**
-   * That a person paused the whole store (`nemia pause`), by whom and why — composed on read onto every run from the store's one file,
-   * `pauseFile`, and never written into a record. While it stands the run files nothing new, no step, try, round or check, and
-   * what a person writes meanwhile waits on its own files for the lift (`assess`); what is in flight runs on. Absent while the store is not
-   * paused.
-   */
-  pause?: Pause;
-  /**
-   * Per step: the task the engine ran, and the workspace and branch it ran in.
-   *
-   * `taskId` is the step's OWN task, always — `apps/api` reads it. The run's check of the step's work
-   * is a task of its own, under `check`, filed once the step has signed off and been handed off.
-   *
-   * Both are the CURRENT try's. A step tried again (`retries:`, `nemia retry`) keeps the tries it replaced
-   * beside them, under `tries`, in order — so everything that reads `taskId` and `check` reads the try
-   * that decides the step.
-   */
-  steps: Record<string, StepRecord>;
-  createdAt: string;
-};
-
 /**
  * A person's hold on a run, as its file says it: when it was put, the runs it waits on to land, in the order they were named, the
  * person's words for why (`why`, absent when none were given) and who put it (`by`, absent on a file older code wrote), each one line.
  */
-export type Hold = { at: string; until: string[]; why?: string; by?: string };
+export type Hold = { at: string; until: readonly string[]; why?: string; by?: string };
 
 /** The longest a hold's why is kept and shown (`nemia hold --why`): what is over it is clipped with `…` (`oneLine`). */
 export const WHY_CAP = 200;
@@ -307,7 +82,7 @@ export const BY_CAP = 64;
  * — and, once `nemia prune --artifacts` removed its files directory (`runs/<id>/artifacts/`), when that was and what it freed. `at` is when
  * its worktrees went; a prune of the files alone, of a run whose worktrees were already gone or never cut, says its own time there too.
  */
-export type Pruned = { at: string; worktrees: Array<{ path: string; bytes: number }>; artifacts?: PrunedFiles };
+export type Pruned = { at: string; worktrees: ReadonlyArray<{ path: string; bytes: number }>; artifacts?: PrunedFiles };
 
 /** When `nemia prune --artifacts` removed a run's files directory, and the bytes that freed. */
 export type PrunedFiles = { at: string; bytes: number };
@@ -447,7 +222,7 @@ export const checkTaskId = (run: Run, step: string, n = tryOf(run, step)): strin
   n <= 1 ? `${run.id}-${step}-check` : `${run.id}-${step}-try${n}-check`;
 
 /** The id of a step's own task on its n-th try: `<run>-<step>`, then `<run>-<step>-try<n>`. Derived, for the reason a check's is. */
-export const stepTaskId = (run: Pick<Run, 'id'>, step: string, n = 1): string =>
+export const stepTaskId = (run: { readonly id: string }, step: string, n = 1): string =>
   n <= 1 ? `${run.id}-${step}` : `${run.id}-${step}-try${n}`;
 
 /**
@@ -476,7 +251,7 @@ export type StepRecord = {
   workspace?: string;
   branch?: string;
   check?: { taskId: string };
-  tries?: EarlierTry[];
+  tries?: readonly EarlierTry[];
   /**
    * The task whose leftovers the run has committed (`handOffDue`): once for each try, so what a person leaves in the workspace after is
    * theirs.

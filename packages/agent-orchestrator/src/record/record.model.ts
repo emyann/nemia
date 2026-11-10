@@ -5,11 +5,13 @@
 import { Schema } from 'effect';
 import { foreignId, brandedCount, brandedId, type Count, type Id } from '../model/brand.model.ts';
 import type { ErModel } from '../model/er.model.ts';
-import { stepTaskId, type Run as HandRun, type RouteBy, type StepRecord } from './record.ts';
+import { stepTaskId, type LandingRecord, type RouteBy, type StepRecord } from './record.ts';
 import { idRefusal } from '../forget/forget.ts';
 import { FrozenWorkflowStep, StepName, WorkflowDir, WorkflowName } from '../folder/folder.model.ts';
 import { TRY_CAUSES, upgradeTries } from '../retry/index.ts';
 import { HarnessSettings } from '../harness-settings/harness-settings.model.ts';
+import { REVISION_KINDS } from '../revisions/revisions.ts';
+import type { StepSpec } from '../step/step.ts';
 
 /** What a stored record is read through before `Run` reads it, as the store does: a try's former `then` read as its `cause`. */
 export { upgradeTries };
@@ -56,9 +58,13 @@ export const Try = Schema.Struct({
 }).annotate({ identifier: 'Try' });
 export type Try = typeof Try.Type;
 
+/** A key a member of the run's union refuses, since the other member names it: absent, or `undefined`. */
+const none = Schema.optional(Schema.Undefined);
+
 /**
- * What the run did with the merge an ending staged (`LandingRecord`, record.ts:479): the commit it made, the abort and why, or nothing
- * touched — exactly one, as the `LandingRecord` union every writer of `landed` is typed by holds it.
+ * What the run did with the merge an ending staged (`LandingRecord`, record.ts): the commit it made, the abort and why, or nothing
+ * touched — exactly one, as the check holds it. Typed as the `LandingRecord` union every writer of `landed` is typed by, which the check
+ * makes it: a member of the union refusing the others' keys would leave a reader's `'commit' in landed` narrowing nothing.
  */
 export const Landing = Schema.Struct({
   commit: Schema.optional(Schema.String),
@@ -70,18 +76,18 @@ export const Landing = Schema.Struct({
     Schema.makeFilter(
       (l) =>
         [l.commit, l.aborted, l.untouched].filter((v) => v !== undefined).length === 1 ||
-        'a landing is one of `commit`, `aborted` or `untouched`: write the one the pass did (`LandingRecord`, record.ts:479)',
+        'a landing is one of `commit`, `aborted` or `untouched`: write the one the pass did (`LandingRecord`, record.ts)',
     ),
   )
-  .annotate({ identifier: 'Landing' });
+  .annotate({ identifier: 'Landing' }) as unknown as Schema.Codec<LandingRecord>;
 export type Landing = typeof Landing.Type;
 
 /**
  * One step on a run's record (`StepRecord`): its current try's task — `null` while nothing of it is filed — and check, where it
  * works, the tries behind it, and what the run did with it. Its name is its key in the run's `steps`.
  */
-/** A revision a run is behind the files on, read loosely: its kinds are the revisions' own (`Pin`, revisions/revisions.ts). */
-const Pin = Schema.Struct({ kind: Schema.String, name: Schema.String, n: Schema.Number, hash: Schema.String });
+/** A revision a run is behind the files on (`Pin`, revisions/revisions.ts): one of the revisions' own kinds (`REVISION_KINDS`). */
+const Pin = Schema.Struct({ kind: Schema.Literals(REVISION_KINDS), name: Schema.String, n: Schema.Number, hash: Schema.String });
 
 /** The route a condition's try took, as the tick copied it once (`RouteRecord`, record.ts). */
 const RouteRecord = Schema.Struct({
@@ -189,6 +195,9 @@ const Pruned = Schema.Struct({
   artifacts: Schema.optional(Schema.Struct({ at: Schema.String, bytes: Schema.Number })),
 });
 
+/** A folder a step may reach beyond its workspace (`Mount`, record.ts). */
+const Mount = Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean });
+
 /** The store's pause, composed onto every run read (`Pause`, pause/pause.ts). */
 const Pause = Schema.Struct({
   at: Schema.String,
@@ -198,75 +207,282 @@ const Pause = Schema.Struct({
 });
 
 /**
- * A run's record (`Run`, record.ts:37), the aggregate: what it was started on and with, frozen at start, its steps by name, and what
- * the tick wrote down of it. A repository run names its repository, base, branch and worktrees; a folder run, `place: { kind:
- * 'folder' }` and none of them. It names the workflow's folder it started on (`workflowDir`, read nominally, so no stored record is
- * refused) and the steps it froze at start (`workflow`, read loosely, `FrozenWorkflowStep`); the counters the tick keeps for the metrics
+ * The fields every run's record has, whatever its place: what it was started on and with, frozen at start, its steps by name, and what
+ * the tick wrote down of it. It names the workflow's folder it started on (`workflowDir`, read nominally, so no stored record is refused)
+ * and the steps it froze at start (`workflow`, read loosely, `FrozenWorkflowStep`); the counters the tick keeps for the metrics
  * (`gatesTimed`, `deniedCounted`, `settlesCounted`, `runTimed`, `slotHeldAt`); the revisions it is behind (`pinned`, read loosely, the
  * revisions' own); and what `runRecord` composes on read and the store's write drops (`approvals`, `acceptances`, `pruned`, `hold`,
- * `pause`, and a person's `labels`), whose shapes a run written back is held to. Every field of the run's type in record.ts is here
- * (`runFieldsHeld`). Read as the store's reader reads it: a key it does not name is kept on the record, and ignored here.
+ * `pause`, and a person's `labels`), whose shapes a run written back is held to.
  */
-export const Run = Schema.Struct({
+/**
+ * A step of the workflow a run froze, decoded loosely (`FrozenWorkflowStep`, so a record an older or newer tick wrote is not refused) and
+ * typed as what `nemia start` froze into it, the parser's step (`StepSpec`): every reader of the frozen copy reads it as the parser's.
+ */
+const FrozenSteps = FrozenWorkflowStep as unknown as Schema.Codec<StepSpec>;
+
+const runFields = {
   id: RunId.OnRead,
+  /**
+   * Where the run's first step works: its repository's checkout, or a folder run's own folder. Later steps inherit, fork or merge from it.
+   */
   workspace: Schema.String,
+  /** What the person actually asked for. This travels to EVERY step; it is the spec. */
   brief: Schema.String,
   workflowDir: WorkflowDir.OnRead,
-  workflow: Schema.optional(Schema.Array(FrozenWorkflowStep)),
+  /**
+   * The workflow as it was when the run started, read once by `nemia start` and never again.
+   *
+   * A fence, not a cache. The folder is a path anybody can edit — with `--no-worktree` a step works
+   * in the very checkout it lives in — and a `check:` is the command that judges a step: one the step
+   * could rewrite would be a step marking its own homework. Every pass reads this. Absent, the folder
+   * is read.
+   */
+  workflow: Schema.optional(Schema.Array(FrozenSteps)),
+  /**
+   * The runs this one waits on (`nemia start --after`), frozen at start like the workflow: none of its steps is filed until
+   * every one of them has landed (`runReady`). Absent on a run that waits on none.
+   */
   after: Schema.optional(Schema.Array(RunId.OnRead)),
+  /**
+   * The runs this one is handed as context (`nemia start --from`, a card's `from:`), frozen at start: what each concluded is read once, on
+   * the pass that files the roots, and none is ever waited on. Absent on a run handed none.
+   */
   context: Schema.optional(Schema.Array(RunId.OnRead)),
+  /**
+   * The files `nemia start --input` copied into the run's own `inputs/` directory (`inputsDir` in record.store.ts), by name, in the order
+   * given. Named on every step's brief that carries what was asked for (`inputsLine`), and under the run's line in `nemia decide`. Absent
+   * on a run given none.
+   */
   inputs: Schema.optional(Schema.Array(Schema.String)),
+  /**
+   * The digest's hex of the run's own copy of its workflow folder (`workflowFilesDir` in frozen.store.ts), which its next filings take:
+   * every check and session is told the folder as `WF_WORKFLOW_FILES`. Taken at `nemia start` (`freezeWorkflowFiles`) and again wherever
+   * the run's pins move (`renderAgain`), so a check line and the scripts it runs are the one revision. Absent on a run started before
+   * the copy was taken.
+   */
   workflowFiles: Schema.optional(Schema.String),
+  /**
+   * The digest's hex of the run's own copy of the carried folder beside its workflow's (`carriedFilesDir` in frozen.store.ts): every check
+   * and session is told it as `WF_CARRIED_FILES`. Taken with `workflowFiles`, at `nemia start` and wherever the run's pins move
+   * (`renderAgain`); absent where no `carried/` stands beside the workflow's folder.
+   */
   carriedFiles: Schema.optional(Schema.String),
+  /**
+   * Where the run came from, when it was not typed at `nemia start`: `{ inbox: <name> }` for a card started out of the inbox
+   * (`startFromInbox` in inbox.verb.ts), which keeps the card. The inbox's listing reads it to give the card its state, `started` while
+   * this record stands, and `nemia inbox` to say it was `started as` this run, and `nemia decide` names the card under the run's line.
+   * Absent on a run started any other way.
+   */
   from: Schema.optional(Schema.Struct({ inbox: CardName.OnRead })),
+  /**
+   * The schedule that started the run, when the tick did (`startDue` in schedule.verb.ts): the factory, the workflow, and the fire it was
+   * started for (`due`). The schedule's last run is read off it. Absent on a run started any other way.
+   */
   scheduled: Schema.optional(Schema.Struct({ factory: FactoryName.OnRead, workflow: WorkflowName.OnRead, due: Schema.String })),
+  /**
+   * The steps this run is gated at beyond those its workflow gates (`gate: true`), frozen at start: `nemia start --gate <step>`, and an
+   * inbox card's `gate:`. Each such step's closeout waits for a person — `nemia approve` — before anything after it is filed (`hasGate`).
+   * Absent on a run given none.
+   */
   gates: Schema.optional(Schema.Array(StepName.OnRead)),
+  /**
+   * The factory the run was started in (`nemia start --factory`), frozen at start: its hires filled the steps, and a repository run's
+   * `repo` is one of its repositories. Absent on a run in the default factory, which is every record written before a run named its
+   * factory.
+   */
   factory: Schema.optional(FactoryName.OnRead),
-  mounts: Schema.optional(Schema.Array(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean }))),
-  volumes: Schema.optional(Schema.Array(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean }))),
+  /**
+   * The folders beyond its workspace each local step may read, frozen at start from the factory (`factoryMounts`): its repositories but
+   * the run's own, each read-only, left out when it was no directory at start. Filed with every local step (`filedConfig`), named on its
+   * brief (`mountsLine`), so a later change to the factory changes no run started. Absent: none.
+   */
+  mounts: Schema.optional(Schema.Array(Mount)),
+  /**
+   * The factory's volumes, frozen at start from its file (`factoryVolumes`): folders of the person's machine apart from its
+   * repositories, each marked as the factory named it, left out when it was no directory at start. Filed with every local step beside
+   * `mounts` (`volumeMounts`), a writable one writable only where the step's fence writes, and named on its brief. Kept apart from
+   * `mounts` so that `writable:` never widens one by its folder's name. A writable volume is not the run's workspace: nothing commits,
+   * lands or reverts what a step writes there. Absent: none.
+   */
+  volumes: Schema.optional(Schema.Array(Mount)),
+  /**
+   * The factory's harness settings, frozen at start from its file once judged (`harnessSettingsRefusal`): the settings of a harness each
+   * step of the run on it is given on top of the repository's own, its own agent's laid over them (`filedConfig`), so a later change to
+   * the factory changes no run started. Read as the record holds it, among the keys the store keeps unnamed, and judged again key by key
+   * at each filing (`filedSettings`), so a hand-edited record files no key a factory may not set. Absent: none, and in the
+   * default factory.
+   */
   harnessSettings: Schema.optional(HarnessSettings),
-  place: Schema.optional(Schema.Struct({ kind: Schema.Literal('folder') })),
-  repo: Schema.optional(Schema.String),
-  baseRef: Schema.optional(Schema.String),
-  branch: Schema.optional(Schema.String),
-  isolate: Schema.optional(Schema.Boolean),
-  placeSkill: Schema.optional(Schema.Struct({ skill: Schema.String, version: Schema.String })),
-  stagedFile: Schema.optional(Schema.String),
+  /**
+   * Each result branch's commit, as this run's own tick last saw it once the run had finished (`tipsSeen`): what `nemia decide` offers to
+   * land. Kept so that once a person has deleted the branch after the merge, git can still be asked whether that commit is on the base
+   * (the place's `standing`, `standingNow`) — by this run's own `nemia decide`, and by a run that waits on it. Absent until the run has
+   * finished.
+   */
   tips: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  /**
+   * When somebody called the run off, if they did.
+   *
+   * On the run rather than on a step, because that is what it is about: stopping the step in
+   * flight is one consequence of it, and "file nothing further" is the other, and no step's task
+   * can hold the second one.
+   */
   cancelledAt: Schema.optional(Schema.String),
+  /**
+   * A person's labels on the run (`nemia label run`, and what `nemia start` copied once, at creation): free `key=value` pairs, never a
+   * closed key (`factory`, `workflow`), which the run's whole map adds itself (`metadataLabels`). Composed onto every read of the store
+   * from a file of its own, `runs/<id>.labels` (`labelled` in files.store.ts), never written into the record, and removed by `nemia rm`
+   * with the run. Absent on a run nobody labelled.
+   */
   labels: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  /**
+   * When the cap on runs in flight (`WF_MAX_RUNS`) first held this run, with nothing of it filed: written once, by the pass that held it.
+   * What says the time before its first filing was a wait for a run slot (`timeline`). Absent on a run the cap never held.
+   */
   slotHeldAt: Schema.optional(Schema.String),
+  /**
+   * The approvals whose gate wait the tick has put into the metrics (`gateWaits`), by step and try: each written by the pass that read the
+   * approval first, so a pass after a restart, which reads the same approval, emits none again. `[]` on a run started with it; absent on a
+   * record written before it, whose gates are never timed. A gate approved on a try that answered an earlier try's session is timed only
+   * while `runTimed` is `false`.
+   */
   gatesTimed: Schema.optional(Schema.Array(Schema.Struct({ step: Schema.String, try: Schema.Number }))),
+  /**
+   * The sessions whose denied calls the tick has handed the metrics (`deniedCalls`), by task: how many of its attempts, from the first, are
+   * counted. Written by the pass that counts them, so a pass after a restart, which reads the same attempts, counts none again. `[]` on a
+   * run started with it; absent on a record written before it, whose denied calls are never counted.
+   */
   deniedCounted: Schema.optional(Schema.Array(Schema.Struct({ task: Schema.String, attempts: Schema.Number }))),
+  /**
+   * The tasks whose settle the tick has handed the metrics (`settlesDue`), a session's and a check's alike: each written by the pass that
+   * first reads it settled, so a pass after a restart, which reads the same task settled, counts none again, and a task that settled
+   * while no daemon read is counted by the first that does. `[]` on a run started with it; absent on a record written before it, whose
+   * settles are never counted.
+   */
   settlesCounted: Schema.optional(Schema.Array(Schema.String)),
+  /**
+   * Whether the tick has handed the run's timeline to the metrics (`timelineFacts`): `false` on a run started with it, `true` once the
+   * pass that read the run over, with nothing of it in flight, has written it, so a pass after a restart hands none again. Absent on a
+   * record written before it, whose timeline is never handed over.
+   */
   runTimed: Schema.optional(Schema.Boolean),
+  /**
+   * What people approved at a gate (`nemia approve`), each in a file of its own beside the retry asks —
+   * `runs/<id>.asks/approve-<step>-<try>` — composed on read, as `cancelledAt` is (`runRecord` in record.store.ts), and never written into
+   * the record: the tick owns the record, a person owns their word. An approval opens a gate for the try it names (`approvalOf`), and one
+   * for an earlier try is spent. Absent when there are none.
+   */
   approvals: Schema.optional(Schema.Array(Approval)),
+  /**
+   * What people accepted at a loop out of rounds (`nemia approve`), each in a file of its own beside the approvals —
+   * `runs/<id>.asks/accept-<step>-<try>` — composed on read like them, and never written into the record. An acceptance ends the loop on a
+   * person's word where the looping step asked for another round it has no rounds left for: what waits on it is filed as if it had said
+   * `again: false`, with its findings still on the record (`acceptanceOf`). One for an earlier try is spent. Absent when there are none.
+   */
   acceptances: Schema.optional(Schema.Array(Acceptance)),
+  /**
+   * When `nemia prune` removed the run's worktrees, and which, with what each held on disk — composed on read from a file of its own,
+   * `runs/<id>.pruned`, as `cancelledAt` is (`runRecord` in record.store.ts), and never written into the record. A pruned run is read as it
+   * was, off its record, its branches and its files directory, and nothing more of it is filed: every verb that would work in a worktree
+   * refuses it (`prunedRefusal`), and so does every pass (`advance`). Absent on a run nobody pruned.
+   */
   pruned: Schema.optional(Pruned),
+  /**
+   * That a person holds the run until other runs land (`nemia hold <run> --until <run>…`), and since when — composed on read from a file of
+   * its own, `runs/<id>.hold`, as `cancelledAt` is, and never written into the record. While it stands the run files nothing new, and no
+   * verb offers or takes an approval, a try, a round or an acceptance (`heldRefusal`): what is in flight runs on, and what a step asks
+   * stays on its record, to be asked once the hold lifts. The tick lifts it once every run it names has landed, as `--after` reads
+   * landed (`removeHold`); `nemia hold <run> --off` lifts it by hand. Absent on a run nobody holds.
+   */
   hold: Schema.optional(Hold),
+  /**
+   * That a person paused the whole store (`nemia pause`), by whom and why — composed on read onto every run from the store's one file,
+   * `pauseFile`, and never written into a record. While it stands the run files nothing new, no step, try, round or check, and
+   * what a person writes meanwhile waits on its own files for the lift (`assess`); what is in flight runs on. Absent while the store is not
+   * paused.
+   */
   pause: Schema.optional(Pause),
+  /**
+   * What this run resolved of each kind it reads — its workflow folder, each step's agent, each skill and its factory's rules — with the
+   * revision of each (`Pin`): written by the pass that resolves them, which is every pass while the run has filed nothing, and again by
+   * the pass that takes a person's refresh. Never re-read from the folder for a run that has filed: `stepsOf` reads the frozen workflow,
+   * and these say which revision that copy is. Absent on a record written before revisions, which pinned nothing.
+   */
   pinned: Schema.optional(Schema.Array(Pin)),
+  /**
+   * Per step: the task the engine ran, and the workspace and branch it ran in.
+   *
+   * `taskId` is the step's OWN task, always — `apps/api` reads it. The run's check of the step's work
+   * is a task of its own, under `check`, filed once the step has signed off and been handed off.
+   *
+   * Both are the CURRENT try's. A step tried again (`retries:`, `nemia retry`) keeps the tries it replaced
+   * beside them, under `tries`, in order — so everything that reads `taskId` and `check` reads the try
+   * that decides the step.
+   */
   steps: Schema.Record(StepName.OnRead, Step),
   createdAt: Schema.String,
-})
-  .check(triesNamed, afterOthers)
-  .annotate({ identifier: 'Run' });
-export type Run = typeof Run.Type;
+};
 
-/** Every key of any member of `U`. */
-type KeysOf<U> = U extends unknown ? keyof U : never;
+/**
+ * A repository run (`RepositoryRun`, record.ts): its steps work on branches of one repository. Its `place` is absent, as on any record
+ * that names no kind. `repo`, `baseRef`, `branch` and `isolate` are required: every repository run has written all four since the first
+ * record (`nemia start`), so none a store holds lacks one.
+ */
+export const RepositoryRun = Schema.Struct({
+  ...runFields,
+  place: none,
+  /** The repository the work is about. */
+  repo: Schema.String,
+  /** The commit the workspace started from, so a reviewer can diff against it. */
+  baseRef: Schema.String,
+  /** The repository's branch when the run started. */
+  branch: Schema.String,
+  /** Whether each step gets a worktree of its own. False only for `--no-worktree`. */
+  isolate: Schema.Boolean,
+  /**
+   * The place skill a run named when a record said which place its verbs ran from, by name and digest. Read and kept, never written: a
+   * run asks the place its program is given.
+   */
+  placeSkill: Schema.optional(Schema.Struct({ skill: Schema.String, version: Schema.String })),
+  /**
+   * The file whose presence says a merge is staged in the repository's checkout, as the place's `open` named it at `nemia start`, read
+   * with a `stat` (`stagedHere`). Absent for a run started before the place named one, whose checkout is read through `status`.
+   */
+  stagedFile: Schema.optional(Schema.String),
+}).annotate({ identifier: 'RepositoryRun' });
+
+/**
+ * A folder run (`FolderRun`, record.ts): a run of a team whose every step says `place: folder`, `place: { kind: 'folder' }` — an object so
+ * that another kind can say which workspace it is. No repository, no base, no branch, no worktrees: a repository field on it is refused,
+ * never dropped.
+ */
+export const FolderRun = Schema.Struct({
+  ...runFields,
+  place: Schema.Struct({ kind: Schema.Literal('folder') }),
+  repo: none,
+  baseRef: none,
+  branch: none,
+  isolate: none,
+  placeSkill: none,
+  stagedFile: none,
+}).annotate({ identifier: 'FolderRun' });
+
+/**
+ * A run's record (`Run`, record.ts), the aggregate: a repository run or a folder run, by `place`, each held to the run's invariants. Read
+ * as the store's reader reads it: a key neither names is kept on the record, and ignored here. Its encoded side is the record as stored,
+ * which is record.ts's `Run`.
+ */
+export const Run = Schema.Union([RepositoryRun, FolderRun]).check(triesNamed, afterOthers).annotate({ identifier: 'Run' });
+export type Run = typeof Run.Type;
 
 /** Whether two types are one. */
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 
-/** The model's run names every field the run's type in record.ts has, and no other: a field added to either fails the typecheck here. */
-export const runFieldsHeld: Same<KeysOf<HandRun>, keyof Run> = true;
-
-/** And a step's record every field of `StepRecord` in record.ts, and no other. */
+/** A step's record names every field of `StepRecord` in record.ts, and no other: a field added to either fails the typecheck here. */
 export const stepFieldsHeld: Same<keyof StepRecord, keyof Step> = true;
 
 /** Run-core's part of the orchestrator's diagram (`model/diagram.model.ts`): its entities, and the ids it owns. */
 export const recordModel = {
-  entities: [Run, Step, Try, Round, Landing],
+  entities: [RepositoryRun, FolderRun, Step, Try, Round, Landing],
   ids: { RunId: 'Run', TryNumber: 'Try' },
 } satisfies ErModel;

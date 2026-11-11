@@ -70,6 +70,10 @@ test("a step's gate decodes with its budgets and without them; REFUSED: budgets 
   const withGate = (g: unknown) => ({ ...run, status: { ...run.status, steps: [{ ...step, gate: g }, ...run.status.steps.slice(1)] } });
   assert.equal(Schema.decodeUnknownResult(Run)(withGate(gate))._tag, 'Success', 'a gate with no budgets');
   assert.equal(Schema.decodeUnknownResult(Run)(withGate({ ...gate, budgets }))._tag, 'Success', 'a gate with budgets');
+  const past = { ...budgets, line: { usd: 50, said: 'at most $63.00 passes the cost line of $50.00' } };
+  assert.deepEqual(Schema.decodeUnknownSync(Run)(withGate({ ...gate, budgets: past })).status.steps[0]?.gate?.budgets?.line, past.line);
+  const lineless = withGate({ ...gate, budgets: { ...budgets, line: { said: 'no amount' } } });
+  assert.equal(Schema.decodeUnknownResult(Run)(lineless)._tag, 'Failure', 'a line carries its amount');
   assert.ok(!(GATE_BUDGETS_FROM as readonly string[]).includes('guessed'));
   const guessed = withGate({ ...gate, budgets: { ...budgets, from: 'guessed' } });
   assert.equal(Schema.decodeUnknownResult(Run)(guessed)._tag, 'Failure', 'budgets come from one of their words');

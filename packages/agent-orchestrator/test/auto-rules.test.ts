@@ -105,6 +105,7 @@ const plantRun = (
   factory?: string,
   workflow: object[] = [{ name: 'build', after: [], body: 'Build it.', harness: 'codex' }],
   steps = {},
+  rest: Partial<Run> = {},
 ) =>
   Effect.runPromise(
     Effect.provide(
@@ -119,6 +120,7 @@ const plantRun = (
           workflow,
           steps,
           ...(factory === undefined ? {} : { factory }),
+          ...rest,
         } as Run),
       ),
       door(),
@@ -294,6 +296,40 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
       }
       assert.equal(await decidedAtAuto('nemia approve g-above build'), 'ask', "$60 for land, above the workflow's $40");
       assert.equal(await decidedAtAuto('nemia approve g-within build'), undefined, '$30 for land, within it');
+    },
+  );
+  await s.test(
+    "REFUSED: at auto, a gate whose caps pass the run's cost line is asked; one whose caps stay under it is given unasked",
+    async () => {
+      const schema = { type: 'object', properties: { budgets: BUDGETS_SCHEMA }, required: ['budgets'], additionalProperties: false };
+      const PROPOSING = [
+        {
+          name: 'build',
+          after: [],
+          body: 'Build it.',
+          harness: 'codex',
+          gate: true,
+          check: 'npm test',
+          output: { file: 'b.json', schema },
+        },
+        { name: 'land', after: ['build'], body: 'Land it.', harness: 'codex', budget: 40 },
+      ];
+      for (const [id, costLine] of [
+        ['g-past', 25],
+        ['g-under', 50],
+      ] as const) {
+        const steps = { build: { taskId: `${id}-build`, check: { taskId: `${id}-check` } } };
+        await plantRun(id, 'auto', PROPOSING, steps, { costLine });
+        settled(`${id}-build`, {
+          outcome: 'done',
+          summary: 'Built.',
+          artifacts: [],
+          budgets: [{ step: 'land', usd: 30, why: 'p90 of land' }],
+        });
+        settled(`${id}-check`, undefined, 0);
+      }
+      assert.equal(await decidedAtAuto('nemia approve g-past build'), 'ask', '$30 for land passes the line of $25');
+      assert.equal(await decidedAtAuto('nemia approve g-under build'), undefined, '$30 for land, under the line of $50');
     },
   );
   await s.test('REFUSED: a confirm of a rule is asked every time, at auto', async () => {

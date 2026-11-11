@@ -232,3 +232,34 @@ test("gateBudgets: a gate's budgets, proposed before its approval and approved a
     assert.equal(gateBudgets(gated(), DESIGN, STEPS, proposing([{ step: 'design', usd: 5, why: 'w' }]), spent), undefined);
   });
 });
+
+test("gateBudgets: a gate whose caps pass the run's cost line says so, with the most, the line, the factory and the workflow", async (t) => {
+  const spent = () => ({ usd: 1.5, measured: 1, unmeasured: 0, budgetEnded: false });
+  const capping = (implement: number) =>
+    proposing([
+      { step: 'implement', usd: implement, why: 'w' },
+      { step: 'review', usd: 1.5, why: 'w' },
+    ]);
+  const lined = (costLine?: number) =>
+    run(
+      { intake: 'i1', design: 'd1', implement: null, review: null },
+      { factory: 'mill', workflowDir: '/wf/build', ...(costLine === undefined ? {} : { costLine }) },
+    );
+  await t.test(
+    'caps totalling $95 (intake $1.50 spent, design $12, implement $80, review $1.50) against a line of $80: the gate carries the line, its sentence naming both',
+    () => {
+      const line = gateBudgets(lined(80), DESIGN, STEPS, capping(80), spent)?.line;
+      assert.equal(line?.usd, 80);
+      names(line?.said, '$95.00', '$80.00', 'mill', 'build');
+    },
+  );
+  await t.test('caps totalling $70 against the same line: no line said', () =>
+    assert.equal(gateBudgets(lined(80), DESIGN, STEPS, capping(55), spent)?.line, undefined),
+  );
+  await t.test('caps at the line exactly: not past it', () =>
+    assert.equal(gateBudgets(lined(80), DESIGN, STEPS, capping(65), spent)?.line, undefined),
+  );
+  await t.test('a run with no cost line: no line said, whatever its caps', () =>
+    assert.equal(gateBudgets(lined(), DESIGN, STEPS, capping(80), spent)?.line, undefined),
+  );
+});

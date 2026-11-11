@@ -81,7 +81,7 @@
     },
     {
       "term": "Approved budget",
-      "meaning": "the cap a gate's approval sets for a step after it: what the gated step's closeout proposed in a field of the `budgets` shape (`\"x-shape\": \"budgets\"`), with the amounts the person gave over it (`nemia approve --budget <step>=<amount>`), written into the approval file and read as the step's budget on every pass. A cap above the step's own `budget:` is said at the gate (`GateBudgets`), and no rule of auto approves it unasked.",
+      "meaning": "the cap a gate's approval sets for a step after it: what the gated step's closeout proposed in a field of the `budgets` shape (`\"x-shape\": \"budgets\"`), with the amounts the person gave over it (`nemia approve --budget <step>=<amount>`), written into the approval file and read as the step's budget on every pass. A cap above the step's own `budget:` is said at the gate (`GateBudgets`), and no rule of auto approves it unasked. So is a run whose caps pass its factory's cost line.",
       "type": "GateBudgets",
       "see": {
         "label": "What a step may spend",
@@ -158,6 +158,15 @@
       "see": {
         "label": "The closeout",
         "href": "/workflows/#the-closeout"
+      }
+    },
+    {
+      "term": "Cost line",
+      "meaning": "what a run of a workflow may cost before its gate says so, in dollars: set by the person per workflow a factory offers (`costLines` on its file, `nemia factory cost-line set <factory> <workflow> <usd>`), frozen on the run at its start (`Run.costLine`), and read at each gate that sets budgets against the most the run may cost under its caps (`pastTheLine`). Past it, the gate says so (`GateBudgets.line`) and no rule of auto approves it unasked; it cuts nothing, and a rule's `under` keeps its own amount of what the run has spent.",
+      "type": "GateBudgets",
+      "see": {
+        "label": "What a step may spend",
+        "href": "/workflows/#what-a-step-may-spend"
       }
     },
     {

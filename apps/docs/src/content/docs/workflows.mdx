@@ -155,6 +155,12 @@ holds is the one it runs under:
 A cap above the step's own `budget` is said at the gate, beside the amount the workflow gives it, and Nemia at `auto` never approves
 such a gate unasked: a person does.
 
+A factory can set a cost line per workflow: what a run of that workflow should stay under, every try and round of every step included
+(`nemia factory cost-line set <factory> <workflow> <usd>`, or the board's factory settings). A run keeps the line it was started with.
+At a gate with budgets, the most the run may cost under them is what it has spent plus what each step's cap still allows; where that
+passes the line, the gate says so, on the board and in `nemia decide`, and Nemia at `auto` never approves that gate unasked. With no line
+set, or caps at or under it, nothing is said. The line cuts nothing: a step's cap still ends its session.
+
 ## An example
 
 The `sdlc` template's `build` is a workflow, `packages/templates/sdlc/workflows/build/`: design, then implement, then review

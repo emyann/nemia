@@ -71,6 +71,7 @@ erDiagram
     list mounts "optional"
     list volumes "optional"
     object harnessSettings "optional"
+    number costLine "optional"
     object tips "optional"
     string cancelledAt "optional"
     object labels "optional"
@@ -112,6 +113,7 @@ erDiagram
     list mounts "optional"
     list volumes "optional"
     object harnessSettings "optional"
+    number costLine "optional"
     object tips "optional"
     string cancelledAt "optional"
     object labels "optional"
@@ -206,6 +208,7 @@ erDiagram
     enum revisions "optional"
     string tree "optional"
     object harnessSettings "optional"
+    object costLines "optional"
     number generation "optional"
   }
   AppliedTemplate {

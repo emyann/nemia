@@ -359,6 +359,33 @@ test("REFUSED: FactoryVolumes says the caveat on a writable volume alone — eac
   assert.doesNotMatch(none, /data-factory-volume=/);
 });
 
+test("a factory's cost lines: a row per workflow it offers, its line or none, an amount field each, and Clear only where a line is set", async () => {
+  const { FactoryCostLines } = await import('../src/components/factory/FactoryCostLines.tsx');
+  const factory = filed('nemia', { workflows: ['build', 'quick'], costLines: { build: 80 } });
+  const html = await routedWith(createElement(FactoryCostLines, { factory }), []);
+  assert.match(html, /data-cost-lines="nemia"/);
+  assert.deepEqual(
+    [...html.matchAll(/data-cost-line="([^"]*)"/g)].map((m) => m[1]),
+    ['build', 'quick'],
+    'a row per workflow the factory offers, in its order',
+  );
+  const [, build = '', quick = ''] = html.split(/data-cost-line="/);
+  assert.match(build, /data-cost-line-said="80"[^>]*>\$80</, "build's line, as its author writes a budget");
+  assert.match(build, /value="80"/, 'its field holds the line');
+  assert.match(build, />Clear</, 'a line set can be cleared');
+  assert.match(quick, /data-cost-line-said="none"/, 'quick sets none, and says so');
+  assert.doesNotMatch(quick, />Clear</, 'no line: nothing to clear');
+  assert.equal(html.match(/<input/g)?.length, 2, 'an amount field per workflow');
+  assert.doesNotMatch(html, /data-no-cost-lines|data-cost-line-refused|data-cost-line-done/);
+
+  const fallback = await routedWith(createElement(FactoryCostLines, { factory: filed('default', { default: true, workflows: null }) }), []);
+  assert.match(fallback, /data-no-cost-lines/, 'the default factory sets no line, and says so');
+  assert.doesNotMatch(fallback, /data-cost-line=|<input/);
+  const bare = await routedWith(createElement(FactoryCostLines, { factory: filed('nemia', { workflows: [] }) }), []);
+  assert.match(bare, /data-no-cost-lines/);
+  assert.ok(bare.includes('nemia factory attach nemia &lt;workflow&gt;'), `with no workflow, the api's line that attaches one: ${bare}`);
+});
+
 test('REFUSED: the start of a card that names no factory draws no start form before a factory is picked — a Factory list with nothing chosen; and with no factory to offer, the line that files one', async () => {
   const start = (factories: unknown[]) =>
     routedWith(createElement(UnassignedStart, { entry: inboxCard(), onStarted: () => {}, onRefused: () => {} }), [

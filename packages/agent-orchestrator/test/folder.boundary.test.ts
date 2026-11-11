@@ -174,6 +174,13 @@ const board = () => {
         },
       };
     },
+    /**
+     * Each of `ids` the board has filed, viewed as `view` views it, as the engine's `list` answers: the judgement reads the run through
+     * it. `promised` calls each method on the fake, so `this` is the fake.
+     */
+    async list(this: { view: (id: string) => Promise<unknown> }, ids: string[]) {
+      return { views: await Promise.all(ids.filter((id) => tasks.has(id)).map((id) => this.view(id))), unreadable: [] };
+    },
     file: async (spec: { id: string; brief: string; cwd: string }) => {
       tasks.set(spec.id, { spec, phase: 'pending' });
       return spec.id;

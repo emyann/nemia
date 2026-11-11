@@ -426,32 +426,38 @@ test('a run waiting on you, read and landed: its screens, and what approving its
     },
   );
 
-  await s.test("the branch's standing against the base is a fact on every screen — ahead by N, landed by hand, gone", async (c) => {
-    assert.ok((await screen(c, a.run.id)).includes(`  branch    ${a.branch} is ahead of main by 1 commit`));
+  await s.test(
+    "the branch's standing against the base is a fact on every screen, once a pass has read it — ahead by N, landed by hand, gone",
+    async (c) => {
+      await aPass();
+      assert.ok((await screen(c, a.run.id)).includes(`  branch    ${a.branch} is ahead of main by 1 commit`));
 
-    const other = await awaiting();
-    const world = stage.place().world;
-    world.stage(a.repo, a.branch);
-    world.commit(a.repo, 'land it by hand');
-    assert.deepEqual(
-      await screen(c, a.run.id),
-      [`${a.run.id}  add sub`, '', `  landed — ${a.branch} is already on main`],
-      'merged by hand, as a person lands a run with no ending step: the run reads landed, and there is nothing left to decide',
-    );
+      const other = await awaiting();
+      const world = stage.place().world;
+      world.stage(a.repo, a.branch);
+      world.commit(a.repo, 'land it by hand');
+      await aPass();
+      assert.deepEqual(
+        await screen(c, a.run.id),
+        [`${a.run.id}  add sub`, '', `  landed — ${a.branch} is already on main`],
+        'merged by hand, as a person lands a run with no ending step: the run reads landed, and there is nothing left to decide',
+      );
 
-    const workspaces = Object.values(runRecord(ROOT, other.run.id).steps).flatMap((step) => (step.workspace ? [step.workspace] : []));
-    const removed = stage
-      .place()
-      .place.askNow('remove', { repo: other.repo, workspaces: [...new Set(workspaces)], branches: [other.branch] });
-    assert.ok('answer' in removed && removed.answer.deleted.includes(other.branch), JSON.stringify(removed));
-    assert.ok(
-      (await screen(c, other.run.id)).some((l) => l.startsWith(`  branch    ${other.branch} is gone`)),
-      'a branch deleted with no tip recorded for it is gone',
-    );
-  });
+      const workspaces = Object.values(runRecord(ROOT, other.run.id).steps).flatMap((step) => (step.workspace ? [step.workspace] : []));
+      const removed = stage
+        .place()
+        .place.askNow('remove', { repo: other.repo, workspaces: [...new Set(workspaces)], branches: [other.branch] });
+      assert.ok('answer' in removed && removed.answer.deleted.includes(other.branch), JSON.stringify(removed));
+      await aPass();
+      assert.ok(
+        (await screen(c, other.run.id)).some((l) => l.startsWith(`  branch    ${other.branch} is gone`)),
+        'a branch deleted with no tip recorded for it is gone',
+      );
+    },
+  );
 
   await s.test(
-    "a folder whose last step is an ending: `nemia decide` says what that step would do in the folder's words, and the word that runs it — and offers no command of the branch, since the step is the one that merges",
+    "a folder whose last step is an ending: `nemia decide`, once a pass has read where its branch stands, says what that step would do in the folder's words, and the word that runs it — and offers no command of the branch, since the step is the one that merges",
     async (c) => {
       const run = await stage.runPlaced(
         startRun({ brief: 'add sub', repo: aRepo(), workflowDir: ending('ship', `${SHIP_IT}\n\nAbort on any failure.\n`) }),
@@ -463,6 +469,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
       await tick(run.id);
       assert.equal(runRecord(ROOT, run.id).steps.ship.taskId, null, 'nothing of the ending is filed without a person');
 
+      await aPass();
       const lines = await screen(c, run.id);
       indexOf(
         lines,
@@ -489,7 +496,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
   );
 
   await s.test(
-    "at an ending's gate, `nemia decide` says which runs in flight on the base its branch collides with, and in which files; REFUSED: a run still running reads none",
+    "at an ending's gate, `nemia decide`, after a pass, says which runs in flight on the base its branch collides with, and in which files; REFUSED: a run still running reads none",
     async (c) => {
       const repo = aRepo();
       const dir = ending('ship', 'Ship it.\n');
@@ -509,6 +516,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
       const theirs = await working(add, 'export const add = (a, b) => a + b + 0;\n', false);
       const apart = await working('packages/x/src/sub.ts', 'export const sub = (a, b) => a - b;\n', false);
 
+      await aPass();
       const { collisions } = await stage.runWith(stage.board().e, decideRun(ours.id));
       assert.deepEqual([...(collisions?.inFlight ?? [])].sort(), [theirs.id, apart.id].sort());
       assert.deepEqual(
@@ -863,21 +871,25 @@ test('a run on two branches, side by side: each read, each in full, the longer n
     await tick(id);
   });
 
-  await s.test('`nemia decide` reads what each branch touched, and the check files in full on each', async (c) => {
-    lines = await screen(c, id);
-    indexOf(lines, '  UNVERIFIED: docs, implement  — no check: declared; only its own word says it worked');
-    const run = indexOf(lines, `  touched  wf/${id}/run`);
-    assert.equal(lines[run + 1], '    (root)  1 file   +123 −0');
-    const implement = indexOf(lines, `  touched  wf/${id}/implement`);
-    assert.equal(lines[implement + 1], '    (root)  1 file   +1 −0');
-    for (const branch of [`wf/${id}/run`, `wf/${id}/implement`]) {
-      const heading = indexOf(
-        lines,
-        `  ── in full: the check-affecting files — what a change could edit to make its check pass, on ${branch} ───`,
-      );
-      assert.equal(lines[heading + 1], '  none');
-    }
-  });
+  await s.test(
+    '`nemia decide`, once a pass has read where the branches stand, reads what each branch touched, and the check files in full on each',
+    async (c) => {
+      await aPass();
+      lines = await screen(c, id);
+      indexOf(lines, '  UNVERIFIED: docs, implement  — no check: declared; only its own word says it worked');
+      const run = indexOf(lines, `  touched  wf/${id}/run`);
+      assert.equal(lines[run + 1], '    (root)  1 file   +123 −0');
+      const implement = indexOf(lines, `  touched  wf/${id}/implement`);
+      assert.equal(lines[implement + 1], '    (root)  1 file   +1 −0');
+      for (const branch of [`wf/${id}/run`, `wf/${id}/implement`]) {
+        const heading = indexOf(
+          lines,
+          `  ── in full: the check-affecting files — what a change could edit to make its check pass, on ${branch} ───`,
+        );
+        assert.equal(lines[heading + 1], '  none');
+      }
+    },
+  );
 
   await s.test('a note longer than the screen shows is cut, saying how many more lines there are and where to read them', async () => {
     const at = indexOf(lines, `  wf/${id}/run  — 1 file: +123 −0`);

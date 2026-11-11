@@ -8,7 +8,8 @@
  * the harness does with the words is the runtime's to prove.
  *
  * One table of what the route refuses, nothing said and nothing written — each 409 equal to what `sayRun` says itself — then the story
- * of a person's words handed to a working session and read back on the step.
+ * of a person's words handed to a working session and read back on the step; then who says them: a session by its token, an agent the
+ * person allowed, and the refusals of the others.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
@@ -21,7 +22,7 @@ import { testPlace } from 'agent-orchestrator/testing';
 import type { Said } from 'agent-orchestrator';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import { listedOf, objectOf, type ObjectStep } from '../../test/run-reads.ts';
-import { list, runsAtOnce, sayRun } from 'agent-orchestrator';
+import { list, PERSON, runsAtOnce, sayRun, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
 import { story } from 'test-kit/checkpoints';
 
 const stand = eachTest(testPlace);
@@ -101,7 +102,7 @@ const written = () => ({
 /** What the package's `sayRun` refuses the words for, word for word: what `nemia say` prints. */
 const sayRefuses = async (step: string, text: string, run = R): Promise<string> => {
   try {
-    await runWith(engine(), sayRun(run, step, text));
+    await runWith(engine(), sayRun(run, step, text, { caller: PERSON }));
   } catch (err) {
     return (err as Error).message;
   }
@@ -211,4 +212,65 @@ test("a person's words to a working session: the package's `sayRun` hands them t
       assert.deepEqual(written().files, records, "the runs' records untouched, and no file of the api's");
     },
   );
+});
+
+test('who says words to a step: a session by its token as its agent, framed; an agent with no token under a name the person allowed; the person as ever', async (t) => {
+  const s = story(t);
+  const token = Effect.runSync(
+    Effect.gen(function* () {
+      return yield* (yield* TokenDoor).tokens.mint({
+        agent: 'implementer',
+        factory: null,
+        run: R,
+        step: 'implement',
+        attempt: 1,
+        task: 't-implement',
+      });
+    }).pipe(Effect.provide(tokenDoorFiles(root))),
+  );
+  const asSession = { ...BOARD, authorization: `Bearer ${token}` };
+  const operator = { kind: 'agent', name: 'operator' } as const;
+  /** The list `nemia chat allow` writes, planted as it writes it (`<store>/nemia/chat/speakers.json`). */
+  const allow = (allowed: string[]) => write(path.join(root, 'nemia', 'chat', 'speakers.json'), `${JSON.stringify({ allowed })}\n`);
+
+  await s.test("a live session's token: 202, its words framed under its agent, and the answer says who and the words", async () => {
+    const res = await sayTo('implement', { text: 'Start with the parser.' }, asSession);
+    assert.equal(res.status, 202, await res.clone().text());
+    const said = (await res.json()) as Said & { from?: unknown; words?: string };
+    assert.deepEqual([said.from, said.words], [{ kind: 'agent', name: 'implementer' }, 'Start with the parser.']);
+    assert.deepEqual(standIn().said, [
+      { taskId: 't-implement', text: 'The agent implementer writes, not the person: Start with the parser.' },
+    ]);
+    const implement = (await detailSteps()).find((x) => x.name === 'implement')!;
+    assert.deepEqual(
+      implement.said.map((x) => [x.from, x.words]),
+      [[{ kind: 'agent', name: 'implementer' }, 'Start with the parser.']],
+    );
+  });
+
+  await s.test(
+    'REFUSED: a session that says it is the person is a 422, and an agent the person has not allowed a 409; nothing said',
+    async () => {
+      await refusedWith(await sayTo('implement', { text: 'Cut it.', from: { kind: 'person' } }, asSession), 422, 'a session as the person');
+      await refusedWith(await sayTo('implement', { text: 'Cut it.', from: operator }), 409, 'operator, not allowed');
+      assert.equal(standIn().said.length, 1, 'nothing said');
+    },
+  );
+
+  await s.test("allowed with `nemia chat allow`, an agent's words are taken under its name; the person's stay as they were", async () => {
+    allow(['operator']);
+    try {
+      assert.equal((await sayTo('implement', { text: 'Cut it.', from: operator })).status, 202);
+    } finally {
+      allow([]);
+    }
+    const person = await sayTo('implement', { text: 'Widen it.' });
+    assert.deepEqual(Object.keys((await person.json()) as object).sort(), ['after', 'at', 'attempt', 'text']);
+    assert.deepEqual(
+      standIn()
+        .said.slice(1)
+        .map((x) => x.text),
+      ['The agent operator writes, not the person: Cut it.', 'Widen it.'],
+    );
+  });
 });

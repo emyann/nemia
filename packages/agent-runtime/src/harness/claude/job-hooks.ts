@@ -28,6 +28,9 @@ export type HoldIO = { holdFile: string; drainFile: string; holdMs: number; hold
  *   first read it), a call waiting at its hook (`heldBack`, since the first of them began to wait, and `after`, the main-thread call
  *   that ended last, kept by its `PostToolUse` or `PostToolUseFailure` hook); the last two gone once the drain is read lifted. Once
  *   parked it says `parked`, and nothing after.
+ * - The matchers leave `onFailure` (SDK 0.3.317 and after) at its default, `continue`: a hold is not a fence, so a callback that throws
+ *   lets its call go on to the permission flow, where `block` would stop every call of the step on one failed read of the drain. Every
+ *   callback here and in the attached session's (`hooksOf`) returns on every path: one that returns nothing counts as failing.
  */
 export const jobHoldOf = (io: HoldIO, ended: () => void) => {
   const calls: CallsInFlight = new Map();
@@ -85,11 +88,6 @@ export const jobHoldOf = (io: HoldIO, ended: () => void) => {
     pollMs: io.holdPollMs,
     calls,
   };
-  /**
-   * The matchers leave `onFailure` (SDK 0.3.317 and after) at its default, `continue`: a hold is not a fence, so a callback that throws
-   * lets its call go on to the permission flow, where `block` would stop every call of the step on one failed read of the drain. Every
-   * callback here and in the attached session's (`hooksOf`) returns on every path: one that returns nothing counts as failing.
-   */
   const hooks: Partial<Record<HookEvent, HookCallbackMatcher[]>> = {
     PreToolUse: [
       {

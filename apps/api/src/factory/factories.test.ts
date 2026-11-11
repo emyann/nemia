@@ -707,3 +707,36 @@ test('a person schedules a workflow in a factory: listed with its next fire and 
     assert.equal((await app.request(route, { method: 'DELETE', headers: json, body: '{}' })).status, 404, 'none left to take back');
   });
 });
+
+test("a person sets a workflow's cost line on a factory: the Factory answers it, a DELETE takes it back, and a bad write is refused", async (t) => {
+  const s = story(t);
+  const route = '/api/factories/solo/costlines/alpha';
+  const json = { 'content-type': 'application/json' };
+  const put = (url: string, body: unknown) => app.request(url, { method: 'PUT', headers: json, body: JSON.stringify(body) });
+  const linesOfSolo = async () => (await get<Factory>('/api/factories/solo')).body.spec.costLines;
+
+  await s.test('a PUT of { usd } answers the Factory with the line, and its DELETE answers it without', async () => {
+    const set = await put(route, { usd: 80 });
+    assert.equal(set.status, 200, said(await set.clone().json()));
+    assert.deepEqual(((await set.json()) as Factory).spec.costLines, { alpha: 80 });
+    assert.deepEqual(await linesOfSolo(), { alpha: 80 }, 'got as it was answered');
+    const del = await app.request(route, { method: 'DELETE', headers: json, body: '{}' });
+    assert.equal(del.status, 200, said(await del.clone().json()));
+    assert.equal(((await del.json()) as Factory).spec.costLines, undefined);
+    assert.equal((await app.request(route, { method: 'DELETE', headers: json, body: '{}' })).status, 404, 'no line left to take back');
+  });
+
+  await s.test('REFUSED: an amount as words is a 400, and nothing is set', async () => {
+    assert.equal((await put(route, { usd: '80' })).status, 400);
+    assert.equal(await linesOfSolo(), undefined);
+  });
+
+  await s.test(
+    'REFUSED: a workflow the factory does not offer, and an amount not above zero, are Invalid, and nothing is set',
+    async () => {
+      assert.equal((await put('/api/factories/solo/costlines/gamma', { usd: 80 })).status, 422);
+      assert.equal((await put(route, { usd: 0 })).status, 422);
+      assert.equal(await linesOfSolo(), undefined);
+    },
+  );
+});

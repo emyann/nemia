@@ -18,7 +18,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { staged } from './story.ts';
-import { advanceRun, approveRun, cancelRun, decideRun, list, retryRun, runObject, startRun, runWith } from '../src/runner.ts';
+import { advanceRun, cancelRun, decideRun, list, retryRun, runObject, startRun, runWith } from '../src/runner.ts';
 import { decisionRead } from '../src/decide/decision.verb.ts';
 import { decision } from '../src/decide/decide.ts';
 import { landedOf } from '../src/branches/branches.store.ts';

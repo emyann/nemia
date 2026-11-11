@@ -37,8 +37,7 @@ const branchesAskedSpec = spec<(r: RunAsked) => readonly string[]>({
       condition: ({ input: [r], output }) => !r.cancelled || output.length === 0,
     },
     noneOnTheBase: {
-      description:
-        'A run that worked on its base branch itself asks git nothing: its branch is the base, and no pass reads it for the run',
+      description: 'A run that worked on its base branch itself asks git nothing: its branch is the base, and no pass reads it for the run',
       condition: ({ input: [r], output }) => r.isolate || output.length === 0,
     },
     everyResultOfAFinishedRun: {

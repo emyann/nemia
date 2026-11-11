@@ -196,6 +196,22 @@ test("a factory's level changed wakes her, and only her — her selectors name r
   assert.equal(selects(parseSelectors([...DEFAULT_SELECTORS]), level), false, 'and nobody else is woken');
 });
 
+test("a factory's conflicts pending wake her, and only her — her selectors name reason=ConflictsPending, which the default does not", () => {
+  const pending = upgraded({
+    at: '2026-11-11T13:00:00.000Z',
+    factory: 'acme',
+    word: LINE_WORDS.ConflictsPending,
+    note: 'RULES.md:1-1: choose one',
+    involved: { kind: 'Factory', name: 'acme' },
+    labels: { factory: 'acme' },
+  });
+  assert.deepEqual([pending.reason, pending.type, pending.waits], ['ConflictsPending', 'Normal', undefined], 'a wait on a person by her selector, not by waits');
+  assert.equal(selects(parseSelectors([...NEMIA_SELECTORS]), pending), true, 'she is told of an upgrade waiting on a choice');
+  assert.equal(selects(parseSelectors([...DEFAULT_SELECTORS]), pending), false, 'and nobody else is woken');
+  const settled = upgraded({ ...pending, word: LINE_WORDS.ConflictsSettled, reason: undefined, apiVersion: undefined });
+  assert.equal(selects(parseSelectors([...NEMIA_SELECTORS]), settled), false, 'their settling is routine news, in her digest');
+});
+
 test("REFUSED: a step's denied call wakes her, and only her — her selectors name reason=ToolDenied, which the default does not", () => {
   const shot = upgraded({
     at: '2026-10-05T16:00:00.000Z',
@@ -214,8 +230,8 @@ test("REFUSED: a step's denied call wakes her, and only her — her selectors na
   assert.ok(shot.word.startsWith(DENIED), `the one-shot's word leads with ${JSON.stringify(DENIED)}, and her selector reads its reason`);
   assert.deepEqual(
     [...NEMIA_SELECTORS],
-    ['waits=person', 'reason=ToolDenied', 'reason=LevelChanged'],
-    'three lines a person reads in her record',
+    ['waits=person', 'reason=ToolDenied', 'reason=LevelChanged', 'reason=ConflictsPending'],
+    'four lines a person reads in her record',
   );
   assert.equal(shot.waits, undefined, 'a denial waits on nobody: the step runs on');
 });

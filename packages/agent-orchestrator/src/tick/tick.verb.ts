@@ -33,8 +33,10 @@ import { hasStarted } from '../wait/wait.ts';
 import { ceilings, identify, recordCeilings, recordPassCost, recordRecentPass } from '../daemon/daemon.store.ts';
 import { type Settings, setting, StoreConfig } from '../config/config.store.ts';
 import { feedFile } from '../feed/feed.store.ts';
+import type { FeedConflicts } from '../feed/feed.ts';
 import { emitFeed } from '../feed/feed.verb.ts';
 import { levelsNow } from '../level/levels.verb.ts';
+import { conflictsNow } from '../factory/applied/conflicts.verb.ts';
 import type { FactoryLevel } from '../level/level.ts';
 import {
   freshStandingMemo,
@@ -256,8 +258,9 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
  * - where the process keeps an informer (`Informer`, the api's daemon), the pass begins its number first (`passStarted`), and once every
  *   run is advanced, judges each as the api serves it and keeps it there (`informed`), so a request reads what the pass judged.
  * - then the tasks of runs `nemia rm` removed that had not settled are forgotten (`finishForgetting`), and what it says is the pass's.
- * - last, and apart, the feed is written where it changed, each factory's level in force among it, read beside the pause (`levelsNow`):
- *   a feed that cannot be written costs the report (`feedError`), never the pass, and levels that do not read cost their lines alone.
+ * - last, and apart, the feed is written where it changed, each factory's level in force and its conflicts pending among it, read beside
+ *   the pause (`levelsNow`, `conflictsNow`): a feed that cannot be written costs the report (`feedError`), never the pass, and levels or
+ *   conflicts that do not read cost their lines alone.
  *
  * A run a read of whose task journal is refused (`unreadableJournal`), or that froze no workflow and whose folder does not load
  * (`unloadedFolder`), is left unjudged, out of the feed's `removed` and counted in flight (`judged`); a pause's reads leave it out
@@ -284,6 +287,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   noteSeen({ runs: runs.length });
   const pause = yield* tried(() => readPause(home));
   const levels = yield* levelsNow().pipe(Effect.orElseSucceed(() => undefined));
+  const conflicts = yield* conflictsNow().pipe(Effect.orElseSucceed(() => undefined));
   const judging: Judging = { done: new Map(), unjudged: new Map() };
   const standing = yield* passStanding(runs, memo.standing);
   const read: PassRead = passRead(home, e, runs, config, standing, yield* passRevisions());
@@ -302,7 +306,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   const forgetting = yield* withinEffect('act', finishForgetting().pipe(over(e)));
   yield* Effect.annotateCurrentSpan({ runs: runs.length, rested: resting?.rested ?? 0 });
   return {
-    ...passOf(report, runs, judging, queue, yield* feedErrorOf(home, runs, judging, pause, levels)),
+    ...passOf(report, runs, judging, queue, yield* feedErrorOf(home, runs, judging, pause, { levels, conflicts })),
     ...(scheduled ? { scheduled } : {}),
     ...(forgetting.length ? { forgetting } : {}),
     ...(pause
@@ -452,21 +456,23 @@ const feedOf = <F>(id: string, judged: { feed: F } | undefined): (readonly [stri
 
 /**
  * Why the feed could not be written with what the pass judged (`emitFeed`), the store's pause it read at its start (`pause`, whose
- * put and lift the feed says) and each factory's level in force it read beside it (`levels`, whose changes the feed says; undefined where
- * they did not read, and nothing is said of them), or undefined once it was: never the pass's failure.
+ * put and lift the feed says), each factory's level in force it read beside it (`levels`, whose changes the feed says) and each
+ * factory's `ConflictsPending` condition (`conflicts`, whose turns the feed says) — either undefined where it did not read, and nothing
+ * is said of it — or undefined once it was: never the pass's failure.
  */
 const feedErrorOf = (
   home: string,
   runs: readonly Run[],
   { done, unjudged }: Judging,
   pause: Pause | null,
-  levels: readonly FactoryLevel[] | undefined,
+  { levels, conflicts }: { levels: readonly FactoryLevel[] | undefined; conflicts: FeedConflicts | undefined },
 ): Effect.Effect<string | undefined> =>
   Effect.exit(
     emitFeed(new Map(runs.flatMap((run) => feedOf(run.id, done.get(run.id)))), {
       unjudged: new Set(unjudged.keys()),
       pause,
       ...(levels === undefined ? {} : { levels }),
+      ...(conflicts === undefined ? {} : { conflicts }),
     }),
   ).pipe(
     Effect.map((written) =>

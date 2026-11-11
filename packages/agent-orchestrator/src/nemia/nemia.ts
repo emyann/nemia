@@ -27,11 +27,12 @@ export const NEMIA_FLOOR: Level = 'semi-auto';
 export const NEMIA_SUBSCRIPTION = 'nemia';
 
 /**
- * The selectors of the feed that wake her, three lines a person reads in her record: the lines that wait on a person, a step's calls
- * denied, and a factory's level changed — by the board, the CLI or a raise's end — so she hears a raise as she hears a gate. Hers, not
- * the package's default, and said in the feed's one grammar (`watch/selector.ts`), over the keys the tick stamps.
+ * The selectors of the feed that wake her, four lines a person reads in her record: the lines that wait on a person, a step's calls
+ * denied, a factory's level changed — by the board, the CLI or a raise's end — so she hears a raise as she hears a gate, and a factory's
+ * upgrade waiting on a person's choice for its conflicts. Hers, not the package's default, and said in the feed's one grammar
+ * (`watch/selector.ts`), over the keys the tick stamps.
  */
-export const NEMIA_SELECTORS: readonly string[] = ['waits=person', 'reason=ToolDenied', 'reason=LevelChanged'];
+export const NEMIA_SELECTORS: readonly string[] = ['waits=person', 'reason=ToolDenied', 'reason=LevelChanged', 'reason=ConflictsPending'];
 
 /**
  * The minutes a digest of the feed's routine lines waits for a wake: a day, so routine news reaches her mostly folded into a line that

@@ -25,3 +25,8 @@ test("a folder's files as a spec: its steps by name, its README, and its other t
   );
   assert.equal('readme' in workflowSpecOf([{ name: 'a.md', text: '' }]), false, 'a folder with no README says none');
 });
+
+test("a step's keys in the form the spec carries them: a list a file writes `a, b` as its names", () => {
+  const [step] = workflowSpecOf([{ name: 'b.md', text: '---\nafter: a, c\nagent: x\n---\nDo b.\n' }]).steps;
+  assert.deepEqual(step?.keys, { after: ['a', 'c'], agent: 'x' });
+});

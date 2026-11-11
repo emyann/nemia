@@ -7,7 +7,7 @@
  * Its default refuses, naming the command line, for a program composed without it.
  */
 import { Context, Effect } from 'effect';
-import type { WorkflowSpecRead } from '../../propose/workflow-spec.ts';
+import type { WorkflowSpecRead } from '../../propose/index.ts';
 import { Invalid, type Refusal } from '../../refusal/refusal.ts';
 import type { EngineService } from '../../runtime-client.ts';
 import type { PlaceService } from '../../place/place.store.ts';

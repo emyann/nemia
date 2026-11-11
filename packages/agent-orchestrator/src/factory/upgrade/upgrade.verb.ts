@@ -15,11 +15,9 @@ import { tried } from '../../runtime-client.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../../command/command.ts';
 import type { Command } from '../../command/entry.verb.ts';
 import { Conflict, Invalid, Missing } from '../../refusal/refusal.ts';
-import { workflowSpecOf } from '../../propose/workflow-spec.ts';
+import { workflowSpecOf } from '../../propose/index.ts';
 import { ResolutionProposer } from './proposer.verb.ts';
 import { textIn } from '../../folder/folder.ts';
-import { STEP_KEY_FORM } from 'objects';
-import { tokensOf } from '../../keys/keys.ts';
 import { StoreRoot } from '../../config/root.store.ts';
 import { FactoryDoor, filedFactory } from '../door/factories.store.ts';
 import { templatePlace } from '../../template/door/templates.store.ts';
@@ -626,28 +624,6 @@ function workflowTexts(merge: TreeMerge, choices: Readonly<Record<string, Choice
 }
 
 /**
- * A step's keys as its frontmatter reads (`workflowSpecOf`) put in the form a Workflow's spec carries them (objects' `STEP_KEY_FORM`): a
- * list of steps or of names, which a file writes `a, b`, as its names; a context window written `200k` as its tokens. Any other value as
- * it reads, the proposal's check judging it.
- */
-const servedKeys = (keys: Readonly<Record<string, unknown>>): Record<string, unknown> =>
-  Object.fromEntries(
-    Object.entries(keys).map(([key, value]) => {
-      const form = (STEP_KEY_FORM as Readonly<Record<string, string>>)[key];
-      if (typeof value !== 'string') return [key, value];
-      if (form === 'steps' || form === 'list')
-        return [
-          key,
-          value
-            .split(',')
-            .map((name) => name.trim())
-            .filter(Boolean),
-        ];
-      return [key, form === 'tokens' ? (tokensOf(value) ?? value) : value];
-    }),
-  );
-
-/**
  * The Workflow `workflow` of `factory` as `merge` composes its folder with `choices`, handed to the proposer the program was given
  * (`ResolutionProposer`): proposed at the version its tree's folder is at now, by the caller the session's token names, or its removal
  * where the merge leaves no text file in it. Refused: a composed step that does not read, and a folder left with files but no step
@@ -670,7 +646,7 @@ const proposedResolution = Effect.fn('proposedResolution')(function* (
         message: `${verb}: the workflow ${workflow} as your choices compose it does not read: ${err instanceof Error ? err.message : String(err)} Nothing was proposed. ${kept}`,
       }),
   });
-  const spec = { ...read, steps: read.steps.map((step) => ({ ...step, keys: servedKeys(step.keys) })) };
+  const spec = read;
   if (texts.length > 0 && spec.steps.length === 0)
     return yield* Effect.fail(
       new Invalid({

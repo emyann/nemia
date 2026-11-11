@@ -1,4 +1,7 @@
-/** The check feature: what a step's `check:` runs and means (`check.ts`), and what its failure policy says of a refusal (`check-policy.ts`). */
+/**
+ * The check feature: what a step's `check:` runs and means (`check.ts`), and what its failure policy says of a refusal
+ * (`check-policy.ts`).
+ */
 export {
   attemptVerdict,
   CHECK_DEADLINE_SECONDS,

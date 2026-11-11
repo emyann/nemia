@@ -553,7 +553,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
   await t.test("a refusal its `checkFailurePolicy:` names a person's spends no try: the step waits on you, offered `--recheck`", () => {
     const policed: StepSpec[] = [
       {
-        ...RETRIED[0]!,
+        ...RETRIED[0],
         checkFailurePolicy: {
           rules: [
             { action: 'Count', onExitCodes: { operator: 'In', values: [2] } },
@@ -561,7 +561,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
           ],
         },
       },
-      RETRIED[1]!,
+      RETRIED[1],
     ];
     const read = (code: Verdict) => aRead(policed, onTry(), { phaseOf: checkFailed, signedOff: signedDone, asked, verdictOf: () => code });
     const a = assess(read(78));

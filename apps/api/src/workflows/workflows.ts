@@ -147,11 +147,7 @@ function keyValue(step: StepSpec, key: StepKey): string | null {
   if (value === undefined) return null;
   if (key === 'context' && typeof value === 'number') return contextText(value);
   if (Array.isArray(value)) return value.length ? value.join(', ') : null;
-  if (typeof value === 'object') {
-    if (key === 'route' && step.route) return routeLine(step.route);
-    if (key === 'checkFailurePolicy' && step.checkFailurePolicy) return checkFailurePolicyLine(step.checkFailurePolicy);
-    return null;
-  }
+  if (typeof value === 'object') return objectLine(step, key);
   return String(value);
 }
 
@@ -382,6 +378,13 @@ const routingOf = (step: StepSpec) => ({
   ends: step.ends ?? null,
   workflow: step.workflow ?? null,
 });
+
+/** A key whose value is an object, as its line writes it in YAML flow: `route:` and `checkFailurePolicy:`; null for any other. */
+const objectLine = (step: StepSpec, key: StepKey): string | null => {
+  if (key === 'route' && step.route) return routeLine(step.route);
+  if (key === 'checkFailurePolicy' && step.checkFailurePolicy) return checkFailurePolicyLine(step.checkFailurePolicy);
+  return null;
+};
 
 /** A condition's `route:` as its line writes it, in YAML flow. */
 const routeLine = (route: NonNullable<StepSpec['route']>): string => {

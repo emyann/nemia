@@ -658,19 +658,11 @@ export function retryOffers(
       );
       continue;
     }
-    const persons = status === 'failed (check)' ? personsRefusal(step, verdictOf(step.name)) : undefined;
-    if (d.unfinishedCheck.includes(step.name)) {
-      offer(
-        `${command} --recheck`,
-        'its check did not finish, so no retry was spent on it. Run the check again, and nothing else',
-        sessionNeeds(raise),
-      );
-    } else if (persons !== undefined && !raise && modes.includes('recheck')) {
-      offer(
-        `${command} --recheck`,
-        `its check exited ${persons}, which its \`checkFailurePolicy:\` names a person's to answer, so no retry was spent on it. Answer what its check said, then run the check again, and nothing else`,
-        `  (or continue its session, told what happened: ${command}${spent ? `${spent}` : ''})`,
-      );
+    const recheck = recheckFirst(command, d.unfinishedCheck.includes(step.name), raise, spent, () =>
+      personsOffered(step, status, modes, verdictOf),
+    );
+    if (recheck) {
+      offer(...recheck);
     } else if (raise) {
       const recheck = recheckWords(status, modes);
       const own = judged?.own;
@@ -702,6 +694,41 @@ export function retryOffers(
 function personsRefusal(step: Pick<StepSpec, 'checkFailurePolicy'>, verdict: Verdict | undefined): number | undefined {
   if (verdict === undefined || verdict === 'unfinished') return undefined;
   return checkFailureAction(step.checkFailurePolicy, verdict) === 'FailStep' ? verdict : undefined;
+}
+
+/** A `failed (check)` step's refusal its policy names a person's, where `--recheck` is a way to try it (`personsRefusal`). Pure. */
+const personsOffered = (
+  step: Pick<StepSpec, 'name' | 'checkFailurePolicy'>,
+  status: StepStatus,
+  modes: readonly RetryMode[],
+  verdictOf: (step: string) => Verdict | undefined,
+): number | undefined =>
+  status === 'failed (check)' && modes.includes('recheck') ? personsRefusal(step, verdictOf(step.name)) : undefined;
+
+/**
+ * The offer that leads with `--recheck` (`retryOffers`), or undefined: a check that did not finish, past a budget or not; or a refusal
+ * its step's policy names a person's (`persons`, read only within the budget), its session continued beside it.
+ */
+function recheckFirst(
+  command: string,
+  unfinished: boolean,
+  raise: Raise | undefined,
+  spent: string,
+  persons: () => number | undefined,
+): [string, string, string] | undefined {
+  if (unfinished)
+    return [
+      `${command} --recheck`,
+      'its check did not finish, so no retry was spent on it. Run the check again, and nothing else',
+      sessionNeeds(raise),
+    ];
+  const exit = raise ? undefined : persons();
+  if (exit === undefined) return undefined;
+  return [
+    `${command} --recheck`,
+    `its check exited ${exit}, which its \`checkFailurePolicy:\` names a person's to answer, so no retry was spent on it. Answer what its check said, then run the check again, and nothing else`,
+    `  (or continue its session, told what happened: ${command}${spent})`,
+  ];
 }
 
 /** What `nemia decide` offers for each step a person may try again, as its lines: each offer's sentence (`retryOffers`). Pure. */

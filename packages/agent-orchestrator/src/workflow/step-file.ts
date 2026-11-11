@@ -19,7 +19,7 @@ import {
 import { fenceReach } from 'agent-runtime/vocabulary';
 import { MAP_KEYS, readFrontmatter, renderFrontmatter, type FrontmatterPair } from '../frontmatter/frontmatter.ts';
 import { routeWritten, routingOf } from '../route/index.ts';
-import { checkFailurePolicyLine, checkFailurePolicyOf, checkFailurePolicyWritten, type CheckFailurePolicy } from '../check/index.ts';
+import { checkFailurePolicyOf, checkFailurePolicyWritten, type CheckFailurePolicy } from '../check/index.ts';
 import { DEFAULT_HARNESS, fenceKeyOf, isRemoteHarness, remoteRefusal } from '../harness/harness.ts';
 import {
   budgetOf,
@@ -537,8 +537,6 @@ function writtenValue(step: string, key: StepKey, value: unknown): string | unde
     text = entries.join(', ');
   } else if (key === 'context' && typeof value === 'number') {
     text = contextText(value);
-  } else if (key === 'checkFailurePolicy' && typeof value === 'object') {
-    text = checkFailurePolicyLine(value as CheckFailurePolicy);
   } else if (key === 'output' && typeof value === 'object') {
     text = writtenValue(step, key, (value as { file?: unknown }).file) ?? '';
   } else if (typeof value === 'object' || typeof value === 'function') {

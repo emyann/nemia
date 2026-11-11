@@ -40,7 +40,10 @@ const EXAMPLE = '`checkFailurePolicy: { rules: [ { action: FailStep, onExitCodes
 
 const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
-/** A step's `checkFailurePolicy:` from the JSON text `readKeys` kept of its map; each shape it cannot take is refused with the line to write. */
+/**
+ * A step's `checkFailurePolicy:` from the JSON text `readKeys` kept of its map; each shape it cannot take is refused with the line to
+ * write.
+ */
 export function checkFailurePolicyOf(step: string, text: string | undefined): CheckFailurePolicy | undefined {
   if (text === undefined) return undefined;
   let map: unknown;

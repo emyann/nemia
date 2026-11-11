@@ -3203,8 +3203,9 @@ export const BUDGETED = {
  * A run whose gated step proposes the budgets of the steps after it, written by its page for its visit and taken back before it ends
  * (`writeBudgeting`): `design → implement → review`, gated at design, which signed off proposing implement $60 — above implement's own
  * `budget: 40` — and review $8, under its `budget: 16`. Neither later step is filed. The page changes review's to $6 and approves.
- * Started in the factory `nemia`, of its workflow `build`, under a cost line its caps' bound passes (`line.past`, frozen on the record as `costLine`), so its gate says so; a second run
- * of the same shape (`under.id`), under a line the bound does not reach (`line.under`), says nothing of it.
+ * Started in the factory `nemia`, of its workflow `build`, under a cost line its caps' bound passes (`line.past`, frozen on the record
+ * as `costLine`), so its gate says so; a second run of the same shape (`under.id`), under a line the bound does not reach
+ * (`line.under`), says nothing of it.
  */
 export const BUDGETING = {
   id: 'gate-budgets-e2e',

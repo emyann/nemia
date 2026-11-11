@@ -1,16 +1,20 @@
 /**
  * The guard on every write the api serves (apps/api, src/guard.ts, `writeRefused`): a request refused before its body is read, decided
- * by what its endpoint of `objects`' `Api` declares — its method — and three headers, never by words a route keeps of its own. It
- * replaces the hand guard and the words each hand route spelled for it: the sentence a refusal says is built by the caller from the
- * endpoint's method and path and
- * where the document lists what it takes, and its status is the class of `objects` it is answered as (`Forbidden` 403 for `host` and
- * `site`, the 415 class for `media`), so this function decides which refusal and nothing else.
+ * by what its endpoint of `objects`' `Api` declares — its method — three headers, and whether it presents a bearer token, never by words
+ * a route keeps of its own. The sentence a refusal says is built by the caller from the endpoint's method and path and where the
+ * document lists what it takes, and its status is the class of `objects` it is answered as (`Forbidden` 403 for `host` and `site`, the
+ * 415 class for `media`), so this function decides which refusal and nothing else.
  *
  * Why each: a write is what an agent acts on in the repository, or a person's idea or step gone, so a page on another site must not
  * make one. A name that is not this machine (`Host`) is a site whose name was pointed at 127.0.0.1; a page on another site
  * (`Sec-Fetch-Site`, which the browser sets and no page can) is anything but `same-origin`, `same-site` included, since another port on
  * localhost is the same site; and a body not sent as `application/json` is one any page can send without the browser asking first.
  * An absent `Host` or `Sec-Fetch-Site` is a client outside a browser, such as curl, and passes.
+ *
+ * A write that presents a bearer token (`Authorization: Bearer <token>`) passes the host and the site: a page on another site cannot
+ * send that header without the browser asking the api first, which the api never answers, and cannot know a token; behind a proxy or a
+ * tunnel the `Host` is the store's public name, which only a token makes safe. The token itself is judged before the guard (`callerGate`,
+ * src/caller/caller.ts), a token refused there never reaching it, so presenting one here means a live one. It still says a JSON body.
  */
 import { assume, type Implementation, spec } from '@emyann/tsverify';
 import { loopback, saysJson, type WriteRefusal, type WriteRequest } from '../src/guard.ts';
@@ -24,10 +28,16 @@ import { loopback, saysJson, type WriteRefusal, type WriteRequest } from '../src
 export const loopbackName = assume(loopback, { pure: true });
 export const jsonType = assume(saysJson, { pure: true });
 
+/**
+ * A write as the guard reads it: `WriteRequest`, and `bearer`, whether it presents a bearer token. Implement adds `bearer` to
+ * `WriteRequest` in `src/guard.ts` and drops this type, which changes no law.
+ */
+export type GuardedRequest = WriteRequest & { readonly bearer: boolean };
+
 /** The methods that write nothing, which the guard never stands in front of. */
 const reads = (method: string): boolean => method === 'GET' || method === 'HEAD';
 
-/** Whether `host` names this machine's loopback, on any port; an absent one is this machine. The api listens on 127.0.0.1 alone. */
+/** Whether `host` names this machine's loopback, on any port; an absent one is this machine. */
 const here = (host: string | undefined): boolean => host === undefined || loopback(host);
 
 /** Whether `site` is the board's own page or no browser at all. */
@@ -36,27 +46,34 @@ const ours = (site: string | undefined): boolean => site === undefined || site =
 /** Whether `contentType` says a JSON body, its parameters (`; charset=utf-8`) and its case left out. */
 const json = (contentType: string | undefined): boolean => contentType !== undefined && saysJson(contentType);
 
-const writeRefusedSpec = spec<(request: WriteRequest) => WriteRefusal | null>({
+/** Whether a write may come from where it says it does: this machine, from no other site, or with a token, from anywhere. */
+const fromWhereItMay = (r: GuardedRequest): boolean => r.bearer || (here(r.host) && ours(r.site));
+
+const writeRefusedSpec = spec<(request: GuardedRequest) => WriteRefusal | null>({
   ensures: {
     aReadIsNeverRefused: {
       description: 'A GET or a HEAD writes nothing, and the guard never refuses one',
       condition: ({ input: [r], output }) => !reads(r.method) || output === null,
     },
     anotherHostIsRefused: {
-      description: 'A write addressed to a name that is not this machine is refused for its host, before anything else is read',
-      condition: ({ input: [r], output }) => reads(r.method) || here(r.host) || output === 'host',
+      description: 'A write with no token addressed to a name that is not this machine is refused for its host, before anything else',
+      condition: ({ input: [r], output }) => reads(r.method) || r.bearer || here(r.host) || output === 'host',
     },
     anotherSiteIsRefused: {
-      description: 'A write to this machine made by a page on another site, same-site included, is refused for its site',
-      condition: ({ input: [r], output }) => reads(r.method) || !here(r.host) || ours(r.site) || output === 'site',
+      description: 'A write with no token to this machine made by a page on another site, same-site included, is refused for its site',
+      condition: ({ input: [r], output }) => reads(r.method) || r.bearer || !here(r.host) || ours(r.site) || output === 'site',
+    },
+    aTokenPassesHostAndSite: {
+      description: 'A write that presents a token is never refused for its host or its site',
+      condition: ({ input: [r], output }) => !r.bearer || (output !== 'host' && output !== 'site'),
     },
     aBodyNotJsonIsRefused: {
-      description: 'A write from here that does not say a JSON body is refused for its media: any page can send one without asking',
-      condition: ({ input: [r], output }) => reads(r.method) || !here(r.host) || !ours(r.site) || json(r.contentType) || output === 'media',
+      description: 'A write from where it may come that does not say a JSON body is refused for its media, a token or none',
+      condition: ({ input: [r], output }) => reads(r.method) || !fromWhereItMay(r) || json(r.contentType) || output === 'media',
     },
-    aJsonWriteFromHerePasses: {
-      description: 'A write to this machine, from no other site, saying a JSON body, is never refused',
-      condition: ({ input: [r], output }) => !(here(r.host) && ours(r.site) && json(r.contentType)) || output === null,
+    aJsonWriteFromWhereItMayPasses: {
+      description: 'A write from this machine and no other site, or with a token, saying a JSON body, is never refused',
+      condition: ({ input: [r], output }) => !(fromWhereItMay(r) && json(r.contentType)) || output === null,
     },
   },
 });

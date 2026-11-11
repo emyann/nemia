@@ -1,16 +1,19 @@
 /**
- * Who calls the api (agent-orchestrator, src/token/token.ts, `callerOf`), from the token a request presents: a token per session the store
- * starts, minted as the session is filed and handed to it in its environment, bound to its run, step and try as a Kubernetes bound
- * ServiceAccount token is bound to its Pod. A request that presents none is the person (until the MCP intake gives other callers a
- * credential); a request that presents one is never the person: one the store never minted is refused, and so is one whose try is no
- * longer the step's live one (settled, superseded, or its run gone), read afresh on each request and remembered nowhere. Pure.
+ * Who calls the api (agent-orchestrator, src/token/token.ts, `callerOf`), from the token a request presents and what the route it asks
+ * needs of one. Two kinds of token: a session's, minted as the session is filed and handed to it in its environment, bound to its run,
+ * step and try as a Kubernetes bound ServiceAccount token is bound to its Pod; and a person's, named, minted by the person at the store's
+ * machine (`nemia token add`), printed once, kept as its digest alone and revoked by its name — every one of them is the person. What a
+ * route needs (`TokenNeed`): nothing, where a request with no token is still the person (a store not marked exposed); a token, any
+ * live one (every route of a store marked exposed); or a person's token (the MCP port, always). Read afresh on each request and
+ * remembered nowhere. Pure.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 import type { CallerKind, TokenRefusal } from 'objects';
 
 /**
- * What the store keeps of a token it minted, found by the token's digest: the session's agent, its factory (null for a session of the
- * store's own, Nemia's, which works in every factory), and the run, step and try it was filed for (null for a session that is no run's).
+ * What the store keeps of a session token it minted, found by the token's digest: the session's agent, its factory (null for a session
+ * of the store's own, Nemia's, which works in every factory), and the run, step and try it was filed for (null for a session that is no
+ * run's).
  */
 export type TokenRecord = {
   readonly agent: string;
@@ -19,6 +22,19 @@ export type TokenRecord = {
   readonly step: string | null;
   readonly attempt: number;
 };
+
+/**
+ * What a request's route needs of a token: `none`, a request with none being the person; `token`, any live one; `person`, one of the
+ * person's. Implement moves it to `src/token/token.ts`, which changes no law.
+ */
+export type TokenNeed = 'none' | 'token' | 'person';
+
+/**
+ * The two refusals this change adds to `objects`' `TOKEN_REFUSALS`: no token where the route needs one, and a session's token where it
+ * needs the person's. Implement adds both words to `objects` (`packages/objects/src/words.ts`) and reads them from there, dropping this
+ * type, which changes no law.
+ */
+export type NeedRefusal = 'token-required' | 'person-token-required';
 
 /** The caller a request is: the person, an agent's live session, or refused with its reason. */
 export type CallerOf =
@@ -30,32 +46,55 @@ export type CallerOf =
       readonly run: string | null;
       readonly step: string | null;
     }
-  | { readonly kind: 'refused'; readonly reason: TokenRefusal };
+  | { readonly kind: 'refused'; readonly reason: TokenRefusal | NeedRefusal };
 
-const callerOfSpec = spec<(presented: boolean, record: TokenRecord | null, live: boolean) => CallerOf>({
+/** Whether `output` is a refusal for `reason`. */
+const refusedFor = (output: CallerOf, reason: TokenRefusal | NeedRefusal): boolean =>
+  output.kind === 'refused' && output.reason === reason;
+
+/** A token presented that is no person's: a session's, or one the store never minted. */
+const sessionSide = (presented: boolean, person: boolean): boolean => presented && !person;
+
+const callerOfSpec = spec<
+  (presented: boolean, need: TokenNeed, person: boolean, record: TokenRecord | null, live: boolean) => CallerOf
+>({
+  requires: ({ input: [presented, , person] }) => presented || !person,
   ensures: {
-    noTokenIsThePerson: {
-      description: 'A request that presents no token is the person',
-      condition: ({ input: [presented], output }) => presented || output.kind === 'person',
+    noTokenIsThePersonWhereNoneIsNeeded: {
+      description: 'A request that presents no token, to a route that needs none, is the person',
+      condition: ({ input: [presented, need], output }) => presented || need !== 'none' || output.kind === 'person',
     },
-    aTokenIsNeverThePerson: {
-      description: 'A request that presents a token is never the person, whatever the token',
-      condition: ({ input: [presented], output }) => !presented || output.kind !== 'person',
+    noTokenIsRefusedWhereOneIsNeeded: {
+      description: 'A request that presents no token, to a route that needs one, is refused for it',
+      condition: ({ input: [presented, need], output }) => presented || need === 'none' || refusedFor(output, 'token-required'),
+    },
+    aPersonsTokenIsThePerson: {
+      description: "A request that presents one of the person's tokens is the person, whatever the route needs",
+      condition: ({ input: [presented, , person], output }) => !(presented && person) || output.kind === 'person',
+    },
+    aSessionTokenIsNeverThePerson: {
+      description: "A request that presents a token that is no person's is never the person",
+      condition: ({ input: [presented, , person], output }) => !sessionSide(presented, person) || output.kind !== 'person',
     },
     unknownRefused: {
-      description: 'A token the store never minted is refused',
-      condition: ({ input: [presented, record], output }) =>
-        !(presented && record === null) || (output.kind === 'refused' && output.reason === 'unknown-token'),
+      description: 'A token the store never minted is refused as unknown, whatever the route needs',
+      condition: ({ input: [presented, , person, record], output }) =>
+        !(sessionSide(presented, person) && record === null) || refusedFor(output, 'unknown-token'),
+    },
+    aSessionTokenIsRefusedWhereThePersonsIsNeeded: {
+      description: "A session's token, to a route that needs the person's, is refused for it",
+      condition: ({ input: [presented, need, person, record], output }) =>
+        !(sessionSide(presented, person) && record !== null && need === 'person') || refusedFor(output, 'person-token-required'),
     },
     endedRefused: {
-      description: "A token whose session's try is no longer live is refused",
-      condition: ({ input: [presented, record, live], output }) =>
-        !(presented && record !== null && !live) || (output.kind === 'refused' && output.reason === 'session-ended'),
+      description: "A session's token whose try is no longer live is refused, where the route takes a session's",
+      condition: ({ input: [presented, need, person, record, live], output }) =>
+        !(sessionSide(presented, person) && record !== null && need !== 'person' && !live) || refusedFor(output, 'session-ended'),
     },
     liveIsItsAgent: {
-      description: "A live session's token is its agent, in its factory, run and step",
-      condition: ({ input: [presented, record, live], output }) =>
-        !(presented && record !== null && live) ||
+      description: "A live session's token, where the route takes a session's, is its agent, in its factory, run and step",
+      condition: ({ input: [presented, need, person, record, live], output }) =>
+        !(sessionSide(presented, person) && record !== null && need !== 'person' && live) ||
         (output.kind === 'agent' &&
           output.agent === record.agent &&
           output.factory === record.factory &&

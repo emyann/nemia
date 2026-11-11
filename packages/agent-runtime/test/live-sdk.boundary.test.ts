@@ -117,7 +117,7 @@ test(
 );
 
 /**
- * Each JSON line of a job's stdout. The `init` line is looked for rather than taken first: on 0.3.308, 0.3.316 and 0.3.322 the SDK prints its
+ * Each JSON line of a job's stdout. The `init` line is looked for rather than taken first: on 0.3.308 and 0.3.316 the SDK prints its
  * command lifecycle lines for the queued prompt ahead of it, and a `result` line does not open with its `type`.
  */
 type Line = { type?: string; subtype?: string; model?: string; claude_code_version?: string };

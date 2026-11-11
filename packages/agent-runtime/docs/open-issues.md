@@ -1281,7 +1281,9 @@ the end).
   `permissionMode: auto`, and auto mode's classifier allowed M1's write outside the folder, its `curl` and its fetch, none denied
   and the file written. So M1's and M7's denied jobs are filed in `default`, the mode this record measured them in, and
   `CLAUDE_AUTO_DROPPED` no longer lists the `haiku` alias (2026-11-09): measured on 2.1.316 by the `init` line's `permissionMode`,
-  `haiku` keeps `auto`, while `claude-haiku-4-5` and `claude-sonnet-4-5` still say `default`, and stay listed.
+  `haiku` keeps `auto`, while `claude-haiku-4-5` and `claude-sonnet-4-5` still say `default`, and stay listed. Measured again on
+  2.1.322, 2026-11-11, model by model (`test/live-sdk.boundary.test.ts`): the same two say `default`, and `haiku`, `sonnet`, `opus`
+  and `fable` keep `auto`; the list is unchanged.
 - **M2: a resume's cost and API time are its session's.** Issue 4, narrowed.
 - **M3: `claude -p --resume` continues a `--bg` session**, under the same id, and remembered what it was told (a session
   stopped first). So a job may continue a background session, and the new attempt's mode is the job's.

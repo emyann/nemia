@@ -41,7 +41,11 @@ the orchestrator's code holds a fact today, it is named beside it.
 - **`auto` on haiku is `auto`** (the SDK's Claude Code 2.1.316, `claude-haiku-5-5`, 2026-11-09): a job filed at the runtime's
   default mode ran in `auto` (its transcript's `permissionMode`), and the classifier allowed a write outside its folder, a `curl`
   and a fetch, where on 2.1.280 haiku ran `auto` as `default` and was denied all three. A job meant to be denied by asking is
-  filed in `default` (`test/live.test.ts`, M1 and M7).
+  filed in `default` (`test/live.test.ts`, M1 and M7). Measured again on **SDK 0.3.322, Claude Code 2.1.322, 2026-11-11**, by
+  `test/live-sdk.boundary.test.ts`'s third case, one job per model filed in `auto` and read off its `init` line: `haiku`
+  (`claude-haiku-5-5`), `sonnet` (`claude-sonnet-5-5`), `opus` (`claude-opus-5-5`) and `fable` (`claude-fable-5-2`) ran in `auto`, and
+  `claude-haiku-4-5` and `claude-sonnet-4-5` in `default`, so `CLAUDE_AUTO_DROPPED` stands as it was. The case makes this measurement
+  again at every bump, and hands each line over as `sdk-<version>-auto-<model>.json`.
 - **A session reads neither user settings nor `settings.local.json`** (`settingSources: ['project']`): what a step needs goes on the step, its
   agent or the checkout's `.claude/settings.json`.
 - **A tool's error is exact in the log events, not the spans** (2.1.296, 2026-10-11): `tool_result` with `success="false"` carries
@@ -115,19 +119,38 @@ the orchestrator's code holds a fact today, it is named beside it.
   at each bump and never carried. Measured again on **SDK 0.3.316, Claude Code 2.1.316, 2026-11-01**: still `claude-opus-5-5`, alike
   on the `init` line of `bin/ae-claude-job.ts` run on the bundled Claude Code (`live-sdk.boundary.test.ts`, which keeps that line as
   `sdk-0.3.316-init.json`), on the attempt the engine recorded (`ranOn`), and on the owner's own `claude -p --model opus` at 2.1.316.
+  Measured again on **SDK 0.3.322, Claude Code 2.1.322, 2026-11-11**: still `claude-opus-5-5`, on the bundled Claude Code's `init`
+  line (`sdk-0.3.322-init.json`, `claude_code_version` 2.1.322), on the attempt (`ranOn`, `harnessVersion` 2.1.322), and on the
+  owner's own `claude -p --model opus --output-format stream-json --verbose`, whose `claude --version` said 2.1.322 and whose `init`
+  line said `claude-opus-5-5`.
 - **The mode a session ran in is its `init` line's `permissionMode`** (`sdk.d.ts:6369`), and the runtime reads it as the attempt's
   `ranIn` (`harness/detached/output.ts`): what was asked is the task's `permissionMode`, what ran is what Claude Code printed. The SDK
   prints one `init` per turn, so the last one is read, as `claude_code_version` is, and the capture keeps a later `init` that names
   another mode (`initKept`): on a model that drops `auto` the mode can change from one turn to the next (`auto` on haiku ran as
-  `default` on 2.1.280, and as `auto` on 2.1.316, above), and only that line says which one a turn ran in.
+  `default` on 2.1.280, and as `auto` on 2.1.316 and 2.1.322, above), and only that line says which one a turn ran in.
 - **A job's bin prints the SDK's `command_lifecycle` lines for the queued prompt ahead of `system`/`init`** (SDK 0.3.308 and 0.3.316,
   2026-11-01): `queued`, then `started`, each with the `session_id`, then `init`; and a `result` line does not open with its `type`.
   The worker passes over every line before the start event (`HarnessSpec.start`, `bin/ae-worker.ts`), so it reads the id all the same.
 - **A settings file left out of `settingSources` no longer supplies auto-mode rules or saved permission consents** (Claude Code 2.1.314,
   SDK 0.3.314, from their changelogs, not measured here): a session runs `settingSources: ['project']`, so an `auto` step no longer
   inherits a user-level consent; the first sign of what that changes is the runs' denials after the daemon restarts.
+- **Auto mode with telemetry or feature flags off asks about or denies what its server cannot check, with no fallback to the built-in
+  classifier** (Claude Code 2.1.319, from its changelog, not measured here; `CLAUDE_CODE_AUTO_MODE_SERVER=0` keeps the classifier). The
+  runtime takes only the variables of a process's own telemetry export out of a child (`TELEMETRY_VARIABLE`, `harness/telemetry.ts`), and nothing
+  here sets `DISABLE_TELEMETRY` or `CLAUDE_CODE_DISABLE_FEATURE_FLAGS`; a daemon whose own environment sets one would see every `auto`
+  step's calls asked about, so denied, after it restarts.
+- **The `fable` alias is `claude-fable-5-2`** (Claude Code 2.1.321 from its changelog, measured on 2.1.322 on the `init` line of
+  `sdk-0.3.322-auto-fable.json`, 2026-11-11), where it was Fable 5.1 before; it keeps `auto`.
+- **A hook matcher takes `onFailure`** (SDK 0.3.317, read off `sdk.d.ts` on 0.3.322): `continue`, the default, reports a callback that
+  throws or answers nothing valid and lets the action go on; `block` blocks it. The runtime's hold hooks leave the default
+  (`harness/claude/job-hooks.ts`): a hold is not a fence, and a failed read of the drain must not stop every call of a step. A
+  callback that returns nothing counts as failing, so each returns on every path.
+- **A job resumed on the bundled Claude Code is started with `--await-initialize`** (SDK 0.3.321, read off `sdk.mjs` on 0.3.322,
+  2026-11-11): the SDK adds it where a resume or a continue runs the bundled binary with no `pathToClaudeCodeExecutable` and no
+  `spawnClaudeCodeProcess`, so a job on the stand-in (`AE_CLAUDE_EXECUTABLE`) and an attached session, which spawns its own child,
+  never see it.
 - **The SDK joins most of the flags it builds for Claude Code as `--flag=value`, and a few as two arguments** (0.3.308, read off
-  `sdk.mjs`, 2026-10-22, and re-read on 0.3.316, 2026-11-01, unchanged; the change landed in 0.3.295): joined for the mode, the prompts, the tool lists, the setting sources,
+  `sdk.mjs`, 2026-10-22, and re-read on 0.3.316, 2026-11-01, and on 0.3.322, 2026-11-11, unchanged; the change landed in 0.3.295): joined for the mode, the prompts, the tool lists, the setting sources,
   `--add-dir`, `--plugin-dir`, `--resume`, `--model`, `--effort`; two arguments for `--mcp-config`, `--managed-settings` and every
   `extraArgs` key, `--settings` among them — those it joins only where the value itself opens with a dash — beside the four it opens
   with (`--output-format stream-json --verbose --input-format stream-json`). A test that read such a value as

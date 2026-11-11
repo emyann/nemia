@@ -48,7 +48,13 @@ reads it for them. A red the context judged is first re-run, once: the failed jo
 (`gh run rerun <id> --failed`), waited on within the same whole bound, and only a run on its first attempt is re-run, as GitHub says, so a
 head is never re-run twice; a job red again is the change's, and the pass or the refusal names each job re-run and how it ended the
 second time. A re-run still running at the bound is a refusal the next try answers by changing nothing, its check reading the re-run's
-verdict. An attempt that cannot be read, a re-run `gh` refuses, or a red that is no Actions job is not re-run, said in a line. Where the context is red on the base branch too, at the commit of it the head holds, the refusal says so and names
+verdict. An attempt that cannot be read, a re-run `gh` refuses, or a red that is no Actions job is not re-run, said in a line. A context still absent at half the start bound,
+where the head has a workflow run GitHub queued and never started (`queued`, no job started, which no re-run or cancel frees), has that
+run's own workflow dispatched once on the branch (`gh workflow run <file> --ref <branch>`), waited on within the same start bound and
+said in the pass or the refusal; a dispatched run checks the branch head, not the merge ref, so the landing's wait on the base's own
+context stays the last word. A dispatch GitHub refuses is a person's refusal at once, naming the stuck run and the dispatch to type, with
+`-f` for each input the workflow requires, then the retry. A dispatched run's red, whose entry links its run rather than a job, is
+re-run and read as any other: its failing jobs and their lines are read from the run. Where the context is red on the base branch too, at the commit of it the head holds, the refusal says so and names
 the base's jobs that did not pass, so a failure that is the base's is not read as the change's; it stays the try's refusal. The reviewer alone reads the pull request and its checks itself (`gh pr view`, `gh pr checks`), its fence allowing
 those two and refusing every other form: a browser, `--watch`, a jq query or a template, another repository, and an assignment before
 `gh`.

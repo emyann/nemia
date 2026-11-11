@@ -10,7 +10,7 @@ import { Cause, Effect, Exit, type Duration } from 'effect';
 import { setting } from '../../config/config.store.ts';
 import { firstPiece } from '../../piece/piece.ts';
 import { dropEmpty, freedByRepo, judging, resolved, sized, type Judged, type Sized } from './prune.verb.ts';
-import { freeable, freedLine, freeSaid, freeTurn, pruneLines, type Answered, type Pruning } from './prune.ts';
+import { freeable, freedLine, freeSaid, freeTurn, pruneLines, untakenOf, untakenWords, type Answered, type Pruning } from './prune.ts';
 import { StoreRoot } from '../../config/root.store.ts';
 
 /** The sweep's pace when it is given none. */
@@ -81,7 +81,7 @@ const afterWords = (p: Pruning): string | null => {
     : null;
 };
 
-/** The memory without what it holds of a run that is no candidate any more: freed, or no longer finished. */
+/** The memory without what it holds of a run that is no candidate any more, nor left untaken: freed, or no longer finished. */
 function forgotten(memory: FreeMemory, candidates: readonly string[]): void {
   const standing = new Set(candidates);
   for (const id of memory.judged) if (!standing.has(id)) memory.judged.delete(id);
@@ -113,7 +113,9 @@ const saidOnce = Effect.fnUntraced(function* (left: ReadonlyArray<{ id: string; 
  * - each is judged as `nemia prune <id>` judges it, with no flag (`judging`), and sized when ready (`sized`), side by side;
  * - those ready are removed by one `remove` a repository (`freedByRepo`), repositories side by side;
  * - each run freed is said (`freedLine`), and a run left is said once while its words stand (`freeSaid`): a held, off-branch or
- *   changed worktree, a place that did not answer, a worktree git would not remove.
+ *   changed worktree, a place that did not answer, a worktree git would not remove;
+ * - a finished run the pass did not find at rest for a reason only a person ends (`untaken`: held, or a record that froze no
+ *   workflow), its folder on disk, is said once while its words stand (`untakenWords`), and nothing is asked of its place.
  *
  * Level-triggered: a run freed has no folder left and is no candidate; one that is not freed is judged again on a later sweep, by what
  * the store and the place say then.
@@ -122,7 +124,11 @@ export const freeOnce = Effect.fn('freeOnce')(function* (answers: readonly Answe
   const home = yield* StoreRoot;
   if (yield* setting('keepWorktrees')) return { freed: [], said: [] } satisfies Freed;
   const candidates = freeable(answers).filter((id) => fs.existsSync(path.join(home, 'worktrees', id)));
-  forgotten(memory, candidates);
+  const untakenLeft = answers.flatMap((a) => {
+    const why = untakenOf(a);
+    return why && fs.existsSync(path.join(home, 'worktrees', a.run.id)) ? [{ id: a.run.id, words: untakenWords(a.run, why) }] : [];
+  });
+  forgotten(memory, [...candidates, ...untakenLeft.map((u) => u.id)]);
   const turn = freeTurn(candidates, memory.judged, FREE_A_SWEEP, memory.turn++);
   const judged = yield* Effect.forEach(turn, swept, { concurrency: FREE_A_SWEEP });
   for (const id of turn) memory.judged.add(id);
@@ -131,10 +137,19 @@ export const freeOnce = Effect.fn('freeOnce')(function* (answers: readonly Answe
   const removed = (yield* freedByRepo(ready, FREE_A_SWEEP)).flatMap(freedTogether);
 
   const freed = removed.filter((p) => p.kind === 'pruned' && p.worktrees.length > 0);
-  const left = [...judged.flatMap((j) => ('words' in j ? [j] : [])), ...removed.map((p) => ({ id: p.id, words: afterWords(p) }))];
+  const left = [
+    ...untakenLeft,
+    ...judged.flatMap((j) => ('words' in j ? [j] : [])),
+    ...removed.map((p) => ({ id: p.id, words: afterWords(p) })),
+  ];
   for (const p of freed) yield* Effect.logInfo(freedLine(p)).pipe(Effect.annotateLogs({ run: p.id }));
   const said = yield* saidOnce(left, memory);
-  yield* Effect.annotateCurrentSpan({ candidates: candidates.length, judged: turn.length, freed: freed.length });
+  yield* Effect.annotateCurrentSpan({
+    candidates: candidates.length,
+    untaken: untakenLeft.length,
+    judged: turn.length,
+    freed: freed.length,
+  });
   return { freed, said } satisfies Freed;
 });
 

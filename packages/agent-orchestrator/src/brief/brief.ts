@@ -23,7 +23,7 @@ import {
 import { landsOnCheck, merged, owesReplies } from '../status/status.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { mergeReviewSection, mergeSection } from '../merge/merge.ts';
-import { checkContract, checkHandedSection, landingContract, type CheckHanded, type LandingWords } from '../check/check.ts';
+import { checkContract, checkHandedSection, landingContract, type CheckHanded, type LandingWords } from '../check/index.ts';
 import { artifactsContract } from '../artifacts/artifacts.ts';
 import { briefBody, rendersAgent, skillLayers } from '../agents/agents.ts';
 import { ownNote } from '../ending/ending.ts';

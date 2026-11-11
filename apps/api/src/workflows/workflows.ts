@@ -33,6 +33,7 @@ import {
   type Places,
 } from 'agent-orchestrator';
 import {
+  checkFailurePolicyLine,
   contextText,
   isFolderTeam,
   STEP_KEY_MEANINGS,
@@ -146,14 +147,15 @@ export type KeyRow = { key: string; value: string | null; meaning: string };
 
 /**
  * A step's value for `key`, as a row says it: a list joined, a count in digits, a context window in the package's one form (`200k`, as
- * `renderStep` writes it), `output:` as the file it names, `route:` as its line (`routeLine`), and null for none.
+ * `renderStep` writes it), `output:` as the file it names, `route:` as its line (`routeLine`), `checkFailurePolicy:` as its line
+ * (`checkFailurePolicyLine`), and null for none.
  */
 function keyValue(step: StepSpec, key: StepKey): string | null {
   const value = key === 'output' ? step.output?.file : key === 'agent' ? step.agent?.name : step[key];
   if (value === undefined) return null;
   if (key === 'context' && typeof value === 'number') return contextText(value);
   if (Array.isArray(value)) return value.length ? value.join(', ') : null;
-  if (typeof value === 'object') return key === 'route' && step.route ? routeLine(step.route) : null;
+  if (typeof value === 'object') return objectLine(step, key);
   return String(value);
 }
 
@@ -396,6 +398,7 @@ export const specOf = (step: StepSpec): WorkflowStepSpec => ({
   ...boundsOf(step),
   check: step.check ?? null,
   retries: step.retries ?? null,
+  checkFailurePolicy: step.checkFailurePolicy ? checkFailurePolicyLine(step.checkFailurePolicy) : null,
   gate: step.gate ?? null,
   output: step.output?.file ?? null,
   loop: step.loop ?? null,
@@ -411,6 +414,13 @@ const routingOf = (step: StepSpec) => ({
   ends: step.ends ?? null,
   workflow: step.workflow ?? null,
 });
+
+/** A key whose value is an object, as its line writes it in YAML flow: `route:` and `checkFailurePolicy:`; null for any other. */
+const objectLine = (step: StepSpec, key: StepKey): string | null => {
+  if (key === 'route' && step.route) return routeLine(step.route);
+  if (key === 'checkFailurePolicy' && step.checkFailurePolicy) return checkFailurePolicyLine(step.checkFailurePolicy);
+  return null;
+};
 
 /** A condition's `route:` as its line writes it, in YAML flow. */
 const routeLine = (route: NonNullable<StepSpec['route']>): string => {

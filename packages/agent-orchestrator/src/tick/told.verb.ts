@@ -43,7 +43,7 @@ import { workflowDescription } from '../folder/folder.store.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
 import { SkillName } from '../agents/agents.model.ts';
 import { enabledSkillsOf, renderedFlags, rendersAgent, unrendered, type SkillAgain } from '../agents/agents.ts';
-import type { LandingWords } from '../check/check.ts';
+import type { LandingWords } from '../check/index.ts';
 import { landingWords, placeSay } from '../place/landing.store.ts';
 import type { Place } from '../place/place.store.ts';
 import type { PlaceSay } from '../place/place.ts';

@@ -63,6 +63,7 @@ export const UNSET: Readonly<WorkflowStepSpec> = {
   budget: null,
   check: null,
   retries: null,
+  checkFailurePolicy: null,
   gate: null,
   output: null,
   tally: [],

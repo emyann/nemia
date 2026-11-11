@@ -519,25 +519,31 @@ test('REFUSED otherwise: a branch that merged a newer base is measured on its ow
   assert.equal(git(repo, 'diff', '--numstat', base, 'HEAD').includes(`${MANY}\t0\ttheirs.ts`), true, 'which the first base would not');
 });
 
-/** The line each refusal of `change.ts` ends with: none is the work's, so a try retried on its own changes nothing and stops. */
-const NOT_THE_WORK = /^nemia change: not the work: /m;
+/**
+ * What each refusal of `change.ts` exits with: none is the work's, so each is the code quick's `implement` names in its
+ * `checkFailurePolicy:` (sdlc's `PERSONS_EXIT`), and the run waits on the person rather than try the step again. No line says it.
+ */
+const PERSONS = 78;
 
-test('REFUSED: no base to measure from, and a verb the script has not', () => {
+/** The line a person's refusal ended with before the exit said it. */
+const TAGGED = /not the work/;
+
+test("REFUSED: no base to measure from, and a verb the script has not, each a person's, by its exit", () => {
   const { repo, base } = workOn(files(1));
   const { bin } = stubs();
   const { WF_BASE_REF: _unset, ...env } = envOf(repo, base, bin);
   const unbased = spawnSync(process.execPath, [SCRIPT, 'size'], { cwd: repo, env, encoding: 'utf8', timeout: 60_000 });
-  assert.equal(unbased.status, 1);
+  assert.equal(unbased.status, PERSONS, "a run's environment is a person's");
   assert.match(unbased.stderr, /WF_BASE_REF is not set/);
-  assert.match(unbased.stderr, NOT_THE_WORK, "a run's environment is a person's");
+  assert.doesNotMatch(unbased.stderr, TAGGED, 'the exit says whose it is, no line does');
   const gone = change(repo, 'no-such-commit', 'size');
-  assert.equal(gone.code, 1);
+  assert.equal(gone.code, PERSONS, "a base git cannot read is a person's");
   assert.match(gone.err, /cannot tell where the work began/);
   for (const verb of ['trim', 'tests', 'pages']) {
     const unknown = change(repo, base, verb, closeoutFile({ pages: ['runs'] }));
-    assert.equal(unknown.code, 1, verb);
+    assert.equal(unknown.code, PERSONS, `${verb}: the check line is a person's`);
     assert.ok(unknown.err.startsWith('nemia change: ') && unknown.err.includes(JSON.stringify(verb)), `naming the verb:\n${unknown.err}`);
-    assert.match(unknown.err, NOT_THE_WORK, `${verb}: the check line is a person's`);
+    assert.doesNotMatch(unknown.err, TAGGED, `${verb}: the exit says whose it is, no line does`);
     assert.equal(unknown.out, '');
     assert.deepEqual(unknown.said, [], 'nothing is started');
   }

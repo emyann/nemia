@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { workflowSpecOf } from './workflow-spec.ts';
+import { parseWorkflow, renderStep } from '../workflow/index.ts';
 
 test("a folder's files as a spec: its steps by name, its README, and its other text files sorted, none of them markdown", () => {
   const spec = workflowSpecOf([
@@ -39,4 +40,18 @@ test('markdown in capitals is markdown: a README.MD is the README, and no .MD is
   ]);
   assert.equal(spec.readme, '# Flow\n');
   assert.deepEqual(spec.files, []);
+});
+
+test("a step's check failure policy is carried as the map its frontmatter reads, as `route:` is, and written back it loads as it was", () => {
+  const line = '{ rules: [ { action: FailStep, onExitCodes: { operator: In, values: [78] } } ] }';
+  const [step] = workflowSpecOf([
+    { name: 'implement.md', text: `---\nplace: git\ncheck: npm test\nretries: 2\ncheckFailurePolicy: ${line}\n---\nDo it.\n` },
+  ]).steps;
+  assert.deepEqual(step?.keys.checkFailurePolicy, {
+    rules: [{ action: 'FailStep', onExitCodes: { operator: 'In', values: [78] } }],
+  });
+  const written = renderStep({ name: 'implement', body: step?.body ?? '', ...step?.keys } as never);
+  assert.deepEqual(parseWorkflow('implement', written).checkFailurePolicy, {
+    rules: [{ action: 'FailStep', onExitCodes: { operator: 'In', values: [78] } }],
+  });
 });

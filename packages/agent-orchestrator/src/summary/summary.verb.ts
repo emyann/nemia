@@ -32,7 +32,7 @@ import {
   type StepReason,
   type WaitOn,
 } from '../feed/index.ts';
-import type { CheckVerdict } from '../check/check.ts';
+import type { CheckVerdict } from '../check/index.ts';
 import { judgedSteps, stepNames, tryOf, type Unreadable, type Views, workflowsOf } from './reads.verb.ts';
 import {
   needsOf,

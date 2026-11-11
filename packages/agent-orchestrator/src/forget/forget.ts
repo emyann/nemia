@@ -6,7 +6,7 @@
 import type { StepSpec } from '../step/step.ts';
 import { andList, type CloseoutAsked, type RepositoryRun, type Run, type TaskPhase } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
-import type { Verdict } from '../check/check.ts';
+import type { Verdict } from '../check/index.ts';
 import { modeWord, spentAsks, type Retry, type RetryAsk } from '../retry/index.ts';
 import {
   approvedFirst,

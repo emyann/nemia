@@ -28,7 +28,7 @@ import {
 } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { closeoutRefusals } from '../question/index.ts';
-import type { Verdict } from '../check/check.ts';
+import type { Verdict } from '../check/index.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
 import { roundsDue } from '../round/round.ts';
 import { conditionOf, nodeFate, nodeKind } from '../route/index.ts';

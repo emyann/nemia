@@ -29,7 +29,7 @@
  * and load as a tree: the bottom, beneath `record.store.ts`, beneath `worktree.store.ts` and `write.store.ts`, beneath the rest, so no
  * cycle can form (`test/boundary.test.ts`).
  */
-export { attemptVerdict, CHECK_RESULTS, checkVerdictOf, verdictWord, type CheckResult, type CheckVerdict } from './check/check.ts';
+export { attemptVerdict, CHECK_RESULTS, checkVerdictOf, verdictWord, type CheckResult, type CheckVerdict } from './check/index.ts';
 export { VERSION } from './version/version.store.ts';
 export { leaseRelease, trialRefusal, checkoutPromiseLine, type Running } from './release/release.ts';
 export type { SessionHarness, SessionRelease } from './release/release.ts';

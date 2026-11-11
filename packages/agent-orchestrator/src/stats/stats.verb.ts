@@ -12,7 +12,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { Cause, Effect, Exit, Result } from 'effect';
 import { EngineService, denialText, over, unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
 import { refusedCheck, type Run } from '../record/record.ts';
-import { attemptVerdict } from '../check/check.ts';
+import { attemptVerdict } from '../check/index.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import type { StepSpec } from '../step/step.ts';
 import { timeline } from '../timeline/index.ts';

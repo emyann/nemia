@@ -132,6 +132,7 @@ export const stepSpec = (extra: Partial<WorkflowStepSpec> = {}): WorkflowStepSpe
   budget: 5,
   check: 'npm test',
   retries: 1,
+  checkFailurePolicy: null,
   gate: true,
   output: 'ship.schema.json',
   tally: [],

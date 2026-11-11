@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { asked, type Engine, type TaskView } from '../runtime-client.ts';
-import { CHECK_DEADLINE_SECONDS, CHECK_NICENESS, checkEnvOf, type Verdict } from '../check/check.ts';
+import { CHECK_DEADLINE_SECONDS, CHECK_NICENESS, checkEnvOf, type Verdict } from '../check/index.ts';
 import { stepTaskId, tryOf, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
 import type { StepSpec } from '../step/step.ts';
 import { MOMENTUM, stepStatus, type SpendOf } from '../status/status.ts';

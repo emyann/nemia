@@ -6,7 +6,8 @@
  * question field that does not read. `approvedCaps` is what an approval writes: the proposals, with the person's own amounts over
  * them. `capInForce` is the cap a step is filed and judged under, read on every pass from the record and the approvals in force,
  * nothing carried. `aboveTheWorkflow` names the caps above the step's own `budget:`, which the gate says and which no rule of auto
- * approves unasked.
+ * approves unasked. `pastTheLine` says whether the most a run may cost under a gate's caps passes the cost line its factory sets for
+ * its workflow, which the gate says and which no rule of auto approves unasked either.
  *
  * The types the laws read (`StepBudget`, `CapInput`) are the code's, in `src/budget/budget.ts`.
  */
@@ -163,3 +164,33 @@ const aboveTheWorkflowSpec = spec<(caps: readonly StepBudget[], ceilings: readon
 });
 /** The function's type, which the code takes: it then imports nothing of tsverify. */
 export type AboveTheWorkflow = Implementation<typeof aboveTheWorkflowSpec>;
+
+/**
+ * Whether a run passes its factory's cost line at a gate (`pastTheLine`): `most` is the most the run may cost under the gate's caps and
+ * the caps in force on every other step (spent plus what the caps allow, `runLine` in src/gate-budgets/gate-budgets.ts), `line` the cost
+ * line the run froze from its factory at its start (`Run.costLine`), undefined where its factory sets none for its workflow. The gate
+ * says it, and no rule of auto approves such a gate unasked (`withinBudget`).
+ */
+const pastTheLineSpec = spec<(most: number, line: number | undefined) => boolean>({
+  /**
+   * The readers hand it no NaN: `most` is a sum of caps and spends, each dollars read as finite numbers, and a line is refused at its
+   * write unless it is dollars above zero (`costLineRefusal`), as a cap is.
+   */
+  requires: ({ input: [most, line] }) => !Number.isNaN(most) && (line === undefined || anAmount(line)),
+  ensures: {
+    noLineSaysNothing: {
+      description: 'Where the factory sets no line for the workflow, no gate says the run passes one',
+      condition: ({ input: [, line], output }) => line !== undefined || !output,
+    },
+    pastWhenAbove: {
+      description: 'A run that may cost more than its line under the caps passes it',
+      condition: ({ input: [most, line], output }) => line === undefined || !(most > line) || output,
+    },
+    notPastAtOrUnder: {
+      description: 'A run that may cost its line or less under the caps does not pass it',
+      condition: ({ input: [most, line], output }) => line === undefined || most > line || !output,
+    },
+  },
+});
+/** The function's type, which the code takes: it then imports nothing of tsverify. */
+export type PastTheLine = Implementation<typeof pastTheLineSpec>;

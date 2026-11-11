@@ -159,6 +159,7 @@ export const filedOf = (listing: FactoryListing, home: string): FiledFactory => 
     hires: { ...listing.hires },
     volumes: factoryVolumesNamed(listing).map(({ name, path, readOnly }) => ({ name, path, readOnly })),
     ...harnessSettingsOf(listing.harnessSettings),
+    ...(listing.costLines === undefined || Object.keys(listing.costLines).length === 0 ? {} : { costLines: { ...listing.costLines } }),
     ...(listing.revisions === undefined ? {} : { revisions: listing.revisions }),
     ...(listing.template === undefined
       ? {}

@@ -304,11 +304,15 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                is on, which the merge does not spend; the step is the one that closes
                                the loop, left out where the run has one loop
                                on the port: refresh
-  nemia say <runId> <step> "<words>"
+  nemia say <runId> <step> [--as <name>] "<words>"
                                tell a step's running session something, through its harness: the
                                engine journals the words on the step's task, nemia ls notes the step
                                said to, and nemia decide prints them under it. A try that continues
-                               the session is handed them again, as ## Said to your session
+                               the session is handed them again, as ## Said to your session.
+                               Words from a session its run filed are its agent's, by its token
+                               (WF_SESSION_TOKEN); an agent with none says --as <name> before its
+                               words, a name the person allowed with nemia chat allow. An agent's
+                               words reach the step under its name, never as yours
                                on the port: say
   nemia agents run yours <name> --brief <words>
                                an agent of yours tried on a short brief, in a folder of its own,
@@ -457,6 +461,11 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia factory setting rm <factory> <harness>.<key>
                                take a harness setting off a factory, by its key
                                CLI only: the board shows no harness setting yet: nemia factory setting writes them
+  nemia factory cost-line set <factory> <workflow> <usd>
+                               set what a run of a workflow may cost before its gate says so, in dollars:
+                               a gate whose caps pass it is said, and never approved unasked at auto
+  nemia factory cost-line rm <factory> <workflow>
+                               take a workflow's cost line off a factory
   nemia factory instruct <name> --file <path>|- | --clear
                                write the instruction the store keeps for a factory (- for stdin), what
                                Nemia is to know of it and no step is told, or remove it with --clear
@@ -548,8 +557,9 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                asked of you again. Asked of you every time
                                on the port: policy_rm
   nemia chat allow <name>
-                               let an agent speak in her chat under a name: its words reach her and the
-                               board as its own, never as yours. Asked of you every time
+                               let an agent speak in her chat under a name, and to a step's session
+                               (nemia say --as <name>): its words reach her, the step and the board as
+                               its own, never as yours. Asked of you every time
                                CLI only: the board shows no speaker list yet: nemia chat allow writes it
   nemia chat disallow <name>
                                take a name back: words under it are refused. Asked of you every time

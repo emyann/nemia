@@ -15,7 +15,7 @@ import { detailOf, tailStart, type FoldedTurn, type SystemTurn, type ThinkingTur
  */
 export type SessionOwn =
   | { what: 'brief'; text: string }
-  | { what: 'told'; at: string; attempt: number; text: string; arrived: string | null }
+  | { what: 'told'; at: string; attempt: number; text: string; arrived: string | null; by: string | null }
   | { what: 'closeout'; call: ToolCall };
 
 /** The tool name a thought's line carries, and a line from the harness's: the two lines of a turn that called nothing. */
@@ -107,7 +107,7 @@ export function sessionItems(turns: readonly Turn[], who: string, live: boolean)
           ? own(turn.key, { what: 'brief', text: turn.text })
           : { kind: 'said', id: turn.key, who, at: turn.at, text: turn.text, markdown: true, yours: false, links: [] };
       case 'told':
-        return own(turn.key, { what: 'told', at: turn.at, attempt: turn.attempt, text: turn.text, arrived: turn.arrived });
+        return own(turn.key, { what: 'told', at: turn.at, attempt: turn.attempt, text: turn.text, arrived: turn.arrived, by: turn.by });
       case 'closeout':
         return own(turn.key, { what: 'closeout', call: turn.call });
       case 'system':

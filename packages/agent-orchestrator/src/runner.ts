@@ -294,7 +294,7 @@ export { lockfileParts, provisionDeps } from './workspace/worktree.store.ts';
 export { artifactFiles, missingArtifacts } from './artifacts/artifacts.store.ts';
 export { lackLines } from './artifacts/artifacts.ts';
 export { type BranchReader } from './branches/branches.store.ts';
-export { passStanding, standingLive, standingLiveOf, standingReader, standingSnapshot, standingWhen } from './standing/standing.verb.ts';
+export { passStanding, standingLive, standingLiveOf, standingReader, standingSnapshot } from './standing/standing.verb.ts';
 export { changesOf, type BranchChanges, type Note } from './branches/changes.store.ts';
 export { evictedBy, recordMemo, type RecordMemo } from './rest/index.ts';
 export { removeAgent, writeAgent, type AgentSchema } from './agents/agents.store.ts';
@@ -415,6 +415,7 @@ export { CONCLUDED, folderRefusal, START, StartInput } from './start/commands.ve
 export { INBOX, INBOX_ADD, INBOX_QUEUE, INBOX_RM } from './inbox/commands.verb.ts';
 export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction, type FactoryInstruction } from './factory/instruction.verb.ts';
 export { FACTORY_RULES, factoryRules, type FactoryRules } from './factory/rules/rules.verb.ts';
+export { FACTORY_COST_LINE_RM, FACTORY_COST_LINE_SET } from './factory/cost-line/cost-line.verb.ts';
 /**
  * A factory's own MCP servers: the entries that list its record with each server's state, record one (its flags mapped by `serverAddOf`)
  * and take one off, and the name rule the board shares.

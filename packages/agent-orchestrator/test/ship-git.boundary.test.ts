@@ -44,7 +44,7 @@ import {
   runWith as runEngine,
   gitPlaceLayer,
 } from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
+import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { stepsNow as stepsOf } from './steps-now.ts';
 import { roundOf } from '../src/run.ts';
 import { main } from '../src/cli/main.ts';
@@ -53,7 +53,7 @@ import { stagedHere, landingDenies, landingWords } from '../src/place/landing.st
 import { builtinGitPlace } from '../src/place/builtin.store.ts';
 import { filedDenies } from '../src/ending/ending.ts';
 import { landingContract } from '../src/check/check.ts';
-import { standingLive } from '../src/standing/standing.verb.ts';
+import { passStanding, standingLive } from '../src/standing/standing.verb.ts';
 import { filesStoreAt } from '../src/record/files.store.ts';
 import type { Env } from '../src/config/config.store.ts';
 
@@ -63,6 +63,8 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
 const runWith = runOver(runEngine, gitPlaceLayer, ENV);
 const runPlaced = runGiven(gitPlaceLayer, ENV);
+/** A pass of the tick's over every run of the store, on the git place: where their branches stand, written down for every reader. */
+const aPass = () => runPlaced(passStanding(listRuns(ROOT)));
 const rooted = filesStoreAt(ROOT);
 type PlaceVerb = import('../src/place/place.ts').PlaceVerb;
 type Place = import('../src/place/place.store.ts').Place;
@@ -259,7 +261,7 @@ async function atTheGate(given: Given = {}) {
   return { repo, id: run.id, branch: work.branch!, e, tasks, filings, settle, pass, base: git(repo, 'rev-parse', 'HEAD') };
 }
 
-test("an approved ending with no check of its own is filed, in the repository's own checkout, and the merge its prose describes lands the run", async () => {
+test("an approved ending with no check of its own is filed, in the repository's own checkout, and the merge its prose describes lands the run, read landed once a pass has read it", async () => {
   const { repo, id, branch, e, tasks, settle, base } = await atTheGate({ dir: uncheckedFolder() });
   const { approval } = await runWith(e, approveRun(id, 'ship', 'Merge it.'));
   assert.deepEqual([approval.step, approval.try], ['ship', 1]);
@@ -312,6 +314,7 @@ test("an approved ending with no check of its own is filed, in the repository's 
   assert.equal(git(repo, 'log', '-1', '--format=%(trailers)'), '', 'with no trailer');
   assert.equal(git(repo, 'status', '--porcelain'), '', 'and nothing is left in the checkout, the message included');
   assert.equal(await isLanded(repositoryRun(record), branch), true);
+  await aPass();
   const { decision, toDecide, standings } = await runWith(e, decideRun(id));
   assert.deepEqual([decision.kind, toDecide, standings], ['landed', undefined, [{ branch, where: 'on' }]]);
   assert.equal(
@@ -443,7 +446,7 @@ const pngsIn = (dir: string): string[] =>
         .sort()
     : [];
 
-test("an approved ending stages the merge and signs off its message; the run executes ship's check on the merged tree, and commits the merge only on its exit 0", async () => {
+test("an approved ending stages the merge and signs off its message; the run executes ship's check on the merged tree, and commits the merge only on its exit 0, read landed once a pass has read it", async () => {
   const { repo, id, branch, e, tasks, settle, base, signed, checkId } = await stagedAndSigned();
   const spec = tasks.get(`${id}-ship`)!.spec;
   assert.match(
@@ -537,6 +540,7 @@ test("an approved ending stages the merge and signs off its message; the run exe
     `on the store's shape, every byte of them less the note's is freed: freed ${shot.before - after} of ${shot.before} bytes`,
   );
   assert.equal(landed.status, 'succeeded');
+  await aPass();
   const { decision } = await runWith(e, decideRun(id));
   assert.equal(decision.kind, 'landed');
   const shipLine = (await runWith(e, list(e, runRecord(ROOT, id)))).steps.find((s) => s.name === 'ship')!;

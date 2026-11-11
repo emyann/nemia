@@ -161,6 +161,7 @@ export {
   Factory,
   FactoryCommands,
   FactoryCondition,
+  FactoryCostLineWrite,
   FactoryInstruction,
   FactoryInstructionWords,
   FactoryInstructionWrite,

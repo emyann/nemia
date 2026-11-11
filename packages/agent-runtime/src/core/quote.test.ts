@@ -1,11 +1,11 @@
 /**
  * The bounded quote (`core/quote.ts`): a text over its bound is cut there and marked, one within it comes back whole, and a list
- * past its count names how many more it held. What each caller quotes through it, bounded end to end, is
- * `test/remote-quotes.test.ts`'s.
+ * past its count names how many more it held; a log's end is kept within its bound under a line that says it was cut. What each
+ * caller quotes through it, bounded end to end, is `test/remote-quotes.test.ts`'s.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { firstOf, quote, VALUE_QUOTE, WORDS_QUOTE } from './quote.ts';
+import { endOf, firstOf, quote, VALUE_QUOTE, WORDS_QUOTE } from './quote.ts';
 
 const many = Array.from({ length: 2_000 }, (_, i) => `item ${i}`);
 
@@ -29,8 +29,17 @@ const ROWS: Array<{ name: string; got: () => string; want: string }> = [
   { name: 'a list within its count is joined whole', got: () => firstOf(many.slice(0, 3), ', '), want: 'item 0, item 1, item 2' },
   { name: 'a count given is the count kept', got: () => firstOf(many.slice(0, 4), ', ', 1), want: 'item 0, and 3 more' },
   { name: 'an empty list is an empty text', got: () => firstOf([], ', '), want: '' },
+  { name: 'a log that fits, of which nothing was cut, comes back whole', got: () => endOf('abc', 10, 'cut', false), want: 'abc' },
+  {
+    name: 'a log over its bound keeps its end, `max` in all, under the line',
+    got: () => endOf(`${'a'.repeat(99_990)}0123456789`, 100, 'cut', false),
+    want: `cut\n${'a'.repeat(86)}0123456789`,
+  },
+  { name: 'a log cut before it was handed over is under the line, whole', got: () => endOf('abc', 10, 'cut', true), want: 'cut\nabc' },
+  { name: 'an empty log of which something was cut is the line alone', got: () => endOf('', 10, 'cut', true), want: 'cut\n' },
+  { name: 'a log as long as its bound comes back whole', got: () => endOf('a'.repeat(10), 10, 'cut', false), want: 'a'.repeat(10) },
 ];
 
-test('quote and firstOf: a text cut at its bound and marked, a list cut at its count and counted, each whole within it', async (t) => {
+test('quote, firstOf and endOf: a text cut at its bound and marked, a list cut at its count and counted, a log kept at its end, each whole within it', async (t) => {
   for (const row of ROWS) await t.test(row.name, () => assert.equal(row.got(), row.want));
 });

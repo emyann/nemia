@@ -13,12 +13,13 @@
  */
 import { endsOnBase, type StepSpec } from '../step/step.ts';
 import { terminalSteps } from '../workflow/index.ts';
-import type { Run } from '../record/record.ts';
+import { isRepositoryRun, type Run } from '../record/record.ts';
 import { conditionOf } from '../route/index.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { Landed } from '../decide/decide.ts';
 import type { BranchStood } from '../place/place.ts';
 import type { LessonState } from 'objects';
+import type { BranchesAsked, RunAsked } from '../../contracts/branches-asked.contract.ts';
 
 /**
  * The steps whose branch is the run's result: the steps nothing waits on (`terminalSteps`) — and, where one of those works in the
@@ -426,3 +427,22 @@ export function lessonOf(touched: readonly Touched[]): { said: string; state: Le
 
 /** The lesson line `nemia decide` prints (`lessonOf`), under its label. */
 export const lessonLine = (touched: readonly Touched[]): string => `lesson  ${lessonOf(touched).said}`;
+
+/**
+ * Which of a run's result branches its reading asks where they stand (`BranchesAsked`, contracts/branches-asked.contract.ts): every one
+ * of a run that cut worktrees of its own, nobody called off, and that is no longer running, whatever its status and whether a step of it
+ * merges; none of any other. Exactly the runs the tick's pass asks git of (`asksOwn`), so a branch asked is one `standing.json` holds.
+ * Pure: what the judgement, the tick's `withStandings` and `nemia decide` all read a run's standings off.
+ */
+export const branchesAsked: BranchesAsked = ({ isolate, cancelled, running, results }) =>
+  isolate && !cancelled && !running ? [...new Set(results)] : [];
+
+/** What `branchesAsked` is asked of `run`, off its record and its status (`assess`'s): its result branches, in the order of its steps. */
+export const askedOf = (run: Run, steps: readonly StepSpec[], status: Assessment['status']): RunAsked => ({
+  isolate: isRepositoryRun(run) && Boolean(run.isolate),
+  cancelled: Boolean(run.cancelledAt) || status === 'cancelled',
+  running: status === 'running',
+  results: resultSteps(steps)
+    .map((s) => run.steps[s.name]?.branch)
+    .filter((b): b is string => Boolean(b)),
+});

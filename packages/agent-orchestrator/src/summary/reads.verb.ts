@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';
+import { frozenStepsOf } from '../steps/steps.ts';
 import { asked, type Engine, type TaskView, unreadableJournal } from '../runtime-client.ts';
 import { doorAt } from '../factory/door/factories.store.ts';
 import { FactoryName, isDefaultFactory } from '../factory/factory.model.ts';
@@ -53,8 +54,11 @@ export function unreadableOf(run: Run, unreadable: Unreadable): { taskId: string
   return undefined;
 }
 
-/** What `judgedUnlessUnreadable` answers: the judgement, or why there is none. */
-export type JudgedOrNot<T> = { judged: T } | { unreadable: string };
+/**
+ * What `judgedUnlessUnreadable` answers: the judgement, or why there is none, in the board's words (`unreadable`) and in a reader's own
+ * (`saidBy`, the reader named: `nemia decide`).
+ */
+export type JudgedOrNot<T> = { judged: T } | { unreadable: string; saidBy: (by: string) => string };
 
 /**
  * `judge` of `run`, or why it is not judged, in the words the list and a run's page say it with (`RunSummary.unreadable`): its unfrozen
@@ -68,15 +72,16 @@ export const judgedUnlessUnreadable = Effect.fnUntraced(function* <T, E, R>(
   unreadable: Unreadable,
   judge: () => Effect.Effect<T, E, R>,
 ): Effect.fn.Return<JudgedOrNot<T>, E, R> {
+  const said = (saidBy: (by: string) => string) => ({ unreadable: saidBy('the board'), saidBy });
   const folder = yield* Effect.orDie(unloadedOf(run));
-  if (folder !== undefined) return { unreadable: unloadedWords(run.id, folder, 'the board') };
+  if (folder !== undefined) return said((by) => unloadedWords(run.id, folder, by));
   const own = unreadableOf(run, unreadable);
-  if (own) return { unreadable: unjudgedWords(run.id, own.taskId, own.why, 'the board') };
+  if (own) return said((by) => unjudgedWords(run.id, own.taskId, own.why, by));
   const exit = yield* Effect.exit(judge());
   if (Exit.isSuccess(exit)) return { judged: exit.value };
   const why = unreadableJournal(Cause.squash(exit.cause));
   if (why === undefined) return yield* Effect.failCause(exit.cause);
-  return { unreadable: unjudgedWords(run.id, undefined, why, 'the board') };
+  return said((by) => unjudgedWords(run.id, undefined, why, by));
 });
 
 /**
@@ -209,12 +214,12 @@ export function stepNames(run: Run, workflows: readonly StepSpec[] | null): stri
 }
 
 /**
- * The steps a run is judged by: the workflow it froze at `nemia start`, which the tick reads (`stepsOf` in
- * record.store.ts), and for a record that froze none, the folder. A record whose folder does not read is
+ * The steps a run is judged by: the workflow it froze at `nemia start`, in the order its steps run, as the tick reads it
+ * (`frozenStepsOf`), and for a record that froze none, the folder. A record whose folder does not read is
  * judged from the record alone, a `bare` step each.
  */
 export const judgedSteps = (run: Run, folder: readonly StepSpec[] | null): readonly StepSpec[] =>
-  run.workflow ?? folder ?? Object.keys(run.steps).map(bare);
+  frozenStepsOf(run) ?? folder ?? Object.keys(run.steps).map(bare);
 
 /** A step nothing defines: all the record says of it is its name, with no `after`, `check:` or `output:`. */
 export const bare = (name: string): StepSpec => ({ name, after: [], body: '' });

@@ -320,6 +320,13 @@ const runFields = {
    */
   harnessSettings: Schema.optional(HarnessSettings),
   /**
+   * The cost line the factory set for the run's workflow (`costLines`, `nemia factory cost-line set`), in dollars, frozen at start so a
+   * later change to the factory changes no run started. A gate whose caps let the run cost more says so (`GateBudgets.line`,
+   * `pastTheLine`), and no rule of auto approves it unasked (`withinBudget`); it cuts nothing. Absent: none set for the workflow, and in
+   * the default factory.
+   */
+  costLine: Schema.optional(Schema.Finite),
+  /**
    * Each result branch's commit, as this run's own tick last saw it once the run had finished (`tipsSeen`): what `nemia decide` offers to
    * land. Kept so that once a person has deleted the branch after the merge, git can still be asked whether that commit is on the base
    * (the place's `standing`, `standingNow`) — by this run's own `nemia decide`, and by a run that waits on it. Absent until the run has

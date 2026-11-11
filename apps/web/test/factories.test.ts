@@ -54,6 +54,7 @@ const factory = (name: string, extra: Partial<Factory> = {}): Factory => ({
   },
   untrusted: [],
   volumes: [],
+  costLines: {},
   template: null,
   ...extra,
 });

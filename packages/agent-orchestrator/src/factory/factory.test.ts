@@ -315,6 +315,16 @@ test('factoryLines: `nemia factory ls`, the default first, then each factory by 
     ]);
     assert.deepEqual(factoryLines([acme]), [DEFAULT_LINE, 'acme     /code/acme']);
   });
+  await t.test('its cost lines, one per workflow, sorted, and none for a factory that sets none', () => {
+    const mill = { name: 'mill', file: '/s/factories/mill.json', repos: ['/code/mill'], workflows: [], hires: {}, schedules: {} };
+    assert.deepEqual(factoryLines([{ ...mill, costLines: { intake: 5, build: 80 } }]), [
+      DEFAULT_LINE,
+      'mill     /code/mill',
+      '         cost line build $80.00',
+      '         cost line intake $5.00',
+    ]);
+    assert.deepEqual(factoryLines([mill]), [DEFAULT_LINE, 'mill     /code/mill']);
+  });
   await t.test('its hires, sorted by step, whatever order its file has them in', () =>
     assert.deepEqual(
       factoryLines([

@@ -11,6 +11,7 @@
  * words.
  */
 import { Schema } from 'effect';
+import { ChatSpeaker } from './nemia.ts';
 import { RunDrift } from './run.ts';
 import { RETRY_MODES, SAID_AFTER } from './words.ts';
 
@@ -101,16 +102,26 @@ export const RunApproved = Schema.Struct({
 }).annotate({ identifier: 'RunApproved' });
 export type RunApproved = typeof RunApproved.Type;
 
-/** Words said to a step's running session, as `nemia say` says them. */
-export const RunSay = Schema.Struct({ text: Schema.String }).annotate({ identifier: 'RunSay' });
+/**
+ * Words said to a step's running session, as `nemia say` says them, and who wrote them (`from`): none is the caller the request is —
+ * the person with no session's token, a session by its own.
+ */
+export const RunSay = Schema.Struct({ text: Schema.String, from: Schema.optionalKey(ChatSpeaker) }).annotate({
+  identifier: 'RunSay',
+});
 export type RunSay = typeof RunSay.Type;
 
-/** What the session's harness took and the engine journalled: when, on which attempt, the words, and what they came after. */
+/**
+ * What the session's harness took and the engine journalled: when, on which attempt, the words as said (`text`, an agent's in its
+ * frame), and what they came after; where an agent wrote them, which (`from`) and its words without the frame (`words`).
+ */
 export const RunSaid = Schema.Struct({
   at: Schema.String,
   attempt: Schema.Finite,
   text: Schema.String,
   after: Schema.NullOr(Schema.Struct({ kind: Schema.Literals(SAID_AFTER), id: Schema.String })),
+  from: Schema.optionalKey(ChatSpeaker),
+  words: Schema.optionalKey(Schema.String),
 }).annotate({ identifier: 'RunSaid' });
 export type RunSaid = typeof RunSaid.Type;
 

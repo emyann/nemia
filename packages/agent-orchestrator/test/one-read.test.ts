@@ -19,6 +19,10 @@ import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { staged } from './story.ts';
 import { advanceRun, cancelRun, decideRun, list, retryRun, runObject, startRun, runWith } from '../src/runner.ts';
+import { decisionRead } from '../src/decide/decision.verb.ts';
+import { decision } from '../src/decide/decide.ts';
+import { landedOf } from '../src/branches/branches.store.ts';
+import { Tracer } from 'effect';
 import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { passStanding, standingSnapshot, headsOver, standingReader } from '../src/standing/standing.verb.ts';
 import { filesStoreAt } from '../src/record/files.store.ts';
@@ -61,6 +65,8 @@ const tickRead = (e: Engine, run: Run) =>
     );
     return {
       ...assessed,
+      landed: decision(read, landedOf(run, standingReader(snapshot)), assessed).kind === 'landed',
+      checkout: read.checkout?.run ?? null,
       plan: cancelPlan(read, assessed),
       asked: assessed.due.retry.filter((t) => t.by === 'ask').map((t) => t.step),
       roundDue: assessed.round.map((t) => t.step),
@@ -91,6 +97,23 @@ const started = async (workflowDir: string, repo = aRepo()): Promise<string> => 
   return run.id;
 };
 
+/** A run of `workflowDir` whose `implement` committed its work and succeeded, ticked so the steps after it are filed. */
+const worked = async (workflowDir: string, repo = aRepo()): Promise<{ id: string; repo: string; branch: string }> => {
+  const id = await started(workflowDir, repo);
+  const work = theRun(id).steps.implement;
+  fs.writeFileSync(path.join(work.workspace!, `${id}.txt`), 'the work\n');
+  stage.place().world.commit(work.workspace!, 'the work');
+  stage.board().settle(`${id}-implement`, 'succeeded', SIGNED);
+  await tick(id);
+  return { id, repo, branch: work.branch! };
+};
+
+/** `branch` merged into `repo`'s checkout and committed, as a person merges a result by hand: no pass has read it. */
+const mergedByHand = (repo: string, branch: string): void => {
+  stage.place().world.stage(repo, branch);
+  stage.place().world.commit(repo, `Merge branch '${branch}'`);
+};
+
 /** What one reader says of a run: each fact it says, and none it does not. */
 type Said = {
   status?: string;
@@ -103,6 +126,16 @@ type Said = {
   toDecide?: string | null;
   waitingOnYou?: string[];
   finished?: boolean;
+  /** Whether every result branch is on the base, as the reader's decision says (`landed`). */
+  landed?: boolean;
+  /** The runs the run's roots wait on, by id. */
+  waitingOn?: string[];
+  /** The run whose ending holds the repository's checkout while this run's waits for it, or null. */
+  checkout?: string | null;
+  /** Each step's tries on the clock, as `<step>:<try>` in the order the reader names them. */
+  tries?: string[];
+  /** Where each try's check stands on the clock, as `<step>:<try>:<at>` (`TaskSpan`'s `at`), for a try whose check was filed. */
+  checks?: string[];
 };
 
 /** A `ToDecide`, or the board's, as one comparable word: its kind and what it names. */
@@ -123,16 +156,34 @@ const finishedOf = (
 
 const sorted = (names: Iterable<string>): string[] => [...new Set(names)].sort();
 
-/** What each reader says of the run `id`, the tick's pass first. */
-const readers = async (id: string): Promise<Record<string, Said>> => {
+/** Each step's tries on a clock (`Timeline`'s steps), as `<step>:<try>`, the steps sorted. */
+const triesOn = (steps: Record<string, readonly { try: number }[]>): string[] =>
+  Object.keys(steps)
+    .sort()
+    .flatMap((name) => (steps[name] ?? []).map((t) => `${name}:${t.try}`));
+
+/** Where each try's check stands on a clock, as `<step>:<try>:<at>`, the steps sorted: a check the reader did not view reads `unknown`. */
+const checksOn = (steps: Record<string, readonly { try: number; check: { at: string } | null }[]>): string[] =>
+  Object.keys(steps)
+    .sort()
+    .flatMap((name) => (steps[name] ?? []).flatMap((t) => (t.check ? [`${name}:${t.try}:${t.check.at}`] : [])));
+
+/**
+ * What each reader says of the run `id`, the tick's pass first, after a pass wrote where the branches stand; with `pass: false`, off
+ * what the last pass wrote, a person's hand on the repository since read by none.
+ */
+const readers = async (id: string, { pass: passFirst = true } = {}): Promise<Record<string, Said>> => {
   const e = stage.board().e;
-  await aPass();
+  if (passFirst) await aPass();
   const pass = await stage.runWith(e, tickRead(e, theRun(id)));
   const listed = await stage.runWith(
     e,
     Effect.flatMap(standingSnapshot(), (standing) => list(e, theRun(id), undefined, standing)),
   );
   const decided = await stage.runWith(e, decideRun(id));
+  const decisionOf = await stage.runWith(e, decisionRead(id));
+  assert.ok('decision' in decisionOf, `${id} is judged`);
+  const read = decisionOf.decision;
   const object = await stage.runWith(e, Effect.provideService(runObject(theRun(id), { memo: { said: new Map() } }), StoreRoot, ROOT));
   const pruned = await stage.runWith(e, judging(id));
   const said: Record<string, Said> = {
@@ -145,6 +196,8 @@ const readers = async (id: string): Promise<Record<string, Said>> => {
       asked: sorted(pass.asked),
       roundDue: sorted(pass.roundDue),
       toDecide: decideWord(pass.toDecide),
+      landed: pass.landed,
+      checkout: pass.checkout,
     },
     listing: {
       status: listed.assessed.status,
@@ -157,6 +210,7 @@ const readers = async (id: string): Promise<Record<string, Said>> => {
       toDecide: decideWord(listed.toDecide),
       waitingOnYou: sorted(listed.waitingOnYou),
       finished: finishedOf(listed.assessed, listed.waitingOnYou),
+      waitingOn: sorted((listed.waiting ?? []).map((w) => w.run)),
     },
     cancel: { finished: pass.plan.kind === 'finished' },
     decide: {
@@ -164,6 +218,16 @@ const readers = async (id: string): Promise<Record<string, Said>> => {
       retries: sorted(decided.retrying.map((r) => r.step)),
       rounds: sorted(decided.rounding.map((r) => r.step)),
       toDecide: decideWord(decided.toDecide),
+      landed: decided.decision.kind === 'landed',
+      waitingOn: sorted(decided.waiting.map((w) => w.run)),
+      checkout: decided.checkout?.run ?? null,
+      tries: triesOn(decided.timeline.steps),
+      checks: checksOn(decided.timeline.steps),
+    },
+    decision: {
+      landed: 'nothing' in read && Boolean(read.nothing?.startsWith('landed')),
+      waitingOn: sorted('waiting' in read ? read.waiting.runs.map((w) => w.run) : []),
+      ...('standings' in read ? { checkout: read.baseHeldBy?.run ?? null } : {}),
     },
     ...('unjudged' in object
       ? {}
@@ -174,6 +238,9 @@ const readers = async (id: string): Promise<Record<string, Said>> => {
             roundDue: sorted(object.status.steps.filter((s) => s.roundDue).map((s) => s.name)),
             toDecide: decideWord(object.status.toDecide),
             waitingOnYou: sorted(object.status.waitingOnYou),
+            waitingOn: sorted((object.status.waiting?.runs ?? []).map((w) => w.run)),
+            tries: triesOn(Object.fromEntries(object.status.steps.map((s) => [s.name, s.timeline]))),
+            checks: checksOn(Object.fromEntries(object.status.steps.map((s) => [s.name, s.timeline]))),
           },
         }),
     ...(pruned.facts?.decided ? { prune: { running: pruned.facts.decided === 'running' } } : {}),
@@ -328,6 +395,127 @@ test('one read of a run: the tick, nemia ls, nemia decide, nemia prune and the r
     await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'continue', message: 'not this way' }));
     agree(await readers(id));
   });
+
+  await t.test(
+    'F1: a finished run merged by hand since the last pass: the result is to decide for every reader until a pass reads it',
+    async () => {
+      const { id, repo, branch } = await worked(folder({ implement: [], review: ['after: implement'] }));
+      stage.board().settle(`${id}-review`, 'succeeded', SIGNED);
+      await tick(id);
+      await aPass();
+      mergedByHand(repo, branch);
+      const before = await readers(id, { pass: false });
+      agree(before);
+      assert.equal(before.decide?.toDecide, `result:${branch}`, 'every reader reads the last pass, which read the branch ahead');
+      const after = await readers(id);
+      agree(after);
+      assert.equal(after.decide?.landed, true, 'a pass reads the hand merge');
+      assert.equal(after.decide?.toDecide, null);
+    },
+  );
+
+  await t.test('F2: a finished run in a store no pass has read: nothing to decide and no branch read, for every reader', async () => {
+    const { id, branch } = await worked(folder({ implement: [], review: ['after: implement'] }));
+    stage.board().settle(`${id}-review`, 'succeeded', SIGNED);
+    await tick(id);
+    fs.rmSync(path.join(ROOT, 'standing.json'), { force: true });
+    const said = await readers(id, { pass: false });
+    agree(said);
+    assert.equal(said.decide?.toDecide, null, 'a branch no pass read decides nothing');
+    const decided = await stage.runWith(stage.board().e, decideRun(id));
+    assert.deepEqual(
+      decided.standings.map((s) => [s.branch, s.where]),
+      [[branch, 'unread']],
+      'decide reads the branch unread, as nemia ls does',
+    );
+  });
+
+  await t.test('F3: a run after a parent merged by hand since the last pass: every reader waits on the parent', async () => {
+    const repo = aRepo();
+    const parent = await worked(folder({ implement: [], review: ['after: implement'] }), repo);
+    stage.board().settle(`${parent.id}-review`, 'succeeded', SIGNED);
+    await tick(parent.id);
+    const child = await stage.runPlaced(startRun({ brief: 'after it', repo, workflowDir: folder({ implement: [] }), after: [parent.id] }));
+    await tick(child.id);
+    await aPass();
+    mergedByHand(repo, parent.branch);
+    const said = await readers(child.id, { pass: false });
+    agree(said);
+    assert.deepEqual(said.decide?.waitingOn, [parent.id], 'no reader reads the merge before a pass does');
+  });
+
+  await t.test(
+    'F4: an ending waits for the checkout a run held at the last pass and has let go since: every reader names one holder',
+    async () => {
+      const repo = aRepo();
+      const workflow = folder({ implement: [], land: ['after: implement', 'workspace: base'] });
+      const first = await started(workflow, repo);
+      stage.board().settle(`${first}-implement`, 'succeeded', SIGNED);
+      await tick(first);
+      stage.board().settle(`${first}-land`, 'working');
+      const second = await started(workflow, repo);
+      stage.board().settle(`${second}-implement`, 'succeeded', SIGNED);
+      await aPass();
+      stage.board().settle(`${first}-land`, 'succeeded', SIGNED);
+      agree(await readers(second, { pass: false }));
+    },
+  );
+
+  await t.test('F5: a gated ending never filed whose result a person merged by hand: nothing to approve, for every reader', async () => {
+    const { id, repo, branch } = await worked(folder({ implement: [], land: ['after: implement', 'workspace: base', 'gate: true'] }));
+    mergedByHand(repo, branch);
+    const said = await readers(id);
+    agree(said);
+    assert.equal(said.object?.toDecide, null, 'nothing is left for the ending to merge');
+  });
+
+  await t.test('F8: a step tried twice: nemia decide and the run object name the same tries, in the same order', async () => {
+    const id = await started(folder({ implement: [], review: ['after: implement'] }));
+    stage.board().settle(`${id}-implement`, 'failed');
+    await tick(id);
+    await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'fresh' }));
+    await tick(id);
+    stage.board().settle(`${id}-implement`, 'succeeded', SIGNED);
+    await tick(id);
+    const said = await readers(id);
+    agree(said);
+    assert.deepEqual(said.decide?.tries, ['implement:1', 'implement:2'], 'both tries of implement, and review not yet on the clock');
+  });
+
+  await t.test("a step tried again by its refused check: nemia decide and the run object both time the first try's check", async () => {
+    const id = await started(folder({ implement: ['check: npm test', 'retries: 1'], review: ['after: implement'] }));
+    stage.board().settle(`${id}-implement`, 'succeeded', SIGNED);
+    await tick(id);
+    stage.board().settle(`${id}-implement-check`, 'failed', undefined, 1);
+    await tick(id);
+    stage.board().settle(`${id}-implement`, 'succeeded', SIGNED);
+    await tick(id);
+    const said = await readers(id);
+    agree(said);
+    assert.deepEqual(said.decide?.tries, ['implement:1', 'implement:2'], 'both tries of implement, and review not yet on the clock');
+    assert.equal(said.decide?.checks?.[0], 'implement:1:ended', "the first try's refused check is on decide's clock, not unknown");
+  });
+});
+
+test('F7: a cold decision of a finished run judges it once', async () => {
+  const { id } = await worked(folder({ implement: [], review: ['after: implement'] }));
+  stage.board().settle(`${id}-review`, 'succeeded', SIGNED);
+  await tick(id);
+  await aPass();
+  const e = stage.board().e;
+  const spans: Tracer.NativeSpan[] = [];
+  const tracer = Tracer.make({
+    span(options) {
+      const span = new Tracer.NativeSpan(options);
+      spans.push(span);
+      return span;
+    },
+  });
+  const answer = await stage.runWith(e, Effect.withTracer(decisionRead(id), tracer));
+  assert.ok('decision' in answer, 'the run is judged');
+  const read = answer.decision;
+  assert.ok('standings' in read, 'the run awaits a decision on its branch');
+  assert.equal(spans.filter((span) => span.name === 'judge').length, 1, 'one judgement makes the whole decision');
 });
 
 test("the tables' empty read is `readersOf`'s on an empty view: every task unknown, nothing signed, asked, blocked or spent", async () => {

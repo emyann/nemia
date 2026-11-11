@@ -42,6 +42,7 @@ import {
   retryRun,
   roundRun,
   sayRun,
+  PERSON,
   startRun,
   tickRun,
   runWith as runEngine,
@@ -58,6 +59,7 @@ import { main } from '../src/cli/main.ts';
 import { filesStoreAt } from '../src/record/files.store.ts';
 import * as views from '../src/views/views.verb.ts';
 import { standingLiveOf } from '../src/standing/standing.verb.ts';
+import { writeSpeakers } from '../src/chat/chat.store.ts';
 
 const ROOT = scratch('wf-faces-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -369,8 +371,8 @@ test("each verb's program, given its services, answers what its plain face answe
       await runWith(b.e, advanceRun(runRecord(ROOT, running.id)));
       const taskId = `${running.id}-implement`;
       b.settle(taskId, 'working');
-      const told = await over(b.e, sayRun(running.id, 'implement', 'Start with the parser.'));
-      const face = await runWith(b.e, sayRun(running.id, 'implement', 'Start with the parser.'));
+      const told = await over(b.e, sayRun(running.id, 'implement', 'Start with the parser.', { caller: PERSON }));
+      const face = await runWith(b.e, sayRun(running.id, 'implement', 'Start with the parser.', { caller: PERSON }));
       const journalled = b.tasks.get(taskId)!.said;
       assert.deepStrictEqual(
         [told, face],
@@ -426,7 +428,7 @@ test("each verb's program, given its services, answers what its plain face answe
         ['nemia approve of a loop', acceptRun('garbled', undefined, ENOUGH)],
         ['nemia retry', retryRun('garbled', 'implement', { mode: 'fresh' })],
         ['nemia approve', approveRun('garbled', 'implement')],
-        ['nemia say', sayRun('garbled', 'implement', 'hello')],
+        ['nemia say', sayRun('garbled', 'implement', 'hello', { caller: PERSON })],
         ['nemia cancel', cancelRun('garbled')],
       ];
       for (const [what, program] of programs) assert.match(await recovered(e, program, 'Invalid'), /is not JSON/, what);
@@ -453,7 +455,11 @@ test("each verb's program, given its services, answers what its plain face answe
           () => runWith(broken, retryRun(run.id, 'implement', { mode: 'fresh' })),
         ],
         ['nemia approve', approveRun(run.id, 'implement', 'ok'), () => runWith(broken, approveRun(run.id, 'implement', 'ok'))],
-        ['nemia say', sayRun(run.id, 'implement', 'hello'), () => runWith(broken, sayRun(run.id, 'implement', 'hello'))],
+        [
+          'nemia say',
+          sayRun(run.id, 'implement', 'hello', { caller: PERSON }),
+          () => runWith(broken, sayRun(run.id, 'implement', 'hello', { caller: PERSON })),
+        ],
         ['nemia cancel', cancelRun(run.id), () => runWith(broken, cancelRun(run.id))],
       ];
       for (const [what, program, face] of verbs) {
@@ -472,16 +478,61 @@ test("each verb's program, given its services, answers what its plain face answe
       const run = await started(folder());
       await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
       const taskId = `${run.id}-implement`;
-      const unheard = await recovered(b.e, sayRun(run.id, 'implement', 'Start with the parser.'), 'Conflict');
+      const unheard = await recovered(b.e, sayRun(run.id, 'implement', 'Start with the parser.', { caller: PERSON }), 'Conflict');
       assert.ok(unheard.startsWith(`say: \`${taskId}\``) && unheard.includes('has not started an attempt'), unheard);
 
       b.settle(taskId, 'working');
       const lost = new Error(`say: ae/${taskId}/1 was not given the words`);
       const deaf = { ...b.e, say: () => Effect.die(lost) };
-      const program = sayRun(run.id, 'implement', 'Widen the scope.').pipe(Effect.catch(() => Effect.succeed('caught')));
+      const program = sayRun(run.id, 'implement', 'Widen the scope.', { caller: PERSON }).pipe(
+        Effect.catch(() => Effect.succeed('caught')),
+      );
       assert.equal(await rejection(over(deaf, program), 'nemia say'), lost, 'a defect, which no `Effect.catch` recovers');
-      assert.equal(await rejection(runWith(deaf, sayRun(run.id, 'implement', 'Widen the scope.')), 'nemia say'), lost);
+      assert.equal(await rejection(runWith(deaf, sayRun(run.id, 'implement', 'Widen the scope.', { caller: PERSON })), 'nemia say'), lost);
       assert.deepEqual(b.tasks.get(taskId)!.said, [], 'nothing said');
+    },
+  );
+
+  await t.test(
+    'who says words to a step: a session by its token as its own agent, framed; an agent with no token under a name the person allowed; the person as ever. REFUSED: a name not allowed (`Conflict`), a session naming another (`Invalid`), nothing said',
+    async () => {
+      const b = stage.board();
+      const run = await started(folder());
+      await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+      const taskId = `${run.id}-implement`;
+      b.settle(taskId, 'working');
+      const heard = () => b.tasks.get(taskId)!.said.map((s) => s.text);
+      const session = { kind: 'agent', agent: 'implement', factory: null } as const;
+      const operator = { kind: 'agent', name: 'operator' } as const;
+
+      const told = await runWith(b.e, sayRun(run.id, 'implement', 'Start with the parser.', { caller: session }));
+      assert.deepEqual(told.from, { kind: 'agent', name: 'implement' }, "a session's words are its agent's");
+      assert.deepEqual(heard(), ['The agent implement writes, not the person: Start with the parser.'], 'handed in its frame');
+
+      const unallowed = await rejection(
+        runWith(b.e, sayRun(run.id, 'implement', 'Cut it.', { caller: PERSON, from: operator })),
+        'an agent the person has not allowed',
+      );
+      assert.ok(unallowed instanceof Conflict && unallowed.exitCode === 2, String(unallowed));
+      const another = await rejection(
+        runWith(b.e, sayRun(run.id, 'implement', 'Cut it.', { caller: session, from: { kind: 'person' } })),
+        'a session that says it is the person',
+      );
+      assert.ok(another instanceof Invalid && another.exitCode === 2, String(another));
+      assert.equal(heard().length, 1, 'nothing said for either');
+
+      writeSpeakers(path.join(ROOT, 'nemia'), ['operator']);
+      try {
+        const allowed = await runWith(b.e, sayRun(run.id, 'implement', 'Cut it.', { caller: PERSON, from: operator }));
+        assert.deepEqual(allowed.from, operator);
+        assert.equal(heard()[1], 'The agent operator writes, not the person: Cut it.', 'an allowed agent under its name');
+      } finally {
+        writeSpeakers(path.join(ROOT, 'nemia'), []);
+      }
+
+      const person = await runWith(b.e, sayRun(run.id, 'implement', 'Widen the scope.', { caller: PERSON }));
+      assert.deepEqual(person.from, { kind: 'person' });
+      assert.equal(heard()[2], 'Widen the scope.', "the person's words as they always were, in no frame");
     },
   );
 

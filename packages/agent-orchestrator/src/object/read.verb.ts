@@ -18,6 +18,7 @@ import { setting } from '../config/config.store.ts';
 import { standingReader, standingSnapshot } from '../standing/standing.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import type { Run } from '../record/record.ts';
+import type { BranchReader } from '../branches/branches.store.ts';
 import type { StepSpec } from '../step/step.ts';
 import { type CheckStderr, checksOf, refusedStderr, type StepCheck } from '../resource/checks.verb.ts';
 import { attemptsIn, closeoutIn, type StepTry, triesOf, unreadableIn } from '../resource/tries.verb.ts';
@@ -26,7 +27,8 @@ import { attemptsIn, closeoutIn, type StepTry, triesOf, unreadableIn } from '../
  * What the package judges of `run` (`Judgement`), its steps `folder` as it loads now: read through this process's informer where it keeps
  * one (`Informer`), served from what the tick's pass or an earlier request judged while every input it was judged on holds
  * (`informedJudgements`), and kept on a miss; judged on demand where it keeps none (`judgementsOf`), as an in-process read is. Where its
- * branches stand is read off `standing.json` (`standingSnapshot`).
+ * branches stand is read off `standing.json` (`standingSnapshot`), and the reader it was read through is given beside the judgement
+ * (`git`), so a read beside it asks the same reading.
  */
 const judgedOn = Effect.fnUntraced(function* (e: Engine, home: string, run: Run) {
   const git = standingReader(yield* standingSnapshot());
@@ -34,7 +36,7 @@ const judgedOn = Effect.fnUntraced(function* (e: Engine, home: string, run: Run)
   const read = informer ? yield* informerRead(e, informer, yield* setting('verifyRest'), git, sameJudgement) : undefined;
   const judged = read ? yield* informedJudgements(e, home, [run], read, git) : yield* judgementsOf(e, home, [run], git);
   const one = judged.runs.get(run.id);
-  return one ?? (yield* Effect.die(new Error(`Run ${run.id} was handed to its judgement and not judged.`)));
+  return { one: one ?? (yield* Effect.die(new Error(`Run ${run.id} was handed to its judgement and not judged.`))), git };
 });
 
 /** What the run is judged as (`judge`), when it is. */
@@ -52,6 +54,11 @@ export type StepsReading = Judgement & {
   readonly stderr: CheckStderr;
   /** The store's real releases folder, which a step's attempt is placed under to say the release it ran on (`realReleasesDir`). */
   readonly releases: string;
+  /**
+   * The branch reader the run was judged through (`standingReader`, off `standing.json`): what a read beside the judgement — the cap's
+   * parents, the collisions at an ending, the branches a decision shows — asks, so it reads no other reading than the judgement did.
+   */
+  readonly git: BranchReader;
 };
 
 /** What `runReading` read once of a run: its steps (`StepsReading`), and its timeline off their views. */
@@ -74,7 +81,8 @@ export const stepsReading = Effect.fnUntraced(function* (run: Run) {
   const e = yield* EngineService;
   const home = yield* StoreRoot;
   const folder = workflowsOf(run, home);
-  return yield* stepsReadingOf(e, home, run, yield* judgedOn(e, home, run), folder);
+  const { one, git } = yield* judgedOn(e, home, run);
+  return yield* stepsReadingOf(e, home, run, one, folder, git);
 });
 
 /**
@@ -87,13 +95,14 @@ export const stepsReadingOf = Effect.fnUntraced(function* (
   run: Run,
   one: JudgedOrWhy,
   folder: ReturnType<typeof workflowsOf>,
+  git: BranchReader,
 ) {
-  if ('unjudged' in one) return { unjudged: one.unjudged, steps: one.steps };
+  if ('unjudged' in one) return { unjudged: one.unjudged, saidBy: one.saidBy, steps: one.steps };
   const { judgement } = one;
   const stderr = yield* Effect.promise(() => refusedStderr(e, run, judgement.views));
   const checks = yield* Effect.promise(() => checksOf(e, run, judgement.steps, judgement.views, stderr));
   const source = shownWorkflow(run, folder.steps);
-  const at: StepsReading = { ...judgement, run, e, home, folder, source, checks, stderr, releases: realReleasesDir(home) };
+  const at: StepsReading = { ...judgement, run, e, home, folder, source, checks, stderr, releases: realReleasesDir(home), git };
   return at;
 });
 

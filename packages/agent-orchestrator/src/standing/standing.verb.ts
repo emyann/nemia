@@ -268,32 +268,6 @@ export const standingLive = Effect.fn('standingLive')(function* (runs: readonly 
   return standingReader(yield* standingNow([...runs, ...related], asksOwnOr(runs.map((r) => r.id))));
 });
 
-/**
- * Where the repositories of `runs` stand, asked now at most once, and only once a reader is wanted (`standingNow`, of the result
- * branches of the run `id` and of every run the tick's pass would ask of): what a person's verb reads that needs it for some runs and
- * not others. `standing` is the reading, asked as it is first yielded; `when(need)` a reader over it where `need` holds, and one that
- * asks nothing where it does not (`NOTHING_READ`); `read()` a reader over what was asked so far, nothing before the first.
- */
-export const standingWhen = Effect.fn('standingWhen')(function* (runs: readonly Run[], id: string) {
-  let asked: PassStanding = NOTHING_READ;
-  const remember = (standing: PassStanding) =>
-    Effect.sync(() => {
-      asked = standing;
-    });
-  const place = yield* PlaceService;
-  const now = standingNow(runs, asksOwnOr([id])).pipe(Effect.provideService(PlaceService, place));
-  const standing = yield* Effect.cached(now.pipe(Effect.tap(remember)));
-  return {
-    standing,
-    read: (): BranchReader => standingReader(asked),
-    when: (need: boolean): Effect.Effect<BranchReader, Refusal> =>
-      need ? Effect.map(standing, standingReader) : Effect.succeed(standingReader(NOTHING_READ)),
-  };
-});
-
-/** Where branches stand, asked at most once for a person's verb (`standingWhen`), to hand on to another read of the same request. */
-export type StandingAsker = Effect.Success<ReturnType<typeof standingWhen>>;
-
 /** What a person's verb asks of: the result branches of each run of `ids`, called off or not, and of every run `asksOwn` asks of. */
 export const asksOwnOr = (ids: readonly string[]): ((run: RepositoryRun) => boolean) => {
   const asked = new Set(ids);

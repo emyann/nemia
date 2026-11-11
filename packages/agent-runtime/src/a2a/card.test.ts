@@ -111,6 +111,12 @@ test('cardOfJson: a card is taken with what it declares, kept whole beyond the f
     for (const [json, said] of cases) assert.match(wrong(json), said, JSON.stringify(json));
   });
 
+  await t.test('a card that names a key of 10,000 characters is refused in words that quote it, not in all of it', () => {
+    const name = 'k'.repeat(10_000);
+    const said = wrong({ supportedInterfaces: [INTERFACE], securitySchemes: { [name]: { httpAuthSecurityScheme: { scheme: 5 } } } });
+    assert.ok(said.length < 1_000, `${said.length} characters`);
+  });
+
   await t.test('a field the runtime reads, spelled in snake_case, is refused, naming the camelCase key to write', () => {
     const cases: Array<[unknown, RegExp]> = [
       [

@@ -15,6 +15,7 @@ const AGREED: Seen = {
   loops: [{ again: false, personAccepted: false }],
   overBudget: false,
   aboveCeiling: false,
+  pastLine: false,
   spend: 4.5,
   othersWaiting: false,
 };
@@ -63,6 +64,9 @@ test('`factsOf`: all five hold where all agree, and each fails on the state that
   await t.test("REFUSED withinBudget: a proposed cap above a step's own budget, which a person sees at the gate", () => {
     assert.equal(factsOf({ ...AGREED, aboveCeiling: true }).withinBudget, false);
     assert.equal(factsOf(AGREED).withinBudget, true);
+  });
+  await t.test("REFUSED withinBudget: a gate whose caps pass the factory's cost line", () => {
+    assert.equal(factsOf({ ...AGREED, pastLine: true }).withinBudget, false);
   });
   await t.test('REFUSED nothingOpen: a question asked, a need said, and another step waiting on the person', () => {
     assert.equal(factsOf({ ...AGREED, questions: [{ recommended: 'Strict' }] }).nothingOpen, false);

@@ -6,7 +6,6 @@
  */
 import { Effect } from 'effect';
 import type { Decidable, DiffFile, RunDecision, SensitiveDiff, Standing } from 'objects';
-import { EngineService, over } from '../runtime-client.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { PlaceService } from '../place/place.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
@@ -14,19 +13,14 @@ import { RunId } from '../record/record.model.ts';
 import { isRepositoryRun, namesInOrder, type Run } from '../record/record.ts';
 import type { Refusal } from '../refusal/refusal.ts';
 import { approvedFirst, branchWord } from '../status/status.ts';
-import { waitedOn } from '../wait/wait.ts';
-import { standingWhen } from '../standing/standing.verb.ts';
-import { parentsRead, viewedOnce } from '../views/views.verb.ts';
-import { holdingOf, judge, runWaitingOf } from '../summary/judged.verb.ts';
-import { judgedSteps, judgedUnlessUnreadable, stepNames, viewsFor, viewsOf, workflowsOf } from '../summary/reads.verb.ts';
+import { stepsReading, type StepsReading } from '../object/read.verb.ts';
 import { branchesToRead, CHECK_AFFECTING, countsLine, lessonOf, resultSteps } from '../branches/index.ts';
 import { branchStandings, type BranchReader } from '../branches/branches.store.ts';
 import { changesOf, type BranchChanges } from '../branches/changes.store.ts';
 import { mergesRead } from '../branches/merges.verb.ts';
 import type { Collisions } from '../collide/collide.ts';
 import { totalOf, usedOf } from '../resource/index.ts';
-import { decideRun, type Decided } from './decide.verb.ts';
-import { holdsOf, waitsOf } from '../wait/wait.ts';
+import { decidedOf, type Decided } from './decide.verb.ts';
 
 /** How many lines of one file's check-affecting diff a decision carries. `nemia decide` prints them all, off the place's whole diff. */
 export const DIFF_LINES = 400;
@@ -88,48 +82,52 @@ function sensitiveOf({ branch, inFull }: BranchChanges): SensitiveDiff {
   return { branch, files: inFull.trim() ? diffFiles(inFull) : [], error: null };
 }
 
+/** A run whose decision is not read, and why, in the board's words (`unjudged`) and in a reader's own (`saidBy`). */
+export type DecisionUnjudged = { run: Run; unjudged: string; saidBy: (by: string) => string };
+
+/** A run's decision, or why it is not read: what `decisionRead` answers, as one type. */
+const answered = (read: DecisionRead | DecisionUnjudged): DecisionRead | DecisionUnjudged => read;
+
 /**
- * A run's decision, in one order. Called off is `nothing`, and nothing is read. Then the runs it waits on and is held until, each read
- * once (`parentsRead`): a run whose roots wait on runs that have not landed is `waiting` — with its hold beside it — and one a person holds
- * is `holding`; none of its tasks is read for either. Else the run is judged (`judge`) and decided (`decideRun`), where its branches stand
- * asked of their places at most once, live (`standingWhen`), and only where it is read. A run the cap on runs in flight holds is `running`
- * with its slot (its `WF_MAX_RUNS` before any pass is `env`'s), as is a run still running with nobody waited on. A run whose branches are
- * already on its base is `nothing`, with an approved ending that never ran named. Else what there is to decide (`Decidable`), with the
- * branches read: the ones the run awaits, or the result steps' while a run still running has a step waiting on you, and every branch a
- * step worked on when no terminal step has one (`branchesToRead`), never the base branch of a run that cut worktrees, each read from the
- * run's place on this read (`changesOf`). What the place could not say is an `error` on its entry, never a failed read. A folder run has
- * no repository to ask, and a run that worked on its base branch itself no standings.
+ * A run's decision, in one order, off its one reading (`stepsReading`): the judgement the run object, the runs list and the tick's informer
+ * read, where its branches stand as the tick's last pass read them (`standing.json`), never git asked now. A run whose unfrozen folder or a
+ * task journal of which does not read is answered unjudged (`DecisionUnjudged`), as its object is, called off or not. Called off is
+ * `nothing`. Then the runs it waits on and is held until, as the judgement read them: a run whose roots wait on runs that have not
+ * landed is `waiting` — with its hold beside it — and one a person holds is `holding`, with what is in flight (`decided`). Else the run is
+ * decided (`decidedOf`). A run the cap on runs in flight holds is `running` with its slot (its `WF_MAX_RUNS` before any pass is `env`'s),
+ * as is a run still running with nobody waited on. A run whose branches are already on its base is `nothing`, with an approved ending that
+ * never ran named. Else what there is to decide (`Decidable`), with the branches read: the ones the run awaits, or the result steps' while
+ * a run still running has a step waiting on you, and every branch a step worked on when no terminal step has one (`branchesToRead`), never
+ * the base branch of a run that cut worktrees, each read from the run's place on this read (`changesOf`). What the place could not say is
+ * an `error` on its entry, never a failed read. A folder run has no repository to ask, and a run that worked on its base branch itself no
+ * standings.
  *
- * Fails with `Missing` for a run the store does not have; a journal that does not read fails as the runtime fails it (`runDecision`
- * words it).
+ * Fails with `Missing` for a run the store does not have.
  */
 export const decisionRead = Effect.fn('decisionRead')(function* (id: string, how: DecisionHow = {}) {
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
-  const none = { run, touched: [], results: [] };
+  const at = yield* stepsReading(run);
+  if ('unjudged' in at) return answered({ run, unjudged: at.unjudged, saidBy: at.saidBy });
   if (run.cancelledAt)
-    return { decision: { nothing: `cancelled at ${run.cancelledAt} — nothing to decide` }, ...none } satisfies DecisionRead;
-  const e = viewedOnce(yield* EngineService);
-  const live = yield* standingWhen(yield* (yield* RunDoor).runs.list(), run.id);
-  const parent = yield* parentsRead(run, yield* live.when(waitedOn(run).length > 0)).pipe(over(e));
-  const waiting = runWaitingOf(run, waitsOf(run, parent));
-  const holding = holdingOf(run, holdsOf(run, parent));
+    return answered({ run, decision: { nothing: `cancelled at ${run.cancelledAt} — nothing to decide` }, touched: [], results: [] });
+  return answered(yield* decisionOf(at, how));
+});
+
+/** A run's decision off its one reading (`decisionRead`, which reads it). */
+const decisionOf = Effect.fnUntraced(function* (at: StepsReading, how: DecisionHow) {
+  const { run, judged, git } = at;
+  const none = { run, touched: [], results: [] };
+  const { waiting, holding } = judged;
   if (waiting) return { decision: { waiting, ...(holding ? { holding } : {}) }, ...none } satisfies DecisionRead;
-  if (holding) return { decision: { holding }, ...none } satisfies DecisionRead;
-  const folder = workflowsOf(run, yield* StoreRoot).steps;
-  const views = yield* viewsOf(run, e);
-  const judgedOver = (git: BranchReader) => judge(run, stepNames(run, folder), folder, views, { reader: e, git, parent });
-  const unasked = yield* judgedOver(yield* live.when(false));
-  const settled = unasked.status === 'running' && !unasked.waitingOnYou.length;
-  const git = yield* live.when(!settled);
-  const judged = settled ? unasked : yield* judgedOver(git);
-  const decided = yield* decideRun(run.id, live).pipe(over(e));
+  const decided = yield* decidedOf(at);
+  if (holding) return { decision: { holding }, decided, ...none } satisfies DecisionRead;
   if (decided.held) return { decision: { running: true, held: decided.held }, decided, ...none } satisfies DecisionRead;
   if (judged.status === 'running' && !judged.waitingOnYou.length)
     return { decision: { running: true }, decided, ...none } satisfies DecisionRead;
   const d = decided.decision;
   if (d.kind === 'landed')
     return { decision: { nothing: landedWords(run, d.branches, decided.steps) }, decided, ...none } satisfies DecisionRead;
-  const steps = judgedSteps(run, folder);
+  const steps = decided.steps;
   const collisions = decided.collisions ?? null;
   const read = yield* branchesOf(run, git, steps, decided, d.kind === 'awaiting' ? d.branches : undefined, collisions, how);
   const touched = read.touched.map(({ branch, radius }) => ({ branch, radius }));
@@ -155,17 +153,13 @@ export const decisionRead = Effect.fn('decisionRead')(function* (id: string, how
 });
 
 /**
- * A run's decision as the api serves it (`decisionRead`), or why it is not judged, in the words the board says it with
- * (`judgedUnlessUnreadable`): its unfrozen workflow folder that does not load, or a task's journal the runtime left out. Its tasks and
- * those of the runs it waits on are read once, over one look at the harnesses (`viewsFor`), which
- * the decision reads them through.
+ * A run's decision as the api serves it (`decisionRead`), or why it is not judged, in the words the board says it with: its unfrozen
+ * workflow folder that does not load, or a task's journal the runtime left out.
  */
 export const runDecision = Effect.fn('runDecision')(function* (id: string, how: DecisionHow = {}) {
-  const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
-  const { unreadable, reader } = yield* viewsFor(yield* EngineService, [run]);
-  const read = yield* judgedUnlessUnreadable(run, unreadable, () => decisionRead(id, how).pipe(over(reader)));
+  const read = yield* decisionRead(id, how);
   const answer: { decision: RunDecision } | { unjudged: string } =
-    'unreadable' in read ? { unjudged: read.unreadable } : { decision: read.judged.decision };
+    'unjudged' in read ? { unjudged: read.unjudged } : { decision: read.decision };
   return answer;
 });
 

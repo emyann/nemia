@@ -35,6 +35,7 @@ import { Table } from './table.ts';
 import {
   Factory,
   FactoryCommands,
+  FactoryCostLineWrite,
   FactoryInstruction,
   FactoryInstructionWords,
   FactoryInstructionWrite,
@@ -138,6 +139,7 @@ const namespaceParams = { namespace: Schema.String };
 
 /** A factory, by its name. */
 const factoryParams = { name: Schema.String };
+const factoryWorkflowParams = { name: Schema.String, workflow: Schema.String };
 
 /** What a card's verbs refuse with: a request its reader refuses before the package is asked (400) among them. */
 const cardErrors = [BadRequest, Missing, Conflict, Invalid];
@@ -202,7 +204,7 @@ const objectErrors = cardErrors;
 /** What a definition's verbs refuse with: a part's refusals, and a write the disk failed. */
 const definitionErrors = [...cardErrors, Failed];
 
-/** The factories, which no namespace holds, and each one's rules, instruction and command lines. */
+/** The factories, which no namespace holds, and each one's rules, instruction, command lines and cost lines. */
 export class FactoriesGroup extends HttpApiGroup.make('factories').add(
   HttpApiEndpoint.get('listAll', '/api/factories', { query: listQuery, success: FactoryListObject, error: objectErrors }),
   HttpApiEndpoint.get('get', '/api/factories/:name', { params: factoryParams, success: FactoryObject, error: objectErrors }),
@@ -248,6 +250,17 @@ export class FactoriesGroup extends HttpApiGroup.make('factories').add(
   HttpApiEndpoint.get('commands', '/api/factories/:name/commands', {
     params: factoryParams,
     success: FactoryCommandsObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.put('putCostLine', '/api/factories/:name/costlines/:workflow', {
+    params: factoryWorkflowParams,
+    payload: FactoryCostLineWrite,
+    success: FactoryObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.delete('deleteCostLine', '/api/factories/:name/costlines/:workflow', {
+    params: factoryWorkflowParams,
+    success: FactoryObject,
     error: objectErrors,
   }),
 ) {}

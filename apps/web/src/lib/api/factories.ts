@@ -71,7 +71,8 @@ export type FactoryVolume = { path: string; readOnly: boolean; commands: { rm: s
  * The board's view of a factory (`factoryViewOf`): its name, whether it is the default factory, the repositories it works on, the
  * workflows it offers — null for the default factory, which offers every workflow found — its hires, `<workflow>/<step>` to an agent's
  * name, and its schedules. `error` says why its file does not read, null for every other. `template` is the template it is made from,
- * null for one that is not; `untrusted` each of its places a harness does not trust now; `volumes` each folder its runs reach.
+ * null for one that is not; `untrusted` each of its places a harness does not trust now; `volumes` each folder its runs reach;
+ * `costLines` the line it sets per workflow, none where it sets none.
  */
 export type Factory = {
   name: string;
@@ -89,6 +90,8 @@ export type Factory = {
   template: FactoryTemplate | null;
   untrusted: FactoryUntrusted[];
   volumes: FactoryVolume[];
+  /** The cost line of each workflow it sets one for, in dollars: a gate whose caps' bound passes it says so. */
+  costLines: Record<string, number>;
 };
 
 /** A schedule of a factory, as the view draws it: `unschedule` the line that takes it back. */
@@ -128,6 +131,7 @@ export const factoryViewOf = (factory: FactoryObject, commands: FactoryCommands,
     },
     template: spec.template ? { ...spec.template, applied: status.applied ?? null, conditions: status.conditions } : null,
     untrusted: status.untrusted.map((u) => ({ place: u.place, harness: u.harness, withheld: u.withheld, never: u.never ?? null })),
+    costLines: { ...spec.costLines },
     volumes: spec.volumes.map((v) => ({
       path: v.path,
       readOnly: v.readOnly,
@@ -193,6 +197,20 @@ export const writeInstruction = (name: string, words: string): Promise<FactoryIn
 
 /** Remove the instruction the store keeps for the factory `name`: the instruction as it then reads. */
 export const clearInstruction = (name: string): Promise<FactoryInstruction> => factories.deleteInstructionWords(name);
+
+/**
+ * Set the cost line of `workflow` in the factory `name` to `usd` dollars: the factory as it then reads. A run started from then on keeps
+ * it, and its gates say when their caps' bound passes it. Rejects with a `WriteRefusal` in the package's words: no such factory, an
+ * amount not above zero, a workflow it does not offer, the default factory.
+ */
+export const setCostLine = (name: string, workflow: string, usd: number): Promise<FactoryObject> =>
+  factories.putCostLine(name, workflow, usd);
+
+/**
+ * Take the cost line of `workflow` off the factory `name`: the factory as it then reads. Rejects with a `WriteRefusal` where it sets
+ * none.
+ */
+export const clearCostLine = (name: string, workflow: string): Promise<FactoryObject> => factories.deleteCostLine(name, workflow);
 
 /** The name of the hire into `step`, `<workflow>/<step>`: the two joined by a dot, the Hire's name. */
 const hireNamed = (step: string): string => {

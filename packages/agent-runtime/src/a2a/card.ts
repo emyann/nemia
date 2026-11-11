@@ -15,7 +15,7 @@
  */
 import { Result, Schema } from 'effect';
 import { AgentCard, type SecurityScheme } from '@a2a-js/sdk';
-import { firstRefusal } from '../core/index.ts';
+import { firstRefusal, quote } from '../core/index.ts';
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 
@@ -110,23 +110,27 @@ const HOLDER = 'an A2A 1.0 card holds';
 
 const hasKey = (value: unknown, key: string): boolean => typeof value === 'object' && value !== null && Object.hasOwn(value, key);
 
-/** The first thing wrong with `json` as a card, in words: its dotted path, and what is there; a key in snake_case by the one to write. */
+/**
+ * The first thing wrong with `json` as a card, in words: its dotted path, and what is there; a key in snake_case by the one to write.
+ * Each key of the path is quoted, since a served card is another party's, which may name a key of any length.
+ */
 const wrongOf = (json: unknown, error: Schema.SchemaError): string => {
   const { path, words } = firstRefusal(json, error, HOLDER);
   const keys = path.map(String);
+  const shown = keys.map((k) => quote(k));
   const last = keys.at(-1);
   if (last === undefined) return `it ${words}`;
   const parent = keys.slice(0, -1).reduce<unknown>((at, k) => (hasKey(at, k) ? (at as Record<string, unknown>)[k] : undefined), json);
   const camel = CAMEL[last];
   if (camel && words.endsWith(`${HOLDER} never`)) {
-    const at = [...keys.slice(0, -1), camel].join('.');
+    const at = [...shown.slice(0, -1), camel].join('.');
     return hasKey(parent, camel)
       ? `its \`${at}\` is also written \`${last}\`: write \`${camel}\` alone, as A2A's JSON does`
       : `its \`${at}\` is written \`${last}\`: write \`${camel}\`, as A2A's JSON does`;
   }
   const snake = Object.keys(CAMEL).find((k) => CAMEL[k] === last && hasKey(parent, k));
   const hint = snake && words === 'is missing' ? `, and \`${snake}\` is there: write \`${last}\`, as A2A's JSON does` : '';
-  return `its \`${keys.join('.')}\` ${words}${hint}`;
+  return `its \`${shown.join('.')}\` ${words}${hint}`;
 };
 
 /**

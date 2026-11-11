@@ -487,7 +487,7 @@ test("a run waits at its ending's gate, is approved, stages its merge, lands it 
   });
 
   await s.test(
-    "its check passes and the merge lands: only the check's pictures are removed — a picture the closeout names, a file that is no picture, one in a folder and a link are kept, and nothing is removed through a link",
+    "its check passes and the merge lands: only the check's pictures are removed — a picture the closeout names, a file that is no picture, one in a folder and a link are kept, and nothing is removed through a link; nemia decide reads it landed once a pass has read it",
     async () => {
       const outside = path.join(fs.mkdtempSync(path.join(ROOT, 'outside-')), 'kept.png');
       fs.writeFileSync(outside, "not the run's");
@@ -518,6 +518,7 @@ test("a run waits at its ending's gate, is approved, stages its merge, lands it 
         fs.readFileSync(path.join(dir, 'e2e-pictures.txt'), 'utf8'),
         /removed the 1 picture the check[^]*\n {2}page-light\.png {2}14 B\n/,
       );
+      await at.aPass(e);
       assert.equal((await stage.runWith(e, decideRun(id))).decision.kind, 'landed');
     },
   );
@@ -541,7 +542,7 @@ test('a landing a pass reads again — after a restart, under a pause, or with a
   const { settle } = stage.board();
 
   await s.test(
-    'a merge committed before the run wrote it down is recorded as landed, never committed twice, and the pictures the pass that died left go',
+    'a merge committed before the run wrote it down is recorded as landed, never committed twice, and the pictures the pass that died left go; nemia decide reads it landed once a pass has read it',
     async () => {
       const { repo, id, checkId } = await at.stagedAndSigned();
       settle(checkId, 'succeeded', undefined, 0);
@@ -558,6 +559,7 @@ test('a landing a pass reads again — after a restart, under a pause, or with a
         'its note is left',
       );
       assert.equal(world().head(repo), head, 'nothing committed again');
+      await at.aPass(stage.board().e);
       assert.equal((await stage.runWith(stage.board().e, decideRun(id))).decision.kind, 'landed');
     },
   );
@@ -907,7 +909,8 @@ const blockedClean = async () => {
 
 /**
  * The screen of an ending whose check on the staged merge settled with `exitCode`, its approval at `08:00Z`, two pictures in its
- * files: a check that exited printed nothing on its stdout, and one that did not finish kept no stream, so its log is read.
+ * files: a check that exited printed nothing on its stdout, and one that did not finish kept no stream, so its log is read. A pass has
+ * read where its branch stands after the pass that settled the check, as the tick's does, so the screen reads it off `standing.json`.
  */
 const checkedScreen = async (st: import('node:test').TestContext, exitCode: number | undefined): Promise<string[]> => {
   const { repo, id, checkId } = await at.stagedAndSigned();
@@ -917,6 +920,7 @@ const checkedScreen = async (st: import('node:test').TestContext, exitCode: numb
   stage.board().settle(checkId, 'failed', undefined, exitCode);
   if (exitCode !== undefined) stage.board().tasks.get(checkId)!.printed = { stdout: '' };
   await at.pass(id);
+  await at.aPass(stage.board().e);
   const base = world().head(repo).slice(0, 7);
   return timeless(
     await decideAt(st, stage.board().e, [id], { '<id>': id, '<repo>': repo, '<root>': ROOT, '<base>': base }, stage.place().place),
@@ -1057,30 +1061,36 @@ test('an ending that stops on its own word, or whose check refuses the merged tr
     assert.equal(at.mergeHead(repo), true, "the run is forgotten with the person's merge left as it is");
   });
 
-  await s.test("the whole screen of an ending whose check did not finish on the merge, with the check's files", async (st) => {
-    assert.deepEqual(await checkedScreen(st, undefined), [
-      ...workAbove(
-        '  CHECK DID NOT FINISH: ship  — stopped, or killed before it exited: no verdict on the work, and no retry spent; nothing after it ran',
-        '    ship: its check did not finish, so the run aborted the merge and nothing landed on main. Merge and check again:  nemia retry <id> ship',
-      ),
-      '    check  npm test && npm run typecheck && npm run lint  →  unfinished ✗',
-      '      stdout:',
-      '        (the test engine keeps no logs)',
-      ...shipBelow,
-    ]);
-  });
+  await s.test(
+    "the whole screen of an ending whose check did not finish on the merge, with the check's files, once a pass has read where its branch stands",
+    async (st) => {
+      assert.deepEqual(await checkedScreen(st, undefined), [
+        ...workAbove(
+          '  CHECK DID NOT FINISH: ship  — stopped, or killed before it exited: no verdict on the work, and no retry spent; nothing after it ran',
+          '    ship: its check did not finish, so the run aborted the merge and nothing landed on main. Merge and check again:  nemia retry <id> ship',
+        ),
+        '    check  npm test && npm run typecheck && npm run lint  →  unfinished ✗',
+        '      stdout:',
+        '        (the test engine keeps no logs)',
+        ...shipBelow,
+      ]);
+    },
+  );
 
-  await s.test("the whole screen of an ending whose check refused the merge, with the check's files", async (st) => {
-    assert.deepEqual(await checkedScreen(st, 1), [
-      ...workAbove(
-        '  FAILED CHECK: ship  — the run executed its check and it did not exit 0; nothing after it ran',
-        '    ship: failed (check) — nothing landed on main: its check refused the merge (exit 1). Land again, when what stopped it was not the work — a dirty checkout, a flaky test. Continue its session, told what happened:  nemia retry <id> ship  (--fresh, or --model <m>, for a new session)',
-      ),
-      '    check  npm test && npm run typecheck && npm run lint  →  exit 1 ✗',
-      ...shipBelow,
-      "  semantic  merges cleanly onto main, and ship's landing check refused the merged tree at <base>: a conflict of meaning, not of text",
-    ]);
-  });
+  await s.test(
+    "the whole screen of an ending whose check refused the merge, with the check's files, once a pass has read where its branch stands",
+    async (st) => {
+      assert.deepEqual(await checkedScreen(st, 1), [
+        ...workAbove(
+          '  FAILED CHECK: ship  — the run executed its check and it did not exit 0; nothing after it ran',
+          '    ship: failed (check) — nothing landed on main: its check refused the merge (exit 1). Land again, when what stopped it was not the work — a dirty checkout, a flaky test. Continue its session, told what happened:  nemia retry <id> ship  (--fresh, or --model <m>, for a new session)',
+        ),
+        '    check  npm test && npm run typecheck && npm run lint  →  exit 1 ✗',
+        ...shipBelow,
+        "  semantic  merges cleanly onto main, and ship's landing check refused the merged tree at <base>: a conflict of meaning, not of text",
+      ]);
+    },
+  );
 });
 
 test('a result a person merged by hand before its ending ran: the run has landed as git reads it, a run `--after` it starts, and every screen agrees', async (t) => {
@@ -1326,47 +1336,51 @@ test('two runs of one repository at their endings: the oldest approval takes the
     },
   );
 
-  await s.test('the whole screen of the run whose ending ended blocked, before it is sent back', async (st) => {
-    assert.deepEqual(await screenOf(st, two.second.id), [
-      '<second>  add sub',
-      '',
-      '  UNVERIFIED: implement  — no check: declared; only its own word says it worked',
-      '  BLOCKED, waiting on you: ship',
-      '',
-      '  once more, on the next tick:',
-      '    ship: blocked. Land again, when what stopped it was not the work — a dirty checkout, a flaky test. Continue its session, told what happened:  nemia retry <second> ship  (--fresh, or --model <m>, for a new session)',
-      '',
-      '  touched  wf/<second>/run',
-      '    (root)  1 file   +1 −0',
-      '  lesson  nothing written where the next agent reads',
-      '',
-      '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
-      '  none',
-      '',
-      '  implement',
-      '    used  not measured',
-      '    cost  not measured',
-      '    timeline  try 1  filed <t>  spawned <t>  ended <t>  queued 0s  ran 0s  used not measured',
-      '    did the work',
-      '',
-      '  ship  BLOCKED',
-      '    gate  approved 08:00Z',
-      '    used  not measured',
-      '    cost  not measured',
-      '    timeline  try 1  filed <t>  spawned <t>  ended <t>  queued 0s  ran 0s  used not measured',
-      '    the check refused',
-      '    !! declared and not given: message',
-      '    needs: read the suite',
-      '    to answer it:  nemia retry <second> ship --message "<answer>"',
-      '',
-      '  cost  run not measured',
-      '  timeline  run  queued 0s  ran 0s  wall 0s',
-      '',
-      '  wf/<second>/run  — 1 file: +1 −0',
-      '',
-      '  branch    wf/<second>/run is ahead of main by 1 commit',
-    ]);
-  });
+  await s.test(
+    'the whole screen of the run whose ending ended blocked, before it is sent back, once a pass has read where its branch stands',
+    async (st) => {
+      await at.aPass(e());
+      assert.deepEqual(await screenOf(st, two.second.id), [
+        '<second>  add sub',
+        '',
+        '  UNVERIFIED: implement  — no check: declared; only its own word says it worked',
+        '  BLOCKED, waiting on you: ship',
+        '',
+        '  once more, on the next tick:',
+        '    ship: blocked. Land again, when what stopped it was not the work — a dirty checkout, a flaky test. Continue its session, told what happened:  nemia retry <second> ship  (--fresh, or --model <m>, for a new session)',
+        '',
+        '  touched  wf/<second>/run',
+        '    (root)  1 file   +1 −0',
+        '  lesson  nothing written where the next agent reads',
+        '',
+        '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
+        '  none',
+        '',
+        '  implement',
+        '    used  not measured',
+        '    cost  not measured',
+        '    timeline  try 1  filed <t>  spawned <t>  ended <t>  queued 0s  ran 0s  used not measured',
+        '    did the work',
+        '',
+        '  ship  BLOCKED',
+        '    gate  approved 08:00Z',
+        '    used  not measured',
+        '    cost  not measured',
+        '    timeline  try 1  filed <t>  spawned <t>  ended <t>  queued 0s  ran 0s  used not measured',
+        '    the check refused',
+        '    !! declared and not given: message',
+        '    needs: read the suite',
+        '    to answer it:  nemia retry <second> ship --message "<answer>"',
+        '',
+        '  cost  run not measured',
+        '  timeline  run  queued 0s  ran 0s  wall 0s',
+        '',
+        '  wf/<second>/run  — 1 file: +1 −0',
+        '',
+        '  branch    wf/<second>/run is ahead of main by 1 commit',
+      ]);
+    },
+  );
 
   await s.test(
     "a try of an ending step waits for the checkout as its first filing does: a person's send-back of a ship that ended blocked files nothing while another run's ship is merging",
@@ -1504,14 +1518,18 @@ test('two runs of one repository land close together: each records the commit th
     assert.deepEqual(world().read(repo, mergedB).parents[0], mergedA);
   });
 
-  await s.test('the first check passes: its run records its own merge commit, not the base as it now stands', async () => {
-    const { repo, second: a } = two;
-    settle(`${a.id}-ship-check`, 'succeeded', undefined, 0);
-    await at.pass(a.id);
-    assert.deepEqual(runRecord(ROOT, a.id).steps.ship.landed, { commit: mergedA });
-    assert.equal(world().head(repo), mergedB, 'nothing committed by the run');
-    assert.equal((await stage.runWith(e(), decideRun(a.id))).decision.kind, 'landed');
-  });
+  await s.test(
+    'the first check passes: its run records its own merge commit, not the base as it now stands, and reads landed once a pass has read it',
+    async () => {
+      const { repo, second: a } = two;
+      settle(`${a.id}-ship-check`, 'succeeded', undefined, 0);
+      await at.pass(a.id);
+      assert.deepEqual(runRecord(ROOT, a.id).steps.ship.landed, { commit: mergedA });
+      assert.equal(world().head(repo), mergedB, 'nothing committed by the run');
+      await at.aPass(e());
+      assert.equal((await stage.runWith(e(), decideRun(a.id))).decision.kind, 'landed');
+    },
+  );
 
   await s.test('the other ending then takes the checkout, finds its result on the base, and records its own merge commit', async () => {
     const { repo, first: b } = two;
@@ -2280,10 +2298,11 @@ test('`nemia refresh --base` of the base into the work: refused where nothing co
   let refused: Awaited<ReturnType<typeof at.refusedOnBase>>;
 
   await s.test(
-    'nemia decide reads the semantic conflict live at an ending whose landing check refused the merged tree: clean as text, refused on the base as it is',
+    'nemia decide reads the semantic conflict off the last pass at an ending whose landing check refused the merged tree: clean as text, refused on the base as it is',
     async () => {
       refused = await at.refusedOnBase();
       const { id, base, checkId } = refused;
+      await at.aPass(e());
       const { collisions, toDecide } = await stage.runWith(e(), decideRun(id));
       assert.equal(toDecide?.kind === 'approve', false, 'the ending waits at no gate: it was filed, and its landing aborted');
       assert.deepEqual(collisions?.semantic, {

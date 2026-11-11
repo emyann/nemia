@@ -18,7 +18,7 @@
  * (`a2a/handler.ts`), which is why a restarted runtime answers at once.
  */
 import { Role, TaskState, type Artifact, type Message, type Part, type Task } from '@a2a-js/sdk';
-import { nameParts, type Attempt, type Sighting, type SessionState } from '../core/index.ts';
+import { endOf, nameParts, quote, type Attempt, type Sighting, type SessionState } from '../core/index.ts';
 import type { SpawnRequest } from '../harness/index.ts';
 
 /**
@@ -412,13 +412,41 @@ const partText = (p: Part): string => {
   return `(${c?.$case ?? 'empty'} part${p.filename ? ` ${p.filename}` : ''})`;
 };
 
-/** What a remote Task holds, as text a person reads: its messages in order, its state and status words, and its Artifacts. */
-export const logsOfTask = (t: Task): string => {
-  const said = (m: Message) => `${m.role === Role.ROLE_AGENT ? 'agent' : 'user'}: ${m.parts.map(partText).join(' ')}`;
+/** How many characters a remote agent's `logs` returns at most: the end of what it said, where its state and its last words are. */
+export const LOGS_CHARS = 8_000;
+
+/** How many characters of one part — a message, the status's words, an artifact — a remote agent's `logs` quotes. */
+export const LOG_PART_CHARS = 2_000;
+
+/** How many of a remote Task's latest messages its `logs` asks the agent for (GetTask's `historyLength`). */
+export const LOG_MESSAGES = 20;
+
+/** The first line of a remote agent's `logs` when anything of it was cut, and where the whole is. */
+export const LOGS_CUT =
+  "(cut: this is the end of what the agent said, each part and the whole bounded; the session's transcript holds the whole)";
+
+/**
+ * What a remote Task holds, as text a person reads, bounded: its messages in order, its Artifacts, then its state and status
+ * words, last, so that the end kept always says how it stands. Each part is quoted to `LOG_PART_CHARS`, and the whole kept to
+ * its last `LOGS_CHARS` under `LOGS_CUT` when anything was cut — a part, or a history as long as the `asked` messages, which
+ * the agent may have read from a longer one.
+ */
+export const logsOfTask = (t: Task, asked?: number): string => {
+  let cut = asked !== undefined && t.history.length >= asked;
+  const part = (text: string): string => {
+    if (text.length > LOG_PART_CHARS) cut = true;
+    return quote(text, LOG_PART_CHARS);
+  };
+  const words = (parts: Part[]) => parts.map((p) => part(partText(p))).join(' ');
+  const said = (m: Message) => `${m.role === Role.ROLE_AGENT ? 'agent' : 'user'}: ${words(m.parts)}`;
   const state = TaskState[t.status?.state ?? TaskState.TASK_STATE_UNSPECIFIED].replace(/^TASK_STATE_/, '');
-  return [
+  const text = [
     ...t.history.map(said),
-    `${state}${t.status?.message ? ` — ${t.status.message.parts.map(partText).join(' ')}` : ''}`,
-    ...t.artifacts.map((a) => `artifact ${a.name || a.artifactId}: ${a.parts.map(partText).join(' ')}`),
+    ...t.artifacts.map((a) => `artifact ${part(a.name || a.artifactId)}: ${words(a.parts)}`),
+    `${state}${t.status?.message ? ` — ${words(t.status.message.parts)}` : ''}`,
   ].join('\n');
+  return endOf(text, LOGS_CHARS, LOGS_CUT, cut);
 };
+
+/** A remote agent's reply, a Message that ended its session with no Task, as its `logs` reads it: bounded as a Task's are. */
+export const logsOfReply = (reply: string): string => endOf(`agent: ${reply}`, LOGS_CHARS, LOGS_CUT, false);

@@ -46,7 +46,8 @@ of a held session on its `system`/`init` message, and `bin/ae-claude-job.ts`, wh
 file beside the run (`bridgeDue`).
 
 **What is known.** `@anthropic-ai/claude-agent-sdk` declares no `enableRemoteControl` on its `Query` type — not on 0.3.270, and not
-on 0.3.316, where `sdk.d.ts` still has no such name and `sdk.mjs` still carries the method (re-read 2026-11-01 at the bump) — yet the object
+on 0.3.316 nor 0.3.322, where `sdk.d.ts` still has no such name and `sdk.mjs` still carries the method, its body unchanged (re-read
+2026-11-01 and 2026-11-11 at the bumps) — yet the object
 `query()` answers carries it: `enableRemoteControl(enabled, name?, { reattachSessionId?, keepSessionOnExit?, workSecret? })`, which
 sends a `remote_control` control request with `reattach_session_id` and `keep_session_on_exit` at its top level, answers the bridge's
 facts (`session_url`, `connect_url`, `environment_id`, `bridge_epoch`, `bridge_session_id`), and drives `system`/`bridge_state`
@@ -639,6 +640,15 @@ and one of them on a pass:
 
 The size itself is the lever not taken: a feed rotated on a size or an age, its sealed half kept for a cursor from before, would
 keep the disk and those reads bounded. Not changed with the reads, so a store's format stays as it is.
+
+### 41. A remote agent's ids are kept whole (2026-11-11)
+
+A remote Task's `id` and `contextId`, and an artifact's `artifactId`, are another party's words that the runtime keeps whole: in the
+registry entry, as the attempt's `nativeId` on the journal, and in the words that name the Task (`entry.ts`'s `forget`, the logs of a
+Task the agent no longer has). Everything else a remote agent sends is bounded where a sentence or a log says it (`quote` and
+`endOf`, `core/quote.ts`): its words on `logs`, a served card's keys and a late request's path. An id is not cut, since a later
+GetTask needs it whole, so its only bound would be a refusal, a Task whose id is over some length read as a failed send. Left as it
+is on the owner's decision: an id is the agent's own key, and an agent that floods it gains nothing.
 
 ## Verified live, once
 
@@ -1280,7 +1290,9 @@ the end).
   `permissionMode: auto`, and auto mode's classifier allowed M1's write outside the folder, its `curl` and its fetch, none denied
   and the file written. So M1's and M7's denied jobs are filed in `default`, the mode this record measured them in, and
   `CLAUDE_AUTO_DROPPED` no longer lists the `haiku` alias (2026-11-09): measured on 2.1.316 by the `init` line's `permissionMode`,
-  `haiku` keeps `auto`, while `claude-haiku-4-5` and `claude-sonnet-4-5` still say `default`, and stay listed.
+  `haiku` keeps `auto`, while `claude-haiku-4-5` and `claude-sonnet-4-5` still say `default`, and stay listed. Measured again on
+  2.1.322, 2026-11-11, model by model (`test/live-sdk.boundary.test.ts`): the same two say `default`, and `haiku`, `sonnet`, `opus`
+  and `fable` keep `auto`; the list is unchanged.
 - **M2: a resume's cost and API time are its session's.** Issue 4, narrowed.
 - **M3: `claude -p --resume` continues a `--bg` session**, under the same id, and remembered what it was told (a session
   stopped first). So a job may continue a background session, and the new attempt's mode is the job's.
@@ -1612,7 +1624,7 @@ it, and was refused at design (2026-10-23) as a second cost source drifting from
 bites.
 
 The step's spend cap holds across those processes as far as that total does. The SDK's `maxBudgetUsd` counts only the spend since
-its `query()` call started (`sdk.d.ts:6100-6103`), so `adopt` hands the resumed process the task's `config.budgetUsd` less what the
+its `query()` call started (`sdk.d.ts:6182-6185`), so `adopt` hands the resumed process the task's `config.budgetUsd` less what the
 attempt has spent so far by its capture (`capLeft`, `src/core/cap.ts`), the run file keeping the whole cap for the next
 take-up to count from; an attempt that has spent it all is not resumed, but ended `failed` with `limit: 'budget'` (the
 harness-updates intent, 2026-11-03). What is left is the same loss: a process killed outright spent what no total saved, so the cap

@@ -43,6 +43,7 @@ import {
   retryRun,
   roundRun,
   sayRun,
+  PERSON,
   startRun,
   unhold,
   WHY_CAP,
@@ -415,27 +416,30 @@ test('a run held until another lands: said by every screen with why and who, not
       b.settle(`${blocked.id}-implement`, 'succeeded', { ...SIGNED, outcome: 'blocked', needs: 'a word' });
       await tick(b, blocked.id);
       await assert.rejects(
-        stage.runWith(b.e, sayRun(blocked.id, 'implement', 'hello')),
+        stage.runWith(b.e, sayRun(blocked.id, 'implement', 'hello', { caller: PERSON })),
         (err: Error) => /: nemia retry /.test(err.message),
         'offered before the hold on a step that signed off blocked: settled, and the run not finished, so it may be held',
       );
       await stage.runWith(b.e, hold(blocked.id, [target.id]));
-      await assert.rejects(stage.runWith(b.e, sayRun(blocked.id, 'implement', 'hello')), (err: Error & { exitCode?: number }) => {
-        assert.equal(err.exitCode, 2);
-        names(err.message, `no try is filed while ${blocked.id} is held until ${target.id} lands`, `nemia hold ${blocked.id} --off`);
-        assert.doesNotMatch(err.message, VERBS);
-        return true;
-      });
+      await assert.rejects(
+        stage.runWith(b.e, sayRun(blocked.id, 'implement', 'hello', { caller: PERSON })),
+        (err: Error & { exitCode?: number }) => {
+          assert.equal(err.exitCode, 2);
+          names(err.message, `no try is filed while ${blocked.id} is held until ${target.id} lands`, `nemia hold ${blocked.id} --off`);
+          assert.doesNotMatch(err.message, VERBS);
+          return true;
+        },
+      );
       await stage.runWith(b.e, unhold(blocked.id));
       assert.equal((await stage.runWith(b.e, prune(done.id, { yes: true, unmerged: true }))).kind, 'pruned');
       await assert.rejects(
-        stage.runWith(b.e, sayRun(done.id, 'implement', 'hello')),
+        stage.runWith(b.e, sayRun(done.id, 'implement', 'hello', { caller: PERSON })),
         (err: Error) => /Nor is it tried again: .* was pruned at /.test(err.message) && !VERBS.test(err.message),
       );
     },
   );
   await s.test(
-    'the whole screen of a run held while its step runs, of one waiting --after another, alone and with a hold beside, and of one held until a run that was cancelled',
+    'the whole screen of a run held while its step runs, once a pass has read where the run it names stands, of one waiting --after another, alone and with a hold beside, and of one held until a run that was cancelled',
     async (sub) => {
       const parent = await aRunning(b, repo);
       const cancelled = await aRunning(b, repo);
@@ -444,6 +448,7 @@ test('a run held until another lands: said by every screen with why and who, not
       const going = await aRunning(b, repo);
       await stage.runWith(b.e, hold(going.id, [cancelled.id]));
       asOlder(going.id);
+      await aPass(b.e);
       assert.deepEqual(await decideScreen(sub, b.e, [going.id], { ...ids, '<id>': going.id }, place), [
         '<id>  still going',
         '',
@@ -961,9 +966,10 @@ async function outOfRounds(b: Board, repo = aRepo()) {
   return loop;
 }
 
-test('the whole screen of a loop out of rounds, and of the round a person asks for', async (t) => {
+test('the whole screen of a loop out of rounds, once a pass has read where its branch stands, and of the round a person asks for', async (t) => {
   const b = stage.board();
   const loop = await outOfRounds(b);
+  await aPass(b.e);
   const place = stage.place().place;
   assert.deepEqual(
     untimed(await decideScreen(t, b.e, [loop.id], { '<id>': loop.id, '<repo>': runRecord(ROOT, loop.id).repo!, '<root>': ROOT }, place)),
@@ -1018,7 +1024,7 @@ test('the whole screen of a loop out of rounds, and of the round a person asks f
   ]);
 });
 
-test('the whole screen of a loop a person accepted as it stands', async (t) => {
+test('the whole screen of a loop a person accepted as it stands, once a pass has read where its branch stands', async (t) => {
   const b = stage.board();
   const loop = await outOfRounds(b);
   committed(runRecord(ROOT, loop.id).steps.implement.workspace!, 'loop.ts');
@@ -1028,6 +1034,7 @@ test('the whole screen of a loop a person accepted as it stands', async (t) => {
   const file = path.join(asks, accepted);
   fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), at: '2026-09-17T08:00:00.000Z' }));
   await tick(b, loop.id);
+  await aPass(b.e);
   const place = stage.place().place;
   assert.deepEqual(
     untimed(await decideScreen(t, b.e, [loop.id], { '<id>': loop.id, '<repo>': runRecord(ROOT, loop.id).repo!, '<root>': ROOT }, place)),

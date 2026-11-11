@@ -1,5 +1,5 @@
 /**
- * Which of a run's result branches its one judgement asks where they stand (agent-orchestrator, src/summary/judged.verb.ts,
+ * Which of a run's result branches its one judgement asks where they stand (agent-orchestrator, src/branches/branches.ts,
  * `branchesAsked`): what the run object, the runs list, the tick's informer and `nemia decide` all read a run's standings, its
  * `toDecide` and its decision off, so none of them reads a branch another does not. It replaces `toDecideBranches`, which asked only a
  * succeeded run with no merging step, while `nemia decide` asked every result branch of a run neither running nor called off: an ending
@@ -52,7 +52,7 @@ const branchesAskedSpec = spec<(r: RunAsked) => readonly string[]>({
     },
     eachOnce: {
       description: 'Each branch is asked of once, though two result steps name it',
-      condition: ({ output }) => output.every((b, i) => output.indexOf(b) === i),
+      condition: ({ output }) => output.every((b, i) => !output.slice(0, i).includes(b)),
     },
   },
 });

@@ -214,7 +214,7 @@ const readers = async (id: string, { pass: passFirst = true } = {}): Promise<Rec
       tries: triesOn(decided.timeline.steps),
     },
     decision: {
-      landed: 'nothing' in read && read.nothing.startsWith('landed'),
+      landed: 'nothing' in read && Boolean(read.nothing?.startsWith('landed')),
       waitingOn: sorted('waiting' in read ? read.waiting.runs.map((w) => w.run) : []),
       ...('standings' in read ? { checkout: read.baseHeldBy?.run ?? null } : {}),
     },

@@ -7,7 +7,8 @@
  * Beneath the controllers, beside `record.store.ts`, handed a run's steps by the program that read them (`stepsOf`): it imports neither
  * the engine nor a controller, and `runner.ts` re-exports most of what it exports.
  */
-import { resultSteps } from './branches.ts';
+import { askedOf, branchesAsked, resultSteps } from './branches.ts';
+import type { Assessment } from '../tick/assess.ts';
 import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';
 import type { BranchStanding } from '../status/status.ts';
 import type { Landed } from '../decide/decide.ts';
@@ -16,6 +17,18 @@ import type { StepSpec } from '../workflow.ts';
 /** Where a run's result branches stand, as `branchStandings` says: none for a folder run, which has no branch. */
 export const standingsOf = (run: Run, steps: readonly StepSpec[], git: BranchReader): BranchStanding[] =>
   isRepositoryRun(run) ? branchStandings(run, resultBranches(run, steps), git) : [];
+
+/**
+ * Where the result branches a run's reading asks of stand (`branchesAsked`, off `status`, `assess`'s), as `git` says: what the tick's
+ * pass, the judgement and `nemia decide` read a run's standings off. None for a folder run, nor for one running, called off, or that worked
+ * on its base branch itself.
+ */
+export const askedStandings = (
+  run: Run,
+  steps: readonly StepSpec[],
+  status: Assessment['status'],
+  git: BranchReader,
+): BranchStanding[] => (isRepositoryRun(run) ? branchStandings(run, branchesAsked(askedOf(run, steps, status)), git) : []);
 
 /** Whether a branch of the run is on its base, as `git` says: never, for a folder run, which has no branch to ask about. */
 export const landedOf =

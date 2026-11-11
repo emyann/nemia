@@ -24,7 +24,8 @@ import { selectedRuns } from '../labels/labels.ts';
 import type { Selectors } from '../watch/selector.ts';
 import { unloadedFolder } from '../steps/steps.ts';
 import { stepsAmong, stepsOf } from '../steps/steps.verb.ts';
-import { resultBranches, standingsOf, type BranchReader } from '../branches/branches.store.ts';
+import { askedStandings, landedOf, resultBranches, type BranchReader } from '../branches/branches.store.ts';
+import { decision, type Decision } from '../decide/decide.ts';
 import { headsOver, standingReader, standingSnapshot, type PassStanding } from '../standing/standing.verb.ts';
 import { daemonStanding } from '../daemon/daemon.store.ts';
 import { schedulesListed } from '../factory/schedule/listed.store.ts';
@@ -41,7 +42,7 @@ import {
 } from '../views/views.verb.ts';
 import { engineWord, killedMemoryOf, parkedOf } from '../views/views-words.ts';
 import { checkoutHold } from '../ending/ending.verb.ts';
-import { readRun } from '../tick/told.verb.ts';
+import { readRun, type RunRead } from '../tick/told.verb.ts';
 import { landsOnCheck } from '../status/status.ts';
 import { mergeStaged, statusMemo } from '../place/landing.store.ts';
 import { PlaceService } from '../place/place.store.ts';
@@ -55,8 +56,8 @@ import { currentTasks, finishingAmong, parkedAmong, type Pause, type Paused, typ
  * @param views The engine's view of every task the run filed, an earlier try's included; left out, read one by one (`taskPhasesRead`).
  * @param steps The steps the run is judged by; left out, its frozen workflow (`stepsOf`).
  * @param shown The steps listed, a line each; left out, `steps`.
- * @param standings Where each result branch stands against the base branch, asked once the run's status is known; left out, every result
- *   branch of the run, as `git` reads it (`standingsOf`).
+ * @param standings Where each result branch stands against the base branch, asked once the run's status is known; left out, the result
+ *   branches the tick's pass reads (`askedStandings`, `branchesAsked`), as `git` reads them.
  * @param slot The cap on runs in flight holding this run (`runSlots`), said where `waiting` would be; left out, none.
  * @param checkout Where the branches stand, as `git` was read off it, to read the run whose `workspace: base` step holds the repository's
  *   own checkout over (`checkoutHold`), as the pass reads it; left out, the tick's last reading (`standingSnapshot`), read only where the
@@ -86,10 +87,14 @@ export type ListReadingHow = {
 /**
  * A run as the package reads it once (`listReading`): what `nemia ls` lists (`Listing`) and what `assess` says of the run on the same
  * inputs (`assessed`) — with `assessOf` to ask it again of the record as it would stand (a hold lifted), each task's phase as the tick
- * reads it (`phaseOf`), the asks that carried a message (`answers`), what each task cost (`spendOf`), and the whole run's spend (`spend`).
+ * reads it (`phaseOf`), the asks that carried a message (`answers`), what each task cost (`spendOf`), and the whole run's spend (`spend`);
+ * the run's one read it assessed, with its checkout and standings (`read`), and what is left for a person to do about it on the same
+ * read (`decision`), each branch on the base or not as `git` says it (`landedOf`): what `nemia decide` answers from.
  */
 export type ListReading = Listing & {
   assessed: Assessment;
+  read: RunRead;
+  decision: Decision;
   assessOf: (on: Run) => Assessment;
   phaseOf: (taskId: string) => TaskPhase;
   answers: readonly RetryAsk[];
@@ -117,9 +122,11 @@ export const listReading = Effect.fnUntraced(function* (e: Engine, run: Run, how
   const standing = how.checkout ? Effect.succeed(how.checkout) : standingSnapshot();
   const checkout = yield* checkoutHold(home, e, run, steps, { standing }, how.config ?? (yield* StoreConfig), memo);
   const held = { ...base, checkout };
-  const standings = how.standings ? how.standings(assess(held).status, steps) : standingsOf(run, steps, git);
+  const status = assess(held).status;
+  const standings = how.standings ? how.standings(status, steps) : askedStandings(run, steps, status, git);
   const read = { ...held, standings };
   const assessed = assess(read);
+  const decided = decision(read, landedOf(run, git), assessed);
   const assessOf = (on: Run): Assessment => assess({ ...read, run: on });
   const parent = how.parent ?? (yield* parentsRead(run, git).pipe(over(e)));
   const scripted = base.signedOff;
@@ -141,7 +148,17 @@ export const listReading = Effect.fnUntraced(function* (e: Engine, run: Run, how
     memoryOf: (taskId) => killedMemoryOf(views.get(taskId)),
     holds: holdsOf(run, parent),
   });
-  return { ...listed, assessed, assessOf, phaseOf, answers, spendOf, spend: runSpend(run, spendOf) } satisfies ListReading;
+  return {
+    ...listed,
+    assessed,
+    read,
+    decision: decided,
+    assessOf,
+    phaseOf,
+    answers,
+    spendOf,
+    spend: runSpend(run, spendOf),
+  } satisfies ListReading;
 });
 
 /**

@@ -108,9 +108,12 @@ export const restingOf = Effect.fnUntraced(function* (e: Engine, { run, judged, 
   return [...(yield* viewsOf(run, seenBy(e, views))).values()].every((view) => view.state.settled);
 });
 
-/** What two judgements of a run are compared by under `WF_VERIFY_REST`: everything but the functions the judgement carries. */
+/**
+ * What two judgements of a run are compared by under `WF_VERIFY_REST`: everything but the functions the judgement carries — its spend
+ * reader, and the read it was made on, whose views and standings are compared already, through `views` and what was decided on them.
+ */
 const comparable = ({ run, names, steps, views, judged, asked }: Judgement) => {
-  const { spendOf: _, ...said } = judged;
+  const { spendOf: _, read: __, ...said } = judged;
   return { run: JSON.stringify(run), names, steps, views: runTasks(run).map((id) => views.get(id)), said, asked };
 };
 

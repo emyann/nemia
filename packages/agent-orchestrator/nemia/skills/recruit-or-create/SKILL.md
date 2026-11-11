@@ -7,6 +7,9 @@ description: Find an agent for a step — search the person's own places, read e
 A step needs an agent who can do its work. The person may already have one, in a repository the store knows or in their library: recruit
 it rather than write it again. When none fits, write one with them.
 
+A line here written `nemia <verb> …` names the verb `<verb>`: at a shell, type it as written; on the MCP port, call its tool, whose
+schema says its arguments. The `verbs` skill names each verb's tools, and which run at a shell alone.
+
 ## When
 
 - A step has no hire, or the person wants to replace the one it has.

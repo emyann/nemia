@@ -5,7 +5,9 @@
  * step's gate alone (`gateWordsIn`), but in her generated verbs skill, whose words are the command table's. Her skills and her instruction
  * keep their sections (`SECTIONS`), and the facts of her memory are said by the same names in each file that writes or reads them
  * (`FACTS`). Where her instruction tells her to act on a line of the feed, it names the words that line shows her (`feedLineWords`)
- * beside the reason her selector asks for. Its wording is judged by a person at the landing step; this holds only what it names.
+ * beside the reason her selector asks for. Her plugin's agent is the file the keeper reads (`nemiaDefinition`), and its one server is the
+ * store's MCP port, read from the person's environment (`serverBreaks`). Its wording is judged by a person at the landing step; this
+ * holds only what it names.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,6 +18,7 @@ import { FORMER_TEAM } from './team-names.baseline.ts';
 import { DENIED, feedLineWords, upgraded } from '../src/feed/index.ts';
 import { skillFolders, skillRead } from '../src/skills/skills.store.ts';
 import { WAITS_ON_PERSON } from '../src/retry/waits.ts';
+import { SHIPPED_NEMIA, nemiaDefinition } from '../src/nemia/level.store.ts';
 
 const SHIPPED = path.join(import.meta.dirname, '..', 'nemia');
 
@@ -64,9 +67,9 @@ test("what ships with Nemia names no agent of this repository's team, no doc of 
 test('REFUSED: a skill of hers that names an agent of the team, or the playbook, is named', () => {
   const files = new Map([
     ['skills/x/SKILL.md', `Commission ${TEAM[0].toUpperCase()} to read the stats.`],
-    ['nemia.md', 'Follow docs/playbook-operator.md.'],
+    ['agents/nemia.md', 'Follow docs/playbook-operator.md.'],
   ]);
-  assert.deepEqual(oursIn(files), [`skills/x/SKILL.md: ${TEAM[0]}`, 'nemia.md: playbook-operator']);
+  assert.deepEqual(oursIn(files), [`skills/x/SKILL.md: ${TEAM[0]}`, 'agents/nemia.md: playbook-operator']);
 });
 
 test("REFUSED: a skill of hers that says the owner's settings is named for each", () => {
@@ -84,7 +87,7 @@ test('each skill her instruction and her skills name ships under nemia/skills/, 
     const at = /^skills\/([^/]+)\/SKILL\.md$/.exec(file);
     if (at) assert.match(text, new RegExp(`^---\\nname: ${at[1]}\\n`), file);
   }
-  assert.deepEqual(skillsNamed(new Map([['nemia.md', 'use the `grant-access` skill']])), ['nemia.md: grant-access']);
+  assert.deepEqual(skillsNamed(new Map([['agents/nemia.md', 'use the `grant-access` skill']])), ['agents/nemia.md: grant-access']);
 });
 
 /** The phrases that name a step's gate: its key, its flag, a step at its gate, any step's gate, a step gated at one. */
@@ -103,7 +106,7 @@ const gateWordsIn = (files: Map<string, string>): string[] =>
 test('what ships with Nemia, and this factory\'s instruction to her, say "gate" only for a step\'s gate, but in her generated verbs skill', () => {
   const files = shipped();
   files.delete('skills/verbs/SKILL.md');
-  assert.ok(files.has('nemia.md') && files.has('skills/bring-what-waits/SKILL.md'), 'her instruction and her skills are read');
+  assert.ok(files.has('agents/nemia.md') && files.has('skills/bring-what-waits/SKILL.md'), 'her instruction and her skills are read');
   files.set('NEMIA.md', fs.readFileSync(path.join(REPO, 'NEMIA.md'), 'utf8'));
   assert.deepEqual(gateWordsIn(files), []);
 });
@@ -158,7 +161,7 @@ test('each reason a try waits on the person for has a section of bring-what-wait
 const SECTIONS: Record<string, string[]> = {
   'skills/recruit-or-create/SKILL.md': ['When', 'Search', 'Read each against the need', 'Propose', 'Recruit', 'Create'],
   'skills/first-meeting/SKILL.md': ['When', 'Introduce yourself', 'The offer', 'Never unasked'],
-  'nemia.md': ['What you learn of the person'],
+  'agents/nemia.md': ['What you learn of the person'],
   'skills/bring-what-waits/SKILL.md': ["A factory's upgrade", "A factory's takeover"],
 };
 
@@ -187,7 +190,7 @@ test('REFUSED: a first-meeting with a section dropped and another renamed is nam
 
 /** The facts of her memory each of these files names, by its path under `nemia/`, each said in backticks. */
 const FACTS: Record<string, string[]> = {
-  'nemia.md': ['met', 'language', 'time-zone', 'cost-line'],
+  'agents/nemia.md': ['met', 'language', 'time-zone', 'cost-line'],
   'skills/first-meeting/SKILL.md': ['met'],
   'skills/write-a-card/SKILL.md': ['cost-line'],
   'skills/recap/SKILL.md': ['feed-cursor'],
@@ -260,11 +263,54 @@ test('her instruction names both the word a denial shows her and the reason her 
     'the message that wakes her carries the word and the call, and no reason field',
   );
   assert.equal(DENIAL.reason, 'ToolDenied', 'the reason is hers to select on, not hers to read');
-  assert.deepEqual(unnamedWords(shipped().get('nemia.md') ?? '', [DENIED.trim(), 'ToolDenied']), []);
+  assert.deepEqual(unnamedWords(shipped().get('agents/nemia.md') ?? '', [DENIED.trim(), 'ToolDenied']), []);
 });
 
 test('REFUSED: an instruction that names the reason alone, and not the word the message shows, is named for it', () => {
   const only = 'When a line’s reason is `ToolDenied`, read it with the `grant-access` skill.';
   assert.deepEqual(unnamedWords(only, [DENIED.trim(), 'ToolDenied']), [DENIED.trim()]);
   assert.deepEqual(unnamedWords(`${only} A line says \`denied:\` and the call.`, [DENIED.trim(), 'ToolDenied']), []);
+});
+
+test("her plugin's agent is the file the keeper reads, and the only agent it ships", () => {
+  assert.equal(SHIPPED_NEMIA, SHIPPED, 'the keeper reads the shipped plugin');
+  assert.equal(nemiaDefinition(), path.join(SHIPPED, 'agents', 'nemia.md'));
+  assert.deepEqual(
+    [...shipped().keys()].filter((file) => file.startsWith('agents/') || (file.endsWith('.md') && !file.startsWith('skills/'))),
+    ['agents/nemia.md'],
+  );
+});
+
+/**
+ * Where a plugin's `.mcp.json` text breaks what her port's entry is: one server, `nemia`, of `type: "http"`, its url `${NEMIA_URL}` (a
+ * default allowed) then `/mcp`, and its `Authorization` header `Bearer ${NEMIA_TOKEN}`, nothing of the store's written in: a line each.
+ */
+const serverBreaks = (text: string): string[] => {
+  const servers = (JSON.parse(text) as { mcpServers?: Record<string, Record<string, unknown>> }).mcpServers ?? {};
+  const names = Object.keys(servers);
+  if (names.length !== 1 || names[0] !== 'nemia') return [`servers: ${names.join(', ') || 'none'}`];
+  const { type, url, headers } = servers.nemia;
+  const breaks: string[] = [];
+  if (type !== 'http') breaks.push(`type: ${String(type)}`);
+  if (typeof url !== 'string' || !/^\$\{NEMIA_URL(?::-[^}]+)?\}\/mcp$/.test(url)) breaks.push(`url: ${String(url)}`);
+  if (JSON.stringify(headers) !== JSON.stringify({ Authorization: 'Bearer ${NEMIA_TOKEN}' }))
+    breaks.push(`headers: ${JSON.stringify(headers)}`);
+  return breaks;
+};
+
+test("her plugin's one server is the store's MCP port, its address and token read from the person's environment", () => {
+  const text = shipped().get('.mcp.json');
+  assert.ok(text !== undefined, 'the plugin ships .mcp.json at its root');
+  assert.deepEqual(serverBreaks(text), []);
+});
+
+test('REFUSED: a server entry with a written address, a written token or a second server is named for each', () => {
+  const entry = (nemia: Record<string, unknown>, more = {}) => JSON.stringify({ mcpServers: { nemia, ...more } });
+  assert.deepEqual(serverBreaks(entry({ type: 'sse', url: 'http://127.0.0.1:8787/mcp', headers: { Authorization: 'Bearer nm_1234' } })), [
+    'type: sse',
+    'url: http://127.0.0.1:8787/mcp',
+    'headers: {"Authorization":"Bearer nm_1234"}',
+  ]);
+  assert.deepEqual(serverBreaks(entry({ type: 'http', url: '${NEMIA_URL}/mcp', headers: {} }, { other: {} })), ['servers: nemia, other']);
+  assert.deepEqual(serverBreaks(entry({ type: 'http', url: '${NEMIA_URL}/mcp', headers: { Authorization: 'Bearer ${NEMIA_TOKEN}' } })), []);
 });

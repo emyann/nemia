@@ -2446,7 +2446,7 @@ and every write she proposes is asked of the person at a prompt, over Remote Con
   unsubscribe nemia` are refused, pointing to `nemia level` (`Conflict`).
 - **`nemia memory [<fact>]`** (`src/nemia/memory.verb.ts`, also `GET /api/nemia/memory[/:fact]`) lists the facts she keeps in
   `$WF_ROOT/nemia/memory/`, or prints one; read-only, so she stays its one writer.
-- **What she is ships in `packages/agent-orchestrator/nemia/`**: `nemia.md` (her instruction, her allow list of read verbs and her deny
+- **What she is ships in `packages/agent-orchestrator/nemia/`**: `agents/nemia.md` (her instruction, her allow list of read verbs and her deny
   list: push, a forced branch delete, a merge, a kill by name, a pull request or release by `gh`, `browser_run_code_unsafe`), and her
   skills: at 5b `recap`, bring-a-gate, `grant-access` and `commission-a-workflow`; card B's (below) are today's. A factory's instruction (`NEMIA.md`) is what she reads
   before acting there, and no step is told it; this repository's is `NEMIA.md` at its root. What every agent hired into a factory is
@@ -2531,7 +2531,7 @@ reaches her open long-lived session within one keeper beat, through the runtime'
   reads them too, and the words recorded as told. A refused `say` writes nothing, and `sayCustom` is owed again on the next beat.
 - **Said in its words**: `nemia agents custom nemia` prints that her open session is told at the keeper's next beat, where a hired
   agent's says a run already started keeps its words; the board's panel says a save or a clear is told to her open session.
-- **Her instruction** (`nemia/nemia.md`) says that what the keeper says of a change replaces the words she was started with.
+- **Her instruction** (`nemia/agents/nemia.md`) says that what the keeper says of a change replaces the words she was started with.
 
 Tested in `src/nemia/nemia.test.ts` (a `sayCustom` owed in `kept` alone; its words; the edge drawn), `src/nemia/keep.verb.test.ts` (told once
 to her open task, never by a filing or a stop, and a clear; a refused `say`; words that do not read; her shipped instruction changed alone; a session kept before the record), `test/nemia-told.test.ts` (on
@@ -2541,7 +2541,7 @@ the runtime: the words in her live session's inbox, one attempt, never stopped),
 ## Shipped: at Semi-auto, only what waits on the person prompts
 
 Card A of the third Nemia amendment: every command of the table is classed once by who answers for it when an agent calls it, and her
-fence is derived from the class, with no hand list in `nemia/nemia.md`.
+fence is derived from the class, with no hand list in `nemia/agents/nemia.md`.
 
 - **The class** (`class` on each entry, `src/admission/class.ts`): `read`, `act` (a write run unasked), `ask` (a write that cannot be
   undone or changes the person's settings or a factory), `answer` (to what waits: a gate, a step's question, a loop out of rounds, a

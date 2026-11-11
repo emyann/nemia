@@ -10,6 +10,9 @@ denial is one line, however many passes read it, and a call refused twice is two
 it runs says them only at the end. The fence is its agent's: what it may call unasked (`allowedTools:`), what it may never call (`disallowedTools:`), the tools it is given at all
 (`tools:`), and the folders it may write. Each list sits under the block of the harness the agent runs on, in its frontmatter:
 
+A line here written `nemia <verb> …` names the verb `<verb>`: at a shell, type it as written; on the MCP port, call its tool, whose
+schema says its arguments. The `verbs` skill names each verb's tools, and which run at a shell alone.
+
 ```yaml
 claude:
   fence:
